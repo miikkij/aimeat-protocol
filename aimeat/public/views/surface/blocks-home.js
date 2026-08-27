@@ -12,10 +12,14 @@
  *
  *   WHAT THIS CHANGES IS WHEN THINGS ARE READ. The old home ran eleven requests through one loader
  *   and re-ran all eleven on any SSE event whatsoever. Here a mailbox arriving re-reads the mailbox.
- * @structure NameplateBlock · MatBlock · MailboxBlock · ChatDoorBlock · FleetBlock · ThingsBlock ·
- *   PlaybooksBlock · AchievementsBlock · FeedBlock · OpenItemsBlock · InstallCtaBlock · TrustBlock · StepsBlock
+ * @structure NameplateBlock · McpConnectBlock · MatBlock · MailboxBlock · ChatDoorBlock · FleetBlock ·
+ *   ThingsBlock · PlaybooksBlock · AchievementsBlock · FeedBlock · OpenItemsBlock · InstallCtaBlock ·
+ *   TrustBlock · StepsBlock
  * @usage Reached through views/surface/block-map.js, never imported directly by a view.
  * @version-history
+ *   v1.1.0 — 2026-08-27 — McpConnectBlock, and the mcp- platform-name shaping it shares with
+ *     ChatDoorBlock lifted into one function: useShared caches by key and shapes at read time, so
+ *     two blocks on '/v1/chat-instances' with two different shapes would race.
  *   v1.0.0 — 2026-08-26 — Initial.
  */
 import { h } from 'preact';
@@ -33,6 +37,7 @@ import { HomeHeader } from '/views/home/header.js';
 import { HomeFeed } from '/views/home/feed.js';
 import { OpenItemsList } from '/components/OpenItemsList.js';
 import { InstallCta } from '/components/InstallCta.js';
+import { McpQuickConnect } from '/components/McpInstall.js';
 import { listApps } from '/js/services/apps.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -80,14 +85,38 @@ export function FleetBlock() {
   return html`<${FleetLine} agent=${state.agent} />`;
 }
 
+/**
+ * Which AIs have ever opened an MCP session here, by the name of the app they run in.
+ *
+ * ONE function, shared by the two blocks that ask, because useShared caches by KEY and applies the
+ * shaping at read time: two blocks on one key with two different shapes would hand whichever
+ * mounted second the other's answer.
+ */
+const mcpPlatformNames = (d) => [...new Set((d?.chat_instances ?? [])
+  .filter((i) => String(i.id || '').startsWith('mcp-'))
+  .map((i) => String(i.platform || '').replace(/^mcp-/, '')).filter(Boolean)
+  .map((p) => p.charAt(0).toUpperCase() + p.slice(1)))];
+
 export function ChatDoorBlock() {
   const { data: chatStatus } = useShared('chat-status', '/v1/chat/status', ['chat']);
-  const { data: instances } = useShared('chat-instances', '/v1/chat-instances', ['instances'],
-    (d) => [...new Set((d?.chat_instances ?? [])
-      .filter((i) => String(i.id || '').startsWith('mcp-'))
-      .map((i) => String(i.platform || '').replace(/^mcp-/, '')).filter(Boolean)
-      .map((p) => p.charAt(0).toUpperCase() + p.slice(1)))]);
+  const { data: instances } = useShared('chat-instances', '/v1/chat-instances', ['instances'], mcpPlatformNames);
   return html`<${ChatDoor} chatStatus=${chatStatus} mcpNames=${instances ?? []} />`;
+}
+
+/**
+ * The short way into an MCP connection, on the home of an account that has none.
+ *
+ * The gate is the connection record itself, not a step anybody ticked: the moment any AI opens a
+ * session here the card is gone, and it cannot linger claiming work that is already done. While the
+ * read is still out (`ready` false) it draws nothing, so a connected account never sees this flash
+ * up and vanish on every page load.
+ */
+export function McpConnectBlock() {
+  const { data: mcpNames, ready } = useShared('chat-instances', '/v1/chat-instances', ['instances'], mcpPlatformNames);
+  if (!ready || (mcpNames ?? []).length) return null;
+  return html`<${McpQuickConnect}
+    title=${tr('mcpInstall.homeTitle', 'No AI is connected here yet')}
+    lead=${tr('mcpInstall.homeLead', 'Everything here is meant to be run from the chat you already use. One link, or one file, and your AI can read and write what you know.')} />`;
 }
 
 /**

@@ -14,6 +14,9 @@
  * @structure McpSetupGuide() · InstructionsDialog({ open, onClose })
  * @usage import { McpSetupGuide, InstructionsDialog } from '/views/profile/ai-setup-guide.js';
  * @version-history
+ *   v2.2.0 — 2026-08-27 — The short way in (McpInstallRow) renders above the steps for the three
+ *     clients that have one, and the module-level table cache moved to ai-tool-setup.js so the
+ *     install shortcuts elsewhere on the page share this read instead of opening a second.
  *   v2.0.0 — 2026-07-31 — Table fetched from GET /v1/ai-tools instead of an in-SPA copy, so
  *     the Experience Center reads the same one.
  *   v1.0.0 — 2026-07-31 — Initial.
@@ -24,11 +27,12 @@
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
-import { t, getLocale } from '/js/i18n.js';
+import { t } from '/js/i18n.js';
 import { Modal } from '/components/Modal.js';
 import { CopyButton } from '/components/CopyButton.js';
-import { fetchAiTools } from '/views/profile/ai-tool-setup.js';
+import { useAiTools } from '/views/profile/ai-tool-setup.js';
 import { InstructionBlock } from '/views/profile/instruction-block.js';
+import { McpInstallRow } from '/components/McpInstall.js';
 import { getOrganismsTab } from '/js/services/organisms.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -40,34 +44,6 @@ const rememberedTool = () => {
   // eslint-disable-next-line aimeat/no-silent-catch -- blocked storage means "no remembered choice", which is the same answer as an empty slot; the caller falls back to the first tool either way
   try { return localStorage.getItem(LAST_TOOL_KEY) || ''; } catch { return ''; }
 };
-
-/**
- * The table, fetched once per language and shared by both surfaces. A module-level promise rather
- * than per-component state: the dialog and the Hello MCP panel can be on screen together, and the
- * table is the same answer for both.
- */
-const cache = new Map();
-function loadTools(lang) {
-  if (!cache.has(lang)) cache.set(lang, fetchAiTools(lang).catch((err) => { swallowed('ai-setup-guide: tools', err); return []; }));
-  return cache.get(lang);
-}
-
-/** Everything below renders nothing until the table arrives; there is no local copy to fall back to. */
-function useTools() {
-  const [tools, setTools] = useState(null);
-  const [lang, setLang] = useState(getLocale());
-  useEffect(() => {
-    const onLang = () => setLang(getLocale());
-    window.addEventListener('lang-change', onLang);
-    return () => window.removeEventListener('lang-change', onLang);
-  }, []);
-  useEffect(() => {
-    let cancelled = false;
-    loadTools(lang).then(list => { if (!cancelled) setTools(list); });
-    return () => { cancelled = true; };
-  }, [lang]);
-  return tools;
-}
 
 const pickTool = (tools, id) => tools.find(x => x.id === id) || tools[0];
 
@@ -110,7 +86,7 @@ function Params({ params }) {
  * and the vendor's own page.
  */
 export function McpSetupGuide() {
-  const tools = useTools();
+  const tools = useAiTools();
   const [toolId, setToolId] = useState(rememberedTool);
   const pick = (id) => {
     setToolId(id);
@@ -126,6 +102,10 @@ export function McpSetupGuide() {
     <div class="ast">
       <p class="ast-lead">${tr('setup.pickTool', 'Which AI tool are you connecting? The steps differ enough that the general version is not usable.')}</p>
       <${ToolPicker} tools=${tools} value=${tool.id} onPick=${pick} />
+
+      <!-- The short way in comes first, and removes none of the steps below it: a one-click link is
+           blocked on a managed machine and does nothing where the client is not installed. -->
+      <${McpInstallRow} tool=${tool} />
 
       ${tool.mcp.plans ? html`<p class="ast-plans">${tool.mcp.plans}</p>` : null}
       ${tool.mcp.warn ? html`<p class="ast-warn">${tool.mcp.warn}</p>` : null}
@@ -156,7 +136,7 @@ export function McpSetupGuide() {
  * two questions that arrive together: what do I paste, and where does it go in MY tool.
  */
 export function InstructionsDialog({ open, onClose }) {
-  const tools = useTools();
+  const tools = useAiTools();
   const [toolId, setToolId] = useState(rememberedTool);
   const [orgs, setOrgs] = useState(null);
   const [orgId, setOrgId] = useState('');

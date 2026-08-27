@@ -9,6 +9,11 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   v1.10.0 — 2026-08-27 — Mount connectInstallRouter (GET /v1/connect/mcp.json — the downloadable
+ *     MCP config file, so a client can be attached without walking its settings menu). To make room
+ *     for it: pure extraction of the process-level buffers and listeners to process-buffers.ts.
+ *     None of it mounted a route, and the file was at 799 of 800 lines, where no router could be
+ *     added at all. Same calls, same order, still ahead of route mounting.
  *   v1.9.0 — 2026-08-22 — Pure extraction of the background-job startup to background-jobs.ts.
  *     None of it mounted a route, and the file had reached the 800-line ceiling where the next
  *     router could not be added at all. Also mounts settingsProactiveRouter.
@@ -198,12 +203,12 @@ import { skillsRouter } from '../routes/skills.js';
 import { webmcpRouter } from '../routes/webmcp.js';
 import { agentOnboardingRouter } from '../routes/agent-onboarding.js';
 import { connectTunnelRouter } from '../routes/connect-tunnel.js';
+import { connectInstallRouter } from '../routes/connect-install.js';
 import { subdomainServeRouter } from '../routes/subdomains.js';
 import { subdomainAdminRouter } from '../routes/subdomain-admin.js';
 import { appsBackupRouter } from '../routes/apps-backup.js';
 
 // Services needed during route mounting
-import { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
 import { createPushService } from '../services/push.js';
 import { setNotifyPushService } from '../services/notify.js';
 import { createEudiwService } from '../services/eudiw.js';
@@ -218,16 +223,8 @@ import { startSiteSyncJob, triggerSiteSync } from '../services/site-sync.js';
 import { startMatchNotificationJob } from '../services/match-notification.js';
 import { createMatchingEngine, startMatchingScheduler } from '../services/matching.js';
 import { createGenesisPeeringService } from '../services/genesis-peering.js';
-import { onChangeEvent } from '../services/event-bus.js';
 import { startBackgroundJobs } from './background-jobs.js';
-import { invalidateTag } from '../services/cache.js';
-import { parseGaiiLoose } from '../utils/gaii.js';
-import { initStats } from '../services/stats.js';
-import { configureAuthAudit } from '../services/auth-audit.js';
-import { initTelemetryBuffer } from '../services/telemetry-buffer.js';
-import { initUsageBuffer } from '../services/usage/usage-buffer.js';
-import { initWriteTallyBuffer } from '../services/data-map/write-tally-buffer.js';
-import { initConsentAuditBuffer } from '../services/consent-audit-buffer.js';
+import { initProcessBuffers } from './process-buffers.js';
 import { createMetricsRegistry } from '../services/prometheus.js';
 import { metricsMiddleware } from '../middleware/metrics.js';
 
@@ -270,41 +267,10 @@ export async function mountRoutes(
     scheduler, workflowEngine, invalidateHasOwnersCache,
   } = opts;
 
-  // Webhook dispatcher for agent push notifications
-  const webhookDispatcher = createWebhookDispatcher({ config, storage });
-
-  // Statistics collector (with persistence via storage)
-  const stats = await initStats(storage);
-
-  // The refusal log. Wired before any route exists, because the first thing a node does on a public
-  // address is refuse somebody, and the point of this file is that those refusals are not lost.
-  configureAuthAudit(config);
-
-  // In-memory accumulator for high-frequency agent signals (telemetry + heartbeat),
-  // flushed to storage on an interval instead of per request.
-  initTelemetryBuffer(storage);
-
-  // The one write door for the usage call stream: every measured call, whichever surface it came
-  // through, buffers here and flushes on an interval so a request never waits on a metrics write.
-  initUsageBuffer(storage);
-  // The write tally starts collecting here. It fills only from now on: the writer was never
-  // recorded before this, so there is no history to seed it from.
-  initWriteTallyBuffer(storage);
-
-  // Off-request-path buffer for consent-audit writes (denials + grant/revoke mutations).
-  initConsentAuditBuffer(storage);
-
-  // Generic read-cache invalidation: translate every mutation (`emitChange(domain, ownerGaii?)`)
-  // into cache tag drops. The broad `domain:<d>` tag is the safety net for write paths that don't
-  // carry an owner; the owner-scoped tag is the precise drop when they do. Read paths opt in by
-  // tagging their cached() entries with these same tags (see services/cache.ts).
-  onChangeEvent((evt) => {
-    invalidateTag(`domain:${evt.domain}`);
-    if (evt.ownerGaii) {
-      const owner = parseGaiiLoose(evt.ownerGaii).owner;
-      if (owner) invalidateTag(`owner:${owner}:${evt.domain}`);
-    }
-  });
+  // The webhook dispatcher, the stats collector, the refusal log, the write buffers and the
+  // cache-invalidation listener. None of it mounts a route, which is why it lives in a sibling; it
+  // stays AHEAD of route mounting because the refusal log has to exist before anything can refuse.
+  const { webhookDispatcher, stats } = await initProcessBuffers(config, storage);
 
   // Prometheus metrics registry (opt-in)
   // The per-request middleware mounts HERE, before any route, or the
@@ -775,6 +741,10 @@ export async function mountRoutes(
   });
 
   app.use(specRouter(config));
+
+  // The MCP config file a client can be handed instead of a settings menu. Public and secretless:
+  // this node authenticates MCP over OAuth, so the file is the endpoint URL and a name.
+  app.use(connectInstallRouter(config));
 
   // Connector forward tunnel — operator-only stats route (WS upgrade is in index.ts)
   if (config.connectTunnelEnabled) {

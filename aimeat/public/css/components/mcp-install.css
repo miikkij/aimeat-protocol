@@ -1,0 +1,136 @@
+/**
+ * @file mcp-install.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The short way in: one-click install links, terminal one-liners and downloadable
+ *   config files. Drawn for /components/McpInstall.js.
+ *
+ *   THE THREE ROWS ARE RANKED BY EFFORT, and the styling says so. The one-click links are primary
+ *   buttons, the one-liner is a code line with a copy control beside it, and the files are plain
+ *   text links. A person scanning top to bottom meets the least work first.
+ * @structure .mcpi · .mcpi--tool · .mcpi--quick · .mcpi-oneclick · .mcpi-cmd · .mcpi-files
+ * @version-history
+ *   v1.0.0 — 2026-08-27 — Initial.
+ */
+
+.mcpi {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+/* Inside the per-tool setup guide it is a framed aside above that tool's steps. */
+.mcpi--tool {
+  margin: 0 0 0.7rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--accent-soft-border, var(--border));
+  border-radius: var(--radius-xs);
+  background: var(--accent-soft, var(--bg-dim));
+}
+
+/* On the home and on an agent's page it is the card's whole content. */
+.mcpi--quick {
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, var(--radius-xs));
+  background: var(--bg-card);
+}
+
+.mcpi-head {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-dim);
+}
+
+.mcpi-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.mcpi-lead {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+
+.mcpi-oneclick,
+.mcpi-file {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.mcpi-note {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
+/* The one-liner. It scrolls inside itself rather than widening the card it sits in. */
+.mcpi-cmd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.mcpi-cmd-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  flex: none;
+}
+
+.mcpi-cmd-text {
+  flex: 1 1 16rem;
+  min-width: 0;
+  padding: 0.4rem 0.6rem;
+  background: var(--bg-dim);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.78rem;
+  color: var(--text);
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.mcpi-files {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--text-dim);
+}
+
+.mcpi-files-label { flex: none; }
+
+.mcpi-file-link {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+.mcpi-file-link:hover { border-bottom-color: var(--accent); }
+.mcpi-file-link code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.mcpi-more {
+  font-size: 0.8125rem;
+  color: var(--text-dim);
+  text-decoration: none;
+}
+.mcpi-more:hover { color: var(--accent); }
+
+@media (max-width: 480px) {
+  .mcpi-cmd-label { flex: 1 1 100%; }
+  .mcpi-cmd-text { flex: 1 1 100%; }
+}

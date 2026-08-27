@@ -9,6 +9,9 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.22.0 -- 2026-08-27 -- Add e2e-mcp-install.ts: the downloadable MCP config file per client,
+ *            the name sanitizing on its query, and the promise that every install shortcut the
+ *            tool table advertises actually resolves.
  *   v1.21.0 -- 2026-08-21 -- Add e2e-static-hardening.ts to ALL_SUITES and the guard tier: the node
  *            refuses any dotfile path (.env, .env~, .git/) with a 403 before every static handler,
  *            so a leftover secrets backup cannot be read even without the apex nginx dotfile deny.
@@ -374,6 +377,7 @@ const ALL_SUITES = [
     'test/e2e-mcp-flags.ts',
     'test/e2e-mcp-commerce.ts',
     'test/e2e-mcp-prompts.ts',
+    'test/e2e-mcp-install.ts',
     'test/e2e-packages.ts',
     'test/e2e-businesslauncher.ts',
     'test/e2e-company-brain.ts',

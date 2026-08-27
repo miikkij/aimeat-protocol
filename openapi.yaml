@@ -8479,6 +8479,51 @@ paths:
         '200':
           description: The tool table, plus this node's mcp_url
 
+  /v1/connect/mcp.json:
+    get:
+      operationId: getMcpConfigFile
+      summary: The client's MCP configuration file, ready to save
+      description: >-
+        The four lines that attach this node to Claude Code, VS Code or Cursor, so a person can
+        save a file instead of walking a settings menu. The shapes differ per client and the
+        differences are load-bearing: Claude Code and Cursor key on `mcpServers`, VS Code on
+        `servers`, and VS Code requires `type`. A wrong shape is loaded and silently ignored.
+
+        This route answers with the FILE, not the standard `success()` envelope. The bytes are read
+        by the client, which knows nothing about a `data` wrapper; an envelope would have to be
+        unwrapped by hand before the file worked, which is the whole thing this route removes. A
+        refusal still uses the envelope, because a refusal is read by us.
+
+        Public, and secretless. This node authenticates MCP over OAuth 2.1 with dynamic client
+        registration, so the file carries the endpoint URL and a name and nothing else. Everything
+        personal happens afterwards, in a browser, as whoever signs in.
+      tags:
+        - Discovery
+      parameters:
+        - name: client
+          in: query
+          required: true
+          schema: { type: string, enum: [claude-code, vscode, cursor] }
+          description: Which client's file shape to produce
+        - name: name
+          in: query
+          schema: { type: string }
+          description: >-
+            The name the server appears under in the client's own list (default `aimeat`).
+            Sanitized to lowercase letters, digits and hyphens before it is used.
+      responses:
+        '200':
+          description: >-
+            The configuration file. `Content-Disposition: attachment` names it `.mcp.json` for
+            Claude Code and `mcp.json` for VS Code and Cursor.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          description: Unknown client id
+
   /v1/prompts/open-items:
     get:
       operationId: openItemsPrompt

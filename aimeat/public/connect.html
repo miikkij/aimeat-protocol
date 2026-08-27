@@ -247,7 +247,7 @@
       <div class="client-card">
         <h3>Cursor <span class="badge">1-click</span></h3>
         <p class="subtitle">URL-scheme deeplink. Cursor pops a confirmation dialog.</p>
-        <a class="deeplink" href="cursor://anysphere.cursor-deeplink/mcp/install?name=aimeat&amp;config={{cursorDeeplinkConfig}}">Add to Cursor</a>
+        <a class="deeplink" href="{{cursorInstallHref}}">Add to Cursor</a>
       </div>
 
       <div class="client-card">
@@ -256,12 +256,14 @@
         <pre>claude mcp add aimeat \
   --transport http \
   {{mcpUrl}}</pre>
+        <p class="subtitle">Or save the file: <a href="{{claudeCodeConfigUrl}}"><code>.mcp.json</code></a> at the root of a project. It holds no token, so it can be committed.</p>
       </div>
 
       <div class="client-card">
-        <h3>VS Code (Copilot) <span class="badge">1-line</span></h3>
-        <p class="subtitle">Adds the server to your user MCP config.</p>
-        <pre>code --add-mcp '{"name":"aimeat","url":"{{mcpUrl}}"}'</pre>
+        <h3>VS Code (Copilot) <span class="badge">1-click</span></h3>
+        <p class="subtitle">Opens VS Code with the server pre-filled.</p>
+        <a class="deeplink" href="{{vscodeInstallHref}}">Add to VS Code</a>
+        <p class="subtitle">By hand: <code>code --add-mcp '{"name":"aimeat","type":"http","url":"{{mcpUrl}}"}'</code>, or save <a href="{{vscodeConfigUrl}}"><code>mcp.json</code></a> as <code>.vscode/mcp.json</code>.</p>
       </div>
 
       <div class="client-card">

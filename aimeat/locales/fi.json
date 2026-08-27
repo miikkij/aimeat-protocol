@@ -4688,6 +4688,14 @@
   "markdown.embed.notFound": "Avainta ei löytynyt",
   "markdown.embed.refresh": "Päivitä",
   "markdown.embed.signIn": "Kirjaudu nähdäksesi tämän datan",
+  "mcpInstall.agentAgain": "Kytke tämä agentti toiseen työkaluun tai toiselle koneelle:",
+  "mcpInstall.agentLead": "Agentti tekee alla olevat vaiheet tämän yhteyden yli, joten yhteys tulee ensin.",
+  "mcpInstall.agentTitle": "Kytke tämä agentti siihen työkaluun, jossa se toimii",
+  "mcpInstall.filesLabel": "Tai tallenna asetustiedosto:",
+  "mcpInstall.homeLead": "Kaikki täällä on tarkoitettu käytettäväksi siitä chatista, jota jo käytät. Yksi linkki tai yksi tiedosto, ja tekoälysi lukee ja kirjoittaa omaa tietoasi.",
+  "mcpInstall.homeTitle": "Yksikään tekoäly ei ole vielä kiinni täällä",
+  "mcpInstall.more": "Toinen työkalu, tai koko ohje",
+  "mcpInstall.title": "Nopein tapa",
   "members.desc": "Täällä olevat ihmiset, jotka ovat julkaisseet oman sivunsa.",
   "members.empty": "Kukaan ei ole vielä julkaissut sivua. Sinun voi olla ensimmäinen.",
   "members.title": "Jäsenet",
@@ -10260,6 +10268,9 @@
       "home": {
         "nameplate": {
           "label": "Nimi ja kuva"
+        },
+        "mcp-connect": {
+          "label": "Tekoälyn kytkentä, kun yhtään ei ole kiinni"
         },
         "mat": {
           "label": "Linkki omaan sivuun"

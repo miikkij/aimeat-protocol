@@ -4700,6 +4700,14 @@
   "markdown.embed.notFound": "Key not found",
   "markdown.embed.refresh": "Refresh",
   "markdown.embed.signIn": "Sign in to view this data",
+  "mcpInstall.agentAgain": "Attach this agent in another tool, or on another machine:",
+  "mcpInstall.agentLead": "The steps below are things the agent does over that connection, so it comes first.",
+  "mcpInstall.agentTitle": "Attach this agent to the tool it runs in",
+  "mcpInstall.filesLabel": "Or save the configuration file:",
+  "mcpInstall.homeLead": "Everything here is meant to be run from the chat you already use. One link, or one file, and your AI can read and write what you know.",
+  "mcpInstall.homeTitle": "No AI is connected here yet",
+  "mcpInstall.more": "Another tool, or the steps in full",
+  "mcpInstall.title": "The short way in",
   "members.desc": "People here who have published a page of their own.",
   "members.empty": "Nobody has published a page yet. Yours can be the first.",
   "members.title": "Members",
@@ -10272,6 +10280,9 @@
       "home": {
         "nameplate": {
           "label": "Name and picture"
+        },
+        "mcp-connect": {
+          "label": "Connect an AI, when none is"
         },
         "mat": {
           "label": "Link to their own webpage"

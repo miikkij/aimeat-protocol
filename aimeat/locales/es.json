@@ -4556,6 +4556,14 @@
   "markdown.embed.notFound": "No se encontró la clave",
   "markdown.embed.refresh": "Actualizar",
   "markdown.embed.signIn": "Inicia sesión para ver estos datos",
+  "mcpInstall.agentAgain": "Conecta este agente en otra herramienta, o en otra computadora:",
+  "mcpInstall.agentLead": "El agente hace los pasos de abajo a través de esa conexión, así que la conexión va primero.",
+  "mcpInstall.agentTitle": "Conecta este agente a la herramienta donde se ejecuta",
+  "mcpInstall.filesLabel": "O guarda el archivo de configuración:",
+  "mcpInstall.homeLead": "Todo esto está pensado para usarse desde el chat que ya usas. Un enlace o un archivo, y tu IA puede leer y escribir lo que tú sabes.",
+  "mcpInstall.homeTitle": "Todavía no hay ninguna IA conectada aquí",
+  "mcpInstall.more": "Otra herramienta, o los pasos completos",
+  "mcpInstall.title": "La vía rápida",
   "members.desc": "Personas de aquí que han publicado una página propia.",
   "members.empty": "Todavía nadie ha publicado una página. La tuya puede ser la primera.",
   "members.title": "Miembros",
@@ -9986,6 +9994,9 @@
       "home": {
         "nameplate": {
           "label": "Nombre e imagen"
+        },
+        "mcp-connect": {
+          "label": "Conectar una IA, cuando no hay ninguna"
         },
         "mat": {
           "label": "Enlace a su propia página"

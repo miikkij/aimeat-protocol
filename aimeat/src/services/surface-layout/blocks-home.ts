@@ -28,6 +28,9 @@
  * @usage
  *   import { HOME_BLOCKS } from './blocks-home.js';
  * @version-history
+ *   v1.1.0 — 2026-08-27 — home.mcp-connect: the short way into an MCP connection, on the home of
+ *     an account that has none. It gates on the connection record itself rather than on a step
+ *     someone ticked, so it cannot stay up after the thing it asks for has happened.
  *   v1.0.0 — 2026-08-26 — Initial: the blocks of today's finished home and the onboarding step
  *     machine, derived from views/home/index.js:263-295 and status-parts.js.
  */
@@ -43,6 +46,20 @@ export const HOME_BLOCKS: readonly SurfaceBlockDef[] = [
         props: {},
         maxPerSurface: 1,
         summary: 'Who the person is: their picture, their name, and the way into their settings.',
+    },
+    {
+        // Present on every node and absent from almost every page: it draws only while nothing has
+        // ever connected over MCP, and the person reaches this home through a browser, so the one
+        // thing missing is the road they came here to build. It disappears the moment any AI opens
+        // a session, and nothing has to be marked done for that to happen.
+        id: 'home.mcp-connect',
+        surfaces: ['home'],
+        presence: { kind: 'always' },
+        localeStem: 'mcpInstall.homeTitle',
+        liveDomains: ['instances'],
+        props: {},
+        maxPerSurface: 1,
+        summary: 'The one-click links and config files that attach an AI to this node. Absent once one is connected.',
     },
     {
         id: 'home.mat',
