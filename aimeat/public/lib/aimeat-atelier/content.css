@@ -100,6 +100,12 @@ button.ak-list__row:hover { box-shadow: var(--ak-elev-1); }
 }
 button.ak-card { cursor: pointer; touch-action: manipulation; }
 button.ak-card:hover { box-shadow: var(--ak-elev-2); transform: translateY(-2px); }
+/* The tilt token reaches the grid too: sticker's playfulness is the form language of the whole
+ * surface, not one KPI row. Zero everywhere else, so only a look that sets it moves anything. */
+.ak-grid .ak-card { transform: rotate(var(--ak-tilt)); }
+.ak-grid .ak-card:nth-child(even) { transform: rotate(calc(var(--ak-tilt) * -1)); }
+.ak-grid button.ak-card:hover { transform: rotate(var(--ak-tilt)) translateY(-2px); }
+.ak-grid button.ak-card:nth-child(even):hover { transform: rotate(calc(var(--ak-tilt) * -1)) translateY(-2px); }
 .ak-card__art {
   display: flex;
   align-items: center;

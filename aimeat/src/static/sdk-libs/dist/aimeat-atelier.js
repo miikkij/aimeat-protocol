@@ -1634,7 +1634,9 @@
   }
   function derivedColumns(rows) {
     if (!rows.length) return [];
-    return Object.keys(rows[0]).map(function(key) {
+    return Object.keys(rows[0]).filter(function(key) {
+      return key !== "id";
+    }).map(function(key) {
       return { key, label: key, sortable: true };
     });
   }
@@ -2072,7 +2074,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.4.1",
+    version: "0.5.0",
     // ── Shell and navigation ──
     app,
     section,
