@@ -36,6 +36,14 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.3.4 — 2026-08-27 — Every .ak-root is a positioning context: an unanchored screen-reader
+ *     span escaped to the document and stretched the page past its own frame.
+ *   v0.3.3 — 2026-08-27 — The main scroller's children never flex-shrink: the tab row (a flex
+ *     child with its own overflow) was crushed to 12px once content exceeded the scroller.
+ *   v0.3.2 — 2026-08-27 — .ak-body (margin 0 + page ground) for the full-frame app: the browser's
+ *     default body margin left an 8px gutter around the frame. Found by the real-browser run.
+ *   v0.3.1 — 2026-08-27 — Kit release marker only (the JS↔CSS version pin): the shell's boot
+ *     defers one tick so onReady never fires before app() returns. No stylesheet rule changed.
  *   v0.3.0 — 2026-08-27 — The content and data parts arrive (content.css: keyed list,
  *     master–detail with a container-query split, card grid with deterministic monogram
  *     washes, timeline; data.css: the declared form, the table that scrolls in its own box,

@@ -16,6 +16,12 @@
  *   ak-loading · ak-skeleton · shared primitives (ak-btn, ak-scroll, focus, ak-busy)
  * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
  * @version-history
+ *   v0.3.4 — 2026-08-27 — Every .ak-root is a positioning context: a component-internal absolute
+ *     (.ak-sr-only) escaped to the document and stretched the page past its own frame.
+ *   v0.3.3 — 2026-08-27 — The scroller's children never shrink: a flex child with its own
+ *     overflow (tabs, table) resolved min-height to 0 and rendered 12px tall once the main
+ *     region's content exceeded its height. Third real-browser finding of the run.
+ *   v0.3.2 — 2026-08-27 — .ak-body: the full-frame body reset (margin 0, --ak-bg ground).
  *   v0.3.0 — 2026-08-27 — Shared primitives grow .ak-badge and .ak-sr-only for the content and
  *     data parts (list badges, form/table screen-reader text).
  *   v0.2.0 — 2026-08-27 — The display-treatment tokens land on the components: the hero title
@@ -30,10 +36,19 @@
   font-size: var(--ak-text-body);
   color: var(--ak-ink);
   box-sizing: border-box;
+  /* Every component root is a positioning context, so a component-internal absolute (the
+     screen-reader-only caption, a badge) can NEVER escape to the document and stretch the page —
+     an invisible 1px .ak-sr-only did exactly that (html scrollHeight 1150 on a 900 viewport,
+     an outer scrollbar on a frame that owns its own scrolling). Fourth real-browser finding. */
+  position: relative;
 }
 .ak-root *, .ak-root *::before, .ak-root *::after { box-sizing: inherit; }
 
 /* ── The app frame ────────────────────────────────────────────────────────────────────────── */
+/* A full-frame app owns the page: the shell stamps this class on <body> so the browser's
+   default 8px body margin cannot leave a gutter around the frame — no preflight resets it on
+   this track, because the kit is the only stylesheet. */
+.ak-body { margin: 0; background: var(--ak-bg); }
 .ak-app {
   height: 100dvh;
   display: flex;
@@ -80,6 +95,11 @@
 .ak-app--bottomnav .ak-app__main {
   padding-bottom: calc(var(--ak-chrome-bottom) + var(--ak-touch) + var(--ak-pad));
 }
+/* The scroller's children keep their natural height: a flex child with its own overflow (the
+   tab row, the table box) resolves min-height to 0 and gets CRUSHED when content exceeds the
+   scroller — the tabs rendered 12px tall on the first real-browser run. The main region
+   scrolls; its children never shrink. */
+.ak-app__main > * { flex-shrink: 0; }
 .ak-app__foot {
   padding: 8px var(--ak-pad);
   text-align: center;
