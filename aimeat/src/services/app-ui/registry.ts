@@ -38,6 +38,7 @@
  *     (TARGET-074 phase 2).
  */
 import type { BlockPropDef } from '../surface-layout/registry-types.js';
+import { LOOKS as LOOK_REGISTRY, STRUCTURES } from '../../data/atelier-looks.js';
 import { UI_LAYOUT_PRESETS, type AppUiLayoutPreset } from './layouts.js';
 
 /** A mosaic prop: the shared grammar, plus whether a layout must supply it. */
@@ -68,8 +69,10 @@ export const NAV_MODES = ['tabs', 'bottom-bar', 'canvas', 'deck', 'flow', 'rail'
  *  is two blocks, `main` beside `side`. */
 export const BLOCK_SPANS = ['full', 'main', 'side', 'half'] as const;
 
-/** The look presets the stylesheet ships — check:atelier verifies every one arithmetically. */
-export const LOOKS = ['vivid', 'calm-card', 'editorial', 'sticker', 'neon-dense', 'poster', 'flat'] as const;
+/** The look presets the stylesheet ships — DERIVED from the look registry
+ *  (src/data/atelier-looks.ts), the same source the generated stylesheet and the build prompt
+ *  read, so the three can never disagree. check:atelier verifies every one arithmetically. */
+export const LOOKS: readonly string[] = LOOK_REGISTRY.map((l) => l.id);
 
 const text = (description: string, maxLength = 200): AppUiPropDef => ({ type: 'string', maxLength, description });
 const requiredText = (description: string, maxLength = 200): AppUiPropDef => ({ type: 'string', maxLength, description, required: true });
@@ -187,6 +190,8 @@ export function buildUiCatalogue(): {
   nav_modes: readonly string[];
   looks: readonly string[];
   spans: { values: readonly string[]; summary: string };
+  look_sheets: Array<{ id: string; feel: string; structures: string[] }>;
+  structures: Array<{ id: string; summary: string }>;
   layouts: readonly AppUiLayoutPreset[];
 } {
   return {
@@ -205,6 +210,10 @@ export function buildUiCatalogue(): {
         + 'asymmetric editorial split; two `half` blocks share a line. Narrow screens stack '
         + 'everything, so a span is layout ambition, never a mobile risk.',
     },
+    // The look data sheets: what each look feels like and which page structures it carries —
+    // enough for an AI to pick by intent instead of by trying them all.
+    look_sheets: LOOK_REGISTRY.map((l) => ({ id: l.id, feel: l.feel, structures: l.structures })),
+    structures: STRUCTURES.map((s) => ({ id: s.id, summary: s.summary })),
     layouts: UI_LAYOUT_PRESETS,
   };
 }

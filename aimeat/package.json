@@ -28,6 +28,7 @@
     "check:changelog": "tsx scripts/check-changelog.ts",
     "check:commit-msg": "tsx scripts/check-commit-msg.ts",
     "build:sdk": "tsx scripts/build-sdk-libs.ts",
+    "build:atelier-looks": "tsx tools/build-atelier-looks.ts",
     "check:sdk": "tsx scripts/build-sdk-libs.ts --check",
     "check:surface-blocks": "vitest run test/unit/surface-block-parity.test.ts",
     "check:mcp-tools": "tsx scripts/audit-mcp-tools.ts --check",

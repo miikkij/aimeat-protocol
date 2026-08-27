@@ -92,22 +92,8 @@
   .ak-mosaic__railitem { white-space: nowrap; }
 }
 
-/* ── Editorial: the JOINED composition ────────────────────────────────────────────────────────
-   The look is a newspaper table, not floating cards: cells share hairlines inside one frame,
-   nothing is rounded, nothing floats. Structure carries the page. */
-[data-ak-look='editorial'] .ak-mosaic__units--grid {
-  gap: 0;
-  border: var(--ak-line-w) solid var(--ak-line);
-}
-[data-ak-look='editorial'] .ak-mosaic__units--grid .ak-mosaic__unit {
-  align-self: stretch;
-  border-right: var(--ak-line-w) solid var(--ak-line);
-  border-bottom: var(--ak-line-w) solid var(--ak-line);
-  padding: var(--ak-pad);
-  /* The negative offsets collapse the doubled hairlines where cells meet the frame edge. */
-  margin-right: calc(-1 * var(--ak-line-w));
-  margin-bottom: calc(-1 * var(--ak-line-w));
-}
+/* The JOINED composition (cells sharing hairlines in one frame) is a structure recipe —
+   generated per look into ./looks.css from src/data/atelier-looks.ts. */
 
 /* ── Tabs / bottom-bar picker ─────────────────────────────────────────────────────────────── */
 .ak-mosaic__picker { display: flex; flex-direction: column; gap: var(--ak-gap); min-width: 0; }
