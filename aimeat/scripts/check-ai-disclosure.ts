@@ -208,6 +208,10 @@ const AI_PROVENANCE_REQUIRED = [
   // screen, and an agent is exactly who arranges it. The service mints the record, so the REST
   // door carries the same decision.
   'aimeat_app_ui_set',
+  // A Design Book part's title and summary are gallery text people read, and its adopted body is
+  // an app screen's wording. The service mints on both writes, so every door carries it.
+  'aimeat_designbook_propose',
+  'aimeat_designbook_adopt',
   'aimeat_board_post',
   'aimeat_board_reply',
   // A published data package is world-readable at a permanent address and is read by people as

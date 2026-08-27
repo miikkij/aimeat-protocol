@@ -374,6 +374,10 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_datamap_set: { title: 'Data map: state it', destructiveHint: true, idempotentHint: true },
     aimeat_app_ui_get: { title: 'App layout: read + catalogue', readOnlyHint: true },
     aimeat_app_ui_set: { title: 'App layout: replace (versioned)', destructiveHint: true, idempotentHint: true },
+    aimeat_designbook_search: { title: 'Design Book: browse the parts', readOnlyHint: true },
+    aimeat_designbook_get: { title: 'Design Book: one part, whole', readOnlyHint: true },
+    aimeat_designbook_propose: { title: 'Design Book: propose (benched first)', idempotentHint: true },
+    aimeat_designbook_adopt: { title: 'Design Book: adopt into your app', destructiveHint: true, idempotentHint: true },
     aimeat_memory_hands: { title: 'Memory: who has written here', readOnlyHint: true },
     aimeat_compliance_register_read: { title: 'Compliance: Read Register', readOnlyHint: true },
     // destructiveHint: it REPLACES the document rather than merging into it, so a partial write

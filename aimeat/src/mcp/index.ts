@@ -133,6 +133,7 @@ import { registerPackageTools } from './packages.js';
 import { registerPortfolioTools } from './portfolio.js';
 import { registerSurfaceLayoutTools } from './surface-layout.js';
 import { registerAppUiTools } from './app-ui.js';
+import { registerDesignbookTools } from './designbook.js';
 import { registerAgentOnboardingTools } from './agent-onboarding.js';
 import { registerAgentTelemetryTools } from './agent-telemetry.js';
 import { registerAgentManagementTools } from './agent-management.js';
@@ -322,6 +323,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         registerPortfolioTools(mcp, storage, config, () => agentGaii);
         registerSurfaceLayoutTools(mcp, storage, config, () => agentGaii);
         registerAppUiTools(mcp, storage, config, () => agentGaii);
+        registerDesignbookTools(mcp, storage, config, () => agentGaii);
         registerAgentTelemetryTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerAgentOnboardingTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerAgentManagementTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);

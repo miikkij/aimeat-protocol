@@ -53,6 +53,7 @@ import { complianceTools } from './definitions/compliance.js';
 import { dataMapTools } from './definitions/data-map.js';
 import { surfaceLayoutTools } from './definitions/surface-layout.js';
 import { appUiTools } from './definitions/app-ui.js';
+import { designbookTools } from './definitions/designbook.js';
 import { connectionTools } from './definitions/connections.js';
 
 export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
@@ -75,6 +76,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     ...dataMapTools,
     ...surfaceLayoutTools,
     ...appUiTools,
+    ...designbookTools,
     ...connectionTools,
 ];
 
