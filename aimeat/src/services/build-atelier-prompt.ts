@@ -26,6 +26,9 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.4.0 — 2026-08-28 — "Two details the review always catches": edit mode says so, and counters
+ *     share their source with the lists beside them. Both are the first AEB review's app-level
+ *     findings, stated once here instead of waiting to be re-found per app.
  *   v1.3.0 — 2026-08-27 — Composition: per-block `span` and the `rail` nav mode reach the
  *     generated guide — compose a page, never pile cards.
  *   v1.2.0 — 2026-08-27 — The first move is a layout preset: the catalogue's `layouts` are the
@@ -257,6 +260,13 @@ function composeBody(config: AimeatConfig): string {
     + 'no console errors. Publish with `aimeat_app_publish` and pass `spec_token: '
     + SPEC_TOKEN_SLOT + '` — the digest of this document — so the node can tell the app was '
     + 'built against the spec in force.\n\n';
+
+  body += '## Two details the review always catches\n\n';
+  body += '- A form that switches into edit mode says so: retitle it and its primary action '
+    + '("Edit entry" / "Save changes"), and the row being edited stays visibly selected. A form '
+    + 'still headed "Log an entry" while it edits reads as adding a duplicate.\n'
+    + '- Counters and the lists beside them read from the SAME data, computed in one place. A '
+    + 'screen whose numbers disagree with its rows reads as broken even when both are defensible.\n\n';
 
   body += '## Never\n\n';
   body += '- daisyUI/Tailwind classes outside a `section` body — the kit is the vocabulary.\n'

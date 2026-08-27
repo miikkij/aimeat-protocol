@@ -15,6 +15,7 @@
  * @usage  AIMEAT.atelier.i18n.use({ fi: { addTask: 'Lisää tehtävä' }, en: { addTask: 'Add task' } });
  *         AIMEAT.atelier.i18n.t('addTask');
  * @version-history
+ *   v0.1.1 — 2026-08-28 — +signInHint, the shell's default hint on the designed sign-in state.
  *   v0.1.0 — 2026-08-27 — Initial (TARGET-074 phase 1, slice 1).
  */
 
@@ -40,6 +41,7 @@ const BASE = {
     loadFailed: 'This did not load',
     loadFailedHint: 'Check your connection and try again.',
     signIn: 'Log in to continue.',
+    signInHint: 'Use the account button in the top corner.',
     required: 'Required',
     optional: 'Optional',
     total: 'Total',
@@ -70,6 +72,7 @@ const BASE = {
     loadFailed: 'Tämä ei latautunut',
     loadFailedHint: 'Tarkista yhteys ja yritä uudelleen.',
     signIn: 'Kirjaudu sisään jatkaaksesi.',
+    signInHint: 'Käytä yläkulman tilinappia.',
     required: 'Pakollinen',
     optional: 'Valinnainen',
     total: 'Yhteensä',
@@ -100,6 +103,7 @@ const BASE = {
     loadFailed: 'Esto no se cargó',
     loadFailedHint: 'Revisa tu conexión e inténtalo otra vez.',
     signIn: 'Inicia sesión para continuar.',
+    signInHint: 'Usa el botón de cuenta en la esquina superior.',
     required: 'Obligatorio',
     optional: 'Opcional',
     total: 'Total',

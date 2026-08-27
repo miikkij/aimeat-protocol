@@ -28,6 +28,9 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.11.0 — 2026-08-28 — The first AEB review's kit fixes: designed sign-in after the boot
+ *     grace, the hero claiming a repeated title, visible list selection with the detail brought
+ *     into view, and the styling round in shell.css/content.css.
  *   v0.10.0 — 2026-08-27 — Scroll reveals on the composition grid and the `overlay` projection
  *     (the full-screen menu in display type) — the award-site motion vocabulary, kit-owned.
  *   v0.9.0 — 2026-08-27 — figure(): the data IS the hero — one giant display numeral with its
@@ -93,7 +96,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.10.0',
+  version: '0.11.0',
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,

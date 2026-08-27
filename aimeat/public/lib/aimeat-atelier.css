@@ -36,6 +36,12 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.11.0 — 2026-08-28 — The first AEB review's seven kit fixes (shell.css + content.css +
+ *     shell/hero/list/i18n JS): a designed sign-in state after the boot grace instead of an
+ *     endless "Loading…", the bar heading yielding when a hero carries the same name, the bar
+ *     wrapping so the pill cannot crush the title at 390px, short-viewport caps extended, the
+ *     empty state slimmed, the featured card's wide-band cover with a chip monogram, and a
+ *     visible selected row + detail brought into view on pick.
  *   v0.10.0 — 2026-08-27 — Scroll reveals (mosaic.css: units rise into view on the composition
  *     grid, distance from the look's entrance token, flat opts out) and the overlay menu — one
  *     Menu control opening a full-screen list in display type over an accent-breathed, blurred
