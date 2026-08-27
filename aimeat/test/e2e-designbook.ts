@@ -226,6 +226,33 @@ const GOOD_BODY = {
         assert(!!hit, `the part appears in /v1/discover, got ${JSON.stringify(r.body.data).slice(0, 200)}`);
     });
 
+    await test('a fresh node\'s Book is never an empty shelf: the six leiskat are seeded published', async () => {
+        // Seeding runs non-blocking at boot; by now (owner registration + the suite above) it has
+        // had seconds, but poll briefly rather than depend on the race.
+        let seeded: any[] = [];
+        for (let i = 0; i < 10; i++) {
+            const r = await json('/v1/designbook?status=published&q=leiska', { headers: auth(other.token) });
+            seeded = (r.body.data?.parts ?? []).filter((p: any) => p.id.startsWith('leiska-'));
+            if (seeded.length >= 6) break;
+            await new Promise(res => setTimeout(res, 500));
+        }
+        assert(seeded.length === 6, `six seeded leiskat, got ${seeded.length}`);
+        assert(seeded.every((p: any) => p.status === 'published'), 'all seeded parts are published');
+    });
+
+    await test('adoption is the heartbeat: adopting an aging part lifts it back to published', async () => {
+        const fade = await json('/v1/designbook/leiska-cover/status', {
+            method: 'POST', headers: auth(op.token), body: JSON.stringify({ status: 'aging' }),
+        });
+        assert(fade.status === 200 && fade.body.data.status === 'aging', `faded, got ${fade.status}`);
+        const adopt = await json('/v1/designbook/leiska-cover/adopt', {
+            method: 'POST', headers: auth(other.token), body: JSON.stringify({ filename: otherApp }),
+        });
+        assert(adopt.status === 200, `an aging part is still adoptable, got ${adopt.status}: ${JSON.stringify(adopt.body?.error)}`);
+        const g = await json('/v1/designbook/leiska-cover', { headers: auth(other.token) });
+        assert(g.body.data.part.status === 'published', `one adopt un-fades it, got ${g.body.data.part.status}`);
+    });
+
     await test('the operator retires it, and a retired address stays retired', async () => {
         const r = await json(`/v1/designbook/${partId}/status`, {
             method: 'POST', headers: auth(op.token), body: JSON.stringify({ status: 'retired' }),
