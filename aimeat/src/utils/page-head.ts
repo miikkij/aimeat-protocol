@@ -26,8 +26,10 @@
  *   v1.2.1 — 2026-08-26 — SECURITY (CodeQL js/reflected-xss): the per-page WebPage JSON-LD embedded
  *     page.title/description via JSON.stringify, which does not escape `<`, so a `</script>` in a
  *     title taken from a URL path (/v1/portfolio/:username with no portfolio) broke out of the
- *     ld+json block. jsonLdSafe() now \u-escapes `<`,`>`,`&` on every ld+json embed. The `<title>`
- *     upsert regex is bounded (`[^<]{0,2048}`) so it is linear, not the O(n²) `[\s\S]*?` shape.
+ *     ld+json block. jsonLdSafe() now \u-escapes `<`,`>`,`&` on every ld+json embed. Also (CodeQL
+ *     js/polynomial-redos, FP-on-the-static-shell but cheap to make linear): the `<link …[^>]*>`
+ *     upsert regexes — whose `>`-free prefix let `[^>]*` span many `<link>` starts, the O(n²) shape —
+ *     and the `<title>` scan are bounded (`[^>]{0,512}` / `[^<]{0,2048}`).
  *   v1.2.0 — 2026-08-25 — injectSiteHead(): the node's own name, description, social image,
  *     search-engine verification tags and the two site-level JSON-LD blocks, read from config
  *     instead of being literals in spa.html. Three things were wrong with the literals. They named
@@ -214,7 +216,7 @@ export function injectPageHead(
     `<meta name="twitter:title" content="${title}">`);
   out = upsert(out, /<meta name="twitter:description" content="[^"]*"\s*\/?>/i,
     `<meta name="twitter:description" content="${desc}">`);
-  out = upsert(out, /<link rel="canonical"[^>]*>/i, `<link rel="canonical" href="${url}">`);
+  out = upsert(out, /<link rel="canonical"[^>]{0,512}>/i, `<link rel="canonical" href="${url}">`);
   // A page with its own picture overrides the node-wide one injectSiteHead just stamped. Without
   // this, every page on the node shares one social card, which is what happened for a year.
   if (page.image) {
@@ -225,13 +227,13 @@ export function injectPageHead(
       `<meta name="twitter:image" content="${img}">`);
   }
   if (page.markdown) {
-    out = upsert(out, /<link rel="alternate" type="text\/markdown"[^>]*>/i,
+    out = upsert(out, /<link rel="alternate" type="text\/markdown"[^>]{0,512}>/i,
       `<link rel="alternate" type="text/markdown" href="${mirror}">`);
   }
   // llmstxt.org v2 names rel="describedby" as the link from a page to the llms.txt that covers it,
   // beside the markdown alternate above. A reader that finds one convention and not the other has
   // to guess the path.
-  out = upsert(out, /<link rel="describedby"[^>]*>/i,
+  out = upsert(out, /<link rel="describedby"[^>]{0,512}>/i,
     `<link rel="describedby" type="text/plain" href="${b}/llms.txt">`);
 
   // The WebPage block describes THIS page and is separate from the site-level SoftwareApplication
