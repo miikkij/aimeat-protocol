@@ -1042,7 +1042,7 @@ await test('GET /v1/libs/aimeat-atelier.js — serves the Atelier kit with every
     // rather than as a missing screen in somebody's app.
     for (const part of [
         'app', 'section', 'tabs', 'bottomNav',
-        'hero', 'statRow', 'emptyState', 'skeleton',
+        'hero', 'statRow', 'figure', 'emptyState', 'skeleton',
         'list', 'listDetail', 'cardGrid', 'mediaCard', 'timeline',
         'form', 'table', 'searchBar',
         'mosaic', 'appRef',
@@ -1128,12 +1128,17 @@ await test('GET /lib/aimeat-atelier.css — serves the theming contract, light, 
     }
     // Light is the default and dark is a re-declaration of the same names.
     assert(css.includes(':root[data-theme=\'dark\']'), 'dark mode must re-declare the same tokens');
-    // The seven presets, each a tagged block check:atelier verifies arithmetically. Vivid is the
-    // base contract; a preset that loses its tag falls out of the matrix, which is the failure
-    // this catches.
-    for (const preset of ['flat', 'calm-card', 'editorial', 'sticker', 'neon-dense', 'poster']) {
-        assert(css.includes(`[data-ak-look='${preset}']`), `the ${preset} preset block must exist`);
-        assert(text.includes(`@preset-block ${preset}`), `the ${preset} preset must carry its @preset-block tag`);
+    // The presets live in the GENERATED looks.css (the look factory, 2026-08-27): each a tagged
+    // block check:atelier verifies arithmetically. Vivid is the base contract; a preset that
+    // loses its tag falls out of the matrix, which is the failure this catches.
+    const looksRes = await fetch(`${BASE}/lib/aimeat-atelier/looks.css`);
+    assert(looksRes.ok, 'the generated looks.css must be served');
+    const looksText = await looksRes.text();
+    const looksCss = withoutComments(looksText);
+    for (const preset of ['flat', 'calm-card', 'editorial', 'sticker', 'neon-dense', 'poster',
+        'broadsheet', 'gallery', 'brutalist', 'terminal', 'aurora']) {
+        assert(looksCss.includes(`[data-ak-look='${preset}']`), `the ${preset} preset block must exist`);
+        assert(looksText.includes(`@preset-block ${preset}`), `the ${preset} preset must carry its @preset-block tag`);
     }
     assert(text.includes('@preset-block vivid'), 'the base contract must carry the vivid @preset-block tag');
     // The parts the entry imports must actually be reachable, or the kit renders unstyled.
@@ -1149,8 +1154,13 @@ await test('GET /lib/aimeat-atelier.css — serves the theming contract, light, 
         'the main region must reserve the bottom chrome strip');
     assert(/bottom:\s*var\(--ak-chrome-bottom\)/.test(parts),
         'the bottom navigation must sit above the chrome strip, never under it');
-    // Motion is finite: no infinite animation anywhere, so an idle surface repaints zero times.
-    assert(!/animation[^;]*infinite/.test(css + parts), 'no animation may run forever');
+    // Motion is finite — with ONE named exception, decided 2026-08-27 on the developer's
+    // direction: the hero's aurora drift (a compositor background tween that mutates no DOM,
+    // so the idle-mutation measurement still reads zero, and reduced-motion collapses it).
+    // The claim narrows, it does not vanish: exactly one infinite animation, and it is the drift.
+    const infinites = (css + parts).match(/animation[^;]*infinite/g) || [];
+    assert(infinites.length === 1 && /ak-hero-drift/.test(infinites[0]!),
+        `exactly one infinite animation (the hero drift) — found ${infinites.length}: ${infinites.join(' | ')}`);
     // A dark-theme-only wash breaks every light look, in the entry and in the parts alike.
     assert(!/rgba\(\s*255\s*,\s*255\s*,\s*255/.test(css + parts), 'must not use rgba(255,255,255,…)');
 });

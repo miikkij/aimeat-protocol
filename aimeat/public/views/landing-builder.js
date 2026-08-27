@@ -18,6 +18,10 @@
  *   tierTitle · packMatchesIdea · BuildAppPrompt · BuildInvite
  * @usage import { BuildInvite } from './landing-builder.js';
  * @version-history
+ *   v1.1.0 — 2026-08-27 — The TRACK is the first decision (TARGET-074): Classic or Atelier as
+ *     two cards, each track fetching its own guide (/v1/prompts/build-app vs
+ *     /v1/prompts/build-app-atelier), never mixed — Atelier hides Classic's templates and packs
+ *     because the kit is its vocabulary. Classic stays the default until measured evidence.
  *   v1.0.0 — 2026-08-26 — Pure extraction from landing.js v5.3.0. No behaviour change.
  */
 import { h } from 'preact';
@@ -33,14 +37,17 @@ import { swallowed } from '/js/swallowed.js';
 // t() echoes the key when a translation is missing — fall back to readable English.
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
-// Canonical build prompt from the node (GET /v1/prompts/build-app - the single source of
-// truth the app-catalog + agentic coders use; includes the registry-generated library
-// sections and capability packs). Cached per locale.
+// Canonical build prompt from the node - the single source of truth the app-catalog + agentic
+// coders use. TWO TRACKS, TWO GUIDES (TARGET-074): Classic reads /v1/prompts/build-app (the
+// daisyUI vocabulary, templates and capability packs), Atelier reads /v1/prompts/build-app-atelier
+// (the served kit, the looks, the mosaic). Neither prompt teaches the other's mechanics, so the
+// choice is made HERE and nothing is mixed after it. Cached per locale and track.
 const _canonicalPromptCache = {};
-async function fetchCanonicalBuildPrompt(locale) {
-  const key = locale || 'en';
+async function fetchCanonicalBuildPrompt(locale, track) {
+  const key = (locale || 'en') + '|' + (track || 'classic');
   if (_canonicalPromptCache[key]) return _canonicalPromptCache[key];
-  const d = await (await fetch('/v1/prompts/build-app?mode=new&lang=' + encodeURIComponent(key))).json();
+  const path = track === 'atelier' ? '/v1/prompts/build-app-atelier' : '/v1/prompts/build-app';
+  const d = await (await fetch(path + '?mode=new&lang=' + encodeURIComponent(locale || 'en'))).json();
   const full = d && d.data && d.data.prompt;
   if (typeof full === 'string' && full.length > 500) { _canonicalPromptCache[key] = full; return full; }
   throw new Error('no canonical prompt');
@@ -74,6 +81,7 @@ function readBuilderDraft() {
       idea: typeof d.idea === 'string' ? d.idea : '',
       tplId: typeof d.tplId === 'string' ? d.tplId : '',
       chosen: d.chosen && typeof d.chosen === 'object' ? d.chosen : {},
+      track: d.track === 'atelier' ? 'atelier' : 'classic',
     };
   } catch (err) { swallowed('landing: read builder draft', err); return {}; }
 }
@@ -84,7 +92,7 @@ function writeBuilderDraft(draft) {
     // a blank form. Emptiness counts only packs that are ON: unticking leaves an explicit `false`,
     // which is a decision about idea-matching and is meaningless once the idea box is empty too.
     const anyPackOn = Object.values(draft.chosen || {}).some(Boolean);
-    if (!draft.idea && !draft.tplId && !anyPackOn) sessionStorage.removeItem(BUILDER_DRAFT_KEY);
+    if (!draft.idea && !draft.tplId && !anyPackOn && draft.track !== 'atelier') sessionStorage.removeItem(BUILDER_DRAFT_KEY);
     else sessionStorage.setItem(BUILDER_DRAFT_KEY, JSON.stringify(draft));
   } catch (err) { swallowed('landing: write builder draft', err); }
 }
@@ -124,8 +132,17 @@ function BuildAppPrompt() {
   const [tplId, setTplId] = useState(saved.tplId || '');
   const [idea, setIdea] = useState(saved.idea || '');
   const [chosen, setChosen] = useState(saved.chosen || {});   // id → true/false, set only by a real click
+  // The TRACK is the first decision and the guides never mix. Classic stays the default until
+  // the measured evidence says otherwise (TARGET-074 phase 3).
+  const [track, setTrack] = useState(saved.track || 'classic');
 
-  useEffect(() => { writeBuilderDraft({ idea, tplId, chosen }); }, [idea, tplId, chosen]);
+  useEffect(() => { writeBuilderDraft({ idea, tplId, chosen, track }); }, [idea, tplId, chosen, track]);
+
+  // The canonical prompt follows the chosen track.
+  useEffect(() => {
+    setCanonical('');
+    fetchCanonicalBuildPrompt(getLocale(), track).then(setCanonical).catch(err => { swallowed('landing: prompt', err); });
+  }, [track]);
 
   useEffect(() => {
     // Starting points only: full use-case scaffolds first, then blank app-shells (not components).
@@ -145,7 +162,7 @@ function BuildAppPrompt() {
       }));
     }).catch(err => { swallowed('landing: packs', err); });
 
-    fetchCanonicalBuildPrompt(getLocale()).then(setCanonical).catch(err => { swallowed('landing: prompt', err); });
+    // (The canonical prompt is fetched by the track effect above, per chosen track.)
 
     // A restored template id names the template but carries none of its content, and the content
     // is what the prompt appends.
@@ -181,6 +198,13 @@ function BuildAppPrompt() {
 
   const prompt = (() => {
     if (!canonical) return '';
+    // Atelier: the kit is the vocabulary — no Classic templates, no capability packs, and the
+    // idea rides as its own opening line (the Atelier guide has no placeholder to replace).
+    if (track === 'atelier') {
+      return idea.trim()
+        ? "The app idea, in the owner's words: " + idea.trim() + '\n\n' + canonical
+        : canonical;
+    }
     let out = idea.trim()
       ? canonical.replace(IDEA_PLACEHOLDER, 'My initial idea: ' + idea.trim())
       : canonical;
@@ -200,13 +224,17 @@ function BuildAppPrompt() {
   // What the prompt CONTAINS, rather than how many characters it is. A character count reads as
   // complexity; the contents read as value, and they are the reason the prompt is long.
   const contains = [];
-  if (tplId) contains.push(tr('landing.promptHasTemplate', 'your starting template'));
-  if (selected.length) {
-    contains.push(selected.length === 1
-      ? tr('landing.promptHasPack', 'one capability pack with its usage doc')
-      : `${selected.length} ${tr('landing.promptHasPacks', 'capability packs with their usage docs')}`);
+  if (track === 'atelier') {
+    contains.push(tr('landing.promptHasAtelier', 'the Atelier kit: living looks, layouts and motion the AI composes from'));
+  } else {
+    if (tplId) contains.push(tr('landing.promptHasTemplate', 'your starting template'));
+    if (selected.length) {
+      contains.push(selected.length === 1
+        ? tr('landing.promptHasPack', 'one capability pack with its usage doc')
+        : `${selected.length} ${tr('landing.promptHasPacks', 'capability packs with their usage docs')}`);
+    }
+    contains.push(tr('landing.promptHasPitfalls', 'this node’s libraries and the pitfalls already written down'));
   }
-  contains.push(tr('landing.promptHasPitfalls', 'this node’s libraries and the pitfalls already written down'));
 
   // Which pack's description to spell out. Pointing at one wins, because that is a question being
   // asked right now; otherwise the ones that are ON, which is what the prompt will actually carry.
@@ -220,17 +248,32 @@ function BuildAppPrompt() {
 
       <div class="ld-gen-step">
         <div class="ld-gen-head"><span class="ld-gen-num">1</span><span>${tr('landing.genStep1', 'Describe your app')}</span></div>
+
+        <div class="ld-gen-track" role="radiogroup" aria-label=${tr('landing.trackTitle', 'How should it be built?')}>
+          <label class=${`ld-gen-trackcard ${track === 'classic' ? 'is-on' : ''}`}>
+            <input type="radio" name="ld-gen-track" checked=${track === 'classic'} onChange=${() => setTrack('classic')} />
+            <span class="ld-gen-trackname">${tr('landing.trackClassic', 'Classic')}</span>
+            <span class="ld-gen-trackdesc">${tr('landing.trackClassicDesc', 'The proven way: templates, capability packs, the familiar clean style.')}</span>
+          </label>
+          <label class=${`ld-gen-trackcard ${track === 'atelier' ? 'is-on' : ''}`}>
+            <input type="radio" name="ld-gen-track" checked=${track === 'atelier'} onChange=${() => setTrack('atelier')} />
+            <span class="ld-gen-trackname">${tr('landing.trackAtelier', 'Atelier')}</span>
+            <span class="ld-gen-tracknew">${tr('landing.trackNew', 'new')}</span>
+            <span class="ld-gen-trackdesc">${tr('landing.trackAtelierDesc', 'The new track: living looks (newspaper, gallery, neon console…), layouts your AI can rearrange later without republishing, motion built in.')}</span>
+          </label>
+        </div>
+
         <textarea class="ld-gen-idea" rows="3" value=${idea} onInput=${(e) => setIdea(e.target.value)}
           placeholder=${tr('landing.genIdeaPh', 'Describe what the app should do…')}></textarea>
 
-        ${templates.length ? html`
+        ${track === 'classic' && templates.length ? html`
           <label class="ld-gen-label" for="ld-gen-tpl">${tr('landing.startTemplate', 'Start from a template')} <span class="ld-gen-opt">${tr('landing.genOptional', '(optional)')}</span></label>
           <select id="ld-gen-tpl" class="input-field ld-gen-select" onChange=${onPickTemplate} value=${tplId}>
             <option value="">${tr('landing.fromScratch', '(none, build from scratch)')}</option>
             ${templates.map(t => html`<option value=${t.id} key=${t.id}>${t.kind === 'use-case' ? '★ ' : ''}${t.title}</option>`)}
           </select>` : ''}
 
-        ${packs.length ? html`
+        ${track === 'classic' && packs.length ? html`
           <div class="ld-gen-label">${tr('landing.genPacks', 'Capability packs')} <span class="ld-gen-opt">${tr('landing.genOptional', '(optional)')}</span></div>
           <p class="ld-gen-hint">${tr('landing.genPacksHint', 'Charts, editable flow diagrams, games, 3D. Self-hosted libraries with AI instructions baked into the prompt. Your idea text pre-selects matching packs.')}</p>
           <div class="ld-gen-packs">

@@ -98,6 +98,15 @@ function labToHex(lab: Lab): string {
   return `#${to(r)}${to(g)}${to(b)}`;
 }
 
+/** Rotate a colour's OKLCh hue by `deg`, keeping L and C — the browser's relative-colour
+ *  `oklch(from X l c calc(h + deg))`, computed the same way. */
+function rotateHue(hex: string, deg: number): string {
+  const lab = hexToLab(hex);
+  const c = Math.sqrt(lab.a * lab.a + lab.b * lab.b);
+  const h = Math.atan2(lab.b, lab.a) + (deg * Math.PI) / 180;
+  return labToHex({ L: lab.L, a: c * Math.cos(h), b: c * Math.sin(h) });
+}
+
 /** Mix two opaque colours in OKLab, `p` being the first colour's share (0..1). */
 function mixOklab(a: string, b: string, p: number): string {
   const la = hexToLab(a);
@@ -194,8 +203,18 @@ function evalColor(expr: string, vars: Vars, trail: string): Rgba {
       const to = (v: number): string => Math.round(v).toString(16).padStart(2, '0');
       return { hex: `#${to(parts[0]!)}${to(parts[1]!)}${to(parts[2]!)}`, alpha: parts[3] ?? 1 };
     }
+    if (name === 'oklch') {
+      // Relative colour syntax, the one form the contract uses: oklch(from <expr> l c calc(h ± N))
+      // — a HUE ROTATION that keeps lightness and chroma, which is what makes a derived spectrum
+      // arithmetically safe: every contrast ratio depends on L, and L does not move.
+      const m = /^from\s+(.+?)\s+l\s+c\s+(?:calc\(\s*h\s*([+-])\s*(\d+(?:\.\d+)?)(?:deg)?\s*\)|h)$/is.exec(body.trim());
+      if (!m) throw new Error(`${trail}: oklch() is supported only as "oklch(from <colour> l c calc(h ± N))"`);
+      const base = evalColor(m[1]!, vars, trail);
+      const delta = m[2] ? (m[2] === '-' ? -1 : 1) * Number(m[3]) : 0;
+      return { hex: rotateHue(base.hex, delta), alpha: base.alpha };
+    }
   }
-  throw new Error(`${trail}: cannot evaluate colour "${s.slice(0, 60)}" — the contract confines itself to hex, var(), color-mix(in oklab) and gradients over those`);
+  throw new Error(`${trail}: cannot evaluate colour "${s.slice(0, 60)}" — the contract confines itself to hex, var(), color-mix(in oklab), oklch(from … calc(h ± N)) and gradients over those`);
 }
 
 /** Pull the colour stops out of a linear/radial gradient value (positions and angles skipped).
@@ -360,7 +379,8 @@ const HERO_MESH_CAP = 36;
 /** Tokens the base contract must declare — a look can never inherit half its identity. */
 const REQUIRED_BASE = [
   '--ak-bg', '--ak-surface', '--ak-surface-2', '--ak-surface-image', '--ak-ink', '--ak-ink-dim',
-  '--ak-line', '--ak-line-w', '--ak-accent', '--ak-accent-2', '--ak-accent-ink', '--ak-accent-text',
+  '--ak-line', '--ak-line-w', '--ak-accent', '--ak-accent-2', '--ak-spectrum-2', '--ak-spectrum-3',
+  '--ak-page-image', '--ak-glass', '--ak-blur', '--ak-grain', '--ak-accent-ink', '--ak-accent-text',
   '--ak-ok', '--ak-warn', '--ak-err', '--ak-focus', '--ak-grad', '--ak-scrim', '--ak-hero-image',
   '--ak-radius', '--ak-radius-sm', '--ak-radius-pill', '--ak-elev-1', '--ak-elev-2',
   '--ak-font', '--ak-font-display', '--ak-font-mono',
@@ -386,7 +406,17 @@ function pass(combo: string, label: string): void {
 }
 
 const themeCss = readFileSync(new URL('../public/lib/aimeat-theme.css', import.meta.url), 'utf8');
-const atelierCss = readFileSync(new URL('../public/lib/aimeat-atelier.css', import.meta.url), 'utf8');
+const looksCssOnDisk = readFileSync(new URL('../public/lib/aimeat-atelier/looks.css', import.meta.url), 'utf8');
+// THE DRIFT GATE: the look stylesheet is generated from src/data/atelier-looks.ts, and the file
+// on disk must be exactly what the registry emits — otherwise the matrix would be proving a
+// stylesheet nobody ships, which is this codebase's oldest failure shape.
+const { emitLooksCss } = await import('./build-atelier-looks.js');
+if (looksCssOnDisk.replace(/\r\n/g, '\n') !== emitLooksCss().replace(/\r\n/g, '\n')) {
+  console.error('\n✖ public/lib/aimeat-atelier/looks.css drifts from src/data/atelier-looks.ts — run `pnpm build:atelier-looks` and commit the result.\n');
+  process.exit(1);
+}
+// The generated blocks are appended so parseAtelier sees one sheet, base contract first.
+const atelierCss = readFileSync(new URL('../public/lib/aimeat-atelier.css', import.meta.url), 'utf8') + '\n' + looksCssOnDisk;
 const themes = parseThemes(themeCss);
 const sheet = parseAtelier(atelierCss);
 const presetNames = ['vivid', ...sheet.presets.keys()];
@@ -490,6 +520,29 @@ for (const preset of presetNames) {
       for (const p of groundMixPercents(heroRaw, '--ak-bg')) {
         if (p <= HERO_MESH_CAP) pass(combo, 'AK-CAP hero mesh %');
         else fail(combo, 'AK-CAP hero mesh %', `the hero mesh above ${HERO_MESH_CAP}% stops being a wash (uses ${p}%)`);
+      }
+
+      // AK-PAGE: the ambient page ground. Body ink must read on every ambient stop (text sits
+      // directly on the page in status cards and section hints), and the ambient's pigment is
+      // capped at the SURFACE budget — the page whispers, the hero speaks.
+      const pageRaw = vars.get('--ak-page-image') ?? 'none';
+      if (pageRaw !== 'none') {
+        for (const s of gradientStops(pageRaw, vars, `${combo} --ak-page-image`)) {
+          add(combo, 'AK-PAGE ink on ambient ground', ratio(ink, s.alpha === 1 ? s.hex : over(s, bg)), MIN_TEXT, 'body text on the ambient page ground');
+        }
+        for (const p of groundMixPercents(pageRaw, '--ak-bg')) {
+          if (p <= SURFACE_TINT_CAP) pass(combo, 'AK-PAGE ambient %');
+          else fail(combo, 'AK-PAGE ambient %', `the page ambient above ${SURFACE_TINT_CAP}% stops being a whisper (uses ${p}%)`);
+        }
+      }
+
+      // AK-GLASS: bar and bottom-nav text sits on the glass pane composited over the page —
+      // the translucency is a look, never a licence to blur the words with the ground.
+      const glassRaw = vars.get('--ak-glass') ?? 'none';
+      if (glassRaw !== 'none') {
+        const glass = evalColor(glassRaw, vars, `${combo} --ak-glass`);
+        const glassGround = glass.alpha === 1 ? glass.hex : over(glass, bg);
+        add(combo, 'AK-GLASS ink on chrome glass', ratio(ink, glassGround), MIN_TEXT, 'bar text on the glass pane over the page');
       }
     } catch (e) {
       fail(combo, 'resolve', (e as Error).message);

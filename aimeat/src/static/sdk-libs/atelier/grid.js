@@ -57,7 +57,10 @@ function buildCard(item, pickable, onPick) {
     class: 'ak-card__art ak-card__art--w' + washOf(item.id),
     'aria-hidden': 'true',
     vars: layer ? { '--ak-card-image': layer } : null,
-  }, layer ? null : el('span', { class: 'ak-card__monogram', text: (item.title || '?').slice(0, 1).toUpperCase() }));
+  }, layer ? null : el('span', { class: 'ak-card__monogram',
+    // Array.from splits by code point: an emoji-led title keeps its emoji instead of showing
+    // a broken surrogate half — found in the first real-data experiment run.
+    text: (Array.from(item.title || '?')[0] || '?').toUpperCase() }));
   if (layer) art.classList.add('ak-card__art--image');
   const body = el('span', { class: 'ak-card__body' }, [
     el('span', { class: 'ak-card__title', text: item.title }),

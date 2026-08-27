@@ -34,13 +34,18 @@
  *   });
  *   // later, when the app's data changed:  m.refresh('errands.');
  * @version-history
+ *   v0.10.0 — 2026-08-27 — Scroll reveals on the composition grid (units rise into view as they
+ *     enter the viewport, distance from the look's entrance token, reduced-motion off) and the
+ *     `overlay` projection: one Menu control opening a full-screen list in display type.
+ *   v0.7.0 — 2026-08-27 — Composition: the stack projection places blocks on a six-column grid
+ *     by their `span`, and the `rail` projection arrives (desktop left rail, phone strip).
  *   v0.4.0 — 2026-08-27 — Initial (TARGET-074 phase 2, the client renderer).
  */
 import { el, clear, resolve, enter, reducedMotion } from './dom.js';
 import { t } from './i18n.js';
 import { APEX_URL } from '../_core/config.js';
 import { section, tabs, bottomNav } from './shell.js';
-import { hero, statRow } from './hero.js';
+import { hero, statRow, figure } from './hero.js';
 import { emptyState, skeleton } from './state.js';
 import { list } from './list.js';
 import { cardGrid, mediaCard } from './grid.js';
@@ -104,6 +109,7 @@ function labelOf(block) {
 function patchFor(kind, data) {
   if (kind === 'statRow') return { tiles: Array.isArray(data) ? data : [] };
   if (kind === 'table') return { rows: Array.isArray(data) ? data : (data && data.rows) || [] };
+  if (kind === 'figure') return data && typeof data === 'object' ? data : { value: 0 };
   return { items: Array.isArray(data) ? data : [] };
 }
 
@@ -181,6 +187,11 @@ export function mosaic(spec) {
         return bound('statRow', function (data) {
           return statRow({ target: into, tiles: patchFor('statRow', data).tiles });
         });
+      case 'figure':
+        return bound('figure', function (data) {
+          const d = patchFor('figure', data);
+          return figure({ target: into, value: d.value, label: d.label || p.title || '', sub: d.sub, delta: d.delta });
+        });
       case 'list':
         return bound('list', function (data) {
           return list({ target: into, items: patchFor('list', data).items, empty: empty, onPick: pick });
@@ -250,11 +261,152 @@ export function mosaic(spec) {
 
   // ── The five projections ─────────────────────────────────────────────────────────────────────
 
-  /** Stacked: every unit in order; the layout with no nav. */
+  /** Stacked: every unit in order on the COMPOSITION GRID — a block's `span` places it (full
+   *  line, the main column, the side column, a half), so the record composes a page instead of
+   *  piling cards. Narrow screens stack everything (the stylesheet folds the grid). Units below
+   *  the fold REVEAL as they scroll into view — the distance rides the look's own entrance
+   *  token, so a look that declares no entrance (flat) moves nothing here either. */
   function projectStack(units) {
-    const box = el('div', { class: 'ak-mosaic__units' });
-    for (const u of units) box.appendChild(u.el);
+    const box = el('div', { class: 'ak-mosaic__units ak-mosaic__units--grid' });
+    for (const u of units) {
+      u.el.classList.add('ak-mosaic__unit--' + (u.block.span || 'full'));
+      box.appendChild(u.el);
+    }
+    if (!reducedMotion() && typeof IntersectionObserver === 'function') {
+      const io = new IntersectionObserver(function (entries) {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('ak-reveal--in');
+            io.unobserve(entry.target);
+          }
+        }
+        // threshold 0 + a bottom inset, not a ratio: a unit TALLER than the viewport can never
+        // reach a ratio threshold (visible/height stays tiny), and would never reveal.
+      }, { threshold: 0, rootMargin: '0px 0px -12% 0px' });
+      for (const u of units) { u.el.classList.add('ak-reveal'); io.observe(u.el); }
+      alive.cleanup.push(function () { io.disconnect(); });
+    }
     return box;
+  }
+
+  /** The overlay: ONE Menu control opening a full-screen list in display type — the award-site
+   *  move. Escape, the close control and a backdrop tap all leave it (a phone has no Escape,
+   *  and an exit that exists only on a keyboard is no exit — first design review's finding).
+   *  The CURRENT section is marked persistently (aria-current + class), because a hover that is
+   *  the only differentiated state reads as "you are here" when it is only the mouse. */
+  function projectOverlay(units) {
+    const box = el('div', { class: 'ak-mosaic__units' });
+    for (const u of units) { u.el.hidden = true; box.appendChild(u.el); }
+    let current = 0;
+    let open = false;
+    const items = [];
+
+    const heading = el('h2', { class: 'ak-mosaic__unittitle' });
+    const panel = el('div', {
+      class: 'ak-mosaic__overlay', role: 'dialog', 'aria-label': t('menu'),
+      on: { click: function (ev) { if (ev.target === panel) close(); } },
+    });
+    panel.hidden = true;
+
+    const trigger = el('button', {
+      type: 'button', class: 'ak-mosaic__overlaytrigger',
+      'aria-expanded': 'false', 'data-ak-noguard': true,
+      on: { click: function () { if (open) { close(); } else { show(); } } },
+    }, t('menu'));
+
+    const closeBtn = el('button', {
+      type: 'button', class: 'ak-mosaic__overlayclose', 'aria-label': t('close'), 'data-ak-noguard': true,
+      on: { click: function () { close(); } },
+    }, '×');
+    panel.appendChild(closeBtn);
+
+    function mark() {
+      items.forEach(function (btn, i) {
+        btn.classList.toggle('ak-mosaic__overlayitem--on', i === current);
+        if (i === current) btn.setAttribute('aria-current', 'true');
+        else btn.removeAttribute('aria-current');
+      });
+      heading.textContent = units[current] ? units[current].label : '';
+    }
+
+    function show(index) {
+      if (typeof index === 'number') {
+        transition(function () {
+          units[current].el.hidden = true;
+          current = index;
+          units[current].el.hidden = false;
+          mark();
+          enter(units[current].el);
+        });
+        close();
+        return;
+      }
+      open = true;
+      panel.hidden = false;
+      trigger.setAttribute('aria-expanded', 'true');
+      enter(panel);
+      const on = /** @type {HTMLElement|null} */ (panel.querySelector('.ak-mosaic__overlayitem--on') || panel.querySelector('button'));
+      if (on) on.focus();
+    }
+    function close() {
+      open = false;
+      panel.hidden = true;
+      trigger.setAttribute('aria-expanded', 'false');
+      trigger.focus();
+    }
+    function onKey(ev) { if (ev.key === 'Escape' && open) close(); }
+    document.addEventListener('keydown', onKey);
+    alive.cleanup.push(function () { document.removeEventListener('keydown', onKey); });
+
+    units.forEach(function (u, i) {
+      const btn = el('button', {
+        type: 'button', class: 'ak-mosaic__overlayitem', 'data-ak-noguard': true,
+        on: { click: function () { show(i); } },
+      }, [
+        el('span', { class: 'ak-mosaic__overlaynum', text: String(i + 1).padStart(2, '0') }),
+        u.label,
+      ]);
+      items.push(btn);
+      panel.appendChild(btn);
+    });
+    if (units.length) units[0].el.hidden = false;
+    mark();
+
+    return el('div', { class: 'ak-mosaic__overlaywrap' }, [
+      el('div', { class: 'ak-mosaic__overlaybar' }, [heading, trigger]),
+      box, panel,
+    ]);
+  }
+
+  /** The rail: a desktop-grade left rail picking one unit at a time; on a narrow screen the
+   *  stylesheet folds the rail into a top strip. Same blocks, another projection. */
+  function projectRail(units) {
+    const box = el('div', { class: 'ak-mosaic__units' });
+    for (const u of units) { u.el.hidden = true; box.appendChild(u.el); }
+    let current = 0;
+    const items = [];
+    function show(index) {
+      if (index === current && !units[index].el.hidden) return;
+      transition(function () {
+        units[current].el.hidden = true;
+        current = index;
+        units[current].el.hidden = false;
+        items.forEach(function (btn, i) { btn.classList.toggle('ak-mosaic__railitem--on', i === index); });
+        enter(units[current].el);
+      });
+    }
+    const rail = el('nav', { class: 'ak-mosaic__rail' }, units.map(function (u, i) {
+      const btn = el('button', {
+        type: 'button',
+        class: 'ak-mosaic__railitem' + (i === 0 ? ' ak-mosaic__railitem--on' : ''),
+        'data-ak-noguard': true,
+        on: { click: function () { show(i); } },
+      }, u.label);
+      items.push(btn);
+      return btn;
+    }));
+    if (units.length) units[0].el.hidden = false;
+    return el('div', { class: 'ak-mosaic__railwrap' }, [rail, box]);
   }
 
   /** One unit shown at a time; the chrome (tabs or bottom bar) picks. */
@@ -486,6 +638,8 @@ export function mosaic(spec) {
     else if (nav === 'deck') root.appendChild(projectDeck(units));
     else if (nav === 'flow') root.appendChild(projectFlow(units));
     else if (nav === 'canvas') root.appendChild(projectCanvas(units));
+    else if (nav === 'rail') root.appendChild(projectRail(units));
+    else if (nav === 'overlay') root.appendChild(projectOverlay(units));
     else root.appendChild(projectStack(units));
   }
 

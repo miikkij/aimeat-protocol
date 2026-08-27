@@ -230,6 +230,7 @@
       loadFailed: "This did not load",
       loadFailedHint: "Check your connection and try again.",
       signIn: "Log in to continue.",
+      signInHint: "Use the account button in the top corner.",
       required: "Required",
       optional: "Optional",
       total: "Total",
@@ -260,6 +261,7 @@
       loadFailed: "Tämä ei latautunut",
       loadFailedHint: "Tarkista yhteys ja yritä uudelleen.",
       signIn: "Kirjaudu sisään jatkaaksesi.",
+      signInHint: "Käytä yläkulman tilinappia.",
       required: "Pakollinen",
       optional: "Valinnainen",
       total: "Yhteensä",
@@ -290,6 +292,7 @@
       loadFailed: "Esto no se cargó",
       loadFailedHint: "Revisa tu conexión e inténtalo otra vez.",
       signIn: "Inicia sesión para continuar.",
+      signInHint: "Usa el botón de cuenta en la esquina superior.",
       required: "Obligatorio",
       optional: "Opcional",
       total: "Total",
@@ -490,6 +493,7 @@
 
   // src/static/sdk-libs/atelier/shell.js
   var BOOT_POLL_MS = 300;
+  var SIGNIN_GRACE_MS = 2500;
   function app(spec) {
     injectStyle();
     const state = { title: spec.title, look: spec.look || "vivid" };
@@ -538,7 +542,7 @@
       const kinds = {
         empty: { title: o.title || t("empty"), hint: o.hint || t("emptyHint") },
         error: { title: o.title || t("loadFailed"), hint: o.hint || t("loadFailedHint") },
-        signin: { title: o.title || t("signIn"), hint: o.hint }
+        signin: { title: o.title || t("signIn"), hint: o.hint != null ? o.hint : t("signInHint") }
       };
       const chosen = kinds[kind] || kinds.error;
       statusCard = emptyState({
@@ -552,6 +556,7 @@
     const requireLogin = spec.requireLogin !== false;
     let booted = false;
     let pollTimer = null;
+    let graceTimer = null;
     function auth() {
       const ns = (
         /** @type {any} */
@@ -568,6 +573,10 @@
         if (pollTimer) {
           clearInterval(pollTimer);
           pollTimer = null;
+        }
+        if (graceTimer) {
+          clearTimeout(graceTimer);
+          graceTimer = null;
         }
         status("none");
         if (spec.onReady) spec.onReady(session);
@@ -597,6 +606,10 @@
       status("loading");
       armPoll();
       tryBoot();
+      graceTimer = setTimeout(function() {
+        graceTimer = null;
+        if (!booted) status("signin");
+      }, SIGNIN_GRACE_MS);
     }
     function armPoll() {
       if (pollTimer) return;
@@ -635,6 +648,10 @@
         if (pollTimer) {
           clearInterval(pollTimer);
           pollTimer = null;
+        }
+        if (graceTimer) {
+          clearTimeout(graceTimer);
+          graceTimer = null;
         }
         if (statusCard) statusCard.destroy();
         if (nav) nav.destroy();
@@ -768,17 +785,26 @@
     const sub = el("p", { class: "ak-hero__sub" });
     const actions = el("div", { class: "ak-hero__actions" });
     const inner = el("div", { class: "ak-hero__inner" }, [title, sub, actions]);
+    const scrim = el("span", { class: "ak-hero__scrim", "aria-hidden": "true" });
     const root = el("div", {
       class: "ak-root ak-hero",
       "data-ak-hero": true,
       "aria-labelledby": titleId
-    }, [inner]);
+    }, [scrim, inner]);
     const layer = imageLayer(spec.image);
     if (layer) {
       root.style.setProperty("--ak-hero-image", layer);
       root.classList.add("ak-hero--image");
     }
     if (spec.target) resolve(spec.target).appendChild(root);
+    requestAnimationFrame(function() {
+      const appRoot = root.closest(".ak-app");
+      if (!appRoot) return;
+      const barTitle = appRoot.querySelector(".ak-app__bar .ak-app__title");
+      if (!barTitle) return;
+      const same = (barTitle.textContent || "").trim().toLowerCase() === String(state.title || "").trim().toLowerCase();
+      if (same) appRoot.classList.add("ak-app--hero-titled");
+    });
     function render() {
       title.textContent = state.title;
       sub.textContent = state.sub || "";
@@ -880,6 +906,53 @@
       }
     };
   }
+  function figure(spec) {
+    const state = { value: spec.value || 0, label: spec.label || "", sub: spec.sub, delta: spec.delta };
+    const fmt = spec.format || function(n) {
+      return String(Math.round(n));
+    };
+    const label = el("span", { class: "ak-figure__label", text: state.label });
+    const value = el("span", { class: "ak-figure__value", text: fmt(state.value) });
+    const delta = el("span", { class: "ak-figure__delta", text: state.delta || "" });
+    delta.hidden = !state.delta;
+    const sub = el("p", { class: "ak-figure__sub", text: state.sub || "" });
+    sub.hidden = !state.sub;
+    const root = el("div", { class: "ak-root ak-figure" }, [
+      label,
+      el("div", { class: "ak-figure__row" }, [value, delta]),
+      sub
+    ]);
+    if (spec.target) resolve(spec.target).appendChild(root);
+    enter(root);
+    return {
+      el: root,
+      /** @param {{ value?: number, label?: string, sub?: string, delta?: string }} patch */
+      set(patch) {
+        if (!patch) return;
+        if (patch.label != null) {
+          state.label = patch.label;
+          label.textContent = state.label;
+        }
+        if (patch.sub !== void 0) {
+          state.sub = patch.sub;
+          sub.textContent = state.sub || "";
+          sub.hidden = !state.sub;
+        }
+        if (patch.delta !== void 0) {
+          state.delta = patch.delta;
+          delta.textContent = state.delta || "";
+          delta.hidden = !state.delta;
+        }
+        if (patch.value != null && patch.value !== state.value) {
+          countUp(value, state.value, patch.value, { format: fmt });
+          state.value = patch.value;
+        }
+      },
+      destroy() {
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
 
   // src/static/sdk-libs/atelier/list.js
   function fillRow(row, item) {
@@ -908,6 +981,12 @@
         "data-ak-noguard": true,
         "data-ak-id": item.id,
         on: pickable ? { click: function() {
+          for (const other of root.querySelectorAll(".ak-list__row--selected")) {
+            other.classList.remove("ak-list__row--selected");
+            other.removeAttribute("aria-current");
+          }
+          row.classList.add("ak-list__row--selected");
+          row.setAttribute("aria-current", "true");
           if (spec.onPick) spec.onPick(shown.get(item.id)?.item || item);
         } } : null
       });
@@ -1036,9 +1115,21 @@
     function select(id) {
       selected = id;
       for (const row of root.querySelectorAll(".ak-list__row")) {
-        row.classList.toggle("ak-list__row--selected", row.getAttribute("data-ak-id") === id);
+        const on = row.getAttribute("data-ak-id") === id;
+        row.classList.toggle("ak-list__row--selected", on);
+        if (on) row.setAttribute("aria-current", "true");
+        else row.removeAttribute("aria-current");
       }
       renderDetail();
+      if (id != null) {
+        requestAnimationFrame(function() {
+          const box = detail.getBoundingClientRect();
+          const viewH = window.innerHeight || document.documentElement.clientHeight;
+          if (box.top >= viewH || box.bottom <= 0) {
+            detail.scrollIntoView({ block: "nearest", behavior: reducedMotion() ? "auto" : "smooth" });
+          }
+        });
+      }
     }
     renderDetail();
     return {
@@ -1084,7 +1175,12 @@
       class: "ak-card__art ak-card__art--w" + washOf(item.id),
       "aria-hidden": "true",
       vars: layer ? { "--ak-card-image": layer } : null
-    }, layer ? null : el("span", { class: "ak-card__monogram", text: (item.title || "?").slice(0, 1).toUpperCase() }));
+    }, layer ? null : el("span", {
+      class: "ak-card__monogram",
+      // Array.from splits by code point: an emoji-led title keeps its emoji instead of showing
+      // a broken surrogate half — found in the first real-data experiment run.
+      text: (Array.from(item.title || "?")[0] || "?").toUpperCase()
+    }));
     if (layer) art.classList.add("ak-card__art--image");
     const body = el("span", { class: "ak-card__body" }, [
       el("span", { class: "ak-card__title", text: item.title }),
@@ -1530,6 +1626,9 @@
 
   // src/static/sdk-libs/atelier/timeline.js
   function fmtTs(ts) {
+    if (typeof ts === "string" && /^\d{4}-\d{2}-\d{2}$/.test(ts)) {
+      return (/* @__PURE__ */ new Date(ts + "T12:00:00")).toLocaleDateString(void 0, { dateStyle: "medium" });
+    }
     const d = ts instanceof Date ? ts : new Date(ts);
     if (Number.isNaN(d.getTime())) return String(ts);
     return d.toLocaleString(void 0, { dateStyle: "medium", timeStyle: "short" });
@@ -1630,6 +1729,7 @@
   function patchFor(kind, data) {
     if (kind === "statRow") return { tiles: Array.isArray(data) ? data : [] };
     if (kind === "table") return { rows: Array.isArray(data) ? data : data && data.rows || [] };
+    if (kind === "figure") return data && typeof data === "object" ? data : { value: 0 };
     return { items: Array.isArray(data) ? data : [] };
   }
   function derivedColumns(rows) {
@@ -1678,6 +1778,11 @@
         case "statRow":
           return bound("statRow", function(data) {
             return statRow({ target: into, tiles: patchFor("statRow", data).tiles });
+          });
+        case "figure":
+          return bound("figure", function(data) {
+            const d = patchFor("figure", data);
+            return figure({ target: into, value: d.value, label: d.label || p.title || "", sub: d.sub, delta: d.delta });
           });
         case "list":
           return bound("list", function(data) {
@@ -1750,9 +1855,172 @@
       }
     }
     function projectStack(units) {
-      const box = el("div", { class: "ak-mosaic__units" });
-      for (const u of units) box.appendChild(u.el);
+      const box = el("div", { class: "ak-mosaic__units ak-mosaic__units--grid" });
+      for (const u of units) {
+        u.el.classList.add("ak-mosaic__unit--" + (u.block.span || "full"));
+        box.appendChild(u.el);
+      }
+      if (!reducedMotion() && typeof IntersectionObserver === "function") {
+        const io = new IntersectionObserver(function(entries) {
+          for (const entry of entries) {
+            if (entry.isIntersecting) {
+              entry.target.classList.add("ak-reveal--in");
+              io.unobserve(entry.target);
+            }
+          }
+        }, { threshold: 0, rootMargin: "0px 0px -12% 0px" });
+        for (const u of units) {
+          u.el.classList.add("ak-reveal");
+          io.observe(u.el);
+        }
+        alive.cleanup.push(function() {
+          io.disconnect();
+        });
+      }
       return box;
+    }
+    function projectOverlay(units) {
+      const box = el("div", { class: "ak-mosaic__units" });
+      for (const u of units) {
+        u.el.hidden = true;
+        box.appendChild(u.el);
+      }
+      let current2 = 0;
+      let open = false;
+      const items = [];
+      const heading = el("h2", { class: "ak-mosaic__unittitle" });
+      const panel = el("div", {
+        class: "ak-mosaic__overlay",
+        role: "dialog",
+        "aria-label": t("menu"),
+        on: { click: function(ev) {
+          if (ev.target === panel) close();
+        } }
+      });
+      panel.hidden = true;
+      const trigger = el("button", {
+        type: "button",
+        class: "ak-mosaic__overlaytrigger",
+        "aria-expanded": "false",
+        "data-ak-noguard": true,
+        on: { click: function() {
+          if (open) {
+            close();
+          } else {
+            show();
+          }
+        } }
+      }, t("menu"));
+      const closeBtn = el("button", {
+        type: "button",
+        class: "ak-mosaic__overlayclose",
+        "aria-label": t("close"),
+        "data-ak-noguard": true,
+        on: { click: function() {
+          close();
+        } }
+      }, "×");
+      panel.appendChild(closeBtn);
+      function mark() {
+        items.forEach(function(btn, i) {
+          btn.classList.toggle("ak-mosaic__overlayitem--on", i === current2);
+          if (i === current2) btn.setAttribute("aria-current", "true");
+          else btn.removeAttribute("aria-current");
+        });
+        heading.textContent = units[current2] ? units[current2].label : "";
+      }
+      function show(index) {
+        if (typeof index === "number") {
+          transition(function() {
+            units[current2].el.hidden = true;
+            current2 = index;
+            units[current2].el.hidden = false;
+            mark();
+            enter(units[current2].el);
+          });
+          close();
+          return;
+        }
+        open = true;
+        panel.hidden = false;
+        trigger.setAttribute("aria-expanded", "true");
+        enter(panel);
+        const on = (
+          /** @type {HTMLElement|null} */
+          panel.querySelector(".ak-mosaic__overlayitem--on") || panel.querySelector("button")
+        );
+        if (on) on.focus();
+      }
+      function close() {
+        open = false;
+        panel.hidden = true;
+        trigger.setAttribute("aria-expanded", "false");
+        trigger.focus();
+      }
+      function onKey(ev) {
+        if (ev.key === "Escape" && open) close();
+      }
+      document.addEventListener("keydown", onKey);
+      alive.cleanup.push(function() {
+        document.removeEventListener("keydown", onKey);
+      });
+      units.forEach(function(u, i) {
+        const btn = el("button", {
+          type: "button",
+          class: "ak-mosaic__overlayitem",
+          "data-ak-noguard": true,
+          on: { click: function() {
+            show(i);
+          } }
+        }, [
+          el("span", { class: "ak-mosaic__overlaynum", text: String(i + 1).padStart(2, "0") }),
+          u.label
+        ]);
+        items.push(btn);
+        panel.appendChild(btn);
+      });
+      if (units.length) units[0].el.hidden = false;
+      mark();
+      return el("div", { class: "ak-mosaic__overlaywrap" }, [
+        el("div", { class: "ak-mosaic__overlaybar" }, [heading, trigger]),
+        box,
+        panel
+      ]);
+    }
+    function projectRail(units) {
+      const box = el("div", { class: "ak-mosaic__units" });
+      for (const u of units) {
+        u.el.hidden = true;
+        box.appendChild(u.el);
+      }
+      let current2 = 0;
+      const items = [];
+      function show(index) {
+        if (index === current2 && !units[index].el.hidden) return;
+        transition(function() {
+          units[current2].el.hidden = true;
+          current2 = index;
+          units[current2].el.hidden = false;
+          items.forEach(function(btn, i) {
+            btn.classList.toggle("ak-mosaic__railitem--on", i === index);
+          });
+          enter(units[current2].el);
+        });
+      }
+      const rail = el("nav", { class: "ak-mosaic__rail" }, units.map(function(u, i) {
+        const btn = el("button", {
+          type: "button",
+          class: "ak-mosaic__railitem" + (i === 0 ? " ak-mosaic__railitem--on" : ""),
+          "data-ak-noguard": true,
+          on: { click: function() {
+            show(i);
+          } }
+        }, u.label);
+        items.push(btn);
+        return btn;
+      }));
+      if (units.length) units[0].el.hidden = false;
+      return el("div", { class: "ak-mosaic__railwrap" }, [rail, box]);
     }
     function projectPicker(units, mode) {
       const box = el("div", { class: "ak-mosaic__units" });
@@ -2008,6 +2276,8 @@
       else if (nav === "deck") root.appendChild(projectDeck(units));
       else if (nav === "flow") root.appendChild(projectFlow(units));
       else if (nav === "canvas") root.appendChild(projectCanvas(units));
+      else if (nav === "rail") root.appendChild(projectRail(units));
+      else if (nav === "overlay") root.appendChild(projectOverlay(units));
       else root.appendChild(projectStack(units));
     }
     let currentLayout = null;
@@ -2074,7 +2344,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.5.0",
+    version: "0.11.0",
     // ── Shell and navigation ──
     app,
     section,
@@ -2086,6 +2356,7 @@
     // ── Focal content ──
     hero,
     statRow,
+    figure,
     // ── Content ──
     list,
     listDetail,

@@ -26,6 +26,11 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.4.0 — 2026-08-28 — "Two details the review always catches": edit mode says so, and counters
+ *     share their source with the lists beside them. Both are the first AEB review's app-level
+ *     findings, stated once here instead of waiting to be re-found per app.
+ *   v1.3.0 — 2026-08-27 — Composition: per-block `span` and the `rail` nav mode reach the
+ *     generated guide — compose a page, never pile cards.
  *   v1.2.0 — 2026-08-27 — The first move is a layout preset: the catalogue's `layouts` are the
  *     starting shapes, filled rather than composed (TARGET-074, leiskat v1).
  *   v1.1.0 — 2026-08-27 — The mosaic section: apps render through AIMEAT.atelier.mosaic() and
@@ -35,6 +40,7 @@
  */
 import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
+import { LOOKS as LOOK_REGISTRY } from '../data/atelier-looks.js';
 
 /** Slot the publish gate's token is substituted into (mirrors build-app-prompt.ts). */
 const SPEC_TOKEN_SLOT = '{{aimeat_spec_token}}';
@@ -106,6 +112,11 @@ export const ATELIER_COMPONENTS: ReadonlyArray<{ id: string; summary: string; ex
     example: "AIMEAT.atelier.tabs({ target: a.main, items: [{ id: 'open', label: 'Open' }, { id: 'done', label: 'Done' }], onChange: show });",
   },
   {
+    id: 'figure',
+    summary: 'The data IS the hero: one giant numeral with its label and context line, counting up on change — use it when a single number is what the person came to see.',
+    example: "AIMEAT.atelier.figure({ target: a.main, value: 48, label: 'Combined storage', sub: 'Monday looks like the wettest day.', delta: '-19% vs last year' });",
+  },
+  {
     id: 'section',
     summary: 'The titled card AND the escape hatch: markup the catalogue cannot express goes inside a section body, so custom work keeps the surface, the measure and the entrance. This is the ONLY place raw HTML belongs.',
     example: "var s = AIMEAT.atelier.section({ target: a.main, title: 'Custom' }); s.body.appendChild(myOwnMarkup);",
@@ -123,18 +134,12 @@ export const ATELIER_COMPONENTS: ReadonlyArray<{ id: string; summary: string; ex
 ];
 
 /**
- * The look picker + each look's imagery style words (the imagery pipeline composes its prompts
- * from these — house style + look words + palette words + your subject).
+ * The look picker + each look's imagery style words — DERIVED from the look registry
+ * (src/data/atelier-looks.ts), the same source the generated stylesheet and the mosaic
+ * catalogue read. The prompt's look table and the CSS cannot drift apart.
  */
-export const ATELIER_LOOKS: ReadonlyArray<{ id: string; feel: string; imagery: string }> = [
-  { id: 'vivid', feel: 'the default — a hero on the brand gradient, tinted cards, a real entrance; pick when unsure', imagery: 'bright layered gradient-mesh abstract, soft grain, airy light ground' },
-  { id: 'calm-card', feel: 'quiet professional product', imagery: 'minimal line illustration, single accent hue, generous ground' },
-  { id: 'editorial', feel: 'magazine: big display type, rules instead of shadows, slow fades', imagery: 'warm duotone photographic style' },
-  { id: 'sticker', feel: 'playful: pill corners, tilted tiles, extruded titles, confetti-ready', imagery: 'flat sticker illustration, thick outline, white sticker border' },
-  { id: 'neon-dense', feel: 'operator console: tight, mono display face, fast', imagery: 'isometric technical illustration, blueprint linework' },
-  { id: 'poster', feel: 'one giant focal statement; the hero owns the first viewport', imagery: 'bold graphic poster art, dominant brand hue' },
-  { id: 'flat', feel: 'the deliberate opt-out: no decoration, no entrance', imagery: 'none — flat means flat' },
-];
+export const ATELIER_LOOKS: ReadonlyArray<{ id: string; feel: string; imagery: string }> =
+  LOOK_REGISTRY.map((l) => ({ id: l.id, feel: l.feel, imagery: l.imagery }));
 
 /** Palette colour words for imagery prompts, matching /lib/aimeat-theme.css. */
 export const PALETTE_COLOR_WORDS: Readonly<Record<string, string>> = {
@@ -204,8 +209,13 @@ function composeBody(config: AimeatConfig): string {
     + "m.refresh('errands.');   // after your data changed — the change paints with motion\n"
     + '```\n\n'
     + 'The layout\'s `nav` field projects the same blocks as stacked sections, a tab row, a bottom '
-    + 'bar, a swipeable deck, a step-by-step flow or a pan-zoom canvas — all five work on every '
-    + 'screen size, so never build navigation by hand.\n\n'
+    + 'bar, a swipeable deck, a step-by-step flow, a pan-zoom canvas, a desktop-grade left rail '
+    + '(`rail`) or a full-screen menu in display type (`overlay`) — all of them work on every '
+    + 'screen size, so never build navigation by hand. On the stacked grid, blocks below the fold '
+    + 'reveal as the person scrolls; that too is the kit\'s, never yours to code.\n\n'
+    + 'COMPOSE, do not pile: a block may carry `span` — `full` (default), `main` + `side` for the '
+    + 'asymmetric editorial split, or `half` — and the screen becomes a laid-out page instead of a '
+    + 'column of cards. Narrow screens fold every span to one column on their own.\n\n'
     + 'THE FIRST MOVE IS A PRESET, not a blank page: `GET ' + base + '/v1/apps/ui/catalogue` '
     + 'carries `layouts` — finished, fillable shapes (cover, dashboard, browse, work-queue, '
     + 'story-deck, guided-flow). Pick the one nearest the app, replace every <angle-bracketed> '
@@ -250,6 +260,13 @@ function composeBody(config: AimeatConfig): string {
     + 'no console errors. Publish with `aimeat_app_publish` and pass `spec_token: '
     + SPEC_TOKEN_SLOT + '` — the digest of this document — so the node can tell the app was '
     + 'built against the spec in force.\n\n';
+
+  body += '## Two details the review always catches\n\n';
+  body += '- A form that switches into edit mode says so: retitle it and its primary action '
+    + '("Edit entry" / "Save changes"), and the row being edited stays visibly selected. A form '
+    + 'still headed "Log an entry" while it edits reads as adding a duplicate.\n'
+    + '- Counters and the lists beside them read from the SAME data, computed in one place. A '
+    + 'screen whose numbers disagree with its rows reads as broken even when both are defensible.\n\n';
 
   body += '## Never\n\n';
   body += '- daisyUI/Tailwind classes outside a `section` body — the kit is the vocabulary.\n'

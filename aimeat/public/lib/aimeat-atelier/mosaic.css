@@ -27,6 +27,185 @@
 .ak-mosaic__unit { display: flex; flex-direction: column; gap: var(--ak-gap); min-width: 0; }
 .ak-mosaic__unit[hidden] { display: none; }
 
+/* ── The composition grid: a block's span PLACES it ───────────────────────────────────────────
+   Six columns; `full` is the whole line, `main` + `side` make the asymmetric editorial split,
+   two `half` blocks share a line. This is the axis that turns a pile of cards into a laid-out
+   page. A narrow screen folds everything to one column, so a span is never a mobile risk. */
+.ak-mosaic__units--grid { display: grid; grid-template-columns: repeat(6, 1fr); align-items: start; }
+.ak-mosaic__unit--full { grid-column: 1 / -1; }
+.ak-mosaic__unit--main { grid-column: span 4; }
+.ak-mosaic__unit--side { grid-column: span 2; }
+.ak-mosaic__unit--half { grid-column: span 3; }
+@media (max-width: 760px) {
+  .ak-mosaic__unit--main, .ak-mosaic__unit--side, .ak-mosaic__unit--half { grid-column: 1 / -1; }
+}
+
+/* ── Rail: the desktop-grade left rail ────────────────────────────────────────────────────── */
+.ak-mosaic__railwrap {
+  display: grid;
+  grid-template-columns: minmax(160px, 220px) 1fr;
+  gap: calc(var(--ak-gap) * 1.5);
+  align-items: start;
+  min-width: 0;
+}
+.ak-mosaic__rail {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: sticky;
+  top: var(--ak-pad);
+  border-right: var(--ak-line-w) solid var(--ak-line);
+  padding-right: var(--ak-gap);
+}
+.ak-mosaic__railitem {
+  min-height: var(--ak-touch);
+  padding: 8px 12px;
+  text-align: left;
+  font: inherit;
+  font-weight: 600;
+  color: var(--ak-ink-dim);
+  background: transparent;
+  border: 0;
+  border-radius: var(--ak-radius-sm);
+  cursor: pointer;
+  transition: background calc(0.15s * var(--ak-motion)) var(--ak-ease), color calc(0.15s * var(--ak-motion)) var(--ak-ease);
+}
+.ak-mosaic__railitem:hover { color: var(--ak-ink); background: var(--ak-surface); }
+.ak-mosaic__railitem--on {
+  color: var(--ak-accent-text);
+  background: color-mix(in oklab, var(--ak-accent) 10%, var(--ak-surface));
+}
+.ak-mosaic__railitem:focus-visible { outline: 2px solid var(--ak-focus); outline-offset: -2px; }
+@media (max-width: 760px) {
+  /* The rail folds to a horizontal strip above the content — same picks, phone ergonomics. */
+  .ak-mosaic__railwrap { grid-template-columns: 1fr; }
+  .ak-mosaic__rail {
+    position: static;
+    flex-direction: row;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    border-right: 0;
+    border-bottom: var(--ak-line-w) solid var(--ak-line);
+    padding-right: 0;
+    padding-bottom: 6px;
+  }
+  .ak-mosaic__railitem { white-space: nowrap; }
+}
+
+/* ── Scroll reveals: units below the fold rise into view ──────────────────────────────────────
+   The distance rides the look's own entrance token, so flat (0px) fades nothing and moves
+   nothing; the kit-wide reduced-motion block collapses the transition. Applied only by the
+   renderer (never at rest), so an idle surface still repaints zero times. */
+.ak-mosaic__unit.ak-reveal {
+  opacity: 0;
+  transform: translateY(calc(var(--ak-enter-distance) * 1.6));
+}
+.ak-mosaic__unit.ak-reveal--in {
+  opacity: 1;
+  transform: none;
+  transition: opacity calc(var(--ak-motion) * 2.4) var(--ak-ease),
+              transform calc(var(--ak-motion) * 2.4) var(--ak-ease);
+}
+[data-ak-look='flat'] .ak-mosaic__unit.ak-reveal { opacity: 1; transform: none; }
+
+/* ── Overlay: the full-screen menu ────────────────────────────────────────────────────────── */
+.ak-mosaic__overlaywrap { display: flex; flex-direction: column; gap: var(--ak-gap); min-width: 0; }
+/* The bar carries the CURRENT section's name and the one Menu control — sticky, so navigation
+ * is where the visitor left it however far they scrolled. */
+.ak-mosaic__overlaybar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ak-gap);
+  padding: 6px 0;
+  background: var(--ak-glass);
+  backdrop-filter: blur(var(--ak-blur));
+  -webkit-backdrop-filter: blur(var(--ak-blur));
+}
+.ak-mosaic__unittitle {
+  margin: 0;
+  font-family: var(--ak-font-display);
+  font-weight: var(--ak-weight-display);
+  font-size: var(--ak-text-title);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* One consistent bordered pill, first render and every render after. */
+.ak-mosaic__overlaytrigger {
+  flex: none;
+  min-height: var(--ak-touch);
+  padding: 8px 18px;
+  font: inherit;
+  font-weight: 700;
+  color: var(--ak-accent-text);
+  background: var(--ak-surface);
+  border: var(--ak-line-w) solid var(--ak-accent-text);
+  border-radius: var(--ak-radius-pill);
+  cursor: pointer;
+}
+.ak-mosaic__overlayclose {
+  position: absolute;
+  top: max(var(--ak-pad), 3vw);
+  right: max(var(--ak-pad), 3vw);
+  width: var(--ak-touch);
+  height: var(--ak-touch);
+  font-size: 1.6rem;
+  line-height: 1;
+  color: var(--ak-ink);
+  background: var(--ak-surface);
+  border: var(--ak-line-w) solid var(--ak-line);
+  border-radius: var(--ak-radius-pill);
+  cursor: pointer;
+}
+.ak-mosaic__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: max(var(--ak-pad), 6vw);
+  background: color-mix(in oklab, var(--ak-bg) 88%, var(--ak-accent));
+  backdrop-filter: blur(var(--ak-blur));
+  -webkit-backdrop-filter: blur(var(--ak-blur));
+  overflow-y: auto;
+}
+.ak-mosaic__overlay[hidden] { display: none; }
+.ak-mosaic__overlayitem {
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  padding: 10px 0;
+  background: transparent;
+  border: 0;
+  border-bottom: var(--ak-line-w) solid var(--ak-line);
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--ak-font-display);
+  font-weight: var(--ak-weight-display);
+  font-size: clamp(1.8rem, 6vw, 3.6rem);
+  line-height: 1.1;
+  color: var(--ak-ink);
+  transition: color calc(var(--ak-motion)) var(--ak-ease), padding-left calc(var(--ak-motion)) var(--ak-ease);
+}
+.ak-mosaic__overlayitem:hover { color: var(--ak-accent-text); padding-left: 12px; }
+.ak-mosaic__overlayitem:focus-visible { outline: 2px solid var(--ak-focus); outline-offset: 4px; }
+.ak-mosaic__overlaynum {
+  font-family: var(--ak-font-mono);
+  font-size: var(--ak-text-fine);
+  font-weight: 700;
+  color: var(--ak-ink-dim);
+}
+
+/* The JOINED composition (cells sharing hairlines in one frame) is a structure recipe —
+   generated per look into ./looks.css from src/data/atelier-looks.ts. */
+
 /* ── Tabs / bottom-bar picker ─────────────────────────────────────────────────────────────── */
 .ak-mosaic__picker { display: flex; flex-direction: column; gap: var(--ak-gap); min-width: 0; }
 /* The bottom bar travels with the shell's fixed bar; inside the mosaic it sits under the units. */

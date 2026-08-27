@@ -36,6 +36,42 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.11.0 — 2026-08-28 — The first AEB review's seven kit fixes (shell.css + content.css +
+ *     shell/hero/list/i18n JS): a designed sign-in state after the boot grace instead of an
+ *     endless "Loading…", the bar heading yielding when a hero carries the same name, the bar
+ *     wrapping so the pill cannot crush the title at 390px, short-viewport caps extended, the
+ *     empty state slimmed, the featured card's wide-band cover with a chip monogram, and a
+ *     visible selected row + detail brought into view on pick.
+ *   v0.10.0 — 2026-08-27 — Scroll reveals (mosaic.css: units rise into view on the composition
+ *     grid, distance from the look's entrance token, flat opts out) and the overlay menu — one
+ *     Menu control opening a full-screen list in display type over an accent-breathed, blurred
+ *     ground, numbered in mono, Escape to close.
+ *   v0.9.0 — 2026-08-27 — The figure: the data IS the hero (shell.css part) — one giant
+ *     accent-inked display numeral with a mono small-caps label, the Cape Town move from the
+ *     research base, reachable as the mosaic `figure` component.
+ *   v0.8.0 — 2026-08-27 — THE LOOK FACTORY: every preset block moves to the GENERATED
+ *     ./aimeat-atelier/looks.css, emitted from the one registry (src/data/atelier-looks.ts)
+ *     that also drives the build prompt's look table and the mosaic catalogue's look sheets.
+ *     Structure recipes (masthead, joined, full-bleed-hero) become shared vocabulary any look
+ *     declares. Five new looks arrive as data entries — broadsheet, gallery, brutalist,
+ *     terminal, aurora — and the matrix (now 120 combinations) proves each automatically.
+ *     check:atelier refuses drift between the registry and the emitted file.
+ *   v0.7.0 — 2026-08-27 — COMPOSITION, on the developer's award-site references: the missing
+ *     axis was layout, not colour. The mosaic gains a six-column composition grid (per-block
+ *     span: full/main/side/half), the `rail` navigation (a desktop-grade left rail folding to a
+ *     strip on phones), editorial becomes a real front page (masthead hero on rules, giant
+ *     joined numerals, cells sharing hairlines in one frame), poster's band runs edge to edge,
+ *     and the measure cap rises from the 52rem tube to 68rem (editorial 76, neon 80).
+ *   v0.6.0 — 2026-08-27 — THE SPECTRUM RELEASE, on the developer's "irrottele" directive. Two
+ *     hues derived from the accent by OKLCh rotation (lightness never moves, so every proven
+ *     contrast holds) turn the hero mesh into an aurora and the brand gradient two-hued; the
+ *     page ground carries a whisper-quiet ambient of the same spectrum; dark surfaces lean
+ *     toward the accent instead of neutral grey and raised things faintly glow; the bar and the
+ *     bottom nav float on saturated glass; film grain rides an inline colourless SVG; and the
+ *     hero's aurora DRIFTS — a 46s compositor tween behind a scrim that stays put, mutating no
+ *     DOM and collapsing under reduced motion. Flat, calm-card and editorial opt out of what
+ *     contradicts them. Verified: AK-PAGE (ink on every ambient stop + the whisper cap) and
+ *     AK-GLASS (bar ink on the composited pane) join the matrix.
  *   v0.5.0 — 2026-08-27 — The energetic presets commit: poster's hero ground IS the brand
  *     gradient (48dvh, 900-weight display up to 5.2rem, extruded), sticker tilts the whole grid
  *     (±2°, chunky offset shadows, 24px pills), neon-dense gets its accent ring + glow and an
@@ -80,6 +116,8 @@
 @import url('./aimeat-atelier/content.css');
 @import url('./aimeat-atelier/data.css');
 @import url('./aimeat-atelier/mosaic.css');
+/* LAST on purpose: the generated look blocks (tokens + structure recipes) override the parts. */
+@import url('./aimeat-atelier/looks.css');
 
 /* ══════════════════════════════════════════════════════════════════════════════════════════
    THE CONTRACT — light. Set these to author a look; do not override component selectors.
@@ -106,6 +144,12 @@
   /* ── Meaningful colour ────────────────────────────────────────────────────────────────── */
   --ak-accent:        var(--color-primary, #e8564a);
   --ak-accent-2:      var(--color-secondary, var(--ak-accent));
+  /* THE SPECTRUM: two hues DERIVED from the accent by OKLCh rotation — lightness and chroma do
+   * not move, so every contrast ratio the matrix proves for the accent holds for its rotations.
+   * This is what lets one brand colour carry an aurora instead of a monochrome wash, without
+   * breaking the "a preset never introduces a colour" rule: the spectrum IS the accent. */
+  --ak-spectrum-2:    oklch(from var(--ak-accent) l c calc(h + 80));
+  --ak-spectrum-3:    oklch(from var(--ak-accent) l c calc(h - 55));
   --ak-accent-ink:    var(--color-primary-content, #ffffff);
   /* The accent as TEXT: pulled toward the ink until small text passes contrast. */
   --ak-accent-text:   color-mix(in oklab, var(--ak-accent) 74%, var(--ak-ink));
@@ -113,20 +157,29 @@
   --ak-warn:          var(--color-warning, #8a5300);
   --ak-err:           var(--color-error, #b3261e);
   --ak-focus:         var(--ak-accent);
-  /* The one brand gradient — hero band, primary CTA fill. One region per screen. */
+  /* The one brand gradient — hero band, primary CTA fill. One region per screen. Two HUES now,
+   * not two darknesses of one: the spectrum is what makes it read as energy. */
   --ak-grad:          linear-gradient(135deg,
                         color-mix(in oklab, var(--ak-accent) 85%, var(--ak-ink)),
-                        color-mix(in oklab, var(--ak-accent-2) 70%, var(--ak-accent)));
+                        color-mix(in oklab, var(--ak-spectrum-2) 74%, var(--ak-ink)));
   /* The scrim hero TEXT sits on — mode-following, composited over image or gradient. */
   --ak-scrim:         color-mix(in oklab, var(--ak-bg) 78%, transparent);
-  /* The zero-image hero ground: a gradient mesh from brand tokens. An image replaces it.
-   * Four lobes, real chroma — the first bench screenshots read as a washed tint, and a focal
-   * band that does not commit is exactly the dryness this system exists to end. The scrim under
-   * the text is what AK-SCRIM verifies, so the mesh may carry colour. */
-  --ak-hero-image:    radial-gradient(at 18% 20%, color-mix(in oklab, var(--ak-accent) 32%, var(--ak-bg)), transparent 52%),
-                      radial-gradient(at 84% 10%, color-mix(in oklab, color-mix(in oklab, var(--ak-accent) 55%, var(--ak-accent-2)) 26%, var(--ak-bg)), transparent 52%),
-                      radial-gradient(at 64% 96%, color-mix(in oklab, var(--ak-accent) 24%, var(--ak-bg)), transparent 55%),
-                      radial-gradient(at 8% 88%,  color-mix(in oklab, var(--ak-accent-2) 14%, var(--ak-bg)), transparent 45%);
+  /* The zero-image hero ground: an AURORA — four lobes across the derived spectrum, real
+   * chroma. The scrim under the text is what AK-SCRIM verifies, so the mesh may commit. */
+  --ak-hero-image:    radial-gradient(at 15% 18%, color-mix(in oklab, var(--ak-accent) 34%, var(--ak-bg)), transparent 50%),
+                      radial-gradient(at 85% 10%, color-mix(in oklab, var(--ak-spectrum-2) 30%, var(--ak-bg)), transparent 52%),
+                      radial-gradient(at 68% 96%, color-mix(in oklab, var(--ak-spectrum-3) 26%, var(--ak-bg)), transparent 55%),
+                      radial-gradient(at 4% 86%,  color-mix(in oklab, var(--ak-spectrum-2) 16%, var(--ak-bg)), transparent 45%);
+  /* The page's own ambient: the same spectrum, whisper-quiet, under everything — the ground
+   * stops being a dead flat and the app has weather. Presets that mean flatness turn it off. */
+  --ak-page-image:    radial-gradient(at 10% 0%,   color-mix(in oklab, var(--ak-accent) 7%, var(--ak-bg)), transparent 42%),
+                      radial-gradient(at 96% 12%,  color-mix(in oklab, var(--ak-spectrum-2) 6%, var(--ak-bg)), transparent 44%),
+                      radial-gradient(at 50% 110%, color-mix(in oklab, var(--ak-spectrum-3) 5%, var(--ak-bg)), transparent 50%);
+  /* Chrome glass: the bar and the bottom nav float on a blurred, saturated pane. */
+  --ak-glass:         color-mix(in oklab, var(--ak-surface) 74%, transparent);
+  --ak-blur:          14px;
+  /* Film grain — an inline, colourless SVG noise; costs no request and no generation. */
+  --ak-grain:         url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n' x='0' y='0' width='100%25' height='100%25'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.16'/></svg>");
 
   /* ── Shape and depth ──────────────────────────────────────────────────────────────────── */
   --ak-radius:        var(--radius-box, 14px);
@@ -162,7 +215,10 @@
   --ak-chrome-bottom: var(--aimeat-chrome-bottom, 56px);
 
   /* ── Component sizing (one sizing everywhere — instances never override these) ────────── */
-  --ak-main-max:      52rem;                            /* measure cap for the main column   */
+  --ak-main-max:      68rem;                            /* measure cap for the main column — a
+                                                           52rem tube read as "basic" on every
+                                                           desktop; the composition grid inside
+                                                           now owns the line lengths */
   --ak-hero-min:      30dvh;                            /* the focal band's minimum height   */
 }
 
@@ -171,11 +227,15 @@
    ══════════════════════════════════════════════════════════════════════════════════════════ */
 /* @preset-block vivid-dark */
 :root[data-theme='dark'] {
-  --ak-bg:          var(--color-base-100, #0f1218);
-  --ak-surface:     var(--color-base-200, #171b23);
-  --ak-surface-2:   var(--color-base-100, #10141a);
+  /* Dark with a SOUL: the surfaces lean toward the accent instead of sitting on neutral grey —
+   * the "sieluton harmaa" verdict was about exactly these three tokens. A few percent of hue
+   * on a near-black ground changes the temperature of the whole app without touching a single
+   * contrast number the matrix cannot see. */
+  --ak-bg:          color-mix(in oklab, var(--ak-accent) 4%, var(--color-base-100, #0f1218));
+  --ak-surface:     color-mix(in oklab, var(--ak-accent) 7%, var(--color-base-200, #171b23));
+  --ak-surface-2:   color-mix(in oklab, var(--ak-accent) 5%, var(--color-base-100, #10141a));
   --ak-ink:         var(--color-base-content, #e7ebf2);
-  --ak-line:        var(--color-base-300, #2b323d);
+  --ak-line:        color-mix(in oklab, var(--ak-accent) 12%, var(--color-base-300, #2b323d));
   --ak-accent:      var(--color-primary, #ff6f62);
   --ak-accent-ink:  var(--color-primary-content, #1a0d0b);
   --ak-ok:          var(--color-success, #43c98a);
@@ -184,127 +244,17 @@
   /* Dark raises the scrim so one image survives both modes with readable text. */
   --ak-scrim:       color-mix(in oklab, var(--ak-bg) 62%, transparent);
   --ak-elev-1:      var(--elev-card, 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 18px rgba(0, 0, 0, 0.35));
-  --ak-elev-2:      var(--elev-raise, 0 10px 30px rgba(0, 0, 0, 0.5));
+  /* Raised things GLOW in the dark, faintly — depth reads as light, not as a grey blur. */
+  --ak-elev-2:      0 10px 30px rgba(0, 0, 0, 0.5), 0 0 26px color-mix(in oklab, var(--ak-accent) 16%, transparent);
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════════════════
-   LOOK PRESETS. The base contract IS vivid; a preset block only re-declares tokens.
-   New presets arrive only through the growth rule: full check:atelier matrix green plus a
-   reviewed diagonal (TARGET-074).
+   LOOK PRESETS live in ./aimeat-atelier/looks.css — GENERATED from src/data/atelier-looks.ts
+   (pnpm build:atelier-looks). One registry drives the stylesheet, the build prompt's look
+   table and the mosaic catalogue; pnpm check:atelier refuses drift and runs the full matrix
+   over every generated block. A new look is one data entry, and the growth rule (matrix green
+   plus a reviewed diagonal, TARGET-074) is enforced by the gate instead of remembered.
    ══════════════════════════════════════════════════════════════════════════════════════════ */
-
-/* @preset-block flat — the deliberate opt-out: no decoration, no entrance, and that is a
-   choice the spec records rather than an accident. */
-[data-ak-look='flat'] {
-  --ak-surface-image: none;
-  --ak-hero-image:    none;
-  /* Flat still darkens the action fill: body-size text on the RAW accent is 3.58:1 on the
-     aimeat palette (the theme's own pair is a large-text pair), and a flat look is not a
-     licence to ship an unreadable button. */
-  --ak-grad:          linear-gradient(135deg,
-                        color-mix(in oklab, var(--ak-accent) 82%, var(--ak-ink)),
-                        color-mix(in oklab, var(--ak-accent) 82%, var(--ak-ink)));
-  --ak-enter-distance: 0px;
-  --ak-enter-stagger:  0ms;
-  --ak-elev-2:        var(--ak-elev-1);
-  --ak-weight-display: 650;
-}
-
-/* @preset-block calm-card — the quiet product: a whisper of tint, hairlines over shadows,
-   a lower hero, a shorter entrance. Calm, not flat. */
-[data-ak-look='calm-card'] {
-  --ak-surface-image: linear-gradient(180deg,
-                        color-mix(in oklab, var(--ak-accent) 3%, var(--ak-surface)),
-                        var(--ak-surface));
-  --ak-hero-image:    radial-gradient(at 30% 20%, color-mix(in oklab, var(--ak-accent) 8%, var(--ak-bg)), transparent 60%);
-  --ak-grad:          linear-gradient(135deg,
-                        color-mix(in oklab, var(--ak-accent) 80%, var(--ak-ink)),
-                        color-mix(in oklab, var(--ak-accent) 70%, var(--ak-ink)));
-  --ak-elev-2:        var(--ak-elev-1);
-  --ak-enter-distance: 8px;
-  --ak-enter-stagger:  30ms;
-  --ak-hero-min:      18dvh;
-  --ak-weight-display: 650;
-}
-
-/* @preset-block editorial — the magazine: a big display step, rules instead of shadows,
-   squarer corners, a slow fade. Structure carries the page, not depth. */
-[data-ak-look='editorial'] {
-  --ak-surface-image: none;
-  --ak-hero-image:    none;
-  --ak-grad:          linear-gradient(135deg,
-                        color-mix(in oklab, var(--ak-accent) 82%, var(--ak-ink)),
-                        color-mix(in oklab, var(--ak-accent) 82%, var(--ak-ink)));
-  --ak-elev-1:        none;
-  --ak-elev-2:        none;
-  --ak-radius:        8px;
-  --ak-radius-sm:     6px;
-  --ak-text-hero:     clamp(2.2rem, 7vw, 3.4rem);
-  --ak-weight-display: 800;
-  --ak-enter-distance: 0px;
-  --ak-enter-stagger:  60ms;
-  --ak-motion:        var(--motion-slow, 320ms);
-}
-
-/* @preset-block sticker — the playful form language the game kit proved: pill corners, a tilt,
-   extruded display type, a springier entrance. */
-[data-ak-look='sticker'] {
-  --ak-radius:        24px;
-  --ak-radius-sm:     16px;
-  /* 3%: the secondary hue runs darker than the accent on several palettes, and at 4% the
-     aimeat palette's near-white card sank into the page (check:atelier, step 1.09). */
-  --ak-surface-image: linear-gradient(180deg,
-                        color-mix(in oklab, var(--ak-accent-2) 3%, var(--ak-surface)),
-                        var(--ak-surface));
-  --ak-display-shadow: 0 4px 0 color-mix(in oklab, var(--ak-ink) 32%, var(--ak-surface));
-  /* The chunky offset shadow IS the sticker edge — depth as a printed shape, not a blur. */
-  --ak-elev-1:        0 5px 0 color-mix(in oklab, var(--ak-ink) 20%, transparent);
-  --ak-tilt:          -2deg;
-  --ak-enter-distance: 22px;
-  --ak-enter-stagger:  55ms;
-  --ak-weight-display: 800;
-}
-
-/* @preset-block neon-dense — the operator console: tight radii and gaps, the mono face on
-   display type, a fast short entrance, an accent-tinted working surface. */
-[data-ak-look='neon-dense'] {
-  --ak-radius:        8px;
-  --ak-radius-sm:     6px;
-  --ak-gap:           8px;
-  --ak-pad:           12px;
-  --ak-font-display:  var(--ak-font-mono);
-  --ak-surface-image: linear-gradient(180deg,
-                        color-mix(in oklab, var(--ak-accent) 4%, var(--ak-surface)),
-                        var(--ak-surface));
-  /* The neon: an accent ring plus a soft accent glow — the card edge carries the current. */
-  --ak-elev-1:        0 0 0 1px color-mix(in oklab, var(--ak-accent) 45%, var(--ak-surface)),
-                      0 0 18px color-mix(in oklab, var(--ak-accent) 22%, transparent);
-  --ak-line:          color-mix(in oklab, var(--ak-accent) 35%, var(--ak-ink-dim));
-  --ak-hero-min:      18dvh;
-  --ak-enter-distance: 6px;
-  --ak-enter-stagger:  20ms;
-  --ak-motion:        var(--motion-fast, 120ms);
-  --ak-weight-display: 700;
-}
-
-/* @preset-block poster — one giant focal statement: the hero owns the first viewport and
-   everything else recedes to bordered lists. The band's ground is the BRAND GRADIENT itself,
-   not the mesh wash — poster means committing; the scrim under the title is still what
-   AK-SCRIM verifies. */
-[data-ak-look='poster'] {
-  --ak-hero-min:      48dvh;
-  --ak-hero-image:    none;
-  --ak-grad:          linear-gradient(160deg,
-                        color-mix(in oklab, var(--ak-accent) 85%, var(--ak-ink)),
-                        color-mix(in oklab, color-mix(in oklab, var(--ak-accent) 55%, var(--ak-accent-2)) 78%, var(--ak-ink)));
-  --ak-text-hero:     clamp(3rem, 11vw, 5.2rem);
-  --ak-weight-display: 900;
-  --ak-display-shadow: 0 4px 0 color-mix(in oklab, var(--ak-ink) 30%, transparent);
-  --ak-surface-image: none;
-  --ak-elev-1:        none;
-  --ak-enter-distance: 24px;
-  --ak-enter-stagger:  70ms;
-}
 
 /* ══════════════════════════════════════════════════════════════════════════════════════════
    Reduced motion: every animated thing collapses to its end state.

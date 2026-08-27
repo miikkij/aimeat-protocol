@@ -12,6 +12,8 @@
  *   getAppdevPitfalls() / getAppdevPitfallIndex() / getAppdevPitfallFacets() — accessors.
  * @usage import { getAppdevPitfalls, getAppdevPitfallIndex } from '../data/appdev-pitfalls.js';
  * @version-history
+ *   v1.5.0 — 2026-08-27 — +track-mixing, the id the four track-separation findings in the publish
+ *     artifact check carry (TARGET-074: Classic and Atelier have separate guides that never mix).
  *   v1.4.0 — 2026-08-25 — +one-file-past-a-megabyte. The first entry here about what an app
  *     ACCUMULATES rather than what it gets wrong: measured on a 3.18 MB app whose author felt the
  *     slowdown for two days while every number that explained it sat on our side, unshown.
@@ -102,6 +104,16 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     severity: 'warn',
     source: 'curated',
     updatedAt: '2026-08-15',
+  }),
+  E({
+    id: 'track-mixing',
+    title: 'An app built from two guides at once',
+    symptom: 'The app declares one build track and carries the other track\'s vocabulary: Classic declared with the Atelier kit loaded, Atelier declared with the kit missing or with raw daisyUI class markup outside a section escape hatch, or the Atelier kit loaded with no track declared at all. Publishing warns; the visible cost comes later, when an edit session loads the declared track\'s guide and half-understands the file.',
+    fix: 'Pick the track first and stay on it. `<meta name="aimeat-track" content="classic">` means daisyUI classes and the Classic build guide; `content="atelier"` means the Atelier kit is the vocabulary, and raw markup lives only inside a section body the app fills itself (`AIMEAT.atelier.section`). The declaration is what routes every later improve session to the right guide, so it must match what the page actually does.',
+    appliesTo: ['app', 'publish'],
+    severity: 'warn',
+    source: 'curated',
+    updatedAt: '2026-08-27',
   }),
   E({
     id: 'namespace-rule',
