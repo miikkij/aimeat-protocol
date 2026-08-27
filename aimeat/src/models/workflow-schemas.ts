@@ -163,6 +163,12 @@ export type WorkflowStepAction =
       prompt_key?: string;
       /** The prompt itself, when it belongs to the workflow rather than to a record. */
       prompt?: string;
+      /**
+       * Owner-namespace keys whose records are read and appended to the prompt, labelled by key.
+       * This model has NO TOOLS: the string we send is all it will ever see, so a prompt telling it
+       * to read a record is a prompt telling it to invent one. Name here what the step needs.
+       */
+      input_keys?: string[];
       /** Where the answer lands, in the owner's namespace. Templated; honours keyPrefix. */
       result_to_key?: string;
       /** Parse the answer as JSON before writing it. A malformed answer fails the step. */
@@ -527,6 +533,7 @@ const WorkflowStepActionSchema = z.discriminatedUnion('kind', [
     kind: z.literal('ai'),
     prompt: z.string().max(20000).optional(),
     prompt_key: z.string().max(400).optional(),
+    input_keys: z.array(z.string().min(1).max(400)).max(20).optional(),
     result_to_key: z.string().max(400).optional(),
     json: z.boolean().optional(),
     model: z.string().max(200).optional(),

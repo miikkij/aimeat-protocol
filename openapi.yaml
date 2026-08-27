@@ -4423,6 +4423,16 @@ components:
                 string). Templated with the run's vars, and so is the text it holds. This is what makes a
                 text stage cheap to change: the wording is a memory record, so editing it touches no code,
                 no agent fleet and no deploy.
+            input_keys:
+              type: array
+              maxItems: 20
+              items: { type: string, maxLength: 400 }
+              description: >-
+                ai: owner-namespace keys read at run time and appended to the prompt, labelled by key and
+                templated with the run's vars. The model behind an ai step has no tools, so the prompt
+                string is the whole of what it can see: a prompt that ASKS it to read a record is a prompt
+                that invites it to invent one. Name the step's inputs here. A key with no record is stated
+                as missing in the prompt rather than left silent.
             json: { type: boolean, description: 'ai: parse the answer as JSON before writing it, so a malformed answer fails the step instead of becoming a string nobody validates.' }
             model: { type: string, maxLength: 200, description: 'ai: override the owner''s default model for this one step.' }
             geai: { type: string, description: 'export-out / trigger-geai: the target GEAI.' }
