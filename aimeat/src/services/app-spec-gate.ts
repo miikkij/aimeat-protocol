@@ -28,6 +28,11 @@
  *   import { evaluateSpecCheck } from './app-spec-gate.js';
  *   const specCheck = evaluateSpecCheck(config, { specToken, specAck });
  * @version-history
+ *   v1.2.0 — 2026-08-27 — Two tracks, two tokens (TARGET-074): the Atelier spec's digest
+ *     (`atelier-…`, /v1/prompts/build-app-atelier) satisfies the gate exactly as the Classic one
+ *     does, with an answer that names the track it proves. Non-ok answers stay Classic-oriented —
+ *     the Atelier skill teaches its own token — but name the other track so a builder on it is
+ *     never steered to the wrong spec.
  *   v1.1.0 — 2026-08-15 — The 'ok' message says what the token proves (the spec was FETCHED at
  *     this version) instead of what it does not (that it was read). One publish carried the token
  *     after four regex searches over about a tenth of the document, and the unread parts are what
@@ -36,9 +41,13 @@
  */
 import type { AimeatConfig } from '../config.js';
 import { buildAppSpecToken } from './build-app-prompt.js';
+import { buildAtelierSpecToken } from './build-atelier-prompt.js';
 
 /** The skill that teaches the whole paved path, named in every non-ok answer. */
 export const APP_BUILDER_SKILL_REF = 'node:aimeat-app-builder';
+
+/** The Atelier track's counterpart (TARGET-074). */
+export const ATELIER_BUILDER_SKILL_REF = 'node:aimeat-app-builder-atelier';
 
 /** The one value the owner may send to publish without the token on purpose. */
 export const SPEC_ACK_SKIPPED = 'skipped-by-owner';
@@ -73,6 +82,15 @@ export function evaluateSpecCheck(config: AimeatConfig, input: SpecCheckInput): 
   const given = typeof input.specToken === 'string' ? input.specToken.trim() : '';
   const specUrl = `${config.baseUrl.replace(/\/+$/, '')}/v1/prompts/build-app`;
 
+  if (given && given === buildAtelierSpecToken(config)) {
+    return {
+      status: 'ok',
+      message: 'You carried the current ATELIER build spec token, so that spec was fetched at this '
+        + 'version. That is what this attests — not that it was read. The parts a search skips are '
+        + 'the parts that bite: the component contract, the look rule, the imagery cost rule.',
+    };
+  }
+
   if (given && given === expected) {
     return {
       status: 'ok',
@@ -105,8 +123,8 @@ export function evaluateSpecCheck(config: AimeatConfig, input: SpecCheckInput): 
     return {
       status: 'stale',
       message: 'The build spec has changed since the token you carried. Fetch GET /v1/prompts/build-app '
-        + 'and pass spec_token. Read what changed before the next publish — the parts you did not read '
-        + 'are the parts that bite.',
+        + '(or /v1/prompts/build-app-atelier on the Atelier track) and pass spec_token. Read what '
+        + 'changed before the next publish — the parts you did not read are the parts that bite.',
       skill: APP_BUILDER_SKILL_REF,
       spec_url: specUrl,
     };
@@ -114,9 +132,10 @@ export function evaluateSpecCheck(config: AimeatConfig, input: SpecCheckInput): 
 
   return {
     status: 'missing',
-    message: 'Fetch GET /v1/prompts/build-app and pass spec_token. It names the library URLs that exist, '
-      + 'the theme tokens, and how to read data your agents wrote — three things a published app gets '
-      + 'wrong when it is modelled on an older template instead.',
+    message: 'Fetch GET /v1/prompts/build-app and pass spec_token — or, on the Atelier track, '
+      + 'GET /v1/prompts/build-app-atelier. The spec names the library URLs that exist, the theme '
+      + 'tokens, and how to read data your agents wrote — three things a published app gets wrong '
+      + 'when it is modelled on an older template instead.',
     skill: APP_BUILDER_SKILL_REF,
     spec_url: specUrl,
   };

@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description App, subdomain, CSM/MSM/schema, system-prompt, and package/template record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.0 — 2026-08-27 — AppManifest gains `track` (TARGET-074): which build track made this app
+ *     (classic | atelier), parsed from the head meta at publish, carried forward, absent = classic.
  *   v1.6.0 — 2026-08-25 — AppVersionSize: a version's three numbers without its bytes, so the
  *     publish path can state how fast an app is growing without reading its whole history.
  *   v1.5.0 — 2026-08-24 — AppManifest gains `dataMap` (TARGET-073): the SUMMARY of where this app
@@ -75,6 +77,19 @@ export interface AppManifest {
    * app has. See services/app-ai-posture.ts.
    */
   aiPosture?: AppAiPosture;
+  /**
+   * Which build track made this app (TARGET-074): `atelier` when the app declared
+   * `<meta name="aimeat-track" content="atelier">` in its head, `classic` when it declared that,
+   * and absent when it declared nothing — which reads as classic, because every app that existed
+   * before the tracks did is a classic app. Parsed from the published bytes at publish time and
+   * carried forward on updates that stop declaring it, so an edit session months later loads the
+   * guide this app was actually built with instead of mixing the two vocabularies.
+   *
+   * On the MANIFEST for the same reasons `aiPosture` is: a JSON blob on both providers, no
+   * migration, and it travels with update, fork, backup and purchase snapshot — a fork of an
+   * Atelier app is still an Atelier app.
+   */
+  track?: 'classic' | 'atelier';
   /**
    * The SUMMARY of this app's data map — what it stores, in how many rows, on how weak a basis, and
    * how much of it nobody has explained. Here for the same reason `aiPosture` is: a JSON blob on both

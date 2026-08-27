@@ -27,6 +27,10 @@
  *   visible afterwards) · blocking artifacts on all three REST doors · the warnings · next_steps
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-publish-gate
  * @version-history
+ *   v1.1.0 — 2026-08-27 — The Atelier track (TARGET-074): its own spec route and `atelier-`
+ *     token satisfy the gate with an answer naming the track; `aimeat-track` lands on the
+ *     manifest and carries forward through a silent update; an undeclared track stays absent;
+ *     the shell-atelier template declares its track and points at its own guide.
  *   v1.0.0 — 2026-08-11 — initial.
  */
 import * as ed from '@noble/ed25519';
@@ -184,6 +188,80 @@ const publish = (token: string, body: Record<string, unknown>) =>
         assert(r.status === 201, `publish ${r.status}: ${JSON.stringify(r.body?.error)}`);
         assert(r.body.data.spec_check?.status === 'ok',
             `expected "ok", got ${JSON.stringify(r.body.data.spec_check)}`);
+    });
+
+    // ── The Atelier track (TARGET-074): its own spec, its own token, its own manifest mark ────
+
+    let atelierToken = '';
+    await test('the ATELIER track has its own spec and token, and the two tracks never collide', async () => {
+        const r = await json('/v1/prompts/build-app-atelier');
+        assert(r.status === 200, `build-app-atelier ${r.status}`);
+        atelierToken = r.body.data.spec_token;
+        assert(typeof atelierToken === 'string' && atelierToken.startsWith('atelier-'),
+            `the Atelier token must be recognisable as the Atelier one: ${JSON.stringify(atelierToken)}`);
+        assert(atelierToken !== specToken, 'the two specs share one token — the gate could not tell the tracks apart');
+        const prompt = r.body.data.prompt as string;
+        // The spec is self-contained for its track: it names its shell and its token, and it
+        // never sends the builder to the Classic spec.
+        assert(prompt.includes('shell-atelier'), 'the spec must name its shell');
+        assert(prompt.includes(atelierToken), 'the prompt text must name its own token (the ?format=txt reader never sees the envelope)');
+        const stable = await json('/v1/prompts/build-app-atelier?mode=improve');
+        assert(stable.body.data.spec_token === atelierToken, 'the token moved with the request');
+        const txt = await fetch(`${BASE}/v1/prompts/build-app-atelier?format=txt`).then(x => x.text());
+        assert(txt.includes(atelierToken), 'the text/plain form dropped the token');
+    });
+
+    await test('the Atelier token answers "ok", and the answer names the track it proves', async () => {
+        const r = await publish(o.token, {
+            filename: `gateat${Date.now()}.html`, mime_type: 'text/html', content: b64(app('x.html')),
+            name: 'Atelier current', description: 'Built against the Atelier spec.', spec_token: atelierToken,
+        });
+        assert(r.status === 201, `publish ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        assert(r.body.data.spec_check?.status === 'ok',
+            `expected "ok", got ${JSON.stringify(r.body.data.spec_check)}`);
+        assert((r.body.data.spec_check.message as string).includes('ATELIER'),
+            'an ok that does not say WHICH spec it proves lets the tracks blur');
+    });
+
+    const trackName = `gatetrack${Date.now()}.html`;
+    await test('aimeat-track lands on the manifest, and survives an update that stops declaring it', async () => {
+        const atelierApp = app(trackName).replace(
+            '<meta name="aimeat-scopes"',
+            '<meta name="aimeat-track" content="atelier">\n<meta name="aimeat-scopes"');
+        const first = await publish(o.token, {
+            filename: trackName, mime_type: 'text/html', content: b64(atelierApp),
+            name: 'Tracked', description: 'An Atelier-track app.', spec_token: atelierToken,
+        });
+        assert(first.status === 201, `publish ${first.status}: ${JSON.stringify(first.body?.error)}`);
+        let row = await appRow(o.name, trackName, o.token);
+        assert(row?.manifest?.track === 'atelier',
+            `the manifest must record the track: ${JSON.stringify(row?.manifest?.track)}`);
+        // A later version published WITHOUT the meta keeps the answer — an edit session months
+        // from now must still learn which guide built this app.
+        const update = await publish(o.token, {
+            filename: trackName, mime_type: 'text/html', content: b64(app(trackName)),
+            name: 'Tracked', description: 'An Atelier-track app.', spec_token: atelierToken,
+        });
+        assert(update.status === 201, `update ${update.status}: ${JSON.stringify(update.body?.error)}`);
+        row = await appRow(o.name, trackName, o.token);
+        assert(row?.manifest?.track === 'atelier',
+            `the track must carry forward through a silent update: ${JSON.stringify(row?.manifest?.track)}`);
+    });
+
+    await test('an app that declares no track has no track — every pre-track app reads as classic', async () => {
+        const row = await appRow(o.name, missingName, o.token);
+        assert(row && row.manifest.track === undefined,
+            `an undeclared track must stay absent, got ${JSON.stringify(row?.manifest?.track)}`);
+    });
+
+    await test('the Atelier shell is served, declares its track, and points at its own guide', async () => {
+        const r = await json('/v1/app-templates/shell-atelier');
+        assert(r.status === 200, `shell-atelier ${r.status}`);
+        const content = r.body.data.template.content as string;
+        assert(content.includes('name="aimeat-track" content="atelier"'), 'the shell must declare its track');
+        assert(content.includes('/v1/prompts/build-app-atelier'), 'the shell must point at the Atelier guide');
+        assert(content.includes('/lib/aimeat-boot.js'), 'the shell must use the served boot script, not an inline IIFE');
+        assert(!content.includes('daisyui'), 'the Atelier shell must not load the Classic styling stack');
     });
 
     const skippedName = `gateskip${Date.now()}.html`;

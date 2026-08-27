@@ -44,6 +44,7 @@ import { buildAppdevFlowPrompt } from '../services/appdev-flow-prompt.js';
 import { HELLO_MCP_KEY, buildHelloMcpPrompt, buildOrganismSetupPrompt } from '../services/hello-mcp.js';
 import { registerIntentPoolPrompt } from './prompts-intent-pool.js';
 import { registerOpenItemsPrompt } from './prompts-open-items.js';
+import { registerAtelierPrompt } from './prompts-atelier.js';
 import { buildAgentConnectPrompt, buildAgentConnectSteps } from '../services/agent-connect-prompt.js';
 import { buildAgentOnboardPrompt } from '../services/agent-onboard-prompt.js';
 import { buildAiToolSetup } from '../services/ai-tool-setup.js';
@@ -287,6 +288,9 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
   // the aimeat-extension-builder skill and llms.txt cannot drift apart. Public: build guidance, not
   // a secret. ?lang, ?owner, ?idea, ?format=txt. MUST be registered before /v1/prompts/:tier.
   registerIntentPoolPrompt(router, config);
+  // The Atelier track's build spec (TARGET-074) — its own module and route so the two tracks'
+  // guides never mix. MUST be registered before /v1/prompts/:tier.
+  registerAtelierPrompt(router, config);
 
   router.get('/v1/prompts/build-extension', (req, res) => {
     const lang = typeof req.query.lang === 'string' ? req.query.lang : 'en';

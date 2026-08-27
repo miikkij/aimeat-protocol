@@ -8388,6 +8388,62 @@ paths:
                               ok | stale | missing | skipped.
                             example: spec-9f21c4ab77de
 
+  /v1/prompts/build-app-atelier:
+    get:
+      operationId: getBuildAppAtelierPrompt
+      summary: The Atelier track's "build an AIMEAT app" prompt
+      description: >-
+        The Atelier build track's canonical spec (TARGET-074), served beside — and deliberately
+        separate from — /v1/prompts/build-app: two build tracks, two guides that never teach each
+        other's mechanics. Carries the served component-kit catalogue (AIMEAT.atelier), the seven
+        look presets with their imagery style words, the generated-imagery pipeline and cost rule,
+        and the track rules. data.spec_token is this spec's own digest (an `atelier-` prefixed
+        value): pass it back as `spec_token` when publishing and the publish response reports
+        whether the app was built against the Atelier spec in force. Public.
+      tags:
+        - Discovery
+      parameters:
+        - name: mode
+          in: query
+          schema: { type: string, enum: [new, improve], default: new }
+          description: new = interview + the spec; improve = the spec body alone, for changing an existing Atelier app
+        - name: lang
+          in: query
+          schema: { type: string }
+          description: Conversation-language instruction embedded in the prompt (the app ships its own translations)
+        - name: idea
+          in: query
+          schema: { type: string, maxLength: 500 }
+          description: The app idea to embed into the prompt header (mode=new)
+        - name: format
+          in: query
+          schema: { type: string, enum: [txt] }
+          description: txt returns the full prompt as text/plain instead of the JSON envelope
+      responses:
+        '200':
+          description: The Atelier build prompt (JSON envelope with prompt + body + spec_token, or text/plain with format=txt)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          prompt: { type: string }
+                          body: { type: string }
+                          mode: { type: string }
+                          lang: { type: string }
+                          spec_token:
+                            type: string
+                            description: >-
+                              Digest of the Atelier spec. Changes when the spec changes. Pass it
+                              as `spec_token` on a publish; the publish answers
+                              `spec_check.status` ok | stale | missing | skipped.
+                            example: atelier-3c81f0a29b4d
+
   /v1/prompts/build-extension:
     get:
       operationId: getBuildExtensionPrompt
