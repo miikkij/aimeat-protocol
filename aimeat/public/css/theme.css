@@ -12,6 +12,8 @@
    @usage Loaded first in spa.html <head>; the theme is toggled by /js/theme.js
      which flips the data-theme attribute on <html>.
    @version-history
+     v1.29.0 — 2026-08-27 — .start-page replaces .ui-switch: the start-page setting
+       (components/StartPageSetting.js) in place of the home-or-profile switch.
      v1.28.0 — 2026-08-17 — The palette bridge: html[data-palette] maps aimeat-theme.css's
        --color-* tokens onto the shell's own, so the golden pill's palette picker finally changes
        what the apex looks like. Inert with no palette chosen (the default removes the attribute).
@@ -1148,14 +1150,16 @@ a { color: inherit; text-decoration: none; }
 .seg-btn.active { background: var(--accent); color: #fff; }
 .seg-btn:disabled { opacity: 0.6; cursor: default; }
 
-/* ── UI switch (components/HomeUiSwitch.js) ──
-   The one control that moves a person between the new home and the old profile. Quiet by design:
-   it is a preference, not an action anyone came to perform. */
-.ui-switch {
-  display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+/* ── Start page (components/StartPageSetting.js) ──
+   Where a sign-in lands. Quiet by design: it is a preference, not an action anyone came to
+   perform. One line of words, one segmented control under it. */
+.start-page {
+  display: flex; flex-direction: column; gap: 0.55rem;
   font-size: 0.88rem; color: var(--text-dim);
 }
-.ui-switch-btn { flex: none; }
+.start-page-words { display: flex; flex-direction: column; gap: 0.15rem; }
+.start-page-title { font-weight: 600; color: var(--text); }
+.start-page-seg { align-self: flex-start; }
 
 /* ── Status dot (canonical) ──
    Small circle whose color is driven by a semantic status token. Consolidates

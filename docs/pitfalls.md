@@ -75,6 +75,7 @@ A running catalogue of traps we've actually hit, so we don't hit them twice. **O
 
 - **`en.json` + `fi.json` are updated together** (Rule 4) — never add a key to one only. If unsure of the Finnish, use the English with a `[TODO:fi]` prefix.
 - **`t()` silently returns the raw key on a miss** — if you see `profile.apps.foo` on screen, the key is missing or the path is wrong. Locales mix **flat dotted keys and nested objects**; check the PARSED path, not a grep (a flat `"a.b.c"` and a nested `a:{b:{c}}` look the same to grep but resolve differently). The generator emits flat keys (`"tab.search": "Haku"`), so `t()` must check the flat key before the nested path.
+- **One key can exist TWICE in the same file, nested and flat, and only the later one renders.** `public/js/i18n.js` flattens the file into one map, so a flat `"profile.landing.home"` near the end of `en.json` overwrites the nested `profile.landing.home` a few thousand lines above it. On 2026-08-27 the nested value was edited, the served file carried the edit, `check:locales` was green, and the screen still showed the old word. Before editing a key, find every occurrence with a parsed walk (`node -e` over the JSON collecting every path that ends in the key), not with a grep for the nested line, and edit the flat one; it is the one that wins.
 
 ## 6. Identity, auth & scopes
 *Symptoms: owner data "disappears" from lists, a cross-owner leak, an anon request treated as authed.*

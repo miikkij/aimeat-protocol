@@ -28,6 +28,8 @@
  * @usage
  *   import { HOME_BLOCKS } from './blocks-home.js';
  * @version-history
+ *   v1.2.0 — 2026-08-27 — home.chat-door is offered on the onboarding home as well, replacing the
+ *     chat as a new account's landing page.
  *   v1.1.0 — 2026-08-27 — home.mcp-connect: the short way into an MCP connection, on the home of
  *     an account that has none. It gates on the connection record itself rather than on a step
  *     someone ticked, so it cannot stay up after the thing it asks for has happened.
@@ -83,7 +85,10 @@ export const HOME_BLOCKS: readonly SurfaceBlockDef[] = [
     },
     {
         id: 'home.chat-door',
-        surfaces: ['home'],
+        // On the onboarding home too: a new account used to be sent straight into the chat because
+        // it is the one place a person with nothing connected can act. The steps and the chat door
+        // side by side keep that without putting anyone in the chat who did not ask for it.
+        surfaces: ['home', 'home-onboarding'],
         presence: { kind: 'capability', capability: 'chat' },
         localeStem: 'home.chatDoor',
         liveDomains: ['chat', 'instances'],

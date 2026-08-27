@@ -199,7 +199,7 @@
       "/js/components/tag-cloud.js": "/js/components/tag-cloud.js",
       "/js/components/tag-editor.js": "/js/components/tag-editor.js",
       "/components/Modal.js": "/components/Modal.js",
-      "/components/HomeUiSwitch.js": "/components/HomeUiSwitch.js",
+      "/components/StartPageSetting.js": "/components/StartPageSetting.js",
       "/components/VoiceRecorder.js": "/components/VoiceRecorder.js",
       "/components/useViewCSS.js": "/components/useViewCSS.js",
       "/components/Markdown.js": "/components/Markdown.js",
@@ -772,14 +772,16 @@
 
       const handleNav = (e, path) => {
         e.preventDefault();
-        // Mark in-app navigation: the landing redirects logged-in users to their Home
-        // ONLY on direct arrival (bookmark/external link), never when they deliberately
-        // navigated here from inside the app (e.g. the brand link).
-        try { sessionStorage.setItem('aimeat.in-app', '1'); } catch {}
         navigate(path);
       };
 
       const currentPath = location.pathname;
+
+      // The brand goes to ONE place per session state: signed in, the home; signed out, the front
+      // page. It used to go to the front page for everyone and leave a per-tab flag behind so the
+      // front page would not forward the person straight back, and the flag never cleared, so the
+      // same click showed the marketing page in one tab and the home in another.
+      const brandPath = session ? '/v1/home' : '/v1/portal';
 
       // Resolve the public links to render: config order, minus hidden, minus the ones that
       // belong to the other session state, by declared id.
@@ -797,7 +799,7 @@
       return html`
         <nav class="topnav" ref=${navRef}>
           <div style="display:flex;align-items:center;gap:20px">
-            <a href="/v1/portal" class="topnav-brand" onClick=${(e) => handleNav(e, '/v1/portal')}>
+            <a href=${brandPath} class="topnav-brand" onClick=${(e) => handleNav(e, brandPath)}>
               AIME<span class="heart">\u2665</span><span class="brand-at">AT</span>
             </a>
             ${morsels !== null && html`<span class="brand-morsels" style="display:inline-flex">${morsels}</span>`}
@@ -823,8 +825,14 @@
               <!-- Where a signed-in person actually goes, inline with the rest. These sat
                    behind a "Me" dropdown until 2026-08-09, which cost a click every time and
                    only existed because the bar was carrying the marketing links at the same
-                   time. Those links are anon-only now, so these three fit on the row. -->
+                   time. Those links are anon-only now, so these fit on the row.
+
+                   Two layers of one thing: the home in front (what is going on, with a door to
+                   each control) and settings and controls behind it (the whole machine room).
+                   Both are on the row, so neither is reachable only through the other. -->
               ${session && html`
+                <a href="/v1/home" class="${currentPath === '/v1/home' ? 'active' : ''}"
+                  onClick=${(e) => { handleNav(e, '/v1/home'); setMenuOpen(false); }}>${t('nav.home') || 'Home'}</a>
                 <a href="/v1/chat" class="${currentPath === '/v1/chat' ? 'active' : ''}"
                   onClick=${(e) => { handleNav(e, '/v1/chat'); setMenuOpen(false); }}>${t('nav.chat') || 'Chat'}</a>
                 <a href="/app-catalog.html" target="_blank" onClick=${() => setMenuOpen(false)}

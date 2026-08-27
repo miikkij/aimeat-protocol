@@ -15,8 +15,8 @@
  *   - ONBOARDING_KEYS: every remake event key, in ONE place (05-mittaus.md) — nothing that writes
  *     a funnel marker spells a key literal of its own
  *   - recordFirstMcpCall() / recordHelloPageOpened() / recordActivation(): write-once markers
- *   - recordTrack() / recordTrackSwitch(): which path the account was created on, and how many
- *     times it flipped. The switch NEVER rewrites `track` — see the note on recordTrackSwitch.
+ *   - recordTrack() / readTrack(): which path the account was created on. Write-once; nothing
+ *     rewrites it, so a cohort's membership never moves.
  *   - recordOnboardingEvent(): the generic write-once marker every remake phase writes through
  *   - recordWelcomeMatPasted(): the ONE deliberately non-write-once marker (attempts accumulate)
  *   - readOnboardingFunnel(): the operator view's rows (activation, TTFV, rescue, remake events)
@@ -25,6 +25,10 @@
  *   import { recordFirstMcpCall } from '../services/onboarding-funnel.js';
  *   void recordFirstMcpCall(storage, config, owner, platform);   // fire-and-forget at MCP init
  * @version-history
+ *   v1.4.0 — 2026-08-27 — The `switched` counter and recordTrackSwitch are gone with the switch they
+ *     counted: the home and the profile are two layers of one thing now (home in front, settings and
+ *     controls behind), so there is no "leaving for the old path" to measure. `track` stays as the
+ *     cohort key the funnel groups by.
  *   v1.3.0 — 2026-08-17 — The welcome mat writes its own feed row. It is the one marker that
  *     accumulates rather than being write-once, so it never reached the recorder that fires on a
  *     first write, and the mat was the one onboarding step missing from the record. Written on the
@@ -259,7 +263,7 @@ export async function recordTrack(
     if (!owner) return;
     try {
         await writeMarkerOnce(storage, ownerGhii(config, owner), ONBOARDING_KEYS.track, {
-            track, at: new Date().toISOString(), switched: 0,
+            track, at: new Date().toISOString(),
         });
     } catch (err) {
         logger.warn('onboarding-funnel: track marker failed', { owner, track, error: String(err) });
@@ -267,43 +271,16 @@ export async function recordTrack(
 }
 
 /**
- * The switch between the new home and the old profile. Increments `switched` and leaves `track`
- * exactly as it was: rewriting it would move the account between cohorts every time the person
- * flipped, and a cohort whose membership changes under you measures nothing. The counter is
- * itself a result — remake-created accounts switching away is the signal the remake failed.
+ * Read an account's track. Absent marker = an account older than the feature. The marker is
+ * write-once and nothing updates it: a record written before 2026-08-27 also carries a `switched`
+ * counter from the home-or-profile switch that no longer exists, and it is ignored.
  */
-export async function recordTrackSwitch(
-    storage: Storage, config: AimeatConfig, owner: string,
-): Promise<number> {
-    if (!owner) return 0;
-    const gaii = ownerGhii(config, owner);
-    const existing = await storage.getMemory(gaii, ONBOARDING_KEYS.track);
-    const prev = (existing?.value ?? {}) as { track?: OnboardingTrack; at?: string; switched?: number };
-    const switched = (typeof prev.switched === 'number' ? prev.switched : 0) + 1;
-    const now = new Date().toISOString();
-    await storage.setMemory({
-        key: ONBOARDING_KEYS.track,
-        ownerGaii: gaii,
-        // An account that somehow has no track yet is legacy by construction: it was created before
-        // the marker existed. Guessing `remake` here would fabricate a cohort member.
-        value: { track: prev.track ?? 'legacy', at: prev.at ?? now, switched },
-        visibility: 'private',
-        tags: ['onboarding-funnel'],
-        ttlHours: null,
-        version: existing ? existing.version + 1 : 1,
-        createdAt: existing?.createdAt ?? now,
-        updatedAt: now,
-    });
-    return switched;
-}
-
-/** Read an account's track (and switch count). Absent marker = an account older than the feature. */
 export async function readTrack(
     storage: Storage, config: AimeatConfig, owner: string,
-): Promise<{ track: OnboardingTrack; switched: number }> {
+): Promise<{ track: OnboardingTrack }> {
     const rec = await storage.getMemory(ownerGhii(config, owner), ONBOARDING_KEYS.track);
-    const v = (rec?.value ?? {}) as { track?: OnboardingTrack; switched?: number };
-    return { track: v.track === 'remake' ? 'remake' : 'legacy', switched: typeof v.switched === 'number' ? v.switched : 0 };
+    const v = (rec?.value ?? {}) as { track?: OnboardingTrack };
+    return { track: v.track === 'remake' ? 'remake' : 'legacy' };
 }
 
 /**
@@ -512,8 +489,6 @@ export interface FunnelRow {
     // ── remake (05-mittaus.md) ──
     /** Which path the account was created on. `legacy` also covers pre-feature accounts. */
     track: OnboardingTrack;
-    /** How many times the person flipped between the two. Never changes `track`. */
-    switched: number;
     matResult: 'ok' | 'failed' | null;
     matAttempts: number;
     /** The model's own claim about itself — unreliable by nature, kept for exactly that reason. */
@@ -593,7 +568,6 @@ export async function readOnboardingFunnel(
             rescueSentAt: str(MCP_RESCUE_SENT_KEY, 'at'),
             // An account with no track marker pre-dates the feature, so it is legacy by construction.
             track: track.track === 'remake' ? 'remake' : 'legacy',
-            switched: typeof track.switched === 'number' ? track.switched : 0,
             matResult: mat.result === 'ok' ? 'ok' : mat.result === 'failed' ? 'failed' : null,
             matAttempts: typeof mat.attempts === 'number' ? mat.attempts : 0,
             aiModel: str(ONBOARDING_KEYS.aiModelDetected, 'model'),

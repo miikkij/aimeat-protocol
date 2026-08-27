@@ -13,6 +13,8 @@
  *   - POST /v1/admin/federation/join: introduces this node to a target via key exchange
  *
  * @version-history
+ *   Funnel — 2026-08-27 — The `switched` column left the onboarding funnel with the home-or-profile
+ *     switch it counted.
  *   Operator revoke — 2026-08-14 — POST /v1/admin/roles/revoke takes the operator role back, refusing
  *     self-revoke and the last operator so the node keeps at least one administrator.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
@@ -305,9 +307,6 @@ export function adminMonitoringRouter(
                     rooms: Object.fromEntries(
                         ROOMS.map(def => [def.id, list.filter(r => r.room === def.id).length]),
                     ) as Record<string, number>,
-                    // Its own column on purpose: remake-created accounts leaving for the old path
-                    // is the result, not a footnote.
-                    switched: list.filter(r => r.switched > 0).length,
                 };
             });
 

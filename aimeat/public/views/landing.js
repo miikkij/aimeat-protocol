@@ -3,9 +3,9 @@
  * @description Logged-out landing page, in the order a visitor needs it (TARGET-056):
  *   the three-step loop → the generator itself → live counters as its evidence → the
  *   ownership question (owner or tenant) → the wall of published apps → agent prompt →
- *   ask-your-own-AI → today's stats → footer. Logged-in visitors are forwarded to the
- *   profile Home dashboard. No protocol terms (GHII/GAII/CSM/federation) above the fold;
- *   a working result does the selling.
+ *   ask-your-own-AI → today's stats → footer. A signed-in visitor arriving at the site's ROOT is
+ *   forwarded to their start page; /v1/portal is the front page itself and never forwards anyone.
+ *   No protocol terms (GHII/GAII/CSM/federation) above the fold; a working result does the selling.
  *
  *   THE ORDER IS THE OPERATOR'S NOW. The page is a layout rendered by views/surface/renderer.js
  *   from the blocks this node declares, and the built-in layout is the order below — so a node
@@ -19,6 +19,10 @@
  * @structure default export Landing({ navigate })
  * @usage routed at /v1/portal (and '/' for browsers) by spa.html
  * @version-history
+ *   v5.6.0 — 2026-08-27 — The arrival forward is decided by the PATH, not by a per-tab flag: only
+ *     the site's root forwards a signed-in person, and /v1/portal always shows the front page. The
+ *     flag was set by every in-app click and never cleared, so the brand link showed this page in
+ *     one tab and the home in another, and nobody could say which they would get.
  *   v5.5.0 — 2026-08-26 — The front page renders through the surface layout engine, so an operator
  *     can arrange it. The built-in layout is this file's own order, and this file's tree stays as
  *     the fallback for the one case that matters: the layout could not be read at all.
@@ -110,29 +114,29 @@ const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fa
 export default function Landing({ navigate }) {
   const surface = useSurfaceLayout('portal');
 
-  // Logged-in users arriving DIRECTLY (bookmark, external link, address bar) go straight
-  // to the Home dashboard. But a deliberate in-app navigation here (brand link, footer)
-  // shows the landing — otherwise a logged-in user could never see this page at all.
-  // The in-app flag is set by spa.html's handleNav (sessionStorage, per browser tab).
+  // A signed-in person arriving at the site's ROOT (bookmark, external link, the bare address) goes
+  // straight to their start page. This same view at /v1/portal is the front page itself, reached on
+  // purpose (a footer link, the address bar), and it never forwards anyone: otherwise a signed-in
+  // person could never see this page at all. The two are told apart by the PATH. A per-tab flag
+  // used to make this decision, set by every in-app click and never cleared, so the same brand
+  // click showed this page in one tab and the home in another.
   //
-  // The flag suppresses ONLY the arrival redirect. Signing in while standing on this page
-  // always moves on to Home: without that, the sign-in modal closed and the visitor was left
-  // looking at the same marketing page with no sign that anything had happened.
+  // Signing in while standing on this page always moves on: without that, the sign-in modal
+  // closed and the visitor was left looking at the same marketing page with no sign that anything
+  // had happened.
   //
-  // WHERE it forwards to is the node's answer, not this file's. The server has decided since the
-  // remake which side an account lands on, and this page sent everyone to /v1/profile regardless —
-  // so a new account created on the new path still arrived at the old one. It asks now, and falls
-  // back to the profile only when the answer does not arrive.
+  // WHERE it forwards to is the node's answer, not this file's: the start page the person chose,
+  // or the home when they have chosen nothing. The home is also the fallback when the answer does
+  // not arrive, because it is where everyone lands by default anyway.
   useEffect(() => {
     const landingFor = async () => {
       try {
         const res = await apiGet('/v1/home/ui-track');
-        return res?.data?.landing || '/v1/profile';
+        return res?.data?.landing || '/v1/home';
       } catch (err) {
         // Not knowing where to send someone is not a reason to leave them on the marketing page.
-        // The old landing is where everyone went until now, so it is the safe answer.
         console.warn('[landing] could not read where this account lands:', err.message);
-        return '/v1/profile';
+        return '/v1/home';
       }
     };
     const check = () => {
@@ -155,9 +159,8 @@ export default function Landing({ navigate }) {
       const urlWish = new URLSearchParams(window.location.search).get('wish')?.trim();
       if (urlWish) storeWish(urlWish);
     } catch (err) { swallowed('landing: url wish', err); }
-    let arrivedInApp = false;
-    try { arrivedInApp = sessionStorage.getItem('aimeat.in-app') === '1'; } catch { /* treat as direct arrival */ }   // eslint-disable-line aimeat/no-silent-catch -- treat as direct arrival
-    if (!arrivedInApp && check()) return undefined;
+    const atRoot = window.location.pathname === '/';
+    if (atRoot && check()) return undefined;
     const onAuth = () => check();
     window.addEventListener('aimeat-auth-change', onAuth);
     return () => window.removeEventListener('aimeat-auth-change', onAuth);

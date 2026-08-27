@@ -3744,19 +3744,18 @@
       "copied": "Copied. Paste it in your AI chat"
     },
     "settings": {
-      "open": "Settings",
-      "title": "Settings",
-      "tabGeneral": "General",
+      "open": "Home settings",
+      "title": "Home settings",
       "showAch": "Show achievements on the home",
-      "tabOpenRouter": "OpenRouter",
-      "tabAccess": "Access",
-      "tabWallet": "Wallet"
+      "allControls": "All settings and controls",
+      "allControlsHint": "Agents, memory, apps, access, billing: everything behind the home."
     },
-    "switch": {
-      "here": "You are using the new home view.",
-      "toProfile": "Go back to the old profile",
-      "hereProfile": "You are using the old profile.",
-      "toHome": "Try the new home"
+    "startPage": {
+      "title": "Start page",
+      "hint": "Where you land when you sign in or arrive at the front page.",
+      "home": "Home",
+      "chat": "Chat",
+      "controls": "Settings & controls"
     },
     "loadFailed": "Your home could not be loaded just now. Try again in a moment."
   },
@@ -4840,8 +4839,9 @@
   "nav": {
     "devView": "For Developers",
     "signIn": "Sign In",
+    "home": "Home",
     "apps": "Apps",
-    "profile": "Profile",
+    "profile": "Settings & Controls",
     "logout": "Log Out",
     "loggedInAs": "logged in as",
     "help": "Help",
@@ -8895,7 +8895,7 @@
       "referencesPackageLevel": "References (package-level)"
     },
     "landing": {
-      "home": "Home",
+      "home": "Overview",
       "nextTitle": "Suggested next steps",
       "next": {
         "writeNotesTitle": "Write self-organizing notes",
@@ -9334,7 +9334,7 @@
     }
   },
   "profile.agents.detail.tabs.schedules": "Schedules",
-  "profile.landing.home": "Home",
+  "profile.landing.home": "Overview",
   "profile.landing.menu": "Menu",
   "profile.living.activityTrigger": "Also pulse after N workspace changes (0 = schedule only)",
   "profile.living.addPoint": "Add point",

@@ -2,9 +2,9 @@
  * @file public/views/home/index.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description KOTI — the home. The new onboarding path, living beside the old profile rather than
- *   replacing it: nothing under public/views/profile/ is touched, and a person moves between the two
- *   with a switch.
+ * @description KOTI — the home. The front room: what is going on, with a door to each control. The
+ *   whole machine room (settings and controls, public/views/profile/) sits one click behind it, and
+ *   nothing there is touched by this side.
  *
  *   THE FINISHED HOME IS NO LONGER DRAWN HERE. It is a layout the operator can arrange, rendered by
  *   views/surface/renderer.js from the blocks this node declares. What that layout says by default

@@ -8738,7 +8738,6 @@ paths:
                               owner: { type: string }
                               ghii: { type: string }
                               track: { type: string, enum: [remake, legacy] }
-                              switched: { type: integer }
                               step:
                                 type: string
                                 enum: [welcome-mat, first-agent, hello-mcp]
@@ -9345,48 +9344,34 @@ paths:
   /v1/home/ui-track:
     get:
       operationId: getHomeUiTrack
-      summary: Which side this person lands on (the switch)
+      summary: The start page
       description: >-
-        The new home or the old profile. K2: the choice is per USER and stored on the account, so it
-        follows them to another device; a per-tab choice would mean landing on whichever side
-        happened to be the default every morning.
+        Where a signed-in person lands when they open the site's root or sign in: the home
+        (`home`), the chat (`chat`), or settings and controls (`profile`). The choice is per USER
+        and stored on the account, so it follows them to another device; a per-tab choice would
+        mean landing on whichever page happened to be the default every morning.
 
-        There are three sides: the chat, the new home, and the old profile.
+        When nothing has been chosen, `defaulted` is true and the answer is the home, for every
+        account. The home is the front room: it shows the person's own state and carries a door to
+        the chat and to every control.
 
-        When nothing has been chosen, `defaulted` is true and the answer comes from the account's
-        cohort (K3): an account created before the remake lands where it always did, so nobody's
-        workflow changes under them. A newer account lands in the chat, which is the one place a
-        person who has connected no AI tool of their own can do something on their first visit — but
-        only on a node that HAS a chat agent. Where there is none, the new home is the answer, since
-        landing somebody in a box that can only say "no agent configured" is worse.
-
-        `track` and `switched` are returned read-only, for transparency — no route here changes
-        `track`.
+        Nothing else reads this. The brand link, the header and the chat's back button go to fixed
+        places regardless of it.
       tags:
         - Portal
       security:
         - BearerAuth: []
       responses:
         '200':
-          description: The current side, and the cohort it belongs to
+          description: The start page and where it is (`landing`)
         '403':
           description: Not the account holder's own session
     put:
       operationId: putHomeUiTrack
-      summary: Switch sides
+      summary: Choose the start page
       description: >-
-        Stores the choice and increments `switched`. It NEVER changes `track`.
-
-        Those answer different questions: `track` is which path the account was created on and
-        defines its cohort; `switched` is how many times the person has flipped. Rewriting `track`
-        on a flip would move accounts between cohorts as people wander, and a cohort whose
-        membership changes under you measures nothing. The counter is itself a result — accounts
-        created on the new path leaving for the old one is the signal that the new path failed.
-
-        Re-affirming the side you are already on is not counted: counting a no-op would inflate the
-        one number that says whether people are leaving.
-
-        The switch moves no data and resets nothing. Both sides read the same account.
+        Stores the choice. It moves no data, resets nothing and changes what no page can see: the
+        home and the controls read the same account.
       tags:
         - Portal
       security:
@@ -9402,7 +9387,7 @@ paths:
                 ui: { type: string, enum: [home, profile, chat] }
       responses:
         '200':
-          description: The new side, where it lands, the switch count, and the UNCHANGED track
+          description: The chosen start page and where it is (`landing`)
         '400':
           description: ui must be "home", "profile" or "chat"
         '403':
@@ -18725,12 +18710,6 @@ paths:
                                     monetise: { type: integer }
                                     company: { type: integer }
                                     messages: { type: integer }
-                                switched:
-                                  type: integer
-                                  description: >-
-                                    Accounts that have flipped between the two paths at least once.
-                                    Its own column on purpose: remake-created accounts leaving for
-                                    the old path is a result, not a footnote.
                           rows:
                             type: array
                             items:
@@ -18748,9 +18727,6 @@ paths:
                                 ttfvMinutes: { type: integer, nullable: true }
                                 rescueSentAt: { type: string, format: date-time, nullable: true }
                                 track: { type: string, enum: [remake, legacy] }
-                                switched:
-                                  type: integer
-                                  description: Times this account flipped paths. Never changes `track`.
                                 matResult: { type: string, enum: [ok, failed], nullable: true }
                                 matAttempts: { type: integer }
                                 aiModel:

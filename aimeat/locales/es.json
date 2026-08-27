@@ -3602,19 +3602,18 @@
       "copied": "Copiado. Pégalo en tu chat con IA"
     },
     "settings": {
-      "open": "Configuración",
-      "title": "Configuración",
-      "tabGeneral": "General",
+      "open": "Configuración del hogar",
+      "title": "Configuración del hogar",
       "showAch": "Mostrar los logros en el inicio",
-      "tabOpenRouter": "OpenRouter",
-      "tabAccess": "Acceso",
-      "tabWallet": "Cartera"
+      "allControls": "Toda la configuración y los controles",
+      "allControlsHint": "Agentes, memoria, aplicaciones, acceso y facturación: todo lo que hay detrás del hogar."
     },
-    "switch": {
-      "here": "Estás usando la vista nueva del hogar.",
-      "toProfile": "Volver al perfil antiguo",
-      "hereProfile": "Estás usando el perfil antiguo.",
-      "toHome": "Prueba el hogar nuevo"
+    "startPage": {
+      "title": "Página de inicio",
+      "hint": "Adonde llegas al iniciar sesión o al entrar por la portada.",
+      "home": "Hogar",
+      "chat": "Chat",
+      "controls": "Configuración y controles"
     },
     "loadFailed": "Tu página de inicio no se ha podido cargar ahora. Inténtalo dentro de un momento."
   },
@@ -4696,8 +4695,9 @@
   "nav": {
     "devView": "Para desarrolladores",
     "signIn": "Iniciar sesión",
+    "home": "Hogar",
     "apps": "Aplicaciones",
-    "profile": "Perfil",
+    "profile": "Configuración y controles",
     "logout": "Cerrar sesión",
     "loggedInAs": "sesión iniciada como",
     "help": "Ayuda",
@@ -9172,7 +9172,7 @@
     }
   },
   "profile.agents.detail.tabs.schedules": "Programaciones",
-  "profile.landing.home": "Inicio",
+  "profile.landing.home": "Resumen",
   "profile.landing.menu": "Menú",
   "profile.living.activityTrigger": "Latir también tras N cambios en el espacio de trabajo (0 = solo por horario)",
   "profile.living.addPoint": "Agregar un punto",

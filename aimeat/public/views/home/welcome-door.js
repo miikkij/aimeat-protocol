@@ -6,7 +6,8 @@
  *   thing on the landing page.
  *
  *   **It renders only for a visitor who is signed out.** The landing page is reachable while
- *   signed in (arriving in-app deliberately suppresses the redirect to Home), and the first
+ *   signed in (/v1/portal is the front page itself and never forwards anyone; only the site's root
+ *   does), and the first
  *   version of this file ignored that and offered "Register your home" to people who were already
  *   using their account. The second version replaced it with a signpost back to their home, which
  *   was the same mistake wearing a different hat: it answered a question nobody asked and put an
@@ -27,6 +28,7 @@
  * @structure WelcomeDoor({ onNavigate })
  * @usage import { WelcomeDoor } from '/views/home/welcome-door.js';
  * @version-history
+ *   (2026-08-27) Comments follow the arrival rule: the path decides, not a per-tab flag.
  *   (2026-08-23) Em-dashes swept from the fallback strings (banned in every surface).
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 8).
  *   v1.2.0 — 2026-08-08 — Renders nothing at all when signed in. The go-home card and the
@@ -84,8 +86,8 @@ export function WelcomeDoor({ onNavigate }) {
   }, [session]);
 
   // Signed in: NOTHING. This is a door for people who are not inside yet, and that is its whole
-  // job. Somebody who pressed the brand link wants the landing page — intercepting them with a
-  // signpost back to where they came from answers a question nobody asked, and putting a
+  // job. Somebody who opened /v1/portal while signed in wants the front page; intercepting them
+  // with a signpost back to where they came from answers a question nobody asked, and putting a
   // UI-version switch above the sentence that says what this company is tells every visitor the
   // product is mid-renovation. Navigation for a signed-in person lives in the header chrome.
   if (session) return null;
