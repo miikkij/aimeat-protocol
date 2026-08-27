@@ -127,6 +127,11 @@ ${sel} .ak-mosaic__band .ak-hero {
   border-radius: 0;
   margin-left: calc(50% - 50vw);
   margin-right: calc(50% - 50vw);
+}
+/* The band escapes the column; its TEXT stays aligned to it — found in the first
+ * real-data experiment run, where the title clipped at the viewport edge. */
+${sel} .ak-mosaic__band .ak-hero .ak-hero__inner {
+  padding-inline: max(var(--ak-pad), calc((100vw - min(var(--ak-main-max), 100vw)) / 2 + var(--ak-pad)));
 }`,
   },
 ];
