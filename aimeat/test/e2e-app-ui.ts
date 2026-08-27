@@ -109,6 +109,23 @@ const GOOD_LAYOUT = {
         method: 'POST', headers: auth(o.token), body: JSON.stringify({ layout }),
     });
 
+    await test('the catalogue carries the layout presets, and EVERY preset validates as-is', async () => {
+        const r = await json('/v1/apps/ui/catalogue');
+        const presets = r.body.data.catalogue.layouts;
+        assert(Array.isArray(presets), 'the catalogue must carry layouts');
+        const ids = presets.map((p: any) => p.id);
+        for (const expected of ['cover', 'dashboard', 'browse', 'work-queue', 'story-deck', 'guided-flow']) {
+            assert(ids.includes(expected), `layouts should carry ${expected} (got: ${ids.join(', ')})`);
+        }
+        // A preset that stopped validating would be teaching a shape the node refuses — run each
+        // through the same dry-run door a builder uses, placeholders unreplaced.
+        for (const preset of presets) {
+            const v = await validate(preset.layout);
+            assert(v.status === 200 && v.body.data.ok === true,
+                `preset "${preset.id}" must validate as-is: ${v.body.data.message ?? v.status}`);
+        }
+    });
+
     await test('an unknown component is refused with the NEAREST real name suggested', async () => {
         const r = await validate({ v: 1, blocks: [{ id: 'g', component: 'cardgird' }] });
         assert(r.status === 200 && r.body.data.ok === false, `expected an ok:false result, got ${r.status}`);
