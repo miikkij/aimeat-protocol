@@ -28,6 +28,9 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.7.0 — 2026-08-27 — Composition: the mosaic's stack becomes a six-column composition grid
+ *     driven by per-block `span`, and `rail` joins the projections (desktop left rail, phone
+ *     strip). The CSS reshapes editorial into a front page and lets poster run edge to edge.
  *   v0.6.0 — 2026-08-27 — Kit release marker (the JS↔CSS pin): the spectrum release — OKLCh-derived
  *     hues, the drifting aurora hero, ambient page ground, glass chrome, grain, dark with a soul.
  *     Stylesheet-only.
@@ -82,7 +85,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.6.0',
+  version: '0.7.0',
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,

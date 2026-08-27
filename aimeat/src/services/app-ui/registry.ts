@@ -25,6 +25,10 @@
  * @usage
  *   import { UI_COMPONENTS, componentById, buildUiCatalogue } from './registry.js';
  * @version-history
+ *   v1.3.0 — 2026-08-27 — COMPOSITION arrives (append-only): per-block `span` (full/main/side/
+ *     half) turns the stack into a composed page, and `rail` joins the nav modes — the
+ *     desktop-grade left rail. The developer's award-site references made the gap plain: the
+ *     missing axis was layout, not colour.
  *   v1.2.0 — 2026-08-27 — The catalogue carries the layout presets (layouts.ts): a first layout
  *     starts from a finished shape, not from nothing (TARGET-074, leiskat v1).
  *   v1.1.0 — 2026-08-27 — Append-only: every unit-forming component gains an optional `title` —
@@ -54,8 +58,15 @@ export interface AppUiComponentDef {
 }
 
 /** Every navigation projection a layout may ask for — all supported on every screen size
- *  (decided 2026-08-27); the renderer carries each mode's own ergonomics. */
-export const NAV_MODES = ['tabs', 'bottom-bar', 'canvas', 'deck', 'flow'] as const;
+ *  (decided 2026-08-27); the renderer carries each mode's own ergonomics. `rail` is the
+ *  desktop-grade left rail (append-only addition, 2026-08-27) that folds to a bottom bar on a
+ *  narrow screen. */
+export const NAV_MODES = ['tabs', 'bottom-bar', 'canvas', 'deck', 'flow', 'rail'] as const;
+
+/** How much of the composition grid one block takes. The default is the full line; the other
+ *  values are what turn a stack of cards into a COMPOSED PAGE — an asymmetric editorial split
+ *  is two blocks, `main` beside `side`. */
+export const BLOCK_SPANS = ['full', 'main', 'side', 'half'] as const;
 
 /** The look presets the stylesheet ships — check:atelier verifies every one arithmetically. */
 export const LOOKS = ['vivid', 'calm-card', 'editorial', 'sticker', 'neon-dense', 'poster', 'flat'] as const;
@@ -175,6 +186,7 @@ export function buildUiCatalogue(): {
   components: Array<{ id: string; summary: string; props: Record<string, AppUiPropDef>; max_per_layout?: number }>;
   nav_modes: readonly string[];
   looks: readonly string[];
+  spans: { values: readonly string[]; summary: string };
   layouts: readonly AppUiLayoutPreset[];
 } {
   return {
@@ -186,6 +198,13 @@ export function buildUiCatalogue(): {
     })),
     nav_modes: NAV_MODES,
     looks: LOOKS,
+    spans: {
+      values: BLOCK_SPANS,
+      summary: 'Optional per-block `span`: how much of the composition grid the block takes. '
+        + '`full` (the default) is the whole line; `main` + `side` side by side make the '
+        + 'asymmetric editorial split; two `half` blocks share a line. Narrow screens stack '
+        + 'everything, so a span is layout ambition, never a mobile risk.',
+    },
     layouts: UI_LAYOUT_PRESETS,
   };
 }

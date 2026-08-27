@@ -16,11 +16,13 @@
  *   import { validateUiLayout, AppUiError } from './validate.js';
  *   const layout = validateUiLayout(req.body);   // throws AppUiError(422) with words
  * @version-history
+ *   v1.1.0 — 2026-08-27 — Per-block `span` (composition grid placement), validated against
+ *     BLOCK_SPANS with the same did-you-mean refusal every other name gets.
  *   v1.0.0 — 2026-08-27 — Initial (TARGET-074 phase 2).
  */
 import type { BlockPropValue } from '../surface-layout/types.js';
 import { propProblem } from '../surface-layout/validate.js';
-import { componentById, NAV_MODES, LOOKS, UI_COMPONENTS } from './registry.js';
+import { componentById, NAV_MODES, LOOKS, BLOCK_SPANS, UI_COMPONENTS } from './registry.js';
 
 /** More blocks than this is a page nobody reads — and a payload nobody meant. */
 const MAX_BLOCKS = 40;
@@ -40,6 +42,8 @@ export interface AppUiBlockInstance {
   id: string;
   component: string;
   props?: Record<string, BlockPropValue>;
+  /** How much of the composition grid the block takes. Absent means the full line. */
+  span?: string;
   hidden?: boolean;
 }
 
@@ -172,10 +176,17 @@ export function validateUiLayout(raw: unknown): AppUiLayout {
       }
     }
 
+    if (b.span !== undefined) {
+      if (typeof b.span !== 'string' || !(BLOCK_SPANS as readonly string[]).includes(b.span)) {
+        unknownName('span', String(b.span), [...BLOCK_SPANS]);
+      }
+    }
+
     out.blocks.push({
       id: b.id,
       component: def.id,
       ...(Object.keys(props).length ? { props } : {}),
+      ...(typeof b.span === 'string' && b.span !== 'full' ? { span: b.span } : {}),
       ...(b.hidden === true ? { hidden: true } : {}),
     });
   });

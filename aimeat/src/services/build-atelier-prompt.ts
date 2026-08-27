@@ -26,6 +26,8 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.3.0 — 2026-08-27 — Composition: per-block `span` and the `rail` nav mode reach the
+ *     generated guide — compose a page, never pile cards.
  *   v1.2.0 — 2026-08-27 — The first move is a layout preset: the catalogue's `layouts` are the
  *     starting shapes, filled rather than composed (TARGET-074, leiskat v1).
  *   v1.1.0 — 2026-08-27 — The mosaic section: apps render through AIMEAT.atelier.mosaic() and
@@ -204,8 +206,11 @@ function composeBody(config: AimeatConfig): string {
     + "m.refresh('errands.');   // after your data changed — the change paints with motion\n"
     + '```\n\n'
     + 'The layout\'s `nav` field projects the same blocks as stacked sections, a tab row, a bottom '
-    + 'bar, a swipeable deck, a step-by-step flow or a pan-zoom canvas — all five work on every '
-    + 'screen size, so never build navigation by hand.\n\n'
+    + 'bar, a swipeable deck, a step-by-step flow, a pan-zoom canvas or a desktop-grade left rail '
+    + '(`rail`) — all of them work on every screen size, so never build navigation by hand.\n\n'
+    + 'COMPOSE, do not pile: a block may carry `span` — `full` (default), `main` + `side` for the '
+    + 'asymmetric editorial split, or `half` — and the screen becomes a laid-out page instead of a '
+    + 'column of cards. Narrow screens fold every span to one column on their own.\n\n'
     + 'THE FIRST MOVE IS A PRESET, not a blank page: `GET ' + base + '/v1/apps/ui/catalogue` '
     + 'carries `layouts` — finished, fillable shapes (cover, dashboard, browse, work-queue, '
     + 'story-deck, guided-flow). Pick the one nearest the app, replace every <angle-bracketed> '

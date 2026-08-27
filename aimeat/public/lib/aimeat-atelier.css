@@ -36,6 +36,12 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.7.0 — 2026-08-27 — COMPOSITION, on the developer's award-site references: the missing
+ *     axis was layout, not colour. The mosaic gains a six-column composition grid (per-block
+ *     span: full/main/side/half), the `rail` navigation (a desktop-grade left rail folding to a
+ *     strip on phones), editorial becomes a real front page (masthead hero on rules, giant
+ *     joined numerals, cells sharing hairlines in one frame), poster's band runs edge to edge,
+ *     and the measure cap rises from the 52rem tube to 68rem (editorial 76, neon 80).
  *   v0.6.0 — 2026-08-27 — THE SPECTRUM RELEASE, on the developer's "irrottele" directive. Two
  *     hues derived from the accent by OKLCh rotation (lightness never moves, so every proven
  *     contrast holds) turn the hero mesh into an aurora and the brand gradient two-hued; the
@@ -187,7 +193,10 @@
   --ak-chrome-bottom: var(--aimeat-chrome-bottom, 56px);
 
   /* ── Component sizing (one sizing everywhere — instances never override these) ────────── */
-  --ak-main-max:      52rem;                            /* measure cap for the main column   */
+  --ak-main-max:      68rem;                            /* measure cap for the main column — a
+                                                           52rem tube read as "basic" on every
+                                                           desktop; the composition grid inside
+                                                           now owns the line lengths */
   --ak-hero-min:      30dvh;                            /* the focal band's minimum height   */
 }
 
@@ -266,6 +275,7 @@
 /* @preset-block editorial — the magazine: a big display step, rules instead of shadows,
    squarer corners, a slow fade. Structure carries the page, not depth. */
 [data-ak-look='editorial'] {
+  --ak-main-max:      76rem;
   --ak-surface-image: none;
   --ak-hero-image:    none;
   --ak-page-image:    none;
@@ -308,6 +318,7 @@
 /* @preset-block neon-dense — the operator console: tight radii and gaps, the mono face on
    display type, a fast short entrance, an accent-tinted working surface. */
 [data-ak-look='neon-dense'] {
+  --ak-main-max:      80rem;
   --ak-radius:        8px;
   --ak-radius-sm:     6px;
   --ak-gap:           8px;

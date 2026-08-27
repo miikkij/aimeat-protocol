@@ -126,6 +126,23 @@ const GOOD_LAYOUT = {
         }
     });
 
+    await test('a block span composes the grid — validated, with the nearest name on a typo', async () => {
+        const bad = await validate({ v: 1, blocks: [{ id: 'a', component: 'list', props: { source: 'x' }, span: 'mian' }] });
+        assert(bad.status === 200 && bad.body.data.ok === false, 'a bad span must refuse');
+        assert(bad.body.data.message.includes('Did you mean "main"?'),
+            `the refusal must suggest the nearest span: ${bad.body.data.message}`);
+        const good = await validate({
+            v: 1,
+            nav: 'rail',
+            blocks: [
+                { id: 'a', component: 'list', props: { source: 'x' }, span: 'main' },
+                { id: 'b', component: 'timeline', props: { source: 'y' }, span: 'side' },
+            ],
+        });
+        assert(good.status === 200 && good.body.data.ok === true,
+            `main+side on the rail must validate: ${JSON.stringify(good.body.data)}`);
+    });
+
     await test('an unknown component is refused with the NEAREST real name suggested', async () => {
         const r = await validate({ v: 1, blocks: [{ id: 'g', component: 'cardgird' }] });
         assert(r.status === 200 && r.body.data.ok === false, `expected an ok:false result, got ${r.status}`);
