@@ -349,6 +349,25 @@
   width: 24px; height: 24px; border-radius: 50%; flex: 0 0 auto;
   background: var(--accent); color: #fff; font-size: .82rem; font-weight: 700;
 }
+/* The track choice: two cards, one decision, made before anything else (TARGET-074). */
+.ld-gen-track { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+@media (max-width: 560px) { .ld-gen-track { grid-template-columns: 1fr; } }
+.ld-gen-trackcard {
+  position: relative; display: block; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px 14px;
+}
+.ld-gen-trackcard.is-on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.ld-gen-trackcard input { position: absolute; opacity: 0; pointer-events: none; }
+.ld-gen-trackcard:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ld-gen-trackname { font-weight: 700; font-size: .92rem; margin-right: 6px; }
+.ld-gen-tracknew {
+  display: inline-block; padding: 1px 8px; border-radius: 999px;
+  background: var(--accent); color: #fff; font-size: .7rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .04em; vertical-align: 2px;
+}
+.ld-gen-trackdesc { display: block; margin-top: 4px; font-size: .8rem; color: var(--text-muted); line-height: 1.45; }
+
 .ld-gen-idea {
   width: 100%; box-sizing: border-box; min-height: 60px; max-height: 120px; resize: vertical;
   background: var(--surface); border: 1px solid var(--border);

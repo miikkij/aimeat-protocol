@@ -2129,6 +2129,24 @@
     .pb-mode-row { display: flex; gap: 12px; margin-bottom: 14px; }
     .pb-mode-radio { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: .88rem; }
     .pb-mode-radio input { accent-color: #E8564A; }
+    /* The track choice: two cards, one decision, made before anything else (TARGET-074). */
+    .pb-track { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+    @media (max-width: 560px) { .pb-track { grid-template-columns: 1fr; } }
+    .pb-trackcard {
+      position: relative; display: block; cursor: pointer;
+      background: var(--bg-subtle); border: 1px solid var(--border-subtle);
+      border-radius: 10px; padding: 12px 14px;
+    }
+    .pb-trackcard.is-on { border-color: #E8564A; box-shadow: 0 0 0 1px #E8564A; }
+    .pb-trackcard input { position: absolute; opacity: 0; pointer-events: none; }
+    .pb-trackcard:has(input:focus-visible) { outline: 2px solid #E8564A; outline-offset: 2px; }
+    .pb-trackname { font-weight: 700; font-size: .92rem; margin-right: 6px; }
+    .pb-tracknew {
+      display: inline-block; padding: 1px 8px; border-radius: 999px;
+      background: #E8564A; color: #fff; font-size: .7rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .04em; vertical-align: 2px;
+    }
+    .pb-trackdesc { display: block; margin-top: 4px; font-size: .8rem; opacity: .75; line-height: 1.45; }
     .pb-desc-area {
       width: 100%; min-height: 60px; max-height: 120px; resize: vertical;
       background: var(--bg-subtle); border: 1px solid var(--border-subtle);
@@ -2854,7 +2872,22 @@
           <label class="pb-mode-radio"><input type="radio" name="pb-mode" value="improve"> <span data-i18n="pb.improve">Improve This App</span></label>
         </div>
         <div id="pb-improving" class="pb-improving" style="display:none"></div>
+        <!-- The TRACK is the first decision, and the two guides never mix (TARGET-074). -->
+        <div class="pb-track" id="pb-track" role="radiogroup">
+          <label class="pb-trackcard is-on" id="pb-track-classic">
+            <input type="radio" name="pb-track" value="classic" checked>
+            <span class="pb-trackname" data-i18n="pb.trackClassic">Classic</span>
+            <span class="pb-trackdesc" data-i18n="pb.trackClassicDesc">The proven way: templates, capability packs, the familiar clean style.</span>
+          </label>
+          <label class="pb-trackcard" id="pb-track-atelier">
+            <input type="radio" name="pb-track" value="atelier">
+            <span class="pb-trackname" data-i18n="pb.trackAtelier">Atelier</span>
+            <span class="pb-tracknew" data-i18n="pb.trackNew">new</span>
+            <span class="pb-trackdesc" data-i18n="pb.trackAtelierDesc">The new track: living looks, layouts your AI can rearrange later, motion built in.</span>
+          </label>
+        </div>
         <textarea class="pb-desc-area" id="pb-description" placeholder="Describe what the app should do..." data-i18n-ph="pb.descPh"></textarea>
+        <div id="pb-classic-extras">
         <label class="pb-ext-toggle" for="pb-template"><span>&#x2728; <span data-i18n="pb.template">Start from a template (optional)</span></span></label>
         <select id="pb-template" class="modal-input pb-template-select"><option value="">(none &#x2014; build from scratch)</option></select>
         <div class="pb-ext-toggle"><span>&#x1F9F0; <span data-i18n="pb.packs">Capability packs (optional)</span></span></div>
@@ -2862,6 +2895,7 @@
         <div class="pb-packs" id="pb-packs"></div>
         <div class="pb-packinfo" id="pb-packinfo"></div>
         <p class="pb-legend" data-i18n="pb.tierLegend">ANY MODEL = any model can build with it &#183; READ THE DOC = the model has no priors for it, so the usage doc travels in the prompt &#183; VERSION TRAP = the model remembers an older version, so follow the version in the doc</p>
+        </div>
       </div>
 
       <div class="pb-step">
@@ -3203,6 +3237,12 @@
       "pb.new": "New App",
       "pb.improve": "Improve This App",
       "pb.descPh": "Describe what the app should do, or what changes to make...",
+      "pb.trackClassic": "Classic",
+      "pb.trackClassicDesc": "The proven way: templates, capability packs, the familiar clean style.",
+      "pb.trackAtelier": "Atelier",
+      "pb.trackAtelierDesc": "The new track: living looks (newspaper, gallery, neon console…), layouts your AI can rearrange later without republishing, motion built in.",
+      "pb.trackNew": "new",
+      "pb.atelierLoading": "Fetching the Atelier build guide from your node…",
       "pb.includeCortex": "Include Cortex Extensions",
       "pb.livePreview": "Live Preview",
       "pb.copy": "📋 Copy Prompt",
@@ -3995,6 +4035,12 @@
       "pb.new": "Uusi sovellus",
       "pb.improve": "Paranna tätä sovellusta",
       "pb.descPh": "Kuvaile mitä sovelluksen tulisi tehdä, tai mitä muutoksia haluat...",
+      "pb.trackClassic": "Perinteinen",
+      "pb.trackClassicDesc": "Tuttu ja varma tapa: aloituspohjat, kyvykkyyspaketit, siisti perustyyli.",
+      "pb.trackAtelier": "Atelier",
+      "pb.trackAtelierDesc": "Uusi rata: elävät tyylit (sanomalehti, galleria, neonkonsoli…), asettelut joita tekoälysi voi järjestellä myöhemmin julkaisematta uudelleen, liike valmiina.",
+      "pb.trackNew": "uusi",
+      "pb.atelierLoading": "Haetaan Atelier-rakennusohjetta nodeltasi…",
       "pb.includeCortex": "Sisällytä Cortex-laajennukset",
       "pb.livePreview": "Esikatselu",
       "pb.copy": "📋 Kopioi prompti",
@@ -5375,6 +5421,15 @@
     cortexEditorExtName = null;
   }
   var pbSourceApp = null;
+  var pbTrack = "classic";
+  function pbApplyTrackUi() {
+    var classicExtras = document.getElementById("pb-classic-extras");
+    if (classicExtras) classicExtras.style.display = pbTrack === "atelier" ? "none" : "";
+    var cardC = document.getElementById("pb-track-classic");
+    var cardA = document.getElementById("pb-track-atelier");
+    if (cardC) cardC.classList.toggle("is-on", pbTrack === "classic");
+    if (cardA) cardA.classList.toggle("is-on", pbTrack === "atelier");
+  }
   function openPromptBuilder(app) {
     pbSourceApp = app || null;
     var overlay = document.getElementById("prompt-builder-overlay");
@@ -5383,6 +5438,21 @@
     window.pbTemplate = null;
     var tplSel0 = document.getElementById("pb-template");
     if (tplSel0) tplSel0.value = "";
+    pbTrack = pbSourceApp && pbSourceApp.track === "atelier" ? "atelier" : "classic";
+    var trackRow = document.getElementById("pb-track");
+    if (trackRow) {
+      trackRow.style.display = pbSourceApp ? "none" : "";
+      var radios2 = trackRow.querySelectorAll('input[name="pb-track"]');
+      radios2.forEach(function(r) {
+        r.checked = r.value === pbTrack;
+        r.onchange = function() {
+          pbTrack = r.value;
+          pbApplyTrackUi();
+          updatePbPreview();
+        };
+      });
+    }
+    pbApplyTrackUi();
     var radios = document.querySelectorAll('input[name="pb-mode"]');
     var improving = document.getElementById("pb-improving");
     if (pbSourceApp) {
@@ -5408,6 +5478,7 @@
     pbSourceApp = null;
   }
   var pbCore = { new: null, improve: null };
+  var pbCoreAtelier = { new: null, improve: null };
   function loadPbCore() {
     var config = loadConfig();
     if (!config.aimeatUrl) return;
@@ -5419,6 +5490,16 @@
         var body = d && d.data && d.data.body;
         if (body && typeof body === "string") {
           pbCore[mode] = body;
+          updatePbPreview();
+        }
+      }).catch(function() {
+      });
+      fetch(base4 + "/v1/prompts/build-app-atelier?mode=" + mode + "&lang=" + encodeURIComponent(getLang())).then(function(r) {
+        return r.json();
+      }).then(function(d) {
+        var full = d && d.data && d.data.prompt;
+        if (full && typeof full === "string") {
+          pbCoreAtelier[mode] = full;
           updatePbPreview();
         }
       }).catch(function() {
@@ -5610,6 +5691,15 @@
     var mode = document.querySelector('input[name="pb-mode"]:checked').value;
     var description = document.getElementById("pb-description").value.trim();
     var prompt2 = "";
+    if (pbTrack === "atelier") {
+      var aCore = pbCoreAtelier[mode === "improve" && pbSourceApp ? "improve" : "new"];
+      if (!aCore) return t("pb.atelierLoading") || "Fetching the Atelier build guide from your node…";
+      var aOut = description ? "The app idea, in the owner's words: " + description + "\n\n" + aCore : aCore;
+      if (mode === "improve" && pbSourceApp && pbSourceApp.blob) {
+        aOut += "\n## The app to improve\n--- Source Code ---\n" + decodeURIComponent(escape(atob(pbSourceApp.blob)));
+      }
+      return aOut;
+    }
     var PB_LANGS = { en: "English", fi: "Finnish (Suomi)" };
     var pbLang = PB_LANGS[getLang()] || "English";
     prompt2 += "Language: talk to me and write ALL user-facing text (UI labels, buttons, messages) in " + pbLang + ". These build instructions are in English, but converse with me and build the app interface in " + pbLang + ".\n\n";
