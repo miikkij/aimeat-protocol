@@ -23,6 +23,11 @@
  *   html = injectSiteHead(html, config, nonceAttr);
  *   html = injectPageHead(html, findPublicPage('/v1/connect'), config, nonceAttr);
  * @version-history
+ *   v1.2.1 — 2026-08-26 — SECURITY (CodeQL js/reflected-xss): the per-page WebPage JSON-LD embedded
+ *     page.title/description via JSON.stringify, which does not escape `<`, so a `</script>` in a
+ *     title taken from a URL path (/v1/portfolio/:username with no portfolio) broke out of the
+ *     ld+json block. jsonLdSafe() now \u-escapes `<`,`>`,`&` on every ld+json embed. The `<title>`
+ *     upsert regex is bounded (`[^<]{0,2048}`) so it is linear, not the O(n²) `[\s\S]*?` shape.
  *   v1.2.0 — 2026-08-25 — injectSiteHead(): the node's own name, description, social image,
  *     search-engine verification tags and the two site-level JSON-LD blocks, read from config
  *     instead of being literals in spa.html. Three things were wrong with the literals. They named
@@ -44,6 +49,16 @@ import type { PublicPage } from '../data/public-pages.js';
 
 function esc(t: string): string {
   return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+}
+
+/**
+ * Escape a serialized-JSON string for embedding inside a `<script type="application/ld+json">`.
+ * JSON.stringify does NOT escape `<`, so a value carrying `</script>` — a page title taken from a
+ * URL path, for instance — would close the script element and inject markup (a reflected-XSS class
+ * hole). Rewriting `<`, `>` and `&` to their `\uXXXX` forms keeps the JSON valid and inert.
+ */
+function jsonLdSafe(json: string): string {
+  return json.replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026');
 }
 
 /**
@@ -86,7 +101,7 @@ export function injectSiteHead(html: string, config: AimeatConfig, nonceAttr = '
       `<meta name="robots" content="noindex, nofollow">`);
   }
 
-  out = upsert(out, /<title>[\s\S]*?<\/title>/i, `<title>${name}</title>`);
+  out = upsert(out, /<title>[^<]{0,2048}<\/title>/i, `<title>${name}</title>`);
   out = upsert(out, /<meta name="description" content="[^"]*"\s*\/?>/i,
     `<meta name="description" content="${desc}">`);
   out = upsert(out, /<meta property="og:site_name" content="[^"]*"\s*\/?>/i,
@@ -147,7 +162,7 @@ export function injectSiteHead(html: string, config: AimeatConfig, nonceAttr = '
       offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
       ...(config.seoSameAs.length ? { sameAs: config.seoSameAs } : {}),
     });
-    out = out.replace('</head>', `<script type="application/ld+json"${nonceAttr}>${software}</script>\n</head>`);
+    out = out.replace('</head>', `<script type="application/ld+json"${nonceAttr}>${jsonLdSafe(software)}</script>\n</head>`);
   }
   if (!/"@type"\s*:\s*"Organization"/.test(out)) {
     const organization = JSON.stringify({
@@ -159,7 +174,7 @@ export function injectSiteHead(html: string, config: AimeatConfig, nonceAttr = '
       description: config.seoSiteDescription,
       ...(config.seoSameAs.length ? { sameAs: config.seoSameAs } : {}),
     });
-    out = out.replace('</head>', `<script type="application/ld+json"${nonceAttr}>${organization}</script>\n</head>`);
+    out = out.replace('</head>', `<script type="application/ld+json"${nonceAttr}>${jsonLdSafe(organization)}</script>\n</head>`);
   }
 
   return out;
@@ -183,7 +198,7 @@ export function injectPageHead(
   const desc = esc(page.description);
 
   let out = html;
-  out = upsert(out, /<title>[\s\S]*?<\/title>/i, `<title>${title}</title>`);
+  out = upsert(out, /<title>[^<]{0,2048}<\/title>/i, `<title>${title}</title>`);
   out = upsert(out, /<meta name="description" content="[^"]*"\s*\/?>/i,
     `<meta name="description" content="${desc}">`);
   out = upsert(out, /<meta property="og:title" content="[^"]*"\s*\/?>/i,
@@ -235,7 +250,7 @@ export function injectPageHead(
       dateModified: new Date().toISOString().split('T')[0],
       isPartOf: { '@type': 'WebSite', name: config.seoSiteName, url: `${b}/` },
     });
-    out = out.replace('</head>', `<script type="application/ld+json"${nonceAttr}>${jsonLd}</script>\n</head>`);
+    out = out.replace('</head>', `<script type="application/ld+json"${nonceAttr}>${jsonLdSafe(jsonLd)}</script>\n</head>`);
   }
   return out;
 }
