@@ -48,6 +48,12 @@ button.ak-list__row:hover { box-shadow: var(--ak-elev-1); }
 .ak-list__title { font-weight: 600; overflow-wrap: anywhere; }
 .ak-list__sub { font-size: var(--ak-text-fine); color: var(--ak-ink-dim); overflow-wrap: anywhere; }
 .ak-list__side { display: flex; align-items: center; gap: 8px; flex: none; }
+/* Narrow screens: the badge/meta strip wraps UNDER the words instead of squeezing them into a
+ * sliver — found on the 390px broadsheet run, where a fixed side lane left ~90px for the title. */
+@media (max-width: 480px) {
+  .ak-list__row { flex-wrap: wrap; }
+  .ak-list__side { width: 100%; justify-content: flex-start; }
+}
 .ak-list__meta { font-size: var(--ak-text-fine); color: var(--ak-ink-dim); font-variant-numeric: tabular-nums; }
 
 /* ── Master–detail: both panes wide, one at a time narrow ─────────────────────────────────── */

@@ -92,6 +92,66 @@
   .ak-mosaic__railitem { white-space: nowrap; }
 }
 
+/* ── Scroll reveals: units below the fold rise into view ──────────────────────────────────────
+   The distance rides the look's own entrance token, so flat (0px) fades nothing and moves
+   nothing; the kit-wide reduced-motion block collapses the transition. Applied only by the
+   renderer (never at rest), so an idle surface still repaints zero times. */
+.ak-mosaic__unit.ak-reveal {
+  opacity: 0;
+  transform: translateY(calc(var(--ak-enter-distance) * 1.6));
+}
+.ak-mosaic__unit.ak-reveal--in {
+  opacity: 1;
+  transform: none;
+  transition: opacity calc(var(--ak-motion) * 2.4) var(--ak-ease),
+              transform calc(var(--ak-motion) * 2.4) var(--ak-ease);
+}
+[data-ak-look='flat'] .ak-mosaic__unit.ak-reveal { opacity: 1; transform: none; }
+
+/* ── Overlay: the full-screen menu ────────────────────────────────────────────────────────── */
+.ak-mosaic__overlaywrap { display: flex; flex-direction: column; gap: var(--ak-gap); min-width: 0; }
+.ak-mosaic__overlaybar { display: flex; justify-content: flex-end; }
+.ak-mosaic__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: max(var(--ak-pad), 6vw);
+  background: color-mix(in oklab, var(--ak-bg) 88%, var(--ak-accent));
+  backdrop-filter: blur(var(--ak-blur));
+  -webkit-backdrop-filter: blur(var(--ak-blur));
+  overflow-y: auto;
+}
+.ak-mosaic__overlay[hidden] { display: none; }
+.ak-mosaic__overlayitem {
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  padding: 10px 0;
+  background: transparent;
+  border: 0;
+  border-bottom: var(--ak-line-w) solid var(--ak-line);
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--ak-font-display);
+  font-weight: var(--ak-weight-display);
+  font-size: clamp(1.8rem, 6vw, 3.6rem);
+  line-height: 1.1;
+  color: var(--ak-ink);
+  transition: color calc(var(--ak-motion)) var(--ak-ease), padding-left calc(var(--ak-motion)) var(--ak-ease);
+}
+.ak-mosaic__overlayitem:hover { color: var(--ak-accent-text); padding-left: 12px; }
+.ak-mosaic__overlayitem:focus-visible { outline: 2px solid var(--ak-focus); outline-offset: 4px; }
+.ak-mosaic__overlaynum {
+  font-family: var(--ak-font-mono);
+  font-size: var(--ak-text-fine);
+  font-weight: 700;
+  color: var(--ak-ink-dim);
+}
+
 /* The JOINED composition (cells sharing hairlines in one frame) is a structure recipe —
    generated per look into ./looks.css from src/data/atelier-looks.ts. */
 

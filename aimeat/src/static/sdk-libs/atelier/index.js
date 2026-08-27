@@ -28,6 +28,8 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.10.0 — 2026-08-27 — Scroll reveals on the composition grid and the `overlay` projection
+ *     (the full-screen menu in display type) — the award-site motion vocabulary, kit-owned.
  *   v0.9.0 — 2026-08-27 — figure(): the data IS the hero — one giant display numeral with its
  *     mono label and context line, counting up on change (the Cape Town move from the research
  *     base). Reaches the mosaic vocabulary as the `figure` component.
@@ -91,7 +93,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.9.0',
+  version: '0.10.0',
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,

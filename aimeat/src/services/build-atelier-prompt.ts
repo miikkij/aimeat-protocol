@@ -206,8 +206,10 @@ function composeBody(config: AimeatConfig): string {
     + "m.refresh('errands.');   // after your data changed — the change paints with motion\n"
     + '```\n\n'
     + 'The layout\'s `nav` field projects the same blocks as stacked sections, a tab row, a bottom '
-    + 'bar, a swipeable deck, a step-by-step flow, a pan-zoom canvas or a desktop-grade left rail '
-    + '(`rail`) — all of them work on every screen size, so never build navigation by hand.\n\n'
+    + 'bar, a swipeable deck, a step-by-step flow, a pan-zoom canvas, a desktop-grade left rail '
+    + '(`rail`) or a full-screen menu in display type (`overlay`) — all of them work on every '
+    + 'screen size, so never build navigation by hand. On the stacked grid, blocks below the fold '
+    + 'reveal as the person scrolls; that too is the kit\'s, never yours to code.\n\n'
     + 'COMPOSE, do not pile: a block may carry `span` — `full` (default), `main` + `side` for the '
     + 'asymmetric editorial split, or `half` — and the screen becomes a laid-out page instead of a '
     + 'column of cards. Narrow screens fold every span to one column on their own.\n\n'
