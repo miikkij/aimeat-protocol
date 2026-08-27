@@ -10,6 +10,10 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   v1.7.0 — 2026-08-27 — The apex inline serve injects the SAME agent-discovery block the app
+ *     origin does (#aimeat-app-ref included): on a node without a provisioned app origin this is
+ *     where runnable HTML is served, and the mosaic renderer reads its identity from that block
+ *     (TARGET-074). One spec, one snippet, both doors.
  *   v1.6.0 — 2026-08-15 — The gated-app redirect carries ?unlock=1 back to the app origin when the
  *     request arrived with it. The app origin now bounces a browser here for the code form, and the
  *     mark is what keeps that bounce single: a grant this node minted and the origin still refuses
@@ -45,6 +49,8 @@ import { verifyDraftToken, DraftTokenError } from '../../services/draft-token.js
 import { generateAppAccessToken } from '../../services/app-access-token.js';
 import { decodeStrictBase64 } from '../../utils/base64.js';
 import { applyServeMarks } from '../../services/app-serve-marks.js';
+import { appToolNames } from '../../services/app-tool-names.js';
+import { wantsWebmcpBridge } from '../../utils/app-agent-discovery.js';
 import { appCsp } from '../../utils/app-csp.js';
 import { appContentType } from '../../utils/app-content-type.js';
 import { detectLocale } from '../../i18n.js';
@@ -608,6 +614,16 @@ export function registerReadRoutes(
                 badge: true,
                 provenance: prov,
                 visibleLabel: { config, locale: detectLocale(req.headers['accept-language']) },
+                // The SAME discovery block the app origin injects — on a node without a
+                // provisioned app origin this apex path is where runnable HTML is served, and
+                // the mosaic renderer reads its app identity from #aimeat-app-ref (TARGET-074).
+                discovery: {
+                    owner: app.ownerName, filename: app.filename,
+                    appName: app.manifest?.name ?? null, description: app.manifest?.description ?? null,
+                    baseUrl: config.baseUrl,
+                    toolNames: await appToolNames(storage, app.ownerGaii, app.filename),
+                    webmcp: wantsWebmcpBridge(app.data),
+                },
             })
             : app.data;
         if (mode === 'inline' && isHtml && hasAnyProtection(app.manifest.protection)) {

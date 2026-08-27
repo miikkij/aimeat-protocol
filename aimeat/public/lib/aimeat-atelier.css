@@ -36,6 +36,10 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.4.0 — 2026-08-27 — The mosaic part arrives (mosaic.css): the five navigation projections
+ *     of one stored layout — stacked units, the tabs/bottom-bar picker, the scroll-snap deck
+ *     with dots, the flow stepper, and the pan-zoom canvas whose tiles expand to full view.
+ *     Motion on input only; the deck and the canvas own their overflow.
  *   v0.3.4 — 2026-08-27 — Every .ak-root is a positioning context: an unanchored screen-reader
  *     span escaped to the document and stretched the page past its own frame.
  *   v0.3.3 — 2026-08-27 — The main scroller's children never flex-shrink: the tab row (a flex
@@ -60,6 +64,7 @@
 @import url('./aimeat-atelier/shell.css');
 @import url('./aimeat-atelier/content.css');
 @import url('./aimeat-atelier/data.css');
+@import url('./aimeat-atelier/mosaic.css');
 
 /* ══════════════════════════════════════════════════════════════════════════════════════════
    THE CONTRACT — light. Set these to author a look; do not override component selectors.

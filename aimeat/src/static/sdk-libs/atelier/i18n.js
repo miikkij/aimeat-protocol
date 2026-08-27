@@ -44,6 +44,11 @@ const BASE = {
     optional: 'Optional',
     total: 'Total',
     you: 'You',
+    next: 'Next',
+    previous: 'Previous',
+    zoomIn: 'Zoom in',
+    zoomOut: 'Zoom out',
+    fitView: 'Fit to view',
   },
   fi: {
     loading: 'Ladataan…',
@@ -69,6 +74,11 @@ const BASE = {
     optional: 'Valinnainen',
     total: 'Yhteensä',
     you: 'Sinä',
+    next: 'Seuraava',
+    previous: 'Edellinen',
+    zoomIn: 'Lähennä',
+    zoomOut: 'Loitonna',
+    fitView: 'Sovita näkymään',
   },
   es: {
     loading: 'Cargando…',
@@ -94,6 +104,11 @@ const BASE = {
     optional: 'Opcional',
     total: 'Total',
     you: 'Tú',
+    next: 'Siguiente',
+    previous: 'Anterior',
+    zoomIn: 'Acercar',
+    zoomOut: 'Alejar',
+    fitView: 'Ajustar a la vista',
   },
 };
 

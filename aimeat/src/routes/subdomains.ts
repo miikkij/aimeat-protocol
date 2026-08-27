@@ -14,6 +14,9 @@
  *            The operator CRUD lives in subdomain-admin.ts.
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  * @version-history
+ *   v1.17.0 — 2026-08-27 — wantsWebmcpBridge() moves to utils/app-agent-discovery.ts, shared with
+ *     the apex inline serve, which now injects the same discovery block this origin does
+ *     (TARGET-074: the mosaic renderer reads its identity from #aimeat-app-ref).
  *   v1.16.0 — 2026-08-16 — Installable apps: /manifest.webmanifest (per-app web-app manifest, the
  *     app's own name + emoji icon) and /icon.svg (the emoji on the house ground, code-point
  *     truncated + entity-escaped because it is owner input inside XML) join the per-origin
@@ -97,6 +100,7 @@ import { applyServeMarks } from '../services/app-serve-marks.js';
 import { appCsp } from '../utils/app-csp.js';
 import { appContentType } from '../utils/app-content-type.js';
 import { appToolNames } from '../services/app-tool-names.js';
+import { wantsWebmcpBridge } from '../utils/app-agent-discovery.js';
 import { appSeoIndexable, appSeoMeta, appScreenshotUrl, appDeclaredLocales } from '../services/app-seo.js';
 import { portfolioSeoIndexable, type PortfolioSeoConfig } from '../services/portfolio-seo.js';
 import { recordAppOpen } from '../services/usage/record-app-open.js';
@@ -265,19 +269,6 @@ export function relaxAppCspMeta(data: Buffer | Uint8Array | string, apexOrigin: 
     return tag.replace(cm[0], cm[0].replace(cm[2], rebuilt));
   });
   return Buffer.from(out, 'utf-8');
-}
-
-/**
- * Should the node load the WebMCP bridge into this app? Yes by default — an app origin is where a
- * browser-resident agent meets the app, and every app already has a listing to expose. No when the
- * app carries its own `aimeat-webmcp.js` (its call wins; two registrations of the same names would
- * just replace each other) or opts out with `<meta name="aimeat-webmcp" content="off">`.
- */
-function wantsWebmcpBridge(data: Buffer | Uint8Array | string): boolean {
-  const raw = typeof data === 'string' ? data : Buffer.from(data).toString('utf-8');
-  const head = raw.slice(0, 64 * 1024);
-  if (/aimeat-webmcp\.js/i.test(raw)) return false;
-  return !/<meta\b[^>]*name\s*=\s*["']aimeat-webmcp["'][^>]*content\s*=\s*["']off["']/i.test(head);
 }
 
 /**

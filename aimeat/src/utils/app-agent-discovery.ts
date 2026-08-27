@@ -22,6 +22,10 @@
  *   services/app-serve-marks.ts.
  * @usage import { agentDiscoverySnippet } from '../utils/app-agent-discovery.js';
  * @version-history
+ *   v2.1.0 — 2026-08-27 — wantsWebmcpBridge() moves here from routes/subdomains.ts, because the
+ *     apex inline serve now injects the same discovery block the app origin does (TARGET-074: the
+ *     mosaic renderer reads its app identity from #aimeat-app-ref, and a node without a
+ *     provisioned app origin serves runnable HTML from the apex) — one decision, one copy.
  *   v2.0.0 — 2026-08-01 — TARGET-058 Phase 5 step 0a: injectAgentDiscovery() becomes
  *     agentDiscoverySnippet(); the document detection and the last-</body> rule move to the single
  *     serve-time-marks pass. Output is byte-identical (test/fixtures/serve-marks-golden.json).
@@ -33,6 +37,19 @@
  *     owner, the app id with its extension, the tool manifest, the WebMCP endpoint and the
  *     agent-face markdown rendering.
  */
+/**
+ * Should the node load the WebMCP bridge into this app? Yes by default — a served app is where a
+ * browser-resident agent meets it, and every app already has a listing to expose. No when the
+ * app carries its own `aimeat-webmcp.js` (its call wins; two registrations of the same names would
+ * just replace each other) or opts out with `<meta name="aimeat-webmcp" content="off">`.
+ */
+export function wantsWebmcpBridge(data: Buffer | Uint8Array | string): boolean {
+  const raw = typeof data === 'string' ? data : Buffer.from(data).toString('utf-8');
+  const head = raw.slice(0, 64 * 1024);
+  if (/aimeat-webmcp\.js/i.test(raw)) return false;
+  return !/<meta\b[^>]*name\s*=\s*["']aimeat-webmcp["'][^>]*content\s*=\s*["']off["']/i.test(head);
+}
+
 /** What the serving route knows about the app being sent. */
 export interface AppDiscoverySpec {
   /** Bare owner name — the `owner` argument of every app-tool call. */
