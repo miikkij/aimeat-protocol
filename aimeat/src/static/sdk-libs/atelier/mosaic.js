@@ -107,10 +107,11 @@ function patchFor(kind, data) {
   return { items: Array.isArray(data) ? data : [] };
 }
 
-/** Columns for a table whose source sent bare rows: one column per key of the first row. */
+/** Columns for a table whose source sent bare rows: one column per key of the first row.
+ *  The `id` key is the row's address, not a column a person reads — it stays out. */
 function derivedColumns(rows) {
   if (!rows.length) return [];
-  return Object.keys(rows[0]).map(function (key) {
+  return Object.keys(rows[0]).filter(function (key) { return key !== 'id'; }).map(function (key) {
     return { key: key, label: key, sortable: true };
   });
 }

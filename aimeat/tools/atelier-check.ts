@@ -198,17 +198,32 @@ function evalColor(expr: string, vars: Vars, trail: string): Rgba {
   throw new Error(`${trail}: cannot evaluate colour "${s.slice(0, 60)}" — the contract confines itself to hex, var(), color-mix(in oklab) and gradients over those`);
 }
 
-/** Pull the colour stops out of a linear/radial gradient value (positions and angles skipped). */
+/** Pull the colour stops out of a linear/radial gradient value (positions and angles skipped).
+ *  A SCANNER, not a regex — the same lesson parseDecls carries: a stop may be a color-mix whose
+ *  first argument is itself a color-mix over var()s, which is three levels of nesting and past
+ *  what a bounded regex balances. The regex this replaced matched nothing on such a value, the
+ *  stop list came back empty, and the caller's raw-accent fallback silently became the number
+ *  under test. */
 function gradientStops(expr: string, vars: Vars, trail: string): Rgba[] {
   const stops: Rgba[] = [];
-  const grads = expr.matchAll(/(?:linear|radial)-gradient\(((?:[^()]|\([^()]*(?:\([^()]*\)[^()]*)*\))*)\)/g);
-  for (const g of grads) {
-    for (const arg of splitArgs(g[1]!)) {
+  const heads = /(?:linear|radial)-gradient\(/g;
+  let m: RegExpExecArray | null;
+  while ((m = heads.exec(expr)) !== null) {
+    const open = m.index + m[0].length - 1;
+    let depth = 0;
+    let end = -1;
+    for (let i = open; i < expr.length; i++) {
+      if (expr[i] === '(') depth++;
+      else if (expr[i] === ')') { depth--; if (depth === 0) { end = i; break; } }
+    }
+    if (end === -1) throw new Error(`${trail}: unbalanced parentheses in gradient value`);
+    for (const arg of splitArgs(expr.slice(open + 1, end))) {
       if (/^(?:-?\d+(?:\.\d+)?deg|at\s)/i.test(arg)) continue;
       const colorPart = arg.replace(/\s+\d+(?:\.\d+)?%\s*$/, '').trim();
       if (/^transparent$/i.test(colorPart)) continue;
       stops.push(evalColor(colorPart, vars, trail));
     }
+    heads.lastIndex = end + 1;
   }
   return stops;
 }

@@ -36,6 +36,10 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.5.0 — 2026-08-27 — The energetic presets commit: poster's hero ground IS the brand
+ *     gradient (48dvh, 900-weight display up to 5.2rem, extruded), sticker tilts the whole grid
+ *     (±2°, chunky offset shadows, 24px pills), neon-dense gets its accent ring + glow and an
+ *     accent-tinted hairline. Card tilt reaches .ak-grid (zero everywhere but sticker).
  *   v0.4.1 — 2026-08-27 — The stylesheet imports its own token upstream (aimeat-theme.css):
  *     palette accents, real webfonts and each palette's display personality now reach every
  *     Atelier app through the one link the shell already has. Found in a real browser: the login
@@ -245,17 +249,19 @@
 /* @preset-block sticker — the playful form language the game kit proved: pill corners, a tilt,
    extruded display type, a springier entrance. */
 [data-ak-look='sticker'] {
-  --ak-radius:        22px;
-  --ak-radius-sm:     14px;
+  --ak-radius:        24px;
+  --ak-radius-sm:     16px;
   /* 3%: the secondary hue runs darker than the accent on several palettes, and at 4% the
      aimeat palette's near-white card sank into the page (check:atelier, step 1.09). */
   --ak-surface-image: linear-gradient(180deg,
                         color-mix(in oklab, var(--ak-accent-2) 3%, var(--ak-surface)),
                         var(--ak-surface));
-  --ak-display-shadow: 0 3px 0 color-mix(in oklab, var(--ak-ink) 28%, var(--ak-surface));
-  --ak-tilt:          -1.2deg;
-  --ak-enter-distance: 18px;
-  --ak-enter-stagger:  50ms;
+  --ak-display-shadow: 0 4px 0 color-mix(in oklab, var(--ak-ink) 32%, var(--ak-surface));
+  /* The chunky offset shadow IS the sticker edge — depth as a printed shape, not a blur. */
+  --ak-elev-1:        0 5px 0 color-mix(in oklab, var(--ak-ink) 20%, transparent);
+  --ak-tilt:          -2deg;
+  --ak-enter-distance: 22px;
+  --ak-enter-stagger:  55ms;
   --ak-weight-display: 800;
 }
 
@@ -270,6 +276,10 @@
   --ak-surface-image: linear-gradient(180deg,
                         color-mix(in oklab, var(--ak-accent) 4%, var(--ak-surface)),
                         var(--ak-surface));
+  /* The neon: an accent ring plus a soft accent glow — the card edge carries the current. */
+  --ak-elev-1:        0 0 0 1px color-mix(in oklab, var(--ak-accent) 45%, var(--ak-surface)),
+                      0 0 18px color-mix(in oklab, var(--ak-accent) 22%, transparent);
+  --ak-line:          color-mix(in oklab, var(--ak-accent) 35%, var(--ak-ink-dim));
   --ak-hero-min:      18dvh;
   --ak-enter-distance: 6px;
   --ak-enter-stagger:  20ms;
@@ -278,15 +288,22 @@
 }
 
 /* @preset-block poster — one giant focal statement: the hero owns the first viewport and
-   everything else recedes to bordered lists. */
+   everything else recedes to bordered lists. The band's ground is the BRAND GRADIENT itself,
+   not the mesh wash — poster means committing; the scrim under the title is still what
+   AK-SCRIM verifies. */
 [data-ak-look='poster'] {
-  --ak-hero-min:      42dvh;
-  --ak-text-hero:     clamp(2.6rem, 9vw, 4.2rem);
-  --ak-weight-display: 850;
+  --ak-hero-min:      48dvh;
+  --ak-hero-image:    none;
+  --ak-grad:          linear-gradient(160deg,
+                        color-mix(in oklab, var(--ak-accent) 85%, var(--ak-ink)),
+                        color-mix(in oklab, color-mix(in oklab, var(--ak-accent) 55%, var(--ak-accent-2)) 78%, var(--ak-ink)));
+  --ak-text-hero:     clamp(3rem, 11vw, 5.2rem);
+  --ak-weight-display: 900;
+  --ak-display-shadow: 0 4px 0 color-mix(in oklab, var(--ak-ink) 30%, transparent);
   --ak-surface-image: none;
   --ak-elev-1:        none;
-  --ak-enter-distance: 20px;
-  --ak-enter-stagger:  60ms;
+  --ak-enter-distance: 24px;
+  --ak-enter-stagger:  70ms;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════════════════
