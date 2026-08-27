@@ -32,6 +32,10 @@
  *   const { blocking, warnings } = await lintAppArtifact(html, config);
  *   if (blocking.length) return refusal;
  * @version-history
+ *   v1.2.1 — 2026-08-28 — atelier.app() counts as mounting the login pill. The Atelier shell mounts
+ *     it internally (sdk-libs/atelier/shell.js), so the pill and the language switch exist without
+ *     either verb appearing in the app's bytes — and the first AEB bench run (phase 3) flagged all
+ *     three correct Atelier builds. Found by the measurement, not by a reader.
  *   v1.2.0 — 2026-08-27 — checkTrackMixing (TARGET-074): the two build tracks have separate guides
  *     that never cross-reference, and this is the seam where a mixed app would land unnoticed. Four
  *     warnings, same declared-vs-actual shape as v1.1.0: Classic declared with the Atelier kit
@@ -188,8 +192,14 @@ function checkDeclaredButUnused(html: string): AppArtifactFinding[] {
   const loadsAuth = /aimeat-auth\.js/i.test(html);
   // The real API is AIMEAT.auth.mountLoginButton (it delegates to mountPill internally). Matched on
   // the verb rather than the full path, so a destructured or aliased call still counts — a check
-  // that only knows one spelling of a correct call is a check that flags correct apps.
-  const mountsPill = /mountLoginButton\s*\(|mountPill\s*\(|data-aimeat-pill|aimeat-login-pill/i.test(html);
+  // that only knows one spelling of a correct call is a check that flags correct apps. The Atelier
+  // shell mounts the pill itself inside atelier.app() (sdk-libs/atelier/shell.js), so that call is a
+  // mount too — and an app may hold the namespace in an alias (`var K = AIMEAT.atelier; K.app(...)`),
+  // so the shell test is "the atelier namespace appears AND some .app( is called", not one spelling.
+  // Both halves of the first AEB bench run (phase 3) hit this: three direct calls, then one alias.
+  const usesAtelierShell = /AIMEAT\s*\.\s*atelier/.test(html) && /\.\s*app\s*\(/.test(html);
+  const mountsPill = usesAtelierShell
+    || /mountLoginButton\s*\(|mountPill\s*\(|data-aimeat-pill|aimeat-login-pill/i.test(html);
   if (loadsAuth && !mountsPill) {
     out.push(finding('app-declared-unused', 'warn',
       'The page loads `aimeat-auth.js` and never mounts the login pill, so there is no sign-in, no '
