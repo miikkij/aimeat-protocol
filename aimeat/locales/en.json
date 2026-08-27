@@ -4580,6 +4580,13 @@
     "promptHasTemplate": "your starting template",
     "promptHasPacks": "capability packs with their usage docs",
     "promptHasPitfalls": "the house libraries and the pitfalls already written down",
+    "promptHasAtelier": "the Atelier kit: living looks, layouts and motion the AI composes from",
+    "trackTitle": "How should it be built?",
+    "trackClassic": "Classic",
+    "trackClassicDesc": "The proven way: templates, capability packs, the familiar clean style.",
+    "trackAtelier": "Atelier",
+    "trackAtelierDesc": "The new track: living looks (newspaper, gallery, neon console…), layouts your AI can rearrange later without republishing, motion built in.",
+    "trackNew": "new",
     "promptHasPack": "one capability pack with its usage doc",
     "tier": {
       "any": "ANY MODEL",
