@@ -34,6 +34,10 @@
  *   });
  *   // later, when the app's data changed:  m.refresh('errands.');
  * @version-history
+ *   v0.12.0 — 2026-08-28 — The SIGNATURE and the MORPH (TARGET-074 phase 4): a layout's bounded
+ *     `tokens` land as inline custom properties on the app frame (server-validated allowlist;
+ *     cleared and reapplied per render), and the canvas tile now GROWS into the focused screen —
+ *     a real shared-element morph via view-transition-name, not a crossfade.
  *   v0.10.0 — 2026-08-27 — Scroll reveals on the composition grid (units rise into view as they
  *     enter the viewport, distance from the look's entrance token, reduced-motion off) and the
  *     `overlay` projection: one Menu control opening a full-screen list in display type.
@@ -125,7 +129,7 @@ function derivedColumns(rows) {
 /**
  * The mosaic.
  * @param {{
- *   app?: { main: HTMLElement, set?: (patch: { look?: string }) => void }, target?: string|Element,
+ *   app?: { main: HTMLElement, el?: HTMLElement, set?: (patch: { look?: string }) => void }, target?: string|Element,
  *   sources?: Record<string, () => any>,
  *   fill?: Record<string, (body: HTMLElement) => void>,
  *   onPick?: (blockId: string, item: any) => void,
@@ -257,6 +261,20 @@ export function mosaic(spec) {
     } else {
       run();
     }
+  }
+
+  /**
+   * The SHARED-ELEMENT morph: the element that exists on both sides of the change carries one
+   * view-transition-name for the duration, so the browser animates it from where it WAS to where
+   * it IS — a tile grows into the full screen instead of crossfading. Falls back to the plain
+   * swap when the browser has no View Transitions or the person asked for reduced motion.
+   * @param {HTMLElement} moving @param {() => void} run
+   */
+  function morph(moving, run) {
+    if (typeof document.startViewTransition !== 'function' || reducedMotion()) { run(); return; }
+    moving.style.viewTransitionName = 'ak-morph';
+    const vt = document.startViewTransition(run);
+    vt.finished.finally(function () { moving.style.viewTransitionName = ''; });
   }
 
   // ── The five projections ─────────────────────────────────────────────────────────────────────
@@ -531,7 +549,7 @@ export function mosaic(spec) {
     }, '↩ ' + t('back'));
 
     function focus(u) {
-      transition(function () {
+      morph(u.el, function () {
         focused = u;
         focusHost.hidden = false;
         viewport.hidden = true;
@@ -545,7 +563,7 @@ export function mosaic(spec) {
     function unfocus() {
       if (!focused) return;
       const u = focused;
-      transition(function () {
+      morph(u.el, function () {
         focused = null;
         u.tile.insertBefore(u.el, u.tile.lastChild);
         focusHost.hidden = true;
@@ -617,6 +635,23 @@ export function mosaic(spec) {
 
     if (layout.look && spec.app && spec.app.set) spec.app.set({ look: layout.look });
     root.setAttribute('data-ak-nav', layout.nav || 'stack');
+
+    // The SIGNATURE: the layout's bounded token overrides land as inline custom properties on the
+    // app frame (or this root, when there is no frame), so one app's shape, type, density and
+    // motion diverge from the look without a stylesheet. The server validated the names and
+    // values against the allowlist; older stored layouts simply have no tokens.
+    const tokenHost = /** @type {any} */ (spec.app && spec.app.el ? spec.app.el : root);
+    if (tokenHost.__akTokens) {
+      for (const name of tokenHost.__akTokens) tokenHost.style.removeProperty(name);
+    }
+    tokenHost.__akTokens = [];
+    if (layout.tokens && typeof layout.tokens === 'object') {
+      for (const name of Object.keys(layout.tokens)) {
+        if (name.indexOf('--ak-') !== 0) continue; // belt on top of the server allowlist
+        tokenHost.style.setProperty(name, String(layout.tokens[name]));
+        tokenHost.__akTokens.push(name);
+      }
+    }
 
     const visible = layout.blocks.filter(function (b) { return !b.hidden; });
     const band = el('div', { class: 'ak-mosaic__band' });
