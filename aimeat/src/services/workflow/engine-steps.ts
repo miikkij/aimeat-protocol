@@ -37,6 +37,7 @@ import { getActiveConnectTunnelManager } from '../connect-tunnel.js';
 import { runExtensionActionAsSystem, type SystemRunResult } from '../extension-system-run.js';
 import { publishPackage, recordFailure } from '../datapackage/store.js';
 import { loc, template } from './engine-util.js';
+import { dispatchAiStep } from './engine-ai-step.js';
 import { isAgentStep, anyAgentReachable, AGENT_OFFLINE_GRACE_MS } from './engine-reachability.js';
 import type { WorkflowRun, WorkflowRunStep, WorkflowStep } from '../../models/workflow-schemas.js';
 
@@ -66,6 +67,12 @@ export async function dispatchStep(deps: StepDeps, ownerGhii: string, run: Workf
   // ecosystem step, so its success_signal decides green or red the same way.
   if (step.action?.kind === 'extension') {
     dispatchExtensionStep(deps, ownerGhii, run, step, step.action, onPushTerminal);
+    return [];
+  }
+  // An ai step runs the owner's own model here, on this node. No agent, no fleet, no browser — and
+  // no round trip through another repository to change what it says.
+  if (step.action?.kind === 'ai') {
+    dispatchAiStep(deps, ownerGhii, run, step, step.action, onPushTerminal);
     return [];
   }
   // A datapackage step publishes what an earlier step produced. Also here rather than over a wire:

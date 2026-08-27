@@ -4413,7 +4413,18 @@ components:
             else's capability, API keys and quota.
           required: [kind]
           properties:
-            kind: { type: string, enum: [agent, export-out, trigger-geai, human-input, extension, datapackage] }
+            kind: { type: string, enum: [agent, export-out, trigger-geai, human-input, extension, datapackage, ai] }
+            prompt: { type: string, maxLength: 20000, description: 'ai: the prompt itself, templated with the run''s vars. Use prompt_key instead when the wording should be changeable without editing the workflow.' }
+            prompt_key:
+              type: string
+              maxLength: 400
+              description: >-
+                ai: owner-namespace key holding the prompt text (a string, or an object with a `prompt`
+                string). Templated with the run's vars, and so is the text it holds. This is what makes a
+                text stage cheap to change: the wording is a memory record, so editing it touches no code,
+                no agent fleet and no deploy.
+            json: { type: boolean, description: 'ai: parse the answer as JSON before writing it, so a malformed answer fails the step instead of becoming a string nobody validates.' }
+            model: { type: string, maxLength: 200, description: 'ai: override the owner''s default model for this one step.' }
             geai: { type: string, description: 'export-out / trigger-geai: the target GEAI.' }
             capability: { type: string, description: 'trigger-geai (required) / export-out (default __deposit__).' }
             from: { type: string, description: 'export-out: owner memory key whose value is pushed.' }
@@ -4430,8 +4441,8 @@ components:
               type: string
               maxLength: 400
               description: >-
-                extension: owner-namespace key (templated, sandbox-prefix-honoring) the action's RETURN
-                VALUE is written to, so a signal can gate on it — the analogue of `answer_to_key`. It is
+                extension / ai: owner-namespace key (templated, sandbox-prefix-honoring) the action's
+                RETURN VALUE — for an ai step, the model's answer — is written to, so a signal can gate on it — the analogue of `answer_to_key`. It is
                 needed because an extension's own memory lives in the `ext:{name}` namespace while a
                 workflow's signals read owner scope, and those never intersect: a signal pointed at what
                 the extension wrote for itself can only read nothing. Absent `success_signal`, the
