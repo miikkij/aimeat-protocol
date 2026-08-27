@@ -25,6 +25,9 @@
  * @usage
  *   import { UI_COMPONENTS, componentById, buildUiCatalogue } from './registry.js';
  * @version-history
+ *   v1.1.0 — 2026-08-27 — Append-only: every unit-forming component gains an optional `title` —
+ *     the block's name in tabs, decks and canvas tiles. The first real-browser run showed
+ *     component ids leaking into tab labels because most blocks had no prop to name them with.
  *   v1.0.0 — 2026-08-27 — Initial: eleven mosaic components mirroring the served kit
  *     (TARGET-074 phase 2).
  */
@@ -76,13 +79,14 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
   {
     id: 'statRow',
     summary: 'The KPI strip; figures count up when the bound data changes.',
-    props: { source: source() },
+    props: { source: source(), title: text('The block\'s name in tabs, decks and canvas tiles.', 80) },
   },
   {
     id: 'list',
     summary: 'Keyed rows with live-change motion; empty renders the designed empty state.',
     props: {
       source: source(),
+      title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
       emptyTitle: text('What the empty state says.', 80),
       emptyHint: text('The line under it.', 160),
     },
@@ -92,6 +96,7 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
     summary: 'The browsing grid; imageless cards keep their deterministic monogram washes.',
     props: {
       source: source(),
+      title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
       emptyTitle: text('What the empty state says.', 80),
       emptyHint: text('The line under it.', 160),
     },
@@ -99,12 +104,19 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
   {
     id: 'table',
     summary: 'Real table semantics that scroll inside their own box.',
-    props: { source: source(), caption: text('The screen-reader caption.', 120) },
+    props: {
+      source: source(),
+      title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
+      caption: text('The screen-reader caption.', 120),
+    },
   },
   {
     id: 'searchBar',
     summary: 'Debounced search that reports the query to the app.',
-    props: { bind: text('What the app filters with this query (its own name for it).', 80) },
+    props: {
+      bind: text('What the app filters with this query (its own name for it).', 80),
+      title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
+    },
   },
   {
     id: 'tabs',
@@ -130,7 +142,7 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
   {
     id: 'timeline',
     summary: 'Events on the vertical line every history shares.',
-    props: { source: source() },
+    props: { source: source(), title: text('The block\'s name in tabs, decks and canvas tiles.', 80) },
   },
   {
     id: 'mediaCard',

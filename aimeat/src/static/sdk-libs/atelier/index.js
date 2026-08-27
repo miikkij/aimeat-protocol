@@ -6,9 +6,11 @@
  *   i18n layers underneath. Load one script and an Atelier app has its frame, its states and its
  *   motion without writing any of it.
  *
- *   IT RENDERS; IT DOES NOT FETCH. There is no network call anywhere in this library — it
- *   imports neither `_core/session.js` nor `_core/config.js`, holds no state beyond what it was
- *   last told, and reports events rather than acting on them. The one outward glance is
+ *   IT RENDERS; IT DOES NOT FETCH — WITH ONE NAMED EXCEPTION. The library imports no
+ *   `_core/session.js`, holds no credentials, no state beyond what it was last told, and reports
+ *   events rather than acting on them. The mosaic module is the single exception: one sessionless
+ *   GET of the app's OWN public layout record (`/v1/apps/:owner/:filename/ui`), which is as
+ *   public as the app itself and read the way the stylesheet is read. The other outward glance is
  *   feature-detecting window.AIMEAT.auth so the shell can mount the login pill the AUTH library
  *   owns; with no auth library on the page the shell still renders and boots sessionless.
  *
@@ -26,6 +28,11 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.4.0 — 2026-08-27 — The mosaic renderer (TARGET-074 phase 2): `mosaic(spec)` reads the
+ *     app's stored layout record and renders it from the kit's own components — the app binds
+ *     sources by name, the layout arranges. All five navigation projections from day one: stack,
+ *     tabs, bottom-bar, deck (scroll-snap), flow (stepper) and canvas (pan-zoom tiles that expand
+ *     to full view). Unit switches ride View Transitions where the browser has them.
  *   v0.3.4 — 2026-08-27 — Kit release marker (the JS↔CSS pin): every .ak-root is a positioning
  *     context, so component-internal absolutes never stretch the page. Stylesheet-only fix.
  *   v0.3.3 — 2026-08-27 — Kit release marker (the JS↔CSS pin): the main scroller's children
@@ -59,6 +66,7 @@ import { cardGrid, mediaCard } from './grid.js';
 import { form } from './form.js';
 import { table, searchBar } from './table.js';
 import { timeline } from './timeline.js';
+import { mosaic, appRef } from './mosaic.js';
 
 const atelier = {
   /**
@@ -66,10 +74,13 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.3.4',
+  version: '0.4.0',
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,
+
+  // ── The stored layout, rendered ──
+  mosaic, appRef,
 
   // ── Focal content ──
   hero, statRow,

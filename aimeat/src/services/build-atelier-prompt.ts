@@ -26,6 +26,9 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.1.0 — 2026-08-27 — The mosaic section: apps render through AIMEAT.atelier.mosaic() and
+ *     declare sources; the arrangement is the stored layout record (TARGET-074 phase 2). The
+ *     spec token moves with the body, as designed.
  *   v1.0.0 — 2026-08-27 — Initial (TARGET-074 phase 2 pulled forward: the track's own spec).
  */
 import { createHash } from 'node:crypto';
@@ -179,6 +182,28 @@ function composeBody(config: AimeatConfig): string {
   body += 'Every component takes a spec and returns `{ el, set(patch), destroy() }`. Copying an '
     + 'example below yields a finished, beautiful, accessible piece — that is the paved path.\n\n';
   body += renderCatalogue() + '\n\n';
+
+  body += '## The mosaic: the arrangement lives outside your file\n\n';
+  body += 'Render the screen through `AIMEAT.atelier.mosaic(...)` instead of appending components '
+    + 'by hand. You declare WHAT the app has — one resolver per data source name, an `onPick`, a '
+    + '`fallback` layout of blocks — and the ARRANGEMENT (order, look, navigation mode) is a '
+    + 'stored record the owner\'s AI can change later with one `aimeat_app_ui_set` call, no '
+    + 'republish. Source names are the binding contract: keep them stable across edits.\n\n'
+    + '```js\n'
+    + 'var m = AIMEAT.atelier.mosaic({\n'
+    + '  app: a,\n'
+    + "  sources: { 'errands.': loadErrandRows },   // name → rows (or a Promise of rows)\n"
+    + '  onPick: function (blockId, item) { open(item); },\n'
+    + "  fallback: { v: 1, blocks: [\n"
+    + "    { id: 'top', component: 'hero', props: { title: 'Errands' } },\n"
+    + "    { id: 'main', component: 'list', props: { source: 'errands.' } },\n"
+    + '  ] },\n'
+    + '});\n'
+    + "m.refresh('errands.');   // after your data changed — the change paints with motion\n"
+    + '```\n\n'
+    + 'The layout\'s `nav` field projects the same blocks as stacked sections, a tab row, a bottom '
+    + 'bar, a swipeable deck, a step-by-step flow or a pan-zoom canvas — all five work on every '
+    + 'screen size, so never build navigation by hand.\n\n';
 
   body += '## The look\n\n';
   body += 'One field chooses the whole art direction: `app({ look: … })`. Vivid is the default '

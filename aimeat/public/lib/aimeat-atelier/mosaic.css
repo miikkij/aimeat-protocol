@@ -1,0 +1,140 @@
+/*
+ * @file aimeat-atelier/mosaic.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Component styles for the mosaic renderer: the five navigation projections of one
+ *   stored layout. Every value comes from the --ak-* contract in ../aimeat-atelier.css.
+ *
+ *   MOTION HAPPENS ON INPUT ONLY. The deck scrolls by the viewer's finger (scroll-snap, no
+ *   script animation), the flow and picker switch on a press, and the canvas transforms on drag
+ *   and wheel — nothing here animates at idle, so the finish gate's zero-repaint measurement
+ *   holds in every mode.
+ *
+ *   THE DECK AND THE CANVAS OWN THEIR OVERFLOW. Both scroll or pan inside their own box; the
+ *   page never widens (the 390px horizontal-overflow measurement is the one a strip is the
+ *   classic way to fail).
+ * @structure ak-mosaic (band, units, unit) · picker · deckwrap/deck/dots · flow/flowbar ·
+ *   canvaswrap/canvas/field/tile/zoombar/focus
+ * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
+ * @version-history
+ *   v0.4.0 — 2026-08-27 — Initial (TARGET-074 phase 2, the client renderer).
+ */
+
+/* ── The frame every projection shares ────────────────────────────────────────────────────── */
+.ak-mosaic { display: flex; flex-direction: column; gap: var(--ak-gap); min-width: 0; }
+.ak-mosaic__band { display: flex; flex-direction: column; gap: var(--ak-gap); min-width: 0; }
+.ak-mosaic__units { display: flex; flex-direction: column; gap: var(--ak-gap); min-width: 0; }
+.ak-mosaic__unit { display: flex; flex-direction: column; gap: var(--ak-gap); min-width: 0; }
+.ak-mosaic__unit[hidden] { display: none; }
+
+/* ── Tabs / bottom-bar picker ─────────────────────────────────────────────────────────────── */
+.ak-mosaic__picker { display: flex; flex-direction: column; gap: var(--ak-gap); min-width: 0; }
+/* The bottom bar travels with the shell's fixed bar; inside the mosaic it sits under the units. */
+.ak-mosaic__picker--bottom-bar .ak-bottomnav { position: static; }
+
+/* ── Deck: a scroll-snap strip, one card per unit ─────────────────────────────────────────── */
+.ak-mosaic__deckwrap { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.ak-mosaic__deck {
+  display: flex;
+  gap: var(--ak-gap);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+  /* The dots and the swipe are the affordance; a full desktop scrollbar doubles it loudly. */
+  scrollbar-width: thin;
+}
+.ak-mosaic__deckcard {
+  flex: 0 0 100%;
+  min-width: 0;
+  scroll-snap-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ak-gap);
+}
+.ak-mosaic__dots { display: flex; justify-content: center; gap: 6px; }
+.ak-mosaic__dot {
+  width: 7px; height: 7px;
+  border-radius: var(--ak-radius-pill);
+  background: var(--ak-line);
+  transition: background calc(0.15s * var(--ak-motion)) var(--ak-ease);
+}
+.ak-mosaic__dot--on { background: var(--ak-accent); }
+
+/* ── Flow: one step at a time ─────────────────────────────────────────────────────────────── */
+.ak-mosaic__flow { display: flex; flex-direction: column; gap: var(--ak-gap); min-width: 0; }
+.ak-mosaic__flowbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ak-gap);
+}
+.ak-mosaic__flowstep {
+  font-size: var(--ak-text-fine);
+  font-variant-numeric: tabular-nums;
+  color: var(--ak-ink-dim);
+}
+
+/* ── Canvas: live tiles on a pan-zoom field ───────────────────────────────────────────────── */
+.ak-mosaic__canvaswrap { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.ak-mosaic__canvas {
+  position: relative;
+  overflow: hidden;
+  min-height: 55vh;
+  border: var(--ak-line-w) solid var(--ak-line);
+  border-radius: var(--ak-radius);
+  background: var(--ak-bg);
+  cursor: grab;
+  touch-action: none;
+}
+.ak-mosaic__canvas:active { cursor: grabbing; }
+.ak-mosaic__field {
+  position: absolute;
+  inset: 0 auto auto 0;
+  display: grid;
+  grid-template-columns: repeat(2, 340px);
+  gap: var(--ak-gap);
+  padding: var(--ak-pad);
+  transform-origin: 0 0;
+  will-change: transform;
+}
+.ak-mosaic__tile {
+  position: relative;
+  width: 340px;
+  max-height: 420px;
+  overflow: hidden;
+  border: var(--ak-line-w) solid var(--ak-line);
+  border-radius: var(--ak-radius);
+  background: var(--ak-surface);
+  padding: var(--ak-pad);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ak-mosaic__tilelabel {
+  font-size: var(--ak-text-fine);
+  font-weight: 700;
+  color: var(--ak-ink-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+/* Zoomed out, the tile is one target: the cover takes the press so inner controls cannot be hit
+ * by accident mid-pan. Expanded (focus view) the unit is fully interactive again. */
+.ak-mosaic__tilecover {
+  position: absolute;
+  inset: 0;
+  background: transparent;
+  border: 0;
+  cursor: zoom-in;
+  border-radius: var(--ak-radius);
+}
+.ak-mosaic__tilecover:focus-visible { outline: 2px solid var(--ak-focus); outline-offset: -2px; }
+.ak-mosaic__zoombar { display: flex; justify-content: center; gap: 8px; }
+.ak-mosaic__focus { display: flex; flex-direction: column; gap: var(--ak-gap); min-width: 0; align-items: flex-start; }
+.ak-mosaic__focus[hidden] { display: none; }
+
+/* Small screens: one tile column, so the zoomed-out map reads as a strip rather than a grid. */
+@media (max-width: 480px) {
+  .ak-mosaic__field { grid-template-columns: 340px; }
+}

@@ -233,7 +233,12 @@
       required: "Required",
       optional: "Optional",
       total: "Total",
-      you: "You"
+      you: "You",
+      next: "Next",
+      previous: "Previous",
+      zoomIn: "Zoom in",
+      zoomOut: "Zoom out",
+      fitView: "Fit to view"
     },
     fi: {
       loading: "Ladataan…",
@@ -258,7 +263,12 @@
       required: "Pakollinen",
       optional: "Valinnainen",
       total: "Yhteensä",
-      you: "Sinä"
+      you: "Sinä",
+      next: "Seuraava",
+      previous: "Edellinen",
+      zoomIn: "Lähennä",
+      zoomOut: "Loitonna",
+      fitView: "Sovita näkymään"
     },
     es: {
       loading: "Cargando…",
@@ -283,7 +293,12 @@
       required: "Obligatorio",
       optional: "Opcional",
       total: "Total",
-      you: "Tú"
+      you: "Tú",
+      next: "Siguiente",
+      previous: "Anterior",
+      zoomIn: "Acercar",
+      zoomOut: "Alejar",
+      fitView: "Ajustar a la vista"
     }
   };
   var HOST = { en: {}, fi: {}, es: {} };
@@ -1567,6 +1582,489 @@
     };
   }
 
+  // src/static/sdk-libs/_core/config.js
+  function cfg() {
+    return window.__AIMEAT_SDK_CFG__ || { nodeId: "", baseUrl: "" };
+  }
+  function resolveNodeUrl() {
+    const meta = document.querySelector('meta[name="aimeat-node"]');
+    if (meta) return (meta.getAttribute("content") || "").replace(/\/$/, "");
+    if (location.protocol === "http:" || location.protocol === "https:") return location.origin;
+    return cfg().baseUrl;
+  }
+  var NODE_URL = resolveNodeUrl();
+  var APEX_URL = cfg().baseUrl;
+  var NODE_ID = cfg().nodeId;
+  var HEARTBEAT_MS = cfg().heartbeatMs || 3e4;
+
+  // src/static/sdk-libs/atelier/mosaic.js
+  var CANVAS_MIN = 0.35;
+  var CANVAS_MAX = 1.6;
+  var CANVAS_STEP = 1.18;
+  function appRef() {
+    try {
+      const node = document.getElementById("aimeat-app-ref");
+      if (!node) return null;
+      const text = (node.textContent || "").replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+      const parsed = JSON.parse(text);
+      return parsed && parsed.owner && parsed.app_id ? { owner: String(parsed.owner), filename: String(parsed.app_id) } : null;
+    } catch {
+      return null;
+    }
+  }
+  async function loadLayout(owner, filename) {
+    try {
+      const base = APEX_URL || "";
+      const res = await fetch(base + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/ui");
+      if (!res.ok) return null;
+      const body = await res.json();
+      return body && body.data && body.data.layout || null;
+    } catch {
+      return null;
+    }
+  }
+  function labelOf(block) {
+    const p = block.props || {};
+    return p.title || p.caption || block.component;
+  }
+  function patchFor(kind, data) {
+    if (kind === "statRow") return { tiles: Array.isArray(data) ? data : [] };
+    if (kind === "table") return { rows: Array.isArray(data) ? data : data && data.rows || [] };
+    return { items: Array.isArray(data) ? data : [] };
+  }
+  function derivedColumns(rows) {
+    if (!rows.length) return [];
+    return Object.keys(rows[0]).map(function(key) {
+      return { key, label: key, sortable: true };
+    });
+  }
+  function mosaic(spec) {
+    const host = spec.app ? spec.app.main : resolve(spec.target, document.body);
+    const root = el("div", { class: "ak-root ak-mosaic" });
+    host.appendChild(root);
+    let alive = { handles: [], bound: [], cleanup: [] };
+    let destroyed = false;
+    function resolveSource(name) {
+      const fn = (spec.sources || {})[name];
+      if (typeof fn !== "function") {
+        console.warn('aimeat-atelier: the layout binds source "' + name + '" but the app declares no resolver for it.');
+        return Promise.resolve(null);
+      }
+      return Promise.resolve().then(fn);
+    }
+    function buildBlock(block, into) {
+      const p = block.props || {};
+      const pick = spec.onPick ? function(item) {
+        spec.onPick(block.id, item);
+      } : void 0;
+      const empty = { title: p.emptyTitle, hint: p.emptyHint };
+      function bound(kind, create) {
+        const wait = skeleton({ target: into, rows: 2 });
+        resolveSource(p.source).then(function(data) {
+          if (destroyed) return;
+          wait.destroy();
+          const handle = create(data == null ? [] : data);
+          alive.handles.push(handle);
+          alive.bound.push({ name: p.source, kind, handle });
+        });
+      }
+      switch (block.component) {
+        case "hero": {
+          alive.handles.push(hero({ target: into, title: p.title, sub: p.sub, image: p.image }));
+          return;
+        }
+        case "statRow":
+          return bound("statRow", function(data) {
+            return statRow({ target: into, tiles: patchFor("statRow", data).tiles });
+          });
+        case "list":
+          return bound("list", function(data) {
+            return list({ target: into, items: patchFor("list", data).items, empty, onPick: pick });
+          });
+        case "cardGrid":
+          return bound("cardGrid", function(data) {
+            return cardGrid({ target: into, items: patchFor("cardGrid", data).items, empty, onPick: pick });
+          });
+        case "table":
+          return bound("table", function(data) {
+            const rows = patchFor("table", data).rows;
+            const columns = data && !Array.isArray(data) && data.columns || derivedColumns(rows);
+            return table({ target: into, columns, rows, caption: p.caption, onPick: pick });
+          });
+        case "timeline":
+          return bound("timeline", function(data) {
+            return timeline({ target: into, items: patchFor("timeline", data).items });
+          });
+        case "searchBar": {
+          alive.handles.push(searchBar({
+            target: into,
+            onChange: spec.onSearch ? function(q) {
+              spec.onSearch(p.bind || block.id, q);
+            } : void 0
+          }));
+          return;
+        }
+        case "tabs": {
+          const items = (p.items || []).map(function(label, i) {
+            return { id: String(i), label };
+          });
+          alive.handles.push(tabs({
+            target: into,
+            items,
+            onChange: spec.onPick ? function(id) {
+              spec.onPick(block.id, items[Number(id)] && items[Number(id)].label);
+            } : void 0
+          }));
+          return;
+        }
+        case "section": {
+          const s = section({ target: into, title: p.title, hint: p.hint });
+          alive.handles.push(s);
+          const fillFn = (spec.fill || {})[block.id];
+          if (fillFn) fillFn(s.body);
+          return;
+        }
+        case "emptyState": {
+          alive.handles.push(emptyState({ target: into, title: p.title, hint: p.hint, tone: p.tone }));
+          return;
+        }
+        case "mediaCard": {
+          alive.handles.push(mediaCard({
+            target: into,
+            item: { id: block.id, title: p.title, sub: p.sub, image: p.image },
+            onPick: pick
+          }));
+          return;
+        }
+        default:
+          console.warn('aimeat-atelier: this kit build has no renderer for "' + block.component + '" — skipping block "' + block.id + '".');
+      }
+    }
+    function transition(run) {
+      if (typeof document.startViewTransition === "function" && !reducedMotion()) {
+        document.startViewTransition(run);
+      } else {
+        run();
+      }
+    }
+    function projectStack(units) {
+      const box = el("div", { class: "ak-mosaic__units" });
+      for (const u of units) box.appendChild(u.el);
+      return box;
+    }
+    function projectPicker(units, mode) {
+      const box = el("div", { class: "ak-mosaic__units" });
+      for (const u of units) {
+        u.el.hidden = true;
+        box.appendChild(u.el);
+      }
+      let current2 = 0;
+      function show(index) {
+        if (index === current2 && !units[index].el.hidden) return;
+        transition(function() {
+          units[current2].el.hidden = true;
+          current2 = index;
+          units[current2].el.hidden = false;
+          enter(units[current2].el);
+        });
+      }
+      const items = units.map(function(u, i) {
+        return { id: String(i), label: u.label };
+      });
+      const chrome = mode === "tabs" ? tabs({ items, value: "0", onChange: function(id) {
+        show(Number(id));
+      } }) : bottomNav({
+        items: items.map(function(item, i) {
+          return { id: item.id, label: item.label, onPick: function() {
+            show(i);
+          } };
+        }),
+        value: "0"
+      });
+      alive.handles.push(chrome);
+      if (units.length) units[0].el.hidden = false;
+      return el(
+        "div",
+        { class: "ak-mosaic__picker ak-mosaic__picker--" + mode },
+        mode === "tabs" ? [chrome.el, box] : [box, chrome.el]
+      );
+    }
+    function projectDeck(units) {
+      const strip = el("div", { class: "ak-mosaic__deck", role: "group" });
+      const dots = el("div", { class: "ak-mosaic__dots", "aria-hidden": "true" });
+      units.forEach(function(u, i) {
+        strip.appendChild(el("div", { class: "ak-mosaic__deckcard", "aria-label": u.label }, u.el));
+        dots.appendChild(el("span", { class: "ak-mosaic__dot" + (i === 0 ? " ak-mosaic__dot--on" : "") }));
+      });
+      const onScroll = function() {
+        const i = Math.round(strip.scrollLeft / Math.max(1, strip.clientWidth));
+        Array.prototype.forEach.call(dots.children, function(dot, j) {
+          dot.classList.toggle("ak-mosaic__dot--on", j === i);
+        });
+      };
+      strip.addEventListener("scroll", onScroll, { passive: true });
+      alive.cleanup.push(function() {
+        strip.removeEventListener("scroll", onScroll);
+      });
+      return el("div", { class: "ak-mosaic__deckwrap" }, [strip, dots]);
+    }
+    function projectFlow(units) {
+      const box = el("div", { class: "ak-mosaic__units" });
+      for (const u of units) {
+        u.el.hidden = true;
+        box.appendChild(u.el);
+      }
+      let current2 = 0;
+      const where = el("span", { class: "ak-mosaic__flowstep", "aria-live": "polite" });
+      function show(index) {
+        transition(function() {
+          units[current2].el.hidden = true;
+          current2 = Math.max(0, Math.min(units.length - 1, index));
+          units[current2].el.hidden = false;
+          where.textContent = current2 + 1 + " / " + units.length;
+          prev.disabled = current2 === 0;
+          next.disabled = current2 === units.length - 1;
+          enter(units[current2].el);
+        });
+      }
+      const prev = (
+        /** @type {HTMLButtonElement} */
+        el("button", {
+          type: "button",
+          class: "ak-btn ak-btn--ghost",
+          "data-ak-noguard": true,
+          on: { click: function() {
+            show(current2 - 1);
+          } }
+        }, t("previous"))
+      );
+      const next = (
+        /** @type {HTMLButtonElement} */
+        el("button", {
+          type: "button",
+          class: "ak-btn ak-btn--primary",
+          "data-ak-noguard": true,
+          on: { click: function() {
+            show(current2 + 1);
+          } }
+        }, t("next"))
+      );
+      if (units.length) {
+        units[0].el.hidden = false;
+        where.textContent = "1 / " + units.length;
+        prev.disabled = true;
+        next.disabled = units.length === 1;
+      }
+      return el("div", { class: "ak-mosaic__flow" }, [
+        box,
+        el("div", { class: "ak-mosaic__flowbar" }, [prev, where, next])
+      ]);
+    }
+    function projectCanvas(units) {
+      const field = el("div", { class: "ak-mosaic__field" });
+      const cam = { x: 0, y: 0, scale: 0.6 };
+      let focused = null;
+      function apply() {
+        field.style.transform = "translate(" + cam.x + "px," + cam.y + "px) scale(" + cam.scale + ")";
+      }
+      const viewport = el("div", { class: "ak-mosaic__canvas" }, field);
+      units.forEach(function(u) {
+        const cover = el("button", {
+          type: "button",
+          class: "ak-mosaic__tilecover",
+          "data-ak-noguard": true,
+          "aria-label": t("open") + ": " + u.label,
+          on: { click: function() {
+            focus(u);
+          } }
+        });
+        u.tile = el("div", { class: "ak-mosaic__tile" }, [
+          el("span", { class: "ak-mosaic__tilelabel", text: u.label }),
+          u.el,
+          cover
+        ]);
+        field.appendChild(u.tile);
+      });
+      const focusHost = el("div", { class: "ak-mosaic__focus", hidden: true });
+      const backBtn = el("button", {
+        type: "button",
+        class: "ak-btn ak-btn--ghost",
+        "data-ak-noguard": true,
+        on: { click: function() {
+          unfocus();
+        } }
+      }, "↩ " + t("back"));
+      function focus(u) {
+        transition(function() {
+          focused = u;
+          focusHost.hidden = false;
+          viewport.hidden = true;
+          zoombar.hidden = true;
+          clear(focusHost);
+          focusHost.appendChild(backBtn);
+          focusHost.appendChild(u.el);
+          enter(focusHost);
+        });
+      }
+      function unfocus() {
+        if (!focused) return;
+        const u = focused;
+        transition(function() {
+          focused = null;
+          u.tile.insertBefore(u.el, u.tile.lastChild);
+          focusHost.hidden = true;
+          viewport.hidden = false;
+          zoombar.hidden = false;
+        });
+      }
+      let drag = null;
+      viewport.addEventListener("pointerdown", function(ev) {
+        const at = (
+          /** @type {Element|null} */
+          ev.target instanceof Element ? ev.target : null
+        );
+        if (at && at.closest(".ak-mosaic__tilecover")) return;
+        drag = { x: ev.clientX, y: ev.clientY };
+        viewport.setPointerCapture(ev.pointerId);
+      });
+      viewport.addEventListener("pointermove", function(ev) {
+        if (!drag) return;
+        cam.x += ev.clientX - drag.x;
+        cam.y += ev.clientY - drag.y;
+        drag = { x: ev.clientX, y: ev.clientY };
+        apply();
+      });
+      viewport.addEventListener("pointerup", function() {
+        drag = null;
+      });
+      viewport.addEventListener("wheel", function(ev) {
+        ev.preventDefault();
+        const factor = ev.deltaY < 0 ? CANVAS_STEP : 1 / CANVAS_STEP;
+        const next = Math.max(CANVAS_MIN, Math.min(CANVAS_MAX, cam.scale * factor));
+        const rect = viewport.getBoundingClientRect();
+        const px = ev.clientX - rect.left;
+        const py = ev.clientY - rect.top;
+        cam.x = px - (px - cam.x) * (next / cam.scale);
+        cam.y = py - (py - cam.y) * (next / cam.scale);
+        cam.scale = next;
+        apply();
+      }, { passive: false });
+      function zoomBtn(label, aria, factor) {
+        return el("button", {
+          type: "button",
+          class: "ak-btn ak-btn--ghost",
+          "aria-label": aria,
+          "data-ak-noguard": true,
+          on: {
+            click: function() {
+              cam.scale = factor === 0 ? 0.6 : Math.max(CANVAS_MIN, Math.min(CANVAS_MAX, cam.scale * factor));
+              if (factor === 0) {
+                cam.x = 0;
+                cam.y = 0;
+              }
+              apply();
+            }
+          }
+        }, label);
+      }
+      const zoombar = el("div", { class: "ak-mosaic__zoombar" }, [
+        zoomBtn("−", t("zoomOut"), 1 / CANVAS_STEP),
+        zoomBtn("⤢", t("fitView"), 0),
+        zoomBtn("+", t("zoomIn"), CANVAS_STEP)
+      ]);
+      apply();
+      return el("div", { class: "ak-mosaic__canvaswrap" }, [viewport, zoombar, focusHost]);
+    }
+    function render(layout) {
+      for (const h of alive.handles) {
+        if (h && h.destroy) h.destroy();
+      }
+      for (const fn of alive.cleanup) fn();
+      alive = { handles: [], bound: [], cleanup: [] };
+      clear(root);
+      if (!layout || !Array.isArray(layout.blocks)) return;
+      if (layout.look && spec.app && spec.app.set) spec.app.set({ look: layout.look });
+      root.setAttribute("data-ak-nav", layout.nav || "stack");
+      const visible = layout.blocks.filter(function(b) {
+        return !b.hidden;
+      });
+      const band = el("div", { class: "ak-mosaic__band" });
+      const units = [];
+      for (const block of visible) {
+        if (block.component === "hero") {
+          buildBlock(block, band);
+          continue;
+        }
+        const unitEl = el("section", { class: "ak-mosaic__unit", "data-ak-block": block.id });
+        buildBlock(block, unitEl);
+        units.push({ el: unitEl, label: labelOf(block), block });
+      }
+      if (band.childNodes.length) root.appendChild(band);
+      const nav = layout.nav || "stack";
+      if (!units.length) return;
+      if (nav === "tabs" || nav === "bottom-bar") root.appendChild(projectPicker(units, nav));
+      else if (nav === "deck") root.appendChild(projectDeck(units));
+      else if (nav === "flow") root.appendChild(projectFlow(units));
+      else if (nav === "canvas") root.appendChild(projectCanvas(units));
+      else root.appendChild(projectStack(units));
+    }
+    let currentLayout = null;
+    async function boot() {
+      let layout = spec.layout || null;
+      if (!layout) {
+        const ref = spec.owner && spec.filename ? { owner: spec.owner, filename: spec.filename } : appRef();
+        if (ref) layout = await loadLayout(ref.owner, ref.filename);
+      }
+      if (destroyed) return;
+      currentLayout = layout || spec.fallback || null;
+      render(currentLayout);
+    }
+    const booting = boot();
+    return {
+      el: root,
+      /** Replace the whole rendered layout — what a live layout-change event calls. */
+      set(layout) {
+        currentLayout = layout || spec.fallback || null;
+        render(currentLayout);
+      },
+      /** Re-fetch the stored layout and re-render — after the app knows it changed. */
+      async reload() {
+        await booting;
+        const ref = spec.owner && spec.filename ? { owner: spec.owner, filename: spec.filename } : appRef();
+        const layout = ref ? await loadLayout(ref.owner, ref.filename) : null;
+        if (destroyed) return;
+        currentLayout = layout || spec.fallback || null;
+        render(currentLayout);
+      },
+      /**
+       * Re-resolve one source (or all) and hand the fresh rows to every component bound to it.
+       * The change paints with the components' own motion — this is the app's line to call when
+       * its data moved.
+       * @param {string} [name]
+       */
+      async refresh(name) {
+        await booting;
+        const targets = alive.bound.filter(function(b) {
+          return !name || b.name === name;
+        });
+        await Promise.all(targets.map(function(b) {
+          return resolveSource(b.name).then(function(data) {
+            if (!destroyed && data != null) b.handle.set(patchFor(b.kind, data));
+          });
+        }));
+      },
+      destroy() {
+        destroyed = true;
+        for (const h of alive.handles) {
+          if (h && h.destroy) h.destroy();
+        }
+        for (const fn of alive.cleanup) fn();
+        alive = { handles: [], bound: [], cleanup: [] };
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+
   // src/static/sdk-libs/atelier/index.js
   var atelier = {
     /**
@@ -1574,12 +2072,15 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.3.4",
+    version: "0.4.0",
     // ── Shell and navigation ──
     app,
     section,
     tabs,
     bottomNav,
+    // ── The stored layout, rendered ──
+    mosaic,
+    appRef,
     // ── Focal content ──
     hero,
     statRow,
