@@ -398,6 +398,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     connectTunnelHeartbeatIntervalMs: parseInt(process.env.AIMEAT_CONNECT_TUNNEL_HEARTBEAT_MS ?? '30000', 10),
     connectTunnelOfflineThresholdMs: parseInt(process.env.AIMEAT_CONNECT_TUNNEL_OFFLINE_MS ?? '90000', 10),
     connectTunnelRequestTimeoutMs: parseInt(process.env.AIMEAT_CONNECT_TUNNEL_REQUEST_TIMEOUT_MS ?? '30000', 10),
+    crewTryTimeoutMs: parseInt(process.env.AIMEAT_CREW_TRY_TIMEOUT_MS ?? '300000', 10),
     smtpHost: process.env.AIMEAT_SMTP_HOST || null,
     smtpPort: parseInt(process.env.AIMEAT_SMTP_PORT ?? '587', 10),
     smtpUser: process.env.AIMEAT_SMTP_USER ?? null,

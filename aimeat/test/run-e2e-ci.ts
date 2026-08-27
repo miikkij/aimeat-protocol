@@ -386,6 +386,7 @@ const ALL_SUITES = [
     'test/e2e-connect-tunnel.ts',
     'test/e2e-connect-tunnel-delivery.ts',
     'test/e2e-connect-tunnel-records.ts',
+    'test/e2e-agent-crew.ts',
     'test/e2e-connect-serve-loopback.ts',
     'test/e2e-phase0.ts',
     'test/e2e-projects.ts',

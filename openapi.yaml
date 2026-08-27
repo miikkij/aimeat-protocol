@@ -141,6 +141,8 @@ tags:
     description: Human↔human (GHII↔GHII) direct messaging with first-contact consent, federation delivery, and media attachments
   - name: Agent Webhooks
     description: Webhook registration, testing, and delivery log for push-based agent notifications
+  - name: Agent Crew
+    description: A JSON crew definition for one of the owner's agents — read, draft, validate, try, publish, restore. Validation and the trial run are asked of the agent's own runtime over the connector tunnel; the node stores and versions the definition and never judges it.
   - name: Agent Telemetry
     description: Telemetry event collection and retrieval for agent observability
   - name: Agent Onboarding
@@ -230,6 +232,93 @@ components:
       description: One-time key for Tier 0.5 operations
 
   schemas:
+    CrewDefDoc:
+      type: object
+      description: >-
+        A crewaimeat crew definition (crew_def.py shape): agent_name, agents[], tasks[], an optional
+        model profile, process, listen_for, tags, capabilities, skills, offers and signals. The node
+        checks only that it is an object; the rules are the runtime's validator.
+      additionalProperties: true
+    CrewDefEnvelope:
+      type: object
+      description: What sits at `crews.registry.<agent>`; crew_registry.py reads `doc` out of it.
+      properties:
+        version:
+          type: integer
+          description: Envelope schema version (1)
+        revision:
+          type: integer
+          description: Running publish number
+        publishedAt:
+          type: string
+          format: date-time
+        publishedBy:
+          type: string
+          description: The principal that published (owner GHII or agent GAII)
+        agent_name:
+          type: string
+        doc:
+          $ref: '#/components/schemas/CrewDefDoc'
+    AgentCrewState:
+      type: object
+      properties:
+        agent:
+          type: string
+        gaii:
+          type: string
+        key:
+          type: string
+          description: The live key, `crews.registry.<agent>`
+        online:
+          type: boolean
+          description: Whether the agent holds a connector tunnel right now
+        published:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/CrewDefEnvelope'
+        draft:
+          type: object
+          nullable: true
+          properties:
+            doc:
+              $ref: '#/components/schemas/CrewDefDoc'
+            savedAt:
+              type: string
+              format: date-time
+        versions:
+          type: array
+          description: Kept revisions, newest first
+          items:
+            type: object
+            properties:
+              revision:
+                type: integer
+              publishedAt:
+                type: string
+                format: date-time
+                nullable: true
+        version_window:
+          type: integer
+          description: How many revisions are kept
+        runtime:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: Whatever the runtime last wrote at `crews.runtime.<agent>` (loadedAt, revision, ok, errors, runtime)
+        try_timeout_ms:
+          type: integer
+    AgentCrewPublished:
+      type: object
+      properties:
+        published:
+          type: boolean
+        revision:
+          type: integer
+        publishedAt:
+          type: string
+          format: date-time
+        key:
+          type: string
     AppSeoState:
       type: string
       description: >-
@@ -4968,6 +5057,14 @@ components:
         type: string
         pattern: '^tc-[0-9a-f-]{36}$'
       description: Work item tracking code
+
+    AgentNamePath:
+      name: name
+      in: path
+      required: true
+      schema:
+        type: string
+      description: The agent's bare name (resolved under the calling owner) or its full GAII
 
     Pagination:
       name: page
@@ -38346,6 +38443,415 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /v1/agents/{name}/crew:
+    get:
+      operationId: getAgentCrew
+      summary: Read an agent's crew definition state
+      description: |
+        Everything the Crew tab shows in one read: the live definition at `crews.registry.<agent>`
+        (envelope with `revision`, `publishedAt`, `publishedBy`, `agent_name`, `doc`), the owner's
+        unpublished draft, the kept revisions, what the runtime last reported loading
+        (`crews.runtime.<agent>`), and whether the agent is on the connector tunnel right now.
+        Owner sessions only.
+      tags: [Agent Crew]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AgentNamePath'
+      responses:
+        '200':
+          description: The crew definition state
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AgentCrewState'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/agents/{name}/crew/draft:
+    put:
+      operationId: saveAgentCrewDraft
+      summary: Save unpublished edits to the crew definition
+      description: |
+        Writes `crews.registry.<agent>.draft` in the agent's namespace (owner visibility) so edits
+        survive a reload. No validation: a draft may be half-written. Owner principal only.
+      tags: [Agent Crew]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AgentNamePath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [doc]
+              properties:
+                doc:
+                  $ref: '#/components/schemas/CrewDefDoc'
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          saved:
+                            type: boolean
+                          savedAt:
+                            type: string
+                            format: date-time
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: discardAgentCrewDraft
+      summary: Discard the unpublished draft
+      tags: [Agent Crew]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AgentNamePath'
+      responses:
+        '200':
+          description: Discarded (or there was none)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          discarded:
+                            type: boolean
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/agents/{name}/crew/validate:
+    post:
+      operationId: validateAgentCrew
+      summary: Ask the agent's runtime to validate a crew definition
+      description: |
+        Sends `crew.validate` to the agent over the connector tunnel's `invoke` frame and returns the
+        runtime's error list verbatim (crewaimeat `validate_crew_doc`, field-anchored strings such as
+        `agents[0] (name): unknown tool 'x'`). The node holds no validator of its own. Nothing is
+        stored. `409 AGENT_OFFLINE` when the agent is not connected; `409 CREW_RUNTIME_MISSING` when it
+        is connected but nothing on its side answers the call; `504 AGENT_TIMEOUT` when it does not
+        answer in time.
+      tags: [Agent Crew]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AgentNamePath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [doc]
+              properties:
+                doc:
+                  $ref: '#/components/schemas/CrewDefDoc'
+      responses:
+        '200':
+          description: The runtime's verdict
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          valid:
+                            type: boolean
+                          errors:
+                            type: array
+                            items:
+                              type: string
+                            description: The validator's messages, unchanged
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: The agent is not connected (AGENT_OFFLINE) or its runtime does not answer this call (CREW_RUNTIME_MISSING)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '502':
+          description: The runtime failed the call or answered in an unknown shape (CREW_RUNTIME_ERROR)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '504':
+          description: The runtime did not answer in time (AGENT_TIMEOUT)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+  /v1/agents/{name}/crew/try:
+    post:
+      operationId: tryAgentCrew
+      summary: Start one trial run of a crew definition on the agent's runtime
+      description: |
+        Sends `crew.try` with the definition and a prompt. The runtime builds the crew and runs it
+        ONCE without registering anything, writing memory or publishing an offer; the node keeps the
+        result in memory for 15 minutes and never stores it. Returns at once with a `try_id` to poll,
+        because a run can take minutes.
+      tags: [Agent Crew]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AgentNamePath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [doc, prompt]
+              properties:
+                doc:
+                  $ref: '#/components/schemas/CrewDefDoc'
+                prompt:
+                  type: string
+                  maxLength: 20000
+                  description: What the crew should do in this trial (becomes `{{ctx.prompt}}`)
+      responses:
+        '202':
+          description: Trial started
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          try_id:
+                            type: string
+                          status:
+                            type: string
+                            enum: [running]
+                          started_at:
+                            type: string
+                            format: date-time
+                          timeout_ms:
+                            type: integer
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: The agent is not connected (AGENT_OFFLINE)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+  /v1/agents/{name}/crew/try/{id}:
+    get:
+      operationId: getAgentCrewTry
+      summary: Poll a trial run
+      tags: [Agent Crew]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AgentNamePath'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The `try_id` from the start call
+      responses:
+        '200':
+          description: The trial's state
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          try_id:
+                            type: string
+                          status:
+                            type: string
+                            enum: [running, done, failed]
+                          result:
+                            description: The runtime's answer when done (`output`, `duration_ms`, optionally `model`)
+                          error:
+                            type: object
+                            nullable: true
+                            properties:
+                              code:
+                                type: string
+                              message:
+                                type: string
+                          started_at:
+                            type: string
+                            format: date-time
+                          finished_at:
+                            type: string
+                            format: date-time
+                            nullable: true
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Unknown or expired trial (TRY_NOT_FOUND), or unknown agent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+  /v1/agents/{name}/crew/publish:
+    post:
+      operationId: publishAgentCrew
+      summary: Publish a crew definition as the live one
+      description: |
+        Asks the runtime to validate first; only a clean verdict is written (`422 CREW_INVALID` with
+        the validator's messages otherwise, and nothing changes). On success the definition becomes
+        revision N+1: a full copy lands at `crews.registry.<agent>.version.N+1`, the live key
+        `crews.registry.<agent>` is replaced, the draft is removed, revisions older than the last 10
+        are pruned, and the runtime is woken with a `crew.def_updated` delivery so it reloads.
+        Owner principal only; the agent must be connected.
+      tags: [Agent Crew]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AgentNamePath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [doc]
+              properties:
+                doc:
+                  $ref: '#/components/schemas/CrewDefDoc'
+      responses:
+        '200':
+          description: Published
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AgentCrewPublished'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: The agent is not connected (AGENT_OFFLINE) or its runtime does not answer validation (CREW_RUNTIME_MISSING)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '422':
+          description: The validator found problems; `error.details.errors` carries them verbatim (CREW_INVALID)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+  /v1/agents/{name}/crew/restore:
+    post:
+      operationId: restoreAgentCrew
+      summary: Republish a kept revision
+      description: |
+        Reads `crews.registry.<agent>.version.<revision>` and publishes it through the same gate as
+        a fresh publish, so it becomes a new revision. `404 REVISION_NOT_FOUND` when that revision
+        was pruned. Owner principal only; the agent must be connected.
+      tags: [Agent Crew]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AgentNamePath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [revision]
+              properties:
+                revision:
+                  type: integer
+                  minimum: 1
+      responses:
+        '200':
+          description: Published as a new revision
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AgentCrewPublished'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Unknown agent, or the revision is no longer kept (REVISION_NOT_FOUND)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '409':
+          description: The agent is not connected (AGENT_OFFLINE)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '422':
+          description: The validator found problems (CREW_INVALID)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
   /v1/agents/{name}/webhook/log:
     get:
       operationId: getAgentWebhookLog

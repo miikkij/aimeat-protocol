@@ -1,0 +1,105 @@
+/**
+ * @file agents-crew.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The Crew tab of the agent detail card (views/profile/agents/tab-crew.js and
+ *   crew-editor.js): state badges, the template menu, member and task cards with the validator's
+ *   messages anchored to them, the grouped tool menu, the task-order picture, and the trial box.
+ *   Shares the agent-detail form rules (.pf-agd-form-field, .pf-agd-section-title) and adds only
+ *   what those do not cover. Colours and spacing come from theme.css variables.
+ * @version-history
+ *   v1.0.0 -- 2026-08-28 -- Initial (JSON-agent Crew tab).
+ */
+
+.pf .pf-agd-crew { display: flex; flex-direction: column; gap: 0.9rem; }
+.pf .pf-agd-crew-head { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; flex-wrap: wrap; }
+.pf .pf-agd-crew-head .section-desc { margin-bottom: 0; }
+.pf .pf-agd-crew-status { display: flex; gap: 0.4rem; align-items: center; flex-shrink: 0; }
+
+.pf .pf-agd-crew-state--empty { background: var(--card-bg-alt); color: var(--text-dim); }
+.pf .pf-agd-crew-state--draft { background: var(--card-bg-alt); color: var(--text); }
+.pf .pf-agd-crew-state--validated { background: var(--info-bg, var(--card-bg-alt)); color: var(--info, var(--accent)); }
+.pf .pf-agd-crew-state--published { background: var(--success); color: var(--bg); }
+.pf .pf-agd-crew-state--invalid { background: var(--danger-bg, var(--card-bg-alt)); color: var(--danger); }
+
+.pf .pf-agd-crew-live { padding: 0.6rem 0.8rem; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg-alt); font-size: 0.85rem; }
+.pf .pf-agd-crew-offline { font-size: 0.82rem; }
+
+.pf .pf-agd-crew-template-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.6rem; margin-top: 0.6rem; }
+.pf .pf-agd-crew-template {
+  text-align: left; padding: 0.75rem 0.85rem; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--card-bg); color: var(--text); cursor: pointer; font: inherit;
+}
+.pf .pf-agd-crew-template:hover { border-color: var(--accent); }
+.pf .pf-agd-crew-template-name { font-weight: 600; font-size: 0.9rem; margin-bottom: 0.25rem; }
+.pf .pf-agd-crew-template-desc { color: var(--text-dim); font-size: 0.8rem; line-height: 1.4; }
+
+.pf .pf-agd-crew-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.pf .pf-agd-crew-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.pf .pf-agd-crew-note { margin: 0; }
+.pf .pf-agd-crew-limit { margin: 0; }
+
+.pf .pf-agd-crew-problems { border: 1px solid var(--danger); border-radius: 8px; padding: 0.6rem 0.8rem; }
+.pf .pf-agd-crew-problems-title { font-weight: 600; color: var(--danger); font-size: 0.85rem; }
+.pf .pf-agd-crew-errors { margin: 0.35rem 0 0; padding-left: 1.1rem; color: var(--danger); font-size: 0.8rem; font-family: var(--font-mono, monospace); line-height: 1.5; }
+.pf .pf-agd-crew-errors li { margin: 0.1rem 0; white-space: pre-wrap; }
+
+.pf .pf-agd-crew-section { border-top: 1px solid var(--border); padding-top: 0.75rem; }
+.pf .pf-agd-crew-sub { font-weight: 600; font-size: 0.85rem; margin: 0.6rem 0 0.4rem; }
+.pf .pf-agd-crew-grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0 0.75rem; }
+.pf .pf-agd-crew-grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0 0.75rem; }
+
+.pf .pf-agd-crew-card { border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.8rem; margin-bottom: 0.6rem; background: var(--card-bg); }
+.pf .pf-agd-crew-card--problem { border-color: var(--danger); }
+.pf .pf-agd-crew-card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem; }
+.pf .pf-agd-crew-card-index { font-family: var(--font-mono, monospace); font-size: 0.75rem; color: var(--text-dim); }
+
+.pf .pf-agd-crew-check { display: flex; align-items: center; gap: 0.4rem; font-size: 0.82rem; margin: 0.3rem 0; cursor: pointer; }
+/* The agent-detail form rule stretches every input in a field to full width; a checkbox is not a field. */
+.pf .pf-agd-form-field .pf-agd-crew-check input[type="checkbox"],
+.pf .pf-agd-form-field .pf-agd-crew-tool input[type="checkbox"],
+.pf .pf-agd-crew-check input[type="checkbox"],
+.pf .pf-agd-crew-tool input[type="checkbox"] { width: auto; margin: 0; display: inline-block; flex: 0 0 auto; }
+.pf .pf-agd-crew-check--inline { display: inline-flex; margin: 0 0.75rem 0.25rem 0; }
+.pf .pf-agd-crew-context { display: flex; flex-wrap: wrap; }
+
+.pf .pf-agd-crew-tools { display: flex; flex-direction: column; gap: 0.5rem; }
+.pf .pf-agd-crew-tools-group { border: 1px solid var(--border); border-radius: 6px; padding: 0.45rem 0.6rem; }
+.pf .pf-agd-crew-tools-title { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.3rem; }
+/* Written against `.pf .pf-agd-form-field label`, which lays every label in a field out as a block. */
+.pf .pf-agd-crew-tool,
+.pf .pf-agd-form-field label.pf-agd-crew-tool { display: grid; grid-template-columns: auto minmax(110px, 150px) 1fr; gap: 0.5rem; align-items: baseline; font-size: 0.8rem; font-weight: 400; color: var(--text); padding: 0.15rem 0; margin: 0; cursor: pointer; }
+.pf .pf-agd-form-field label.pf-agd-crew-check { display: flex; font-weight: 400; margin: 0.3rem 0; }
+.pf .pf-agd-form-field label.pf-agd-crew-check--inline { display: inline-flex; margin: 0 0.75rem 0.25rem 0; }
+.pf .pf-agd-crew-tool-id { font-family: var(--font-mono, monospace); }
+.pf .pf-agd-crew-tool-desc { color: var(--text-dim); }
+.pf .pf-agd-crew-tools-refine { margin-top: 0.25rem; }
+.pf .pf-agd-crew-tools-verbs { margin-top: 0.25rem; padding-left: 0.5rem; border-left: 2px solid var(--border); }
+
+.pf .pf-agd-crew-json { font-family: var(--font-mono, monospace); font-size: 0.8rem; width: 100%; }
+.pf .pf-agd-crew-json--full { min-height: 320px; }
+.pf .pf-agd-crew-parse-error { color: var(--danger); font-size: 0.8rem; margin-top: 0.25rem; }
+
+.pf .pf-agd-crew-dag { overflow-x: auto; margin-top: 0.5rem; }
+.pf .pf-agd-crew-dag svg { display: block; max-width: 100%; height: auto; }
+.pf .pf-agd-crew-dag-node rect { fill: var(--card-bg-alt); stroke: var(--border); stroke-width: 1; }
+.pf .pf-agd-crew-dag-node--problem rect { stroke: var(--danger); stroke-width: 1.5; }
+.pf .pf-agd-crew-dag-id { font-size: 12px; font-weight: 600; fill: var(--text); font-family: var(--font-mono, monospace); }
+.pf .pf-agd-crew-dag-agent { font-size: 11px; fill: var(--text-dim); }
+.pf .pf-agd-crew-dag-edge { fill: none; stroke: var(--accent); stroke-width: 1.5; }
+.pf .pf-agd-crew-dag-arrow { fill: var(--accent); }
+
+.pf .pf-agd-crew-try-row { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.5rem; }
+.pf .pf-agd-crew-try-row .input-field { flex: 1; }
+.pf .pf-agd-crew-try-result { margin-top: 0.6rem; }
+.pf .pf-agd-crew-try-result--failed .pf-agd-crew-try-output { border-color: var(--danger); }
+.pf .pf-agd-crew-try-output { white-space: pre-wrap; font-size: 0.8rem; border: 1px solid var(--border); border-radius: 6px; padding: 0.6rem; background: var(--card-bg-alt); max-height: 400px; overflow: auto; }
+
+.pf .pf-agd-crew-versions { list-style: none; margin: 0.4rem 0 0; padding: 0; font-size: 0.82rem; }
+.pf .pf-agd-crew-versions li { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; padding: 0.25rem 0; border-bottom: 1px dashed var(--border); }
+
+@media (max-width: 640px) {
+  .pf .pf-agd-crew-tool { grid-template-columns: auto 1fr; }
+  .pf .pf-agd-crew-tool-desc { grid-column: 2; }
+  .pf .pf-agd-crew-try-row { flex-direction: column; align-items: stretch; }
+}

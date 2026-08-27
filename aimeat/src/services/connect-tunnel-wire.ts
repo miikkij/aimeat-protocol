@@ -11,6 +11,8 @@
  *   spaceKeyOf(); coerceSpaceRef()
  * @usage import type { ConnectFrame } from './connect-tunnel-wire.js';
  * @version-history
+ *   v1.1.0 -- 2026-08-28 -- `timeout_ms` on the invoke frame, so a connector daemon can drop an
+ *     invoke nobody collected once the server has stopped waiting for it.
  *   v1.0.0 -- 2026-08-19 -- Pure extraction from connect-tunnel.ts, which passed the 800-line cap.
  *     Bodies verbatim; no behaviour change.
  */
@@ -48,6 +50,7 @@ export interface ConnectFrame {
   payload?: unknown;
   // ── invoke (S→C) / invoke_result (C→S) ──
   capability?: string;       // invoke: the capability id/name to run on the principal
+  timeout_ms?: number;       // invoke: how long the server waits — a daemon drops an uncollected invoke after this
   input?: unknown;           // invoke: the input payload
   caller?: string;           // invoke: the AIMEAT caller GHII (the principal maps this to its account)
   ok?: boolean;              // invoke_result: whether the principal handled it successfully
