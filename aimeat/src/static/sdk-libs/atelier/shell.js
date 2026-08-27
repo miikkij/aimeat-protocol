@@ -79,7 +79,13 @@ export function app(spec) {
     root.classList.add('ak-app--bottomnav');
   }
 
-  resolve(spec.target, document.body).appendChild(root);
+  const mount = resolve(spec.target, document.body);
+  mount.appendChild(root);
+  // A full-frame app owns the page: without this the browser's default body margin leaves an
+  // 8px gutter around the frame (found by the first real-browser run — no preflight resets it
+  // on this track, because the kit is the only stylesheet).
+  const fullFrame = mount === document.body;
+  if (fullFrame) document.body.classList.add('ak-body');
 
   /** The current status card, so `status()` swaps rather than stacks. */
   let statusCard = null;
@@ -179,7 +185,11 @@ export function app(spec) {
     heading.textContent = state.title;
   });
 
-  startBoot();
+  // Deferred one tick ON PURPOSE: with requireLogin off — or a session already live when app()
+  // is called — a synchronous boot would fire onReady before app() has RETURNED, and the host's
+  // handle variable is still undefined inside its own onReady. The browser gate caught exactly
+  // that on the first verification run.
+  setTimeout(startBoot, 0);
 
   return {
     el: root,
@@ -201,6 +211,7 @@ export function app(spec) {
       if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
       if (statusCard) statusCard.destroy();
       if (nav) nav.destroy();
+      if (fullFrame) document.body.classList.remove('ak-body');
       if (root.parentNode) root.parentNode.removeChild(root);
     },
   };

@@ -26,6 +26,16 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.3.4 — 2026-08-27 — Kit release marker (the JS↔CSS pin): every .ak-root is a positioning
+ *     context, so component-internal absolutes never stretch the page. Stylesheet-only fix.
+ *   v0.3.3 — 2026-08-27 — Kit release marker (the JS↔CSS pin): the main scroller's children
+ *     never flex-shrink — the tab row was crushed to 12px. Stylesheet-only fix.
+ *   v0.3.2 — 2026-08-27 — A full-frame app stamps .ak-body on <body> (margin 0, page ground):
+ *     the browser's default 8px body margin left a gutter around the frame, because no preflight
+ *     resets it on this track. Second real-browser finding of the run.
+ *   v0.3.1 — 2026-08-27 — The shell's boot defers one tick: with requireLogin off (or a session
+ *     already live) onReady fired before app() returned, so the host's own handle was undefined
+ *     inside it. Found by the first real-browser verification run, not by the string tests.
  *   v0.3.0 — 2026-08-27 — The content and data components arrive: list (keyed rows, live-change
  *     motion), listDetail (container-query master–detail), cardGrid + mediaCard (deterministic
  *     monogram washes where no image exists), form (declared fields with the accessibility
@@ -56,7 +66,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.3.0',
+  version: '0.3.4',
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,

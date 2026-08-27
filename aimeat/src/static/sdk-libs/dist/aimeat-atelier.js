@@ -496,7 +496,10 @@
       root.appendChild(nav.el);
       root.classList.add("ak-app--bottomnav");
     }
-    resolve(spec.target, document.body).appendChild(root);
+    const mount = resolve(spec.target, document.body);
+    mount.appendChild(root);
+    const fullFrame = mount === document.body;
+    if (fullFrame) document.body.classList.add("ak-body");
     let statusCard = null;
     function status(kind, opts) {
       const o = opts || {};
@@ -593,7 +596,7 @@
     const stopLang = i18n.onChange(function() {
       heading.textContent = state.title;
     });
-    startBoot();
+    setTimeout(startBoot, 0);
     return {
       el: root,
       main,
@@ -620,6 +623,7 @@
         }
         if (statusCard) statusCard.destroy();
         if (nav) nav.destroy();
+        if (fullFrame) document.body.classList.remove("ak-body");
         if (root.parentNode) root.parentNode.removeChild(root);
       }
     };
@@ -1570,7 +1574,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.3.0",
+    version: "0.3.4",
     // ── Shell and navigation ──
     app,
     section,
