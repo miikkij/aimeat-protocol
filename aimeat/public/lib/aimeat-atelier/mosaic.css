@@ -110,7 +110,58 @@
 
 /* ── Overlay: the full-screen menu ────────────────────────────────────────────────────────── */
 .ak-mosaic__overlaywrap { display: flex; flex-direction: column; gap: var(--ak-gap); min-width: 0; }
-.ak-mosaic__overlaybar { display: flex; justify-content: flex-end; }
+/* The bar carries the CURRENT section's name and the one Menu control — sticky, so navigation
+ * is where the visitor left it however far they scrolled. */
+.ak-mosaic__overlaybar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ak-gap);
+  padding: 6px 0;
+  background: var(--ak-glass);
+  backdrop-filter: blur(var(--ak-blur));
+  -webkit-backdrop-filter: blur(var(--ak-blur));
+}
+.ak-mosaic__unittitle {
+  margin: 0;
+  font-family: var(--ak-font-display);
+  font-weight: var(--ak-weight-display);
+  font-size: var(--ak-text-title);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* One consistent bordered pill, first render and every render after. */
+.ak-mosaic__overlaytrigger {
+  flex: none;
+  min-height: var(--ak-touch);
+  padding: 8px 18px;
+  font: inherit;
+  font-weight: 700;
+  color: var(--ak-accent-text);
+  background: var(--ak-surface);
+  border: var(--ak-line-w) solid var(--ak-accent-text);
+  border-radius: var(--ak-radius-pill);
+  cursor: pointer;
+}
+.ak-mosaic__overlayclose {
+  position: absolute;
+  top: max(var(--ak-pad), 3vw);
+  right: max(var(--ak-pad), 3vw);
+  width: var(--ak-touch);
+  height: var(--ak-touch);
+  font-size: 1.6rem;
+  line-height: 1;
+  color: var(--ak-ink);
+  background: var(--ak-surface);
+  border: var(--ak-line-w) solid var(--ak-line);
+  border-radius: var(--ak-radius-pill);
+  cursor: pointer;
+}
 .ak-mosaic__overlay {
   position: fixed;
   inset: 0;

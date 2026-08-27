@@ -447,6 +447,16 @@
   outline-offset: 2px;
 }
 
+/* ── Short viewports: the focal pieces yield so CONTENT stays above the fold ──────────────────
+   At 1280x460 a full masthead plus the numeral strip filled the whole height and the first
+   story was a sliver (first design review). Display sizes cap against the viewport HEIGHT. */
+@media (max-height: 540px) {
+  .ak-hero { min-height: 22vh; }
+  .ak-hero__title { font-size: min(var(--ak-text-hero), 9vh); }
+  .ak-statrow__value { font-size: min(var(--ak-text-title), 7vh); }
+  .ak-figure__value { font-size: min(3.4rem, 16vh); }
+}
+
 /* ── Figure: the data IS the hero ─────────────────────────────────────────────────────────── */
 .ak-figure { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .ak-figure__label {
