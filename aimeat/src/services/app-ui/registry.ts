@@ -60,9 +60,10 @@ export interface AppUiComponentDef {
 
 /** Every navigation projection a layout may ask for — all supported on every screen size
  *  (decided 2026-08-27); the renderer carries each mode's own ergonomics. `rail` is the
- *  desktop-grade left rail (append-only addition, 2026-08-27) that folds to a bottom bar on a
- *  narrow screen. */
-export const NAV_MODES = ['tabs', 'bottom-bar', 'canvas', 'deck', 'flow', 'rail'] as const;
+ *  desktop-grade left rail that folds to a strip on a narrow screen; `overlay` is the
+ *  award-site move — one Menu control opening a full-screen list in display type (both
+ *  append-only additions, 2026-08-27). */
+export const NAV_MODES = ['tabs', 'bottom-bar', 'canvas', 'deck', 'flow', 'rail', 'overlay'] as const;
 
 /** How much of the composition grid one block takes. The default is the full line; the other
  *  values are what turn a stack of cards into a COMPOSED PAGE — an asymmetric editorial split

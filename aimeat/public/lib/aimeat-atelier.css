@@ -36,6 +36,10 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.10.0 — 2026-08-27 — Scroll reveals (mosaic.css: units rise into view on the composition
+ *     grid, distance from the look's entrance token, flat opts out) and the overlay menu — one
+ *     Menu control opening a full-screen list in display type over an accent-breathed, blurred
+ *     ground, numbered in mono, Escape to close.
  *   v0.9.0 — 2026-08-27 — The figure: the data IS the hero (shell.css part) — one giant
  *     accent-inked display numeral with a mono small-caps label, the Cape Town move from the
  *     research base, reachable as the mosaic `figure` component.

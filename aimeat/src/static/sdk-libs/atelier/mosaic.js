@@ -34,6 +34,9 @@
  *   });
  *   // later, when the app's data changed:  m.refresh('errands.');
  * @version-history
+ *   v0.10.0 — 2026-08-27 — Scroll reveals on the composition grid (units rise into view as they
+ *     enter the viewport, distance from the look's entrance token, reduced-motion off) and the
+ *     `overlay` projection: one Menu control opening a full-screen list in display type.
  *   v0.7.0 — 2026-08-27 — Composition: the stack projection places blocks on a six-column grid
  *     by their `span`, and the `rail` projection arrives (desktop left rail, phone strip).
  *   v0.4.0 — 2026-08-27 — Initial (TARGET-074 phase 2, the client renderer).
@@ -260,14 +263,92 @@ export function mosaic(spec) {
 
   /** Stacked: every unit in order on the COMPOSITION GRID — a block's `span` places it (full
    *  line, the main column, the side column, a half), so the record composes a page instead of
-   *  piling cards. Narrow screens stack everything (the stylesheet folds the grid). */
+   *  piling cards. Narrow screens stack everything (the stylesheet folds the grid). Units below
+   *  the fold REVEAL as they scroll into view — the distance rides the look's own entrance
+   *  token, so a look that declares no entrance (flat) moves nothing here either. */
   function projectStack(units) {
     const box = el('div', { class: 'ak-mosaic__units ak-mosaic__units--grid' });
     for (const u of units) {
       u.el.classList.add('ak-mosaic__unit--' + (u.block.span || 'full'));
       box.appendChild(u.el);
     }
+    if (!reducedMotion() && typeof IntersectionObserver === 'function') {
+      const io = new IntersectionObserver(function (entries) {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('ak-reveal--in');
+            io.unobserve(entry.target);
+          }
+        }
+        // threshold 0 + a bottom inset, not a ratio: a unit TALLER than the viewport can never
+        // reach a ratio threshold (visible/height stays tiny), and would never reveal.
+      }, { threshold: 0, rootMargin: '0px 0px -12% 0px' });
+      for (const u of units) { u.el.classList.add('ak-reveal'); io.observe(u.el); }
+      alive.cleanup.push(function () { io.disconnect(); });
+    }
     return box;
+  }
+
+  /** The overlay: ONE Menu control opening a full-screen list in display type — the award-site
+   *  move. Escape closes; the pick swaps the visible unit through a transition. */
+  function projectOverlay(units) {
+    const box = el('div', { class: 'ak-mosaic__units' });
+    for (const u of units) { u.el.hidden = true; box.appendChild(u.el); }
+    let current = 0;
+    let open = false;
+
+    const panel = el('div', { class: 'ak-mosaic__overlay', role: 'dialog', 'aria-label': t('menu') });
+    panel.hidden = true;
+
+    const trigger = el('button', {
+      type: 'button', class: 'ak-btn ak-btn--ghost ak-mosaic__overlaytrigger',
+      'aria-expanded': 'false', 'data-ak-noguard': true,
+      on: { click: function () { if (open) { close(); } else { show(); } } },
+    }, t('menu'));
+
+    function show(index) {
+      if (typeof index === 'number') {
+        transition(function () {
+          units[current].el.hidden = true;
+          current = index;
+          units[current].el.hidden = false;
+          enter(units[current].el);
+        });
+        close();
+        return;
+      }
+      open = true;
+      panel.hidden = false;
+      trigger.setAttribute('aria-expanded', 'true');
+      enter(panel);
+      const first = panel.querySelector('button');
+      if (first) first.focus();
+    }
+    function close() {
+      open = false;
+      panel.hidden = true;
+      trigger.setAttribute('aria-expanded', 'false');
+      trigger.focus();
+    }
+    function onKey(ev) { if (ev.key === 'Escape' && open) close(); }
+    document.addEventListener('keydown', onKey);
+    alive.cleanup.push(function () { document.removeEventListener('keydown', onKey); });
+
+    units.forEach(function (u, i) {
+      panel.appendChild(el('button', {
+        type: 'button', class: 'ak-mosaic__overlayitem', 'data-ak-noguard': true,
+        on: { click: function () { show(i); } },
+      }, [
+        el('span', { class: 'ak-mosaic__overlaynum', text: String(i + 1).padStart(2, '0') }),
+        u.label,
+      ]));
+    });
+    if (units.length) units[0].el.hidden = false;
+
+    return el('div', { class: 'ak-mosaic__overlaywrap' }, [
+      el('div', { class: 'ak-mosaic__overlaybar' }, trigger),
+      box, panel,
+    ]);
   }
 
   /** The rail: a desktop-grade left rail picking one unit at a time; on a narrow screen the
@@ -531,6 +612,7 @@ export function mosaic(spec) {
     else if (nav === 'flow') root.appendChild(projectFlow(units));
     else if (nav === 'canvas') root.appendChild(projectCanvas(units));
     else if (nav === 'rail') root.appendChild(projectRail(units));
+    else if (nav === 'overlay') root.appendChild(projectOverlay(units));
     else root.appendChild(projectStack(units));
   }
 

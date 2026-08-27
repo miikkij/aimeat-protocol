@@ -1814,7 +1814,98 @@
         u.el.classList.add("ak-mosaic__unit--" + (u.block.span || "full"));
         box.appendChild(u.el);
       }
+      if (!reducedMotion() && typeof IntersectionObserver === "function") {
+        const io = new IntersectionObserver(function(entries) {
+          for (const entry of entries) {
+            if (entry.isIntersecting) {
+              entry.target.classList.add("ak-reveal--in");
+              io.unobserve(entry.target);
+            }
+          }
+        }, { threshold: 0, rootMargin: "0px 0px -12% 0px" });
+        for (const u of units) {
+          u.el.classList.add("ak-reveal");
+          io.observe(u.el);
+        }
+        alive.cleanup.push(function() {
+          io.disconnect();
+        });
+      }
       return box;
+    }
+    function projectOverlay(units) {
+      const box = el("div", { class: "ak-mosaic__units" });
+      for (const u of units) {
+        u.el.hidden = true;
+        box.appendChild(u.el);
+      }
+      let current2 = 0;
+      let open = false;
+      const panel = el("div", { class: "ak-mosaic__overlay", role: "dialog", "aria-label": t("menu") });
+      panel.hidden = true;
+      const trigger = el("button", {
+        type: "button",
+        class: "ak-btn ak-btn--ghost ak-mosaic__overlaytrigger",
+        "aria-expanded": "false",
+        "data-ak-noguard": true,
+        on: { click: function() {
+          if (open) {
+            close();
+          } else {
+            show();
+          }
+        } }
+      }, t("menu"));
+      function show(index) {
+        if (typeof index === "number") {
+          transition(function() {
+            units[current2].el.hidden = true;
+            current2 = index;
+            units[current2].el.hidden = false;
+            enter(units[current2].el);
+          });
+          close();
+          return;
+        }
+        open = true;
+        panel.hidden = false;
+        trigger.setAttribute("aria-expanded", "true");
+        enter(panel);
+        const first = panel.querySelector("button");
+        if (first) first.focus();
+      }
+      function close() {
+        open = false;
+        panel.hidden = true;
+        trigger.setAttribute("aria-expanded", "false");
+        trigger.focus();
+      }
+      function onKey(ev) {
+        if (ev.key === "Escape" && open) close();
+      }
+      document.addEventListener("keydown", onKey);
+      alive.cleanup.push(function() {
+        document.removeEventListener("keydown", onKey);
+      });
+      units.forEach(function(u, i) {
+        panel.appendChild(el("button", {
+          type: "button",
+          class: "ak-mosaic__overlayitem",
+          "data-ak-noguard": true,
+          on: { click: function() {
+            show(i);
+          } }
+        }, [
+          el("span", { class: "ak-mosaic__overlaynum", text: String(i + 1).padStart(2, "0") }),
+          u.label
+        ]));
+      });
+      if (units.length) units[0].el.hidden = false;
+      return el("div", { class: "ak-mosaic__overlaywrap" }, [
+        el("div", { class: "ak-mosaic__overlaybar" }, trigger),
+        box,
+        panel
+      ]);
     }
     function projectRail(units) {
       const box = el("div", { class: "ak-mosaic__units" });
@@ -2106,6 +2197,7 @@
       else if (nav === "flow") root.appendChild(projectFlow(units));
       else if (nav === "canvas") root.appendChild(projectCanvas(units));
       else if (nav === "rail") root.appendChild(projectRail(units));
+      else if (nav === "overlay") root.appendChild(projectOverlay(units));
       else root.appendChild(projectStack(units));
     }
     let currentLayout = null;
@@ -2172,7 +2264,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.9.0",
+    version: "0.10.0",
     // ── Shell and navigation ──
     app,
     section,
