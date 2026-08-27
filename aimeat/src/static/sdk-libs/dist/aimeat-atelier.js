@@ -44,8 +44,8 @@
     return node;
   }
   function append(parent, kids) {
-    const list = Array.isArray(kids) ? kids : [kids];
-    for (const c of list) {
+    const list2 = Array.isArray(kids) ? kids : [kids];
+    for (const c of list2) {
       if (c == null || c === false) continue;
       parent.appendChild(typeof c === "object" ? (
         /** @type {Node} */
@@ -862,6 +862,707 @@
     };
   }
 
+  // src/static/sdk-libs/atelier/list.js
+  function fillRow(row, item) {
+    clear(row);
+    const text = el("span", { class: "ak-list__text" }, [
+      el("span", { class: "ak-list__title", text: item.title }),
+      item.sub != null ? el("span", { class: "ak-list__sub", text: item.sub }) : null
+    ]);
+    const side = item.meta != null || item.badge != null ? el("span", { class: "ak-list__side" }, [
+      item.badge != null ? el("span", { class: "ak-badge", text: item.badge }) : null,
+      item.meta != null ? el("span", { class: "ak-list__meta", text: item.meta }) : null
+    ]) : null;
+    append(row, side ? [text, side] : [text]);
+  }
+  function list(spec) {
+    const shown = /* @__PURE__ */ new Map();
+    const pickable = typeof spec.onPick === "function";
+    const root = el("div", { class: "ak-root ak-list", role: pickable ? "list" : null });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let emptyCard = null;
+    function buildRow(item) {
+      const row = el(pickable ? "button" : "div", {
+        class: "ak-list__row",
+        type: pickable ? "button" : null,
+        role: pickable ? "listitem" : null,
+        "data-ak-noguard": true,
+        "data-ak-id": item.id,
+        on: pickable ? { click: function() {
+          if (spec.onPick) spec.onPick(shown.get(item.id)?.item || item);
+        } } : null
+      });
+      fillRow(row, item);
+      return row;
+    }
+    function render(items, first) {
+      if (emptyCard) {
+        emptyCard.destroy();
+        emptyCard = null;
+      }
+      if (!items.length) {
+        for (const [, entry] of shown) entry.row.remove();
+        shown.clear();
+        const e = spec.empty || {};
+        emptyCard = emptyState({
+          target: root,
+          tone: "quiet",
+          title: e.title || t("empty"),
+          hint: e.hint || t("emptyHint"),
+          action: e.action || null
+        });
+        return;
+      }
+      const seen = /* @__PURE__ */ new Set();
+      let previous = null;
+      for (const item of items) {
+        seen.add(item.id);
+        let entry = shown.get(item.id);
+        if (!entry) {
+          const row = buildRow(item);
+          if (previous) previous.after(row);
+          else root.prepend(row);
+          if (!first && !reducedMotion() && typeof row.animate === "function") {
+            row.animate(
+              [{ opacity: 0, transform: "translateY(8px)" }, { opacity: 1, transform: "translateY(0)" }],
+              { duration: 200, easing: "cubic-bezier(0.2, 0.7, 0.3, 1)" }
+            );
+          }
+          entry = { row, item };
+          shown.set(item.id, entry);
+        } else {
+          const changed = entry.item.title !== item.title || entry.item.sub !== item.sub || entry.item.meta !== item.meta || entry.item.badge !== item.badge;
+          if (changed) {
+            fillRow(entry.row, item);
+            entry.row.classList.remove("ak-list__row--changed");
+            void entry.row.offsetWidth;
+            entry.row.classList.add("ak-list__row--changed");
+          }
+          entry.item = item;
+          if (previous) previous.after(entry.row);
+          else root.prepend(entry.row);
+        }
+        previous = entry.row;
+      }
+      for (const [id, entry] of shown) {
+        if (!seen.has(id)) {
+          entry.row.remove();
+          shown.delete(id);
+        }
+      }
+    }
+    render(spec.items || [], true);
+    enter(root);
+    return {
+      el: root,
+      /** @param {{ items: ListItem[] }} patch */
+      set(patch) {
+        if (!patch || !patch.items) return;
+        render(patch.items, false);
+      },
+      destroy() {
+        if (emptyCard) emptyCard.destroy();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+  function listDetail(spec) {
+    let selected = null;
+    let items = spec.items || [];
+    const detailBody = el("div", { class: "ak-listdetail__body" });
+    const backBtn = el("button", {
+      type: "button",
+      class: "ak-btn ak-btn--ghost ak-listdetail__back",
+      "data-ak-noguard": true,
+      on: { click: function() {
+        select(null);
+      } }
+    }, "↩ " + t("back"));
+    const detail = el("div", { class: "ak-listdetail__detail" }, [backBtn, detailBody]);
+    const master = list({
+      items,
+      empty: spec.empty,
+      onPick: function(item) {
+        select(item.id);
+      }
+    });
+    const root = el("div", { class: "ak-root ak-listdetail" }, [
+      el("div", { class: "ak-listdetail__master" }, master.el),
+      detail
+    ]);
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let detailEmptyCard = null;
+    function renderDetail() {
+      if (detailEmptyCard) {
+        detailEmptyCard.destroy();
+        detailEmptyCard = null;
+      }
+      clear(detailBody);
+      const item = items.find(function(i) {
+        return i.id === selected;
+      }) || null;
+      root.classList.toggle("ak-listdetail--open", !!item);
+      if (!item) {
+        const e = spec.detailEmpty || {};
+        detailEmptyCard = emptyState({
+          target: detailBody,
+          tone: "quiet",
+          title: e.title || t("open"),
+          hint: e.hint
+        });
+        return;
+      }
+      spec.renderDetail(item, detailBody);
+    }
+    function select(id) {
+      selected = id;
+      for (const row of root.querySelectorAll(".ak-list__row")) {
+        row.classList.toggle("ak-list__row--selected", row.getAttribute("data-ak-id") === id);
+      }
+      renderDetail();
+    }
+    renderDetail();
+    return {
+      el: root,
+      /** @param {{ items: ListItem[] }} patch */
+      set(patch) {
+        if (!patch || !patch.items) return;
+        items = patch.items;
+        master.set({ items });
+        if (selected && !items.some(function(i) {
+          return i.id === selected;
+        })) selected = null;
+        select(selected);
+      },
+      select,
+      destroy() {
+        if (detailEmptyCard) detailEmptyCard.destroy();
+        master.destroy();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/grid.js
+  function imageLayer2(url) {
+    if (!url) return null;
+    const v = String(url);
+    if (/^data:/i.test(v)) {
+      console.warn("aimeat-atelier: card image data: URIs are refused — upload the image to storage and pass its URL.");
+      return null;
+    }
+    return 'url("' + v.replace(/"/g, "%22") + '")';
+  }
+  function washOf(id) {
+    let h = 0;
+    const s = String(id);
+    for (let i = 0; i < s.length; i++) h = h * 31 + s.charCodeAt(i) | 0;
+    return Math.abs(h) % 3 + 1;
+  }
+  function buildCard(item, pickable, onPick) {
+    const layer = imageLayer2(item.image);
+    const art = el("span", {
+      class: "ak-card__art ak-card__art--w" + washOf(item.id),
+      "aria-hidden": "true",
+      vars: layer ? { "--ak-card-image": layer } : null
+    }, layer ? null : el("span", { class: "ak-card__monogram", text: (item.title || "?").slice(0, 1).toUpperCase() }));
+    if (layer) art.classList.add("ak-card__art--image");
+    const body = el("span", { class: "ak-card__body" }, [
+      el("span", { class: "ak-card__title", text: item.title }),
+      item.sub != null ? el("span", { class: "ak-card__sub", text: item.sub }) : null
+    ]);
+    const card = el(pickable ? "button" : "div", {
+      class: "ak-card",
+      type: pickable ? "button" : null,
+      "data-ak-noguard": true,
+      "data-ak-id": item.id,
+      on: pickable && onPick ? { click: function() {
+        onPick(item);
+      } } : null
+    }, [art, item.badge != null ? el("span", { class: "ak-badge ak-card__badge", text: item.badge }) : null, body]);
+    return card;
+  }
+  function cardGrid(spec) {
+    const pickable = typeof spec.onPick === "function";
+    const root = el("div", { class: "ak-root ak-grid" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let emptyCard = null;
+    function render(items) {
+      if (emptyCard) {
+        emptyCard.destroy();
+        emptyCard = null;
+      }
+      clear(root);
+      if (!items.length) {
+        const e = spec.empty || {};
+        emptyCard = emptyState({
+          target: root,
+          tone: "quiet",
+          title: e.title || t("empty"),
+          hint: e.hint || t("emptyHint"),
+          action: e.action || null
+        });
+        return;
+      }
+      for (const item of items) root.appendChild(buildCard(item, pickable, spec.onPick));
+      enter(root);
+    }
+    render(spec.items || []);
+    return {
+      el: root,
+      /** @param {{ items: CardItem[] }} patch */
+      set(patch) {
+        if (!patch || !patch.items) return;
+        render(patch.items);
+      },
+      destroy() {
+        if (emptyCard) emptyCard.destroy();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+  function mediaCard(spec) {
+    let card = buildCard(spec.item, typeof spec.onPick === "function" && !spec.actions, spec.onPick);
+    const actions = spec.actions && spec.actions.length ? el("span", { class: "ak-card__actions" }, spec.actions.map(function(action) {
+      const kind = action.kind || "plain";
+      return el("button", {
+        type: "button",
+        class: "ak-btn" + (kind === "plain" ? "" : " ak-btn--" + kind),
+        "data-ak-id": action.id,
+        on: { click: function() {
+          if (action.onClick) action.onClick(action);
+        } }
+      }, action.label);
+    })) : null;
+    const root = el("div", { class: "ak-root ak-mediacard" }, [card, actions]);
+    if (spec.target) resolve(spec.target).appendChild(root);
+    enter(root);
+    return {
+      el: root,
+      /** @param {{ item: CardItem }} patch */
+      set(patch) {
+        if (!patch || !patch.item) return;
+        const next = buildCard(patch.item, typeof spec.onPick === "function" && !spec.actions, spec.onPick);
+        card.replaceWith(next);
+        card = next;
+      },
+      destroy() {
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/form.js
+  function form(spec) {
+    const controls = /* @__PURE__ */ new Map();
+    const root = el("form", { class: "ak-root ak-form", novalidate: true });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    function buildControl(field) {
+      const type = field.type || "text";
+      const id = uid("ak-f");
+      const hintId = id + "-hint";
+      const errId = id + "-err";
+      const describedBy = (field.hint ? hintId + " " : "") + errId;
+      let input;
+      if (type === "textarea") {
+        input = el("textarea", { id, class: "ak-input ak-input--area", rows: 3, maxlength: field.maxLength || null, "aria-describedby": describedBy });
+        input.value = field.value != null ? String(field.value) : "";
+      } else if (type === "select") {
+        input = el(
+          "select",
+          { id, class: "ak-input", "aria-describedby": describedBy },
+          (field.options || []).map(function(o) {
+            return el("option", { value: o.value, selected: field.value === o.value ? true : null }, o.label);
+          })
+        );
+      } else if (type === "checkbox" || type === "toggle") {
+        input = el("input", {
+          id,
+          type: "checkbox",
+          class: type === "toggle" ? "ak-toggle" : "ak-check",
+          checked: field.value ? true : null,
+          "aria-describedby": describedBy
+        });
+      } else {
+        input = el("input", {
+          id,
+          type,
+          class: "ak-input",
+          min: field.min != null ? String(field.min) : null,
+          max: field.max != null ? String(field.max) : null,
+          maxlength: field.maxLength || null,
+          "aria-describedby": describedBy
+        });
+        if (field.value != null) input.value = String(field.value);
+      }
+      const label = el("label", { class: "ak-form__label", for: id }, [
+        field.label,
+        field.required ? el("span", { class: "ak-form__req", "aria-hidden": "true", text: "*" }) : null,
+        field.required ? el("span", { class: "ak-sr-only", text: " (" + t("required") + ")" }) : null
+      ]);
+      const hint = field.hint ? el("p", { class: "ak-form__hint", id: hintId, text: field.hint }) : null;
+      const error = el("p", { class: "ak-form__error", id: errId, role: "alert" });
+      error.hidden = true;
+      const inline = type === "checkbox" || type === "toggle";
+      const wrap = el(
+        "div",
+        { class: "ak-form__field" + (inline ? " ak-form__field--inline" : "") },
+        inline ? [input, label, hint, error] : [label, input, hint, error]
+      );
+      controls.set(field.name, { field, input, error, wrap });
+      return wrap;
+    }
+    function setError(name, message) {
+      const c = controls.get(name);
+      if (!c) return;
+      c.error.textContent = message;
+      c.error.hidden = false;
+      c.wrap.classList.add("ak-form__field--invalid");
+      c.input.setAttribute("aria-invalid", "true");
+    }
+    function clearErrors() {
+      for (const [, c] of controls) {
+        c.error.hidden = true;
+        c.error.textContent = "";
+        c.wrap.classList.remove("ak-form__field--invalid");
+        c.input.removeAttribute("aria-invalid");
+      }
+    }
+    function values() {
+      const out = {};
+      for (const [name, c] of controls) {
+        const type = c.field.type || "text";
+        if (type === "checkbox" || type === "toggle") out[name] = /** @type {HTMLInputElement} */
+        c.input.checked;
+        else if (type === "number") {
+          const raw = (
+            /** @type {HTMLInputElement} */
+            c.input.value
+          );
+          out[name] = raw === "" ? null : Number(raw);
+        } else out[name] = /** @type {HTMLInputElement} */
+        c.input.value;
+      }
+      return out;
+    }
+    function validate() {
+      clearErrors();
+      let firstBad = null;
+      for (const [name, c] of controls) {
+        const f = c.field;
+        const type = f.type || "text";
+        const v = values()[name];
+        let problem = null;
+        if (f.required && (v === "" || v == null || v === false)) problem = f.label + ": " + t("required").toLowerCase();
+        else if (type === "number" && v != null && Number.isNaN(v)) problem = f.label + ": " + t("required").toLowerCase();
+        else if (type === "number" && v != null && f.min != null && v < f.min) problem = f.label + " ≥ " + f.min;
+        else if (type === "number" && v != null && f.max != null && v > f.max) problem = f.label + " ≤ " + f.max;
+        if (problem) {
+          setError(name, problem);
+          if (!firstBad) firstBad = name;
+        }
+      }
+      return firstBad;
+    }
+    const submitBtn = el(
+      "button",
+      { type: "submit", class: "ak-btn ak-btn--primary", "data-ak-noguard": true },
+      spec.submitLabel || t("save")
+    );
+    const bar = el("div", { class: "ak-form__bar" }, [
+      spec.cancel ? el("button", {
+        type: "button",
+        class: "ak-btn ak-btn--ghost",
+        "data-ak-noguard": true,
+        on: { click: function() {
+          if (spec.cancel && spec.cancel.onClick) spec.cancel.onClick();
+        } }
+      }, spec.cancel.label || t("cancel")) : null,
+      submitBtn
+    ]);
+    function render(fields) {
+      controls.clear();
+      clear(root);
+      for (const field of fields) root.appendChild(buildControl(field));
+      root.appendChild(bar);
+      enter(root);
+    }
+    render(spec.fields || []);
+    root.addEventListener("submit", function(ev) {
+      ev.preventDefault();
+      const bad = validate();
+      if (bad) {
+        const c = controls.get(bad);
+        if (c) c.input.focus();
+        return;
+      }
+      whileBusy(submitBtn, Promise.resolve().then(function() {
+        return spec.onSubmit(values());
+      })).catch(function(e) {
+        const named = e && e.field && controls.has(e.field);
+        if (named) {
+          setError(e.field, e.message || String(e));
+          const c = controls.get(e.field);
+          if (c) c.input.focus();
+        } else {
+          setError(controls.keys().next().value, e && e.message || String(e));
+        }
+      });
+    });
+    return {
+      el: root,
+      values,
+      /** @param {Record<string, any>} next */
+      setValues(next) {
+        for (const name in next) {
+          const c = controls.get(name);
+          if (!c) continue;
+          const type = c.field.type || "text";
+          if (type === "checkbox" || type === "toggle") c.input.checked = !!next[name];
+          else c.input.value = next[name] == null ? "" : String(next[name]);
+        }
+      },
+      setError,
+      clearErrors,
+      /** @param {{ fields?: FormField[] }} patch */
+      set(patch) {
+        if (patch && patch.fields) render(patch.fields);
+      },
+      destroy() {
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/table.js
+  function table(spec) {
+    const columns = spec.columns || [];
+    let rows = spec.rows || [];
+    let sort = null;
+    const thead = el("thead");
+    const tbody = el("tbody");
+    const tableEl = el("table", { class: "ak-table__table" }, [
+      spec.caption ? el("caption", { class: "ak-sr-only", text: spec.caption }) : null,
+      thead,
+      tbody
+    ]);
+    const root = el("div", { class: "ak-root ak-table" }, tableEl);
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let emptyCard = null;
+    function renderHead() {
+      clear(thead);
+      const tr = el("tr");
+      for (const col of columns) {
+        const sorted = sort && sort.key === col.key ? sort.dir === 1 ? "ascending" : "descending" : null;
+        const th = el("th", {
+          scope: "col",
+          class: col.align === "right" ? "ak-table__num" : null,
+          "aria-sort": sorted
+        });
+        if (col.sortable) {
+          th.appendChild(el("button", {
+            type: "button",
+            class: "ak-table__sort",
+            "data-ak-noguard": true,
+            on: {
+              click: function() {
+                sort = sort && sort.key === col.key ? { key: col.key, dir: sort.dir === 1 ? -1 : 1 } : { key: col.key, dir: 1 };
+                renderHead();
+                renderBody();
+              }
+            }
+          }, col.label + (sorted ? sorted === "ascending" ? " ↑" : " ↓" : "")));
+        } else {
+          th.textContent = col.label;
+        }
+        tr.appendChild(th);
+      }
+      thead.appendChild(tr);
+    }
+    function sortedRows() {
+      if (!sort) return rows;
+      const key = sort.key;
+      const dir = sort.dir;
+      return rows.slice().sort(function(a, b) {
+        const av = a[key];
+        const bv = b[key];
+        if (av == null && bv == null) return 0;
+        if (av == null) return 1;
+        if (bv == null) return -1;
+        if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir;
+        return String(av).localeCompare(String(bv)) * dir;
+      });
+    }
+    function renderBody() {
+      if (emptyCard) {
+        emptyCard.destroy();
+        emptyCard = null;
+      }
+      clear(tbody);
+      tableEl.hidden = !rows.length;
+      if (!rows.length) {
+        const e = spec.empty || {};
+        emptyCard = emptyState({
+          target: root,
+          tone: "quiet",
+          title: e.title || t("empty"),
+          hint: e.hint || t("emptyHint")
+        });
+        return;
+      }
+      const pickable = typeof spec.onPick === "function";
+      for (const row of sortedRows()) {
+        const tr = el("tr", {
+          class: pickable ? "ak-table__row--pick" : null,
+          tabindex: pickable ? "0" : null,
+          on: pickable ? {
+            click: function() {
+              if (spec.onPick) spec.onPick(row);
+            },
+            keydown: function(ev) {
+              if (ev.key === "Enter" && spec.onPick) spec.onPick(row);
+            }
+          } : null
+        });
+        for (const col of columns) {
+          const raw = row[col.key];
+          const text = col.format ? col.format(raw, row) : raw == null ? "" : String(raw);
+          tr.appendChild(el("td", { class: col.align === "right" ? "ak-table__num" : null, text }));
+        }
+        tbody.appendChild(tr);
+      }
+    }
+    renderHead();
+    renderBody();
+    enter(root);
+    return {
+      el: root,
+      /** @param {{ rows?: any[] }} patch */
+      set(patch) {
+        if (!patch) return;
+        if (patch.rows) {
+          rows = patch.rows;
+          renderBody();
+        }
+      },
+      destroy() {
+        if (emptyCard) emptyCard.destroy();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+  var SEARCH_DEBOUNCE_MS = 250;
+  function searchBar(spec) {
+    let timer = null;
+    const input = el("input", {
+      type: "search",
+      class: "ak-input ak-search__input",
+      placeholder: spec.placeholder || t("search"),
+      "aria-label": spec.label || t("search"),
+      on: {
+        input: function() {
+          if (!spec.onChange) return;
+          if (timer) clearTimeout(timer);
+          timer = setTimeout(function() {
+            timer = null;
+            if (spec.onChange) spec.onChange(inputEl.value);
+          }, SEARCH_DEBOUNCE_MS);
+        },
+        keydown: function(ev) {
+          if (ev.key === "Enter" && spec.onSubmit) {
+            ev.preventDefault();
+            spec.onSubmit(inputEl.value);
+          }
+        }
+      }
+    });
+    const inputEl = (
+      /** @type {HTMLInputElement} */
+      input
+    );
+    if (spec.value != null) inputEl.value = spec.value;
+    const clearBtn = el("button", {
+      type: "button",
+      class: "ak-search__clear",
+      "aria-label": t("close"),
+      "data-ak-noguard": true,
+      on: {
+        click: function() {
+          inputEl.value = "";
+          inputEl.focus();
+          if (spec.onChange) spec.onChange("");
+        }
+      }
+    }, "×");
+    const root = el("div", { class: "ak-root ak-search", role: "search" }, [input, clearBtn]);
+    if (spec.target) resolve(spec.target).appendChild(root);
+    return {
+      el: root,
+      /** @param {{ value?: string }} patch */
+      set(patch) {
+        if (patch && patch.value != null) inputEl.value = patch.value;
+      },
+      destroy() {
+        if (timer) clearTimeout(timer);
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/timeline.js
+  function fmtTs(ts) {
+    const d = ts instanceof Date ? ts : new Date(ts);
+    if (Number.isNaN(d.getTime())) return String(ts);
+    return d.toLocaleString(void 0, { dateStyle: "medium", timeStyle: "short" });
+  }
+  function timeline(spec) {
+    const fmt = spec.format || fmtTs;
+    const root = el("ol", { class: "ak-root ak-timeline" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let emptyCard = null;
+    function render(items) {
+      if (emptyCard) {
+        emptyCard.destroy();
+        emptyCard = null;
+      }
+      clear(root);
+      if (!items.length) {
+        const e = spec.empty || {};
+        emptyCard = emptyState({
+          target: root,
+          tone: "quiet",
+          title: e.title || t("empty"),
+          hint: e.hint || t("emptyHint")
+        });
+        return;
+      }
+      for (const item of items) {
+        root.appendChild(el("li", { class: "ak-timeline__item", "data-ak-id": item.id }, [
+          el("span", { class: "ak-timeline__dot ak-timeline__dot--" + (item.tone || "plain"), "aria-hidden": "true" }),
+          el("div", { class: "ak-timeline__body" }, [
+            el("span", { class: "ak-timeline__when", text: fmt(item.ts) }),
+            el("span", { class: "ak-timeline__title", text: item.title }),
+            item.sub != null ? el("span", { class: "ak-timeline__sub", text: item.sub }) : null
+          ])
+        ]));
+      }
+      enter(root);
+    }
+    render(spec.items || []);
+    return {
+      el: root,
+      /** @param {{ items: TimelineItem[] }} patch */
+      set(patch) {
+        if (!patch || !patch.items) return;
+        render(patch.items);
+      },
+      destroy() {
+        if (emptyCard) emptyCard.destroy();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+
   // src/static/sdk-libs/atelier/index.js
   var atelier = {
     /**
@@ -869,7 +1570,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.2.0",
+    version: "0.3.0",
     // ── Shell and navigation ──
     app,
     section,
@@ -878,6 +1579,16 @@
     // ── Focal content ──
     hero,
     statRow,
+    // ── Content ──
+    list,
+    listDetail,
+    cardGrid,
+    mediaCard,
+    timeline,
+    // ── Data ──
+    form,
+    table,
+    searchBar,
     // ── Designed states ──
     emptyState,
     skeleton,

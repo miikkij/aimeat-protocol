@@ -16,6 +16,8 @@
  *   ak-loading · ak-skeleton · shared primitives (ak-btn, ak-scroll, focus, ak-busy)
  * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
  * @version-history
+ *   v0.3.0 — 2026-08-27 — Shared primitives grow .ak-badge and .ak-sr-only for the content and
+ *     data parts (list badges, form/table screen-reader text).
  *   v0.2.0 — 2026-08-27 — The display-treatment tokens land on the components: the hero title
  *     carries --ak-display-shadow and --ak-display-stroke, and KPI tiles alternate by
  *     --ak-tilt — so the sticker preset reads as a different form language, not a recolour.
@@ -355,6 +357,31 @@
   animation: ak-spin 700ms linear 12;
 }
 @keyframes ak-spin { to { transform: rotate(360deg); } }
+
+.ak-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 10px;
+  border-radius: var(--ak-radius-pill);
+  background: color-mix(in oklab, var(--ak-accent) 14%, var(--ak-surface));
+  color: var(--ak-accent-text);
+  font-size: var(--ak-text-fine);
+  font-weight: 650;
+  white-space: nowrap;
+}
+/* Screen-reader-only text: visually gone, still announced. */
+.ak-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
 
 /* ── Focus is always visible ──────────────────────────────────────────────────────────────── */
 .ak-root :is(button, [role='button'], [role='tab'], a, input, select, textarea):focus-visible {

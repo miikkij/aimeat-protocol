@@ -1,0 +1,111 @@
+/*
+ * @file aimeat-atelier/data.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Component styles for the aimeat-atelier data slice: the declared form, the data
+ *   table and the search bar. Every value comes from the --ak-* contract in
+ *   ../aimeat-atelier.css.
+ *
+ *   THE TABLE SCROLLS INSIDE ITS OWN BOX. It never widens the page — the wrapper owns
+ *   overflow-x, so the finish gate's horizontal-overflow measurement stays at zero however
+ *   many columns the data has.
+ * @structure ak-form (field, label, hint, error, bar) · ak-input/ak-check/ak-toggle ·
+ *   ak-table · ak-search
+ * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
+ * @version-history
+ *   v0.3.0 — 2026-08-27 — Initial (TARGET-074 phase 1, slice 3).
+ */
+
+/* ── Form ─────────────────────────────────────────────────────────────────────────────────── */
+.ak-form { display: flex; flex-direction: column; gap: var(--ak-gap); min-width: 0; }
+.ak-form__field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.ak-form__field--inline { flex-direction: row; align-items: center; gap: 10px; }
+.ak-form__label { font-size: var(--ak-text-fine); font-weight: 650; color: var(--ak-ink); }
+.ak-form__req { color: var(--ak-accent-text); margin-left: 2px; }
+.ak-form__hint { margin: 0; font-size: var(--ak-text-fine); color: var(--ak-ink-dim); }
+.ak-form__error { margin: 0; font-size: var(--ak-text-fine); color: var(--ak-err); font-weight: 600; }
+.ak-form__error[hidden] { display: none; }
+.ak-form__field--invalid .ak-input { border-color: var(--ak-err); }
+.ak-form__bar { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+
+.ak-input {
+  min-height: var(--ak-touch);
+  padding: 8px 12px;
+  border: var(--ak-line-w) solid var(--ak-line);
+  border-radius: var(--ak-radius-sm);
+  background: var(--ak-bg);
+  color: var(--ak-ink);
+  font: inherit;
+  font-size: var(--ak-text-body);
+  width: 100%;
+  min-width: 0;
+}
+.ak-input--area { min-height: calc(var(--ak-touch) * 2); resize: vertical; }
+.ak-check, .ak-toggle {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  accent-color: var(--ak-accent);
+}
+.ak-toggle { width: 36px; }
+
+/* ── Table: real semantics, scrolls in its own box ────────────────────────────────────────── */
+.ak-table {
+  overflow-x: auto;
+  overflow-y: clip;
+  border: var(--ak-line-w) solid var(--ak-line);
+  border-radius: var(--ak-radius);
+  background: var(--ak-surface);
+  background-image: var(--ak-surface-image);
+}
+.ak-table__table { width: 100%; border-collapse: collapse; font-size: var(--ak-text-body); }
+.ak-table__table[hidden] { display: none; }
+.ak-table th {
+  text-align: left;
+  font-size: var(--ak-text-fine);
+  color: var(--ak-ink-dim);
+  padding: 10px var(--ak-pad);
+  border-bottom: var(--ak-line-w) solid var(--ak-line);
+  white-space: nowrap;
+}
+.ak-table td {
+  padding: 10px var(--ak-pad);
+  border-bottom: var(--ak-line-w) solid color-mix(in oklab, var(--ak-line) 55%, var(--ak-surface));
+  overflow-wrap: anywhere;
+}
+.ak-table tbody tr:last-child td { border-bottom: 0; }
+.ak-table__num { text-align: right; font-variant-numeric: tabular-nums; }
+.ak-table__sort {
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  min-height: var(--ak-touch);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.ak-table__row--pick { cursor: pointer; }
+.ak-table__row--pick:hover td { background: color-mix(in oklab, var(--ak-accent) 6%, var(--ak-surface)); }
+
+/* ── Search ───────────────────────────────────────────────────────────────────────────────── */
+.ak-search { position: relative; display: flex; min-width: 0; }
+.ak-search__input { padding-right: 40px; }
+.ak-search__input::-webkit-search-cancel-button { display: none; }
+.ak-search__clear {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  min-height: 32px;
+  border: 0;
+  border-radius: var(--ak-radius-pill);
+  background: none;
+  color: var(--ak-ink-dim);
+  font-size: var(--ak-text-title);
+  line-height: 1;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.ak-search__clear:hover { color: var(--ak-ink); }

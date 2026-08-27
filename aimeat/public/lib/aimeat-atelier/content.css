@@ -1,0 +1,171 @@
+/*
+ * @file aimeat-atelier/content.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Component styles for the aimeat-atelier content slice: the keyed list, the
+ *   master–detail split, the card grid, the single media card and the timeline. Every value
+ *   comes from the --ak-* contract in ../aimeat-atelier.css.
+ *
+ *   THE SPLIT IS A CONTAINER QUERY. listDetail shows both panes when its own box is wide and
+ *   one pane at a time (with the back affordance) when it is narrow — the component adapts to
+ *   the container it was given, never to the viewport, so it works inside any layout.
+ * @structure ak-list · ak-listdetail · ak-grid + ak-card · ak-mediacard · ak-timeline
+ * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
+ * @version-history
+ *   v0.3.0 — 2026-08-27 — Initial (TARGET-074 phase 1, slice 3).
+ */
+
+/* ── The keyed list ───────────────────────────────────────────────────────────────────────── */
+.ak-list { display: flex; flex-direction: column; gap: 8px; }
+.ak-list__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ak-gap);
+  width: 100%;
+  min-height: var(--ak-touch);
+  padding: 10px var(--ak-pad);
+  border: var(--ak-line-w) solid var(--ak-line);
+  border-radius: var(--ak-radius-sm);
+  background: var(--ak-surface);
+  background-image: var(--ak-surface-image);
+  color: var(--ak-ink);
+  font: inherit;
+  text-align: left;
+  cursor: default;
+  touch-action: manipulation;
+  transition: box-shadow var(--ak-motion) var(--ak-ease), border-color var(--ak-motion) var(--ak-ease);
+}
+button.ak-list__row { cursor: pointer; }
+button.ak-list__row:hover { box-shadow: var(--ak-elev-1); }
+.ak-list__row--selected { border-color: var(--ak-accent); box-shadow: var(--ak-elev-1); }
+.ak-list__row--changed { animation: ak-row-flash calc(var(--ak-motion) * 3) var(--ak-ease) 1; }
+@keyframes ak-row-flash {
+  0% { background-color: color-mix(in oklab, var(--ak-accent) 14%, var(--ak-surface)); }
+  100% { background-color: var(--ak-surface); }
+}
+.ak-list__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ak-list__title { font-weight: 600; overflow-wrap: anywhere; }
+.ak-list__sub { font-size: var(--ak-text-fine); color: var(--ak-ink-dim); overflow-wrap: anywhere; }
+.ak-list__side { display: flex; align-items: center; gap: 8px; flex: none; }
+.ak-list__meta { font-size: var(--ak-text-fine); color: var(--ak-ink-dim); font-variant-numeric: tabular-nums; }
+
+/* ── Master–detail: both panes wide, one at a time narrow ─────────────────────────────────── */
+.ak-listdetail {
+  container-type: inline-size;
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: var(--ak-gap);
+  min-width: 0;
+}
+.ak-listdetail__master, .ak-listdetail__detail { min-width: 0; }
+.ak-listdetail__detail {
+  padding: var(--ak-pad);
+  border: var(--ak-line-w) solid var(--ak-line);
+  border-radius: var(--ak-radius);
+  background: var(--ak-surface);
+  background-image: var(--ak-surface-image);
+}
+.ak-listdetail__back { display: none; }
+@container (max-width: 640px) {
+  .ak-listdetail { grid-template-columns: minmax(0, 1fr); }
+  .ak-listdetail__detail { display: none; }
+  .ak-listdetail--open .ak-listdetail__master { display: none; }
+  .ak-listdetail--open .ak-listdetail__detail { display: block; }
+  .ak-listdetail--open .ak-listdetail__back { display: inline-flex; margin-bottom: 8px; }
+}
+
+/* ── Card grid ────────────────────────────────────────────────────────────────────────────── */
+.ak-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(11rem, 100%), 1fr));
+  gap: var(--ak-gap);
+}
+.ak-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 0;
+  border: var(--ak-line-w) solid var(--ak-line);
+  border-radius: var(--ak-radius);
+  background: var(--ak-surface);
+  background-image: var(--ak-surface-image);
+  box-shadow: var(--ak-elev-1);
+  color: var(--ak-ink);
+  font: inherit;
+  text-align: left;
+  overflow: hidden;
+  transition: box-shadow var(--ak-motion) var(--ak-ease), transform var(--ak-motion) var(--ak-ease);
+}
+button.ak-card { cursor: pointer; touch-action: manipulation; }
+button.ak-card:hover { box-shadow: var(--ak-elev-2); transform: translateY(-2px); }
+.ak-card__art {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 4 / 3;
+  background-size: cover;
+  background-position: center;
+}
+.ak-card__art--image { background-image: var(--ak-card-image); }
+/* The three deterministic monogram washes — an imageless card is designed, never grey. */
+.ak-card__art--w1:not(.ak-card__art--image) {
+  background-image: radial-gradient(at 30% 30%, color-mix(in oklab, var(--ak-accent) 16%, var(--ak-surface)), color-mix(in oklab, var(--ak-accent) 6%, var(--ak-surface)));
+}
+.ak-card__art--w2:not(.ak-card__art--image) {
+  background-image: radial-gradient(at 70% 30%, color-mix(in oklab, var(--ak-accent-2) 16%, var(--ak-surface)), color-mix(in oklab, var(--ak-accent-2) 6%, var(--ak-surface)));
+}
+.ak-card__art--w3:not(.ak-card__art--image) {
+  background-image: radial-gradient(at 50% 70%, color-mix(in oklab, var(--ak-accent) 12%, var(--ak-surface)), color-mix(in oklab, var(--ak-accent-2) 8%, var(--ak-surface)));
+}
+.ak-card__monogram {
+  font-family: var(--ak-font-display);
+  font-weight: var(--ak-weight-display);
+  font-size: var(--ak-text-hero);
+  color: var(--ak-accent-text);
+}
+.ak-card__badge { position: absolute; top: 8px; right: 8px; }
+.ak-card__body { display: flex; flex-direction: column; gap: 2px; padding: 10px var(--ak-pad) var(--ak-pad); }
+.ak-card__title { font-weight: 650; overflow-wrap: anywhere; }
+.ak-card__sub { font-size: var(--ak-text-fine); color: var(--ak-ink-dim); overflow-wrap: anywhere; }
+
+/* ── One media card + its action row ──────────────────────────────────────────────────────── */
+.ak-mediacard { display: flex; flex-direction: column; gap: 8px; max-width: 24rem; }
+.ak-card__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* ── Timeline ─────────────────────────────────────────────────────────────────────────────── */
+.ak-timeline { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.ak-timeline__item {
+  position: relative;
+  display: flex;
+  gap: var(--ak-gap);
+  padding: 0 0 var(--ak-pad) 0;
+}
+.ak-timeline__item::before {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 14px;
+  bottom: 0;
+  width: 2px;
+  background: var(--ak-line);
+}
+.ak-timeline__item:last-child::before { display: none; }
+.ak-timeline__dot {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  margin-top: 4px;
+  border-radius: var(--ak-radius-pill);
+  background: var(--ak-line);
+  position: relative;
+  z-index: 1;
+}
+.ak-timeline__dot--ok { background: var(--ak-ok); }
+.ak-timeline__dot--warn { background: var(--ak-warn); }
+.ak-timeline__dot--err { background: var(--ak-err); }
+.ak-timeline__body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ak-timeline__when { font-size: var(--ak-text-fine); color: var(--ak-ink-dim); font-variant-numeric: tabular-nums; }
+.ak-timeline__title { font-weight: 600; overflow-wrap: anywhere; }
+.ak-timeline__sub { font-size: var(--ak-text-fine); color: var(--ak-ink-dim); overflow-wrap: anywhere; }
