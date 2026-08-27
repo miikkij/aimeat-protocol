@@ -37,6 +37,7 @@
  */
 import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
+import { LOOKS as LOOK_REGISTRY } from '../data/atelier-looks.js';
 
 /** Slot the publish gate's token is substituted into (mirrors build-app-prompt.ts). */
 const SPEC_TOKEN_SLOT = '{{aimeat_spec_token}}';
@@ -125,18 +126,12 @@ export const ATELIER_COMPONENTS: ReadonlyArray<{ id: string; summary: string; ex
 ];
 
 /**
- * The look picker + each look's imagery style words (the imagery pipeline composes its prompts
- * from these — house style + look words + palette words + your subject).
+ * The look picker + each look's imagery style words — DERIVED from the look registry
+ * (src/data/atelier-looks.ts), the same source the generated stylesheet and the mosaic
+ * catalogue read. The prompt's look table and the CSS cannot drift apart.
  */
-export const ATELIER_LOOKS: ReadonlyArray<{ id: string; feel: string; imagery: string }> = [
-  { id: 'vivid', feel: 'the default — a hero on the brand gradient, tinted cards, a real entrance; pick when unsure', imagery: 'bright layered gradient-mesh abstract, soft grain, airy light ground' },
-  { id: 'calm-card', feel: 'quiet professional product', imagery: 'minimal line illustration, single accent hue, generous ground' },
-  { id: 'editorial', feel: 'magazine: big display type, rules instead of shadows, slow fades', imagery: 'warm duotone photographic style' },
-  { id: 'sticker', feel: 'playful: pill corners, tilted tiles, extruded titles, confetti-ready', imagery: 'flat sticker illustration, thick outline, white sticker border' },
-  { id: 'neon-dense', feel: 'operator console: tight, mono display face, fast', imagery: 'isometric technical illustration, blueprint linework' },
-  { id: 'poster', feel: 'one giant focal statement; the hero owns the first viewport', imagery: 'bold graphic poster art, dominant brand hue' },
-  { id: 'flat', feel: 'the deliberate opt-out: no decoration, no entrance', imagery: 'none — flat means flat' },
-];
+export const ATELIER_LOOKS: ReadonlyArray<{ id: string; feel: string; imagery: string }> =
+  LOOK_REGISTRY.map((l) => ({ id: l.id, feel: l.feel, imagery: l.imagery }));
 
 /** Palette colour words for imagery prompts, matching /lib/aimeat-theme.css. */
 export const PALETTE_COLOR_WORDS: Readonly<Record<string, string>> = {

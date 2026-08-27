@@ -406,7 +406,17 @@ function pass(combo: string, label: string): void {
 }
 
 const themeCss = readFileSync(new URL('../public/lib/aimeat-theme.css', import.meta.url), 'utf8');
-const atelierCss = readFileSync(new URL('../public/lib/aimeat-atelier.css', import.meta.url), 'utf8');
+const looksCssOnDisk = readFileSync(new URL('../public/lib/aimeat-atelier/looks.css', import.meta.url), 'utf8');
+// THE DRIFT GATE: the look stylesheet is generated from src/data/atelier-looks.ts, and the file
+// on disk must be exactly what the registry emits — otherwise the matrix would be proving a
+// stylesheet nobody ships, which is this codebase's oldest failure shape.
+const { emitLooksCss } = await import('./build-atelier-looks.js');
+if (looksCssOnDisk.replace(/\r\n/g, '\n') !== emitLooksCss().replace(/\r\n/g, '\n')) {
+  console.error('\n✖ public/lib/aimeat-atelier/looks.css drifts from src/data/atelier-looks.ts — run `pnpm build:atelier-looks` and commit the result.\n');
+  process.exit(1);
+}
+// The generated blocks are appended so parseAtelier sees one sheet, base contract first.
+const atelierCss = readFileSync(new URL('../public/lib/aimeat-atelier.css', import.meta.url), 'utf8') + '\n' + looksCssOnDisk;
 const themes = parseThemes(themeCss);
 const sheet = parseAtelier(atelierCss);
 const presetNames = ['vivid', ...sheet.presets.keys()];

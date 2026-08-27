@@ -36,6 +36,13 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.8.0 — 2026-08-27 — THE LOOK FACTORY: every preset block moves to the GENERATED
+ *     ./aimeat-atelier/looks.css, emitted from the one registry (src/data/atelier-looks.ts)
+ *     that also drives the build prompt's look table and the mosaic catalogue's look sheets.
+ *     Structure recipes (masthead, joined, full-bleed-hero) become shared vocabulary any look
+ *     declares. Five new looks arrive as data entries — broadsheet, gallery, brutalist,
+ *     terminal, aurora — and the matrix (now 120 combinations) proves each automatically.
+ *     check:atelier refuses drift between the registry and the emitted file.
  *   v0.7.0 — 2026-08-27 — COMPOSITION, on the developer's award-site references: the missing
  *     axis was layout, not colour. The mosaic gains a six-column composition grid (per-block
  *     span: full/main/side/half), the `rail` navigation (a desktop-grade left rail folding to a
@@ -96,6 +103,8 @@
 @import url('./aimeat-atelier/content.css');
 @import url('./aimeat-atelier/data.css');
 @import url('./aimeat-atelier/mosaic.css');
+/* LAST on purpose: the generated look blocks (tokens + structure recipes) override the parts. */
+@import url('./aimeat-atelier/looks.css');
 
 /* ══════════════════════════════════════════════════════════════════════════════════════════
    THE CONTRACT — light. Set these to author a look; do not override component selectors.
@@ -227,135 +236,12 @@
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════════════════
-   LOOK PRESETS. The base contract IS vivid; a preset block only re-declares tokens.
-   New presets arrive only through the growth rule: full check:atelier matrix green plus a
-   reviewed diagonal (TARGET-074).
+   LOOK PRESETS live in ./aimeat-atelier/looks.css — GENERATED from src/data/atelier-looks.ts
+   (pnpm build:atelier-looks). One registry drives the stylesheet, the build prompt's look
+   table and the mosaic catalogue; pnpm check:atelier refuses drift and runs the full matrix
+   over every generated block. A new look is one data entry, and the growth rule (matrix green
+   plus a reviewed diagonal, TARGET-074) is enforced by the gate instead of remembered.
    ══════════════════════════════════════════════════════════════════════════════════════════ */
-
-/* @preset-block flat — the deliberate opt-out: no decoration, no entrance, and that is a
-   choice the spec records rather than an accident. */
-[data-ak-look='flat'] {
-  --ak-surface-image: none;
-  --ak-hero-image:    none;
-  --ak-page-image:    none;
-  --ak-grain:         none;
-  --ak-blur:          0px;
-  --ak-glass:         var(--ak-surface);
-  /* Flat still darkens the action fill: body-size text on the RAW accent is 3.58:1 on the
-     aimeat palette (the theme's own pair is a large-text pair), and a flat look is not a
-     licence to ship an unreadable button. */
-  --ak-grad:          linear-gradient(135deg,
-                        color-mix(in oklab, var(--ak-accent) 82%, var(--ak-ink)),
-                        color-mix(in oklab, var(--ak-accent) 82%, var(--ak-ink)));
-  --ak-enter-distance: 0px;
-  --ak-enter-stagger:  0ms;
-  --ak-elev-2:        var(--ak-elev-1);
-  --ak-weight-display: 650;
-}
-
-/* @preset-block calm-card — the quiet product: a whisper of tint, hairlines over shadows,
-   a lower hero, a shorter entrance. Calm, not flat. */
-[data-ak-look='calm-card'] {
-  --ak-page-image:    none;
-  --ak-grain:         none;
-  --ak-surface-image: linear-gradient(180deg,
-                        color-mix(in oklab, var(--ak-accent) 3%, var(--ak-surface)),
-                        var(--ak-surface));
-  --ak-hero-image:    radial-gradient(at 30% 20%, color-mix(in oklab, var(--ak-accent) 8%, var(--ak-bg)), transparent 60%);
-  --ak-grad:          linear-gradient(135deg,
-                        color-mix(in oklab, var(--ak-accent) 80%, var(--ak-ink)),
-                        color-mix(in oklab, var(--ak-accent) 70%, var(--ak-ink)));
-  --ak-elev-2:        var(--ak-elev-1);
-  --ak-enter-distance: 8px;
-  --ak-enter-stagger:  30ms;
-  --ak-hero-min:      18dvh;
-  --ak-weight-display: 650;
-}
-
-/* @preset-block editorial — the magazine: a big display step, rules instead of shadows,
-   squarer corners, a slow fade. Structure carries the page, not depth. */
-[data-ak-look='editorial'] {
-  --ak-main-max:      76rem;
-  --ak-surface-image: none;
-  --ak-hero-image:    none;
-  --ak-page-image:    none;
-  --ak-grain:         none;
-  --ak-blur:          0px;
-  --ak-glass:         var(--ak-surface);
-  --ak-grad:          linear-gradient(135deg,
-                        color-mix(in oklab, var(--ak-accent) 82%, var(--ak-ink)),
-                        color-mix(in oklab, var(--ak-accent) 82%, var(--ak-ink)));
-  --ak-elev-1:        none;
-  --ak-elev-2:        none;
-  --ak-radius:        8px;
-  --ak-radius-sm:     6px;
-  --ak-text-hero:     clamp(2.2rem, 7vw, 3.4rem);
-  --ak-weight-display: 800;
-  --ak-enter-distance: 0px;
-  --ak-enter-stagger:  60ms;
-  --ak-motion:        var(--motion-slow, 320ms);
-}
-
-/* @preset-block sticker — the playful form language the game kit proved: pill corners, a tilt,
-   extruded display type, a springier entrance. */
-[data-ak-look='sticker'] {
-  --ak-radius:        24px;
-  --ak-radius-sm:     16px;
-  /* 3%: the secondary hue runs darker than the accent on several palettes, and at 4% the
-     aimeat palette's near-white card sank into the page (check:atelier, step 1.09). */
-  --ak-surface-image: linear-gradient(180deg,
-                        color-mix(in oklab, var(--ak-accent-2) 3%, var(--ak-surface)),
-                        var(--ak-surface));
-  --ak-display-shadow: 0 4px 0 color-mix(in oklab, var(--ak-ink) 32%, var(--ak-surface));
-  /* The chunky offset shadow IS the sticker edge — depth as a printed shape, not a blur. */
-  --ak-elev-1:        0 5px 0 color-mix(in oklab, var(--ak-ink) 20%, transparent);
-  --ak-tilt:          -2deg;
-  --ak-enter-distance: 22px;
-  --ak-enter-stagger:  55ms;
-  --ak-weight-display: 800;
-}
-
-/* @preset-block neon-dense — the operator console: tight radii and gaps, the mono face on
-   display type, a fast short entrance, an accent-tinted working surface. */
-[data-ak-look='neon-dense'] {
-  --ak-main-max:      80rem;
-  --ak-radius:        8px;
-  --ak-radius-sm:     6px;
-  --ak-gap:           8px;
-  --ak-pad:           12px;
-  --ak-font-display:  var(--ak-font-mono);
-  --ak-surface-image: linear-gradient(180deg,
-                        color-mix(in oklab, var(--ak-accent) 4%, var(--ak-surface)),
-                        var(--ak-surface));
-  /* The neon: an accent ring plus a soft accent glow — the card edge carries the current. */
-  --ak-elev-1:        0 0 0 1px color-mix(in oklab, var(--ak-accent) 45%, var(--ak-surface)),
-                      0 0 18px color-mix(in oklab, var(--ak-accent) 22%, transparent);
-  --ak-line:          color-mix(in oklab, var(--ak-accent) 35%, var(--ak-ink-dim));
-  --ak-hero-min:      18dvh;
-  --ak-enter-distance: 6px;
-  --ak-enter-stagger:  20ms;
-  --ak-motion:        var(--motion-fast, 120ms);
-  --ak-weight-display: 700;
-}
-
-/* @preset-block poster — one giant focal statement: the hero owns the first viewport and
-   everything else recedes to bordered lists. The band's ground is the BRAND GRADIENT itself,
-   not the mesh wash — poster means committing; the scrim under the title is still what
-   AK-SCRIM verifies. */
-[data-ak-look='poster'] {
-  --ak-hero-min:      48dvh;
-  --ak-hero-image:    none;
-  --ak-grad:          linear-gradient(160deg,
-                        color-mix(in oklab, var(--ak-accent) 85%, var(--ak-ink)),
-                        color-mix(in oklab, var(--ak-spectrum-2) 72%, var(--ak-ink)));
-  --ak-text-hero:     clamp(3rem, 11vw, 5.2rem);
-  --ak-weight-display: 900;
-  --ak-display-shadow: 0 4px 0 color-mix(in oklab, var(--ak-ink) 30%, transparent);
-  --ak-surface-image: none;
-  --ak-elev-1:        none;
-  --ak-enter-distance: 24px;
-  --ak-enter-stagger:  70ms;
-}
 
 /* ══════════════════════════════════════════════════════════════════════════════════════════
    Reduced motion: every animated thing collapses to its end state.

@@ -1,0 +1,361 @@
+/*
+ * @file aimeat-atelier/looks.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description GENERATED — do not edit. Source: src/data/atelier-looks.ts, emitted by
+ *   tools/build-atelier-looks.ts (pnpm build:atelier-looks). Every look's token block and the
+ *   structure recipes it uses. pnpm check:atelier refuses drift against the registry and runs
+ *   the full preset x palette x mode matrix over every block below.
+ * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
+ */
+
+/* @preset-block flat — the deliberate opt-out: no decoration, no entrance.
+   The opt-out is a choice the spec records, not an accident — and even flat darkens the action fill, because body-size text on the raw accent fails on the aimeat palette. */
+[data-ak-look='flat'] {
+  --ak-surface-image:   none;
+  --ak-hero-image:      none;
+  --ak-page-image:      none;
+  --ak-grain:           none;
+  --ak-blur:            0px;
+  --ak-glass:           var(--ak-surface);
+  --ak-grad:            linear-gradient(135deg, color-mix(in oklab, var(--ak-accent) 82%, var(--ak-ink)), color-mix(in oklab, var(--ak-accent) 82%, var(--ak-ink)));
+  --ak-enter-distance:  0px;
+  --ak-enter-stagger:   0ms;
+  --ak-elev-2:          var(--ak-elev-1);
+  --ak-weight-display:  650;
+}
+
+/* @preset-block calm-card — quiet professional product.
+   A whisper of tint, hairlines over shadows, a lower hero, a shorter entrance. Calm, not flat. */
+[data-ak-look='calm-card'] {
+  --ak-page-image:      none;
+  --ak-grain:           none;
+  --ak-surface-image:   linear-gradient(180deg, color-mix(in oklab, var(--ak-accent) 3%, var(--ak-surface)), var(--ak-surface));
+  --ak-hero-image:      radial-gradient(at 30% 20%, color-mix(in oklab, var(--ak-accent) 8%, var(--ak-bg)), transparent 60%);
+  --ak-grad:            linear-gradient(135deg, color-mix(in oklab, var(--ak-accent) 80%, var(--ak-ink)), color-mix(in oklab, var(--ak-accent) 70%, var(--ak-ink)));
+  --ak-elev-2:          var(--ak-elev-1);
+  --ak-enter-distance:  8px;
+  --ak-enter-stagger:   30ms;
+  --ak-hero-min:        18dvh;
+  --ak-weight-display:  650;
+}
+
+/* @preset-block editorial — magazine: masthead on rules, giant joined numerals, cells in one frame, slow fades.
+   Structure carries the page, not depth — the front page of a paper. */
+[data-ak-look='editorial'] {
+  --ak-main-max:        76rem;
+  --ak-surface-image:   none;
+  --ak-hero-image:      none;
+  --ak-page-image:      none;
+  --ak-grain:           none;
+  --ak-blur:            0px;
+  --ak-glass:           var(--ak-surface);
+  --ak-grad:            linear-gradient(135deg, color-mix(in oklab, var(--ak-accent) 82%, var(--ak-ink)), color-mix(in oklab, var(--ak-accent) 82%, var(--ak-ink)));
+  --ak-elev-1:          none;
+  --ak-elev-2:          none;
+  --ak-radius:          8px;
+  --ak-radius-sm:       6px;
+  --ak-text-hero:       clamp(2.2rem, 7vw, 3.4rem);
+  --ak-weight-display:  800;
+  --ak-enter-distance:  0px;
+  --ak-enter-stagger:   60ms;
+  --ak-motion:          var(--motion-slow, 320ms);
+}
+/* structure: masthead — The hero is a front-page masthead: giant display type on rules, no card, no mesh. */
+[data-ak-look='editorial'] .ak-hero {
+  min-height: unset;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  border-top: 3px solid var(--ak-ink);
+  border-bottom: var(--ak-line-w) solid var(--ak-line);
+  overflow: visible;
+}
+[data-ak-look='editorial'] .ak-hero::before,
+[data-ak-look='editorial'] .ak-hero__scrim { display: none; }
+[data-ak-look='editorial'] .ak-hero__inner { padding: calc(var(--ak-pad) * 1.25) 0; }
+[data-ak-look='editorial'] .ak-hero__title {
+  font-size: clamp(2.8rem, 9vw, 5.6rem);
+  line-height: 0.98;
+  letter-spacing: -0.02em;
+}
+[data-ak-look='editorial'] .ak-hero__sub { font-size: var(--ak-text-title); }
+[data-ak-look='editorial'] .ak-statrow { gap: 0; }
+[data-ak-look='editorial'] .ak-statrow__tile {
+  border: 0;
+  border-right: var(--ak-line-w) solid var(--ak-line);
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  padding: calc(var(--ak-pad) * 1.25) var(--ak-pad);
+  transform: none;
+}
+[data-ak-look='editorial'] .ak-statrow__tile:last-child { border-right: 0; }
+[data-ak-look='editorial'] .ak-statrow__value { font-size: clamp(2.4rem, 6vw, 4rem); line-height: 1; }
+[data-ak-look='editorial'] .ak-statrow__label {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-family: var(--ak-font-mono);
+}
+/* structure: joined — Cells share hairlines inside one bordered frame — a laid-out page, not floating cards. */
+[data-ak-look='editorial'] .ak-mosaic__units--grid {
+  gap: 0;
+  border: var(--ak-line-w) solid var(--ak-line);
+}
+[data-ak-look='editorial'] .ak-mosaic__units--grid .ak-mosaic__unit {
+  align-self: stretch;
+  border-right: var(--ak-line-w) solid var(--ak-line);
+  border-bottom: var(--ak-line-w) solid var(--ak-line);
+  padding: var(--ak-pad);
+  margin-right: calc(-1 * var(--ak-line-w));
+  margin-bottom: calc(-1 * var(--ak-line-w));
+}
+[data-ak-look='editorial'] .ak-mosaic .ak-section {
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+  padding: 0;
+}
+
+/* @preset-block sticker — playful: pill corners, the whole grid tilts, extruded titles, chunky offset shadows.
+   The playful form language the game kit proved. The 3% secondary tint is deliberate: at 4% the aimeat palette's near-white card sank into the page (check:atelier, step 1.09). */
+[data-ak-look='sticker'] {
+  --ak-radius:          24px;
+  --ak-radius-sm:       16px;
+  --ak-surface-image:   linear-gradient(180deg, color-mix(in oklab, var(--ak-accent-2) 3%, var(--ak-surface)), var(--ak-surface));
+  --ak-display-shadow:  0 4px 0 color-mix(in oklab, var(--ak-ink) 32%, var(--ak-surface));
+  --ak-elev-1:          0 5px 0 color-mix(in oklab, var(--ak-ink) 20%, transparent);
+  --ak-tilt:            -2deg;
+  --ak-enter-distance:  22px;
+  --ak-enter-stagger:   55ms;
+  --ak-weight-display:  800;
+}
+
+/* @preset-block neon-dense — operator console: tight, mono display face, accent ring + glow on every card, fast.
+   The neon is the edge, not the fill: the ring and glow carry the current, the tint stays at 4% so a card never sinks into a light page. */
+[data-ak-look='neon-dense'] {
+  --ak-main-max:        80rem;
+  --ak-radius:          8px;
+  --ak-radius-sm:       6px;
+  --ak-gap:             8px;
+  --ak-pad:             12px;
+  --ak-font-display:    var(--ak-font-mono);
+  --ak-surface-image:   linear-gradient(180deg, color-mix(in oklab, var(--ak-accent) 4%, var(--ak-surface)), var(--ak-surface));
+  --ak-elev-1:          0 0 0 1px color-mix(in oklab, var(--ak-accent) 45%, var(--ak-surface)), 0 0 18px color-mix(in oklab, var(--ak-accent) 22%, transparent);
+  --ak-line:            color-mix(in oklab, var(--ak-accent) 35%, var(--ak-ink-dim));
+  --ak-hero-min:        18dvh;
+  --ak-enter-distance:  6px;
+  --ak-enter-stagger:   20ms;
+  --ak-motion:          var(--motion-fast, 120ms);
+  --ak-weight-display:  700;
+}
+
+/* @preset-block poster — one giant focal statement on the brand gradient, edge to edge; everything else recedes.
+   The band's ground is the brand gradient itself — poster means committing; the scrim under the title is still what AK-SCRIM verifies. */
+[data-ak-look='poster'] {
+  --ak-hero-min:        48dvh;
+  --ak-hero-image:      none;
+  --ak-grad:            linear-gradient(160deg, color-mix(in oklab, var(--ak-accent) 85%, var(--ak-ink)), color-mix(in oklab, var(--ak-spectrum-2) 72%, var(--ak-ink)));
+  --ak-text-hero:       clamp(3rem, 11vw, 5.2rem);
+  --ak-weight-display:  900;
+  --ak-display-shadow:  0 4px 0 color-mix(in oklab, var(--ak-ink) 30%, transparent);
+  --ak-surface-image:   none;
+  --ak-elev-1:          none;
+  --ak-enter-distance:  24px;
+  --ak-enter-stagger:   70ms;
+}
+/* structure: full-bleed-hero — The focal band runs edge to edge, out of the measure column. */
+[data-ak-look='poster'] .ak-mosaic__band .ak-hero {
+  border-radius: 0;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+}
+
+/* @preset-block broadsheet — the big paper: an even bigger masthead than editorial, heavy rules, joined columns, ink on paper.
+   Editorial's bigger sibling: square everything, darker hairlines, a masthead that owns the fold. */
+[data-ak-look='broadsheet'] {
+  --ak-main-max:        78rem;
+  --ak-surface-image:   none;
+  --ak-hero-image:      none;
+  --ak-page-image:      none;
+  --ak-grain:           none;
+  --ak-blur:            0px;
+  --ak-glass:           var(--ak-surface);
+  --ak-grad:            linear-gradient(135deg, color-mix(in oklab, var(--ak-accent) 82%, var(--ak-ink)), color-mix(in oklab, var(--ak-accent) 82%, var(--ak-ink)));
+  --ak-elev-1:          none;
+  --ak-elev-2:          none;
+  --ak-radius:          0px;
+  --ak-radius-sm:       0px;
+  --ak-line:            color-mix(in oklab, var(--ak-ink) 45%, var(--ak-bg));
+  --ak-text-hero:       clamp(3.2rem, 11vw, 6.4rem);
+  --ak-weight-display:  750;
+  --ak-enter-distance:  0px;
+  --ak-enter-stagger:   70ms;
+  --ak-motion:          var(--motion-slow, 320ms);
+}
+/* structure: masthead — The hero is a front-page masthead: giant display type on rules, no card, no mesh. */
+[data-ak-look='broadsheet'] .ak-hero {
+  min-height: unset;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  border-top: 3px solid var(--ak-ink);
+  border-bottom: var(--ak-line-w) solid var(--ak-line);
+  overflow: visible;
+}
+[data-ak-look='broadsheet'] .ak-hero::before,
+[data-ak-look='broadsheet'] .ak-hero__scrim { display: none; }
+[data-ak-look='broadsheet'] .ak-hero__inner { padding: calc(var(--ak-pad) * 1.25) 0; }
+[data-ak-look='broadsheet'] .ak-hero__title {
+  font-size: clamp(2.8rem, 9vw, 5.6rem);
+  line-height: 0.98;
+  letter-spacing: -0.02em;
+}
+[data-ak-look='broadsheet'] .ak-hero__sub { font-size: var(--ak-text-title); }
+[data-ak-look='broadsheet'] .ak-statrow { gap: 0; }
+[data-ak-look='broadsheet'] .ak-statrow__tile {
+  border: 0;
+  border-right: var(--ak-line-w) solid var(--ak-line);
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  padding: calc(var(--ak-pad) * 1.25) var(--ak-pad);
+  transform: none;
+}
+[data-ak-look='broadsheet'] .ak-statrow__tile:last-child { border-right: 0; }
+[data-ak-look='broadsheet'] .ak-statrow__value { font-size: clamp(2.4rem, 6vw, 4rem); line-height: 1; }
+[data-ak-look='broadsheet'] .ak-statrow__label {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-family: var(--ak-font-mono);
+}
+/* structure: joined — Cells share hairlines inside one bordered frame — a laid-out page, not floating cards. */
+[data-ak-look='broadsheet'] .ak-mosaic__units--grid {
+  gap: 0;
+  border: var(--ak-line-w) solid var(--ak-line);
+}
+[data-ak-look='broadsheet'] .ak-mosaic__units--grid .ak-mosaic__unit {
+  align-self: stretch;
+  border-right: var(--ak-line-w) solid var(--ak-line);
+  border-bottom: var(--ak-line-w) solid var(--ak-line);
+  padding: var(--ak-pad);
+  margin-right: calc(-1 * var(--ak-line-w));
+  margin-bottom: calc(-1 * var(--ak-line-w));
+}
+[data-ak-look='broadsheet'] .ak-mosaic .ak-section {
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+  padding: 0;
+}
+
+/* @preset-block gallery — airy exhibition: generous space, thin giant display, hairlines only, the work is the hero.
+   The room recedes so the work can speak: no shadows, no tints, hairline edges, a thin giant title over the full-bleed band. */
+[data-ak-look='gallery'] {
+  --ak-main-max:        80rem;
+  --ak-pad:             22px;
+  --ak-gap:             22px;
+  --ak-surface-image:   none;
+  --ak-page-image:      none;
+  --ak-grain:           none;
+  --ak-elev-1:          none;
+  --ak-elev-2:          none;
+  --ak-radius:          0px;
+  --ak-radius-sm:       0px;
+  --ak-text-hero:       clamp(2.8rem, 9vw, 5rem);
+  --ak-weight-display:  550;
+  --ak-enter-distance:  10px;
+  --ak-enter-stagger:   70ms;
+  --ak-motion:          var(--motion-slow, 320ms);
+}
+/* structure: full-bleed-hero — The focal band runs edge to edge, out of the measure column. */
+[data-ak-look='gallery'] .ak-mosaic__band .ak-hero {
+  border-radius: 0;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+}
+
+/* @preset-block brutalist — loud and square: thick ink borders, hard offset shadows, maximum weight, no apologies.
+   Depth as printed offset, never blur; the accent appears as the display type's hard shadow. */
+[data-ak-look='brutalist'] {
+  --ak-line-w:          2px;
+  --ak-line:            color-mix(in oklab, var(--ak-ink) 80%, var(--ak-bg));
+  --ak-radius:          0px;
+  --ak-radius-sm:       0px;
+  --ak-surface-image:   none;
+  --ak-page-image:      none;
+  --ak-hero-image:      none;
+  --ak-grad:            linear-gradient(135deg, color-mix(in oklab, var(--ak-accent) 82%, var(--ak-ink)), color-mix(in oklab, var(--ak-accent) 82%, var(--ak-ink)));
+  --ak-blur:            0px;
+  --ak-glass:           var(--ak-surface);
+  --ak-elev-1:          5px 5px 0 color-mix(in oklab, var(--ak-ink) 85%, transparent);
+  --ak-elev-2:          8px 8px 0 color-mix(in oklab, var(--ak-ink) 85%, transparent);
+  --ak-display-shadow:  3px 3px 0 color-mix(in oklab, var(--ak-accent) 70%, var(--ak-bg));
+  --ak-text-hero:       clamp(2.6rem, 9vw, 4.6rem);
+  --ak-weight-display:  900;
+  --ak-enter-distance:  10px;
+  --ak-enter-stagger:   30ms;
+}
+
+/* @preset-block terminal — the machine speaks: mono everything, joined cells, dense, grain like phosphor.
+   Everything is the mono face and a hairline grid; the grain stays on, like phosphor. */
+[data-ak-look='terminal'] {
+  --ak-main-max:        80rem;
+  --ak-font:            var(--ak-font-mono);
+  --ak-font-display:    var(--ak-font-mono);
+  --ak-radius:          0px;
+  --ak-radius-sm:       0px;
+  --ak-gap:             6px;
+  --ak-pad:             10px;
+  --ak-surface-image:   none;
+  --ak-page-image:      none;
+  --ak-hero-image:      none;
+  --ak-line:            color-mix(in oklab, var(--ak-accent) 40%, var(--ak-ink-dim));
+  --ak-elev-1:          none;
+  --ak-elev-2:          none;
+  --ak-hero-min:        14dvh;
+  --ak-text-hero:       clamp(1.6rem, 5vw, 2.4rem);
+  --ak-weight-display:  700;
+  --ak-enter-distance:  4px;
+  --ak-enter-stagger:   15ms;
+  --ak-motion:          var(--motion-fast, 120ms);
+}
+/* structure: joined — Cells share hairlines inside one bordered frame — a laid-out page, not floating cards. */
+[data-ak-look='terminal'] .ak-mosaic__units--grid {
+  gap: 0;
+  border: var(--ak-line-w) solid var(--ak-line);
+}
+[data-ak-look='terminal'] .ak-mosaic__units--grid .ak-mosaic__unit {
+  align-self: stretch;
+  border-right: var(--ak-line-w) solid var(--ak-line);
+  border-bottom: var(--ak-line-w) solid var(--ak-line);
+  padding: var(--ak-pad);
+  margin-right: calc(-1 * var(--ak-line-w));
+  margin-bottom: calc(-1 * var(--ak-line-w));
+}
+[data-ak-look='terminal'] .ak-mosaic .ak-section {
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+  padding: 0;
+}
+
+/* @preset-block aurora — vivid at full volume: a taller drifting aurora, wider spectrum, deeper glass, edge to edge.
+   The spectrum spreads wider (+120/-90), the band grows, the glass deepens — the look for an app that wants to feel like weather. */
+[data-ak-look='aurora'] {
+  --ak-spectrum-2:      oklch(from var(--ak-accent) l c calc(h + 120));
+  --ak-spectrum-3:      oklch(from var(--ak-accent) l c calc(h - 90));
+  --ak-hero-min:        42dvh;
+  --ak-blur:            18px;
+  --ak-glass:           color-mix(in oklab, var(--ak-surface) 66%, transparent);
+  --ak-radius:          18px;
+  --ak-enter-distance:  26px;
+  --ak-enter-stagger:   70ms;
+  --ak-weight-display:  800;
+}
+/* structure: full-bleed-hero — The focal band runs edge to edge, out of the measure column. */
+[data-ak-look='aurora'] .ak-mosaic__band .ak-hero {
+  border-radius: 0;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+}

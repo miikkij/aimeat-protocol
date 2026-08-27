@@ -1128,12 +1128,17 @@ await test('GET /lib/aimeat-atelier.css — serves the theming contract, light, 
     }
     // Light is the default and dark is a re-declaration of the same names.
     assert(css.includes(':root[data-theme=\'dark\']'), 'dark mode must re-declare the same tokens');
-    // The seven presets, each a tagged block check:atelier verifies arithmetically. Vivid is the
-    // base contract; a preset that loses its tag falls out of the matrix, which is the failure
-    // this catches.
-    for (const preset of ['flat', 'calm-card', 'editorial', 'sticker', 'neon-dense', 'poster']) {
-        assert(css.includes(`[data-ak-look='${preset}']`), `the ${preset} preset block must exist`);
-        assert(text.includes(`@preset-block ${preset}`), `the ${preset} preset must carry its @preset-block tag`);
+    // The presets live in the GENERATED looks.css (the look factory, 2026-08-27): each a tagged
+    // block check:atelier verifies arithmetically. Vivid is the base contract; a preset that
+    // loses its tag falls out of the matrix, which is the failure this catches.
+    const looksRes = await fetch(`${BASE}/lib/aimeat-atelier/looks.css`);
+    assert(looksRes.ok, 'the generated looks.css must be served');
+    const looksText = await looksRes.text();
+    const looksCss = withoutComments(looksText);
+    for (const preset of ['flat', 'calm-card', 'editorial', 'sticker', 'neon-dense', 'poster',
+        'broadsheet', 'gallery', 'brutalist', 'terminal', 'aurora']) {
+        assert(looksCss.includes(`[data-ak-look='${preset}']`), `the ${preset} preset block must exist`);
+        assert(looksText.includes(`@preset-block ${preset}`), `the ${preset} preset must carry its @preset-block tag`);
     }
     assert(text.includes('@preset-block vivid'), 'the base contract must carry the vivid @preset-block tag');
     // The parts the entry imports must actually be reachable, or the kit renders unstyled.
