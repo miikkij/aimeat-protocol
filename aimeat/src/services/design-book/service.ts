@@ -193,6 +193,13 @@ export class DesignBookService {
     };
   }
 
+  /** The stored record version of one part, or null when the address is empty — the seeding
+   *  probe, so the boot seeder never overrules an operator's Book. */
+  async getRecordVersion(id: string): Promise<number | null> {
+    const record = await this.findRecord(id);
+    return record ? record.version : null;
+  }
+
   /** One part, whole, with its usage count. */
   async get(id: string): Promise<{ part: DesignBookPart; version: number; usage: number; owner: string }> {
     const record = await this.findRecord(id);
@@ -245,7 +252,7 @@ export class DesignBookService {
     if (!record) throw new DesignBookError('NOT_FOUND', `No Design Book part "${id}".`, 404);
     const part = this.parsePart(record);
     const ownerGhii = await this.ownerOf(callerGaii);
-    if (part.status !== 'published' && part.proposed_by_owner !== ownerGhii) {
+    if (part.status !== 'published' && part.status !== 'aging' && part.proposed_by_owner !== ownerGhii) {
       throw new DesignBookError('NOT_PUBLISHED',
         `"${id}" is ${part.status}, and only its proposer can adopt it before it is published. The published catalogue is what everyone builds from.`, 403);
     }
@@ -263,6 +270,12 @@ export class DesignBookService {
         `No published app "${filename}" under your owner "${callerOwnerName}". A part is adopted into a published app — publish first, or check the filename.`, 404);
     }
     const out = await apps.write(app.ownerGaii, filename, part.body, provenance);
+
+    // Adoption is the heartbeat: an aging part someone still reaches for is not stale — one real
+    // use lifts it straight back to published, without an operator round.
+    if (part.status === 'aging') {
+      await this.setStatus(callerGaii, true, id, 'published');
+    }
 
     // The adopt is the usage signal — a read is browsing, an adopt is a build. Untracked on
     // purpose: a counter's history is noise, and it must never pollute the part's own timeline.
