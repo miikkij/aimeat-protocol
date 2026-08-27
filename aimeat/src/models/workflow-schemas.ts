@@ -139,6 +139,37 @@ export interface WorkflowHumanQuestion {
 
 export type WorkflowStepAction =
   | { kind: 'agent' }
+  /**
+   * Run a prompt on the OWNER'S OWN MODEL, in the node, and write the answer to a key.
+   *
+   * WHY THIS EXISTS. A step that only turns text into text needed an agent — not because it needed
+   * anything an agent has, but because there was no other kind of step. That cost a round trip
+   * through a separate repository, a fleet restart and an offer republish for every change to a
+   * sentence of prompt. The engine could already reach the owner's model (`completeForOwner`, used
+   * by the `llm` signal judge); nothing could produce a DELIVERABLE with it.
+   *
+   * `prompt_key` points at an owner-namespace memory record holding the prompt, so changing what a
+   * step says is a memory write and touches no code, no fleet and no deploy. `prompt` is the inline
+   * form for a prompt that is genuinely part of the workflow's definition. Both are templated with
+   * the run's vars, so `{ref}` works the way it does everywhere else.
+   *
+   * `result_to_key` is the deliverable, exactly as it is for an extension step: the engine lands
+   * the answer in the owner's namespace and the success_signal gates on it. Declare it or declare
+   * your own success_signal — with neither there is nothing to green on but "the model replied".
+   */
+  | {
+      kind: 'ai';
+      /** Owner-namespace key holding the prompt text. Templated with the run's vars. */
+      prompt_key?: string;
+      /** The prompt itself, when it belongs to the workflow rather than to a record. */
+      prompt?: string;
+      /** Where the answer lands, in the owner's namespace. Templated; honours keyPrefix. */
+      result_to_key?: string;
+      /** Parse the answer as JSON before writing it. A malformed answer fails the step. */
+      json?: boolean;
+      /** Override the owner's default model for this one step. */
+      model?: string;
+    }
   | { kind: 'export-out'; geai: string; capability?: string; from: string }
   | { kind: 'trigger-geai'; geai: string; capability: string; input?: Record<string, unknown> }
   // human-input: park the run (StepState 'waiting-human') until the owner answers via
@@ -489,6 +520,17 @@ const WorkflowVarSchema = z.object({
 // to / invoke a GEAI over the tunnel and complete on the reply (onPushTerminal), never an agent task.
 const WorkflowStepActionSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('agent') }),
+  // A prompt run on the owner's own model, here on the node. No agent, no fleet, no browser. The
+  // wording lives in a memory record when `prompt_key` names one, so changing what a step says is a
+  // memory write rather than a deploy.
+  z.object({
+    kind: z.literal('ai'),
+    prompt: z.string().max(20000).optional(),
+    prompt_key: z.string().max(400).optional(),
+    result_to_key: z.string().max(400).optional(),
+    json: z.boolean().optional(),
+    model: z.string().max(200).optional(),
+  }),
   z.object({
     kind: z.literal('export-out'),
     geai: z.string().min(1).max(200),                 // the target GEAI (eco:{app}#{owner}@{node})

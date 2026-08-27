@@ -250,6 +250,21 @@ export async function validateWorkflow(
         // Its deliverable is the package, not a memory key, so there is nothing for the default
         // key-signal to read. The step's own outcome is the gate: a publish that refused threw.
       }
+      if (a.kind === 'ai') {
+        // Same contract as an extension step: name where the answer lands, or bring your own signal.
+        // With neither, the only thing left to green on is "the model replied", which is the covering
+        // fallback every other kind here exists to remove.
+        if (!a.prompt && !a.prompt_key) {
+          errors.push(`step "${step.id}": an ai step needs prompt or prompt_key`);
+        }
+        if (!step.success_signal && !a.result_to_key) {
+          errors.push(`step "${step.id}": an ai step needs result_to_key or an explicit success_signal — with neither, the step greens whenever the model answers, whatever it said`);
+        }
+        deliverableKey = a.result_to_key;
+        for (const v of collectVarRefs([a.prompt ?? '', a.prompt_key ?? '', a.result_to_key ?? ''])) {
+          if (!declaredVars.has(v)) errors.push(`step "${step.id}": references undeclared var "{${v}}"`);
+        }
+      }
       if (a.kind === 'human-input') {
         // The answer key is the step's deliverable: fresh clears it, skip_done greens on an existing
         // answer without re-asking, signals-only checks it — all via the synthesized success_signal.
@@ -271,7 +286,8 @@ export async function validateWorkflow(
       const keyDefaultSignal: Signal | undefined =
         a.kind === 'human-input' && a.answer_to_key ? { kind: 'deterministic', key: a.answer_to_key, op: 'nonempty' }
           : a.kind === 'extension' && a.result_to_key ? { kind: 'deterministic', key: a.result_to_key, op: 'nonempty' }
-            : undefined;
+            : a.kind === 'ai' && a.result_to_key ? { kind: 'deterministic', key: a.result_to_key, op: 'nonempty' }
+              : undefined;
       resolved.push({
         stepId: step.id, agents: [], offerId: '',
         success_signal: step.success_signal ?? keyDefaultSignal,
