@@ -20,6 +20,10 @@
  * @usage  const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  *         a.main.appendChild(view);   // the main element is yours to fill
  * @version-history
+ *   v0.2.0 — 2026-08-28 — The signed-out grace: with requireLogin on and no session, the shell used
+ *     to show "Loading…" forever — the first AEB review's worst Atelier finding. Now the loading
+ *     state yields to the designed sign-in state after a short grace, and the sign-in state carries
+ *     a default hint pointing at the account pill.
  *   v0.1.0 — 2026-08-27 — Initial (TARGET-074 phase 1, slice 1).
  */
 import { el, append, clear, resolve, uid, injectStyle, enter } from './dom.js';
@@ -28,6 +32,11 @@ import { emptyState } from './state.js';
 
 /** How often the boot poll looks for a session the silent login produced without an event. */
 const BOOT_POLL_MS = 300;
+
+/** How long the boot may say "loading" before a signed-out visitor gets the designed sign-in
+ * state instead. Long enough for the app-origin silent login to resolve, short enough that a
+ * signed-out first visit never reads as a hung page. */
+const SIGNIN_GRACE_MS = 2500;
 
 /**
  * @typedef {object} AppHandle
@@ -112,7 +121,7 @@ export function app(spec) {
     const kinds = {
       empty: { title: o.title || t('empty'), hint: o.hint || t('emptyHint') },
       error: { title: o.title || t('loadFailed'), hint: o.hint || t('loadFailedHint') },
-      signin: { title: o.title || t('signIn'), hint: o.hint },
+      signin: { title: o.title || t('signIn'), hint: o.hint != null ? o.hint : t('signInHint') },
     };
     const chosen = kinds[kind] || kinds.error;
     statusCard = emptyState({
@@ -131,6 +140,7 @@ export function app(spec) {
   const requireLogin = spec.requireLogin !== false;
   let booted = false;
   let pollTimer = null;
+  let graceTimer = null;
 
   function auth() {
     const ns = /** @type {any} */ (window).AIMEAT;
@@ -144,6 +154,7 @@ export function app(spec) {
     if (session && session.jwt) {
       booted = true;
       if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+      if (graceTimer) { clearTimeout(graceTimer); graceTimer = null; }
       status('none');
       if (spec.onReady) spec.onReady(session);
     }
@@ -171,6 +182,13 @@ export function app(spec) {
     status('loading');
     armPoll();
     tryBoot();
+    // A signed-out visitor is a STATE, not an endless load: when the silent login has produced
+    // nothing by the end of the grace, show the designed sign-in card. The poll keeps running,
+    // so a login through the pill still boots the app the moment it lands.
+    graceTimer = setTimeout(function () {
+      graceTimer = null;
+      if (!booted) status('signin');
+    }, SIGNIN_GRACE_MS);
   }
 
   function armPoll() {
@@ -209,6 +227,7 @@ export function app(spec) {
     destroy() {
       stopLang();
       if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+      if (graceTimer) { clearTimeout(graceTimer); graceTimer = null; }
       if (statusCard) statusCard.destroy();
       if (nav) nav.destroy();
       if (fullFrame) document.body.classList.remove('ak-body');

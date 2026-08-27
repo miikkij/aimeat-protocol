@@ -14,6 +14,10 @@
  * @structure list(spec) → { el, set, destroy } · listDetail(spec) → { el, set, select, destroy }
  * @usage  AIMEAT.atelier.list({ target: a.main, items, onPick(item) { open(item); } });
  * @version-history
+ *   v0.4.0 — 2026-08-28 — A pick is visible: the clicked row keeps a selected mark (class +
+ *     aria-current) in the plain list too, and listDetail scrolls its detail pane into view when
+ *     the pane sits outside the viewport — the first AEB review clicked a row, saw nothing change,
+ *     and concluded nothing happened while the detail filled 700px below the fold.
  *   v0.3.0 — 2026-08-27 — Initial (TARGET-074 phase 1, slice 3).
  */
 import { el, append, clear, resolve, enter, reducedMotion } from './dom.js';
@@ -75,7 +79,17 @@ export function list(spec) {
       role: pickable ? 'listitem' : null,
       'data-ak-noguard': true,
       'data-ak-id': item.id,
-      on: pickable ? { click: function () { if (spec.onPick) spec.onPick(shown.get(item.id)?.item || item); } } : null,
+      on: pickable ? { click: function () {
+        // The pick leaves a mark: without it, a click whose detail renders elsewhere (or below
+        // the fold) reads as "nothing happened" — the first AEB review's exact words.
+        for (const other of root.querySelectorAll('.ak-list__row--selected')) {
+          other.classList.remove('ak-list__row--selected');
+          other.removeAttribute('aria-current');
+        }
+        row.classList.add('ak-list__row--selected');
+        row.setAttribute('aria-current', 'true');
+        if (spec.onPick) spec.onPick(shown.get(item.id)?.item || item);
+      } } : null,
     });
     fillRow(row, item);
     return row;
@@ -206,9 +220,24 @@ export function listDetail(spec) {
   function select(id) {
     selected = id;
     for (const row of root.querySelectorAll('.ak-list__row')) {
-      row.classList.toggle('ak-list__row--selected', row.getAttribute('data-ak-id') === id);
+      const on = row.getAttribute('data-ak-id') === id;
+      row.classList.toggle('ak-list__row--selected', on);
+      if (on) row.setAttribute('aria-current', 'true');
+      else row.removeAttribute('aria-current');
     }
     renderDetail();
+    // The detail must be seen to have answered the click. When the pane sits outside the
+    // viewport (wide layout, detail below the fold), bring it in; when it is visible, leave the
+    // scroll position alone.
+    if (id != null) {
+      requestAnimationFrame(function () {
+        const box = detail.getBoundingClientRect();
+        const viewH = window.innerHeight || document.documentElement.clientHeight;
+        if (box.top >= viewH || box.bottom <= 0) {
+          detail.scrollIntoView({ block: 'nearest', behavior: reducedMotion() ? 'auto' : 'smooth' });
+        }
+      });
+    }
   }
 
   renderDetail();

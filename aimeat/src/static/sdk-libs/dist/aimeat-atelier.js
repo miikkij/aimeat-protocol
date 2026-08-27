@@ -230,6 +230,7 @@
       loadFailed: "This did not load",
       loadFailedHint: "Check your connection and try again.",
       signIn: "Log in to continue.",
+      signInHint: "Use the account button in the top corner.",
       required: "Required",
       optional: "Optional",
       total: "Total",
@@ -260,6 +261,7 @@
       loadFailed: "Tämä ei latautunut",
       loadFailedHint: "Tarkista yhteys ja yritä uudelleen.",
       signIn: "Kirjaudu sisään jatkaaksesi.",
+      signInHint: "Käytä yläkulman tilinappia.",
       required: "Pakollinen",
       optional: "Valinnainen",
       total: "Yhteensä",
@@ -290,6 +292,7 @@
       loadFailed: "Esto no se cargó",
       loadFailedHint: "Revisa tu conexión e inténtalo otra vez.",
       signIn: "Inicia sesión para continuar.",
+      signInHint: "Usa el botón de cuenta en la esquina superior.",
       required: "Obligatorio",
       optional: "Opcional",
       total: "Total",
@@ -490,6 +493,7 @@
 
   // src/static/sdk-libs/atelier/shell.js
   var BOOT_POLL_MS = 300;
+  var SIGNIN_GRACE_MS = 2500;
   function app(spec) {
     injectStyle();
     const state = { title: spec.title, look: spec.look || "vivid" };
@@ -538,7 +542,7 @@
       const kinds = {
         empty: { title: o.title || t("empty"), hint: o.hint || t("emptyHint") },
         error: { title: o.title || t("loadFailed"), hint: o.hint || t("loadFailedHint") },
-        signin: { title: o.title || t("signIn"), hint: o.hint }
+        signin: { title: o.title || t("signIn"), hint: o.hint != null ? o.hint : t("signInHint") }
       };
       const chosen = kinds[kind] || kinds.error;
       statusCard = emptyState({
@@ -552,6 +556,7 @@
     const requireLogin = spec.requireLogin !== false;
     let booted = false;
     let pollTimer = null;
+    let graceTimer = null;
     function auth() {
       const ns = (
         /** @type {any} */
@@ -568,6 +573,10 @@
         if (pollTimer) {
           clearInterval(pollTimer);
           pollTimer = null;
+        }
+        if (graceTimer) {
+          clearTimeout(graceTimer);
+          graceTimer = null;
         }
         status("none");
         if (spec.onReady) spec.onReady(session);
@@ -597,6 +606,10 @@
       status("loading");
       armPoll();
       tryBoot();
+      graceTimer = setTimeout(function() {
+        graceTimer = null;
+        if (!booted) status("signin");
+      }, SIGNIN_GRACE_MS);
     }
     function armPoll() {
       if (pollTimer) return;
@@ -635,6 +648,10 @@
         if (pollTimer) {
           clearInterval(pollTimer);
           pollTimer = null;
+        }
+        if (graceTimer) {
+          clearTimeout(graceTimer);
+          graceTimer = null;
         }
         if (statusCard) statusCard.destroy();
         if (nav) nav.destroy();
@@ -780,6 +797,14 @@
       root.classList.add("ak-hero--image");
     }
     if (spec.target) resolve(spec.target).appendChild(root);
+    requestAnimationFrame(function() {
+      const appRoot = root.closest(".ak-app");
+      if (!appRoot) return;
+      const barTitle = appRoot.querySelector(".ak-app__bar .ak-app__title");
+      if (!barTitle) return;
+      const same = (barTitle.textContent || "").trim().toLowerCase() === String(state.title || "").trim().toLowerCase();
+      if (same) appRoot.classList.add("ak-app--hero-titled");
+    });
     function render() {
       title.textContent = state.title;
       sub.textContent = state.sub || "";
@@ -956,6 +981,12 @@
         "data-ak-noguard": true,
         "data-ak-id": item.id,
         on: pickable ? { click: function() {
+          for (const other of root.querySelectorAll(".ak-list__row--selected")) {
+            other.classList.remove("ak-list__row--selected");
+            other.removeAttribute("aria-current");
+          }
+          row.classList.add("ak-list__row--selected");
+          row.setAttribute("aria-current", "true");
           if (spec.onPick) spec.onPick(shown.get(item.id)?.item || item);
         } } : null
       });
@@ -1084,9 +1115,21 @@
     function select(id) {
       selected = id;
       for (const row of root.querySelectorAll(".ak-list__row")) {
-        row.classList.toggle("ak-list__row--selected", row.getAttribute("data-ak-id") === id);
+        const on = row.getAttribute("data-ak-id") === id;
+        row.classList.toggle("ak-list__row--selected", on);
+        if (on) row.setAttribute("aria-current", "true");
+        else row.removeAttribute("aria-current");
       }
       renderDetail();
+      if (id != null) {
+        requestAnimationFrame(function() {
+          const box = detail.getBoundingClientRect();
+          const viewH = window.innerHeight || document.documentElement.clientHeight;
+          if (box.top >= viewH || box.bottom <= 0) {
+            detail.scrollIntoView({ block: "nearest", behavior: reducedMotion() ? "auto" : "smooth" });
+          }
+        });
+      }
     }
     renderDetail();
     return {
@@ -2301,7 +2344,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.10.0",
+    version: "0.11.0",
     // ── Shell and navigation ──
     app,
     section,

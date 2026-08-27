@@ -19,6 +19,9 @@
  * @usage  AIMEAT.atelier.hero({ target: a.main, title: 'Errands', sub: '3 open',
  *           actions: [{ id: 'add', label: 'Add', kind: 'primary', onClick }] });
  * @version-history
+ *   v0.10.0 — 2026-08-28 — A hero that repeats the app's title claims it: when the hero title
+ *     equals the shell bar's, the bar heading goes screen-reader-only and the masthead carries the
+ *     name alone. All three first-AEB Atelier builds printed the name twice, stacked.
  *   v0.9.0 — 2026-08-27 — figure(): one giant number as the focal point (the Cape Town move —
  *     the data itself is the hero). Counts up on set(), like every figure in the kit.
  *   v0.6.0 — 2026-08-27 — The scrim becomes a child layer (.ak-hero__scrim): the aurora mesh
@@ -82,6 +85,20 @@ export function hero(spec) {
   if (layer) { root.style.setProperty('--ak-hero-image', layer); root.classList.add('ak-hero--image'); }
 
   if (spec.target) resolve(spec.target).appendChild(root);
+
+  // The masthead claims a repeated name. When this hero's title is the same text the shell bar
+  // already shows, the bar heading is made screen-reader-only (the class is on the app root; the
+  // stylesheet does the hiding) so the name appears once, at display size. Checked on the next
+  // frame so it also covers a hero the host mounts after construction (mosaic does).
+  requestAnimationFrame(function () {
+    const appRoot = root.closest('.ak-app');
+    if (!appRoot) return;
+    const barTitle = appRoot.querySelector('.ak-app__bar .ak-app__title');
+    if (!barTitle) return;
+    const same = (barTitle.textContent || '').trim().toLowerCase()
+      === String(state.title || '').trim().toLowerCase();
+    if (same) appRoot.classList.add('ak-app--hero-titled');
+  });
 
   function render() {
     title.textContent = state.title;

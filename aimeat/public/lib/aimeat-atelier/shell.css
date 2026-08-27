@@ -16,6 +16,11 @@
  *   ak-loading · ak-skeleton · shared primitives (ak-btn, ak-scroll, focus, ak-busy)
  * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
  * @version-history
+ *   v0.4.0 — 2026-08-28 — The first AEB review's kit fixes: the bar heading goes screen-reader-only
+ *     when a hero carries the same name (.ak-app--hero-titled, set by hero.js); the bar wraps at
+ *     narrow widths so the account pill can never crush the title to one letter; the short-viewport
+ *     caps extend to the hero band, the KPI tiles and the empty state; and the empty state slims
+ *     down (smaller mark, tighter padding) so stacked empties read as rows, not a wall.
  *   v0.3.4 — 2026-08-27 — Every .ak-root is a positioning context: a component-internal absolute
  *     (.ak-sr-only) escaped to the document and stretched the page past its own frame.
  *   v0.3.3 — 2026-08-27 — The scroller's children never shrink: a flex child with its own
@@ -87,6 +92,24 @@
   white-space: nowrap;
 }
 .ak-app__pill { flex: none; }
+/* A hero below carries the same name at display size (hero.js sets the class), so the bar's copy
+ * yields to the screen reader alone — the name appears once, where it is largest. */
+.ak-app--hero-titled .ak-app__title {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+/* Narrow screens: the account pill may be wider than what remains beside the title. Wrapping
+ * keeps both whole — the pill drops under the title, right-aligned — instead of crushing the
+ * title to a single letter (first AEB review, 390px). */
+@media (max-width: 480px) {
+  .ak-app__bar { flex-wrap: wrap; row-gap: 4px; }
+  .ak-app__title { flex: 1 1 auto; min-width: 55%; }
+  .ak-app__pill { margin-left: auto; }
+}
 .ak-app__status { padding: 0 var(--ak-pad); }
 .ak-app__status[hidden] { display: none; }
 .ak-app__main {
@@ -306,7 +329,7 @@
 
 /* ── The designed empty / error state ─────────────────────────────────────────────────────── */
 .ak-empty {
-  padding: calc(var(--ak-pad) * 1.5) var(--ak-pad);
+  padding: var(--ak-pad);
   border-radius: var(--ak-radius);
   background: var(--ak-surface);
   background-image: var(--ak-surface-image);
@@ -318,23 +341,25 @@
   text-align: center;
 }
 .ak-empty--error { border-color: color-mix(in oklab, var(--ak-err) 45%, var(--ak-line)); }
-.ak-empty__mark { position: relative; width: 56px; height: 56px; margin-bottom: 4px; }
+/* 40px, not 56: three stacked empties measured ~600px of "nothing here" before any content in
+ * the first AEB review — the state stays designed, it just stops being a wall. */
+.ak-empty__mark { position: relative; width: 40px; height: 40px; margin-bottom: 2px; }
 .ak-empty__mark span { position: absolute; border-radius: var(--ak-radius-pill); }
 .ak-empty__mark-a {
   inset: 0;
   background: color-mix(in oklab, var(--ak-accent) 14%, var(--ak-surface));
 }
 .ak-empty__mark-b {
-  inset: 12px 8px 8px 12px;
+  inset: 9px 6px 6px 9px;
   background: color-mix(in oklab, var(--ak-accent-2) 22%, var(--ak-surface));
 }
 .ak-empty__mark-c {
-  inset: 24px 24px 12px 12px;
+  inset: 17px 17px 9px 9px;
   background: color-mix(in oklab, var(--ak-accent) 38%, var(--ak-surface));
 }
 .ak-empty--error .ak-empty__mark-a { background: color-mix(in oklab, var(--ak-err) 12%, var(--ak-surface)); }
 .ak-empty--error .ak-empty__mark-c { background: color-mix(in oklab, var(--ak-err) 32%, var(--ak-surface)); }
-.ak-empty__title { margin: 0; font-family: var(--ak-font-display); font-size: var(--ak-text-title); }
+.ak-empty__title { margin: 0; font-family: var(--ak-font-display); font-size: calc(var(--ak-text-title) * 0.85); }
 .ak-empty__hint { margin: 0; font-size: var(--ak-text-fine); color: var(--ak-ink-dim); max-width: 34ch; }
 .ak-empty__hint[hidden], .ak-empty__actions[hidden] { display: none; }
 
@@ -451,10 +476,14 @@
    At 1280x460 a full masthead plus the numeral strip filled the whole height and the first
    story was a sliver (first design review). Display sizes cap against the viewport HEIGHT. */
 @media (max-height: 540px) {
-  .ak-hero { min-height: 22vh; }
+  .ak-hero { min-height: 18vh; }
   .ak-hero__title { font-size: min(var(--ak-text-hero), 9vh); }
+  .ak-hero__inner { padding: calc(var(--ak-pad) * 0.75) var(--ak-pad); }
   .ak-statrow__value { font-size: min(var(--ak-text-title), 7vh); }
-  .ak-figure__value { font-size: min(3.4rem, 16vh); }
+  .ak-statrow__tile { padding: calc(var(--ak-pad) * 0.6) var(--ak-pad); }
+  .ak-figure__value { font-size: min(2.8rem, 14vh); }
+  .ak-empty { padding: calc(var(--ak-pad) * 0.6) var(--ak-pad); }
+  .ak-empty__mark { display: none; }
 }
 
 /* ── Figure: the data IS the hero ─────────────────────────────────────────────────────────── */
