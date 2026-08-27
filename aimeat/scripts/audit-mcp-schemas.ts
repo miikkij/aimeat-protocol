@@ -38,6 +38,7 @@ import { MCP_SURFACES, V2_ROLES, validateSurfaces } from '../src/mcp/catalog/sur
 
 // ── Server register functions (mirror src/mcp/index.ts) ──
 import { registerCoreTools } from '../src/mcp/core.js';
+import { registerAppUiTools } from '../src/mcp/app-ui.js';
 import { registerBoardsTools } from '../src/mcp/boards.js';
 import { registerOrganismsTools } from '../src/mcp/organisms.js';
 import { registerKnowledgeTools } from '../src/mcp/knowledge.js';
@@ -119,6 +120,9 @@ function captureServer(): Map<string, CapturedTool> {
         registerAgentTaskTools, registerAgentCapabilityTools, registerAgentMessageTools,
         registerAgentTelemetryTools, registerAgentOnboardingTools, registerAgentManagementTools,
         registerComplianceTools,
+        // TARGET-074: the app-ui pair joins the gate on arrival — the measurement found the
+        // surface-layout pair had been left outside it, and outside the gate is where drift lives.
+        registerAppUiTools,
     ];
     for (const fn of reg) fn(mcp, storage, config, gaii, noop, noop);
     return sink;

@@ -406,6 +406,28 @@ export const appTools: ConnectCliToolDefinition[] = [
         input: { name: { type: 'string', required: true, description: 'Cortex name.' } },
         handler: ({ client }, input) => client.delete(`/v1/cortex/${encodeURIComponent(requiredString(input, 'name'))}`),
     },
+    // ── Arranging one Atelier app's screen (TARGET-074). Third-door rule: a parameter that
+    // exists on the MCP surfaces and not here is dropped in silence.
+    {
+        name: 'aimeat_app_ui_get',
+        handler: ({ client, config }, input) => client.get(
+            `/v1/apps/${encodeURIComponent(config.owner)}/${encodeURIComponent(requiredString(input, 'filename'))}/ui`),
+    },
+    {
+        name: 'aimeat_app_ui_set',
+        handler: ({ client, config }, input) => {
+            const layout = input.layout as Record<string, unknown>;
+            const note = optionalString(input, 'note');
+            return client.put(
+                `/v1/apps/${encodeURIComponent(config.owner)}/${encodeURIComponent(requiredString(input, 'filename'))}/ui`,
+                {
+                    layout: note ? { ...layout, meta: { ...(layout?.meta as object ?? {}), note } } : layout,
+                    ...(input.ai_provenance ? { ai_provenance: input.ai_provenance } : {}),
+                    ...(input.ai_provenance_id ? { ai_provenance_id: input.ai_provenance_id } : {}),
+                },
+            );
+        },
+    },
     // ── App drafts (staging): edit + test the next version without touching the live app ──
     {
         // → PUT /v1/apps/:owner/:filename/draft (owner resolved server-side from the session).

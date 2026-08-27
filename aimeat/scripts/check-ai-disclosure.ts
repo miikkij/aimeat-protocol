@@ -204,6 +204,10 @@ function checkOneLlmTransport(): void {
 const AI_PROVENANCE_REQUIRED = [
   'aimeat_app_draft_publish',
   'aimeat_app_publish',
+  // A mosaic layout's titles, notes and empty-state wording are text a person reads on the app's
+  // screen, and an agent is exactly who arranges it. The service mints the record, so the REST
+  // door carries the same decision.
+  'aimeat_app_ui_set',
   'aimeat_board_post',
   'aimeat_board_reply',
   // A published data package is world-readable at a permanent address and is read by people as
