@@ -2,8 +2,9 @@
  * @file public/views/home/header.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The topmost part of the home: the person's name on the left, one settings button on
- *   the right.
+ * @description The topmost part of the home: the person's name on the left, and on the right the
+ *   door to everything behind the home (settings and controls) and the button for the home's own
+ *   two settings.
  *
  *   It reads as a nameplate on the wall of a house rather than a page title, which is why the name
  *   lives HERE and the heading below it states what is going on instead of greeting by name again.
@@ -17,6 +18,8 @@
  *   import { HomeHeader } from '/views/home/header.js';
  *   html`<${HomeHeader} name=${name} onOpenSettings=${() => setOpen(true)} />`
  * @version-history
+ *   v1.3.0 — 2026-08-27 — The door to settings and controls beside the settings button, and the
+ *     button says "Home settings", since the dialog behind it now holds only the home's own two.
  *   v1.2.1 — 2026-08-23 — Em-dash swept from the identity hint (banned in every surface).
  *   v1.2.0 — 2026-08-19 — The GHII address under the name, with its meaning in the tooltip.
  *     Nothing anywhere told a person they HAVE a permanent address; the nameplate is where an
@@ -55,9 +58,17 @@ export function HomeHeader({ name, owner, identity, onOpenSettings }) {
             ${identity}
           </span>`}
       </span>
-      <button type="button" class="btn-ghost koti-settings-btn" onClick=${onOpenSettings}>
-        ${Cog}
-        <span>${tr('home.settings.open', 'Settings')}</span>
-      </button>
+      <span class="koti-header-actions">
+        ${/* The door to everything behind the home. The header carries the same link, but a person
+              reading the nameplate is not reading the header, and the relationship (home in front,
+              controls behind) has to be visible on the page itself. */''}
+        <a class="btn-ghost koti-controls-link" href="/v1/profile">
+          ${tr('home.settings.allControls', 'All settings and controls')} →
+        </a>
+        <button type="button" class="btn-ghost koti-settings-btn" onClick=${onOpenSettings}>
+          ${Cog}
+          <span>${tr('home.settings.open', 'Home settings')}</span>
+        </button>
+      </span>
     </div>`;
 }

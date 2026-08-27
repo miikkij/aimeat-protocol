@@ -16,6 +16,8 @@
  *   - ChatView — the page: status, conversations, one live turn
  * @usage import ChatView from '/views/chat.js'
  * @version-history
+ *   v1.8.0 — 2026-08-27 — The phone's back button goes to the home, always. It read the onboarding
+ *     cohort before, which is not where the person asked to be.
  *   v1.7.0 — 2026-08-23 — A fourth starter, "Set up my company" (TARGET-071). The other three name
  *     something the PERSON does; this one names something their company gets, and it was the one
  *     road into the whole company side that an empty chat did not offer.
@@ -44,8 +46,6 @@ import { h } from 'preact';
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
-import { apiGet } from '/js/api.js';
-import { swallowed } from '/js/swallowed.js';
 import { hasSession } from '/js/services/auth.js';
 import { Spinner } from '/components/Spinner.js';
 import * as chat from '/js/services/chat.js';
@@ -150,8 +150,10 @@ export default function ChatView() {
     const [attachments, setAttachments] = useState([]);
     const [nudgeDismissed, setNudgeDismissed] = useState(true);
     // Where "back" leads on a phone, where this page owns the whole screen and the site nav is
-    // hidden: the person's own side of the house. Remake accounts have the home; legacy the profile.
-    const [exitHref, setExitHref] = useState('/v1/profile');
+    // hidden: the home, which is the front room every other page opens from. It used to depend on
+    // the account's onboarding cohort, which sent people who had chosen the profile to a home they
+    // then left again.
+    const exitHref = '/v1/home';
 
     const abortRef = useRef(null);
     const bottomRef = useRef(null);
@@ -173,9 +175,6 @@ export default function ChatView() {
     // First load: what this node offers, and where the person left off.
     useEffect(() => {
         if (!hasSession()) { setLoading(false); return; }
-        apiGet('/v1/home/ui-track')
-            .then((r) => { if (r?.data?.track === 'remake') setExitHref('/v1/home'); })
-            .catch((e) => swallowed('chat: ui-track', e));
         (async () => {
             try {
                 const [st, list, nudges] = await Promise.all([

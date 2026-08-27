@@ -16,6 +16,10 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-remake-funnel
  * @version-history
+ *   v2.0.0 — 2026-08-27 — Phase 3 is the start page, not the switch: every account defaults to the
+ *     home, choosing a start page never touches `track`, and the `switched` column is asserted
+ *     ABSENT from the funnel. The old assertions counted flips between two paths that are now two
+ *     layers of one thing.
  *   v1.1.0 — 2026-08-16 — The chat as a third side: choosing it is remembered and lands there, and
  *     a node with no chat agent does not send a new account to one.
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 0).
@@ -95,7 +99,7 @@ async function registerHuman(name: string): Promise<string> {
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-const readTrack = async (token: string): Promise<{ track?: string; switched?: number } | null> => {
+const readTrack = async (token: string): Promise<{ track?: string; at?: string } | null> => {
     const { body } = await json(`/v1/memory/${encodeURIComponent(TRACK_KEY)}?soft=1`, auth(token));
     return body.data?.exists === false ? null : body.data?.value ?? null;
 };
@@ -130,7 +134,7 @@ await test('POST /v1/owners writes onboarding.track = remake', async () => {
     const v = await waitForTrack(tokenOp);
     assert(!!v, 'a new account must carry a track marker');
     assert(v!.track === 'remake', `new accounts land on the remake path (K3), got ${JSON.stringify(v)}`);
-    assert(v!.switched === 0, `a fresh account has never switched, got ${JSON.stringify(v)}`);
+    assert(typeof v!.at === 'string', `the marker carries when it was written, got ${JSON.stringify(v)}`);
 });
 
 await test('POST /v1/ghii writes the same marker (one door must not be invisible)', async () => {
@@ -149,7 +153,7 @@ await test('An account can be marked legacy (what an existing account looks like
         method: 'POST',
         body: JSON.stringify({
             key: TRACK_KEY,
-            value: { track: 'legacy', at: new Date().toISOString(), switched: 0 },
+            value: { track: 'legacy', at: new Date().toISOString() },
             visibility: 'private',
         }),
     }));
@@ -227,7 +231,7 @@ await test('The remake columns exist and read zero before anyone walks the path'
     const { body } = await json('/v1/admin/onboarding-funnel?limit=1000', auth(tokenOp));
     const remake = (body.data?.cohorts ?? []).find((c: any) => c.track === 'remake');
     assert(!!remake, 'a remake cohort must exist');
-    for (const col of ['mat_ok', 'mat_failed', 'mat_attempts', 'first_agent_connected', 'home_initialized', 'room_entered', 'switched']) {
+    for (const col of ['mat_ok', 'mat_failed', 'mat_attempts', 'first_agent_connected', 'home_initialized', 'room_entered']) {
         assert(typeof remake[col] === 'number', `cohort column ${col} is missing`);
         assert(remake[col] === 0, `${col} must be 0 before anything happened, got ${remake[col]}`);
     }
@@ -236,74 +240,56 @@ await test('The remake columns exist and read zero before anyone walks the path'
     assert(remake.home_initialized_rate_pct === 0, 'nothing is initialized yet');
 });
 
-console.log('\nPhase 3: the switch changes the counter, never the cohort');
+console.log('\nPhase 3: the start page, and the cohort it never touches');
 
-await test('A new account lands on the home; a legacy one lands on the profile (K3)', async () => {
+await test('Every account lands on the home until it chooses otherwise, whichever path it was created on', async () => {
     const remake = await json('/v1/home/ui-track', auth(tokenOp));
     assert(remake.status === 200, `ui-track ${remake.status}: ${JSON.stringify(remake.body.error)}`);
     assert(remake.body.data.ui === 'home', `a remake account lands on the home, got ${remake.body.data.ui}`);
     assert(remake.body.data.defaulted === true, 'nothing has been chosen yet, so this is the default');
+    assert(remake.body.data.landing === '/v1/home', `and the home is at /v1/home, got ${remake.body.data.landing}`);
 
+    // The profile is one click behind the home now, not a separate path, so an account created on
+    // the old path lands on the home like everyone else.
     const legacy = await json('/v1/home/ui-track', auth(tokenLegacy));
-    assert(legacy.body.data.ui === 'profile',
-        `an account on the old path keeps landing there, got ${legacy.body.data.ui}`);
+    assert(legacy.body.data.ui === 'home',
+        `an account on the old path lands on the home too, got ${legacy.body.data.ui}`);
+    assert(legacy.body.data.defaulted === true, 'it has chosen nothing either');
 });
 
-await test('ACCEPTANCE: switching does NOT change `track` — only `switched`', async () => {
-    // The whole reason these are two fields. `track` is the cohort an account was created into;
-    // rewriting it on a flip would move accounts between cohorts as people wander, and a cohort
-    // whose membership changes under you measures nothing.
+await test('ACCEPTANCE: choosing a start page never touches `track`', async () => {
+    // `track` is the cohort an account was created into and the funnel groups by it. The start page
+    // is a preference on the same account. Writing one must not move the other.
     const before = await readTrack(tokenOp);
-    assert(before?.track === 'remake' && before.switched === 0, `setup: ${JSON.stringify(before)}`);
+    assert(before?.track === 'remake', `setup: ${JSON.stringify(before)}`);
 
     const put = await json('/v1/home/ui-track', auth(tokenOp, {
         method: 'PUT', body: JSON.stringify({ ui: 'profile' }),
     }));
-    assert(put.status === 200, `switch ${put.status}: ${JSON.stringify(put.body.error)}`);
-    assert(put.body.data.landing === '/v1/profile', `it goes to the old side, got ${put.body.data.landing}`);
+    assert(put.status === 200, `choose ${put.status}: ${JSON.stringify(put.body.error)}`);
+    assert(put.body.data.landing === '/v1/profile', `settings and controls are at /v1/profile, got ${put.body.data.landing}`);
+
+    const read = await json('/v1/home/ui-track', auth(tokenOp));
+    assert(read.body.data.ui === 'profile', `the choice stuck, got ${read.body.data.ui}`);
+    assert(read.body.data.defaulted === false, 'a choice is not a default');
 
     const after = await readTrack(tokenOp);
     assert(after?.track === 'remake', `THE CRITERION: track must be untouched, got ${after?.track}`);
-    assert(after?.switched === 1, `switched must count the flip, got ${after?.switched}`);
-    assert(before.at === (after as { at?: string }).at ?? true, 'the cohort timestamp does not move either');
+    assert(before?.at === after?.at, 'the cohort timestamp does not move either');
 });
 
-await test('Re-affirming the SAME side does not inflate the counter', async () => {
-    // Counting a no-op would inflate the one number that says whether people are leaving.
-    const before = await readTrack(tokenOp);
-    const again = await json('/v1/home/ui-track', auth(tokenOp, {
-        method: 'PUT', body: JSON.stringify({ ui: 'profile' }),
-    }));
-    assert(again.status === 200, `re-affirm ${again.status}`);
-    const after = await readTrack(tokenOp);
-    assert(after?.switched === before?.switched,
-        `choosing the current side again is not a switch: ${before?.switched} → ${after?.switched}`);
-});
-
-await test('Switching back counts a second flip, and STILL leaves the cohort alone', async () => {
-    const back = await json('/v1/home/ui-track', auth(tokenOp, {
-        method: 'PUT', body: JSON.stringify({ ui: 'home' }),
-    }));
-    assert(back.status === 200, `switch back ${back.status}`);
-    assert(back.body.data.landing === '/v1/home', `it goes home, got ${back.body.data.landing}`);
-    const after = await readTrack(tokenOp);
-    assert(after?.switched === 2, `two flips counted, got ${after?.switched}`);
-    assert(after?.track === 'remake', `still the cohort it was created in, got ${after?.track}`);
-});
-
-await test('The funnel counts this account in the switched column', async () => {
+await test('The funnel row carries the cohort and no switch column', async () => {
+    // The `switched` column counted people leaving the new path for the old one. There is no
+    // leaving any more, and a column that is always zero reads as a measurement that was made.
     const { body } = await json('/v1/admin/onboarding-funnel?limit=1000', auth(tokenOp));
     const row = (body.data?.rows ?? []).find((r: any) => r.owner === ownerOp);
-    assert(row?.switched === 2, `the row carries the count, got ${row?.switched}`);
-    assert(row?.track === 'remake', `and the cohort is unchanged, got ${row?.track}`);
+    assert(row?.track === 'remake', `the row carries the cohort, got ${row?.track}`);
+    assert(!('switched' in (row ?? {})), 'the row has no switched column');
     const remakeCohort = (body.data?.cohorts ?? []).find((c: any) => c.track === 'remake');
-    assert(remakeCohort.switched >= 1,
-        `the cohort's switched column counts them: ${JSON.stringify(remakeCohort.switched)}`);
+    assert(!('switched' in (remakeCohort ?? {})), 'the cohort has no switched column');
 });
 
-await test('The chat is a third side, and choosing it is remembered', async () => {
-    // A person who works through the built-in agent should land there, not at the profile they only
-    // pass through. The counter treats it like any other flip.
+await test('The chat can be the start page, and choosing it is remembered', async () => {
     const put = await json('/v1/home/ui-track', auth(tokenOp, {
         method: 'PUT', body: JSON.stringify({ ui: 'chat' }),
     }));
@@ -312,30 +298,34 @@ await test('The chat is a third side, and choosing it is remembered', async () =
 
     const read = await json('/v1/home/ui-track', auth(tokenOp));
     assert(read.body.data.ui === 'chat', `and it stuck, got ${read.body.data.ui}`);
-    assert(read.body.data.defaulted === false, 'a choice is not a default');
     assert(read.body.data.landing === '/v1/chat', `the GET agrees, got ${read.body.data.landing}`);
 
     const after = await readTrack(tokenOp);
     assert(after?.track === 'remake', `the cohort is still untouched, got ${after?.track}`);
 });
 
-await test('A node with no chat agent does not send a new account to one', async () => {
-    // This suite runs against a node with no agent configured, which is the point: landing somebody
-    // in a box that can only say "no agent configured" is worse than the home they would have seen.
-    // Put the operator back where the earlier tests left them first.
-    await json('/v1/home/ui-track', auth(tokenOp, { method: 'PUT', body: JSON.stringify({ ui: 'home' }) }));
+await test('Choosing the home again puts a person back where everyone starts', async () => {
+    const back = await json('/v1/home/ui-track', auth(tokenOp, {
+        method: 'PUT', body: JSON.stringify({ ui: 'home' }),
+    }));
+    assert(back.status === 200, `choose home ${back.status}`);
+    assert(back.body.data.landing === '/v1/home', `it goes home, got ${back.body.data.landing}`);
+    const read = await json('/v1/home/ui-track', auth(tokenOp));
+    assert(read.body.data.ui === 'home' && read.body.data.defaulted === false,
+        `a chosen home is still a choice, got ${JSON.stringify(read.body.data)}`);
+});
 
-    const status = await json('/v1/chat/status', auth(tokenOp));
-    assert(status.body.data.enabled === false, 'setup: this node has no chat agent');
-
+await test('A brand-new account lands on the home whether or not this node has a chat', async () => {
+    // A new account used to be sent into the chat when the node had one. The onboarding home carries
+    // the chat door now, so the steps and the chat are side by side and the default is the same
+    // everywhere. This suite runs on a node with no chat agent; the assertion holds either way.
     const tokenFresh = await registerOwner(`rmkfr${stamp}`);
     const fresh = await json('/v1/home/ui-track', auth(tokenFresh));
     assert(fresh.body.data.defaulted === true, 'setup: this account has chosen nothing');
-    assert(fresh.body.data.ui === 'home',
-        `a new account falls back to the home while there is no agent, got ${fresh.body.data.ui}`);
+    assert(fresh.body.data.ui === 'home', `a new account lands on the home, got ${fresh.body.data.ui}`);
 });
 
-await test('FAILURE MODE: an invalid side is refused', async () => {
+await test('FAILURE MODE: an invalid start page is refused', async () => {
     const { status } = await json('/v1/home/ui-track', auth(tokenOp, {
         method: 'PUT', body: JSON.stringify({ ui: 'sideways' }),
     }));

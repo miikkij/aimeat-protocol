@@ -3732,19 +3732,18 @@
       "copied": "Kopioitu. Liitä se tekoälychattiisi"
     },
     "settings": {
-      "open": "Asetukset",
-      "title": "Asetukset",
-      "tabGeneral": "Yleiset",
+      "open": "Kodin asetukset",
+      "title": "Kodin asetukset",
       "showAch": "Näytä saavutukset kotona",
-      "tabOpenRouter": "OpenRouter",
-      "tabAccess": "Pääsy",
-      "tabWallet": "Lompakko"
+      "allControls": "Kaikki asetukset ja hallinta",
+      "allControlsHint": "Agentit, muisti, sovellukset, pääsy ja laskutus: kaikki, mitä kodin takana on."
     },
-    "switch": {
-      "here": "Käytät uutta kotinäkymää.",
-      "toProfile": "Palaa vanhaan profiiliin",
-      "hereProfile": "Käytät vanhaa profiilia.",
-      "toHome": "Kokeile uutta kotia"
+    "startPage": {
+      "title": "Aloitussivu",
+      "hint": "Sivu, jolle päädyt, kun kirjaudut sisään tai tulet etusivulle.",
+      "home": "Koti",
+      "chat": "Chat",
+      "controls": "Asetukset ja hallinta"
     },
     "loadFailed": "Kotisi ei nyt latautunut. Yritä hetken päästä uudelleen."
   },
@@ -4828,8 +4827,9 @@
   "nav": {
     "devView": "Kehittäjille",
     "signIn": "Kirjaudu",
+    "home": "Koti",
     "apps": "Sovellukset",
-    "profile": "Profiili",
+    "profile": "Asetukset ja hallinta",
     "logout": "Kirjaudu ulos",
     "loggedInAs": "kirjautuneena",
     "help": "Apua",
@@ -8883,7 +8883,7 @@
       "referencesPackageLevel": "Viitteet (pakettitaso)"
     },
     "landing": {
-      "home": "Koti",
+      "home": "Yleiskatsaus",
       "nextTitle": "Ehdotetut seuraavat askeleet",
       "next": {
         "writeNotesTitle": "Kirjoita itseorganisoituvia muistiinpanoja",
@@ -9322,7 +9322,7 @@
     }
   },
   "profile.agents.detail.tabs.schedules": "Ajastukset",
-  "profile.landing.home": "Etusivu",
+  "profile.landing.home": "Yleiskatsaus",
   "profile.landing.menu": "Valikko",
   "profile.living.activityTrigger": "Päivitä myös N työtilamuutoksen jälkeen (0 = vain aikataulu)",
   "profile.living.addPoint": "Lisää piste",

@@ -28,6 +28,7 @@
  *   import { blocksForSurface, defaultLayout } from './registry.js';
  *   const offered = blocksForSurface('home', config);
  * @version-history
+ *   v1.1.0 — 2026-08-27 — The chat door joins the built-in onboarding home, under the steps.
  *   v1.0.0 — 2026-08-26 — Initial: the two block sets joined, presence evaluated, and the default
  *     layouts for the three surfaces.
  */
@@ -197,6 +198,9 @@ export const DEFAULT_BLOCKS: Record<SurfaceId, SurfaceBlockInstance[]> = {
     'home-onboarding': [
         b('home.nameplate'),
         b('home.steps'),
+        // Right under the steps, where the chat used to be the whole landing page for a new account.
+        // Filtered out with the rest on a node that has no chat, so it never renders empty.
+        b('home.chat-door'),
         b('home.install-cta'),
         b('home.feed'),
         b('home.trust'),

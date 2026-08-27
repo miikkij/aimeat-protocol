@@ -22,6 +22,7 @@
  *   import { readHomeState } from '../services/home-state.js';
  *   const state = await readHomeState(storage, config, req.auth!.owner);
  * @version-history
+ *   v1.2.0 — 2026-08-27 — `switched` left the state with the home-or-profile switch it counted.
  *   v1.1.0 — 2026-08-09 — The agent card carries the SAME health verdict the Agents tab shows
  *     (services/agent-health.ts), plus how many agents there are and how many are in trouble.
  *     It carried none: the card was derived from agents.length, so the home said "connected and
@@ -60,7 +61,6 @@ export interface HomeState {
     ghii: string;
     displayName: string | null;
     track: OnboardingTrack;
-    switched: number;
     /** The step the person is ON. `null` once the home is initialized. */
     step: HomeStep | null;
     mat: {
@@ -226,7 +226,6 @@ async function readHomeStateInScope(
         ghii,
         displayName: ghiiRecord?.displayName ?? null,
         track: track.track === 'remake' ? 'remake' : 'legacy',
-        switched: typeof track.switched === 'number' ? track.switched : 0,
         step: initialized ? null
             : !matHtmlExists ? 'welcome-mat'
                 : needsBetterApp ? 'better-app'

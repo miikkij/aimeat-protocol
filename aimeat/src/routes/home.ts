@@ -16,7 +16,7 @@
  *     - home/state.ts       — GET /v1/home/state
  *     - home/first-agent.ts — POST /v1/home/first-agent
  *     - home/feed.ts        — GET /v1/home/feed, POST /v1/home/room
- *     - home/track.ts       — GET + PUT /v1/home/ui-track (the switch)
+ *     - home/track.ts       — GET + PUT /v1/home/ui-track (the start page)
  * @usage app.use(homeRouter(config, storage));
  * @version-history
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 2).
