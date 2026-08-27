@@ -62,7 +62,7 @@
   --ak-motion:          var(--motion-slow, 320ms);
 }
 /* structure: masthead — The hero is a front-page masthead: giant display type on rules, no card, no mesh — and the news under it separates with RULES, not boxes (a card widget inside a newspaper was the first design review's finding). */
-[data-ak-look='editorial'] .ak-hero {
+[data-ak-look='editorial'] .ak-hero:not(.ak-hero--image) {
   min-height: unset;
   border-radius: 0;
   box-shadow: none;
@@ -71,9 +71,9 @@
   border-bottom: var(--ak-line-w) solid var(--ak-line);
   overflow: visible;
 }
-[data-ak-look='editorial'] .ak-hero::before,
-[data-ak-look='editorial'] .ak-hero__scrim { display: none; }
-[data-ak-look='editorial'] .ak-hero__inner { padding: calc(var(--ak-pad) * 1.25) 0; }
+[data-ak-look='editorial'] .ak-hero:not(.ak-hero--image)::before,
+[data-ak-look='editorial'] .ak-hero:not(.ak-hero--image) .ak-hero__scrim { display: none; }
+[data-ak-look='editorial'] .ak-hero:not(.ak-hero--image) .ak-hero__inner { padding: calc(var(--ak-pad) * 1.25) 0; }
 [data-ak-look='editorial'] .ak-hero__title {
   font-size: clamp(2.8rem, 9vw, 5.6rem);
   line-height: 0.98;
@@ -217,7 +217,7 @@
   --ak-motion:          var(--motion-slow, 320ms);
 }
 /* structure: masthead — The hero is a front-page masthead: giant display type on rules, no card, no mesh — and the news under it separates with RULES, not boxes (a card widget inside a newspaper was the first design review's finding). */
-[data-ak-look='broadsheet'] .ak-hero {
+[data-ak-look='broadsheet'] .ak-hero:not(.ak-hero--image) {
   min-height: unset;
   border-radius: 0;
   box-shadow: none;
@@ -226,9 +226,9 @@
   border-bottom: var(--ak-line-w) solid var(--ak-line);
   overflow: visible;
 }
-[data-ak-look='broadsheet'] .ak-hero::before,
-[data-ak-look='broadsheet'] .ak-hero__scrim { display: none; }
-[data-ak-look='broadsheet'] .ak-hero__inner { padding: calc(var(--ak-pad) * 1.25) 0; }
+[data-ak-look='broadsheet'] .ak-hero:not(.ak-hero--image)::before,
+[data-ak-look='broadsheet'] .ak-hero:not(.ak-hero--image) .ak-hero__scrim { display: none; }
+[data-ak-look='broadsheet'] .ak-hero:not(.ak-hero--image) .ak-hero__inner { padding: calc(var(--ak-pad) * 1.25) 0; }
 [data-ak-look='broadsheet'] .ak-hero__title {
   font-size: clamp(2.8rem, 9vw, 5.6rem);
   line-height: 0.98;
