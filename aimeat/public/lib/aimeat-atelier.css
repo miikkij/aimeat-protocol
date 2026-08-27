@@ -1,0 +1,166 @@
+/*
+ * @file aimeat-atelier.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Stylesheet for the aimeat-atelier SDK library (/v1/libs/aimeat-atelier.js) — the
+ *   Atelier track's UI kit: the app shell, hero, KPI row, tabs, bottom navigation, and the
+ *   designed empty and loading states.
+ *
+ *   THIS FILE IS THE THEMING CONTRACT. Every colour, radius, shadow, font, density and motion
+ *   value the components read is one of the `--ak-*` custom properties declared below. A look is
+ *   authored by setting those properties and NOTHING else — no selector overrides, no component
+ *   patches. If a look cannot be reached from these variables, the missing value is a bug in
+ *   this contract: add a variable here rather than telling an author to override a class.
+ *
+ *   VIVID IS THE DEFAULT AND FLAT IS THE CHOICE. The base values below ARE the vivid preset:
+ *   a hero band on the brand gradient under a mode-following scrim, tinted cards, a real
+ *   entrance. `[data-ak-look='flat']` is the deliberate opt-out that zeroes the decoration.
+ *   Every preset colour is a color-mix() expression over the AIMEAT theme tokens — a preset
+ *   never introduces a colour of its own, which is what keeps preset × palette × mode
+ *   verifiable by arithmetic (pnpm check:atelier, arriving with the preset set).
+ *
+ *   Each variable falls back to the AIMEAT theme token that means the same thing
+ *   (`--color-base-100`, `--color-primary`, `--radius-box`, `--font-body`, …) and, failing
+ *   that, to a literal that works on a bare page. So the kit inherits a host that loads
+ *   /lib/aimeat-theme.css, and still looks finished on a host that loads nothing.
+ *
+ *   LIGHT IS THE DEFAULT; `:root[data-theme="dark"]` re-declares the literal fallbacks for dark.
+ *   No `rgba(255,255,255,…)` anywhere — light-on-dark washes are `color-mix()` against the
+ *   surface token, so they follow the palette instead of fighting it.
+ *
+ *   MOTION IS FINITE. The entrance tokens drive a one-shot choreography in JS; the only CSS
+ *   animations here (skeleton shimmer, loading pulse) carry a finite iteration count, so an
+ *   idle Atelier surface repaints zero times and the finish gate can measure that.
+ * @structure @import (shell) · the --ak-* token contract (light) · dark re-declaration ·
+ *   look presets ([data-ak-look]) · reduced-motion
+ * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
+ *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
+ * @version-history
+ *   v0.1.0 — 2026-08-27 — Initial slice: the --ak-* token contract (surfaces, colour, shape,
+ *     type, motion, chrome reserve), vivid-as-default values, the flat preset, dark
+ *     re-declaration, and the shell part (TARGET-074 phase 1, slice 1).
+ */
+
+@import url('./aimeat-atelier/shell.css');
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   THE CONTRACT — light. Set these to author a look; do not override component selectors.
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+:root {
+  /* ── Surfaces and ink ─────────────────────────────────────────────────────────────────── */
+  --ak-bg:            var(--color-base-100, #f3f5f8);   /* the page                          */
+  --ak-surface:       var(--color-base-200, #ffffff);   /* cards, bars, panels               */
+  --ak-surface-2:     var(--color-base-100, #eceff4);   /* rows nested inside a surface      */
+  /* Vivid: a card is tinted toward the brand, never flat. Flat zeroes this. */
+  --ak-surface-image: linear-gradient(180deg,
+                        color-mix(in oklab, var(--ak-accent) 5%, var(--ak-surface)),
+                        var(--ak-surface));
+  --ak-ink:           var(--color-base-content, #151a21);
+  --ak-ink-dim:       color-mix(in oklab, var(--ak-ink) 62%, var(--ak-surface));
+  --ak-line:          var(--color-base-300, #d7dce4);   /* hairlines, card edges             */
+  --ak-line-w:        var(--border-w, 1px);
+
+  /* ── Meaningful colour ────────────────────────────────────────────────────────────────── */
+  --ak-accent:        var(--color-primary, #e8564a);
+  --ak-accent-2:      var(--color-secondary, var(--ak-accent));
+  --ak-accent-ink:    var(--color-primary-content, #ffffff);
+  /* The accent as TEXT: pulled toward the ink until small text passes contrast. */
+  --ak-accent-text:   color-mix(in oklab, var(--ak-accent) 74%, var(--ak-ink));
+  --ak-ok:            var(--color-success, #0f7a45);
+  --ak-warn:          var(--color-warning, #8a5300);
+  --ak-err:           var(--color-error, #b3261e);
+  --ak-focus:         var(--ak-accent);
+  /* The one brand gradient — hero band, primary CTA fill. One region per screen. */
+  --ak-grad:          linear-gradient(135deg,
+                        color-mix(in oklab, var(--ak-accent) 85%, var(--ak-ink)),
+                        color-mix(in oklab, var(--ak-accent-2) 70%, var(--ak-accent)));
+  /* The scrim hero TEXT sits on — mode-following, composited over image or gradient. */
+  --ak-scrim:         color-mix(in oklab, var(--ak-bg) 78%, transparent);
+  /* The zero-image hero ground: a gradient mesh from brand tokens. An image replaces it. */
+  --ak-hero-image:    radial-gradient(at 20% 18%, color-mix(in oklab, var(--ak-accent) 16%, var(--ak-bg)), transparent 55%),
+                      radial-gradient(at 82% 8%,  color-mix(in oklab, var(--ak-accent-2) 13%, var(--ak-bg)), transparent 50%),
+                      radial-gradient(at 62% 92%, color-mix(in oklab, var(--ak-accent) 10%, var(--ak-bg)), transparent 55%);
+
+  /* ── Shape and depth ──────────────────────────────────────────────────────────────────── */
+  --ak-radius:        var(--radius-box, 14px);
+  --ak-radius-sm:     var(--radius-field, 9px);
+  --ak-radius-pill:   999px;
+  --ak-elev-1:        var(--elev-card, 0 1px 2px rgba(12, 14, 18, 0.06), 0 6px 18px rgba(12, 14, 18, 0.07));
+  --ak-elev-2:        var(--elev-raise, 0 10px 30px rgba(12, 14, 18, 0.12));
+
+  /* ── Type ─────────────────────────────────────────────────────────────────────────────── */
+  --ak-font:          var(--font-body, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif);
+  --ak-font-display:  var(--font-display, var(--ak-font));
+  --ak-font-mono:     var(--font-mono, ui-monospace, 'JetBrains Mono', 'SFMono-Regular', Menlo, monospace);
+  --ak-text-hero:     var(--text-hero, clamp(1.9rem, 6vw, 2.9rem));
+  --ak-text-title:    var(--text-title, clamp(1.1rem, 2.6vw, 1.4rem));
+  --ak-text-body:     var(--text-body, 0.95rem);
+  --ak-text-fine:     var(--text-fine, 0.8125rem);     /* 13px floor                         */
+  --ak-weight-display: 750;
+
+  /* ── Density, space, motion ───────────────────────────────────────────────────────────── */
+  --ak-gap:           var(--gap-card, 14px);
+  --ak-pad:           16px;
+  --ak-touch:         44px;                             /* minimum interactive height        */
+  --ak-motion:        var(--motion-base, 200ms);
+  --ak-ease:          var(--ease-out, cubic-bezier(0.2, 0.7, 0.3, 1));
+  /* Vivid entrance: components rise in, staggered. Flat zeroes both and nothing animates. */
+  --ak-enter-distance: 14px;
+  --ak-enter-stagger:  40ms;
+
+  /* ── The node's injected bottom controls — never draw under them ──────────────────────── */
+  --ak-chrome-bottom: var(--aimeat-chrome-bottom, 56px);
+
+  /* ── Component sizing (one sizing everywhere — instances never override these) ────────── */
+  --ak-main-max:      52rem;                            /* measure cap for the main column   */
+  --ak-hero-min:      24dvh;                            /* the focal band's minimum height   */
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   THE CONTRACT — dark. Same names, dark literals. A look re-declares only what it changes.
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+:root[data-theme='dark'] {
+  --ak-bg:          var(--color-base-100, #0f1218);
+  --ak-surface:     var(--color-base-200, #171b23);
+  --ak-surface-2:   var(--color-base-100, #10141a);
+  --ak-ink:         var(--color-base-content, #e7ebf2);
+  --ak-line:        var(--color-base-300, #2b323d);
+  --ak-accent:      var(--color-primary, #ff6f62);
+  --ak-accent-ink:  var(--color-primary-content, #1a0d0b);
+  --ak-ok:          var(--color-success, #43c98a);
+  --ak-warn:        var(--color-warning, #e0a33a);
+  --ak-err:         var(--color-error, #f2695c);
+  /* Dark raises the scrim so one image survives both modes with readable text. */
+  --ak-scrim:       color-mix(in oklab, var(--ak-bg) 62%, transparent);
+  --ak-elev-1:      var(--elev-card, 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 18px rgba(0, 0, 0, 0.35));
+  --ak-elev-2:      var(--elev-raise, 0 10px 30px rgba(0, 0, 0, 0.5));
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   LOOK PRESETS. The base contract IS vivid; a preset block only re-declares tokens.
+   New presets arrive only through the growth rule: full check:atelier matrix green plus a
+   reviewed diagonal (TARGET-074).
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+
+/* @preset-block flat — the deliberate opt-out: no decoration, no entrance, and that is a
+   choice the spec records rather than an accident. */
+[data-ak-look='flat'] {
+  --ak-surface-image: none;
+  --ak-hero-image:    none;
+  --ak-grad:          var(--ak-accent);
+  --ak-enter-distance: 0px;
+  --ak-enter-stagger:  0ms;
+  --ak-elev-2:        var(--ak-elev-1);
+  --ak-weight-display: 650;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   Reduced motion: every animated thing collapses to its end state.
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  .ak-root, .ak-root * {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}

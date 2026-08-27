@@ -10,6 +10,9 @@
  * @structure SDK_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
+ *   v1.3.0 — 2026-08-27 — Add aimeat-atelier (the Atelier track's UI kit, TARGET-074). Requires
+ *     nothing; deliberately carries NO promptGroup/promptLine and NO interview triggers, because
+ *     Atelier is its own build track and the Classic prompt must not teach it.
  *   v1.2.0 — 2026-07-28 — Add aimeat-game (the general-purpose gamification UI kit). It requires
  *     nothing: it makes no network calls and its look is a CSS-variable contract, not a dependency.
  *   v1.1.0 — 2026-07-28 — Add aimeat-exchange (the EXCHANGE marketplace browser client). It
@@ -430,6 +433,32 @@ export const SDK_PACKS: LibraryPack[] = [
     modelTier: 'needs-doc',
     promptGroup: 'media',
     promptLine: '- aimeat-game.js — gamification UI for ANY app (`AIMEAT.game`): full-screen `menu` with locked/done entries, `screen` (header + one scrolling body + fixed action bar), `modal`/`toast`/`confirm`, `rail`, `meter`, `scoreBreakdown` (every row a button, so a score becomes a to-do list), `badge`, `comingSoon` (a planned stage that reads as intentional, never broken), `counter`, `streak`, `leaderboard`, `statGrid`, `dataTable`, `card`. It renders only — no fetch, no state. Add `<link rel="stylesheet" href="/lib/aimeat-game.css">` (or call `AIMEAT.game.injectStyle()`); the whole look is the `--ag-*` variables in that file, so a skin needs no selector override and no JS change. Requires nothing.',
+  },
+  {
+    id: 'aimeat-atelier',
+    kind: 'sdk',
+    category: 'ui',
+    title: 'Atelier UI kit',
+    description: 'The Atelier track\'s UI kit: an app shell that carries the whole ceremony (login-pill mount + boot, language re-render, the bottom chrome reserve, designed loading/empty/error/sign-in states, the single scrolling main region), a hero band with a mode-surviving scrim over an image or a designed gradient-mesh fallback, a KPI row whose figures count up on change, tabs, bottom navigation, and the empty/skeleton states. Makes NO network calls — the host supplies the data. The whole look is the --ak-* contract in /lib/aimeat-atelier.css: vivid is the default and [data-ak-look="flat"] is the deliberate opt-out.',
+    url: '/v1/libs/aimeat-atelier.js',
+    include: [
+      '<link rel="stylesheet" href="{{BASE_URL}}/lib/aimeat-atelier.css">',
+      '<script src="{{BASE_URL}}/v1/libs/aimeat-atelier.js"></script>',
+    ],
+    requires: [],
+    license: 'MIT',
+    apiSurface: 'AIMEAT.atelier',
+    aiDoc: 'The Atelier track\'s UI kit. It RENDERS ONLY: no fetch, no state, no credentials; every component takes a spec and returns a handle { el, set(patch), destroy() }. SHELL: app({ title, look, footer, navItems, requireLogin, onReady(session), onLogout }) builds the whole frame — top bar with the login pill mounted (when aimeat-auth is on the page), the ONLY scrolling main region (handle.main is yours to fill) with the node\'s bottom chrome strip reserved, designed loading/empty/error/sign-in states via handle.status(kind, { title, hint, onRetry }), and the boot that polls for the silent app-origin login so onReady always fires with a session. requireLogin: false boots immediately with a null session. section({ title, hint, body, flush }) is the titled card AND the escape hatch — custom markup goes in its body, inside the frame. tabs({ items, value, onChange }) and bottomNav({ items }) report picks; the host swaps views. FOCAL: hero({ target, title, sub, image, actions }) is the ONE focal band a screen gets — with no image the stylesheet paints a designed gradient mesh (never a grey box), with an image the text sits on a mode-following scrim so one picture survives light and dark; a data: URI is refused, upload to storage and pass the URL. statRow({ target, tiles:[{ id, label, value, format, hint }] }) — on set(), a changed figure counts up. STATES: emptyState({ target, tone:"quiet"|"error", title, hint, action }) and skeleton({ target, rows, lines }) — both designed, both finite (the shimmer stops on its own). MOTION IS THE KIT\'S: entrances, count-ups and state feedback come from the components, tuned by the preset\'s --ak-enter-* and --ak-motion tokens, finite by construction, collapsed under prefers-reduced-motion — write no animation code. I18N: the kit ships EN + FI + ES for its own words and follows the PLATFORM language (never build a language switch — the login pill has one); merge app strings with AIMEAT.atelier.i18n.use({ en:{…}, fi:{…} }) and read them with i18n.t(key, vars). HELPERS: el/append/$/$$/clear/uid, busy/whileBusy/guardButtons (a button answers instantly and never double-fires), enter(el) and countUp(node, from, to). THEMING: never write a colour in JavaScript and never override an .ak-* selector. The look is chosen with one value — app({ look: "vivid" }) (default) or "flat" — and authored with the --ak-* variables in /lib/aimeat-atelier.css (surfaces --ak-bg/--ak-surface/--ak-surface-2/--ak-surface-image, ink --ak-ink/--ak-ink-dim, --ak-line/--ak-line-w, colour --ak-accent/--ak-accent-2/--ak-accent-ink/--ak-accent-text/--ak-ok/--ak-warn/--ak-err, the one brand gradient --ak-grad, hero --ak-hero-image/--ak-scrim/--ak-hero-min, shape --ak-radius/--ak-radius-sm/--ak-radius-pill/--ak-elev-1/--ak-elev-2, type --ak-font/--ak-font-display/--ak-font-mono/--ak-text-hero|title|body|fine/--ak-weight-display, density and motion --ak-gap/--ak-pad/--ak-touch/--ak-motion/--ak-ease/--ak-enter-distance/--ak-enter-stagger, measure --ak-main-max, chrome --ak-chrome-bottom). Each falls back to the matching AIMEAT theme token and then to a literal, so it inherits /lib/aimeat-theme.css when present and still looks finished without it; light is the default and :root[data-theme="dark"] carries dark. Pair the head with <script src="/lib/aimeat-boot.js"></script> (synchronous, in <head>) so the user\'s mode and palette are restored before first paint.',
+    changelog: [],
+    demoTemplateId: undefined,
+    tierHint: 'T1',
+    // Deliberately absent from the Classic build prompt and its interview: promptGroup/promptLine
+    // are unset and interviewTriggers is empty, because Atelier is its own build track with its
+    // own prompt and skill (TARGET-074) — the two tracks' guides must not mix.
+    interviewTriggers: [],
+    sizeEstimate: '~14KB',
+    status: 'preview',
+    modelTier: 'needs-doc',
   },
   {
     id: 'aimeat-audio',
