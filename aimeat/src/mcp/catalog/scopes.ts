@@ -320,6 +320,10 @@ export const TOOL_SCOPES: Record<string, string> = {
     // would be a permission that has to be enforced on every door or does not exist (invariant 15).
     aimeat_datamap_get: 'memory:read',
     aimeat_datamap_set: 'memory:write',
+    // The mosaic layout is a memory record in the owner's namespace (TARGET-074): the existing
+    // memory words gate it, no new scope word.
+    aimeat_app_ui_get: 'memory:read',
+    aimeat_app_ui_set: 'memory:write',
     aimeat_memory_hands: 'memory:read',
 
     // NOTE on `provenance:write` (TARGET-058): it deliberately has NO entry in this map, because it

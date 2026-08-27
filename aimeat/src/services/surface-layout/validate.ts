@@ -86,8 +86,12 @@ function fail(code: string, message: string): never {
     throw new SiteError(code, message, 422);
 }
 
-/** Whether a value satisfies one declared prop. Returns the reason it does not, or null. */
-function propProblem(def: BlockPropDef, value: BlockPropValue): string | null {
+/**
+ * Whether a value satisfies one declared prop. Returns the reason it does not, or null.
+ * Exported (TARGET-074): the app-ui registry validates its blocks against the same BlockPropDef
+ * union, and this 30-line judge is the piece both registries must never let drift apart.
+ */
+export function propProblem(def: BlockPropDef, value: BlockPropValue): string | null {
     switch (def.type) {
         case 'string':
             if (typeof value !== 'string') return 'expects text';

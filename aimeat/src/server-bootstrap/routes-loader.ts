@@ -129,6 +129,7 @@ import { chatInstancesRouter } from '../routes/chat-instances.js';
 import { totpRouter } from '../routes/totp.js';
 import { libsRouter } from '../routes/libs.js';
 import { appTemplatesRouter } from '../routes/app-templates.js';
+import { appUiRouter } from '../routes/app-ui.js';
 import { appdevPitfallsRouter } from '../routes/appdev-pitfalls.js';
 import { appdevOverviewRouter } from '../routes/appdev-overview.js';
 import { libraryPacksRouter } from '../routes/library-packs.js';
@@ -673,6 +674,7 @@ export async function mountRoutes(
   app.use(chatInstancesRouter(config, storage));
   app.use(libsRouter(config, storage));
   app.use(appTemplatesRouter(config, storage));
+  app.use(appUiRouter(config, storage));
   app.use(appdevPitfallsRouter(config, storage));
   app.use(appdevOverviewRouter(config, storage));
   app.use(libraryPacksRouter(config, storage));

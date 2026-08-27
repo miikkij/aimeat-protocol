@@ -20312,6 +20312,136 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /v1/apps/ui/catalogue:
+    get:
+      operationId: getAppUiCatalogue
+      summary: The Atelier mosaic vocabulary
+      description: >-
+        Every mosaic component this node knows with the settings each takes, the navigation modes
+        and the look presets (TARGET-074). An AI asked to change an app's layout reads this first,
+        so the first write is never a refusal. Public — build guidance, like the prompts.
+      tags: [Apps]
+      responses:
+        '200': { description: "The catalogue: components (id, summary, props), nav_modes, looks" }
+
+  /v1/apps/ui/validate:
+    post:
+      operationId: validateAppUiLayout
+      summary: Dry-run a mosaic layout
+      description: >-
+        Runs the same validator every layout write runs, without storing anything. Answers 200 with
+        { ok: true } or { ok: false, code, message } — a refusal is a RESULT here, worded so a
+        builder loop can act on it (unknown names come back with the nearest real one suggested).
+        Requires an authenticated member (memory:read).
+      tags: [Apps]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                layout: { type: object, description: "The whole layout: { v: 1, look?, nav?, blocks: [...] }" }
+      responses:
+        '200': { description: "{ ok: true, blocks } or { ok: false, code, message }" }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/apps/{owner}/{filename}/ui:
+    get:
+      operationId: getAppUiLayout
+      summary: One app's stored mosaic layout + the catalogue
+      description: >-
+        The stored layout (or null when the app has never stored one — its own code then decides),
+        its version, and the full catalogue in the same answer. Public: an app page reads its own
+        layout without a session, and an app's arrangement is as public as the app.
+      tags: [Apps]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: "{ layout, version, source: stored|none, catalogue }" }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      operationId: putAppUiLayout
+      summary: Replace one app's mosaic layout (validated, versioned)
+      description: >-
+        Whole-value replace — never a merge. Validated before a byte is written (an unknown
+        component or setting is refused 422 with the nearest real name suggested; a hero image
+        data: URI is refused; at most one hero). Only the app's owner and the agents acting for
+        that owner (memory:write); the previous value is archived, so undo is one restore call.
+      tags: [Apps]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                layout: { type: object }
+                ai_provenance:
+                  allOf:
+                    - $ref: '#/components/schemas/AiProvenanceDeclaration'
+                  description: >-
+                    How this layout was made — its titles and wording are text a person reads, so
+                    the write is stamped: declared when the block is present, node-stamped for a
+                    silent agent. A malformed block is a 422, never a silently dropped field.
+                ai_provenance_id: { type: string }
+      responses:
+        '200': { description: "{ version, replaced_version }" }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { description: The worded refusal naming the block, the field and the nearest real name }
+
+  /v1/apps/{owner}/{filename}/ui/versions:
+    get:
+      operationId: listAppUiLayoutVersions
+      summary: The layout's history
+      description: The archived versions restore picks from, newest first. Owner only (memory:read).
+      tags: [Apps]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 200 } }
+      responses:
+        '200': { description: "{ versions: [{ version, recorded_at }] }" }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/apps/{owner}/{filename}/ui/restore:
+    post:
+      operationId: restoreAppUiLayout
+      summary: Bring one archived layout version back
+      description: Re-validated on the way back, because the registry may have moved on. Owner only (memory:write).
+      tags: [Apps]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [version]
+              properties:
+                version: { type: integer }
+                ai_provenance:
+                  allOf:
+                    - $ref: '#/components/schemas/AiProvenanceDeclaration'
+                  description: Optional — who performed the restore and how, stamped on the restored value.
+                ai_provenance_id: { type: string }
+      responses:
+        '200': { description: "{ version, replaced_version }" }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: No such stored version }
+        '422': { description: The archived layout no longer validates against the registry }
+
   /v1/apps/{owner}/{filename}/members:
     get:
       operationId: appMembersList

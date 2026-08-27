@@ -119,6 +119,10 @@ export const CONNECTOR_PROVENANCE_CARRIERS: Record<string, ProvenanceCarrier> = 
   // echo's `recorded: true`, which is its own slice rather than a line change here.
   aimeat_app_draft_publish: { kind: 'not-carried', route: 'POST /v1/apps/:owner/:filename/publish-draft' },
   aimeat_app_publish: { kind: 'not-carried', route: 'POST /v1/packages' },
+  // Same shape as aimeat_surface_layout_set below: the node route ACCEPTS the declaration (the
+  // app-ui service mints it against the layout's own bytes) and this side does send the block; what
+  // is not proved yet is the `recorded: true` echo, and promoting means proving that.
+  aimeat_app_ui_set: { kind: 'not-carried', route: 'PUT /v1/apps/:owner/:filename/ui' },
   aimeat_board_post: { kind: 'not-carried', route: 'POST /v1/boards/:id/posts' },
   aimeat_board_reply: { kind: 'not-carried', route: 'POST /v1/boards/:id/posts/:postId/replies' },
   aimeat_dm_ask: { kind: 'not-carried', route: 'POST /v1/messages' },

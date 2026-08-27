@@ -372,6 +372,8 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_compliance_report: { title: 'Compliance: Node Report', readOnlyHint: true },
     aimeat_datamap_get: { title: 'Data map: read', readOnlyHint: true },
     aimeat_datamap_set: { title: 'Data map: state it', destructiveHint: true, idempotentHint: true },
+    aimeat_app_ui_get: { title: 'App layout: read + catalogue', readOnlyHint: true },
+    aimeat_app_ui_set: { title: 'App layout: replace (versioned)', destructiveHint: true, idempotentHint: true },
     aimeat_memory_hands: { title: 'Memory: who has written here', readOnlyHint: true },
     aimeat_compliance_register_read: { title: 'Compliance: Read Register', readOnlyHint: true },
     // destructiveHint: it REPLACES the document rather than merging into it, so a partial write
