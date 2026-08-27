@@ -10,6 +10,10 @@
  *   v1.0.0 — 2026-08-28 — A step that only turns text into text needed an agent, because there was
  *     no other kind of step. That cost a round trip through another repository and a fleet restart
  *     for every change to a sentence of prompt.
+ *   v1.1.0 — 2026-08-28 — input_keys. The first version shipped a prompt telling the model to READ
+ *     three memory records, which it cannot do: it has no tools, only the string we send. It
+ *     invented a whole product rather than reading the job, and every field was plausible. What an
+ *     agent had for free, this step has to be handed.
  */
 import type { StepDeps, OnPushTerminal } from './engine-steps.js';
 import type { WorkflowRun, WorkflowStep } from '../../models/workflow-schemas.js';
@@ -52,6 +56,22 @@ export function dispatchAiStep(
       prompt = template(fromRecord, run.vars);
     }
     if (!prompt) throw new Error('an ai step needs prompt or prompt_key');
+
+    // An agent could go and read what it needed. This model cannot: the prompt string is everything
+    // it will ever see. So the records the step names are read HERE and appended, labelled by key.
+    // A missing record is said out loud in the prompt rather than left as a silence the model fills
+    // in with an invention, which is exactly what it did when the reading was only asked for.
+    if (action.input_keys?.length) {
+      const parts: string[] = [];
+      for (const raw of action.input_keys) {
+        const key = template(raw, run.vars);
+        const rec = await getOwnerScopeMemory(deps.storage, deps.config.nodeId, ownerGhii.split('@')[0], key);
+        parts.push(rec
+          ? `### ${key}\n${typeof rec.value === 'string' ? rec.value : JSON.stringify(rec.value, null, 2)}`
+          : `### ${key}\n(no such record — do not invent its contents)`);
+      }
+      prompt += `\n\n---\nINPUT DATA. This is the whole of what you have been given; anything not\nstated here is unknown, and unknown is reported, never filled in.\n\n${parts.join('\n\n')}\n`;
+    }
 
     const r = await completeForOwner(deps.storage, deps.config, ownerGhii, {
       prompt,
