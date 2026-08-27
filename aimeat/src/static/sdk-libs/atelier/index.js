@@ -26,6 +26,10 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.2.0 — 2026-08-27 — The look system arrives: seven presets (vivid · calm-card · editorial ·
+ *     sticker · neon-dense · poster · flat) in the stylesheet, verified by pnpm check:atelier —
+ *     the full 70-combination preset × palette × mode matrix, run arithmetically. No JS surface
+ *     change; the version moves with the stylesheet it is pinned to.
  *   v0.1.0 — 2026-08-27 — Initial slice: app shell, section, tabs, bottomNav, hero, statRow,
  *     emptyState, skeleton, dom + i18n layers (TARGET-074 phase 1, slice 1).
  */
@@ -42,7 +46,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.1.0',
+  version: '0.2.0',
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,
