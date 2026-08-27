@@ -42,7 +42,7 @@ import { el, clear, resolve, enter, reducedMotion } from './dom.js';
 import { t } from './i18n.js';
 import { APEX_URL } from '../_core/config.js';
 import { section, tabs, bottomNav } from './shell.js';
-import { hero, statRow } from './hero.js';
+import { hero, statRow, figure } from './hero.js';
 import { emptyState, skeleton } from './state.js';
 import { list } from './list.js';
 import { cardGrid, mediaCard } from './grid.js';
@@ -106,6 +106,7 @@ function labelOf(block) {
 function patchFor(kind, data) {
   if (kind === 'statRow') return { tiles: Array.isArray(data) ? data : [] };
   if (kind === 'table') return { rows: Array.isArray(data) ? data : (data && data.rows) || [] };
+  if (kind === 'figure') return data && typeof data === 'object' ? data : { value: 0 };
   return { items: Array.isArray(data) ? data : [] };
 }
 
@@ -182,6 +183,11 @@ export function mosaic(spec) {
       case 'statRow':
         return bound('statRow', function (data) {
           return statRow({ target: into, tiles: patchFor('statRow', data).tiles });
+        });
+      case 'figure':
+        return bound('figure', function (data) {
+          const d = patchFor('figure', data);
+          return figure({ target: into, value: d.value, label: d.label || p.title || '', sub: d.sub, delta: d.delta });
         });
       case 'list':
         return bound('list', function (data) {

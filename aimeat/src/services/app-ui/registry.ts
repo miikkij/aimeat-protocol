@@ -99,6 +99,11 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
     props: { source: source(), title: text('The block\'s name in tabs, decks and canvas tiles.', 80) },
   },
   {
+    id: 'figure',
+    summary: 'The data IS the hero: ONE giant display numeral with its label and a context line, counting up on change. The source resolves to { value, label, sub?, delta? }.',
+    props: { source: source(), title: text('The block\'s name in tabs, decks and canvas tiles.', 80) },
+  },
+  {
     id: 'list',
     summary: 'Keyed rows with live-change motion; empty renders the designed empty state.',
     props: {

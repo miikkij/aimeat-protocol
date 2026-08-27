@@ -109,6 +109,11 @@ export const ATELIER_COMPONENTS: ReadonlyArray<{ id: string; summary: string; ex
     example: "AIMEAT.atelier.tabs({ target: a.main, items: [{ id: 'open', label: 'Open' }, { id: 'done', label: 'Done' }], onChange: show });",
   },
   {
+    id: 'figure',
+    summary: 'The data IS the hero: one giant numeral with its label and context line, counting up on change — use it when a single number is what the person came to see.',
+    example: "AIMEAT.atelier.figure({ target: a.main, value: 48, label: 'Combined storage', sub: 'Monday looks like the wettest day.', delta: '-19% vs last year' });",
+  },
+  {
     id: 'section',
     summary: 'The titled card AND the escape hatch: markup the catalogue cannot express goes inside a section body, so custom work keeps the surface, the measure and the entrance. This is the ONLY place raw HTML belongs.',
     example: "var s = AIMEAT.atelier.section({ target: a.main, title: 'Custom' }); s.body.appendChild(myOwnMarkup);",

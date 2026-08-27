@@ -28,6 +28,9 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.9.0 — 2026-08-27 — figure(): the data IS the hero — one giant display numeral with its
+ *     mono label and context line, counting up on change (the Cape Town move from the research
+ *     base). Reaches the mosaic vocabulary as the `figure` component.
  *   v0.8.0 — 2026-08-27 — Kit release marker (the JS↔CSS pin): the look factory — presets are
  *     generated from the one look registry, and five new looks (broadsheet, gallery, brutalist,
  *     terminal, aurora) arrive as data entries. Stylesheet-only.
@@ -73,7 +76,7 @@ import { attach } from '../_core/namespace.js';
 import { el, append, $, $$, clear, uid, busy, guardButtons, whileBusy, injectStyle, reducedMotion, enter, countUp } from './dom.js';
 import { i18n } from './i18n.js';
 import { app, section, tabs, bottomNav } from './shell.js';
-import { hero, statRow } from './hero.js';
+import { hero, statRow, figure } from './hero.js';
 import { emptyState, skeleton } from './state.js';
 import { list, listDetail } from './list.js';
 import { cardGrid, mediaCard } from './grid.js';
@@ -88,7 +91,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.8.0',
+  version: '0.9.0',
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,
@@ -97,7 +100,7 @@ const atelier = {
   mosaic, appRef,
 
   // ── Focal content ──
-  hero, statRow,
+  hero, statRow, figure,
 
   // ── Content ──
   list, listDetail, cardGrid, mediaCard, timeline,
