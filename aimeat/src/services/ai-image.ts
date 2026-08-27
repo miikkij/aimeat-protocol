@@ -20,6 +20,10 @@
  *   import { generateForOwner } from '../services/ai-image.js';
  *   const out = await generateForOwner(storage, config, gaii, { prompt: 'a red bicycle' });
  * @version-history
+ *   v1.1.0 — 2026-08-28 — imageFetchUrl + fetchUrl on the result: the URL that loads for the
+ *     visibility's audience, built once. Both doors used to hand back the owner-authenticated
+ *     /v1/storage/ form for public images, and the first imagery-pipeline demo shipped it into an
+ *     app where every visitor got 401.
  *   v1.0.0 — 2026-08-16 — Initial. The node had no image generation at all: no setting, no route, no
  *     tool, and no 'image' in the modality union, so scripts/gen_image.py was the only way to make a
  *     picture here and it is a developer's script rather than a capability of the node.
@@ -63,6 +67,11 @@ export interface GenerateForOwnerOptions {
 
 export interface GenerateForOwnerResult {
   storageKey: string;
+  /** The node-relative URL that actually loads for the audience the visibility implies: the
+   * anonymous /v1/pub/ form when public, the owner-authenticated /v1/storage/ form when private.
+   * Built here ONCE — the first imagery-pipeline demo shipped a "publicly readable" /v1/storage/
+   * URL that answered 401 to everyone but the owner, because each door built its own. */
+  fetchUrl: string;
   mime: string;
   sizeBytes: number;
   model: string;
@@ -80,6 +89,20 @@ const emptyUsage = (): UsageRecord => ({
 function extensionFor(mime: string): string {
   const sub = mime.split('/')[1] ?? 'png';
   return sub.replace(/[^a-z0-9]/gi, '') || 'png';
+}
+
+/**
+ * The node-relative URL a stored image actually loads from, for the audience its visibility
+ * implies. Public files are served anonymously ONLY under /v1/pub/{owner}/{key}; the
+ * /v1/storage/{key} form is owner-authenticated and answers 401 to everyone else — which is how
+ * the first imagery-pipeline demo shipped a "publicly readable" URL no visitor could open.
+ * @param {('public'|'private')} visibility
+ */
+export function imageFetchUrl(visibility: 'public' | 'private', ownerGaii: string, key: string): string {
+  const encodedKey = key.split('/').map(encodeURIComponent).join('/');
+  return visibility === 'public'
+    ? `/v1/pub/${encodeURIComponent(ownerGaii)}/${encodedKey}`
+    : `/v1/storage/${encodedKey}`;
 }
 
 /**
@@ -162,6 +185,7 @@ export async function generateForOwner(
   const spent = updated.total_cost_usd;
   return {
     storageKey: key,
+    fetchUrl: imageFetchUrl(visibility, gaii, key),
     mime: result.mime,
     sizeBytes: result.data.length,
     model: result.model,

@@ -21,6 +21,9 @@
  *   import { aiRouter } from './routes/ai.js';
  *   app.use(aiRouter(config, storage));
  * @version-history
+ *   v1.x — 2026-08-28 — /v1/ai/image answers with the service's fetchUrl: the anonymous /v1/pub/
+ *     form for a public image, the owner-authenticated /v1/storage/ form for a private one. The
+ *     hand-built public URL answered 401 to every visitor (first imagery-pipeline demo).
  *   v1.x — 2026-08-16 — POST /v1/ai/image. The bytes land in the caller's storage and the answer is
  *     a key and a URL, never base64: a picture returned inline would travel through a tool result
  *     and an agent's context for nothing. Gated with requireScope('ai:use') as middleware as well
@@ -285,7 +288,10 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
           size: r.sizeBytes,
           model: r.model,
           visibility: r.visibility,
-          url: `/v1/storage/${r.storageKey.split('/').map(encodeURIComponent).join('/')}`,
+          // The URL that loads for the audience the visibility implies — the service builds it
+          // once. A public image handed back as /v1/storage/ answered 401 to everyone but the
+          // owner, discovered by the first imagery-pipeline demo.
+          url: r.fetchUrl,
           usage: { cost_usd: r.usage.costUsd, cost_exact: r.usage.costExact },
           budget: {
             daily_budget_usd: r.budget.dailyBudgetUsd,
@@ -293,7 +299,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
             remaining_usd: r.budget.remainingUsd,
           },
         }, [
-          { description: 'Download the image', method: 'GET', url: `/v1/storage/${r.storageKey}` },
+          { description: 'Download the image', method: 'GET', url: r.fetchUrl },
         ]));
       } catch (e) {
         if (e instanceof AiCompletionError) {
