@@ -34,6 +34,8 @@
  *   });
  *   // later, when the app's data changed:  m.refresh('errands.');
  * @version-history
+ *   v0.15.0 — 2026-08-28 — The `chart` block: the bound record ({ labels, series }) rides to the
+ *     chart component whole — the first harvest component in the layout vocabulary.
  *   v0.14.0 — 2026-08-28 — The signature COLOUR pair: an `--ak-accent` token of the form
  *     "#light/#dark" lands as a two-rule style element on :root (light default,
  *     `:root[data-theme="dark"]` override) instead of an inline property — inline cannot switch
@@ -67,6 +69,7 @@ import { list } from './list.js';
 import { cardGrid, mediaCard } from './grid.js';
 import { table, searchBar } from './table.js';
 import { timeline } from './timeline.js';
+import { chart } from './chart.js';
 import { aide } from './aide.js';
 import { projectCanvas } from './mosaic-canvas.js';
 
@@ -126,6 +129,7 @@ function patchFor(kind, data) {
   if (kind === 'statRow') return { tiles: Array.isArray(data) ? data : [] };
   if (kind === 'table') return { rows: Array.isArray(data) ? data : (data && data.rows) || [] };
   if (kind === 'figure') return data && typeof data === 'object' ? data : { value: 0 };
+  if (kind === 'chart') return { data: data && typeof data === 'object' && !Array.isArray(data) ? data : null };
   return { items: Array.isArray(data) ? data : [] };
 }
 
@@ -229,6 +233,10 @@ export function mosaic(spec) {
       case 'cardGrid':
         return bound('cardGrid', function (data) {
           return cardGrid({ target: into, items: patchFor('cardGrid', data).items, empty: empty, onPick: pick });
+        });
+      case 'chart':
+        return bound('chart', function (data) {
+          return chart({ target: into, data: patchFor('chart', data).data, title: p.title, empty: empty });
         });
       case 'table':
         return bound('table', function (data) {

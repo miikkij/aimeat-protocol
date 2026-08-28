@@ -12,6 +12,9 @@
  * @structure ak-list · ak-listdetail · ak-grid + ak-card · ak-mediacard · ak-timeline
  * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
  * @version-history
+ *   v0.6.0 — 2026-08-28 — The chart (TARGET-074, the harvest): grouped bars + drawn lines on
+ *     the look's spectrum, mono ticks, a legend in words; entrance collapses under
+ *     reduced-motion.
  *   v0.5.0 — 2026-08-28 — The aide panel (log, bubbles, the confirm row, the inline generated
  *     panel) and the explain list (TARGET-074 phase 6).
  *   v0.4.0 — 2026-08-28 — The featured card's imageless cover stops pretending to be a portrait:
@@ -287,3 +290,35 @@ button.ak-card:hover { box-shadow: var(--ak-elev-2); transform: translateY(-2px)
   border: var(--ak-line-w) solid var(--ak-line);
 }
 .ak-explain__list { margin: 8px 0 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 4px; }
+
+/* ── Chart: grouped bars + drawn lines, colours from the look's spectrum ─────────────────── */
+.ak-chart {
+  margin: 0;
+  padding: var(--ak-pad);
+  border-radius: var(--ak-radius);
+  background: var(--ak-surface);
+  background-image: var(--ak-surface-image);
+  border: var(--ak-line-w) solid var(--ak-line);
+  box-shadow: var(--ak-elev-1);
+}
+.ak-chart__svg { display: block; width: 100%; height: auto; }
+.ak-chart__grid { stroke: var(--ak-line); stroke-width: 1; opacity: 0.55; }
+.ak-chart__zero { stroke: var(--ak-ink-dim); stroke-width: 1.25; }
+.ak-chart__tick { fill: var(--ak-ink-dim); font-family: var(--ak-font-mono); font-size: 11px; }
+.ak-chart__bar { rx: 2; }
+.ak-chart__bar--enter { animation: ak-chart-grow var(--ak-motion) ease-out backwards; }
+@keyframes ak-chart-grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+.ak-chart__line { fill: none; stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; }
+.ak-chart__line--enter { transition: stroke-dashoffset 900ms ease-out; }
+.ak-chart__line--drawn { stroke-dashoffset: 0 !important; }
+.ak-chart__legend {
+  display: flex; flex-wrap: wrap; gap: 6px 14px;
+  margin-top: 8px; font-size: var(--ak-text-fine); color: var(--ak-ink-dim);
+}
+.ak-chart__key { display: inline-flex; align-items: center; gap: 6px; }
+.ak-chart__swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.ak-chart__swatch--line { height: 4px; border-radius: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .ak-chart__bar--enter { animation: none; }
+  .ak-chart__line--enter { transition: none; stroke-dashoffset: 0 !important; }
+}

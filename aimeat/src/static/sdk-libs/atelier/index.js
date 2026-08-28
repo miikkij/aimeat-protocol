@@ -28,6 +28,10 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.19.0 — 2026-08-28 — The chart (TARGET-074, the harvest): grouped bars + drawn lines over
+ *     one label axis, data-driven and library-free, colours from the look's spectrum, entrance
+ *     animated and reduced-motion-safe. In the mosaic as the `chart` block; budjetti's
+ *     costs/income/cash shape is the reason it exists.
  *   v0.18.0 — 2026-08-28 — The carnival look and the inverse band (CSS-side: the hero's own
  *     text-colour pair joins the contract, the subline no longer dims by default, and the
  *     matrix models the band's true grounds). No JS change; the version rides the pin.
@@ -113,6 +117,7 @@ import { cardGrid, mediaCard } from './grid.js';
 import { form } from './form.js';
 import { table, searchBar } from './table.js';
 import { timeline } from './timeline.js';
+import { chart } from './chart.js';
 import { mosaic, appRef } from './mosaic.js';
 
 const atelier = {
@@ -121,7 +126,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.18.0',
+  version: '0.19.0',
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,
@@ -150,7 +155,7 @@ const atelier = {
   },
 
   // ── Content ──
-  list, listDetail, cardGrid, mediaCard, timeline,
+  list, listDetail, cardGrid, mediaCard, timeline, chart,
 
   // ── Data ──
   form, table, searchBar,

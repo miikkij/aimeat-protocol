@@ -2113,6 +2113,148 @@
     };
   }
 
+  // src/static/sdk-libs/atelier/chart.js
+  var W = 720;
+  var H = 300;
+  var PAD = { top: 14, right: 12, bottom: 34, left: 46 };
+  var SERIES_VARS = ["var(--ak-accent)", "var(--ak-spectrum-2)", "var(--ak-spectrum-3)", "var(--ak-accent-2)"];
+  var SVG_NS = "http://www.w3.org/2000/svg";
+  function svg(name, attrs) {
+    const node = document.createElementNS(SVG_NS, name);
+    for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
+    return node;
+  }
+  function tickStep(span) {
+    const raw = span / 4;
+    const pow = Math.pow(10, Math.floor(Math.log10(raw)));
+    for (const m of [1, 2, 5, 10]) {
+      if (raw <= m * pow) return m * pow;
+    }
+    return 10 * pow;
+  }
+  function fmtTick(v) {
+    if (Math.abs(v) >= 1e3) return (v / 1e3).toLocaleString(void 0, { maximumFractionDigits: 1 }) + "k";
+    return v.toLocaleString(void 0, { maximumFractionDigits: 2 });
+  }
+  function chart(spec) {
+    const root = el("figure", { class: "ak-root ak-chart", role: "img" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let emptyCard = null;
+    function render(data) {
+      if (emptyCard) {
+        emptyCard.destroy();
+        emptyCard = null;
+      }
+      clear(root);
+      const labels = data && Array.isArray(data.labels) ? data.labels : [];
+      const series = (data && Array.isArray(data.series) ? data.series : []).filter((s) => s && Array.isArray(s.values) && s.values.length > 0);
+      if (!labels.length || !series.length) {
+        const e = spec.empty || {};
+        emptyCard = emptyState({ target: root, tone: "quiet", title: e.title || t("empty"), hint: e.hint || t("emptyHint") });
+        return;
+      }
+      root.setAttribute("aria-label", (spec.title ? spec.title + " — " : "") + series.map((s) => s.label).join(", "));
+      let min = 0;
+      let max = 0;
+      for (const s of series) for (const v of s.values) {
+        if (v < min) min = v;
+        if (v > max) max = v;
+      }
+      if (max === min) max = min + 1;
+      const step = tickStep(max - min);
+      min = Math.floor(min / step) * step;
+      max = Math.ceil(max / step) * step;
+      const innerW = W - PAD.left - PAD.right;
+      const innerH = H - PAD.top - PAD.bottom;
+      const x = (i) => PAD.left + innerW * i / labels.length;
+      const slotW = innerW / labels.length;
+      const y = (v) => PAD.top + innerH * (1 - (v - min) / (max - min));
+      const node = svg("svg", { viewBox: `0 0 ${W} ${H}`, class: "ak-chart__svg", "aria-hidden": "true" });
+      for (let v = min; v <= max + step / 2; v += step) {
+        const gy = y(v);
+        node.appendChild(svg("line", { x1: PAD.left, x2: W - PAD.right, y1: gy, y2: gy, class: v === 0 ? "ak-chart__zero" : "ak-chart__grid" }));
+        const tick = svg("text", { x: PAD.left - 6, y: gy + 4, class: "ak-chart__tick", "text-anchor": "end" });
+        tick.textContent = fmtTick(v);
+        node.appendChild(tick);
+      }
+      labels.forEach((label, i) => {
+        const tx = svg("text", { x: x(i) + slotW / 2, y: H - PAD.bottom + 18, class: "ak-chart__tick", "text-anchor": "middle" });
+        tx.textContent = String(label);
+        node.appendChild(tx);
+      });
+      const still = reducedMotion();
+      const bars = series.filter((s) => (s.kind || "bar") === "bar");
+      const lines = series.filter((s) => s.kind === "line");
+      const groupPad = slotW * 0.18;
+      const barW = bars.length ? (slotW - groupPad * 2) / bars.length : 0;
+      bars.forEach((s, si) => {
+        const colour = SERIES_VARS[series.indexOf(s) % SERIES_VARS.length];
+        s.values.slice(0, labels.length).forEach((v, i) => {
+          const top = Math.min(y(v), y(0));
+          const height = Math.abs(y(v) - y(0));
+          const rect = svg("rect", {
+            x: x(i) + groupPad + si * barW + 1,
+            y: top,
+            width: Math.max(barW - 2, 1),
+            height: Math.max(height, 0.5),
+            class: "ak-chart__bar",
+            style: `fill:${colour}`
+          });
+          if (!still) {
+            rect.setAttribute("style", `fill:${colour}; transform-origin: center ${y(0)}px; animation-delay: ${i * 40}ms`);
+            rect.classList.add("ak-chart__bar--enter");
+          }
+          node.appendChild(rect);
+        });
+      });
+      lines.forEach((s) => {
+        const colour = SERIES_VARS[series.indexOf(s) % SERIES_VARS.length];
+        const points = s.values.slice(0, labels.length).map((v, i) => `${x(i) + slotW / 2},${y(v)}`).join(" ");
+        const line = svg("polyline", { points, class: "ak-chart__line", style: `stroke:${colour}` });
+        if (!still) line.classList.add("ak-chart__line--enter");
+        node.appendChild(line);
+      });
+      root.appendChild(node);
+      const legend = el(
+        "figcaption",
+        { class: "ak-chart__legend" },
+        series.map((s) => el("span", { class: "ak-chart__key" }, [
+          el("span", { class: "ak-chart__swatch" + (s.kind === "line" ? " ak-chart__swatch--line" : "") }),
+          el("span", { text: s.label })
+        ]))
+      );
+      series.forEach((s, i) => {
+        const sw = legend.children[i] && legend.children[i].firstChild;
+        if (sw) sw.style.background = SERIES_VARS[i % SERIES_VARS.length];
+      });
+      root.appendChild(legend);
+      if (!still) {
+        for (const line of node.querySelectorAll(".ak-chart__line--enter")) {
+          const len = (
+            /** @type {SVGPolylineElement} */
+            line.getTotalLength()
+          );
+          line.setAttribute("stroke-dasharray", String(len));
+          line.setAttribute("stroke-dashoffset", String(len));
+          requestAnimationFrame(() => line.classList.add("ak-chart__line--drawn"));
+        }
+      }
+    }
+    render(spec.data);
+    return {
+      el: root,
+      /** @param {{ data: ChartData|null }} patch */
+      set(patch) {
+        if (!patch) return;
+        render(patch.data);
+      },
+      destroy() {
+        if (emptyCard) emptyCard.destroy();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+
   // src/static/sdk-libs/_core/config.js
   function cfg() {
     return window.__AIMEAT_SDK_CFG__ || { nodeId: "", baseUrl: "" };
@@ -2279,6 +2421,7 @@
     if (kind === "statRow") return { tiles: Array.isArray(data) ? data : [] };
     if (kind === "table") return { rows: Array.isArray(data) ? data : data && data.rows || [] };
     if (kind === "figure") return data && typeof data === "object" ? data : { value: 0 };
+    if (kind === "chart") return { data: data && typeof data === "object" && !Array.isArray(data) ? data : null };
     return { items: Array.isArray(data) ? data : [] };
   }
   function derivedColumns(rows) {
@@ -2351,6 +2494,10 @@
         case "cardGrid":
           return bound("cardGrid", function(data) {
             return cardGrid({ target: into, items: patchFor("cardGrid", data).items, empty, onPick: pick });
+          });
+        case "chart":
+          return bound("chart", function(data) {
+            return chart({ target: into, data: patchFor("chart", data).data, title: p.title, empty });
           });
         case "table":
           return bound("table", function(data) {
@@ -2927,7 +3074,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.18.0",
+    version: "0.19.0",
     // ── Shell and navigation ──
     app,
     section,
@@ -2967,6 +3114,7 @@
     cardGrid,
     mediaCard,
     timeline,
+    chart,
     // ── Data ──
     form,
     table,
