@@ -20,10 +20,11 @@
  *     registry allowlist (shape/typography/density/motion — a colour name is refused with the
  *     reason, not just the list), values bounded and vehicle-proof (no urls, no declaration
  *     characters). TARGET-074 phase 4, signature-look.
- *   v1.1.1 — 2026-08-28 — SECURITY (CodeQL js/loop-bound-injection): nearest() ran the O(m*n)
- *     Levenshtein against the caller-supplied name at full length, so a huge submitted look/nav/block
- *     value was a DoS. The name is capped at 64 chars before the distance loop; a real name is far
- *     shorter and a long one is never a typo away, so no real suggestion changes.
+ *   v1.1.1 — 2026-08-28 — SECURITY (CodeQL js/loop-bound-injection): distance() ran the O(m*n)
+ *     Levenshtein against a caller-supplied name at full length, so a huge submitted look/nav/block
+ *     value was a DoS. Both grid dimensions are now bounded by a constant (Math.min(.length, 64)) at
+ *     the loop itself, and nearest() slices its input to 64 too; a real name is far shorter and a
+ *     long one is never a typo away, so no real suggestion changes.
  *   v1.1.0 — 2026-08-27 — Per-block `span` (composition grid placement), validated against
  *     BLOCK_SPANS with the same did-you-mean refusal every other name gets.
  *   v1.0.0 — 2026-08-27 — Initial (TARGET-074 phase 2).
@@ -72,8 +73,11 @@ const TOKEN_VALUE_FORBIDDEN = /url\s*\(|[;{}<>@\\]|\/\*/i;
 
 /** Plain Levenshtein — the vocabulary is dozens of short names, so brute force is fine. */
 function distance(a: string, b: string): number {
-  const m = a.length;
-  const n = b.length;
+  // Bound both dimensions of the O(m*n) grid by a constant (js/loop-bound-injection). Callers pass
+  // already-capped names (nearest slices to 64), and truncating a pathological input past 64 chars
+  // changes no real suggestion — a name that far off is not a typo.
+  const m = Math.min(a.length, 64);
+  const n = Math.min(b.length, 64);
   const row = Array.from({ length: n + 1 }, (_, i) => i);
   for (let i = 1; i <= m; i++) {
     let prev = row[0]!;

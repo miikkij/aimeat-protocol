@@ -13,6 +13,9 @@
  * @usage
  *   const ch = new AgentChannel(entry); ch.handleTask(payload, 'deliver'); await ch.nextTask(25_000);
  * @version-history
+ *   v1.0.1 — 2026-08-28 — SECURITY (CodeQL js/resource-exhaustion): the four long-poll setTimeouts
+ *     took `waitMs` straight from the caller. The /local routes already clamp it to [0, 120s], but
+ *     the bound now also sits at each timer (Math.min(waitMs, MAX_WAIT_MS)) so it holds for any caller.
  *   v1.0.0 — 2026-08-28 — Pure extraction from local-server.ts (max-file-lines). No behaviour change.
  */
 import type { ConnectTunnelClient } from '../tunnel-client.js';
@@ -23,6 +26,14 @@ import { launchTaskRunner, isRunner } from '../task-runner.js';
 
 /** How an agent's API calls reach the node right now. Mirrors ServeDiscoveryAgent['transport']. */
 export type ChannelTransport = 'tunnel' | 'direct' | 'auth_failed';
+
+/**
+ * Upper bound on a long-poll timer, matching the [0, 120s] clamp every /local route already applies
+ * to `?wait`. Re-applied at each setTimeout so the timer duration is bounded HERE, not only at the
+ * route parser — the caller could be new, and a timer whose length is a raw request value is a
+ * resource-exhaustion sink (js/resource-exhaustion). 120s is the max legitimate long-poll.
+ */
+const MAX_WAIT_MS = 120_000;
 
 export interface QueuedTask {
   task: Record<string, unknown>;
@@ -111,7 +122,7 @@ export class AgentChannel {
         const i = this.recordWaiters.indexOf(waiter);
         if (i >= 0) this.recordWaiters.splice(i, 1);
         resolve(null);
-      }, waitMs);
+      }, Math.min(waitMs, MAX_WAIT_MS));
       this.recordWaiters.push(waiter);
     });
   }
@@ -139,7 +150,7 @@ export class AgentChannel {
         const i = this.dmWaiters.indexOf(waiter);
         if (i >= 0) this.dmWaiters.splice(i, 1);
         resolve(null);
-      }, waitMs);
+      }, Math.min(waitMs, MAX_WAIT_MS));
       this.dmWaiters.push(waiter);
     });
   }
@@ -196,7 +207,7 @@ export class AgentChannel {
         const i = this.waiters.indexOf(waiter);
         if (i >= 0) this.waiters.splice(i, 1);
         resolve(null);
-      }, waitMs);
+      }, Math.min(waitMs, MAX_WAIT_MS));
       this.waiters.push(waiter);
     });
   }
@@ -226,7 +237,7 @@ export class AgentChannel {
         const i = this.wakeWaiters.indexOf(w);
         if (i >= 0) this.wakeWaiters.splice(i, 1);
         resolve(false);
-      }, waitMs);
+      }, Math.min(waitMs, MAX_WAIT_MS));
       this.wakeWaiters.push(w);
     });
   }

@@ -28,6 +28,8 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.15.0 — 2026-08-28 — The boot gate presents the app (shell: centered sign-in with name +
+ *     tagline, main hidden while gated; body overflow clipped so the frame owns all scrolling).
  *   v0.14.0 — 2026-08-28 — copilot → aide, everywhere (function, mosaic block id, classes, i18n
  *     keys), before any app uses it: the old name collides with a large product family. The
  *     developer picked the new name; UI titles are Aide / Apuri / Ayudante.
@@ -107,7 +109,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.14.0',
+  version: '0.15.0',
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,

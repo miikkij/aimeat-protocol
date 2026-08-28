@@ -26,6 +26,10 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.7.0 — 2026-08-28 — "Two details" grows into "What the review always catches": the second
+ *     AEB round's app-level root causes as rules (say a number once, content before the form,
+ *     listDetail always, one top bar, filters apply on change, the tagline, no storage internals
+ *     on screen) — stated once here instead of re-found per app.
  *   v1.6.0 — 2026-08-28 — "AI inside the app": the aide block over declared sources and
  *     actions, explain() from declarations, and the viewer's overlay (TARGET-074 phase 6).
  *   v1.5.0 — 2026-08-28 — The signature section: bounded token overrides, the design pass
@@ -300,12 +304,28 @@ function composeBody(config: AimeatConfig): string {
     + SPEC_TOKEN_SLOT + '` — the digest of this document — so the node can tell the app was '
     + 'built against the spec in force.\n\n';
 
-  body += '## Two details the review always catches\n\n';
+  body += '## What the review always catches\n\n';
   body += '- A form that switches into edit mode says so: retitle it and its primary action '
     + '("Edit entry" / "Save changes"), and the row being edited stays visibly selected. A form '
     + 'still headed "Log an entry" while it edits reads as adding a duplicate.\n'
     + '- Counters and the lists beside them read from the SAME data, computed in one place. A '
-    + 'screen whose numbers disagree with its rows reads as broken even when both are defensible.\n\n';
+    + 'screen whose numbers disagree with its rows reads as broken even when both are defensible.\n'
+    + '- Say a number ONCE. The same three counts as a stat row, as tab labels, as chips and again '
+    + 'in a heading is the most common defect the review finds — pick the one place the number '
+    + 'earns, and delete the echoes.\n'
+    + '- The content people came for comes BEFORE the form that adds to it. In a journal, reading '
+    + 'is the daily act; a full-height form above the entries buries the product under its input.\n'
+    + '- Master-detail is ALWAYS listDetail, never a hand-rolled pick panel: the component carries '
+    + 'the selection mark, the row-to-detail morph and the narrow-screen fold, and a hand-rolled '
+    + 'panel loses all three.\n'
+    + '- The shell\'s bar is the ONLY top bar. Building a second header of your own puts two bars '
+    + 'and the account pill in a fight for the same edge.\n'
+    + '- A filter applies WHEN IT CHANGES. A separate Show/Apply button beside a dropdown is a '
+    + 'second step nobody expects of a filter.\n'
+    + '- Give the shell a `tagline` (one line on what the app IS): the sign-in screen presents the '
+    + 'app with it, so a first visitor learns what they are looking at before they log in.\n'
+    + '- Storage internals never reach the person: "under keys that start with standup." is a '
+    + 'sentence for a developer, not for a screen.\n\n';
 
   body += '## Never\n\n';
   body += '- daisyUI/Tailwind classes outside a `section` body — the kit is the vocabulary.\n'
