@@ -920,6 +920,11 @@ await test('31b. Re-running onboarding/start preserves already-passed steps (no 
         .map((s: any) => s.id);
     assert(passedBefore.includes('identify_platform'),
         'precondition: identify_platform should be passed before the re-start');
+    const previousTestTaskId: string | undefined = before.body.data.hints.test_task_id;
+    const previousTask = previousTestTaskId
+        ? await json(`/v1/agents/${agentName}/tasks/${previousTestTaskId}`, { headers: { Authorization: `Bearer ${ownerToken}` } })
+        : null;
+    const previousWasOpen = previousTask?.status === 200 && ['queued', 'active', 'revision_requested', 'paused', 'draft'].includes(previousTask.body.data?.task?.status ?? previousTask.body.data?.status);
 
     // Re-start onboarding -- this must NOT discard legitimately-passed api_call/config steps
     // (the reset that stranded agents at 4/7). The test-task pair is the only thing reset.
@@ -942,6 +947,17 @@ await test('31b. Re-running onboarding/start preserves already-passed steps (no 
     // The test-task pair is exempt -- it resets to pending and a fresh (auto-active) test task is made.
     assert(statusById.get('accept_test_task') === 'pending',
         `accept_test_task should reset to pending on re-start, got '${statusById.get('accept_test_task')}'`);
+    // The answer says the state a driver acts on: a fresh smoke test is active and plan-less.
+    const hints = after.body.data.hints;
+    assert(hints.test_task_id && hints.test_task_id !== previousTestTaskId, 'a NEW test task id after the re-start');
+    assert(hints.test_task_status === 'active', `hints.test_task_status should be 'active', got ${JSON.stringify(hints.test_task_status)}`);
+    assert(hints.test_task_has_plan === false, `hints.test_task_has_plan should be false on a fresh test task, got ${JSON.stringify(hints.test_task_has_plan)}`);
+    // The previous smoke test, when it was still open, is gone: a runtime that resolves the test
+    // task by title must not find two "Onboarding verification" tasks and pick the stale one.
+    if (previousWasOpen) {
+        const gone = await json(`/v1/agents/${agentName}/tasks/${previousTestTaskId}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+        assert(gone.status === 404, `previous open test task should be removed on re-start, got ${gone.status}`);
+    }
 });
 
 // ─── Phase 9: Auto-check tests ───

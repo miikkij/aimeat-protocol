@@ -45,6 +45,18 @@ step list plus, for each step, a machine-readable **`howTo`** (and a top-level *
 | 15 | make_workflow_compatible | optional | `aimeat_memory_write` | same key + signals — see §4 |
 | 16 | price_offer | optional | `aimeat_memory_write` | same key + price — see §3 |
 
+**The test task (steps 9–10), in one sentence:** `POST /onboarding/start` creates *Onboarding
+verification* **active and plan-less for every mode** (task-runner included; the owner-approval gate is
+for real tasks), `accept_test_task` means *propose the first plan on it* with `aimeat_task_propose_todos`
+and the id in `hints.test_task_id` (allowed while the task is queued, revision_requested or active
+without a plan; passes the moment the task carries todos, whoever proposed them), and
+`complete_test_task` passes when the task is `done`. The status answer says where it stands:
+`hints.test_task_status` and `hints.test_task_has_plan`. Never look the task up by title: a re-run of
+`/start` makes a new one (and removes the previous one if it is still open), and the id in the hints
+is the only current one. A tool answers a refusal as a value, not an exception — read it; the node's
+message (`INVALID_STATE: TODOs can only be proposed on …`) names both what went wrong and what would
+have been accepted.
+
 **Completion gates only on the 12 required steps.** The optional offers-ladder steps (14–16) and
 `declare_services` (13) auto-mark `skipped` once the required set passes — they never block completion.
 This table is the human form of `STEP_HOWTO` in `aimeat/src/models/agent-onboarding-schemas.ts`; the

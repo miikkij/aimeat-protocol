@@ -154,3 +154,93 @@ def test_never_completable_hits_round_cap():
     with pytest.raises(OnboardingError, match="not completed within"):
         run_hello_integration([status, msg], agent_name="demo", max_rounds=3)
     assert status.calls == 3
+
+
+# ── 0.22.1: the driver reads the answer ──────────────────────────────────────────────────────────
+
+def _guide_accept(task_id="{test_task_id}"):
+    return {"accept_test_task": {"tool": "aimeat_task_propose_todos",
+                                 "args": {"task_id": task_id, "todos": [{"title": "t"}]}}}
+
+
+def test_a_failure_returned_as_a_value_is_logged_verbatim_and_ends_the_run_on_the_second_identical_call():
+    # The node's MCP tool answers a refusal as text; the connector proxies answer with the envelope.
+    # Either way it is a VALUE, not an exception. Two identical failures end the run with the message.
+    refusal = "INVALID_STATE: TODOs can only be proposed on queued, revision_requested, or plan-less active tasks (current: done)"
+    propose = FakeTool("aimeat_task_propose_todos", result=refusal)
+    status = ScriptedStatusTool([
+        _status(completable=False, next_required="accept_test_task", guide=_guide_accept(), hints={"test_task_id": "a096b380"}),
+    ])
+    lines: list[str] = []
+    with pytest.raises(OnboardingError) as ei:
+        run_hello_integration([status, propose], agent_name="sanakirjuri", logger=lines.append)
+    assert ei.value.last_error == refusal
+    assert ei.value.last_step == "accept_test_task"
+    assert refusal in str(ei.value)
+    assert propose.calls == [{"task_id": "a096b380", "todos": [{"title": "t"}]}] * 2, "one retry, then stop -- not a loop"
+    assert any(line.endswith(f"FAILED: {refusal}") for line in lines), lines
+
+
+def test_an_envelope_failure_is_read_too():
+    propose = FakeTool("aimeat_task_propose_todos", result={"ok": False, "error": {"code": "NOT_FOUND", "message": "Task not found"}})
+    status = ScriptedStatusTool([
+        _status(completable=False, next_required="accept_test_task", guide=_guide_accept(), hints={"test_task_id": "nope"}),
+    ])
+    with pytest.raises(OnboardingError) as ei:
+        run_hello_integration([status, propose], agent_name="demo")
+    assert ei.value.last_error == "NOT_FOUND: Task not found"
+
+
+def test_a_success_value_is_not_mistaken_for_a_failure():
+    propose = FakeTool("aimeat_task_propose_todos", result={"ok": True, "data": {"task": {"id": "x", "status": "active"}}})
+    status = ScriptedStatusTool([
+        _status(completable=False, next_required="accept_test_task", guide=_guide_accept(), hints={"test_task_id": "x"}),
+        _status(completable=True),
+    ])
+    lines: list[str] = []
+    final = run_hello_integration([status, propose], agent_name="demo", logger=lines.append)
+    assert final["summary"]["completable"] is True
+    assert propose.calls == [{"task_id": "x", "todos": [{"title": "t"}]}]
+    assert any(line.endswith("aimeat_task_propose_todos ok") for line in lines), lines
+
+
+def test_a_placeholder_the_node_did_not_fill_is_never_sent():
+    # No hints.test_task_id and a literal {test_task_id} in howTo.args: the node has no task yet.
+    # The driver re-checks instead of sending an empty id.
+    propose = FakeTool("aimeat_task_propose_todos")
+    status = ScriptedStatusTool([
+        _status(completable=False, next_required="accept_test_task", guide=_guide_accept(), hints={}),
+        _status(completable=True),
+    ])
+    run_hello_integration([status, propose], agent_name="demo")
+    assert propose.calls == [], "an unfillable placeholder must not become an empty task_id"
+
+
+def test_an_override_is_named_in_the_log():
+    propose = FakeTool("aimeat_task_propose_todos", result="INVALID_STATE: no")
+    status = ScriptedStatusTool([
+        _status(completable=False, next_required="accept_test_task", guide=_guide_accept(), hints={"test_task_id": "new"}),
+    ])
+    lines: list[str] = []
+    with pytest.raises(OnboardingError):
+        run_hello_integration([status, propose], agent_name="demo", logger=lines.append,
+                              step_args={"accept_test_task": {"task_id": "old", "todos": [{"title": "t"}]}})
+    assert propose.calls[0]["task_id"] == "old"
+    assert any("step_args override" in line and '"old"' in line for line in lines), lines
+
+
+def test_exhausted_rounds_carry_the_last_failure():
+    # A DIFFERENT failure each time never trips the two-in-a-row stop, but the final error still
+    # says what the last one was.
+    class Alternating(FakeTool):
+        def run(self, **kwargs):
+            self.calls.append(kwargs)
+            return f"ERR{len(self.calls)}: problem {len(self.calls)}"
+    propose = Alternating("aimeat_task_propose_todos")
+    status = ScriptedStatusTool([
+        _status(completable=False, next_required="accept_test_task", guide=_guide_accept(), hints={"test_task_id": "x"}),
+    ])
+    with pytest.raises(OnboardingError) as ei:
+        run_hello_integration([status, propose], agent_name="demo", max_rounds=3)
+    assert ei.value.last_error == "ERR3: problem 3"
+    assert "ERR3: problem 3" in str(ei.value)
