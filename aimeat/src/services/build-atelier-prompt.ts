@@ -26,7 +26,7 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
- *   v1.6.0 — 2026-08-28 — "AI inside the app": the copilot block over declared sources and
+ *   v1.6.0 — 2026-08-28 — "AI inside the app": the aide block over declared sources and
  *     actions, explain() from declarations, and the viewer's overlay (TARGET-074 phase 6).
  *   v1.5.0 — 2026-08-28 — The signature section: bounded token overrides, the design pass
  *     (compose three, dry-run, the owner picks) and reference-derived shape reading — colour
@@ -273,9 +273,9 @@ function composeBody(config: AimeatConfig): string {
     + 'back (`aimeat_designbook_propose`) so the next build starts where you finished.\n\n';
 
   body += '## AI inside the app\n\n';
-  body += 'The `copilot` block puts an AI panel on the screen whose tools are the app\'s OWN '
+  body += 'The `aide` block puts an AI panel on the screen whose tools are the app\'s OWN '
     + 'declarations: hand the mosaic spec your `sources` and an `actions` list ({ id, summary, '
-    + 'params?, run }) and the copilot can read what the screen reads and PROPOSE what the '
+    + 'params?, run }) and the aide can read what the screen reads and PROPOSE what the '
     + 'buttons do — a person confirms every run, the platform AI notice and provenance labels '
     + 'are built in, and it runs on the owner\'s own key (it sleeps politely when no key is '
     + 'set). A model answer may be a small mosaic panel rendered inline over the same sources — '
