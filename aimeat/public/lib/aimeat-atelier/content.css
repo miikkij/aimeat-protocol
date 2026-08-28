@@ -12,6 +12,9 @@
  * @structure ak-list · ak-listdetail · ak-grid + ak-card · ak-mediacard · ak-timeline
  * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
  * @version-history
+ *   v0.8.0 — 2026-08-28 — The volume rule freed: the tilt becomes a hover/focus/current
+ *     greeting (straight at rest, smooth lift), the monogram grounds go to real spectrum
+ *     chroma with a light pop, and the letter wears the brand gradient cut into the glyph.
  *   v0.7.0 — 2026-08-28 — The harvest trio (TARGET-074): the matrix (toned comparison grid,
  *     sticky row labels, scrolls in its own box), the graph (toned node pills and edges) and
  *     the waveform (mirrored bars, quiet ink to loud accent).
@@ -130,10 +133,21 @@ button.ak-card { cursor: pointer; touch-action: manipulation; }
 button.ak-card:hover { box-shadow: var(--ak-elev-2); transform: translateY(-2px); }
 /* The tilt token reaches the grid too: sticker's playfulness is the form language of the whole
  * surface, not one KPI row. Zero everywhere else, so only a look that sets it moves anything. */
-.ak-grid .ak-card { transform: rotate(var(--ak-tilt)); }
-.ak-grid .ak-card:nth-child(even) { transform: rotate(calc(var(--ak-tilt) * -1)); }
-.ak-grid button.ak-card:hover { transform: rotate(var(--ak-tilt)) translateY(-2px); }
-.ak-grid button.ak-card:nth-child(even):hover { transform: rotate(calc(var(--ak-tilt) * -1)) translateY(-2px); }
+/* THE TILT IS A GREETING, NOT A POSTURE (the developer's rule, 2026-08-28): every card stands
+ * straight at rest, and the look's tilt fires when a card is hovered, focused or current —
+ * with a lift, smoothly. A permanent lean read as mannerism, not play. */
+.ak-grid .ak-card { transition: transform var(--ak-motion) var(--ak-ease), box-shadow var(--ak-motion) var(--ak-ease); }
+.ak-grid .ak-card:hover,
+.ak-grid .ak-card:focus-visible,
+.ak-grid .ak-card[aria-current] {
+  transform: rotate(var(--ak-tilt)) translateY(-3px) scale(1.02);
+  box-shadow: var(--ak-elev-2);
+}
+.ak-grid .ak-card:nth-child(even):hover,
+.ak-grid .ak-card:nth-child(even):focus-visible,
+.ak-grid .ak-card[aria-current]:nth-child(even) {
+  transform: rotate(calc(var(--ak-tilt) * -1)) translateY(-3px) scale(1.02);
+}
 .ak-card__art {
   display: flex;
   align-items: center;
@@ -144,20 +158,35 @@ button.ak-card:hover { box-shadow: var(--ak-elev-2); transform: translateY(-2px)
 }
 .ak-card__art--image { background-image: var(--ak-card-image); }
 /* The three deterministic monogram washes — an imageless card is designed, never grey. */
+/* The monogram grounds commit: three hue worlds off the look's own spectrum at REAL chroma,
+ * each with a light pop so the band has depth — this is the imagery slot, not a text ground,
+ * so the surface-tint budget does not apply and pastel here was timidity, not a rule. */
 .ak-card__art--w1:not(.ak-card__art--image) {
-  background-image: radial-gradient(at 30% 30%, color-mix(in oklab, var(--ak-accent) 16%, var(--ak-surface)), color-mix(in oklab, var(--ak-accent) 6%, var(--ak-surface)));
+  background-image:
+    radial-gradient(at 28% 22%, color-mix(in oklab, var(--ak-bg) 46%, transparent), transparent 55%),
+    linear-gradient(135deg, color-mix(in oklab, var(--ak-accent) 62%, var(--ak-surface)), color-mix(in oklab, var(--ak-spectrum-2) 50%, var(--ak-surface)));
 }
 .ak-card__art--w2:not(.ak-card__art--image) {
-  background-image: radial-gradient(at 70% 30%, color-mix(in oklab, var(--ak-accent-2) 16%, var(--ak-surface)), color-mix(in oklab, var(--ak-accent-2) 6%, var(--ak-surface)));
+  background-image:
+    radial-gradient(at 72% 20%, color-mix(in oklab, var(--ak-bg) 46%, transparent), transparent 55%),
+    linear-gradient(160deg, color-mix(in oklab, var(--ak-spectrum-2) 58%, var(--ak-surface)), color-mix(in oklab, var(--ak-spectrum-3) 48%, var(--ak-surface)));
 }
 .ak-card__art--w3:not(.ak-card__art--image) {
-  background-image: radial-gradient(at 50% 70%, color-mix(in oklab, var(--ak-accent) 12%, var(--ak-surface)), color-mix(in oklab, var(--ak-accent-2) 8%, var(--ak-surface)));
+  background-image:
+    radial-gradient(at 50% 78%, color-mix(in oklab, var(--ak-bg) 42%, transparent), transparent 60%),
+    linear-gradient(115deg, color-mix(in oklab, var(--ak-spectrum-3) 56%, var(--ak-surface)), color-mix(in oklab, var(--ak-accent) 52%, var(--ak-surface)));
 }
+/* The letter wears the brand gradient itself, cut into the glyph, with a printed drop — decor
+ * at full volume (it is aria-hidden ornament; the words below carry the meaning). */
 .ak-card__monogram {
   font-family: var(--ak-font-display);
-  font-weight: var(--ak-weight-display);
-  font-size: var(--ak-text-hero);
-  color: var(--ak-accent-text);
+  font-weight: 900;
+  font-size: calc(var(--ak-text-hero) * 1.15);
+  background-image: var(--ak-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 3px 0 color-mix(in oklab, var(--ak-ink) 30%, transparent));
 }
 .ak-card__badge { position: absolute; top: 8px; right: 8px; }
 .ak-card__body { display: flex; flex-direction: column; gap: 2px; padding: 10px var(--ak-pad) var(--ak-pad); }
