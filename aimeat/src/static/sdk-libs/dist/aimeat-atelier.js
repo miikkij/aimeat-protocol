@@ -2738,10 +2738,26 @@
         for (const name of tokenHost.__akTokens) tokenHost.style.removeProperty(name);
       }
       tokenHost.__akTokens = [];
+      if (tokenHost.__akSigStyle) {
+        tokenHost.__akSigStyle.remove();
+        tokenHost.__akSigStyle = null;
+      }
       if (layout.tokens && typeof layout.tokens === "object") {
         for (const name of Object.keys(layout.tokens)) {
           if (name.indexOf("--ak-") !== 0) continue;
-          tokenHost.style.setProperty(name, String(layout.tokens[name]));
+          const value = String(layout.tokens[name]);
+          if (name === "--ak-accent" && value.indexOf("/") >= 0) {
+            const halves = value.split("/");
+            const light = halves[0].trim();
+            const dark = (halves[1] || halves[0]).trim();
+            if (!/^#[0-9a-fA-F]{3,6}$/.test(light) || !/^#[0-9a-fA-F]{3,6}$/.test(dark)) continue;
+            const style = document.createElement("style");
+            style.textContent = ":root{--ak-accent:" + light + '}\n:root[data-theme="dark"]{--ak-accent:' + dark + "}";
+            document.head.appendChild(style);
+            tokenHost.__akSigStyle = style;
+            continue;
+          }
+          tokenHost.style.setProperty(name, value);
           tokenHost.__akTokens.push(name);
         }
       }
@@ -2891,6 +2907,14 @@
         }
         for (const fn of alive.cleanup) fn();
         alive = { handles: [], bound: [], cleanup: [] };
+        const host2 = (
+          /** @type {any} */
+          spec.app && spec.app.el ? spec.app.el : root
+        );
+        if (host2.__akSigStyle) {
+          host2.__akSigStyle.remove();
+          host2.__akSigStyle = null;
+        }
         if (root.parentNode) root.parentNode.removeChild(root);
       }
     };
@@ -2903,7 +2927,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.16.0",
+    version: "0.17.0",
     // ── Shell and navigation ──
     app,
     section,

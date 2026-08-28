@@ -25,6 +25,9 @@
  * @usage
  *   import { UI_COMPONENTS, componentById, buildUiCatalogue } from './registry.js';
  * @version-history
+ *   v1.5.0 — 2026-08-28 — COLOUR OPENS AS A PAIR (append-only): `--ak-accent` joins the signature
+ *     as "light/dark" — measurement proved no single hex survives both modes, so the validator
+ *     runs the contrast matrix per mode against each half before accepting (TARGET-074).
  *   v1.4.0 — 2026-08-28 — SIGNATURE arrives (append-only): the bounded `--ak-*` token subset a
  *     layout may override (shape, typography, density, motion — deliberately no colour until the
  *     contrast bench can prove an override), listed in the catalogue as signature_tokens.
@@ -192,13 +195,15 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
 
 /**
  * The SIGNATURE TOKENS: the bounded `--ak-*` subset a layout may override to give one app its own
- * hand — shape, typography, density and motion. DELIBERATELY NO COLOUR TOKENS: a colour override
- * is only omalaatuinen-but-readable when the contrast arithmetic has proven it, and that bench is
- * not wired into the validator yet — so colour waits rather than shipping on trust. Growing this
- * list is append-only, and every addition stays provable-safe by construction (a radius cannot
- * break contrast).
+ * hand — colour, shape, typography, density and motion. COLOUR IS ONE TOKEN AND IT IS A PAIR:
+ * measurement proved no single hex survives every palette in both modes (the house coral fails 32
+ * light-mode checks and passes dark completely), so `--ak-accent` takes "light/dark" and the
+ * validator runs the full contrast matrix per mode before accepting it — colour ships proven, not
+ * on trust. Growing this list is append-only, and every other entry stays provable-safe by
+ * construction (a radius cannot break contrast).
  */
 export const SIGNATURE_TOKENS: Record<string, string> = {
+  '--ak-accent': 'The signature colour, as a LIGHT/DARK PAIR "#hex/#hex" — the light-mode value first, the dark-mode value second, e.g. "#0e7c66/#e8564a". Both values run the full contrast matrix at validation, each against its own mode, and a pair that breaks readability anywhere refuses with the numbers. Every accent derivation (text tint, gradient, spectrum, focus ring) follows the pair.',
   '--ak-radius': 'Corner rounding of cards and surfaces, e.g. "2px" for a sharp hand, "18px" for a soft one.',
   '--ak-radius-sm': 'Corner rounding of rows and inputs.',
   '--ak-radius-pill': 'Rounding of pills and chips.',

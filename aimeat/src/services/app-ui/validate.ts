@@ -16,6 +16,10 @@
  *   import { validateUiLayout, AppUiError } from './validate.js';
  *   const layout = validateUiLayout(req.body);   // throws AppUiError(422) with words
  * @version-history
+ *   v1.3.0 — 2026-08-28 — The signature COLOUR opens: `--ak-accent` accepted as a light/dark pair
+ *     "#hex/#hex", each half proven by the full contrast matrix against its own mode's combos
+ *     (validateAccentPair). A failing half refuses with the measured numbers; other colour-token
+ *     names still refuse, now pointing at the pair door. TARGET-074.
  *   v1.2.0 — 2026-08-28 — The SIGNATURE: optional top-level `tokens`, validated against the
  *     registry allowlist (shape/typography/density/motion — a colour name is refused with the
  *     reason, not just the list), values bounded and vehicle-proof (no urls, no declaration
@@ -32,6 +36,7 @@
 import type { BlockPropValue } from '../surface-layout/types.js';
 import { propProblem } from '../surface-layout/validate.js';
 import { componentById, NAV_MODES, LOOKS, BLOCK_SPANS, UI_COMPONENTS, SIGNATURE_TOKENS } from './registry.js';
+import { runMatrix } from '../atelier-contrast.js';
 
 /** More blocks than this is a page nobody reads — and a payload nobody meant. */
 const MAX_BLOCKS = 40;
@@ -117,6 +122,32 @@ function unknownName(kind: string, given: string, known: string[]): never {
   fail(`this node has no ${kind} called "${given}".${hint} The ${kind}s it has: ${known.join(', ')}.`);
 }
 
+/** The signature colour: "#hex/#hex", light first, dark second. */
+const ACCENT_PAIR_RE = /^(#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?)\s*\/\s*(#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?)$/;
+
+/**
+ * Prove a signature colour pair: each half runs the FULL contrast matrix as an `--ak-accent`
+ * override and is judged against its own mode's combos — the sheet derives every other colour
+ * (text tint, gradient, spectrum, focus) from the accent, so proving the accent proves them all.
+ * A failing half refuses with the first measured numbers; the normalized "light/dark" survives.
+ */
+function validateAccentPair(value: string): string {
+  const m = ACCENT_PAIR_RE.exec(value.trim());
+  if (!m) {
+    fail('--ak-accent is a light/dark PAIR "#hex/#hex" — the light-mode value first, the dark-mode value second, like "#0e7c66/#e8564a". A single value cannot stay readable in both modes (measured), so both halves are required.');
+  }
+  const [light, dark] = [m[1]!.toLowerCase(), m[2]!.toLowerCase()];
+  for (const [half, mode] of [[light, 'light'], [dark, 'dark']] as const) {
+    const bad = runMatrix({ '--ak-accent': half })
+      .filter((r) => !r.ok && r.combo.includes('/dark') === (mode === 'dark'));
+    if (bad.length > 0) {
+      const first = bad[0]!;
+      fail(`the ${mode} half of --ak-accent (${half}) fails the contrast matrix: ${first.label} in ${first.combo} measures ${first.actual.toFixed(2)} against the ${first.min} floor (${first.why}); ${bad.length} check(s) fail in all. Pick a ${mode === 'dark' ? 'brighter mid-tone for dark surfaces' : 'deeper value for light surfaces'} and it will pass.`);
+    }
+  }
+  return `${light}/${dark}`;
+}
+
 /**
  * Validate one submitted layout. Returns the typed layout (unknown fields dropped) or throws an
  * AppUiError whose message a builder can act on without fetching anything else.
@@ -152,13 +183,10 @@ export function validateUiLayout(raw: unknown): AppUiLayout {
     for (const [name, value] of Object.entries(input.tokens as Record<string, unknown>)) {
       if (!legal.includes(name)) {
         if (/color|accent|bg|ink|surface|scrim|grad/i.test(name)) {
-          // Not a placeholder refusal: the matrix CAN run overrides now (atelier-contrast.ts),
-          // and running it settled the question — a single hex cannot satisfy the mode- and
-          // palette-tuned derivations (even the house coral fails 32 checks as a global
-          // override), so a signature colour must be a LIGHT/DARK PAIR applied per mode, which
-          // the inline-token mechanism cannot express yet. Until the kit applies mode-paired
-          // colours, the door stays closed rather than open and unpassable.
-          fail(`"${name}" is a colour token, and the signature does not open colour yet: the contrast matrix proved a single hex cannot stay readable across every palette and both modes — a signature colour needs a light/dark pair, which is a named next step. The signature covers shape, typography, density and motion: ${legal.join(', ')}.`);
+          // Colour is open, but through ONE door: measurement proved a single hex cannot satisfy
+          // the mode-tuned derivations, so the signature colour is `--ak-accent` as a light/dark
+          // pair and every other colour token stays derived from it by the sheet.
+          fail(`"${name}" is a colour token the signature does not take directly — the one colour door is --ak-accent as a light/dark pair "#hex/#hex" (both halves are proven by the contrast matrix); every other colour derives from it. The signature covers: ${legal.join(', ')}.`);
         }
         unknownName('signature token', name, legal);
       }
@@ -167,6 +195,10 @@ export function validateUiLayout(raw: unknown): AppUiLayout {
       }
       if (TOKEN_VALUE_FORBIDDEN.test(value)) {
         fail(`the value of ${name} may not carry urls, comments or declaration characters — a token is one value, never a vehicle.`);
+      }
+      if (name === '--ak-accent') {
+        out.tokens[name] = validateAccentPair(value);
+        continue;
       }
       out.tokens[name] = value;
     }

@@ -152,13 +152,37 @@ const GOOD_LAYOUT = {
         assert(typo.body.data.ok === false && typo.body.data.message.includes('Did you mean "--ak-radius"?'),
             `a token typo gets the nearest name: ${typo.body.data.message}`);
 
+        // Not a pair -> refused naming the pair form. (This assertion changed when the colour
+        // door OPENED: --ak-accent is legal now, so "hotpink" fails the pair format instead of
+        // the old closed-door message — the test now asserts the new contract, same protection.)
         const colour = await validate({ v: 1, tokens: { '--ak-accent': 'hotpink' }, blocks: [{ id: 'a', component: 'list', props: { source: 'x' } }] });
-        assert(colour.body.data.ok === false && /light\/dark pair/.test(colour.body.data.message),
-            `a colour token is refused with the MEASURED reason (single hex cannot pass; a pair is the path): ${colour.body.data.message}`);
+        assert(colour.body.data.ok === false && /light\/dark pair/i.test(colour.body.data.message),
+            `a non-pair colour value is refused naming the pair form: ${colour.body.data.message}`);
 
         const vehicle = await validate({ v: 1, tokens: { '--ak-radius': 'url(https://evil.example/x)' }, blocks: [{ id: 'a', component: 'list', props: { source: 'x' } }] });
         assert(vehicle.body.data.ok === false && /vehicle/.test(vehicle.body.data.message),
             `a url value is refused: ${vehicle.body.data.message}`);
+    });
+
+    await test('the signature COLOUR: a proven pair passes, a failing half refuses with the numbers', async () => {
+        // Measured on 2026-08-28: #0e7c66 passes every light-mode combo, #e8564a every dark one.
+        const good = await validate({ v: 1, tokens: { '--ak-accent': '#0e7c66/#e8564a' },
+            blocks: [{ id: 'a', component: 'list', props: { source: 'x' } }] });
+        assert(good.status === 200 && good.body.data.ok === true,
+            `a measured-good pair must validate: ${JSON.stringify(good.body.data)}`);
+
+        // The same deep green as the DARK half fails dark-mode derivations (accent-as-text on a
+        // dark card sinks below 4.5) — the refusal carries the measured number and the floor.
+        const bad = await validate({ v: 1, tokens: { '--ak-accent': '#0e7c66/#0e7c66' },
+            blocks: [{ id: 'a', component: 'list', props: { source: 'x' } }] });
+        assert(bad.body.data.ok === false && /dark half/.test(bad.body.data.message) && /4\.5/.test(bad.body.data.message),
+            `a failing dark half must refuse with the measured numbers: ${bad.body.data.message}`);
+
+        // Any OTHER colour token still refuses, pointing at the one door.
+        const other = await validate({ v: 1, tokens: { '--ak-bg': '#ffffff' },
+            blocks: [{ id: 'a', component: 'list', props: { source: 'x' } }] });
+        assert(other.body.data.ok === false && /--ak-accent/.test(other.body.data.message),
+            `other colour tokens refuse pointing at the pair door: ${other.body.data.message}`);
     });
 
     await test('an unknown component is refused with the NEAREST real name suggested', async () => {
