@@ -53,7 +53,9 @@
 /* A full-frame app owns the page: the shell stamps this class on <body> so the browser's
    default 8px body margin cannot leave a gutter around the frame — no preflight resets it on
    this track, because the kit is the only stylesheet. */
-.ak-body { margin: 0; background: var(--ak-bg); }
+/* overflow hidden: the frame owns ALL scrolling, so the page itself must never grow a second
+ * scrollbar beside the main region's — two tracks side by side was a second-AEB-review finding. */
+.ak-body { margin: 0; background: var(--ak-bg); overflow: hidden; }
 .ak-app {
   height: 100dvh;
   display: flex;
@@ -112,6 +114,17 @@
 }
 .ak-app__status { padding: 0 var(--ak-pad); }
 .ak-app__status[hidden] { display: none; }
+/* The boot gate: before login resolves, the status card IS the page — centered in the frame,
+ * the empty main hidden, so a signed-out first visit reads as a designed screen. */
+.ak-app--gate .ak-app__main { display: none; }
+.ak-app--gate .ak-app__status:not([hidden]) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: var(--ak-pad);
+}
+.ak-app--gate .ak-empty { width: 100%; max-width: 32rem; margin-inline: auto; }
 .ak-app__main {
   flex: 1;
   min-height: 0;

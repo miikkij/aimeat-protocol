@@ -20,6 +20,10 @@
  * @usage  const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  *         a.main.appendChild(view);   // the main element is yours to fill
  * @version-history
+ *   v0.4.0 — 2026-08-28 — The boot gate presents the APP: while login resolves, the status card
+ *     is the whole page (centered, main hidden — .ak-app--gate), and the sign-in card carries the
+ *     app's own name and its `tagline` before the how-to. The second AEB review met a bare system
+ *     sentence floating over 700px of nothing; a first visit is a designed screen now.
  *   v0.3.0 — 2026-08-28 — set({ density }): the comfortable/compact preference as one class over
  *     the tokens (TARGET-074 phase 7). The touch minimum never shrinks with it.
  *   v0.2.0 — 2026-08-28 — The signed-out grace: with requireLogin on and no session, the shell used
@@ -54,7 +58,7 @@ const SIGNIN_GRACE_MS = 2500;
 /**
  * The app shell.
  * @param {{
- *   target?: string|Element, title: string, look?: string, footer?: string,
+ *   target?: string|Element, title: string, tagline?: string, look?: string, footer?: string,
  *   navItems?: Array<{ id: string, label: string, onPick?: (item: any) => void }>,
  *   requireLogin?: boolean,
  *   onReady?: (session: any) => void, onLogout?: () => void,
@@ -123,7 +127,14 @@ export function app(spec) {
     const kinds = {
       empty: { title: o.title || t('empty'), hint: o.hint || t('emptyHint') },
       error: { title: o.title || t('loadFailed'), hint: o.hint || t('loadFailedHint') },
-      signin: { title: o.title || t('signIn'), hint: o.hint != null ? o.hint : t('signInHint') },
+      // The sign-in card PRESENTS THE APP: its own name as the title and, when the app gave one,
+      // its tagline before the how-to — a first visitor learns what this is, not only that a
+      // login exists. (The second AEB review met a bare system sentence on an empty page.)
+      signin: {
+        title: o.title || state.title,
+        hint: o.hint != null ? o.hint
+          : (spec.tagline ? spec.tagline + ' ' : '') + t('signIn') + ' ' + t('signInHint'),
+      },
     };
     const chosen = kinds[kind] || kinds.error;
     statusCard = emptyState({
@@ -157,6 +168,7 @@ export function app(spec) {
       booted = true;
       if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
       if (graceTimer) { clearTimeout(graceTimer); graceTimer = null; }
+      root.classList.remove('ak-app--gate');
       status('none');
       if (spec.onReady) spec.onReady(session);
     }
@@ -169,6 +181,7 @@ export function app(spec) {
         onLogin: function () { tryBoot(); },
         onLogout: function () {
           booted = false;
+          root.classList.add('ak-app--gate');
           status('signin');
           if (spec.onLogout) spec.onLogout();
           armPoll();
@@ -182,6 +195,10 @@ export function app(spec) {
       return;
     }
     status('loading');
+    // While the boot gate is up the status card IS the page: centered, with the empty main
+    // hidden, so a signed-out first visit is a designed screen rather than a card floating over
+    // 700px of nothing (the second AEB review's words).
+    root.classList.add('ak-app--gate');
     armPoll();
     tryBoot();
     // A signed-out visitor is a STATE, not an endless load: when the silent login has produced

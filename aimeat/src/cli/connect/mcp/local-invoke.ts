@@ -25,10 +25,18 @@
  *   // tunnel client: onInvoke: (frame) => inv.handleInvoke(frame)
  *   registerLocalInvokeRoutes(app, resolveAgent, invokeChannels);
  * @version-history
+ *   v1.0.1 — 2026-08-28 — SECURITY (CodeQL js/resource-exhaustion): the long-poll setTimeout is
+ *     bounded at the timer (Math.min(waitMs, MAX_WAIT_MS)), matching the [0, 120s] clamp waitMsOf
+ *     already applies, so the duration is capped for any caller, not only the current route.
  *   v1.0.0 — 2026-08-28 — Initial: invoke queue, NO_HANDLER fast reply, expiry, the two endpoints.
  */
 import type { Express, Request, Response } from 'express';
 import type { RegisteredAgent } from '../agent-registry.js';
+
+/** Upper bound on a long-poll timer, matching the [0, 120s] clamp waitMsOf already applies. Re-applied
+ *  at the setTimeout so the duration is bounded there, not only at the parser — a timer whose length
+ *  is a raw request value is a resource-exhaustion sink (js/resource-exhaustion). */
+const MAX_WAIT_MS = 120_000;
 
 /** A server-initiated invoke, as handed to the consumer on `/local/invoke/next`. */
 export interface PendingInvoke {
@@ -126,7 +134,7 @@ export class InvokeChannel {
         if (i >= 0) this.waiters.splice(i, 1);
         this.lastPollAt = Date.now();
         resolve(null);
-      }, waitMs);
+      }, Math.min(waitMs, MAX_WAIT_MS));
       this.waiters.push(waiter);
     });
   }

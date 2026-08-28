@@ -569,7 +569,13 @@
       const kinds = {
         empty: { title: o.title || t("empty"), hint: o.hint || t("emptyHint") },
         error: { title: o.title || t("loadFailed"), hint: o.hint || t("loadFailedHint") },
-        signin: { title: o.title || t("signIn"), hint: o.hint != null ? o.hint : t("signInHint") }
+        // The sign-in card PRESENTS THE APP: its own name as the title and, when the app gave one,
+        // its tagline before the how-to — a first visitor learns what this is, not only that a
+        // login exists. (The second AEB review met a bare system sentence on an empty page.)
+        signin: {
+          title: o.title || state.title,
+          hint: o.hint != null ? o.hint : (spec.tagline ? spec.tagline + " " : "") + t("signIn") + " " + t("signInHint")
+        }
       };
       const chosen = kinds[kind] || kinds.error;
       statusCard = emptyState({
@@ -605,6 +611,7 @@
           clearTimeout(graceTimer);
           graceTimer = null;
         }
+        root.classList.remove("ak-app--gate");
         status("none");
         if (spec.onReady) spec.onReady(session);
       }
@@ -618,6 +625,7 @@
           },
           onLogout: function() {
             booted = false;
+            root.classList.add("ak-app--gate");
             status("signin");
             if (spec.onLogout) spec.onLogout();
             armPoll();
@@ -631,6 +639,7 @@
         return;
       }
       status("loading");
+      root.classList.add("ak-app--gate");
       armPoll();
       tryBoot();
       graceTimer = setTimeout(function() {
@@ -2759,7 +2768,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.14.0",
+    version: "0.15.0",
     // ── Shell and navigation ──
     app,
     section,
