@@ -655,7 +655,7 @@
     return {
       el: root,
       main,
-      /** @param {{ title?: string, look?: string }} patch */
+      /** @param {{ title?: string, look?: string, density?: 'comfortable'|'compact' }} patch */
       set(patch) {
         if (!patch) return;
         if (patch.title != null) {
@@ -666,6 +666,7 @@
           state.look = patch.look;
           root.setAttribute("data-ak-look", state.look);
         }
+        if (patch.density != null) root.classList.toggle("ak-app--compact", patch.density === "compact");
       },
       status,
       t,
@@ -2669,6 +2670,38 @@
         }));
       },
       /**
+       * ONE DECLARATION, FOUR DOORS: expose this mosaic's declared actions to an in-browser agent
+       * through WebMCP. The same { id, summary, params, run } the buttons and the copilot use
+       * becomes the visiting agent's tool — same handler, same limits, nothing extra. Returns the
+       * registration surface name, or 'none' when the page has no agent API or no actions.
+       * @returns {Promise<string>}
+       */
+      async exposeActions() {
+        const ns = (
+          /** @type {any} */
+          window.AIMEAT
+        );
+        if (!ns || !ns.webmcp || typeof ns.webmcp.register !== "function") return "none";
+        const tools = (spec.actions || []).map(function(a) {
+          const properties = {};
+          const params = a.params || {};
+          for (const key of Object.keys(params)) {
+            properties[key] = { type: params[key] === "number" ? "number" : "string" };
+          }
+          return {
+            name: "app-" + a.id,
+            description: a.summary + " (a declared action of this app; runs the same handler its button runs).",
+            inputSchema: { type: "object", properties },
+            execute: async function(input) {
+              const result = await Promise.resolve(a.run ? a.run(input || {}) : null);
+              return typeof result === "string" ? result : "done";
+            }
+          };
+        });
+        if (!tools.length) return "none";
+        return ns.webmcp.register(tools);
+      },
+      /**
        * The viewer's overlay: set (or clear with null) and re-render. The APP owns loading and
        * saving the overlay record (the viewer's own memory) — the mosaic only applies it.
        * @param {{ hidden?: string[], order?: string[], nav?: string }|null} o
@@ -2738,6 +2771,24 @@
     statRow,
     figure,
     copilot,
+    /**
+     * Read something aloud through the platform's speech library, when the page carries it.
+     * Opt-in by construction: nothing speaks until the app puts a control on the screen and a
+     * person presses it. Returns false when the speech library is absent, so the app can hide
+     * the control instead of showing a dead one.
+     * @param {Element|string} target - an element (its text is read) or the text itself
+     * @returns {boolean}
+     */
+    readAloud(target) {
+      const ns = (
+        /** @type {any} */
+        window.AIMEAT
+      );
+      if (!ns || !ns.speech || typeof ns.speech.say !== "function") return false;
+      const text = target instanceof Element ? target.textContent || "" : String(target);
+      if (text.trim()) ns.speech.say(text.trim());
+      return true;
+    },
     // ── Content ──
     list,
     listDetail,

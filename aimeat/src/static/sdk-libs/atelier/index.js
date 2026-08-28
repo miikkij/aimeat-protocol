@@ -29,7 +29,9 @@
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
  *   v0.13.0 — 2026-08-28 — The AI-native layer (phase 6): copilot() whose tools are the app's own
- *     declarations, the mosaic `copilot` block, the viewer's overlay (setOverlay), and explain().
+ *     declarations, the mosaic `copilot` block, the viewer's overlay (setOverlay), explain(),
+ *     exposeActions() (the same declarations as a visiting agent's WebMCP tools) — and phase 7's
+ *     free pair: set({ density }) on the shell and readAloud() over the speech library.
  *   v0.12.0 — 2026-08-28 — The signature (bounded token overrides from the stored layout) and the
  *     shared-element morphs (canvas tile → focused screen, list row → detail).
  *   v0.11.0 — 2026-08-28 — The first AEB review's kit fixes: designed sign-in after the boot
@@ -112,6 +114,22 @@ const atelier = {
   // ── Focal content ──
   hero, statRow, figure,
   copilot,
+
+  /**
+   * Read something aloud through the platform's speech library, when the page carries it.
+   * Opt-in by construction: nothing speaks until the app puts a control on the screen and a
+   * person presses it. Returns false when the speech library is absent, so the app can hide
+   * the control instead of showing a dead one.
+   * @param {Element|string} target - an element (its text is read) or the text itself
+   * @returns {boolean}
+   */
+  readAloud(target) {
+    const ns = /** @type {any} */ (window).AIMEAT;
+    if (!ns || !ns.speech || typeof ns.speech.say !== 'function') return false;
+    const text = target instanceof Element ? (target.textContent || '') : String(target);
+    if (text.trim()) ns.speech.say(text.trim());
+    return true;
+  },
 
   // ── Content ──
   list, listDetail, cardGrid, mediaCard, timeline,

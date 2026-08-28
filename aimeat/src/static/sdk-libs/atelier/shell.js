@@ -20,6 +20,8 @@
  * @usage  const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  *         a.main.appendChild(view);   // the main element is yours to fill
  * @version-history
+ *   v0.3.0 — 2026-08-28 — set({ density }): the comfortable/compact preference as one class over
+ *     the tokens (TARGET-074 phase 7). The touch minimum never shrinks with it.
  *   v0.2.0 — 2026-08-28 — The signed-out grace: with requireLogin on and no session, the shell used
  *     to show "Loading…" forever — the first AEB review's worst Atelier finding. Now the loading
  *     state yields to the designed sign-in state after a short grace, and the sign-in state carries
@@ -213,11 +215,14 @@ export function app(spec) {
     el: root,
     main: main,
 
-    /** @param {{ title?: string, look?: string }} patch */
+    /** @param {{ title?: string, look?: string, density?: 'comfortable'|'compact' }} patch */
     set(patch) {
       if (!patch) return;
       if (patch.title != null) { state.title = patch.title; heading.textContent = state.title; }
       if (patch.look != null) { state.look = patch.look; root.setAttribute('data-ak-look', state.look); }
+      // Density is token-driven, so it is free: compact tightens padding and gaps while the
+      // touch minimum stays untouched — a preference, never an accessibility trade.
+      if (patch.density != null) root.classList.toggle('ak-app--compact', patch.density === 'compact');
     },
 
     status: status,
