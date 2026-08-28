@@ -83,6 +83,8 @@
   <!-- hrefs are stamped with ?v=BUILD_ID at serve time by portal.ts serveSpa() -->
   <link rel="stylesheet" href="/css/views/landing.css">
   <link rel="stylesheet" href="/css/views/landing-showroom.css">
+  <link rel="stylesheet" href="/css/views/changelog.css">
+  <link rel="stylesheet" href="/css/views/build-story.css">
   <link rel="stylesheet" href="/css/views/portal-classic.css">
   <link rel="stylesheet" href="/css/views/portal-dev.css">
   <link rel="stylesheet" href="/css/views/profile.css">
@@ -442,6 +444,10 @@
       // a price exists. The server redirects the old address there, or to the front page.
       '/v1/start':       () => import('/views/start.js' + B),
       '/v1/how-it-works': () => import('/views/how-it-works.js' + B),
+      // Two showroom companions (2026-08-28): the whole change log, and the story of how an app
+      // gets built here. Both are also spaRoutes in routes/portal.ts, or F5 is a 404.
+      '/v1/changelog':   () => import('/views/changelog.js' + B),
+      '/v1/how-an-app-builds': () => import('/views/build-story.js' + B),
       '/v1/glossary':    () => import('/views/glossary.js' + B),
       '/v1/business':    () => import('/views/business.js' + B),
       '/v1/transparency': () => import('/views/transparency.js' + B),
@@ -880,7 +886,7 @@
     // where that hurts. Work surfaces (profile, admin, home, the pop-outs) get no footer: a
     // page you work in is not a page you leave from.
     const FOOTER_ROUTES = new Set([
-      '/v1/portal', '/v1/how-it-works', '/v1/business',
+      '/v1/portal', '/v1/how-it-works', '/v1/business', '/v1/changelog', '/v1/how-an-app-builds',
       '/v1/members', '/v1/help', '/v1/glossary', '/v1/transparency',
     ]);
 
@@ -900,6 +906,8 @@
               : ''}
             <a href="/v1/help" onClick=${(e) => go(e, '/v1/help')}>${tr('nav.help', 'Help')}</a>
             <a href="/v1/how-it-works" onClick=${(e) => go(e, '/v1/how-it-works')}>${tr('nav.howItWorks', 'How it works')}</a>
+            <a href="/v1/how-an-app-builds" onClick=${(e) => go(e, '/v1/how-an-app-builds')}>${tr('footer.buildStory', 'How an app gets built')}</a>
+            <a href="/v1/changelog" onClick=${(e) => go(e, '/v1/changelog')}>${tr('footer.changelog', 'What shipped')}</a>
             <a href="/v1/business" onClick=${(e) => go(e, '/v1/business')}>${tr('nav.business', 'For your business')}</a>
             <a href="/v1/members" onClick=${(e) => go(e, '/v1/members')}>${tr('nav.members', 'Members')}</a>
             <a href="/v1/portal?view=dev" onClick=${(e) => go(e, '/v1/portal?view=dev')}>${tr('nav.devView', 'For Developers')}</a>

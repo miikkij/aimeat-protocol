@@ -35,6 +35,39 @@ await test('GET /v1/portal — returns HTML', async () => {
     assert(html.includes('<div id="app"'), 'missing SPA mount point');
 });
 
+// ─── The showroom's two companions (2026-08-28): the whole change log and the build story ───
+// Each is an SPA route (spa.html ROUTES + routes/portal.ts spaRoutes, or F5 is a 404) and a
+// public-page registry entry, which is what puts its title in the head and its address in the
+// sitemap. The pricing page left both on the same day.
+for (const [path, title] of [['/v1/changelog', 'What shipped here'], ['/v1/how-an-app-builds', 'How an app gets built here']]) {
+    await test(`GET ${path} — the SPA shell with the page's own title`, async () => {
+        const res = await fetch(`${BASE}${path}`);
+        assert(res.status === 200, `status ${res.status}`);
+        assert((res.headers.get('content-type') ?? '').includes('text/html'), 'html');
+        const html = await res.text();
+        assert(html.includes('<div id="app"'), 'missing SPA mount point');
+        assert(html.includes(title), `the registry's title "${title}" is in the head`);
+    });
+}
+
+// The one gated door in this suite's area: the operator's own front-page template. A stranger and a
+// made-up token both get a refusal, never the template. (The pages above are public on purpose.)
+await test('GET /v1/site/template — refused without an operator session', async () => {
+    const anon = await fetch(`${BASE}/v1/site/template`);
+    assert(anon.status === 401 || anon.status === 403, `anonymous: status ${anon.status}`);
+    const bogus = await fetch(`${BASE}/v1/site/template`, { headers: { Authorization: 'Bearer not-a-token' } });
+    assert(bogus.status === 401 || bogus.status === 403, `bogus token: status ${bogus.status}`);
+});
+
+await test('GET /sitemap.xml — lists the two new pages and not the pricing page', async () => {
+    const res = await fetch(`${BASE}/sitemap.xml`);
+    assert(res.status === 200, `status ${res.status}`);
+    const xml = await res.text();
+    assert(xml.includes('/v1/changelog'), '/v1/changelog is in the sitemap');
+    assert(xml.includes('/v1/how-an-app-builds'), '/v1/how-an-app-builds is in the sitemap');
+    assert(!xml.includes('/v1/pricing'), '/v1/pricing has left the sitemap');
+});
+
 // ─── GET /v1/portal/platforms — JSON ───
 await test('GET /v1/portal/platforms — returns platform list', async () => {
     const res = await fetch(`${BASE}/v1/portal/platforms`);

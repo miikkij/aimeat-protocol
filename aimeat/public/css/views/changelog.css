@@ -1,0 +1,83 @@
+/**
+ * @file changelog.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The change-log page (chg- prefix, views/changelog.js), in the showroom's language:
+ *   the same tokens and shapes as landing-showroom.css (Bungee headings, 3px ink borders, solid
+ *   offset shadows, the sticker yellow), a month rail that sticks while the list scrolls, and a
+ *   card per entry. Colour carries one meaning only: what KIND of change an entry was.
+ * @version-history
+ *   v1.0.0 — 2026-08-28 — Initial.
+ */
+.chg-head { display: flex; flex-direction: column; align-items: flex-start; gap: 1.1rem; padding: 2.5rem 0 1.75rem; }
+.chg-title {
+  margin: 0; font-family: var(--font-display); font-weight: 400; text-transform: uppercase;
+  font-size: clamp(2.2rem, 5vw, 4.5rem); line-height: .98; color: var(--text); text-shadow: .08em .08em 0 var(--accent);
+}
+.chg-lead { margin: 0; max-width: 48rem; font-family: var(--font-marketing); font-size: 1.1rem; line-height: 1.55; font-weight: 600; }
+
+/* Filters and search on one row; the chips wrap under the search on a phone. */
+.chg-bar { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap; padding: 0 0 1.75rem; }
+.chg-chips { display: flex; gap: .5rem; flex-wrap: wrap; }
+.chg-chip {
+  font-family: var(--font-display); text-transform: uppercase; font-size: .72rem; padding: .45rem .75rem;
+  border: 2px solid var(--text); background: var(--card-bg); color: var(--text); cursor: pointer;
+}
+.chg-chip:hover { box-shadow: 3px 3px 0 var(--accent); }
+.chg-chip.is-on { background: var(--text); color: var(--bg); }
+.chg-search {
+  flex: 1 1 220px; max-width: 360px; font-family: var(--font-marketing); font-size: .95rem; font-weight: 600;
+  padding: .65rem .85rem; border: 3px solid var(--text); background: var(--card-bg); color: var(--text); box-shadow: 4px 4px 0 var(--accent);
+}
+.chg-search:focus { outline: none; box-shadow: 4px 4px 0 var(--text); }
+.chg-search::placeholder { color: var(--text-dim); font-style: italic; }
+
+.chg-body { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 3rem; align-items: start; padding-bottom: 3rem; }
+.chg-rail { position: sticky; top: 1.5rem; display: flex; flex-direction: column; gap: .35rem; }
+.chg-rail-label { font-family: var(--font-display); text-transform: uppercase; font-size: .72rem; color: var(--text-dim); margin-bottom: .35rem; }
+.chg-rail-month { font-family: var(--font-marketing); font-size: .95rem; font-weight: 600; color: var(--text-dim); text-decoration: none; padding: .15rem 0 .15rem .85rem; border-left: 4px solid transparent; }
+.chg-rail-month:hover { color: var(--accent); border-left-color: var(--accent); }
+.chg-rail-json { margin-top: 1.25rem; font-size: .85rem; }
+
+.chg-list { display: flex; flex-direction: column; gap: 1.6rem; }
+.chg-month { margin: 1rem 0 0; font-family: var(--font-display); font-weight: 400; text-transform: uppercase; font-size: 1rem; letter-spacing: .04em; color: var(--text-dim); scroll-margin-top: 1rem; }
+.chg-month:first-child { margin-top: 0; }
+.chg-entry {
+  display: flex; flex-direction: column; gap: .7rem; padding: 1.5rem 1.75rem; scroll-margin-top: 1rem;
+  background: var(--card-bg); border: 3px solid var(--text); box-shadow: 6px 6px 0 var(--accent);
+}
+/* The shadow colour rotates down the list, and every third card tilts a third of a degree, so
+   the page reads as a board of cards and not as a table. */
+.chg-entry:nth-of-type(3n+2) { box-shadow: 6px 6px 0 var(--text); transform: rotate(.3deg); }
+.chg-entry:nth-of-type(3n) { box-shadow: 6px 6px 0 var(--sun); transform: rotate(-.3deg); }
+.chg-entry:target { outline: 4px solid var(--sun); outline-offset: 4px; }
+.chg-meta { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+.chg-date { font-family: var(--font-display); font-size: .85rem; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.chg-kind { font-family: var(--font-display); text-transform: uppercase; font-size: .66rem; letter-spacing: .04em; padding: .25rem .55rem; border: 2px solid var(--text); color: var(--text); }
+.chg-kind-feature { background: var(--accent); border-color: var(--accent); color: #FFFFFF; }
+.chg-kind-security { border-color: var(--danger); color: var(--danger); }
+.chg-kind-fix { background: var(--text); color: var(--bg); }
+.chg-version { font-family: var(--font-mono); font-size: .75rem; color: var(--text-muted); }
+.chg-anchor { margin-left: auto; font-family: var(--font-marketing); font-size: .8rem; font-weight: 800; color: var(--text-dim); text-decoration: none; }
+.chg-anchor:hover { color: var(--accent); }
+.chg-entry-title { margin: 0; font-family: var(--font-marketing); font-size: 1.5rem; line-height: 1.2; font-weight: 800; }
+/* pre-line: an entry body carries its own paragraph breaks and nothing parses markdown here. */
+.chg-entry-body { margin: 0; font-family: var(--font-marketing); font-size: 1rem; line-height: 1.6; white-space: pre-line; }
+.chg-empty { font-family: var(--font-marketing); color: var(--text-dim); }
+
+.chg-close { margin: 0 0 1rem; padding: 2rem 3rem; background: var(--sun); color: #1A1A2E; border-top: 3px solid var(--text); border-bottom: 3px solid var(--text); text-align: center; }
+.chg-close p { margin: 0 auto; max-width: 54rem; font-family: var(--font-marketing); font-size: 1.1rem; line-height: 1.6; font-weight: 600; }
+.chg-close-label { font-family: var(--font-display); text-transform: uppercase; font-size: .85rem; color: var(--accent); }
+.chg-close a { color: var(--accent); font-weight: 800; text-decoration: none; }
+
+@media (max-width: 900px) {
+  .chg-body { grid-template-columns: 1fr; gap: 1.5rem; }
+  .chg-rail { position: static; flex-direction: row; flex-wrap: wrap; gap: .5rem 1rem; align-items: center; }
+  .chg-rail-month { padding: .15rem .5rem; border-left: 0; border-bottom: 3px solid transparent; }
+  .chg-rail-json { flex-basis: 100%; margin-top: .5rem; }
+}
+@media (max-width: 600px) {
+  .chg-entry { padding: 1.1rem 1.2rem; }
+  .chg-entry-title { font-size: 1.25rem; }
+  .chg-close { padding: 1.5rem 1.25rem; text-align: left; }
+}

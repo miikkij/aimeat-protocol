@@ -34,6 +34,8 @@
  *   import { sitemapPages } from '../data/public-pages.js';
  *   for (const page of sitemapPages()) { ... }
  * @version-history
+ *   v1.4.0 — 2026-08-28 — /v1/changelog and /v1/how-an-app-builds join the registry; /v1/pricing
+ *     left it (the page is gone, the address redirects to the store).
  *   v1.3.0 — 2026-08-16 — buildLlmsHumanPages()/buildLlmsOptionalPages(): the llms.txt index's
  *     human-page and Optional link lists, generated here so a page added above appears in the
  *     index without a second edit. The manual that preceded the index had no human-page list, so
@@ -239,6 +241,48 @@ The full set with forms, examples and cross-references is at
   },
   // /v1/pricing left this registry on 2026-08-28: the page is gone, the address redirects to the
   // store when the node has one (AIMEAT_SITE_STORE_URL) and to the front page when it does not.
+  {
+    // The whole change log, the same file the front page folds into one line. The markdown mirror
+    // points at the JSON rather than copying entries: a copy here would be stale on the next
+    // shipped change, and the file is the record.
+    path: '/v1/changelog',
+    title: 'What shipped here',
+    description: 'Every change the people running this node shipped, newest first, by month, with an address per entry. Written as what a person gets, not what the code does.',
+    changefreq: 'weekly',
+    priority: '0.6',
+    markdown: `What shipped on this node, newest first.
+
+The page at [{{BASE_URL}}/v1/changelog]({{BASE_URL}}/v1/changelog) lists every entry by month
+with a filter by kind (new, fixed, security, notice) and an address per entry. The same log is
+served as JSON at [{{BASE_URL}}/changelog.json]({{BASE_URL}}/changelog.json), one entry per
+change, each with a date, a kind, a title and a body in English and Finnish.
+`,
+  },
+  {
+    // The story of how an app gets built here, in the order the generator's steps happen. It
+    // exists because the front page folded the generator to one line and a stranger never saw
+    // the road: say it, carry the prompt to any AI, bring the file back, it lands on the wall.
+    path: '/v1/how-an-app-builds',
+    title: 'How an app gets built here',
+    description: 'From a sentence to an app on the wall in four beats, with any AI chat you already have and no connector: describe it, carry the prompt to your AI, bring the file back, and it is live at its own address.',
+    changefreq: 'monthly',
+    priority: '0.7',
+    markdown: `How an app gets built on this node, in four beats.
+
+1. Say what you need, in your own words, and pick how it should be built (the proven templates
+   and packs, or the new track with living looks).
+2. Copy the prompt this node assembles (its own build guide plus what you chose) into any AI chat:
+   Claude, ChatGPT, Gemini, any of them. The AI asks a few questions and hands back one HTML file.
+   No connector is needed for this.
+3. Bring the file back: paste the code or upload the file, making an account on the way if you
+   have none. If the AI you used is connected to this node, it publishes the app for you instead.
+4. The app lands on the wall of published apps at its own address, with your name, the date and a
+   live count of opens. Anyone can open it; anyone who likes it can copy it and make it their own.
+
+The page at [{{BASE_URL}}/v1/how-an-app-builds]({{BASE_URL}}/v1/how-an-app-builds) tells the
+same story with the real pieces, and ends with the generator itself, open.
+`,
+  },
   {
     path: '/v1/app-store',
     title: 'Applications published here',

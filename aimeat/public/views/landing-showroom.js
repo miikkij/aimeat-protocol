@@ -151,6 +151,8 @@ export function WallIntro({ money = true }) {
         </h2>
         <p class="ld-sh-text">
           ${tr('landing.wallIntroText', 'Everything below is a real app someone created here by chatting, and several of them earn their keep: a CRM that took over from HubSpot, an auction house where agents bid for you, a morning brief that publishes itself. Open any of them. When one is close to what you need, copy it and make it your own. And when yours is good, sell it.')}
+          ${' '}
+          <a href="/v1/how-an-app-builds">${tr('landing.wallIntroStory', 'How an app gets built here →')}</a>
         </p>
         ${money ? html`
           <div class="ld-sh-box">
