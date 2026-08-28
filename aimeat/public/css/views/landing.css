@@ -89,8 +89,8 @@
 .ld-section { margin: 1rem 0 2rem; }
 /* The wall's heading wears the showroom face; the older blocks that reuse .ld-h2 (the prompts,
    the folded builder) wear it too, which is the point: one page, one voice. */
-.ld-h2 { font-family: var(--font-display); font-weight: 400; text-transform: uppercase; font-size: clamp(1.3rem, 2.4vw, 1.8rem); line-height: 1.1; margin: 0 0 1rem; }
-.ld-wall-search { width: 100%; max-width: 360px; margin: 0 0 1rem; padding: .6rem .8rem; border: 3px solid var(--text); background: var(--card); color: var(--text); font-size: .9rem; font-family: var(--font-marketing); }
+.ld-h2 { font-family: var(--font-showroom); font-weight: 400; text-transform: uppercase; font-size: clamp(1.3rem, 2.4vw, 1.8rem); line-height: 1.1; margin: 0 0 1rem; }
+.ld-wall-search { width: 100%; max-width: 360px; margin: 0 0 1rem; padding: .6rem .8rem; border: 3px solid var(--text); background: var(--card); color: var(--text); font-size: .9rem; font-family: var(--font-showroom-body); }
 .ld-wall-search:focus { outline: none; box-shadow: 4px 4px 0 var(--accent); }
 /* Four up since the showroom: the page is wider and the cards are the proof, so more of them
    fit above the store. Three on a laptop, two on a tablet, one on a phone. */
@@ -241,11 +241,11 @@
   border-top: 3px solid var(--text); border-bottom: 3px solid var(--text);
 }
 .nt-figure { display: flex; align-items: baseline; gap: .6rem; }
-.nt-value { font-family: var(--font-display); font-size: 1.85rem; line-height: 1; font-variant-numeric: tabular-nums; color: var(--sun); }
-.nt-label { font-family: var(--font-marketing); font-size: 1rem; font-weight: 800; }
+.nt-value { font-family: var(--font-showroom); font-size: 1.85rem; line-height: 1; font-variant-numeric: tabular-nums; color: var(--sun); }
+.nt-label { font-family: var(--font-showroom-body); font-size: 1rem; font-weight: 800; }
 /* The one live figure carries a dot; it is the only colour on the strip that is not yellow. */
 .nt-dot { width: 12px; height: 12px; border-radius: 999px; background: var(--mint); align-self: center; }
-.nt-counting { margin: .4rem 0 0; text-align: center; font-family: var(--font-marketing); font-size: .8rem; color: var(--text-muted); }
+.nt-counting { margin: .4rem 0 0; text-align: center; font-family: var(--font-showroom-body); font-size: .8rem; color: var(--text-muted); }
 @media (max-width: 900px) {
   .nt-strip { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .9rem 1rem; padding: 1.25rem; }
   .nt-figure { flex-direction: column; align-items: flex-start; gap: .1rem; }
@@ -279,7 +279,7 @@
    The placeholder is bold italic on purpose: it is the one question the page asks. */
 .ld-wish-input {
   flex: 1 1 auto; min-width: 0;
-  font-family: var(--font-marketing); font-size: 1.2rem; font-weight: 800;
+  font-family: var(--font-showroom-body); font-size: 1.2rem; font-weight: 800;
   padding: .9rem 1.1rem;
   border: 3px solid var(--text); border-radius: 0;
   background: var(--card-bg); color: var(--text);
@@ -288,7 +288,7 @@
 .ld-wish-input:focus { outline: none; box-shadow: 6px 6px 0 var(--text); }
 .ld-wish-input::placeholder { color: var(--text-dim); font-weight: 800; font-style: italic; }
 .ld-wish-go {
-  flex: 0 0 auto; font-family: var(--font-display); font-weight: 400; text-transform: uppercase;
+  flex: 0 0 auto; font-family: var(--font-showroom); font-weight: 400; text-transform: uppercase;
   font-size: 1.2rem; padding: .9rem 1.8rem; border: 3px solid var(--text); border-radius: 0;
   background: var(--accent); color: #FFFFFF; box-shadow: 6px 6px 0 var(--text);
   transition: transform 120ms ease, box-shadow 120ms ease;
@@ -338,8 +338,8 @@
   border-top: 3px solid var(--text); border-bottom: 3px solid var(--text);
   display: flex; flex-direction: column; gap: 1.25rem;
 }
-.ld-log-dogfood { margin: 0 auto; max-width: 54rem; text-align: center; font-family: var(--font-marketing); font-size: 1.1rem; line-height: 1.6; font-weight: 600; }
-.ld-log-dogfood-label { font-family: var(--font-display); text-transform: uppercase; font-size: .9rem; letter-spacing: .02em; color: var(--accent); }
+.ld-log-dogfood { margin: 0 auto; max-width: 54rem; text-align: center; font-family: var(--font-showroom-body); font-size: 1.1rem; line-height: 1.6; font-weight: 600; }
+.ld-log-dogfood-label { font-family: var(--font-showroom); text-transform: uppercase; font-size: .9rem; letter-spacing: .02em; color: var(--accent); }
 .ld-log .collapsible {
   max-width: 54rem; width: 100%; margin: 0 auto;
   border: 3px solid var(--text); box-shadow: 6px 6px 0 var(--text);
