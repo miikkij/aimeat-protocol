@@ -242,6 +242,7 @@ export function buildUiCatalogue(): {
   structures: Array<{ id: string; summary: string }>;
   layouts: readonly AppUiLayoutPreset[];
   signature_tokens: { values: Record<string, string>; summary: string };
+  imagery: { summary: string };
 } {
   return {
     components: UI_COMPONENTS.map((c) => ({
@@ -266,11 +267,17 @@ export function buildUiCatalogue(): {
     layouts: UI_LAYOUT_PRESETS,
     signature_tokens: {
       values: SIGNATURE_TOKENS,
-      summary: 'Optional top-level `tokens`: the app\'s SIGNATURE — bounded overrides of shape, '
-        + 'typography, density and motion, applied on top of the look. Only the names listed here '
-        + 'are legal, and colour is deliberately absent until the contrast bench can prove an '
-        + 'override readable. The design pass: propose two or three token-sets as whole layouts, '
+      summary: 'Optional top-level `tokens`: the app\'s SIGNATURE — bounded overrides of colour, '
+        + 'shape, typography, density and motion, applied on top of the look. Only the names '
+        + 'listed here are legal. The one colour door is --ak-accent as a light/dark pair '
+        + '"#hex/#hex", proven by the full contrast matrix at validation — every other colour '
+        + 'derives from it. The design pass: propose two or three token-sets as whole layouts, '
         + 'dry-run each, show the owner, store the one they pick.',
+    },
+    imagery: {
+      summary: 'Optional top-level `imagery`: art direction for the imagery pipeline as data — '
+        + '{ style: "the illustration prompt fragment", palette_words?: "colour words" }. '
+        + 'Builders and the Design Book\'s illustration parts write it; image generation reads it.',
     },
   };
 }

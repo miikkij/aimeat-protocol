@@ -26,6 +26,9 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.8.0 — 2026-08-28 — The signature section teaches the COLOUR PAIR (--ak-accent as
+ *     "#light/#dark", matrix-proven per mode) and the Design Book section names the five part
+ *     kinds and the replace-vs-merge adopt rule.
  *   v1.7.0 — 2026-08-28 — "Two details" grows into "What the review always catches": the second
  *     AEB round's app-level root causes as rules (say a number once, content before the form,
  *     listDetail always, one top bar, filters apply on change, the tagline, no storage internals
@@ -263,25 +266,34 @@ function composeBody(config: AimeatConfig): string {
     + 'with words when no agent is connected.\n\n';
 
   body += '## The signature: this app\'s own hand\n\n';
-  body += 'A stored layout may carry a top-level `tokens` object: bounded overrides of shape, '
-    + 'typography, density and motion on top of the look (the catalogue\'s `signature_tokens` '
-    + 'lists every legal name — colour is deliberately absent until the contrast bench can prove '
-    + 'an override readable). This is how one app stops looking like every other app on the same '
-    + 'look. THE DESIGN PASS, when the owner asks for a distinctive style: compose two or three '
-    + 'candidate signatures as whole layouts (same blocks, different `tokens`), dry-run each with '
-    + 'the validate endpoint, describe each in one sentence of plain words ("sharp corners, heavy '
-    + 'masthead, snappy motion"), and store the one the owner picks. FROM A REFERENCE: when the '
-    + 'owner shows a page or picture they like, read its shapes — corner rounding, type weight, '
-    + 'density, how much things move — and translate THOSE into the token vocabulary; never copy '
-    + 'colours you cannot prove.\n\n';
+  body += 'A stored layout may carry a top-level `tokens` object: bounded overrides of colour, '
+    + 'shape, typography, density and motion on top of the look (the catalogue\'s '
+    + '`signature_tokens` lists every legal name). The one colour door is `--ak-accent` as a '
+    + 'LIGHT/DARK PAIR "#hex/#hex" — the validator runs the full contrast matrix on each half '
+    + 'against its own mode, so a pair that lands is proven readable everywhere, and a failing '
+    + 'one refuses with the measured numbers and which direction to move. Every other colour '
+    + '(text tint, gradient, spectrum, focus) derives from the accent on its own. This is how '
+    + 'one app stops looking like every other app on the same look. THE DESIGN PASS, when the '
+    + 'owner asks for a distinctive style: compose two or three candidate signatures as whole '
+    + 'layouts (same blocks, different `tokens`), dry-run each with the validate endpoint, '
+    + 'describe each in one sentence of plain words ("sharp corners, heavy masthead, deep green '
+    + 'signature"), and store the one the owner picks. FROM A REFERENCE: when the owner shows a '
+    + 'page or picture they like, read its shapes and its one leading colour — corner rounding, '
+    + 'type weight, density, how much things move — and translate THOSE into the token '
+    + 'vocabulary; a reference colour becomes a pair the matrix accepts, never a copied hex on '
+    + 'trust.\n\n';
 
   body += '## The Design Book first\n\n';
   body += 'Before composing a screen from nothing, search the Design Book '
-    + '(`aimeat_designbook_search`, or GET /v1/designbook): it holds PROVEN arrangements — every '
-    + 'part passed the same validator your layout must pass, and adopting one '
-    + '(`aimeat_designbook_adopt`) is one call. A starting shape from the Book plus your words '
-    + 'beats a fresh composition, and when you make an arrangement worth keeping, propose it '
-    + 'back (`aimeat_designbook_propose`) so the next build starts where you finished.\n\n';
+    + '(`aimeat_designbook_search`, or GET /v1/designbook): it holds PROVEN parts — every one '
+    + 'passed its own bench before landing, and adopting one (`aimeat_designbook_adopt`) is one '
+    + 'call. Five kinds: a `layout` (a complete arrangement) or `fill` (a starting shape with '
+    + '<placeholder> slots) REPLACES the app\'s arrangement; a `look` (a signature token sheet, '
+    + 'colour pair included), `motion` (a motion recipe) or `illustration` (art direction for '
+    + 'the imagery) MERGES into the arrangement the app already has. A starting shape from the '
+    + 'Book plus your words beats a fresh composition, and when you make something worth '
+    + 'keeping, propose it back (`aimeat_designbook_propose`) so the next build starts where '
+    + 'you finished.\n\n';
 
   body += '## AI inside the app\n\n';
   body += 'The `aide` block puts an AI panel on the screen whose tools are the app\'s OWN '
