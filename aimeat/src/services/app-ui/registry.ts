@@ -25,6 +25,9 @@
  * @usage
  *   import { UI_COMPONENTS, componentById, buildUiCatalogue } from './registry.js';
  * @version-history
+ *   v1.7.0 — 2026-08-28 — The harvest trio (append-only): `matrix` (suunta's comparison grid),
+ *     `graph` (suunta's node map) and `waveform` (the sound strip kaiku, band-jam and
+ *     freepartylights each hand-rolled) join the components.
  *   v1.6.0 — 2026-08-28 — THE HARVEST BEGINS (append-only): `chart` joins the components —
  *     grouped bars + drawn lines over one label axis, the shape budjetti proved every money
  *     view needs. The Book can now carry chart-bearing arrangements as data.
@@ -188,6 +191,36 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
   {
     id: 'chart',
     summary: 'Grouped bars and drawn lines over one label axis — the costs/income/cash-curve shape. The source resolves to ONE record: { labels: string[], series: [{ id, label, kind: "bar"|"line", values: number[] }] }. Colours come from the look\'s own accent spectrum; negatives are legal and the zero line appears when crossed.',
+    props: {
+      source: source(),
+      title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
+      emptyTitle: text('What the empty state says.', 80),
+      emptyHint: text('The line under it.', 160),
+    },
+  },
+  {
+    id: 'matrix',
+    summary: 'Labelled rows against labelled columns, every cell a toned word — the comparison grid (capabilities × competitors, coverage, readiness). The source resolves to ONE record: { cols: [{ id, label }], rows: [{ id, label, badge?, tone?, cells: [{ col, tone: "ok"|"warn"|"err"|"accent"|"plain", label? }] }] }. Wide grids scroll inside their own box.',
+    props: {
+      source: source(),
+      title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
+      emptyTitle: text('What the empty state says.', 80),
+      emptyHint: text('The line under it.', 160),
+    },
+  },
+  {
+    id: 'graph',
+    summary: 'Named nodes and the lines between them, read-only — a capability map, a dependency web. The source resolves to ONE record: { nodes: [{ id, label, tone?, x?, y? }], edges: [{ from, to, label? }] }; coordinates are 0-100 when given, and nodes without them sit on a deterministic ring.',
+    props: {
+      source: source(),
+      title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
+      emptyTitle: text('What the empty state says.', 80),
+      emptyHint: text('The line under it.', 160),
+    },
+  },
+  {
+    id: 'waveform',
+    summary: 'Sound (or any magnitudes) as mirrored bars, quiet ink to loud accent. The source resolves to ONE record: { values: number[], max? }; the app owns the audio, the kit owns the picture.',
     props: {
       source: source(),
       title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
