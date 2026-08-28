@@ -358,6 +358,7 @@ export const REQUIRED_BASE = [
   '--ak-bg', '--ak-surface', '--ak-surface-2', '--ak-surface-image', '--ak-ink', '--ak-ink-dim',
   '--ak-line', '--ak-line-w', '--ak-accent', '--ak-accent-2', '--ak-spectrum-2', '--ak-spectrum-3',
   '--ak-page-image', '--ak-glass', '--ak-blur', '--ak-grain', '--ak-accent-ink', '--ak-accent-text',
+  '--ak-hero-ink', '--ak-hero-ink-dim',
   '--ak-ok', '--ak-warn', '--ak-err', '--ak-focus', '--ak-grad', '--ak-scrim', '--ak-hero-image',
   '--ak-radius', '--ak-radius-sm', '--ak-radius-pill', '--ak-elev-1', '--ak-elev-2',
   '--ak-font', '--ak-font-display', '--ak-font-mono',
@@ -511,12 +512,24 @@ export function runMatrix(overrides?: Record<string, string>): Result[] {
           add(combo, 'AK-GRAD action ink on gradient stop', ratio(accentInk, ground), MIN_TEXT, 'primary-action text on the brand gradient');
         }
 
-        // AK-SCRIM: ink over the scrim over every ground the hero can show.
+        // AK-SCRIM: the hero's OWN ink pair over the scrim over every ground the band can show.
+        // The band's base is ALWAYS the brand gradient (shell.css paints var(--ak-grad) under the
+        // mesh), so the grounds are the grad stops and every mesh stop COMPOSITED OVER each grad
+        // stop — never the bare page, which the band never reveals. Modelling the page as a
+        // ground was the conservatism that made a saturated banner unprovable; the hero-ink pair
+        // (default: the page ink; inverse: the action ink) is what a look declares and this
+        // proves.
+        const heroInk = colorOf('--ak-hero-ink');
+        const heroInkDim = colorOf('--ak-hero-ink-dim');
         const heroRaw = vars.get('--ak-hero-image')!;
         const meshStops = heroRaw === 'none' ? [] : gradientStops(heroRaw, vars, `${combo} --ak-hero-image`);
-        const heroGrounds = [...gradGrounds, ...meshStops.map((s) => (s.alpha === 1 ? s.hex : over(s, bg))), bg];
+        const heroGrounds = [
+          ...gradGrounds,
+          ...meshStops.flatMap((s) => (s.alpha === 1 ? [s.hex] : gradGrounds.map((g) => over(s, g)))),
+        ];
         for (const ground of heroGrounds) {
-          add(combo, 'AK-SCRIM ink over scrim', ratio(ink, over(scrim, ground)), MIN_TEXT, 'hero text on the scrimmed ground');
+          add(combo, 'AK-SCRIM hero ink over scrim', ratio(heroInk, over(scrim, ground)), MIN_TEXT, 'hero title on the scrimmed band');
+          add(combo, 'AK-SCRIM hero sub over scrim', ratio(heroInkDim, over(scrim, ground)), MIN_TEXT, 'hero subline on the scrimmed band');
         }
         // Only pigment laid over the page ground counts against the mesh budget — a nested hue
         // blend between two accents is vocabulary, not coverage (see groundMixPercents).

@@ -218,6 +218,7 @@
 }
 .ak-hero__title {
   margin: 0;
+  color: var(--ak-hero-ink);
   font-family: var(--ak-font-display);
   font-weight: var(--ak-weight-display);
   font-size: var(--ak-text-hero);
@@ -227,7 +228,7 @@
   text-shadow: var(--ak-display-shadow);
   -webkit-text-stroke: var(--ak-display-stroke);
 }
-.ak-hero__sub { margin: 0; font-size: var(--ak-text-body); color: var(--ak-ink-dim); }
+.ak-hero__sub { margin: 0; font-size: var(--ak-text-body); color: var(--ak-hero-ink-dim); }
 .ak-hero__sub[hidden] { display: none; }
 .ak-hero__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
 .ak-hero__actions[hidden] { display: none; }
