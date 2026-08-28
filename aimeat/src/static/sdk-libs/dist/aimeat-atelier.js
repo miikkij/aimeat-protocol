@@ -241,13 +241,13 @@
       zoomOut: "Zoom out",
       fitView: "Fit to view",
       send: "Send",
-      copilotTitle: "Copilot",
-      copilotPlaceholder: "Ask, or say what to do…",
-      copilotNotice: "You are talking with an AI. Answers can be wrong; actions run only when you confirm them.",
-      copilotNoAi: "AI is not set up on this account yet. Connect a key under Profile, and the copilot wakes up.",
-      copilotFailed: "That did not go through. Try again.",
-      copilotRun: "Run it",
-      copilotUnknownAction: "The model proposed something this app does not declare — nothing was run.",
+      aideTitle: "Aide",
+      aidePlaceholder: "Ask, or say what to do…",
+      aideNotice: "You are talking with an AI. Answers can be wrong; actions run only when you confirm them.",
+      aideNoAi: "AI is not set up on this account yet. Connect a key under Profile, and the aide wakes up.",
+      aideFailed: "That did not go through. Try again.",
+      aideRun: "Run it",
+      aideUnknownAction: "The model proposed something this app does not declare — nothing was run.",
       explainTitle: "What this screen holds"
     },
     fi: {
@@ -281,13 +281,13 @@
       zoomOut: "Loitonna",
       fitView: "Sovita näkymään",
       send: "Lähetä",
-      copilotTitle: "Copilot",
-      copilotPlaceholder: "Kysy, tai sano mitä tehdään…",
-      copilotNotice: "Keskustelet tekoälyn kanssa. Vastaus voi olla väärin; toiminnot ajetaan vasta kun vahvistat ne.",
-      copilotNoAi: "Tälle tilille ei ole vielä kytketty tekoälyä. Liitä avain profiilissa, niin copilot herää.",
-      copilotFailed: "Se ei mennyt läpi. Yritä uudelleen.",
-      copilotRun: "Aja",
-      copilotUnknownAction: "Malli ehdotti jotain mitä tämä appsi ei tunne — mitään ei ajettu.",
+      aideTitle: "Apuri",
+      aidePlaceholder: "Kysy, tai sano mitä tehdään…",
+      aideNotice: "Keskustelet tekoälyn kanssa. Vastaus voi olla väärin; toiminnot ajetaan vasta kun vahvistat ne.",
+      aideNoAi: "Tälle tilille ei ole vielä kytketty tekoälyä. Liitä avain profiilissa, niin apuri herää.",
+      aideFailed: "Se ei mennyt läpi. Yritä uudelleen.",
+      aideRun: "Aja",
+      aideUnknownAction: "Malli ehdotti jotain mitä tämä appsi ei tunne — mitään ei ajettu.",
       explainTitle: "Mitä tällä näytöllä on"
     },
     es: {
@@ -321,13 +321,13 @@
       zoomOut: "Alejar",
       fitView: "Ajustar a la vista",
       send: "Enviar",
-      copilotTitle: "Copilot",
-      copilotPlaceholder: "Pregunta, o di qué hacer…",
-      copilotNotice: "Estás hablando con una IA. Las respuestas pueden fallar; las acciones solo se ejecutan cuando las confirmas.",
-      copilotNoAi: "Esta cuenta aún no tiene IA configurada. Conecta una clave en el perfil y el copilot despierta.",
-      copilotFailed: "No ha funcionado. Inténtalo otra vez.",
-      copilotRun: "Ejecutar",
-      copilotUnknownAction: "El modelo propuso algo que esta app no declara — no se ejecutó nada.",
+      aideTitle: "Ayudante",
+      aidePlaceholder: "Pregunta, o di qué hacer…",
+      aideNotice: "Estás hablando con una IA. Las respuestas pueden fallar; las acciones solo se ejecutan cuando las confirmas.",
+      aideNoAi: "Esta cuenta aún no tiene IA configurada. Conecta una clave en el perfil y el ayudante despierta.",
+      aideFailed: "No ha funcionado. Inténtalo otra vez.",
+      aideRun: "Ejecutar",
+      aideUnknownAction: "El modelo propuso algo que esta app no declara — no se ejecutó nada.",
       explainTitle: "Qué hay en esta pantalla"
     }
   };
@@ -982,7 +982,7 @@
     };
   }
 
-  // src/static/sdk-libs/atelier/copilot.js
+  // src/static/sdk-libs/atelier/aide.js
   var SOURCE_CHARS_MAX = 2e3;
   var CONTEXT_CHARS_MAX = 8e3;
   var PANEL_BLOCKS_MAX = 8;
@@ -1000,18 +1000,18 @@
     },
     required: ["reply"]
   };
-  function copilot(spec) {
+  function aide(spec) {
     const s = spec || {};
     const history = [];
     let firstSend = true;
-    const log = el("div", { class: "ak-copilot__log", role: "log", "aria-live": "polite" });
+    const log = el("div", { class: "ak-aide__log", role: "log", "aria-live": "polite" });
     const input = (
       /** @type {HTMLTextAreaElement} */
       el("textarea", {
-        class: "ak-input ak-input--area ak-copilot__input",
+        class: "ak-input ak-input--area ak-aide__input",
         rows: 2,
-        placeholder: t("copilotPlaceholder"),
-        "aria-label": t("copilotPlaceholder")
+        placeholder: t("aidePlaceholder"),
+        "aria-label": t("aidePlaceholder")
       })
     );
     const sendBtn = el("button", {
@@ -1027,14 +1027,14 @@
         send();
       }
     });
-    const notice = el("p", { class: "ak-copilot__notice" });
-    const root = el("section", { class: "ak-root ak-copilot", "aria-label": "Copilot" }, [
-      el("header", { class: "ak-copilot__head" }, [
-        el("h2", { class: "ak-section__title", text: t("copilotTitle") }),
+    const notice = el("p", { class: "ak-aide__notice" });
+    const root = el("section", { class: "ak-root ak-aide", "aria-label": "Aide" }, [
+      el("header", { class: "ak-aide__head" }, [
+        el("h2", { class: "ak-section__title", text: t("aideTitle") }),
         notice
       ]),
       log,
-      el("div", { class: "ak-copilot__row" }, [input, sendBtn])
+      el("div", { class: "ak-aide__row" }, [input, sendBtn])
     ]);
     if (s.target) resolve(s.target).appendChild(root);
     enter(root);
@@ -1050,15 +1050,15 @@
         console.warn("aimeat-atelier: the AI notice did not render", err);
       }
     } else {
-      notice.textContent = t("copilotNotice");
+      notice.textContent = t("aideNotice");
     }
     if (s.intro) bubble("assistant", s.intro, null);
     function bubble(who, text, provenance) {
-      const b = el("div", { class: "ak-copilot__msg ak-copilot__msg--" + who }, [
-        el("p", { class: "ak-copilot__text", text })
+      const b = el("div", { class: "ak-aide__msg ak-aide__msg--" + who }, [
+        el("p", { class: "ak-aide__text", text })
       ]);
       if (who === "assistant" && provenance && aiNs && typeof aiNs.disclose === "function") {
-        const tag = el("span", { class: "ak-copilot__label" });
+        const tag = el("span", { class: "ak-aide__label" });
         b.appendChild(tag);
         try {
           aiNs.disclose(provenance, { target: tag });
@@ -1080,7 +1080,7 @@
         try {
           data = await Promise.resolve().then(s.sources[name]);
         } catch (err) {
-          console.warn('aimeat-atelier: copilot source "' + name + '" failed', err);
+          console.warn('aimeat-atelier: aide source "' + name + '" failed', err);
           continue;
         }
         const chunk = JSON.stringify(data).slice(0, Math.min(SOURCE_CHARS_MAX, budget));
@@ -1101,14 +1101,14 @@
       const text = input.value.trim();
       if (!text) return;
       if (!aiNs || typeof aiNs.completeJson !== "function") {
-        bubble("assistant", t("copilotNoAi"), null);
+        bubble("assistant", t("aideNoAi"), null);
         return;
       }
       const available = await aiNs.isAvailable().catch(function() {
         return false;
       });
       if (!available) {
-        bubble("assistant", t("copilotNoAi"), null);
+        bubble("assistant", t("aideNoAi"), null);
         return;
       }
       input.value = "";
@@ -1116,7 +1116,7 @@
       history.push({ who: "user", text });
       const thinking = bubble("assistant", "…", null);
       const prompt = [
-        'You are the in-app copilot of "' + (s.appName || document.title || "this app") + '" on the AIMEAT platform.',
+        'You are the in-app aide of "' + (s.appName || document.title || "this app") + '" on the AIMEAT platform.',
         "You may ONLY act through the declared actions below, and only propose one when the person asked to DO something.",
         'Answer as JSON: { "reply": "<plain words for the person>", "action"?: { "id", "params" }, "panel"?: <a small mosaic layout { v:1, blocks:[...] } when a visual answer helps> }.',
         actionsText(),
@@ -1132,7 +1132,7 @@
         out = await aiNs.completeJson({
           prompt,
           schema: ANSWER_SCHEMA,
-          app_id: s.appId || s.appName || "atelier-copilot",
+          app_id: s.appId || s.appName || "atelier-aide",
           confirm: firstSend
         });
         firstSend = false;
@@ -1140,12 +1140,12 @@
         thinking.remove();
         const code = err && /** @type {any} */
         err.code;
-        bubble("assistant", code === "SPEND_CANCELLED" ? t("cancel") + "." : t("copilotFailed"), null);
+        bubble("assistant", code === "SPEND_CANCELLED" ? t("cancel") + "." : t("aideFailed"), null);
         return;
       }
       thinking.remove();
       const answer = out && out.data ? out.data : out;
-      const reply = answer && typeof answer.reply === "string" ? answer.reply : t("copilotFailed");
+      const reply = answer && typeof answer.reply === "string" ? answer.reply : t("aideFailed");
       const b = bubble("assistant", reply, out && out.provenance ? out.provenance : null);
       history.push({ who: "assistant", text: reply });
       if (answer && answer.action && answer.action.id) offerAction(answer.action, b);
@@ -1156,10 +1156,10 @@
         return a.id === proposed.id;
       });
       if (!declared) {
-        into.appendChild(el("p", { class: "ak-copilot__text", text: t("copilotUnknownAction") }));
+        into.appendChild(el("p", { class: "ak-aide__text", text: t("aideUnknownAction") }));
         return;
       }
-      const row = el("div", { class: "ak-copilot__confirm" }, [
+      const row = el("div", { class: "ak-aide__confirm" }, [
         el("span", { text: declared.summary }),
         el("button", {
           type: "button",
@@ -1173,11 +1173,11 @@
               row.appendChild(el("span", { text: typeof result === "string" ? result : t("ready") }));
             } catch (err) {
               clear(row);
-              row.appendChild(el("span", { text: t("copilotFailed") + " " + String(err && /** @type {any} */
+              row.appendChild(el("span", { text: t("aideFailed") + " " + String(err && /** @type {any} */
               err.message || "") }));
             }
           } }
-        }, t("copilotRun")),
+        }, t("aideRun")),
         el("button", {
           type: "button",
           class: "ak-btn ak-btn--ghost",
@@ -1195,7 +1195,7 @@
         window.AIMEAT
       );
       if (!ns || !ns.atelier || typeof ns.atelier.mosaic !== "function") return;
-      const host = el("div", { class: "ak-copilot__panel" });
+      const host = el("div", { class: "ak-aide__panel" });
       into.appendChild(host);
       try {
         const handle = ns.atelier.mosaic({ target: host, layout: { v: 1, blocks: panel.blocks }, sources: s.sources || {} });
@@ -2178,8 +2178,8 @@
           alive.handles.push(hero({ target: into, title: p.title, sub: p.sub, image: p.image }));
           return;
         }
-        case "copilot": {
-          alive.handles.push(copilot({
+        case "aide": {
+          alive.handles.push(aide({
             target: into,
             appName: p.title || document.title,
             intro: p.intro,
@@ -2671,7 +2671,7 @@
       },
       /**
        * ONE DECLARATION, FOUR DOORS: expose this mosaic's declared actions to an in-browser agent
-       * through WebMCP. The same { id, summary, params, run } the buttons and the copilot use
+       * through WebMCP. The same { id, summary, params, run } the buttons and the aide use
        * becomes the visiting agent's tool — same handler, same limits, nothing extra. Returns the
        * registration surface name, or 'none' when the page has no agent API or no actions.
        * @returns {Promise<string>}
@@ -2757,7 +2757,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.13.0",
+    version: "0.14.0",
     // ── Shell and navigation ──
     app,
     section,
@@ -2770,7 +2770,7 @@
     hero,
     statRow,
     figure,
-    copilot,
+    aide,
     /**
      * Read something aloud through the platform's speech library, when the page carries it.
      * Opt-in by construction: nothing speaks until the app puts a control on the screen and a

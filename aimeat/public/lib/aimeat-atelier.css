@@ -36,6 +36,8 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.14.0 — 2026-08-28 — copilot → aide: the panel classes are .ak-aide__* now. Renamed before
+ *     any app used the block, so nothing breaks; the developer picked the name.
  *   v0.13.0 — 2026-08-28 — The AI-native layer (content.css: the copilot panel — log, bubbles,
  *     confirm row, inline generated panel — and the explain list).
  *   v0.12.0 — 2026-08-28 — The signature and the morphs (JS side: mosaic tokens + shared-element
