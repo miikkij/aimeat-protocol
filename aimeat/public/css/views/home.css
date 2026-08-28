@@ -14,6 +14,8 @@
  *   over the showroom-sticker and night-shift alternatives. The onboarding steps keep their plain
  *   card shape: one job at a time, nothing pulling the eye away from the open step.
  * @version-history
+ *   v3.0.1 — 2026-08-29 — Every poster headline reads --font-poster-weight instead of a literal 400,
+ *     so the face and its weight change together in theme.css.
  *   v3.0.0 — 2026-08-28 — The poster face. .koti drops its card frame for a wide paper column;
  *     .koti-name is the masthead; .koti-big is the numeral in the mailbox and fleet lines;
  *     .koti-chatdoor is the band (rotated pseudo-elements, straight under 640px); bands are
@@ -83,7 +85,7 @@ body:has(.koti) .page-content { background: var(--bg); }
 .koti-welcome { margin-bottom: 2rem; }
 .koti-h1 {
   font-family: var(--font-poster);
-  font-weight: 400;
+  font-weight: var(--font-poster-weight);
   font-size: 2.6rem;
   letter-spacing: -0.03em;
   text-transform: uppercase;
@@ -118,7 +120,7 @@ body:has(.koti) .page-content { background: var(--bg); }
 .koti-step-open .koti-step-num { border-color: var(--text); background: var(--sun); color: var(--text); }
 .koti-step-num-done { border-color: var(--success); color: var(--success); }
 
-.koti-step-title { font-family: var(--font-poster); font-weight: 400; font-size: 1.15rem; text-transform: uppercase; margin: 0; }
+.koti-step-title { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.15rem; text-transform: uppercase; margin: 0; }
 .koti-step-lede { color: var(--text-dim); font-size: 0.98rem; line-height: 1.55; margin: 0 0 1.1rem; }
 .koti-step-dim .koti-step-lede { margin-bottom: 0; }
 
@@ -281,7 +283,7 @@ body:has(.koti) .page-content { background: var(--bg); }
 .koti-agent-dot--idle { background: var(--text-muted); }
 .koti-agent-dot--new,
 .koti-agent-dot--onboarding { background: var(--warning); }
-.koti-agent-name { font-family: var(--font-poster); font-weight: 400; font-size: 1.15rem; text-transform: uppercase; }
+.koti-agent-name { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.15rem; text-transform: uppercase; }
 .koti-agent-sub { font-size: 0.9rem; color: var(--text-dim); }
 .koti-agent-toggle { margin-top: 0.7rem; font-size: 0.88rem; }
 .koti-agent-details { margin: 0.8rem 0 0; display: grid; grid-template-columns: auto 1fr; gap: 0.35rem 1rem; }
@@ -347,7 +349,7 @@ body:has(.koti) .page-content { background: var(--bg); }
 .koti-avatar svg { width: 100%; height: 100%; display: block; }
 .koti-nameplate { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
 .koti-name {
-  font-family: var(--font-poster); font-weight: 400;
+  font-family: var(--font-poster); font-weight: var(--font-poster-weight);
   font-size: 5.2rem; line-height: 0.9; letter-spacing: -0.035em; text-transform: uppercase;
   color: var(--text);
   max-width: 12ch;
@@ -376,7 +378,7 @@ body:has(.koti) .page-content { background: var(--bg); }
 .koti-mailbox:hover, .koti-fleet:hover { color: var(--accent); }
 .koti-mailbox-icon { display: none; }
 .koti-big {
-  font-family: var(--font-poster); font-weight: 400;
+  font-family: var(--font-poster); font-weight: var(--font-poster-weight);
   font-size: 3rem; line-height: 0.85; letter-spacing: -0.04em;
   color: var(--text); margin-right: 0.2rem;
 }
@@ -400,7 +402,7 @@ body:has(.koti) .page-content { background: var(--bg); }
 .koti-chatdoor::after { height: 22px; background: var(--sun); transform: translateY(calc(-50% + 118px)) rotate(-2.5deg); }
 .koti-chatdoor-text { position: relative; z-index: 1; min-width: 0; flex: 1 1 24rem; }
 .koti-chatdoor-lede {
-  margin: 0; font-family: var(--font-poster); font-weight: 400;
+  margin: 0; font-family: var(--font-poster); font-weight: var(--font-poster-weight);
   font-size: 2rem; line-height: 1.05; letter-spacing: -0.02em; text-transform: uppercase;
   color: var(--bg); max-width: 22ch;
 }
@@ -424,7 +426,7 @@ body:has(.koti) .page-content { background: var(--bg); }
 /* ── The bands: a headline over ink rules, the space between them doing the grouping ── */
 .koti-band { margin-top: 4.5rem; }
 .koti-band-title {
-  font-family: var(--font-poster); font-weight: 400;
+  font-family: var(--font-poster); font-weight: var(--font-poster-weight);
   font-size: 2.4rem; line-height: 0.95; letter-spacing: -0.03em; text-transform: uppercase;
   color: var(--text); margin: 0 0 1.4rem;
 }
@@ -450,7 +452,7 @@ body:has(.koti) .page-content { background: var(--bg); }
   transition: border-color .15s;
 }
 .koti-thing:hover { border-color: var(--accent); }
-.koti-thing-n { font-family: var(--font-poster); font-weight: 400; font-size: 1.05rem; color: var(--accent); }
+.koti-thing-n { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.05rem; color: var(--accent); }
 .koti-thing-label { color: var(--text); }
 .koti-thing--named { padding: 0.2rem 0; gap: 0.35rem; }
 .koti-thing--named .koti-thing-n { font-size: 0.95rem; }
@@ -597,7 +599,7 @@ a.koti-feed-line:hover { color: var(--accent); }
 .koti-hist-empty { font-size: 0.95rem; color: var(--text-dim); line-height: 1.6; }
 .koti-hist-archive { margin-top: 2.6rem; padding-top: 1.6rem; border-top: 3px solid var(--text); }
 .koti-hist-archtitle {
-  font-family: var(--font-poster); font-weight: 400; font-size: 1.4rem; text-transform: uppercase;
+  font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.4rem; text-transform: uppercase;
   color: var(--text); margin: 0 0 0.4rem;
 }
 .koti-hist-archnote { margin: 0 0 1rem; font-size: 0.9rem; color: var(--text-dim); line-height: 1.6; }
@@ -702,7 +704,7 @@ a.koti-feed-line:hover { color: var(--accent); }
   gap: 0.75rem; flex-wrap: wrap; margin: 0 0 0.8rem;
 }
 .open-items-title {
-  font-family: var(--font-poster); font-weight: 400; font-size: 1.4rem; letter-spacing: -0.02em;
+  font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.4rem; letter-spacing: -0.02em;
   text-transform: uppercase; color: var(--text); margin: 0;
 }
 .open-items-count {

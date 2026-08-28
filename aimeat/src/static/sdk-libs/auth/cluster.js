@@ -11,6 +11,9 @@
  * @structure ensureClusterStyles() — idempotent <style> injector.
  * @usage import { ensureClusterStyles } from './cluster.js';   (pill.js calls it once per render)
  * @version-history
+ *   v1.1.0 — 2026-08-29 — The segments and the popover trigger wear the pill's new frame: a 2px
+ *     currentColor border, square unless --aimeat-pill-radius says otherwise, the pressed option
+ *     filled with the page's text colour. Matches pill.js v1.4.0.
  *   v1.0.0 — 2026-07-25 — Born with the control cluster (theme system v2): replaces the per-button
  *     inline styles of the old cycling language button + lone theme toggle.
  */
@@ -24,9 +27,9 @@ export function ensureClusterStyles() {
     '.aimeat-ctl{display:inline-flex;align-items:center;gap:6px}',
 
     /* Segmented group: one bordered pill, every option a button. */
-    '.aimeat-seg{display:inline-flex;align-items:stretch;height:30px;flex:0 0 auto;',
-      'border:1px solid color-mix(in oklab,currentColor 38%,transparent);border-radius:999px;',
-      'overflow:hidden;background:color-mix(in oklab,currentColor 5%,transparent)}',
+    '.aimeat-seg{display:inline-flex;align-items:stretch;height:26px;flex:0 0 auto;',
+      'border:2px solid currentColor;border-radius:var(--aimeat-pill-radius,0);',
+      'overflow:hidden;background:transparent}',
     '.aimeat-seg button{appearance:none;border:0;background:transparent;color:currentColor;',
       'opacity:.6;font:700 11px/1 "Inter","Segoe UI",system-ui,sans-serif;letter-spacing:.4px;',
       'padding:0 10px;margin:0;cursor:pointer;display:inline-flex;align-items:center;gap:4px;',
@@ -34,15 +37,15 @@ export function ensureClusterStyles() {
     '.aimeat-seg button:hover{opacity:.9}',
     '.aimeat-seg button:focus-visible{outline:2px solid currentColor;outline-offset:-2px;opacity:1}',
     '.aimeat-seg button[aria-pressed="true"]{opacity:1;',
-      'background:color-mix(in oklab,currentColor 16%,transparent)}',
-    '.aimeat-seg button+button{border-left:1px solid color-mix(in oklab,currentColor 22%,transparent)}',
+      'background:var(--aimeat-pill-fg,var(--text,#1A1A2E));color:var(--aimeat-pill-bg,var(--bg,#FAFAF8))}',
+    '.aimeat-seg button+button{border-left:0}',
     '.aimeat-seg .seg-ico{font-size:13px;line-height:1}',
 
     /* Popover trigger (palette picker; language picker when 4+ languages). */
     '.aimeat-pop-wrap{position:relative;display:inline-flex;flex:0 0 auto}',
     '.aimeat-pop-btn{appearance:none;display:inline-flex;align-items:center;justify-content:center;',
-      'gap:5px;height:30px;min-width:30px;padding:0 7px;background:color-mix(in oklab,currentColor 5%,transparent);',
-      'border:1px solid color-mix(in oklab,currentColor 38%,transparent);border-radius:999px;',
+      'gap:5px;height:26px;min-width:26px;padding:0 6px;background:transparent;',
+      'border:2px solid currentColor;border-radius:var(--aimeat-pill-radius,0);',
       'cursor:pointer;color:currentColor;font:700 11px/1 "Inter","Segoe UI",system-ui,sans-serif;letter-spacing:.4px;',
       'transition:background var(--motion-fast,120ms) ease}',
     '.aimeat-pop-btn:hover{background:color-mix(in oklab,currentColor 12%,transparent)}',

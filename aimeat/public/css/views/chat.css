@@ -17,6 +17,7 @@
  *
  *   NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v2.0.1 — 2026-08-29 — Poster headlines read --font-poster-weight (theme.css) instead of a literal 400.
  *   v2.0.0 — 2026-08-28 — The poster chat. The rail carries .chat-this (name, status, actions) and
  *     .chat-rail-foot (notice, credit); .chat-head is phone-only; the composer is one 44px row with
  *     an underline field and an ink Send slab; user turns are sun blocks, agent turns carry a coral
@@ -167,7 +168,7 @@
 .chat-this .chat-rail-h { margin-bottom: 2px; }
 .chat-rail-title {
   margin: 0;
-  font-family: var(--font-poster); font-weight: 400;
+  font-family: var(--font-poster); font-weight: var(--font-poster-weight);
   font-size: 0.95rem; line-height: 1.15; letter-spacing: -0.01em; text-transform: uppercase;
   overflow-wrap: anywhere;
 }
@@ -232,7 +233,7 @@
 }
 
 .chat-welcome h2 {
-  font-family: var(--font-poster); font-weight: 400;
+  font-family: var(--font-poster); font-weight: var(--font-poster-weight);
   font-size: 2rem; line-height: 0.95; letter-spacing: -0.03em; text-transform: uppercase;
   margin: 0 0 10px;
   color: var(--text);
@@ -475,7 +476,7 @@
   padding: 1rem 0 1.2rem;
   margin-top: 0.5rem;
 }
-.chat-cap-title { margin: 0 0 0.4rem; font-family: var(--font-poster); font-weight: 400; font-size: 1.2rem; text-transform: uppercase; }
+.chat-cap-title { margin: 0 0 0.4rem; font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.2rem; text-transform: uppercase; }
 .chat-cap-body { margin: 0 0 0.8rem; font-size: 0.95rem; font-weight: 600; color: var(--text-dim); line-height: 1.55; }
 .chat-cap-actions { display: flex; gap: 0.7rem; flex-wrap: wrap; }
 
@@ -737,7 +738,7 @@
   }
   .chat-title {
     flex: 1 1 auto; min-width: 0; margin: 0;
-    font-family: var(--font-poster); font-weight: 400;
+    font-family: var(--font-poster); font-weight: var(--font-poster-weight);
     font-size: 0.9rem; line-height: 1.1; letter-spacing: -0.01em; text-transform: uppercase;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }

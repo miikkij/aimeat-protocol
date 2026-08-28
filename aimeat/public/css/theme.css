@@ -12,6 +12,13 @@
    @usage Loaded first in spa.html <head>; the theme is toggled by /js/theme.js
      which flips the data-theme attribute on <html>.
    @version-history
+     v1.32.0 — 2026-08-29 — Poster weight tokens: --font-poster-weight (the headline cut, 400 on
+       Archivo Black), --font-poster-text-weight (500) and --font-poster-strong-weight (700) for the
+       machine room's running text and its emphasised words, so the face and its weights change
+       in one place. --on-sun is the ink for words on a sun selection. The top bar wears the poster
+       face: a 3px ink rule under it, bold links with the open one underlined in coral, the morsel
+       count on a sun chip. The sign-in pill itself lives in the auth lib (sdk-libs/auth/pill.js)
+       and now draws its colours from the page's own tokens instead of a gold gradient.
      v1.31.0 — 2026-08-28 — --font-poster (Archivo Black): the display face of the poster skin the
        home, the settings overview and the chat wear (design canvas "AIMEAT Home, Settings and
        Chat", direction C). Additive only; loaded in spa.html with the other faces.
@@ -192,10 +199,20 @@
      on every heading in the shell for one afternoon. */
   --font-showroom: 'Bungee', 'Archivo', 'DM Sans', system-ui, sans-serif;
   --font-showroom-body: 'Archivo', 'DM Sans', system-ui, sans-serif;
-  /* The poster voice of the inside pages (home, settings overview, chat): Archivo Black for the
-     headlines and the big numbers, --font-showroom-body for everything else. Same rule as above:
-     not --font-display. */
+  /* The poster voice of the inside pages (home, settings and its tabs, chat): Archivo Black for
+     every headline and big numeral, --font-showroom-body for everything else. The weights are
+     tokens so the whole skin changes in one place: the headline face has one weight (400 is
+     Archivo Black's only cut; put 'Archivo' first and raise it for a lighter headline), the
+     running text of the machine room sits at --font-poster-text-weight and its emphasised words
+     (row names, labels, actions) at --font-poster-strong-weight. Same rule as above: not
+     --font-display. */
   --font-poster: 'Archivo Black', 'Archivo', 'DM Sans', system-ui, sans-serif;
+  --font-poster-weight: 400;
+  --font-poster-text-weight: 500;
+  --font-poster-strong-weight: 700;
+  /* Ink on the sun: the words on a sun-yellow selection stay ink in every theme, because --sun
+     does not flip in dark mode and --text does. */
+  --on-sun: #1A1A2E;
 
   /* The sticker yellow of the showroom front page. Used for the kicker, the price sticker and the
      live counters; not a semantic colour (that is --warn) and it does not flip in dark mode. */
@@ -720,8 +737,30 @@ a { color: inherit; text-decoration: none; }
 .topnav-menu { display: flex; align-items: center; gap: 0.75rem; flex-wrap: nowrap; justify-content: flex-end; }
 .topnav-menu > a { white-space: nowrap; }
 .topnav-burger { display: none; }
-/* Truncate a long GHII in the gold pill so it never blows out the bar (desktop). */
+/* Truncate a long GHII in the pill so it never blows out the bar (desktop). */
 .aimeat-auth-ghii { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── The poster bar: the header wears the same face as the pages under it ──────────────────
+   A 3px ink rule instead of a hairline, bold links with the open one underlined in coral, the
+   morsel count on a sun chip, the bell and the pill in ink frames. Everything reads the shell's
+   tokens, so the dark theme and the palettes keep working. */
+.topnav { border-bottom: 3px solid var(--text); font-family: var(--font-showroom-body); }
+.topnav-brand { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.25rem; letter-spacing: -0.01em; }
+.topnav-right a, .topnav-menu > a { font-weight: 800; font-size: 0.88rem; color: var(--text-dim); padding: 6px 4px; border-radius: 0; }
+.topnav-right a:hover, .topnav-menu > a:hover { color: var(--text); background: none; }
+.topnav-right .profile-link { color: var(--text); background: none; }
+.topnav-right a.active, .topnav-menu > a.active {
+  color: var(--text); background: none;
+  text-decoration: underline; text-decoration-thickness: 3px; text-underline-offset: 7px; text-decoration-color: var(--accent);
+}
+.brand-morsels {
+  font-family: var(--font-mono); font-size: 0.76rem; font-weight: 500; letter-spacing: 0;
+  background: var(--sun); color: var(--on-sun); border: 0; border-radius: 0; padding: 3px 9px; margin-left: 12px;
+}
+.notif-bell-btn { border-radius: 0; }
+.notif-bell-btn:hover { background: var(--sun); }
+.notif-badge { border-radius: 0; font-family: var(--font-mono); }
+.notif-dropdown { border: 3px solid var(--text); border-radius: 0; box-shadow: 8px 8px 0 var(--sun); }
 
 /* Collapse the header to a hamburger the moment the inline nav stops fitting.
    TWO triggers, one rule set:

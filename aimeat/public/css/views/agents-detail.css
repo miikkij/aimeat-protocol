@@ -6,6 +6,8 @@
  *   Uses agd- prefix to avoid collisions with other profile styles.
  *   All colors use CSS variables from theme.css.
  * @version-history
+ *   v1.22.1 -- 2026-08-29 -- .pf-agd-board-card-name reads --agd-state (set on the card) for its colour;
+ *     the inline style that carried it is gone, so a skin can override it.
  *   v1.22.0 -- 2026-08-26 -- The board mini-card's ID plate opens below the card instead of over
  *     it; covering the card hid what the pointer was about to click.
  *   v1.21.0 -- 2026-08-13 -- The card-footer host link truncates instead of wrapping: a hostname is
@@ -1587,6 +1589,7 @@
   .pf .pf-agd-idcard { display: none; }
 }
 .pf .pf-agd-board-card-name {
+  color: var(--agd-state, var(--text));
   font-weight: 600;
   font-size: 0.85rem;
   margin-bottom: 0.2rem;
