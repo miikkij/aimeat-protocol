@@ -10,6 +10,8 @@
  *   import { registerDesignbookTools } from './designbook.js';
  *   registerDesignbookTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   v1.1.0 — 2026-08-28 — The kind wording grows with the Book: look, motion and illustration
+ *     join layout and fill in the search filter and the propose contract.
  *   v1.0.0 — 2026-08-28 — Initial (TARGET-074 phase 5, slice 1).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -48,7 +50,7 @@ export function registerDesignbookTools(
         'aimeat_designbook_search',
         descriptionFor('aimeat_designbook_search'),
         {
-            kind: z.string().optional().describe('Only this part kind: "layout" or "fill".'),
+            kind: z.string().optional().describe('Only this part kind: "layout", "fill", "look", "motion" or "illustration".'),
             status: z.string().optional().describe('Only this lifecycle state: proposed, published, aging or retired.'),
             q: z.string().optional().describe('A word matched against id, title, summary and tags.'),
             limit: z.number().optional().describe('Rows to return, 1-200. Default 50.'),
@@ -79,7 +81,7 @@ export function registerDesignbookTools(
         'aimeat_designbook_propose',
         descriptionFor('aimeat_designbook_propose'),
         {
-            part: z.record(z.string(), z.unknown()).describe('The part: { id, kind: "layout"|"fill", title, summary, body, tags? }.'),
+            part: z.record(z.string(), z.unknown()).describe('The part: { id, kind: "layout"|"fill"|"look"|"motion"|"illustration", title, summary, body, tags? }. The kind decides the body: a whole mosaic layout (layout/fill), { tokens, look? } (look), { tokens } of motion tokens only (motion), or { style, palette_words? } (illustration).'),
             ...aiProvenanceInputs,
         },
         annotationsFor('aimeat_designbook_propose'),

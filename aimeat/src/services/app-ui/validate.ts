@@ -16,6 +16,10 @@
  *   import { validateUiLayout, AppUiError } from './validate.js';
  *   const layout = validateUiLayout(req.body);   // throws AppUiError(422) with words
  * @version-history
+ *   v1.4.0 — 2026-08-28 — Two benches step out as REUSABLE doors for the Design Book's new part
+ *     kinds: validateSignatureTokens() (pure extraction of the tokens loop, now also serving the
+ *     `look` and `motion` kinds) and validateImageryStyle() (new: art direction as data, serving
+ *     the layout's append-only optional `imagery` field and the `illustration` kind).
  *   v1.3.0 — 2026-08-28 — The signature COLOUR opens: `--ak-accent` accepted as a light/dark pair
  *     "#hex/#hex", each half proven by the full contrast matrix against its own mode's combos
  *     (validateAccentPair). A failing half refuses with the measured numbers; other colour-token
@@ -67,6 +71,8 @@ export interface AppUiLayout {
   nav?: string;
   /** The app's SIGNATURE: bounded token overrides (shape, typography, density, motion). */
   tokens?: Record<string, string>;
+  /** Art direction for the imagery pipeline: a prompt fragment and optional colour words. */
+  imagery?: { style: string; palette_words?: string };
   blocks: AppUiBlockInstance[];
   meta?: { note?: string };
 }
@@ -122,6 +128,70 @@ function unknownName(kind: string, given: string, known: string[]): never {
   fail(`this node has no ${kind} called "${given}".${hint} The ${kind}s it has: ${known.join(', ')}.`);
 }
 
+/**
+ * The signature-token bench, on its own so ONE implementation serves every door that takes
+ * tokens: a layout's top-level `tokens`, and the Design Book's `look` and `motion` part kinds.
+ * Returns the validated map (accent pair normalized); throws with the same worded refusals.
+ */
+export function validateSignatureTokens(raw: unknown): Record<string, string> {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    fail('tokens is one object of { "--ak-…": "value" } overrides — the catalogue\'s signature_tokens lists the legal names.');
+  }
+  const legal = Object.keys(SIGNATURE_TOKENS);
+  const out: Record<string, string> = {};
+  for (const [name, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (!legal.includes(name)) {
+      if (/color|accent|bg|ink|surface|scrim|grad/i.test(name)) {
+        // Colour is open, but through ONE door: measurement proved a single hex cannot satisfy
+        // the mode-tuned derivations, so the signature colour is `--ak-accent` as a light/dark
+        // pair and every other colour token stays derived from it by the sheet.
+        fail(`"${name}" is a colour token the signature does not take directly — the one colour door is --ak-accent as a light/dark pair "#hex/#hex" (both halves are proven by the contrast matrix); every other colour derives from it. The signature covers: ${legal.join(', ')}.`);
+      }
+      unknownName('signature token', name, legal);
+    }
+    if (typeof value !== 'string' || !value.trim() || value.length > TOKEN_VALUE_MAX) {
+      fail(`the value of ${name} must be a short CSS value string (at most ${TOKEN_VALUE_MAX} characters).`);
+    }
+    if (TOKEN_VALUE_FORBIDDEN.test(value)) {
+      fail(`the value of ${name} may not carry urls, comments or declaration characters — a token is one value, never a vehicle.`);
+    }
+    if (name === '--ak-accent') {
+      out[name] = validateAccentPair(value);
+      continue;
+    }
+    out[name] = value;
+  }
+  return out;
+}
+
+/**
+ * Art direction for the imagery pipeline, as data: a prompt fragment and optional colour words.
+ * Serves the layout's optional `imagery` field and the Design Book's `illustration` part kind —
+ * one bench for both, like the tokens above.
+ */
+export function validateImageryStyle(raw: unknown): { style: string; palette_words?: string } {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    fail('imagery is one object: { style, palette_words? } — art direction as data, no urls.');
+  }
+  const o = raw as Record<string, unknown>;
+  const style = typeof o.style === 'string' ? o.style.trim() : '';
+  if (!style || style.length > 400) {
+    fail('imagery.style is the illustration prompt fragment: 1-400 characters of art direction, like "soft watercolour wash, grainy paper, no text".');
+  }
+  if (TOKEN_VALUE_FORBIDDEN.test(style)) {
+    fail('imagery.style may not carry urls, comments or declaration characters — it is words for the image prompt, never a vehicle.');
+  }
+  const out: { style: string; palette_words?: string } = { style };
+  if (o.palette_words !== undefined) {
+    const pw = typeof o.palette_words === 'string' ? o.palette_words.trim() : '';
+    if (!pw || pw.length > 200 || TOKEN_VALUE_FORBIDDEN.test(pw)) {
+      fail('imagery.palette_words is a short line of colour words (at most 200 characters, no urls or declaration characters).');
+    }
+    out.palette_words = pw;
+  }
+  return out;
+}
+
 /** The signature colour: "#hex/#hex", light first, dark second. */
 const ACCENT_PAIR_RE = /^(#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?)\s*\/\s*(#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?)$/;
 
@@ -175,34 +245,12 @@ export function validateUiLayout(raw: unknown): AppUiLayout {
   }
 
   if (input.tokens !== undefined) {
-    if (input.tokens === null || typeof input.tokens !== 'object' || Array.isArray(input.tokens)) {
-      fail('tokens is one object of { "--ak-…": "value" } overrides — the catalogue\'s signature_tokens lists the legal names.');
-    }
-    const legal = Object.keys(SIGNATURE_TOKENS);
-    out.tokens = {};
-    for (const [name, value] of Object.entries(input.tokens as Record<string, unknown>)) {
-      if (!legal.includes(name)) {
-        if (/color|accent|bg|ink|surface|scrim|grad/i.test(name)) {
-          // Colour is open, but through ONE door: measurement proved a single hex cannot satisfy
-          // the mode-tuned derivations, so the signature colour is `--ak-accent` as a light/dark
-          // pair and every other colour token stays derived from it by the sheet.
-          fail(`"${name}" is a colour token the signature does not take directly — the one colour door is --ak-accent as a light/dark pair "#hex/#hex" (both halves are proven by the contrast matrix); every other colour derives from it. The signature covers: ${legal.join(', ')}.`);
-        }
-        unknownName('signature token', name, legal);
-      }
-      if (typeof value !== 'string' || !value.trim() || value.length > TOKEN_VALUE_MAX) {
-        fail(`the value of ${name} must be a short CSS value string (at most ${TOKEN_VALUE_MAX} characters).`);
-      }
-      if (TOKEN_VALUE_FORBIDDEN.test(value)) {
-        fail(`the value of ${name} may not carry urls, comments or declaration characters — a token is one value, never a vehicle.`);
-      }
-      if (name === '--ak-accent') {
-        out.tokens[name] = validateAccentPair(value);
-        continue;
-      }
-      out.tokens[name] = value;
-    }
+    out.tokens = validateSignatureTokens(input.tokens);
     if (Object.keys(out.tokens).length === 0) delete out.tokens;
+  }
+
+  if (input.imagery !== undefined) {
+    out.imagery = validateImageryStyle(input.imagery);
   }
 
   if (!Array.isArray(input.blocks)) fail('blocks must be a list of block instances.');

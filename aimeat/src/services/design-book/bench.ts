@@ -21,6 +21,10 @@
  * @usage
  *   const result = await runPartBench(storage, config, 'leiska-cover');
  * @version-history
+ *   v1.1.0 — 2026-08-28 — The new kinds meet the browser: a look or motion part is benched by
+ *     rendering the DEMO arrangement wearing its token sheet (an override that breaks the render
+ *     is caught here, not shipped), and an illustration answers ran:false with the reason — its
+ *     bench is the field validation at propose time.
  *   v1.0.0 — 2026-08-28 — Initial (TARGET-074, the guarantee bench automated).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -63,9 +67,34 @@ interface BenchPage {
   close(): Promise<void>;
 }
 
+/** A representative arrangement for parts that are seasoning rather than a dish: a look or
+ *  motion sheet is benched by rendering THIS demo layout wearing it, so an override that breaks
+ *  the render (an enormous display size, a wild tilt) is caught in a real browser, not shipped. */
+const DEMO_LAYOUT_FOR_TOKENS = {
+  v: 1,
+  blocks: [
+    { id: 'top', component: 'hero', props: { title: 'Bench', sub: 'The demo arrangement this sheet is proven on.' } },
+    { id: 'kpis', component: 'statRow', props: { source: 'demo.stats', title: 'Numbers' } },
+    { id: 'rows', component: 'list', props: { source: 'demo.rows', title: 'Rows' } },
+    { id: 'grid', component: 'cardGrid', props: { source: 'demo.cards', title: 'Cards' } },
+    { id: 'hist', component: 'timeline', props: { source: 'demo.events', title: 'History' } },
+  ],
+};
+
+/** What the browser renders for one part: the body itself for an arrangement, the demo
+ *  arrangement wearing the sheet for a look/motion part, nothing for an illustration. */
+function renderableBodyFor(part: DesignBookPart): Record<string, unknown> | null {
+  if (part.kind === 'look' || part.kind === 'motion') {
+    const body = part.body as { tokens?: Record<string, string>; look?: string };
+    return { ...DEMO_LAYOUT_FOR_TOKENS, look: body.look ?? 'vivid', tokens: body.tokens ?? {} };
+  }
+  if (part.kind === 'illustration') return null;
+  return part.body;
+}
+
 /** The bench page: the kit, the part, demo rows per component — the gallery preview, inlined. */
-function benchPageHtml(part: DesignBookPart): string {
-  const partJson = JSON.stringify(part.body).replace(/<\//g, '<\\/');
+function benchPageHtml(body: Record<string, unknown>): string {
+  const partJson = JSON.stringify(body).replace(/<\//g, '<\\/');
   return [
     '<!DOCTYPE html><html lang="en" data-theme="light"><head><meta charset="utf-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
@@ -123,7 +152,15 @@ export async function runPartBench(
 ): Promise<DesignBookBenchResult> {
   const book = new DesignBookService(storage, config);
   const { part } = await book.get(id);
-  const html = benchPageHtml(part);
+  const renderable = renderableBodyFor(part);
+  if (renderable === null) {
+    return {
+      ran: false,
+      reason: 'An illustration style has nothing of its own to render — it is proven by its field bench at propose time.',
+      at: new Date().toISOString(),
+    };
+  }
+  const html = benchPageHtml(renderable);
   const base = config.baseUrl.replace(/\/+$/, '');
   const url = `${base}/v1/designbook/${encodeURIComponent(id)}/bench-page`;
   const at = new Date().toISOString();

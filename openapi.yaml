@@ -20541,14 +20541,16 @@ paths:
       operationId: listDesignbookParts
       summary: Browse the Design Book
       description: >-
-        The node's shared library of PROVEN screen arrangements (TARGET-074 phase 5). Each part is
-        a `layout` (a complete Atelier mosaic arrangement) or a `fill` (the same shape with
-        <placeholder> slots — a starting shape), with its lifecycle status and how many builds
-        have adopted it. Published parts are what everyone builds from.
+        The node's shared library of PROVEN parts (TARGET-074 phase 5). Each part is a `layout`
+        (a complete Atelier mosaic arrangement), a `fill` (the same shape with <placeholder>
+        slots — a starting shape), a `look` (a signature token sheet with an optional preset), a
+        `motion` (a motion-token recipe) or an `illustration` (art direction for the imagery
+        pipeline), with its lifecycle status and how many builds have adopted it. Published parts
+        are what everyone builds from.
       tags: [Apps]
       security: [{ bearerAuth: [] }]
       parameters:
-        - { name: kind, in: query, schema: { type: string, enum: [layout, fill] } }
+        - { name: kind, in: query, schema: { type: string, enum: [layout, fill, look, motion, illustration] } }
         - { name: status, in: query, schema: { type: string, enum: [proposed, published, aging, retired] } }
         - { name: q, in: query, schema: { type: string }, description: Matched against id, title, summary and tags }
         - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 200 } }
@@ -20560,8 +20562,10 @@ paths:
       summary: Propose a part (the bench runs first)
       description: >-
         Propose a part into the Book, or update one you already proposed. The body goes through
-        the SAME layout validator every app layout passes, before anything lands — a refusal is
-        worded, with the nearest real name suggested. A new part lands as `proposed`; publishing
+        the kind's own bench before anything lands — the layout validator for layout/fill, the
+        signature-token bench (contrast-matrix pair proof included) for look/motion, the
+        imagery-style bench for illustration — and a refusal is worded, with the nearest real
+        name suggested. A new part lands as `proposed`; publishing
         it into the shared catalogue is the node operator's call. A part id is a node-wide
         address: once claimed, it answers the same part for everyone, forever, and updating your
         own re-runs the bench and flows as a minor. Requires memory:write.
@@ -20576,7 +20580,11 @@ paths:
               properties:
                 part:
                   type: object
-                  description: "{ id, kind: layout|fill, title, summary, body, tags? } — body is a whole mosaic layout"
+                  description: >-
+                    { id, kind: layout|fill|look|motion|illustration, title, summary, body,
+                    tags? } — the kind decides the body: a whole mosaic layout (layout/fill),
+                    { tokens, look? } (look), { tokens } of motion tokens only (motion), or
+                    { style, palette_words? } (illustration)
                 ai_provenance:
                   allOf:
                     - $ref: '#/components/schemas/AiProvenanceDeclaration'
@@ -20613,11 +20621,13 @@ paths:
       operationId: adoptDesignbookPart
       summary: Adopt a part into one of your apps
       description: >-
-        The part's body becomes the named app's stored mosaic layout, through the same validated,
-        versioned, provenance-stamped write every layout takes — the replaced layout is archived,
-        so putting it back is one restore. Published parts are adoptable by anyone; a proposed
-        one only by its own proposer. Adopting is the usage signal that keeps a part alive.
-        Requires memory:write, and the app must belong to the caller's owner.
+        A layout or fill REPLACES the named app's stored mosaic layout; a look, motion or
+        illustration part MERGES into the arrangement the app already has (and refuses with
+        words when there is none). Every path writes through the same validated, versioned,
+        provenance-stamped door — the replaced layout is archived, so putting it back is one
+        restore. Published parts are adoptable by anyone; a proposed one only by its own
+        proposer. Adopting is the usage signal that keeps a part alive. Requires memory:write,
+        and the app must belong to the caller's owner.
       tags: [Apps]
       security: [{ bearerAuth: [] }]
       parameters:
@@ -20648,9 +20658,12 @@ paths:
         The part rendered in a real headless browser at three viewports (390×844, 1280×900,
         1280×460) with the guarantees MEASURED — horizontal overflow zero, units actually
         painted, every control at the touch minimum — and the numbers stamped onto the part's
-        bench field. "Ajetaan, ei luvata." A node with no browser answers ran:false with the
-        reason and stamps nothing. The operator's or the part's own proposer's call (its result
-        changes what the gallery says about the part). Requires memory:write.
+        bench field. "Ajetaan, ei luvata." A look or motion part is benched by rendering the
+        demo arrangement wearing its token sheet; an illustration answers ran:false with the
+        reason (its bench is the field validation at propose time). A node with no browser
+        answers ran:false with the reason and stamps nothing. The operator's or the part's own
+        proposer's call (its result changes what the gallery says about the part). Requires
+        memory:write.
       tags: [Apps]
       security: [{ bearerAuth: [] }]
       parameters:
