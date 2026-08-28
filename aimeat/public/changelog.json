@@ -5,6 +5,18 @@
       "date": "2026-08-28",
       "kind": "feature",
       "title": {
+        "en": "Two new pages: everything that shipped, and how an app gets built here",
+        "fi": "Kaksi uutta sivua: kaikki mitä on julkaistu, ja miten appi rakentuu täällä"
+      },
+      "body": {
+        "en": "What shipped (/v1/changelog) is this log in full: every entry by month, a filter by kind, a search, and an address for each entry you can send to someone. The front page keeps its one-line fold and links here.\n\nHow an app gets built (/v1/how-an-app-builds) tells the road in four beats with the real pieces: say what you need, carry the prompt to any AI chat you already have, bring the file back by hand or through a connected AI, and watch it land on the wall of apps. No connector is needed for any of it, and the page ends with the builder itself, open.\n\nBoth are in the footer of every public page, and the wall's introduction on the front page links to the story.",
+        "fi": "Mitä on julkaistu (/v1/changelog) on tämä loki kokonaan: jokainen merkintä kuukausittain, suodatus lajin mukaan, haku, ja jokaiselle merkinnälle oma osoite, jonka voi lähettää jollekulle. Etusivun yhden rivin taite jää ja vie tänne.\n\nMiten appi rakentuu (/v1/how-an-app-builds) kertoo tien neljässä iskussa oikeilla palasilla: sano mitä tarvitset, kanna kehote mihin tahansa tekoälykeskusteluun joka sinulla jo on, tuo tiedosto takaisin käsin tai kytketyn tekoälyn kautta, ja katso kun se laskeutuu appiseinälle. Mihinkään näistä ei tarvita liitintä, ja sivu päättyy itse rakentajaan, auki.\n\nMolemmat ovat jokaisen julkisen sivun alatunnisteessa, ja etusivun seinän johdanto vie tarinaan."
+      }
+    },
+    {
+      "date": "2026-08-28",
+      "kind": "feature",
+      "title": {
         "en": "The front page is a showroom: try everything here, then take one home",
         "fi": "Etusivu on näyttelytila: kokeile kaikkea täällä ja vie sitten oma kotiin"
       },

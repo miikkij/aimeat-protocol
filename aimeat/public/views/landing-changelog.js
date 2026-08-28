@@ -11,6 +11,8 @@
  *   pick() language resolver · fmtDate() · KIND labels.
  * @usage import NodeChangeLog from './landing-changelog.js'; <${NodeChangeLog} />
  * @version-history
+ *   v1.2.0 — 2026-08-28 — pick(), fmtDate() and KIND_LABEL are exported for the changelog page
+ *     (views/changelog.js), and the fold ends with a link to it.
  *   v1.1.0 — 2026-08-28 — The "built with itself" claim leads the section, and the log is its
  *     evidence. Styled as the showroom's yellow band; the fold and the data are unchanged.
  *   v1.0.0 — 2026-07-31 — Initial: folded change-log section fed by public/changelog.json.
@@ -26,7 +28,7 @@ import { swallowed } from '/js/swallowed.js';
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
 /** An entry field is a plain string, or { en, fi } when the wording deserves both languages. */
-function pick(value, lang) {
+export function pick(value, lang) {
   if (!value) return '';
   if (typeof value === 'string') return value;
   return value[lang] || value.en || Object.values(value)[0] || '';
@@ -34,14 +36,14 @@ function pick(value, lang) {
 
 // The APP's language decides the format, not the browser's: a Finnish reader on a US-locale
 // browser was getting 7/31/2026, which reads as a different day here (and as noise anywhere).
-function fmtDate(iso, lang) {
+export function fmtDate(iso, lang) {
   try {
     const d = new Date(iso);
     return isNaN(d.getTime()) ? iso : d.toLocaleDateString(lang === 'fi' ? 'fi-FI' : 'en-GB');
   } catch (err) { swallowed('landing-changelog: fmtDate', err); return iso; }
 }
 
-const KIND_LABEL = {
+export const KIND_LABEL = {
   feature: () => tr('landing.logKindFeature', 'New'),
   fix: () => tr('landing.logKindFix', 'Fixed'),
   security: () => tr('landing.logKindSecurity', 'Security'),
@@ -109,6 +111,9 @@ export default function NodeChangeLog() {
             </article>
           `)}
         </div>
+        ${/* The whole log has a page of its own since 2026-08-28, with a month rail, filters and
+              an address per entry; the fold stays the front page's short form of it. */''}
+        <p class="ld-log-all"><a href="/v1/changelog">${tr('landing.logAll', 'Every entry, by month, with an address of its own →')}</a></p>
       <//>
     </section>
   `;

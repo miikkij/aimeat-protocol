@@ -69,8 +69,10 @@ export function WishBlock(/** @type {{ ctx?: any, props?: Record<string, any>, t
     </section>`;
 }
 
-export function BuildInviteBlock() {
-  return html`<${BuildInvite} />`;
+export function BuildInviteBlock(/** @type {{ ctx?: any, props?: Record<string, any>, title?: string, text?: string, blockKey?: string }} */ { props = {} }) {
+  // The block has declared openByDefault since 2026-08-26; the component learned to read it on
+  // 2026-08-28.
+  return html`<${BuildInvite} openByDefault=${props.openByDefault === true} />`;
 }
 
 export function ConnectInviteBlock(/** @type {{ ctx?: any, props?: Record<string, any>, title?: string, text?: string, blockKey?: string }} */ { ctx }) {

@@ -491,6 +491,9 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     '/v1/publicworkspaceviewer',
     // /v1/pricing left this list on 2026-08-28: the page is gone and the address redirects below.
     '/v1/how-it-works',
+    // The showroom's two companions (2026-08-28): the whole change log, and how an app gets built.
+    '/v1/changelog',
+    '/v1/how-an-app-builds',
     '/v1/glossary',
     '/v1/business',
     // The human sibling of the machine-readable statement at /v1/ai-transparency. A different

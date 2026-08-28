@@ -18,6 +18,8 @@
  *   tierTitle · packMatchesIdea · BuildAppPrompt · BuildInvite
  * @usage import { BuildInvite } from './landing-builder.js';
  * @version-history
+ *   (2026-08-28) fetchCanonicalBuildPrompt is exported for the build-story page, and BuildInvite
+ *     takes openByDefault: the block declared that setting on 2026-08-26 and nothing read it.
  *   v1.1.0 — 2026-08-27 — The TRACK is the first decision (TARGET-074): Classic or Atelier as
  *     two cards, each track fetching its own guide (/v1/prompts/build-app vs
  *     /v1/prompts/build-app-atelier), never mixed — Atelier hides Classic's templates and packs
@@ -43,7 +45,7 @@ const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fa
 // (the served kit, the looks, the mosaic). Neither prompt teaches the other's mechanics, so the
 // choice is made HERE and nothing is mixed after it. Cached per locale and track.
 const _canonicalPromptCache = {};
-async function fetchCanonicalBuildPrompt(locale, track) {
+export async function fetchCanonicalBuildPrompt(locale, track) {
   const key = (locale || 'en') + '|' + (track || 'classic');
   if (_canonicalPromptCache[key]) return _canonicalPromptCache[key];
   const path = track === 'atelier' ? '/v1/prompts/build-app-atelier' : '/v1/prompts/build-app';
@@ -328,9 +330,12 @@ function BuildAppPrompt() {
    false: anonymous access is off, so an app only reaches the server behind a login. Designing is
    still free — /v1/prompts/build-app, /v1/app-templates and /v1/library-packs all answer
    anonymously — and that is the distinction the subline has to carry. */
-export function BuildInvite() {
+export function BuildInvite({ openByDefault = false } = {}) {
   // Shut by default, but a draft left in this tab means the visitor was mid-thought: open onto it.
+  // openByDefault is the block's own setting (portal.build-invite) and the build-story page's
+  // choice: there the generator IS the page's last word, so it starts open.
   const [open, setOpen] = useState(() => {
+    if (openByDefault) return true;
     const d = readBuilderDraft();
     return !!(d.idea || d.tplId || Object.values(d.chosen || {}).some(Boolean));
   });
