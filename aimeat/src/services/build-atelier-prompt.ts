@@ -264,6 +264,14 @@ function composeBody(config: AimeatConfig): string {
     + 'density, how much things move — and translate THOSE into the token vocabulary; never copy '
     + 'colours you cannot prove.\n\n';
 
+  body += '## The Design Book first\n\n';
+  body += 'Before composing a screen from nothing, search the Design Book '
+    + '(`aimeat_designbook_search`, or GET /v1/designbook): it holds PROVEN arrangements — every '
+    + 'part passed the same validator your layout must pass, and adopting one '
+    + '(`aimeat_designbook_adopt`) is one call. A starting shape from the Book plus your words '
+    + 'beats a fresh composition, and when you make an arrangement worth keeping, propose it '
+    + 'back (`aimeat_designbook_propose`) so the next build starts where you finished.\n\n';
+
   body += '## AI inside the app\n\n';
   body += 'The `copilot` block puts an AI panel on the screen whose tools are the app\'s OWN '
     + 'declarations: hand the mosaic spec your `sources` and an `actions` list ({ id, summary, '

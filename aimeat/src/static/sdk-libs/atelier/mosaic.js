@@ -37,8 +37,10 @@
  *   v0.13.0 — 2026-08-28 — The AI-NATIVE layer reaches the mosaic (TARGET-074 phase 6): the
  *     `copilot` block (its tools are the spec's own sources and actions), the viewer's overlay
  *     (hidden/order/nav over the owner's layout, applied at render, never written back) with
- *     setOverlay() on the handle, and explain() — what this screen holds, generated from the
- *     declarations instead of a help text that would drift.
+ *     setOverlay() on the handle, explain() — what this screen holds, generated from the
+ *     declarations instead of a help text that would drift — and exposeActions(): the same
+ *     declared actions handed to a visiting in-browser agent over WebMCP (one declaration,
+ *     four doors: the button, the copilot, the agent, and the app's own code).
  *   v0.12.0 — 2026-08-28 — The SIGNATURE and the MORPH (TARGET-074 phase 4): a layout's bounded
  *     `tokens` land as inline custom properties on the app frame (server-validated allowlist;
  *     cleared and reapplied per render), and the canvas tile now GROWS into the focused screen —
@@ -147,6 +149,7 @@ function derivedColumns(rows) {
  * @returns {{ el: HTMLElement, set: (layout: object|null) => void, reload: () => Promise<void>,
  *   setOverlay: (o: { hidden?: string[], order?: string[], nav?: string }|null) => void,
  *   explain: (opts?: { target?: string|Element }) => string[],
+ *   exposeActions: () => Promise<string>,
  *   refresh: (name?: string) => Promise<void>, destroy: () => void }}
  */
 export function mosaic(spec) {
@@ -667,6 +670,36 @@ export function mosaic(spec) {
           if (!destroyed && data != null) b.handle.set(patchFor(b.kind, data));
         });
       }));
+    },
+
+    /**
+     * ONE DECLARATION, FOUR DOORS: expose this mosaic's declared actions to an in-browser agent
+     * through WebMCP. The same { id, summary, params, run } the buttons and the copilot use
+     * becomes the visiting agent's tool — same handler, same limits, nothing extra. Returns the
+     * registration surface name, or 'none' when the page has no agent API or no actions.
+     * @returns {Promise<string>}
+     */
+    async exposeActions() {
+      const ns = /** @type {any} */ (window).AIMEAT;
+      if (!ns || !ns.webmcp || typeof ns.webmcp.register !== 'function') return 'none';
+      const tools = (spec.actions || []).map(function (a) {
+        const properties = {};
+        const params = a.params || {};
+        for (const key of Object.keys(params)) {
+          properties[key] = { type: params[key] === 'number' ? 'number' : 'string' };
+        }
+        return {
+          name: 'app-' + a.id,
+          description: a.summary + ' (a declared action of this app; runs the same handler its button runs).',
+          inputSchema: { type: 'object', properties: properties },
+          execute: async function (input) {
+            const result = await Promise.resolve(a.run ? a.run(input || {}) : null);
+            return typeof result === 'string' ? result : 'done';
+          },
+        };
+      });
+      if (!tools.length) return 'none';
+      return ns.webmcp.register(tools);
     },
 
     /**
