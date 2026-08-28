@@ -9,15 +9,26 @@
 </head>
 <body data-active-view="library">
 
-  <header>
-    <a class="aimeat-cta aimeat-home" id="aimeat-home-link" href="/" data-i18n-title="cta.backHome" title="Back to home"><span class="aimeat-cta-spark">⚡</span><span id="aimeat-home-label">aimeat.io</span></a>
-    <h1 data-i18n="header.title">My Apps</h1>
-    <input type="text" id="search-input" placeholder="Search apps..." data-i18n-ph="search.ph" autocomplete="off" spellcheck="false"/>
+  <header class="cat-head">
+    <div class="cat-head-brand">
+      <a class="aimeat-cta aimeat-home" id="aimeat-home-link" href="/" data-i18n-title="cta.backHome" title="Back to home"><span class="aimeat-cta-spark">⚡</span><span id="aimeat-home-label">aimeat.io</span></a>
+      <!-- The sticker: how many apps, how many listed, how many with a draft waiting. Filled by renderApps. -->
+      <span id="cat-kicker" class="cat-kicker" hidden></span>
+      <h1 class="cat-title" data-i18n="header.title">My Apps</h1>
+    </div>
+    <div class="cat-head-tools">
+      <input type="text" id="search-input" class="cat-search" placeholder="Search apps..." data-i18n-ph="search.ph" autocomplete="off" spellcheck="false"/>
+      <div id="cat-sort" class="cat-sort" role="group">
+        <button type="button" class="cat-sort-btn is-on" data-sort="newest" onclick="window._launcher.setSort('newest')" data-i18n="sort.newest">Newest</button>
+        <button type="button" class="cat-sort-btn" data-sort="opens" onclick="window._launcher.setSort('opens')" data-i18n="sort.opens">Most opened</button>
+        <button type="button" class="cat-sort-btn" data-sort="name" onclick="window._launcher.setSort('name')" data-i18n="sort.name">A → Z</button>
+      </div>
+    </div>
     <div class="header-actions">
       <span id="headerAuth" class="header-auth-pill"></span>
       <!-- Create menu: Add app / Generate with AI / Generate homepage grouped under one + -->
       <div class="backup-menu-wrap">
-        <button class="icon-btn" id="create-btn" data-i18n-title="action.create" title="Create" onclick="window._launcher.toggleCreateMenu(event)">+</button>
+        <button class="cat-btn cat-btn--hot" id="create-btn" data-i18n-title="action.create" title="Create" onclick="window._launcher.toggleCreateMenu(event)">+ <span data-i18n="action.create">Create</span></button>
         <div id="create-menu" class="backup-menu" hidden>
           <button id="add-btn" data-i18n="action.add">&#x2795; Add app</button>
           <button id="generate-btn" data-i18n="action.generate">&#x2728; Generate with AI</button>
@@ -43,14 +54,26 @@
     </div>
   </header>
 
-  <!-- Two views: Kirjasto (your apps: local + published + parked) vs Yhteisö (community).
-       Sections carry data-view; body[data-active-view] hides the inactive one via CSS. -->
-  <nav id="view-tabs" class="view-tabs" role="tablist">
-    <button id="view-tab-library" class="view-tab active" role="tab" onclick="window._launcher.switchView('library')" data-i18n="view.library">&#x1F4DA; Library</button>
-    <button id="view-tab-community" class="view-tab" role="tab" onclick="window._launcher.switchView('community')" data-i18n="view.community">&#x1F30D; Community</button>
-  </nav>
-
-  <nav id="tag-bar"></nav>
+  <!-- Three views: your apps, the community, your favourites. Sections carry data-view and
+       body[data-active-view] hides the other two via CSS. The rail on the left holds the view
+       switch, the state filter (library only), the tags with their counts, and the one-paragraph
+       explanation of how listing works. -->
+  <div class="cat-body">
+  <aside class="cat-rail" id="cat-rail">
+    <nav id="view-tabs" class="cat-rail-group" role="tablist">
+      <div class="cat-rail-label" data-i18n="rail.show">Show</div>
+      <button type="button" id="view-tab-library" class="cat-rail-item active" role="tab" onclick="window._launcher.switchView('library')"><span data-i18n="view.library">Your apps</span><span class="cat-rail-count" id="rail-count-library"></span></button>
+      <button type="button" id="view-tab-community" class="cat-rail-item" role="tab" onclick="window._launcher.switchView('community')"><span data-i18n="view.community">Community</span><span class="cat-rail-count" id="rail-count-community"></span></button>
+      <button type="button" id="view-tab-favorites" class="cat-rail-item" role="tab" onclick="window._launcher.switchView('favorites')"><span data-i18n="view.favorites">Favourites</span><span class="cat-rail-count" id="rail-count-favorites"></span></button>
+    </nav>
+    <nav id="state-bar" class="cat-rail-group" data-view="library"></nav>
+    <nav id="tag-bar" class="cat-rail-group"></nav>
+    <div class="cat-rail-box" data-view="library">
+      <div class="cat-rail-box-label" data-i18n="rail.howTitle">How this works</div>
+      <span data-i18n="sec.localHint">Add app publishes to your account as unlisted — list it when it's ready to be public.</span>
+    </div>
+  </aside>
+  <div class="cat-main">
 
   <!-- Active Extensions Bar -->
   <div id="cortex-bar" data-view="library" style="display:none;margin:0 24px 1.5rem;position:relative;z-index:1">
@@ -100,10 +123,10 @@
   <!-- Community Apps Section (other users) -->
   <div id="community-section" data-view="community" style="display:none">
     <div class="published-header" onclick="window._launcher.toggleCommunity()">
-      <h2><span data-i18n="sec.community">&#x1F30D; Community Apps</span> <span id="community-count"></span></h2>
+      <h2><span data-i18n="sec.community">Community apps</span> <span id="community-count"></span></h2>
       <span class="arrow open" id="community-arrow">&#x25BC;</span>
     </div>
-    <div id="community-grid" class="published-grid"></div>
+    <div id="community-grid" class="published-grid cat-list"></div>
   </div>
 
   <!-- The wait, for the Community view. Without it the empty state below claims "no community apps
@@ -120,20 +143,26 @@
     <p class="view-empty-hint" data-i18n="view.communityHint">Community apps are apps other people on this node have published. When someone publishes one, it shows up here.</p>
   </div>
 
-  <!-- ⭐ Favourites group (Library) — apps the owner favourited, pinned above "Your apps" -->
-  <div id="favorites-section" data-view="library" style="display:none;margin:0 24px 1rem">
-    <h2 class="fav-section-title"><span data-i18n="fav.title">⭐ Favourites</span> <span id="favorites-count" class="fav-section-count"></span></h2>
-    <div id="favorites-grid" class="published-grid"></div>
+  <!-- Favourites: its own view. Apps the owner starred, own and community alike. -->
+  <div id="favorites-section" data-view="favorites">
+    <div class="cat-list-title">
+      <h2 class="fav-section-title"><span data-i18n="fav.title">Favourites</span> <span id="favorites-count" class="fav-section-count"></span></h2>
+    </div>
+    <div id="favorites-grid" class="published-grid cat-list"></div>
+    <div id="favorites-empty" class="view-empty" style="display:none">
+      <p data-i18n="fav.empty">No favourites yet.</p>
+      <p class="view-empty-hint" data-i18n="fav.emptyHint">Star an app in your library or in the community and it lands here.</p>
+    </div>
   </div>
 
   <div id="local-apps-block" class="local-apps-block" data-view="library">
-    <div id="local-apps-header" style="display:none">
-      <h2 style="font-size:1rem;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px"><span data-i18n="sec.local">&#x1F4DA; Your apps</span> <span id="local-apps-count" style="opacity:.6;font-weight:400"></span></h2>
-      <p class="local-apps-note" data-i18n="sec.localNote">One card per app. The badge shows where it lives — Local (this browser), Published (on the server), Parked (hidden from the public catalogue), or Server only (no local copy).</p>
-      <p class="local-apps-hint" data-i18n="sec.localHint">&#x1F4A1; Publish an app from here to put it on the server — then you can manage it from anywhere.</p>
+    <div id="local-apps-header" class="cat-list-title" style="display:none">
+      <h2><span data-i18n="sec.local">Your apps</span> <span id="local-apps-count" class="cat-count"></span></h2>
     </div>
     <main id="app-grid"></main>
   </div>
+  </div><!-- .cat-main -->
+  </div><!-- .cat-body -->
 
   <footer>
     <span id="stats">0 apps</span>

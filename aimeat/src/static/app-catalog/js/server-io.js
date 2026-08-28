@@ -15,6 +15,9 @@
  *     the card menu can route their Delete here instead of dropping a page-session record.
  *   v2.2.0 — 2026-08-19 — loadPublishedApps reports when the first listing has finished — on success, on failure,
  *     and when there is no node to ask — so the grid can show a wait instead of an empty answer.
+ *   v2.0.0 — 2026-08-28 — The showroom skin: community and favourites render as rows (rows.js),
+ *     favourites is a third view of its own, the header's sort order applies to both lists, and
+ *     the rail reads getCommunityApps / getFavoriteServerApps for its tag counts.
  */
 import { escapeHtml, jsArg, bareOwnerName, sameOwner, filterAttr } from './util.js';
 import { getAllApps, saveApp } from './db.js';
@@ -25,19 +28,38 @@ import { closeModal } from './apps-io.js';
 import { getCortexOwnerToken } from './cortex.js';
 import { fetchAppContentBase64, refreshServerMgmt } from './detail.js';
 import { favStarHtml, isFavorite, loadFavorites } from './favorites.js';
+import { listHeadHtml, rowHtml, fmtDate } from './rows.js';
 import { loadPromoted } from './promote.js';
 
 // Injected once at bootstrap by main.js: read getters + write setters for the shared app-state
 // (which stays main-owned), plus a few main-local fns.
-let getMainApps, getServerState, getServerManifests, setServerManifests, getOwnServerApps, setOwnServerApps, getActiveTag, getSearchQuery, generateId, renderApps, refreshAll, setListingLoaded, isListingLoaded;
+let getMainApps, getServerState, getServerManifests, setServerManifests, getOwnServerApps, setOwnServerApps, getActiveTag, getSearchQuery, getSortMode, generateId, renderApps, refreshAll, setListingLoaded, isListingLoaded;
 export function initServerIo(deps) {
-  ({ getMainApps, getServerState, getServerManifests, setServerManifests, getOwnServerApps, setOwnServerApps, getActiveTag, getSearchQuery, generateId, renderApps, refreshAll, setListingLoaded, isListingLoaded } = deps);
+  ({ getMainApps, getServerState, getServerManifests, setServerManifests, getOwnServerApps, setOwnServerApps, getActiveTag, getSearchQuery, getSortMode, generateId, renderApps, refreshAll, setListingLoaded, isListingLoaded } = deps);
 }
 
 // Cache of the last full server-app list (own + community) + base URL, so a favourite toggle can
-// re-render the ⭐ group + all star states without a network round-trip.
+// re-render the favourites view + all star states without a network round-trip.
 let lastAllServerApps = [];
+let lastCommunityApps = [];
 let lastAimeatUrl = '';
+
+/** The community and favourites lists, read by the rail for its tag counts. */
+function getCommunityApps() { return lastCommunityApps; }
+function getFavoriteServerApps() {
+  return (lastAllServerApps || []).filter(function (sa) { return isFavorite((sa.owner || '') + '/' + (sa.filename || '')); });
+}
+
+/** The header's order, applied to a server-app list: newest keeps the server's order. */
+function sortServerApps(list) {
+  var mode = getSortMode ? getSortMode() : 'newest';
+  if (mode === 'opens') list.sort(function (a, b) { return (b.downloads || 0) - (a.downloads || 0); });
+  else if (mode === 'name') {
+    var nm = function (sa) { return String((sa.manifest && sa.manifest.name) || sa.filename || ''); };
+    list.sort(function (a, b) { return nm(a).localeCompare(nm(b), undefined, { sensitivity: 'base' }); });
+  }
+  return list;
+}
 
 // ── Publish to AIMEAT ───────────────────────────
 
@@ -232,14 +254,26 @@ function toggleCommunity() {
 // ── Two views: Kirjasto (your apps: local + published + parked) / Yhteisö (community) ──
 // Sections carry data-view; body[data-active-view] hides the inactive one via CSS.
 function switchView(view) {
-  if (view !== 'community') view = 'library';
+  if (view !== 'community' && view !== 'favorites') view = 'library';
   document.body.setAttribute('data-active-view', view);
-  var lib = document.getElementById('view-tab-library');
-  var com = document.getElementById('view-tab-community');
-  if (lib) lib.classList.toggle('active', view === 'library');
-  if (com) com.classList.toggle('active', view === 'community');
+  var names = ['library', 'community', 'favorites'];
+  for (var i = 0; i < names.length; i++) {
+    var el = document.getElementById('view-tab-' + names[i]);
+    if (el) el.classList.toggle('active', view === names[i]);
+  }
   try { localStorage.setItem('appCatalogView', view); } catch (e) { /* private mode */ }
   updateCommunityEmpty();
+  updateFavoritesEmpty();
+  // The rail's tags count the list on screen, so a view change re-counts them.
+  if (renderApps) renderApps();
+}
+
+// The favourites view says why it is empty instead of showing an empty box.
+function updateFavoritesEmpty() {
+  var empty = document.getElementById('favorites-empty');
+  var grid = document.getElementById('favorites-grid');
+  if (!empty || !grid) return;
+  empty.style.display = grid.children.length > 0 ? 'none' : 'block';
 }
 
 // Empty-state for the Community view: shown only when that view is active and has no apps
@@ -854,6 +888,7 @@ function loadPublishedApps() {
         // Cache the FULL list (own + community) so a favourite toggle can re-render the ⭐ group
         // and the star state in place, without another round-trip.
         lastAllServerApps = serverApps;
+        lastCommunityApps = communityApps;
         lastAimeatUrl = aimeatUrl;
 
         return loadSubdomainSites().then(function () {
@@ -888,74 +923,64 @@ function applyServerFilter() {
   var q = (getSearchQuery() || '').toLowerCase();
   var at = getActiveTag();
   var filtering = !!(q || (at !== null));
-  var grid = document.getElementById('community-grid');
-  if (!grid) return;
-  var cards = grid.querySelectorAll('.published-card');
-  if (!cards.length) return;
-  var shown = 0;
-  cards.forEach(function (card) {
-    var match = true;
-    if (at === '__favorites__') { match = false; } // favorites is a Local-only filter
-    else if (at !== null) {
-      match = (',' + (card.getAttribute('data-tags') || '') + ',').indexOf(',' + at.toLowerCase() + ',') !== -1;
+  var grids = ['community-grid', 'favorites-grid'];
+  for (var g = 0; g < grids.length; g++) {
+    var grid = document.getElementById(grids[g]);
+    if (!grid) continue;
+    var rows = grid.querySelectorAll('.cat-row');
+    var shown = 0;
+    rows.forEach(function (row) {
+      var match = true;
+      if (at === '__favorites__') { match = false; } // favorites is a Local-only filter
+      else if (at !== null) {
+        match = (',' + (row.getAttribute('data-tags') || '') + ',').indexOf(',' + at.toLowerCase() + ',') !== -1;
+      }
+      if (match && q) match = (row.getAttribute('data-filter') || '').indexOf(q) !== -1;
+      row.style.display = match ? '' : 'none';
+      if (match) shown++;
+    });
+    if (grids[g] === 'community-grid' && rows.length) {
+      var countEl = document.getElementById('community-count');
+      if (countEl) countEl.textContent = '· ' + shown;
+      var sectionEl = document.getElementById('community-section');
+      if (sectionEl) sectionEl.style.display = (filtering && shown === 0) ? 'none' : '';
     }
-    if (match && q) match = (card.getAttribute('data-filter') || '').indexOf(q) !== -1;
-    card.style.display = match ? '' : 'none';
-    if (match) shown++;
-  });
-  var countEl = document.getElementById('community-count');
-  if (countEl) countEl.textContent = '(' + shown + ')';
-  var sectionEl = document.getElementById('community-section');
-  if (sectionEl) sectionEl.style.display = (filtering && shown === 0) ? 'none' : '';
+  }
 }
 
-// One published-app card (used by BOTH the Community grid and the ⭐ Favourites group). Carries a
-// favourite toggle + a description localized to the current UI language.
-function publishedCardHtml(sa, aimeatUrl) {
+// One published-app ROW (used by BOTH the Community list and the Favourites view). Carries a
+// favourite toggle + a description localized to the current UI language; rows.js draws it.
+function publishedRowHtml(sa, aimeatUrl, index) {
   var owner = sa.owner || '';
   var fn = sa.filename || '';
   var ref = owner + '/' + fn;
   var m = sa.manifest || {};
   var name = m.name || fn;
-  var version = sa.version_number ? 'v' + sa.version_number : '';
   var description = (m.descriptions && m.descriptions[getLang()]) || m.description || '';
-  var date = sa.created_at ? new Date(sa.created_at).toLocaleDateString() : '';
   var author = m.authorDisplay || owner;
   var viewUrl = aimeatUrl + '/v1/apps/' + encodeURIComponent(owner) + '/' + encodeURIComponent(fn);
-  // Agent-Bundled Apps: this app ships its own agent(s) — badge it and offer the Bundled-agents modal.
+  // Agent-Bundled Apps: this app ships its own agent(s) — mark it and offer the Bundled-agents modal.
   var shipsAgent = !!(m.cortex && m.cortex.agents && m.cortex.agents.length);
-  return '<div class="published-card"' + filterAttr(name, m.tags || []) + '>' +
-      favStarHtml(ref) +
-      '<div class="published-card-name">' + escapeHtml(name) + '</div>' +
-      (description ? '<div class="published-card-desc">' + escapeHtml(description) + '</div>' : '') +
-      '<div class="published-card-footer">' +
-        '<div class="published-card-metaline">' +
-          '<span class="pcm-main" style="color:var(--accent)">&#x1F464; ' + escapeHtml(author) + '</span>' +
-          (date ? '<span class="pcm-date">' + date + '</span>' : '') +
-        '</div>' +
-        '<div class="published-card-actions">' +
-          '<button onclick="window._launcher.viewPublished(\'' + escapeHtml(viewUrl) + '?mode=inline\', \'' + jsArg(name) + '\')">' + t('card.view') + '</button>' +
-          // Fork is offered on a community app only when its owner marked it forkable.
-          (sa.forkable
-            ? '<button onclick="window._launcher.forkVersion(\'' + escapeHtml(owner) + '\', \'' + escapeHtml(fn) + '\', ' + (sa.version_number || 0) + ')" title="' + escapeHtml(t('card.forkHint')) + '">' + t('card.fork') + '</button>'
-            : '') +
-          (shipsAgent
-            ? '<button onclick="window._launcher.showAppAgentsModal(\'' + jsArg(owner) + '\', \'' + jsArg(fn) + '\')" title="' + escapeHtml(t('card.agentHint')) + '">' + t('card.agent') + '</button>'
-            : '') +
-        '</div>' +
-        ((version || (sa.forks && sa.forks > 0) || shipsAgent)
-          ? '<div class="published-card-badgerow">'
-            + (shipsAgent
-              ? '<span class="pcb-agent" title="' + escapeHtml(t('card.agentHint')) + '">&#x1F916;</span>'
-              : '')
-            + ((sa.forks && sa.forks > 0)
-              ? '<span class="pcb-forks" title="' + escapeHtml(t('card.forksHint')) + '" onclick="window._launcher.showLineageModal(\'' + escapeHtml(owner) + '\', \'' + escapeHtml(fn) + '\')">⑂ ' + sa.forks + '</span>'
-              : '')
-            + (version ? '<span class="pcb-version">' + escapeHtml(version) + '</span>' : '')
-            + '</div>'
-          : '') +
-      '</div>' +
-    '</div>';
+  var detailCall = 'window._launcher.openPublishedDetail(\'' + jsArg(owner) + '\', \'' + jsArg(fn) + '\', \'\', ' + (sa.version_number || 0) + ')';
+  var actions = [{ label: t('card.view'), onclick: 'window._launcher.viewPublished(\'' + jsArg(viewUrl) + '?mode=inline\', \'' + jsArg(name) + '\')', kind: 'open' }];
+  // Fork is offered on a community app only when its owner marked it forkable.
+  if (sa.forkable) actions.push({ label: t('card.fork'), onclick: 'window._launcher.forkVersion(\'' + jsArg(owner) + '\', \'' + jsArg(fn) + '\', ' + (sa.version_number || 0) + ')', title: t('card.forkHint'), kind: 'plain' });
+  if (shipsAgent) actions.push({ label: t('card.agent'), onclick: 'window._launcher.showAppAgentsModal(\'' + jsArg(owner) + '\', \'' + jsArg(fn) + '\')', title: t('card.agentHint'), kind: 'plain' });
+  actions.push({ label: '⋯', onclick: detailCall, title: t('ctx.details'), kind: 'more' });
+  var metaParts = ['\u{1F464} ' + author];
+  if (sa.version_number) metaParts.push('v' + sa.version_number);
+  var when = fmtDate(sa.created_at); if (when) metaParts.push(when);
+  var nameExtra = (shipsAgent ? ' <span class="pcb-agent" title="' + escapeHtml(t('card.agentHint')) + '">\u{1F916}</span>' : '') +
+    ((sa.forks && sa.forks > 0)
+      ? ' <span class="pcb-forks" title="' + escapeHtml(t('card.forksHint')) + '" onclick="event.stopPropagation(); window._launcher.showLineageModal(\'' + jsArg(owner) + '\', \'' + jsArg(fn) + '\')">⑂ ' + sa.forks + '</span>'
+      : '');
+  return rowHtml({
+    icon: sa.icon || m.icon || '\u{1F4DD}', name: name, nameExtra: nameExtra, favStar: favStarHtml(ref),
+    meta: metaParts.join(' · '), desc: description,
+    state: sa.parked ? 'unlisted' : 'listed', draft: false,
+    opens: (typeof sa.downloads === 'number') ? sa.downloads : null,
+    tags: m.tags || [], rowClick: detailCall, actions: actions, index: index
+  });
 }
 
 function renderCommunityApps(serverApps, aimeatUrl, section, grid, countEl, currentOwner) {
@@ -967,46 +992,51 @@ function renderCommunityApps(serverApps, aimeatUrl, section, grid, countEl, curr
     return;
   }
   section.style.display = '';
-  countEl.textContent = '(' + serverApps.length + ')';
-  var html = '';
-  for (var i = 0; i < serverApps.length; i++) html += publishedCardHtml(serverApps[i], aimeatUrl);
+  countEl.textContent = '· ' + serverApps.length;
+  var railCount = document.getElementById('rail-count-community');
+  if (railCount) railCount.textContent = String(serverApps.length);
+  var list = sortServerApps(serverApps.slice());
+  var html = listHeadHtml();
+  for (var i = 0; i < list.length; i++) html += publishedRowHtml(list[i], aimeatUrl, i);
   grid.innerHTML = html;
   updateCommunityEmpty();
 }
 
-// The ⭐ Favourites group (Library view): apps the owner favourited, drawn from the FULL server-app
-// list (own + community). Pinned above "Your apps"; hidden when there are none.
+// The Favourites view: apps the owner starred, drawn from the FULL server-app list (own +
+// community). Its own view since 2026-08-28; empty, it says why.
 function renderFavorites(allServerApps, aimeatUrl) {
   var section = document.getElementById('favorites-section');
   var grid = document.getElementById('favorites-grid');
   var countEl = document.getElementById('favorites-count');
   if (!section || !grid) return;
-  var favs = (allServerApps || []).filter(function (sa) { return isFavorite((sa.owner || '') + '/' + (sa.filename || '')); });
-  if (favs.length === 0) { section.style.display = 'none'; grid.innerHTML = ''; return; }
-  section.style.display = '';
-  if (countEl) countEl.textContent = '(' + favs.length + ')';
-  var html = '';
-  for (var i = 0; i < favs.length; i++) html += publishedCardHtml(favs[i], aimeatUrl);
+  var favs = getFavoriteServerApps();
+  var railCount = document.getElementById('rail-count-favorites');
+  if (railCount) railCount.textContent = String(favs.length);
+  if (countEl) countEl.textContent = '· ' + favs.length;
+  if (favs.length === 0) { grid.innerHTML = ''; updateFavoritesEmpty(); return; }
+  var list = sortServerApps(favs.slice());
+  var html = listHeadHtml();
+  for (var i = 0; i < list.length; i++) html += publishedRowHtml(list[i], aimeatUrl, i);
   grid.innerHTML = html;
+  updateFavoritesEmpty();
 }
 
-// Re-render everything that shows a star (own grid, community grid, ⭐ group) from the cached list
-// after a favourite toggle — no re-fetch. Called by the _launcher.toggleFavorite handler.
-function refreshFavoritesUI() {
+// Re-render the community and favourites lists from the cached listing — no re-fetch. The rail
+// calls this after a sort change; a favourite toggle calls refreshFavoritesUI, which adds the
+// owner's own rows (their stars).
+function rerenderServerLists() {
   renderFavorites(lastAllServerApps, lastAimeatUrl);
-  var currentOwner = null;
-  try {
-    var s = (window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.getSession());
-    currentOwner = (s && s.owner) || (JSON.parse(localStorage.getItem('aimeat_session') || '{}').owner) || null;
-  } catch (e) { /* anonymous */ }
-  var communityApps = currentOwner
-    ? lastAllServerApps.filter(function (a) { return !sameOwner(a.owner, currentOwner); })
-    : lastAllServerApps;
-  renderCommunityApps(communityApps, lastAimeatUrl,
+  renderCommunityApps(lastCommunityApps, lastAimeatUrl,
     document.getElementById('community-section'), document.getElementById('community-grid'),
-    document.getElementById('community-count'), currentOwner);
+    document.getElementById('community-count'), null);
   applyServerFilter();
-  renderApps(); // own-grid stars
+}
+
+// Re-render everything that shows a star (own list, community list, favourites view) from the
+// cached list after a favourite toggle. Called by the _launcher.toggleFavorite handler.
+function refreshFavoritesUI() {
+  rerenderServerLists();
+  renderApps(); // own-list stars
 }
 
 // Render the owner's PARKED apps in their own section. A parked app is hidden from
@@ -1155,6 +1185,9 @@ export {
   submitBackupRestore,
   loadPublishedApps,
   refreshFavoritesUI,
+  rerenderServerLists,
+  getCommunityApps,
+  getFavoriteServerApps,
   applyServerFilter,
   unpublishApp,
   toggleParkApp,

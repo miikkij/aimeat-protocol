@@ -50,7 +50,9 @@ export async function renderAppCatalog(): Promise<string> {
   if (!template.includes(STYLES_MARKER)) throw new Error(`template missing ${STYLES_MARKER}`);
   if (!template.includes(BUNDLE_MARKER)) throw new Error(`template missing ${BUNDLE_MARKER}`);
 
-  const css = readFileSync(join(SRC_DIR, 'styles', 'app-catalog.css'), 'utf-8');
+  // The showroom skin is appended AFTER the base stylesheet so it wins every cascade it shares.
+  const css = readFileSync(join(SRC_DIR, 'styles', 'app-catalog.css'), 'utf-8') + '\n' +
+    readFileSync(join(SRC_DIR, 'styles', 'app-catalog-showroom.css'), 'utf-8');
   const bundle = await bundleJs();
 
   const banner =
