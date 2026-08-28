@@ -34,6 +34,8 @@
  *   });
  *   // later, when the app's data changed:  m.refresh('errands.');
  * @version-history
+ *   v0.16.0 — 2026-08-28 — The harvest trio joins the vocabulary: `matrix`, `graph` and
+ *     `waveform` blocks, each riding its bound record whole like the chart.
  *   v0.15.0 — 2026-08-28 — The `chart` block: the bound record ({ labels, series }) rides to the
  *     chart component whole — the first harvest component in the layout vocabulary.
  *   v0.14.0 — 2026-08-28 — The signature COLOUR pair: an `--ak-accent` token of the form
@@ -70,6 +72,10 @@ import { cardGrid, mediaCard } from './grid.js';
 import { table, searchBar } from './table.js';
 import { timeline } from './timeline.js';
 import { chart } from './chart.js';
+import { matrix } from './matrix.js';
+import { graph } from './graph.js';
+import { waveform } from './waveform.js';
+import { patchFor, derivedColumns } from './mosaic-bind.js';
 import { aide } from './aide.js';
 import { projectCanvas } from './mosaic-canvas.js';
 
@@ -122,24 +128,6 @@ async function loadLayout(owner, filename) {
 function labelOf(block) {
   const p = block.props || {};
   return p.title || p.caption || block.component;
-}
-
-/** What `set()` takes for one bound component kind, from a freshly resolved source. */
-function patchFor(kind, data) {
-  if (kind === 'statRow') return { tiles: Array.isArray(data) ? data : [] };
-  if (kind === 'table') return { rows: Array.isArray(data) ? data : (data && data.rows) || [] };
-  if (kind === 'figure') return data && typeof data === 'object' ? data : { value: 0 };
-  if (kind === 'chart') return { data: data && typeof data === 'object' && !Array.isArray(data) ? data : null };
-  return { items: Array.isArray(data) ? data : [] };
-}
-
-/** Columns for a table whose source sent bare rows: one column per key of the first row.
- *  The `id` key is the row's address, not a column a person reads — it stays out. */
-function derivedColumns(rows) {
-  if (!rows.length) return [];
-  return Object.keys(rows[0]).filter(function (key) { return key !== 'id'; }).map(function (key) {
-    return { key: key, label: key, sortable: true };
-  });
 }
 
 /**
@@ -237,6 +225,18 @@ export function mosaic(spec) {
       case 'chart':
         return bound('chart', function (data) {
           return chart({ target: into, data: patchFor('chart', data).data, title: p.title, empty: empty });
+        });
+      case 'matrix':
+        return bound('matrix', function (data) {
+          return matrix({ target: into, data: patchFor('matrix', data).data, empty: empty, onPick: pick });
+        });
+      case 'graph':
+        return bound('graph', function (data) {
+          return graph({ target: into, data: patchFor('graph', data).data, title: p.title, empty: empty, onPick: pick });
+        });
+      case 'waveform':
+        return bound('waveform', function (data) {
+          return waveform({ target: into, data: patchFor('waveform', data).data, title: p.title, empty: empty });
         });
       case 'table':
         return bound('table', function (data) {

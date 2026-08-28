@@ -12,6 +12,9 @@
  * @structure ak-list · ak-listdetail · ak-grid + ak-card · ak-mediacard · ak-timeline
  * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
  * @version-history
+ *   v0.7.0 — 2026-08-28 — The harvest trio (TARGET-074): the matrix (toned comparison grid,
+ *     sticky row labels, scrolls in its own box), the graph (toned node pills and edges) and
+ *     the waveform (mirrored bars, quiet ink to loud accent).
  *   v0.6.0 — 2026-08-28 — The chart (TARGET-074, the harvest): grouped bars + drawn lines on
  *     the look's spectrum, mono ticks, a legend in words; entrance collapses under
  *     reduced-motion.
@@ -322,3 +325,84 @@ button.ak-card:hover { box-shadow: var(--ak-elev-2); transform: translateY(-2px)
   .ak-chart__bar--enter { animation: none; }
   .ak-chart__line--enter { transition: none; stroke-dashoffset: 0 !important; }
 }
+
+/* ── Matrix: labelled rows × labelled columns, every cell a toned word ────────────────────── */
+.ak-matrix {
+  border-radius: var(--ak-radius);
+  background: var(--ak-surface);
+  background-image: var(--ak-surface-image);
+  border: var(--ak-line-w) solid var(--ak-line);
+  box-shadow: var(--ak-elev-1);
+}
+.ak-matrix__scroll { overflow-x: auto; }
+.ak-matrix__table { border-collapse: collapse; width: 100%; min-width: 30rem; }
+.ak-matrix__col, .ak-matrix__corner {
+  padding: 10px 12px;
+  font-family: var(--ak-font-mono);
+  font-size: var(--ak-text-fine);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ak-ink-dim);
+  text-align: left;
+  border-bottom: var(--ak-line-w) solid var(--ak-line);
+}
+.ak-matrix__label {
+  padding: 10px 12px;
+  text-align: left;
+  font-weight: 600;
+  position: sticky;
+  left: 0;
+  background: var(--ak-surface);
+  white-space: nowrap;
+}
+.ak-matrix__badge { margin-left: 8px; }
+.ak-matrix__row { border-bottom: 1px solid color-mix(in oklab, var(--ak-line) 55%, transparent); }
+.ak-matrix__row[role='button'] { cursor: pointer; }
+.ak-matrix__row[role='button']:hover .ak-matrix__label { color: var(--ak-accent-text); }
+.ak-matrix__cell { padding: 8px 12px; }
+.ak-matrix__chip {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: var(--ak-radius-pill);
+  font-size: var(--ak-text-fine);
+  border: 1px solid transparent;
+}
+.ak-matrix__cell--ok     { background: color-mix(in oklab, var(--ak-ok) 16%, var(--ak-surface)); color: color-mix(in oklab, var(--ak-ok) 60%, var(--ak-ink)); }
+.ak-matrix__cell--warn   { background: color-mix(in oklab, var(--ak-warn) 18%, var(--ak-surface)); color: color-mix(in oklab, var(--ak-warn) 45%, var(--ak-ink)); }
+.ak-matrix__cell--err    { background: color-mix(in oklab, var(--ak-err) 16%, var(--ak-surface)); color: color-mix(in oklab, var(--ak-err) 55%, var(--ak-ink)); }
+.ak-matrix__cell--accent { background: color-mix(in oklab, var(--ak-accent) 16%, var(--ak-surface)); color: var(--ak-accent-text); }
+.ak-matrix__cell--plain  { background: color-mix(in oklab, var(--ak-ink) 7%, var(--ak-surface)); color: var(--ak-ink-dim); }
+
+/* ── Graph: toned node pills and the lines between them ───────────────────────────────────── */
+.ak-graph {
+  margin: 0;
+  padding: calc(var(--ak-pad) * 0.75);
+  border-radius: var(--ak-radius);
+  background: var(--ak-surface);
+  background-image: var(--ak-surface-image);
+  border: var(--ak-line-w) solid var(--ak-line);
+  box-shadow: var(--ak-elev-1);
+}
+.ak-graph__svg { display: block; width: 100%; height: auto; }
+.ak-graph__edge { stroke: var(--ak-line); stroke-width: 1.5; }
+.ak-graph__edgelabel { fill: var(--ak-ink-dim); font-family: var(--ak-font-mono); font-size: 10px; }
+.ak-graph__pill { fill: var(--ak-surface-2); stroke: var(--ak-line); stroke-width: var(--ak-line-w); }
+.ak-graph__label { fill: var(--ak-ink); font-size: 12.5px; font-weight: 600; }
+.ak-graph__node--ok .ak-graph__pill     { fill: color-mix(in oklab, var(--ak-ok) 16%, var(--ak-surface)); stroke: color-mix(in oklab, var(--ak-ok) 45%, var(--ak-line)); }
+.ak-graph__node--warn .ak-graph__pill   { fill: color-mix(in oklab, var(--ak-warn) 18%, var(--ak-surface)); stroke: color-mix(in oklab, var(--ak-warn) 45%, var(--ak-line)); }
+.ak-graph__node--err .ak-graph__pill    { fill: color-mix(in oklab, var(--ak-err) 16%, var(--ak-surface)); stroke: color-mix(in oklab, var(--ak-err) 45%, var(--ak-line)); }
+.ak-graph__node--accent .ak-graph__pill { fill: color-mix(in oklab, var(--ak-accent) 18%, var(--ak-surface)); stroke: color-mix(in oklab, var(--ak-accent) 50%, var(--ak-line)); }
+.ak-graph__node[role='button'] { cursor: pointer; }
+.ak-graph__node[role='button']:hover .ak-graph__pill { stroke: var(--ak-accent); }
+
+/* ── Waveform: sound as mirrored bars, quiet ink to loud accent ───────────────────────────── */
+.ak-waveform {
+  margin: 0;
+  padding: calc(var(--ak-pad) * 0.75);
+  border-radius: var(--ak-radius);
+  background: var(--ak-surface);
+  background-image: var(--ak-surface-image);
+  border: var(--ak-line-w) solid var(--ak-line);
+  box-shadow: var(--ak-elev-1);
+}
+.ak-waveform__svg { display: block; width: 100%; height: 96px; }

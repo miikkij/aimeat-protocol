@@ -2255,6 +2255,255 @@
     };
   }
 
+  // src/static/sdk-libs/atelier/matrix.js
+  var TONES = ["ok", "warn", "err", "accent", "plain"];
+  function matrix(spec) {
+    const root = el("div", { class: "ak-root ak-matrix" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let emptyCard = null;
+    function render(data) {
+      if (emptyCard) {
+        emptyCard.destroy();
+        emptyCard = null;
+      }
+      clear(root);
+      const cols = data && Array.isArray(data.cols) ? data.cols : [];
+      const rows = data && Array.isArray(data.rows) ? data.rows : [];
+      if (!cols.length || !rows.length) {
+        const e = spec.empty || {};
+        emptyCard = emptyState({ target: root, tone: "quiet", title: e.title || t("empty"), hint: e.hint || t("emptyHint") });
+        return;
+      }
+      const table2 = el("table", { class: "ak-matrix__table" });
+      const head = el("tr", {}, [el("th", { class: "ak-matrix__corner", scope: "col" })]);
+      for (const col of cols) {
+        head.appendChild(el("th", { class: "ak-matrix__col", scope: "col", text: col.label }));
+      }
+      table2.appendChild(el("thead", {}, [head]));
+      const body = el("tbody", {});
+      for (const row of rows) {
+        const cellsByCol = new Map((row.cells || []).map((c) => [c.col, c]));
+        const tr = el("tr", {
+          class: "ak-matrix__row",
+          ...spec.onPick ? { tabindex: "0", role: "button" } : {}
+        });
+        const label = el("th", { class: "ak-matrix__label", scope: "row" }, [
+          el("span", { text: row.label }),
+          row.badge != null ? el("span", { class: "ak-badge ak-matrix__badge" + (row.tone ? " ak-matrix__cell--" + row.tone : ""), text: row.badge }) : null
+        ]);
+        tr.appendChild(label);
+        for (const col of cols) {
+          const cell = cellsByCol.get(col.id);
+          const tone = cell && TONES.includes(cell.tone || "") ? cell.tone : cell ? "plain" : null;
+          tr.appendChild(el("td", { class: "ak-matrix__cell" }, [
+            tone === null ? null : el("span", {
+              class: "ak-matrix__chip ak-matrix__cell--" + tone,
+              text: cell && cell.label != null ? cell.label : "●",
+              ...cell && cell.label == null ? { "aria-label": tone } : {}
+            })
+          ]));
+        }
+        if (spec.onPick) {
+          const pick = () => spec.onPick(row);
+          tr.addEventListener("click", pick);
+          tr.addEventListener("keydown", (ev) => {
+            if (
+              /** @type {KeyboardEvent} */
+              ev.key === "Enter" || /** @type {KeyboardEvent} */
+              ev.key === " "
+            ) {
+              ev.preventDefault();
+              pick();
+            }
+          });
+        }
+        body.appendChild(tr);
+      }
+      table2.appendChild(body);
+      root.appendChild(el("div", { class: "ak-matrix__scroll" }, [table2]));
+      enter(root);
+    }
+    render(spec.data);
+    return {
+      el: root,
+      /** @param {{ data: MatrixData|null }} patch */
+      set(patch) {
+        if (!patch) return;
+        render(patch.data);
+      },
+      destroy() {
+        if (emptyCard) emptyCard.destroy();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/graph.js
+  var W2 = 720;
+  var H2 = 420;
+  var PAD2 = 46;
+  var SVG_NS2 = "http://www.w3.org/2000/svg";
+  function svg2(name, attrs) {
+    const node = document.createElementNS(SVG_NS2, name);
+    for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
+    return node;
+  }
+  function place(nodes) {
+    const out = /* @__PURE__ */ new Map();
+    const ringed = nodes.filter((n) => typeof n.x !== "number" || typeof n.y !== "number");
+    let ringIndex = 0;
+    for (const node of nodes) {
+      if (typeof node.x === "number" && typeof node.y === "number") {
+        out.set(node.id, {
+          x: PAD2 + Math.min(Math.max(node.x, 0), 100) / 100 * (W2 - PAD2 * 2),
+          y: PAD2 + Math.min(Math.max(node.y, 0), 100) / 100 * (H2 - PAD2 * 2)
+        });
+      } else {
+        const angle = 2 * Math.PI * ringIndex / Math.max(ringed.length, 1) - Math.PI / 2;
+        out.set(node.id, {
+          x: W2 / 2 + Math.cos(angle) * (W2 / 2 - PAD2 * 1.6),
+          y: H2 / 2 + Math.sin(angle) * (H2 / 2 - PAD2 * 1.4)
+        });
+        ringIndex++;
+      }
+    }
+    return out;
+  }
+  function graph(spec) {
+    const root = el("figure", { class: "ak-root ak-graph", role: "img" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let emptyCard = null;
+    function render(data) {
+      if (emptyCard) {
+        emptyCard.destroy();
+        emptyCard = null;
+      }
+      clear(root);
+      const nodes = data && Array.isArray(data.nodes) ? data.nodes.filter((n) => n && n.id) : [];
+      const edges = data && Array.isArray(data.edges) ? data.edges : [];
+      if (!nodes.length) {
+        const e = spec.empty || {};
+        emptyCard = emptyState({ target: root, tone: "quiet", title: e.title || t("empty"), hint: e.hint || t("emptyHint") });
+        return;
+      }
+      root.setAttribute("aria-label", (spec.title ? spec.title + " — " : "") + nodes.map((n) => n.label).join(", "));
+      const at = place(nodes);
+      const node = svg2("svg", { viewBox: `0 0 ${W2} ${H2}`, class: "ak-graph__svg", "aria-hidden": "true" });
+      for (const edge of edges) {
+        const a = at.get(edge.from);
+        const b = at.get(edge.to);
+        if (!a || !b) continue;
+        node.appendChild(svg2("line", { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: "ak-graph__edge" }));
+        if (edge.label) {
+          const text = svg2("text", {
+            x: (a.x + b.x) / 2,
+            y: (a.y + b.y) / 2 - 5,
+            class: "ak-graph__edgelabel",
+            "text-anchor": "middle"
+          });
+          text.textContent = edge.label;
+          node.appendChild(text);
+        }
+      }
+      for (const item of nodes) {
+        const p = at.get(item.id);
+        const width = Math.min(Math.max(item.label.length * 7.6 + 26, 60), 190);
+        const g = svg2("g", { class: "ak-graph__node ak-graph__node--" + (item.tone || "plain"), transform: `translate(${p.x}, ${p.y})` });
+        g.appendChild(svg2("rect", { x: -width / 2, y: -17, width, height: 34, rx: 17, class: "ak-graph__pill" }));
+        const label = svg2("text", { x: 0, y: 5, class: "ak-graph__label", "text-anchor": "middle" });
+        label.textContent = item.label.length > 24 ? item.label.slice(0, 23) + "…" : item.label;
+        g.appendChild(label);
+        if (spec.onPick) {
+          g.setAttribute("role", "button");
+          g.setAttribute("tabindex", "0");
+          g.addEventListener("click", () => spec.onPick(item));
+          g.addEventListener("keydown", (ev) => {
+            if (
+              /** @type {KeyboardEvent} */
+              ev.key === "Enter"
+            ) spec.onPick(item);
+          });
+        }
+        node.appendChild(g);
+      }
+      root.appendChild(node);
+      enter(root);
+    }
+    render(spec.data);
+    return {
+      el: root,
+      /** @param {{ data: GraphData|null }} patch */
+      set(patch) {
+        if (!patch) return;
+        render(patch.data);
+      },
+      destroy() {
+        if (emptyCard) emptyCard.destroy();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/waveform.js
+  var W3 = 720;
+  var H3 = 120;
+  var SVG_NS3 = "http://www.w3.org/2000/svg";
+  function svg3(name, attrs) {
+    const node = document.createElementNS(SVG_NS3, name);
+    for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
+    return node;
+  }
+  function waveform(spec) {
+    const root = el("figure", { class: "ak-root ak-waveform", role: "img" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let emptyCard = null;
+    function render(data) {
+      if (emptyCard) {
+        emptyCard.destroy();
+        emptyCard = null;
+      }
+      clear(root);
+      const values = data && Array.isArray(data.values) ? data.values.filter((v) => typeof v === "number" && Number.isFinite(v)).map((v) => Math.max(v, 0)) : [];
+      if (!values.length) {
+        const e = spec.empty || {};
+        emptyCard = emptyState({ target: root, tone: "quiet", title: e.title || t("empty"), hint: e.hint || t("emptyHint") });
+        return;
+      }
+      root.setAttribute("aria-label", spec.title || t("empty"));
+      const max = data && typeof data.max === "number" && data.max > 0 ? data.max : Math.max(...values, 1e-4);
+      const node = svg3("svg", { viewBox: `0 0 ${W3} ${H3}`, class: "ak-waveform__svg", "aria-hidden": "true", preserveAspectRatio: "none" });
+      const slot = W3 / values.length;
+      const barW = Math.max(Math.min(slot * 0.62, 14), 1.5);
+      values.forEach((v, i) => {
+        const half = Math.max(Math.min(v / max, 1) * (H3 - 8) / 2, 1.2);
+        const strength = Math.round(Math.min(v / max, 1) * 100);
+        node.appendChild(svg3("rect", {
+          x: i * slot + (slot - barW) / 2,
+          y: H3 / 2 - half,
+          width: barW,
+          height: half * 2,
+          rx: barW / 2,
+          class: "ak-waveform__bar",
+          style: `fill: color-mix(in oklab, var(--ak-accent) ${strength}%, var(--ak-ink-dim))`
+        }));
+      });
+      root.appendChild(node);
+    }
+    render(spec.data);
+    return {
+      el: root,
+      /** @param {{ data: { values: number[], max?: number }|null }} patch */
+      set(patch) {
+        if (!patch) return;
+        render(patch.data);
+      },
+      destroy() {
+        if (emptyCard) emptyCard.destroy();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+
   // src/static/sdk-libs/_core/config.js
   function cfg() {
     return window.__AIMEAT_SDK_CFG__ || { nodeId: "", baseUrl: "" };
@@ -2269,6 +2518,25 @@
   var APEX_URL = cfg().baseUrl;
   var NODE_ID = cfg().nodeId;
   var HEARTBEAT_MS = cfg().heartbeatMs || 3e4;
+
+  // src/static/sdk-libs/atelier/mosaic-bind.js
+  function patchFor(kind, data) {
+    if (kind === "statRow") return { tiles: Array.isArray(data) ? data : [] };
+    if (kind === "table") return { rows: Array.isArray(data) ? data : data && data.rows || [] };
+    if (kind === "figure") return data && typeof data === "object" ? data : { value: 0 };
+    if (kind === "chart" || kind === "matrix" || kind === "graph" || kind === "waveform") {
+      return { data: data && typeof data === "object" && !Array.isArray(data) ? data : null };
+    }
+    return { items: Array.isArray(data) ? data : [] };
+  }
+  function derivedColumns(rows) {
+    if (!rows.length) return [];
+    return Object.keys(rows[0]).filter(function(key) {
+      return key !== "id";
+    }).map(function(key) {
+      return { key, label: key, sortable: true };
+    });
+  }
 
   // src/static/sdk-libs/atelier/mosaic-canvas.js
   var CANVAS_MIN = 0.35;
@@ -2417,21 +2685,6 @@
     const p = block.props || {};
     return p.title || p.caption || block.component;
   }
-  function patchFor(kind, data) {
-    if (kind === "statRow") return { tiles: Array.isArray(data) ? data : [] };
-    if (kind === "table") return { rows: Array.isArray(data) ? data : data && data.rows || [] };
-    if (kind === "figure") return data && typeof data === "object" ? data : { value: 0 };
-    if (kind === "chart") return { data: data && typeof data === "object" && !Array.isArray(data) ? data : null };
-    return { items: Array.isArray(data) ? data : [] };
-  }
-  function derivedColumns(rows) {
-    if (!rows.length) return [];
-    return Object.keys(rows[0]).filter(function(key) {
-      return key !== "id";
-    }).map(function(key) {
-      return { key, label: key, sortable: true };
-    });
-  }
   function mosaic(spec) {
     const host = spec.app ? spec.app.main : resolve(spec.target, document.body);
     const root = el("div", { class: "ak-root ak-mosaic" });
@@ -2498,6 +2751,18 @@
         case "chart":
           return bound("chart", function(data) {
             return chart({ target: into, data: patchFor("chart", data).data, title: p.title, empty });
+          });
+        case "matrix":
+          return bound("matrix", function(data) {
+            return matrix({ target: into, data: patchFor("matrix", data).data, empty, onPick: pick });
+          });
+        case "graph":
+          return bound("graph", function(data) {
+            return graph({ target: into, data: patchFor("graph", data).data, title: p.title, empty, onPick: pick });
+          });
+        case "waveform":
+          return bound("waveform", function(data) {
+            return waveform({ target: into, data: patchFor("waveform", data).data, title: p.title, empty });
           });
         case "table":
           return bound("table", function(data) {
@@ -3074,7 +3339,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.19.0",
+    version: "0.20.0",
     // ── Shell and navigation ──
     app,
     section,
@@ -3115,6 +3380,9 @@
     mediaCard,
     timeline,
     chart,
+    matrix,
+    graph,
+    waveform,
     // ── Data ──
     form,
     table,
