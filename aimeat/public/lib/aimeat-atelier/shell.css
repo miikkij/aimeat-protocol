@@ -250,9 +250,11 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  transform: rotate(var(--ak-tilt));
+  /* Straight at rest — the tilt is a hover greeting, never a posture (see content.css). */
+  transition: transform var(--ak-motion) var(--ak-ease);
 }
-.ak-statrow__tile:nth-child(even) { transform: rotate(calc(var(--ak-tilt) * -1)); }
+.ak-statrow__tile:hover { transform: rotate(var(--ak-tilt)); }
+.ak-statrow__tile:nth-child(even):hover { transform: rotate(calc(var(--ak-tilt) * -1)); }
 .ak-statrow__value {
   font-family: var(--ak-font-display);
   font-weight: var(--ak-weight-display);

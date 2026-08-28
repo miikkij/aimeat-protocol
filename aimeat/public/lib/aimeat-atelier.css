@@ -36,6 +36,13 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.22.0 — 2026-08-28 — THE VOLUME RULE FREED (the developer's direction): the tilt is a
+ *     hover greeting, never a resting posture (cards and tiles stand straight; the look's tilt
+ *     fires on hover/focus/current, with a lift); the monogram grounds commit to real chroma
+ *     off the spectrum (the imagery slot was never bound by the surface-tint budget — pastel
+ *     there was timidity, not a rule) and the letter wears the brand gradient cut into the
+ *     glyph; the vivid aurora deepens (36/34/32 within the mesh cap). The readability floors
+ *     did not move: matrix 3292/3292.
  *   v0.21.0 — 2026-08-28 — The nesting guard (looks.css): every look block declares the
  *     inverse-band trio — own value or contract default — so a nested look never inherits the
  *     outer look's band type.
@@ -201,10 +208,10 @@
   --ak-hero-ink-dim:  var(--ak-hero-ink);
   /* The zero-image hero ground: an AURORA — four lobes across the derived spectrum, real
    * chroma. The scrim under the text is what AK-SCRIM verifies, so the mesh may commit. */
-  --ak-hero-image:    radial-gradient(at 15% 18%, color-mix(in oklab, var(--ak-accent) 34%, var(--ak-bg)), transparent 50%),
-                      radial-gradient(at 85% 10%, color-mix(in oklab, var(--ak-spectrum-2) 30%, var(--ak-bg)), transparent 52%),
-                      radial-gradient(at 68% 96%, color-mix(in oklab, var(--ak-spectrum-3) 26%, var(--ak-bg)), transparent 55%),
-                      radial-gradient(at 4% 86%,  color-mix(in oklab, var(--ak-spectrum-2) 16%, var(--ak-bg)), transparent 45%);
+  --ak-hero-image:    radial-gradient(at 15% 18%, color-mix(in oklab, var(--ak-accent) 36%, var(--ak-bg)), transparent 52%),
+                      radial-gradient(at 85% 10%, color-mix(in oklab, var(--ak-spectrum-2) 34%, var(--ak-bg)), transparent 54%),
+                      radial-gradient(at 68% 96%, color-mix(in oklab, var(--ak-spectrum-3) 32%, var(--ak-bg)), transparent 56%),
+                      radial-gradient(at 4% 86%,  color-mix(in oklab, var(--ak-spectrum-2) 22%, var(--ak-bg)), transparent 46%);
   /* The page's own ambient: the same spectrum, whisper-quiet, under everything — the ground
    * stops being a dead flat and the app has weather. Presets that mean flatness turn it off. */
   --ak-page-image:    radial-gradient(at 10% 0%,   color-mix(in oklab, var(--ak-accent) 7%, var(--ak-bg)), transparent 42%),
