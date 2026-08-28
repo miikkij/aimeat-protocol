@@ -28,6 +28,10 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.17.0 — 2026-08-28 — The signature colour pair: a layout's `--ak-accent` token in the form
+ *     "#light/#dark" is applied per mode by the mosaic (style element scoped to the host), so an
+ *     app can carry its own proven brand colour in both themes. Validation and the contrast
+ *     proof live on the server; the kit only applies what was accepted.
  *   v0.16.0 — 2026-08-28 — Agentness in the app (phase 6's tail): delegate() — "let AI handle
  *     it" on a declared task, spend-guarded through the agents library, outcome in the same
  *     view — and agentActivity(), the owner's agents' work as the kit's own timeline. Both
@@ -114,7 +118,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.16.0',
+  version: '0.17.0',
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,
