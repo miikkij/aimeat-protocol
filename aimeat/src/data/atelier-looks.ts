@@ -25,6 +25,9 @@
  * @usage
  *   import { LOOKS, STRUCTURES } from '../data/atelier-looks.js';
  * @version-history
+ *   v1.3.0 — 2026-08-28 — BILLBOARD: the whole screen is the poster — carnival's language with
+ *     the measure column dropped (--ak-main-max 100%) and a half-viewport banner. The
+ *     developer's ask: not everything is a lane in the middle of the screen.
  *   v1.2.0 — 2026-08-28 — CARNIVAL: the front-demo2 register joins the registry — a saturated
  *     three-hue banner mixed over ink (so AK-GRAD proves the action ink on every stop and the
  *     mesh cap never applies), brutalist offset depth, sticker tilt, maximum display weight.
@@ -432,6 +435,37 @@ export const LOOKS: readonly AtelierLook[] = [
       '--ak-display-stroke': '0',
     },
     note: 'The front-demo2 register as arithmetic: a three-hue brand banner (every stop mixed over ink, so the mesh cap never applies and AK-GRAD proves the action ink on each), the INVERSE BAND (light hero ink on the saturated ground, a thin dark scrim instead of the pale wash — the pair AK-SCRIM now proves), depth as printed offset like brutalist, the tilt doing the sticker work. Loud is a look, not an accident.',
+  },
+  {
+    id: 'billboard',
+    feel: 'the whole screen is the poster: carnival\'s energy edge to edge, no measure column, a half-screen banner — for fronts, showcases and anything that should fill the room',
+    imagery: 'vibrant pop-art carnival illustration, saturated colours, bold outlines, wide panoramic energy',
+    structures: ['full-bleed-hero'],
+    tokens: {
+      '--ak-main-max': '100%',
+      '--ak-hero-min': '52dvh',
+      '--ak-hero-image': 'none',
+      '--ak-grad': 'linear-gradient(150deg, color-mix(in oklab, var(--ak-accent) 82%, var(--ak-ink)), color-mix(in oklab, var(--ak-spectrum-2) 76%, var(--ak-ink)) 55%, color-mix(in oklab, var(--ak-spectrum-3) 70%, var(--ak-ink)))',
+      '--ak-line-w': '2px',
+      '--ak-line': 'color-mix(in oklab, var(--ak-ink) 85%, var(--ak-bg))',
+      '--ak-radius': '14px',
+      '--ak-radius-sm': '10px',
+      '--ak-gap': '18px',
+      '--ak-surface-image': 'linear-gradient(180deg, color-mix(in oklab, var(--ak-spectrum-2) 4%, var(--ak-surface)), var(--ak-surface))',
+      '--ak-elev-1': '6px 6px 0 color-mix(in oklab, var(--ak-ink) 88%, transparent)',
+      '--ak-elev-2': '10px 10px 0 color-mix(in oklab, var(--ak-ink) 88%, transparent)',
+      '--ak-display-shadow': '3px 3px 0 color-mix(in oklab, var(--ak-ink) 40%, transparent)',
+      '--ak-text-hero': 'clamp(3.2rem, 12vw, 6.4rem)',
+      '--ak-weight-display': '900',
+      '--ak-tilt': '-1.6deg',
+      '--ak-enter-distance': '30px',
+      '--ak-enter-stagger': '55ms',
+      '--ak-scrim': 'color-mix(in oklab, var(--ak-ink) 14%, transparent)',
+      '--ak-hero-ink': 'var(--ak-accent-ink)',
+      '--ak-hero-ink-dim': 'var(--ak-accent-ink)',
+      '--ak-display-stroke': '0',
+    },
+    note: 'The developer\'s ask, verbatim in spirit: why is everything a lane in the middle of the screen? Billboard drops the measure column entirely (--ak-main-max 100%) and grows the banner to half the viewport — carnival\'s inverse band and printed depth, at room scale. The narrow-screen story is unchanged: the column was never narrower than the phone.',
   },
   {
     id: 'aurora',

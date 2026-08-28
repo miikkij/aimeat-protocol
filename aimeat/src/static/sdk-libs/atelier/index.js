@@ -28,6 +28,8 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.23.0 — 2026-08-28 — Billboard (the full-canvas look) and the Voltage palette land beside
+ *     the kit (CSS-side; the palette rides the golden pill like every other).
  *   v0.22.0 — 2026-08-28 — The volume rule freed (CSS-side): tilt becomes a hover greeting,
  *     the monogram grounds commit to real chroma with a gradient-cut letter, the vivid aurora
  *     deepens. Readability floors unmoved; matrix 3292/3292.
@@ -137,7 +139,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.22.0',
+  version: '0.23.0',
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,

@@ -36,6 +36,9 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.23.0 — 2026-08-28 — BILLBOARD joins the looks (looks.css): the whole screen is the
+ *     poster — no measure column, a half-viewport banner, carnival's printed depth at room
+ *     scale. Matrix 4285/4285 over 14 looks × 12 palette-modes (Voltage included).
  *   v0.22.0 — 2026-08-28 — THE VOLUME RULE FREED (the developer's direction): the tilt is a
  *     hover greeting, never a resting posture (cards and tiles stand straight; the look's tilt
  *     fires on hover/focus/current, with a lift); the monogram grounds commit to real chroma

@@ -1129,6 +1129,10 @@
     { id: "mist", label: "Mist", swatch: {
       light: { bg: "#e6eae4", card: "#fbfcfa", accent: "#47695a" },
       dark: { bg: "#141715", card: "#252b27", accent: "#9cc0ae" }
+    } },
+    { id: "voltage", label: "Voltage", swatch: {
+      light: { bg: "#f1e4d2", card: "#ffffff", accent: "#c2187e" },
+      dark: { bg: "#150d20", card: "#2c1d3f", accent: "#ff4fa8" }
     } }
   ];
   function aimeatReadPalette() {
