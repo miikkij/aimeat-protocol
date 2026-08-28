@@ -23,6 +23,9 @@
  *     tag bar becomes a rail with counts and a fold, plus a state filter (listed / unlisted / draft
  *     waiting), a sort order (newest / most opened / A→Z) and the header sticker with the counts.
  *     Built to the design canvas "App Catalog Alternate".
+ *   v3.1.0 — 2026-08-28 — The poster face (design canvas "App Catalog Poster"): the rows are a
+ *     numbered index that opens in place, the header sticker becomes the band with the numbers
+ *     (plus the opens total) and the masthead's mono line, and the foot carries the count.
  */
 import { escapeHtml, jsArg, sourceLabel, filterAttr, isSameOriginUrl } from './util.js';
 import { getAllApps, saveApp, deleteApp } from './db.js';
@@ -34,7 +37,7 @@ import { setEditingAppId, switchTab } from './apps-io.js';
 import { openPromptBuilder } from './cortex.js';
 import { openDetailView, openPublishedDetail } from './detail.js';
 import { loadPublishedApps, showPublishModal, applyServerFilter, deleteServerApp, getCommunityApps, getFavoriteServerApps, rerenderServerLists } from './server-io.js';
-import { listHeadHtml, rowHtml, fmtKb, fmtDate } from './rows.js';
+import { rowHtml, fmtKb, fmtDate } from './rows.js';
 
 // browser-local list + filter state stay main-owned; injected once via initRender at bootstrap.
 let getMainApps, setAllApps, getActiveTag, setActiveTag, getSearchQuery;
@@ -121,10 +124,25 @@ function renderStateBar(entries) {
       railItem(t('state.unlisted'), unlisted, activeState === 'unlisted', 'window._launcher.filterByState(\'unlisted\')', false) +
       railItem(t('state.draft'), drafts, activeState === 'draft', 'window._launcher.filterByState(\'draft\')', false);
   }
-  var kicker = document.getElementById('cat-kicker');
-  if (kicker) {
-    kicker.textContent = t('kicker.line').replace('{n}', String(entries.length)).replace('{listed}', String(listed)).replace('{drafts}', String(drafts));
-    kicker.hidden = !(listingLoaded && entries.length > 0);
+  // The band under the masthead says the same numbers, plus how often the apps were opened.
+  var opensTotal = 0;
+  for (var o = 0; o < entries.length; o++) opensTotal += entries[o].opens || 0;
+  var band = document.getElementById('cat-band');
+  if (band) {
+    var setN = function (id, v) { var el = document.getElementById(id); if (el) el.textContent = v; };
+    setN('cat-band-apps', String(entries.length));
+    setN('cat-band-listed', String(listed));
+    setN('cat-band-drafts', String(drafts));
+    setN('cat-band-opens', opensTotal.toLocaleString());
+    band.hidden = !(listingLoaded && entries.length > 0);
+  }
+  var mast = document.getElementById('cat-mastline');
+  if (mast) {
+    var owner = (entries[0] && (entries[0].owner || entries[0].aimeatOwner)) || '';
+    var host = (typeof location !== 'undefined' && location.host) ? location.host.replace(/^apps\./, '') : '';
+    mast.textContent = (listingLoaded && entries.length > 0)
+      ? t('mast.line').replace('{owner}', owner).replace('{n}', String(entries.length)).replace('{host}', host)
+      : '';
   }
   var railCount = document.getElementById('rail-count-library');
   if (railCount) railCount.textContent = listingLoaded ? String(entries.length) : '';
@@ -508,17 +526,17 @@ function renderApps() {
           '</div>';
       }
     } else {
-      var html = listHeadHtml();
+      var html = '';
       for (var j = 0; j < filtered.length; j++) {
-        html += libraryRowHtml(filtered[j], j);
+        html += libraryRowHtml(filtered[j], j + 1);
       }
       grid.innerHTML = html;
     }
 
-    // Stats: app count only — the catalog is server-only, so there is no local footprint to report.
-    // "0 apps" before the first listing lands is a claim we cannot make yet, so hold the line blank.
+    // The foot's first fact carries the count. Before the first listing lands the count is a
+    // claim we cannot make yet, so the line stays blank.
     var statsEl = document.getElementById('stats');
-    statsEl.textContent = listingLoaded ? (entries.length + ' ' + t('stats.apps')) : '';
+    statsEl.textContent = listingLoaded ? t('foot.p1').replace('{n}', String(entries.length)) : '';
 
     renderStateBar(entries);
     renderTags(entries);
@@ -538,11 +556,11 @@ function libraryRowHtml(e, i) {
     : (e.hasLocal
         ? 'window._launcher.launchApp(\'' + jsArg(e.localId) + '\', \'' + jsArg(e.openMode || 'tab') + '\')'
         : detailCall);
-  var actions = [{ label: t('card.open'), onclick: openCall, title: t(e.hasDraft ? 'card.openReleasedHint' : 'card.openHint'), kind: 'open' }];
+  var actions = [{ label: t('card.open'), onclick: openCall, title: t(e.hasDraft ? 'card.openReleasedHint' : 'card.openHint'), kind: 'slab' }];
   if (e.hasDraft && e.viewUrl) {
-    actions.push({ label: t('card.draft'), onclick: 'window._launcher.openStagingPreview(\'' + jsArg(e.owner || '') + '\', \'' + jsArg(e.filename || '') + '\')', title: t('card.openStagingHint'), kind: 'draft' });
+    actions.push({ label: t('card.openDraft'), onclick: 'window._launcher.openStagingPreview(\'' + jsArg(e.owner || '') + '\', \'' + jsArg(e.filename || '') + '\')', title: t('card.openStagingHint'), kind: 'word' });
   }
-  actions.push({ label: '⋯', onclick: detailCall, title: t('ctx.details'), kind: 'more' });
+  actions.push({ label: t('card.details'), onclick: detailCall, title: t('ctx.details'), kind: 'word' });
   var metaParts = [];
   if (e.versionNumber) metaParts.push('v' + e.versionNumber);
   var when = fmtDate(e.createdAt); if (when) metaParts.push(when);
@@ -550,13 +568,18 @@ function libraryRowHtml(e, i) {
   var nameExtra = (e.origin === 'ai-published' ? ' <span class="ai-origin-badge">AI</span>' : '') +
     (e.hasAgents ? ' <span class="pcb-agent" title="' + escapeHtml(t('card.agentHint')) + '">\u{1F916}</span>' : '') +
     aiPostureMarkers(e);
+  // The one line in the panel: where the work is.
+  var line = e.hasDraft ? t('row.lineDraft')
+    : (e.parked ? t('row.lineUnlisted')
+      : (e.published ? t('row.linePublished').replace('{v}', e.versionNumber ? 'v' + e.versionNumber : '').replace('{date}', when || '')
+        : t('row.lineLocal')));
   return rowHtml({
-    icon: e.icon, name: e.name, nameExtra: nameExtra,
+    n: i, icon: e.icon, name: e.name, nameExtra: nameExtra,
     favStar: e.filename ? favStarHtml((e.owner || e.aimeatOwner || '') + '/' + e.filename) : '',
     meta: metaParts.join(' · '),
     desc: (e.descriptions && e.descriptions[getLang()]) || e.description || '',
     state: e.parked ? 'unlisted' : (e.published ? 'listed' : 'local'),
-    draft: !!e.hasDraft, opens: e.opens, tags: e.tags, rowClick: detailCall, actions: actions, index: i
+    draft: !!e.hasDraft, opens: e.opens, tags: e.tags, line: line, actions: actions
   });
 }
 

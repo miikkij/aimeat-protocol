@@ -18,6 +18,9 @@
  *   v2.0.0 — 2026-08-28 — The showroom skin: community and favourites render as rows (rows.js),
  *     favourites is a third view of its own, the header's sort order applies to both lists, and
  *     the rail reads getCommunityApps / getFavoriteServerApps for its tag counts.
+ *   v2.1.0 — 2026-08-28 — The poster face: rows are numbered index lines with a panel (the doors
+ *     as a slab and underlined words, one line about who published it and when); a filtered-out
+ *     row's panel hides with it.
  */
 import { escapeHtml, jsArg, bareOwnerName, sameOwner, filterAttr } from './util.js';
 import { getAllApps, saveApp } from './db.js';
@@ -28,7 +31,7 @@ import { closeModal } from './apps-io.js';
 import { getCortexOwnerToken } from './cortex.js';
 import { fetchAppContentBase64, refreshServerMgmt } from './detail.js';
 import { favStarHtml, isFavorite, loadFavorites } from './favorites.js';
-import { listHeadHtml, rowHtml, fmtDate } from './rows.js';
+import { rowHtml, fmtDate } from './rows.js';
 import { loadPromoted } from './promote.js';
 
 // Injected once at bootstrap by main.js: read getters + write setters for the shared app-state
@@ -937,6 +940,10 @@ function applyServerFilter() {
       }
       if (match && q) match = (row.getAttribute('data-filter') || '').indexOf(q) !== -1;
       row.style.display = match ? '' : 'none';
+      // The panel under a hidden row hides with it, and a hidden row is never left open.
+      if (!match) row.classList.remove('is-open');
+      var panel = row.nextElementSibling;
+      if (panel && panel.classList.contains('cat-row-panel')) panel.style.display = match ? '' : 'none';
       if (match) shown++;
     });
     if (grids[g] === 'community-grid' && rows.length) {
@@ -962,12 +969,12 @@ function publishedRowHtml(sa, aimeatUrl, index) {
   // Agent-Bundled Apps: this app ships its own agent(s) — mark it and offer the Bundled-agents modal.
   var shipsAgent = !!(m.cortex && m.cortex.agents && m.cortex.agents.length);
   var detailCall = 'window._launcher.openPublishedDetail(\'' + jsArg(owner) + '\', \'' + jsArg(fn) + '\', \'\', ' + (sa.version_number || 0) + ')';
-  var actions = [{ label: t('card.view'), onclick: 'window._launcher.viewPublished(\'' + jsArg(viewUrl) + '?mode=inline\', \'' + jsArg(name) + '\')', kind: 'open' }];
+  var actions = [{ label: t('card.view'), onclick: 'window._launcher.viewPublished(\'' + jsArg(viewUrl) + '?mode=inline\', \'' + jsArg(name) + '\')', kind: 'slab' }];
   // Fork is offered on a community app only when its owner marked it forkable.
-  if (sa.forkable) actions.push({ label: t('card.fork'), onclick: 'window._launcher.forkVersion(\'' + jsArg(owner) + '\', \'' + jsArg(fn) + '\', ' + (sa.version_number || 0) + ')', title: t('card.forkHint'), kind: 'plain' });
-  if (shipsAgent) actions.push({ label: t('card.agent'), onclick: 'window._launcher.showAppAgentsModal(\'' + jsArg(owner) + '\', \'' + jsArg(fn) + '\')', title: t('card.agentHint'), kind: 'plain' });
-  actions.push({ label: '⋯', onclick: detailCall, title: t('ctx.details'), kind: 'more' });
-  var metaParts = ['\u{1F464} ' + author];
+  if (sa.forkable) actions.push({ label: t('card.fork'), onclick: 'window._launcher.forkVersion(\'' + jsArg(owner) + '\', \'' + jsArg(fn) + '\', ' + (sa.version_number || 0) + ')', title: t('card.forkHint'), kind: 'word' });
+  if (shipsAgent) actions.push({ label: t('card.agent'), onclick: 'window._launcher.showAppAgentsModal(\'' + jsArg(owner) + '\', \'' + jsArg(fn) + '\')', title: t('card.agentHint'), kind: 'word' });
+  actions.push({ label: t('card.details'), onclick: detailCall, title: t('ctx.details'), kind: 'word' });
+  var metaParts = [author];
   if (sa.version_number) metaParts.push('v' + sa.version_number);
   var when = fmtDate(sa.created_at); if (when) metaParts.push(when);
   var nameExtra = (shipsAgent ? ' <span class="pcb-agent" title="' + escapeHtml(t('card.agentHint')) + '">\u{1F916}</span>' : '') +
@@ -975,11 +982,12 @@ function publishedRowHtml(sa, aimeatUrl, index) {
       ? ' <span class="pcb-forks" title="' + escapeHtml(t('card.forksHint')) + '" onclick="event.stopPropagation(); window._launcher.showLineageModal(\'' + jsArg(owner) + '\', \'' + jsArg(fn) + '\')">⑂ ' + sa.forks + '</span>'
       : '');
   return rowHtml({
-    icon: sa.icon || m.icon || '\u{1F4DD}', name: name, nameExtra: nameExtra, favStar: favStarHtml(ref),
+    n: index + 1, icon: sa.icon || m.icon || '\u{1F4DD}', name: name, nameExtra: nameExtra, favStar: favStarHtml(ref),
     meta: metaParts.join(' · '), desc: description,
     state: sa.parked ? 'unlisted' : 'listed', draft: false,
     opens: (typeof sa.downloads === 'number') ? sa.downloads : null,
-    tags: m.tags || [], rowClick: detailCall, actions: actions, index: index
+    tags: m.tags || [], actions: actions,
+    line: t('row.lineBy').replace('{owner}', author).replace('{date}', when || '')
   });
 }
 
@@ -996,7 +1004,7 @@ function renderCommunityApps(serverApps, aimeatUrl, section, grid, countEl, curr
   var railCount = document.getElementById('rail-count-community');
   if (railCount) railCount.textContent = String(serverApps.length);
   var list = sortServerApps(serverApps.slice());
-  var html = listHeadHtml();
+  var html = '';
   for (var i = 0; i < list.length; i++) html += publishedRowHtml(list[i], aimeatUrl, i);
   grid.innerHTML = html;
   updateCommunityEmpty();
@@ -1015,7 +1023,7 @@ function renderFavorites(allServerApps, aimeatUrl) {
   if (countEl) countEl.textContent = '· ' + favs.length;
   if (favs.length === 0) { grid.innerHTML = ''; updateFavoritesEmpty(); return; }
   var list = sortServerApps(favs.slice());
-  var html = listHeadHtml();
+  var html = '';
   for (var i = 0; i < list.length; i++) html += publishedRowHtml(list[i], aimeatUrl, i);
   grid.innerHTML = html;
   updateFavoritesEmpty();

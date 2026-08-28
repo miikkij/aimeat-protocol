@@ -9,48 +9,24 @@
 </head>
 <body data-active-view="library">
 
-  <header class="cat-head">
-    <div class="cat-head-brand">
-      <a class="aimeat-cta aimeat-home" id="aimeat-home-link" href="/" data-i18n-title="cta.backHome" title="Back to home"><span class="aimeat-cta-spark">⚡</span><span id="aimeat-home-label">aimeat.io</span></a>
-      <!-- The sticker: how many apps, how many listed, how many with a draft waiting. Filled by renderApps. -->
-      <span id="cat-kicker" class="cat-kicker" hidden></span>
-      <h1 class="cat-title" data-i18n="header.title">My Apps</h1>
-    </div>
-    <div class="cat-head-tools">
-      <input type="text" id="search-input" class="cat-search" placeholder="Search apps..." data-i18n-ph="search.ph" autocomplete="off" spellcheck="false"/>
-      <div id="cat-sort" class="cat-sort" role="group">
-        <button type="button" class="cat-sort-btn is-on" data-sort="newest" onclick="window._launcher.setSort('newest')" data-i18n="sort.newest">Newest</button>
-        <button type="button" class="cat-sort-btn" data-sort="opens" onclick="window._launcher.setSort('opens')" data-i18n="sort.opens">Most opened</button>
-        <button type="button" class="cat-sort-btn" data-sort="name" onclick="window._launcher.setSort('name')" data-i18n="sort.name">A → Z</button>
-      </div>
+  <!-- The site bar, as on every page of the house: the node's name, the three doors, the
+       language, the theme, the shared login pill. The catalog's own controls sit in the masthead. -->
+  <header class="cat-bar">
+    <div class="cat-bar-left">
+      <a class="cat-brand" id="aimeat-home-link" href="/" data-i18n-title="cta.backHome" title="Back to home"><span id="aimeat-home-label">aimeat.io</span></a>
+      <nav class="cat-bar-nav">
+        <a href="/v1/home" data-i18n="nav.home">Home</a>
+        <a href="/v1/chat" data-i18n="nav.chat">Chat</a>
+        <span class="active" data-i18n="nav.apps">Apps</span>
+      </nav>
     </div>
     <div class="header-actions">
-      <span id="headerAuth" class="header-auth-pill"></span>
-      <!-- Create menu: Add app / Generate with AI / Generate homepage grouped under one + -->
-      <div class="backup-menu-wrap">
-        <button class="cat-btn cat-btn--hot" id="create-btn" data-i18n-title="action.create" title="Create" onclick="window._launcher.toggleCreateMenu(event)">+ <span data-i18n="action.create">Create</span></button>
-        <div id="create-menu" class="backup-menu" hidden>
-          <button id="add-btn" data-i18n="action.add">&#x2795; Add app</button>
-          <button id="generate-btn" data-i18n="action.generate">&#x2728; Generate with AI</button>
-          <button id="homepage-btn" data-i18n="action.homepage">&#x1F3E0; Generate homepage</button>
-        </div>
-      </div>
-      <!-- Data menu: backups + imports -->
-      <div class="backup-menu-wrap">
-        <button class="icon-btn" id="backup-btn" data-i18n-title="backup.menu" title="Backup" onclick="window._launcher.toggleBackupMenu(event)">&#x1F4BE;</button>
-        <div id="backup-menu" class="backup-menu" hidden>
-          <button onclick="window._launcher.exportBackupZip()" data-i18n="backup.exportAll">&#x1F4E6; Export all (.zip)</button>
-          <button onclick="window._launcher.importBackupPick()" data-i18n="backup.importFrom">&#x1F4E5; Import from backup...</button>
-        </div>
-      </div>
-      <input type="file" id="backup-file-input" accept=".zip,application/zip,application/x-zip-compressed" hidden />
       <div class="lang-toggle" id="lang-toggle" title="Language / Kieli">
         <button class="lang-btn" data-lang="en" onclick="window._launcher.setLanguage('en')">EN</button>
         <button class="lang-btn" data-lang="fi" onclick="window._launcher.setLanguage('fi')">FI</button>
       </div>
       <button class="icon-btn" id="theme-btn" onclick="window._launcher.toggleTheme()" data-i18n-title="action.theme" title="Toggle theme">&#x1F319;</button>
-      <button class="icon-btn" id="help-btn" onclick="window._launcher.openHelp()" data-i18n-title="action.help" title="Help">?</button>
-      <button class="icon-btn" id="settings-btn" data-i18n-title="action.settings" title="Settings">&#x2699;</button>
+      <span id="headerAuth" class="header-auth-pill"></span>
     </div>
   </header>
 
@@ -60,20 +36,70 @@
        explanation of how listing works. -->
   <div class="cat-body">
   <aside class="cat-rail" id="cat-rail">
+    <a class="cat-rail-home" href="/v1/home">← <span data-i18n="rail.home">Home</span></a>
+    <div class="cat-rail-id"><div class="cat-rail-avatar">&#x1F4DA;</div><div class="cat-rail-idname" data-i18n="header.title">My Apps</div></div>
     <nav id="view-tabs" class="cat-rail-group" role="tablist">
-      <div class="cat-rail-label" data-i18n="rail.show">Show</div>
       <button type="button" id="view-tab-library" class="cat-rail-item active" role="tab" onclick="window._launcher.switchView('library')"><span data-i18n="view.library">Your apps</span><span class="cat-rail-count" id="rail-count-library"></span></button>
       <button type="button" id="view-tab-community" class="cat-rail-item" role="tab" onclick="window._launcher.switchView('community')"><span data-i18n="view.community">Community</span><span class="cat-rail-count" id="rail-count-community"></span></button>
       <button type="button" id="view-tab-favorites" class="cat-rail-item" role="tab" onclick="window._launcher.switchView('favorites')"><span data-i18n="view.favorites">Favourites</span><span class="cat-rail-count" id="rail-count-favorites"></span></button>
     </nav>
     <nav id="state-bar" class="cat-rail-group" data-view="library"></nav>
     <nav id="tag-bar" class="cat-rail-group"></nav>
-    <div class="cat-rail-box" data-view="library">
-      <div class="cat-rail-box-label" data-i18n="rail.howTitle">How this works</div>
-      <span data-i18n="sec.localHint">Add app publishes to your account as unlisted — list it when it's ready to be public.</span>
-    </div>
   </aside>
   <div class="cat-main">
+
+  <!-- The masthead: the page's name, one mono line, the one loud control and the quiet words. -->
+  <div class="cat-masthead">
+    <div class="cat-masthead-main">
+      <h1 class="cat-title" data-i18n="header.title">My Apps</h1>
+      <div id="cat-mastline" class="cat-mastline"></div>
+    </div>
+    <div class="cat-masthead-actions">
+      <!-- Create menu: Add app / Generate with AI / Generate homepage grouped under one slab -->
+      <div class="backup-menu-wrap">
+        <button type="button" class="cat-slab" id="create-btn" data-i18n-title="action.create" title="Create" onclick="window._launcher.toggleCreateMenu(event)">+ <span data-i18n="action.createApp">Create an app</span></button>
+        <div id="create-menu" class="backup-menu" hidden>
+          <button id="add-btn" data-i18n="action.add">&#x2795; Add app</button>
+          <button id="generate-btn" data-i18n="action.generate">&#x2728; Generate with AI</button>
+          <button id="homepage-btn" data-i18n="action.homepage">&#x1F3E0; Generate homepage</button>
+        </div>
+      </div>
+      <div class="cat-masthead-links">
+        <!-- Data menu: backups + imports -->
+        <div class="backup-menu-wrap">
+          <button type="button" class="cat-word" id="backup-btn" data-i18n="action.backups" data-i18n-title="backup.menu" title="Backup" onclick="window._launcher.toggleBackupMenu(event)">Backups and imports</button>
+          <div id="backup-menu" class="backup-menu" hidden>
+            <button onclick="window._launcher.exportBackupZip()" data-i18n="backup.exportAll">&#x1F4E6; Export all (.zip)</button>
+            <button onclick="window._launcher.importBackupPick()" data-i18n="backup.importFrom">&#x1F4E5; Import from backup...</button>
+          </div>
+        </div>
+        <input type="file" id="backup-file-input" accept=".zip,application/zip,application/x-zip-compressed" hidden />
+        <button type="button" class="cat-word" id="help-btn" onclick="window._launcher.openHelp()" data-i18n="action.help">Help</button>
+        <button type="button" class="cat-word" id="settings-btn" data-i18n="action.settings">Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- The band: the four numbers on the diagonal stripe, as on the profile. Filled by renderApps. -->
+  <div id="cat-band" class="cat-band" data-view="library" hidden>
+    <div class="cat-band-in">
+      <div class="cat-band-item"><div class="cat-band-n" id="cat-band-apps">0</div><div class="cat-band-l" data-i18n="band.apps">Apps</div></div>
+      <div class="cat-band-item"><div class="cat-band-n" id="cat-band-listed">0</div><div class="cat-band-l" data-i18n="band.listed">Listed</div></div>
+      <div class="cat-band-item"><div class="cat-band-n" id="cat-band-drafts">0</div><div class="cat-band-l" data-i18n="band.drafts">Draft waiting</div></div>
+      <div class="cat-band-item"><div class="cat-band-n" id="cat-band-opens">0</div><div class="cat-band-l" data-i18n="band.opens">Opens, all time</div></div>
+    </div>
+  </div>
+
+  <!-- Search and order: an underline field and underlined words -->
+  <div class="cat-tools">
+    <input type="text" id="search-input" class="cat-search" placeholder="Search apps..." data-i18n-ph="search.ph" autocomplete="off" spellcheck="false"/>
+    <div id="cat-sort" class="cat-sort" role="group">
+      <span class="cat-sort-label" data-i18n="sort.label">Order</span>
+      <button type="button" class="cat-sort-btn is-on" data-sort="newest" onclick="window._launcher.setSort('newest')" data-i18n="sort.newest">Newest</button>
+      <button type="button" class="cat-sort-btn" data-sort="opens" onclick="window._launcher.setSort('opens')" data-i18n="sort.opens">Most opened</button>
+      <button type="button" class="cat-sort-btn" data-sort="name" onclick="window._launcher.setSort('name')" data-i18n="sort.name">A → Z</button>
+    </div>
+  </div>
 
   <!-- Active Extensions Bar -->
   <div id="cortex-bar" data-view="library" style="display:none;margin:0 24px 1.5rem;position:relative;z-index:1">
@@ -160,14 +186,17 @@
       <h2><span data-i18n="sec.local">Your apps</span> <span id="local-apps-count" class="cat-count"></span></h2>
     </div>
     <main id="app-grid"></main>
+    <p class="cat-list-foot" data-i18n="list.foot">One row per app. The number is its place in the order above; press a row for its doors and a line about where the work is.</p>
   </div>
-  </div><!-- .cat-main -->
-  </div><!-- .cat-body -->
 
+  <!-- The foot, on ink: two facts. The first carries the count. -->
   <footer>
-    <span id="stats">0 apps</span>
+    <p id="stats" class="cat-foot-p"></p>
+    <p class="cat-foot-p" data-i18n="foot.p2">An app that generates content with an AI model says so on its own page.</p>
     <span class="footer-brand">AIMEAT</span>
   </footer>
+  </div><!-- .cat-main -->
+  </div><!-- .cat-body -->
 
   <div id="modal-overlay" hidden>
     <div class="modal" id="add-app-modal">

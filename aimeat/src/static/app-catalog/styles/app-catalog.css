@@ -126,7 +126,7 @@
   <meta name="theme-color" content="#FAFAF8"/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Bungee&family=Archivo:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Archivo+Black&family=Archivo:wght@400;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet"/>
   <title>My Apps — AIMEAT</title>
   <style>
     :root {
@@ -154,6 +154,8 @@
     v2.16.0 — 2026-08-19 — .cat-spinner — the ring the loading state shows in the empty-state icon slot.
     v2.17.0 — 2026-08-28 — The showroom skin: Bungee + Archivo join the font link, and the rules that
       restyle the page live in app-catalog-showroom.css, appended after this file by the build.
+    v2.18.0 — 2026-08-28 — The poster face replaces the showroom skin: Archivo Black + JetBrains Mono
+      in the font link (Bungee leaves), the rules in app-catalog-poster.css.
   */
     [data-theme="dark"] {
       color-scheme: dark;

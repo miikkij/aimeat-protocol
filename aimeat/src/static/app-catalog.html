@@ -134,7 +134,7 @@
   <meta name="theme-color" content="#FAFAF8"/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Bungee&family=Archivo:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Archivo+Black&family=Archivo:wght@400;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet"/>
   <title>My Apps — AIMEAT</title>
   <style>
     :root {
@@ -162,6 +162,8 @@
     v2.16.0 — 2026-08-19 — .cat-spinner — the ring the loading state shows in the empty-state icon slot.
     v2.17.0 — 2026-08-28 — The showroom skin: Bungee + Archivo join the font link, and the rules that
       restyle the page live in app-catalog-showroom.css, appended after this file by the build.
+    v2.18.0 — 2026-08-28 — The poster face replaces the showroom skin: Archivo Black + JetBrains Mono
+      in the font link (Bungee leaves), the rules in app-catalog-poster.css.
   */
     [data-theme="dark"] {
       color-scheme: dark;
@@ -2426,421 +2428,416 @@
       text-align: center; border: 1px dashed var(--border-subtle); border-radius: 8px; }
 
 /*
-  @file app-catalog-showroom.css
+  @file app-catalog-poster.css
   @author Jouni Miikki
   SPDX-License-Identifier: MIT
-  @description The catalog's showroom skin (cat- prefix), appended after app-catalog.css by
-    scripts/build-app-catalog.ts so it wins every cascade it shares. The language is the front
-    page's (public/css/views/landing-showroom.css): Bungee headlines and stickers, Archivo body,
-    3px ink borders, hard offset shadows in coral, ink and sticker yellow. Borders and shadows are
-    var(--text), so the dark theme inverts to a light line on a dark ground instead of painting ink.
-    Built to the design canvas "App Catalog Alternate" (2026-08-28): the library as a list with a
-    filter rail, the detail view as a hero plus two columns, the phone as stacked cards.
-  @structure tokens · page frame (header, rail, list, footer) · rows · detail view · phone
+  @description The catalog's poster face (cat- prefix), appended after app-catalog.css by
+    scripts/build-app-catalog.ts so it wins every cascade it shares. The language is the one the
+    home, chat and profile pages wear (public/css/views/home.css, chat.css, profile.css): Archivo
+    Black mastheads over ink rules, the diagonal coral band with the big numbers, the profile's index
+    with the open row on the sun, the chat's underline field and ink slab, actions as underlined
+    words. Every rule and shadow is var(--text), so the dark theme inverts instead of painting ink.
+    Built to the design canvas "App Catalog Poster" (2026-08-28), which replaced the showroom skin
+    of the same morning.
+  @structure tokens · site bar · masthead, band, tools · rail · the index (rows and panels) ·
+    foot · detail view · phone
   @version-history
     v1.0.0 — 2026-08-28 — Initial.
 */
 
-/* ── Tokens the showroom vocabulary needs on top of the catalog's own ─────────────────────── */
+/* ── Tokens the poster needs on top of the catalog's own ─────────────────────────────────── */
 :root {
   --sun: #FFB52E;
-  --font-display: 'Bungee', 'Archivo', 'DM Sans', system-ui, sans-serif;
-  --font-marketing: 'Archivo', 'DM Sans', system-ui, sans-serif;
+  --font-poster: 'Archivo Black', 'Archivo', 'DM Sans', system-ui, sans-serif;
+  --font-body: 'Archivo', 'DM Sans', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
   --card-bg: var(--surface);
   --bg-surface: var(--bg-subtle);
   --border: var(--border-subtle);
-  --ink-shadow: var(--text);
+  --accent-subtle: rgba(232, 86, 74, .06);
 }
+[data-theme="dark"] { --accent-subtle: rgba(255, 111, 98, .10); }
 
-body { font-family: var(--font-marketing); }
+body { font-family: var(--font-body); }
 body::before { display: none; }
 button { font-family: inherit; }
 
-/* ── Header ───────────────────────────────────────────────────────────────────────────────── */
-header.cat-head {
-  position: static;
-  display: flex; align-items: flex-end; gap: 28px; flex-wrap: wrap;
-  padding: 24px 32px 18px;
-  background: var(--bg); backdrop-filter: none; -webkit-backdrop-filter: none;
-  border-bottom: 3px solid var(--text);
+/* The two words of the poster: a slab, and an underlined word. */
+.cat-slab {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 44px; padding: 0 18px;
+  background: var(--text); color: var(--bg);
+  border: 0; border-radius: 0; box-shadow: 4px 4px 0 var(--sun);
+  font-family: var(--font-body); font-weight: 800; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em;
+  cursor: pointer; white-space: nowrap; transition: transform 120ms ease, box-shadow 120ms ease;
 }
-.cat-head-brand { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
-.cat-head-brand .aimeat-cta { font-family: var(--font-marketing); }
-.cat-kicker {
-  display: inline-block; font-family: var(--font-display); text-transform: uppercase; font-size: .8rem; letter-spacing: .06em;
-  padding: 8px 14px; background: var(--sun); color: #1A1A2E;
-  border: 3px solid var(--text); box-shadow: 5px 5px 0 var(--ink-shadow); transform: rotate(-2deg);
-  white-space: nowrap;
+.cat-slab:hover { color: var(--sun); transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--sun); }
+.cat-word {
+  display: inline-block; background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0; box-shadow: none;
+  padding: 0 0 1px; cursor: pointer;
+  font-family: var(--font-body); font-weight: 800; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--text); white-space: nowrap;
 }
-.cat-kicker[hidden] { display: none; }
-header.cat-head h1.cat-title {
-  font-family: var(--font-display); font-weight: 400; text-transform: uppercase;
-  font-size: 3.5rem; line-height: .96; color: var(--text);
-  text-shadow: .075em .075em 0 var(--accent);
+.cat-word:hover { color: var(--accent); border-color: var(--accent); }
+.cat-word--danger { color: var(--accent); border-color: var(--accent); }
+.cat-mono-link {
+  background: none; border: 0; padding: 0; cursor: pointer; text-align: left;
+  font-family: var(--font-mono); font-size: .8rem; color: var(--accent);
+  text-decoration: underline; text-underline-offset: 4px;
 }
-.cat-head-tools { flex: 1 1 360px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding-bottom: 6px; }
-header.cat-head #search-input.cat-search {
-  flex: 1 1 260px; max-width: 520px; min-width: 200px;
-  padding: 12px 14px; border: 3px solid var(--text); border-radius: 0;
-  background: var(--card-bg); color: var(--text); font-size: .95rem; font-family: var(--font-marketing);
+.cat-mono-link:hover { color: var(--text); }
+
+/* ── The site bar, as on every page ───────────────────────────────────────────────────────── */
+header.cat-bar {
+  position: static; height: 56px; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: nowrap;
+  padding: 0 24px; background: var(--surface); backdrop-filter: none; -webkit-backdrop-filter: none;
+  border-bottom: 1px solid var(--border);
+  font-family: 'DM Sans', system-ui, sans-serif;
 }
-header.cat-head #search-input.cat-search::placeholder { color: var(--text-muted); }
-header.cat-head #search-input.cat-search:focus { outline: none; border-color: var(--text); box-shadow: 4px 4px 0 var(--accent); }
-.cat-sort { display: inline-flex; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; background: var(--card-bg); }
+.cat-bar-left { display: flex; align-items: center; gap: 22px; min-width: 0; }
+.cat-brand {
+  display: inline-flex; align-items: center; gap: 0; padding: 0; border: 0; border-radius: 0; background: none;
+  font-weight: 800; font-size: 1.125rem; letter-spacing: .3px; color: var(--text); text-decoration: none; white-space: nowrap;
+}
+.cat-brand .cat-heart { color: var(--accent); margin: 0 1px; font-size: 1rem; }
+.cat-bar-nav { display: flex; align-items: center; gap: 4px; }
+.cat-bar-nav a, .cat-bar-nav span {
+  padding: 6px 12px; border-radius: 6px; font-size: .9rem; font-weight: 500; color: var(--text-dim); text-decoration: none; white-space: nowrap;
+}
+.cat-bar-nav a:hover { color: var(--text); }
+.cat-bar-nav .active { background: var(--accent-subtle); color: var(--accent); font-weight: 600; }
+header.cat-bar .header-actions { gap: 12px; flex-wrap: nowrap; }
+header.cat-bar .lang-toggle { border: 1px solid var(--border); border-radius: 6px; background: var(--surface); padding: 0; gap: 0; }
+header.cat-bar .lang-btn { border-radius: 0; padding: 5px 9px; font-size: .75rem; font-weight: 700; }
+header.cat-bar .lang-btn.active { background: var(--text); color: var(--bg); }
+header.cat-bar .icon-btn { width: 36px; height: 36px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); box-shadow: none; font-size: 1rem; }
+header.cat-bar .icon-btn:hover { transform: none; box-shadow: none; background: var(--bg-surface); }
+
+/* ── The page: the index on the left, the poster on the right ─────────────────────────────── */
+.cat-body {
+  display: flex; align-items: flex-start; flex: 1; position: relative; z-index: 1;
+}
+.cat-main { flex: 1 1 auto; min-width: 0; max-width: 1180px; padding: 40px 44px 0 24px; display: flex; flex-direction: column; }
+
+/* The masthead: the name of the page, a mono line, the one loud control and the quiet words. */
+.cat-masthead { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 26px; }
+.cat-masthead-main { display: flex; flex-direction: column; min-width: 0; }
+h1.cat-title {
+  font-family: var(--font-poster); font-weight: 400; font-size: 5.2rem; line-height: .9; letter-spacing: -.035em;
+  text-transform: uppercase; color: var(--text); max-width: 12ch;
+}
+.cat-mastline { font-family: var(--font-mono); font-size: .8rem; color: var(--text-dim); margin-top: 14px; min-height: 1.2em; }
+.cat-masthead-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; flex: 0 0 auto; }
+.cat-masthead-links { display: flex; gap: 18px; align-items: baseline; flex-wrap: wrap; justify-content: flex-end; }
+.cat-masthead .backup-menu { border: 2px solid var(--text); border-radius: 0; box-shadow: 4px 4px 0 var(--sun); }
+
+/* The band: the diagonal coral stripe with the numbers, as on the profile. */
+.cat-band { position: relative; overflow: hidden; margin: 8px 0 0; padding: 64px 0 56px; color: var(--bg); }
+.cat-band[hidden] { display: none; }
+.cat-band::before, .cat-band::after { content: ''; position: absolute; left: -10%; right: -10%; top: 50%; z-index: 0; }
+.cat-band::before { height: 190px; background: var(--accent); transform: translateY(-50%) rotate(-2.5deg); }
+.cat-band::after { height: 20px; background: var(--sun); transform: translateY(calc(-50% + 104px)) rotate(-2.5deg); }
+.cat-band-in { position: relative; z-index: 1; display: flex; gap: 56px; align-items: flex-end; padding: 0 16px; flex-wrap: wrap; }
+.cat-band-item { display: flex; flex-direction: column; gap: 6px; }
+.cat-band-n { font-family: var(--font-poster); font-size: 4rem; line-height: .85; letter-spacing: -.04em; color: var(--bg); }
+.cat-band-l { font-size: .78rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--bg); }
+
+/* Search and order: an underline field and underlined words. */
+.cat-tools { display: flex; align-items: flex-end; gap: 28px; margin: 36px 0 0; flex-wrap: wrap; }
+header.cat-bar #search-input, .cat-tools #search-input.cat-search {
+  flex: 1 1 360px; min-width: 240px; max-width: none;
+  padding: 8px 0; border: 0; border-bottom: 3px solid var(--text); border-radius: 0;
+  background: transparent; color: var(--text); font-family: var(--font-body); font-weight: 700; font-size: 1.05rem;
+}
+.cat-tools #search-input.cat-search::placeholder { color: var(--text-dim); font-weight: 700; }
+.cat-tools #search-input.cat-search:focus { outline: none; border-color: var(--accent); box-shadow: none; }
+.cat-sort { display: flex; gap: 20px; align-items: baseline; padding-bottom: 10px; border: 0; border-radius: 0; background: none; overflow: visible; }
+.cat-sort-label { font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
 .cat-sort-btn {
-  border: 0; background: transparent; cursor: pointer; font: inherit; font-size: .78rem; font-weight: 600;
-  color: var(--text-muted); padding: .38rem .8rem; white-space: nowrap;
+  border: 0; border-bottom: 3px solid transparent; background: transparent; cursor: pointer; padding: 0 0 1px; border-radius: 0;
+  font-family: var(--font-body); font-weight: 800; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-dim); white-space: nowrap;
 }
 .cat-sort-btn:hover { color: var(--text); }
-.cat-sort-btn.is-on { background: var(--accent); color: #fff; }
-header.cat-head .header-actions { padding-bottom: 6px; }
-
-/* The showroom button: Bungee on a hard-shadowed slab; hover presses it into its shadow. */
-.cat-btn {
-  display: inline-block; font-family: var(--font-display); text-transform: uppercase; font-size: .95rem;
-  padding: 12px 22px; border: 3px solid var(--text); border-radius: 0; box-shadow: 6px 6px 0 var(--ink-shadow);
-  background: var(--card-bg); color: var(--text); cursor: pointer; text-align: center; white-space: nowrap;
-  transition: transform 120ms ease, box-shadow 120ms ease;
-}
-.cat-btn:hover { transform: translate(2px, 2px); box-shadow: 3px 3px 0 var(--ink-shadow); }
-.cat-btn--hot { background: var(--accent); color: #FFFFFF; }
-.cat-btn--sun { background: var(--sun); color: #1A1A2E; }
-header.cat-head .icon-btn {
-  border: 2px solid var(--text); border-radius: 0; background: var(--card-bg); box-shadow: 3px 3px 0 var(--ink-shadow);
-  transition: transform 120ms ease, box-shadow 120ms ease;
-}
-header.cat-head .icon-btn:hover { transform: translate(1px, 1px); box-shadow: 2px 2px 0 var(--ink-shadow); background: var(--card-bg); }
-header.cat-head .lang-toggle { border: 2px solid var(--text); border-radius: 0; background: var(--card-bg); }
-header.cat-head .lang-btn { border-radius: 0; font-family: var(--font-display); font-size: .68rem; }
-header.cat-head .backup-menu { border: 3px solid var(--text); border-radius: 0; box-shadow: 6px 6px 0 var(--ink-shadow); }
-
-/* ── Page frame: the rail and the list ────────────────────────────────────────────────────── */
-.cat-body {
-  display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 40px;
-  padding: 28px 32px 32px; flex: 1; position: relative; z-index: 1;
-}
-.cat-main { min-width: 0; display: flex; flex-direction: column; }
-.cat-rail { display: flex; flex-direction: column; gap: 22px; }
-.cat-rail-group { display: flex; flex-direction: column; gap: 4px; }
-.cat-rail-label {
-  font-family: var(--font-display); text-transform: uppercase; font-size: .72rem; letter-spacing: .06em;
-  color: var(--text-dim); margin-bottom: 4px;
-}
-.cat-rail-item {
-  display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%;
-  padding: 8px 12px; border: 3px solid transparent; background: transparent; border-radius: 0;
-  font-family: var(--font-marketing); font-weight: 600; font-size: .9rem; color: var(--text); text-align: left; cursor: pointer;
-}
-.cat-rail-item:hover { background: var(--bg-surface); }
-.cat-rail-item.active {
-  background: var(--sun); color: #1A1A2E; font-weight: 800;
-  border-color: var(--text); box-shadow: 4px 4px 0 var(--ink-shadow);
-}
-.cat-rail-item.active .cat-rail-count { color: #1A1A2E; }
-/* The old tag bar was a padded, wrapping strip; in the rail it is a column like the others. */
-#tag-bar { padding: 0; display: flex; flex-direction: column; flex-wrap: nowrap; gap: 4px; z-index: auto; }
-.cat-rail-item--tag { padding: 6px 12px; font-weight: 400; font-size: .88rem; color: var(--text-dim); }
-/* The chosen tag is marked with ink, not with the sticker: one yellow box per rail, the view's. */
-.cat-rail-item--tag.active { font-weight: 800; color: var(--text); background: var(--bg-surface); border-color: var(--text); box-shadow: none; }
-.cat-rail-item--tag.active .cat-rail-count { color: var(--text); }
-.cat-rail-count { color: var(--text-muted); font-weight: 400; flex: 0 0 auto; }
-.cat-rail-more {
-  padding: 6px 12px; background: none; border: 0; border-radius: 0; cursor: pointer; text-align: left;
-  font-family: var(--font-marketing); font-size: .88rem; font-weight: 800; color: var(--accent);
-}
-.cat-rail-more:hover { text-decoration: underline; }
-.cat-rail-box {
-  padding: 16px 18px; border: 3px dashed var(--accent); background: var(--card-bg);
-  font-family: var(--font-marketing); font-size: .88rem; line-height: 1.55; color: var(--text);
-}
-.cat-rail-box-label { font-family: var(--font-display); text-transform: uppercase; font-size: .75rem; letter-spacing: .04em; color: var(--accent); margin-bottom: 6px; }
+.cat-sort-btn.is-on { background: none; color: var(--text); border-bottom-color: var(--accent); }
 
 /* Three views, one attribute. Sections carry data-view; everything else (fixed overlays) shows always. */
 body[data-active-view="library"]   [data-view]:not([data-view="library"])   { display: none !important; }
 body[data-active-view="community"] [data-view]:not([data-view="community"]) { display: none !important; }
 body[data-active-view="favorites"] [data-view]:not([data-view="favorites"]) { display: none !important; }
 
-/* The old chrome these blocks carried: the indigo panel, the glass sections, the card grids. */
-.local-apps-block { margin: 0; padding: 0; background: transparent; border: 0; border-radius: 0; }
-#published-section, #parked-section, #community-section { margin: 0; }
-#favorites-section { margin: 0; }
-.cat-list-title {
-  display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 0 0 14px;
+/* ── The rail: the profile's index ─────────────────────────────────────────────────────────── */
+.cat-rail { width: 250px; flex: 0 0 250px; padding: 24px 20px 32px 24px; display: flex; flex-direction: column; }
+.cat-rail-home {
+  border-top: 3px solid var(--text); padding-top: 14px; font-family: var(--font-mono); font-size: .8rem; color: var(--accent); text-decoration: none;
 }
+.cat-rail-home:hover { text-decoration: underline; }
+.cat-rail-id { display: flex; align-items: center; gap: 10px; padding: 6px 0 16px; }
+.cat-rail-avatar { width: 38px; height: 38px; flex: 0 0 auto; border: 3px solid var(--text); background: var(--surface); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
+.cat-rail-idname { font-family: var(--font-poster); font-size: 1rem; line-height: 1.1; text-transform: uppercase; color: var(--text); }
+.cat-rail-group { display: flex; flex-direction: column; margin-top: 18px; }
+#view-tabs.cat-rail-group { margin-top: 0; }
+#tag-bar { padding: 0; display: flex; flex-direction: column; flex-wrap: nowrap; gap: 0; z-index: auto; }
+.cat-rail-label {
+  font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent);
+  padding: 0 0 6px; border-bottom: 2px solid var(--text); margin: 0;
+}
+.cat-rail-item {
+  display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%;
+  padding: 7px 0; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: none;
+  font-family: var(--font-body); font-weight: 700; font-size: .98rem; color: var(--text); text-align: left; cursor: pointer;
+}
+.cat-rail-item:hover { color: var(--accent); background: none; }
+.cat-rail-item.active { background: var(--sun); color: var(--text); font-weight: 800; padding-left: 8px; padding-right: 8px; border-bottom-color: var(--text); box-shadow: none; border-color: var(--text); }
+.cat-rail-count { font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); font-weight: 400; flex: 0 0 auto; }
+.cat-rail-item.active .cat-rail-count { background: var(--accent); color: var(--bg); padding: 1px 7px; }
+.cat-rail-item--tag { font-size: .9rem; color: var(--text-dim); padding: 6px 0; }
+.cat-rail-item--tag.active { color: var(--text); }
+.cat-rail-more { margin-top: 14px; padding: 0; background: none; border: 0; border-radius: 0; cursor: pointer; text-align: left; font-family: var(--font-mono); font-size: .8rem; font-weight: 400; color: var(--accent); text-decoration: underline; text-underline-offset: 4px; }
+.cat-rail-more:hover { color: var(--text); text-decoration: underline; }
+
+/* ── The index of apps ─────────────────────────────────────────────────────────────────────── */
+.local-apps-block { margin: 48px 0 0; padding: 0; background: transparent; border: 0; border-radius: 0; flex: 0 0 auto; }
+#published-section, #parked-section, #community-section, #favorites-section { margin: 48px 0 0; }
+.cat-list-title { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 0 0 20px; }
 .cat-list-title h2, .cat-list-title .fav-section-title, .published-header h2 {
-  font-family: var(--font-display); font-weight: 400; text-transform: uppercase; font-size: 1.4rem; line-height: 1.1;
-  color: var(--text); margin: 0; display: flex; align-items: center; gap: 8px;
+  font-family: var(--font-poster); font-weight: 400; text-transform: uppercase; font-size: 2.4rem; line-height: .95; letter-spacing: -.03em;
+  color: var(--text); margin: 0; display: flex; align-items: baseline; gap: 12px;
 }
-.cat-list-title .cat-count, .published-header h2 span:last-child, .fav-section-count, #local-apps-count { color: var(--accent); opacity: 1; font-weight: 400; }
-.published-header { margin-bottom: 14px; }
-.published-header .arrow { font-size: .9rem; }
+.cat-list-title .cat-count, .published-header h2 span:last-child, .fav-section-count, #local-apps-count { font-family: var(--font-mono); font-size: .9rem; color: var(--accent); opacity: 1; font-weight: 400; letter-spacing: 0; }
+.published-header { margin-bottom: 20px; }
+.published-header .arrow { font-family: var(--font-poster); font-size: 1rem; color: var(--text); }
 .local-apps-note, .local-apps-hint { display: none; }
+.view-empty { margin: 0; border: 0; border-top: 3px solid var(--text); border-radius: 0; background: transparent; text-align: left; padding: 22px 0; }
+.view-empty p { font-family: var(--font-body); }
 
-/* The list container: a 3px ink box with a coral shadow. */
 #app-grid, .published-grid.cat-list {
-  display: block; padding: 0; gap: 0; flex: 0 0 auto;
-  border: 3px solid var(--text); background: var(--card-bg); box-shadow: 8px 8px 0 var(--accent);
-  margin: 0 8px 8px 0;
+  display: flex; flex-direction: column; padding: 0; gap: 0; margin: 0;
+  border: 0; border-top: 3px solid var(--text); background: transparent; box-shadow: none;
 }
-#app-grid:empty, .published-grid.cat-list:empty { border: 0; box-shadow: none; }
-.cat-list-head {
-  display: grid; grid-template-columns: 52px minmax(0, 2fr) minmax(0, 3fr) 128px 76px 168px; gap: 14px; align-items: center;
-  padding: 10px 18px; background: var(--bg-surface); border-bottom: 3px solid var(--text);
-  font-family: var(--font-display); text-transform: uppercase; font-size: .66rem; letter-spacing: .06em; color: var(--text-dim);
-}
-.cat-list .empty-state, #app-grid .empty-state { padding: 48px 24px; }
+#app-grid:empty, .published-grid.cat-list:empty { border: 0; }
+.cat-list-foot { margin-top: 14px; font-size: .85rem; font-weight: 600; color: var(--text-dim); line-height: 1.5; }
+.cat-list .empty-state, #app-grid .empty-state { padding: 40px 0; align-items: flex-start; text-align: left; }
+#app-grid .empty-state h3 { font-family: var(--font-poster); text-transform: uppercase; font-size: 1.4rem; color: var(--text); }
 
-/* ── Rows ─────────────────────────────────────────────────────────────────────────────────── */
+/* A row: number, icon, name and meta, what it does, state, opens, the arrow. */
 .cat-row {
-  display: grid; grid-template-columns: 52px minmax(0, 2fr) minmax(0, 3fr) 128px 76px 168px; gap: 14px; align-items: center;
-  padding: 12px 18px; border-top: 1px solid var(--border); cursor: pointer;
+  display: grid; grid-template-columns: 36px 40px minmax(0, 5fr) minmax(0, 7fr) 170px 60px 28px; gap: 14px; align-items: center;
+  padding: 12px 8px; border-bottom: 1px solid var(--border); cursor: pointer;
   animation: cardIn .4s cubic-bezier(.16, 1, .3, 1) both;
 }
-.cat-row:first-of-type, .cat-list-head + .cat-row { border-top: 0; }
 .cat-row:hover { background: var(--bg-surface); }
-.cat-row-icon {
-  width: 44px; height: 44px; border: 2px solid var(--text); background: var(--bg-surface);
-  display: flex; align-items: center; justify-content: center; font-size: 1.4rem;
-}
+.cat-row.is-open { background: var(--sun); border-bottom: 2px solid var(--text); }
+.cat-row:last-of-type { border-bottom-width: 3px; border-bottom-color: var(--text); }
+.cat-row-n { font-family: var(--font-mono); font-size: .8rem; color: var(--accent); }
+.cat-row-icon { width: 40px; height: 40px; border: 2px solid var(--text); background: var(--surface); display: flex; align-items: center; justify-content: center; font-size: 1.25rem; }
+.cat-row.is-unlisted { opacity: .6; }
 .cat-row.is-unlisted .cat-row-icon { border-style: dashed; border-color: var(--text-muted); }
-.cat-row.is-unlisted .cat-row-name, .cat-row.is-unlisted .cat-row-opens { color: var(--text-dim); }
-.cat-row.is-unlisted .cat-row-desc { color: var(--text-muted); }
-.cat-row-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.cat-row-name {
-  display: flex; align-items: center; gap: 6px; font-weight: 800; font-size: .95rem; color: var(--text);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
+.cat-row.is-unlisted .cat-row-state { color: var(--text-dim); }
+.cat-row-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cat-row-name { display: flex; align-items: center; gap: 6px; font-weight: 800; font-size: 1.05rem; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cat-row-name > span:first-of-type { overflow: hidden; text-overflow: ellipsis; }
-.cat-row-meta { font-size: .75rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cat-row-desc {
-  font-size: .82rem; color: var(--text-dim); line-height: 1.4;
-  display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-}
-.cat-row-state { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-.cat-pill {
-  display: inline-block; font-family: var(--font-display); text-transform: uppercase; font-size: .6rem; letter-spacing: .04em;
-  padding: 4px 8px; border: 2px solid var(--text); background: var(--card-bg); color: var(--text); white-space: nowrap;
-}
-.cat-pill--dim { border-style: dashed; border-color: var(--text-dim); color: var(--text-dim); }
-.cat-pill--sun { background: var(--sun); color: #1A1A2E; box-shadow: 2px 2px 0 var(--ink-shadow); transform: rotate(4deg); }
-.cat-row-opens { font-family: var(--font-display); font-size: .88rem; color: var(--text); }
-.cat-row-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
-.cat-row-actions button {
-  font-family: var(--font-display); text-transform: uppercase; font-size: .68rem; padding: 8px 14px;
-  border: 2px solid var(--text); border-radius: 0; box-shadow: 3px 3px 0 var(--ink-shadow);
-  background: var(--card-bg); color: var(--text); cursor: pointer; white-space: nowrap;
-  transition: transform 120ms ease, box-shadow 120ms ease;
-}
-.cat-row-actions button:hover { transform: translate(1px, 1px); box-shadow: 2px 2px 0 var(--ink-shadow); }
-.cat-row-actions button.cat-act--draft { background: var(--sun); color: #1A1A2E; }
-.cat-row-actions button.cat-act--more { width: 34px; padding: 8px 0; text-align: center; }
-/* The star sits in the name cell here, not in a card corner. */
+.cat-row-meta { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cat-row.is-open .cat-row-meta { color: var(--text); }
+.cat-row-desc { font-weight: 600; font-size: .9rem; color: var(--text-dim); line-height: 1.45; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cat-row.is-open .cat-row-desc { color: var(--text); }
+.cat-row-state { font-family: var(--font-mono); font-size: .72rem; color: var(--accent); text-transform: uppercase; letter-spacing: .04em; }
+.cat-row-opens { font-family: var(--font-poster); font-size: 1.125rem; letter-spacing: -.02em; text-align: right; color: var(--text); }
+.cat-row-arrow { font-family: var(--font-poster); font-size: 1.125rem; text-align: right; color: var(--text); }
+.cat-row-arrow::before { content: '\2192'; }
+.cat-row.is-open .cat-row-arrow::before { content: '\2193'; }
+/* The star sits with the name; the AI markers keep their own look. */
 .cat-row .fav-toggle { position: static; font-size: .95rem; opacity: .45; padding: 0; }
 .cat-row .fav-toggle.on { opacity: 1; }
 .cat-row .pcb-ai-gen, .cat-row .pcb-ai-gap, .cat-row .ai-origin-badge { margin-left: 0; }
 
-/* ── Footer ───────────────────────────────────────────────────────────────────────────────── */
+/* What opens under the row: the doors and the one line about where the work is. */
+.cat-row-panel { display: none; align-items: center; gap: 22px; flex-wrap: wrap; padding: 14px 8px 18px 90px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.cat-row.is-open + .cat-row-panel { display: flex; }
+.cat-row-line { font-size: .85rem; font-weight: 600; color: var(--text-dim); margin-left: auto; line-height: 1.5; }
+
+/* ── The foot, on ink ──────────────────────────────────────────────────────────────────────── */
 footer {
-  padding: 16px 32px; border-top: 3px solid var(--text); background: var(--text); color: var(--bg);
+  margin: 64px -44px 0 -24px; padding: 40px 44px; border: 0; background: var(--text); color: var(--bg);
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 44px; align-items: start;
 }
-footer #stats { color: var(--bg); font-family: var(--font-marketing); font-size: .82rem; letter-spacing: 0; }
-footer .footer-brand { font-family: var(--font-display); font-size: .82rem; letter-spacing: .08em; color: var(--sun); opacity: 1; }
+footer #stats, footer .cat-foot-p { font-family: var(--font-body); font-size: .95rem; font-weight: 600; line-height: 1.55; color: var(--bg); letter-spacing: 0; opacity: 1; }
+footer .footer-brand { grid-column: 1 / -1; font-family: var(--font-poster); font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; color: var(--sun); opacity: 1; }
+.cat-main > footer { width: auto; }
 
-/* ── Detail view ──────────────────────────────────────────────────────────────────────────── */
-#detail-view .dtl-toolbar {
-  background: var(--bg); backdrop-filter: none; -webkit-backdrop-filter: none;
-  border-bottom: 3px solid var(--text); padding: 12px 32px;
-}
-#detail-view .dtl-toolbar .icon-btn { border: 2px solid var(--text); border-radius: 0; box-shadow: 3px 3px 0 var(--ink-shadow); background: var(--card-bg); }
-#detail-view .dtl-toolbar .dtl-toolbar-title { font-family: var(--font-marketing); font-weight: 800; }
-#detail-view .dtl-body { max-width: 1440px; padding: 0 32px 40px; }
-.dtl-hero {
-  display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 48px; align-items: center;
-  padding: 32px 0 24px;
-}
-.dtl-hero-main { display: flex; gap: 26px; align-items: flex-start; min-width: 0; }
-.dtl-hero-icon {
-  width: 96px; height: 96px; flex: 0 0 auto; border: 3px solid var(--text); box-shadow: 6px 6px 0 var(--sun);
-  background: var(--card-bg); display: flex; align-items: center; justify-content: center; font-size: 3rem; transform: rotate(-2deg);
-}
-.dtl-hero-copy { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-.dtl-hero-stickers { display: flex; gap: 10px; flex-wrap: wrap; }
-.dtl-sticker {
-  display: inline-block; font-family: var(--font-display); text-transform: uppercase; font-size: .68rem; letter-spacing: .05em;
-  padding: 6px 10px; border: 3px solid var(--text); background: var(--card-bg); color: var(--text); box-shadow: 3px 3px 0 var(--ink-shadow);
-}
-.dtl-sticker--dim { border-style: dashed; box-shadow: none; color: var(--text-dim); }
-.dtl-sticker--sun { background: var(--sun); color: #1A1A2E; transform: rotate(3deg); }
-.dtl-sticker--hot { background: var(--accent); border-color: var(--accent); color: #FFFFFF; }
-.dtl-hero-name {
-  font-family: var(--font-display); font-weight: 400; text-transform: uppercase; font-size: clamp(2rem, 4.4vw, 4rem); line-height: .96;
-  color: var(--text); text-shadow: .075em .075em 0 var(--accent); overflow-wrap: anywhere;
-}
-.dtl-hero-desc { font-size: 1.1rem; line-height: 1.5; font-weight: 600; color: var(--text); max-width: 640px; }
-.dtl-hero-line { font-size: .85rem; color: var(--text-dim); overflow-wrap: anywhere; }
-.dtl-hero-side { display: flex; flex-direction: column; gap: 14px; align-items: flex-end; }
-.dtl-hero-buttons { display: flex; gap: 16px; flex-wrap: wrap; justify-content: flex-end; }
-.dtl-hero-buttons .cat-btn { font-size: 1rem; padding: 16px 28px; }
-.dtl-hero-hint { font-size: .82rem; color: var(--text-dim); text-align: right; max-width: 380px; line-height: 1.5; }
-.dtl-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px; padding: 4px 0 34px; }
-.dtl-stat-tile {
-  display: flex; flex-direction: column; gap: 4px; padding: 14px 16px;
-  background: var(--card-bg); border: 3px solid var(--text); box-shadow: 4px 4px 0 var(--ink-shadow);
-}
-.dtl-stat-tile:nth-child(even) { box-shadow: 4px 4px 0 var(--accent); }
-.dtl-stat-tile .dtl-stat-label { font-family: var(--font-display); text-transform: uppercase; font-size: .68rem; letter-spacing: 0; color: var(--text-dim); }
-.dtl-stat-tile .dtl-stat-val { font-family: var(--font-display); font-size: 1.6rem; line-height: 1.1; font-weight: 400; color: var(--text); overflow-wrap: anywhere; }
-.dtl-stat-tile .dtl-stat-sub { font-size: .75rem; color: var(--text-dim); }
-.dtl-columns { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 40px; align-items: start; }
-.dtl-col { display: flex; flex-direction: column; gap: 28px; min-width: 0; }
+/* ── The detail view: a poster page of its own ────────────────────────────────────────────── */
+#detail-view .dtl-toolbar { background: var(--surface); backdrop-filter: none; -webkit-backdrop-filter: none; border-bottom: 1px solid var(--border); padding: 8px 24px; height: 56px; box-sizing: border-box; }
+#detail-view .dtl-toolbar .icon-btn { width: 36px; height: 36px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); box-shadow: none; }
+#detail-view .dtl-toolbar .dtl-toolbar-title { font-family: var(--font-body); font-weight: 800; }
+#detail-view .dtl-toolbar #detail-launch-btn { display: none; }
+#detail-view .dtl-body { max-width: 1180px; padding: 40px 44px 0; font-family: var(--font-body); }
 
-/* Sections: the work column reads as open text under Bungee headings; the switch column as boxes. */
-.dtl-section { background: transparent; border: 0; border-radius: 0; padding: 0; margin: 0; }
+.dtl-back { display: block; border-top: 3px solid var(--text); padding-top: 14px; font-family: var(--font-mono); font-size: .8rem; color: var(--accent); background: none; border-left: 0; border-right: 0; border-bottom: 0; border-radius: 0; cursor: pointer; text-align: left; width: 100%; }
+.dtl-back:hover { text-decoration: underline; }
+.dtl-mast { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin: 22px 0 26px; }
+.dtl-mast-main { display: flex; gap: 24px; align-items: flex-end; min-width: 0; }
+.dtl-mast-icon { width: 96px; height: 96px; flex: 0 0 auto; border: 3px solid var(--text); background: var(--surface); display: flex; align-items: center; justify-content: center; font-size: 3rem; }
+.dtl-mast-copy { display: flex; flex-direction: column; min-width: 0; }
+.dtl-mast-name { font-family: var(--font-poster); font-weight: 400; font-size: clamp(2.6rem, 5.5vw, 5.2rem); line-height: .9; letter-spacing: -.035em; text-transform: uppercase; color: var(--text); overflow-wrap: anywhere; }
+.dtl-mast-line { font-family: var(--font-mono); font-size: .8rem; color: var(--text-dim); margin-top: 14px; overflow-wrap: anywhere; }
+.dtl-mast-desc { font-size: 1.05rem; font-weight: 600; line-height: 1.5; color: var(--text); margin-top: 12px; max-width: 66ch; }
+.dtl-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.dtl-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid var(--border); background: var(--surface); font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
+.dtl-chip--sun { border-color: var(--text); background: var(--sun); color: var(--text); }
+.dtl-chip--hot { border-color: var(--accent); color: var(--accent); }
+.dtl-mast-side { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; flex: 0 0 auto; }
+.dtl-mast-side .cat-slab { min-height: 52px; padding: 0 26px; font-size: 1rem; box-shadow: 8px 8px 0 var(--sun); }
+.dtl-mast-side .cat-slab:hover { box-shadow: 4px 4px 0 var(--sun); }
+.dtl-mast-hint { font-size: .78rem; font-weight: 600; color: var(--text-dim); text-align: right; max-width: 300px; line-height: 1.5; }
+.dtl-band { margin-top: 8px; }
+
+/* Sections as bands: a poster headline over an ink rule, sixty-four pixels apart. */
+.dtl-section { background: transparent; border: 0; border-radius: 0; padding: 0; margin: 64px 0 0; }
 .dtl-section h3 {
-  font-family: var(--font-display); font-weight: 400; text-transform: uppercase; font-size: 1.35rem; line-height: 1.1;
-  color: var(--text); margin: 0 0 14px;
+  font-family: var(--font-poster); font-weight: 400; text-transform: uppercase; font-size: 2.4rem; line-height: .95; letter-spacing: -.03em;
+  color: var(--text); margin: 0 0 22px;
 }
-.dtl-col--switches .dtl-section {
-  padding: 20px 22px; border: 3px solid var(--text); background: var(--card-bg); box-shadow: 6px 6px 0 var(--ink-shadow); margin-right: 6px;
-}
-.dtl-col--switches .dtl-section:nth-child(3n+2) { box-shadow: 6px 6px 0 var(--accent); }
-.dtl-col--switches .dtl-section:nth-child(3n) { box-shadow: 6px 6px 0 var(--sun); }
-.dtl-col--switches #detail-server-mgmt .dtl-section { border: 3px dashed var(--accent); box-shadow: none; }
-.dtl-col--switches .dtl-section h3 { font-size: .95rem; }
-.dtl-col--switches #detail-server-mgmt h3 { font-size: .8rem; letter-spacing: .04em; color: var(--accent); }
-.dtl-col--switches .dtl-btn-row { gap: 8px; }
-.dtl-col--switches .dtl-btn { font-size: .62rem; padding: 8px 12px; box-shadow: 3px 3px 0 var(--ink-shadow); }
-
-/* Buttons and bands inside the detail. */
+.dtl-section > h3 + * { border-top: 3px solid var(--text); padding-top: 14px; }
+.dtl-desc { font-size: 1rem; font-weight: 600; line-height: 1.55; }
+.dtl-btn-row { gap: 24px; align-items: center; }
 .dtl-btn {
-  font-family: var(--font-display); text-transform: uppercase; font-size: .72rem; padding: 10px 16px;
-  border: 3px solid var(--text); border-radius: 0; box-shadow: 4px 4px 0 var(--ink-shadow); background: var(--card-bg); color: var(--text);
+  display: inline-block; background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0; box-shadow: none;
+  padding: 0 0 1px; cursor: pointer;
+  font-family: var(--font-body); font-weight: 800; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text);
+  transition: none;
+}
+.dtl-btn:hover { color: var(--accent); border-color: var(--accent); transform: none; box-shadow: none; }
+.dtl-btn.primary, .dtl-btn.success {
+  min-height: 44px; padding: 0 18px; display: inline-flex; align-items: center; justify-content: center;
+  background: var(--text); color: var(--bg); border: 0; box-shadow: 4px 4px 0 var(--sun);
   transition: transform 120ms ease, box-shadow 120ms ease;
 }
-.dtl-btn:hover { border-color: var(--text); transform: translate(1px, 1px); box-shadow: 2px 2px 0 var(--ink-shadow); }
-.dtl-btn.primary { background: var(--accent); border-color: var(--text); color: #FFFFFF; }
-.dtl-btn.success { background: var(--sun); border-color: var(--text); color: #1A1A2E; }
-.dtl-btn.danger { border-color: var(--accent); color: var(--accent); box-shadow: none; }
-.dtl-btn:disabled { transform: none; }
-.wc-stop { border: 3px solid var(--text); border-radius: 0; box-shadow: 5px 5px 0 var(--ink-shadow); padding: 14px 18px; }
-.wc-stop.is-active { background: var(--sun); color: #1A1A2E; border-color: var(--text); }
-.wc-stop.is-active .wc-stop-label, .wc-stop.is-active .wc-stop-val, .wc-stop.is-active .wc-stop-note { color: #1A1A2E; }
-.wc-stop.is-live { background: var(--card-bg); border-color: var(--text); box-shadow: 5px 5px 0 var(--accent); }
-.wc-stop-label { font-family: var(--font-display); letter-spacing: .04em; }
-.wc-stop-val { font-family: var(--font-display); font-weight: 400; font-size: 1.1rem; }
-.wc-arrow { font-family: var(--font-display); font-size: 1.5rem; color: var(--text); }
-.wc-row img { border-radius: 0 !important; border: 3px solid var(--text) !important; box-shadow: 5px 5px 0 var(--ink-shadow); transform: rotate(1.2deg); }
-.dtl-sync { border-radius: 0; font-family: var(--font-marketing); }
-.dtl-ai-draft { border: 3px dashed var(--accent); border-radius: 0; }
-.dtl-version-row, .version-row { border-bottom-color: var(--border); }
-.version-actions button, .dtl-version-row button { border-radius: 0; border: 2px solid var(--text); font-weight: 700; }
-.modal-input { border-radius: 0; border: 3px solid var(--text); }
-.modal-input:focus { box-shadow: 4px 4px 0 var(--accent); border-color: var(--text); }
-#detail-ai-input { border-radius: 0; border: 3px solid var(--text); }
-.aga-chip, .dtl-badge-on { border-radius: 0; }
+.dtl-btn.primary:hover, .dtl-btn.success:hover { color: var(--sun); transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--sun); }
+.dtl-btn.danger { color: var(--accent); border-color: var(--accent); }
+.dtl-btn:disabled { opacity: .5; transform: none; }
+.dtl-stat .dtl-stat-label, .dtl-meta-item .dtl-meta-label, .wc-stop-label { font-size: .72rem; color: var(--accent); text-transform: uppercase; letter-spacing: .1em; font-weight: 800; }
+.dtl-stat .dtl-stat-val, .dtl-meta-item .dtl-meta-val { font-family: var(--font-body); font-weight: 700; }
+/* Where your work is: the two stops as named rows, the active one's value on the sun. */
+.wc-row { flex-direction: column; gap: 14px; }
+.wc-band { flex-direction: column; gap: 14px; min-width: 0; }
+.wc-stop { display: flex; flex-direction: row; align-items: baseline; gap: 14px; flex-wrap: wrap; padding: 14px 0 0; border: 0; border-top: 3px solid var(--text); border-radius: 0; background: transparent; box-shadow: none; }
+.wc-stop:first-child { border-top: 0; padding-top: 0; }
+/* The base stylesheet tints the live and active stops; here the state is the value on the sun. */
+.wc-stop.is-live, .wc-stop.is-active, .wc-stop.is-idle { background: transparent; border-color: var(--text); }
+.wc-stop-label { flex: 0 0 176px; }
+.wc-stop-val { font-family: var(--font-poster); font-weight: 400; font-size: 1.75rem; letter-spacing: -.02em; color: var(--text); }
+.wc-stop.is-active .wc-stop-val { background: var(--sun); padding: 2px 10px; }
+.wc-stop-note { font-size: 1rem; font-weight: 700; color: var(--text); }
+.wc-arrow { display: none; }
+.wc-row img { border-radius: 0 !important; border: 3px solid var(--text) !important; }
+.wc-explain { margin: 18px 0 10px 192px; font-size: 1rem; font-weight: 600; line-height: 1.55; max-width: 62ch; }
+.wc-size { margin-left: 192px; font-family: var(--font-mono); }
+.dtl-sync { border-radius: 0; font-family: var(--font-mono); font-weight: 400; }
+.dtl-ai-notice { border-radius: 0; }
+.dtl-ai-draft { border: 3px solid var(--text); border-radius: 0; }
+#detail-ai-input, .modal-input { border-radius: 0; border: 0; border-bottom: 3px solid var(--text); background: transparent; font-family: var(--font-body); font-weight: 700; }
+#detail-ai-input:focus, .modal-input:focus { box-shadow: none; border-color: var(--accent); outline: none; }
+.dtl-version-row, .version-row { border-bottom-color: var(--border); padding: 12px 0; }
+.version-actions button, .dtl-version-row button { border: 0; border-radius: 0; background: none; font-family: var(--font-mono); font-size: .8rem; color: var(--accent); text-decoration: underline; text-underline-offset: 4px; padding: 0; }
+.version-actions button:hover, .dtl-version-row button:hover { color: var(--text); background: none; }
+.version-current { border-radius: 0; font-family: var(--font-mono); }
+.aga-chip, .dtl-badge-on { border-radius: 0; font-family: var(--font-mono); }
+.dtl-meta-grid { gap: 18px 24px; }
 
-/* ── Phone: the rail becomes chip strips, the rows become stacked cards ───────────────────── */
+/* ── Phone: the rail becomes chip strips, the band a solid block, the rows stack ──────────── */
 @media (max-width: 900px) {
-  header.cat-head { padding: 18px 20px 14px; gap: 14px; }
-  header.cat-head h1.cat-title { font-size: 2.4rem; }
-  .cat-kicker { font-size: .66rem; box-shadow: 4px 4px 0 var(--ink-shadow); }
-  .cat-head-tools { flex-basis: 100%; }
-  .cat-body { grid-template-columns: 1fr; gap: 18px; padding: 18px 20px 24px; }
-  /* A grid item's automatic minimum is its content's width, and the chip strips are wide: without
-     this the rail holds the page open to the strips' full length and the phone scrolls sideways. */
-  .cat-body > * { min-width: 0; }
-  .cat-rail { gap: 12px; min-width: 0; }
-  /* The shared login pill is wider than a phone; let its controls wrap instead of pushing the page. */
-  header.cat-head .aimeat-auth-pill { flex-wrap: wrap; max-width: 100%; row-gap: 6px; }
-  .cat-rail-group, #tag-bar { flex-direction: row; flex-wrap: nowrap; overflow-x: auto; gap: 8px; padding-bottom: 6px; scrollbar-width: none; }
+  header.cat-bar { padding: 0 16px; }
+  .cat-bar-nav { display: none; }
+  header.cat-bar .aimeat-auth-pill .aimeat-auth-label, header.cat-bar .aimeat-auth-pill .aimeat-auth-ghii { display: none !important; }
+  header.cat-bar .aimeat-auth-pill { padding: 5px 11px !important; gap: 6px !important; }
+  /* The pill carries its own language and theme controls, so the bar's own can go and the
+     node's name keeps its room. */
+  header.cat-bar #theme-btn, header.cat-bar #lang-toggle { display: none; }
+  /* The pill's mount point is styled inline by the shared lib to fill its row; here it is one
+     item beside the node's name, so it takes the pill's own width and no more. */
+  header.cat-bar #headerAuth { width: auto !important; flex: 0 0 auto !important; }
+  .cat-bar-left { flex: 1 1 60px; min-width: 60px; }
+  /* A column now, and every child stretched to it: with the desktop's flex-start the rail would
+     shrink to its strips' full width and hold the page open sideways. */
+  .cat-body { flex-direction: column; align-items: stretch; }
+  .cat-body > * { min-width: 0; width: auto; }
+  .cat-brand { min-width: 0; overflow: hidden; text-overflow: ellipsis; display: block; }
+  /* The actions shrink to what is left beside the node's name; the pill inside wraps if it must. */
+  header.cat-bar .header-actions { flex: 0 1 auto; min-width: 0; max-width: calc(100% - 76px); }
+  .cat-rail { width: auto; flex: 0 0 auto; padding: 22px 18px 0; gap: 12px; }
+  .cat-rail-id { display: none; }
+  .cat-rail-group, #tag-bar { flex-direction: row; flex-wrap: nowrap; overflow-x: auto; gap: 14px; margin-top: 10px; padding-bottom: 6px; scrollbar-width: none; }
   .cat-rail-group::-webkit-scrollbar, #tag-bar::-webkit-scrollbar { display: none; }
-  /* The create button is a square "+" on a phone; its word is on the menu it opens. */
-  header.cat-head .cat-btn--hot { padding: 12px 16px; box-shadow: 4px 4px 0 var(--ink-shadow); }
-  header.cat-head .cat-btn--hot span { display: none; }
   .cat-rail-label { display: none; }
-  .cat-rail-item, .cat-rail-item--tag {
-    width: auto; flex: 0 0 auto; gap: 6px; padding: 8px 12px;
-    font-family: var(--font-display); text-transform: uppercase; font-size: .66rem; font-weight: 400;
-    border: 3px solid var(--text); background: var(--card-bg); color: var(--text);
-  }
-  .cat-rail-item.active { box-shadow: 3px 3px 0 var(--ink-shadow); font-weight: 400; }
-  .cat-rail-more { flex: 0 0 auto; font-size: .8rem; }
-  .cat-rail-box { display: none; }
-  #app-grid, .published-grid.cat-list { border: 0; box-shadow: none; background: transparent; margin: 0; display: flex; flex-direction: column; gap: 14px; }
-  .cat-list-head { display: none; }
-  .cat-row {
-    display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: center;
-    padding: 14px; border: 3px solid var(--text); background: var(--card-bg); box-shadow: 5px 5px 0 var(--accent);
-  }
-  .cat-row:nth-child(3n) { box-shadow: 5px 5px 0 var(--ink-shadow); }
-  .cat-row:nth-child(3n+1) { box-shadow: 5px 5px 0 var(--sun); }
-  .cat-row.is-unlisted { border-style: dashed; border-color: var(--text-dim); box-shadow: none; }
-  .cat-row:hover { background: var(--card-bg); }
+  .cat-rail-item, .cat-rail-item--tag { width: auto; flex: 0 0 auto; gap: 6px; padding: 4px 0; border: 0; border-bottom: 2px solid var(--text); font-size: .78rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--text); }
+  .cat-rail-item.active { padding: 4px 8px; border-bottom: 0; }
+  .cat-rail-more { flex: 0 0 auto; margin-top: 0; }
+  .cat-main { padding: 16px 18px 0; }
+  .cat-masthead { align-items: flex-end; gap: 12px; margin-bottom: 0; }
+  h1.cat-title { font-size: 2.9rem; }
+  .cat-mastline { margin-top: 10px; font-size: .72rem; }
+  .cat-masthead-actions { gap: 8px; }
+  .cat-masthead-actions .cat-slab { min-height: 44px; min-width: 44px; padding: 0 12px; }
+  .cat-masthead-actions .cat-slab span { display: none; }
+  .cat-masthead-links { display: none; }
+  .cat-band { margin: 18px -18px 0; padding: 30px 18px 34px; background: var(--accent); }
+  .cat-band::before { display: none; }
+  .cat-band::after { transform: none; top: auto; bottom: 0; height: 10px; left: 0; right: 0; }
+  .cat-band-in { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 12px; padding: 0; }
+  .cat-band-n { font-size: 2.5rem; }
+  .cat-band-l { font-size: .68rem; }
+  .cat-tools { margin-top: 20px; gap: 12px; }
+  .cat-sort { padding-bottom: 0; gap: 14px; overflow-x: auto; scrollbar-width: none; }
+  .local-apps-block, #community-section, #favorites-section { margin-top: 28px; }
+  .cat-list-title h2, .published-header h2 { font-size: 1.8rem; }
+  .cat-row { display: flex; flex-wrap: wrap; gap: 6px 10px; padding: 12px 0; }
+  .cat-row.is-open { padding: 12px 8px; margin: 0 -8px; }
+  .cat-row-icon { display: none; }
+  .cat-row-n { flex: 0 0 24px; }
   .cat-row-main { flex: 1 1 0; }
-  .cat-row-desc { flex-basis: 100%; }
-  .cat-row-state { flex: 0 0 auto; }
-  .cat-row-opens { display: none; }
-  .cat-row-actions { flex-basis: 100%; justify-content: stretch; }
-  .cat-row-actions button { flex: 1; padding: 11px 0; }
-  .cat-row-actions button.cat-act--more { width: auto; }
-  .dtl-hero { grid-template-columns: 1fr; gap: 20px; padding: 20px 0 16px; }
-  .dtl-hero-main { gap: 16px; }
-  .dtl-hero-icon { width: 64px; height: 64px; font-size: 2rem; }
-  .dtl-hero-side { align-items: stretch; }
-  .dtl-hero-buttons { justify-content: stretch; }
-  .dtl-hero-buttons .cat-btn { flex: 1; }
-  .dtl-hero-hint { text-align: left; max-width: none; }
-  .dtl-columns { grid-template-columns: 1fr; gap: 28px; }
-  #detail-view .dtl-body { padding: 0 20px 32px; }
-  #detail-view .dtl-toolbar { padding: 10px 16px; }
-  footer { padding: 14px 20px; }
+  .cat-row-meta { display: none; }
+  .cat-row-opens { flex: 0 0 auto; font-size: 1rem; }
+  .cat-row-arrow { flex: 0 0 auto; font-size: 1rem; }
+  .cat-row-desc { flex-basis: 100%; padding-left: 34px; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; }
+  .cat-row-state { flex-basis: 100%; padding-left: 34px; font-size: .68rem; }
+  .cat-row-panel { padding: 10px 0 14px 34px; gap: 12px; }
+  .cat-row-line { flex-basis: 100%; margin-left: 0; }
+  footer { margin: 40px -18px 0; padding: 28px 18px; grid-template-columns: 1fr; gap: 14px; }
+  #detail-view .dtl-body { padding: 16px 18px 0; }
+  #detail-view .dtl-toolbar { padding: 8px 16px; }
+  .dtl-mast { flex-direction: column; align-items: stretch; gap: 16px; }
+  .dtl-mast-main { gap: 14px; }
+  .dtl-mast-icon { width: 56px; height: 56px; font-size: 1.8rem; }
+  .dtl-mast-side { align-items: stretch; }
+  .dtl-mast-side .cat-slab { box-shadow: 4px 4px 0 var(--sun); }
+  .dtl-mast-hint { text-align: left; max-width: none; }
+  .dtl-section { margin-top: 40px; }
+  .dtl-section h3 { font-size: 1.8rem; }
+  .wc-stop-label { flex: 0 0 100%; }
+  .wc-explain, .wc-size { margin-left: 0; }
 }
 </style>
 </head>
 <body data-active-view="library">
 
-  <header class="cat-head">
-    <div class="cat-head-brand">
-      <a class="aimeat-cta aimeat-home" id="aimeat-home-link" href="/" data-i18n-title="cta.backHome" title="Back to home"><span class="aimeat-cta-spark">⚡</span><span id="aimeat-home-label">aimeat.io</span></a>
-      <!-- The sticker: how many apps, how many listed, how many with a draft waiting. Filled by renderApps. -->
-      <span id="cat-kicker" class="cat-kicker" hidden></span>
-      <h1 class="cat-title" data-i18n="header.title">My Apps</h1>
-    </div>
-    <div class="cat-head-tools">
-      <input type="text" id="search-input" class="cat-search" placeholder="Search apps..." data-i18n-ph="search.ph" autocomplete="off" spellcheck="false"/>
-      <div id="cat-sort" class="cat-sort" role="group">
-        <button type="button" class="cat-sort-btn is-on" data-sort="newest" onclick="window._launcher.setSort('newest')" data-i18n="sort.newest">Newest</button>
-        <button type="button" class="cat-sort-btn" data-sort="opens" onclick="window._launcher.setSort('opens')" data-i18n="sort.opens">Most opened</button>
-        <button type="button" class="cat-sort-btn" data-sort="name" onclick="window._launcher.setSort('name')" data-i18n="sort.name">A → Z</button>
-      </div>
+  <!-- The site bar, as on every page of the house: the node's name, the three doors, the
+       language, the theme, the shared login pill. The catalog's own controls sit in the masthead. -->
+  <header class="cat-bar">
+    <div class="cat-bar-left">
+      <a class="cat-brand" id="aimeat-home-link" href="/" data-i18n-title="cta.backHome" title="Back to home"><span id="aimeat-home-label">aimeat.io</span></a>
+      <nav class="cat-bar-nav">
+        <a href="/v1/home" data-i18n="nav.home">Home</a>
+        <a href="/v1/chat" data-i18n="nav.chat">Chat</a>
+        <span class="active" data-i18n="nav.apps">Apps</span>
+      </nav>
     </div>
     <div class="header-actions">
-      <span id="headerAuth" class="header-auth-pill"></span>
-      <!-- Create menu: Add app / Generate with AI / Generate homepage grouped under one + -->
-      <div class="backup-menu-wrap">
-        <button class="cat-btn cat-btn--hot" id="create-btn" data-i18n-title="action.create" title="Create" onclick="window._launcher.toggleCreateMenu(event)">+ <span data-i18n="action.create">Create</span></button>
-        <div id="create-menu" class="backup-menu" hidden>
-          <button id="add-btn" data-i18n="action.add">&#x2795; Add app</button>
-          <button id="generate-btn" data-i18n="action.generate">&#x2728; Generate with AI</button>
-          <button id="homepage-btn" data-i18n="action.homepage">&#x1F3E0; Generate homepage</button>
-        </div>
-      </div>
-      <!-- Data menu: backups + imports -->
-      <div class="backup-menu-wrap">
-        <button class="icon-btn" id="backup-btn" data-i18n-title="backup.menu" title="Backup" onclick="window._launcher.toggleBackupMenu(event)">&#x1F4BE;</button>
-        <div id="backup-menu" class="backup-menu" hidden>
-          <button onclick="window._launcher.exportBackupZip()" data-i18n="backup.exportAll">&#x1F4E6; Export all (.zip)</button>
-          <button onclick="window._launcher.importBackupPick()" data-i18n="backup.importFrom">&#x1F4E5; Import from backup...</button>
-        </div>
-      </div>
-      <input type="file" id="backup-file-input" accept=".zip,application/zip,application/x-zip-compressed" hidden />
       <div class="lang-toggle" id="lang-toggle" title="Language / Kieli">
         <button class="lang-btn" data-lang="en" onclick="window._launcher.setLanguage('en')">EN</button>
         <button class="lang-btn" data-lang="fi" onclick="window._launcher.setLanguage('fi')">FI</button>
       </div>
       <button class="icon-btn" id="theme-btn" onclick="window._launcher.toggleTheme()" data-i18n-title="action.theme" title="Toggle theme">&#x1F319;</button>
-      <button class="icon-btn" id="help-btn" onclick="window._launcher.openHelp()" data-i18n-title="action.help" title="Help">?</button>
-      <button class="icon-btn" id="settings-btn" data-i18n-title="action.settings" title="Settings">&#x2699;</button>
+      <span id="headerAuth" class="header-auth-pill"></span>
     </div>
   </header>
 
@@ -2850,20 +2847,70 @@ footer .footer-brand { font-family: var(--font-display); font-size: .82rem; lett
        explanation of how listing works. -->
   <div class="cat-body">
   <aside class="cat-rail" id="cat-rail">
+    <a class="cat-rail-home" href="/v1/home">← <span data-i18n="rail.home">Home</span></a>
+    <div class="cat-rail-id"><div class="cat-rail-avatar">&#x1F4DA;</div><div class="cat-rail-idname" data-i18n="header.title">My Apps</div></div>
     <nav id="view-tabs" class="cat-rail-group" role="tablist">
-      <div class="cat-rail-label" data-i18n="rail.show">Show</div>
       <button type="button" id="view-tab-library" class="cat-rail-item active" role="tab" onclick="window._launcher.switchView('library')"><span data-i18n="view.library">Your apps</span><span class="cat-rail-count" id="rail-count-library"></span></button>
       <button type="button" id="view-tab-community" class="cat-rail-item" role="tab" onclick="window._launcher.switchView('community')"><span data-i18n="view.community">Community</span><span class="cat-rail-count" id="rail-count-community"></span></button>
       <button type="button" id="view-tab-favorites" class="cat-rail-item" role="tab" onclick="window._launcher.switchView('favorites')"><span data-i18n="view.favorites">Favourites</span><span class="cat-rail-count" id="rail-count-favorites"></span></button>
     </nav>
     <nav id="state-bar" class="cat-rail-group" data-view="library"></nav>
     <nav id="tag-bar" class="cat-rail-group"></nav>
-    <div class="cat-rail-box" data-view="library">
-      <div class="cat-rail-box-label" data-i18n="rail.howTitle">How this works</div>
-      <span data-i18n="sec.localHint">Add app publishes to your account as unlisted — list it when it's ready to be public.</span>
-    </div>
   </aside>
   <div class="cat-main">
+
+  <!-- The masthead: the page's name, one mono line, the one loud control and the quiet words. -->
+  <div class="cat-masthead">
+    <div class="cat-masthead-main">
+      <h1 class="cat-title" data-i18n="header.title">My Apps</h1>
+      <div id="cat-mastline" class="cat-mastline"></div>
+    </div>
+    <div class="cat-masthead-actions">
+      <!-- Create menu: Add app / Generate with AI / Generate homepage grouped under one slab -->
+      <div class="backup-menu-wrap">
+        <button type="button" class="cat-slab" id="create-btn" data-i18n-title="action.create" title="Create" onclick="window._launcher.toggleCreateMenu(event)">+ <span data-i18n="action.createApp">Create an app</span></button>
+        <div id="create-menu" class="backup-menu" hidden>
+          <button id="add-btn" data-i18n="action.add">&#x2795; Add app</button>
+          <button id="generate-btn" data-i18n="action.generate">&#x2728; Generate with AI</button>
+          <button id="homepage-btn" data-i18n="action.homepage">&#x1F3E0; Generate homepage</button>
+        </div>
+      </div>
+      <div class="cat-masthead-links">
+        <!-- Data menu: backups + imports -->
+        <div class="backup-menu-wrap">
+          <button type="button" class="cat-word" id="backup-btn" data-i18n="action.backups" data-i18n-title="backup.menu" title="Backup" onclick="window._launcher.toggleBackupMenu(event)">Backups and imports</button>
+          <div id="backup-menu" class="backup-menu" hidden>
+            <button onclick="window._launcher.exportBackupZip()" data-i18n="backup.exportAll">&#x1F4E6; Export all (.zip)</button>
+            <button onclick="window._launcher.importBackupPick()" data-i18n="backup.importFrom">&#x1F4E5; Import from backup...</button>
+          </div>
+        </div>
+        <input type="file" id="backup-file-input" accept=".zip,application/zip,application/x-zip-compressed" hidden />
+        <button type="button" class="cat-word" id="help-btn" onclick="window._launcher.openHelp()" data-i18n="action.help">Help</button>
+        <button type="button" class="cat-word" id="settings-btn" data-i18n="action.settings">Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- The band: the four numbers on the diagonal stripe, as on the profile. Filled by renderApps. -->
+  <div id="cat-band" class="cat-band" data-view="library" hidden>
+    <div class="cat-band-in">
+      <div class="cat-band-item"><div class="cat-band-n" id="cat-band-apps">0</div><div class="cat-band-l" data-i18n="band.apps">Apps</div></div>
+      <div class="cat-band-item"><div class="cat-band-n" id="cat-band-listed">0</div><div class="cat-band-l" data-i18n="band.listed">Listed</div></div>
+      <div class="cat-band-item"><div class="cat-band-n" id="cat-band-drafts">0</div><div class="cat-band-l" data-i18n="band.drafts">Draft waiting</div></div>
+      <div class="cat-band-item"><div class="cat-band-n" id="cat-band-opens">0</div><div class="cat-band-l" data-i18n="band.opens">Opens, all time</div></div>
+    </div>
+  </div>
+
+  <!-- Search and order: an underline field and underlined words -->
+  <div class="cat-tools">
+    <input type="text" id="search-input" class="cat-search" placeholder="Search apps..." data-i18n-ph="search.ph" autocomplete="off" spellcheck="false"/>
+    <div id="cat-sort" class="cat-sort" role="group">
+      <span class="cat-sort-label" data-i18n="sort.label">Order</span>
+      <button type="button" class="cat-sort-btn is-on" data-sort="newest" onclick="window._launcher.setSort('newest')" data-i18n="sort.newest">Newest</button>
+      <button type="button" class="cat-sort-btn" data-sort="opens" onclick="window._launcher.setSort('opens')" data-i18n="sort.opens">Most opened</button>
+      <button type="button" class="cat-sort-btn" data-sort="name" onclick="window._launcher.setSort('name')" data-i18n="sort.name">A → Z</button>
+    </div>
+  </div>
 
   <!-- Active Extensions Bar -->
   <div id="cortex-bar" data-view="library" style="display:none;margin:0 24px 1.5rem;position:relative;z-index:1">
@@ -2950,14 +2997,17 @@ footer .footer-brand { font-family: var(--font-display); font-size: .82rem; lett
       <h2><span data-i18n="sec.local">Your apps</span> <span id="local-apps-count" class="cat-count"></span></h2>
     </div>
     <main id="app-grid"></main>
+    <p class="cat-list-foot" data-i18n="list.foot">One row per app. The number is its place in the order above; press a row for its doors and a line about where the work is.</p>
   </div>
-  </div><!-- .cat-main -->
-  </div><!-- .cat-body -->
 
+  <!-- The foot, on ink: two facts. The first carries the count. -->
   <footer>
-    <span id="stats">0 apps</span>
+    <p id="stats" class="cat-foot-p"></p>
+    <p class="cat-foot-p" data-i18n="foot.p2">An app that generates content with an AI model says so on its own page.</p>
     <span class="footer-brand">AIMEAT</span>
   </footer>
+  </div><!-- .cat-main -->
+  </div><!-- .cat-body -->
 
   <div id="modal-overlay" hidden>
     <div class="modal" id="add-app-modal">
@@ -3566,6 +3616,29 @@ footer .footer-brand { font-family: var(--font-display); font-size: .82rem; lett
       "detail.favBadge": "Favourite",
       "detail.heroHint": "Launch opens the published version everyone sees. Open draft opens the working copy only you can see.",
       "detail.heroHintClean": "Launch opens the published version everyone sees.",
+      "nav.home": "Home",
+      "nav.chat": "Chat",
+      "nav.apps": "Apps",
+      "rail.home": "Home",
+      "action.createApp": "Create an app",
+      "action.backups": "Backups and imports",
+      "band.apps": "Apps",
+      "band.listed": "Listed",
+      "band.drafts": "Draft waiting",
+      "band.opens": "Opens, all time",
+      "sort.label": "Order",
+      "state.draftShort": "draft waiting",
+      "card.details": "Details",
+      "card.openDraft": "Open the draft",
+      "row.lineDraft": "A working copy waits. Only you can see it until you publish.",
+      "row.lineUnlisted": "Unlisted: anyone with the link can use it, the catalogue does not show it.",
+      "row.linePublished": "Published as {v} on {date}. Everyone can see it.",
+      "row.lineLocal": "Not published yet. Only this browser has it.",
+      "row.lineBy": "Published by {owner} on {date}.",
+      "mast.line": "{owner} · {n} apps published on {host}",
+      "list.foot": "One row per app. The number is its place in the order above; press a row for its doors and a line about where the work is.",
+      "foot.p1": "Every one of your {n} apps is one HTML file you own. Publishing puts it on this node under your name; listing puts it in the public catalogue. Unlisting keeps it usable by link.",
+      "foot.p2": "An app that generates content with an AI model says so on its own page.",
       "view.communityEmpty": "No community apps on this node yet.",
       "view.communityHint": "Community apps are apps other people on this node have published. When someone publishes one, it shows up here.",
       "sec.parked": "Unlisted apps",
@@ -4403,6 +4476,29 @@ footer .footer-brand { font-family: var(--font-display); font-size: .82rem; lett
       "detail.favBadge": "Suosikki",
       "detail.heroHint": "Käynnistä avaa julkaistun version, jonka kaikki näkevät. Avaa luonnos avaa työkopion, jonka näet vain sinä.",
       "detail.heroHintClean": "Käynnistä avaa julkaistun version, jonka kaikki näkevät.",
+      "nav.home": "Koti",
+      "nav.chat": "Chat",
+      "nav.apps": "Sovellukset",
+      "rail.home": "Koti",
+      "action.createApp": "Luo sovellus",
+      "action.backups": "Varmuuskopiot ja tuonnit",
+      "band.apps": "Sovellusta",
+      "band.listed": "Listalla",
+      "band.drafts": "Luonnos odottaa",
+      "band.opens": "Avausta kaikkiaan",
+      "sort.label": "Järjestys",
+      "state.draftShort": "luonnos odottaa",
+      "card.details": "Tiedot",
+      "card.openDraft": "Avaa luonnos",
+      "row.lineDraft": "Työkopio odottaa. Vain sinä näet sen, kunnes julkaiset.",
+      "row.lineUnlisted": "Ei listalla: linkillä sitä voi käyttää kuka tahansa, katalogi ei näytä sitä.",
+      "row.linePublished": "Julkaistu versiona {v} {date}. Kaikki näkevät sen.",
+      "row.lineLocal": "Ei vielä julkaistu. Vain tämä selain tuntee sen.",
+      "row.lineBy": "Julkaissut {owner}, {date}.",
+      "mast.line": "{owner} · {n} sovellusta julkaistu nodella {host}",
+      "list.foot": "Yksi rivi per sovellus. Numero on sen paikka yllä olevassa järjestyksessä; paina riviä, niin näet ovet ja rivin siitä, missä työ on.",
+      "foot.p1": "Jokainen {n} sovelluksestasi on yksi HTML-tiedosto, jonka omistat. Julkaisu vie sen tälle nodelle sinun nimissäsi; listaus vie sen julkiseen katalogiin. Listalta poisto pitää sen käytössä linkillä.",
+      "foot.p2": "Sovellus, joka tuottaa sisältöä tekoälymallilla, kertoo sen omalla sivullaan.",
       "view.communityEmpty": "Tällä nodella ei ole vielä yhteisön sovelluksia.",
       "view.communityHint": "Yhteisön sovellukset ovat sovelluksia, joita muut tämän noden käyttäjät ovat julkaisseet. Kun joku julkaisee sellaisen, se näkyy täällä.",
       "sec.parked": "Listaamattomat sovellukset",
@@ -8102,35 +8198,35 @@ footer .footer-brand { font-family: var(--font-display); font-size: .82rem; lett
     var heroDesc = app.descriptions && app.descriptions[getLang()] || app.description || "";
     var heroOwner = detailServerOwner(app);
     var favRef = heroOwner && app.publishedFilename ? heroOwner + "/" + app.publishedFilename : "";
-    var stickers = "";
-    if (app.published && svrFacts && svrFacts.parked) stickers += '<span class="dtl-sticker dtl-sticker--dim">' + escapeHtml(t("status.parked")) + "</span>";
-    else if (app.published) stickers += '<span class="dtl-sticker">' + escapeHtml(t("status.published") + (publishedV ? " · " + publishedV : "")) + "</span>";
-    else stickers += '<span class="dtl-sticker dtl-sticker--dim">' + escapeHtml(t("status.local")) + "</span>";
+    var chips = "";
+    if (app.published && svrFacts && svrFacts.parked) chips += '<span class="dtl-chip">■ ' + escapeHtml(t("status.parked")) + "</span>";
+    else if (app.published) chips += '<span class="dtl-chip dtl-chip--sun">■ ' + escapeHtml(t("status.published") + (publishedV ? " · " + publishedV : "")) + "</span>";
+    else chips += '<span class="dtl-chip">■ ' + escapeHtml(t("status.local")) + "</span>";
     var draftWaits = !!(svrFacts && svrFacts.hasDraft) || wcState !== "clean";
-    if (draftWaits) stickers += '<span class="dtl-sticker dtl-sticker--sun">' + escapeHtml(t("detail.draftWaiting")) + "</span>";
-    if (favRef && isFavorite(favRef)) stickers += '<span class="dtl-sticker dtl-sticker--hot">★ ' + escapeHtml(t("detail.favBadge")) + "</span>";
-    var heroLineParts = [];
-    if (heroOwner && app.publishedFilename) heroLineParts.push(heroOwner + " / " + app.publishedFilename);
-    if (svrFacts && svrFacts.category) heroLineParts.push(svrFacts.category);
-    if (app.tags && app.tags.length) heroLineParts.push(app.tags.join(", "));
-    var draftBtn = svrFacts && svrFacts.hasDraft && heroOwner && app.publishedFilename ? `<button type="button" class="cat-btn cat-btn--sun" onclick="window._launcher.openStagingPreview('` + jsArg(heroOwner) + "', '" + jsArg(app.publishedFilename) + `')" title="` + escapeHtml(t("card.openStagingHint")) + '">' + escapeHtml(t("detail.openDraft")) + "</button>" : "";
-    var heroHtml = '<div class="dtl-hero"><div class="dtl-hero-main"><div class="dtl-hero-icon">' + escapeHtml(icon) + '</div><div class="dtl-hero-copy"><div class="dtl-hero-stickers">' + stickers + '</div><div class="dtl-hero-name">' + escapeHtml(app.name || "App") + "</div>" + (heroDesc ? '<div class="dtl-hero-desc">' + escapeHtml(heroDesc) + "</div>" : "") + (heroLineParts.length ? '<div class="dtl-hero-line">' + escapeHtml(heroLineParts.join(" · ")) + "</div>" : "") + '</div></div><div class="dtl-hero-side"><div class="dtl-hero-buttons"><button type="button" class="cat-btn cat-btn--hot" onclick="window._launcher.detailLaunch()">' + escapeHtml(t("detail.launch")) + "</button>" + draftBtn + "</div>" + (app.published ? '<div class="dtl-hero-hint">' + escapeHtml(t(draftBtn ? "detail.heroHint" : "detail.heroHintClean")) + "</div>" : "") + "</div></div>";
-    var tile = function(label2, val2, sub) {
-      return '<div class="dtl-stat-tile"><div class="dtl-stat-label">' + escapeHtml(label2) + '</div><div class="dtl-stat-val">' + escapeHtml(val2) + "</div>" + (sub ? '<div class="dtl-stat-sub">' + escapeHtml(sub) + "</div>" : "") + "</div>";
+    if (draftWaits) chips += '<span class="dtl-chip dtl-chip--hot">■ ' + escapeHtml(t("detail.draftWaiting")) + "</span>";
+    if (favRef && isFavorite(favRef)) chips += '<span class="dtl-chip">★ ' + escapeHtml(t("detail.favBadge")) + "</span>";
+    var mastParts = [];
+    if (heroOwner && app.publishedFilename) mastParts.push(heroOwner + " / " + app.publishedFilename);
+    if (svrFacts && svrFacts.category) mastParts.push(svrFacts.category);
+    if (app.tags && app.tags.length) mastParts.push(app.tags.join(", "));
+    var draftWord = svrFacts && svrFacts.hasDraft && heroOwner && app.publishedFilename ? `<button type="button" class="cat-word" onclick="window._launcher.openStagingPreview('` + jsArg(heroOwner) + "', '" + jsArg(app.publishedFilename) + `')" title="` + escapeHtml(t("card.openStagingHint")) + '">' + escapeHtml(t("detail.openDraft")) + "</button>" : "";
+    var heroHtml = '<button type="button" class="dtl-back" onclick="window._launcher.closeDetailView()">← ' + escapeHtml(t("view.library")) + '</button><div class="dtl-mast"><div class="dtl-mast-main"><div class="dtl-mast-icon">' + escapeHtml(icon) + '</div><div class="dtl-mast-copy"><div class="dtl-mast-name">' + escapeHtml(app.name || "App") + "</div>" + (mastParts.length ? '<div class="dtl-mast-line">' + escapeHtml(mastParts.join(" · ")) + "</div>" : "") + (heroDesc ? '<div class="dtl-mast-desc">' + escapeHtml(heroDesc) + "</div>" : "") + '<div class="dtl-chips">' + chips + '</div></div></div><div class="dtl-mast-side"><button type="button" class="cat-slab" onclick="window._launcher.detailLaunch()">' + escapeHtml(t("detail.launch")) + "</button>" + draftWord + (app.published ? '<div class="dtl-mast-hint">' + escapeHtml(t(draftWord ? "detail.heroHint" : "detail.heroHintClean")) + "</div>" : "") + "</div></div>";
+    var bandItem = function(n, label2) {
+      return '<div class="cat-band-item"><div class="cat-band-n">' + escapeHtml(n) + '</div><div class="cat-band-l">' + escapeHtml(label2) + "</div></div>";
     };
-    var tiles = "";
+    var bandItems = "";
     if (svrFacts) {
       var updated = svrFacts.createdAt ? new Date(svrFacts.createdAt).toLocaleDateString() : "";
-      tiles += tile(t("detail.opens"), String(svrFacts.downloads || 0), "");
-      if (publishedV) tiles += tile(t("detail.version"), publishedV, "");
-      if (svrFacts.size) tiles += tile(t("detail.size"), fmtSize(svrFacts.size), "");
-      if (updated) tiles += tile(t("detail.updated"), updated, "");
-      tiles += tile(t("detail.forks"), String(svrFacts.forks || 0), "");
+      bandItems += bandItem(String(svrFacts.downloads || 0), t("detail.opens"));
+      if (app.publishedVersionNumber) bandItems += bandItem(String(app.publishedVersionNumber), t("detail.versions"));
+      if (svrFacts.size) bandItems += bandItem(fmtSize(svrFacts.size), t("detail.size"));
+      if (updated) bandItems += bandItem(updated, t("detail.updated"));
+      bandItems += bandItem(String(svrFacts.forks || 0), t("detail.forks"));
     } else if (localBytes) {
-      tiles += tile(t("detail.size"), fmtSize(localBytes), "");
+      bandItems += bandItem(fmtSize(localBytes), t("detail.size"));
     }
-    var factsHtml = tiles ? '<div class="dtl-stats">' + tiles + "</div>" : "";
-    document.getElementById("detail-body").innerHTML = heroHtml + factsHtml + '<div class="dtl-columns"><div class="dtl-col dtl-col--work">' + statusHtml + aiHtml + aboutHtml + dataMapHtml + historyHtml + versionsHtml + actionsHtml + '</div><div class="dtl-col dtl-col--switches">' + mgmtHtml + skillsHtml + seoHtml + promoteHtml + odpsHtml + monetizeHtml + costHtml + agentsHtml + "</div></div>";
+    var bandHtml = bandItems ? '<div class="cat-band dtl-band"><div class="cat-band-in">' + bandItems + "</div></div>" : "";
+    document.getElementById("detail-body").innerHTML = heroHtml + bandHtml + statusHtml + aiHtml + aboutHtml + dataMapHtml + historyHtml + versionsHtml + mgmtHtml + skillsHtml + seoHtml + promoteHtml + odpsHtml + monetizeHtml + costHtml + agentsHtml + actionsHtml;
     var dmOwner = detailServerOwner(app);
     var dmFile = app.publishedFilename || "";
     if (dmOwner && dmFile) loadDataMapInto(dmOwner, dmFile, { docKey: "apps." + dmFile.replace(/\.html$/i, "") + ".datamap" });
@@ -10109,21 +10205,28 @@ footer .footer-brand { font-family: var(--font-display); font-size: .82rem; lett
     var d = new Date(iso);
     return isNaN(d.getTime()) ? "" : d.toLocaleDateString();
   }
-  function listHeadHtml() {
-    return '<div class="cat-list-head" aria-hidden="true"><div></div><div>' + escapeHtml(t("list.app")) + "</div><div>" + escapeHtml(t("list.what")) + "</div><div>" + escapeHtml(t("list.state")) + "</div><div>" + escapeHtml(t("list.opens")) + "</div><div></div></div>";
-  }
   function rowHtml2(m) {
-    var stateClass = m.state === "unlisted" ? " is-unlisted" : "";
-    var stateLabel = m.state === "unlisted" ? t("status.parked") : m.state === "local" ? t("status.local") : t("status.published");
-    var statePill = '<span class="cat-pill' + (m.state === "unlisted" ? " cat-pill--dim" : "") + '">' + escapeHtml(stateLabel) + "</span>";
-    var draftPill = m.draft ? '<span class="cat-pill cat-pill--sun" title="' + escapeHtml(t("card.stagingHint")) + '">' + escapeHtml(t("card.draft")) + "</span>" : "";
-    var buttons = "";
+    var stateText = m.state === "unlisted" ? t("status.parked") : m.state === "local" ? t("status.local") : t("status.published");
+    if (m.draft) stateText += " · " + t("state.draftShort");
+    var doors = "";
     for (var i = 0; i < (m.actions || []).length; i++) {
       var a = m.actions[i];
-      var cls = a.kind === "draft" ? ' class="cat-act--draft"' : a.kind === "more" ? ' class="cat-act--more"' : "";
-      buttons += '<button type="button"' + cls + ' onclick="event.stopPropagation(); ' + a.onclick + '"' + (a.title ? ' title="' + escapeHtml(a.title) + '"' : "") + ">" + escapeHtml(a.label) + "</button>";
+      var cls = a.kind === "slab" ? "cat-slab" : a.kind === "danger" ? "cat-word cat-word--danger" : "cat-word";
+      doors += '<button type="button" class="' + cls + '" onclick="event.stopPropagation(); ' + a.onclick + '"' + (a.title ? ' title="' + escapeHtml(a.title) + '"' : "") + ">" + escapeHtml(a.label) + "</button>";
     }
-    return '<div class="cat-row' + stateClass + (m.draft ? " is-draft" : "") + '"' + filterAttr(m.name, m.tags, m.desc) + (m.rowClick ? ' onclick="' + m.rowClick + '"' : "") + ' style="animation-delay:' + (m.index || 0) * 0.03 + 's"><div class="cat-row-icon">' + escapeHtml(m.icon || "📝") + '</div><div class="cat-row-main"><div class="cat-row-name">' + (m.favStar || "") + "<span>" + escapeHtml(m.name) + "</span>" + (m.nameExtra || "") + "</div>" + (m.meta ? '<div class="cat-row-meta">' + escapeHtml(m.meta) + "</div>" : "") + '</div><div class="cat-row-desc">' + escapeHtml(m.desc || "") + '</div><div class="cat-row-state">' + statePill + draftPill + '</div><div class="cat-row-opens">' + (typeof m.opens === "number" ? String(m.opens) : "") + '</div><div class="cat-row-actions">' + buttons + "</div></div>";
+    var n = m.n ? String(m.n) : "";
+    if (n.length === 1) n = "0" + n;
+    return '<div class="cat-row' + (m.state === "unlisted" ? " is-unlisted" : "") + (m.draft ? " is-draft" : "") + '"' + filterAttr(m.name, m.tags, m.desc) + ' onclick="window._launcher.toggleRow(this)" style="animation-delay:' + ((m.n || 1) - 1) * 0.03 + 's"><div class="cat-row-n">' + n + '</div><div class="cat-row-icon">' + escapeHtml(m.icon || "📝") + '</div><div class="cat-row-main"><div class="cat-row-name">' + (m.favStar || "") + "<span>" + escapeHtml(m.name) + "</span>" + (m.nameExtra || "") + "</div>" + (m.meta ? '<div class="cat-row-meta">' + escapeHtml(m.meta) + "</div>" : "") + '</div><div class="cat-row-desc">' + escapeHtml(m.desc || "") + '</div><div class="cat-row-state">' + escapeHtml(stateText) + '</div><div class="cat-row-opens">' + (typeof m.opens === "number" ? String(m.opens) : "") + '</div><div class="cat-row-arrow" aria-hidden="true"></div></div><div class="cat-row-panel">' + doors + (m.line ? '<span class="cat-row-line">' + escapeHtml(m.line) + "</span>" : "") + "</div>";
+  }
+  function toggleRow(el) {
+    if (!el) return;
+    var wasOpen = el.classList.contains("is-open");
+    var list = el.parentNode;
+    if (list) {
+      var open = list.querySelectorAll(".cat-row.is-open");
+      for (var i = 0; i < open.length; i++) open[i].classList.remove("is-open");
+    }
+    if (!wasOpen) el.classList.add("is-open");
   }
 
   // src/static/app-catalog/js/server-io.js
@@ -10895,6 +10998,9 @@ footer .footer-brand { font-family: var(--font-display); font-size: .82rem; lett
         }
         if (match && q) match = (row.getAttribute("data-filter") || "").indexOf(q) !== -1;
         row.style.display = match ? "" : "none";
+        if (!match) row.classList.remove("is-open");
+        var panel = row.nextElementSibling;
+        if (panel && panel.classList.contains("cat-row-panel")) panel.style.display = match ? "" : "none";
         if (match) shown++;
       });
       if (grids[g] === "community-grid" && rows.length) {
@@ -10916,16 +11022,17 @@ footer .footer-brand { font-family: var(--font-display); font-size: .82rem; lett
     var viewUrl = aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(fn);
     var shipsAgent = !!(m.cortex && m.cortex.agents && m.cortex.agents.length);
     var detailCall = "window._launcher.openPublishedDetail('" + jsArg(owner) + "', '" + jsArg(fn) + "', '', " + (sa.version_number || 0) + ")";
-    var actions = [{ label: t("card.view"), onclick: "window._launcher.viewPublished('" + jsArg(viewUrl) + "?mode=inline', '" + jsArg(name) + "')", kind: "open" }];
-    if (sa.forkable) actions.push({ label: t("card.fork"), onclick: "window._launcher.forkVersion('" + jsArg(owner) + "', '" + jsArg(fn) + "', " + (sa.version_number || 0) + ")", title: t("card.forkHint"), kind: "plain" });
-    if (shipsAgent) actions.push({ label: t("card.agent"), onclick: "window._launcher.showAppAgentsModal('" + jsArg(owner) + "', '" + jsArg(fn) + "')", title: t("card.agentHint"), kind: "plain" });
-    actions.push({ label: "⋯", onclick: detailCall, title: t("ctx.details"), kind: "more" });
-    var metaParts = ["👤 " + author];
+    var actions = [{ label: t("card.view"), onclick: "window._launcher.viewPublished('" + jsArg(viewUrl) + "?mode=inline', '" + jsArg(name) + "')", kind: "slab" }];
+    if (sa.forkable) actions.push({ label: t("card.fork"), onclick: "window._launcher.forkVersion('" + jsArg(owner) + "', '" + jsArg(fn) + "', " + (sa.version_number || 0) + ")", title: t("card.forkHint"), kind: "word" });
+    if (shipsAgent) actions.push({ label: t("card.agent"), onclick: "window._launcher.showAppAgentsModal('" + jsArg(owner) + "', '" + jsArg(fn) + "')", title: t("card.agentHint"), kind: "word" });
+    actions.push({ label: t("card.details"), onclick: detailCall, title: t("ctx.details"), kind: "word" });
+    var metaParts = [author];
     if (sa.version_number) metaParts.push("v" + sa.version_number);
     var when = fmtDate(sa.created_at);
     if (when) metaParts.push(when);
     var nameExtra = (shipsAgent ? ' <span class="pcb-agent" title="' + escapeHtml(t("card.agentHint")) + '">🤖</span>' : "") + (sa.forks && sa.forks > 0 ? ' <span class="pcb-forks" title="' + escapeHtml(t("card.forksHint")) + `" onclick="event.stopPropagation(); window._launcher.showLineageModal('` + jsArg(owner) + "', '" + jsArg(fn) + `')">⑂ ` + sa.forks + "</span>" : "");
     return rowHtml2({
+      n: index + 1,
       icon: sa.icon || m.icon || "📝",
       name,
       nameExtra,
@@ -10936,9 +11043,8 @@ footer .footer-brand { font-family: var(--font-display); font-size: .82rem; lett
       draft: false,
       opens: typeof sa.downloads === "number" ? sa.downloads : null,
       tags: m.tags || [],
-      rowClick: detailCall,
       actions,
-      index
+      line: t("row.lineBy").replace("{owner}", author).replace("{date}", when || "")
     });
   }
   function renderCommunityApps(serverApps, aimeatUrl, section, grid, countEl, currentOwner) {
@@ -10954,7 +11060,7 @@ footer .footer-brand { font-family: var(--font-display); font-size: .82rem; lett
     var railCount = document.getElementById("rail-count-community");
     if (railCount) railCount.textContent = String(serverApps.length);
     var list = sortServerApps(serverApps.slice());
-    var html = listHeadHtml();
+    var html = "";
     for (var i = 0; i < list.length; i++) html += publishedRowHtml(list[i], aimeatUrl, i);
     grid.innerHTML = html;
     updateCommunityEmpty();
@@ -10974,7 +11080,7 @@ footer .footer-brand { font-family: var(--font-display); font-size: .82rem; lett
       return;
     }
     var list = sortServerApps(favs.slice());
-    var html = listHeadHtml();
+    var html = "";
     for (var i = 0; i < list.length; i++) html += publishedRowHtml(list[i], aimeatUrl, i);
     grid.innerHTML = html;
     updateFavoritesEmpty();
@@ -11198,10 +11304,25 @@ footer .footer-brand { font-family: var(--font-display); font-size: .82rem; lett
     if (bar) {
       bar.innerHTML = '<div class="cat-rail-label">' + escapeHtml(t("rail.state")) + "</div>" + railItem(t("state.listed"), listed, activeState === "listed", "window._launcher.filterByState('listed')", false) + railItem(t("state.unlisted"), unlisted, activeState === "unlisted", "window._launcher.filterByState('unlisted')", false) + railItem(t("state.draft"), drafts, activeState === "draft", "window._launcher.filterByState('draft')", false);
     }
-    var kicker = document.getElementById("cat-kicker");
-    if (kicker) {
-      kicker.textContent = t("kicker.line").replace("{n}", String(entries.length)).replace("{listed}", String(listed)).replace("{drafts}", String(drafts));
-      kicker.hidden = !(listingLoaded && entries.length > 0);
+    var opensTotal = 0;
+    for (var o = 0; o < entries.length; o++) opensTotal += entries[o].opens || 0;
+    var band = document.getElementById("cat-band");
+    if (band) {
+      var setN = function(id, v) {
+        var el = document.getElementById(id);
+        if (el) el.textContent = v;
+      };
+      setN("cat-band-apps", String(entries.length));
+      setN("cat-band-listed", String(listed));
+      setN("cat-band-drafts", String(drafts));
+      setN("cat-band-opens", opensTotal.toLocaleString());
+      band.hidden = !(listingLoaded && entries.length > 0);
+    }
+    var mast = document.getElementById("cat-mastline");
+    if (mast) {
+      var owner = entries[0] && (entries[0].owner || entries[0].aimeatOwner) || "";
+      var host = typeof location !== "undefined" && location.host ? location.host.replace(/^apps\./, "") : "";
+      mast.textContent = listingLoaded && entries.length > 0 ? t("mast.line").replace("{owner}", owner).replace("{n}", String(entries.length)).replace("{host}", host) : "";
     }
     var railCount = document.getElementById("rail-count-library");
     if (railCount) railCount.textContent = listingLoaded ? String(entries.length) : "";
@@ -11514,14 +11635,14 @@ footer .footer-brand { font-family: var(--font-display); font-size: .82rem; lett
           grid.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div><h3>' + t("empty.noMatch") + "</h3><p>" + t("empty.noMatchDesc") + "</p></div>";
         }
       } else {
-        var html = listHeadHtml();
+        var html = "";
         for (var j = 0; j < filtered.length; j++) {
-          html += libraryRowHtml(filtered[j], j);
+          html += libraryRowHtml(filtered[j], j + 1);
         }
         grid.innerHTML = html;
       }
       var statsEl = document.getElementById("stats");
-      statsEl.textContent = listingLoaded ? entries.length + " " + t("stats.apps") : "";
+      statsEl.textContent = listingLoaded ? t("foot.p1").replace("{n}", String(entries.length)) : "";
       renderStateBar(entries);
       renderTags(entries);
     });
@@ -11529,11 +11650,11 @@ footer .footer-brand { font-family: var(--font-display); font-size: .82rem; lett
   function libraryRowHtml(e, i) {
     var detailCall = e.filename ? "window._launcher.openPublishedDetail('" + jsArg(e.owner || "") + "', '" + jsArg(e.filename) + "', '" + jsArg(e.hasLocal ? e.localId : "") + "', " + (e.versionNumber || 0) + ")" : "window._launcher.openDetailView('" + jsArg(e.localId) + "')";
     var openCall = (e.published || e.parked || e.serverOnly) && e.viewUrl ? "window._launcher.viewPublished('" + jsArg(e.viewUrl) + "?mode=inline', '" + jsArg(e.name) + "')" : e.hasLocal ? "window._launcher.launchApp('" + jsArg(e.localId) + "', '" + jsArg(e.openMode || "tab") + "')" : detailCall;
-    var actions = [{ label: t("card.open"), onclick: openCall, title: t(e.hasDraft ? "card.openReleasedHint" : "card.openHint"), kind: "open" }];
+    var actions = [{ label: t("card.open"), onclick: openCall, title: t(e.hasDraft ? "card.openReleasedHint" : "card.openHint"), kind: "slab" }];
     if (e.hasDraft && e.viewUrl) {
-      actions.push({ label: t("card.draft"), onclick: "window._launcher.openStagingPreview('" + jsArg(e.owner || "") + "', '" + jsArg(e.filename || "") + "')", title: t("card.openStagingHint"), kind: "draft" });
+      actions.push({ label: t("card.openDraft"), onclick: "window._launcher.openStagingPreview('" + jsArg(e.owner || "") + "', '" + jsArg(e.filename || "") + "')", title: t("card.openStagingHint"), kind: "word" });
     }
-    actions.push({ label: "⋯", onclick: detailCall, title: t("ctx.details"), kind: "more" });
+    actions.push({ label: t("card.details"), onclick: detailCall, title: t("ctx.details"), kind: "word" });
     var metaParts = [];
     if (e.versionNumber) metaParts.push("v" + e.versionNumber);
     var when = fmtDate(e.createdAt);
@@ -11541,7 +11662,9 @@ footer .footer-brand { font-family: var(--font-display); font-size: .82rem; lett
     var kb = fmtKb(e.size);
     if (kb) metaParts.push(kb);
     var nameExtra = (e.origin === "ai-published" ? ' <span class="ai-origin-badge">AI</span>' : "") + (e.hasAgents ? ' <span class="pcb-agent" title="' + escapeHtml(t("card.agentHint")) + '">🤖</span>' : "") + aiPostureMarkers(e);
+    var line = e.hasDraft ? t("row.lineDraft") : e.parked ? t("row.lineUnlisted") : e.published ? t("row.linePublished").replace("{v}", e.versionNumber ? "v" + e.versionNumber : "").replace("{date}", when || "") : t("row.lineLocal");
     return rowHtml2({
+      n: i,
       icon: e.icon,
       name: e.name,
       nameExtra,
@@ -11552,9 +11675,8 @@ footer .footer-brand { font-family: var(--font-display); font-size: .82rem; lett
       draft: !!e.hasDraft,
       opens: e.opens,
       tags: e.tags,
-      rowClick: detailCall,
-      actions,
-      index: i
+      line,
+      actions
     });
   }
   var currentIframeUrl = "";
@@ -11926,6 +12048,7 @@ footer .footer-brand { font-family: var(--font-display); font-size: .82rem; lett
     filterByState,
     setSort,
     toggleAllTags,
+    toggleRow,
     unpublishApp,
     deleteServerApp: deleteServerApp2,
     toggleParkApp,
