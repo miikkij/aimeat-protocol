@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Onboarding, agent, message, DM and task connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 -- 2026-08-28 -- The five aimeat_crew_* tools as thin proxies onto /v1/agents/:name/crew*;
+ *     try waits locally by polling, so wait_seconds is consumed here rather than forwarded.
  *   v1.4.0 -- 2026-08-14 -- aimeat_task_create takes `scope` here too.
  *   v1.3.0 -- 2026-08-13 -- Add the aimeat_agent_console_set handler (PATCH
  *     /v1/agents/:name/console-url).
@@ -16,7 +18,7 @@
  *   v1.0.0 -- 2026-07-13 -- Extracted from tool-call.ts (max-file-lines)
  */
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
-import { query, optionalString, requiredString, optionalArray, optionalRecord, optionalNumber, taskTodoPayload } from './tool-call-helpers.js';
+import { query, optionalString, requiredString, optionalArray, optionalRecord, requiredRecord, optionalNumber, taskTodoPayload } from './tool-call-helpers.js';
 
 export const agentTools: ConnectCliToolDefinition[] = [
     {
@@ -478,6 +480,83 @@ export const agentTools: ConnectCliToolDefinition[] = [
             if (budget !== undefined) applied.ai_settings = (await client.post('/v1/ai/settings', { daily_budget_usd: budget })).data ?? 'ok';
             for (const k of ['model', 'reasoning_model', 'execution_model']) if (optionalString(input, k) !== undefined) unsupported.push(k);
             return { ok: true as const, data: { applied, ...(unsupported.length ? { unsupported, note: 'Model routing has no REST route — set it via the profile UI or the server MCP tool.' } : {}) } };
+        },
+    },
+    // ── Crew definition: thin proxies onto /v1/agents/:name/crew*, the routes the Crew tab and
+    // both MCP surfaces use. `target_agent_name` is the definition's agent; the call runs as the
+    // registered agent the dispatcher picked.
+    {
+        name: 'aimeat_crew_get',
+        description: "Read an agent's crew definition state: live definition, draft, kept revisions, the runtime's last load report, and whether the agent is connected.",
+        input: { target_agent_name: { type: 'string', description: "The definition's agent (bare name or GAII; same owner as the caller)." } },
+        handler: ({ client }, input) => client.get(`/v1/agents/${encodeURIComponent(requiredString(input, 'target_agent_name'))}/crew`),
+    },
+    {
+        name: 'aimeat_crew_validate',
+        description: "Ask the agent's own runtime to validate a crew definition; the messages come back verbatim.",
+        input: {
+            target_agent_name: { type: 'string', description: "The definition's agent." },
+            doc: { type: 'object', description: 'The whole crew definition to check.' },
+        },
+        handler: ({ client }, input) => client.post(`/v1/agents/${encodeURIComponent(requiredString(input, 'target_agent_name'))}/crew/validate`, { doc: requiredRecord(input, 'doc') }),
+    },
+    {
+        name: 'aimeat_crew_try',
+        description: "Run a crew definition once on the agent's runtime and wait for the output (doc + prompt to start, try_id to keep waiting).",
+        input: {
+            target_agent_name: { type: 'string', description: "The definition's agent." },
+            doc: { type: 'object', description: 'Start a trial: the definition to run once.' },
+            prompt: { type: 'string', description: 'Start a trial: what the crew should do. Required with doc.' },
+            try_id: { type: 'string', description: 'Continue waiting on a trial already started.' },
+            wait_seconds: { type: 'number', description: 'How long to wait before handing back the try_id (default 50, max 120).' },
+        },
+        handler: async ({ client }, input) => {
+            const path = `/v1/agents/${encodeURIComponent(requiredString(input, 'target_agent_name'))}/crew/try`;
+            const doc = optionalRecord(input, 'doc');
+            let id = optionalString(input, 'try_id');
+            if (doc) {
+                const started = await client.post(path, { doc, prompt: optionalString(input, 'prompt') });
+                if (!started.ok) return started;
+                id = (started.data as { try_id?: string } | undefined)?.try_id;
+            }
+            if (!id) throw new Error('Pass doc and prompt to start a trial, or try_id to keep waiting on one.');
+            const deadline = Date.now() + Math.min(120, optionalNumber(input, 'wait_seconds') ?? 50) * 1000;
+            for (;;) {
+                const look = await client.get(`${path}/${encodeURIComponent(id)}`);
+                const status = (look.data as { status?: string } | undefined)?.status;
+                if (!look.ok || status !== 'running' || Date.now() >= deadline) return look;
+                await new Promise(r => setTimeout(r, 1000));
+            }
+        },
+    },
+    {
+        name: 'aimeat_crew_draft',
+        description: "Keep unpublished edits to an agent's crew definition, or discard the saved draft by omitting doc.",
+        input: {
+            target_agent_name: { type: 'string', description: "The definition's agent." },
+            doc: { type: 'object', description: 'The edits to keep. Omit to discard the saved draft.' },
+        },
+        handler: ({ client }, input) => {
+            const path = `/v1/agents/${encodeURIComponent(requiredString(input, 'target_agent_name'))}/crew/draft`;
+            const doc = optionalRecord(input, 'doc');
+            return doc ? client.put(path, { doc }) : client.delete(path);
+        },
+    },
+    {
+        name: 'aimeat_crew_publish',
+        description: "Make a crew definition live after the agent's runtime validates it, or restore a kept revision with `revision`.",
+        input: {
+            target_agent_name: { type: 'string', description: "The definition's agent." },
+            doc: { type: 'object', description: 'The definition to make live.' },
+            revision: { type: 'number', description: 'Instead of doc: the kept revision to republish.' },
+        },
+        handler: ({ client }, input) => {
+            const base = `/v1/agents/${encodeURIComponent(requiredString(input, 'target_agent_name'))}/crew`;
+            const doc = optionalRecord(input, 'doc');
+            if (doc) return client.post(`${base}/publish`, { doc });
+            const revision = optionalNumber(input, 'revision');
+            if (revision === undefined) throw new Error('Pass doc to publish a definition, or revision to restore a kept one.');
+            return client.post(`${base}/restore`, { revision });
         },
     },
 ];

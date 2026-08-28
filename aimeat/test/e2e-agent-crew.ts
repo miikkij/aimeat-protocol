@@ -274,9 +274,36 @@ await test('18. Another owner cannot read, validate or publish this agent\'s cre
   const state = await json(crew(), { headers: auth(ownerToken) });
   assert(state.body.data.published.revision === 4, 'unchanged');
 });
-await test('19. The agent\'s own token cannot publish through this door (owner principal only)', async () => {
-  const r = await tunnel!.request('POST', crew('/publish'), { body: { doc: goodDoc } });
-  assert(r.status === 403, `agent publish ${r.status}: ${JSON.stringify(r.body)}`);
+await test('19. The agent\'s own token (memory:write) publishes through this door, into its own namespace', async () => {
+  // A chat session over MCP is an agent principal too; this is the door it uses. The agent here
+  // holds '*', so requireScope passes, and the service resolves the target against its owner.
+  const r = await tunnel!.request('POST', crew('/publish'), { body: { doc: { ...goodDoc, tags: ['self'] } } });
+  assert(r.status === 200, `agent publish ${r.status}: ${JSON.stringify(r.body)}`);
+  const rev = (r.body as any).data.revision;
+  const state = await json(crew(), { headers: auth(ownerToken) });
+  assert(state.body.data.published.revision === rev && state.body.data.published.doc.tags?.[0] === 'self', 'landed as the live definition in the agent\'s namespace');
+  assert(state.body.data.published.publishedBy === agentGaii, `publishedBy names the agent: ${state.body.data.published.publishedBy}`);
+});
+await test('19b. A plain memory write of crews.registry.<agent> from another principal is refused with the pointer', async () => {
+  // The owner writing the key lands in the OWNER namespace, where neither the tab nor the runtime
+  // looks; the write is refused and told where to go. Public copies stay allowed (sharing).
+  const r = await json('/v1/memory', { method: 'POST', headers: auth(ownerToken), body: JSON.stringify({ key: `crews.registry.${agentName}`, value: { doc: goodDoc }, visibility: 'owner' }) });
+  assert(r.status === 403, `owner-namespace crew write ${r.status}: ${JSON.stringify(r.body)}`);
+  assert(/aimeat_crew_publish/.test(r.body.error?.message ?? ''), `message points at the publish tool: ${r.body.error?.message}`);
+  const pub = await json('/v1/memory', { method: 'POST', headers: auth(ownerToken), body: JSON.stringify({ key: `crews.registry.${agentName}`, value: { doc: goodDoc }, visibility: 'public' }) });
+  assert(pub.status === 201 || pub.status === 200, `a public copy under the publisher is a share, not a misdirection: ${pub.status}`);
+  await json(`/v1/memory/${encodeURIComponent(`crews.registry.${agentName}`)}`, { method: 'DELETE', headers: auth(ownerToken) });
+  const own = await tunnel!.request('POST', '/v1/memory', { body: { key: `crews.registry.${agentName}`, value: { doc: goodDoc }, visibility: 'owner' } });
+  assert(own.status === 201 || own.status === 200, `the agent itself writing its own key stays allowed (crew_registry.py): ${own.status}`);
+});
+await test('19c. A same-owner agent WITHOUT memory:write cannot publish → 403', async () => {
+  const r = await json('/v1/agents', { method: 'POST', headers: auth(ownerToken), body: JSON.stringify({ name: 'noscope', owner: ownerName, capabilities: ['memory'], scopes: ['memory:read'] }) });
+  assert(r.status === 201, `register noscope ${r.status}`);
+  const tok = await getToken(r.body.data.agent.gaii, r.body.data.private_key, true);
+  const pub = await json(crew('/publish'), { method: 'POST', headers: auth(tok), body: JSON.stringify({ doc: goodDoc }) });
+  assert(pub.status === 403, `scope-less sibling publish ${pub.status}: ${JSON.stringify(pub.body)}`);
+  const get = await json(crew(), { headers: auth(tok) });
+  assert(get.status === 200 && get.body.data.agent === agentName, `a sibling may still READ the definition: ${get.status}`);
 });
 await test('20. Unauthenticated → 401', async () => {
   const { status } = await json(crew());
@@ -284,15 +311,17 @@ await test('20. Unauthenticated → 401', async () => {
 });
 
 console.log('\nPhase 4 — the window');
-await test('21. Twelve publishes keep the last ten revisions', async () => {
-  for (let i = 5; i <= 12; i++) {
+await test('21. Thirteen publishes keep the last ten revisions', async () => {
+  // 19b left a CLI-shaped (unnumbered) live key; the kept history ends at revision 5, so the next
+  // publish numbers on from there.
+  for (let i = 6; i <= 13; i++) {
     const r = await json(crew('/publish'), { method: 'POST', headers: auth(ownerToken), body: JSON.stringify({ doc: { ...goodDoc, tags: [`r${i}`] } }) });
     assert(r.status === 200 && r.body.data.revision === i, `publish ${i}: ${r.status} ${r.body.data?.revision}`);
   }
   const state = await json(crew(), { headers: auth(ownerToken) });
   const revs = state.body.data.versions.map((v: any) => v.revision);
   assert(revs.length === 10, `kept ${revs.length}: ${revs.join(',')}`);
-  assert(revs[0] === 12 && revs[9] === 3, `window 3..12, got ${revs.join(',')}`);
+  assert(revs[0] === 13 && revs[9] === 4, `window 4..13, got ${revs.join(',')}`);
   const pruned = await json(`/v1/memory/${encodeURIComponent(agentGaii)}/crews.registry.${agentName}.version.1`, { headers: auth(ownerToken) });
   assert(pruned.status === 404, 'revision 1 pruned');
 });

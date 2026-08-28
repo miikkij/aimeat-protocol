@@ -38616,7 +38616,8 @@ paths:
         (envelope with `revision`, `publishedAt`, `publishedBy`, `agent_name`, `doc`), the owner's
         unpublished draft, the kept revisions, what the runtime last reported loading
         (`crews.runtime.<agent>`), and whether the agent is on the connector tunnel right now.
-        Owner sessions only.
+        An owner session for any of their agents, or an agent session for itself or a same-owner
+        sibling (a chat session over MCP is one). The same call is `aimeat_crew_get` over MCP.
       tags: [Agent Crew]
       security:
         - BearerAuth: []
@@ -38644,7 +38645,8 @@ paths:
       summary: Save unpublished edits to the crew definition
       description: |
         Writes `crews.registry.<agent>.draft` in the agent's namespace (owner visibility) so edits
-        survive a reload. No validation: a draft may be half-written. Owner principal only.
+        survive a reload. No validation: a draft may be half-written. An owner session, or a
+        same-owner agent session holding `memory:write`; an app grant is refused.
       tags: [Agent Crew]
       security:
         - BearerAuth: []
@@ -38912,7 +38914,11 @@ paths:
         revision N+1: a full copy lands at `crews.registry.<agent>.version.N+1`, the live key
         `crews.registry.<agent>` is replaced, the draft is removed, revisions older than the last 10
         are pruned, and the runtime is woken with a `crew.def_updated` delivery so it reloads.
-        Owner principal only; the agent must be connected.
+        An owner session, or a same-owner agent session holding `memory:write` (a chat session over
+        MCP: `aimeat_crew_publish`); an app grant is refused. The agent must be connected. This is
+        the only way a crew definition should be written: a plain memory write of
+        `crews.registry.<agent>` from any other principal is refused, because it would land in that
+        principal's namespace where the tab and the runtime do not look.
       tags: [Agent Crew]
       security:
         - BearerAuth: []
@@ -38965,7 +38971,7 @@ paths:
       description: |
         Reads `crews.registry.<agent>.version.<revision>` and publishes it through the same gate as
         a fresh publish, so it becomes a new revision. `404 REVISION_NOT_FOUND` when that revision
-        was pruned. Owner principal only; the agent must be connected.
+        was pruned. Same callers as publish; the agent must be connected.
       tags: [Agent Crew]
       security:
         - BearerAuth: []

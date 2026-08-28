@@ -29,6 +29,10 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.4.0 — 2026-08-28 — A crews.registry.* / crews.runtime.* key is refused unless it lands in the
+ *     namespace of the agent it names (services/crew-def-store.ts misdirectedCrewKey). A chat
+ *     session writing an agent's definition under its own principal produced a definition the
+ *     runtime ran and the Crew tab could not see.
  *   v1.3.0 — 2026-08-11 — Security audit H-2: the owner/operator bypass now excludes agent and
  *     ecosystem sessions, which is what requireScope has always done and what this copy of the rule
  *     had dropped. While POST /v1/auth/token mirrored the owner's roles onto agent tokens, an agent
@@ -62,6 +66,7 @@ import { runAutomationRecipesForWrite } from './ecosystem-automation.js';
 import { logger } from '../utils/logger.js';
 import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
 import { checkOrganismNamespaceAccess } from './organism-namespace-access.js';
+import { misdirectedCrewKey } from './crew-def-store.js';
 import { parseGAII } from '../utils/gaii.js';
 
 /** What a caller must supply for the fan-out that a memory write sets off. */
@@ -206,6 +211,14 @@ export async function writeMemoryRecord(
             principal: caller.principal, owner: ownerName, roles: caller.roles,
         }, input.key, 'write');
         if (refusal) return { ok: false, ...refusal };
+    }
+    // 1d. A crew definition (crews.registry.<agent>, crews.runtime.<agent>) belongs in the namespace
+    //     of the agent it names. Any door can be asked to write it somewhere else — a chat session
+    //     is an agent principal with its own name — and the result is a definition the runtime runs
+    //     and the Crew tab cannot see. The rule and its message live with the key contract.
+    const misdirected = misdirectedCrewKey(input.key, caller.targetGaii, input.visibility);
+    if (misdirected) {
+        return { ok: false, status: 403, code: 'ACCESS_DENIED', message: misdirected };
     }
     // 2. Schema locks apply on EVERY write surface. MCP used to call setMemory directly, so a write
     //    that REST answered with 422 sailed through there.
