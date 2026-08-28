@@ -251,6 +251,20 @@ await test('17. Runtime that does not answer this call → 409 CREW_RUNTIME_MISS
   tunnel!.onInvoke(runtimeReply);
 });
 
+await test('14b. A definition published from the crewaimeat CLI (old envelope, no revision) reads as unnumbered and the next tab publish numbers on', async () => {
+  // crew_registry.publish_crew_def writes { version, publishedAt, agent_name, doc } under the agent's
+  // own token, with capabilities.technical as {name, type} objects. The tab must show it, not "0".
+  const cliDoc = { ...goodDoc, capabilities: { technical: [{ name: 'web-search', type: 'tool' }], domain: ['news'], languages: ['fi'] } };
+  const w = await tunnel!.request('POST', '/v1/memory', { body: { key: `crews.registry.${agentName}`, value: { version: 1, publishedAt: new Date().toISOString(), agent_name: agentName, doc: cliDoc }, visibility: 'owner' } });
+  assert(w.status === 201 || w.status === 200, `cli-style write ${w.status}: ${JSON.stringify(w.body)}`);
+  const state = await json(crew(), { headers: auth(ownerToken) });
+  assert(state.body.data.published !== null, 'the CLI-published definition is the live one');
+  assert(state.body.data.published.revision === 0, `no revision number on a CLI publish: ${state.body.data.published.revision}`);
+  assert(state.body.data.published.doc.capabilities.technical[0].type === 'tool', 'objects survive the read untouched');
+  const r = await json(crew('/publish'), { method: 'POST', headers: auth(ownerToken), body: JSON.stringify({ doc: cliDoc }) });
+  assert(r.status === 200 && r.body.data.revision === 4, `next tab publish numbers on from the kept history (expected 4): ${r.status} ${r.body.data?.revision}`);
+});
+
 console.log('\nPhase 3 — isolation');
 await test('18. Another owner cannot read, validate or publish this agent\'s crew → 403/404', async () => {
   const r1 = await json(crew(), { headers: auth(otherToken) });
@@ -258,7 +272,7 @@ await test('18. Another owner cannot read, validate or publish this agent\'s cre
   const r2 = await json(crew('/publish'), { method: 'POST', headers: auth(otherToken), body: JSON.stringify({ doc: goodDoc }) });
   assert(r2.status === 403 || r2.status === 404, `publish ${r2.status}`);
   const state = await json(crew(), { headers: auth(ownerToken) });
-  assert(state.body.data.published.revision === 3, 'unchanged');
+  assert(state.body.data.published.revision === 4, 'unchanged');
 });
 await test('19. The agent\'s own token cannot publish through this door (owner principal only)', async () => {
   const r = await tunnel!.request('POST', crew('/publish'), { body: { doc: goodDoc } });
@@ -270,15 +284,15 @@ await test('20. Unauthenticated → 401', async () => {
 });
 
 console.log('\nPhase 4 — the window');
-await test('21. Eleven publishes keep the last ten revisions', async () => {
-  for (let i = 4; i <= 11; i++) {
+await test('21. Twelve publishes keep the last ten revisions', async () => {
+  for (let i = 5; i <= 12; i++) {
     const r = await json(crew('/publish'), { method: 'POST', headers: auth(ownerToken), body: JSON.stringify({ doc: { ...goodDoc, tags: [`r${i}`] } }) });
     assert(r.status === 200 && r.body.data.revision === i, `publish ${i}: ${r.status} ${r.body.data?.revision}`);
   }
   const state = await json(crew(), { headers: auth(ownerToken) });
   const revs = state.body.data.versions.map((v: any) => v.revision);
   assert(revs.length === 10, `kept ${revs.length}: ${revs.join(',')}`);
-  assert(revs[0] === 11 && revs[9] === 2, `window 2..11, got ${revs.join(',')}`);
+  assert(revs[0] === 12 && revs[9] === 3, `window 3..12, got ${revs.join(',')}`);
   const pruned = await json(`/v1/memory/${encodeURIComponent(agentGaii)}/crews.registry.${agentName}.version.1`, { headers: auth(ownerToken) });
   assert(pruned.status === 404, 'revision 1 pruned');
 });
