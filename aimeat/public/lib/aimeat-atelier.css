@@ -36,6 +36,9 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.21.0 — 2026-08-28 — The nesting guard (looks.css): every look block declares the
+ *     inverse-band trio — own value or contract default — so a nested look never inherits the
+ *     outer look's band type.
  *   v0.20.0 — 2026-08-28 — The harvest trio's styles (content.css): the matrix grid, the graph
  *     pills and edges, the waveform bars.
  *   v0.19.0 — 2026-08-28 — The chart's styles (content.css: bars, drawn lines, mono ticks, the

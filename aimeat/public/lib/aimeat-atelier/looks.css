@@ -9,6 +9,14 @@
  * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
  */
 
+/* vivid — the default — an aurora hero on the derived spectrum, tinted cards, glass chrome, a real entrance; pick when unsure.
+   The base contract IS vivid; this entry exists for the picker and the prompt table. */
+[data-ak-look='vivid'] {
+  --ak-hero-ink:      var(--ak-ink);
+  --ak-hero-ink-dim:  var(--ak-hero-ink);
+  --ak-scrim:         color-mix(in oklab, var(--ak-bg) 78%, transparent);
+}
+
 /* @preset-block flat — the deliberate opt-out: no decoration, no entrance.
    The opt-out is a choice the spec records, not an accident — and even flat darkens the action fill, because body-size text on the raw accent fails on the aimeat palette. */
 [data-ak-look='flat'] {
@@ -23,6 +31,9 @@
   --ak-enter-stagger:   0ms;
   --ak-elev-2:          var(--ak-elev-1);
   --ak-weight-display:  650;
+  --ak-hero-ink:        var(--ak-ink);
+  --ak-hero-ink-dim:    var(--ak-hero-ink);
+  --ak-scrim:           color-mix(in oklab, var(--ak-bg) 78%, transparent);
 }
 
 /* @preset-block calm-card — quiet professional product.
@@ -38,6 +49,9 @@
   --ak-enter-stagger:   30ms;
   --ak-hero-min:        18dvh;
   --ak-weight-display:  650;
+  --ak-hero-ink:        var(--ak-ink);
+  --ak-hero-ink-dim:    var(--ak-hero-ink);
+  --ak-scrim:           color-mix(in oklab, var(--ak-bg) 78%, transparent);
 }
 
 /* @preset-block editorial — magazine: masthead on rules, giant joined numerals, cells in one frame, slow fades.
@@ -60,6 +74,9 @@
   --ak-enter-distance:  0px;
   --ak-enter-stagger:   60ms;
   --ak-motion:          var(--motion-slow, 320ms);
+  --ak-hero-ink:        var(--ak-ink);
+  --ak-hero-ink-dim:    var(--ak-hero-ink);
+  --ak-scrim:           color-mix(in oklab, var(--ak-bg) 78%, transparent);
 }
 /* structure: masthead — The hero is a front-page masthead: giant display type on rules, no card, no mesh — and the news under it separates with RULES, not boxes (a card widget inside a newspaper was the first design review's finding). */
 [data-ak-look='editorial'] .ak-hero:not(.ak-hero--image) {
@@ -147,6 +164,9 @@
   --ak-enter-distance:  22px;
   --ak-enter-stagger:   55ms;
   --ak-weight-display:  800;
+  --ak-hero-ink:        var(--ak-ink);
+  --ak-hero-ink-dim:    var(--ak-hero-ink);
+  --ak-scrim:           color-mix(in oklab, var(--ak-bg) 78%, transparent);
 }
 
 /* @preset-block neon-dense — operator console: tight, mono display face, accent ring + glow on every card, fast.
@@ -166,6 +186,9 @@
   --ak-enter-stagger:   20ms;
   --ak-motion:          var(--motion-fast, 120ms);
   --ak-weight-display:  700;
+  --ak-hero-ink:        var(--ak-ink);
+  --ak-hero-ink-dim:    var(--ak-hero-ink);
+  --ak-scrim:           color-mix(in oklab, var(--ak-bg) 78%, transparent);
 }
 
 /* @preset-block poster — one giant focal statement on the brand gradient, edge to edge; everything else recedes.
@@ -181,6 +204,9 @@
   --ak-elev-1:          none;
   --ak-enter-distance:  24px;
   --ak-enter-stagger:   70ms;
+  --ak-hero-ink:        var(--ak-ink);
+  --ak-hero-ink-dim:    var(--ak-hero-ink);
+  --ak-scrim:           color-mix(in oklab, var(--ak-bg) 78%, transparent);
 }
 /* structure: full-bleed-hero — The focal band runs edge to edge, out of the measure column. */
 [data-ak-look='poster'] .ak-mosaic__band .ak-hero {
@@ -215,6 +241,9 @@
   --ak-enter-distance:  0px;
   --ak-enter-stagger:   70ms;
   --ak-motion:          var(--motion-slow, 320ms);
+  --ak-hero-ink:        var(--ak-ink);
+  --ak-hero-ink-dim:    var(--ak-hero-ink);
+  --ak-scrim:           color-mix(in oklab, var(--ak-bg) 78%, transparent);
 }
 /* structure: masthead — The hero is a front-page masthead: giant display type on rules, no card, no mesh — and the news under it separates with RULES, not boxes (a card widget inside a newspaper was the first design review's finding). */
 [data-ak-look='broadsheet'] .ak-hero:not(.ak-hero--image) {
@@ -308,6 +337,9 @@
   --ak-enter-distance:  10px;
   --ak-enter-stagger:   70ms;
   --ak-motion:          var(--motion-slow, 320ms);
+  --ak-hero-ink:        var(--ak-ink);
+  --ak-hero-ink-dim:    var(--ak-hero-ink);
+  --ak-scrim:           color-mix(in oklab, var(--ak-bg) 78%, transparent);
 }
 /* structure: full-bleed-hero — The focal band runs edge to edge, out of the measure column. */
 [data-ak-look='gallery'] .ak-mosaic__band .ak-hero {
@@ -341,6 +373,9 @@
   --ak-weight-display:  900;
   --ak-enter-distance:  10px;
   --ak-enter-stagger:   30ms;
+  --ak-hero-ink:        var(--ak-ink);
+  --ak-hero-ink-dim:    var(--ak-hero-ink);
+  --ak-scrim:           color-mix(in oklab, var(--ak-bg) 78%, transparent);
 }
 
 /* @preset-block terminal — the machine speaks: mono everything, joined cells, dense, grain like phosphor.
@@ -365,6 +400,9 @@
   --ak-enter-distance:  4px;
   --ak-enter-stagger:   15ms;
   --ak-motion:          var(--motion-fast, 120ms);
+  --ak-hero-ink:        var(--ak-ink);
+  --ak-hero-ink-dim:    var(--ak-hero-ink);
+  --ak-scrim:           color-mix(in oklab, var(--ak-bg) 78%, transparent);
 }
 /* structure: joined — Cells share hairlines inside one bordered frame — a laid-out page, not floating cards. */
 [data-ak-look='terminal'] .ak-mosaic__units--grid {
@@ -434,6 +472,9 @@
   --ak-enter-distance:  26px;
   --ak-enter-stagger:   70ms;
   --ak-weight-display:  800;
+  --ak-hero-ink:        var(--ak-ink);
+  --ak-hero-ink-dim:    var(--ak-hero-ink);
+  --ak-scrim:           color-mix(in oklab, var(--ak-bg) 78%, transparent);
 }
 /* structure: full-bleed-hero — The focal band runs edge to edge, out of the measure column. */
 [data-ak-look='aurora'] .ak-mosaic__band .ak-hero {
