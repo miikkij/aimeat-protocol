@@ -15,6 +15,9 @@
  * @usage import { PALETTES, aimeatApplyPalette, aimeatRestorePalette } from './palette.js';
  *   In the app: nothing — the login pill renders the picker and the CSS follows.
  * @version-history
+ *   v1.2.0 — 2026-08-28 — VOLTAGE joins the palettes: the front-demo2 register as a theme — hot
+ *     magenta on warm cream, deep violet night, electric yellow, 2px borders, Space Grotesk
+ *     display. check:theme holds its swatches and ratios like every other.
  *   v1.1.0 — 2026-07-26 — ?palette= is read first (the ?lang= door): an app EMBEDDED by another
  *     page cannot see the look chosen on the embedder's origin, so the embedder says it in the URL
  *     and the app inherits it. Never persisted — an embed decides how it looks while it is
@@ -48,6 +51,9 @@ export var PALETTES = [
   { id: 'mist', label: 'Mist', swatch: {
     light: { bg: '#e6eae4', card: '#fbfcfa', accent: '#47695a' },
     dark: { bg: '#141715', card: '#252b27', accent: '#9cc0ae' } } },
+  { id: 'voltage', label: 'Voltage', swatch: {
+    light: { bg: '#f1e4d2', card: '#ffffff', accent: '#c2187e' },
+    dark: { bg: '#150d20', card: '#2c1d3f', accent: '#ff4fa8' } } },
 ];
 
 /** The palette in effect: stored choice if valid, else the default (first in PALETTES). */
