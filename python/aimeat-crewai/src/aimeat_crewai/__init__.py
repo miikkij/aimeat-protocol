@@ -40,7 +40,9 @@ from .mcp_client import (
 )
 from .daemon import (
     run_crew_daemon,
+    run_invoke_listener,
     BuildCrewCallback,
+    InvokeHandler,
     DAEMON_DEFAULT_TOOL_FILTER,
 )
 from .workflow_spec import (
@@ -115,7 +117,7 @@ from .provenance import (
 
 # Kept in step with pyproject BY HAND, which is why it was wrong: 0.20.0 shipped announcing
 # itself as 0.19.0, and the first crew to install it reported the mismatch before we saw it.
-__version__ = "0.21.0"
+__version__ = "0.22.0"
 
 __all__ = [
     "__version__",
@@ -131,6 +133,9 @@ __all__ = [
     "run_crew_daemon",
     "BuildCrewCallback",
     "DAEMON_DEFAULT_TOOL_FILTER",
+    # Server-initiated invokes — the Crew tab's Validate and Try (0.22.0)
+    "run_invoke_listener",
+    "InvokeHandler",
     # Offers + workflow-compatibility (0.5.0)
     "Sig",
     "NONE",

@@ -256,6 +256,41 @@ To queue work for the daemon from elsewhere:
 
 See [`examples/crew_daemon.py`](examples/crew_daemon.py) for a runnable starter.
 
+## Answering the node: the Crew tab's Validate and Try (0.22.0+)
+
+The node can ask a running crew to do something and wait for the answer, over the same
+tunnel the daemon already holds. Today two things ask: the **Crew** tab under Profile → Agents
+sends `crew.validate` when the person presses Validate and `crew.try` when they press Try. The
+node holds no validator of its own, so what your handler says is what the person sees, verbatim.
+
+```python
+from aimeat_crewai import run_crew_daemon
+
+def on_invoke(capability, input, invoke):
+    if capability == "crew.validate":
+        return {"errors": validate_crew_doc(input["doc"])}       # [] means valid
+    if capability == "crew.try":
+        return {"output": try_once(input["doc"], input["prompt"]), "duration_ms": 1234}
+    return False, {"code": "UNSUPPORTED", "message": f"no {capability} here"}
+
+run_crew_daemon(agent_name="demo-crew", build_crew=build_crew_for_task, on_invoke=on_invoke)
+```
+
+- The listener runs in its own thread **from startup**. The serve daemon tells the node
+  `NO_HANDLER` for an agent nobody has polled in 90 seconds, so a listener that starts on
+  demand is an agent the tab reports as "connected, but nothing answers".
+- Handlers run in a small pool: a `crew.try` that takes minutes does not block the next
+  `crew.validate`. Raise to answer `ok=False` with the message; return `(False, {...})` to
+  refuse with your own shape.
+- A trial must leave nothing behind (no task, no memory write, no offer); that is the
+  handler's promise. The node keeps the result in memory for 15 minutes and never stores it.
+- A publish from the tab wakes an agent that listens for `records` with a `crew.def_updated`
+  event (`{type, key, revision, agent_name}`): read the live key, validate, reload, and write
+  `crews.runtime.<agent>` (`{loadedAt, revision, ok, errors, runtime}`) so the tab can show
+  which revision is actually in force.
+- Outside the daemon, `run_invoke_listener(api, handler, stop)` is the same loop for a process
+  of your own.
+
 ## Usage telemetry → ledger (0.16.0+)
 
 The daemon automatically meters every LLM call your crew makes and reports it to the node's
@@ -401,6 +436,7 @@ under a function whose name says otherwise.
 | 0.16.x | 1.38.0+ for the usage ledger (older nodes accept the telemetry but record no ledger row) | 0.80+ |
 | 0.17.x | 2.2.0+ for file helpers (`?mode=handle` on `/v1/pub`, `resources.files` on tasks). Against an older node, reading a file the owner shared still works over plain `GET /v1/pub/{owner}/{key}` — only the handle + task-attachment helpers need 2.2.0. | 0.80+ |
 | 0.20.x | 3.3.0+ for data packages (`/v1/datapackages`). `read_package` and `to_dataframe` need only the package's public address, so they read a package from ANY node that publishes one; `publish_package` and `package_versions` need the routes. | 0.80+ |
+| 0.22.x | 3.9.0+ node AND `aimeat` connector for server-initiated invokes (`/local/invoke/next` on the serve daemon). On an older serve daemon the listener logs once that the surface is missing and the rest of the daemon is unchanged. | 0.80+ |
 
 ## License
 
