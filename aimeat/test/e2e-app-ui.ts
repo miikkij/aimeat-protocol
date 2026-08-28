@@ -143,6 +143,24 @@ const GOOD_LAYOUT = {
             `main+side on the rail must validate: ${JSON.stringify(good.body.data)}`);
     });
 
+    await test('the signature: legal tokens pass, a typo gets the nearest name, colour is refused with the reason', async () => {
+        const good = await validate({ v: 1, tokens: { '--ak-radius': '2px', '--ak-weight-display': '900', '--ak-tilt': '0deg' },
+            blocks: [{ id: 'a', component: 'list', props: { source: 'x' } }] });
+        assert(good.status === 200 && good.body.data.ok === true, `legal tokens must validate: ${JSON.stringify(good.body.data)}`);
+
+        const typo = await validate({ v: 1, tokens: { '--ak-radiuss': '2px' }, blocks: [{ id: 'a', component: 'list', props: { source: 'x' } }] });
+        assert(typo.body.data.ok === false && typo.body.data.message.includes('Did you mean "--ak-radius"?'),
+            `a token typo gets the nearest name: ${typo.body.data.message}`);
+
+        const colour = await validate({ v: 1, tokens: { '--ak-accent': 'hotpink' }, blocks: [{ id: 'a', component: 'list', props: { source: 'x' } }] });
+        assert(colour.body.data.ok === false && /contrast bench/.test(colour.body.data.message),
+            `a colour token is refused with the reason: ${colour.body.data.message}`);
+
+        const vehicle = await validate({ v: 1, tokens: { '--ak-radius': 'url(https://evil.example/x)' }, blocks: [{ id: 'a', component: 'list', props: { source: 'x' } }] });
+        assert(vehicle.body.data.ok === false && /vehicle/.test(vehicle.body.data.message),
+            `a url value is refused: ${vehicle.body.data.message}`);
+    });
+
     await test('an unknown component is refused with the NEAREST real name suggested', async () => {
         const r = await validate({ v: 1, blocks: [{ id: 'g', component: 'cardgird' }] });
         assert(r.status === 200 && r.body.data.ok === false, `expected an ok:false result, got ${r.status}`);

@@ -12,6 +12,8 @@
  * @structure ak-list · ak-listdetail · ak-grid + ak-card · ak-mediacard · ak-timeline
  * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
  * @version-history
+ *   v0.5.0 — 2026-08-28 — The copilot panel (log, bubbles, the confirm row, the inline generated
+ *     panel) and the explain list (TARGET-074 phase 6).
  *   v0.4.0 — 2026-08-28 — The featured card's imageless cover stops pretending to be a portrait:
  *     the media card gets a wide 7:3 art band with a two-hue wash, and its monogram becomes a
  *     small glass chip in the lower corner — the first AEB review read the giant centred letter
@@ -217,3 +219,67 @@ button.ak-card:hover { box-shadow: var(--ak-elev-2); transform: translateY(-2px)
 .ak-timeline__when { font-size: var(--ak-text-fine); color: var(--ak-ink-dim); font-variant-numeric: tabular-nums; }
 .ak-timeline__title { font-weight: 600; overflow-wrap: anywhere; }
 .ak-timeline__sub { font-size: var(--ak-text-fine); color: var(--ak-ink-dim); overflow-wrap: anywhere; }
+
+/* ── The copilot panel ────────────────────────────────────────────────────────────────────────
+   A chat surface inside the app: the log scrolls, the person's words sit right on the accent
+   wash, the model's on the surface with its provenance label, and the confirm row makes "the
+   model proposes, the person disposes" visible as a control. */
+.ak-copilot {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: var(--ak-pad);
+  border-radius: var(--ak-radius);
+  background: var(--ak-surface);
+  background-image: var(--ak-surface-image);
+  border: var(--ak-line-w) solid var(--ak-line);
+  box-shadow: var(--ak-elev-1);
+}
+.ak-copilot__head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.ak-copilot__notice { margin: 0; font-size: var(--ak-text-fine); color: var(--ak-ink-dim); }
+.ak-copilot__log {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 22rem;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.ak-copilot__msg {
+  max-width: 46rem;
+  padding: 8px 12px;
+  border-radius: var(--ak-radius-sm);
+  border: var(--ak-line-w) solid var(--ak-line);
+  background: var(--ak-bg);
+}
+.ak-copilot__msg--user {
+  align-self: flex-end;
+  background: color-mix(in oklab, var(--ak-accent) 12%, var(--ak-surface));
+  border-color: color-mix(in oklab, var(--ak-accent) 30%, var(--ak-line));
+}
+.ak-copilot__msg--assistant { align-self: flex-start; }
+.ak-copilot__text { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.ak-copilot__label { display: inline-block; margin-top: 4px; font-size: var(--ak-text-fine); }
+.ak-copilot__confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: var(--ak-line-w) dashed var(--ak-line);
+  font-size: var(--ak-text-fine);
+}
+.ak-copilot__panel { margin-top: 8px; }
+.ak-copilot__row { display: flex; gap: 8px; align-items: flex-end; }
+.ak-copilot__input { flex: 1; min-width: 0; }
+
+/* ── The explain list: what this screen holds, in words ──────────────────────────────────── */
+.ak-explain {
+  padding: var(--ak-pad);
+  border-radius: var(--ak-radius);
+  background: var(--ak-surface);
+  background-image: var(--ak-surface-image);
+  border: var(--ak-line-w) solid var(--ak-line);
+}
+.ak-explain__list { margin: 8px 0 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 4px; }

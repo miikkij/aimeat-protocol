@@ -51,6 +51,7 @@ import { registerCompanyTools } from './companies.js';
 import { registerPortfolioTools } from './portfolio.js';
 import { registerSurfaceLayoutTools } from './surface-layout.js';
 import { registerAppUiTools } from './app-ui.js';
+import { registerDesignbookTools } from './designbook.js';
 import { registerOperatorTools } from './operator.js';
 import { registerComplianceTools } from './compliance.js';
 import { registerDataMapTools } from './data-map.js';
@@ -92,6 +93,7 @@ export function registerAllTools(mcp: McpServer, registry: AgentRegistry): void 
   registerPortfolioTools(mcp, registry);
   registerSurfaceLayoutTools(mcp, registry);
   registerAppUiTools(mcp, registry);
+  registerDesignbookTools(mcp, registry);
   registerOperatorTools(mcp, registry);
   registerComplianceTools(mcp, registry);
   registerDataMapTools(mcp, registry);

@@ -327,6 +327,15 @@
 }
 .ak-bottomnav__item--active { color: var(--ak-accent-text); font-weight: 650; }
 
+/* ── Density: the compact preference, over the tokens ─────────────────────────────────────────
+   One class, and everything that reads the pad/gap tokens tightens with it. The touch minimum
+   (--ak-touch) deliberately does not move: density is a preference, never an accessibility
+   trade. */
+.ak-app--compact {
+  --ak-pad: 10px;
+  --ak-gap: 10px;
+}
+
 /* ── The designed empty / error state ─────────────────────────────────────────────────────── */
 .ak-empty {
   padding: var(--ak-pad);

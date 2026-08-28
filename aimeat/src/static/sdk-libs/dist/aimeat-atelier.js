@@ -239,7 +239,16 @@
       previous: "Previous",
       zoomIn: "Zoom in",
       zoomOut: "Zoom out",
-      fitView: "Fit to view"
+      fitView: "Fit to view",
+      send: "Send",
+      copilotTitle: "Copilot",
+      copilotPlaceholder: "Ask, or say what to do…",
+      copilotNotice: "You are talking with an AI. Answers can be wrong; actions run only when you confirm them.",
+      copilotNoAi: "AI is not set up on this account yet. Connect a key under Profile, and the copilot wakes up.",
+      copilotFailed: "That did not go through. Try again.",
+      copilotRun: "Run it",
+      copilotUnknownAction: "The model proposed something this app does not declare — nothing was run.",
+      explainTitle: "What this screen holds"
     },
     fi: {
       loading: "Ladataan…",
@@ -270,7 +279,16 @@
       previous: "Edellinen",
       zoomIn: "Lähennä",
       zoomOut: "Loitonna",
-      fitView: "Sovita näkymään"
+      fitView: "Sovita näkymään",
+      send: "Lähetä",
+      copilotTitle: "Copilot",
+      copilotPlaceholder: "Kysy, tai sano mitä tehdään…",
+      copilotNotice: "Keskustelet tekoälyn kanssa. Vastaus voi olla väärin; toiminnot ajetaan vasta kun vahvistat ne.",
+      copilotNoAi: "Tälle tilille ei ole vielä kytketty tekoälyä. Liitä avain profiilissa, niin copilot herää.",
+      copilotFailed: "Se ei mennyt läpi. Yritä uudelleen.",
+      copilotRun: "Aja",
+      copilotUnknownAction: "Malli ehdotti jotain mitä tämä appsi ei tunne — mitään ei ajettu.",
+      explainTitle: "Mitä tällä näytöllä on"
     },
     es: {
       loading: "Cargando…",
@@ -301,7 +319,16 @@
       previous: "Anterior",
       zoomIn: "Acercar",
       zoomOut: "Alejar",
-      fitView: "Ajustar a la vista"
+      fitView: "Ajustar a la vista",
+      send: "Enviar",
+      copilotTitle: "Copilot",
+      copilotPlaceholder: "Pregunta, o di qué hacer…",
+      copilotNotice: "Estás hablando con una IA. Las respuestas pueden fallar; las acciones solo se ejecutan cuando las confirmas.",
+      copilotNoAi: "Esta cuenta aún no tiene IA configurada. Conecta una clave en el perfil y el copilot despierta.",
+      copilotFailed: "No ha funcionado. Inténtalo otra vez.",
+      copilotRun: "Ejecutar",
+      copilotUnknownAction: "El modelo propuso algo que esta app no declara — no se ejecutó nada.",
+      explainTitle: "Qué hay en esta pantalla"
     }
   };
   var HOST = { en: {}, fi: {}, es: {} };
@@ -628,7 +655,7 @@
     return {
       el: root,
       main,
-      /** @param {{ title?: string, look?: string }} patch */
+      /** @param {{ title?: string, look?: string, density?: 'comfortable'|'compact' }} patch */
       set(patch) {
         if (!patch) return;
         if (patch.title != null) {
@@ -639,6 +666,7 @@
           state.look = patch.look;
           root.setAttribute("data-ak-look", state.look);
         }
+        if (patch.density != null) root.classList.toggle("ak-app--compact", patch.density === "compact");
       },
       status,
       t,
@@ -954,6 +982,243 @@
     };
   }
 
+  // src/static/sdk-libs/atelier/copilot.js
+  var SOURCE_CHARS_MAX = 2e3;
+  var CONTEXT_CHARS_MAX = 8e3;
+  var PANEL_BLOCKS_MAX = 8;
+  var HISTORY_TURNS = 12;
+  var ANSWER_SCHEMA = {
+    type: "object",
+    properties: {
+      reply: { type: "string" },
+      action: {
+        type: "object",
+        properties: { id: { type: "string" }, params: { type: "object" } },
+        required: ["id"]
+      },
+      panel: { type: "object" }
+    },
+    required: ["reply"]
+  };
+  function copilot(spec) {
+    const s = spec || {};
+    const history = [];
+    let firstSend = true;
+    const log = el("div", { class: "ak-copilot__log", role: "log", "aria-live": "polite" });
+    const input = (
+      /** @type {HTMLTextAreaElement} */
+      el("textarea", {
+        class: "ak-input ak-input--area ak-copilot__input",
+        rows: 2,
+        placeholder: t("copilotPlaceholder"),
+        "aria-label": t("copilotPlaceholder")
+      })
+    );
+    const sendBtn = el("button", {
+      type: "button",
+      class: "ak-btn ak-btn--primary",
+      on: { click: function() {
+        send();
+      } }
+    }, t("send"));
+    input.addEventListener("keydown", function(ev) {
+      if (ev.key === "Enter" && !ev.shiftKey) {
+        ev.preventDefault();
+        send();
+      }
+    });
+    const notice = el("p", { class: "ak-copilot__notice" });
+    const root = el("section", { class: "ak-root ak-copilot", "aria-label": "Copilot" }, [
+      el("header", { class: "ak-copilot__head" }, [
+        el("h2", { class: "ak-section__title", text: t("copilotTitle") }),
+        notice
+      ]),
+      log,
+      el("div", { class: "ak-copilot__row" }, [input, sendBtn])
+    ]);
+    if (s.target) resolve(s.target).appendChild(root);
+    enter(root);
+    const aiNs = (
+      /** @type {any} */
+      window.AIMEAT && /** @type {any} */
+      window.AIMEAT.ai
+    );
+    if (aiNs && typeof aiNs.chatNotice === "function") {
+      try {
+        aiNs.chatNotice({ target: notice });
+      } catch (err) {
+        console.warn("aimeat-atelier: the AI notice did not render", err);
+      }
+    } else {
+      notice.textContent = t("copilotNotice");
+    }
+    if (s.intro) bubble("assistant", s.intro, null);
+    function bubble(who, text, provenance) {
+      const b = el("div", { class: "ak-copilot__msg ak-copilot__msg--" + who }, [
+        el("p", { class: "ak-copilot__text", text })
+      ]);
+      if (who === "assistant" && provenance && aiNs && typeof aiNs.disclose === "function") {
+        const tag = el("span", { class: "ak-copilot__label" });
+        b.appendChild(tag);
+        try {
+          aiNs.disclose(provenance, { target: tag });
+        } catch (err) {
+          console.warn("aimeat-atelier: the provenance label did not render", err);
+        }
+      }
+      log.appendChild(b);
+      log.scrollTop = log.scrollHeight;
+      return b;
+    }
+    async function contextText() {
+      const parts = [];
+      const names = Object.keys(s.sources || {});
+      let budget = CONTEXT_CHARS_MAX;
+      for (const name of names) {
+        if (budget <= 0) break;
+        let data;
+        try {
+          data = await Promise.resolve().then(s.sources[name]);
+        } catch (err) {
+          console.warn('aimeat-atelier: copilot source "' + name + '" failed', err);
+          continue;
+        }
+        const chunk = JSON.stringify(data).slice(0, Math.min(SOURCE_CHARS_MAX, budget));
+        budget -= chunk.length;
+        parts.push("SOURCE " + name + ": " + chunk);
+      }
+      return parts.join("\n");
+    }
+    function actionsText() {
+      const list2 = s.actions || [];
+      if (!list2.length) return "This app declares no actions: answer with words only.";
+      return "ACTIONS you may propose (a person confirms before anything runs):\n" + list2.map(function(a) {
+        const params = a.params ? " params: " + JSON.stringify(a.params) : "";
+        return '- id "' + a.id + '": ' + a.summary + params;
+      }).join("\n");
+    }
+    async function send() {
+      const text = input.value.trim();
+      if (!text) return;
+      if (!aiNs || typeof aiNs.completeJson !== "function") {
+        bubble("assistant", t("copilotNoAi"), null);
+        return;
+      }
+      const available = await aiNs.isAvailable().catch(function() {
+        return false;
+      });
+      if (!available) {
+        bubble("assistant", t("copilotNoAi"), null);
+        return;
+      }
+      input.value = "";
+      bubble("user", text, null);
+      history.push({ who: "user", text });
+      const thinking = bubble("assistant", "…", null);
+      const prompt = [
+        'You are the in-app copilot of "' + (s.appName || document.title || "this app") + '" on the AIMEAT platform.',
+        "You may ONLY act through the declared actions below, and only propose one when the person asked to DO something.",
+        'Answer as JSON: { "reply": "<plain words for the person>", "action"?: { "id", "params" }, "panel"?: <a small mosaic layout { v:1, blocks:[...] } when a visual answer helps> }.',
+        actionsText(),
+        "DATA the screen shows right now:",
+        await contextText(),
+        "CONVERSATION so far:",
+        history.slice(-HISTORY_TURNS).map(function(h) {
+          return h.who + ": " + h.text;
+        }).join("\n")
+      ].join("\n\n");
+      let out;
+      try {
+        out = await aiNs.completeJson({
+          prompt,
+          schema: ANSWER_SCHEMA,
+          app_id: s.appId || s.appName || "atelier-copilot",
+          confirm: firstSend
+        });
+        firstSend = false;
+      } catch (err) {
+        thinking.remove();
+        const code = err && /** @type {any} */
+        err.code;
+        bubble("assistant", code === "SPEND_CANCELLED" ? t("cancel") + "." : t("copilotFailed"), null);
+        return;
+      }
+      thinking.remove();
+      const answer = out && out.data ? out.data : out;
+      const reply = answer && typeof answer.reply === "string" ? answer.reply : t("copilotFailed");
+      const b = bubble("assistant", reply, out && out.provenance ? out.provenance : null);
+      history.push({ who: "assistant", text: reply });
+      if (answer && answer.action && answer.action.id) offerAction(answer.action, b);
+      if (answer && answer.panel) renderPanel(answer.panel, b);
+    }
+    function offerAction(proposed, into) {
+      const declared = (s.actions || []).find(function(a) {
+        return a.id === proposed.id;
+      });
+      if (!declared) {
+        into.appendChild(el("p", { class: "ak-copilot__text", text: t("copilotUnknownAction") }));
+        return;
+      }
+      const row = el("div", { class: "ak-copilot__confirm" }, [
+        el("span", { text: declared.summary }),
+        el("button", {
+          type: "button",
+          class: "ak-btn ak-btn--primary",
+          on: { click: async function() {
+            clear(row);
+            row.appendChild(el("span", { text: "…" }));
+            try {
+              const result = await Promise.resolve(declared.run ? declared.run(proposed.params || {}) : null);
+              clear(row);
+              row.appendChild(el("span", { text: typeof result === "string" ? result : t("ready") }));
+            } catch (err) {
+              clear(row);
+              row.appendChild(el("span", { text: t("copilotFailed") + " " + String(err && /** @type {any} */
+              err.message || "") }));
+            }
+          } }
+        }, t("copilotRun")),
+        el("button", {
+          type: "button",
+          class: "ak-btn ak-btn--ghost",
+          on: { click: function() {
+            row.remove();
+          } }
+        }, t("cancel"))
+      ]);
+      into.appendChild(row);
+    }
+    function renderPanel(panel, into) {
+      if (!panel || !Array.isArray(panel.blocks) || panel.blocks.length === 0 || panel.blocks.length > PANEL_BLOCKS_MAX) return;
+      const ns = (
+        /** @type {any} */
+        window.AIMEAT
+      );
+      if (!ns || !ns.atelier || typeof ns.atelier.mosaic !== "function") return;
+      const host = el("div", { class: "ak-copilot__panel" });
+      into.appendChild(host);
+      try {
+        const handle = ns.atelier.mosaic({ target: host, layout: { v: 1, blocks: panel.blocks }, sources: s.sources || {} });
+        root.addEventListener("ak-destroy", function() {
+          handle.destroy();
+        }, { once: true });
+      } catch (err) {
+        console.warn("aimeat-atelier: a generated panel did not render — the words above stand alone.", err);
+        host.remove();
+      }
+    }
+    return {
+      el: root,
+      open() {
+        input.focus();
+      },
+      destroy() {
+        root.dispatchEvent(new Event("ak-destroy"));
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+
   // src/static/sdk-libs/atelier/list.js
   function fillRow(row, item) {
     clear(row);
@@ -1114,13 +1379,34 @@
     }
     function select(id) {
       selected = id;
-      for (const row of root.querySelectorAll(".ak-list__row")) {
-        const on = row.getAttribute("data-ak-id") === id;
-        row.classList.toggle("ak-list__row--selected", on);
-        if (on) row.setAttribute("aria-current", "true");
-        else row.removeAttribute("aria-current");
+      const mark = function() {
+        for (const row of root.querySelectorAll(".ak-list__row")) {
+          const on = row.getAttribute("data-ak-id") === id;
+          row.classList.toggle("ak-list__row--selected", on);
+          if (on) row.setAttribute("aria-current", "true");
+          else row.removeAttribute("aria-current");
+        }
+        renderDetail();
+      };
+      const picked = (
+        /** @type {HTMLElement|null} */
+        id != null ? Array.from(root.querySelectorAll(".ak-list__row")).find(function(r) {
+          return r.getAttribute("data-ak-id") === id;
+        }) ?? null : null
+      );
+      if (picked && typeof document.startViewTransition === "function" && !reducedMotion()) {
+        picked.style.viewTransitionName = "ak-morph";
+        const vt = document.startViewTransition(function() {
+          picked.style.viewTransitionName = "";
+          detail.style.viewTransitionName = "ak-morph";
+          mark();
+        });
+        vt.finished.finally(function() {
+          detail.style.viewTransitionName = "";
+        });
+      } else {
+        mark();
       }
-      renderDetail();
       if (id != null) {
         requestAnimationFrame(function() {
           const box = detail.getBoundingClientRect();
@@ -1696,10 +1982,127 @@
   var NODE_ID = cfg().nodeId;
   var HEARTBEAT_MS = cfg().heartbeatMs || 3e4;
 
-  // src/static/sdk-libs/atelier/mosaic.js
+  // src/static/sdk-libs/atelier/mosaic-canvas.js
   var CANVAS_MIN = 0.35;
   var CANVAS_MAX = 1.6;
   var CANVAS_STEP = 1.18;
+  function projectCanvas(units, morph) {
+    const field = el("div", { class: "ak-mosaic__field" });
+    const cam = { x: 0, y: 0, scale: 0.6 };
+    let focused = null;
+    function apply() {
+      field.style.transform = "translate(" + cam.x + "px," + cam.y + "px) scale(" + cam.scale + ")";
+    }
+    const viewport = el("div", { class: "ak-mosaic__canvas" }, field);
+    units.forEach(function(u) {
+      const cover = el("button", {
+        type: "button",
+        class: "ak-mosaic__tilecover",
+        "data-ak-noguard": true,
+        "aria-label": t("open") + ": " + u.label,
+        on: { click: function() {
+          focus(u);
+        } }
+      });
+      u.tile = el("div", { class: "ak-mosaic__tile" }, [
+        el("span", { class: "ak-mosaic__tilelabel", text: u.label }),
+        u.el,
+        cover
+      ]);
+      field.appendChild(u.tile);
+    });
+    const focusHost = el("div", { class: "ak-mosaic__focus", hidden: true });
+    const backBtn = el("button", {
+      type: "button",
+      class: "ak-btn ak-btn--ghost",
+      "data-ak-noguard": true,
+      on: { click: function() {
+        unfocus();
+      } }
+    }, "↩ " + t("back"));
+    function focus(u) {
+      morph(u.el, function() {
+        focused = u;
+        focusHost.hidden = false;
+        viewport.hidden = true;
+        zoombar.hidden = true;
+        clear(focusHost);
+        focusHost.appendChild(backBtn);
+        focusHost.appendChild(u.el);
+        enter(focusHost);
+      });
+    }
+    function unfocus() {
+      if (!focused) return;
+      const u = focused;
+      morph(u.el, function() {
+        focused = null;
+        u.tile.insertBefore(u.el, u.tile.lastChild);
+        focusHost.hidden = true;
+        viewport.hidden = false;
+        zoombar.hidden = false;
+      });
+    }
+    let drag = null;
+    viewport.addEventListener("pointerdown", function(ev) {
+      const at = (
+        /** @type {Element|null} */
+        ev.target instanceof Element ? ev.target : null
+      );
+      if (at && at.closest(".ak-mosaic__tilecover")) return;
+      drag = { x: ev.clientX, y: ev.clientY };
+      viewport.setPointerCapture(ev.pointerId);
+    });
+    viewport.addEventListener("pointermove", function(ev) {
+      if (!drag) return;
+      cam.x += ev.clientX - drag.x;
+      cam.y += ev.clientY - drag.y;
+      drag = { x: ev.clientX, y: ev.clientY };
+      apply();
+    });
+    viewport.addEventListener("pointerup", function() {
+      drag = null;
+    });
+    viewport.addEventListener("wheel", function(ev) {
+      ev.preventDefault();
+      const factor = ev.deltaY < 0 ? CANVAS_STEP : 1 / CANVAS_STEP;
+      const next = Math.max(CANVAS_MIN, Math.min(CANVAS_MAX, cam.scale * factor));
+      const rect = viewport.getBoundingClientRect();
+      const px = ev.clientX - rect.left;
+      const py = ev.clientY - rect.top;
+      cam.x = px - (px - cam.x) * (next / cam.scale);
+      cam.y = py - (py - cam.y) * (next / cam.scale);
+      cam.scale = next;
+      apply();
+    }, { passive: false });
+    function zoomBtn(label, aria, factor) {
+      return el("button", {
+        type: "button",
+        class: "ak-btn ak-btn--ghost",
+        "aria-label": aria,
+        "data-ak-noguard": true,
+        on: {
+          click: function() {
+            cam.scale = factor === 0 ? 0.6 : Math.max(CANVAS_MIN, Math.min(CANVAS_MAX, cam.scale * factor));
+            if (factor === 0) {
+              cam.x = 0;
+              cam.y = 0;
+            }
+            apply();
+          }
+        }
+      }, label);
+    }
+    const zoombar = el("div", { class: "ak-mosaic__zoombar" }, [
+      zoomBtn("−", t("zoomOut"), 1 / CANVAS_STEP),
+      zoomBtn("⤢", t("fitView"), 0),
+      zoomBtn("+", t("zoomIn"), CANVAS_STEP)
+    ]);
+    apply();
+    return el("div", { class: "ak-mosaic__canvaswrap" }, [viewport, zoombar, focusHost]);
+  }
+
+  // src/static/sdk-libs/atelier/mosaic.js
   function appRef() {
     try {
       const node = document.getElementById("aimeat-app-ref");
@@ -1773,6 +2176,17 @@
       switch (block.component) {
         case "hero": {
           alive.handles.push(hero({ target: into, title: p.title, sub: p.sub, image: p.image }));
+          return;
+        }
+        case "copilot": {
+          alive.handles.push(copilot({
+            target: into,
+            appName: p.title || document.title,
+            intro: p.intro,
+            appId: p.title,
+            sources: spec.sources || {},
+            actions: spec.actions || []
+          }));
           return;
         }
         case "statRow":
@@ -1853,6 +2267,17 @@
       } else {
         run();
       }
+    }
+    function morph(moving, run) {
+      if (typeof document.startViewTransition !== "function" || reducedMotion()) {
+        run();
+        return;
+      }
+      moving.style.viewTransitionName = "ak-morph";
+      const vt = document.startViewTransition(run);
+      vt.finished.finally(function() {
+        moving.style.viewTransitionName = "";
+      });
     }
     function projectStack(units) {
       const box = el("div", { class: "ak-mosaic__units ak-mosaic__units--grid" });
@@ -2130,120 +2555,23 @@
         el("div", { class: "ak-mosaic__flowbar" }, [prev, where, next])
       ]);
     }
-    function projectCanvas(units) {
-      const field = el("div", { class: "ak-mosaic__field" });
-      const cam = { x: 0, y: 0, scale: 0.6 };
-      let focused = null;
-      function apply() {
-        field.style.transform = "translate(" + cam.x + "px," + cam.y + "px) scale(" + cam.scale + ")";
-      }
-      const viewport = el("div", { class: "ak-mosaic__canvas" }, field);
-      units.forEach(function(u) {
-        const cover = el("button", {
-          type: "button",
-          class: "ak-mosaic__tilecover",
-          "data-ak-noguard": true,
-          "aria-label": t("open") + ": " + u.label,
-          on: { click: function() {
-            focus(u);
-          } }
-        });
-        u.tile = el("div", { class: "ak-mosaic__tile" }, [
-          el("span", { class: "ak-mosaic__tilelabel", text: u.label }),
-          u.el,
-          cover
-        ]);
-        field.appendChild(u.tile);
-      });
-      const focusHost = el("div", { class: "ak-mosaic__focus", hidden: true });
-      const backBtn = el("button", {
-        type: "button",
-        class: "ak-btn ak-btn--ghost",
-        "data-ak-noguard": true,
-        on: { click: function() {
-          unfocus();
-        } }
-      }, "↩ " + t("back"));
-      function focus(u) {
-        transition(function() {
-          focused = u;
-          focusHost.hidden = false;
-          viewport.hidden = true;
-          zoombar.hidden = true;
-          clear(focusHost);
-          focusHost.appendChild(backBtn);
-          focusHost.appendChild(u.el);
-          enter(focusHost);
+    let viewerOverlay = spec.overlay || null;
+    function applyViewerOverlay(layout, o) {
+      if (!o) return layout;
+      const out = { v: layout.v, look: layout.look, nav: o.nav || layout.nav, tokens: layout.tokens, meta: layout.meta, blocks: layout.blocks.slice() };
+      if (Array.isArray(o.hidden) && o.hidden.length) {
+        out.blocks = out.blocks.filter(function(b) {
+          return o.hidden.indexOf(b.id) < 0;
         });
       }
-      function unfocus() {
-        if (!focused) return;
-        const u = focused;
-        transition(function() {
-          focused = null;
-          u.tile.insertBefore(u.el, u.tile.lastChild);
-          focusHost.hidden = true;
-          viewport.hidden = false;
-          zoombar.hidden = false;
+      if (Array.isArray(o.order) && o.order.length) {
+        out.blocks.sort(function(a, b) {
+          const ia = o.order.indexOf(a.id);
+          const ib = o.order.indexOf(b.id);
+          return (ia < 0 ? o.order.length : ia) - (ib < 0 ? o.order.length : ib);
         });
       }
-      let drag = null;
-      viewport.addEventListener("pointerdown", function(ev) {
-        const at = (
-          /** @type {Element|null} */
-          ev.target instanceof Element ? ev.target : null
-        );
-        if (at && at.closest(".ak-mosaic__tilecover")) return;
-        drag = { x: ev.clientX, y: ev.clientY };
-        viewport.setPointerCapture(ev.pointerId);
-      });
-      viewport.addEventListener("pointermove", function(ev) {
-        if (!drag) return;
-        cam.x += ev.clientX - drag.x;
-        cam.y += ev.clientY - drag.y;
-        drag = { x: ev.clientX, y: ev.clientY };
-        apply();
-      });
-      viewport.addEventListener("pointerup", function() {
-        drag = null;
-      });
-      viewport.addEventListener("wheel", function(ev) {
-        ev.preventDefault();
-        const factor = ev.deltaY < 0 ? CANVAS_STEP : 1 / CANVAS_STEP;
-        const next = Math.max(CANVAS_MIN, Math.min(CANVAS_MAX, cam.scale * factor));
-        const rect = viewport.getBoundingClientRect();
-        const px = ev.clientX - rect.left;
-        const py = ev.clientY - rect.top;
-        cam.x = px - (px - cam.x) * (next / cam.scale);
-        cam.y = py - (py - cam.y) * (next / cam.scale);
-        cam.scale = next;
-        apply();
-      }, { passive: false });
-      function zoomBtn(label, aria, factor) {
-        return el("button", {
-          type: "button",
-          class: "ak-btn ak-btn--ghost",
-          "aria-label": aria,
-          "data-ak-noguard": true,
-          on: {
-            click: function() {
-              cam.scale = factor === 0 ? 0.6 : Math.max(CANVAS_MIN, Math.min(CANVAS_MAX, cam.scale * factor));
-              if (factor === 0) {
-                cam.x = 0;
-                cam.y = 0;
-              }
-              apply();
-            }
-          }
-        }, label);
-      }
-      const zoombar = el("div", { class: "ak-mosaic__zoombar" }, [
-        zoomBtn("−", t("zoomOut"), 1 / CANVAS_STEP),
-        zoomBtn("⤢", t("fitView"), 0),
-        zoomBtn("+", t("zoomIn"), CANVAS_STEP)
-      ]);
-      apply();
-      return el("div", { class: "ak-mosaic__canvaswrap" }, [viewport, zoombar, focusHost]);
+      return out;
     }
     function render(layout) {
       for (const h of alive.handles) {
@@ -2253,8 +2581,24 @@
       alive = { handles: [], bound: [], cleanup: [] };
       clear(root);
       if (!layout || !Array.isArray(layout.blocks)) return;
+      layout = applyViewerOverlay(layout, viewerOverlay);
       if (layout.look && spec.app && spec.app.set) spec.app.set({ look: layout.look });
       root.setAttribute("data-ak-nav", layout.nav || "stack");
+      const tokenHost = (
+        /** @type {any} */
+        spec.app && spec.app.el ? spec.app.el : root
+      );
+      if (tokenHost.__akTokens) {
+        for (const name of tokenHost.__akTokens) tokenHost.style.removeProperty(name);
+      }
+      tokenHost.__akTokens = [];
+      if (layout.tokens && typeof layout.tokens === "object") {
+        for (const name of Object.keys(layout.tokens)) {
+          if (name.indexOf("--ak-") !== 0) continue;
+          tokenHost.style.setProperty(name, String(layout.tokens[name]));
+          tokenHost.__akTokens.push(name);
+        }
+      }
       const visible = layout.blocks.filter(function(b) {
         return !b.hidden;
       });
@@ -2275,7 +2619,7 @@
       if (nav === "tabs" || nav === "bottom-bar") root.appendChild(projectPicker(units, nav));
       else if (nav === "deck") root.appendChild(projectDeck(units));
       else if (nav === "flow") root.appendChild(projectFlow(units));
-      else if (nav === "canvas") root.appendChild(projectCanvas(units));
+      else if (nav === "canvas") root.appendChild(projectCanvas(units, morph));
       else if (nav === "rail") root.appendChild(projectRail(units));
       else if (nav === "overlay") root.appendChild(projectOverlay(units));
       else root.appendChild(projectStack(units));
@@ -2325,6 +2669,75 @@
           });
         }));
       },
+      /**
+       * ONE DECLARATION, FOUR DOORS: expose this mosaic's declared actions to an in-browser agent
+       * through WebMCP. The same { id, summary, params, run } the buttons and the copilot use
+       * becomes the visiting agent's tool — same handler, same limits, nothing extra. Returns the
+       * registration surface name, or 'none' when the page has no agent API or no actions.
+       * @returns {Promise<string>}
+       */
+      async exposeActions() {
+        const ns = (
+          /** @type {any} */
+          window.AIMEAT
+        );
+        if (!ns || !ns.webmcp || typeof ns.webmcp.register !== "function") return "none";
+        const tools = (spec.actions || []).map(function(a) {
+          const properties = {};
+          const params = a.params || {};
+          for (const key of Object.keys(params)) {
+            properties[key] = { type: params[key] === "number" ? "number" : "string" };
+          }
+          return {
+            name: "app-" + a.id,
+            description: a.summary + " (a declared action of this app; runs the same handler its button runs).",
+            inputSchema: { type: "object", properties },
+            execute: async function(input) {
+              const result = await Promise.resolve(a.run ? a.run(input || {}) : null);
+              return typeof result === "string" ? result : "done";
+            }
+          };
+        });
+        if (!tools.length) return "none";
+        return ns.webmcp.register(tools);
+      },
+      /**
+       * The viewer's overlay: set (or clear with null) and re-render. The APP owns loading and
+       * saving the overlay record (the viewer's own memory) — the mosaic only applies it.
+       * @param {{ hidden?: string[], order?: string[], nav?: string }|null} o
+       */
+      setOverlay(o) {
+        viewerOverlay = o || null;
+        render(currentLayout);
+      },
+      /**
+       * EXPLAIN THIS SCREEN, generated from the declarations rather than from a hand-written help
+       * text that would drift: every visible block, its name and what it draws from, in words.
+       * Returns the lines; also renders them as a designed panel when `target` is given.
+       * @param {{ target?: string|Element }} [opts]
+       */
+      explain(opts) {
+        const layout = currentLayout ? applyViewerOverlay(currentLayout, viewerOverlay) : null;
+        const lines = (layout && Array.isArray(layout.blocks) ? layout.blocks : []).filter(function(b) {
+          return !b.hidden;
+        }).map(function(b) {
+          const p = b.props || {};
+          const name = p.title || labelOf(b);
+          return name + " — " + b.component + (p.source ? " (" + t("open").toLowerCase() + ": " + p.source + ")" : "");
+        });
+        if (opts && opts.target) {
+          const host2 = resolve(opts.target);
+          const panel = el("div", { class: "ak-root ak-explain" }, [
+            el("h3", { class: "ak-section__title", text: t("explainTitle") }),
+            el("ul", { class: "ak-explain__list" }, lines.map(function(line) {
+              return el("li", { text: line });
+            }))
+          ]);
+          host2.appendChild(panel);
+          enter(panel);
+        }
+        return lines;
+      },
       destroy() {
         destroyed = true;
         for (const h of alive.handles) {
@@ -2344,7 +2757,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.11.0",
+    version: "0.13.0",
     // ── Shell and navigation ──
     app,
     section,
@@ -2357,6 +2770,25 @@
     hero,
     statRow,
     figure,
+    copilot,
+    /**
+     * Read something aloud through the platform's speech library, when the page carries it.
+     * Opt-in by construction: nothing speaks until the app puts a control on the screen and a
+     * person presses it. Returns false when the speech library is absent, so the app can hide
+     * the control instead of showing a dead one.
+     * @param {Element|string} target - an element (its text is read) or the text itself
+     * @returns {boolean}
+     */
+    readAloud(target) {
+      const ns = (
+        /** @type {any} */
+        window.AIMEAT
+      );
+      if (!ns || !ns.speech || typeof ns.speech.say !== "function") return false;
+      const text = target instanceof Element ? target.textContent || "" : String(target);
+      if (text.trim()) ns.speech.say(text.trim());
+      return true;
+    },
     // ── Content ──
     list,
     listDetail,

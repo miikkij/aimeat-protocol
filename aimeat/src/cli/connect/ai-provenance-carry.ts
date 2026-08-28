@@ -123,6 +123,8 @@ export const CONNECTOR_PROVENANCE_CARRIERS: Record<string, ProvenanceCarrier> = 
   // app-ui service mints it against the layout's own bytes) and this side does send the block; what
   // is not proved yet is the `recorded: true` echo, and promoting means proving that.
   aimeat_app_ui_set: { kind: 'not-carried', route: 'PUT /v1/apps/:owner/:filename/ui' },
+  aimeat_designbook_propose: { kind: 'not-carried', route: 'POST /v1/designbook' },
+  aimeat_designbook_adopt: { kind: 'not-carried', route: 'POST /v1/designbook/:id/adopt' },
   aimeat_board_post: { kind: 'not-carried', route: 'POST /v1/boards/:id/posts' },
   aimeat_board_reply: { kind: 'not-carried', route: 'POST /v1/boards/:id/posts/:postId/replies' },
   aimeat_dm_ask: { kind: 'not-carried', route: 'POST /v1/messages' },
