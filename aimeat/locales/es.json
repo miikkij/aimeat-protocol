@@ -944,6 +944,7 @@
   "chat.stop": "Detener",
   "chat.stopListening": "Detener",
   "chat.title": "Chat",
+  "chat.thisConversation": "Esta conversación",
   "chat.transcribeFailed": "Esa grabación no se pudo convertir en texto.",
   "chat.turnCount": "{n} mensajes",
   "chat.turnFailed": "No se pudo completar el turno.",

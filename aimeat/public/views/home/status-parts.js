@@ -15,6 +15,9 @@
  * @structure MailboxRow · FleetLine · ChatDoor · NamedRow · Things · FavoriteApps · Playbooks · TrustLine · Achievements
  * @usage import { MailboxRow, FleetLine, ChatDoor, Things, FavoriteApps, Achievements } from '/views/home/status-parts.js';
  * @version-history
+ *   v1.5.0 — 2026-08-28 — The poster home: the mailbox and fleet lines carry their number as a
+ *     big numeral (bigNumber() splits the translated sentence at its placeholder, so every
+ *     language keeps its own word order), and the chat door is the coral band.
  *   v1.4.0 — 2026-08-23 — Jouni's second round on prod: the count tiles become the Assets row
  *     and the playbook pills the To-set-up row, so every row in a band hangs on the same label
  *     column; the em-dash (banned in every surface) is swept out of the fallback strings; the
@@ -54,6 +57,16 @@ const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fa
 const FOLD_AFTER = 3;
 
 /**
+ * A sentence with its number set big. The translated string keeps its placeholder until here, so
+ * the numeral lands where that language puts it; a string without the placeholder renders as it is.
+ */
+function bigNumber(sentence, placeholder, value) {
+  const at = sentence.indexOf(placeholder);
+  if (at < 0) return sentence;
+  return html`${sentence.slice(0, at)}<b class="koti-big">${String(value)}</b>${sentence.slice(at + placeholder.length)}`;
+}
+
+/**
  * The mailbox on the wall: flag up when something unread waits, and one line saying how much.
  * Renders only when the count is known — a mailbox that cannot be read is not shown broken.
  */
@@ -65,7 +78,7 @@ export function MailboxRow({ mail }) {
       <span class="koti-mailbox-icon" aria-hidden="true">${unread > 0 ? '📬' : '📪'}</span>
       <span class="koti-mailbox-text">
         ${unread > 0
-          ? tr('home.mail.unread', '{n} unread, go have a look').replace('{n}', String(unread))
+          ? bigNumber(tr('home.mail.unread', '{n} unread, go have a look'), '{n}', unread)
           : tr('home.mail.empty', 'Mailbox: nothing new')}
       </span>
     </a>`;
@@ -84,14 +97,14 @@ export function FleetLine({ agent }) {
   return html`
     <a class="koti-fleet ${ok ? 'koti-fleet--ok' : 'koti-fleet--trouble'}" href="/v1/profile?tab=agents">
       <span class="koti-fleet-dot" aria-hidden="true"></span>
-      <span>
+      <span class="koti-fleet-text">
         ${total === 1
           ? (ok
             ? tr('home.fleet.oneOk', 'Your agent is home and well.')
             : tr('home.fleet.oneTrouble', 'Your agent {name} needs a look.').replace('{name}', agent.name || ''))
           : (ok
-            ? tr('home.fleet.allOk', '{total} agents home, all well.').replace('{total}', String(total))
-            : tr('home.fleet.trouble', '{total} agents home · {n} need a look').replace('{total}', String(total)).replace('{n}', String(problems)))}
+            ? bigNumber(tr('home.fleet.allOk', '{total} agents home, all well.'), '{total}', total)
+            : bigNumber(tr('home.fleet.trouble', '{total} agents home · {n} need a look').replace('{n}', String(problems)), '{total}', total))}
       </span>
     </a>`;
 }

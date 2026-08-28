@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Profile home dashboard cards, home sub-components, and the sidebar group model. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   2026-08-28 — The poster overview: a stat is icon, numeral and label in three spans, so the
+ *     stylesheet can set the numeral big on the band and drop the emoji.
  *   2026-08-24 — Live update listens on 'scheduler'; 'schedules' is emitted by nobody, so the next-job
  *     card never followed a schedule change.
  *   2026-07-19 — Re-add the orphaned OpenRouter Settings item (route id 'generator') to the Build & Share
@@ -489,7 +491,9 @@ export function ProfileCard({ tier, stats, session, onEditProfile, switchTab }) 
   // Stats are NAVIGATION, not decoration \u2014 each one opens its own section.
   const stat = (icon, val, labelKey, tabId, green) => html`
     <button class="pf-lp-stat pf-lp-stat-link" onClick=${() => switchTab?.(tabId)}>
-      ${icon} <span class="pf-lp-stat-val${green ? ' pf-lp-stat-green' : ''}">${val}</span> ${t(labelKey)}
+      <span class="pf-lp-stat-ico" aria-hidden="true">${icon}</span>
+      <span class="pf-lp-stat-val${green ? ' pf-lp-stat-green' : ''}">${val}</span>
+      <span class="pf-lp-stat-label">${t(labelKey)}</span>
     </button>`;
 
   return html`

@@ -6,6 +6,12 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v3.0.0 — 2026-08-28 — The overview and the sidebar wear the poster face (design canvas "AIMEAT
+ *     Home, Settings and Chat", direction C): the sidebar is an index with coral group words and
+ *     the open item on the sun; the profile card is a masthead in --font-poster with its four
+ *     numbers on a diagonal coral band; next steps are a numbered index; the dashboard cards are
+ *     sections under headlines with ink rules, thick quota bars and numerals for the counts. Tabs
+ *     opened from the index are untouched.
  *   v2.25.0 — 2026-08-27 — .pf-start-page replaces .pf-ui-switch at the foot of the overview, and
  *     .pf-side-home is the "← Home" link at the top of the sidebar.
  *   v2.24.0 — 2026-08-22 — .pf-setting-heading / .pf-setting-text: the same settings-row rule the
@@ -1893,83 +1899,118 @@
 /* Container */
 .pf .pf-landing { display: flex; flex-direction: column; gap: 16px; }
 
-/* --- Profile Card (landing variant) --- */
-.pf .pf-lp-card {
-  background: var(--card, #fff); border-radius: 16px; padding: 20px 24px;
-  box-shadow: 0 4px 12px rgba(0,0,0,.06); position: relative; overflow: hidden;
-}
-.pf .pf-lp-card::before {
-  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
-  background: linear-gradient(90deg, var(--accent, #E8564A), #6366F1);
-}
-.pf .pf-lp-card-header { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+/* --- Profile Card (landing variant): the masthead, then the numbers on the band --- */
+.pf .pf-lp-card { background: none; padding: 0.75rem 0 0; position: relative; overflow: hidden; }
+.pf .pf-lp-card-header { display: flex; align-items: flex-end; gap: 24px; flex-wrap: wrap; }
 .pf .pf-lp-avatar {
-  width: 48px; height: 48px; border-radius: 50%;
-  background: var(--card, #fff); border: 2px solid var(--border-soft, #f0f0ec);
-  overflow: hidden; flex-shrink: 0;
+  width: 88px; height: 88px;
+  background: var(--card); border: 3px solid var(--text);
+  overflow: hidden; flex-shrink: 0; cursor: pointer;
 }
 .pf .pf-lp-avatar svg { width: 100%; height: 100%; }
 .pf .pf-lp-info { flex: 1; min-width: 0; }
 .pf .pf-lp-name-row { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-.pf .pf-lp-name { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.3px; }
-.pf .pf-lp-edit { font-size: .81rem; color: var(--accent, #E8564A); text-decoration: none; font-weight: 500; }
+.pf .pf-lp-name {
+  font-family: var(--font-poster); font-weight: 400;
+  font-size: 4.4rem; line-height: 0.9; letter-spacing: -0.035em; text-transform: uppercase;
+  color: var(--text); max-width: 14ch;
+}
+.pf .pf-lp-edit { font-size: .81rem; color: var(--accent); text-decoration: none; font-weight: 500; }
 .pf .pf-lp-edit:hover { text-decoration: underline; }
-.pf .pf-lp-ghii { font-family: var(--font-mono, monospace); font-size: .7rem; color: var(--accent, #E8564A); opacity: .7; margin-top: 1px; }
-.pf .pf-lp-node { font-size: .75rem; color: var(--text-dim, #9CA3AF); }
+.pf .pf-lp-ghii { font-family: var(--font-mono); font-size: .8rem; color: var(--text-dim); margin-top: 12px; }
+.pf .pf-lp-node { font-family: var(--font-mono); font-size: .8rem; color: var(--text-dim); }
+/* The numbers ride one diagonal coral band with a sun stripe, the same band the home's chat door
+   is. Contained in the card so it never crosses the index. */
 .pf .pf-lp-stats {
-  display: flex; gap: 14px; flex-wrap: wrap; font-size: .81rem;
-  color: var(--text-dim, #6B7280); margin-top: 12px; padding-top: 12px;
-  border-top: 1px solid var(--border-soft, #f0f0ec);
+  position: relative; overflow: hidden;
+  display: flex; gap: 44px; flex-wrap: wrap; align-items: flex-end;
+  margin: 2.5rem -1.5rem 0; padding: 4.5rem 2.5rem 5rem;
+  color: var(--bg);
 }
-.pf .pf-lp-stat { display: flex; align-items: center; gap: 4px; }
-.pf .pf-lp-stat-val { font-weight: 600; color: var(--text, #1a1a1a); font-variant-numeric: tabular-nums; }
-.pf .pf-lp-stat-green { color: var(--success, #22c55e); }
+.pf .pf-lp-stats::before, .pf .pf-lp-stats::after {
+  content: ''; position: absolute; left: -10%; right: -10%; top: 50%; z-index: 0;
+}
+/* No numbers yet (the composite still loading, or an account with nothing to count): no band.
+   An empty coral block measured 104px tall on the first paint and read as a broken picture. */
+.pf .pf-lp-stats:empty { display: none; }
+.pf .pf-lp-stats::before { height: 200px; background: var(--accent); transform: translateY(-50%) rotate(-3deg); }
+.pf .pf-lp-stats::after { height: 24px; background: var(--sun); transform: translateY(calc(-50% + 113px)) rotate(-3deg); }
+.pf .pf-lp-stat {
+  position: relative; z-index: 1;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
+  background: none; border: 0; padding: 0; cursor: pointer; font: inherit; color: var(--bg);
+}
+.pf .pf-lp-stat:hover .pf-lp-stat-val { color: var(--sun); }
+.pf .pf-lp-stat-ico { display: none; }
+.pf .pf-lp-stat-val {
+  font-family: var(--font-poster); font-weight: 400;
+  font-size: 4.2rem; line-height: 0.85; letter-spacing: -0.04em;
+  color: var(--bg); font-variant-numeric: tabular-nums;
+}
+.pf .pf-lp-stat-green { color: var(--bg); }
+.pf .pf-lp-stat-label { font-family: var(--font-showroom-body); font-weight: 800; font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; }
+/* A phone: the masthead shrinks to what the width holds, and the numbers halve. Measured before
+   this: a 4.4rem HAPPYADMIN was 501px wide on a 390px screen and the card's overflow ate the end. */
+@media (max-width: 760px) {
+  .pf .pf-lp-card-header { align-items: flex-start; gap: 14px; }
+  .pf .pf-lp-avatar { width: 56px; height: 56px; }
+  .pf .pf-lp-name { font-size: 2.2rem; max-width: none; overflow-wrap: anywhere; }
+  .pf .pf-lp-actions { width: 100%; flex-direction: row; flex-wrap: wrap; align-items: center; margin-left: 0; gap: 8px 18px; }
+  .pf .pf-lp-stats { margin: 1.5rem -1rem 0; padding: 3rem 1.5rem 3.5rem; gap: 20px 28px; }
+  .pf .pf-lp-stats::before { height: 150px; }
+  .pf .pf-lp-stats::after { transform: translateY(calc(-50% + 88px)) rotate(-3deg); }
+  .pf .pf-lp-stat-val { font-size: 2.6rem; }
+}
 .pf .pf-federation-badge {
-  display: inline-flex; align-items: center; gap: 5px;
-  font-size: .75rem; color: var(--info-fg); background: var(--info-bg);
-  padding: 3px 10px; border-radius: 20px; font-weight: 500; margin-top: 6px;
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: .74rem; color: var(--text); background: var(--card);
+  border: 2px solid var(--text); padding: 2px 9px; font-weight: 500; margin: 12px 8px 0 0;
 }
-.pf .pf-fed-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success, #22c55e); }
+.pf .pf-mcp-badge { background: var(--sun); }
+.pf .pf-fed-dot { width: 8px; height: 8px; background: var(--success); }
 
 /* --- Header actions + presence pill (ProfileCard header) --- */
 .pf .pf-lp-actions {
-  margin-left: auto; display: flex; align-items: center; gap: 10px;
-  align-self: flex-start; flex-wrap: wrap;
+  margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
+  align-self: flex-end;
 }
+.pf .pf-lp-actions .btn-outline {
+  background: none; border: 0; border-bottom: 3px solid var(--text); border-radius: 0; box-shadow: none;
+  padding: 0 0 2px; color: var(--text);
+  font-family: var(--font-showroom-body); font-weight: 800; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.04em;
+}
+.pf .pf-lp-actions .btn-outline:hover { color: var(--accent); border-color: var(--accent); }
 .pf .pf-presence-pill-btn {
-  display: inline-flex; align-items: center; gap: 4px;
-  border: 1px solid var(--border, #e5e5e0); background: var(--bg-dim, #FAFAF8);
-  color: var(--text, #1a1a1a); border-radius: 999px; padding: 4px 10px 4px 8px;
-  cursor: pointer; font: inherit; font-size: .8rem;
-  transition: border-color .15s, background .15s;
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 0; background: none;
+  color: var(--text); border-radius: 0; padding: 0;
+  cursor: pointer; font: inherit; font-weight: 800; font-size: .85rem;
 }
 .pf .pf-presence-pill-btn:hover { border-color: var(--accent, #E8564A); background: var(--surface, var(--card)); }
 .pf .pf-presence-pill-caret { font-size: .7rem; color: var(--text-dim, #9CA3AF); margin-left: 2px; }
 
-/* --- Suggested next steps (home dashboard) --- */
-.pf .pf-next {
-  background: var(--card, #fff); border-radius: 16px; padding: 18px 20px;
-  box-shadow: 0 1px 3px rgba(0,0,0,.04); border: 1px solid var(--border-soft, #f0f0ec);
-}
+/* --- Suggested next steps (home dashboard): a numbered index under a headline --- */
+.pf .pf-next { background: none; padding: 2.5rem 0 0; }
 .pf .pf-next-title {
-  font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
-  color: var(--text-dim, #9CA3AF); margin-bottom: 12px;
+  font-family: var(--font-poster); font-weight: 400;
+  font-size: 2.1rem; line-height: 0.95; letter-spacing: -0.03em; text-transform: uppercase;
+  color: var(--text); margin-bottom: 1.2rem;
 }
-.pf .pf-next-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+.pf .pf-next-grid { display: grid; grid-template-columns: repeat(1, minmax(0, 1fr)); gap: 0; border-top: 3px solid var(--text); counter-reset: pf-next; }
 .pf .pf-next-card {
-  display: flex; align-items: center; gap: 14px; width: 100%; text-align: left;
-  padding: 14px 16px; border-radius: 12px; cursor: pointer; font: inherit;
-  border: 1.5px solid var(--border, #e5e5e0); background: var(--card, #fff);
-  color: var(--text, #1a1a1a); transition: all .18s;
+  display: flex; align-items: baseline; gap: 20px; width: 100%; text-align: left;
+  padding: 14px 0; border-radius: 0; cursor: pointer; font: inherit;
+  border: 0; border-bottom: 2px solid var(--text); background: none;
+  color: var(--text); counter-increment: pf-next;
 }
-.pf .pf-next-card:hover { border-color: var(--accent, #E8564A); box-shadow: 0 4px 12px rgba(0,0,0,.06); transform: translateY(-1px); }
-.pf .pf-next-card--primary { border-color: var(--accent, #E8564A); background: var(--accent-soft, #FFF0EE); }
-.pf .pf-next-card--primary:hover { background: var(--accent-subtle); }
-.pf .pf-next-ico { font-size: 22px; flex-shrink: 0; line-height: 1; }
-.pf .pf-next-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.pf .pf-next-card-title { font-size: .92rem; font-weight: 600; }
-.pf .pf-next-card-desc { font-size: .8rem; color: var(--text-dim, #6B7280); line-height: 1.45; }
-.pf .pf-next-arrow { font-size: 1.1rem; color: var(--accent, #E8564A); flex-shrink: 0; opacity: .7; }
+.pf .pf-next-card::before { content: counter(pf-next, decimal-leading-zero); font-family: var(--font-mono); font-size: 0.8rem; color: var(--accent); flex: 0 0 2.2rem; }
+.pf .pf-next-card:hover { background: var(--sun); }
+.pf .pf-next-card--primary { background: var(--sun); }
+.pf .pf-next-ico { display: none; }
+.pf .pf-next-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.pf .pf-next-card-title { font-size: 1.25rem; font-weight: 800; letter-spacing: -0.01em; }
+.pf .pf-next-card-desc { font-size: .92rem; font-weight: 600; color: var(--text-dim); line-height: 1.45; }
+.pf .pf-next-arrow { font-family: var(--font-poster); font-size: 1.1rem; color: var(--text); flex-shrink: 0; }
 
 /* --- Cortex Extensions (new user) --- */
 .pf .pf-cortex-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
@@ -2381,7 +2422,7 @@
 .pf-shell { display: flex; align-items: flex-start; gap: 0; position: relative; }
 
 .pf-sidebar {
-  width: 240px; flex: 0 0 240px;
+  width: 250px; flex: 0 0 250px;
   /* App-shell: the scroll region is now .page-content (the header lives OUTSIDE
      it), so the sidebar sticks to the top of that region (top:0), not below the
      header. Height caps at the region's height so its own nav list scrolls.
@@ -2392,34 +2433,39 @@
   box-sizing: border-box;
   max-height: calc(100dvh - var(--nav-height, 56px));
   overflow-y: auto;
-  padding: 0.75rem 0.5rem 2rem;
-  border-right: 1px solid var(--border);
+  padding: 1.5rem 1.25rem 2rem 1.5rem;
+  font-family: var(--font-showroom-body);
 }
-.pf-side-identity { display: flex; align-items: center; gap: 0.6rem; padding: 0.4rem 0.6rem 0.8rem; }
-.pf-side-avatar { width: 34px; height: 34px; border-radius: var(--radius-full, 999px); flex: 0 0 auto; background: var(--card); border: 1.5px solid var(--border); overflow: hidden; }
+/* The index: a table of contents rather than a menu. One rule on top, group words in coral,
+   every item a hairline row, the open one on the sun. */
+.pf-side-home { border-top: 3px solid var(--text); padding-top: 0.9rem; font-family: var(--font-mono); font-size: 0.8rem; color: var(--accent); }
+.pf-side-identity { display: flex; align-items: center; gap: 0.6rem; padding: 0.4rem 0 1rem; }
+.pf-side-avatar { width: 38px; height: 38px; flex: 0 0 auto; background: var(--card); border: 3px solid var(--text); overflow: hidden; }
 .pf-side-avatar svg { width: 100%; height: 100%; }
-.pf-side-id-name { font-weight: 700; font-size: 0.95rem; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-side-id-name { font-family: var(--font-poster); font-weight: 400; font-size: 1rem; line-height: 1.1; text-transform: uppercase; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.pf-side-group { margin-top: 0.4rem; }
-.pf-side-group-title { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-dim); padding: 0.55rem 0.7rem 0.25rem; }
+.pf-side-group { margin-top: 1.1rem; }
+.pf-side-group-title { font-size: 0.66rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); padding: 0 0 0.35rem; border-bottom: 2px solid var(--text); }
 .pf-side-item {
   display: flex; align-items: center; gap: 0.6rem; width: 100%;
-  padding: 0.5rem 0.7rem; border: none; background: none; color: var(--text);
-  cursor: pointer; font: inherit; font-size: 0.9rem; text-align: left;
-  border-radius: var(--radius-sm, 8px);
+  padding: 0.45rem 0; border: none; border-bottom: 1px solid var(--border); background: none; color: var(--text);
+  cursor: pointer; font: inherit; font-size: 0.98rem; font-weight: 700; text-align: left;
+  border-radius: 0;
 }
-.pf-side-item:hover { background: var(--bg-hover, var(--bg-dim)); }
-.pf-side-item--active { background: var(--accent-faint, var(--bg-dim)); color: var(--accent); font-weight: 700; }
+.pf-side-item:hover { color: var(--accent); }
+.pf-side-item--active { background: var(--sun); color: var(--text); font-weight: 800; padding-left: 0.5rem; border-bottom-color: var(--text); }
 /* The one toggle between the basic menu and every tool (K5). Reads as an action, not a tab. */
-.pf-side-more { margin-top: 0.5rem; color: var(--accent); font-weight: 600; }
+.pf-side-more { margin-top: 0.9rem; border-bottom: 0; font-family: var(--font-mono); font-size: 0.8rem; font-weight: 400; color: var(--accent); text-decoration: underline; text-underline-offset: 4px; }
 .pf-side-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pf-side-badge { margin-left: auto; font-size: 0.68rem; background: var(--bg-dim); color: var(--text-dim); padding: 0.05rem 0.45rem; border-radius: var(--radius-full, 999px); }
+.pf-side-badge { margin-left: auto; font-family: var(--font-mono); font-size: 0.7rem; background: var(--accent); color: var(--bg); padding: 0.05rem 0.45rem; }
 
 /* Content fills the space next to the (left-anchored) sidebar, but caps at
    ~1360px so the total usable width settles around 1600px on ultra-wide
    monitors — readable line lengths, no full-bleed stretch. Extra space falls
    to the right; the sidebar stays flush to the screen's left edge. */
 .pf-content { flex: 1 1 auto; min-width: 0; max-width: 1360px; padding: 1.25rem 1.5rem; }
+/* The overview wears the poster face; a tab opened from the index keeps its own. */
+.pf-content > .pf-lp-card, .pf-content > .pf-next, .pf-content > .pf-home-grid, .pf-content > .pf-start-page { font-family: var(--font-showroom-body); }
 .pf-content-head { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
 .pf-back-btn { background: none; border: 1px solid var(--border); color: var(--text-dim); border-radius: var(--radius-sm, 8px); padding: 0.3rem 0.7rem; cursor: pointer; font: inherit; font-size: 0.85rem; }
 .pf-back-btn:hover { background: var(--bg-hover, var(--bg-dim)); }
@@ -3172,52 +3218,62 @@
 .pf-waiting-text { flex: 1; font-size: 0.88rem; color: var(--text-dim); }
 .pf-waiting-text b { font-weight: 600; color: var(--text); }
 .pf-waiting-where { color: var(--muted); }
-.pf-home-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0; }
-@media (max-width: 760px) { .pf-home-grid { grid-template-columns: 1fr; } }
+/* The dashboard: sections under headlines, ink rules instead of cards. Two columns for the short
+   ones (agents, commerce), the full width for the ones that carry bars and charts. */
+.pf-home-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem 2.75rem; margin: 3rem 0 0; }
+@media (max-width: 760px) { .pf-home-grid { grid-template-columns: 1fr; gap: 2.5rem; } }
 /* min-width:0 is load-bearing: grid/flex items default to min-width:auto and refuse to shrink
    below their content's intrinsic width. Without it, a card with unbreakable inner content (long
    app names, the 3-col number grid, the chart canvas) forces its grid column — and thus the whole
    home dashboard — wider than a narrow phone, overflowing the right edge. */
-.pf-home-card { border: 1px solid var(--border); border-radius: 12px; background: var(--card); padding: 0.8rem 1rem; min-width: 0; }
-.pf-home-card-title { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.5rem; background: none; border: none; padding: 0; text-align: left; }
+.pf-home-card { border: 0; background: none; padding: 0; min-width: 0; }
+.pf-home-card-title {
+  font-family: var(--font-poster); font-weight: 400;
+  font-size: 2.1rem; line-height: 0.95; letter-spacing: -0.03em; text-transform: uppercase;
+  color: var(--text); margin-bottom: 1rem; background: none; border: none; padding: 0; text-align: left;
+  display: flex; align-items: baseline; gap: 0.8rem; flex-wrap: wrap;
+}
 .pf-home-card-link { cursor: pointer; }
-.pf-home-card-link:hover { color: var(--text); }
-.pf-home-card-note { font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--muted); }
-.pf-home-row { display: flex; align-items: center; gap: 0.55rem; width: 100%; background: none; border: none; padding: 0.32rem 0.2rem; border-radius: 8px; cursor: pointer; font-size: 0.88rem; color: var(--text-dim); text-align: left; }
-.pf-home-row:hover { background: var(--bg-surface); color: var(--text); }
+.pf-home-card-link:hover { color: var(--accent); }
+.pf-home-card-note { font-family: var(--font-mono); font-weight: 400; font-size: 0.8rem; text-transform: none; letter-spacing: 0; color: var(--text-dim); }
+.pf-home-card > .pf-home-row:first-of-type { border-top: 3px solid var(--text); }
+.pf-home-row { display: flex; align-items: center; gap: 0.7rem; width: 100%; background: none; border: none; border-bottom: 1px solid var(--border); padding: 0.55rem 0; border-radius: 0; cursor: pointer; font-size: 0.98rem; font-weight: 700; color: var(--text); text-align: left; font-family: inherit; }
+.pf-home-row:hover { color: var(--accent); }
 .pf-home-row-static { cursor: default; }
-.pf-home-row-static:hover { background: none; color: var(--text-dim); }
+.pf-home-row-static:hover { color: var(--text); }
 .pf-home-row-ico { flex: none; }
-.pf-home-row-label { flex: 1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pf-home-row-meta { flex: none; font-size: 0.78rem; color: var(--muted); }
+.pf-home-row-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-home-row-meta { flex: none; font-family: var(--font-mono); font-size: 0.76rem; color: var(--text-dim); }
 .pf-home-row-meta.pf-ok { color: var(--success-fg, var(--text)); }
-.pf-lp-stat-link { background: none; border: none; padding: 0.15rem 0.35rem; border-radius: 8px; cursor: pointer; font: inherit; color: inherit; }
-.pf-lp-stat-link:hover { background: var(--bg-surface); }
-/* Home "Usage & quotas" card — quota bars + count chips */
+.pf-lp-stat-link { background: none; border: none; padding: 0; border-radius: 0; cursor: pointer; font: inherit; color: inherit; }
+/* Home "Usage & quotas" card — thick quota bars + the counts as a row of numerals */
 .pf-usage-card { grid-column: 1 / -1; }
-.pf-usage-row { margin-bottom: 0.55rem; }
-.pf-usage-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; margin-bottom: 0.25rem; }
-.pf-usage-label { font-size: 0.82rem; font-weight: 600; color: var(--text); }
-.pf-usage-bar { height: 6px; border-radius: 999px; background: var(--bg-dim); overflow: hidden; }
-.pf-usage-fill { height: 100%; background: var(--accent); border-radius: 999px; transition: width 0.3s; }
+.pf-usage-card > .pf-usage-row:first-of-type { border-top: 3px solid var(--text); }
+.pf-usage-row { padding: 0.9rem 0; border-bottom: 1px solid var(--border); margin: 0; }
+.pf-usage-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; margin-bottom: 0.5rem; }
+.pf-usage-label { font-size: 1rem; font-weight: 800; color: var(--text); }
+.pf-usage-card .text-meta-sm { font-family: var(--font-mono); font-size: 0.76rem; color: var(--text-dim); }
+.pf-usage-bar { height: 18px; border-radius: 0; background: var(--card); border: 2px solid var(--text); overflow: hidden; }
+.pf-usage-fill { height: 100%; background: var(--accent); border-radius: 0; transition: width 0.3s; }
 .pf-usage-fill--danger { background: var(--danger); }
-.pf-usage-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.7rem; }
-.pf-usage-chip { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 0.1rem; padding: 0.35rem 0.6rem; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-surface); cursor: pointer; text-align: left; }
+.pf-usage-chips { display: flex; flex-wrap: wrap; gap: 0.6rem 1.8rem; margin-top: 1.2rem; }
+.pf-usage-chip { display: inline-flex; flex-direction: row; align-items: baseline; gap: 0.5rem; padding: 0; border: 0; border-radius: 0; background: none; cursor: pointer; text-align: left; font-family: inherit; }
 .pf-usage-chip[disabled] { cursor: default; }
-.pf-usage-chip:not([disabled]):hover { border-color: var(--accent); }
-.pf-usage-chip-val { font-size: 0.95rem; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
-.pf-usage-chip-label { font-size: 0.7rem; color: var(--muted); }
-/* Home "AI apps spend" card — 24h/7d/30d windows + per-app stacked bar + top apps */
+.pf-usage-chip:not([disabled]):hover .pf-usage-chip-val { color: var(--accent); }
+.pf-usage-chip-val { font-family: var(--font-poster); font-weight: 400; font-size: 1.5rem; line-height: 1; color: var(--text); font-variant-numeric: tabular-nums; }
+.pf-usage-chip-label { font-size: 0.74rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-dim); }
+/* Home "AI apps spend" card — 24h/7d/30d as big numerals + per-app stacked bar + top apps */
 .pf-ai-card { grid-column: 1 / -1; }
-.pf-ai-windows { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin: 0.4rem 0 0.8rem; }
-.pf-ai-win { display: flex; flex-direction: column; gap: 0.1rem; padding: 0.5rem 0.6rem; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-surface); }
-.pf-ai-win-label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
-.pf-ai-win-cost { font-size: 1.15rem; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
-.pf-ai-win-sub { font-size: 0.72rem; color: var(--muted); font-variant-numeric: tabular-nums; }
-.pf-ai-chart { margin: 0.2rem 0 0.6rem; }
-.pf-ai-apps-head { font-size: 0.75rem; font-weight: 600; color: var(--muted); margin-bottom: 0.35rem; }
-.pf-ai-app-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.2rem 0; font-size: 0.82rem; }
-.pf-ai-app-dot { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.pf-ai-windows { display: flex; flex-wrap: wrap; gap: 2.5rem; margin: 0.4rem 0 1.4rem; }
+.pf-ai-win { display: flex; flex-direction: column; gap: 0.35rem; padding: 0; border: 0; border-radius: 0; background: none; }
+.pf-ai-win-label { order: 2; font-size: 0.74rem; font-weight: 800; color: var(--text); text-transform: uppercase; letter-spacing: 0.08em; }
+.pf-ai-win-cost { font-family: var(--font-poster); font-weight: 400; font-size: 3rem; line-height: 0.9; letter-spacing: -0.03em; color: var(--text); font-variant-numeric: tabular-nums; }
+.pf-ai-windows .pf-ai-win:first-child .pf-ai-win-cost { color: var(--accent); }
+.pf-ai-win-sub { order: 3; font-family: var(--font-mono); font-size: 0.74rem; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.pf-ai-chart { margin: 0.2rem 0 1rem; border-top: 3px solid var(--text); padding-top: 0.6rem; }
+.pf-ai-apps-head { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); margin-bottom: 0.3rem; padding-bottom: 0.4rem; border-bottom: 3px solid var(--text); }
+.pf-ai-app-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.45rem 0; border-bottom: 1px solid var(--border); font-size: 0.95rem; font-weight: 700; }
+.pf-ai-app-dot { width: 14px; height: 14px; border-radius: 0; flex: none; }
 /* min-width:0 lets the flex:1 item actually shrink so the ellipsis engages on a long app name
    (a bare flex:1 keeps min-width:auto and would overflow the card on a narrow screen instead). */
 .pf-ai-app-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
@@ -3226,9 +3282,9 @@
 .pf-ai-win, .pf-usage-chip { min-width: 0; }
 /* A very long quota value wraps under its label instead of forcing the row wider than the screen. */
 .pf-usage-head { flex-wrap: wrap; }
-.pf-ai-app-cost { color: var(--text); font-variant-numeric: tabular-nums; }
-.pf-ai-app-pct { width: 3ch; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
-.pf-ai-app-meta { color: var(--muted); font-size: 0.72rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pf-ai-app-cost { color: var(--text); font-family: var(--font-mono); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.pf-ai-app-pct { width: 3.5ch; text-align: right; color: var(--text-dim); font-family: var(--font-mono); font-size: 0.78rem; font-variant-numeric: tabular-nums; }
+.pf-ai-app-meta { color: var(--text-dim); font-family: var(--font-mono); font-size: 0.72rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .pf-promo-dismiss { float: right; background: none; border: none; cursor: pointer; color: var(--muted); font-size: 0.85rem; padding: 0 0.2rem; }
 .pf-promo-dismiss:hover { color: var(--text); }
 /* Edit profile / password dialogs */
@@ -3757,9 +3813,15 @@
 /* The start-page setting, at the foot of the overview. Separated by a rule so it reads as a footer
    preference rather than another card in the grid. */
 .pf .pf-start-page {
-  margin: 2rem 0 0.5rem; padding-top: 1.1rem;
-  border-top: 1px solid var(--border);
+  margin: 4rem 0 1rem; padding-top: 1.2rem;
+  border-top: 3px solid var(--text);
+  flex-direction: row; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;
 }
+.pf .pf-start-page .start-page-title { font-weight: 800; font-size: 1rem; }
+.pf .pf-start-page .seg { border: 2px solid var(--text); border-radius: 0; }
+.pf .pf-start-page .seg-btn { font-weight: 800; padding: 0.4rem 0.9rem; }
+.pf .pf-start-page .seg-btn + .seg-btn { border-left: 2px solid var(--text); }
+.pf .pf-start-page .seg-btn.active { background: var(--text); color: var(--bg); }
 
 /* The way back to the home, at the top of the sidebar. An anchor wearing the sidebar item's
    clothes, so it lines up with the buttons under it. */

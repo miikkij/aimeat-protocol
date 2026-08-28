@@ -944,6 +944,7 @@
   "chat.stop": "Pysäytä",
   "chat.stopListening": "Pysäytä",
   "chat.title": "Chat",
+  "chat.thisConversation": "Tämä keskustelu",
   "chat.transcribeFailed": "Nauhoitusta ei saatu muutettua tekstiksi.",
   "chat.turnCount": "{n} viestiä",
   "chat.turnFailed": "Vuoroa ei saatu vietyä loppuun.",

@@ -12,6 +12,8 @@
  * @structure .sf-band · .sf-free · .sf-portal-text · .sf-portal-board · .sf-settings-door
  * @usage Linked from public/spa.html beside the other view stylesheets.
  * @version-history
+ *   v1.1.0 — 2026-08-28 — The band wears the poster home's face: no rule above it, the title in
+ *     --font-poster at the size of the home's own band titles. Matched to .koti-band as before.
  *   v1.0.0 — 2026-08-26 — Initial.
  */
 
@@ -21,19 +23,20 @@
    existed, and it has to look the same afterwards. It lives here rather than there because the front
    page can group blocks too, and a rule the portal needs does not belong in the home's stylesheet. */
 .sf-band {
-  margin-top: 1.8rem;
-  padding-top: 1.4rem;
-  border-top: 1px solid var(--border);
+  margin-top: 4.5rem;
 }
 
 .sf-band-title {
-  font-size: 0.92rem;
+  font-family: var(--font-poster);
+  font-weight: 400;
+  font-size: 2.4rem;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
   text-transform: uppercase;
-  letter-spacing: 1.4px;
-  color: var(--text-dim);
-  font-weight: 700;
-  margin: 0 0 0.9rem;
+  color: var(--text);
+  margin: 0 0 1.4rem;
 }
+@media (max-width: 560px) { .sf-band { margin-top: 3rem; } .sf-band-title { font-size: 1.7rem; } }
 
 /* Inside a band, successive rows keep one rhythm: more air between rows than between the chips
    inside one, so the categories read apart instead of as one lump. */
