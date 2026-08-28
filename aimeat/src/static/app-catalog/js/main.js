@@ -12,6 +12,7 @@
  *   v2.1.0 — 2026-08-19 — pass setListingLoaded into initServerIo, so server-io can end the grid’s loading state.
  *   v2.2.0 — 2026-08-28 — The showroom skin's rail: expose filterByState / setSort / toggleAllTags on
  *     _launcher and hand getSortMode to server-io so the community list sorts the same way.
+ *   v2.3.0 — 2026-08-28 — The poster face: expose toggleRow (a row opens its panel in place).
  */
 import { t, getLang, setLang, applyI18n } from './i18n.js';
 import { escapeHtml, jsArg, sourceLabel, sourceLabelText, bareOwnerName, sameOwner, filterAttr, isSameOriginUrl, currentOwnerName, generateId, readFileAsText } from './util.js';
@@ -28,6 +29,7 @@ import { loadCortexExtensions, showCortexPopup, cortexCopy, getCortexOwnerToken,
 import { initSettings, applyTheme, updateThemeToggle, toggleTheme, getThemePref, openSettings, saveSettings, syncConfigToServer, loadConfigFromServer, closeSettings, openHelp, closeHelp } from './settings.js';
 import { initAppsIo, setEditingAppId, showModal, requireSignInThen, prefillFromHtml, closeModal, switchTab, handleFileDrop, handleSave } from './apps-io.js';
 import { initServerIo, isOperatorSession, showPublishModal, submitPublish, toggleCommunity, switchView, showSubdomainModal, submitSubdomainAssign, unassignSubdomain, closeConsents, openConsents, revokeConsent, toggleBackupMenu, toggleCreateMenu, closeCreateMenu, toggleCortexBar, exportBackupZip, importBackupPick, importBackupFile, backupUpdateSummary, backupSelectAll, submitBackupRestore, loadPublishedApps, refreshFavoritesUI, applyServerFilter, unpublishApp, toggleParkApp, toggleForkApp, deleteServerApp } from './server-io.js';
+import { toggleRow } from './rows.js';
 import { initRender, filterByState, setSort, toggleAllTags, getSortMode, setListingLoaded, isListingLoaded, setServerManifests, setOwnServerApps, setIframeUrl, serverStateByFilename, serverAppManifests, ownAppProtection, ownServerApps, currentIframeUrl, renderTags, filterByTag, launchApp, launchInTab, viewPublished, launchInIframe, renderApps, closeIframe, openExternal, showContextMenu, hideContextMenu, handleContextAction, viewSource, generateSharePrompt, generateHomepagePrompt } from './render.js';
 import { initAppAgents, showAppAgentsModal, agentsDeploy, agentsUndeploy } from './app-agents.js';
 import { checkLegacyLocalApps } from './migrate.js';
@@ -128,6 +130,7 @@ import { toggleFavorite } from './favorites.js';
     filterByState: filterByState,
     setSort: setSort,
     toggleAllTags: toggleAllTags,
+    toggleRow: toggleRow,
     unpublishApp: unpublishApp,
     deleteServerApp: deleteServerApp,
     toggleParkApp: toggleParkApp,

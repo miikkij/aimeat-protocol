@@ -8,9 +8,10 @@
  *   injected once via initDetail(deps) — so there is no import cycle back through the entry module.
  * @usage import { initDetail, openDetailView, mountLoginPill, ... } from './detail.js'; initDetail({...})
  * @version-history
- *   2026-08-28 — The showroom skin: a hero (icon, state stickers, name, description, the two
- *     openers) and facts tiles above the sections, which now sit in two columns: the work on the
- *     left, the switches on the right. Built to the design canvas "App Catalog Alternate".
+ *   2026-08-28 — The poster face (design canvas "App Catalog Poster"): a back link, a masthead
+ *     (icon, name, mono line, description, state chips, the two openers as a slab and a word) and
+ *     the band with the numbers, then the sections as one column of bands. Replaces the same
+ *     morning's showroom hero, tiles and two columns.
  *   2026-08-28 — The versions list paints on the FIRST open. detailLoadVersions looked the list
  *     element up, then called renderDetailView() when the server's newest version differed from
  *     what this browser remembered — which rebuilds the panel — and then wrote the rows into the
@@ -675,73 +676,69 @@ function renderDetailView() {
   // here.
   var dataMapHtml = dataMapSectionHtml();
 
-  // ── HERO + FACTS (the showroom skin, 2026-08-28) ──
-  // What the row said, said large: the icon, the state stickers, the name, the description in the
-  // reader's language, and the openers — the published version everyone sees and, when a working
-  // copy waits, the draft only the owner sees. The facts under it are tiles.
+  // ── MASTHEAD + BAND (the poster face, 2026-08-28) ──
+  // What the row said, said large: the icon, the name as a masthead, one mono line, the description
+  // in the reader's language, the state as chips, and the two openers — the published version
+  // everyone sees and, when a working copy waits, the draft only the owner sees. Under it the band
+  // with the numbers, as on the profile page.
   var svrFacts = (app.publishedFilename && getServerState()[app.publishedFilename]) || null;
   var heroDesc = (app.descriptions && app.descriptions[getLang()]) || app.description || '';
   var heroOwner = detailServerOwner(app);
   var favRef = (heroOwner && app.publishedFilename) ? (heroOwner + '/' + app.publishedFilename) : '';
-  var stickers = '';
-  if (app.published && svrFacts && svrFacts.parked) stickers += '<span class="dtl-sticker dtl-sticker--dim">' + escapeHtml(t('status.parked')) + '</span>';
-  else if (app.published) stickers += '<span class="dtl-sticker">' + escapeHtml(t('status.published') + (publishedV ? ' · ' + publishedV : '')) + '</span>';
-  else stickers += '<span class="dtl-sticker dtl-sticker--dim">' + escapeHtml(t('status.local')) + '</span>';
+  var chips = '';
+  if (app.published && svrFacts && svrFacts.parked) chips += '<span class="dtl-chip">■ ' + escapeHtml(t('status.parked')) + '</span>';
+  else if (app.published) chips += '<span class="dtl-chip dtl-chip--sun">■ ' + escapeHtml(t('status.published') + (publishedV ? ' · ' + publishedV : '')) + '</span>';
+  else chips += '<span class="dtl-chip">■ ' + escapeHtml(t('status.local')) + '</span>';
   var draftWaits = !!(svrFacts && svrFacts.hasDraft) || wcState !== 'clean';
-  if (draftWaits) stickers += '<span class="dtl-sticker dtl-sticker--sun">' + escapeHtml(t('detail.draftWaiting')) + '</span>';
-  if (favRef && isFavorite(favRef)) stickers += '<span class="dtl-sticker dtl-sticker--hot">★ ' + escapeHtml(t('detail.favBadge')) + '</span>';
-  var heroLineParts = [];
-  if (heroOwner && app.publishedFilename) heroLineParts.push(heroOwner + ' / ' + app.publishedFilename);
-  if (svrFacts && svrFacts.category) heroLineParts.push(svrFacts.category);
-  if (app.tags && app.tags.length) heroLineParts.push(app.tags.join(', '));
-  var draftBtn = (svrFacts && svrFacts.hasDraft && heroOwner && app.publishedFilename)
-    ? '<button type="button" class="cat-btn cat-btn--sun" onclick="window._launcher.openStagingPreview(\'' + jsArg(heroOwner) + '\', \'' + jsArg(app.publishedFilename) + '\')" title="' + escapeHtml(t('card.openStagingHint')) + '">' + escapeHtml(t('detail.openDraft')) + '</button>'
+  if (draftWaits) chips += '<span class="dtl-chip dtl-chip--hot">■ ' + escapeHtml(t('detail.draftWaiting')) + '</span>';
+  if (favRef && isFavorite(favRef)) chips += '<span class="dtl-chip">★ ' + escapeHtml(t('detail.favBadge')) + '</span>';
+  var mastParts = [];
+  if (heroOwner && app.publishedFilename) mastParts.push(heroOwner + ' / ' + app.publishedFilename);
+  if (svrFacts && svrFacts.category) mastParts.push(svrFacts.category);
+  if (app.tags && app.tags.length) mastParts.push(app.tags.join(', '));
+  var draftWord = (svrFacts && svrFacts.hasDraft && heroOwner && app.publishedFilename)
+    ? '<button type="button" class="cat-word" onclick="window._launcher.openStagingPreview(\'' + jsArg(heroOwner) + '\', \'' + jsArg(app.publishedFilename) + '\')" title="' + escapeHtml(t('card.openStagingHint')) + '">' + escapeHtml(t('detail.openDraft')) + '</button>'
     : '';
   var heroHtml =
-    '<div class="dtl-hero">' +
-      '<div class="dtl-hero-main">' +
-        '<div class="dtl-hero-icon">' + escapeHtml(icon) + '</div>' +
-        '<div class="dtl-hero-copy">' +
-          '<div class="dtl-hero-stickers">' + stickers + '</div>' +
-          '<div class="dtl-hero-name">' + escapeHtml(app.name || 'App') + '</div>' +
-          (heroDesc ? '<div class="dtl-hero-desc">' + escapeHtml(heroDesc) + '</div>' : '') +
-          (heroLineParts.length ? '<div class="dtl-hero-line">' + escapeHtml(heroLineParts.join(' · ')) + '</div>' : '') +
+    '<button type="button" class="dtl-back" onclick="window._launcher.closeDetailView()">← ' + escapeHtml(t('view.library')) + '</button>' +
+    '<div class="dtl-mast">' +
+      '<div class="dtl-mast-main">' +
+        '<div class="dtl-mast-icon">' + escapeHtml(icon) + '</div>' +
+        '<div class="dtl-mast-copy">' +
+          '<div class="dtl-mast-name">' + escapeHtml(app.name || 'App') + '</div>' +
+          (mastParts.length ? '<div class="dtl-mast-line">' + escapeHtml(mastParts.join(' · ')) + '</div>' : '') +
+          (heroDesc ? '<div class="dtl-mast-desc">' + escapeHtml(heroDesc) + '</div>' : '') +
+          '<div class="dtl-chips">' + chips + '</div>' +
         '</div>' +
       '</div>' +
-      '<div class="dtl-hero-side">' +
-        '<div class="dtl-hero-buttons">' +
-          '<button type="button" class="cat-btn cat-btn--hot" onclick="window._launcher.detailLaunch()">' + escapeHtml(t('detail.launch')) + '</button>' +
-          draftBtn +
-        '</div>' +
-        (app.published ? '<div class="dtl-hero-hint">' + escapeHtml(t(draftBtn ? 'detail.heroHint' : 'detail.heroHintClean')) + '</div>' : '') +
+      '<div class="dtl-mast-side">' +
+        '<button type="button" class="cat-slab" onclick="window._launcher.detailLaunch()">' + escapeHtml(t('detail.launch')) + '</button>' +
+        draftWord +
+        (app.published ? '<div class="dtl-mast-hint">' + escapeHtml(t(draftWord ? 'detail.heroHint' : 'detail.heroHintClean')) + '</div>' : '') +
       '</div>' +
     '</div>';
-  var tile = function (label, val, sub) {
-    return '<div class="dtl-stat-tile"><div class="dtl-stat-label">' + escapeHtml(label) + '</div>' +
-      '<div class="dtl-stat-val">' + escapeHtml(val) + '</div>' + (sub ? '<div class="dtl-stat-sub">' + escapeHtml(sub) + '</div>' : '') + '</div>';
+  var bandItem = function (n, label) {
+    return '<div class="cat-band-item"><div class="cat-band-n">' + escapeHtml(n) + '</div><div class="cat-band-l">' + escapeHtml(label) + '</div></div>';
   };
-  var tiles = '';
+  var bandItems = '';
   if (svrFacts) {
     var updated = svrFacts.createdAt ? new Date(svrFacts.createdAt).toLocaleDateString() : '';
-    tiles += tile(t('detail.opens'), String(svrFacts.downloads || 0), '');
-    if (publishedV) tiles += tile(t('detail.version'), publishedV, '');
-    if (svrFacts.size) tiles += tile(t('detail.size'), fmtSize(svrFacts.size), '');
-    if (updated) tiles += tile(t('detail.updated'), updated, '');
-    tiles += tile(t('detail.forks'), String(svrFacts.forks || 0), '');
+    bandItems += bandItem(String(svrFacts.downloads || 0), t('detail.opens'));
+    if (app.publishedVersionNumber) bandItems += bandItem(String(app.publishedVersionNumber), t('detail.versions'));
+    if (svrFacts.size) bandItems += bandItem(fmtSize(svrFacts.size), t('detail.size'));
+    if (updated) bandItems += bandItem(updated, t('detail.updated'));
+    bandItems += bandItem(String(svrFacts.forks || 0), t('detail.forks'));
   } else if (localBytes) {
-    tiles += tile(t('detail.size'), fmtSize(localBytes), '');
+    bandItems += bandItem(fmtSize(localBytes), t('detail.size'));
   }
-  var factsHtml = tiles ? '<div class="dtl-stats">' + tiles + '</div>' : '';
+  var bandHtml = bandItems ? '<div class="cat-band dtl-band"><div class="cat-band-in">' + bandItems + '</div></div>' : '';
 
-  // Two columns: the work on the left (where it is, edit it, what it is, its versions, the
-  // actions), the switches on the right (manage on server, skills, search, promote, monetize,
-  // cost, agents). The phone stylesheet stacks them.
+  // One column of bands, the way the home page reads: where the work is, edit it, what it is,
+  // its versions, then the switches on the server, and the rest.
   document.getElementById('detail-body').innerHTML =
-    heroHtml + factsHtml +
-    '<div class="dtl-columns">' +
-      '<div class="dtl-col dtl-col--work">' + statusHtml + aiHtml + aboutHtml + dataMapHtml + historyHtml + versionsHtml + actionsHtml + '</div>' +
-      '<div class="dtl-col dtl-col--switches">' + mgmtHtml + skillsHtml + seoHtml + promoteHtml + odpsHtml + monetizeHtml + costHtml + agentsHtml + '</div>' +
-    '</div>';
+    heroHtml + bandHtml +
+    statusHtml + aiHtml + aboutHtml + dataMapHtml + historyHtml + versionsHtml +
+    mgmtHtml + skillsHtml + seoHtml + promoteHtml + odpsHtml + monetizeHtml + costHtml + agentsHtml + actionsHtml;
 
   var dmOwner = detailServerOwner(app);
   var dmFile = app.publishedFilename || '';
