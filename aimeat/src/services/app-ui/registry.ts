@@ -179,6 +179,15 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
       image: text('A storage URL. Never a data: URI.', 500),
     },
   },
+  {
+    id: 'copilot',
+    summary: 'The in-app AI: a chat panel whose tools are the app\'s OWN declared sources and actions — it reads what the screen reads and proposes what the buttons do, a person confirms every run. Runs on the owner\'s AI key; shows the platform AI notice and per-message provenance labels itself.',
+    maxPerLayout: 1,
+    props: {
+      title: text('The app name the copilot speaks as.', 80),
+      intro: text('The opening line the panel greets with.', 200),
+    },
+  },
 ];
 
 /**

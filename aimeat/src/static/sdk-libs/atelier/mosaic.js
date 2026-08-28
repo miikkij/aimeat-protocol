@@ -34,6 +34,11 @@
  *   });
  *   // later, when the app's data changed:  m.refresh('errands.');
  * @version-history
+ *   v0.13.0 — 2026-08-28 — The AI-NATIVE layer reaches the mosaic (TARGET-074 phase 6): the
+ *     `copilot` block (its tools are the spec's own sources and actions), the viewer's overlay
+ *     (hidden/order/nav over the owner's layout, applied at render, never written back) with
+ *     setOverlay() on the handle, and explain() — what this screen holds, generated from the
+ *     declarations instead of a help text that would drift.
  *   v0.12.0 — 2026-08-28 — The SIGNATURE and the MORPH (TARGET-074 phase 4): a layout's bounded
  *     `tokens` land as inline custom properties on the app frame (server-validated allowlist;
  *     cleared and reapplied per render), and the canvas tile now GROWS into the focused screen —
@@ -55,11 +60,11 @@ import { list } from './list.js';
 import { cardGrid, mediaCard } from './grid.js';
 import { table, searchBar } from './table.js';
 import { timeline } from './timeline.js';
+import { copilot } from './copilot.js';
+import { projectCanvas } from './mosaic-canvas.js';
 
 /** Canvas zoom bounds and wheel step — tight enough that a tile never vanishes or fills the sky. */
-const CANVAS_MIN = 0.35;
-const CANVAS_MAX = 1.6;
-const CANVAS_STEP = 1.18;
+// The canvas camera constants moved with the projection to mosaic-canvas.js (pure extraction).
 
 /**
  * The app's own identity, from the `#aimeat-app-ref` block the node injects into every served
@@ -131,6 +136,8 @@ function derivedColumns(rows) {
  * @param {{
  *   app?: { main: HTMLElement, el?: HTMLElement, set?: (patch: { look?: string }) => void }, target?: string|Element,
  *   sources?: Record<string, () => any>,
+ *   actions?: Array<{ id: string, summary: string, params?: Record<string, string>, run?: (params: any) => any }>,
+ *   overlay?: { hidden?: string[], order?: string[], nav?: string }|null,
  *   fill?: Record<string, (body: HTMLElement) => void>,
  *   onPick?: (blockId: string, item: any) => void,
  *   onSearch?: (bind: string, query: string) => void,
@@ -138,6 +145,8 @@ function derivedColumns(rows) {
  *   owner?: string, filename?: string,
  * }} spec
  * @returns {{ el: HTMLElement, set: (layout: object|null) => void, reload: () => Promise<void>,
+ *   setOverlay: (o: { hidden?: string[], order?: string[], nav?: string }|null) => void,
+ *   explain: (opts?: { target?: string|Element }) => string[],
  *   refresh: (name?: string) => Promise<void>, destroy: () => void }}
  */
 export function mosaic(spec) {
@@ -185,6 +194,15 @@ export function mosaic(spec) {
     switch (block.component) {
       case 'hero': {
         alive.handles.push(hero({ target: into, title: p.title, sub: p.sub, image: p.image }));
+        return;
+      }
+      case 'copilot': {
+        // The copilot's tools ARE the app's declarations: the same sources this mosaic reads and
+        // the actions the app handed the spec. It can do nothing a button could not.
+        alive.handles.push(copilot({
+          target: into, appName: p.title || document.title, intro: p.intro,
+          appId: p.title, sources: spec.sources || {}, actions: spec.actions || [],
+        }));
         return;
       }
       case 'statRow':
@@ -512,115 +530,28 @@ export function mosaic(spec) {
     ]);
   }
 
+  /** The viewer's own overlay, applied over the owner's layout at render. */
+  let viewerOverlay = spec.overlay || null;
+
   /**
-   * The canvas: units as live tiles on a pan-and-zoom field. Zoomed out the app is its own map;
-   * a tile expands to full view on pick and collapses on back — the semantic-zoom promise, sized
-   * for v1. Buttons carry the zoom for keyboards and touch alike; drag pans; wheel zooms at the
-   * cursor. Nothing animates at idle — motion happens on input only.
+   * Apply one viewer's overlay to a layout copy: `hidden` drops blocks, `order` re-sorts the
+   * rest (ids it does not name keep their place at the end), `nav` re-projects. Props are
+   * deliberately untouchable — an overlay arranges, it never rewrites content.
+   * @param {any} layout @param {{ hidden?: string[], order?: string[], nav?: string }|null} o
    */
-  function projectCanvas(units) {
-    const field = el('div', { class: 'ak-mosaic__field' });
-    const cam = { x: 0, y: 0, scale: 0.6 };
-    let focused = null;
-
-    function apply() {
-      field.style.transform = 'translate(' + cam.x + 'px,' + cam.y + 'px) scale(' + cam.scale + ')';
+  function applyViewerOverlay(layout, o) {
+    if (!o) return layout;
+    const out = { v: layout.v, look: layout.look, nav: o.nav || layout.nav, tokens: layout.tokens, meta: layout.meta, blocks: layout.blocks.slice() };
+    if (Array.isArray(o.hidden) && o.hidden.length) {
+      out.blocks = out.blocks.filter(function (b) { return o.hidden.indexOf(b.id) < 0; });
     }
-
-    const viewport = el('div', { class: 'ak-mosaic__canvas' }, field);
-
-    units.forEach(function (u) {
-      const cover = el('button', {
-        type: 'button', class: 'ak-mosaic__tilecover', 'data-ak-noguard': true,
-        'aria-label': t('open') + ': ' + u.label,
-        on: { click: function () { focus(u); } },
-      });
-      u.tile = el('div', { class: 'ak-mosaic__tile' }, [
-        el('span', { class: 'ak-mosaic__tilelabel', text: u.label }),
-        u.el, cover,
-      ]);
-      field.appendChild(u.tile);
-    });
-
-    const focusHost = el('div', { class: 'ak-mosaic__focus', hidden: true });
-    const backBtn = el('button', {
-      type: 'button', class: 'ak-btn ak-btn--ghost', 'data-ak-noguard': true,
-      on: { click: function () { unfocus(); } },
-    }, '↩ ' + t('back'));
-
-    function focus(u) {
-      morph(u.el, function () {
-        focused = u;
-        focusHost.hidden = false;
-        viewport.hidden = true;
-        zoombar.hidden = true;
-        clear(focusHost);
-        focusHost.appendChild(backBtn);
-        focusHost.appendChild(u.el);
-        enter(focusHost);
+    if (Array.isArray(o.order) && o.order.length) {
+      out.blocks.sort(function (a, b) {
+        const ia = o.order.indexOf(a.id); const ib = o.order.indexOf(b.id);
+        return (ia < 0 ? o.order.length : ia) - (ib < 0 ? o.order.length : ib);
       });
     }
-    function unfocus() {
-      if (!focused) return;
-      const u = focused;
-      morph(u.el, function () {
-        focused = null;
-        u.tile.insertBefore(u.el, u.tile.lastChild);
-        focusHost.hidden = true;
-        viewport.hidden = false;
-        zoombar.hidden = false;
-      });
-    }
-
-    // Pan by pointer drag; zoom at the cursor by wheel; buttons as the keyboard-reachable twin.
-    let drag = null;
-    viewport.addEventListener('pointerdown', function (ev) {
-      const at = /** @type {Element|null} */ (ev.target instanceof Element ? ev.target : null);
-      if (at && at.closest('.ak-mosaic__tilecover')) return;
-      drag = { x: ev.clientX, y: ev.clientY };
-      viewport.setPointerCapture(ev.pointerId);
-    });
-    viewport.addEventListener('pointermove', function (ev) {
-      if (!drag) return;
-      cam.x += ev.clientX - drag.x;
-      cam.y += ev.clientY - drag.y;
-      drag = { x: ev.clientX, y: ev.clientY };
-      apply();
-    });
-    viewport.addEventListener('pointerup', function () { drag = null; });
-    viewport.addEventListener('wheel', function (ev) {
-      ev.preventDefault();
-      const factor = ev.deltaY < 0 ? CANVAS_STEP : 1 / CANVAS_STEP;
-      const next = Math.max(CANVAS_MIN, Math.min(CANVAS_MAX, cam.scale * factor));
-      const rect = viewport.getBoundingClientRect();
-      const px = ev.clientX - rect.left;
-      const py = ev.clientY - rect.top;
-      cam.x = px - (px - cam.x) * (next / cam.scale);
-      cam.y = py - (py - cam.y) * (next / cam.scale);
-      cam.scale = next;
-      apply();
-    }, { passive: false });
-
-    function zoomBtn(label, aria, factor) {
-      return el('button', {
-        type: 'button', class: 'ak-btn ak-btn--ghost', 'aria-label': aria, 'data-ak-noguard': true,
-        on: {
-          click: function () {
-            cam.scale = factor === 0 ? 0.6 : Math.max(CANVAS_MIN, Math.min(CANVAS_MAX, cam.scale * factor));
-            if (factor === 0) { cam.x = 0; cam.y = 0; }
-            apply();
-          },
-        },
-      }, label);
-    }
-    const zoombar = el('div', { class: 'ak-mosaic__zoombar' }, [
-      zoomBtn('−', t('zoomOut'), 1 / CANVAS_STEP),
-      zoomBtn('⤢', t('fitView'), 0),
-      zoomBtn('+', t('zoomIn'), CANVAS_STEP),
-    ]);
-
-    apply();
-    return el('div', { class: 'ak-mosaic__canvaswrap' }, [viewport, zoombar, focusHost]);
+    return out;
   }
 
   // ── Render, and the handle ───────────────────────────────────────────────────────────────────
@@ -632,6 +563,12 @@ export function mosaic(spec) {
     alive = { handles: [], bound: [], cleanup: [] };
     clear(root);
     if (!layout || !Array.isArray(layout.blocks)) return;
+
+    // The VIEWER'S overlay: their own kept preference over the owner's page — hide, reorder,
+    // change the navigation — applied at render, never written back to the owner's layout. The
+    // malleable-software rule: the person shapes their tool at the moment of use, the owner's
+    // base survives untouched.
+    layout = applyViewerOverlay(layout, viewerOverlay);
 
     if (layout.look && spec.app && spec.app.set) spec.app.set({ look: layout.look });
     root.setAttribute('data-ak-nav', layout.nav || 'stack');
@@ -672,7 +609,7 @@ export function mosaic(spec) {
     if (nav === 'tabs' || nav === 'bottom-bar') root.appendChild(projectPicker(units, nav));
     else if (nav === 'deck') root.appendChild(projectDeck(units));
     else if (nav === 'flow') root.appendChild(projectFlow(units));
-    else if (nav === 'canvas') root.appendChild(projectCanvas(units));
+    else if (nav === 'canvas') root.appendChild(projectCanvas(units, morph));
     else if (nav === 'rail') root.appendChild(projectRail(units));
     else if (nav === 'overlay') root.appendChild(projectOverlay(units));
     else root.appendChild(projectStack(units));
@@ -730,6 +667,43 @@ export function mosaic(spec) {
           if (!destroyed && data != null) b.handle.set(patchFor(b.kind, data));
         });
       }));
+    },
+
+    /**
+     * The viewer's overlay: set (or clear with null) and re-render. The APP owns loading and
+     * saving the overlay record (the viewer's own memory) — the mosaic only applies it.
+     * @param {{ hidden?: string[], order?: string[], nav?: string }|null} o
+     */
+    setOverlay(o) {
+      viewerOverlay = o || null;
+      render(currentLayout);
+    },
+
+    /**
+     * EXPLAIN THIS SCREEN, generated from the declarations rather than from a hand-written help
+     * text that would drift: every visible block, its name and what it draws from, in words.
+     * Returns the lines; also renders them as a designed panel when `target` is given.
+     * @param {{ target?: string|Element }} [opts]
+     */
+    explain(opts) {
+      const layout = currentLayout ? applyViewerOverlay(currentLayout, viewerOverlay) : null;
+      const lines = (layout && Array.isArray(layout.blocks) ? layout.blocks : [])
+        .filter(function (b) { return !b.hidden; })
+        .map(function (b) {
+          const p = b.props || {};
+          const name = p.title || labelOf(b);
+          return name + ' — ' + b.component + (p.source ? ' (' + t('open').toLowerCase() + ': ' + p.source + ')' : '');
+        });
+      if (opts && opts.target) {
+        const host = resolve(opts.target);
+        const panel = el('div', { class: 'ak-root ak-explain' }, [
+          el('h3', { class: 'ak-section__title', text: t('explainTitle') }),
+          el('ul', { class: 'ak-explain__list' }, lines.map(function (line) { return el('li', { text: line }); })),
+        ]);
+        host.appendChild(panel);
+        enter(panel);
+      }
+      return lines;
     },
 
     destroy() {
