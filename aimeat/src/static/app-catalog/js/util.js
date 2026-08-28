@@ -20,6 +20,7 @@
  *     know from that list — how long a round took, and how long the whole app took — was a
  *     subtraction nobody performed. 415 versions of one app carry that history and none of it was
  *     readable.
+ *   v1.1.0 — 2026-08-28 — filterAttr takes the description too, so a search finds what an app does.
  */
 
 /**
@@ -113,9 +114,10 @@ export function sameOwner(appOwner, sessionOwner) {
  * applyServerFilter() uses getAttribute(), which returns the decoded original text — so the
  * escaping is invisible to the search that consumes them.
  */
-export function filterAttr(name, tags) {
+export function filterAttr(name, tags, extra) {
   tags = (tags || []).map(function (tg) { return String(tg).toLowerCase(); });
-  var searchable = escapeHtml((String(name || '') + ' ' + tags.join(' ')).toLowerCase());
+  // `extra` is the description: a search for "what it does" should find it, not only the name.
+  var searchable = escapeHtml((String(name || '') + ' ' + tags.join(' ') + (extra ? ' ' + String(extra) : '')).toLowerCase());
   return ' data-filter="' + searchable + '" data-tags="' + escapeHtml(tags.join(',')) + '"';
 }
 

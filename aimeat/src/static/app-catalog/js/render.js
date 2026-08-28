@@ -19,6 +19,10 @@
  *     emptying the page-session record, which left the app published and the card in place.
  *   v2.2.0 — 2026-08-19 — a "Loading apps…" state until the first listing lands. An empty grid used to say
  *     "No apps yet. Add your first app", which is an answer, for the whole fetch.
+ *   v3.0.0 — 2026-08-28 — The showroom skin: the grid of cards becomes a list of rows (rows.js), the
+ *     tag bar becomes a rail with counts and a fold, plus a state filter (listed / unlisted / draft
+ *     waiting), a sort order (newest / most opened / A→Z) and the header sticker with the counts.
+ *     Built to the design canvas "App Catalog Alternate".
  */
 import { escapeHtml, jsArg, sourceLabel, filterAttr, isSameOriginUrl } from './util.js';
 import { getAllApps, saveApp, deleteApp } from './db.js';
@@ -29,7 +33,8 @@ import { favStarHtml } from './favorites.js';
 import { setEditingAppId, switchTab } from './apps-io.js';
 import { openPromptBuilder } from './cortex.js';
 import { openDetailView, openPublishedDetail } from './detail.js';
-import { loadPublishedApps, showPublishModal, applyServerFilter, deleteServerApp } from './server-io.js';
+import { loadPublishedApps, showPublishModal, applyServerFilter, deleteServerApp, getCommunityApps, getFavoriteServerApps, rerenderServerLists } from './server-io.js';
+import { listHeadHtml, rowHtml, fmtKb, fmtDate } from './rows.js';
 
 // browser-local list + filter state stay main-owned; injected once via initRender at bootstrap.
 let getMainApps, setAllApps, getActiveTag, setActiveTag, getSearchQuery;
@@ -42,44 +47,115 @@ export function setServerManifests(v) { serverAppManifests = v; }
 export function setOwnServerApps(v) { ownServerApps = v; }
 export function setIframeUrl(v) { currentIframeUrl = v; }
 
-// ── Tag Rendering ─────────────────────────────────
+// ── The rail: the state filter and the tags, each with its count ──────────────────────────
+// The view and the search are main-owned; these three are the rail's own.
+let activeState = null;      // null | 'listed' | 'unlisted' | 'draft' — library view only
+let sortMode = 'newest';     // 'newest' | 'opens' | 'name' — every list
+let tagsExpanded = false;    // the tag list folds after TAGS_FOLDED rows
+let lastEntries = [];        // the owner's entries from the last render, for a re-count without a re-fetch
+const TAGS_FOLDED = 8;
+export function getSortMode() { return sortMode; }
 
-function renderTags() {
+function railItem(label, count, on, onclick, isTag) {
+  return '<button type="button" class="cat-rail-item' + (isTag ? ' cat-rail-item--tag' : '') + (on ? ' active' : '') +
+    '" onclick="' + onclick + '"><span>' + escapeHtml(label) + '</span>' +
+    (typeof count === 'number' ? '<span class="cat-rail-count">' + count + '</span>' : '') + '</button>';
+}
+
+// What the tags count: in the library the owner's entries, in the community the other people's
+// apps, in the favourites the starred ones. A tag's count is then the number of rows under it.
+function railCollection(entries) {
+  var view = document.body.getAttribute('data-active-view') || 'library';
+  var pick = function (sa) { return { tags: (sa.manifest && sa.manifest.tags) || [] }; };
+  if (view === 'community') return getCommunityApps().map(pick);
+  if (view === 'favorites') return getFavoriteServerApps().map(pick);
+  return entries || [];
+}
+
+function renderTags(entries) {
   var tagBar = document.getElementById('tag-bar');
-  var tagSet = {};
-  var hasFavorites = false;
-
-  for (var i = 0; i < getMainApps().length; i++) {
-    var app = getMainApps()[i];
-    if (app.favorite) hasFavorites = true;
-    if (app.tags && app.tags.length) {
-      for (var j = 0; j < app.tags.length; j++) {
-        // Case-insensitive dedup — "Tools" and "tools" are one tag; first-seen casing wins.
-        var lc = String(app.tags[j]).toLowerCase();
-        if (!(lc in tagSet)) tagSet[lc] = app.tags[j];
-      }
+  if (!tagBar) return;
+  var coll = railCollection(entries === undefined ? lastEntries : entries);
+  var counts = {}, casing = {};
+  for (var i = 0; i < coll.length; i++) {
+    var tags = coll[i].tags || [], seen = {};
+    for (var j = 0; j < tags.length; j++) {
+      // Case-insensitive dedup — "Tools" and "tools" are one tag; first-seen casing wins.
+      var lc = String(tags[j]).toLowerCase();
+      if (seen[lc]) continue;
+      seen[lc] = true;
+      if (!(lc in casing)) casing[lc] = String(tags[j]);
+      counts[lc] = (counts[lc] || 0) + 1;
     }
   }
-
-  var uniqueTags = Object.keys(tagSet).map(function (k) { return tagSet[k]; })
-    .sort(function (a, b) { return a.toLowerCase().localeCompare(b.toLowerCase()); });
-  var html = '';
-
-  // "All" button
-  html += '<button class="tag' + (getActiveTag() === null ? ' active' : '') + '" onclick="window._launcher.filterByTag(null)">' + t('tag.all') + '</button>';
-
-  // Favorites button (only if any favorites exist)
-  if (hasFavorites) {
-    html += '<button class="tag' + (getActiveTag() === '__favorites__' ? ' active' : '') + '" onclick="window._launcher.filterByTag(\'__favorites__\')">' + t('tag.favorites') + '</button>';
+  var keys = Object.keys(counts).sort(function (a, b) { return (counts[b] - counts[a]) || a.localeCompare(b); });
+  var active = getActiveTag();
+  var activeLc = (active && active !== '__favorites__') ? String(active).toLowerCase() : null;
+  var html = '<div class="cat-rail-label">' + escapeHtml(t('rail.tags')) + '</div>';
+  html += railItem(t('tag.all'), coll.length, active === null, 'window._launcher.filterByTag(null)', true);
+  var shown = tagsExpanded ? keys : keys.slice(0, TAGS_FOLDED);
+  // An active tag past the fold stays on screen, or the reader cannot see why the list is short.
+  if (activeLc && shown.indexOf(activeLc) < 0 && keys.indexOf(activeLc) >= 0) shown = shown.concat([activeLc]);
+  for (var k = 0; k < shown.length; k++) {
+    var key = shown[k];
+    html += railItem(casing[key], counts[key], activeLc === key, 'window._launcher.filterByTag(\'' + jsArg(casing[key]) + '\')', true);
   }
-
-  // One button per unique tag
-  for (var k = 0; k < uniqueTags.length; k++) {
-    var tag = uniqueTags[k];
-    html += '<button class="tag' + (getActiveTag() === tag ? ' active' : '') + '" onclick="window._launcher.filterByTag(\'' + jsArg(tag) + '\')">' + escapeHtml(tag) + '</button>';
+  if (keys.length > TAGS_FOLDED) {
+    html += '<button type="button" class="cat-rail-more" onclick="window._launcher.toggleAllTags()">' +
+      escapeHtml(tagsExpanded ? t('rail.fewerTags') : t('rail.allTags').replace('{n}', String(keys.length))) + '</button>';
   }
-
   tagBar.innerHTML = html;
+}
+
+// The state rows (Listed / Unlisted / Draft waiting) and the header sticker say the same numbers.
+function renderStateBar(entries) {
+  var listed = 0, unlisted = 0, drafts = 0;
+  for (var i = 0; i < entries.length; i++) {
+    if (entries[i].parked) unlisted++; else if (entries[i].published) listed++;
+    if (entries[i].hasDraft) drafts++;
+  }
+  var bar = document.getElementById('state-bar');
+  if (bar) {
+    bar.innerHTML = '<div class="cat-rail-label">' + escapeHtml(t('rail.state')) + '</div>' +
+      railItem(t('state.listed'), listed, activeState === 'listed', 'window._launcher.filterByState(\'listed\')', false) +
+      railItem(t('state.unlisted'), unlisted, activeState === 'unlisted', 'window._launcher.filterByState(\'unlisted\')', false) +
+      railItem(t('state.draft'), drafts, activeState === 'draft', 'window._launcher.filterByState(\'draft\')', false);
+  }
+  var kicker = document.getElementById('cat-kicker');
+  if (kicker) {
+    kicker.textContent = t('kicker.line').replace('{n}', String(entries.length)).replace('{listed}', String(listed)).replace('{drafts}', String(drafts));
+    kicker.hidden = !(listingLoaded && entries.length > 0);
+  }
+  var railCount = document.getElementById('rail-count-library');
+  if (railCount) railCount.textContent = listingLoaded ? String(entries.length) : '';
+}
+
+/** A state row pressed twice clears the filter. */
+export function filterByState(state) {
+  activeState = (activeState === state) ? null : state;
+  renderApps();
+}
+
+/** The order of every list: the library re-renders here, the community and favourites through theirs. */
+export function setSort(mode) {
+  if (mode !== 'opens' && mode !== 'name') mode = 'newest';
+  sortMode = mode;
+  var btns = document.querySelectorAll('.cat-sort-btn');
+  for (var i = 0; i < btns.length; i++) btns[i].classList.toggle('is-on', btns[i].getAttribute('data-sort') === mode);
+  renderApps();
+  rerenderServerLists();
+}
+
+export function toggleAllTags() {
+  tagsExpanded = !tagsExpanded;
+  renderTags();
+}
+
+/** newest keeps the server's order (newest first); the other two sort in place. */
+export function sortRows(list, getOpens, getName) {
+  if (sortMode === 'opens') list.sort(function (a, b) { return (getOpens(b) || 0) - (getOpens(a) || 0); });
+  else if (sortMode === 'name') list.sort(function (a, b) { return String(getName(a) || '').localeCompare(String(getName(b) || ''), undefined, { sensitivity: 'base' }); });
+  return list;
 }
 
 // ── Tag Filtering ─────────────────────────────────
@@ -307,6 +383,7 @@ function buildLibraryEntries(localApps, serverApps) {
       m.hasAgents = shipsAgent;
       m.aiPosture = sa.ai_posture || null;
       m.protection = prot;
+      m.opens = sa.downloads || 0; m.createdAt = sa.created_at || null; m.size = sa.size || 0;
       // EXACTLY what the old "View" used: the CONSTRUCTED served URL (aimeatUrl/v1/apps/<owner>/<file>),
       // NOT the local publishedUrl — so Open opens the app top-level on its origin (and it SSOs)
       // identically to the old published card's View button.
@@ -316,7 +393,8 @@ function buildLibraryEntries(localApps, serverApps) {
       var se = {
         hasLocal: false, localId: null,
         name: (sa.manifest && sa.manifest.name) || fn,
-        icon: '\u{1F310}',
+        // The app's own icon where it has one; the same fallback the detail title uses.
+        icon: sa.icon || (sa.manifest && sa.manifest.icon) || '\u{1F4DD}',
         description: (sa.manifest && sa.manifest.description) || '',
         descriptions: (sa.manifest && sa.manifest.descriptions) || null,
         tags: (sa.manifest && sa.manifest.tags) || [],
@@ -330,7 +408,9 @@ function buildLibraryEntries(localApps, serverApps) {
         forkable: !!sa.forkable, forks: sa.forks || 0, protection: prot, hasAgents: shipsAgent,
         // TARGET-058: what the app says about the AI inside it. The node strips the publish check's
         // gap for everyone but the owner, so a gap arriving here IS the viewer's own app.
-        aiPosture: sa.ai_posture || null
+        aiPosture: sa.ai_posture || null,
+        // The row's facts: how often opened, when the current version landed, how big the file is.
+        opens: sa.downloads || 0, createdAt: sa.created_at || null, size: sa.size || 0
       };
       entries.push(se);
       if (fn) byFilename[fn] = se;
@@ -345,7 +425,9 @@ function buildLibraryEntries(localApps, serverApps) {
         hasDraft: !!sa.has_draft,
         // `protected` is the ACCESS-CODE flag (distinct from copy-`protection`); the detail view's
         // access-code editor reads it to show whether the app currently requires a code.
-        accessCode: !!sa.protected
+        accessCode: !!sa.protected,
+        // The detail hero's facts tiles.
+        downloads: sa.downloads || 0, size: sa.size || 0, createdAt: sa.created_at || null, category: sa.category || ''
       };
       ownAppProtection[fn] = prot;
       if (sa.access_code) ownAppAccessCodes[(sa.owner || '') + '/' + fn] = sa.access_code;
@@ -362,12 +444,10 @@ function renderApps() {
     // apps exist anymore, so nothing local is merged in — the grid is purely the owner's server apps.
     var entries = buildLibraryEntries([], ownServerApps);
 
-    // Sort: Listed (public) before Unlisted (parked); the server already returns each group
-    // newest-first, so preserve that order within a group.
-    entries.sort(function (a, b) {
-      if (!!a.parked !== !!b.parked) return a.parked ? 1 : -1;
-      return 0;
-    });
+    // The order: the server returns newest-first, which "Newest" keeps; the other two sort here.
+    // Listed and Unlisted are no longer grouped — the state rows in the rail do that on request.
+    lastEntries = entries;
+    sortRows(entries, function (e) { return e.opens; }, function (e) { return e.name; });
 
     // Filter by getActiveTag()
     var filtered = entries;
@@ -380,11 +460,17 @@ function renderApps() {
       });
     }
 
-    // Filter by getSearchQuery()
+    // Filter by the rail's state row
+    if (activeState === 'listed') filtered = filtered.filter(function (e) { return e.published && !e.parked; });
+    else if (activeState === 'unlisted') filtered = filtered.filter(function (e) { return !!e.parked; });
+    else if (activeState === 'draft') filtered = filtered.filter(function (e) { return !!e.hasDraft; });
+
+    // Filter by getSearchQuery(): the name, a tag, or what it does
     if (getSearchQuery()) {
       var q = getSearchQuery().toLowerCase();
       filtered = filtered.filter(function (app) {
         if (app.name && app.name.toLowerCase().indexOf(q) !== -1) return true;
+        if (app.description && app.description.toLowerCase().indexOf(q) !== -1) return true;
         if (app.tags) {
           for (var i = 0; i < app.tags.length; i++) {
             if (String(app.tags[i]).toLowerCase().indexOf(q) !== -1) return true;
@@ -399,7 +485,7 @@ function renderApps() {
     var localCount = document.getElementById('local-apps-count');
     if (localHeader) {
       localHeader.style.display = entries.length > 0 ? '' : 'none';
-      if (localCount) localCount.textContent = '(' + entries.length + ')';
+      if (localCount) localCount.textContent = '· ' + entries.length;
     }
 
     if (filtered.length === 0) {
@@ -422,9 +508,9 @@ function renderApps() {
           '</div>';
       }
     } else {
-      var html = '';
+      var html = listHeadHtml();
       for (var j = 0; j < filtered.length; j++) {
-        html += libraryCardHtml(filtered[j], j);
+        html += libraryRowHtml(filtered[j], j);
       }
       grid.innerHTML = html;
     }
@@ -434,14 +520,49 @@ function renderApps() {
     var statsEl = document.getElementById('stats');
     statsEl.textContent = listingLoaded ? (entries.length + ' ' + t('stats.apps')) : '';
 
-    renderTags();
+    renderStateBar(entries);
+    renderTags(entries);
   });
 }
 
-// One unified card. hasLocal entries keep favorites/drag-drop/menu; server-only entries are
-// read-only (open the published copy). Management (publish, park, fork, protect, versions,
-// remove, consents) lives in the detail view — the card face stays to a status badge + two
-// buttons (Open, Details).
+// One row per app (rows.js draws it). Management (publish, park, fork, protect, versions, remove,
+// consents) lives in the detail view — the row carries the state pill, Open (or Open + Draft when
+// a working copy waits) and the ⋯ that opens the details.
+function libraryRowHtml(e, i) {
+  var detailCall = (e.filename)
+    ? 'window._launcher.openPublishedDetail(\'' + jsArg(e.owner || '') + '\', \'' + jsArg(e.filename) + '\', \'' + jsArg(e.hasLocal ? e.localId : '') + '\', ' + (e.versionNumber || 0) + ')'
+    : 'window._launcher.openDetailView(\'' + jsArg(e.localId) + '\')';
+  // A published app opens TOP-LEVEL on its served URL (see the note on libraryCardHtml below).
+  var openCall = ((e.published || e.parked || e.serverOnly) && e.viewUrl)
+    ? 'window._launcher.viewPublished(\'' + jsArg(e.viewUrl) + '?mode=inline\', \'' + jsArg(e.name) + '\')'
+    : (e.hasLocal
+        ? 'window._launcher.launchApp(\'' + jsArg(e.localId) + '\', \'' + jsArg(e.openMode || 'tab') + '\')'
+        : detailCall);
+  var actions = [{ label: t('card.open'), onclick: openCall, title: t(e.hasDraft ? 'card.openReleasedHint' : 'card.openHint'), kind: 'open' }];
+  if (e.hasDraft && e.viewUrl) {
+    actions.push({ label: t('card.draft'), onclick: 'window._launcher.openStagingPreview(\'' + jsArg(e.owner || '') + '\', \'' + jsArg(e.filename || '') + '\')', title: t('card.openStagingHint'), kind: 'draft' });
+  }
+  actions.push({ label: '⋯', onclick: detailCall, title: t('ctx.details'), kind: 'more' });
+  var metaParts = [];
+  if (e.versionNumber) metaParts.push('v' + e.versionNumber);
+  var when = fmtDate(e.createdAt); if (when) metaParts.push(when);
+  var kb = fmtKb(e.size); if (kb) metaParts.push(kb);
+  var nameExtra = (e.origin === 'ai-published' ? ' <span class="ai-origin-badge">AI</span>' : '') +
+    (e.hasAgents ? ' <span class="pcb-agent" title="' + escapeHtml(t('card.agentHint')) + '">\u{1F916}</span>' : '') +
+    aiPostureMarkers(e);
+  return rowHtml({
+    icon: e.icon, name: e.name, nameExtra: nameExtra,
+    favStar: e.filename ? favStarHtml((e.owner || e.aimeatOwner || '') + '/' + e.filename) : '',
+    meta: metaParts.join(' · '),
+    desc: (e.descriptions && e.descriptions[getLang()]) || e.description || '',
+    state: e.parked ? 'unlisted' : (e.published ? 'listed' : 'local'),
+    draft: !!e.hasDraft, opens: e.opens, tags: e.tags, rowClick: detailCall, actions: actions, index: i
+  });
+}
+
+// The card the list replaced (2026-08-28). Kept for the notes it carries on WHY a published app
+// opens top-level and a local blob does not; libraryRowHtml above makes the same choices.
+// eslint-disable-next-line no-unused-vars
 function libraryCardHtml(e, i) {
   var idAttr = e.hasLocal ? escapeHtml(e.localId) : ('srv:' + escapeHtml(e.filename));
   // Detail routing: openPublishedDetail resolves a local twin itself; local-only -> openDetailView.
