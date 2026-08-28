@@ -195,6 +195,34 @@ async function boot() {
 If the user hasn't logged in, `AIMEAT.ai.isAvailable()` returns false and
 your "Use AI" buttons should hide. After login it returns the real value.
 
+### Styling the sign-in pill
+
+The pill `mountLoginButton` renders carries no colours of its own. It reads the page's tokens
+(`--text` for its frame and words, `--bg` behind them, `--accent` for the name, `--success` for
+the live dot, `--sun` for the sign-in slab's shadow, `--font-showroom-body` or `--font` for the
+face) with a fallback for each, so on a page that defines none it is ink on paper, and on a page
+with a palette it follows the palette. To give it a look of its own, set these on any ancestor
+(the mount point is enough):
+
+```css
+#header-auth {
+  --aimeat-pill-fg: #1A1A2E;      /* frame and words */
+  --aimeat-pill-bg: transparent;  /* behind them */
+  --aimeat-pill-name: #E8564A;    /* the signed-in name */
+  --aimeat-pill-live: #10B981;    /* the dot */
+  --aimeat-pill-radius: 0;        /* square by default; 999px for a capsule */
+  --aimeat-pill-font: 'Archivo', system-ui, sans-serif;
+  --aimeat-pill-cta-bg: #1A1A2E;  /* the signed-out slab */
+  --aimeat-pill-cta-fg: #FAFAF8;
+  --aimeat-pill-cta-shadow: #FFB52E;
+}
+```
+
+The language switch, the light/dark switch and the palette picker inside the pill take the same
+frame colour and radius. Nothing in the markup is styled inline, so a stylesheet rule on
+`.aimeat-auth-pill`, `.aimeat-auth-logout` or `.aimeat-sign-btn` also works when a variable is
+not enough.
+
 ---
 
 ## The "Use AI" pattern (canonical)
