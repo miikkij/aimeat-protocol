@@ -14,6 +14,17 @@ This is the second half of the AIMEAT-CrewAI integration story:
     them up automatically.
 
 Changelog:
+  0.22.0 -- Server-initiated invokes (the Crew tab's Validate and Try). The node can now ask a running
+    crew to do something and wait for the answer over the connector tunnel's `invoke` frame; the serve
+    daemon queues each one on `GET /local/invoke/next` and takes the reply on
+    `POST /local/invoke/<id>/result` (AIMEAT >= 3.9). `run_invoke_listener(agent_name, handler)` is the
+    consumer: a thread that polls from the moment it starts (the serve daemon answers NO_HANDLER for an
+    agent nobody has polled in 90 s, so a listener that only starts on demand is an agent that cannot be
+    asked), runs each handler in a small pool so a minutes-long `crew.try` does not block the next
+    `crew.validate`, and answers HANDLER_ERROR when the handler raises. `run_crew_daemon(on_invoke=...)`
+    starts one alongside the poll loop and stops it with the loop. The two capabilities the Crew tab
+    sends are `crew.validate` ({doc} -> {errors: [...]}) and `crew.try` ({doc, prompt} -> {output, ...}).
+    A publish also wakes a records-parked agent with a `crew.def_updated` event on /local/records/next.
   0.21.0 -- PROPOSE also picks up PLAN-LESS ACTIVE tasks. It polled 'queued' only, and a task-runner
     agent has no queued tasks -- the node auto-activates them on create, and the Hello Integration
     test task is born active for every mode. So the plan was never proposed and EXECUTE completed the
@@ -183,6 +194,7 @@ from __future__ import annotations
 
 import signal
 import sys
+import threading
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
@@ -726,6 +738,106 @@ def _drain_dms(api: _Api, max_items: int = 50) -> list[dict[str, Any]]:
     return out
 
 
+InvokeHandler = Callable[[str, Any, dict[str, Any]], Any]
+"""An invoke handler: (capability, input, invoke) -> result. Return the result value the node
+should receive (any JSON-serializable value); raise to answer ok=False. Returning a tuple
+(ok: bool, result) sets the ok flag explicitly -- the way to refuse without an exception."""
+
+
+def _next_invoke(api: _Api, wait_ms: int) -> dict[str, Any] | None | str:
+    """One long-poll on the serve daemon's invoke queue. Returns the invoke dict (id, capability, input,
+    caller, timeout_ms, received_at), None when nothing arrived in `wait_ms`, or "unsupported" when the
+    serve daemon predates the endpoint (404) so the caller can stop polling instead of spinning."""
+    r = api.get(
+        "/local/invoke/next",
+        params={"wait": wait_ms, "agent": api.agent_name},
+        timeout=wait_ms / 1000 + 10,
+    )
+    if r.status_code == 404:
+        return "unsupported"
+    if r.status_code != 200:
+        return None
+    data = r.json().get("data")
+    return data if isinstance(data, dict) and data.get("id") else None
+
+
+def _answer_invoke(api: _Api, invoke_id: str, ok: bool, result: Any) -> bool:
+    """Hand the answer back; the serve daemon forwards it over the tunnel as `invoke_result`. False when
+    the daemon no longer knows the id (already answered, or the node stopped waiting)."""
+    r = api.post(
+        f"/local/invoke/{invoke_id}/result",
+        params={"agent": api.agent_name},
+        json={"ok": ok, "result": result},
+        timeout=10,
+    )
+    return r.status_code == 200
+
+
+def _run_invoke_handler(handler: InvokeHandler, invoke: dict[str, Any]) -> tuple[bool, Any]:
+    """Run one handler and shape its outcome as (ok, result). A raised exception becomes HANDLER_ERROR
+    with the message, so the person at the Crew tab reads the reason instead of a timeout."""
+    capability = str(invoke.get("capability") or "")
+    try:
+        out = handler(capability, invoke.get("input"), invoke)
+    except Exception as exc:  # noqa: BLE001 -- the handler is the crew's code; report, do not die
+        return False, {"code": "HANDLER_ERROR", "message": f"{type(exc).__name__}: {exc}"}
+    if isinstance(out, tuple) and len(out) == 2 and isinstance(out[0], bool):
+        return out[0], out[1]
+    return True, out
+
+
+def run_invoke_listener(
+    api: _Api,
+    handler: InvokeHandler,
+    stop: dict[str, Any],
+    *,
+    wait_seconds: float = 25.0,
+    max_workers: int = 2,
+    label: str | None = None,
+) -> str:
+    """Serve the node's server-initiated invokes for one agent until `stop["flag"]` is set.
+
+    This is what makes the Crew tab's Validate and Try buttons work: the node sends `invoke` over the
+    tunnel, the serve daemon queues it, and this loop collects it, runs `handler(capability, input,
+    invoke)` and posts the answer back. Poll from startup, not on demand: the serve daemon answers the
+    node with NO_HANDLER when nobody has polled an agent's queue in 90 s, which is the right thing for
+    an agent with no runtime and the wrong thing for one whose listener starts late.
+
+    Handlers run in a pool of `max_workers` so a `crew.try` that takes minutes does not block the next
+    `crew.validate`; the poll itself keeps going between them. Returns "stopped" on the stop flag, or
+    "unsupported" when the serve daemon predates the endpoint (an older `aimeat` package) -- the caller
+    logs that once rather than spinning on 404s.
+    """
+    name = label or f"invoke:{api.agent_name}"
+    pool = ThreadPoolExecutor(max_workers=max(1, max_workers), thread_name_prefix=name)
+    outcome = "stopped"
+
+    def _serve_one(invoke: dict[str, Any]) -> None:
+        ok, result = _run_invoke_handler(handler, invoke)
+        try:
+            if not _answer_invoke(api, str(invoke["id"]), ok, result):
+                print(f"[{name}] answer for {invoke.get('capability')} #{invoke['id']} was no longer wanted")
+        except Exception as exc:  # noqa: BLE001 -- loopback hiccup; the node times out on its own
+            print(f"[{name}] could not answer {invoke.get('capability')} #{invoke['id']}: {exc}")
+
+    try:
+        while not stop["flag"]:
+            wait_ms = int(max(0.5, min(wait_seconds, 25.0)) * 1000)
+            try:
+                got = _next_invoke(api, wait_ms)
+            except Exception:  # noqa: BLE001 -- serve daemon restarting; try again shortly
+                time.sleep(1.0)
+                continue
+            if got == "unsupported":
+                outcome = "unsupported"
+                break
+            if isinstance(got, dict):
+                pool.submit(_serve_one, got)
+    finally:
+        pool.shutdown(wait=True)
+    return outcome
+
+
 def _serve_agent_status(api: _Api) -> dict[str, Any]:
     """This agent's serve-daemon status entry (transport, reconnects, ...) from `/local/status`, or {}
     on error. Loopback-only -- NOT a node call -- so polling it per cycle keeps an idle agent quiet."""
@@ -892,6 +1004,7 @@ def run_crew_daemon(
     record_spaces: Iterable[dict[str, Any]] | None = None,
     on_record: Callable[[dict[str, Any]], None] | None = None,
     on_dm: Callable[[dict[str, Any]], None] | None = None,
+    on_invoke: InvokeHandler | None = None,
     on_idle: Callable[[], None] | None = None,
     on_error: Callable[[Exception], None] | None = None,
     one_shot: bool = False,
@@ -1005,6 +1118,15 @@ def run_crew_daemon(
             is a lightweight summary -- read the full thread via
             aimeat_dm_thread(conversationId), or use messaging.read_answers /
             answers_from_dm to pull structured answers for an "answers" wake.
+        on_invoke: A handler `(capability, input, invoke) -> result` for the node's
+            server-initiated invokes (0.22.0, AIMEAT >= 3.9): the Crew tab's
+            Validate sends `crew.validate` with {doc} and expects {errors: [...]};
+            Try sends `crew.try` with {doc, prompt} and expects {output, ...}.
+            Runs in its own listener thread from startup (see run_invoke_listener),
+            so answering never waits for the poll cycle or a running kickoff. Raise
+            to answer ok=False with the message; return (False, {...}) to refuse
+            with your own shape. Without it, the node is told this agent has no
+            handler and the tab says so.
         on_idle: Optional callback fired once per poll cycle when no work
             arrived. Useful for heartbeat logging.
         on_error: Optional callback fired with any unhandled exception
@@ -1080,6 +1202,19 @@ def run_crew_daemon(
     signal.signal(signal.SIGINT, _handle_signal)
     if hasattr(signal, "SIGTERM"):
         signal.signal(signal.SIGTERM, _handle_signal)
+
+    # Server-initiated invokes (Crew tab Validate/Try) are collected by their own thread from the
+    # start, because the serve daemon reports NO_HANDLER for an agent nobody has polled in 90 s and
+    # a poll that waited for the idle cycle would miss the first click after every kickoff.
+    invoke_thread: threading.Thread | None = None
+    if on_invoke is not None:
+        def _invoke_main() -> None:
+            outcome = run_invoke_listener(api, on_invoke, stop, label=f"invoke:{agent_name}")
+            if outcome == "unsupported":
+                print(f"[daemon:{agent_name}] this serve daemon has no /local/invoke surface (aimeat < 3.9); "
+                      "Validate/Try from the Crew tab will not reach this agent until it is updated")
+        invoke_thread = threading.Thread(target=_invoke_main, name=f"invoke:{agent_name}", daemon=True)
+        invoke_thread.start()
 
     print(
         f"[daemon:{agent_name}] starting against {node_url} via loopback serve "
@@ -1653,6 +1788,11 @@ def run_crew_daemon(
             print(f"[daemon:{agent_name}] waiting for {len(in_flight)} in-flight task(s) to finish...")
         executor.shutdown(wait=True)
         _reap_finished()
+
+    # The invoke listener parks in <=25 s long-polls; the stop flag is already set, so it returns
+    # after its current poll. A bounded join so shutdown never hangs on a stuck loopback call.
+    if invoke_thread is not None:
+        invoke_thread.join(timeout=30)
 
     # P2: a revoked/expired bearer is a distinct, human-actionable exit (not a crash) -- exit 2 so a
     # supervisor stops restarting and prompts re-auth, instead of crash-looping on a dead credential.
