@@ -152,7 +152,13 @@ export function validateUiLayout(raw: unknown): AppUiLayout {
     for (const [name, value] of Object.entries(input.tokens as Record<string, unknown>)) {
       if (!legal.includes(name)) {
         if (/color|accent|bg|ink|surface|scrim|grad/i.test(name)) {
-          fail(`"${name}" is a colour token, and colour overrides wait for the contrast bench — an unproven colour is how a signature stops being readable. The signature covers shape, typography, density and motion: ${legal.join(', ')}.`);
+          // Not a placeholder refusal: the matrix CAN run overrides now (atelier-contrast.ts),
+          // and running it settled the question — a single hex cannot satisfy the mode- and
+          // palette-tuned derivations (even the house coral fails 32 checks as a global
+          // override), so a signature colour must be a LIGHT/DARK PAIR applied per mode, which
+          // the inline-token mechanism cannot express yet. Until the kit applies mode-paired
+          // colours, the door stays closed rather than open and unpassable.
+          fail(`"${name}" is a colour token, and the signature does not open colour yet: the contrast matrix proved a single hex cannot stay readable across every palette and both modes — a signature colour needs a light/dark pair, which is a named next step. The signature covers shape, typography, density and motion: ${legal.join(', ')}.`);
         }
         unknownName('signature token', name, legal);
       }
