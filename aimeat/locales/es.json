@@ -5605,6 +5605,7 @@
       "typePersonal": "Personal / estilo blog",
       "typeCustom": "A medida (descríbelo en el prompt)",
       "designStyle": "Estilo de diseño",
+      "stylePoster": "Cartel AIMEAT (el estilo de la casa)",
       "styleMinimal": "Minimalista y limpio",
       "styleBold": "Atrevido y colorido",
       "styleDark": "Oscuro y moderno",

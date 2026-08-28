@@ -5815,6 +5815,7 @@
       "typePersonal": "Henkilökohtainen / Blogi",
       "typeCustom": "Mukautettu (kuvaile promptissa)",
       "designStyle": "Visuaalinen tyyli",
+      "stylePoster": "AIMEAT-juliste (talon tyyli)",
       "styleMinimal": "Minimalistinen ja selkeä",
       "styleBold": "Rohkea ja värikäs",
       "styleDark": "Tumma ja moderni",

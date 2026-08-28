@@ -5827,6 +5827,7 @@
       "typePersonal": "Personal / Blog-style",
       "typeCustom": "Custom (describe in prompt)",
       "designStyle": "Design style",
+      "stylePoster": "AIMEAT poster (the house style)",
       "styleMinimal": "Minimal & Clean",
       "styleBold": "Bold & Colorful",
       "styleDark": "Dark & Modern",

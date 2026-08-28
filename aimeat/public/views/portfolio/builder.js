@@ -6,6 +6,9 @@
  *   prompt, and upload/publish the resulting HTML. Extracted from portfolio.js
  *   to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-08-28 — "AIMEAT poster" is the first design style and the default: the house
+ *     face (Archivo Black headlines, ink rules, one coral band with a sun stripe) written into the
+ *     prompt, so a page built from here matches the home it is linked from.
  *   v1.0.0 — 2026-07-13 — Extracted from portfolio.js (max-file-lines)
  *   v1.1.0 — 2026-08-08 — Copy labels now resolve from the shared common.copy / common.copied / common.copyPrompt /
  *       common.copyLink / common.copyUrl keys; the per-view copy label keys this file used were
@@ -33,6 +36,9 @@ const PORTFOLIO_TYPES = [
 ];
 
 const DESIGN_STYLES = [
+  // The house style first and by default: the page a person builds here is linked from the
+  // poster home, and a portfolio that wears the same face reads as part of the same place.
+  { id: 'poster', key: 'portfolio.builder.stylePoster' },
   { id: 'minimal', key: 'portfolio.builder.styleMinimal' },
   { id: 'bold', key: 'portfolio.builder.styleBold' },
   { id: 'dark', key: 'portfolio.builder.styleDark' },
@@ -78,7 +84,7 @@ export function PortfolioBuilder({ session, navigate }) {
 
   // Style
   const [portfolioType, setPortfolioType] = useState('dev');
-  const [designStyle, setDesignStyle] = useState('dark');
+  const [designStyle, setDesignStyle] = useState('poster');
   const [authGates, setAuthGates] = useState(new Set());
 
   // Prompt
