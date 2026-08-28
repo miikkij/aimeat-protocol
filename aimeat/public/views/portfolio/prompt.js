@@ -6,6 +6,10 @@
  *   prompt from the user's selected content, style, and auth gates. Extracted from
  *   portfolio.js to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-08-28 — The "AIMEAT poster" design style: when chosen, the prompt carries the
+ *     house face as concrete rules (faces, colours, the band, the rules, what to avoid), so the
+ *     person's AI can build a page that matches the home it is linked from. The work is in the
+ *     prompt text, as every prompt-driven feature here.
  *   v1.0.0 — 2026-07-13 — Extracted from portfolio.js (max-file-lines)
  */
 import { NODE_URL } from './shared.js';
@@ -95,13 +99,30 @@ The user wants to create a personal portfolio website. Generate a single, self-c
 
   // Portfolio requirements
   const typeLabels = { cv: 'Professional / CV', creative: 'Creative / Art Showcase', dev: 'Developer / Technical', personal: 'Personal / Blog-style', custom: 'Custom' };
-  const styleLabels = { minimal: 'Minimal & Clean', bold: 'Bold & Colorful', dark: 'Dark & Modern', classic: 'Classic & Elegant' };
+  const styleLabels = { poster: 'AIMEAT poster (the house style, specified below)', minimal: 'Minimal & Clean', bold: 'Bold & Colorful', dark: 'Dark & Modern', classic: 'Classic & Elegant' };
 
   prompt += `
 ## Portfolio Requirements
 - Type: ${typeLabels[portfolioType] || portfolioType}${portfolioType === 'custom' && customTypeDesc ? ` — ${customTypeDesc}` : ''}
 - Design Style: ${styleLabels[designStyle] || designStyle}
 `;
+
+  // The house style, as rules a model can follow. It is the face of the home this page is linked
+  // from, so a person who picks it gets a portfolio that reads as part of the same place.
+  if (designStyle === 'poster') {
+    prompt += `
+## The AIMEAT poster style (follow these exactly)
+An editorial poster: big type, ink rules, one diagonal colour band, and a lot of paper.
+- Faces: headlines in "Archivo Black" (uppercase, tight letter-spacing around -0.03em, line-height 0.9), body and labels in "Archivo" (weights 400/600/800), small facts (addresses, dates, counts) in "JetBrains Mono". Load them from Google Fonts with a <link> in <head>; give every face a system fallback (Arial Black / Arial / monospace).
+- Colours, and only these: paper #FAFAF8 (background), ink #1A1A2E (text, rules, the one solid button), coral #E8564A (the band, one accent word in a headline, links), sun #FFB52E (highlights, the stripe under the band, the selected thing). No gradients, no drop shadows with blur, no rounded corners anywhere.
+- The masthead: the person's name as the headline, very large (5rem and up on desktop, 2.6rem on a phone), one word of it in coral. Under it a one-line kicker in mono.
+- The band: one full-width coral band rotated about -3deg with a 20px sun stripe along its lower edge, carrying two to four big numbers in paper (Archivo Black, 4rem+) with an uppercase label under each, and one call-to-action as an ink rectangle with a solid 8px offset sun shadow. Use overflow: hidden on the band's wrapper so the rotation never causes a horizontal scrollbar, and make the wrapper tall enough that the numbers sit fully on the coral at both ends.
+- Sections: no cards. A section is a headline (Archivo Black, uppercase, 2.4rem) over a 3px ink rule; lists are rows separated by 2px ink rules with a two-digit mono index in coral on the left (01, 02, 03) and an arrow on the right; a fact table is a two-column grid with uppercase coral labels.
+- Highlights: a sun background behind a phrase or a selected row, with ink text. Quiet actions are uppercase 800-weight words with a 2px ink underline; there is exactly one solid ink button per screen.
+- Phone (under 640px): the band goes straight (no rotation), the numbers go two per row, everything else stacks.
+- Avoid: emoji, icon fonts, cards with borders on all four sides, rounded pills, more than two type sizes per section, decorative images that were not provided.
+`;
+  }
 
   // Auth-gated sections
   if (authGates.length > 0) {

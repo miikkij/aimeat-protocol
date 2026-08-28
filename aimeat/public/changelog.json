@@ -5,6 +5,18 @@
       "date": "2026-08-28",
       "kind": "feature",
       "title": {
+        "en": "The poster face: the home, the chat and every setting wear one look",
+        "fi": "Julisteilme: koti, chat ja jokainen asetus samassa asussa"
+      },
+      "body": {
+        "en": "The home reads like a printed page: your name as the headline, the two status lines with their number set big, the door to the chat as one coral band, the playbooks as a numbered index and the record of what happened as a time-first table. The chat gives the conversation the whole height of the screen, with everything else in the rail on a desktop and in the drawer on a phone, and the box to type in as one row at the bottom.\n\nSettings & Controls follows: the sidebar is an index, the overview a masthead with your four numbers on the band, and every tab (agents and their detail tabs, organisms and workspaces, memory, knowledge, access, wallet, companies, portfolio) is built from the same rules instead of cards. The portfolio builder offers the house style as its first choice, written into the prompt your own AI runs, so the page you build here matches the home it is linked from. Your published portfolio itself is untouched.",
+        "fi": "Koti lukee kuin painettu sivu: nimesi otsikkona, kaksi tilariviä isolla numerolla, chatin ovi yhtenä korallinauhana, playbookit numeroituna hakemistona ja tapahtumat aikaleima edellä. Chat antaa keskustelulle koko ruudun korkeuden; kaikki muu on työpöydällä reunapalkissa ja puhelimessa laatikossa, ja kirjoituskenttä on yksi rivi alhaalla.\n\nAsetukset ja säätimet seuraa perässä: sivupalkki on sisällysluettelo, yleiskatsaus masthead neljällä luvulla nauhalla, ja jokainen välilehti (agentit ja niiden välilehdet, organismit ja työtilat, muisti, tieto, pääsy, lompakko, yritykset, portfolio) rakentuu samoista viivoista korttien sijaan. Portfolion rakennin tarjoaa talon tyylin ensimmäisenä vaihtoehtona, kirjoitettuna kehotteeseen jonka oma tekoälysi ajaa, joten täällä tehty sivu sopii kotiin josta siihen viitataan. Julkaistuun portfolioosi ei kosketa."
+      }
+    },
+    {
+      "date": "2026-08-28",
+      "kind": "feature",
+      "title": {
         "en": "Two new pages: everything that shipped, and how an app gets built here",
         "fi": "Kaksi uutta sivua: kaikki mitä on julkaistu, ja miten appi rakentuu täällä"
       },
