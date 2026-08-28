@@ -21,6 +21,11 @@
  * @usage
  *   const result = await runPartBench(storage, config, 'leiska-cover');
  * @version-history
+ *   v1.2.0 — 2026-08-28 — Three production lessons in one: the page loads from the node's own
+ *     LOOPBACK (a server often cannot reach its own public hostname from inside, and the first
+ *     prod run proved it), readiness is domcontentloaded + settle (a slow remote hero image must
+ *     never time the bench out), and a render-time failure answers ran:false WITH THE REAL
+ *     REASON instead of a 500 — a crash is not a contract answer.
  *   v1.1.0 — 2026-08-28 — The new kinds meet the browser: a look or motion part is benched by
  *     rendering the DEMO arrangement wearing its token sheet (an override that breaks the render
  *     is caught here, not shipped), and an illustration answers ran:false with the reason — its
@@ -161,31 +166,48 @@ export async function runPartBench(
     };
   }
   const html = benchPageHtml(renderable);
-  const base = config.baseUrl.replace(/\/+$/, '');
-  const url = `${base}/v1/designbook/${encodeURIComponent(id)}/bench-page`;
+  // The page's kit assets are RELATIVE, and they resolve against this address — so it points at
+  // the node's own loopback, not its public URL: a server often cannot reach its own public
+  // hostname from inside (hairpin NAT), and the bench must not depend on that.
+  const url = `http://127.0.0.1:${config.port}/v1/designbook/${encodeURIComponent(id)}/bench-page`;
   const at = new Date().toISOString();
 
   const viewports: BenchViewportResult[] = [];
   for (const vp of BENCH_VIEWPORTS) {
-    const measured = await withHeadlessContext({ width: vp.width, height: vp.height }, async (ctx) => {
-      const page = await ctx.newPage() as BenchPage;
-      try {
-        let fulfilled = false;
-        await page.route('**/*', (route) => {
-          if (!fulfilled && route.request().resourceType() === 'document') {
-            fulfilled = true;
-            route.fulfill({ status: 200, contentType: 'text/html', body: html });
-          } else {
-            route.continue();
-          }
-        });
-        await page.goto(url, { waitUntil: 'load', timeout: PAGE_TIMEOUT_MS });
-        await page.waitForTimeout(SETTLE_MS);
-        return await page.evaluate<{ overflow: number; units: number; smallControls: number }>(MEASURE_JS);
-      } finally {
-        await page.close();
-      }
-    });
+    // A render-time failure (the page never loads, the browser dies mid-run) is part of the
+    // CONTRACT, not an exception: the bench answers ran:false WITH THE REAL REASON, because a
+    // 500 tells the operator nothing and an unavailable bench is never a passed bench.
+    let measured: { overflow: number; units: number; smallControls: number } | null;
+    try {
+      measured = await withHeadlessContext({ width: vp.width, height: vp.height }, async (ctx) => {
+        const page = await ctx.newPage() as BenchPage;
+        try {
+          let fulfilled = false;
+          await page.route('**/*', (route) => {
+            if (!fulfilled && route.request().resourceType() === 'document') {
+              fulfilled = true;
+              route.fulfill({ status: 200, contentType: 'text/html', body: html });
+            } else {
+              route.continue();
+            }
+          });
+          // domcontentloaded, not load: a slow or unreachable IMAGE (a hero photo on another
+          // host) must never time the whole bench out — layout is measured after the settle.
+          await page.goto(url, { waitUntil: 'domcontentloaded', timeout: PAGE_TIMEOUT_MS });
+          await page.waitForTimeout(SETTLE_MS);
+          return await page.evaluate<{ overflow: number; units: number; smallControls: number }>(MEASURE_JS);
+        } finally {
+          await page.close();
+        }
+      });
+    } catch (err) {
+      return {
+        ran: false,
+        reason: `The browser launched but the render failed at ${vp.id}: ${(err as Error)?.message ?? 'unknown error'}. `
+          + 'A page-load timeout here usually means this node cannot reach its own public URL from inside — the kit assets never arrive.',
+        at,
+      };
+    }
     if (measured === null) {
       return { ran: false, reason: 'No headless browser on this node — install one with `npx playwright install --with-deps chromium`, or run the bench on a node that has Edge or Chrome.', at };
     }
