@@ -153,8 +153,8 @@ const GOOD_LAYOUT = {
             `a token typo gets the nearest name: ${typo.body.data.message}`);
 
         const colour = await validate({ v: 1, tokens: { '--ak-accent': 'hotpink' }, blocks: [{ id: 'a', component: 'list', props: { source: 'x' } }] });
-        assert(colour.body.data.ok === false && /contrast bench/.test(colour.body.data.message),
-            `a colour token is refused with the reason: ${colour.body.data.message}`);
+        assert(colour.body.data.ok === false && /light\/dark pair/.test(colour.body.data.message),
+            `a colour token is refused with the MEASURED reason (single hex cannot pass; a pair is the path): ${colour.body.data.message}`);
 
         const vehicle = await validate({ v: 1, tokens: { '--ak-radius': 'url(https://evil.example/x)' }, blocks: [{ id: 'a', component: 'list', props: { source: 'x' } }] });
         assert(vehicle.body.data.ok === false && /vehicle/.test(vehicle.body.data.message),
