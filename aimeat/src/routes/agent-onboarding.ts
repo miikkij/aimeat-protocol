@@ -12,6 +12,10 @@
  *   - DELETE /v1/agents/:name/onboarding/override    -- Clear readiness override
  *   - DELETE /v1/agents/:name/onboarding           -- Cancel onboarding
  * @version-history
+ *   v1.9.0 -- 2026-08-28 -- hints.test_task_status and hints.test_task_has_plan say the state a driver
+ *                            acts on; POST /start removes the previous smoke test when it is still
+ *                            open. A crew that resolved the test task by TITLE found the old one,
+ *                            proposed a plan on it 15 times, and the driver never read the refusal.
  *   v1.8.0 -- 2026-08-24 -- The stuck hint comes from the shared buildStuckHint() and now also
  *                            fires on a PENDING accept_test_task whose task does not exist: that
  *                            jam showed as an ordinary pending step forever, so no escalation
@@ -55,6 +59,7 @@ import { refreshOnboarding, confirmOnboardingStep } from '../services/onboarding
 import { createOnboardingTestTask } from '../services/onboarding-test-task.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
+import { LIVE_TASK_STATUSES } from '../storage/types/agents-messaging.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole, requireScope, agentNotFoundResponse } from '../auth/middleware.js';
 import { buildGAII } from '../utils/gaii.js';
@@ -173,16 +178,27 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
     const testTaskId = (testTaskStep?.details as Record<string, unknown> | undefined)?.testTaskId as string | undefined;
     let testTaskStatus: string | undefined;
     let testTaskFound = false;
+    let testTaskHasPlan = false;
     if (testTaskId) {
       const task = await storage.getAgentTask(testTaskId);
       testTaskStatus = task?.status;
       testTaskFound = !!task;
+      testTaskHasPlan = (task?.todos?.length ?? 0) > 0;
     }
     const hints: Record<string, unknown> = {};
     // Driver contract: hints.test_task_id is ALWAYS present when a test task exists -- connectors
     // (aimeat-crewai onboarding driver) fill the {test_task_id} placeholder from it, so gating it
     // on a specific task status starved them into calling propose_todos with an empty task id.
     if (testTaskId) hints.test_task_id = testTaskId;
+    // The state a driver acts on, said outright. The test task is born `active` and plan-less for
+    // every mode; accept_test_task is "propose the FIRST plan on it", which is allowed while it is
+    // queued, revision_requested or active without a plan, and passes the moment it carries todos.
+    // Three connector workarounds were written from log archaeology because none of this was in
+    // the answer; a driver that reads these two fields never has to guess.
+    if (testTaskId && testTaskFound) {
+      hints.test_task_status = testTaskStatus;
+      hints.test_task_has_plan = testTaskHasPlan;
+    }
     if (testTaskStatus === 'active') {
       hints.test_task_active = true;
       hints.message = 'Your test task is active. Execute the todos and POST /complete to finish steps 9-10.';
@@ -269,6 +285,18 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
           step.validatedAt = prior.validatedAt;
           step.validationMethod = prior.validationMethod;
           step.details = prior.details;
+        }
+      }
+      // The previous smoke test, when it is still open, goes with the re-start. It carried no work
+      // of the owner's, and left in place it is a second "Onboarding verification" task: a runtime
+      // that resolves the test task by title picks the old one, proposes a plan on it, and burns
+      // every round on a step whose real target is the new task. That was a day of log reading.
+      const priorTestTaskId = (priorById.get('accept_test_task')?.details as Record<string, unknown> | undefined)?.testTaskId;
+      if (typeof priorTestTaskId === 'string') {
+        const prior = await storage.getAgentTask(priorTestTaskId);
+        if (prior && (LIVE_TASK_STATUSES as readonly string[]).includes(prior.status)) {
+          await storage.deleteAgentTask(priorTestTaskId);
+          logger.info('onboarding/start: previous open test task removed', { agent: agentGaii, taskId: priorTestTaskId, status: prior.status });
         }
       }
     }

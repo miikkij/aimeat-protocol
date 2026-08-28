@@ -14,6 +14,13 @@ This is the second half of the AIMEAT-CrewAI integration story:
     them up automatically.
 
 Changelog:
+  0.22.1 -- The onboarding driver reads the tool's answer (onboarding.py). A tool returns a failure
+    as a VALUE, it does not raise, and the driver logged the attempt before the call and nothing
+    after it: a new agent's accept_test_task failed 15 times in a row with the same call and no line
+    said why. Now every call logs `ok` or `FAILED: <the node's message verbatim>`, an identical call
+    that fails with the same code twice ends the run (OnboardingError.last_error / last_step carry
+    the cause), a step_args override is logged as such, and a `{test_task_id}` the node did not fill
+    is never sent as an empty id.
   0.22.0 -- Server-initiated invokes (the Crew tab's Validate and Try). The node can now ask a running
     crew to do something and wait for the answer over the connector tunnel's `invoke` frame; the serve
     daemon queues each one on `GET /local/invoke/next` and takes the reply on
