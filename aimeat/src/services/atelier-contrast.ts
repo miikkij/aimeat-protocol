@@ -389,7 +389,7 @@ export function loadAtelierSheets(): AtelierSheets {
   const atelierCss = readFileSync(new URL('../../public/lib/aimeat-atelier.css', import.meta.url), 'utf8') + '\n' + looksCss;
   const themes = parseThemes(themeCss);
   const sheet = parseAtelier(atelierCss);
-  sheetsCache = { themes, sheet, presetNames: ['vivid', ...sheet.presets.keys()] };
+  sheetsCache = { themes, sheet, presetNames: [...new Set(['vivid', ...sheet.presets.keys()])] };
   return sheetsCache;
 }
 

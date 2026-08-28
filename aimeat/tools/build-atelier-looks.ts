@@ -10,12 +10,31 @@
  * @structure emitLooksCss() · main (writes the file)
  * @usage pnpm build:atelier-looks   (or: pnpm exec tsx tools/build-atelier-looks.ts)
  * @version-history
+ *   v1.1.0 — 2026-08-28 — The NESTING GUARD: every look's block (the bare default included)
+ *     declares the never-inherited trio (--ak-hero-ink, --ak-hero-ink-dim, --ak-scrim) — its
+ *     own value or the contract default — so a look previewed inside another look never wears
+ *     the outer look's band type. Found by the Book's stage-controls run: an editorial preview
+ *     inside the carnival gallery drew a light title on a pale ground. The vivid block carries
+ *     no @preset-block marker (that tag names the base contract in the entry stylesheet).
  *   v1.0.0 — 2026-08-27 — Initial (TARGET-074, the look factory).
  */
 import { writeFileSync } from 'node:fs';
 import { LOOKS, STRUCTURES } from '../src/data/atelier-looks.js';
 
 const structById = new Map(STRUCTURES.map((s) => [s.id, s]));
+
+/**
+ * Tokens a look must never INHERIT from an enclosing look: the inverse-band trio. A gallery on
+ * carnival previewing an editorial part would otherwise hand the editorial hero carnival's
+ * light type on a pale ground (found in the Book's first stage-controls run). Every emitted
+ * block declares them — its own value when the look sets one, the contract default when not —
+ * so nesting one look inside another is always safe.
+ */
+const NEVER_INHERITED: Record<string, string> = {
+  '--ak-hero-ink': 'var(--ak-ink)',
+  '--ak-hero-ink-dim': 'var(--ak-hero-ink)',
+  '--ak-scrim': 'color-mix(in oklab, var(--ak-bg) 78%, transparent)',
+};
 
 /** The whole generated stylesheet, deterministically — the drift gate compares against this. */
 export function emitLooksCss(): string {
@@ -31,20 +50,31 @@ export function emitLooksCss(): string {
  * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
  */`);
 
+  // EVERY look emits a block — even one with no overrides of its own carries the
+  // never-inherited trio, because the bare default look (vivid) is exactly the one most often
+  // nested inside another.
   for (const look of LOOKS) {
-    if (Object.keys(look.tokens).length === 0 && look.structures.length === 0) continue;
     const sel = `[data-ak-look='${look.id}']`;
     out.push('');
-    out.push(`/* @preset-block ${look.id} — ${look.feel}.`);
-    out.push(`   ${look.note} */`);
-    if (Object.keys(look.tokens).length) {
-      out.push(`${sel} {`);
-      const width = Math.max(...Object.keys(look.tokens).map((k) => k.length)) + 1;
-      for (const [name, value] of Object.entries(look.tokens)) {
-        out.push(`  ${(name + ':').padEnd(width + 1)} ${value};`);
-      }
-      out.push('}');
+    // The base look's block carries NO @preset-block marker: that tag names the BASE CONTRACT
+    // in the entry stylesheet, and a second one here would shadow it in the matrix's parser.
+    // The block itself still emits — it is the nesting guard for the default look.
+    if (look.id === 'vivid') {
+      out.push(`/* ${look.id} — ${look.feel}.`);
+    } else {
+      out.push(`/* @preset-block ${look.id} — ${look.feel}.`);
     }
+    out.push(`   ${look.note} */`);
+    const tokens: Record<string, string> = { ...look.tokens };
+    for (const [name, fallback] of Object.entries(NEVER_INHERITED)) {
+      if (!(name in tokens)) tokens[name] = fallback;
+    }
+    out.push(`${sel} {`);
+    const width = Math.max(...Object.keys(tokens).map((k) => k.length)) + 1;
+    for (const [name, value] of Object.entries(tokens)) {
+      out.push(`  ${(name + ':').padEnd(width + 1)} ${value};`);
+    }
+    out.push('}');
     for (const sid of look.structures) {
       const s = structById.get(sid);
       if (!s) throw new Error(`look "${look.id}" uses unknown structure "${sid}"`);
