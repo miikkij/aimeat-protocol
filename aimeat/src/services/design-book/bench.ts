@@ -1,0 +1,206 @@
+/**
+ * @file src/services/design-book/bench.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The GUARANTEE BENCH, automated (TARGET-074): a Design Book part rendered in a real
+ *   headless browser at three viewports, with the guarantees MEASURED — horizontal overflow zero,
+ *   something actually painted, every control at the touch minimum — and the numbers stored on
+ *   the part's bench field. "Ajetaan, ei luvata": what the propose-time validator proves about
+ *   the DATA, this proves about the RENDER.
+ *
+ *   NO NEW ROUTE SERVES THE PAGE. The bench builds a self-contained HTML page in memory (the kit
+ *   from this node's own /v1/libs and /lib URLs, the part's body rendered by the same mosaic
+ *   every app uses, demo rows shaped per component exactly like the gallery's preview) and hands
+ *   it to the browser by fulfilling the document request — the screenshot capturer's own trick,
+ *   through the same shared renderer (one headless-browser story on the node, not two).
+ *
+ *   A NODE WITH NO BROWSER ANSWERS WITH WORDS. withHeadlessContext returns null where no
+ *   Chromium/Edge/Chrome exists; the bench then reports ran:false with the reason, and the part's
+ *   record is left untouched — an unavailable bench is not a passed bench.
+ * @structure BENCH_VIEWPORTS · runPartBench(storage, config, id) → DesignBookBenchResult
+ * @usage
+ *   const result = await runPartBench(storage, config, 'leiska-cover');
+ * @version-history
+ *   v1.0.0 — 2026-08-28 — Initial (TARGET-074, the guarantee bench automated).
+ */
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { systemGhiiFor } from '../compliance-register.js';
+import { withHeadlessContext } from '../screenshot-capture.js';
+import { DesignBookService, partKey, type DesignBookPart } from './service.js';
+import { DesignBookError } from './validate.js';
+
+export const BENCH_VIEWPORTS = [
+  { id: '390x844', width: 390, height: 844 },
+  { id: '1280x900', width: 1280, height: 900 },
+  { id: '1280x460', width: 1280, height: 460 },
+] as const;
+
+const PAGE_TIMEOUT_MS = 20_000;
+const SETTLE_MS = 1_200;
+
+export interface BenchViewportResult {
+  viewport: string;
+  overflow_px: number;
+  units_rendered: number;
+  controls_below_touch_min: number;
+}
+
+export interface DesignBookBenchResult {
+  ran: boolean;
+  reason?: string;
+  passed?: boolean;
+  viewports?: BenchViewportResult[];
+  at: string;
+}
+
+/** The slice of the Playwright page surface the bench drives; playwright-core stays lazy. */
+interface BenchPage {
+  goto(u: string, o: unknown): Promise<unknown>;
+  waitForTimeout(ms: number): Promise<void>;
+  route(m: string, h: (r: { request(): { resourceType(): string }; fulfill(o: unknown): void; continue(): void }) => void): Promise<void>;
+  evaluate<T>(fn: string): Promise<T>;
+  close(): Promise<void>;
+}
+
+/** The bench page: the kit, the part, demo rows per component — the gallery preview, inlined. */
+function benchPageHtml(part: DesignBookPart): string {
+  const partJson = JSON.stringify(part.body).replace(/<\//g, '<\\/');
+  return [
+    '<!DOCTYPE html><html lang="en" data-theme="light"><head><meta charset="utf-8">',
+    '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
+    '<link rel="stylesheet" href="/lib/aimeat-atelier.css"></head><body>',
+    '<script src="/v1/libs/aimeat-atelier.js"></scr' + 'ipt>',
+    '<script>',
+    'var BODY = ' + partJson + ';',
+    'function demoFor(component) {',
+    "  if (component === 'statRow') return function () { return [",
+    "    { id: 'a', label: 'This week', value: 12 }, { id: 'b', label: 'Open', value: 4 }, { id: 'c', label: 'Done', value: 8 } ]; };",
+    "  if (component === 'figure') return function () { return { value: 128, label: 'Sample figure', sub: 'A featured number.' }; };",
+    "  if (component === 'table') return function () { return [",
+    "    { id: 'r1', name: 'First row', when: '2026-08-01' }, { id: 'r2', name: 'Second row', when: '2026-08-14' } ]; };",
+    "  if (component === 'timeline') return function () { return [",
+    "    { id: 't1', ts: '2026-08-27T10:00:00Z', title: 'Something happened', tone: 'ok' } ]; };",
+    '  return function () { return [',
+    "    { id: 'i1', title: 'A sample row', sub: 'What content looks like here.', badge: 'sample' },",
+    "    { id: 'i2', title: 'Another row', sub: 'Titles and lines take this shape.' } ]; };",
+    '}',
+    'var sources = {};',
+    '(BODY.blocks || []).forEach(function (b) {',
+    '  var s = b.props && b.props.source;',
+    '  if (s) sources[s] = demoFor(b.component);',
+    '});',
+    'var frame = document.createElement("div");',
+    'frame.className = "ak-root";',
+    'frame.setAttribute("data-ak-look", BODY.look || "vivid");',
+    'document.body.appendChild(frame);',
+    'AIMEAT.atelier.mosaic({ target: frame, layout: BODY, sources: sources });',
+    '</scr' + 'ipt></body></html>',
+  ].join('\n');
+}
+
+/** The in-page measurements, one string so the lazy page surface needs no function serializer. */
+const MEASURE_JS = `(() => {
+  const doc = document.documentElement;
+  const overflow = doc.scrollWidth - doc.clientWidth;
+  const units = document.querySelectorAll('.ak-mosaic__unit, .ak-mosaic__band > *').length;
+  let smallControls = 0;
+  for (const el of document.querySelectorAll('button, [role="button"], a, input, select')) {
+    const r = el.getBoundingClientRect();
+    if (r.width === 0 && r.height === 0) continue;    // not rendered (hidden projection state)
+    if (r.height < 24 || r.width < 24) smallControls++;
+  }
+  return { overflow, units, smallControls };
+})()`;
+
+/**
+ * Render one part at the three bench viewports and measure the guarantees. Reads the part through
+ * the service (a part that does not exist refuses there); writes NOTHING here — the caller
+ * decides whether and where the result lands.
+ */
+export async function runPartBench(
+  storage: Storage, config: AimeatConfig, id: string,
+): Promise<DesignBookBenchResult> {
+  const book = new DesignBookService(storage, config);
+  const { part } = await book.get(id);
+  const html = benchPageHtml(part);
+  const base = config.baseUrl.replace(/\/+$/, '');
+  const url = `${base}/v1/designbook/${encodeURIComponent(id)}/bench-page`;
+  const at = new Date().toISOString();
+
+  const viewports: BenchViewportResult[] = [];
+  for (const vp of BENCH_VIEWPORTS) {
+    const measured = await withHeadlessContext({ width: vp.width, height: vp.height }, async (ctx) => {
+      const page = await ctx.newPage() as BenchPage;
+      try {
+        let fulfilled = false;
+        await page.route('**/*', (route) => {
+          if (!fulfilled && route.request().resourceType() === 'document') {
+            fulfilled = true;
+            route.fulfill({ status: 200, contentType: 'text/html', body: html });
+          } else {
+            route.continue();
+          }
+        });
+        await page.goto(url, { waitUntil: 'load', timeout: PAGE_TIMEOUT_MS });
+        await page.waitForTimeout(SETTLE_MS);
+        return await page.evaluate<{ overflow: number; units: number; smallControls: number }>(MEASURE_JS);
+      } finally {
+        await page.close();
+      }
+    });
+    if (measured === null) {
+      return { ran: false, reason: 'No headless browser on this node — install one with `npx playwright install --with-deps chromium`, or run the bench on a node that has Edge or Chrome.', at };
+    }
+    viewports.push({
+      viewport: vp.id,
+      overflow_px: measured.overflow,
+      units_rendered: measured.units,
+      controls_below_touch_min: measured.smallControls,
+    });
+  }
+
+  const passed = viewports.every((v) => v.overflow_px === 0 && v.units_rendered > 0 && v.controls_below_touch_min === 0);
+  return { ran: true, passed, viewports, at };
+}
+
+/**
+ * Run the bench and STAMP the result onto the part's record — the operator's and the proposer's
+ * call, decided by the caller through the same rule setStatus uses. The stamp keeps the
+ * propose-time checks and appends the browser result beside them.
+ */
+export async function benchAndStamp(
+  storage: Storage, config: AimeatConfig, id: string,
+): Promise<DesignBookBenchResult> {
+  const result = await runPartBench(storage, config, id);
+  if (!result.ran) return result;
+
+  const system = systemGhiiFor(config.nodeId);
+  const record = await storage.getMemory(system, partKey(id));
+  if (!record) throw new DesignBookError('NOT_FOUND', `No Design Book part "${id}".`, 404);
+  const part = JSON.parse(typeof record.value === 'string' ? record.value : JSON.stringify(record.value)) as DesignBookPart;
+  const now = new Date().toISOString();
+  const next: DesignBookPart = {
+    ...part,
+    updated_at: now,
+    bench: {
+      ...part.bench,
+      checks: Array.from(new Set([...(part.bench?.checks ?? []), 'browser-render'])),
+      passed_at: result.passed ? now : part.bench?.passed_at ?? now,
+      browser: result,
+    },
+  };
+  await storage.setMemory({
+    key: record.key,
+    ownerGaii: system,
+    value: JSON.stringify(next),
+    visibility: 'public',
+    tags: record.tags ?? ['designbook'],
+    ttlHours: null,
+    version: record.version + 1,
+    createdAt: record.createdAt,
+    updatedAt: now,
+    trackable: true,
+  });
+  return result;
+}

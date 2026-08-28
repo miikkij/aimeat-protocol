@@ -20640,6 +20640,27 @@ paths:
         '403': { description: Not published and not yours, or the app belongs to another owner }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /v1/designbook/{id}/bench:
+    post:
+      operationId: benchDesignbookPart
+      summary: Run the automated guarantee bench on a part
+      description: >-
+        The part rendered in a real headless browser at three viewports (390×844, 1280×900,
+        1280×460) with the guarantees MEASURED — horizontal overflow zero, units actually
+        painted, every control at the touch minimum — and the numbers stamped onto the part's
+        bench field. "Ajetaan, ei luvata." A node with no browser answers ran:false with the
+        reason and stamps nothing. The operator's or the part's own proposer's call (its result
+        changes what the gallery says about the part). Requires memory:write.
+      tags: [Apps]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: "{ ran, passed?, viewports?: [{ viewport, overflow_px, units_rendered, controls_below_touch_min }], reason?, at }" }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: Not the operator and not the proposer }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /v1/designbook/{id}/status:
     post:
       operationId: setDesignbookPartStatus

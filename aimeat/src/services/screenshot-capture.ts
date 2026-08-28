@@ -26,6 +26,8 @@
  *     so the on-demand path carries a per-owner throttle of its own.
  *   v1.0.0 — 2026-06-20 — initial: interval backfill writing straight to storage; channel-fallback
  *     browser via lazy playwright-core; graceful self-disable when no browser is present.
+ *     withHeadlessContext (2026-08-28) lends the same renderer to the Design Book's guarantee
+ *     bench, so the node has one headless browser story rather than two.
  *   v1.1.0 — 2026-06-20 — render the app's STORED HTML directly (fulfill the main document) instead of
  *     navigating to the inline URL, which 301s to the app origin under H-2 and 404s on a node with no
  *     app host (local dev) → captured error pages. Export runScreenshotCapturePass for manual/one-shot.
@@ -153,6 +155,25 @@ async function renderAndStore(
     return jpeg.length;
   } finally {
     await page.close();
+  }
+}
+
+/**
+ * The same headless browser, lent out: launch, hand over a context, always close, and answer null
+ * when no browser exists on this machine (the caller words its own "unavailable"). Exported for
+ * the Design Book's guarantee bench — one renderer on the node, not two.
+ */
+export async function withHeadlessContext<T>(
+  viewport: { width: number; height: number },
+  fn: (ctx: { newPage(): Promise<unknown> }) => Promise<T>,
+): Promise<T | null> {
+  const browser = await launchBrowser();
+  if (!browser) return null;
+  try {
+    const ctx = await browser.newContext({ viewport, deviceScaleFactor: 1 }) as { newPage(): Promise<unknown> };
+    return await fn(ctx);
+  } finally {
+    await browser.close();
   }
 }
 
