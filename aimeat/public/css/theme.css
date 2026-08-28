@@ -12,6 +12,9 @@
    @usage Loaded first in spa.html <head>; the theme is toggled by /js/theme.js
      which flips the data-theme attribute on <html>.
    @version-history
+     v1.33.0 — 2026-08-29 — The lighter cut the reviewed canvas showed on a phone: --font-poster-section
+       (Archivo regular, uppercase) for the headline under a page title, running text at 400 and
+       emphasis at 600 through the two weight tokens, the bar's links at 700.
      v1.32.0 — 2026-08-29 — Poster weight tokens: --font-poster-weight (the headline cut, 400 on
        Archivo Black), --font-poster-text-weight (500) and --font-poster-strong-weight (700) for the
        machine room's running text and its emphasised words, so the face and its weights change
@@ -208,8 +211,13 @@
      --font-display. */
   --font-poster: 'Archivo Black', 'Archivo', 'DM Sans', system-ui, sans-serif;
   --font-poster-weight: 400;
-  --font-poster-text-weight: 500;
-  --font-poster-strong-weight: 700;
+  --font-poster-text-weight: 400;
+  --font-poster-strong-weight: 600;
+  /* The section face: the headline under the page title ("My skills", "Node library") is the
+     same uppercase and tracking as the page title but in Archivo's regular cut, which is what
+     gives the reviewed canvas its air. One face, one weight, changed here. */
+  --font-poster-section: 'Archivo', 'DM Sans', system-ui, sans-serif;
+  --font-poster-section-weight: 400;
   /* Ink on the sun: the words on a sun-yellow selection stay ink in every theme, because --sun
      does not flip in dark mode and --text does. */
   --on-sun: #1A1A2E;
@@ -746,7 +754,7 @@ a { color: inherit; text-decoration: none; }
    tokens, so the dark theme and the palettes keep working. */
 .topnav { border-bottom: 3px solid var(--text); font-family: var(--font-showroom-body); }
 .topnav-brand { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.25rem; letter-spacing: -0.01em; }
-.topnav-right a, .topnav-menu > a { font-weight: 800; font-size: 0.88rem; color: var(--text-dim); padding: 6px 4px; border-radius: 0; }
+.topnav-right a, .topnav-menu > a { font-weight: 700; font-size: 0.88rem; color: var(--text-dim); padding: 6px 4px; border-radius: 0; }
 .topnav-right a:hover, .topnav-menu > a:hover { color: var(--text); background: none; }
 .topnav-right .profile-link { color: var(--text); background: none; }
 .topnav-right a.active, .topnav-menu > a.active {
