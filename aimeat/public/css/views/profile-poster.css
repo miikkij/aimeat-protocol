@@ -19,6 +19,8 @@
  *   renders in a sandboxed frame with its own stylesheet.
  * @usage Linked from public/spa.html after every other stylesheet.
  * @version-history
+ *   v1.2.0 — 2026-08-29 — The second tour: discover, ecosystem, skills, capabilities, libraries, extensions,
+ *     packages, the AI provider settings and boards on the same four shapes.
  *   v1.1.0 — 2026-08-29 — Weights through the tokens (--font-poster-text-weight for running text,
  *     --font-poster-strong-weight for the emphasised words), so the reviewed canvas's lighter body
  *     text is one number in theme.css; sections and rows take more air; the other tabs' cards, rows,
@@ -379,6 +381,54 @@
 .inbox-body { border: 3px solid var(--text); border-radius: 0; box-shadow: none; }
 .inbox-bubble { border-radius: 0; border: 2px solid var(--border); }
 .inbox-bubble--mine { border-color: var(--text); border-bottom-right-radius: 0; }
+
+/* ── The second tour (every remaining index page): discover, ecosystem, skills, capabilities,
+   libraries, extensions, packages, the AI provider settings, boards ─────────────────────── */
+/* Rows */
+.pf .dsc-item, .pf .pf-eco-card, .pf .pf-skl-row, .pf .pf-or-mrow, .pf .pf-eco-adv-item, .pf .pf-eco-auto-job, .pf .pj-app-card, .pf .pf-skl-file-row {
+  background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0; box-shadow: none; padding: 0.9rem 0; margin-bottom: 0;
+}
+.pf .dsc-item:hover, .pf .pf-eco-card:hover, .pf .pf-skl-row:hover, .pf .pf-or-mrow:hover { border-color: var(--accent); background: none; box-shadow: none; transform: none; }
+.pf .pf-or-mrow { border-bottom-width: 1px; border-bottom-color: var(--border); padding: 0.5rem 0; }
+.pf .pf-or-mrow--on { background: var(--sun); color: var(--on-sun); padding-left: 0.5rem; }
+.pf .dsc-item-title, .pf .pf-eco-name, .pf .pf-skl-name { font-weight: var(--font-poster-strong-weight); }
+/* Sections and panels */
+.pf .pf-or-wrapper, .pf .pf-or-section, .pf .pf-eco-section, .pf .pf-skl-section, .pf .pkg-section, .pf .cap-create-section, .pf .pf-eco-auto-flow-card, .pf .pf-eco-mcp, .pf .pf-eco-recipe {
+  background: none; border: 0; border-top: 3px solid var(--text); border-radius: 0; box-shadow: none; padding: 1rem 0 1.25rem;
+}
+.pf .pf-or-panel, .pf .pf-or-picker, .pf .pf-eco-data-pre, .pf .pf-eco-mcp-sample-prompt, .pf .pf-skl-body-md, .pf .pf-skl-editor-md, .pf .pf-eco-cmd {
+  border: 2px solid var(--text); border-radius: 0; background: var(--bg-dim); box-shadow: none;
+}
+.pf .pf-or-section-title, .pf .pf-eco-section-title, .pf .pf-skl-section-title, .pf .pkg-section-header, .pf .cap-info-title {
+  font-family: var(--font-poster); font-weight: var(--font-poster-weight);
+  font-size: 1.4rem; line-height: 1; letter-spacing: -0.02em; text-transform: uppercase; color: var(--text);
+}
+/* Chips */
+.pf .dsc-facet, .pf .dsc-type-badge, .pf .dsc-tag, .pf .dsc-scope-btn, .pf .pf-eco-status, .pf .pf-eco-pill, .pf .pf-eco-chip, .pf .pf-eco-count-badge, .pf .pf-eco-rec-chip,
+.pf .cap-badge, .pf .cap-tag, .pf .pkg-badge, .pf .pkg-tag, .pf .pkg-comp-type, .pf .pkg-nav button, .pf .lib-tier-btn, .pf .vis-pill, .pf .pf-or-status, .pf .pf-skl-version, .pf .pf-eco-auto-status-chip, .pf .pf-eco-setup-progress-chip {
+  border-radius: 0; background: none; border: 2px solid currentColor; color: var(--text);
+  font-family: var(--font-mono); font-size: 0.68rem; font-weight: 500; letter-spacing: 0; text-transform: none; padding: 1px 7px; line-height: 1.5;
+}
+.pf .dsc-type-badge, .pf .cap-badge-callable, .pf .pf-eco-status-pending, .pf .pkg-badge-featured { color: var(--accent); }
+.pf .pf-eco-status-active, .pf .pkg-badge-installed, .pf .pkg-badge-active, .pf .pkg-badge-published, .pf .pf-or-status--on { color: var(--success-fg); }
+.pf .pf-eco-status-revoked, .pf .pkg-badge-error { color: var(--danger); }
+.pf .dsc-facet-active, .pf .dsc-scope-active, .pf .pkg-nav button.active, .pf .lib-tier-btn.lib-tier-active { background: var(--sun); color: var(--on-sun); border-color: var(--text); }
+.pf .dsc-facet:hover, .pf .dsc-scope-btn:hover, .pf .pkg-nav button:hover:not(.active), .pf .lib-tier-btn:hover { background: none; border-color: var(--accent); color: var(--accent); }
+.pf .pkg-nav button, .pf .dsc-scope-btn, .pf .lib-tier-btn { font-family: var(--font-showroom-body); font-weight: var(--font-poster-text-weight); font-size: 0.8rem; padding: 4px 10px; }
+/* The quiet actions the older tabs draw as small framed buttons */
+.pf .ext-card-actions button, .pf .pf-skl-actions button, .pf .pkg-card-actions button:not(.btn-primary), .pf .pf-eco-adv-actions button {
+  background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0; box-shadow: none; padding: 0 0 1px;
+  font-family: var(--font-showroom-body); font-weight: var(--font-poster-strong-weight); font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text);
+}
+.pf .ext-card-actions button:hover, .pf .pf-skl-actions button:hover, .pf .pkg-card-actions button:not(.btn-primary):hover { background: none; color: var(--accent); border-color: var(--accent); }
+.pf .ext-card-actions button.danger { color: var(--accent); border-color: var(--accent); }
+/* Search fields the older tabs draw as boxes */
+.pf .dsc-search, .pf .cap-search-input, .pf .lib-search, .pf .pf-or-msearch, .pf .pkg-filters input, .pf .fnd-cal-create-input {
+  background: transparent; border: 0; border-bottom: 3px solid var(--text); border-radius: 0; padding: 8px 0;
+  font-family: var(--font-showroom-body); font-weight: var(--font-poster-text-weight); color: var(--text); box-shadow: none;
+}
+.pf .dsc-search:focus, .pf .cap-search-input:focus, .pf .lib-search:focus, .pf .pf-or-msearch:focus { border-color: var(--accent); outline: none; box-shadow: none; }
+.pf .pkg-filters select, .pf .cap-filter-select, .pf .pf-or-select { border: 2px solid var(--text); border-radius: 0; background: var(--bg); }
 
 @media (max-width: 700px) {
   .pf-back-current { font-size: 1.7rem; }
