@@ -16,6 +16,8 @@
  *   - StatusBar — which agent, what is left to spend, and what is wrong when something is
  * @usage import { ThreadList, Turn, Composer, StatusBar } from './chat/parts.js';
  * @version-history
+ *   v1.3.0 — 2026-08-28 — ThreadList takes children, rendered under the list: the rail now carries
+ *     everything that is not the conversation (the poster chat, vertical space first).
  *   v1.2.0 — 2026-08-17 — StatusBar speaks human: "Your agent" with the raw GAII in the tooltip
  *     (the technical identity was the FIRST thing on a new person's screen), and when the node is
  *     paying with no own key stored, a small door to Profile › OpenRouter sits on the same line —
@@ -314,10 +316,10 @@ export function Choices({ options, onPick, disabled }) {
  * made — the opposite of the honesty the label exists for. The icon belongs on an answer the day
  * these turns carry records, and this comment is the note to add it then.
  */
-export function AiNotice({ compact = false }) {
+export function AiNotice({ compact = false, className = '' }) {
     const [open, setOpen] = useState(false);
     return html`
-        <div class=${'chat-ai-notice' + (compact ? ' chat-ai-notice--compact' : '')}>
+        <div class=${'chat-ai-notice' + (compact ? ' chat-ai-notice--compact' : '') + (className ? ' ' + className : '')}>
             ${/* FULL the first time, one line after that. The duty is to make sure a person knows a
                   machine is on the other end, and somebody twenty messages into their fourth
                   conversation knows. Two lines and a button at the top of every screen from then on
@@ -393,7 +395,7 @@ export function TurnError({ message, onRetry }) {
  * would otherwise carry the control is hidden. Without it, opening the list is a room with no door:
  * the only exit is picking a different conversation than the one you were reading.
  */
-export function ThreadList({ threads, activeId, onOpen, onNew, onDelete, onClose }) {
+export function ThreadList({ threads, activeId, onOpen, onNew, onDelete, onClose, children }) {
     return html`
         <aside class="chat-threads">
             <button type="button" class="btn-ghost chat-threads-close" onClick=${onClose}>
@@ -418,6 +420,7 @@ export function ThreadList({ threads, activeId, onOpen, onNew, onDelete, onClose
                             </li>
                         `)}
                     </ul>`}
+            ${children}
         </aside>
     `;
 }

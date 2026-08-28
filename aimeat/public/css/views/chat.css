@@ -2,8 +2,14 @@
  * @file chat.css
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Styles for the chat page: the conversation list, the turns, the work log under each
- *   one, and the composer. Two panes on a desktop, one at a time on a phone.
+ * @description Styles for the chat page: the rail (the conversation list and everything about the
+ *   open conversation that is not the conversation), the turns, the work log under each one, and
+ *   the one-row composer. Two panes on a desktop, one at a time on a phone.
+ *
+ *   VERTICAL SPACE FIRST (since 2026-08-28, the poster chat). The conversation runs from the site
+ *   bar to the composer, and the composer is one row; the name, the status line, the actions, the
+ *   AI notice and the credit live in the rail, which on a phone is the drawer. Jouni, on the
+ *   design canvas: the chat space is what matters, and the input at the bottom.
  *
  *   The work log is styled to be read, not hidden. It is the evidence that what the agent said it
  *   did, it did, and folding it away by default would turn the page back into something a person has
@@ -11,6 +17,11 @@
  *
  *   NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v2.0.0 — 2026-08-28 — The poster chat. The rail carries .chat-this (name, status, actions) and
+ *     .chat-rail-foot (notice, credit); .chat-head is phone-only; the composer is one 44px row with
+ *     an underline field and an ink Send slab; user turns are sun blocks, agent turns carry a coral
+ *     spine; --font-poster for the name, --font-showroom-body for the words. The chat area measured
+ *     86% of a 1440x900 screen and 87% of a 390x844 one on the canvas this implements.
  *   v1.6.0 — 2026-08-19 — .chat-cap: the session cost cap's managed landing, standing where the
  *     composer stood (TARGET-066).
  *   v1.5.0 — 2026-08-18 — A phone could not LEAVE: the chat owns the whole screen and hides the
@@ -32,44 +43,65 @@
 /* ── Layout ── */
 .chat-view {
   display: grid;
-  grid-template-columns: 260px 1fr;
-  gap: 16px;
-  max-width: 1100px;
+  grid-template-columns: 236px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 0 28px;
+  max-width: 1440px;
   margin: 0 auto;
-  padding: 16px;
-  height: calc(100dvh - 120px);
-  /* Low enough that a short window (a laptop with a docked terminal, 1280x460) still puts the
-     composer on screen. A taller floor pushed it 70px below the fold, and the composer is the one
-     control the page exists for. */
+  padding: 0 32px;
+  /* The whole region under the bar: the conversation is the page. */
+  height: calc(100dvh - var(--nav-height, 56px));
   min-height: 320px;
+  font-family: var(--font-showroom-body);
+  color: var(--text);
 }
 
 .chat-view--signin {
   display: block;
   height: auto;
+  padding: 2rem 32px;
 }
 
-/* ── The conversation list ── */
+/* ── The rail: the list, then everything about the open conversation ── */
 .chat-threads {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 0;
   min-height: 0;
   overflow-y: auto;
-  padding-right: 4px;
+  padding: 14px 20px 12px 0;
+  border-right: 3px solid var(--text);
 }
 
+/* The ink slab: the one loud control on the page. Shared by New conversation and Send. */
+.chat-new, .chat-send {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 44px; padding: 0 16px;
+  background: var(--text); color: var(--bg);
+  border: 0; border-radius: 0; box-shadow: 4px 4px 0 var(--sun);
+  font-family: inherit; font-weight: 800; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em;
+  cursor: pointer; transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.chat-new:hover, .chat-send:hover { color: var(--sun); transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--sun); }
+.chat-send:disabled { opacity: 0.45; cursor: default; transform: none; }
 .chat-new { width: 100%; }
 
 /* The way back out of the list. Only a phone needs it: on a desktop the list and the conversation
    are both on screen, so there is nothing to go back from. */
 .chat-threads-close { display: none; }
 
+.chat-rail-h {
+  margin: 22px 0 0;
+  font-size: 0.64rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--accent);
+  padding-bottom: 5px; border-bottom: 2px solid var(--text);
+}
 .chat-threads-empty {
-  color: var(--text-muted);
+  color: var(--text-dim);
   font-size: 0.85rem;
+  font-weight: 600;
   line-height: 1.5;
-  margin: 0;
+  margin: 8px 0 0;
 }
 
 .chat-thread-list {
@@ -78,17 +110,17 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 0;
 }
 
 .chat-thread {
   display: flex;
   align-items: center;
   gap: 4px;
-  border-radius: var(--radius-sm);
+  border-bottom: 1px solid var(--border);
 }
 
-.chat-thread--active { background: var(--bg-surface); }
+.chat-thread--active { background: var(--sun); border-bottom: 2px solid var(--text); }
 
 .chat-thread-open {
   flex: 1 1 auto;
@@ -97,7 +129,7 @@
   background: none;
   border: none;
   cursor: pointer;
-  padding: 8px 10px;
+  padding: 9px 8px;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -106,16 +138,17 @@
 }
 
 .chat-thread-title {
-  font-size: 0.9rem;
-  font-weight: 600;
+  font-size: 0.86rem;
+  font-weight: 800;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .chat-thread-sub {
-  font-size: 0.75rem;
-  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-dim);
 }
 
 .chat-thread-del {
@@ -123,135 +156,143 @@
   padding: 4px 8px;
   opacity: 0;
   transition: opacity 0.15s;
+  background: none; border: 0; box-shadow: none; color: var(--text); font-weight: 800; cursor: pointer;
 }
 
 .chat-thread:hover .chat-thread-del,
 .chat-thread--active .chat-thread-del { opacity: 1; }
+
+/* This conversation: its name, the status line as a column of facts, and the two actions. */
+.chat-this { display: flex; flex-direction: column; gap: 8px; }
+.chat-this .chat-rail-h { margin-bottom: 2px; }
+.chat-rail-title {
+  margin: 0;
+  font-family: var(--font-poster); font-weight: 400;
+  font-size: 0.95rem; line-height: 1.15; letter-spacing: -0.01em; text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+.chat-status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 0;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  line-height: 1.5;
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+.chat-status-agent { color: var(--accent); }
+.chat-status-ownkey { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.chat-status-model { color: var(--text-dim); }
+.chat-status-elsewhere { color: var(--text-dim); }
+/* The actions: ink-underlined words, never buttons competing with the conversation. */
+.chat-act, .chat-status-reset {
+  align-self: flex-start;
+  margin-top: 4px;
+  background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0; box-shadow: none;
+  padding: 0 0 1px; cursor: pointer;
+  font-family: var(--font-showroom-body); font-weight: 800; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--text);
+}
+.chat-act:hover, .chat-status-reset:hover { color: var(--accent); border-color: var(--accent); }
+.chat-act.copied { color: var(--success-fg); border-color: var(--success-fg); }
+
+/* The foot of the rail: that a machine answers, and whose agent it is. */
+.chat-rail-foot { margin-top: auto; padding-top: 16px; display: flex; flex-direction: column; gap: 8px; }
 
 /* ── The conversation ── */
 .chat-main {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  /* A soft wash of the node's own accent rather than flat white. The chat was three greys deep —
-     surface, card and muted text — which reads as a disabled form rather than a conversation, and
-     none of the theme's colour reached it. Everything here is a theme token, so it follows the
-     accent wherever the theme takes it. */
-  background: linear-gradient(180deg, var(--accent-subtle) 0%, var(--bg-card) 220px);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  overflow: hidden;
+  position: relative;
 }
 
-.chat-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--accent-border);
-}
-
-.chat-title {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--accent);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* The list is always visible on a desktop, so its toggle would be a button that does nothing. */
-.chat-list-toggle { display: none; }
-
-.chat-status {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding: 6px 16px;
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  border-bottom: 1px solid var(--border-subtle);
-  background: transparent;
-}
-
-.chat-status-agent { color: var(--accent); }
-.chat-status-ownkey { color: var(--accent); text-decoration: none; }
-.chat-status-ownkey:hover { text-decoration: underline; }
-/* The model sits beside the payer line, not in place of it: which model answered and whose money
-   paid are two different questions and a person checking one still needs the other. */
-.chat-status-model { color: var(--text-dim); }
-.chat-status-elsewhere { color: var(--text-dim); }
-.chat-status-reset { margin-left: auto; font-size: 0.75rem; padding: 2px 8px; }
+/* The head row is the phone's: on a desktop the rail carries the name and the actions. */
+.chat-head { display: none; }
 
 .chat-scroll {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  padding: 16px;
+  padding: 16px 0 12px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 20px;
 }
 
 .chat-welcome {
-  color: var(--text-muted);
+  color: var(--text-dim);
   max-width: 46ch;
   margin: auto;
   text-align: center;
+  font-weight: 600;
 }
 
 .chat-welcome h2 {
-  font-size: 1.1rem;
-  margin: 0 0 6px;
-  color: var(--text-primary);
+  font-family: var(--font-poster); font-weight: 400;
+  font-size: 2rem; line-height: 0.95; letter-spacing: -0.03em; text-transform: uppercase;
+  margin: 0 0 10px;
+  color: var(--text);
 }
 
-.chat-welcome p { margin: 0; line-height: 1.6; font-size: 0.9rem; }
+.chat-welcome p { margin: 0; line-height: 1.6; font-size: 0.95rem; }
 .chat-welcome .chat-welcome-trust { color: var(--text-dim); margin-top: 6px; }
 
-/* One concrete opening each, wrapping on a phone. Outline buttons: they are suggestions, and the
+/* One concrete opening each, wrapping on a phone. Underlined words: they are suggestions, and the
    composer stays the primary way in. */
 .chat-starters {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px 22px;
   justify-content: center;
-  margin-top: 14px;
+  margin-top: 18px;
 }
-.chat-starter { font-size: 0.82rem; padding: 6px 12px; }
+.chat-starter {
+  background: none; border: 0; border-bottom: 3px solid var(--text); border-radius: 0; box-shadow: none;
+  padding: 0 0 2px; cursor: pointer;
+  font-family: inherit; font-weight: 800; font-size: 0.88rem; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--text);
+}
+.chat-starter:hover { color: var(--accent); border-color: var(--accent); }
 
 /* ── One turn ── */
 .chat-turn {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  max-width: 85%;
+  gap: 5px;
+  max-width: 82%;
 }
 
 .chat-turn--user { align-self: flex-end; align-items: flex-end; }
 .chat-turn--agent { align-self: flex-start; }
 
 .chat-bubble {
-  padding: 10px 14px;
-  border-radius: var(--radius);
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  box-shadow: var(--shadow-sm);
-  line-height: 1.6;
-  font-size: 0.92rem;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  border: 0;
+  line-height: 1.55;
+  font-size: 1rem;
+  font-weight: 600;
   overflow-wrap: anywhere;
 }
 
+/* What the person said: a sun block, bold, its own words. */
 .chat-turn--user .chat-bubble {
-  background: var(--accent-subtle);
-  border: 1px solid var(--accent-border);
+  background: var(--sun);
+  color: var(--text);
+  padding: 10px 16px;
+  font-weight: 800;
+  font-size: 1.1rem;
+  letter-spacing: -0.01em;
 }
 
 /* The agent's side gets the accent as a spine rather than a fill: readable at any length, and it
    makes the two speakers tellable apart at a glance instead of by position alone. */
-.chat-turn--agent .chat-bubble { border-left: 3px solid var(--accent-border); }
+.chat-turn--agent .chat-bubble { border-left: 6px solid var(--accent-border); padding-left: 18px; }
 .chat-turn--live .chat-bubble { border-left-color: var(--accent); }
 
 .chat-said { margin: 0; white-space: pre-wrap; }
@@ -267,17 +308,20 @@
 
 .chat-thinking {
   margin: 0;
-  color: var(--text-muted);
+  color: var(--text-dim);
   font-style: italic;
 }
 
 .chat-meta {
   display: flex;
+  align-items: center;
   gap: 8px;
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  padding: 0 4px;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  padding: 0 2px;
 }
+.chat-turn--agent .chat-meta { padding-left: 24px; }
 
 .chat-model { font-family: var(--font-mono); }
 
@@ -287,31 +331,30 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-top: 10px;
+  margin-top: 12px;
 }
 .chat-card {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border: 2px solid var(--text);
   background: var(--bg-card);
 }
 .chat-card-img {
   width: 64px;
   height: 48px;
   object-fit: cover;
-  border-radius: 4px;
   flex: 0 0 auto;
 }
 .chat-card--image .chat-card-img { width: 120px; height: 90px; }
 .chat-card-body { min-width: 0; flex: 1 1 auto; }
 .chat-card-kind {
   font-size: 0.65rem;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
 }
 /* One colour per kind of thing, so a page, an app and a saved record are distinguishable before
    the words are read. Palette tokens only: they flip with the theme. */
@@ -321,15 +364,15 @@
 .chat-card--file .chat-card-kind { color: var(--teal); }
 .chat-card--memory .chat-card-kind { color: var(--mint); }
 .chat-card--workspace .chat-card-kind { color: var(--orange); }
-.chat-card--page { border-left: 3px solid var(--accent); }
-.chat-card--app { border-left: 3px solid var(--blue); }
-.chat-card--image { border-left: 3px solid var(--purple); }
-.chat-card--file { border-left: 3px solid var(--teal); }
-.chat-card--memory { border-left: 3px solid var(--mint); }
-.chat-card--workspace { border-left: 3px solid var(--orange); }
+.chat-card--page { border-left: 6px solid var(--accent); }
+.chat-card--app { border-left: 6px solid var(--blue); }
+.chat-card--image { border-left: 6px solid var(--purple); }
+.chat-card--file { border-left: 6px solid var(--teal); }
+.chat-card--memory { border-left: 6px solid var(--mint); }
+.chat-card--workspace { border-left: 6px solid var(--orange); }
 .chat-card-title {
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-size: 0.9rem;
+  font-weight: 800;
   overflow-wrap: anywhere;
 }
 .chat-card-ref { font-size: 0.72rem; color: var(--text-dim); overflow-wrap: anywhere; }
@@ -337,16 +380,17 @@
 
 /* ── The work log ── */
 .chat-work {
-  margin-top: 10px;
-  border-top: 1px solid var(--border-subtle);
+  margin-top: 12px;
+  border-top: 2px dashed var(--border);
   padding-top: 8px;
 }
 
 .chat-work-head {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
   margin-bottom: 4px;
 }
 
@@ -363,14 +407,15 @@
   display: flex;
   gap: 8px;
   align-items: baseline;
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   font-family: var(--font-mono);
+  font-weight: 400;
 }
 
 .chat-work-status {
   flex: 0 0 auto;
   min-width: 68px;
-  color: var(--text-muted);
+  color: var(--text-dim);
 }
 
 .chat-work-line--completed .chat-work-status { color: var(--success); }
@@ -389,13 +434,13 @@
   align-items: center;
   gap: 8px;
   margin-top: 8px;
-  font-size: 0.75rem;
-  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-dim);
 }
 .chat-live-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
+  width: 9px;
+  height: 9px;
   background: var(--accent);
   animation: chat-live-pulse 1.4s ease-in-out infinite;
 }
@@ -409,44 +454,55 @@
    rather than pushing it, so its appearance never moves the text you are reading. */
 .chat-jump-latest {
   position: absolute;
-  right: 20px;
-  bottom: 96px;
+  right: 8px;
+  bottom: 84px;
   z-index: 4;
-  font-size: 0.78rem;
-  padding: 4px 10px;
-  box-shadow: var(--shadow-sm);
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 6px 12px;
+  background: var(--text); color: var(--bg);
+  border: 0; border-radius: 0; box-shadow: 4px 4px 0 var(--sun);
+  cursor: pointer;
 }
-.chat-main { position: relative; }
 
 /* The session cap's managed landing: stands where the composer stood, so the conversation ends
    in a door rather than a dead input. */
 .chat-cap {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  padding: 1rem 1.2rem;
+  border-top: 3px solid var(--text);
+  background: none;
+  padding: 1rem 0 1.2rem;
   margin-top: 0.5rem;
 }
-.chat-cap-title { margin: 0 0 0.4rem; font-weight: 700; }
-.chat-cap-body { margin: 0 0 0.8rem; font-size: 0.92rem; color: var(--text-dim); line-height: 1.55; }
+.chat-cap-title { margin: 0 0 0.4rem; font-family: var(--font-poster); font-weight: 400; font-size: 1.2rem; text-transform: uppercase; }
+.chat-cap-body { margin: 0 0 0.8rem; font-size: 0.95rem; font-weight: 600; color: var(--text-dim); line-height: 1.55; }
 .chat-cap-actions { display: flex; gap: 0.7rem; flex-wrap: wrap; }
 
-.chat-copy { padding: 0 4px; }
-.chat-copy-all { margin-left: auto; font-size: 0.75rem; padding: 2px 8px; }
+.chat-copy { padding: 0 4px; background: none; border: 0; box-shadow: none; color: var(--text-dim); cursor: pointer; }
+.chat-copy:hover { color: var(--text); }
 
-/* That a machine is on the other end. Quiet, above the conversation, with the rest one press away. */
+/* That a machine is on the other end. In the rail on a desktop; on a phone the main copy shows. */
 .chat-ai-notice {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  padding: 6px 16px;
+  padding: 0;
+  font-weight: 800;
+  font-size: 0.74rem;
+  color: var(--text-dim);
+  line-height: 1.45;
 }
-.chat-ai-notice-line { flex: 1 1 260px; }
-/* One line once it has been read: the words stay, the block does not take the top of the page. */
-.chat-ai-notice--compact { padding: 2px 16px; }
-.chat-ai-notice-short { font-size: 0.72rem; color: var(--text-dim); }
-.chat-ai-more { font-size: 0.72rem; padding: 2px 8px; }
+.chat-ai-notice-line { flex: 1 1 100%; }
+.chat-ai-notice--compact { padding: 0; }
+.chat-ai-notice-short { font-size: 0.74rem; color: var(--text-dim); }
+.chat-ai-more {
+  background: none; border: 0; box-shadow: none; padding: 0; cursor: pointer;
+  font-family: var(--font-mono); font-weight: 400; font-size: 0.7rem; color: var(--accent);
+  text-decoration: underline; text-underline-offset: 3px;
+}
+.chat-ai-notice--main { display: none; }
 
 /* One suggestion, once, with the way out on the same line as the ask. */
 .chat-nudge {
@@ -454,12 +510,12 @@
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  margin: 0 16px 8px;
+  margin: 12px 0 0;
   padding: 8px 12px;
-  border: 1px solid var(--accent-border);
-  background: var(--accent-subtle);
-  border-radius: var(--radius-sm);
-  font-size: 0.8rem;
+  border: 2px dashed var(--text);
+  background: none;
+  font-size: 0.82rem;
+  font-weight: 600;
   line-height: 1.5;
 }
 .chat-nudge-text { flex: 1 1 260px; }
@@ -467,9 +523,10 @@
 
 /* Whose agent this is. Quiet, and permanently there. */
 .chat-credit {
-  padding: 6px 16px 10px;
-  text-align: center;
-  font-size: 0.72rem;
+  padding: 0;
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
 }
 .chat-credit-link {
   display: inline-flex;
@@ -478,7 +535,7 @@
   color: var(--text-dim);
   text-decoration: none;
 }
-.chat-credit-link:hover { color: var(--text-muted); text-decoration: underline; }
+.chat-credit-link:hover { color: var(--accent); text-decoration: underline; }
 .chat-credit-mark { font-size: 0.9rem; }
 
 /* The fork an agent named, as buttons. The note keeps the box in play: three options are never the
@@ -487,19 +544,23 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 8px 18px;
   align-self: flex-start;
-  max-width: 85%;
+  max-width: 82%;
 }
-.chat-choice { font-size: 0.82rem; padding: 6px 12px; }
-.chat-choices-note { font-size: 0.75rem; color: var(--text-dim); }
+.chat-choice {
+  background: none; border: 0; border-bottom: 3px solid var(--text); border-radius: 0; box-shadow: none;
+  padding: 0 0 2px; cursor: pointer;
+  font-family: inherit; font-weight: 800; font-size: 0.88rem; color: var(--text);
+}
+.chat-choice:hover { color: var(--accent); border-color: var(--accent); }
+.chat-choices-note { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim); }
 
 /* ── A turn that could not run ── */
 .chat-error {
   align-self: stretch;
-  border: 1px solid var(--accent-border);
-  background: var(--accent-subtle);
-  border-radius: var(--radius-sm);
+  border: 2px solid var(--accent);
+  background: none;
   padding: 10px 14px;
   display: flex;
   align-items: center;
@@ -510,7 +571,8 @@
 .chat-error-msg {
   margin: 0;
   flex: 1 1 240px;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
+  font-weight: 600;
   line-height: 1.5;
 }
 
@@ -521,19 +583,18 @@
   align-items: center;
   gap: 6px;
   padding: 3px 6px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border: 2px solid var(--text);
   background: var(--bg-surface);
   font-size: 0.75rem;
+  font-weight: 600;
   max-width: 220px;
 }
 .chat-attachment--error { border-color: var(--danger); color: var(--danger); }
-.chat-attachment-thumb { width: 28px; height: 28px; object-fit: cover; border-radius: 3px; }
+.chat-attachment-thumb { width: 28px; height: 28px; object-fit: cover; }
 .chat-attachment-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chat-attachment-state { color: var(--text-muted); }
+.chat-attachment-state { color: var(--text-dim); }
 .chat-attachment-drop { padding: 0 4px; line-height: 1; }
 .chat-file-input { display: none; }
-.chat-attach { flex: 0 0 auto; padding: 6px 10px; }
 
 .chat-turn-images { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 .chat-turn-file {
@@ -541,84 +602,102 @@
   align-items: center;
   gap: 6px;
   padding: 4px 8px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
+  border: 2px solid var(--text);
   background: var(--bg-surface);
   font-size: 0.78rem;
+  font-weight: 600;
   color: inherit;
   text-decoration: none;
 }
-.chat-turn-file:hover { border-color: var(--accent-border); }
+.chat-turn-file:hover { color: var(--accent); }
 .chat-turn-image {
   max-width: 220px;
   max-height: 180px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-subtle);
+  border: 2px solid var(--text);
 }
 
-/* ── The composer ── */
+/* ── The composer: one row ── */
 .chat-composer {
-  border-top: 1px solid var(--border-subtle);
-  padding: 10px 16px;
-  background: var(--bg-card);
+  flex: none;
+  border-top: 3px solid var(--text);
+  padding: 10px 0 12px;
+  background: var(--bg);
 }
 
 .chat-composer-note {
   margin: 0 0 6px;
   font-size: 0.78rem;
-  color: var(--text-muted);
+  font-weight: 600;
+  color: var(--text-dim);
   line-height: 1.5;
 }
 
 .chat-composer-row {
   display: flex;
-  gap: 8px;
-  align-items: flex-end;
+  gap: 12px;
+  align-items: center;
 }
 
 .chat-input {
   flex: 1 1 auto;
   min-width: 0;
   resize: none;
+  height: 44px;
   max-height: 200px;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg-input);
+  padding: 8px 0;
+  border: 0;
+  border-bottom: 3px solid var(--text);
+  border-radius: 0;
+  background: transparent;
   color: inherit;
   font: inherit;
-  font-size: 0.92rem;
+  font-weight: 700;
+  font-size: 1.05rem;
   line-height: 1.5;
 }
-
+.chat-input::placeholder { color: var(--text-dim); font-weight: 600; }
 .chat-input:focus {
   outline: none;
-  border-color: var(--border-focus);
-  background: var(--bg-input-focus);
+  border-color: var(--accent);
 }
+.chat-input:disabled { opacity: 0.6; }
+
+/* The two tools beside the field: square, ink-framed, 44px. */
+.chat-attach, .chat-voice {
+  flex: 0 0 auto;
+  width: 44px; height: 44px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 2px solid var(--text); border-radius: 0; box-shadow: none;
+  background: var(--bg); color: var(--text); cursor: pointer; font-size: 1rem;
+}
+.chat-attach:hover, .chat-voice:hover { background: var(--sun); }
 
 .chat-send { flex: 0 0 auto; }
 
-/* The way OUT of the full-screen phone chat. Desktop has the site nav, so it hides there. */
+/* The way OUT of the full-screen phone chat, and the icon buttons of the phone's head row.
+   Desktop has the rail, so all of it hides there. */
 .chat-back { display: none; }
-.chat-voice { flex: 0 0 auto; }
+.chat-ico { display: none; }
 
 /* The read-aloud control sits with the timestamp rather than on the bubble: it is about the turn,
    not part of what was said. */
-.chat-listen { font-size: 0.7rem; padding: 0 6px; }
+.chat-listen { font-size: 0.7rem; padding: 0 6px; background: none; border: 0; box-shadow: none; color: var(--text-dim); cursor: pointer; }
+.chat-listen:hover { color: var(--text); }
 
 /* ── Phones ──
    One pane at a time. The page takes the whole viewport, the shell's sticky nav is hidden (it lives
    in a higher stacking context, so a z-index here cannot cover it), and the composer sits on the
    keyboard: --chat-avail is the measured visual-viewport height, with 100dvh as the fallback the
    viewport meta's interactive-widget=resizes-content already provides. Same pattern as the inbox,
-   which is the surface this one is modelled on. */
+   which is the surface this one is modelled on. One row above the conversation, one row below. */
 @media (max-width: 760px) {
   .chat-view {
     position: fixed;
     inset: 0;
     z-index: 1000;
-    grid-template-columns: 1fr;
+    /* minmax(0, …), not a bare 1fr: a bare 1fr floors at the column's min-content width, and a
+       long unbroken line in a turn then pushed the whole column to 752px on a 390px phone. */
+    grid-template-columns: minmax(0, 1fr);
     gap: 0;
     padding: 0;
     max-width: none;
@@ -633,46 +712,60 @@
   .chat-threads { display: none; }
   .chat-view--list .chat-threads {
     display: flex;
-    padding: 12px;
-    background: var(--bg-card);
+    padding: 12px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+    border-right: 0;
+    background: var(--bg);
   }
   .chat-view--list .chat-main { display: none; }
-
-  .chat-list-toggle { display: inline-flex; }
-  .chat-threads-close { display: inline-flex; align-self: flex-start; }
-
-  .chat-main {
-    border: none;
-    border-radius: 0;
-    height: 100%;
+  .chat-threads-close {
+    display: inline-flex; align-items: center; align-self: flex-start; min-height: 44px; margin-bottom: 4px;
+    background: none; border: 0; box-shadow: none; padding: 0;
+    font-family: var(--font-mono); font-size: 0.8rem; color: var(--accent); cursor: pointer;
   }
 
-  .chat-back { display: inline-flex; align-items: center; min-height: 40px; flex: 0 0 auto; }
-  .chat-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chat-main { height: 100%; }
+
+  /* The one row above: back, the name, copy, the drawer. 48px, and nothing else above the words. */
+  .chat-head {
+    display: flex; align-items: center; gap: 8px;
+    flex: none; height: 48px; padding: 0 8px 0 12px;
+    border-bottom: 3px solid var(--text);
+  }
+  .chat-back {
+    display: inline-flex; align-items: center; min-width: 44px; min-height: 44px;
+    font-family: var(--font-mono); font-size: 0.78rem; color: var(--accent); text-decoration: none; white-space: nowrap;
+  }
+  .chat-title {
+    flex: 1 1 auto; min-width: 0; margin: 0;
+    font-family: var(--font-poster); font-weight: 400;
+    font-size: 0.9rem; line-height: 1.1; letter-spacing: -0.01em; text-transform: uppercase;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .chat-ico {
+    display: inline-flex; align-items: center; justify-content: center; flex: none;
+    width: 44px; height: 40px;
+    border: 2px solid var(--text); border-radius: 0; box-shadow: none; background: var(--bg);
+    color: var(--text); font-weight: 800; font-size: 1rem; cursor: pointer; padding: 0;
+  }
+  .chat-list-toggle { background: var(--sun); }
+  .chat-copy-head.copied { background: var(--sun); }
+
+  /* The notice where the person is looking, one line, above the words. */
+  .chat-ai-notice--main { display: flex; flex-wrap: nowrap; padding: 6px 12px 0; }
+  .chat-ai-notice--main .chat-ai-notice-line { flex: 1 1 auto; min-width: 0; }
+  .chat-ai-notice--main .chat-ai-more { flex: none; white-space: nowrap; }
 
   .chat-turn { max-width: 92%; }
-  .chat-scroll { padding: 16px 12px; gap: 16px; }
+  .chat-scroll { padding: 12px 12px 8px; gap: 16px; }
+  .chat-turn--user .chat-bubble { font-size: 1rem; padding: 9px 13px; }
+  .chat-turn--agent .chat-bubble { border-left-width: 5px; padding-left: 11px; }
+  .chat-turn--agent .chat-meta { padding-left: 16px; }
   .chat-composer {
-    padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
+    padding: 8px 8px calc(10px + env(safe-area-inset-bottom, 0px)) 12px;
   }
-
-  /* The composer, two honest rows. One row squeezed the textarea to a slot between three
-     buttons — the writing surface was the smallest thing on the writing row. The box takes the
-     full width; the controls sit under it, attach and voice on the left, Send grown to a real
-     target on the right. */
-  .chat-composer-row { flex-wrap: wrap; }
-  .chat-input { flex: 1 1 100%; }
-  .chat-attach, .chat-voice { flex: 0 0 auto; min-height: 40px; }
-  .chat-send { flex: 1 1 auto; margin-left: auto; max-width: 50%; min-height: 40px; }
-
-  /* The status area earns its rows. The agent's GAII is identity chrome a phone screen cannot
-     afford — it is on the desktop, in the profile, and in every record; the money line and the
-     model stay because one is about their wallet and the other makes answers checkable. */
-  .chat-status { padding: 4px 12px; gap: 8px; }
-  .chat-status-agent { display: none; }
-  /* The full model id is a third of the screen's width; the tooltip keeps the whole string. */
-  .chat-status-model { max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .chat-ai-notice { padding: 4px 12px; }
-  .chat-head { padding: 10px 12px; }
-  .chat-copy-all { font-size: 0.7rem; padding: 2px 6px; }
+  .chat-composer-row { gap: 8px; }
+  .chat-attach, .chat-voice { width: 40px; }
+  .chat-send { min-width: 60px; padding: 0 14px; }
+  .chat-jump-latest { right: 12px; bottom: 80px; }
+  .chat-nudge { margin: 8px 12px 0; }
 }

@@ -18,6 +18,8 @@
  *   import { HomeHeader } from '/views/home/header.js';
  *   html`<${HomeHeader} name=${name} onOpenSettings=${() => setOpen(true)} />`
  * @version-history
+ *   v1.4.0 — 2026-08-28 — The poster home: the two actions are ink-underlined links (.koti-link)
+ *     rather than ghost buttons, so the nameplate's masthead has one register.
  *   v1.3.0 — 2026-08-27 — The door to settings and controls beside the settings button, and the
  *     button says "Home settings", since the dialog behind it now holds only the home's own two.
  *   v1.2.1 — 2026-08-23 — Em-dash swept from the identity hint (banned in every surface).
@@ -62,10 +64,10 @@ export function HomeHeader({ name, owner, identity, onOpenSettings }) {
         ${/* The door to everything behind the home. The header carries the same link, but a person
               reading the nameplate is not reading the header, and the relationship (home in front,
               controls behind) has to be visible on the page itself. */''}
-        <a class="btn-ghost koti-controls-link" href="/v1/profile">
+        <a class="koti-link koti-controls-link" href="/v1/profile">
           ${tr('home.settings.allControls', 'All settings and controls')} →
         </a>
-        <button type="button" class="btn-ghost koti-settings-btn" onClick=${onOpenSettings}>
+        <button type="button" class="koti-link koti-settings-btn" onClick=${onOpenSettings}>
           ${Cog}
           <span>${tr('home.settings.open', 'Home settings')}</span>
         </button>

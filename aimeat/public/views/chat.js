@@ -16,6 +16,12 @@
  *   - ChatView — the page: status, conversations, one live turn
  * @usage import ChatView from '/views/chat.js'
  * @version-history
+ *   v2.0.0 — 2026-08-28 — The poster chat, vertical space first (Jouni: "the chat space is what
+ *     matters, and the input at the bottom"). Everything that is not the conversation moves into
+ *     the rail: the conversation's name, the status line, Copy conversation, Reset session, the AI
+ *     notice and the goose credit sit under the thread list, which on a phone is the drawer. The
+ *     head row stays for the phone only (back, the name, the drawer toggle, copy), and the
+ *     conversation runs from the bar to the one-row composer.
  *   v1.8.0 — 2026-08-27 — The phone's back button goes to the home, always. It read the onboarding
  *     cohort before, which is not where the person asked to be.
  *   v1.7.0 — 2026-08-23 — A fourth starter, "Set up my company" (TARGET-071). The other three name
@@ -525,35 +531,56 @@ export default function ChatView() {
                 onOpen=${openThread}
                 onNew=${startThread}
                 onDelete=${removeThread}
-                onClose=${() => setListOpen(false)} />
+                onClose=${() => setListOpen(false)}>
+                ${/* Everything about THIS conversation that is not the conversation: its name, who
+                      answers and on whose money, and the two actions. In the rail on a desktop, in
+                      the drawer on a phone, so the column keeps its height for the words. */''}
+                <div class="chat-this">
+                    <h2 class="chat-rail-h">${tr('chat.thisConversation', 'This conversation')}</h2>
+                    <p class="chat-rail-title">${thread?.title ?? tr('chat.title', 'Chat')}</p>
+                    <${StatusBar} status=${status} onReset=${thread ? resetSession : null} />
+                    ${turns.length > 0 && html`<${CopyButton}
+                        text=${conversationAsText(thread?.title, turns)}
+                        className="chat-act chat-copy-all"
+                        label=${tr('chat.copyAll', 'Copy conversation')}
+                        copiedLabel=${'✓ ' + t('common.copied')}
+                        title=${tr('chat.copyAllTitle', 'Copy the whole conversation as text')}
+                        ariaLabel=${tr('chat.copyAll', 'Copy conversation')} />`}
+                </div>
+                <div class="chat-rail-foot">
+                    <${AiNotice} compact=${true} />
+                    <${GooseCredit} />
+                </div>
+            <//>
 
             <section class="chat-main">
                 <header class="chat-head">
                     <!-- On a phone this page owns the whole screen and the site nav is hidden, so
-                         without this there is NO way back to anything. Mobile-only via CSS. -->
-                    <a class="btn-ghost chat-back" href=${exitHref}
+                         without this there is NO way back to anything. The whole row is phone-only
+                         via CSS: on a desktop the rail carries the name and the actions. -->
+                    <a class="chat-back" href=${exitHref}
                         aria-label=${tr('chat.back', 'Back')}>← ${tr('chat.back', 'Back')}</a>
-                    <button type="button" class="btn-ghost chat-list-toggle"
-                        onClick=${() => setListOpen((o) => !o)}>
-                        ${listOpen ? tr('chat.closeList', 'Close') : tr('chat.openList', 'Conversations')}
-                    </button>
                     <h1 class="chat-title">${thread?.title ?? tr('chat.title', 'Chat')}</h1>
                     <!-- The whole conversation as plain text: what you paste into a document, an
                          issue or another AI. Both sides, in order, with the work log left out —
                          it is a record of the conversation, not of the machinery. -->
                     ${turns.length > 0 && html`<${CopyButton}
                         text=${conversationAsText(thread?.title, turns)}
-                        className="btn-ghost chat-copy-all"
-                        label=${tr('chat.copyAll', 'Copy conversation')}
-                        copiedLabel=${'✓ ' + t('common.copied')}
+                        className="chat-ico chat-copy-head"
+                        label="⧉"
+                        copiedLabel="✓"
                         title=${tr('chat.copyAllTitle', 'Copy the whole conversation as text')}
                         ariaLabel=${tr('chat.copyAll', 'Copy conversation')} />`}
+                    <button type="button" class="chat-ico chat-list-toggle"
+                        aria-label=${listOpen ? tr('chat.closeList', 'Close') : tr('chat.openList', 'Conversations')}
+                        title=${listOpen ? tr('chat.closeList', 'Close') : tr('chat.openList', 'Conversations')}
+                        onClick=${() => setListOpen((o) => !o)}>${listOpen ? '✕' : '≡'}</button>
                 </header>
 
-                <${StatusBar} status=${status} onReset=${thread ? resetSession : null} />
-                ${/* Full while this is the first conversation and nothing has been said yet; one
-                      line from the first answer onwards. */''}
-                <${AiNotice} compact=${turns.length > 0 || threads.length > 1} />
+                ${/* The phone keeps the notice where the person is looking: full on the first
+                      conversation, one line from the first answer onwards. The desktop reads it in
+                      the rail, so this copy is phone-only via CSS. */''}
+                <${AiNotice} compact=${turns.length > 0 || threads.length > 1} className="chat-ai-notice--main" />
                 ${showMobileNudge && html`<${MobileNudge} onDismiss=${dismissNudge} />`}
                 ${!showMobileNudge && html`<${InstallCta} compact=${true} />`}
 
@@ -615,8 +642,6 @@ export default function ChatView() {
                     busy=${busy}
                     disabled=${disabled}
                     note=${disabled ? (status?.note ?? '') : ''} />`}
-
-                <${GooseCredit} />
             </section>
         </div>
     `;

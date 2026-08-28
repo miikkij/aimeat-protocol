@@ -12,6 +12,9 @@
    @usage Loaded first in spa.html <head>; the theme is toggled by /js/theme.js
      which flips the data-theme attribute on <html>.
    @version-history
+     v1.31.0 — 2026-08-28 — --font-poster (Archivo Black): the display face of the poster skin the
+       home, the settings overview and the chat wear (design canvas "AIMEAT Home, Settings and
+       Chat", direction C). Additive only; loaded in spa.html with the other faces.
      v1.30.1 — 2026-08-28 — The two font tokens renamed --font-showroom / --font-showroom-body:
        --font-display was already the variable lib/aimeat-theme.css reads for every heading, so
        defining it here put Bungee on the whole shell.
@@ -189,6 +192,10 @@
      on every heading in the shell for one afternoon. */
   --font-showroom: 'Bungee', 'Archivo', 'DM Sans', system-ui, sans-serif;
   --font-showroom-body: 'Archivo', 'DM Sans', system-ui, sans-serif;
+  /* The poster voice of the inside pages (home, settings overview, chat): Archivo Black for the
+     headlines and the big numbers, --font-showroom-body for everything else. Same rule as above:
+     not --font-display. */
+  --font-poster: 'Archivo Black', 'Archivo', 'DM Sans', system-ui, sans-serif;
 
   /* The sticker yellow of the showroom front page. Used for the kicker, the price sticker and the
      live counters; not a semantic colour (that is --warn) and it does not flip in dark mode. */
