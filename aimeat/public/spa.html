@@ -63,7 +63,7 @@
       }
     })();
   </script>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800&family=JetBrains+Mono:wght@400;500&family=Bungee&family=Archivo:ital,wght@0,400;0,600;0,800;1,400&display=swap" rel="stylesheet">
   <!-- The palette definitions (--color-* per data-palette, light and dark), loaded BEFORE
        theme.css on purpose: theme.css ends with the bridge that maps these onto the shell's own
        tokens, and it re-declares --border — a width here, a color there — so order is the tiebreak. -->
@@ -82,6 +82,7 @@
   <!-- View CSS preloaded so they are ready before any view renders (prevents FOUC) -->
   <!-- hrefs are stamped with ?v=BUILD_ID at serve time by portal.ts serveSpa() -->
   <link rel="stylesheet" href="/css/views/landing.css">
+  <link rel="stylesheet" href="/css/views/landing-showroom.css">
   <link rel="stylesheet" href="/css/views/portal-classic.css">
   <link rel="stylesheet" href="/css/views/portal-dev.css">
   <link rel="stylesheet" href="/css/views/profile.css">
@@ -129,6 +130,8 @@
       "/views/landing-builder.js": "/views/landing-builder.js",
       "/views/landing-changelog.js": "/views/landing-changelog.js",
       "/views/landing-doors.js": "/views/landing-doors.js",
+      "/views/landing-showroom.js": "/views/landing-showroom.js",
+      "/views/landing-showroom-rooms.js": "/views/landing-showroom-rooms.js",
       "/views/landing-node-totals.js": "/views/landing-node-totals.js",
       "/views/landing-prompts.js": "/views/landing-prompts.js",
       "/views/landing-wall.js": "/views/landing-wall.js",
@@ -435,7 +438,8 @@
       // logged-in visitors are forwarded to /v1/profile by the view itself. The old
       // portal view stays reachable at /v1/classic (prompt boxes / "Build").
       '/v1/portal':      () => import('/views/landing.js' + B),
-      '/v1/pricing':     () => import('/views/pricing.js' + B),
+      // /v1/pricing is gone (2026-08-28): the store is its own AIMEAT instance and the only place
+      // a price exists. The server redirects the old address there, or to the front page.
       '/v1/start':       () => import('/views/start.js' + B),
       '/v1/how-it-works': () => import('/views/how-it-works.js' + B),
       '/v1/glossary':    () => import('/views/glossary.js' + B),
@@ -876,7 +880,7 @@
     // where that hurts. Work surfaces (profile, admin, home, the pop-outs) get no footer: a
     // page you work in is not a page you leave from.
     const FOOTER_ROUTES = new Set([
-      '/v1/portal', '/v1/pricing', '/v1/how-it-works', '/v1/business',
+      '/v1/portal', '/v1/how-it-works', '/v1/business',
       '/v1/members', '/v1/help', '/v1/glossary', '/v1/transparency',
     ]);
 
@@ -889,13 +893,17 @@
       return html`
         <footer class="site-footer">
           <div class="site-footer-row">
-            <a href="/v1/pricing" onClick=${(e) => go(e, '/v1/pricing')}>${tr('footer.pricing', 'Pricing')}</a>
+            ${/* The store is the one price door, and it is an address this node is told, not a page
+                  it has: no store, no link. The pricing page it replaced is gone. */''}
+            ${(window.__SITE && window.__SITE.store)
+              ? html`<a href=${window.__SITE.store} target="_blank" rel="noopener">${tr('footer.store', 'Store')}</a>`
+              : ''}
             <a href="/v1/help" onClick=${(e) => go(e, '/v1/help')}>${tr('nav.help', 'Help')}</a>
             <a href="/v1/how-it-works" onClick=${(e) => go(e, '/v1/how-it-works')}>${tr('nav.howItWorks', 'How it works')}</a>
             <a href="/v1/business" onClick=${(e) => go(e, '/v1/business')}>${tr('nav.business', 'For your business')}</a>
             <a href="/v1/members" onClick=${(e) => go(e, '/v1/members')}>${tr('nav.members', 'Members')}</a>
             <a href="/v1/portal?view=dev" onClick=${(e) => go(e, '/v1/portal?view=dev')}>${tr('nav.devView', 'For Developers')}</a>
-            <a href="/v1/pricing#own-node" onClick=${(e) => go(e, '/v1/pricing#own-node')}>${tr('footer.ownNode', 'Run your own node')}</a>
+            <a href="https://github.com/miikkij/aimeat-protocol/releases/latest" target="_blank" rel="noopener">${tr('footer.ownNode', 'Run your own node')}</a>
             <a href="/v1/transparency" onClick=${(e) => go(e, '/v1/transparency')}>${tr('footer.transparency', 'AI transparency')}</a>
             <a href="https://github.com/miikkij/aimeat-protocol" target="_blank" rel="noopener">GitHub</a>
           </div>

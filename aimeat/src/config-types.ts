@@ -7,6 +7,10 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   v1.6.0 — 2026-08-28 — siteLinks.store and siteLinks.incubator, and storeEnabled derived from the
+ *     first: the store is its own AIMEAT instance and the one place a price exists, so this node
+ *     shows a store section only when told where the store is. The two site-link interfaces moved
+ *     verbatim to config-types-site-links.ts (this file had reached 806 lines) and are re-exported.
  *   v1.5.0 — 2026-08-26 — ConnectionsConfig mixed in (config-types-connections.ts): the OUTBOUND
  *     connect credentials moved verbatim when the Microsoft mail registration took this file over
  *     the 800-line ceiling again. It sits beside SocialLoginConfig on purpose and is not the same
@@ -126,65 +130,11 @@ export interface OperatorConfig {
   policyVersion: string;
 }
 
-/**
- * Links the public marketing pages (landing, how-it-works, business, help) point at.
- *
- * These are THIS node's own apps and contacts, not protocol features. aimeat.io fills them
- * in from its deployment environment; a fresh clone leaves them empty and every page renders
- * without the link, the nav item or the whole section. Nothing here may be required for a
- * page to work — an operator who sets none of it still gets a coherent site that never
- * advertises somebody else's apps or phone number.
- *
- * Same posture rule as the rest of the config (Rule 10): safe public default in the repo,
- * documented per-node override.
- */
-/**
- * One person printed on the public pages. The FIRST entry with an email is the one every
- * "book a demo" / "talk to us" call to action mails, so order it by who should field the
- * first contact rather than by seniority.
- */
-export interface SiteContact {
-  /** Display name. */
-  name: string;
-  /** Role line under the name (e.g. "CEO and co-founder"). Optional. */
-  role: string;
-  /** Contact email. An entry with no email is dropped — it would render as a dead card. */
-  email: string;
-  /** Phone, rendered as a tel: link. Optional. */
-  phone: string;
-  /** Profile URL (LinkedIn or equivalent), rendered as a link. Optional. */
-  linkedin: string;
-}
-
-export interface SiteLinksConfig {
-  /** Hands-on academy / showroom app. Renders the "Learn" nav item when set. */
-  learn: string;
-  /** Capability marketplace app. Renders the "EXCHANGE" nav item when set. */
-  exchange: string;
-  /** Free AI current-state assessment used as the business-page entry point. */
-  assessment: string;
-  /** Public roadmap + portfolio surface. */
-  roadmap: string;
-  /** Agent-written publication, used as the "work happens without you" proof. */
-  paper: string;
-  /** CRM app. */
-  crm: string;
-  /** Company-intelligence / mention radar app. */
-  radar: string;
-  /** Morning briefing board app. */
-  briefing: string;
-  /** API-acceleration app (make an existing API agent-native). */
-  apiAccelerator: string;
-  /** Playbook app (the repeatable change package). */
-  playbooks: string;
-  /** An external node running on AIMEAT, shown as third-party proof. */
-  showcase: string;
-  /**
-   * People shown on the public pages, in the order they should be approached. Empty means the
-   * node prints no contact card and no "talk to us" control at all, which is a valid state.
-   */
-  contacts: SiteContact[];
-}
+// The site links (the apps, the store and the people the public pages point at) live in
+// config-types-site-links.ts since 2026-08-28, when they took this file past 800 lines. Re-exported
+// so every importer of SiteContact / SiteLinksConfig from here is unchanged.
+import type { SiteLinksConfig } from './config-types-site-links.js';
+export type { SiteContact, SiteLinksConfig } from './config-types-site-links.js';
 
 import type { AiCapabilityConfig } from './config-types-ai.js';
 import type { SitePresenceConfig } from './config-site-presence.js';
@@ -715,6 +665,13 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   templateDiscussionsEnabled: boolean;
   packageFederationEnabled: boolean;
   packageFederationAutoAccept: boolean;
+
+  /**
+   * Whether this node has a store to send people to: true exactly when `siteLinks.store` is set.
+   * A boolean of its own because the front page's store block gates on a boolean config field
+   * (BlockPresence 'config'), and a block that gated on a string would silently never appear.
+   */
+  storeEnabled: boolean;
 
   // Portfolio
   portfolioEnabled: boolean;

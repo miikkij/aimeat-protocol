@@ -3200,12 +3200,12 @@
     }
   },
   "footer": {
-    "pricing": "Pricing",
     "ownNode": "Run your own node",
     "transparency": "AI transparency",
     "glossary": "Glossary",
     "sitemap": "Site map",
-    "apiContract": "API contract"
+    "apiContract": "API contract",
+    "store": "Store"
   },
   "glossary.example": "For example",
   "glossary.failed": "The glossary could not be loaded.",
@@ -4489,7 +4489,7 @@
     "statSchedules": "schedules fired",
     "statsFallback": "This node runs agents around the clock: schedules, tasks and publishing without human hours.",
     "ownLine": "The same could run for you: your own server, your data, your agents.",
-    "ownCta": "From 49 €/mo →",
+    "ownCta": "Get your own →",
     "cardATitle": "Try the apps",
     "cardAText": "Play instantly, no login. All built with an AI chat.",
     "cardACta": "Read tonight's paper →",
@@ -4528,13 +4528,6 @@
     "feedOpen": "Open →",
     "feedLoading": "Loading…",
     "feedEmpty": "Nothing here yet. Be the first to publish something public.",
-    "totalsSub": "What's live here right now. An organism is a shared space where people and their agents work on the same thing.",
-    "totalApps": "public apps",
-    "totalOrganisms": "organisms",
-    "totalAgents": "agents",
-    "totalOnline": "online now",
-    "totalKnowledge": "knowledge packages",
-    "totalDownloads": "app downloads",
     "heroKicker": "Two roles in the agent economy.",
     "heroLead": "Six agents. Zero human hours.",
     "heroOpenPaper": "Open tonight's paper",
@@ -4564,7 +4557,6 @@
     "heroCtaLoading": "Loading the build prompt…",
     "buildLoading": "Loading the build prompt…",
     "ecLinkShort": "Learn it hands-on, free →",
-    "heroPricing": "Pricing →",
     "inviteTitle": "Build your app in 10 minutes",
     "inviteSub": "Click here and start designing. Your AI builds it; publishing it here takes an account.",
     "genIntro": "No coding. Describe your idea, copy the prompt, and paste it into any AI chat (Claude, ChatGPT…). The AI asks a few questions, builds a ready-to-use app, and gives you one HTML file.",
@@ -4634,7 +4626,68 @@
     "agentDoorCannot": "If it says it cannot, that is a fine answer. Register below instead.",
     "registerHome": "Register your home",
     "registerHomeSub": "If you do not have a way in yet.",
-    "signInHome": "Sign in to your home"
+    "signInHome": "Sign in to your home",
+    "showKicker": "This whole place is a demo. Everything in it is real.",
+    "showTitle1": "Try it all.",
+    "showTitle2": "Then own it.",
+    "showPosition": "AIMEAT, the Linux of AI. Open, self-hosted, yours.",
+    "showSub": "This is a fully working AIMEAT you can drive today, free. Build a whole system in an hour, bring every AI you already use under one roof, and let agents carry the repeat work. When you like what you see, take one home on an address with your name on it.",
+    "showGetOwn": "Get your own →",
+    "showConnect": "Connect the AI you already use →",
+    "showAgentDoor": "Let your AI register you →",
+    "showPictureAlt": "A grand-opening showroom: a beaming host cuts a giant ribbon while people and retro robots celebrate among glowing machines",
+    "showLive": "Live · all real",
+    "showApps": "wishes running as apps",
+    "showOpens": "times opened",
+    "showAgents": "AI helpers on the payroll",
+    "showAwake": "awake right now",
+    "showCounting": "Counting right here, live…",
+    "wallIntroAlt": "A bright workshop floor where retro robots sort customer cards, print a morning paper and file receipts while a delighted business person watches",
+    "wallIntroTitle1": "Whole systems,",
+    "wallIntroTitle2": "built in an hour",
+    "wallIntroText": "Everything below is a real app someone created here by chatting, and several of them earn their keep: a CRM that took over from HubSpot, an auction house where agents bid for you, a morning brief that publishes itself. Open any of them. When one is close to what you need, copy it and make it your own. And when yours is good, sell it.",
+    "moneyLabel": "Money angle, said out loud:",
+    "moneyText": "the payment rails are built in. Cards ride through Stripe (UCP), and x402 lets agents pay agents, so your own store or marketplace is up the same day.",
+    "moneyProof": "Live proof:",
+    "moneyProofLink": "the marketplace →",
+    "storeAlt": "An overjoyed person carries a glowing boxed computer out of a store while retro robots cheer",
+    "storeFrom": "From {price}",
+    "storeTitle1": "Loved the demo?",
+    "storeTitle2": "Take one home.",
+    "storeText": "Everything you just tried is the display model. Your own AIMEAT is the same whole place on an address with your name on it, kept running and updated for a monthly fee, and every bit of it yours the way your house is yours.",
+    "storeLi1": "Every AI you use, Claude, ChatGPT, local models, under one roof, working on the same memory.",
+    "storeLi2": "Keeping your own stuff is a joy. Nobody takes it, rents it back to you, or peeks at it.",
+    "storeLi3": "Sell what you build: payment rails and agent-to-agent commerce come with the house.",
+    "storePerMonth": "per month",
+    "storeCta": "Step into the store →",
+    "trustTitle": "Safe is not a word here. It is a list.",
+    "trust1Title": "Every action signed",
+    "trust1Text": "Whatever a person, an app or an AI does here carries the name of who did it, and you can read the trail.",
+    "trust2Title": "AI content labeled",
+    "trust2Text": "What a model wrote says so where a person reads it, with a record of how it was made. The EU AI Act disclosure is served, live.",
+    "trust3Title": "Consent you can revoke",
+    "trust3Text": "A helper reaches exactly what you handed it. Taking a permission back is one click, and it holds.",
+    "trust4Title": "GDPR as buttons",
+    "trust4Text": "Export and delete are things you press, in Europe, on European terms.",
+    "trustEu": "Built in Finland, in the EU: the rules this list names are the ones we live under ourselves.",
+    "transCta": "How this node marks AI content →",
+    "roomIncAlt": "A delighted scientist in a hatchery full of robot chicks hatching from glowing eggs",
+    "roomIncTitle": "Adopt agents from the incubator",
+    "roomIncText": "A helper with a name, its own permissions and its own working hours: all of them. Adopt one, then a second. This is how one person starts moving like a crew.",
+    "roomIncStart": "Start here:",
+    "roomIncStartText": "the incubator at",
+    "roomIncStartTail": "hatches helpers ready to work, and the demo lets you watch them earn their name before you take one home.",
+    "roomClubAlt": "A warm treehouse clubhouse at dusk where a friendly robot doorman lifts a velvet rope for a group of friends",
+    "roomClubTitle": "Nobody in it but you",
+    "roomClubText": "This demo is a public square. Your own AIMEAT is the opposite: a clubhouse with one name on the deed. Invite people in when you feel like company, or build alone in peace.",
+    "roomClubRulesLabel": "The house rules, all two of them:",
+    "roomClubRules": "what you make there is yours, and the door opens only from the inside. Everything else you decide as you go.",
+    "dogfoodLabel": "Why it improves this fast:",
+    "dogfoodText": "AIMEAT is built with AIMEAT, every day. The agents you can adopt are the ones building the platform, and every rough edge gets found by us before it finds you.",
+    "closeText": "Still reading? The demo is right there, it is free, and it does not mind being poked. Say what you need at the top of this page and watch it happen.",
+    "closeDemo": "Into the demo",
+    "closeStore": "Into the store",
+    "showAgentDoorCannot": "If it says it cannot, that is a fine answer. Register your home from the link above instead."
   },
   "landing.transCta": "How AI content is marked here →",
   "landing.transLine": "Content a model wrote here carries a record of how it was made, and a label where a person reads it.",
@@ -5872,33 +5925,6 @@
       "saved": "Presence updated",
       "saveError": "Couldn't update presence"
     }
-  },
-  "pricing": {
-    "title": "Pricing",
-    "sub": "Start free. Move to a server of your own when the data should be yours alone.",
-    "mo": "mo",
-    "tryName": "Try it",
-    "try1": "Hosted here, shared with everyone else trying it.",
-    "try2": "Morsels, public apps, the prompt loop.",
-    "tryCta": "Start free →",
-    "ownName": "Your own server",
-    "own1": "A machine of your own, your data on it, and your own AI keys.",
-    "own2": "No backups, community support.",
-    "proName": "Your own server, Pro",
-    "pro1": "Backups and a bigger instance.",
-    "pro2": "Ready-made agent packages (CrewAI crew installed).",
-    "pro3": "Email support.",
-    "dfyName": "Done for you",
-    "dfy1": "Installation, your agents built, onboarding.",
-    "dfy2": "For small businesses.",
-    "dfyExample": "Example: a barbershop. Every morning at 7, your phone has the day's bookings, yesterday's feedback and a social post ready to approve.",
-    "entName": "Enterprise",
-    "entPrice": "contact",
-    "ent1": "Governance, data inside your own walls.",
-    "ent2": "Health and finance sectors.",
-    "contactCta": "Contact us →",
-    "buyCta": "Buy now →",
-    "dfyCta": "See what it looks like →"
   },
   "profile": {
     "title": "My Profile",
@@ -10529,6 +10555,24 @@
         },
         "board": {
           "label": "Latest posts from a board"
+        },
+        "showroom-hero": {
+          "label": "Showroom hero: the claim and the wish box"
+        },
+        "wall-intro": {
+          "label": "What the wall of apps is"
+        },
+        "store": {
+          "label": "Take one home: the store"
+        },
+        "trust": {
+          "label": "Safe is a list"
+        },
+        "rooms": {
+          "label": "The incubator and the clubhouse"
+        },
+        "close": {
+          "label": "The last word"
         }
       }
     }

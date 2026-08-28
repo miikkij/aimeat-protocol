@@ -19,6 +19,8 @@
  * @structure SurfaceLayoutEditor
  * @usage html`<${SurfaceLayoutEditor} surface="home" onChanged=${bumpPreview} />`
  * @version-history
+ *   v1.0.1 — 2026-08-28 — A block's settings read `props`, the name the catalogue actually sends.
+ *     They read `settings`, so no block had an Edit button and nothing was editable by hand.
  *   v1.0.0 — 2026-08-26 — Initial.
  */
 import { h } from 'preact';
@@ -242,7 +244,11 @@ export function SurfaceLayoutEditor({ surface, onChanged }) {
         <tbody>
           ${blocks.map((b, idx) => {
             const def = defOf(b.id);
-            const settings = def ? Object.entries(def.settings ?? {}) : [];
+            // `props` is the catalogue's word (GET /v1/site/blocks, and the layout the validator
+            // reads); this read `settings`, which the node has never sent, so no block ever showed
+            // an Edit button and every setting was reachable only through the AI prompt. Found
+            // 2026-08-28 when the store block's price ladder had nowhere to be typed.
+            const settings = def ? Object.entries(def.props ?? {}) : [];
             const isOpen = openBlock === b.key;
             return html`
               <tr key=${b.key}>

@@ -34,7 +34,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { ContactCard } from '/components/ContactCard.js';
 import { openAppSandboxed, isAppHtmlUrl } from '/js/app-sandbox.js';
-import { siteLink, hasSite, contactHref } from '/js/site.js';
+import { siteLink, hasSite, contactHref, storeHref } from '/js/site.js';
 import { swallowed } from '/js/swallowed.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -183,7 +183,7 @@ export default function Business({ navigate }) {
             quoteBy=${'Kalle Määttä, founder, The Original Miskate Oy'}
             proofHref=${siteLink('showcase')}
             proofLabel=${tr('biz.c6Proof', 'Open a living node →')}
-            ctaLabel=${tr('biz.c6Cta', 'See hosting packages →')} ctaHref="/v1/pricing" />` : ''}
+            ctaLabel=${tr('biz.c6Cta', 'See hosting packages →')} ctaHref=${storeHref()} />` : ''}
       <//>
 
       <!-- The reason a regulated buyer signs. Often decisive before any of the cases above. -->
@@ -233,7 +233,7 @@ export default function Business({ navigate }) {
           ${hasSite('assessment') ? html`
             <a class="btn-primary" href=${siteLink('assessment')} target="_blank" rel="noopener">${tr('biz.ctaAssessment', 'Free: where is your AI right now? →')}</a>` : ''}
           ${CONTACT ? html`<a class=${hasSite('assessment') ? 'btn-outline' : 'btn-primary'} href=${CONTACT}>${tr('biz.ctaDemo', 'Book a demo →')}</a>` : ''}
-          <a class="btn-outline" href="/v1/pricing" onClick=${(e) => { e.preventDefault(); navigate('/v1/pricing'); }}>${tr('biz.ctaPricing', 'See pricing →')}</a>
+          ${storeHref() ? html`<a class="btn-outline" href=${storeHref()} target="_blank" rel="noopener">${tr('biz.ctaPricing', 'See pricing →')}</a>` : ''}
         </div>
       </div>
 

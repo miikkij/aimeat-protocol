@@ -22,6 +22,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { openAppSandboxed } from '/js/app-sandbox.js';
+import { storeHref } from '/js/site.js';
 import { swallowed } from '/js/swallowed.js';
 
 // t() echoes the key when a translation is missing — fall back to readable English.
@@ -32,7 +33,8 @@ const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fa
 const EyeMark = html`<svg class="ld-eye" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
 
 /* ── Today's stats + ownership line — THE sales core. Real numbers; zeros are omitted. ── */
-export function StatsPanel({ navigate }) {
+// No navigate prop any more: the one link here leaves the site (the store), so nothing routes.
+export function StatsPanel() {
   const [stats, setStats] = useState(null);
   useEffect(() => {
     fetch('/v1/public/node-stats-today').then(r => r.json())
@@ -54,9 +56,8 @@ export function StatsPanel({ navigate }) {
       </div>
       <div class="ld-stats-own">
         ${tr('landing.ownLine', 'The same could run for you. Your own node, your data, your agents.')}
-        <a class="ld-stats-cta" href="/v1/pricing" onClick=${(e) => { e.preventDefault(); navigate('/v1/pricing'); }}>
-          ${tr('landing.ownCta', 'From 49 €/mo →')}
-        </a>
+        ${/* The store is the one price door, so this line names no price of its own any more. */''}
+        ${storeHref() ? html`<a class="ld-stats-cta" href=${storeHref()} target="_blank" rel="noopener">${tr('landing.ownCta', 'Get your own →')}</a>` : ''}
       </div>
     </div>
   `;

@@ -11,6 +11,9 @@
  * @structure default export NodeTotals() — sibling component imported by landing.js.
  * @usage import NodeTotals from './landing-node-totals.js'; <${NodeTotals} />
  * @version-history
+ *   v2.0.0 — 2026-08-28 — The showroom strip: four figures on one dark band (apps, opens, agents,
+ *     awake now) in the visitor's words, no icons, no heading. The fetch and the refresh rules are
+ *     unchanged; organisms and knowledge packages stay in the answer and leave the strip.
  *   v1.0.0 — 2026-06-20 — Initial: cumulative node counters replacing the activity feed.
  */
 import { h } from 'preact';
@@ -45,30 +48,29 @@ export default function NodeTotals() {
     };
   }, []);
 
+  // Four figures on one dark strip, in the showroom's words: what people made, how often it was
+  // opened, how many helpers work here and how many are awake this minute. Organisms and knowledge
+  // packages are still in the answer and no longer on the strip: a visitor has no word for either
+  // yet, and a number with no word is noise. The strip says it is counting until the answer lands,
+  // because a hard 0 on a live counter reads as a dead node.
   const d = totals || {};
-  const cards = [
-    { icon: '🎮', value: d.apps, label: tr('landing.totalApps', 'public apps') },
-    { icon: '🧬', value: d.organisms, label: tr('landing.totalOrganisms', 'organisms') },
-    {
-      icon: '🤖', value: d.agents, label: tr('landing.totalAgents', 'agents'),
-      sub: d.agents_online > 0 ? `${num(d.agents_online)} ${tr('landing.totalOnline', 'online now')}` : null,
-    },
-    { icon: '📚', value: d.knowledge_packages, label: tr('landing.totalKnowledge', 'knowledge packages') },
-    { icon: '⬇️', value: d.downloads, label: tr('landing.totalDownloads', 'app downloads') },
+  const figures = [
+    { key: 'apps', value: d.apps, label: tr('landing.showApps', 'wishes running as apps') },
+    { key: 'opens', value: d.downloads, label: tr('landing.showOpens', 'times opened') },
+    { key: 'agents', value: d.agents, label: tr('landing.showAgents', 'AI helpers on the payroll') },
+    { key: 'awake', value: d.agents_online, label: tr('landing.showAwake', 'awake right now'), live: true },
   ];
 
   return html`
-    <section class="pa nt">
-      <h2 class="pa-title">${tr('landing.feedTitle', 'Happening on this node')}</h2>
-      <p class="pa-sub">${tr('landing.totalsSub', "What's live on this node right now.")}</p>
-      <div class="nt-grid">
-        ${cards.map(c => html`
-          <div class="nt-card" key=${c.label}>
-            <span class="nt-icon">${c.icon}</span>
-            <span class="nt-value">${totals ? num(c.value) : '–'}</span>
-            <span class="nt-label">${c.label}</span>
-            ${c.sub ? html`<span class="nt-sub">${c.sub}</span>` : null}
+    <section class="nt" aria-live="polite">
+      <div class="nt-strip">
+        ${figures.map(f => html`
+          <div class="nt-figure" key=${f.key}>
+            ${f.live ? html`<span class="nt-dot" aria-hidden="true"></span>` : null}
+            <span class="nt-value">${totals ? num(f.value) : '…'}</span>
+            <span class="nt-label">${f.label}</span>
           </div>`)}
       </div>
+      ${totals ? null : html`<p class="nt-counting">${tr('landing.showCounting', 'Counting right here, live…')}</p>`}
     </section>`;
 }

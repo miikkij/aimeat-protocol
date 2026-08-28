@@ -11,6 +11,8 @@
  *   pick() language resolver · fmtDate() · KIND labels.
  * @usage import NodeChangeLog from './landing-changelog.js'; <${NodeChangeLog} />
  * @version-history
+ *   v1.1.0 — 2026-08-28 — The "built with itself" claim leads the section, and the log is its
+ *     evidence. Styled as the showroom's yellow band; the fold and the data are unchanged.
  *   v1.0.0 — 2026-07-31 — Initial: folded change-log section fed by public/changelog.json.
  */
 import { h } from 'preact';
@@ -70,6 +72,14 @@ export default function NodeChangeLog() {
 
   return html`
     <section class="ld-log">
+      ${/* The claim first, the evidence under it: this platform is built with itself every day,
+            and the list below is what that produced. The two used to sit apart, the claim on a
+            static page and the log folded under the builder, and neither carried the other. */''}
+      <p class="ld-log-dogfood">
+        <span class="ld-log-dogfood-label">${tr('landing.dogfoodLabel', 'Why it improves this fast:')}</span>
+        ${' '}
+        ${tr('landing.dogfoodText', 'AIMEAT is built with AIMEAT, every day. The agents you can adopt are the ones building the platform, and every rough edge gets found by us before it finds you.')}
+      </p>
       <${Collapsible}
         title=${html`
           <span class="ld-log-head">

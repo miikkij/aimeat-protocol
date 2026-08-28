@@ -18,8 +18,15 @@
  *       wears it too.
  *   v1.6.0 — 2026-08-16 — .ld-wish: the wish box under the pitch line (input + GO), the front
  *       page's primary action.
+ *   v2.0.0 — 2026-08-28 — The showroom. The page widens to 1280; the wish box, the wall cards, the
+ *       counters (now one dark strip) and the change log (now the yellow band with the "built with
+ *       itself" claim) wear the showroom face: Bungee, 3px ink borders, solid offset shadows. The
+ *       pricing page's .ld-pricing / .ld-tier rules are gone with the page. The six new blocks have
+ *       their own file, landing-showroom.css.
  */
-.ld { max-width: 980px; margin: 0 auto; padding: 2rem 1.25rem 3rem; color: var(--text); }
+/* 1280 rather than 980 since the showroom (2026-08-28): its bands and its four-up wall want the
+   width, and the older blocks an operator may put back centre themselves inside it anyway. */
+.ld { max-width: 1280px; margin: 0 auto; padding: 0 1.25rem 3rem; color: var(--text); }
 
 /* ── Hero v2 — reward first: a newspaper-framed Sanomat teaser (designed card now, real
    screenshot when one exists) + two CTAs. Mobile-first, no iframe. ── */
@@ -79,20 +86,32 @@
 .ld-path-cta:hover { text-decoration: underline; }
 .ld-loop { display: flex; align-items: center; justify-content: center; gap: .6rem; flex-wrap: wrap; margin: 1.5rem 0 2rem; padding: .8rem 1rem; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-surface, var(--bg-dim)); font-size: .9rem; }
 .ld-loop-arrow { color: var(--text-dim); }
-.ld-section { margin: 2rem 0; }
-.ld-h2 { font-size: 1.3rem; margin: 0 0 1rem; }
-.ld-wall-search { width: 100%; max-width: 360px; margin: 0 0 1rem; padding: .55rem .8rem; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--text); font-size: .9rem; }
-.ld-gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: .9rem; }
+.ld-section { margin: 1rem 0 2rem; }
+/* The wall's heading wears the showroom face; the older blocks that reuse .ld-h2 (the prompts,
+   the folded builder) wear it too, which is the point: one page, one voice. */
+.ld-h2 { font-family: var(--font-display); font-weight: 400; text-transform: uppercase; font-size: clamp(1.3rem, 2.4vw, 1.8rem); line-height: 1.1; margin: 0 0 1rem; }
+.ld-wall-search { width: 100%; max-width: 360px; margin: 0 0 1rem; padding: .6rem .8rem; border: 3px solid var(--text); background: var(--card); color: var(--text); font-size: .9rem; font-family: var(--font-marketing); }
+.ld-wall-search:focus { outline: none; box-shadow: 4px 4px 0 var(--accent); }
+/* Four up since the showroom: the page is wider and the cards are the proof, so more of them
+   fit above the store. Three on a laptop, two on a tablet, one on a phone. */
+.ld-gallery { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.25rem; padding: 6px; }
+@media (max-width: 1100px) { .ld-gallery { grid-template-columns: repeat(3, 1fr); } }
 @media (max-width: 900px) { .ld-gallery { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 560px) { .ld-gallery { grid-template-columns: 1fr; } }
 /* A column so the footer can be pushed to the bottom edge. Cards in a row are as tall as the
    longest description, and a footer that floated up behind a short one left the ragged gap that
-   made the grid look unfinished. */
+   made the grid look unfinished. The showroom card: a 3px ink border and a solid offset shadow
+   whose colour rotates down the row (coral, ink, yellow, coral), two of every four tilted half a
+   degree, so the wall reads as stickers on a board rather than as a table. */
 .ld-app-card {
-  display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 10px;
-  background: var(--card); padding: .9rem 1rem; text-decoration: none; color: var(--text); cursor: pointer;
+  display: flex; flex-direction: column; border: 3px solid var(--text);
+  background: var(--card-bg); padding: 1rem 1.1rem; text-decoration: none; color: var(--text); cursor: pointer;
+  box-shadow: 6px 6px 0 var(--accent);
+  transition: transform 120ms ease, box-shadow 120ms ease;
 }
-.ld-app-card:hover { border-color: var(--accent); }
+.ld-app-card:nth-child(4n+2) { box-shadow: 6px 6px 0 var(--text); transform: rotate(.6deg); }
+.ld-app-card:nth-child(4n+3) { box-shadow: 6px 6px 0 var(--sun); transform: rotate(-.6deg); }
+.ld-app-card:hover, .ld-app-card:focus-visible { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--text); outline: none; }
 /* Search and order on one row; the order buttons wrap under the search on a narrow screen. */
 .ld-wall-bar { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin-bottom: .8rem; }
 .ld-wall-bar .ld-wall-search { flex: 1 1 220px; margin-bottom: 0; }
@@ -104,7 +123,7 @@
 .ld-wall-sort-btn:hover { color: var(--text); }
 .ld-wall-sort-btn.is-on { background: var(--accent); color: #fff; }
 
-.ld-app-shot { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); margin-bottom: .55rem; background: var(--bg-dim); }
+.ld-app-shot { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; border: 2px solid var(--text); margin-bottom: .55rem; background: var(--bg-dim); }
 .ld-app-name { font-weight: 700; margin-bottom: .25rem; }
 .ld-app-desc { font-size: .82rem; color: var(--text-dim); margin-bottom: .55rem; }
 .ld-app-meta { font-size: .72rem; color: var(--muted); }
@@ -129,16 +148,8 @@
 .ld-transline a { color: var(--accent); font-weight: 600; white-space: nowrap; }
 /* .ld-footer / .ld-gh / .gh-mark left with the landing's own footer on 2026-08-09: the shell
    renders one .site-footer (theme.css) under every public view instead. */
-/* Pricing */
-.ld-pricing .ld-h1 { text-align: center; }
-.ld-pricing .ld-hero-sub { text-align: center; margin-bottom: 1.5rem; }
-.ld-tiers { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin: 1.25rem 0; }
-.ld-tier { border: 1px solid var(--border); border-radius: 12px; background: var(--card); padding: 1.1rem 1.2rem; display: flex; flex-direction: column; }
-.ld-tier--hot { border-color: var(--accent); border-width: 2px; }
-.ld-tier-name { margin: 0 0 .2rem; font-size: 1.05rem; }
-.ld-tier-price { font-size: 1.3rem; font-weight: 800; margin-bottom: .6rem; }
-.ld-tier-lines { margin: 0 0 1rem; padding-left: 1.1rem; color: var(--text-dim); font-size: .88rem; flex: 1; }
-.ld-tier-lines li { margin-bottom: .3rem; }
+/* The pricing page's rules (.ld-pricing, .ld-tiers, .ld-tier*) left with the page on 2026-08-28:
+   the store is its own AIMEAT instance and the one place a price exists. */
 
 /* ── How it works ── */
 .hiw-diagram { margin: 1.5rem 0; }
@@ -222,13 +233,24 @@
 .pa-detail-link { color: var(--accent); font-weight: 700; text-decoration: none; font-size: .85rem; }
 .pa-detail-link:hover { text-decoration: underline; }
 
-/* ── Node totals panel (nt- prefix) — cumulative counters replacing the activity feed ── */
-.nt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: .6rem; }
-.nt-card { display: flex; flex-direction: column; align-items: center; gap: .15rem; padding: 1rem .75rem; border: 1px solid var(--border); border-radius: 12px; background: var(--card); text-align: center; }
-.nt-icon { font-size: 1.4rem; line-height: 1; }
-.nt-value { font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--text); }
-.nt-label { font-size: .8rem; color: var(--text-dim); }
-.nt-sub { font-size: .72rem; font-weight: 600; color: var(--accent); }
+/* ── Node totals (nt- prefix) — the showroom's live strip: four figures on one dark band ── */
+.nt { margin: 1.5rem 0 0; }
+.nt-strip {
+  display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: .75rem 4rem;
+  padding: 1.4rem 1.5rem; background: var(--text); color: var(--bg);
+  border-top: 3px solid var(--text); border-bottom: 3px solid var(--text);
+}
+.nt-figure { display: flex; align-items: baseline; gap: .6rem; }
+.nt-value { font-family: var(--font-display); font-size: 1.85rem; line-height: 1; font-variant-numeric: tabular-nums; color: var(--sun); }
+.nt-label { font-family: var(--font-marketing); font-size: 1rem; font-weight: 800; }
+/* The one live figure carries a dot; it is the only colour on the strip that is not yellow. */
+.nt-dot { width: 12px; height: 12px; border-radius: 999px; background: var(--mint); align-self: center; }
+.nt-counting { margin: .4rem 0 0; text-align: center; font-family: var(--font-marketing); font-size: .8rem; color: var(--text-muted); }
+@media (max-width: 900px) {
+  .nt-strip { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .9rem 1rem; padding: 1.25rem; }
+  .nt-figure { flex-direction: column; align-items: flex-start; gap: .1rem; }
+  .nt-label { font-size: .85rem; }
+}
 
 /* ── Build invitation, folded (TARGET-056) ──────────────────────────────────
    The generator used to sit open at the top. Two visitors made a throwaway chat app
@@ -252,17 +274,30 @@
 
 /* The wish box: the one field the whole page funnels into. Big on purpose — it is the primary
    action of the front page, and everything below it is evidence that pressing GO works. */
-.ld-wish { display: flex; gap: .6rem; margin: 1rem 0 0; }
+.ld-wish { display: flex; gap: .9rem; margin: 1rem 0 0; }
+/* The showroom's wish box: a 3px ink frame with a coral offset shadow, and the GO slab in Bungee.
+   The placeholder is bold italic on purpose: it is the one question the page asks. */
 .ld-wish-input {
   flex: 1 1 auto; min-width: 0;
-  font-size: 1.1rem; font-weight: 600;
-  padding: .8rem 1rem;
-  border: 2px solid var(--border); border-radius: 12px;
-  background: var(--card); color: var(--text);
+  font-family: var(--font-marketing); font-size: 1.2rem; font-weight: 800;
+  padding: .9rem 1.1rem;
+  border: 3px solid var(--text); border-radius: 0;
+  background: var(--card-bg); color: var(--text);
+  box-shadow: 6px 6px 0 var(--accent);
 }
-.ld-wish-input:focus { outline: none; border-color: var(--accent); }
-.ld-wish-input::placeholder { color: var(--text-dim); font-weight: 400; }
-.ld-wish-go { flex: 0 0 auto; font-size: 1rem; padding: .8rem 1.6rem; }
+.ld-wish-input:focus { outline: none; box-shadow: 6px 6px 0 var(--text); }
+.ld-wish-input::placeholder { color: var(--text-dim); font-weight: 800; font-style: italic; }
+.ld-wish-go {
+  flex: 0 0 auto; font-family: var(--font-display); font-weight: 400; text-transform: uppercase;
+  font-size: 1.2rem; padding: .9rem 1.8rem; border: 3px solid var(--text); border-radius: 0;
+  background: var(--accent); color: #FFFFFF; box-shadow: 6px 6px 0 var(--text);
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.ld-wish-go:hover { transform: translate(2px, 2px); box-shadow: 3px 3px 0 var(--text); background: var(--accent); }
+@media (max-width: 600px) {
+  .ld-wish { flex-direction: column; }
+  .ld-wish-go { width: 100%; }
+}
 
 .ld-invite { max-width: 760px; margin: 0 auto 2rem; }
 .ld-invite .collapsible {
@@ -296,11 +331,21 @@
    Same door as .ld-invite (one collapsible on the page should not read as two components),
    but quieter: this is a status line, not the page's invitation. Shut it shows the freshest
    entry; open it scrolls its own history instead of pushing the wall off the screen. */
-.ld-log { max-width: 760px; margin: 0 auto 1.25rem; }
-.ld-log .collapsible {
-  border: 1px solid var(--border); border-radius: 14px;
-  background: var(--card); overflow: hidden;
+/* Since the showroom (2026-08-28) the log is the yellow band under the two rooms: the "built with
+   itself" claim leads it and the folded list is the evidence. */
+.ld-log {
+  margin: 0; padding: 2rem 3rem; background: var(--sun); color: #1A1A2E;
+  border-top: 3px solid var(--text); border-bottom: 3px solid var(--text);
+  display: flex; flex-direction: column; gap: 1.25rem;
 }
+.ld-log-dogfood { margin: 0 auto; max-width: 54rem; text-align: center; font-family: var(--font-marketing); font-size: 1.1rem; line-height: 1.6; font-weight: 600; }
+.ld-log-dogfood-label { font-family: var(--font-display); text-transform: uppercase; font-size: .9rem; letter-spacing: .02em; color: var(--accent); }
+.ld-log .collapsible {
+  max-width: 54rem; width: 100%; margin: 0 auto;
+  border: 3px solid var(--text); box-shadow: 6px 6px 0 var(--text);
+  background: var(--card-bg); color: var(--text); overflow: hidden;
+}
+@media (max-width: 600px) { .ld-log { padding: 1.5rem 1.25rem; } .ld-log-dogfood { text-align: left; } }
 .ld-log .collapsible-header { padding: 12px 20px; width: 100%; cursor: pointer; }
 .ld-log .collapsible-header:hover { background: var(--surface); }
 .ld-log .collapsible-title { text-align: left; }

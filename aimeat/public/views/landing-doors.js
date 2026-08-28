@@ -26,7 +26,7 @@ import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { siteLink, hasSite } from '/js/site.js';
+import { siteLink, hasSite, storeHref } from '/js/site.js';
 import { showLoginModal } from '/js/services/auth.js';
 import { Collapsible } from '/components/Collapsible.js';
 import { swallowed } from '/js/swallowed.js';
@@ -135,7 +135,7 @@ export function BuildHero({ onNavigate }) {
       <div class="ld-hero2-more">
         <a href="https://github.com/miikkij/aimeat-protocol/releases/latest" target="_blank" rel="noopener">${tr('landing.heroGetOwn', 'Run it on your own server →')}</a>
         ${hasSite('learn') ? html`<a href=${siteLink('learn')} target="_blank" rel="noopener">${tr('landing.ecLinkShort', 'Learn it hands-on, free →')}</a>` : ''}
-        <a href="/v1/pricing" onClick=${(e) => { e.preventDefault(); onNavigate('/v1/pricing'); }}>${tr('landing.heroPricing', 'Pricing →')}</a>
+        ${storeHref() ? html`<a href=${storeHref()} target="_blank" rel="noopener">${tr('landing.heroPricing', 'Pricing →')}</a>` : ''}
       </div>
     </section>
   `;

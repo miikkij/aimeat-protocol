@@ -15,6 +15,8 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   v1.10.0 — 2026-08-28 — AIMEAT_SITE_STORE_URL and AIMEAT_SITE_INCUBATOR_URL join the site links;
+ *     storeEnabled is derived from the first, so the front page's store block can gate on it.
  *   v1.9.0 — 2026-08-22 — AIMEAT_PROACTIVE_GUIDANCE, defaulting on: an operator opts out rather
  *     than in, because a node that never offers anything is the state this feature exists to end.
  *   v1.8.0 — 2026-08-18 — sealedConfigKeys: the settings whoever STARTED this node nominated as
@@ -706,8 +708,15 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
       apiAccelerator: process.env.AIMEAT_SITE_API_ACCELERATOR_URL ?? '',
       playbooks: process.env.AIMEAT_SITE_PLAYBOOKS_URL ?? '',
       showcase: process.env.AIMEAT_SITE_SHOWCASE_URL ?? '',
+      store: (process.env.AIMEAT_SITE_STORE_URL ?? '').trim(),
+      incubator: (process.env.AIMEAT_SITE_INCUBATOR_URL ?? '').trim(),
       contacts: parseSiteContacts(),
     },
+    // The store section and every "get your own" door exist only when there is a store to reach.
+    // A getter, not a value: the store address is editable at runtime from the admin Config tab,
+    // and a boolean copied at boot would say "no store" for the rest of the process after an
+    // operator typed one in.
+    get storeEnabled(): boolean { return (this.siteLinks?.store ?? '').trim() !== ''; },
 
     // Consul
     consulEnabled: process.env.AIMEAT_CONSUL_ENABLED === 'true',

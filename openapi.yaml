@@ -29555,6 +29555,49 @@ paths:
                           cache_cleared:
                             type: boolean
 
+  /v1/site/store-tiers:
+    get:
+      operationId: getSiteStoreTiers
+      summary: The store's public price ladder, read by the node
+      description: |
+        The front page's store section shows the prices the store itself publishes: the public
+        record `tiers` in the store's shop extension namespace (`GET {store}/v1/memory/ext:shop/tiers`,
+        value `{ from, tiers: [{ name, price }] }`). This node fetches that record (safeFetch, three
+        second budget) and holds it for five minutes, because a browser on this node cannot reach
+        the store's origin under the node's CSP and the front page must never wait on another host.
+
+        No authentication (Tier 0). `tiers` is empty when this node has no store
+        (`AIMEAT_SITE_STORE_URL` unset), when the store has not published the record, or when it did
+        not answer in time; the page then shows the ladder the operator typed into the store block.
+      tags: [Site]
+      responses:
+        '200':
+          description: The store's ladder, or an empty one
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          store:
+                            type: string
+                            nullable: true
+                            description: The store's address this node asked, or null when it has none
+                          from:
+                            type: string
+                            nullable: true
+                            description: The lowest price as the store states it, e.g. "19 €/mo"
+                          tiers:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                name: { type: string }
+                                price: { type: string, description: 'Per month in euros, as the store states it, e.g. "19" or "from 2 000"' }
   /v1/site/header-nav:
     get:
       operationId: getSiteHeaderNav

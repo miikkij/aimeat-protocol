@@ -20,6 +20,9 @@
  * @usage
  *   import { PORTAL_BLOCKS } from './blocks-portal.js';
  * @version-history
+ *   v1.1.0 — 2026-08-28 — The showroom: six blocks for the front page as a demo floor for the
+ *     store (showroom-hero, wall-intro, store, trust, rooms, close). portal.store is the first
+ *     portal block gated on config: it exists only when the node has a store to send people to.
  *   v1.0.0 — 2026-08-26 — Initial: the sections of today's landing page, derived from
  *     views/landing.js and its three siblings.
  */
@@ -214,5 +217,93 @@ export const PORTAL_BLOCKS: readonly SurfaceBlockDef[] = [
         },
         maxPerSurface: 4,
         summary: 'The latest posts from one board, for announcements a visitor should see.',
+    },
+
+    // ── The showroom (2026-08-28). The front page as a demo floor for the store: everything on
+    //    it is real, and the visitor can take one home. Components in views/landing-showroom*.js.
+    {
+        id: 'portal.showroom-hero',
+        surfaces: ['portal'],
+        presence: { kind: 'always' },
+        localeStem: 'landing.show',
+        liveDomains: [],
+        props: {
+            picture: {
+                type: 'boolean',
+                default: true,
+                description: 'Whether the full-width showroom picture renders under the headline. Off gives a text-only hero.',
+            },
+        },
+        maxPerSurface: 1,
+        summary: 'The showroom hero: the claim, the wish box as the one action, and the three quieter doors (get your own, connect your AI, let your AI register you).',
+    },
+    {
+        id: 'portal.wall-intro',
+        surfaces: ['portal'],
+        presence: { kind: 'always' },
+        localeStem: 'landing.wallIntro',
+        liveDomains: [],
+        props: {
+            money: {
+                type: 'boolean',
+                default: true,
+                description: 'Whether the payment-rails passage renders under the introduction: cards through Stripe, agents paying agents through x402, and the live proof link when this node has one.',
+            },
+        },
+        maxPerSurface: 1,
+        summary: 'What the wall below is: whole systems built in an hour by chatting, several of which earn their keep. Sits directly above the wall.',
+    },
+    {
+        id: 'portal.store',
+        surfaces: ['portal'],
+        presence: { kind: 'config', configKey: 'storeEnabled' },
+        localeStem: 'landing.store',
+        liveDomains: [],
+        props: {
+            fromPrice: {
+                type: 'string',
+                default: '19 €/mo',
+                maxLength: 24,
+                description: 'The sticker on the picture: the lowest price a visitor can take one home for. Used only while the store has not published its own (see tiers).',
+            },
+            tiers: {
+                type: 'string',
+                default: 'Solo: 19 · Team: 59 · Office: 99 · Own machine: 179 · Compliance: 369 · Managed: from 2 000',
+                maxLength: 240,
+                description: 'The fallback price ladder as one line: "name: price" pairs separated by " · ", each price per month in euros (the € and "per month" are added on the page). The store is the source: when it publishes the public record ext:shop/tiers ({ from, tiers: [{ name, price }] }), the page shows that and this line is not read.',
+            },
+        },
+        maxPerSurface: 1,
+        summary: 'Loved the demo? Take one home. The store door, the three reasons, and the price ladder read from the store itself. Offered only when this node has a store (AIMEAT_SITE_STORE_URL).',
+    },
+    {
+        id: 'portal.trust',
+        surfaces: ['portal'],
+        presence: { kind: 'always' },
+        localeStem: 'landing.trust',
+        liveDomains: [],
+        props: {},
+        maxPerSurface: 1,
+        summary: 'Safe is a list, not a word: every action signed, AI content labeled, consent you can revoke, GDPR as buttons, and the link to how this node marks AI content.',
+    },
+    {
+        id: 'portal.rooms',
+        surfaces: ['portal'],
+        presence: { kind: 'always' },
+        localeStem: 'landing.rooms',
+        liveDomains: [],
+        props: {},
+        maxPerSurface: 1,
+        summary: 'Two cards: adopt agents from the incubator (its door when this node has one), and nobody in it but you.',
+    },
+    {
+        id: 'portal.close',
+        surfaces: ['portal'],
+        presence: { kind: 'always' },
+        localeStem: 'landing.close',
+        liveDomains: [],
+        props: {},
+        maxPerSurface: 1,
+        summary: 'The last word: the demo is free and does not mind being poked, with the way back up to the wish box and, when there is one, the store.',
     },
 ];

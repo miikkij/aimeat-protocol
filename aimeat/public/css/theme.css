@@ -12,6 +12,8 @@
    @usage Loaded first in spa.html <head>; the theme is toggled by /js/theme.js
      which flips the data-theme attribute on <html>.
    @version-history
+     v1.30.0 — 2026-08-28 — Three tokens for the showroom front page: --font-display (Bungee),
+       --font-marketing (Archivo) and --sun, the sticker yellow. Additive only.
      v1.29.0 — 2026-08-27 — .start-page replaces .ui-switch: the start-page setting
        (components/StartPageSetting.js) in place of the home-or-profile switch.
      v1.28.0 — 2026-08-17 — The palette bridge: html[data-palette] maps aimeat-theme.css's
@@ -177,6 +179,14 @@
   /* Typography */
   --font: 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+  /* The showroom voice: Bungee for the front page's headlines and stickers, Archivo for its body.
+     Loaded with the shell's other faces in spa.html; only the front page wears them today. */
+  --font-display: 'Bungee', 'Archivo', 'DM Sans', system-ui, sans-serif;
+  --font-marketing: 'Archivo', 'DM Sans', system-ui, sans-serif;
+
+  /* The sticker yellow of the showroom front page. Used for the kicker, the price sticker and the
+     live counters; not a semantic colour (that is --warn) and it does not flip in dark mode. */
+  --sun: #FFB52E;
 
   /* Layout */
   --nav-height: 56px;

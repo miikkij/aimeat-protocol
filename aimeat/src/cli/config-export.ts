@@ -11,6 +11,8 @@
  *   - exportToConsul: pushes mutable (non-immutable) config values into Consul KV
  *
  * @version-history
+ *   (2026-08-28) Reads a row's value through readConfigField, so the site-link rows
+ *     (siteLinks.<name>) export like every other row.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
@@ -20,7 +22,7 @@
  */
 
 import ini from 'ini';
-import { CONFIG_FIELDS, serializeConfigValue } from '../services/config-schema.js';
+import { CONFIG_FIELDS, serializeConfigValue, readConfigField } from '../services/config-schema.js';
 import type { AimeatConfig } from '../config.js';
 import { createConsulConfigService } from '../services/consul-config.js';
 
@@ -51,7 +53,7 @@ function exportToEnv(config: AimeatConfig): string {
       lines.push(`# ${section}`);
       lastSection = section;
     }
-    const value = config[field.key];
+    const value = readConfigField(config, field);
     if (value !== undefined && value !== null && value !== '') {
       lines.push(`${field.envVar}=${serializeConfigValue(value)}`);
     }
@@ -69,7 +71,7 @@ function exportToIni(config: AimeatConfig): string {
     const key = parts[parts.length - 1];
 
     if (!sections[section]) sections[section] = {};
-    const value = config[field.key];
+    const value = readConfigField(config, field);
     if (value !== undefined && value !== null && value !== '') {
       sections[section][key] = serializeConfigValue(value);
     }
@@ -87,7 +89,7 @@ function exportToJson(config: AimeatConfig): string {
     const key = parts.length > 1 ? parts.slice(1).join('_') : parts[0];
 
     if (!result[section]) result[section] = {};
-    const value = config[field.key];
+    const value = readConfigField(config, field);
     if (value !== undefined && value !== null && value !== '') {
       result[section][key] = value;
     }
@@ -106,7 +108,7 @@ async function exportToConsul(config: AimeatConfig): Promise<void> {
   let exported = 0;
   for (const field of CONFIG_FIELDS) {
     if (field.immutable) continue;
-    const value = config[field.key];
+    const value = readConfigField(config, field);
     if (value !== undefined && value !== null) {
       try {
         await consulService.set(field.dotPath, serializeConfigValue(value));

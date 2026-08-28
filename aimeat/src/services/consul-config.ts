@@ -12,6 +12,8 @@
  *   - polling watcher hashes loadAll() output to detect and dispatch config changes
  *
  * @version-history
+ *   (2026-08-28) Applies a value through writeConfigField, so a site-link row (siteLinks.<name>)
+ *     lands one level down like every other row.
  *   v1.1.0 — 2026-08-18 — applyConsulValues skips a path the node's host sealed. One edit covers
  *     three callers, and the third is the one nobody had listed: the boot-time load, the import
  *     route, and the LIVE WATCH LOOP, which re-applies whatever the KV store says on every change
@@ -21,7 +23,7 @@
 
 import Consul from 'consul';
 import type { AimeatConfig } from '../config.js';
-import { isImmutable, MUTABLE_CONFIG_MAP, parseConfigValue } from './config-schema.js';
+import { isImmutable, MUTABLE_CONFIG_MAP, parseConfigValue, writeConfigField } from './config-schema.js';
 import { isSealed } from './config-sealing.js';
 import { logger } from '../utils/logger.js';
 
@@ -133,7 +135,7 @@ export function applyConsulValues(
     try {
       const value = parseConfigValue(field, rawValue);
       if (!field.validate(value)) { skipped.push(dotPath); continue; }
-      (config as unknown as Record<string, unknown>)[field.key] = value;
+      writeConfigField(config, field, value);
       applied.push(dotPath);
       // eslint-disable-next-line aimeat/no-silent-catch -- not silent: the key is reported to the caller in the returned `skipped` list
     } catch { skipped.push(dotPath); }
