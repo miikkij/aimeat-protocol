@@ -21,6 +21,13 @@
  *     actions: [{ id: 'complete', summary: 'Mark one errand done', params: { id: 'string' },
  *                 run: (p) => completeErrand(p.id) }] });
  * @version-history
+ *   v0.3.0 — 2026-08-28 — What the first PAID run on production found, fixed: (1) completeJson
+ *     answers { data: { content, parsed, provenance } } and the validated object is `parsed` —
+ *     the aide read `data` itself and reported failure over a good answer; (2) the model was
+ *     never told the panel block's exact grammar, so its first panel had no `component` and
+ *     rendered empty — the prompt now spells out the block shape, the six legal components and
+ *     that only declared source names may be bound. With both: reply, action proposal → human
+ *     confirm → app handler, and a generated panel over real sources, all proven live.
  *   v0.2.0 — 2026-08-28 — Renamed copilot → aide before any app uses it: "copilot" collides with
  *     a large product family and the collision would only get more expensive. Same component,
  *     same contract, new name everywhere (function, block id, classes, i18n keys).
@@ -165,7 +172,8 @@ export function aide(spec) {
     const prompt = [
       'You are the in-app aide of "' + (s.appName || document.title || 'this app') + '" on the AIMEAT platform.',
       'You may ONLY act through the declared actions below, and only propose one when the person asked to DO something.',
-      'Answer as JSON: { "reply": "<plain words for the person>", "action"?: { "id", "params" }, "panel"?: <a small mosaic layout { v:1, blocks:[...] } when a visual answer helps> }.',
+      'Answer as JSON: { "reply": "<plain words for the person>", "action"?: { "id", "params" }, "panel"?: { "blocks": [...] } when a visual answer helps }.',
+      'A panel block is exactly { "id": "<short-slug>", "component": "<one of: list, statRow, table, timeline, figure, cardGrid>", "props": { "source": "<one of the SOURCE names below>", "title": "<a heading>" } } — no other component names, and only source names that appear below.',
       actionsText(),
       'DATA the screen shows right now:',
       await contextText(),
@@ -190,9 +198,13 @@ export function aide(spec) {
     }
 
     thinking.remove();
-    const answer = out && out.data ? out.data : out;
+    // completeJson answers { data: { content, parsed, provenance, ... } } — the VALIDATED object
+    // is `parsed`. The first paid run read `data` itself and reported failure over a perfectly
+    // good answer, which is why this line is spelled out.
+    const body = out && out.data ? out.data : out;
+    const answer = body && body.parsed ? body.parsed : body;
     const reply = answer && typeof answer.reply === 'string' ? answer.reply : t('aideFailed');
-    const b = bubble('assistant', reply, out && out.provenance ? out.provenance : null);
+    const b = bubble('assistant', reply, (body && body.provenance) || (out && out.provenance) || null);
     history.push({ who: 'assistant', text: reply });
 
     if (answer && answer.action && answer.action.id) offerAction(answer.action, b);

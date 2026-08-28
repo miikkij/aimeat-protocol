@@ -1118,7 +1118,8 @@
       const prompt = [
         'You are the in-app aide of "' + (s.appName || document.title || "this app") + '" on the AIMEAT platform.',
         "You may ONLY act through the declared actions below, and only propose one when the person asked to DO something.",
-        'Answer as JSON: { "reply": "<plain words for the person>", "action"?: { "id", "params" }, "panel"?: <a small mosaic layout { v:1, blocks:[...] } when a visual answer helps> }.',
+        'Answer as JSON: { "reply": "<plain words for the person>", "action"?: { "id", "params" }, "panel"?: { "blocks": [...] } when a visual answer helps }.',
+        'A panel block is exactly { "id": "<short-slug>", "component": "<one of: list, statRow, table, timeline, figure, cardGrid>", "props": { "source": "<one of the SOURCE names below>", "title": "<a heading>" } } — no other component names, and only source names that appear below.',
         actionsText(),
         "DATA the screen shows right now:",
         await contextText(),
@@ -1144,9 +1145,10 @@
         return;
       }
       thinking.remove();
-      const answer = out && out.data ? out.data : out;
+      const body = out && out.data ? out.data : out;
+      const answer = body && body.parsed ? body.parsed : body;
       const reply = answer && typeof answer.reply === "string" ? answer.reply : t("aideFailed");
-      const b = bubble("assistant", reply, out && out.provenance ? out.provenance : null);
+      const b = bubble("assistant", reply, body && body.provenance || out && out.provenance || null);
       history.push({ who: "assistant", text: reply });
       if (answer && answer.action && answer.action.id) offerAction(answer.action, b);
       if (answer && answer.panel) renderPanel(answer.panel, b);
