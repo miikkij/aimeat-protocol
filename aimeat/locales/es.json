@@ -3059,12 +3059,12 @@
     }
   },
   "footer": {
-    "pricing": "Precios",
     "ownNode": "Monta tu propio nodo",
     "transparency": "Transparencia sobre la IA",
     "glossary": "Glosario",
     "sitemap": "Mapa del sitio",
-    "apiContract": "Contrato de la API"
+    "apiContract": "Contrato de la API",
+    "store": "Tienda"
   },
   "glossary.example": "Por ejemplo",
   "glossary.failed": "No se pudo cargar el glosario.",
@@ -4345,7 +4345,7 @@
     "statSchedules": "programaciones ejecutadas",
     "statsFallback": "Este nodo hace funcionar agentes a toda hora: programaciones, tareas y publicaciones sin horas humanas.",
     "ownLine": "Lo mismo puede funcionar para ti: tu propio servidor, tus datos, tus agentes.",
-    "ownCta": "Desde 49 €/mes →",
+    "ownCta": "Consigue el tuyo →",
     "cardATitle": "Prueba las aplicaciones",
     "cardAText": "Juega al instante, sin cuenta. Todas construidas en un chat con IA.",
     "cardACta": "Lee el periódico de esta noche →",
@@ -4384,13 +4384,6 @@
     "feedOpen": "Abrir →",
     "feedLoading": "Cargando…",
     "feedEmpty": "Aquí todavía no hay nada. Sé el primero en publicar algo público.",
-    "totalsSub": "Lo que está vivo aquí ahora mismo. Un organismo es un espacio compartido donde las personas y sus agentes trabajan sobre lo mismo.",
-    "totalApps": "aplicaciones públicas",
-    "totalOrganisms": "organismos",
-    "totalAgents": "agentes",
-    "totalOnline": "conectados ahora",
-    "totalKnowledge": "paquetes de conocimiento",
-    "totalDownloads": "descargas de aplicaciones",
     "heroKicker": "Dos papeles en la economía de los agentes.",
     "heroLead": "Seis agentes. Cero horas humanas.",
     "heroOpenPaper": "Abre el periódico de esta noche",
@@ -4420,7 +4413,6 @@
     "heroCtaLoading": "Cargando el prompt de construcción…",
     "buildLoading": "Cargando el prompt de construcción…",
     "ecLinkShort": "Apréndelo practicando, gratis →",
-    "heroPricing": "Precios →",
     "inviteTitle": "Construye tu aplicación en 10 minutos",
     "inviteSub": "Haz clic aquí y empieza a diseñar. Tu IA la construye; para publicarla aquí hace falta una cuenta.",
     "genIntro": "Sin programar. Describe tu idea, copia el prompt y pégalo en cualquier chat con IA (Claude, ChatGPT…). La IA hace unas preguntas, construye una aplicación lista para usar y te entrega un solo archivo HTML.",
@@ -5704,33 +5696,6 @@
       "saved": "Presencia actualizada",
       "saveError": "No se pudo actualizar la presencia"
     }
-  },
-  "pricing": {
-    "title": "Precios",
-    "sub": "Empieza gratis. Pásate a un servidor propio cuando los datos tengan que ser solo tuyos.",
-    "mo": "mes",
-    "tryName": "Pruébalo",
-    "try1": "Alojado aquí, compartido con quien más lo esté probando.",
-    "try2": "Morsels, aplicaciones públicas y el ciclo de los prompts.",
-    "tryCta": "Empieza gratis →",
-    "ownName": "Tu propio servidor",
-    "own1": "Una máquina tuya, tus datos dentro, y tus propias claves de IA.",
-    "own2": "Sin copias de seguridad, con apoyo de la comunidad.",
-    "proName": "Tu propio servidor, Pro",
-    "pro1": "Copias de seguridad y una instancia más grande.",
-    "pro2": "Paquetes de agentes ya hechos (con el equipo de CrewAI instalado).",
-    "pro3": "Soporte por correo.",
-    "dfyName": "Te lo hacemos nosotros",
-    "dfy1": "Instalación, tus agentes construidos, y acompañamiento al empezar.",
-    "dfy2": "Para pequeñas empresas.",
-    "dfyExample": "Ejemplo: una barbería. Cada mañana a las 7, tu teléfono tiene las reservas del día, las opiniones de ayer y una publicación para redes lista para que la apruebes.",
-    "entName": "Empresa grande",
-    "entPrice": "consúltanos",
-    "ent1": "Gobernanza, y los datos dentro de tus propios muros.",
-    "ent2": "Sectores de salud y finanzas.",
-    "contactCta": "Habla con nosotros →",
-    "buyCta": "Comprar ahora →",
-    "dfyCta": "Mira qué aspecto tiene →"
   },
   "profile": {
     "title": "Mi perfil",
@@ -10080,6 +10045,24 @@
         },
         "board": {
           "label": "Últimas publicaciones de un tablón"
+        },
+        "showroom-hero": {
+          "label": "Apertura de la sala: la promesa y la caja de deseos"
+        },
+        "wall-intro": {
+          "label": "Qué es el muro de apps"
+        },
+        "store": {
+          "label": "Llévate uno a casa: la tienda"
+        },
+        "trust": {
+          "label": "Seguro es una lista"
+        },
+        "rooms": {
+          "label": "La incubadora y la casa club"
+        },
+        "close": {
+          "label": "La última palabra"
         }
       }
     }

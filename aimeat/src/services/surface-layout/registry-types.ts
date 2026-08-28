@@ -24,6 +24,7 @@
  * @usage
  *   import type { SurfaceBlockDef } from './registry-types.js';
  * @version-history
+ *   v1.1.0 — 2026-08-28 — storeEnabled joins the boolean keys a block may gate on.
  *   v1.0.0 — 2026-08-26 — Initial.
  */
 import type { SurfaceId } from './types.js';
@@ -71,7 +72,8 @@ export type BooleanConfigKey =
     | 'commerceEnabled'
     | 'coOriginEnabled'
     | 'portfolioEnabled'
-    | 'siteEnabled';
+    | 'siteEnabled'
+    | 'storeEnabled';
 
 /** Named predicates a block may gate on, resolved in registry.ts against the real function. */
 export type CapabilityName = 'chat';

@@ -18,6 +18,7 @@
  *   StatsBlock · TransparencyBlock · PortalTextBlock · PortalBoardBlock
  * @usage Reached through views/surface/block-map.js, never imported directly by a view.
  * @version-history
+ *   v1.1.0 — 2026-08-28 — The six showroom blocks (hero, wall intro, store, trust, rooms, close).
  *   v1.0.0 — 2026-08-26 — Initial.
  */
 import { h } from 'preact';
@@ -33,6 +34,8 @@ import { BuildAgentPrompt, AskYourAI } from '/views/landing-prompts.js';
 import NodeTotals from '/views/landing-node-totals.js';
 import NodeChangeLog from '/views/landing-changelog.js';
 import { WelcomeDoor } from '/views/home/welcome-door.js';
+import { ShowroomHero, WallIntro, ShowroomClose } from '/views/landing-showroom.js';
+import { StoreSection, TrustList, Rooms } from '/views/landing-showroom-rooms.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
@@ -125,6 +128,37 @@ export function PortalTextBlock(/** @type {{ ctx?: any, props?: Record<string, a
       ${title ? html`<h2 class="sf-band-title">${title}</h2>` : ''}
       <${Markdown} text=${data} />
     </section>`;
+}
+
+// ── The showroom (2026-08-28) ──────────────────────────────────────────────────────────────
+// Thin adapters, like every block above: the sections live in views/landing-showroom*.js. A block
+// setting travels as a prop; a missing one falls back to the component's own default, which is
+// the value the registry declares.
+
+export function ShowroomHeroBlock(/** @type {{ ctx?: any, props?: Record<string, any>, title?: string, text?: string, blockKey?: string }} */ { ctx, props = {} }) {
+  return html`<${ShowroomHero} navigate=${nav(ctx)} picture=${props.picture !== false} />`;
+}
+
+export function WallIntroBlock(/** @type {{ ctx?: any, props?: Record<string, any>, title?: string, text?: string, blockKey?: string }} */ { props = {} }) {
+  return html`<${WallIntro} money=${props.money !== false} />`;
+}
+
+export function StoreBlock(/** @type {{ ctx?: any, props?: Record<string, any>, title?: string, text?: string, blockKey?: string }} */ { props = {} }) {
+  return html`<${StoreSection}
+    fromPrice=${typeof props.fromPrice === 'string' ? props.fromPrice : '19 €/mo'}
+    tiers=${typeof props.tiers === 'string' ? props.tiers : 'Solo: 19 · Team: 59 · Office: 99 · Own machine: 179 · Compliance: 369 · Managed: from 2 000'} />`;
+}
+
+export function TrustBlock(/** @type {{ ctx?: any, props?: Record<string, any>, title?: string, text?: string, blockKey?: string }} */ { ctx }) {
+  return html`<${TrustList} navigate=${nav(ctx)} />`;
+}
+
+export function RoomsBlock() {
+  return html`<${Rooms} />`;
+}
+
+export function CloseBlock() {
+  return html`<${ShowroomClose} />`;
 }
 
 /** The latest posts from one board. Only system and public boards ever answer. */

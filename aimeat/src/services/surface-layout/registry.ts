@@ -28,6 +28,9 @@
  *   import { blocksForSurface, defaultLayout } from './registry.js';
  *   const offered = blocksForSurface('home', config);
  * @version-history
+ *   v1.2.0 — 2026-08-28 — The built-in portal is the showroom: six new blocks (showroom-hero,
+ *     wall-intro, store, trust, rooms, close) and a new default order. Nothing was removed from the
+ *     catalogue; the nine blocks the default no longer lists are still an operator's to add.
  *   v1.1.0 — 2026-08-27 — The chat door joins the built-in onboarding home, under the steps.
  *   v1.0.0 — 2026-08-26 — Initial: the two block sets joined, presence evaluated, and the default
  *     layouts for the three surfaces.
@@ -155,20 +158,22 @@ function b(id: string, props?: SurfaceBlockInstance['props']): SurfaceBlockInsta
  * not yet initialized.
  */
 export const DEFAULT_BLOCKS: Record<SurfaceId, SurfaceBlockInstance[]> = {
+    // The showroom order (2026-08-28): the wish box and the three doors in one hero, the live
+    // counters as its first evidence, the wall with its introduction, then the store (offered only
+    // when this node has one), the safety list, the two rooms, and what shipped lately as the proof
+    // under the "built with itself" claim. The blocks this replaced (the front door, the pitch line,
+    // the folded builder, the connect invitation, the owner-or-tenant hero, the two prompts, today's
+    // stats and the transparency line) stay in the catalogue for an operator to put back.
     portal: [
-        b('portal.welcome-door'),
-        b('portal.pitch'),
-        b('portal.wish'),
-        b('portal.build-invite'),
-        b('portal.connect-invite'),
-        b('portal.changelog'),
-        b('portal.gallery'),
+        b('portal.showroom-hero'),
         b('portal.totals'),
-        b('portal.hero'),
-        b('portal.agent-prompt'),
-        b('portal.ask-ai'),
-        b('portal.stats'),
-        b('portal.transparency'),
+        b('portal.wall-intro'),
+        b('portal.gallery'),
+        b('portal.store'),
+        b('portal.trust'),
+        b('portal.rooms'),
+        b('portal.changelog'),
+        b('portal.close'),
     ],
     home: [
         b('home.nameplate'),

@@ -16,6 +16,7 @@
  * @structure BLOCKS · blockFor
  * @usage const load = BLOCKS['home.feed']; const Component = await load();
  * @version-history
+ *   v1.2.0 — 2026-08-28 — The six showroom blocks of the front page.
  *   v1.1.0 — 2026-08-27 — home.mcp-connect.
  *   v1.0.0 — 2026-08-26 — Initial.
  */
@@ -60,6 +61,14 @@ export const BLOCKS = {
   'portal.transparency': () => import('/views/surface/blocks-portal.js').then(m => m.TransparencyBlock),
   'portal.text': () => import('/views/surface/blocks-portal.js').then(m => m.PortalTextBlock),
   'portal.board': () => import('/views/surface/blocks-portal.js').then(m => m.PortalBoardBlock),
+  // The showroom (2026-08-28). Its sections live in views/landing-showroom*.js and are adapted in
+  // blocks-portal.js like every other portal block.
+  'portal.showroom-hero': () => import('/views/surface/blocks-portal.js').then(m => m.ShowroomHeroBlock),
+  'portal.wall-intro': () => import('/views/surface/blocks-portal.js').then(m => m.WallIntroBlock),
+  'portal.store': () => import('/views/surface/blocks-portal.js').then(m => m.StoreBlock),
+  'portal.trust': () => import('/views/surface/blocks-portal.js').then(m => m.TrustBlock),
+  'portal.rooms': () => import('/views/surface/blocks-portal.js').then(m => m.RoomsBlock),
+  'portal.close': () => import('/views/surface/blocks-portal.js').then(m => m.CloseBlock),
 };
 
 /**

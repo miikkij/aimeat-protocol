@@ -18,6 +18,8 @@
  *   - mutation routes: validate + persist mutable config, emit change events
  *
  * @version-history
+ *   (2026-08-28) Reads and writes a row's value through readConfigField / writeConfigField, so the
+ *     site-link rows (siteLinks.<name>) resolve one level down like every other row.
  *   v1.1.0 — 2026-08-18 — Sealed configuration on all four doors: GET reports `sealed`, PUT and
  *     DELETE refuse with 403 SEALED_CONFIG, and the Consul export stops pushing a sealed value
  *     into a KV store where it would look editable. PUT refuses the WHOLE request when any path
@@ -31,7 +33,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { CONFIG_FIELDS, MUTABLE_CONFIG_MAP, DOT_PATH_TO_ENV, serializeConfigValue } from '../services/config-schema.js';
+import { CONFIG_FIELDS, MUTABLE_CONFIG_MAP, DOT_PATH_TO_ENV, serializeConfigValue, readConfigField, writeConfigField } from '../services/config-schema.js';
 import { isSealed, sealRefusal } from '../services/config-sealing.js';
 import type { ConfigProvenance } from '../services/config-provenance.js';
 import type { ConsulConfigService } from '../services/consul-config.js';
@@ -66,7 +68,7 @@ export function adminConfigRouter(
                 const configuredPath = `${field.dotPath}_configured`;
                 const src = provenance?.getSource(field.dotPath);
                 schema[configuredPath] = {
-                    value: !!config[field.key],
+                    value: !!readConfigField(config, field),
                     type: 'boolean',
                     description: `Whether ${field.description.toLowerCase().replace(' (secret)', '')} is configured (read-only secret)`,
                     mutable: false,
@@ -87,7 +89,7 @@ export function adminConfigRouter(
             const sealed = isSealed(config, field.dotPath);
             const src = sealed ? 'sealed' : (provenance?.getSource(field.dotPath) ?? 'default');
             schema[field.dotPath] = {
-                value: config[field.key],
+                value: readConfigField(config, field),
                 type: typeStr,
                 description: field.description,
                 ...(field.range ? { range: field.range } : {}),
@@ -178,8 +180,8 @@ export function adminConfigRouter(
                 errors.push({ path, reason: `Invalid value for ${path}` });
                 continue;
             }
-            const oldValue = config[mapping.key];
-            (config as unknown as Record<string, unknown>)[mapping.key] = value;
+            const oldValue = readConfigField(config, mapping);
+            writeConfigField(config, mapping, value);
             applied.push({ path, old_value: oldValue, new_value: value });
 
             // Persist to database as raw string
@@ -286,7 +288,7 @@ export function adminConfigRouter(
             // then discarded on the next import without anyone being told. Leave it out.
             if (isSealed(config, dotPath)) { sealedSkipped++; continue; }
             try {
-                const value = (config as unknown as Record<string, unknown>)[field.key];
+                const value = readConfigField(config, field);
                 await consulService.set(dotPath, serializeConfigValue(value));
                 exported++;
             } catch (err) { logger.warn('value: skip individual failures', { error: String(err) }); }

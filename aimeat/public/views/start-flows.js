@@ -187,13 +187,20 @@ export function buildPlaybook(answers, mcpUrl) {
         { text: needText, quote: true },
       ],
     });
-    sections.push({
-      title: { k: 'start.pb.h2.title', f: 'Step 2: See the pricing' },
-      items: [
-        { text: { k: 'start.pb.h2.a', f: 'Self-serve tiers and done-for-you packages:' },
-          link: { href: '/v1/pricing', label: { k: 'start.pb.h2.link', f: 'See pricing →' } } },
-      ],
-    });
+    // The store is the one price door and an address this node is told (window.__SITE.store), so
+    // the step exists only when there is somewhere to send the reader. The pricing page it used to
+    // point at is gone.
+    const site = /** @type {any} */ (window).__SITE;
+    const store = (site && typeof site.store === 'string') ? site.store : '';
+    if (store) {
+      sections.push({
+        title: { k: 'start.pb.h2.title', f: 'Step 2: See the pricing' },
+        items: [
+          { text: { k: 'start.pb.h2.a', f: 'Self-serve tiers and done-for-you packages:' },
+            link: { href: store, label: { k: 'start.pb.h2.link', f: 'See pricing →' } } },
+        ],
+      });
+    }
     sections.push({
       title: { k: 'start.pb.h3.title', f: 'Step 3: Try it meanwhile' },
       items: [

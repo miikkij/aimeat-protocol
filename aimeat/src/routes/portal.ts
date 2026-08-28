@@ -489,7 +489,7 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     '/v1/help',
     '/v1/publicknowledgeviewer',
     '/v1/publicworkspaceviewer',
-    '/v1/pricing',
+    // /v1/pricing left this list on 2026-08-28: the page is gone and the address redirects below.
     '/v1/how-it-works',
     '/v1/glossary',
     '/v1/business',
@@ -506,6 +506,16 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
   router.get('/start', (req, res) => {
     const qs = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
     res.redirect(301, `/v1/start${qs}`);
+  });
+
+  // The pricing page is gone (2026-08-28). The store is its own AIMEAT instance and the only place
+  // a price exists, so the old address goes there when this node has a store, and to the front page
+  // when it does not. A redirect rather than a 404, because the address sat in the footer of every
+  // public page for months and is bookmarked and indexed. 302 to the front page (a node may gain a
+  // store later); 301 to the store (that is where it now lives).
+  router.get('/v1/pricing', (_req, res) => {
+    if (config.siteLinks.store) { res.redirect(301, config.siteLinks.store); return; }
+    res.redirect(302, '/v1/portal');
   });
 
   for (const path of spaRoutes) {

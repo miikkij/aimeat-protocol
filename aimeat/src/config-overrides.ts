@@ -14,6 +14,8 @@
  * @usage
  *   import { applyConfigOverrides } from './config.js';   // re-exported
  * @version-history
+ *   (2026-08-28) Applies a stored value through writeConfigField, so a site-link row
+ *     (siteLinks.<name>) lands one level down like every other row.
  *   v1.0.0 — 2026-08-18 — Pure extraction from config.ts, plus the sealed-path skip. A DB row for a
  *     sealed path was the whole reason sealing had to exist: an operator's write survived a restart
  *     and an image swap because this function re-applied it at every boot, so an environment value
@@ -21,7 +23,7 @@
  *     docs/plans/sealed-config-plan.md
  */
 import type { AimeatConfig, RateLimitsConfig, RateLimitTier } from './config-types.js';
-import { MUTABLE_CONFIG_MAP, parseConfigValue, isImmutable } from './services/config-schema.js';
+import { MUTABLE_CONFIG_MAP, parseConfigValue, isImmutable, writeConfigField } from './services/config-schema.js';
 import { isSealed } from './services/config-sealing.js';
 import type { ConfigProvenance } from './services/config-provenance.js';
 import type { Storage } from './storage/interface.js';
@@ -65,7 +67,7 @@ export async function applyConfigOverrides(
     try {
       const value = parseConfigValue(field, rawValue);
       if (!field.validate(value)) { skipped.push(dotPath); continue; }
-      (config as unknown as Record<string, unknown>)[field.key] = value;
+      writeConfigField(config, field, value);
       applied.push(dotPath);
     } catch (err) {
       logger.warn('config: suppressed failure, continuing', { error: String(err) });

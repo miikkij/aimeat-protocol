@@ -17,6 +17,8 @@
  *     so a node that is not aimeat.io never advertises aimeat.io's apps or contact details.
  *   v1.1.0 — 2026-07-28 — Contacts become a list with roles (a company has more than one
  *     person), replacing the single contactName/Email/Phone trio.
+ *   v1.2.0 — 2026-08-28 — storeHref(): the one price door. The pricing page is gone; every
+ *     "get your own" control goes to the store when the node has one and hides when it does not.
  */
 
 /** @returns {Record<string, any>} */
@@ -45,6 +47,16 @@ export function siteLink(key) {
  */
 export function hasSite(key) {
   return siteLink(key) !== '';
+}
+
+/**
+ * Where "get your own" goes: the store this node sells through, or '' when it has none. The ONE
+ * price door on the whole site: the store is its own AIMEAT instance and the only place a price
+ * exists, so a caller with '' hides the control rather than pointing at a page of its own.
+ * @returns {string}
+ */
+export function storeHref() {
+  return siteLink('store');
 }
 
 /**

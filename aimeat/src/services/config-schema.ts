@@ -12,6 +12,10 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   v1.6.0 — 2026-08-28 — The site links get their rows (site.learn_url … site.contacts): twelve
+ *     addresses, the store, the incubator and the contact list, all mutable. They are the first
+ *     nested group, addressed as 'siteLinks.<name>' through readConfigField / writeConfigField,
+ *     which every consumer now uses instead of indexing config[field.key] itself.
  *   v1.5.0 — 2026-08-25 — The `seo.` group and `apps.seo_mode`. Every value in it was a literal in
  *     public/spa.html naming aimeat.io and its operator, so any other node running this software
  *     said in its own structured data that it WAS that company. Mutable rather than immutable
@@ -32,12 +36,20 @@
  */
 
 import type { AimeatConfig } from '../config.js';
+import type { SiteLinksConfig } from '../config-types-site-links.js';
 
 // ── Field Definition ──
 
+/**
+ * The site links are the one nested group a row may address: `siteLinks.learn` and its siblings.
+ * Every reader and writer of a row's value goes through readConfigField / writeConfigField below,
+ * which is what lets a row point one level down without each consumer learning to.
+ */
+export type SiteLinkFieldKey = `siteLinks.${keyof SiteLinksConfig}`;
+
 export interface ConfigFieldDef {
-  /** AimeatConfig property name (e.g. 'welcomeBonus') */
-  key: keyof AimeatConfig;
+  /** AimeatConfig property name (e.g. 'welcomeBonus'), or a site link as 'siteLinks.<name>'. */
+  key: keyof AimeatConfig | SiteLinkFieldKey;
   /** Dot-path notation for admin API (e.g. 'morsel_policy.welcome_bonus') */
   dotPath: string;
   /** AIMEAT_* environment variable name */
@@ -513,7 +525,40 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'gooseModel', dotPath: 'ai.chat_agent_model', envVar: 'AIMEAT_GOOSE_MODEL', type: 'string', validate: () => true, immutable: false, description: 'Model the chat agent runs on. Also what the node records as the model that answered a turn' },
   { key: 'gooseProviderApiKey', dotPath: 'ai.chat_agent_key', envVar: 'AIMEAT_GOOSE_PROVIDER_API_KEY', type: 'string', validate: () => true, immutable: false, description: 'The key EVERY chat turn is spent from. Not metered per person: the allowance above does not apply to the chat', adminDisplay: 'configured' },
   { key: 'chatMaxLiveThreads', dotPath: 'ai.chat_max_live_threads', envVar: 'AIMEAT_CHAT_MAX_LIVE_THREADS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 1000, immutable: false, description: 'How many conversations stay open before the oldest rolls into a per-month archive record', range: '1-1000' },
+
+  // ── Site links (mutable) ──
+  // The apps, the store and the people this node's public pages point at. Every one is empty on a
+  // fresh clone and every page renders without it (the link, the nav item or the whole section is
+  // dropped), so none of these may ever be required. Mutable: a store opens, an app moves, and the
+  // front page should follow without a restart. These are the one nested group in this file; the
+  // key addresses config.siteLinks.<name> through readConfigField / writeConfigField.
+  { key: 'siteLinks.learn', dotPath: 'site.learn_url', envVar: 'AIMEAT_SITE_LEARN_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'Hands-on academy / showroom app. Renders the "Learn" nav item when set; empty hides it' },
+  { key: 'siteLinks.exchange', dotPath: 'site.exchange_url', envVar: 'AIMEAT_SITE_EXCHANGE_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'Capability marketplace app. Renders the "EXCHANGE" nav item and the front page\'s live-proof link when set' },
+  { key: 'siteLinks.assessment', dotPath: 'site.assessment_url', envVar: 'AIMEAT_SITE_ASSESSMENT_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'Free AI current-state assessment, the business page\'s entry point' },
+  { key: 'siteLinks.roadmap', dotPath: 'site.roadmap_url', envVar: 'AIMEAT_SITE_ROADMAP_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'Public roadmap and portfolio surface' },
+  { key: 'siteLinks.paper', dotPath: 'site.paper_url', envVar: 'AIMEAT_SITE_PAPER_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'Agent-written publication, the "work happens without you" proof on the business page' },
+  { key: 'siteLinks.crm', dotPath: 'site.crm_url', envVar: 'AIMEAT_SITE_CRM_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'CRM app shown as a business case' },
+  { key: 'siteLinks.radar', dotPath: 'site.radar_url', envVar: 'AIMEAT_SITE_RADAR_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'Company-intelligence / mention radar app shown as a business case' },
+  { key: 'siteLinks.briefing', dotPath: 'site.briefing_url', envVar: 'AIMEAT_SITE_BRIEFING_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'Morning briefing board app shown as a business case' },
+  { key: 'siteLinks.apiAccelerator', dotPath: 'site.api_accelerator_url', envVar: 'AIMEAT_SITE_API_ACCELERATOR_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'Make-an-existing-API-agent-native app shown as a business case' },
+  { key: 'siteLinks.playbooks', dotPath: 'site.playbooks_url', envVar: 'AIMEAT_SITE_PLAYBOOKS_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'Playbook app (the repeatable change package) shown as a business case' },
+  { key: 'siteLinks.showcase', dotPath: 'site.showcase_url', envVar: 'AIMEAT_SITE_SHOWCASE_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'An external site running on AIMEAT, shown as third-party proof' },
+  { key: 'siteLinks.store', dotPath: 'site.store_url', envVar: 'AIMEAT_SITE_STORE_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'The store where a visitor buys their own AIMEAT: the ONE price door. Empty hides the front page\'s store section, every "get your own" control and every price; set, the section renders, the ladder is read from the store\'s public ext:shop/tiers record, and /v1/pricing redirects there' },
+  { key: 'siteLinks.incubator', dotPath: 'site.incubator_url', envVar: 'AIMEAT_SITE_INCUBATOR_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'The agent incubator (adopt a ready-made helper): the "start here" door on the front page\'s incubator card' },
+  { key: 'siteLinks.contacts', dotPath: 'site.contacts', envVar: 'AIMEAT_SITE_CONTACTS', type: 'object', validate: isContactList, immutable: false, description: 'People printed on the public pages, in the order they should be approached: a JSON list of {name, role, email, phone, linkedin}. The first entry with an email fields every "talk to us" control; empty prints no contact card at all' },
 ];
+
+/** '' or an absolute http(s) URL. Every site link is allowed to be empty, and empty means "no link". */
+function isEmptyOrHttpUrl(v: unknown): boolean {
+  return typeof v === 'string' && (v.trim() === '' || /^https?:\/\/\S+$/i.test(v.trim()));
+}
+
+/** The contact list: an array of objects with a string name and email; the other fields are optional strings. */
+function isContactList(v: unknown): boolean {
+  if (!Array.isArray(v)) return false;
+  return v.every(c => !!c && typeof c === 'object' && !Array.isArray(c)
+    && ['name', 'role', 'email', 'phone', 'linkedin'].every(k => (c as Record<string, unknown>)[k] === undefined || typeof (c as Record<string, unknown>)[k] === 'string'));
+}
 
 // ── Derived Lookup Maps ──
 
@@ -537,6 +582,29 @@ for (const field of CONFIG_FIELDS) {
 }
 
 // ── Helper Functions ──
+
+/**
+ * The value a row addresses on the live config. The one place that knows a key may be one level
+ * down ('siteLinks.learn'): every consumer that used to index config[field.key] goes through here,
+ * so the nested group is not a special case they each have to remember.
+ */
+export function readConfigField(config: AimeatConfig, field: ConfigFieldDef): unknown {
+  const dot = field.key.indexOf('.');
+  if (dot < 0) return (config as unknown as Record<string, unknown>)[field.key];
+  const group = (config as unknown as Record<string, unknown>)[field.key.slice(0, dot)];
+  return group && typeof group === 'object' ? (group as Record<string, unknown>)[field.key.slice(dot + 1)] : undefined;
+}
+
+/** The writing half of readConfigField: sets the value where the row's key says it lives. */
+export function writeConfigField(config: AimeatConfig, field: ConfigFieldDef, value: unknown): void {
+  const dot = field.key.indexOf('.');
+  const target = config as unknown as Record<string, unknown>;
+  if (dot < 0) { target[field.key] = value; return; }
+  const groupKey = field.key.slice(0, dot);
+  const group = target[groupKey];
+  if (!group || typeof group !== 'object') target[groupKey] = {};
+  (target[groupKey] as Record<string, unknown>)[field.key.slice(dot + 1)] = value;
+}
 
 /** Check if a dot-path is immutable (unknown fields default to immutable for safety) */
 export function isImmutable(dotPath: string): boolean {

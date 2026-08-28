@@ -2,6 +2,18 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does.",
   "entries": [
     {
+      "date": "2026-08-28",
+      "kind": "feature",
+      "title": {
+        "en": "The front page is a showroom: try everything here, then take one home",
+        "fi": "Etusivu on näyttelytila: kokeile kaikkea täällä ja vie sitten oma kotiin"
+      },
+      "body": {
+        "en": "The front page says what this place is in one line and asks one thing: what do you need. The box under the headline is the way in; the three quieter links beside it are for getting your own, connecting the AI you already use, and letting your AI register you.\n\nUnder it, the live figures: how many wishes run here as apps, how often they were opened, how many helpers work here and how many are awake this minute. Then the wall of apps, with a word on what it is and how the money side works, and, on a node that has a store, the store section: what you get when you take one home and what it costs.\n\nThe safety list, the incubator and the clubhouse follow, and the change log now sits under the line that says this platform is built with itself every day, because the log is what that produces.\n\nIf you run a node, the front page is still yours to arrange: the six new parts are in the block editor next to the old ones, and nothing was taken out of the catalogue. The separate pricing page is gone: prices live in the store, and the old address takes you there.",
+        "fi": "Etusivu sanoo yhdellä rivillä mikä tämä paikka on ja kysyy yhtä asiaa: mitä tarvitset. Otsikon alla oleva laatikko on tie sisään; sen vieressä on kolme hiljaisempaa linkkiä: hanki oma, kytke tekoäly jota jo käytät, ja anna tekoälysi rekisteröidä sinut.\n\nSen alla ovat livelukemat: montako toivetta täällä pyörii appeina, montako kertaa niitä on avattu, montako apuria täällä työskentelee ja montako on hereillä juuri nyt. Sitten appiseinä, sana siitä mikä se on ja miten raha siinä liikkuu, ja nodella jolla on kauppa, kauppaosio: mitä saat kun viet oman kotiin ja mitä se maksaa.\n\nPerässä tulevat turvalista, hautomo ja klubitalo, ja muutosloki on nyt sen rivin alla, joka kertoo että tätä alustaa rakennetaan sillä itsellään joka päivä, koska loki on se mitä siitä syntyy.\n\nJos ylläpidät nodea, etusivu on yhä sinun järjestettävissäsi: kuusi uutta osaa ovat lohkoeditorissa vanhojen vieressä, eikä luettelosta poistettu mitään. Erillinen hinnoittelusivu on poissa: hinnat asuvat kaupassa, ja vanha osoite vie sinne."
+      }
+    },
+    {
       "date": "2026-08-27",
       "kind": "feature",
       "title": {

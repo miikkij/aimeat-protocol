@@ -7,6 +7,9 @@
  *              the operator-authored portal template).
  * @usage Mounted in server.ts via siteRouter(config, storage).
  * @version-history
+ *   v1.6.0 — 2026-08-28 — GET /v1/site/store-tiers: the store's public price record (ext:shop /
+ *            tiers), fetched by the node through safeFetch and held five minutes, because the
+ *            browser's CSP cannot reach the store's origin and the front page must not wait on it.
  *   v1.1.0 — 2026-06-18 — GET /v1/site/template returns 200 {template:null} (not 404) when no
  *            custom template is set, so polling clients stop logging spurious 404s.
  *   v1.2.0 — 2026-06-19 — Add GET (public) + PUT (operator) /v1/site/header-nav for
@@ -29,6 +32,12 @@ import { injectCspNonce } from '../utils/csp-nonce.js';
 import { prefersMarkdown, sendMarkdown, htmlToMarkdown } from '../services/markdown-negotiation.js';
 import { siteLayoutRouter } from './site-layout.js';
 import { isReservedSurfaceKey } from '../services/surface-layout/keys.js';
+import { safeFetch } from '../utils/url-validator.js';
+import { logger } from '../utils/logger.js';
+
+/** The store's price record, held for five minutes so the front page never waits on the store. */
+const STORE_TIERS_TTL_MS = 5 * 60 * 1000;
+let storeTiersCache: { store: string; at: number; body: { store: string | null; from: string | null; tiers: { name: string; price: string }[] } } | null = null;
 
 export function siteRouter(config: AimeatConfig, storage: Storage, siteService?: SiteService): Router {
     const router = Router();
@@ -227,6 +236,46 @@ export function siteRouter(config: AimeatConfig, storage: Storage, siteService?:
         }, [
             { description: 'Update header navigation (operator)', method: 'PUT', url: '/v1/site/header-nav' },
         ]));
+    });
+
+    // GET /v1/site/store-tiers — the store's public price record, fetched by the node.
+    //
+    // THE STORE IS THE SOURCE OF ITS OWN PRICES, AND THE NODE IS THE ONE THAT ASKS. The front
+    // page's store section shows the ladder the store publishes as the public record
+    // `ext:shop / tiers` (value { from, tiers: [{ name, price }] }). The browser cannot ask for
+    // it: this node's CSP allows connections to itself only, and widening it to a configured
+    // origin is a larger door than a five-minute cache here. safeFetch, because the address is
+    // configuration and not a constant. Empty `tiers` is the honest answer for no store, a store
+    // that has not published the record, or one that did not answer in time: the page then shows
+    // the ladder the operator typed into the block.
+    router.get('/v1/site/store-tiers', async (_req, res) => {
+        const store = (config.siteLinks.store || '').trim().replace(/\/+$/, '');
+        const empty = { store: store || null, from: null as string | null, tiers: [] as { name: string; price: string }[] };
+        if (!store) { res.json(success(config.nodeId, empty)); return; }
+        const now = Date.now();
+        if (storeTiersCache && storeTiersCache.store === store && now - storeTiersCache.at < STORE_TIERS_TTL_MS) {
+            res.set('Cache-Control', 'public, max-age=300');
+            res.json(success(config.nodeId, storeTiersCache.body));
+            return;
+        }
+        let body = empty;
+        try {
+            const r = await safeFetch(`${store}/v1/memory/ext%3Ashop/tiers?soft=1`, { signal: AbortSignal.timeout(3000) });
+            const j = r.ok ? await r.json() as { data?: { value?: unknown } } : null;
+            const v = j?.data?.value as { from?: unknown; tiers?: unknown } | null | undefined;
+            const rows = Array.isArray(v?.tiers)
+                ? (v!.tiers as unknown[])
+                    .map(t => ({ name: String((t as { name?: unknown })?.name ?? '').trim(), price: String((t as { price?: unknown })?.price ?? '').trim() }))
+                    .filter(t => t.name && t.price)
+                : [];
+            if (rows.length) body = { store, from: typeof v?.from === 'string' ? v.from.trim() : null, tiers: rows };
+        } catch (err) {
+            // A store that does not answer is not an error on this page; the fallback ladder is.
+            logger.warn('site: store tiers not read', { store, error: String(err) });
+        }
+        storeTiersCache = { store, at: now, body };
+        res.set('Cache-Control', 'public, max-age=300');
+        res.json(success(config.nodeId, body));
     });
 
     // PUT /v1/site/header-nav — Update header navigation config (operator)

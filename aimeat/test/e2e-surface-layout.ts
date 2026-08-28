@@ -13,6 +13,9 @@
  *   pressing the delete cross beside a JSON blob they did not recognise.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=surface-layout
  * @version-history
+ *   v1.1.0 — 2026-08-28 — The showroom: the portal catalogue offers the six new blocks and the
+ *     config-gated store, the built-in portal layout is the showroom order, and /v1/pricing
+ *     redirects to the store.
  *   v1.0.0 — 2026-08-26 — Initial suite.
  */
 import * as ed from '@noble/ed25519';
@@ -155,6 +158,52 @@ await test('GET /v1/site/blocks?surface=home — lists blocks with the settings 
     assert(feed.props?.limit?.type === 'number', 'the feed declares its limit setting');
     assert(typeof feed.summary === 'string' && feed.summary.length > 10, 'each block says what it is');
     assert(feed.label_key === 'surface.blocks.home.feed.label', `label key ${feed.label_key}`);
+});
+
+// The store block is the first portal block gated on config: it exists only when the node has a
+// store to send people to. The test env sets AIMEAT_SITE_STORE_URL, so it is offered here; the
+// unset case is test/unit/surface-store-presence.test.ts. Written with the showroom (2026-08-28).
+await test('GET /v1/site/blocks?surface=portal — the showroom blocks, and the store because this node has one', async () => {
+    const { status, body } = await json('/v1/site/blocks?surface=portal', op());
+    assert(status === 200, `status ${status}`);
+    const ids = body.data.blocks.map((b: any) => b.id);
+    for (const id of ['portal.showroom-hero', 'portal.wall-intro', 'portal.trust', 'portal.rooms', 'portal.close']) {
+        assert(ids.includes(id), `${id} is offered`);
+    }
+    assert(ids.includes('portal.store'), 'portal.store is offered when AIMEAT_SITE_STORE_URL is set');
+    const store = body.data.blocks.find((b: any) => b.id === 'portal.store');
+    assert(store.props?.tiers?.type === 'string', 'the store declares its price ladder as a text setting');
+    assert(typeof store.props?.tiers?.default === 'string' && store.props.tiers.default.includes('Solo: 19'),
+        'and the ladder defaults to the store\'s own tiers');
+    assert(ids.includes('portal.welcome-door') && ids.includes('portal.build-invite'),
+        'the blocks the showroom order dropped are still in the catalogue');
+});
+
+await test('GET /v1/site/layout/portal — the built-in front page is the showroom order', async () => {
+    const { body } = await json('/v1/site/layout/portal');
+    const ids = (body.data?.layout?.blocks ?? []).map((b: any) => b.id);
+    assert(ids[0] === 'portal.showroom-hero', `the hero leads, got ${ids[0]}`);
+    assert(ids.indexOf('portal.wall-intro') === ids.indexOf('portal.gallery') - 1, 'the introduction sits directly above the wall');
+    assert(ids.includes('portal.store'), 'the store is in the default because this node has one');
+    assert(ids[ids.length - 1] === 'portal.close', 'the last word is last');
+});
+
+// The store's ladder comes from the store itself, through the node. The test store address does
+// not resolve, so the honest answer is the empty ladder and the front page's fallback: the route
+// answers 200, names the store it asked, and never hands the browser an error to render.
+await test('GET /v1/site/store-tiers — asks the store, and answers an empty ladder when it does not', async () => {
+    const { status, body } = await json('/v1/site/store-tiers');
+    assert(status === 200, `status ${status}`);
+    assert(body.ok === true, 'envelope ok');
+    assert(typeof body.data.store === 'string' && body.data.store.startsWith('https://store.example.test'), `store ${body.data.store}`);
+    assert(Array.isArray(body.data.tiers) && body.data.tiers.length === 0, 'no ladder from a store that does not answer');
+    assert(body.data.from === null, 'and no "from" price either');
+});
+
+await test('GET /v1/pricing → redirects to the store (the page is gone)', async () => {
+    const res = await fetch(`${BASE}/v1/pricing`, { redirect: 'manual' });
+    assert(res.status === 301, `status ${res.status}`);
+    assert((res.headers.get('location') ?? '').startsWith('https://store.example.test'), `location ${res.headers.get('location')}`);
 });
 
 await test('GET /v1/site/blocks?surface=bogus → 422', async () => {

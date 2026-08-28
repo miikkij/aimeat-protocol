@@ -54,6 +54,7 @@ import { readIntake, clearIntake, intakeText } from '/js/intake.js';
 import { ThreadList, Turn, LiveTurn, TurnError, Composer, StatusBar, GooseCredit, Choices, choicesIn, AiNotice, MobileNudge } from './chat/parts.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { InstallCta } from '/components/InstallCta.js';
+import { storeHref } from '/js/site.js';
 
 const html = htm.bind(h);
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -597,8 +598,8 @@ export default function ChatView() {
                         <p class="chat-cap-body">${tr('chat.capBody', "Chat here runs on the house's own AI budget, and this session has reached its share (about 50,000 tokens). The conversation stays right here — nothing is lost. Two ways to keep going:")}</p>
                         <div class="chat-cap-actions">
                             <a class="btn-primary" href="/v1/profile?tab=generator">${tr('chat.capOwnKey', 'Bring your own key →')}</a>
-                            ${/* TODO(store): point at the store when it ships; /v1/pricing is the door until then. */''}
-                            <a class="btn-outline" href="/v1/pricing">${tr('chat.capOwnPlace', 'Get your own place →')}</a>
+                            ${/* The store is the one price door; a node without one offers only the key. */''}
+                            ${storeHref() ? html`<a class="btn-outline" href=${storeHref()} target="_blank" rel="noopener">${tr('chat.capOwnPlace', 'Get your own place →')}</a>` : ''}
                         </div>
                     </div>` : html`
                 <${Composer}

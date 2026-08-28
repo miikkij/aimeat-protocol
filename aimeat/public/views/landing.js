@@ -1,11 +1,11 @@
 /**
  * @file landing.js
- * @description Logged-out landing page, in the order a visitor needs it (TARGET-056):
- *   the three-step loop → the generator itself → live counters as its evidence → the
- *   ownership question (owner or tenant) → the wall of published apps → agent prompt →
- *   ask-your-own-AI → today's stats → footer. A signed-in visitor arriving at the site's ROOT is
- *   forwarded to their start page; /v1/portal is the front page itself and never forwards anyone.
- *   No protocol terms (GHII/GAII/CSM/federation) above the fold; a working result does the selling.
+ * @description Logged-out front page, the showroom (2026-08-28): the hero with the wish box as the
+ *   one action → live counters as its evidence → the wall of published apps with its introduction
+ *   → the store (when this node has one) → the safety list → the two rooms → what shipped lately →
+ *   the last word. A signed-in visitor arriving at the site's ROOT is forwarded to their start
+ *   page; /v1/portal is the front page itself and never forwards anyone. No protocol terms
+ *   (GHII/GAII/CSM/federation) above the fold; a working result does the selling.
  *
  *   THE ORDER IS THE OPERATOR'S NOW. The page is a layout rendered by views/surface/renderer.js
  *   from the blocks this node declares, and the built-in layout is the order below — so a node
@@ -13,12 +13,21 @@
  *   is the door an anonymous visitor arrives at and a blank front page is the worst thing that can
  *   happen on the node.
  *
- *   Each section lives in its own sibling: landing-doors.js (wish box, connect invitation,
- *   owner-or-tenant hero), landing-builder.js (the folded generator), landing-wall.js (published
- *   apps + today's numbers), landing-node-totals.js, landing-changelog.js, landing-prompts.js.
+ *   Each section lives in its own sibling: landing-showroom.js (hero, wall introduction, last
+ *   word), landing-showroom-rooms.js (store, safety list, rooms), landing-wall.js (the wall),
+ *   landing-node-totals.js, landing-changelog.js. The blocks the showroom order no longer lists
+ *   (landing-doors.js, landing-builder.js, landing-prompts.js, home/welcome-door.js) are still in
+ *   the block catalogue for an operator to put back.
  * @structure default export Landing({ navigate })
  * @usage routed at /v1/portal (and '/' for browsers) by spa.html
  * @version-history
+ *   v6.1.0 — 2026-08-28 — The page renders nothing until the layout answer arrives (or fails):
+ *     the fallback tree used to mount every block once before the layout mounted them again,
+ *     so the counters, the wall and the log each fetched twice on every arrival.
+ *   v6.0.0 — 2026-08-28 — The showroom. The front page is a demo floor for the store: the wish
+ *     box is the one action, the counters are its first evidence, the wall keeps its place, and
+ *     the store section (gated on AIMEAT_SITE_STORE_URL), the safety list, the two rooms and the
+ *     "built with itself" log follow. The fallback tree here mirrors DEFAULT_LAYOUTS.portal.
  *   v5.6.0 — 2026-08-27 — The arrival forward is decided by the PATH, not by a per-tab flag: only
  *     the site's root forwards a signed-in person, and /v1/portal always shows the front page. The
  *     flag was set by every in-app click and never cleared, so the brand link showed this page in
@@ -96,20 +105,17 @@ import { h } from 'preact';
 import { useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t, getLocale } from '/js/i18n.js';
+import { getLocale } from '/js/i18n.js';
 import { apiGet } from '/js/api.js';
 import { SurfaceRenderer, useSurfaceLayout } from '/views/surface/renderer.js';
 import NodeTotals from './landing-node-totals.js';
 import NodeChangeLog from './landing-changelog.js';
-import { BuildAgentPrompt, AskYourAI } from './landing-prompts.js';
-import { Gallery, StatsPanel } from './landing-wall.js';
-import { BuildInvite } from './landing-builder.js';
-import { WishBox, ConnectInvite, BuildHero, storeWish, hasStoredWish } from './landing-doors.js';
+import { Gallery } from './landing-wall.js';
+import { storeWish, hasStoredWish } from './landing-doors.js';
+import { ShowroomHero, WallIntro, ShowroomClose } from './landing-showroom.js';
+import { StoreSection, TrustList, Rooms } from './landing-showroom-rooms.js';
+import { storeHref } from '/js/site.js';
 import { swallowed } from '/js/swallowed.js';
-import { WelcomeDoor } from '/views/home/welcome-door.js';
-
-// t() echoes the key when a translation is missing — fall back to readable English.
-const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
 export default function Landing({ navigate }) {
   const surface = useSurfaceLayout('portal');
@@ -186,80 +192,49 @@ export default function Landing({ navigate }) {
       </div>`;
   }
 
+  // Nothing yet, on purpose, while the layout is on its way. The fallback used to render here in
+  // the meantime and every block fetched its data, then the layout arrived and the same blocks
+  // mounted again and fetched again: the counters, the wall and the log each cost two requests on
+  // every arrival (three for the counters, with the live update). The answer takes a few
+  // milliseconds; a blank page for that long is invisible, a doubled page load is not.
+  if (!surface.failed && !surface.ready) return html`<div class="ld"></div>`;
+
+  // The showroom order, the same one DEFAULT_LAYOUTS.portal declares on the server: the store
+  // section is the one part that depends on configuration (a node without a store has no prices to
+  // show), and the fallback reads the same site link the block registry gates on.
   return html`
     <div class="ld">
-      <!-- 0. The front door (remake phase 8). What this place is, in one sentence, and the three
-              ways in — the agent door first, because "your AI can do the whole thing" is the
-              product's strongest claim and this demonstrates it instead of describing it.
-              The landing page belongs to both the old path and the new one, which makes this the
-              one deliberate, bounded exception to the new path keeping to its own files. -->
-      <${WelcomeDoor} onNavigate=${navigate} />
+      <!-- 0. The hero: the claim, the wish box as the one action, three quieter doors, the
+              showroom picture. -->
+      <${ShowroomHero} navigate=${navigate} />
 
-      <!-- Order reversed 2026-07-30 (TARGET-056). The strongest thing on this page is that a
-           sentence becomes a published app, and it used to sit below the fold under a wall of
-           other people's work. It leads now; the reason it matters (owner or tenant) comes
-           after, because it answers a question the visitor only has once they have seen the
-           thing work. -->
-
-      <!-- 0. What this place IS, in one sentence, before anything asks the visitor to do
-              something. The fold below opens onto a tool for building an app, and a tool
-              answers "what can I make" while leaving "what is this" unanswered. The lead-in
-              line frames the fold as one example rather than the whole product. -->
-      <section class="ld-pitch">
-        <p class="ld-pitch-line">${tr('landing.pitch', 'AIMEAT — the Linux of AI. An open, federated, self-hosted AI operating system, and everything in it is yours.')}</p>
-        <${WishBox} navigate=${navigate} />
-        <p class="ld-pitch-lead">${tr('landing.wishLead', 'Say what you need and press GO. You land in a chat that starts building it with you; new here, you make an account on the way and lose nothing you typed.')}</p>
-      </section>
-
-      <!-- 1. The invitation, folded. Measured behaviour beat the theory here: with the generator
-              open on the page, two visitors produced a throwaway chat app and stopped. What holds
-              attention is the wall directly below: it shows the place is alive, which is what
-              makes someone want to add to it. So the builder is one line until it is wanted.
-              It leads the page: the visitor's own first move outranks our release notes. -->
-      <${BuildInvite} />
-
-      <!-- 1a. The second door, equal weight: connect the chat you already use. The two doors are
-               the two real ways in, and until 2026-08-07 only one of them was on this page. -->
-      <${ConnectInvite} onNavigate=${navigate} />
-
-      <!-- 1b. What we shipped, folded to one line, directly under the invitation — near enough
-               to say the place is worked on, below the thing the visitor came to do. -->
-      <${NodeChangeLog} />
-
-      <!-- 2. The wall, immediately visible. The best thing on this page for showing activity. -->
-      <${Gallery} />
-
-      <!-- 3. Live counters close the activity block. "N agents, M online now" is the strongest
-              single number here. -->
+      <!-- 1. Live counters, directly under the claim, as its first evidence. -->
       <${NodeTotals} />
 
-      <!-- 4. Why it matters: owner or tenant. After the proof, not before it. -->
-      <${BuildHero} onNavigate=${navigate} />
+      <!-- 2. What the wall is, then the wall itself: the best thing on this page for showing the
+              place is alive. -->
+      <${WallIntro} />
+      <${Gallery} />
 
-      <!-- 6. Build an AGENT (local crewaimeat fleet on Ollama/Gemma) — the coder/tinkerer on-ramp. -->
-      <${BuildAgentPrompt} />
+      <!-- 3. Loved the demo? Take one home. Only when this node has a store to send people to. -->
+      ${storeHref() ? html`<${StoreSection} fromPrice="19 €/mo"
+        tiers="Solo: 19 · Team: 59 · Office: 99 · Own machine: 179 · Compliance: 369 · Managed: from 2 000" />` : ''}
 
-      <!-- 7. Ask your own AI what AIMEAT is — for you (a homework path, for the already-curious). -->
-      <${AskYourAI} />
+      <!-- 4. Safe is a list, not a word; it ends with how this node marks AI content. -->
+      <${TrustList} navigate=${navigate} />
 
-      <!-- 8. Today's stats + ownership line — the sales close. -->
-      <${StatsPanel} navigate=${navigate} />
+      <!-- 5. The two rooms: the incubator and the clubhouse. -->
+      <${Rooms} />
 
-      <!-- 8b. One line about AI transparency, and one link. It is deliberately one line: the
-               landing page is not a compliance brochure, and the page it links to is where the
-               limits are stated properly. -->
-      <p class="ld-transline">
-        ${tr('landing.transLine', 'Content a model wrote here carries a record of how it was made, and a label where a person reads it.')}
-        ${' '}
-        <a href="/v1/transparency" onClick=${(e) => { e.preventDefault(); navigate('/v1/transparency'); }}>
-          ${tr('landing.transCta', 'How this node marks AI content →')}
-        </a>
-      </p>
+      <!-- 6. Built with itself, every day, and the log that proves it. -->
+      <${NodeChangeLog} />
 
-      ${/* The footer this page used to carry (Pricing, Docs, Run your own node, GitHub, For
-            developers, AI transparency) is the shell's SiteFooter now — spa.html renders it
-            under every public view, so those links are on the pricing page and the help page
-            too instead of only here, and there is one footer to edit rather than three. */''}
+      <!-- 7. The last word, and the way back up to the wish box. -->
+      <${ShowroomClose} />
+
+      ${/* The footer this page used to carry (Docs, Run your own node, GitHub, For developers,
+            AI transparency) is the shell's SiteFooter now — spa.html renders it under every
+            public view, so there is one footer to edit rather than three. */''}
     </div>
   `;
 }

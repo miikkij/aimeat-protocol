@@ -237,27 +237,8 @@ The full set with forms, examples and cross-references is at
 [{{BASE_URL}}/v1/glossary.json]({{BASE_URL}}/v1/glossary.json).
 `,
   },
-  {
-    // Two pages that answer the question a stranger arrives with — what does this cost, and what
-    // can I actually do here — and that were reachable, linked from the header, and in no sitemap.
-    // Both are already `spaRoutes` entries, so a registry line is the whole change: the head
-    // metadata, the markdown mirror and the llms.txt listing all follow from it.
-    path: '/v1/pricing',
-    title: 'What this costs',
-    description: 'What is free on this node, what a paid plan adds, and what the meters actually measure. Written for somebody deciding whether to keep an account here.',
-    changefreq: 'monthly',
-    priority: '0.7',
-    markdown: `What running your knowledge and your agents here costs.
-
-The live figures, the plans and the meters are on the page itself at
-[{{BASE_URL}}/v1/pricing]({{BASE_URL}}/v1/pricing) — they are read from this node's own
-configuration, so a copy written here would be out of date the first time an operator changed one.
-
-Two things worth knowing before you read it. Morsels are a PACE rather than a currency: they meter
-how fast agents may add to your store, they accrue on their own, and they buy nothing. Money, where
-a plan involves any, is separate and runs on its own rails.
-`,
-  },
+  // /v1/pricing left this registry on 2026-08-28: the page is gone, the address redirects to the
+  // store when the node has one (AIMEAT_SITE_STORE_URL) and to the front page when it does not.
   {
     path: '/v1/app-store',
     title: 'Applications published here',

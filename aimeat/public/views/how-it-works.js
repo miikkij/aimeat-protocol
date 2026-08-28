@@ -25,7 +25,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { openAppSandboxed } from '/js/app-sandbox.js';
-import { siteLink, hasSite } from '/js/site.js';
+import { siteLink, hasSite, storeHref } from '/js/site.js';
 import { swallowed } from '/js/swallowed.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -189,7 +189,7 @@ export default function HowItWorks({ navigate }) {
         ${hasSite('learn')
           ? html`<a class="btn-primary" href=${siteLink('learn')} target="_blank" rel="noopener">${tr('hiw.ctaLearn', 'Learn it hands-on, free →')}</a>`
           : html`<a class="btn-primary" href="/v1/portal" onClick=${(e) => { e.preventDefault(); navigate('/v1/portal'); }}>${tr('hiw.ctaTry', 'Try it free →')}</a>`}
-        <a class="btn-outline" href="/v1/pricing" onClick=${(e) => { e.preventDefault(); navigate('/v1/pricing'); }}>${tr('hiw.ctaPricing', 'See pricing →')}</a>
+        ${storeHref() ? html`<a class="btn-outline" href=${storeHref()} target="_blank" rel="noopener">${tr('hiw.ctaPricing', 'See pricing →')}</a>` : ''}
         <a class="btn-outline" href="/v1/business" onClick=${(e) => { e.preventDefault(); navigate('/v1/business'); }}>${tr('hiw.ctaBusiness', 'For your business →')}</a>
       </div>
     </div>
