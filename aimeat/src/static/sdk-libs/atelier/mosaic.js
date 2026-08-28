@@ -35,12 +35,12 @@
  *   // later, when the app's data changed:  m.refresh('errands.');
  * @version-history
  *   v0.13.0 — 2026-08-28 — The AI-NATIVE layer reaches the mosaic (TARGET-074 phase 6): the
- *     `copilot` block (its tools are the spec's own sources and actions), the viewer's overlay
+ *     `aide` block (its tools are the spec's own sources and actions), the viewer's overlay
  *     (hidden/order/nav over the owner's layout, applied at render, never written back) with
  *     setOverlay() on the handle, explain() — what this screen holds, generated from the
  *     declarations instead of a help text that would drift — and exposeActions(): the same
  *     declared actions handed to a visiting in-browser agent over WebMCP (one declaration,
- *     four doors: the button, the copilot, the agent, and the app's own code).
+ *     four doors: the button, the aide, the agent, and the app's own code).
  *   v0.12.0 — 2026-08-28 — The SIGNATURE and the MORPH (TARGET-074 phase 4): a layout's bounded
  *     `tokens` land as inline custom properties on the app frame (server-validated allowlist;
  *     cleared and reapplied per render), and the canvas tile now GROWS into the focused screen —
@@ -62,7 +62,7 @@ import { list } from './list.js';
 import { cardGrid, mediaCard } from './grid.js';
 import { table, searchBar } from './table.js';
 import { timeline } from './timeline.js';
-import { copilot } from './copilot.js';
+import { aide } from './aide.js';
 import { projectCanvas } from './mosaic-canvas.js';
 
 /** Canvas zoom bounds and wheel step — tight enough that a tile never vanishes or fills the sky. */
@@ -199,10 +199,10 @@ export function mosaic(spec) {
         alive.handles.push(hero({ target: into, title: p.title, sub: p.sub, image: p.image }));
         return;
       }
-      case 'copilot': {
-        // The copilot's tools ARE the app's declarations: the same sources this mosaic reads and
+      case 'aide': {
+        // The aide's tools ARE the app's declarations: the same sources this mosaic reads and
         // the actions the app handed the spec. It can do nothing a button could not.
-        alive.handles.push(copilot({
+        alive.handles.push(aide({
           target: into, appName: p.title || document.title, intro: p.intro,
           appId: p.title, sources: spec.sources || {}, actions: spec.actions || [],
         }));
@@ -674,7 +674,7 @@ export function mosaic(spec) {
 
     /**
      * ONE DECLARATION, FOUR DOORS: expose this mosaic's declared actions to an in-browser agent
-     * through WebMCP. The same { id, summary, params, run } the buttons and the copilot use
+     * through WebMCP. The same { id, summary, params, run } the buttons and the aide use
      * becomes the visiting agent's tool — same handler, same limits, nothing extra. Returns the
      * registration surface name, or 'none' when the page has no agent API or no actions.
      * @returns {Promise<string>}

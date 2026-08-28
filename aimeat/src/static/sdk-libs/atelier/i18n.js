@@ -15,7 +15,9 @@
  * @usage  AIMEAT.atelier.i18n.use({ fi: { addTask: 'Lisää tehtävä' }, en: { addTask: 'Add task' } });
  *         AIMEAT.atelier.i18n.t('addTask');
  * @version-history
- *   v0.2.0 — 2026-08-28 — The copilot's words (title, notice, no-AI state, run/confirm) and the
+ *   v0.2.1 — 2026-08-28 — copilot* keys become aide* (the component was renamed before any app
+ *     uses it), visible titles per language: Aide / Apuri / Ayudante.
+ *   v0.2.0 — 2026-08-28 — The aide's words (title, notice, no-AI state, run/confirm) and the
  *     explain-screen title, in all three languages (TARGET-074 phase 6).
  *   v0.1.1 — 2026-08-28 — +signInHint, the shell's default hint on the designed sign-in state.
  *   v0.1.0 — 2026-08-27 — Initial (TARGET-074 phase 1, slice 1).
@@ -54,13 +56,13 @@ const BASE = {
     zoomOut: 'Zoom out',
     fitView: 'Fit to view',
     send: 'Send',
-    copilotTitle: 'Copilot',
-    copilotPlaceholder: 'Ask, or say what to do…',
-    copilotNotice: 'You are talking with an AI. Answers can be wrong; actions run only when you confirm them.',
-    copilotNoAi: 'AI is not set up on this account yet. Connect a key under Profile, and the copilot wakes up.',
-    copilotFailed: 'That did not go through. Try again.',
-    copilotRun: 'Run it',
-    copilotUnknownAction: 'The model proposed something this app does not declare — nothing was run.',
+    aideTitle: 'Aide',
+    aidePlaceholder: 'Ask, or say what to do…',
+    aideNotice: 'You are talking with an AI. Answers can be wrong; actions run only when you confirm them.',
+    aideNoAi: 'AI is not set up on this account yet. Connect a key under Profile, and the aide wakes up.',
+    aideFailed: 'That did not go through. Try again.',
+    aideRun: 'Run it',
+    aideUnknownAction: 'The model proposed something this app does not declare — nothing was run.',
     explainTitle: 'What this screen holds',
   },
   fi: {
@@ -94,13 +96,13 @@ const BASE = {
     zoomOut: 'Loitonna',
     fitView: 'Sovita näkymään',
     send: 'Lähetä',
-    copilotTitle: 'Copilot',
-    copilotPlaceholder: 'Kysy, tai sano mitä tehdään…',
-    copilotNotice: 'Keskustelet tekoälyn kanssa. Vastaus voi olla väärin; toiminnot ajetaan vasta kun vahvistat ne.',
-    copilotNoAi: 'Tälle tilille ei ole vielä kytketty tekoälyä. Liitä avain profiilissa, niin copilot herää.',
-    copilotFailed: 'Se ei mennyt läpi. Yritä uudelleen.',
-    copilotRun: 'Aja',
-    copilotUnknownAction: 'Malli ehdotti jotain mitä tämä appsi ei tunne — mitään ei ajettu.',
+    aideTitle: 'Apuri',
+    aidePlaceholder: 'Kysy, tai sano mitä tehdään…',
+    aideNotice: 'Keskustelet tekoälyn kanssa. Vastaus voi olla väärin; toiminnot ajetaan vasta kun vahvistat ne.',
+    aideNoAi: 'Tälle tilille ei ole vielä kytketty tekoälyä. Liitä avain profiilissa, niin apuri herää.',
+    aideFailed: 'Se ei mennyt läpi. Yritä uudelleen.',
+    aideRun: 'Aja',
+    aideUnknownAction: 'Malli ehdotti jotain mitä tämä appsi ei tunne — mitään ei ajettu.',
     explainTitle: 'Mitä tällä näytöllä on',
   },
   es: {
@@ -134,13 +136,13 @@ const BASE = {
     zoomOut: 'Alejar',
     fitView: 'Ajustar a la vista',
     send: 'Enviar',
-    copilotTitle: 'Copilot',
-    copilotPlaceholder: 'Pregunta, o di qué hacer…',
-    copilotNotice: 'Estás hablando con una IA. Las respuestas pueden fallar; las acciones solo se ejecutan cuando las confirmas.',
-    copilotNoAi: 'Esta cuenta aún no tiene IA configurada. Conecta una clave en el perfil y el copilot despierta.',
-    copilotFailed: 'No ha funcionado. Inténtalo otra vez.',
-    copilotRun: 'Ejecutar',
-    copilotUnknownAction: 'El modelo propuso algo que esta app no declara — no se ejecutó nada.',
+    aideTitle: 'Ayudante',
+    aidePlaceholder: 'Pregunta, o di qué hacer…',
+    aideNotice: 'Estás hablando con una IA. Las respuestas pueden fallar; las acciones solo se ejecutan cuando las confirmas.',
+    aideNoAi: 'Esta cuenta aún no tiene IA configurada. Conecta una clave en el perfil y el ayudante despierta.',
+    aideFailed: 'No ha funcionado. Inténtalo otra vez.',
+    aideRun: 'Ejecutar',
+    aideUnknownAction: 'El modelo propuso algo que esta app no declara — no se ejecutó nada.',
     explainTitle: 'Qué hay en esta pantalla',
   },
 };

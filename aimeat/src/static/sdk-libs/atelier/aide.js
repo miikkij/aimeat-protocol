@@ -1,7 +1,7 @@
 /**
- * @file atelier/copilot.js
- * @description The in-app copilot (TARGET-074 phase 6): a chat panel whose TOOLS ARE THE APP'S
- *   OWN DECLARATIONS. The app hands over its data sources and its actions; the copilot can read
+ * @file atelier/aide.js
+ * @description The in-app aide (TARGET-074 phase 6): a chat panel whose TOOLS ARE THE APP'S
+ *   OWN DECLARATIONS. The app hands over its data sources and its actions; the aide can read
  *   what the screen reads and do what the buttons do — nothing else, by construction. "Mark the
  *   overdue ones done" becomes a declared action run through the same handler a button runs.
  *
@@ -14,14 +14,17 @@
  *   wears the provenance label the ai library mints. The model runs on the OWNER'S key through
  *   AIMEAT.ai — no key here, no model call until the person sends, and the first send confirms
  *   the spend.
- * @structure copilot(spec) → { el, open, destroy }
+ * @structure aide(spec) → { el, open, destroy }
  * @usage
- *   AIMEAT.atelier.copilot({ target: a.main, appName: 'Errands',
+ *   AIMEAT.atelier.aide({ target: a.main, appName: 'Errands',
  *     sources: { 'errands.items': loadItems },
  *     actions: [{ id: 'complete', summary: 'Mark one errand done', params: { id: 'string' },
  *                 run: (p) => completeErrand(p.id) }] });
  * @version-history
- *   v0.1.0 — 2026-08-28 — Initial (TARGET-074 phase 6, slice 1).
+ *   v0.2.0 — 2026-08-28 — Renamed copilot → aide before any app uses it: "copilot" collides with
+ *     a large product family and the collision would only get more expensive. Same component,
+ *     same contract, new name everywhere (function, block id, classes, i18n keys).
+ *   v0.1.0 — 2026-08-28 — Initial as copilot.js (TARGET-074 phase 6, slice 1).
  */
 import { el, clear, resolve, enter } from './dom.js';
 import { t } from './i18n.js';
@@ -58,15 +61,15 @@ const ANSWER_SCHEMA = {
  * }} spec
  * @returns {{ el: HTMLElement, open: () => void, destroy: () => void }}
  */
-export function copilot(spec) {
+export function aide(spec) {
   const s = spec || {};
   const history = [];
   let firstSend = true;
 
-  const log = el('div', { class: 'ak-copilot__log', role: 'log', 'aria-live': 'polite' });
+  const log = el('div', { class: 'ak-aide__log', role: 'log', 'aria-live': 'polite' });
   const input = /** @type {HTMLTextAreaElement} */ (el('textarea', {
-    class: 'ak-input ak-input--area ak-copilot__input', rows: 2,
-    placeholder: t('copilotPlaceholder'), 'aria-label': t('copilotPlaceholder'),
+    class: 'ak-input ak-input--area ak-aide__input', rows: 2,
+    placeholder: t('aidePlaceholder'), 'aria-label': t('aidePlaceholder'),
   }));
   const sendBtn = el('button', {
     type: 'button', class: 'ak-btn ak-btn--primary',
@@ -76,14 +79,14 @@ export function copilot(spec) {
     if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); send(); }
   });
 
-  const notice = el('p', { class: 'ak-copilot__notice' });
-  const root = el('section', { class: 'ak-root ak-copilot', 'aria-label': 'Copilot' }, [
-    el('header', { class: 'ak-copilot__head' }, [
-      el('h2', { class: 'ak-section__title', text: t('copilotTitle') }),
+  const notice = el('p', { class: 'ak-aide__notice' });
+  const root = el('section', { class: 'ak-root ak-aide', 'aria-label': 'Aide' }, [
+    el('header', { class: 'ak-aide__head' }, [
+      el('h2', { class: 'ak-section__title', text: t('aideTitle') }),
       notice,
     ]),
     log,
-    el('div', { class: 'ak-copilot__row' }, [input, sendBtn]),
+    el('div', { class: 'ak-aide__row' }, [input, sendBtn]),
   ]);
   if (s.target) resolve(s.target).appendChild(root);
   enter(root);
@@ -95,16 +98,16 @@ export function copilot(spec) {
       console.warn('aimeat-atelier: the AI notice did not render', err);
     }
   } else {
-    notice.textContent = t('copilotNotice');
+    notice.textContent = t('aideNotice');
   }
   if (s.intro) bubble('assistant', s.intro, null);
 
   function bubble(who, text, provenance) {
-    const b = el('div', { class: 'ak-copilot__msg ak-copilot__msg--' + who }, [
-      el('p', { class: 'ak-copilot__text', text: text }),
+    const b = el('div', { class: 'ak-aide__msg ak-aide__msg--' + who }, [
+      el('p', { class: 'ak-aide__text', text: text }),
     ]);
     if (who === 'assistant' && provenance && aiNs && typeof aiNs.disclose === 'function') {
-      const tag = el('span', { class: 'ak-copilot__label' });
+      const tag = el('span', { class: 'ak-aide__label' });
       b.appendChild(tag);
       try { aiNs.disclose(provenance, { target: tag }); } catch (err) {
         console.warn('aimeat-atelier: the provenance label did not render', err);
@@ -123,7 +126,7 @@ export function copilot(spec) {
       if (budget <= 0) break;
       let data;
       try { data = await Promise.resolve().then(s.sources[name]); } catch (err) {
-        console.warn('aimeat-atelier: copilot source "' + name + '" failed', err);
+        console.warn('aimeat-atelier: aide source "' + name + '" failed', err);
         continue;
       }
       const chunk = JSON.stringify(data).slice(0, Math.min(SOURCE_CHARS_MAX, budget));
@@ -146,12 +149,12 @@ export function copilot(spec) {
     const text = input.value.trim();
     if (!text) return;
     if (!aiNs || typeof aiNs.completeJson !== 'function') {
-      bubble('assistant', t('copilotNoAi'), null);
+      bubble('assistant', t('aideNoAi'), null);
       return;
     }
     const available = await aiNs.isAvailable().catch(function () { return false; });
     if (!available) {
-      bubble('assistant', t('copilotNoAi'), null);
+      bubble('assistant', t('aideNoAi'), null);
       return;
     }
     input.value = '';
@@ -160,7 +163,7 @@ export function copilot(spec) {
     const thinking = bubble('assistant', '…', null);
 
     const prompt = [
-      'You are the in-app copilot of "' + (s.appName || document.title || 'this app') + '" on the AIMEAT platform.',
+      'You are the in-app aide of "' + (s.appName || document.title || 'this app') + '" on the AIMEAT platform.',
       'You may ONLY act through the declared actions below, and only propose one when the person asked to DO something.',
       'Answer as JSON: { "reply": "<plain words for the person>", "action"?: { "id", "params" }, "panel"?: <a small mosaic layout { v:1, blocks:[...] } when a visual answer helps> }.',
       actionsText(),
@@ -175,20 +178,20 @@ export function copilot(spec) {
       out = await aiNs.completeJson({
         prompt: prompt,
         schema: ANSWER_SCHEMA,
-        app_id: s.appId || s.appName || 'atelier-copilot',
+        app_id: s.appId || s.appName || 'atelier-aide',
         confirm: firstSend,
       });
       firstSend = false;
     } catch (err) {
       thinking.remove();
       const code = err && /** @type {any} */ (err).code;
-      bubble('assistant', code === 'SPEND_CANCELLED' ? t('cancel') + '.' : t('copilotFailed'), null);
+      bubble('assistant', code === 'SPEND_CANCELLED' ? t('cancel') + '.' : t('aideFailed'), null);
       return;
     }
 
     thinking.remove();
     const answer = out && out.data ? out.data : out;
-    const reply = answer && typeof answer.reply === 'string' ? answer.reply : t('copilotFailed');
+    const reply = answer && typeof answer.reply === 'string' ? answer.reply : t('aideFailed');
     const b = bubble('assistant', reply, out && out.provenance ? out.provenance : null);
     history.push({ who: 'assistant', text: reply });
 
@@ -200,10 +203,10 @@ export function copilot(spec) {
   function offerAction(proposed, into) {
     const declared = (s.actions || []).find(function (a) { return a.id === proposed.id; });
     if (!declared) {
-      into.appendChild(el('p', { class: 'ak-copilot__text', text: t('copilotUnknownAction') }));
+      into.appendChild(el('p', { class: 'ak-aide__text', text: t('aideUnknownAction') }));
       return;
     }
-    const row = el('div', { class: 'ak-copilot__confirm' }, [
+    const row = el('div', { class: 'ak-aide__confirm' }, [
       el('span', { text: declared.summary }),
       el('button', {
         type: 'button', class: 'ak-btn ak-btn--primary',
@@ -216,10 +219,10 @@ export function copilot(spec) {
             row.appendChild(el('span', { text: typeof result === 'string' ? result : t('ready') }));
           } catch (err) {
             clear(row);
-            row.appendChild(el('span', { text: t('copilotFailed') + ' ' + String(err && /** @type {any} */ (err).message || '') }));
+            row.appendChild(el('span', { text: t('aideFailed') + ' ' + String(err && /** @type {any} */ (err).message || '') }));
           }
         } },
-      }, t('copilotRun')),
+      }, t('aideRun')),
       el('button', {
         type: 'button', class: 'ak-btn ak-btn--ghost',
         on: { click: function () { row.remove(); } },
@@ -233,7 +236,7 @@ export function copilot(spec) {
     if (!panel || !Array.isArray(panel.blocks) || panel.blocks.length === 0 || panel.blocks.length > PANEL_BLOCKS_MAX) return;
     const ns = /** @type {any} */ (window).AIMEAT;
     if (!ns || !ns.atelier || typeof ns.atelier.mosaic !== 'function') return;
-    const host = el('div', { class: 'ak-copilot__panel' });
+    const host = el('div', { class: 'ak-aide__panel' });
     into.appendChild(host);
     try {
       const handle = ns.atelier.mosaic({ target: host, layout: { v: 1, blocks: panel.blocks }, sources: s.sources || {} });
