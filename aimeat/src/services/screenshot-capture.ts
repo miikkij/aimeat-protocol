@@ -18,6 +18,10 @@
  *   runScreenshotCapturePass() one batch scan; captureAppScreenshot() one app, with its own
  *   per-owner throttle; renderAndStore() the shared render both paths use.
  * @version-history
+ *   v1.4.0 — 2026-08-28 — launchBrowser() PROVES a page opens before handing the browser out
+ *     (a root chromium launches fine and then crashes every target — the first production
+ *     bench found it), and a final no-sandbox/-dev-shm attempt joins the ladder, tried only
+ *     after every sandboxed launch failed its probe.
  *   v1.3.0 — 2026-08-16 — captureAppScreenshot(): one named app, on demand, answering with a reason
  *     instead of a number. The render moved into renderAndStore() so the batch and the request run
  *     the same code. The module-level `running` flag stays a BATCH guard only — it used to make any
@@ -74,18 +78,37 @@ async function launchBrowser(): Promise<{ close(): Promise<void>; newContext(o: 
     logger.info('Screenshot auto-capture: playwright-core not available — disabled.');
     return null;
   }
-  const attempts: Array<{ channel?: string; label: string }> = [
+  // Sandboxed first, relaxed only as the fallback: a root-run server chromium crashes its
+  // targets under the sandbox ("Target crashed" — the first production bench found it), and a
+  // container's small /dev/shm kills tabs the same way. The relaxed args trade renderer
+  // isolation for a working bench, so they are tried ONLY after every sandboxed launch failed.
+  const RELAXED = ['--no-sandbox', '--disable-dev-shm-usage'];
+  const attempts: Array<{ channel?: string; label: string; args?: string[] }> = [
     { channel: 'msedge', label: 'system Edge' },
     { channel: 'chrome', label: 'system Chrome' },
     { label: 'Playwright Chromium' },
+    { label: 'Playwright Chromium (no sandbox)', args: RELAXED },
   ];
   let lastErr: unknown;
   for (const a of attempts) {
+    let browser: { close(): Promise<void>; newContext(o: unknown): Promise<unknown> } | null = null;
     try {
-      const browser = await chromium.launch({ headless: true, channel: a.channel });
+      browser = await chromium.launch({ headless: true, channel: a.channel, args: a.args });
+      // Prove the browser can actually open a page — a root chromium LAUNCHES fine under the
+      // sandbox and then crashes every target, which a launch-only probe never sees.
+      const probe = await browser.newContext({}) as {
+        newPage(): Promise<{ close(): Promise<void> }>; close(): Promise<void>;
+      };
+      const page = await probe.newPage();
+      await page.close();
+      await probe.close();
       logger.info(`Screenshot auto-capture: using ${a.label}.`);
       return browser;
-    } catch (e) { lastErr = e; /* try the next browser */ }
+    } catch (e) {
+      lastErr = e;
+      // eslint-disable-next-line aimeat/no-silent-catch -- a browser that failed its probe may also fail to close; the attempt loop moves on either way
+      if (browser) { try { await browser.close(); } catch { /* already gone */ } }
+    }
   }
   // Surface the real launch failure — a downloaded browser that can't start (missing Linux libs)
   // looks identical to "not installed" otherwise. On Linux: `sudo npx playwright install-deps chromium`.
