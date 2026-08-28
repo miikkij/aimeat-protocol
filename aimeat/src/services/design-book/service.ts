@@ -67,7 +67,15 @@ export interface DesignBookPart {
   proposed_by: string;
   /** The proposer's owner GHII — the identity the ownership rules compare against. */
   proposed_by_owner: string;
-  bench: { checks: string[]; passed_at: string };
+  bench: {
+    checks: string[];
+    passed_at: string;
+    /** The automated guarantee bench's last browser run (design-book/bench.ts), when one ran. */
+    browser?: {
+      ran: boolean; passed?: boolean; reason?: string; at: string;
+      viewports?: Array<{ viewport: string; overflow_px: number; units_rendered: number; controls_below_touch_min: number }>;
+    };
+  };
   created_at: string;
   updated_at: string;
   published_at?: string;

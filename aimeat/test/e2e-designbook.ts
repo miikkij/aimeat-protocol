@@ -253,6 +253,32 @@ const GOOD_BODY = {
         assert(g.body.data.part.status === 'published', `one adopt un-fades it, got ${g.body.data.part.status}`);
     });
 
+    await test('the guarantee bench answers its contract: a run with measurements, or the worded unavailable', async () => {
+        // On a machine with a browser the bench renders three viewports and stamps the record; on
+        // a CI box with none it answers ran:false WITH THE REASON. Both are the contract; a
+        // silent 500 or an unstamped "pass" is neither.
+        const r = await json('/v1/designbook/leiska-cover/bench', {
+            method: 'POST', headers: auth(op.token),
+        });
+        assert(r.status === 200, `bench ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        if (r.body.data.ran === true) {
+            assert(Array.isArray(r.body.data.viewports) && r.body.data.viewports.length === 3,
+                `three viewports measured, got ${JSON.stringify(r.body.data.viewports)}`);
+            const g = await json('/v1/designbook/leiska-cover', { headers: auth(op.token) });
+            assert(g.body.data.part.bench.browser?.ran === true, 'the result is stamped on the record');
+        } else {
+            assert(typeof r.body.data.reason === 'string' && r.body.data.reason.length > 0,
+                'an unavailable bench says why');
+        }
+    });
+
+    await test('the bench is the operator\'s or the proposer\'s — a bystander gets the rule in words', async () => {
+        const r = await json('/v1/designbook/leiska-cover/bench', {
+            method: 'POST', headers: auth(other.token),
+        });
+        assert(r.status === 403 && r.body.error?.code === 'NOT_ALLOWED', `403 NOT_ALLOWED, got ${r.status} ${r.body.error?.code}`);
+    });
+
     await test('the operator retires it, and a retired address stays retired', async () => {
         const r = await json(`/v1/designbook/${partId}/status`, {
             method: 'POST', headers: auth(op.token), body: JSON.stringify({ status: 'retired' }),
