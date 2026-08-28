@@ -25,6 +25,11 @@
  * @usage
  *   import { LOOKS, STRUCTURES } from '../data/atelier-looks.js';
  * @version-history
+ *   v1.2.0 — 2026-08-28 — CARNIVAL: the front-demo2 register joins the registry — a saturated
+ *     three-hue banner mixed over ink (so AK-GRAD proves the action ink on every stop and the
+ *     mesh cap never applies), brutalist offset depth, sticker tilt, maximum display weight.
+ *     The developer pointed at the demo page and asked where the loud looks were; now it is one
+ *     entry the matrix proves (2942 checks over 13 looks).
  *   v1.1.0 — 2026-08-28 — An explicit hero image survives the masthead: the structure's hero
  *     flattening (no band, no scrim, zero inline padding) scopes to :not(.ak-hero--image), so an
  *     editorial or broadsheet page with a generated cover keeps the photographic band and its
@@ -398,6 +403,35 @@ export const LOOKS: readonly AtelierLook[] = [
       '--ak-motion': 'var(--motion-fast, 120ms)',
     },
     note: 'Everything is the mono face and a hairline grid; the grain stays on, like phosphor.',
+  },
+  {
+    id: 'carnival',
+    feel: 'the fairground at full volume: a saturated three-hue banner, thick ink borders, hard offset shadows, tilted stickers, maximum energy',
+    imagery: 'vibrant pop-art carnival illustration, saturated colours, bold outlines, confetti energy',
+    structures: ['full-bleed-hero'],
+    tokens: {
+      '--ak-hero-min': '44dvh',
+      '--ak-hero-image': 'none',
+      '--ak-grad': 'linear-gradient(150deg, color-mix(in oklab, var(--ak-accent) 82%, var(--ak-ink)), color-mix(in oklab, var(--ak-spectrum-2) 76%, var(--ak-ink)) 55%, color-mix(in oklab, var(--ak-spectrum-3) 70%, var(--ak-ink)))',
+      '--ak-line-w': '2px',
+      '--ak-line': 'color-mix(in oklab, var(--ak-ink) 85%, var(--ak-bg))',
+      '--ak-radius': '12px',
+      '--ak-radius-sm': '8px',
+      '--ak-surface-image': 'linear-gradient(180deg, color-mix(in oklab, var(--ak-spectrum-2) 4%, var(--ak-surface)), var(--ak-surface))',
+      '--ak-elev-1': '5px 5px 0 color-mix(in oklab, var(--ak-ink) 88%, transparent)',
+      '--ak-elev-2': '9px 9px 0 color-mix(in oklab, var(--ak-ink) 88%, transparent)',
+      '--ak-display-shadow': '3px 3px 0 color-mix(in oklab, var(--ak-ink) 40%, transparent)',
+      '--ak-text-hero': 'clamp(3rem, 11vw, 5.4rem)',
+      '--ak-weight-display': '900',
+      '--ak-tilt': '-1.6deg',
+      '--ak-enter-distance': '26px',
+      '--ak-enter-stagger': '60ms',
+      '--ak-scrim': 'color-mix(in oklab, var(--ak-ink) 14%, transparent)',
+      '--ak-hero-ink': 'var(--ak-accent-ink)',
+      '--ak-hero-ink-dim': 'var(--ak-accent-ink)',
+      '--ak-display-stroke': '0',
+    },
+    note: 'The front-demo2 register as arithmetic: a three-hue brand banner (every stop mixed over ink, so the mesh cap never applies and AK-GRAD proves the action ink on each), the INVERSE BAND (light hero ink on the saturated ground, a thin dark scrim instead of the pale wash — the pair AK-SCRIM now proves), depth as printed offset like brutalist, the tilt doing the sticker work. Loud is a look, not an accident.',
   },
   {
     id: 'aurora',

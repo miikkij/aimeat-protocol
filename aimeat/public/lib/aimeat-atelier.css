@@ -36,6 +36,13 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.18.0 — 2026-08-28 — The INVERSE BAND joins the contract: --ak-hero-ink / --ak-hero-ink-dim
+ *     name the hero's own text pair (default: the page ink; the subline no longer dims by
+ *     default — it measured 3.2:1 on the band's real grounds), and the carnival look arrives —
+ *     the front-demo2 register: a saturated three-hue banner with light type on a thin dark
+ *     scrim, thick ink borders, hard offset shadows, sticker tilt. All proven: the matrix now
+ *     models the band's true grounds (the brand gradient under the mesh, never the bare page)
+ *     and checks the declared hero pair — 3292 checks over 13 looks.
  *   v0.17.0 — 2026-08-28 — The signature colour pair ships (no stylesheet change: the mosaic
  *     injects the per-mode `--ak-accent` scoped to its host; every accent derivation below
  *     follows the pair through var()).
@@ -178,6 +185,13 @@
                         color-mix(in oklab, var(--ak-spectrum-2) 74%, var(--ak-ink)));
   /* The scrim hero TEXT sits on — mode-following, composited over image or gradient. */
   --ak-scrim:         color-mix(in oklab, var(--ak-bg) 78%, transparent);
+  /* The hero's OWN text colours. Default: the page ink over the pale scrim, and the SUBLINE
+   * carries the same colour (hierarchy comes from size — a dimmed subline measured 3.2:1 on the
+   * band's real grounds, so dimming is a look's own provable choice, never the default). An
+   * inverse-band look (a saturated banner with light type — carnival) points these at the
+   * action ink and thins the scrim; AK-SCRIM proves whichever pair is declared. */
+  --ak-hero-ink:      var(--ak-ink);
+  --ak-hero-ink-dim:  var(--ak-hero-ink);
   /* The zero-image hero ground: an AURORA — four lobes across the derived spectrum, real
    * chroma. The scrim under the text is what AK-SCRIM verifies, so the mesh may commit. */
   --ak-hero-image:    radial-gradient(at 15% 18%, color-mix(in oklab, var(--ak-accent) 34%, var(--ak-bg)), transparent 50%),

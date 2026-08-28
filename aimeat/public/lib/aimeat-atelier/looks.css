@@ -386,6 +386,42 @@
   padding: 0;
 }
 
+/* @preset-block carnival — the fairground at full volume: a saturated three-hue banner, thick ink borders, hard offset shadows, tilted stickers, maximum energy.
+   The front-demo2 register as arithmetic: a three-hue brand banner (every stop mixed over ink, so the mesh cap never applies and AK-GRAD proves the action ink on each), the INVERSE BAND (light hero ink on the saturated ground, a thin dark scrim instead of the pale wash — the pair AK-SCRIM now proves), depth as printed offset like brutalist, the tilt doing the sticker work. Loud is a look, not an accident. */
+[data-ak-look='carnival'] {
+  --ak-hero-min:        44dvh;
+  --ak-hero-image:      none;
+  --ak-grad:            linear-gradient(150deg, color-mix(in oklab, var(--ak-accent) 82%, var(--ak-ink)), color-mix(in oklab, var(--ak-spectrum-2) 76%, var(--ak-ink)) 55%, color-mix(in oklab, var(--ak-spectrum-3) 70%, var(--ak-ink)));
+  --ak-line-w:          2px;
+  --ak-line:            color-mix(in oklab, var(--ak-ink) 85%, var(--ak-bg));
+  --ak-radius:          12px;
+  --ak-radius-sm:       8px;
+  --ak-surface-image:   linear-gradient(180deg, color-mix(in oklab, var(--ak-spectrum-2) 4%, var(--ak-surface)), var(--ak-surface));
+  --ak-elev-1:          5px 5px 0 color-mix(in oklab, var(--ak-ink) 88%, transparent);
+  --ak-elev-2:          9px 9px 0 color-mix(in oklab, var(--ak-ink) 88%, transparent);
+  --ak-display-shadow:  3px 3px 0 color-mix(in oklab, var(--ak-ink) 40%, transparent);
+  --ak-text-hero:       clamp(3rem, 11vw, 5.4rem);
+  --ak-weight-display:  900;
+  --ak-tilt:            -1.6deg;
+  --ak-enter-distance:  26px;
+  --ak-enter-stagger:   60ms;
+  --ak-scrim:           color-mix(in oklab, var(--ak-ink) 14%, transparent);
+  --ak-hero-ink:        var(--ak-accent-ink);
+  --ak-hero-ink-dim:    var(--ak-accent-ink);
+  --ak-display-stroke:  0;
+}
+/* structure: full-bleed-hero — The focal band runs edge to edge, out of the measure column. */
+[data-ak-look='carnival'] .ak-mosaic__band .ak-hero {
+  border-radius: 0;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+}
+/* The band escapes the column; its TEXT stays aligned to it — found in the first
+ * real-data experiment run, where the title clipped at the viewport edge. */
+[data-ak-look='carnival'] .ak-mosaic__band .ak-hero .ak-hero__inner {
+  padding-inline: max(var(--ak-pad), calc((100vw - min(var(--ak-main-max), 100vw)) / 2 + var(--ak-pad)));
+}
+
 /* @preset-block aurora — vivid at full volume: a taller drifting aurora, wider spectrum, deeper glass, edge to edge.
    The spectrum spreads wider (+120/-90), the band grows, the glass deepens — the look for an app that wants to feel like weather. */
 [data-ak-look='aurora'] {
