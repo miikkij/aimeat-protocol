@@ -255,6 +255,13 @@ function composeBody(config: AimeatConfig): string {
     + 'URI is refused by the components and by the publish gate. With zero images the app still '
     + 'looks finished — the fallbacks are designed — so imagery is polish, never a blocker.\n\n';
 
+  body += 'Two agentness handles ride the kit too: `AIMEAT.atelier.delegate({ agent, task: { '
+    + 'title, description } })` puts a "let AI handle it" button on any declared piece of work '
+    + '(the agents library\'s spend guard asks the person first, and the outcome lands back in '
+    + 'the same view), and `AIMEAT.atelier.agentActivity({ agent })` shows what the owner\'s '
+    + 'agents have been doing as the kit\'s own timeline — ownership made visible. Both degrade '
+    + 'with words when no agent is connected.\n\n';
+
   body += '## The signature: this app\'s own hand\n\n';
   body += 'A stored layout may carry a top-level `tokens` object: bounded overrides of shape, '
     + 'typography, density and motion on top of the look (the catalogue\'s `signature_tokens` '

@@ -36,6 +36,8 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.16.0 — 2026-08-28 — The delegate handle's row styles (content.css) beside the phase-6
+ *     agentness pair (delegate + agentActivity in the kit).
  *   v0.15.0 — 2026-08-28 — The boot gate (shell.css: .ak-app--gate centers the status card and
  *     hides the empty main; .ak-body clips overflow so no second scrollbar ever appears).
  *   v0.14.0 — 2026-08-28 — copilot → aide: the panel classes are .ak-aide__* now. Renamed before

@@ -274,6 +274,10 @@ button.ak-card:hover { box-shadow: var(--ak-elev-2); transform: translateY(-2px)
 .ak-aide__row { display: flex; gap: 8px; align-items: flex-end; }
 .ak-aide__input { flex: 1; min-width: 0; }
 
+/* ── The delegate handle: "let AI handle it", with its outcome beside it ─────────────────── */
+.ak-delegate { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ak-delegate__status { font-size: var(--ak-text-fine); color: var(--ak-ink-dim); }
+
 /* ── The explain list: what this screen holds, in words ──────────────────────────────────── */
 .ak-explain {
   padding: var(--ak-pad);
