@@ -25,6 +25,9 @@
  * @usage
  *   import { UI_COMPONENTS, componentById, buildUiCatalogue } from './registry.js';
  * @version-history
+ *   v1.6.0 — 2026-08-28 — THE HARVEST BEGINS (append-only): `chart` joins the components —
+ *     grouped bars + drawn lines over one label axis, the shape budjetti proved every money
+ *     view needs. The Book can now carry chart-bearing arrangements as data.
  *   v1.5.0 — 2026-08-28 — COLOUR OPENS AS A PAIR (append-only): `--ak-accent` joins the signature
  *     as "light/dark" — measurement proved no single hex survives both modes, so the validator
  *     runs the contrast matrix per mode against each half before accepting (TARGET-074).
@@ -180,6 +183,16 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
       title: requiredText('The card title.', 80),
       sub: text('The line under it.', 160),
       image: text('A storage URL. Never a data: URI.', 500),
+    },
+  },
+  {
+    id: 'chart',
+    summary: 'Grouped bars and drawn lines over one label axis — the costs/income/cash-curve shape. The source resolves to ONE record: { labels: string[], series: [{ id, label, kind: "bar"|"line", values: number[] }] }. Colours come from the look\'s own accent spectrum; negatives are legal and the zero line appears when crossed.',
+    props: {
+      source: source(),
+      title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
+      emptyTitle: text('What the empty state says.', 80),
+      emptyHint: text('The line under it.', 160),
     },
   },
   {
