@@ -40,7 +40,7 @@ const MAX_LIMIT = 100;
 /** Memory-backed domains that have their OWN DiscoverySource own their records — exclude them here so a
  *  record is surfaced once, with its canonical type, not also as a generic 'memory' hit. (Secretary P5 / S-D:
  *  published use-case templates live at template.catalog.* and are owned by the `templates` source.) */
-const OWNED_BY_OTHER_SOURCE = ['template.catalog.'];
+const OWNED_BY_OTHER_SOURCE = ['template.catalog.', 'atelier.book.'];
 const isOwnedElsewhere = (key: string) => OWNED_BY_OTHER_SOURCE.some(p => key.startsWith(p));
 
 /** The uniform internal row both paths (searchText / listing) produce before normalization. */

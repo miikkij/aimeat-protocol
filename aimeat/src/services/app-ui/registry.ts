@@ -25,6 +25,9 @@
  * @usage
  *   import { UI_COMPONENTS, componentById, buildUiCatalogue } from './registry.js';
  * @version-history
+ *   v1.4.0 — 2026-08-28 — SIGNATURE arrives (append-only): the bounded `--ak-*` token subset a
+ *     layout may override (shape, typography, density, motion — deliberately no colour until the
+ *     contrast bench can prove an override), listed in the catalogue as signature_tokens.
  *   v1.3.0 — 2026-08-27 — COMPOSITION arrives (append-only): per-block `span` (full/main/side/
  *     half) turns the stack into a composed page, and `rail` joins the nav modes — the
  *     desktop-grade left rail. The developer's award-site references made the gap plain: the
@@ -176,7 +179,41 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
       image: text('A storage URL. Never a data: URI.', 500),
     },
   },
+  {
+    id: 'copilot',
+    summary: 'The in-app AI: a chat panel whose tools are the app\'s OWN declared sources and actions — it reads what the screen reads and proposes what the buttons do, a person confirms every run. Runs on the owner\'s AI key; shows the platform AI notice and per-message provenance labels itself.',
+    maxPerLayout: 1,
+    props: {
+      title: text('The app name the copilot speaks as.', 80),
+      intro: text('The opening line the panel greets with.', 200),
+    },
+  },
 ];
+
+/**
+ * The SIGNATURE TOKENS: the bounded `--ak-*` subset a layout may override to give one app its own
+ * hand — shape, typography, density and motion. DELIBERATELY NO COLOUR TOKENS: a colour override
+ * is only omalaatuinen-but-readable when the contrast arithmetic has proven it, and that bench is
+ * not wired into the validator yet — so colour waits rather than shipping on trust. Growing this
+ * list is append-only, and every addition stays provable-safe by construction (a radius cannot
+ * break contrast).
+ */
+export const SIGNATURE_TOKENS: Record<string, string> = {
+  '--ak-radius': 'Corner rounding of cards and surfaces, e.g. "2px" for a sharp hand, "18px" for a soft one.',
+  '--ak-radius-sm': 'Corner rounding of rows and inputs.',
+  '--ak-radius-pill': 'Rounding of pills and chips.',
+  '--ak-gap': 'The grid gap between blocks.',
+  '--ak-pad': 'The base padding inside surfaces.',
+  '--ak-main-max': 'The content column width, e.g. "56rem" for a tight editorial measure.',
+  '--ak-font': 'The body face (a stack; the platform webfonts are already loaded).',
+  '--ak-font-display': 'The display face for titles and figures.',
+  '--ak-weight-display': 'The display weight, e.g. "900" for a heavy masthead.',
+  '--ak-text-hero': 'The hero title size, e.g. "clamp(2.2rem, 7vw, 4.4rem)".',
+  '--ak-tilt': 'The playful tilt of cards and tiles, e.g. "1.2deg". "0deg" is calm.',
+  '--ak-motion': 'The base transition duration, e.g. "120ms" for a snappy hand.',
+  '--ak-enter-distance': 'How far content travels on entry, e.g. "0px" turns reveals off.',
+  '--ak-blur': 'The glass blur of the chrome, e.g. "0px" for solid chrome.',
+};
 
 const byId = new Map(UI_COMPONENTS.map((c) => [c.id, c]));
 
@@ -199,6 +236,7 @@ export function buildUiCatalogue(): {
   look_sheets: Array<{ id: string; feel: string; structures: string[] }>;
   structures: Array<{ id: string; summary: string }>;
   layouts: readonly AppUiLayoutPreset[];
+  signature_tokens: { values: Record<string, string>; summary: string };
 } {
   return {
     components: UI_COMPONENTS.map((c) => ({
@@ -221,5 +259,13 @@ export function buildUiCatalogue(): {
     look_sheets: LOOK_REGISTRY.map((l) => ({ id: l.id, feel: l.feel, structures: l.structures })),
     structures: STRUCTURES.map((s) => ({ id: s.id, summary: s.summary })),
     layouts: UI_LAYOUT_PRESETS,
+    signature_tokens: {
+      values: SIGNATURE_TOKENS,
+      summary: 'Optional top-level `tokens`: the app\'s SIGNATURE — bounded overrides of shape, '
+        + 'typography, density and motion, applied on top of the look. Only the names listed here '
+        + 'are legal, and colour is deliberately absent until the contrast bench can prove an '
+        + 'override readable. The design pass: propose two or three token-sets as whole layouts, '
+        + 'dry-run each, show the owner, store the one they pick.',
+    },
   };
 }

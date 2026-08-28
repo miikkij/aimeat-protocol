@@ -26,6 +26,11 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.6.0 — 2026-08-28 — "AI inside the app": the copilot block over declared sources and
+ *     actions, explain() from declarations, and the viewer's overlay (TARGET-074 phase 6).
+ *   v1.5.0 — 2026-08-28 — The signature section: bounded token overrides, the design pass
+ *     (compose three, dry-run, the owner picks) and reference-derived shape reading — colour
+ *     explicitly excluded until the contrast bench can prove it (TARGET-074 phase 4).
  *   v1.4.0 — 2026-08-28 — "Two details the review always catches": edit mode says so, and counters
  *     share their source with the lists beside them. Both are the first AEB review's app-level
  *     findings, stated once here instead of waiting to be re-found per app.
@@ -245,6 +250,40 @@ function composeBody(config: AimeatConfig): string {
     + '`atelier.img.<slot>.<look>.<subject-slug>` holding a previous URL means reuse it. A `data:` '
     + 'URI is refused by the components and by the publish gate. With zero images the app still '
     + 'looks finished — the fallbacks are designed — so imagery is polish, never a blocker.\n\n';
+
+  body += '## The signature: this app\'s own hand\n\n';
+  body += 'A stored layout may carry a top-level `tokens` object: bounded overrides of shape, '
+    + 'typography, density and motion on top of the look (the catalogue\'s `signature_tokens` '
+    + 'lists every legal name — colour is deliberately absent until the contrast bench can prove '
+    + 'an override readable). This is how one app stops looking like every other app on the same '
+    + 'look. THE DESIGN PASS, when the owner asks for a distinctive style: compose two or three '
+    + 'candidate signatures as whole layouts (same blocks, different `tokens`), dry-run each with '
+    + 'the validate endpoint, describe each in one sentence of plain words ("sharp corners, heavy '
+    + 'masthead, snappy motion"), and store the one the owner picks. FROM A REFERENCE: when the '
+    + 'owner shows a page or picture they like, read its shapes — corner rounding, type weight, '
+    + 'density, how much things move — and translate THOSE into the token vocabulary; never copy '
+    + 'colours you cannot prove.\n\n';
+
+  body += '## The Design Book first\n\n';
+  body += 'Before composing a screen from nothing, search the Design Book '
+    + '(`aimeat_designbook_search`, or GET /v1/designbook): it holds PROVEN arrangements — every '
+    + 'part passed the same validator your layout must pass, and adopting one '
+    + '(`aimeat_designbook_adopt`) is one call. A starting shape from the Book plus your words '
+    + 'beats a fresh composition, and when you make an arrangement worth keeping, propose it '
+    + 'back (`aimeat_designbook_propose`) so the next build starts where you finished.\n\n';
+
+  body += '## AI inside the app\n\n';
+  body += 'The `copilot` block puts an AI panel on the screen whose tools are the app\'s OWN '
+    + 'declarations: hand the mosaic spec your `sources` and an `actions` list ({ id, summary, '
+    + 'params?, run }) and the copilot can read what the screen reads and PROPOSE what the '
+    + 'buttons do — a person confirms every run, the platform AI notice and provenance labels '
+    + 'are built in, and it runs on the owner\'s own key (it sleeps politely when no key is '
+    + 'set). A model answer may be a small mosaic panel rendered inline over the same sources — '
+    + 'arrangement from the closed vocabulary, never markup. Two more affordances every mosaic '
+    + 'carries: `m.explain()` renders "what this screen holds" from the declarations (never '
+    + 'hand-write a help text that will drift), and `m.setOverlay({ hidden, order, nav })` '
+    + 'applies THIS VIEWER\'S own arrangement over the owner\'s page — store it in the viewer\'s '
+    + 'own memory (`atelier.overlay.<filename>`), never in the owner\'s layout.\n\n';
 
   body += '## Data, in short\n\n';
   body += 'Login and data come from `aimeat-auth` and `aimeat-data` exactly as on the rest of the '

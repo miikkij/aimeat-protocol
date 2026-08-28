@@ -35,6 +35,7 @@ import { seedCsmTemplates } from '../services/csm-seed.js';
 import { seedManifestSchema } from '../services/manifest-schema.js';
 import { seedTemplateBundles } from '../services/template-bundles.js';
 import { seedKnowledgeTemplates } from '../services/knowledge.js';
+import { seedDesignBook } from '../services/design-book/lifecycle.js';
 import { seedSystemPrompts } from '../services/prompt-seeder.js';
 import { seedBundledCortexes } from '../services/cortex-seeder.js';
 import { seedExamplePackages } from '../services/package-seeder.js';
@@ -122,6 +123,11 @@ export async function initializeServices(
   seedTemplateBundles(storage, `system@${config.nodeId}`)
     .then(count => { if (count > 0) logger.info(`Seeded ${count} template-bundle CSMs`); })
     .catch(err => logger.error('Failed to seed template bundles', { error: err }));
+
+  // Seed the Design Book's first published parts: the six leiskat, benched like any proposal —
+  // a fresh node's Book is never an empty shelf (TARGET-074 phase 5).
+  seedDesignBook(storage, config)
+    .catch(err => logger.error('Failed to seed the Design Book', { error: err }));
 
   // Seed knowledge packager prompt templates
   seedKnowledgeTemplates(storage, `system@${config.nodeId}`)

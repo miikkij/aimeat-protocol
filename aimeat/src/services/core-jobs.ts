@@ -39,6 +39,12 @@ export function registerCoreHandlers(
   scheduler.registerCoreHandler('board-post-ttl-cleanup', () => runBoardPostTtlCleanupJob(storage));
   scheduler.registerCoreHandler('dispute-timeout', () => runDisputeTimeoutJob(config, storage));
   scheduler.registerCoreHandler('execution-log-prune', () => runExecutionLogPruneJob(config, storage));
+  // The Design Book's nightly fade: published parts nobody has adopted within the window turn
+  // `aging` (one adopt lifts them back). Dynamic import like the other heavy handlers.
+  scheduler.registerCoreHandler('designbook-aging', async () => {
+    const { runDesignBookAgingJob } = await import('./design-book/lifecycle.js');
+    await runDesignBookAgingJob(storage, config);
+  });
   scheduler.registerCoreHandler('invitation-expiry', () => runInvitationExpiryJob(storage));
   if (config.consentEnabled) {
     scheduler.registerCoreHandler('consent-expiry', () => runConsentExpiryJob(storage));
