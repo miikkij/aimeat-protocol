@@ -460,6 +460,44 @@
   padding-inline: max(var(--ak-pad), calc((100vw - min(var(--ak-main-max), 100vw)) / 2 + var(--ak-pad)));
 }
 
+/* @preset-block billboard — the whole screen is the poster: carnival's energy edge to edge, no measure column, a half-screen banner — for fronts, showcases and anything that should fill the room.
+   The developer's ask, verbatim in spirit: why is everything a lane in the middle of the screen? Billboard drops the measure column entirely (--ak-main-max 100%) and grows the banner to half the viewport — carnival's inverse band and printed depth, at room scale. The narrow-screen story is unchanged: the column was never narrower than the phone. */
+[data-ak-look='billboard'] {
+  --ak-main-max:        100%;
+  --ak-hero-min:        52dvh;
+  --ak-hero-image:      none;
+  --ak-grad:            linear-gradient(150deg, color-mix(in oklab, var(--ak-accent) 82%, var(--ak-ink)), color-mix(in oklab, var(--ak-spectrum-2) 76%, var(--ak-ink)) 55%, color-mix(in oklab, var(--ak-spectrum-3) 70%, var(--ak-ink)));
+  --ak-line-w:          2px;
+  --ak-line:            color-mix(in oklab, var(--ak-ink) 85%, var(--ak-bg));
+  --ak-radius:          14px;
+  --ak-radius-sm:       10px;
+  --ak-gap:             18px;
+  --ak-surface-image:   linear-gradient(180deg, color-mix(in oklab, var(--ak-spectrum-2) 4%, var(--ak-surface)), var(--ak-surface));
+  --ak-elev-1:          6px 6px 0 color-mix(in oklab, var(--ak-ink) 88%, transparent);
+  --ak-elev-2:          10px 10px 0 color-mix(in oklab, var(--ak-ink) 88%, transparent);
+  --ak-display-shadow:  3px 3px 0 color-mix(in oklab, var(--ak-ink) 40%, transparent);
+  --ak-text-hero:       clamp(3.2rem, 12vw, 6.4rem);
+  --ak-weight-display:  900;
+  --ak-tilt:            -1.6deg;
+  --ak-enter-distance:  30px;
+  --ak-enter-stagger:   55ms;
+  --ak-scrim:           color-mix(in oklab, var(--ak-ink) 14%, transparent);
+  --ak-hero-ink:        var(--ak-accent-ink);
+  --ak-hero-ink-dim:    var(--ak-accent-ink);
+  --ak-display-stroke:  0;
+}
+/* structure: full-bleed-hero — The focal band runs edge to edge, out of the measure column. */
+[data-ak-look='billboard'] .ak-mosaic__band .ak-hero {
+  border-radius: 0;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+}
+/* The band escapes the column; its TEXT stays aligned to it — found in the first
+ * real-data experiment run, where the title clipped at the viewport edge. */
+[data-ak-look='billboard'] .ak-mosaic__band .ak-hero .ak-hero__inner {
+  padding-inline: max(var(--ak-pad), calc((100vw - min(var(--ak-main-max), 100vw)) / 2 + var(--ak-pad)));
+}
+
 /* @preset-block aurora — vivid at full volume: a taller drifting aurora, wider spectrum, deeper glass, edge to edge.
    The spectrum spreads wider (+120/-90), the band grows, the glass deepens — the look for an app that wants to feel like weather. */
 [data-ak-look='aurora'] {

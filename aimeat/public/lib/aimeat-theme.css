@@ -39,6 +39,10 @@
  *   Deliberately UNLAYERED: daisyUI declares its themes inside `@layer base`, and any unlayered
  *   rule beats every layered one regardless of order or specificity.
  * @version-history
+ *   v2.2.0 — 2026-08-28 — VOLTAGE: the sixth palette — the front-demo2 register (hot magenta on
+ *     warm cream; deep violet night with hot pink; electric yellow accent with dark content;
+ *     2px borders; Space Grotesk display). Both gates green: check:theme 186 with accurate
+ *     stated ratios, the atelier matrix across every look.
  *   v2.1.0 — 2026-07-25 — Owner review round: the default (and mist) display face is Inter — the
  *     geometric Space Grotesk read wrong in the hero sizes (the faces stay vendored for apps);
  *     aimeat secondary is slate steel #45637A/#9AB8D0 (full 4.5:1+ pairs) instead of the purple;
@@ -521,6 +525,78 @@ html[data-palette='mist'][data-theme='dark'] {
   --font-body: 'Inter', 'Segoe UI', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
   --display-tracking: 0;
+}
+
+/* @theme-block voltage light */
+html[data-palette='voltage'][data-theme='light'] {
+  color-scheme: light;
+  --color-base-100: #f1e4d2;
+  --color-base-200: #ffffff;
+  --color-base-300: #dcc9b3;
+  --color-base-content: #241a2e;
+  --color-primary: #c2187e;
+  --color-primary-content: #ffffff;           /* 5.6:1 */
+  --color-secondary: #6d28d9;
+  --color-secondary-content: #ffffff;         /* 7.1:1 */
+  --color-accent: #f5b800;
+  --color-accent-content: #241a2e;            /* 9.3:1 — the yellow needs DARK content */
+  --color-neutral: #241a2e;
+  --color-neutral-content: #ffffff;           /* 16.6:1 */
+  --color-info: #2563eb;
+  --color-info-content: #ffffff;              /* 5.2:1 */
+  --color-success: #0f7a45;
+  --color-success-content: #ffffff;           /* 5.4:1 */
+  --color-warning: #b45309;
+  --color-warning-content: #ffffff;           /* 5.0:1 */
+  --color-error: #d5202f;
+  --color-error-content: #ffffff;             /* 5.2:1 */
+  --radius-box: 14px;
+  --radius-field: 8px;
+  --radius-selector: 6px;
+  --border: 2px;
+  --border-w: 2px;
+  --depth: 0;
+  --noise: 0;
+  --font-display: 'Space Grotesk', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-body: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
+  --display-tracking: -0.02em;
+}
+
+/* @theme-block voltage dark */
+html[data-palette='voltage'][data-theme='dark'] {
+  color-scheme: dark;
+  --color-base-100: #150d20;
+  --color-base-200: #2c1d3f;
+  --color-base-300: #4d3768;
+  --color-base-content: #f3eaff;
+  --color-primary: #ff4fa8;
+  --color-primary-content: #33061e;           /* 5.9:1 */
+  --color-secondary: #a78bfa;
+  --color-secondary-content: #1c1040;         /* 6.4:1 */
+  --color-accent: #ffd166;
+  --color-accent-content: #241a06;            /* 11.9:1 */
+  --color-neutral: #201530;
+  --color-neutral-content: #f3eaff;           /* 14.9:1 */
+  --color-info: #7cb7ff;
+  --color-info-content: #0a1f3a;              /* 7.9:1 */
+  --color-success: #34d399;
+  --color-success-content: #052b1c;           /* 8.0:1 */
+  --color-warning: #fbbf24;
+  --color-warning-content: #2a1d02;           /* 9.9:1 */
+  --color-error: #ff7b72;
+  --color-error-content: #35080a;             /* 7.0:1 */
+  --radius-box: 14px;
+  --radius-field: 8px;
+  --radius-selector: 6px;
+  --border: 2px;
+  --border-w: 2px;
+  --depth: 0;
+  --noise: 0;
+  --font-display: 'Space Grotesk', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-body: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
+  --display-tracking: -0.02em;
 }
 
 /* ── TYPOGRAPHY APPLICATION ──────────────────────────────────────────────────
