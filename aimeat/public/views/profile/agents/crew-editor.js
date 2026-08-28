@@ -13,6 +13,11 @@
  *   - ToolMenu — nine core tools, the Exchange bundle, and the verbs behind a "pick verbs" toggle
  *   - IdentitySection · CrewSection · RunSection · ContractSection
  * @version-history
+ *   v1.1.0 -- 2026-08-28 -- A list field never flattens what it cannot show. capabilities.technical is
+ *     a list of {name, type} objects; the comma input rendered them as "[object Object]" and a blur
+ *     wrote that string back, which would have emptied the agent's searchable capabilities without
+ *     an error. Now: objects shown by name and preserved by name on edit, any other non-string
+ *     list handed to the JSON editor, and a blur writes only when the text changed.
  *   v1.0.0 -- 2026-08-28 -- Initial (JSON-agent Crew tab).
  */
 import { h } from 'preact';
@@ -62,14 +67,38 @@ export function ErrorLines({ lines }) {
   return html`<ul class="pf-agd-crew-errors">${lines.map((l, i) => html`<li key=${i}>${l}</li>`)}</ul>`;
 }
 
-/** A comma-separated list with local text, committed on blur so typing a comma is not eaten. */
-function ListInput({ value, onChange, placeholder, id }) {
-  const joined = (Array.isArray(value) ? value : []).join(', ');
+const isStringList = (v) => Array.isArray(v) && v.every(x => typeof x === 'string');
+
+/**
+ * A comma-separated list with local text, committed on blur so typing a comma is not eaten, and
+ * only when the text actually changed. Two guards keep it from destroying what it cannot show:
+ * `toText`/`fromText` map a list of objects to names and back (the mapper decides how an existing
+ * object survives an edit), and a list this input has no mapper for and cannot show as strings is
+ * handed to the JSON editor instead of being flattened to "[object Object]" and written back.
+ */
+function ListInput({ value, onChange, placeholder, id, toText, fromText }) {
+  const list = Array.isArray(value) ? value : [];
+  const canShow = toText ? true : isStringList(list);
+  const joined = canShow ? (toText ? toText(list) : list).join(', ') : '';
   const [text, setText] = useState(joined);
   useEffect(() => { setText(joined); }, [joined]);
-  const commit = () => onChange(text.split(',').map(s => s.trim()).filter(Boolean));
+  if (!canShow) return html`<${JsonInput} id=${id} value=${list} onChange=${onChange} rows="3" />`;
+  const commit = () => {
+    if (text === joined) return;
+    const names = text.split(',').map(s => s.trim()).filter(Boolean);
+    onChange(fromText ? fromText(names, list) : names);
+  };
   return html`<input id=${id} type="text" class="input-field input-sm" value=${text} placeholder=${placeholder || ''}
     onInput=${e => setText(e.target.value)} onBlur=${commit} />`;
+}
+
+/** capabilities.technical is a list of {name, type} objects (the node indexes it for search). Shown
+ *  by name; an edit keeps the existing object for a name that is still there and makes {name, type:
+ *  'tool'} for a new one, so nothing the person did not touch is rewritten. */
+const technicalToText = (list) => list.map(x => (x && typeof x === 'object' ? String(x.name ?? '') : String(x))).filter(Boolean);
+function technicalFromText(names, prev) {
+  const byName = new Map((Array.isArray(prev) ? prev : []).map(x => [x && typeof x === 'object' ? x.name : x, x]));
+  return names.map(n => (byName.has(n) ? byName.get(n) : { name: n, type: 'tool' }));
 }
 
 /** A JSON blob (offers, signals) with local text; parsed on blur, parse errors shown in place. */
@@ -156,7 +185,8 @@ export function IdentitySection({ doc, onChange, errors }) {
       <//>
       <div class="pf-agd-crew-grid3">
         <${Field} label=${t(`${K}.fields.capTechnical`)} htmlFor="crew-cap-tech">
-          <${ListInput} id="crew-cap-tech" value=${caps.technical} onChange=${v => setCap('technical', v)} />
+          <${ListInput} id="crew-cap-tech" value=${caps.technical} onChange=${v => setCap('technical', v)}
+            toText=${technicalToText} fromText=${technicalFromText} />
         <//>
         <${Field} label=${t(`${K}.fields.capDomain`)} htmlFor="crew-cap-domain">
           <${ListInput} id="crew-cap-domain" value=${caps.domain} onChange=${v => setCap('domain', v)} />

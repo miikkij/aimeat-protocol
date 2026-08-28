@@ -18,6 +18,9 @@
  *   - TabCrew — load, actions (validate / try / publish / draft / restore), the header and the
  *     form-or-JSON body; sections live in ./crew-editor.js, templates in ./crew-templates.js
  * @version-history
+ *   v1.1.0 -- 2026-08-28 -- A definition published from outside the tab (crewaimeat CLI) has no
+ *     revision number; the live line says so instead of "revision 0", and the runtime line shows
+ *     when it loaded rather than a timestamp in a number's place.
  *   v1.0.0 -- 2026-08-28 -- Initial (JSON-agent Crew tab).
  */
 import { h } from 'preact';
@@ -238,7 +241,9 @@ export default function TabCrew({ agentName, showToast }) {
 
       ${published && html`
         <div class="pf-agd-crew-live">
-          <div>${t(`${K}.liveRevision`, { rev: published.revision, when: timeAgo(published.publishedAt) })}</div>
+          <div>${published.revision > 0
+            ? t(`${K}.liveRevision`, { rev: published.revision, when: timeAgo(published.publishedAt) })
+            : t(`${K}.liveUnnumbered`, { when: timeAgo(published.publishedAt) })}</div>
           <div class="pf-agd-help-text">${runtimeLine(runtime, published)}</div>
         </div>
       `}
@@ -340,17 +345,23 @@ export default function TabCrew({ agentName, showToast }) {
   `;
 }
 
-/** The runtime's own report of what it loaded, or that it has not reported. */
+/**
+ * The runtime's own report of what it loaded, or that it has not reported. A revision number is
+ * the node route's; a definition published from the crewaimeat CLI carries none, and a runtime
+ * that loaded one reports no number either, so the line falls back to WHEN it loaded rather than
+ * printing a timestamp where a number is expected.
+ */
 function runtimeLine(runtime, published) {
   if (!runtime || typeof runtime.loadedAt !== 'string') return t(`${K}.runtimeNotReported`);
-  const rev = runtime.revision ?? '?';
+  const numbered = typeof runtime.revision === 'number' && runtime.revision > 0;
+  const rev = numbered ? runtime.revision : '?';
   const when = timeAgo(runtime.loadedAt);
   const errs = Array.isArray(runtime.errors) ? runtime.errors : [];
   if (runtime.ok === false || errs.length) return t(`${K}.runtimeLoadedProblems`, { rev, when, n: errs.length });
-  if (typeof runtime.revision === 'number' && runtime.revision < published.revision) {
+  if (numbered && published.revision > 0 && runtime.revision < published.revision) {
     return t(`${K}.runtimeStale`, { rev: runtime.revision, live: published.revision });
   }
-  return t(`${K}.runtimeLoaded`, { rev, when });
+  return numbered ? t(`${K}.runtimeLoaded`, { rev, when }) : t(`${K}.runtimeLoadedAt`, { when });
 }
 
 function tryOutput(run) {
