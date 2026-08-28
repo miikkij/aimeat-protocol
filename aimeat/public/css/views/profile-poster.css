@@ -19,6 +19,9 @@
  *   renders in a sandboxed frame with its own stylesheet.
  * @usage Linked from public/spa.html after every other stylesheet.
  * @version-history
+ *   v1.3.0 — 2026-08-29 — Section headlines (the title under a page title, the other tabs' own section
+ *     titles, the dialog title, the builder's steps) wear --font-poster-section, Archivo's regular cut;
+ *     the small coral labels stay at 700 whatever the emphasis token says.
  *   v1.2.0 — 2026-08-29 — The second tour: discover, ecosystem, skills, capabilities, libraries, extensions,
  *     packages, the AI provider settings and boards on the same four shapes.
  *   v1.1.0 — 2026-08-29 — Weights through the tokens (--font-poster-text-weight for running text,
@@ -31,24 +34,31 @@
 
 /* ── Faces and the tab head ─────────────────────────────────────────────────────────────── */
 .pf-content, .portfolio-container, .portfolio-viewer-full { font-family: var(--font-showroom-body); }
-.pf-content-head { border-bottom: 3px solid var(--text); padding-bottom: 0.6rem; margin-bottom: 1.6rem; }
-.pf-back-current {
+/* The tab head is the crumb ("Agents /", small mono in coral) and the tab's own first title is the
+   page title in the Black face, as the canvas draws it: crumb above, headline under it, no rule
+   between. Every later .section-title is a section headline in the regular cut. */
+.pf-content-head { border-bottom: 0; padding-bottom: 0; margin-bottom: 0.2rem; }
+.pf .pf-back-current { font-family: var(--font-mono); font-weight: 400; font-size: 0.8rem; letter-spacing: 0; text-transform: none; color: var(--accent); }
+.pf .pf-back-current::after { content: ' /'; }
+.pf .pf-content-body > .section-title:first-child, .pf .pf-content-body > *:first-child > .section-title:first-child,
+.pf .pf-content-body > *:first-child > *:first-child > .section-title:first-child,
+.pf .pf-content-body > *:first-child > h2:not([class]):first-child, .pf .pf-content-body > *:first-child > *:first-child > h2:not([class]):first-child {
   font-family: var(--font-poster); font-weight: var(--font-poster-weight);
-  font-size: 2.4rem; line-height: 0.95; letter-spacing: -0.03em; text-transform: uppercase;
+  font-size: 2.8rem; line-height: 0.9; letter-spacing: -0.035em; margin-bottom: 0.6rem;
 }
 .pf .section-title, .portfolio-container h1 {
-  font-family: var(--font-poster); font-weight: var(--font-poster-weight);
-  font-size: 1.6rem; line-height: 1; letter-spacing: -0.02em; text-transform: uppercase;
+  font-family: var(--font-poster-section); font-weight: var(--font-poster-section-weight);
+  font-size: 1.9rem; line-height: 0.95; letter-spacing: -0.03em; text-transform: uppercase;
   color: var(--text); margin-bottom: 0.5rem;
 }
-.portfolio-container h1 { font-size: 3.4rem; letter-spacing: -0.035em; }
+.portfolio-container h1 { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 3.4rem; letter-spacing: -0.035em; }
 .pf .section-title.section-title-spaced { margin-top: 2.6rem; }
 .pf .section-desc, .portfolio-subtitle-text { font-weight: 600; color: var(--text-dim); font-size: 0.92rem; }
 .pf .card-h3, .pf .card-title, .pf .pf-agd-section-label, .pf .pf-agd-section-title, .pf .pj-section-title,
 .pf .form-row label, .pf .detail-label, .pf .tx-detail-label, .pf .pj-field > span, .pf .pj-rec-field-label,
 .pf .pf-co-field > span, .pf .pj-form-group, .portfolio-source-group summary {
   font-family: var(--font-showroom-body);
-  font-size: 0.72rem; font-weight: var(--font-poster-strong-weight); letter-spacing: 0.1em; text-transform: uppercase;
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
   color: var(--accent); margin-bottom: 0.4rem;
 }
 .pf .card-title { font-size: 1.05rem; letter-spacing: -0.01em; text-transform: none; color: var(--text); }
@@ -246,7 +256,7 @@
 
 /* ── Dialogs ────────────────────────────────────────────────────────────────────────────── */
 .modal { border: 3px solid var(--text); border-radius: 0; box-shadow: 12px 12px 0 var(--sun); font-family: var(--font-showroom-body); }
-.modal-header h3 { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.4rem; text-transform: uppercase; letter-spacing: -0.02em; }
+.modal-header h3 { font-family: var(--font-poster-section); font-weight: var(--font-poster-section-weight); font-size: 1.4rem; text-transform: uppercase; letter-spacing: -0.02em; }
 .modal-footer { border-top: 3px solid var(--text); padding-top: 1rem; }
 
 /* ── Words on the sun stay ink in every theme ───────────────────────────────────────────── */
@@ -258,7 +268,7 @@
 .portfolio-step { padding-top: 1.4rem; margin-bottom: 2.4rem; }
 .portfolio-step h3 {
   display: flex; align-items: baseline; gap: 1rem; margin-bottom: 1rem;
-  font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.8rem; line-height: 0.95; letter-spacing: -0.03em; text-transform: uppercase;
+  font-family: var(--font-poster-section); font-weight: var(--font-poster-section-weight); font-size: 1.8rem; line-height: 0.95; letter-spacing: -0.03em; text-transform: uppercase;
 }
 .portfolio-step-number { width: auto; height: auto; border-radius: 0; background: none; color: var(--accent); font-family: var(--font-mono); font-size: 0.85rem; font-weight: 400; margin: 0; }
 .portfolio-flow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 2rem; padding: 0; margin: 2rem 0 1.5rem; background: none; border: 0; border-top: 3px solid var(--text); border-radius: 0; }
@@ -374,8 +384,8 @@
 .pf .sch-cal-weekcol-head, .pf .sch-cal-head { background: none; border-bottom: 2px solid var(--text); font-weight: var(--font-poster-strong-weight); }
 /* Headings the view sheets set on their own */
 .pf .sch-section-title, .pf .wf-section-title, .pf .of-group-title, .pf .cap-section-title, .pf .mbr-section-title, .pf .pf-content-body h2:not([class]), .pf .pf-content-body h3:not([class]) {
-  font-family: var(--font-poster); font-weight: var(--font-poster-weight);
-  font-size: 1.4rem; line-height: 1; letter-spacing: -0.02em; text-transform: uppercase; color: var(--text);
+  font-family: var(--font-poster-section); font-weight: var(--font-poster-section-weight);
+  font-size: 1.7rem; line-height: 0.95; letter-spacing: -0.03em; text-transform: uppercase; color: var(--text);
 }
 /* The message tab: an ink frame around the two panes, square bubbles */
 .inbox-body { border: 3px solid var(--text); border-radius: 0; box-shadow: none; }
@@ -400,8 +410,8 @@
   border: 2px solid var(--text); border-radius: 0; background: var(--bg-dim); box-shadow: none;
 }
 .pf .pf-or-section-title, .pf .pf-eco-section-title, .pf .pf-skl-section-title, .pf .pkg-section-header, .pf .cap-info-title {
-  font-family: var(--font-poster); font-weight: var(--font-poster-weight);
-  font-size: 1.4rem; line-height: 1; letter-spacing: -0.02em; text-transform: uppercase; color: var(--text);
+  font-family: var(--font-poster-section); font-weight: var(--font-poster-section-weight);
+  font-size: 1.7rem; line-height: 0.95; letter-spacing: -0.03em; text-transform: uppercase; color: var(--text);
 }
 /* Chips */
 .pf .dsc-facet, .pf .dsc-type-badge, .pf .dsc-tag, .pf .dsc-scope-btn, .pf .pf-eco-status, .pf .pf-eco-pill, .pf .pf-eco-chip, .pf .pf-eco-count-badge, .pf .pf-eco-rec-chip,
@@ -431,7 +441,8 @@
 .pf .pkg-filters select, .pf .cap-filter-select, .pf .pf-or-select { border: 2px solid var(--text); border-radius: 0; background: var(--bg); }
 
 @media (max-width: 700px) {
-  .pf-back-current { font-size: 1.7rem; }
+  .pf .pf-content-body > .section-title:first-child, .pf .pf-content-body > *:first-child > .section-title:first-child,
+  .pf .pf-content-body > *:first-child > *:first-child > .section-title:first-child { font-size: 2rem; }
   .portfolio-container h1 { font-size: 2.2rem; }
   .portfolio-flow { grid-template-columns: 1fr; }
   .portfolio-viewer-bar { padding: 0 0.8rem; gap: 0.8rem; }

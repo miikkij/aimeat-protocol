@@ -6,6 +6,7 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v3.0.2 — 2026-08-29 — The name in the index wears the section face (Archivo regular), as the canvas shows it.
  *   v3.0.1 — 2026-08-29 — Poster headlines read --font-poster-weight (theme.css) instead of a literal 400;
  *     the index's item weights read --font-poster-text-weight / --font-poster-strong-weight; the content
  *     column takes the canvas's gutter (3rem left, 2.75rem right) so a page has the room the design has.
@@ -2445,7 +2446,7 @@
 .pf-side-identity { display: flex; align-items: center; gap: 0.6rem; padding: 0.4rem 0 1rem; }
 .pf-side-avatar { width: 38px; height: 38px; flex: 0 0 auto; background: var(--card); border: 3px solid var(--text); overflow: hidden; }
 .pf-side-avatar svg { width: 100%; height: 100%; }
-.pf-side-id-name { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1rem; line-height: 1.1; text-transform: uppercase; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-side-id-name { font-family: var(--font-poster-section); font-weight: var(--font-poster-section-weight); font-size: 1.05rem; line-height: 1.1; text-transform: uppercase; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .pf-side-group { margin-top: 1.1rem; }
 .pf-side-group-title { font-size: 0.66rem; font-weight: var(--font-poster-strong-weight); letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); padding: 0 0 0.35rem; border-bottom: 2px solid var(--text); }
