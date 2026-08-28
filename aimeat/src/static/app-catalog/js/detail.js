@@ -8,6 +8,20 @@
  *   injected once via initDetail(deps) — so there is no import cycle back through the entry module.
  * @usage import { initDetail, openDetailView, mountLoginPill, ... } from './detail.js'; initDetail({...})
  * @version-history
+ *   2026-08-28 — The versions list paints on the FIRST open. detailLoadVersions looked the list
+ *     element up, then called renderDetailView() when the server's newest version differed from
+ *     what this browser remembered — which rebuilds the panel — and then wrote the rows into the
+ *     element it had looked up before, now detached. The list stayed on "loading versions" until
+ *     the panel was closed and reopened. Found while adding the line below, on the first open of
+ *     an app this browser had never published from.
+ *   2026-08-28 — The version list says how far apart the publishes are: a "since the previous one"
+ *     on every row and a line above the list carrying the count, the day (or the span of days) and
+ *     the distance from the first publish to the last. Nothing new is stored and no endpoint
+ *     changed — the node has stamped every publish since June and pruned none, so this history was
+ *     already on disk for all 141 apps here and the list rendered each stamp beside the next
+ *     without ever subtracting them. The labels say "since the previous one" and "first to last",
+ *     never "took": in one sitting a gap is the length of a round, across a weekend it is a
+ *     weekend, and the stamps cannot tell those apart.
  *   2026-08-25 — The data map section, between ABOUT and EDIT WITH AI. Until it existed the map
  *     was written, stamped and summarised everywhere and there was nowhere to read one in full.
  *   v1.7.0 — 2026-08-17 — Delete deletes: the Actions button routes an own published app to the
@@ -33,7 +47,7 @@
  *     setSkillBinding frontmatter rewrite so the standalone bundle needs no SPA service layer).
  *   v1.0.0 — 2026-07-10 — Initial extraction (TARGET-021 Aalto 3 modularization, phase 7).
  */
-import { escapeHtml, jsArg, sourceLabel, sourceLabelText, currentOwnerName } from './util.js';
+import { escapeHtml, jsArg, sourceLabel, sourceLabelText, currentOwnerName, gapMs, durationLabel } from './util.js';
 import { saveApp, deleteApp } from './db.js';
 import { dtlBtn, showConfirm, showNotice } from './ui.js';
 import { dataMapSectionHtml, loadDataMapInto } from './data-map.js';
@@ -1357,6 +1371,61 @@ function detailCheckAiAvailability() {
     .catch(function() { detailAiAvailable = false; if (detailAppId) renderDetailView(); });
 }
 
+/** The duration units in the language the catalogue is showing. */
+function durationUnits() {
+  return { s: t('dur.s'), min: t('dur.min'), h: t('dur.h'), d: t('dur.d') };
+}
+
+/**
+ * " · since the previous one 1 min 53 s" for one row of a newest-first version list, or '' for
+ * the oldest row and for anything the stamps cannot answer.
+ *
+ * WHY THIS IS WORTH THE LINE. The node has stamped every publish since June and never pruned one
+ * — 415 versions of one app on this node — and the list rendered each stamp beside the next
+ * without ever subtracting them. So the shape of the work (which round was quick, which one was
+ * the same bug three times) was on disk for every app here and readable in none of them.
+ *
+ * @param {Array<{ created_at?: string }>} versions newest first
+ * @param {number} i
+ */
+function versionSinceText(versions, i) {
+  var prev = versions[i + 1];
+  if (!prev) return '';
+  var label = durationLabel(gapMs(versions[i].created_at, prev.created_at), durationUnits());
+  return label ? ' · ' + t('versions.sincePrev') + ' ' + label : '';
+}
+
+/**
+ * The one line above the list: how many versions, the day or the span of days they cover, and how
+ * long the first is from the last.
+ *
+ * It says "first to last" and not "took", and the distinction is the whole point. Between two
+ * publishes in one sitting the number is the length of a round; between June and August it is a
+ * summer. The stamps cannot tell those apart and neither can this line, so it states the distance
+ * and leaves the reading to the person.
+ *
+ * @param {Array<{ created_at?: string }>} versions newest first
+ */
+function versionSpanText(versions) {
+  if (versions.length < 2) return '';
+  var newest = versions[0].created_at;
+  var oldest = versions[versions.length - 1].created_at;
+  if (!newest || !oldest) return '';
+  var first = new Date(oldest).toLocaleDateString();
+  var last = new Date(newest).toLocaleDateString();
+  var when = first === last ? first : first + ' – ' + last;
+  var span = durationLabel(gapMs(newest, oldest), durationUnits());
+  return ' · ' + when + (span ? ' · ' + t('versions.span') + ' ' + span : '');
+}
+
+/** The same line as a block above the detail view's list, where no count is shown otherwise. */
+function versionSpanHtml(versions) {
+  var text = versionSpanText(versions);
+  if (!text) return '';
+  return '<div class="version-span" style="color:var(--text-muted);font-size:.8rem;margin-bottom:.5rem">' +
+    escapeHtml(versions.length + ' ' + t('versions.stored') + text) + '</div>';
+}
+
 function detailLoadVersions(owner, filename) {
   var config = loadConfig();
   if (!config.aimeatUrl) return;
@@ -1381,20 +1450,27 @@ function detailLoadVersions(owner, filename) {
           renderDetailView();
         }
       }
+      // renderDetailView() above rebuilds the whole panel, so the element looked up before it is
+      // now detached and writing to it paints nothing: the list sat on "loading versions" forever
+      // on the first open of any app whose published number this browser had not seen. Re-resolve
+      // it, every time, rather than reason about which branch ran.
+      listEl = document.getElementById('detail-versions-list') || listEl;
       if (versions.length === 0) { detailVersionsHtml = '<span style="color:var(--text-muted);font-size:.85rem">' + t('detail.noVersions') + '</span>'; listEl.innerHTML = detailVersionsHtml; return; }
       var ownerArg = "'" + jsArg(owner) + "'";
       var fileArg = "'" + jsArg(filename) + "'";
-      var html = '';
+      var html = versionSpanHtml(versions);
       for (var i = 0; i < versions.length; i++) {
         var v = versions[i];
         var isLatest = (i === 0);
         var kb = v.size ? (Math.round(v.size / 102.4) / 10) + ' KB' : '';
         var when = v.created_at ? new Date(v.created_at).toLocaleString() : '';
+        // The list is newest-first, so the row after this one is the publish before it.
+        var since = versionSinceText(versions, i);
         var viewU = aimeatUrl + '/v1/apps/' + encodeURIComponent(owner) + '/' + encodeURIComponent(filename) + '?version=' + v.version_number + '&mode=inline';
         html +=
           '<div class="dtl-version-row">' +
             '<div class="version-meta"><span class="version-num">v' + v.version_number + (isLatest ? ' <span class="version-current">' + t('versions.current') + '</span>' : '') + '</span> ' +
-              '<span class="version-sub" style="color:var(--text-muted);font-size:.8rem">' + (kb ? kb : '') + (when ? ' · ' + when : '') + '</span></div>' +
+              '<span class="version-sub" style="color:var(--text-muted);font-size:.8rem">' + (kb ? kb : '') + (when ? ' · ' + when : '') + since + '</span></div>' +
             '<div class="dtl-btn-row">' +
               dtlBtn(t('card.view'), 'window._launcher.viewPublished(\'' + escapeHtml(viewU) + '\', \'' + jsArg(filename) + '\')') +
               (isLatest ? '' : dtlBtn(t('card.restore'), 'window._launcher.restoreVersion(' + ownerArg + ', ' + fileArg + ', ' + v.version_number + ')')) +
@@ -2079,7 +2155,7 @@ function showVersionsModal(owner, filename) {
     .then(function(json) {
       var versions = json.data && json.data.versions ? json.data.versions : [];
       if (versions.length === 0) { statusEl.textContent = 'No versions found.'; return; }
-      statusEl.textContent = versions.length + ' ' + t('versions.stored');
+      statusEl.textContent = versions.length + ' ' + t('versions.stored') + versionSpanText(versions);
       statusEl.style.color = 'var(--text-muted)';
 
       var ownerArg = "'" + jsArg(owner) + "'";
@@ -2090,12 +2166,13 @@ function showVersionsModal(owner, filename) {
         var isLatest = (i === 0);
         var kb = v.size ? (Math.round(v.size / 102.4) / 10) + ' KB' : '';
         var when = v.created_at ? new Date(v.created_at).toLocaleString() : '';
+        var since = versionSinceText(versions, i);
         var viewU = aimeatUrl + '/v1/apps/' + encodeURIComponent(owner) + '/' + encodeURIComponent(filename) + '?version=' + v.version_number + '&mode=inline';
         html +=
           '<div class="version-row">' +
             '<div class="version-meta">' +
               '<span class="version-num">v' + v.version_number + (isLatest ? ' <span class="version-current">' + t('versions.current') + '</span>' : '') + '</span>' +
-              '<span class="version-sub">' + escapeHtml(v.version || '') + (kb ? ' · ' + kb : '') + (when ? ' · ' + when : '') + '</span>' +
+              '<span class="version-sub">' + escapeHtml(v.version || '') + (kb ? ' · ' + kb : '') + (when ? ' · ' + when : '') + since + '</span>' +
             '</div>' +
             '<div class="version-actions">' +
               '<button onclick="window._launcher.viewPublished(\'' + escapeHtml(viewU) + '\', \'' + jsArg(filename) + '\')">' + t('card.view') + '</button>' +

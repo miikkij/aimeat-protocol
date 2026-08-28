@@ -28,6 +28,23 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.19.0 — 2026-08-28 — The chart (TARGET-074, the harvest): grouped bars + drawn lines over
+ *     one label axis, data-driven and library-free, colours from the look's spectrum, entrance
+ *     animated and reduced-motion-safe. In the mosaic as the `chart` block; budjetti's
+ *     costs/income/cash shape is the reason it exists.
+ *   v0.18.0 — 2026-08-28 — The carnival look and the inverse band (CSS-side: the hero's own
+ *     text-colour pair joins the contract, the subline no longer dims by default, and the
+ *     matrix models the band's true grounds). No JS change; the version rides the pin.
+ *   v0.17.0 — 2026-08-28 — The signature colour pair: a layout's `--ak-accent` token in the form
+ *     "#light/#dark" is applied per mode by the mosaic (style element scoped to the host), so an
+ *     app can carry its own proven brand colour in both themes. Validation and the contrast
+ *     proof live on the server; the kit only applies what was accepted.
+ *   v0.16.0 — 2026-08-28 — Agentness in the app (phase 6's tail): delegate() — "let AI handle
+ *     it" on a declared task, spend-guarded through the agents library, outcome in the same
+ *     view — and agentActivity(), the owner's agents' work as the kit's own timeline. Both
+ *     degrade with words when no agent surface exists.
+ *   v0.15.0 — 2026-08-28 — The boot gate presents the app (shell: centered sign-in with name +
+ *     tagline, main hidden while gated; body overflow clipped so the frame owns all scrolling).
  *   v0.14.0 — 2026-08-28 — copilot → aide, everywhere (function, mosaic block id, classes, i18n
  *     keys), before any app uses it: the old name collides with a large product family. The
  *     developer picked the new name; UI titles are Aide / Apuri / Ayudante.
@@ -93,12 +110,14 @@ import { i18n } from './i18n.js';
 import { app, section, tabs, bottomNav } from './shell.js';
 import { hero, statRow, figure } from './hero.js';
 import { aide } from './aide.js';
+import { delegate, agentActivity } from './agentic.js';
 import { emptyState, skeleton } from './state.js';
 import { list, listDetail } from './list.js';
 import { cardGrid, mediaCard } from './grid.js';
 import { form } from './form.js';
 import { table, searchBar } from './table.js';
 import { timeline } from './timeline.js';
+import { chart } from './chart.js';
 import { mosaic, appRef } from './mosaic.js';
 
 const atelier = {
@@ -107,7 +126,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.14.0',
+  version: '0.19.0',
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,
@@ -117,7 +136,7 @@ const atelier = {
 
   // ── Focal content ──
   hero, statRow, figure,
-  aide,
+  aide, delegate, agentActivity,
 
   /**
    * Read something aloud through the platform's speech library, when the page carries it.
@@ -136,7 +155,7 @@ const atelier = {
   },
 
   // ── Content ──
-  list, listDetail, cardGrid, mediaCard, timeline,
+  list, listDetail, cardGrid, mediaCard, timeline, chart,
 
   // ── Data ──
   form, table, searchBar,

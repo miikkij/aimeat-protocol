@@ -34,6 +34,11 @@
  *   const book = new DesignBookService(storage, config);
  *   const out = await book.propose(callerGaii, raw, provenance);
  * @version-history
+ *   v1.1.0 — 2026-08-28 — The new kinds land in the lifecycle: propose stamps the checks the
+ *     kind's own bench ran (tokens-valid / contrast-matrix / style-valid), and adopt() MERGES a
+ *     look, motion recipe or illustration style into the app's existing arrangement (refusing
+ *     with words when there is none) instead of replacing it — the whole-layout replace stays
+ *     the layout/fill behaviour.
  *   v1.0.0 — 2026-08-28 — Initial (TARGET-074 phase 5, slice 1).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -54,6 +59,16 @@ export const PART_KEY_RE = /^atelier\.book\.part\.[a-z0-9][a-z0-9-]{2,60}$/;
 export function partKey(id: string): string { return `${PART_KEY_PREFIX}${id}`; }
 function usageKey(id: string): string { return `${USAGE_KEY_PREFIX}${id}`; }
 
+/** What the propose-time bench actually proved, named by kind — the record says which bench ran. */
+function proposeChecksFor(input: PartInput): string[] {
+  if (input.kind === 'layout' || input.kind === 'fill') return ['layout-valid'];
+  if (input.kind === 'illustration') return ['style-valid'];
+  const checks = ['tokens-valid'];
+  const tokens = (input.body as { tokens?: Record<string, string> }).tokens ?? {};
+  if (tokens['--ak-accent']) checks.push('contrast-matrix');
+  return checks;
+}
+
 /** The stored record value — self-describing, per the memory-contracts rule. */
 export interface DesignBookPart {
   spec: 'aimeat.designbook.part/v1';
@@ -67,7 +82,15 @@ export interface DesignBookPart {
   proposed_by: string;
   /** The proposer's owner GHII — the identity the ownership rules compare against. */
   proposed_by_owner: string;
-  bench: { checks: string[]; passed_at: string };
+  bench: {
+    checks: string[];
+    passed_at: string;
+    /** The automated guarantee bench's last browser run (design-book/bench.ts), when one ran. */
+    browser?: {
+      ran: boolean; passed?: boolean; reason?: string; at: string;
+      viewports?: Array<{ viewport: string; overflow_px: number; units_rendered: number; controls_below_touch_min: number }>;
+    };
+  };
   created_at: string;
   updated_at: string;
   published_at?: string;
@@ -153,7 +176,7 @@ export class DesignBookService {
       status: prev?.status ?? 'proposed',
       proposed_by: provenance.principal,
       proposed_by_owner: ownerGhii,
-      bench: { checks: ['layout-valid'], passed_at: now },
+      bench: { checks: proposeChecksFor(input), passed_at: now },
       created_at: prev?.created_at ?? now,
       updated_at: now,
       ...(prev?.published_at ? { published_at: prev.published_at } : {}),
@@ -269,7 +292,29 @@ export class DesignBookService {
       throw new DesignBookError('NOT_FOUND',
         `No published app "${filename}" under your owner "${callerOwnerName}". A part is adopted into a published app — publish first, or check the filename.`, 404);
     }
-    const out = await apps.write(app.ownerGaii, filename, part.body, provenance);
+    // A layout or leiska REPLACES the app's arrangement; a look, motion recipe or illustration
+    // style MERGES into the one it already has — those kinds are seasoning, and seasoning with
+    // no dish to land on refuses with words. Every path writes through the same validated,
+    // versioned, provenance-stamped door, so an adopted accent pair re-proves its matrix here.
+    let nextLayout: unknown = part.body;
+    if (part.kind === 'look' || part.kind === 'motion' || part.kind === 'illustration') {
+      const current = await apps.read(app.ownerGaii, filename);
+      if (!current.layout) {
+        throw new DesignBookError('NO_LAYOUT',
+          `"${filename}" has no stored arrangement to adopt a ${part.kind} into. Adopt a layout or fill first (or store one with the ui set tool), then season it.`, 409);
+      }
+      if (part.kind === 'illustration') {
+        nextLayout = { ...current.layout, imagery: part.body };
+      } else {
+        const body = part.body as { tokens?: Record<string, string>; look?: string };
+        nextLayout = {
+          ...current.layout,
+          ...(part.kind === 'look' && body.look ? { look: body.look } : {}),
+          tokens: { ...(current.layout.tokens ?? {}), ...(body.tokens ?? {}) },
+        };
+      }
+    }
+    const out = await apps.write(app.ownerGaii, filename, nextLayout, provenance);
 
     // Adoption is the heartbeat: an aging part someone still reaches for is not stale — one real
     // use lifts it straight back to published, without an operator round.

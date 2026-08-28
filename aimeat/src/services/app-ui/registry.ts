@@ -25,6 +25,12 @@
  * @usage
  *   import { UI_COMPONENTS, componentById, buildUiCatalogue } from './registry.js';
  * @version-history
+ *   v1.6.0 — 2026-08-28 — THE HARVEST BEGINS (append-only): `chart` joins the components —
+ *     grouped bars + drawn lines over one label axis, the shape budjetti proved every money
+ *     view needs. The Book can now carry chart-bearing arrangements as data.
+ *   v1.5.0 — 2026-08-28 — COLOUR OPENS AS A PAIR (append-only): `--ak-accent` joins the signature
+ *     as "light/dark" — measurement proved no single hex survives both modes, so the validator
+ *     runs the contrast matrix per mode against each half before accepting (TARGET-074).
  *   v1.4.0 — 2026-08-28 — SIGNATURE arrives (append-only): the bounded `--ak-*` token subset a
  *     layout may override (shape, typography, density, motion — deliberately no colour until the
  *     contrast bench can prove an override), listed in the catalogue as signature_tokens.
@@ -180,6 +186,16 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
     },
   },
   {
+    id: 'chart',
+    summary: 'Grouped bars and drawn lines over one label axis — the costs/income/cash-curve shape. The source resolves to ONE record: { labels: string[], series: [{ id, label, kind: "bar"|"line", values: number[] }] }. Colours come from the look\'s own accent spectrum; negatives are legal and the zero line appears when crossed.',
+    props: {
+      source: source(),
+      title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
+      emptyTitle: text('What the empty state says.', 80),
+      emptyHint: text('The line under it.', 160),
+    },
+  },
+  {
     id: 'aide',
     summary: 'The in-app AI: a chat panel whose tools are the app\'s OWN declared sources and actions — it reads what the screen reads and proposes what the buttons do, a person confirms every run. Runs on the owner\'s AI key; shows the platform AI notice and per-message provenance labels itself.',
     maxPerLayout: 1,
@@ -192,13 +208,15 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
 
 /**
  * The SIGNATURE TOKENS: the bounded `--ak-*` subset a layout may override to give one app its own
- * hand — shape, typography, density and motion. DELIBERATELY NO COLOUR TOKENS: a colour override
- * is only omalaatuinen-but-readable when the contrast arithmetic has proven it, and that bench is
- * not wired into the validator yet — so colour waits rather than shipping on trust. Growing this
- * list is append-only, and every addition stays provable-safe by construction (a radius cannot
- * break contrast).
+ * hand — colour, shape, typography, density and motion. COLOUR IS ONE TOKEN AND IT IS A PAIR:
+ * measurement proved no single hex survives every palette in both modes (the house coral fails 32
+ * light-mode checks and passes dark completely), so `--ak-accent` takes "light/dark" and the
+ * validator runs the full contrast matrix per mode before accepting it — colour ships proven, not
+ * on trust. Growing this list is append-only, and every other entry stays provable-safe by
+ * construction (a radius cannot break contrast).
  */
 export const SIGNATURE_TOKENS: Record<string, string> = {
+  '--ak-accent': 'The signature colour, as a LIGHT/DARK PAIR "#hex/#hex" — the light-mode value first, the dark-mode value second, e.g. "#0e7c66/#e8564a". Both values run the full contrast matrix at validation, each against its own mode, and a pair that breaks readability anywhere refuses with the numbers. Every accent derivation (text tint, gradient, spectrum, focus ring) follows the pair.',
   '--ak-radius': 'Corner rounding of cards and surfaces, e.g. "2px" for a sharp hand, "18px" for a soft one.',
   '--ak-radius-sm': 'Corner rounding of rows and inputs.',
   '--ak-radius-pill': 'Rounding of pills and chips.',
@@ -237,6 +255,7 @@ export function buildUiCatalogue(): {
   structures: Array<{ id: string; summary: string }>;
   layouts: readonly AppUiLayoutPreset[];
   signature_tokens: { values: Record<string, string>; summary: string };
+  imagery: { summary: string };
 } {
   return {
     components: UI_COMPONENTS.map((c) => ({
@@ -261,11 +280,17 @@ export function buildUiCatalogue(): {
     layouts: UI_LAYOUT_PRESETS,
     signature_tokens: {
       values: SIGNATURE_TOKENS,
-      summary: 'Optional top-level `tokens`: the app\'s SIGNATURE — bounded overrides of shape, '
-        + 'typography, density and motion, applied on top of the look. Only the names listed here '
-        + 'are legal, and colour is deliberately absent until the contrast bench can prove an '
-        + 'override readable. The design pass: propose two or three token-sets as whole layouts, '
+      summary: 'Optional top-level `tokens`: the app\'s SIGNATURE — bounded overrides of colour, '
+        + 'shape, typography, density and motion, applied on top of the look. Only the names '
+        + 'listed here are legal. The one colour door is --ak-accent as a light/dark pair '
+        + '"#hex/#hex", proven by the full contrast matrix at validation — every other colour '
+        + 'derives from it. The design pass: propose two or three token-sets as whole layouts, '
         + 'dry-run each, show the owner, store the one they pick.',
+    },
+    imagery: {
+      summary: 'Optional top-level `imagery`: art direction for the imagery pipeline as data — '
+        + '{ style: "the illustration prompt fragment", palette_words?: "colour words" }. '
+        + 'Builders and the Design Book\'s illustration parts write it; image generation reads it.',
     },
   };
 }

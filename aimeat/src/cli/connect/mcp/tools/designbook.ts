@@ -11,6 +11,9 @@
  * @structure registerDesignbookTools(mcp, registry)
  * @usage import { registerDesignbookTools } from './designbook.js';
  * @version-history
+ *   v1.1.0 — 2026-08-28 — The kind wording grows with the Book: look, motion and illustration
+ *     join layout and fill in the search filter and the propose contract (parity with the server
+ *     MCP, same slice).
  *   v1.0.0 — 2026-08-28 — Initial (TARGET-074 phase 5, slice 1).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -26,7 +29,7 @@ export function registerDesignbookTools(mcp: McpServer, registry: AgentRegistry)
     ({ content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) });
 
   mcp.tool('aimeat_designbook_search', descriptionFor('aimeat_designbook_search'), {
-    kind: z.string().optional().describe('Only this part kind: "layout" or "fill".'),
+    kind: z.string().optional().describe('Only this part kind: "layout", "fill", "look", "motion" or "illustration".'),
     status: z.string().optional().describe('Only this lifecycle state: proposed, published, aging or retired.'),
     q: z.string().optional().describe('A word matched against id, title, summary and tags.'),
     limit: z.number().optional().describe('Rows to return, 1-200. Default 50.'),
@@ -47,7 +50,7 @@ export function registerDesignbookTools(mcp: McpServer, registry: AgentRegistry)
   });
 
   mcp.tool('aimeat_designbook_propose', descriptionFor('aimeat_designbook_propose'), {
-    part: z.record(z.string(), z.unknown()).describe('The part: { id, kind: "layout"|"fill", title, summary, body, tags? }.'),
+    part: z.record(z.string(), z.unknown()).describe('The part: { id, kind: "layout"|"fill"|"look"|"motion"|"illustration", title, summary, body, tags? }. The kind decides the body: a whole mosaic layout (layout/fill), { tokens, look? } (look), { tokens } of motion tokens only (motion), or { style, palette_words? } (illustration).'),
     ...aiProvenanceInputs,
   }, annotationsFor('aimeat_designbook_propose'), async ({ part, ai_provenance, ai_provenance_id }) => {
     return out(await client.post('/v1/designbook', {

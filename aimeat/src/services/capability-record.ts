@@ -327,23 +327,52 @@ export async function deleteCapability(
     return { ok: true, value: { id } };
 }
 
-/** Vouch for someone else's capability. Your own does not count, which is the whole point. */
+/** The human behind a principal: an agent's vouch is its owner's vouch — one person, one vote. */
+function voucherGhiiOf(gaii: string): string {
+    const hash = gaii.indexOf('#');
+    return hash >= 0 ? gaii.slice(hash + 1) : gaii;
+}
+
+/**
+ * Vouch for someone else's capability. Your own does not count, which is the whole point — and
+ * "your own" is decided on the OWNER, so an owner cannot vouch for themselves through an agent.
+ * A vouch is a ROW keyed per voucher: a second vouch by the same person is a no-op that says so,
+ * the comment lands beside it, and the count is derived from the rows — never incremented.
+ */
 export async function vouchCapability(
     deps: CapabilityDeps,
     caller: CapabilityCaller,
     id: string,
-): Promise<CapabilityResult<{ vouchCount: number }>> {
+    comment?: string,
+): Promise<CapabilityResult<{ vouchCount: number; already: boolean }>> {
     const { storage } = deps;
 
     const cap = await storage.getCapability(id);
     if (!cap) return refuse(404, 'NOT_FOUND', 'Capability not found');
-    if (cap.ownerGhii === caller.gaii) {
+    const voucher = voucherGhiiOf(caller.gaii);
+    if (voucherGhiiOf(cap.ownerGhii) === voucher) {
         return refuse(400, 'CANNOT_VOUCH_OWN', 'Cannot vouch for your own capability');
     }
 
-    await storage.incrementVouchCount(id);
-    const updated = await storage.getCapability(id);
-    return { ok: true, value: { vouchCount: updated?.trust.vouchCount ?? 0 } };
+    const added = await storage.addCapabilityVouch(id, voucher, comment);
+    const count = await storage.countCapabilityVouches(id);
+    return { ok: true, value: { vouchCount: count, already: !added } };
+}
+
+/** Take YOUR vouch back — and only yours: whose vouch is removed is decided by who is asking. */
+export async function unvouchCapability(
+    deps: CapabilityDeps,
+    caller: CapabilityCaller,
+    id: string,
+): Promise<CapabilityResult<{ vouchCount: number; removed: boolean }>> {
+    const { storage } = deps;
+
+    const cap = await storage.getCapability(id);
+    if (!cap) return refuse(404, 'NOT_FOUND', 'Capability not found');
+
+    const removed = await storage.removeCapabilityVouch(id, voucherGhiiOf(caller.gaii));
+    const count = await storage.countCapabilityVouches(id);
+    return { ok: true, value: { vouchCount: count, removed } };
 }
 
 /**

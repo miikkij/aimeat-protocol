@@ -213,17 +213,26 @@ describe('CapabilityRepository (SQLite)', () => {
     expect(got2!.operatorOverride).toBeNull();
   });
 
-  it('setTrust and vouchCount', async () => {
+  it('setTrust, and vouches as ROWS: dedup per voucher, derived count, comment kept', async () => {
     const cap = makeCap();
     await s.createCapability(cap);
     await s.setCapabilityTrust(cap.id, { operatorReviewed: true, reviewedAt: new Date().toISOString() });
-    await s.incrementVouchCount(cap.id);
-    await s.incrementVouchCount(cap.id);
+
+    // Two different people vouch; one of them tries twice — the second try is a no-op that says
+    // so, which is the exact contract the old counter could not offer.
+    expect(await s.addCapabilityVouch(cap.id, 'alice@test-node', 'Great tool.')).toBe(true);
+    expect(await s.addCapabilityVouch(cap.id, 'alice@test-node')).toBe(false);
+    expect(await s.addCapabilityVouch(cap.id, 'bob@test-node')).toBe(true);
+    expect(await s.countCapabilityVouches(cap.id)).toBe(2);
+
     const got = await s.getCapability(cap.id);
     expect(got!.trust.operatorReviewed).toBe(true);
-    expect(got!.trust.vouchCount).toBe(2);
+    expect(got!.trust.vouchCount).toBe(2); // the blob mirrors the rows
 
-    await s.decrementVouchCount(cap.id);
+    // Removing takes exactly the named person's vouch, and only once.
+    expect(await s.removeCapabilityVouch(cap.id, 'alice@test-node')).toBe(true);
+    expect(await s.removeCapabilityVouch(cap.id, 'alice@test-node')).toBe(false);
+    expect(await s.countCapabilityVouches(cap.id)).toBe(1);
     const got2 = await s.getCapability(cap.id);
     expect(got2!.trust.vouchCount).toBe(1);
   });

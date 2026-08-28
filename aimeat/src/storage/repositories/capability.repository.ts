@@ -9,9 +9,14 @@
  * @structure
  *   - CapabilityRepository: create/get/update/delete + list/lookup by owner/source
  *   - stats & logs: incrementCapabilityStats, addCapabilityLog, listCapabilityLogs, prune
- *   - governance: setCapabilityOverride, setCapabilityTrust, increment/decrementVouchCount
+ *   - governance: setCapabilityOverride, setCapabilityTrust, add/remove/countCapabilityVouches
  *
  * @version-history
+ *   v1.1.0 — 2026-08-28 — Vouches become ROWS, not a counter. increment/decrementVouchCount only
+ *     rewrote a number in the trust blob: the vouches table sat unread and unwritten since it was
+ *     created, so one caller could vouch any number of times, the comment was silently dropped,
+ *     and "who vouched" was unanswerable. add/remove are keyed per voucher (the table's PK does
+ *     the dedup) and the count is derived from the rows.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import type { CapabilityRecord, CapabilityLogEntry, CapabilityOverride, CapabilityTrust, CapabilityFilter } from '../interface.js';
@@ -41,6 +46,9 @@ export interface CapabilityRepository {
 
   setCapabilityOverride(id: string, override: CapabilityOverride | null): Promise<void>;
   setCapabilityTrust(id: string, trust: Partial<CapabilityTrust>): Promise<void>;
-  incrementVouchCount(id: string): Promise<void>;
-  decrementVouchCount(id: string): Promise<void>;
+  /** One vouch per voucher: a second add by the same GHII is a no-op and answers false. */
+  addCapabilityVouch(capabilityId: string, userGhii: string, comment?: string): Promise<boolean>;
+  /** Removes THIS voucher's vouch only; answers false when they had none to remove. */
+  removeCapabilityVouch(capabilityId: string, userGhii: string): Promise<boolean>;
+  countCapabilityVouches(capabilityId: string): Promise<number>;
 }
