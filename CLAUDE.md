@@ -284,4 +284,4 @@ curl -s -X PUT "<upload_url>" -H "Content-Type: <ct>" --data-binary @file
 
 Copy-pasteable agent connect instructions live in `public/views/profile/agents-tab.js` (`buildAgentPrompt()` and `PLATFORMS`). Machine-readable discovery is `src/routes/bootstrap.ts` at `GET /`; managed system prompts are in the DB, served by `src/routes/prompts.ts` at `/v1/prompts/:name`.
 
-Project skills, loaded when the task calls for them: `aimeat-writing`, `aimeat-app-building`, `aimeat-library-authoring`, `aimeat-frontend-verify`, `aimeat-organism-records`, `aimeat-imagery`.
+Project skills, loaded when the task calls for them: `aimeat-writing`, `aimeat-app-building`, `aimeat-library-authoring`, `aimeat-frontend-verify`, `aimeat-organism-records`, `aimeat-imagery`, `aimeat-video`.
