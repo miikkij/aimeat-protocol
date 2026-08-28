@@ -16,14 +16,23 @@
  *   import { validateUiLayout, AppUiError } from './validate.js';
  *   const layout = validateUiLayout(req.body);   // throws AppUiError(422) with words
  * @version-history
+ *   v1.4.0 — 2026-08-28 — Two benches step out as REUSABLE doors for the Design Book's new part
+ *     kinds: validateSignatureTokens() (pure extraction of the tokens loop, now also serving the
+ *     `look` and `motion` kinds) and validateImageryStyle() (new: art direction as data, serving
+ *     the layout's append-only optional `imagery` field and the `illustration` kind).
+ *   v1.3.0 — 2026-08-28 — The signature COLOUR opens: `--ak-accent` accepted as a light/dark pair
+ *     "#hex/#hex", each half proven by the full contrast matrix against its own mode's combos
+ *     (validateAccentPair). A failing half refuses with the measured numbers; other colour-token
+ *     names still refuse, now pointing at the pair door. TARGET-074.
  *   v1.2.0 — 2026-08-28 — The SIGNATURE: optional top-level `tokens`, validated against the
  *     registry allowlist (shape/typography/density/motion — a colour name is refused with the
  *     reason, not just the list), values bounded and vehicle-proof (no urls, no declaration
  *     characters). TARGET-074 phase 4, signature-look.
- *   v1.1.1 — 2026-08-28 — SECURITY (CodeQL js/loop-bound-injection): nearest() ran the O(m*n)
- *     Levenshtein against the caller-supplied name at full length, so a huge submitted look/nav/block
- *     value was a DoS. The name is capped at 64 chars before the distance loop; a real name is far
- *     shorter and a long one is never a typo away, so no real suggestion changes.
+ *   v1.1.1 — 2026-08-28 — SECURITY (CodeQL js/loop-bound-injection): distance() ran the O(m*n)
+ *     Levenshtein against a caller-supplied name at full length, so a huge submitted look/nav/block
+ *     value was a DoS. Both grid dimensions are now bounded by a constant (Math.min(.length, 64)) at
+ *     the loop itself, and nearest() slices its input to 64 too; a real name is far shorter and a
+ *     long one is never a typo away, so no real suggestion changes.
  *   v1.1.0 — 2026-08-27 — Per-block `span` (composition grid placement), validated against
  *     BLOCK_SPANS with the same did-you-mean refusal every other name gets.
  *   v1.0.0 — 2026-08-27 — Initial (TARGET-074 phase 2).
@@ -31,6 +40,7 @@
 import type { BlockPropValue } from '../surface-layout/types.js';
 import { propProblem } from '../surface-layout/validate.js';
 import { componentById, NAV_MODES, LOOKS, BLOCK_SPANS, UI_COMPONENTS, SIGNATURE_TOKENS } from './registry.js';
+import { runMatrix } from '../atelier-contrast.js';
 
 /** More blocks than this is a page nobody reads — and a payload nobody meant. */
 const MAX_BLOCKS = 40;
@@ -61,6 +71,8 @@ export interface AppUiLayout {
   nav?: string;
   /** The app's SIGNATURE: bounded token overrides (shape, typography, density, motion). */
   tokens?: Record<string, string>;
+  /** Art direction for the imagery pipeline: a prompt fragment and optional colour words. */
+  imagery?: { style: string; palette_words?: string };
   blocks: AppUiBlockInstance[];
   meta?: { note?: string };
 }
@@ -72,8 +84,11 @@ const TOKEN_VALUE_FORBIDDEN = /url\s*\(|[;{}<>@\\]|\/\*/i;
 
 /** Plain Levenshtein — the vocabulary is dozens of short names, so brute force is fine. */
 function distance(a: string, b: string): number {
-  const m = a.length;
-  const n = b.length;
+  // Bound both dimensions of the O(m*n) grid by a constant (js/loop-bound-injection). Callers pass
+  // already-capped names (nearest slices to 64), and truncating a pathological input past 64 chars
+  // changes no real suggestion — a name that far off is not a typo.
+  const m = Math.min(a.length, 64);
+  const n = Math.min(b.length, 64);
   const row = Array.from({ length: n + 1 }, (_, i) => i);
   for (let i = 1; i <= m; i++) {
     let prev = row[0]!;
@@ -114,6 +129,96 @@ function unknownName(kind: string, given: string, known: string[]): never {
 }
 
 /**
+ * The signature-token bench, on its own so ONE implementation serves every door that takes
+ * tokens: a layout's top-level `tokens`, and the Design Book's `look` and `motion` part kinds.
+ * Returns the validated map (accent pair normalized); throws with the same worded refusals.
+ */
+export function validateSignatureTokens(raw: unknown): Record<string, string> {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    fail('tokens is one object of { "--ak-…": "value" } overrides — the catalogue\'s signature_tokens lists the legal names.');
+  }
+  const legal = Object.keys(SIGNATURE_TOKENS);
+  const out: Record<string, string> = {};
+  for (const [name, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (!legal.includes(name)) {
+      if (/color|accent|bg|ink|surface|scrim|grad/i.test(name)) {
+        // Colour is open, but through ONE door: measurement proved a single hex cannot satisfy
+        // the mode-tuned derivations, so the signature colour is `--ak-accent` as a light/dark
+        // pair and every other colour token stays derived from it by the sheet.
+        fail(`"${name}" is a colour token the signature does not take directly — the one colour door is --ak-accent as a light/dark pair "#hex/#hex" (both halves are proven by the contrast matrix); every other colour derives from it. The signature covers: ${legal.join(', ')}.`);
+      }
+      unknownName('signature token', name, legal);
+    }
+    if (typeof value !== 'string' || !value.trim() || value.length > TOKEN_VALUE_MAX) {
+      fail(`the value of ${name} must be a short CSS value string (at most ${TOKEN_VALUE_MAX} characters).`);
+    }
+    if (TOKEN_VALUE_FORBIDDEN.test(value)) {
+      fail(`the value of ${name} may not carry urls, comments or declaration characters — a token is one value, never a vehicle.`);
+    }
+    if (name === '--ak-accent') {
+      out[name] = validateAccentPair(value);
+      continue;
+    }
+    out[name] = value;
+  }
+  return out;
+}
+
+/**
+ * Art direction for the imagery pipeline, as data: a prompt fragment and optional colour words.
+ * Serves the layout's optional `imagery` field and the Design Book's `illustration` part kind —
+ * one bench for both, like the tokens above.
+ */
+export function validateImageryStyle(raw: unknown): { style: string; palette_words?: string } {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    fail('imagery is one object: { style, palette_words? } — art direction as data, no urls.');
+  }
+  const o = raw as Record<string, unknown>;
+  const style = typeof o.style === 'string' ? o.style.trim() : '';
+  if (!style || style.length > 400) {
+    fail('imagery.style is the illustration prompt fragment: 1-400 characters of art direction, like "soft watercolour wash, grainy paper, no text".');
+  }
+  if (TOKEN_VALUE_FORBIDDEN.test(style)) {
+    fail('imagery.style may not carry urls, comments or declaration characters — it is words for the image prompt, never a vehicle.');
+  }
+  const out: { style: string; palette_words?: string } = { style };
+  if (o.palette_words !== undefined) {
+    const pw = typeof o.palette_words === 'string' ? o.palette_words.trim() : '';
+    if (!pw || pw.length > 200 || TOKEN_VALUE_FORBIDDEN.test(pw)) {
+      fail('imagery.palette_words is a short line of colour words (at most 200 characters, no urls or declaration characters).');
+    }
+    out.palette_words = pw;
+  }
+  return out;
+}
+
+/** The signature colour: "#hex/#hex", light first, dark second. */
+const ACCENT_PAIR_RE = /^(#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?)\s*\/\s*(#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?)$/;
+
+/**
+ * Prove a signature colour pair: each half runs the FULL contrast matrix as an `--ak-accent`
+ * override and is judged against its own mode's combos — the sheet derives every other colour
+ * (text tint, gradient, spectrum, focus) from the accent, so proving the accent proves them all.
+ * A failing half refuses with the first measured numbers; the normalized "light/dark" survives.
+ */
+function validateAccentPair(value: string): string {
+  const m = ACCENT_PAIR_RE.exec(value.trim());
+  if (!m) {
+    fail('--ak-accent is a light/dark PAIR "#hex/#hex" — the light-mode value first, the dark-mode value second, like "#0e7c66/#e8564a". A single value cannot stay readable in both modes (measured), so both halves are required.');
+  }
+  const [light, dark] = [m[1]!.toLowerCase(), m[2]!.toLowerCase()];
+  for (const [half, mode] of [[light, 'light'], [dark, 'dark']] as const) {
+    const bad = runMatrix({ '--ak-accent': half })
+      .filter((r) => !r.ok && r.combo.includes('/dark') === (mode === 'dark'));
+    if (bad.length > 0) {
+      const first = bad[0]!;
+      fail(`the ${mode} half of --ak-accent (${half}) fails the contrast matrix: ${first.label} in ${first.combo} measures ${first.actual.toFixed(2)} against the ${first.min} floor (${first.why}); ${bad.length} check(s) fail in all. Pick a ${mode === 'dark' ? 'brighter mid-tone for dark surfaces' : 'deeper value for light surfaces'} and it will pass.`);
+    }
+  }
+  return `${light}/${dark}`;
+}
+
+/**
  * Validate one submitted layout. Returns the typed layout (unknown fields dropped) or throws an
  * AppUiError whose message a builder can act on without fetching anything else.
  */
@@ -140,27 +245,12 @@ export function validateUiLayout(raw: unknown): AppUiLayout {
   }
 
   if (input.tokens !== undefined) {
-    if (input.tokens === null || typeof input.tokens !== 'object' || Array.isArray(input.tokens)) {
-      fail('tokens is one object of { "--ak-…": "value" } overrides — the catalogue\'s signature_tokens lists the legal names.');
-    }
-    const legal = Object.keys(SIGNATURE_TOKENS);
-    out.tokens = {};
-    for (const [name, value] of Object.entries(input.tokens as Record<string, unknown>)) {
-      if (!legal.includes(name)) {
-        if (/color|accent|bg|ink|surface|scrim|grad/i.test(name)) {
-          fail(`"${name}" is a colour token, and colour overrides wait for the contrast bench — an unproven colour is how a signature stops being readable. The signature covers shape, typography, density and motion: ${legal.join(', ')}.`);
-        }
-        unknownName('signature token', name, legal);
-      }
-      if (typeof value !== 'string' || !value.trim() || value.length > TOKEN_VALUE_MAX) {
-        fail(`the value of ${name} must be a short CSS value string (at most ${TOKEN_VALUE_MAX} characters).`);
-      }
-      if (TOKEN_VALUE_FORBIDDEN.test(value)) {
-        fail(`the value of ${name} may not carry urls, comments or declaration characters — a token is one value, never a vehicle.`);
-      }
-      out.tokens[name] = value;
-    }
+    out.tokens = validateSignatureTokens(input.tokens);
     if (Object.keys(out.tokens).length === 0) delete out.tokens;
+  }
+
+  if (input.imagery !== undefined) {
+    out.imagery = validateImageryStyle(input.imagery);
   }
 
   if (!Array.isArray(input.blocks)) fail('blocks must be a list of block instances.');

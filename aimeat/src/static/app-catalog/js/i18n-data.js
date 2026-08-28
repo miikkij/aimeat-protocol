@@ -297,6 +297,15 @@ export const I18N = {
       'versions.help': 'Every publish is kept. Restore re-publishes an older version as the new latest; Fork copies it into a new app. Older versions are never lost.',
       'versions.current': 'current',
       'versions.stored': 'versions stored',
+      // The distance between two publishes. Inside one sitting it is the length of a round;
+      // across a weekend it is a weekend. The wording says "since the previous one" and never
+      // "took", because the stamps cannot tell the two apart.
+      'versions.sincePrev': 'since the previous one',
+      'versions.span': 'first to last:',
+      'dur.s': 's',
+      'dur.min': 'min',
+      'dur.h': 'h',
+      'dur.d': 'd',
       'pb.title': '✨ Generate App with AI',
       'pb.intro': 'No coding. Describe your idea, copy the prompt, and paste it into any AI chat (Claude, ChatGPT…). The AI asks a few questions, builds a ready-to-use app, and gives you one HTML file — then add it here to put it live.',
       'pb.step1': 'Describe your app',
@@ -1095,6 +1104,12 @@ export const I18N = {
       'versions.help': 'Jokainen julkaisu säilytetään. Palauta julkaisee vanhan version uudelleen uusimmaksi; Haaroita kopioi sen uudeksi sovellukseksi. Vanhoja versioita ei koskaan menetetä.',
       'versions.current': 'nykyinen',
       'versions.stored': 'versiota tallennettu',
+      'versions.sincePrev': 'edellisestä',
+      'versions.span': 'ensimmäisestä viimeiseen:',
+      'dur.s': 's',
+      'dur.min': 'min',
+      'dur.h': 't',
+      'dur.d': 'pv',
       'pb.title': '✨ Luo sovellus tekoälyllä',
       'pb.intro': 'Ei koodausta. Kuvaile ideasi, kopioi prompti ja liitä se mihin tahansa tekoälykeskusteluun (Claude, ChatGPT…). Tekoäly kysyy muutaman kysymyksen, rakentaa valmiin sovelluksen ja antaa sinulle yhden HTML-tiedoston — lisää se sitten tästä julkaistaksesi.',
       'pb.step1': 'Kuvaile sovelluksesi',

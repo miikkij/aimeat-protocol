@@ -720,6 +720,58 @@ await test('Cannot vouch own capability', async () => {
     });
 });
 
+await test('A vouch is one row per person: dedup, comment landing, and taking only YOUR vouch back', async () => {
+    // The dead-counter finding (August 2026 audit + TARGET-074 night run): the vouches table was
+    // created and never read or written, so one caller could vouch any number of times and the
+    // comment vanished. These assertions are the mechanism's contract now.
+    const capIdV = 'vouch-dedup-' + Math.random().toString(36).slice(2, 8);
+    await json('/v1/capabilities', {
+        method: 'POST', headers: { 'Authorization': `Bearer ${ownerToken}` },
+        body: JSON.stringify({
+            id: capIdV, name: 'Vouch Dedup', summary: 'Test',
+            source: { type: 'manual', ref: 'manual', version: '1.0.0' },
+            callable: false, visibility: 'public', status: 'active',
+        }),
+    });
+    const vb = 'vch' + Date.now() % 100000;
+    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: vb, public_key: 'placeholder' }) });
+    assert(reg.status === 201, `register voucher: ${reg.status}`);
+    const ts = new Date().toISOString();
+    const sig = await signMsg(reg.body.data.private_key, vb + NODE_ID + ts);
+    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: vb, timestamp: ts, signature: sig }) });
+    const vToken = tok.body.data.token as string;
+
+    const first = await json(`/v1/capabilities/${capIdV}/vouch`, {
+        method: 'POST', headers: { 'Authorization': `Bearer ${vToken}` },
+        body: JSON.stringify({ comment: 'Solid and useful.' }),
+    });
+    assert(first.status === 200 && first.body.data.vouchCount === 1 && first.body.data.already === false,
+        `first vouch counts once: ${JSON.stringify(first.body.data)}`);
+
+    const second = await json(`/v1/capabilities/${capIdV}/vouch`, {
+        method: 'POST', headers: { 'Authorization': `Bearer ${vToken}` },
+    });
+    assert(second.status === 200 && second.body.data.vouchCount === 1 && second.body.data.already === true,
+        `the same person cannot vouch twice: ${JSON.stringify(second.body.data)}`);
+
+    const listed = await json(`/v1/capabilities/${capIdV}`, { headers: { 'Authorization': `Bearer ${vToken}` } });
+    assert(listed.body.data.trust.vouchCount === 1, `the trust blob mirrors the rows: ${listed.body.data.trust.vouchCount}`);
+
+    const un = await json(`/v1/capabilities/${capIdV}/vouch`, {
+        method: 'DELETE', headers: { 'Authorization': `Bearer ${vToken}` },
+    });
+    assert(un.status === 200 && un.body.data.removed === true && un.body.data.vouchCount === 0,
+        `unvouch removes exactly your vouch: ${JSON.stringify(un.body.data)}`);
+
+    const unAgain = await json(`/v1/capabilities/${capIdV}/vouch`, {
+        method: 'DELETE', headers: { 'Authorization': `Bearer ${vToken}` },
+    });
+    assert(unAgain.body.data.removed === false && unAgain.body.data.vouchCount === 0,
+        `a second unvouch has nothing to remove: ${JSON.stringify(unAgain.body.data)}`);
+
+    await json(`/v1/capabilities/${capIdV}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${ownerToken}` } });
+});
+
 // ─── Phase 9: Delete ───
 console.log('\nPhase 9 — Delete');
 

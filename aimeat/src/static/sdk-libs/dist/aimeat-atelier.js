@@ -248,7 +248,12 @@
       aideFailed: "That did not go through. Try again.",
       aideRun: "Run it",
       aideUnknownAction: "The model proposed something this app does not declare — nothing was run.",
-      explainTitle: "What this screen holds"
+      explainTitle: "What this screen holds",
+      delegateGo: "Let AI handle it",
+      delegateHanded: "Handed over",
+      delegateFailed: "The agent could not finish it.",
+      delegateNoAgents: "No agent is connected to this account yet.",
+      agentActivityNone: "No agent activity yet."
     },
     fi: {
       loading: "Ladataan…",
@@ -288,7 +293,12 @@
       aideFailed: "Se ei mennyt läpi. Yritä uudelleen.",
       aideRun: "Aja",
       aideUnknownAction: "Malli ehdotti jotain mitä tämä appsi ei tunne — mitään ei ajettu.",
-      explainTitle: "Mitä tällä näytöllä on"
+      explainTitle: "Mitä tällä näytöllä on",
+      delegateGo: "Anna tekoälyn hoitaa",
+      delegateHanded: "Annettu hoidettavaksi",
+      delegateFailed: "Agentti ei saanut sitä valmiiksi.",
+      delegateNoAgents: "Tähän tiliin ei ole vielä kytketty agenttia.",
+      agentActivityNone: "Ei agenttitoimintaa vielä."
     },
     es: {
       loading: "Cargando…",
@@ -328,7 +338,12 @@
       aideFailed: "No ha funcionado. Inténtalo otra vez.",
       aideRun: "Ejecutar",
       aideUnknownAction: "El modelo propuso algo que esta app no declara — no se ejecutó nada.",
-      explainTitle: "Qué hay en esta pantalla"
+      explainTitle: "Qué hay en esta pantalla",
+      delegateGo: "Deja que la IA lo haga",
+      delegateHanded: "Encargado",
+      delegateFailed: "El agente no pudo terminarlo.",
+      delegateNoAgents: "Esta cuenta aún no tiene ningún agente conectado.",
+      agentActivityNone: "Sin actividad de agentes todavía."
     }
   };
   var HOST = { en: {}, fi: {}, es: {} };
@@ -569,7 +584,13 @@
       const kinds = {
         empty: { title: o.title || t("empty"), hint: o.hint || t("emptyHint") },
         error: { title: o.title || t("loadFailed"), hint: o.hint || t("loadFailedHint") },
-        signin: { title: o.title || t("signIn"), hint: o.hint != null ? o.hint : t("signInHint") }
+        // The sign-in card PRESENTS THE APP: its own name as the title and, when the app gave one,
+        // its tagline before the how-to — a first visitor learns what this is, not only that a
+        // login exists. (The second AEB review met a bare system sentence on an empty page.)
+        signin: {
+          title: o.title || state.title,
+          hint: o.hint != null ? o.hint : (spec.tagline ? spec.tagline + " " : "") + t("signIn") + " " + t("signInHint")
+        }
       };
       const chosen = kinds[kind] || kinds.error;
       statusCard = emptyState({
@@ -605,6 +626,7 @@
           clearTimeout(graceTimer);
           graceTimer = null;
         }
+        root.classList.remove("ak-app--gate");
         status("none");
         if (spec.onReady) spec.onReady(session);
       }
@@ -618,6 +640,7 @@
           },
           onLogout: function() {
             booted = false;
+            root.classList.add("ak-app--gate");
             status("signin");
             if (spec.onLogout) spec.onLogout();
             armPoll();
@@ -631,6 +654,7 @@
         return;
       }
       status("loading");
+      root.classList.add("ak-app--gate");
       armPoll();
       tryBoot();
       graceTimer = setTimeout(function() {
@@ -1118,7 +1142,8 @@
       const prompt = [
         'You are the in-app aide of "' + (s.appName || document.title || "this app") + '" on the AIMEAT platform.',
         "You may ONLY act through the declared actions below, and only propose one when the person asked to DO something.",
-        'Answer as JSON: { "reply": "<plain words for the person>", "action"?: { "id", "params" }, "panel"?: <a small mosaic layout { v:1, blocks:[...] } when a visual answer helps> }.',
+        'Answer as JSON: { "reply": "<plain words for the person>", "action"?: { "id", "params" }, "panel"?: { "blocks": [...] } when a visual answer helps }.',
+        'A panel block is exactly { "id": "<short-slug>", "component": "<one of: list, statRow, table, timeline, figure, cardGrid>", "props": { "source": "<one of the SOURCE names below>", "title": "<a heading>" } } — no other component names, and only source names that appear below.',
         actionsText(),
         "DATA the screen shows right now:",
         await contextText(),
@@ -1144,9 +1169,10 @@
         return;
       }
       thinking.remove();
-      const answer = out && out.data ? out.data : out;
+      const body = out && out.data ? out.data : out;
+      const answer = body && body.parsed ? body.parsed : body;
       const reply = answer && typeof answer.reply === "string" ? answer.reply : t("aideFailed");
-      const b = bubble("assistant", reply, out && out.provenance ? out.provenance : null);
+      const b = bubble("assistant", reply, body && body.provenance || out && out.provenance || null);
       history.push({ who: "assistant", text: reply });
       if (answer && answer.action && answer.action.id) offerAction(answer.action, b);
       if (answer && answer.panel) renderPanel(answer.panel, b);
@@ -1214,6 +1240,183 @@
       },
       destroy() {
         root.dispatchEvent(new Event("ak-destroy"));
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/timeline.js
+  function fmtTs(ts) {
+    if (typeof ts === "string" && /^\d{4}-\d{2}-\d{2}$/.test(ts)) {
+      return (/* @__PURE__ */ new Date(ts + "T12:00:00")).toLocaleDateString(void 0, { dateStyle: "medium" });
+    }
+    const d = ts instanceof Date ? ts : new Date(ts);
+    if (Number.isNaN(d.getTime())) return String(ts);
+    return d.toLocaleString(void 0, { dateStyle: "medium", timeStyle: "short" });
+  }
+  function timeline(spec) {
+    const fmt = spec.format || fmtTs;
+    const root = el("ol", { class: "ak-root ak-timeline" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let emptyCard = null;
+    function render(items) {
+      if (emptyCard) {
+        emptyCard.destroy();
+        emptyCard = null;
+      }
+      clear(root);
+      if (!items.length) {
+        const e = spec.empty || {};
+        emptyCard = emptyState({
+          target: root,
+          tone: "quiet",
+          title: e.title || t("empty"),
+          hint: e.hint || t("emptyHint")
+        });
+        return;
+      }
+      for (const item of items) {
+        root.appendChild(el("li", { class: "ak-timeline__item", "data-ak-id": item.id }, [
+          el("span", { class: "ak-timeline__dot ak-timeline__dot--" + (item.tone || "plain"), "aria-hidden": "true" }),
+          el("div", { class: "ak-timeline__body" }, [
+            el("span", { class: "ak-timeline__when", text: fmt(item.ts) }),
+            el("span", { class: "ak-timeline__title", text: item.title }),
+            item.sub != null ? el("span", { class: "ak-timeline__sub", text: item.sub }) : null
+          ])
+        ]));
+      }
+      enter(root);
+    }
+    render(spec.items || []);
+    return {
+      el: root,
+      /** @param {{ items: TimelineItem[] }} patch */
+      set(patch) {
+        if (!patch || !patch.items) return;
+        render(patch.items);
+      },
+      destroy() {
+        if (emptyCard) emptyCard.destroy();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/agentic.js
+  function agentsNs() {
+    const ns = (
+      /** @type {any} */
+      window.AIMEAT
+    );
+    return ns && ns.agents && typeof ns.agents.createTask === "function" ? ns.agents : null;
+  }
+  function delegate(spec) {
+    const status = el("span", { class: "ak-delegate__status", "aria-live": "polite" });
+    const btn = (
+      /** @type {HTMLButtonElement} */
+      el("button", {
+        type: "button",
+        class: "ak-btn ak-btn--ghost",
+        on: { click: run }
+      }, "✦ " + (spec.label || t("delegateGo")))
+    );
+    const root = el("div", { class: "ak-root ak-delegate" }, [btn, status]);
+    if (spec.target) resolve(spec.target).appendChild(root);
+    enter(root);
+    let stopWatch = null;
+    async function run() {
+      const agents = agentsNs();
+      if (!agents) {
+        status.textContent = t("delegateNoAgents");
+        return;
+      }
+      btn.disabled = true;
+      status.textContent = "…";
+      try {
+        const created = await agents.createTask(spec.agent, {
+          title: spec.task.title,
+          description: spec.task.description
+        }, { confirm: true });
+        const id = created && (created.id || created.task_id);
+        status.textContent = t("delegateHanded") + " (" + spec.agent + ")";
+        if (id && typeof agents.watch === "function") {
+          stopWatch = agents.watch(spec.agent, id, function(task) {
+            if (task.status === "done") {
+              status.textContent = t("ready");
+              btn.disabled = false;
+              if (stopWatch) {
+                stopWatch();
+                stopWatch = null;
+              }
+              if (spec.onDone) spec.onDone({ task, deliverable: null });
+            } else if (task.status === "failed" || task.status === "stalled") {
+              status.textContent = t("delegateFailed");
+              btn.disabled = false;
+              if (stopWatch) {
+                stopWatch();
+                stopWatch = null;
+              }
+            }
+          });
+        } else {
+          btn.disabled = false;
+        }
+      } catch (err) {
+        const code = err && /** @type {any} */
+        err.code;
+        status.textContent = code === "SPEND_CANCELLED" ? t("cancel") + "." : t("delegateFailed");
+        btn.disabled = false;
+      }
+    }
+    return {
+      el: root,
+      destroy() {
+        if (stopWatch) stopWatch();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+  function agentActivity(spec) {
+    const root = el("div", { class: "ak-root ak-agentactivity" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let inner = null;
+    async function refresh() {
+      const agents = agentsNs();
+      if (inner && inner.destroy) inner.destroy();
+      clear(root);
+      if (!agents) {
+        inner = emptyState({ target: root, tone: "quiet", title: t("agentActivityNone"), hint: t("delegateNoAgents") });
+        return;
+      }
+      let tasks;
+      try {
+        tasks = await agents.tasks(spec.agent, {});
+      } catch (err) {
+        console.warn("aimeat-atelier: agent activity could not be read", err);
+        inner = emptyState({ target: root, tone: "quiet", title: t("agentActivityNone") });
+        return;
+      }
+      const rows = (tasks || []).slice(0, spec.limit || 8).map(function(task) {
+        return {
+          id: String(task.id || task.title),
+          ts: task.updated_at || task.created_at || (/* @__PURE__ */ new Date()).toISOString(),
+          title: task.title || task.description || "",
+          sub: task.status,
+          tone: task.status === "failed" ? "err" : task.status === "done" ? "ok" : "warn"
+        };
+      });
+      if (!rows.length) {
+        inner = emptyState({ target: root, tone: "quiet", title: t("agentActivityNone") });
+        return;
+      }
+      inner = timeline({ target: root, items: rows });
+    }
+    refresh();
+    return {
+      el: root,
+      refresh,
+      destroy() {
+        if (inner && inner.destroy) inner.destroy();
         if (root.parentNode) root.parentNode.removeChild(root);
       }
     };
@@ -1910,55 +2113,140 @@
     };
   }
 
-  // src/static/sdk-libs/atelier/timeline.js
-  function fmtTs(ts) {
-    if (typeof ts === "string" && /^\d{4}-\d{2}-\d{2}$/.test(ts)) {
-      return (/* @__PURE__ */ new Date(ts + "T12:00:00")).toLocaleDateString(void 0, { dateStyle: "medium" });
-    }
-    const d = ts instanceof Date ? ts : new Date(ts);
-    if (Number.isNaN(d.getTime())) return String(ts);
-    return d.toLocaleString(void 0, { dateStyle: "medium", timeStyle: "short" });
+  // src/static/sdk-libs/atelier/chart.js
+  var W = 720;
+  var H = 300;
+  var PAD = { top: 14, right: 12, bottom: 34, left: 46 };
+  var SERIES_VARS = ["var(--ak-accent)", "var(--ak-spectrum-2)", "var(--ak-spectrum-3)", "var(--ak-accent-2)"];
+  var SVG_NS = "http://www.w3.org/2000/svg";
+  function svg(name, attrs) {
+    const node = document.createElementNS(SVG_NS, name);
+    for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
+    return node;
   }
-  function timeline(spec) {
-    const fmt = spec.format || fmtTs;
-    const root = el("ol", { class: "ak-root ak-timeline" });
+  function tickStep(span) {
+    const raw = span / 4;
+    const pow = Math.pow(10, Math.floor(Math.log10(raw)));
+    for (const m of [1, 2, 5, 10]) {
+      if (raw <= m * pow) return m * pow;
+    }
+    return 10 * pow;
+  }
+  function fmtTick(v) {
+    if (Math.abs(v) >= 1e3) return (v / 1e3).toLocaleString(void 0, { maximumFractionDigits: 1 }) + "k";
+    return v.toLocaleString(void 0, { maximumFractionDigits: 2 });
+  }
+  function chart(spec) {
+    const root = el("figure", { class: "ak-root ak-chart", role: "img" });
     if (spec.target) resolve(spec.target).appendChild(root);
     let emptyCard = null;
-    function render(items) {
+    function render(data) {
       if (emptyCard) {
         emptyCard.destroy();
         emptyCard = null;
       }
       clear(root);
-      if (!items.length) {
+      const labels = data && Array.isArray(data.labels) ? data.labels : [];
+      const series = (data && Array.isArray(data.series) ? data.series : []).filter((s) => s && Array.isArray(s.values) && s.values.length > 0);
+      if (!labels.length || !series.length) {
         const e = spec.empty || {};
-        emptyCard = emptyState({
-          target: root,
-          tone: "quiet",
-          title: e.title || t("empty"),
-          hint: e.hint || t("emptyHint")
-        });
+        emptyCard = emptyState({ target: root, tone: "quiet", title: e.title || t("empty"), hint: e.hint || t("emptyHint") });
         return;
       }
-      for (const item of items) {
-        root.appendChild(el("li", { class: "ak-timeline__item", "data-ak-id": item.id }, [
-          el("span", { class: "ak-timeline__dot ak-timeline__dot--" + (item.tone || "plain"), "aria-hidden": "true" }),
-          el("div", { class: "ak-timeline__body" }, [
-            el("span", { class: "ak-timeline__when", text: fmt(item.ts) }),
-            el("span", { class: "ak-timeline__title", text: item.title }),
-            item.sub != null ? el("span", { class: "ak-timeline__sub", text: item.sub }) : null
-          ])
-        ]));
+      root.setAttribute("aria-label", (spec.title ? spec.title + " — " : "") + series.map((s) => s.label).join(", "));
+      let min = 0;
+      let max = 0;
+      for (const s of series) for (const v of s.values) {
+        if (v < min) min = v;
+        if (v > max) max = v;
       }
-      enter(root);
+      if (max === min) max = min + 1;
+      const step = tickStep(max - min);
+      min = Math.floor(min / step) * step;
+      max = Math.ceil(max / step) * step;
+      const innerW = W - PAD.left - PAD.right;
+      const innerH = H - PAD.top - PAD.bottom;
+      const x = (i) => PAD.left + innerW * i / labels.length;
+      const slotW = innerW / labels.length;
+      const y = (v) => PAD.top + innerH * (1 - (v - min) / (max - min));
+      const node = svg("svg", { viewBox: `0 0 ${W} ${H}`, class: "ak-chart__svg", "aria-hidden": "true" });
+      for (let v = min; v <= max + step / 2; v += step) {
+        const gy = y(v);
+        node.appendChild(svg("line", { x1: PAD.left, x2: W - PAD.right, y1: gy, y2: gy, class: v === 0 ? "ak-chart__zero" : "ak-chart__grid" }));
+        const tick = svg("text", { x: PAD.left - 6, y: gy + 4, class: "ak-chart__tick", "text-anchor": "end" });
+        tick.textContent = fmtTick(v);
+        node.appendChild(tick);
+      }
+      labels.forEach((label, i) => {
+        const tx = svg("text", { x: x(i) + slotW / 2, y: H - PAD.bottom + 18, class: "ak-chart__tick", "text-anchor": "middle" });
+        tx.textContent = String(label);
+        node.appendChild(tx);
+      });
+      const still = reducedMotion();
+      const bars = series.filter((s) => (s.kind || "bar") === "bar");
+      const lines = series.filter((s) => s.kind === "line");
+      const groupPad = slotW * 0.18;
+      const barW = bars.length ? (slotW - groupPad * 2) / bars.length : 0;
+      bars.forEach((s, si) => {
+        const colour = SERIES_VARS[series.indexOf(s) % SERIES_VARS.length];
+        s.values.slice(0, labels.length).forEach((v, i) => {
+          const top = Math.min(y(v), y(0));
+          const height = Math.abs(y(v) - y(0));
+          const rect = svg("rect", {
+            x: x(i) + groupPad + si * barW + 1,
+            y: top,
+            width: Math.max(barW - 2, 1),
+            height: Math.max(height, 0.5),
+            class: "ak-chart__bar",
+            style: `fill:${colour}`
+          });
+          if (!still) {
+            rect.setAttribute("style", `fill:${colour}; transform-origin: center ${y(0)}px; animation-delay: ${i * 40}ms`);
+            rect.classList.add("ak-chart__bar--enter");
+          }
+          node.appendChild(rect);
+        });
+      });
+      lines.forEach((s) => {
+        const colour = SERIES_VARS[series.indexOf(s) % SERIES_VARS.length];
+        const points = s.values.slice(0, labels.length).map((v, i) => `${x(i) + slotW / 2},${y(v)}`).join(" ");
+        const line = svg("polyline", { points, class: "ak-chart__line", style: `stroke:${colour}` });
+        if (!still) line.classList.add("ak-chart__line--enter");
+        node.appendChild(line);
+      });
+      root.appendChild(node);
+      const legend = el(
+        "figcaption",
+        { class: "ak-chart__legend" },
+        series.map((s) => el("span", { class: "ak-chart__key" }, [
+          el("span", { class: "ak-chart__swatch" + (s.kind === "line" ? " ak-chart__swatch--line" : "") }),
+          el("span", { text: s.label })
+        ]))
+      );
+      series.forEach((s, i) => {
+        const sw = legend.children[i] && legend.children[i].firstChild;
+        if (sw) sw.style.background = SERIES_VARS[i % SERIES_VARS.length];
+      });
+      root.appendChild(legend);
+      if (!still) {
+        for (const line of node.querySelectorAll(".ak-chart__line--enter")) {
+          const len = (
+            /** @type {SVGPolylineElement} */
+            line.getTotalLength()
+          );
+          line.setAttribute("stroke-dasharray", String(len));
+          line.setAttribute("stroke-dashoffset", String(len));
+          requestAnimationFrame(() => line.classList.add("ak-chart__line--drawn"));
+        }
+      }
     }
-    render(spec.items || []);
+    render(spec.data);
     return {
       el: root,
-      /** @param {{ items: TimelineItem[] }} patch */
+      /** @param {{ data: ChartData|null }} patch */
       set(patch) {
-        if (!patch || !patch.items) return;
-        render(patch.items);
+        if (!patch) return;
+        render(patch.data);
       },
       destroy() {
         if (emptyCard) emptyCard.destroy();
@@ -2133,6 +2421,7 @@
     if (kind === "statRow") return { tiles: Array.isArray(data) ? data : [] };
     if (kind === "table") return { rows: Array.isArray(data) ? data : data && data.rows || [] };
     if (kind === "figure") return data && typeof data === "object" ? data : { value: 0 };
+    if (kind === "chart") return { data: data && typeof data === "object" && !Array.isArray(data) ? data : null };
     return { items: Array.isArray(data) ? data : [] };
   }
   function derivedColumns(rows) {
@@ -2205,6 +2494,10 @@
         case "cardGrid":
           return bound("cardGrid", function(data) {
             return cardGrid({ target: into, items: patchFor("cardGrid", data).items, empty, onPick: pick });
+          });
+        case "chart":
+          return bound("chart", function(data) {
+            return chart({ target: into, data: patchFor("chart", data).data, title: p.title, empty });
           });
         case "table":
           return bound("table", function(data) {
@@ -2592,10 +2885,26 @@
         for (const name of tokenHost.__akTokens) tokenHost.style.removeProperty(name);
       }
       tokenHost.__akTokens = [];
+      if (tokenHost.__akSigStyle) {
+        tokenHost.__akSigStyle.remove();
+        tokenHost.__akSigStyle = null;
+      }
       if (layout.tokens && typeof layout.tokens === "object") {
         for (const name of Object.keys(layout.tokens)) {
           if (name.indexOf("--ak-") !== 0) continue;
-          tokenHost.style.setProperty(name, String(layout.tokens[name]));
+          const value = String(layout.tokens[name]);
+          if (name === "--ak-accent" && value.indexOf("/") >= 0) {
+            const halves = value.split("/");
+            const light = halves[0].trim();
+            const dark = (halves[1] || halves[0]).trim();
+            if (!/^#[0-9a-fA-F]{3,6}$/.test(light) || !/^#[0-9a-fA-F]{3,6}$/.test(dark)) continue;
+            const style = document.createElement("style");
+            style.textContent = ":root{--ak-accent:" + light + '}\n:root[data-theme="dark"]{--ak-accent:' + dark + "}";
+            document.head.appendChild(style);
+            tokenHost.__akSigStyle = style;
+            continue;
+          }
+          tokenHost.style.setProperty(name, value);
           tokenHost.__akTokens.push(name);
         }
       }
@@ -2745,6 +3054,14 @@
         }
         for (const fn of alive.cleanup) fn();
         alive = { handles: [], bound: [], cleanup: [] };
+        const host2 = (
+          /** @type {any} */
+          spec.app && spec.app.el ? spec.app.el : root
+        );
+        if (host2.__akSigStyle) {
+          host2.__akSigStyle.remove();
+          host2.__akSigStyle = null;
+        }
         if (root.parentNode) root.parentNode.removeChild(root);
       }
     };
@@ -2757,7 +3074,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.14.0",
+    version: "0.19.0",
     // ── Shell and navigation ──
     app,
     section,
@@ -2771,6 +3088,8 @@
     statRow,
     figure,
     aide,
+    delegate,
+    agentActivity,
     /**
      * Read something aloud through the platform's speech library, when the page carries it.
      * Opt-in by construction: nothing speaks until the app puts a control on the screen and a
@@ -2795,6 +3114,7 @@
     cardGrid,
     mediaCard,
     timeline,
+    chart,
     // ── Data ──
     form,
     table,

@@ -10,6 +10,7 @@
  * @version-history
  *   v1.0.0 — 2026-07-15 — Phase 5: capability layer on Postgres+Kysely.
  */
+import { randomUUID } from 'node:crypto';
 import type { Selectable } from 'kysely';
 import type { CapabilityRecord, CapabilityLogEntry, CapabilityOverride, CapabilityTrust, CapabilityFilter } from '../../../interface.js';
 import type { Capability } from '../db-types.js';
@@ -219,19 +220,47 @@ export const capabilityMethods = {
     await this.db.updateTable('Capability').set({ trust: jsonb(merged) } as any).where('id', '=', id).execute();
   },
 
-  async incrementVouchCount(this: PostgresKyselyStorage, id: string): Promise<void> {
-    const cap = await this.getCapability(id);
-    if (!cap) return;
-    const trust = { ...cap.trust, vouchCount: cap.trust.vouchCount + 1 };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await this.db.updateTable('Capability').set({ trust: jsonb(trust) } as any).where('id', '=', id).execute();
+  // ── Vouches are ROWS. The unique (capabilityId, userGhii) index is the dedup: one person, one
+  //    vouch, and the count is derived — never a number anyone increments. The trust-blob copy is
+  //    refreshed after every change so listings that read the blob stay truthful without a join.
+
+  async addCapabilityVouch(this: PostgresKyselyStorage, capabilityId: string, userGhii: string, comment?: string): Promise<boolean> {
+    const cap = await this.getCapability(capabilityId);
+    if (!cap) return false;
+    const res = await this.db.insertInto('CapabilityVouch')
+      .values({ id: randomUUID(), capabilityId, userGhii, comment: comment ?? null })
+      .onConflict((oc) => oc.columns(['capabilityId', 'userGhii']).doNothing())
+      .executeTakeFirst();
+    await syncVouchCount(this, capabilityId);
+    return (res.numInsertedOrUpdatedRows ?? 0n) > 0n;
   },
 
-  async decrementVouchCount(this: PostgresKyselyStorage, id: string): Promise<void> {
-    const cap = await this.getCapability(id);
-    if (!cap) return;
-    const trust = { ...cap.trust, vouchCount: Math.max(0, cap.trust.vouchCount - 1) };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await this.db.updateTable('Capability').set({ trust: jsonb(trust) } as any).where('id', '=', id).execute();
+  async removeCapabilityVouch(this: PostgresKyselyStorage, capabilityId: string, userGhii: string): Promise<boolean> {
+    const res = await this.db.deleteFrom('CapabilityVouch')
+      .where('capabilityId', '=', capabilityId).where('userGhii', '=', userGhii)
+      .executeTakeFirst();
+    await syncVouchCount(this, capabilityId);
+    return (res.numDeletedRows ?? 0n) > 0n;
+  },
+
+  async countCapabilityVouches(this: PostgresKyselyStorage, capabilityId: string): Promise<number> {
+    const row = await this.db.selectFrom('CapabilityVouch')
+      .select((eb) => eb.fn.countAll<string>().as('n'))
+      .where('capabilityId', '=', capabilityId)
+      .executeTakeFirst();
+    return row ? Number(row.n) : 0;
   },
 };
+
+/** Refresh the trust blob's derived vouch count from the rows — one truth, copied for cheap reads. */
+async function syncVouchCount(storage: PostgresKyselyStorage, capabilityId: string): Promise<void> {
+  const cap = await storage.getCapability(capabilityId);
+  if (!cap) return;
+  const row = await storage.db.selectFrom('CapabilityVouch')
+    .select((eb) => eb.fn.countAll<string>().as('n'))
+    .where('capabilityId', '=', capabilityId)
+    .executeTakeFirst();
+  const trust = { ...cap.trust, vouchCount: row ? Number(row.n) : 0 };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await storage.db.updateTable('Capability').set({ trust: jsonb(trust) } as any).where('id', '=', capabilityId).execute();
+}

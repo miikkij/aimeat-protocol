@@ -253,6 +253,132 @@ const GOOD_BODY = {
         assert(g.body.data.part.status === 'published', `one adopt un-fades it, got ${g.body.data.part.status}`);
     });
 
+    await test('the guarantee bench answers its contract: a run with measurements, or the worded unavailable', async () => {
+        // On a machine with a browser the bench renders three viewports and stamps the record; on
+        // a CI box with none it answers ran:false WITH THE REASON. Both are the contract; a
+        // silent 500 or an unstamped "pass" is neither.
+        const r = await json('/v1/designbook/leiska-cover/bench', {
+            method: 'POST', headers: auth(op.token),
+        });
+        assert(r.status === 200, `bench ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        if (r.body.data.ran === true) {
+            assert(Array.isArray(r.body.data.viewports) && r.body.data.viewports.length === 3,
+                `three viewports measured, got ${JSON.stringify(r.body.data.viewports)}`);
+            const g = await json('/v1/designbook/leiska-cover', { headers: auth(op.token) });
+            assert(g.body.data.part.bench.browser?.ran === true, 'the result is stamped on the record');
+        } else {
+            assert(typeof r.body.data.reason === 'string' && r.body.data.reason.length > 0,
+                'an unavailable bench says why');
+        }
+    });
+
+    await test('the bench is the operator\'s or the proposer\'s — a bystander gets the rule in words', async () => {
+        const r = await json('/v1/designbook/leiska-cover/bench', {
+            method: 'POST', headers: auth(other.token),
+        });
+        assert(r.status === 403 && r.body.error?.code === 'NOT_ALLOWED', `403 NOT_ALLOWED, got ${r.status} ${r.body.error?.code}`);
+    });
+
+    await test('a look part: the token sheet benches (accent pair through the matrix) and adopt MERGES', async () => {
+        // A failing pair refuses at propose with the measured numbers — the same bench a layout's
+        // signature runs, so a look that enters the Book is proven readable everywhere.
+        const bad = await json('/v1/designbook', {
+            method: 'POST', headers: auth(op.token),
+            body: JSON.stringify({ part: { id: 'look-e2e-bad', kind: 'look', title: 'Bad pair', summary: 'The same deep value doubled fails dark derivations.', body: { tokens: { '--ak-accent': '#0e7c66/#0e7c66' } } } }),
+        });
+        assert(bad.status === 422 && /dark half/.test(String(bad.body.error?.message)),
+            `a failing pair refuses with the numbers, got ${bad.status}: ${bad.body.error?.message}`);
+
+        const r = await json('/v1/designbook', {
+            method: 'POST', headers: auth(op.token),
+            body: JSON.stringify({ part: { id: 'look-e2e-forest', kind: 'look', title: 'Forest ledger', summary: 'Editorial calm with a proven green/coral signature pair and sharp corners.', body: { look: 'editorial', tokens: { '--ak-accent': '#0e7c66/#e8564a', '--ak-radius': '3px' } }, tags: ['look'] } }),
+        });
+        assert(r.status === 201, `look propose ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        const g = await json('/v1/designbook/look-e2e-forest', { headers: auth(op.token) });
+        assert(g.body.data.part.bench.checks.includes('tokens-valid') && g.body.data.part.bench.checks.includes('contrast-matrix'),
+            `the record names the benches that ran, got ${JSON.stringify(g.body.data.part.bench.checks)}`);
+
+        await json('/v1/designbook/look-e2e-forest/status', {
+            method: 'POST', headers: auth(op.token), body: JSON.stringify({ status: 'published' }),
+        });
+        const adopt = await json('/v1/designbook/look-e2e-forest/adopt', {
+            method: 'POST', headers: auth(other.token), body: JSON.stringify({ filename: otherApp }),
+        });
+        assert(adopt.status === 200, `look adopt ${adopt.status}: ${JSON.stringify(adopt.body?.error)}`);
+        const ui = await json(`/v1/apps/${other.name}/${otherApp}/ui`);
+        assert(ui.body.data.layout?.look === 'editorial', `the look preset landed, got ${ui.body.data.layout?.look}`);
+        assert(ui.body.data.layout?.tokens?.['--ak-accent'] === '#0e7c66/#e8564a', 'the pair landed in the tokens');
+        assert(Array.isArray(ui.body.data.layout?.blocks) && ui.body.data.layout.blocks.length > 0,
+            'the arrangement SURVIVED — a look merges, never replaces');
+    });
+
+    await test('a motion part: only motion tokens pass, and the recipe merges beside the look', async () => {
+        const wrong = await json('/v1/designbook', {
+            method: 'POST', headers: auth(op.token),
+            body: JSON.stringify({ part: { id: 'motion-e2e-bad', kind: 'motion', title: 'Not motion', summary: 'A radius is not motion.', body: { tokens: { '--ak-radius': '3px' } } } }),
+        });
+        assert(wrong.status === 422 && /motion token/.test(String(wrong.body.error?.message)),
+            `a non-motion token refuses naming the vocabulary, got ${wrong.status}: ${wrong.body.error?.message}`);
+
+        const r = await json('/v1/designbook', {
+            method: 'POST', headers: auth(op.token),
+            body: JSON.stringify({ part: { id: 'motion-e2e-calm', kind: 'motion', title: 'Calm hand', summary: 'No tilt, short travel, quick transitions — the still-hands recipe.', body: { tokens: { '--ak-motion': '120ms', '--ak-enter-distance': '0px', '--ak-tilt': '0deg' } }, tags: ['motion'] } }),
+        });
+        assert(r.status === 201, `motion propose ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        await json('/v1/designbook/motion-e2e-calm/status', {
+            method: 'POST', headers: auth(op.token), body: JSON.stringify({ status: 'published' }),
+        });
+        const adopt = await json('/v1/designbook/motion-e2e-calm/adopt', {
+            method: 'POST', headers: auth(other.token), body: JSON.stringify({ filename: otherApp }),
+        });
+        assert(adopt.status === 200, `motion adopt ${adopt.status}: ${JSON.stringify(adopt.body?.error)}`);
+        const ui = await json(`/v1/apps/${other.name}/${otherApp}/ui`);
+        assert(ui.body.data.layout?.tokens?.['--ak-motion'] === '120ms', 'the recipe landed');
+        assert(ui.body.data.layout?.tokens?.['--ak-accent'] === '#0e7c66/#e8564a',
+            'the earlier look\'s pair SURVIVED — recipes season the same sheet');
+    });
+
+    await test('an illustration part: art direction as data — adopt writes imagery, the browser bench answers with words', async () => {
+        const r = await json('/v1/designbook', {
+            method: 'POST', headers: auth(op.token),
+            body: JSON.stringify({ part: { id: 'illus-e2e-wash', kind: 'illustration', title: 'Watercolour wash', summary: 'Soft washes on grainy paper, no text in the image.', body: { style: 'soft watercolour wash, grainy paper, no text', palette_words: 'moss, cream, rust' }, tags: ['illustration'] } }),
+        });
+        assert(r.status === 201, `illustration propose ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        const g = await json('/v1/designbook/illus-e2e-wash', { headers: auth(op.token) });
+        assert(g.body.data.part.bench.checks.includes('style-valid'),
+            `the record names the style bench, got ${JSON.stringify(g.body.data.part.bench.checks)}`);
+
+        await json('/v1/designbook/illus-e2e-wash/status', {
+            method: 'POST', headers: auth(op.token), body: JSON.stringify({ status: 'published' }),
+        });
+        const adopt = await json('/v1/designbook/illus-e2e-wash/adopt', {
+            method: 'POST', headers: auth(other.token), body: JSON.stringify({ filename: otherApp }),
+        });
+        assert(adopt.status === 200, `illustration adopt ${adopt.status}: ${JSON.stringify(adopt.body?.error)}`);
+        const ui = await json(`/v1/apps/${other.name}/${otherApp}/ui`);
+        assert(ui.body.data.layout?.imagery?.style === 'soft watercolour wash, grainy paper, no text',
+            'the art direction landed on the layout');
+
+        const bench = await json('/v1/designbook/illus-e2e-wash/bench', {
+            method: 'POST', headers: auth(op.token),
+        });
+        assert(bench.status === 200 && bench.body.data.ran === false && /nothing of its own to render/.test(String(bench.body.data.reason)),
+            `an illustration bench answers with words, got ${JSON.stringify(bench.body.data)}`);
+    });
+
+    await test('seasoning with no dish refuses: adopting a look into an app with no stored arrangement → 409', async () => {
+        const bare = 'db-bare.html';
+        const pub = await json('/v1/apps', {
+            method: 'POST', headers: auth(other.token),
+            body: JSON.stringify({ filename: bare, mime_type: 'text/html', content: b64(APP(bare)), name: 'Bare', description: 'No stored layout.' }),
+        });
+        assert(pub.status === 201, `publish bare app ${pub.status}`);
+        const r = await json('/v1/designbook/look-e2e-forest/adopt', {
+            method: 'POST', headers: auth(other.token), body: JSON.stringify({ filename: bare }),
+        });
+        assert(r.status === 409 && r.body.error?.code === 'NO_LAYOUT', `NO_LAYOUT 409, got ${r.status} ${r.body.error?.code}`);
+    });
+
     await test('the operator retires it, and a retired address stays retired', async () => {
         const r = await json(`/v1/designbook/${partId}/status`, {
             method: 'POST', headers: auth(op.token), body: JSON.stringify({ status: 'retired' }),

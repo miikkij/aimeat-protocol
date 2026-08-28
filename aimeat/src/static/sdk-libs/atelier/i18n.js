@@ -64,6 +64,11 @@ const BASE = {
     aideRun: 'Run it',
     aideUnknownAction: 'The model proposed something this app does not declare — nothing was run.',
     explainTitle: 'What this screen holds',
+    delegateGo: 'Let AI handle it',
+    delegateHanded: 'Handed over',
+    delegateFailed: 'The agent could not finish it.',
+    delegateNoAgents: 'No agent is connected to this account yet.',
+    agentActivityNone: 'No agent activity yet.',
   },
   fi: {
     loading: 'Ladataan…',
@@ -104,6 +109,11 @@ const BASE = {
     aideRun: 'Aja',
     aideUnknownAction: 'Malli ehdotti jotain mitä tämä appsi ei tunne — mitään ei ajettu.',
     explainTitle: 'Mitä tällä näytöllä on',
+    delegateGo: 'Anna tekoälyn hoitaa',
+    delegateHanded: 'Annettu hoidettavaksi',
+    delegateFailed: 'Agentti ei saanut sitä valmiiksi.',
+    delegateNoAgents: 'Tähän tiliin ei ole vielä kytketty agenttia.',
+    agentActivityNone: 'Ei agenttitoimintaa vielä.',
   },
   es: {
     loading: 'Cargando…',
@@ -144,6 +154,11 @@ const BASE = {
     aideRun: 'Ejecutar',
     aideUnknownAction: 'El modelo propuso algo que esta app no declara — no se ejecutó nada.',
     explainTitle: 'Qué hay en esta pantalla',
+    delegateGo: 'Deja que la IA lo haga',
+    delegateHanded: 'Encargado',
+    delegateFailed: 'El agente no pudo terminarlo.',
+    delegateNoAgents: 'Esta cuenta aún no tiene ningún agente conectado.',
+    agentActivityNone: 'Sin actividad de agentes todavía.',
   },
 };
 

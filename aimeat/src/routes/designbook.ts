@@ -111,6 +111,27 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
     } catch (err) { refuse(res, err); }
   });
 
+  // The guarantee bench, run on demand: the part rendered headless at three viewports, the
+  // guarantees MEASURED (overflow, painted units, touch minimums) and stamped onto the record.
+  // The operator's and the proposer's call — running a browser is work, and the result changes
+  // what the gallery says about the part.
+  router.post('/v1/designbook/:id/bench', requireAuth(), requireScope('memory:write'), async (req: Request, res: Response) => {
+    try {
+      const { benchAndStamp } = await import('../services/design-book/bench.js');
+      const id = req.params.id as string;
+      const { part } = await book.get(id);
+      const who = caller(req);
+      const ownerGhii = who.includes('#') ? who.slice(who.indexOf('#') + 1) : who;
+      const isOperator = req.auth!.roles.includes('operator');
+      if (!isOperator && part.proposed_by_owner !== ownerGhii) {
+        return res.status(403).json(error(config.nodeId, 'NOT_ALLOWED',
+          'The bench is run by the node operator or the part\'s own proposer — its result changes what the gallery says about the part.'));
+      }
+      const result = await benchAndStamp(storage, config, id);
+      res.json(success(config.nodeId, result));
+    } catch (err) { refuse(res, err); }
+  });
+
   // Lifecycle: the operator's door, plus a proposer retiring their own.
   // memory:write is the door's scope; WHO may move WHAT is the service's decision (operator, or
   // the proposer retiring their own) — a scope word cannot express that split, so it lives there.

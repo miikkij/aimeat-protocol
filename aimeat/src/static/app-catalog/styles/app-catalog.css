@@ -2392,6 +2392,10 @@
 
     @media (max-width: 640px) {
       .dtl-dm-head { grid-template-columns: minmax(0, 1fr); }
+      /* The version sub-line is nowrap + ellipsis so a desktop row stays one line. On a phone
+         that cuts it mid-timestamp, and the tail is where the useful part now lives ("since the
+         previous one 4 min 21 s"). Two short lines beat one truncated one. */
+      .version-sub { white-space: normal; overflow: visible; text-overflow: clip; }
     }
 
     /* ── Search section of the app detail view (seo.js) ── */

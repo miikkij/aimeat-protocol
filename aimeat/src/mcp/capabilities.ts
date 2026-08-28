@@ -265,11 +265,10 @@ export function registerCapabilitiesTools(
             comment: z.string().optional().describe('Optional comment explaining why you vouch for this capability'),
         },
         annotationsFor('aimeat_capabilities_vouch'),
-        // `comment` is accepted and goes nowhere: a vouch is a counter on both doors and nothing
-        // stores the text. Reported in the August 2026 audit; removing the parameter or giving it
-        // somewhere to land is a change to what this tool offers, not part of moving the write.
-        async ({ id, comment: _comment }) => {
-            const vouched = await vouchCapability({ storage, config }, await caller(), id);
+        // The comment LANDS now: a vouch is a row per voucher (the audit's dead-counter finding,
+        // fixed 2026-08-28), and the text is stored beside it.
+        async ({ id, comment }) => {
+            const vouched = await vouchCapability({ storage, config }, await caller(), id, comment);
             if (!vouched.ok) {
                 return { content: [{ type: 'text' as const, text: `${vouched.code}: ${vouched.message}` }], isError: true };
             }

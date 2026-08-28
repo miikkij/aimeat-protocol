@@ -259,20 +259,33 @@ export const capabilityAgentsMethods = {
       .run(JSON.stringify(merged), new Date().toISOString(), id);
   },
 
-  async incrementVouchCount(this: SqliteStorage, id: string): Promise<void> {
-    const cap = await this.getCapability(id);
-    if (!cap) return;
-    const trust = { ...cap.trust, vouchCount: cap.trust.vouchCount + 1 };
-    this.db.prepare('UPDATE capabilities SET trust = ?, updatedAt = ? WHERE id = ?')
-      .run(JSON.stringify(trust), new Date().toISOString(), id);
+  // ── Vouches are ROWS. The table's primary key (capabilityId, userGhii) is the dedup: one
+  //    person, one vouch, and the count is derived — never a number anyone increments. The
+  //    trust-blob copy of the count is refreshed after every change so listings that read the
+  //    blob stay truthful without a join.
+
+  async addCapabilityVouch(this: SqliteStorage, capabilityId: string, userGhii: string, comment?: string): Promise<boolean> {
+    const cap = await this.getCapability(capabilityId);
+    if (!cap) return false;
+    const res = this.db.prepare(
+      'INSERT INTO capability_vouches (capabilityId, userGhii, comment, createdAt) VALUES (?, ?, ?, ?) '
+      + 'ON CONFLICT(capabilityId, userGhii) DO NOTHING',
+    ).run(capabilityId, userGhii, comment ?? null, new Date().toISOString());
+    await syncVouchCount(this, capabilityId);
+    return res.changes > 0;
   },
 
-  async decrementVouchCount(this: SqliteStorage, id: string): Promise<void> {
-    const cap = await this.getCapability(id);
-    if (!cap) return;
-    const trust = { ...cap.trust, vouchCount: Math.max(0, cap.trust.vouchCount - 1) };
-    this.db.prepare('UPDATE capabilities SET trust = ?, updatedAt = ? WHERE id = ?')
-      .run(JSON.stringify(trust), new Date().toISOString(), id);
+  async removeCapabilityVouch(this: SqliteStorage, capabilityId: string, userGhii: string): Promise<boolean> {
+    const res = this.db.prepare('DELETE FROM capability_vouches WHERE capabilityId = ? AND userGhii = ?')
+      .run(capabilityId, userGhii);
+    await syncVouchCount(this, capabilityId);
+    return res.changes > 0;
+  },
+
+  async countCapabilityVouches(this: SqliteStorage, capabilityId: string): Promise<number> {
+    const row = this.db.prepare('SELECT COUNT(*) AS n FROM capability_vouches WHERE capabilityId = ?')
+      .get(capabilityId) as { n: number } | undefined;
+    return row ? row.n : 0;
   },
 
   // ── Stats Persistence ──
@@ -544,3 +557,14 @@ export const capabilityAgentsMethods = {
 
   // ══════════════════════════════════════════════════════════
 };
+
+/** Refresh the trust blob's derived vouch count from the rows — one truth, copied for cheap reads. */
+async function syncVouchCount(storage: SqliteStorage, capabilityId: string): Promise<void> {
+  const cap = await storage.getCapability(capabilityId);
+  if (!cap) return;
+  const row = storage.db.prepare('SELECT COUNT(*) AS n FROM capability_vouches WHERE capabilityId = ?')
+    .get(capabilityId) as { n: number } | undefined;
+  const trust = { ...cap.trust, vouchCount: row ? row.n : 0 };
+  storage.db.prepare('UPDATE capabilities SET trust = ?, updatedAt = ? WHERE id = ?')
+    .run(JSON.stringify(trust), new Date().toISOString(), capabilityId);
+}

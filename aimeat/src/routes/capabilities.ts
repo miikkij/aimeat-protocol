@@ -39,7 +39,7 @@
  */
 import { Router } from 'express';
 import {
-  createCapability, updateCapability, deleteCapability, vouchCapability, recordCapabilityInvocation,
+  createCapability, updateCapability, deleteCapability, vouchCapability, unvouchCapability, recordCapabilityInvocation,
 } from '../services/capability-record.js';
 import type { Request } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -354,17 +354,19 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
   // ── Vouching ──
 
   router.post('/v1/capabilities/:id/vouch', requireAuth(), requireRole('owner'), async (req, res) => {
-    const vouched = await vouchCapability({ storage, config }, caller(req), req.params.id as string);
+    const comment = typeof (req.body as Record<string, unknown> | undefined)?.comment === 'string'
+      ? (req.body as Record<string, string>).comment : undefined;
+    const vouched = await vouchCapability({ storage, config }, caller(req), req.params.id as string, comment);
     if (!vouched.ok) return res.status(vouched.status).json(error(config.nodeId, vouched.code, vouched.message));
     res.json(success(config.nodeId, vouched.value));
   });
 
+  // Removes the CALLER'S vouch only — whose vouch goes is decided by who is asking, in the
+  // service, never by the route decrementing a number.
   router.delete('/v1/capabilities/:id/vouch', requireAuth(), requireRole('owner'), async (req, res) => {
-    const cap = await storage.getCapability(req.params.id as string);
-    if (!cap) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Capability not found'));
-    await storage.decrementVouchCount(req.params.id as string);
-    const updated = await storage.getCapability(req.params.id as string);
-    res.json(success(config.nodeId, { vouchCount: updated?.trust.vouchCount ?? 0 }));
+    const out = await unvouchCapability({ storage, config }, caller(req), req.params.id as string);
+    if (!out.ok) return res.status(out.status).json(error(config.nodeId, out.code, out.message));
+    res.json(success(config.nodeId, out.value));
   });
 
   // ── Test (dry-run invoke for manual webhook capabilities) ──

@@ -34,6 +34,13 @@
  *   });
  *   // later, when the app's data changed:  m.refresh('errands.');
  * @version-history
+ *   v0.15.0 — 2026-08-28 — The `chart` block: the bound record ({ labels, series }) rides to the
+ *     chart component whole — the first harvest component in the layout vocabulary.
+ *   v0.14.0 — 2026-08-28 — The signature COLOUR pair: an `--ak-accent` token of the form
+ *     "#light/#dark" lands as a two-rule style element on :root (light default,
+ *     `:root[data-theme="dark"]` override) instead of an inline property — inline cannot switch
+ *     with the theme, and the sheet's derivations substitute var(--ak-accent) at :root, so only
+ *     a :root override reaches them. Removed on re-render and on destroy.
  *   v0.13.0 — 2026-08-28 — The AI-NATIVE layer reaches the mosaic (TARGET-074 phase 6): the
  *     `aide` block (its tools are the spec's own sources and actions), the viewer's overlay
  *     (hidden/order/nav over the owner's layout, applied at render, never written back) with
@@ -62,6 +69,7 @@ import { list } from './list.js';
 import { cardGrid, mediaCard } from './grid.js';
 import { table, searchBar } from './table.js';
 import { timeline } from './timeline.js';
+import { chart } from './chart.js';
 import { aide } from './aide.js';
 import { projectCanvas } from './mosaic-canvas.js';
 
@@ -121,6 +129,7 @@ function patchFor(kind, data) {
   if (kind === 'statRow') return { tiles: Array.isArray(data) ? data : [] };
   if (kind === 'table') return { rows: Array.isArray(data) ? data : (data && data.rows) || [] };
   if (kind === 'figure') return data && typeof data === 'object' ? data : { value: 0 };
+  if (kind === 'chart') return { data: data && typeof data === 'object' && !Array.isArray(data) ? data : null };
   return { items: Array.isArray(data) ? data : [] };
 }
 
@@ -224,6 +233,10 @@ export function mosaic(spec) {
       case 'cardGrid':
         return bound('cardGrid', function (data) {
           return cardGrid({ target: into, items: patchFor('cardGrid', data).items, empty: empty, onPick: pick });
+        });
+      case 'chart':
+        return bound('chart', function (data) {
+          return chart({ target: into, data: patchFor('chart', data).data, title: p.title, empty: empty });
         });
       case 'table':
         return bound('table', function (data) {
@@ -585,10 +598,31 @@ export function mosaic(spec) {
       for (const name of tokenHost.__akTokens) tokenHost.style.removeProperty(name);
     }
     tokenHost.__akTokens = [];
+    if (tokenHost.__akSigStyle) { tokenHost.__akSigStyle.remove(); tokenHost.__akSigStyle = null; }
     if (layout.tokens && typeof layout.tokens === 'object') {
       for (const name of Object.keys(layout.tokens)) {
         if (name.indexOf('--ak-') !== 0) continue; // belt on top of the server allowlist
-        tokenHost.style.setProperty(name, String(layout.tokens[name]));
+        const value = String(layout.tokens[name]);
+        // The signature COLOUR is a light/dark pair "#hex/#hex" applied PER MODE — an inline
+        // property cannot switch with the theme, so the pair lands as a two-rule style element.
+        // It MUST target :root, not the app frame: the sheet's derivations (gradient, mesh,
+        // spectrum, text tints) are custom properties declared at :root, and the browser
+        // substitutes their var(--ak-accent) AT :ROOT at computed-value time — descendants
+        // inherit the already-resolved value, so a frame-scoped override would recolour direct
+        // uses while every derivation kept the house colour (measured in a real browser).
+        if (name === '--ak-accent' && value.indexOf('/') >= 0) {
+          const halves = value.split('/');
+          const light = halves[0].trim();
+          const dark = (halves[1] || halves[0]).trim();
+          if (!/^#[0-9a-fA-F]{3,6}$/.test(light) || !/^#[0-9a-fA-F]{3,6}$/.test(dark)) continue;
+          const style = document.createElement('style');
+          style.textContent = ':root{--ak-accent:' + light + '}\n'
+            + ':root[data-theme="dark"]{--ak-accent:' + dark + '}';
+          document.head.appendChild(style);
+          tokenHost.__akSigStyle = style;
+          continue;
+        }
+        tokenHost.style.setProperty(name, value);
         tokenHost.__akTokens.push(name);
       }
     }
@@ -744,6 +778,8 @@ export function mosaic(spec) {
       for (const h of alive.handles) { if (h && h.destroy) h.destroy(); }
       for (const fn of alive.cleanup) fn();
       alive = { handles: [], bound: [], cleanup: [] };
+      const host = /** @type {any} */ (spec.app && spec.app.el ? spec.app.el : root);
+      if (host.__akSigStyle) { host.__akSigStyle.remove(); host.__akSigStyle = null; }
       if (root.parentNode) root.parentNode.removeChild(root);
     },
   };

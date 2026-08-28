@@ -1043,7 +1043,7 @@ await test('GET /v1/libs/aimeat-atelier.js — serves the Atelier kit with every
     for (const part of [
         'app', 'section', 'tabs', 'bottomNav',
         'hero', 'statRow', 'figure', 'emptyState', 'skeleton',
-        'list', 'listDetail', 'cardGrid', 'mediaCard', 'timeline',
+        'list', 'listDetail', 'cardGrid', 'mediaCard', 'timeline', 'chart',
         'form', 'table', 'searchBar',
         'mosaic', 'appRef',
         'injectStyle', 'guardButtons', 'whileBusy', 'enter', 'countUp',
@@ -1136,7 +1136,7 @@ await test('GET /lib/aimeat-atelier.css — serves the theming contract, light, 
     const looksText = await looksRes.text();
     const looksCss = withoutComments(looksText);
     for (const preset of ['flat', 'calm-card', 'editorial', 'sticker', 'neon-dense', 'poster',
-        'broadsheet', 'gallery', 'brutalist', 'terminal', 'aurora']) {
+        'broadsheet', 'gallery', 'brutalist', 'terminal', 'aurora', 'carnival']) {
         assert(looksCss.includes(`[data-ak-look='${preset}']`), `the ${preset} preset block must exist`);
         assert(looksText.includes(`@preset-block ${preset}`), `the ${preset} preset must carry its @preset-block tag`);
     }
