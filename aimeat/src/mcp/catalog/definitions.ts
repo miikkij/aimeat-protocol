@@ -13,6 +13,8 @@
  * @usage
  *   import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../../mcp/catalog/definitions.js';
  * @version-history
+ *   v1.x -- 2026-08-28 -- definitions/crew.ts: the five aimeat_crew_* tools (read, validate, try,
+ *     draft, publish a JSON crew definition on one of the caller's agents).
  *   v1.x -- 2026-07-13 -- aimeat_cortex_install description states the CREATE-ONLY contract:
  *     re-installing an existing name fails (PROCESSING_FAILED on the ZIP path); updates go through
  *     PUT /v1/cortex/{name} (idempotent redeploy) or delete + reinstall. Found in TARGET-032.
@@ -40,6 +42,7 @@ export type { ToolCallerType, ToolVisibility, ToolInputField, AimeatToolDefiniti
 
 import type { AimeatToolDefinition } from './definitions/types.js';
 import { agentMessagingTools } from './definitions/agent-messaging.js';
+import { crewTools } from './definitions/crew.js';
 import { companyTools } from './definitions/companies.js';
 import { schedulesTasksMemoryTools } from './definitions/schedules-tasks-memory.js';
 import { discoveryWorkBoardsTools } from './definitions/discovery-work-boards.js';
@@ -58,6 +61,7 @@ import { connectionTools } from './definitions/connections.js';
 
 export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     ...agentMessagingTools,
+    ...crewTools,
     ...schedulesTasksMemoryTools,
     ...discoveryWorkBoardsTools,
     ...capabilitiesGroupsSkillsTools,

@@ -11,6 +11,8 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   v1.19.0 -- 2026-08-28 -- registerAgentCrewTools: the five aimeat_crew_* tools, which call
+ *     services/crew-ops.ts exactly as the Crew tab's routes do.
  *   v1.18.0 -- 2026-08-23 -- The MCP door asks all FOUR credential-death questions
  *     (credentialRevoked), not just exact-token revocation: a revoked session, a revoked app grant
  *     and a deactivated owner (BR-04) were alive here while dead on every REST route, and the
@@ -137,6 +139,7 @@ import { registerDesignbookTools } from './designbook.js';
 import { registerAgentOnboardingTools } from './agent-onboarding.js';
 import { registerAgentTelemetryTools } from './agent-telemetry.js';
 import { registerAgentManagementTools } from './agent-management.js';
+import { registerAgentCrewTools } from './agent-crew.js';
 import { scopeAllowsTool } from './catalog/scopes.js';
 import { registerConnectionTools } from './connections.js';
 import { wrapToolHandler } from './tool-usage-wrap.js';
@@ -327,6 +330,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         registerAgentTelemetryTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerAgentOnboardingTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerAgentManagementTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
+        registerAgentCrewTools(mcp, storage, config, () => agentGaii, scopes);
 
         // Restore the original methods and report what scope enforcement did this session.
         patchable.tool = originalTool;

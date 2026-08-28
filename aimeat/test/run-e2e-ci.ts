@@ -191,6 +191,7 @@ const ALL_SUITES = [
     // The MCP task lifecycle, which nothing exercised — which is why five differences from the REST
     // routes survived every green run.
     'test/e2e-mcp-agent-tasks.ts',
+    'test/e2e-mcp-crew.ts',
     // Running a schedule NOW from the surface that creates them. Creating a 07:00 job over MCP has
     // always worked; proving it works could only be done over HTTP, so nobody did.
     'test/e2e-mcp-schedule-trigger.ts',

@@ -20,6 +20,8 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.15.0 -- 2026-08-28 -- The five crew-definition tools: get -> memory:read, validate/try/draft/
+ *     publish -> memory:write, the scope the REST doors gate the definition writes on.
  *   v1.14.0 -- 2026-08-28 -- The four Design Book tools (TARGET-074 phase 5): search/get ->
  *     memory:read, propose/adopt -> memory:write, mirroring the REST requireScope gates on
  *     /v1/designbook. Adoption writes the caller's own app layout, which is exactly memory:write.
@@ -143,6 +145,16 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_agent_mode_set:                    'agent:write',
     aimeat_agent_console_set:                 'agent:write',
     aimeat_agent_tags_set:                    'agent:write',
+    // A crew definition is a memory record in the agent's namespace: reading it is memory:read,
+    // and every step toward changing it (validate, try, draft, publish) is memory:write, the scope
+    // the REST doors gate the writes on. Validate and try change nothing, but they are only ever
+    // steps of a publish, and an agent that may not publish has no business driving a sibling's
+    // runtime through them.
+    aimeat_crew_get:                          'memory:read',
+    aimeat_crew_validate:                     'memory:write',
+    aimeat_crew_try:                          'memory:write',
+    aimeat_crew_draft:                        'memory:write',
+    aimeat_crew_publish:                      'memory:write',
     // Rewriting an agent's PERMISSIONS is its own word, and no wildcard carries it. PATCH
     // /v1/agents/:name/scopes is owner-only, and the propose-then-confirm dance here binds the
     // token to the CALLER — so the same agent mints and redeems it in two consecutive calls, and

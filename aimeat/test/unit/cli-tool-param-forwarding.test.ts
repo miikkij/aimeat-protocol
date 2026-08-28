@@ -62,6 +62,13 @@ const UNREACHABLE: Record<string, Record<string, string>> = {
         propose: 'Server-MCP only by design (workflows.ts v1.1.0): the propose-then-confirm flow is an operator path, and PUT /v1/workflows/:id takes the definition as its whole body with no field for it.',
         confirm_token: 'Same flow, same reason. A connector caller saves directly or not at all.',
     },
+    aimeat_crew_try: {
+        try_id: 'Conditional, not dropped: the probe sets doc as well, which STARTS a trial and gets its own id; try_id is only read when there is no doc (continue waiting). Both branches reach the node in test/e2e-agent-crew.ts.',
+        wait_seconds: 'Consumed by the door itself, like response_format: the routes have no wait; the handler polls GET .../crew/try/:id for that long before handing the id back.',
+    },
+    aimeat_crew_publish: {
+        revision: 'Conditional, not dropped: the probe sets doc as well, which publishes; revision is only read when there is no doc (restore). Both reach the node in test/e2e-agent-crew.ts.',
+    },
     aimeat_knowledge_contribute: {
         package_id: 'This tool is deliberately unreachable from the connector — see knowledgeContributeUnreachable().',
         entry_key: 'Same: the tool answers with a refusal rather than calling the node.',

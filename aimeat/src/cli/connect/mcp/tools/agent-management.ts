@@ -11,6 +11,8 @@
  *     a same-owner sibling's mode, so a device-authed crew self-sets task-runner at startup.
  *
  * @version-history
+ *   v1.5.0 -- 2026-08-28 -- The five aimeat_crew_* tools, parity with the server MCP surface: thin
+ *     proxies onto /v1/agents/:name/crew*, with try polling locally up to wait_seconds.
  *   v1.4.0 -- 2026-08-13 -- Add aimeat_agent_console_set, parity with the server MCP surface.
  *   v1.0.0 -- 2026-05-29 -- Initial creation: tags_set + mode_set
  *   v1.1.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
@@ -80,6 +82,93 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
       const { client } = pickAgent(registry, agent_name);
       const resp = await client.patch(`/v1/agents/${encodeURIComponent(target_agent_name)}/console-url`, { console_url });
       return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    },
+  );
+
+  // ── Crew definition tools: thin proxies onto /v1/agents/:name/crew*, the same routes the Crew
+  // tab and the node MCP use. `agent_name` here picks the REGISTERED agent that makes the call
+  // (the connector convention); the definition's agent is `target_agent_name`.
+  const crewAgentSchema = z.string().describe("The agent whose definition this is (bare name of one of the owner's agents, or its full GAII). The calling agent may name itself or a same-owner sibling.");
+  const docSchema = z.record(z.string(), z.unknown());
+  const text = (resp: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify((resp as { data?: unknown })?.data ?? resp, null, 2) }] });
+
+  mcp.tool(
+    'aimeat_crew_get',
+    descriptionFor('aimeat_crew_get'),
+    { agent_name: agentNameSchema, target_agent_name: crewAgentSchema },
+    async ({ agent_name, target_agent_name }) => {
+      const { client } = pickAgent(registry, agent_name);
+      return text(await client.get(`/v1/agents/${encodeURIComponent(target_agent_name)}/crew`));
+    },
+  );
+
+  mcp.tool(
+    'aimeat_crew_validate',
+    descriptionFor('aimeat_crew_validate'),
+    { agent_name: agentNameSchema, target_agent_name: crewAgentSchema, doc: docSchema.describe('The whole crew definition to check.') },
+    async ({ agent_name, target_agent_name, doc }) => {
+      const { client } = pickAgent(registry, agent_name);
+      return text(await client.post(`/v1/agents/${encodeURIComponent(target_agent_name)}/crew/validate`, { doc }));
+    },
+  );
+
+  mcp.tool(
+    'aimeat_crew_try',
+    descriptionFor('aimeat_crew_try'),
+    {
+      agent_name: agentNameSchema,
+      target_agent_name: crewAgentSchema,
+      doc: docSchema.optional().describe('Start a trial: the definition to run once. Omit when continuing to wait on a try_id.'),
+      prompt: z.string().optional().describe('Start a trial: what the crew should do in this run. Required with doc.'),
+      try_id: z.string().optional().describe('Continue waiting on a trial already started.'),
+      wait_seconds: z.number().int().min(0).max(120).optional().describe('How long this call waits before handing back the try_id (default 50, max 120).'),
+    },
+    async ({ agent_name, target_agent_name, doc, prompt, try_id, wait_seconds }) => {
+      const { client } = pickAgent(registry, agent_name);
+      const path = `/v1/agents/${encodeURIComponent(target_agent_name)}/crew/try`;
+      let id = try_id;
+      if (doc) {
+        const started = await client.post(path, { doc, prompt });
+        if (!started.ok) return text(started);
+        id = (started.data as { try_id?: string })?.try_id;
+      }
+      if (!id) return { content: [{ type: 'text' as const, text: 'Pass doc and prompt to start a trial, or try_id to keep waiting on one.' }], isError: true };
+      const deadline = Date.now() + Math.min(120, wait_seconds ?? 50) * 1000;
+      for (;;) {
+        const look = await client.get(`${path}/${encodeURIComponent(id)}`);
+        const status = (look.data as { status?: string })?.status;
+        if (!look.ok || status !== 'running' || Date.now() >= deadline) return text(look);
+        await new Promise(r => setTimeout(r, 1000));
+      }
+    },
+  );
+
+  mcp.tool(
+    'aimeat_crew_draft',
+    descriptionFor('aimeat_crew_draft'),
+    { agent_name: agentNameSchema, target_agent_name: crewAgentSchema, doc: docSchema.optional().describe('The edits to keep. Omit it to discard the saved draft.') },
+    async ({ agent_name, target_agent_name, doc }) => {
+      const { client } = pickAgent(registry, agent_name);
+      const path = `/v1/agents/${encodeURIComponent(target_agent_name)}/crew/draft`;
+      return text(doc ? await client.put(path, { doc }) : await client.delete(path));
+    },
+  );
+
+  mcp.tool(
+    'aimeat_crew_publish',
+    descriptionFor('aimeat_crew_publish'),
+    {
+      agent_name: agentNameSchema,
+      target_agent_name: crewAgentSchema,
+      doc: docSchema.optional().describe('The definition to make live.'),
+      revision: z.number().int().positive().optional().describe('Instead of doc: republish this kept revision.'),
+    },
+    async ({ agent_name, target_agent_name, doc, revision }) => {
+      const { client } = pickAgent(registry, agent_name);
+      const base = `/v1/agents/${encodeURIComponent(target_agent_name)}/crew`;
+      if (doc) return text(await client.post(`${base}/publish`, { doc }));
+      if (revision !== undefined) return text(await client.post(`${base}/restore`, { revision }));
+      return { content: [{ type: 'text' as const, text: 'Pass doc to publish a definition, or revision to restore a kept one.' }], isError: true };
     },
   );
 }

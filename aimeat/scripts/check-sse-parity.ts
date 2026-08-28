@@ -106,6 +106,11 @@ const EXEMPT: Record<string, string> = {
  * claim that rots — each entry says which function carries it.
  */
 const DELEGATES: Record<string, string> = {
+    'src/mcp/agent-crew.ts': "services/crew-ops.ts → services/crew-def-store.ts, which emits 'agents' "
+        + 'after a publish (publishCrewDef, the same call the Crew tab\'s route makes) and writes the '
+        + 'draft and every version copy through services/memory-write.ts, whose afterMemoryWrite fires '
+        + 'the memory events the profile listens on. The trial runs never touch storage and have '
+        + 'nothing to announce. Verified by reading the domain out of publishCrewDef.',
     // Step 8 (2026-08-11) moved each of these writes into the service its REST twin already called,
     // and the emit went with the write. Each was verified by reading the domain out of the service
     // rather than trusting the delegation: a tool that hands its write to a silent service is the

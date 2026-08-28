@@ -23,6 +23,7 @@
  *     async ({ key }) => { ... }
  *   );
  * @version-history
+ *   2026-08-28 — The five crew-definition tools.
  *   2026-08-25 — The three data-map tools.
  *   v1.x — 2026-08-23 — Annotation for aimeat_package_install: a write, not destructive, and NOT
  *     idempotent — each install mints a fresh instance with its own component names, so a host that
@@ -246,6 +247,13 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_agent_tags_set: { title: 'Set Agent Tags', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_agent_mode_set: { title: 'Set Agent Mode', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_agent_console_set: { title: 'Set Agent Console Address', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+
+    // ── Crew definition (the chat path to building a JSON agent) ──
+    aimeat_crew_get: { title: 'Read Crew Definition', readOnlyHint: true },
+    aimeat_crew_validate: { title: 'Validate Crew Definition', readOnlyHint: true, openWorldHint: false },
+    aimeat_crew_try: { title: 'Try Crew Definition Once', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    aimeat_crew_draft: { title: 'Save or Discard Crew Draft', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_crew_publish: { title: 'Publish Crew Definition', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
 
     // ── Knowledge packages ──
     aimeat_knowledge_list: { title: 'List Knowledge Packages', readOnlyHint: true },
