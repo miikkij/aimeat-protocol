@@ -12,6 +12,8 @@
    @usage Loaded first in spa.html <head>; the theme is toggled by /js/theme.js
      which flips the data-theme attribute on <html>.
    @version-history
+     v1.31.1 — 2026-08-28 — --on-sun: the ink for words on the sticker yellow, which does not flip
+       in dark mode while --text does. Additive.
      v1.31.0 — 2026-08-28 — --font-poster (Archivo Black): the display face of the poster skin the
        home, the settings overview and the chat wear (design canvas "AIMEAT Home, Settings and
        Chat", direction C). Additive only; loaded in spa.html with the other faces.
@@ -200,6 +202,9 @@
   /* The sticker yellow of the showroom front page. Used for the kicker, the price sticker and the
      live counters; not a semantic colour (that is --warn) and it does not flip in dark mode. */
   --sun: #FFB52E;
+  /* Ink on the sticker yellow. The sun does not flip in dark mode, so the words on it cannot
+     follow --text either: light text on yellow measured under 2:1. Same value as --toast-warn-fg. */
+  --on-sun: #1A1A2E;
 
   /* Layout */
   --nav-height: 56px;
