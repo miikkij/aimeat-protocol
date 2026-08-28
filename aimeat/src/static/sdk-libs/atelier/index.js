@@ -28,6 +28,8 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.13.0 — 2026-08-28 — The AI-native layer (phase 6): copilot() whose tools are the app's own
+ *     declarations, the mosaic `copilot` block, the viewer's overlay (setOverlay), and explain().
  *   v0.12.0 — 2026-08-28 — The signature (bounded token overrides from the stored layout) and the
  *     shared-element morphs (canvas tile → focused screen, list row → detail).
  *   v0.11.0 — 2026-08-28 — The first AEB review's kit fixes: designed sign-in after the boot
@@ -84,6 +86,7 @@ import { el, append, $, $$, clear, uid, busy, guardButtons, whileBusy, injectSty
 import { i18n } from './i18n.js';
 import { app, section, tabs, bottomNav } from './shell.js';
 import { hero, statRow, figure } from './hero.js';
+import { copilot } from './copilot.js';
 import { emptyState, skeleton } from './state.js';
 import { list, listDetail } from './list.js';
 import { cardGrid, mediaCard } from './grid.js';
@@ -98,7 +101,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.12.0',
+  version: '0.13.0',
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,
@@ -108,6 +111,7 @@ const atelier = {
 
   // ── Focal content ──
   hero, statRow, figure,
+  copilot,
 
   // ── Content ──
   list, listDetail, cardGrid, mediaCard, timeline,
