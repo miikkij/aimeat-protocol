@@ -10,10 +10,16 @@
  *   - bareOwnerName(), sameOwner()     → owner-identifier comparison
  *   - filterAttr()      → the data-filter/data-tags pair used by the card search
  *   - isSameOriginUrl(), currentOwnerName(), generateId(), readFileAsText()
+ *   - gapMs(), durationLabel() → the distance between two publishes, in words
  * @usage import { escapeHtml, jsArg, sameOwner } from './util.js'
  * @version-history
  *   v1.0.0 — 2026-07-10 — Initial extraction (TARGET-021 Aalto 3 modularization, phase 1).
  *   v1.1.0 — 2026-08-11 — escapeHtml also escapes " and ' (audit H-25, stored XSS via filterAttr).
+ *   v1.2.0 — 2026-08-28 — gapMs + durationLabel. The node has stamped every publish since June and
+ *     the version list rendered each stamp on its own, so the one thing a person actually wants to
+ *     know from that list — how long a round took, and how long the whole app took — was a
+ *     subtraction nobody performed. 415 versions of one app carry that history and none of it was
+ *     readable.
  */
 
 /**
@@ -149,6 +155,58 @@ export function generateId() {
     var v = c === 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
   });
+}
+
+/**
+ * Milliseconds between two ISO timestamps, or 0 when either is missing, unparseable or out of
+ * order. Version lists arrive newest-first, so the caller passes (this row, the row after it).
+ *
+ * @param {string} laterIso
+ * @param {string} earlierIso
+ * @returns {number}
+ */
+export function gapMs(laterIso, earlierIso) {
+  if (!laterIso || !earlierIso) return 0;
+  var later = Date.parse(laterIso);
+  var earlier = Date.parse(earlierIso);
+  if (!isFinite(later) || !isFinite(earlier) || later <= earlier) return 0;
+  return later - earlier;
+}
+
+/**
+ * A length of time in words, at the coarsest unit that still says something: seconds under a
+ * minute, minutes and seconds under an hour, hours and minutes under a day, days and hours above.
+ *
+ * The units are passed in rather than looked up, so this file keeps its no-imports contract and
+ * the caller decides the language. THE CALLER ALSO OWNS THE LABEL, and the label matters more
+ * than the number: what this measures is the distance between two publishes, which inside one
+ * sitting is the length of a round and across a weekend is a weekend. Anything calling it "time
+ * spent" or "duration of work" would be reading calendar time as effort.
+ *
+ * @param {number} ms
+ * @param {{ s: string, min: string, h: string, d: string }} units
+ * @returns {string} the words, or '' when there is nothing to say
+ */
+export function durationLabel(ms, units) {
+  if (!(ms > 0)) return '';
+  var seconds = Math.round(ms / 1000);
+  if (seconds < 60) return seconds + ' ' + units.s;
+  var minutes = Math.floor(seconds / 60);
+  var restSeconds = seconds % 60;
+  if (minutes < 60) {
+    return restSeconds ? minutes + ' ' + units.min + ' ' + restSeconds + ' ' + units.s
+      : minutes + ' ' + units.min;
+  }
+  var hours = Math.floor(minutes / 60);
+  var restMinutes = minutes % 60;
+  if (hours < 24) {
+    return restMinutes ? hours + ' ' + units.h + ' ' + restMinutes + ' ' + units.min
+      : hours + ' ' + units.h;
+  }
+  var days = Math.floor(hours / 24);
+  var restHours = hours % 24;
+  return restHours ? days + ' ' + units.d + ' ' + restHours + ' ' + units.h
+    : days + ' ' + units.d;
 }
 
 /** Read a File/Blob as a UTF-8 string (Promise). Pure FileReader helper. */

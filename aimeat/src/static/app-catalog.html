@@ -2400,6 +2400,10 @@
 
     @media (max-width: 640px) {
       .dtl-dm-head { grid-template-columns: minmax(0, 1fr); }
+      /* The version sub-line is nowrap + ellipsis so a desktop row stays one line. On a phone
+         that cuts it mid-timestamp, and the tail is where the useful part now lives ("since the
+         previous one 4 min 21 s"). Two short lines beat one truncated one. */
+      .version-sub { white-space: normal; overflow: visible; text-overflow: clip; }
     }
 
     /* ── Search section of the app detail view (seo.js) ── */
@@ -3215,6 +3219,15 @@
       "versions.help": "Every publish is kept. Restore re-publishes an older version as the new latest; Fork copies it into a new app. Older versions are never lost.",
       "versions.current": "current",
       "versions.stored": "versions stored",
+      // The distance between two publishes. Inside one sitting it is the length of a round;
+      // across a weekend it is a weekend. The wording says "since the previous one" and never
+      // "took", because the stamps cannot tell the two apart.
+      "versions.sincePrev": "since the previous one",
+      "versions.span": "first to last:",
+      "dur.s": "s",
+      "dur.min": "min",
+      "dur.h": "h",
+      "dur.d": "d",
       "pb.title": "✨ Generate App with AI",
       "pb.intro": "No coding. Describe your idea, copy the prompt, and paste it into any AI chat (Claude, ChatGPT…). The AI asks a few questions, builds a ready-to-use app, and gives you one HTML file — then add it here to put it live.",
       "pb.step1": "Describe your app",
@@ -4013,6 +4026,12 @@
       "versions.help": "Jokainen julkaisu säilytetään. Palauta julkaisee vanhan version uudelleen uusimmaksi; Haaroita kopioi sen uudeksi sovellukseksi. Vanhoja versioita ei koskaan menetetä.",
       "versions.current": "nykyinen",
       "versions.stored": "versiota tallennettu",
+      "versions.sincePrev": "edellisestä",
+      "versions.span": "ensimmäisestä viimeiseen:",
+      "dur.s": "s",
+      "dur.min": "min",
+      "dur.h": "t",
+      "dur.d": "pv",
       "pb.title": "✨ Luo sovellus tekoälyllä",
       "pb.intro": "Ei koodausta. Kuvaile ideasi, kopioi prompti ja liitä se mihin tahansa tekoälykeskusteluun (Claude, ChatGPT…). Tekoäly kysyy muutaman kysymyksen, rakentaa valmiin sovelluksen ja antaa sinulle yhden HTML-tiedoston — lisää se sitten tästä julkaistaksesi.",
       "pb.step1": "Kuvaile sovelluksesi",
@@ -4620,6 +4639,31 @@
       var v = c === "x" ? r : r & 3 | 8;
       return v.toString(16);
     });
+  }
+  function gapMs(laterIso, earlierIso) {
+    if (!laterIso || !earlierIso) return 0;
+    var later = Date.parse(laterIso);
+    var earlier = Date.parse(earlierIso);
+    if (!isFinite(later) || !isFinite(earlier) || later <= earlier) return 0;
+    return later - earlier;
+  }
+  function durationLabel(ms, units) {
+    if (!(ms > 0)) return "";
+    var seconds = Math.round(ms / 1e3);
+    if (seconds < 60) return seconds + " " + units.s;
+    var minutes = Math.floor(seconds / 60);
+    var restSeconds = seconds % 60;
+    if (minutes < 60) {
+      return restSeconds ? minutes + " " + units.min + " " + restSeconds + " " + units.s : minutes + " " + units.min;
+    }
+    var hours = Math.floor(minutes / 60);
+    var restMinutes = minutes % 60;
+    if (hours < 24) {
+      return restMinutes ? hours + " " + units.h + " " + restMinutes + " " + units.min : hours + " " + units.h;
+    }
+    var days = Math.floor(hours / 24);
+    var restHours = hours % 24;
+    return restHours ? days + " " + units.d + " " + restHours + " " + units.h : days + " " + units.d;
   }
   function readFileAsText(file) {
     return new Promise(function(resolve, reject) {
@@ -8249,6 +8293,31 @@
       if (detailAppId) renderDetailView();
     });
   }
+  function durationUnits() {
+    return { s: t("dur.s"), min: t("dur.min"), h: t("dur.h"), d: t("dur.d") };
+  }
+  function versionSinceText(versions, i) {
+    var prev = versions[i + 1];
+    if (!prev) return "";
+    var label2 = durationLabel(gapMs(versions[i].created_at, prev.created_at), durationUnits());
+    return label2 ? " · " + t("versions.sincePrev") + " " + label2 : "";
+  }
+  function versionSpanText(versions) {
+    if (versions.length < 2) return "";
+    var newest = versions[0].created_at;
+    var oldest = versions[versions.length - 1].created_at;
+    if (!newest || !oldest) return "";
+    var first = new Date(oldest).toLocaleDateString();
+    var last = new Date(newest).toLocaleDateString();
+    var when = first === last ? first : first + " – " + last;
+    var span = durationLabel(gapMs(newest, oldest), durationUnits());
+    return " · " + when + (span ? " · " + t("versions.span") + " " + span : "");
+  }
+  function versionSpanHtml(versions) {
+    var text = versionSpanText(versions);
+    if (!text) return "";
+    return '<div class="version-span" style="color:var(--text-muted);font-size:.8rem;margin-bottom:.5rem">' + escapeHtml(versions.length + " " + t("versions.stored") + text) + "</div>";
+  }
   function detailLoadVersions(owner, filename) {
     var config = loadConfig();
     if (!config.aimeatUrl) return;
@@ -8272,6 +8341,7 @@
           renderDetailView();
         }
       }
+      listEl = document.getElementById("detail-versions-list") || listEl;
       if (versions.length === 0) {
         detailVersionsHtml = '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.noVersions") + "</span>";
         listEl.innerHTML = detailVersionsHtml;
@@ -8279,14 +8349,15 @@
       }
       var ownerArg = "'" + jsArg(owner) + "'";
       var fileArg = "'" + jsArg(filename) + "'";
-      var html = "";
+      var html = versionSpanHtml(versions);
       for (var i = 0; i < versions.length; i++) {
         var v = versions[i];
         var isLatest = i === 0;
         var kb = v.size ? Math.round(v.size / 102.4) / 10 + " KB" : "";
         var when = v.created_at ? new Date(v.created_at).toLocaleString() : "";
+        var since = versionSinceText(versions, i);
         var viewU = aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "?version=" + v.version_number + "&mode=inline";
-        html += '<div class="dtl-version-row"><div class="version-meta"><span class="version-num">v' + v.version_number + (isLatest ? ' <span class="version-current">' + t("versions.current") + "</span>" : "") + '</span> <span class="version-sub" style="color:var(--text-muted);font-size:.8rem">' + (kb ? kb : "") + (when ? " · " + when : "") + '</span></div><div class="dtl-btn-row">' + dtlBtn(t("card.view"), "window._launcher.viewPublished('" + escapeHtml(viewU) + "', '" + jsArg(filename) + "')") + (isLatest ? "" : dtlBtn(t("card.restore"), "window._launcher.restoreVersion(" + ownerArg + ", " + fileArg + ", " + v.version_number + ")")) + dtlBtn(t("card.fork"), "window._launcher.forkVersion(" + ownerArg + ", " + fileArg + ", " + v.version_number + ")") + "</div></div>";
+        html += '<div class="dtl-version-row"><div class="version-meta"><span class="version-num">v' + v.version_number + (isLatest ? ' <span class="version-current">' + t("versions.current") + "</span>" : "") + '</span> <span class="version-sub" style="color:var(--text-muted);font-size:.8rem">' + (kb ? kb : "") + (when ? " · " + when : "") + since + '</span></div><div class="dtl-btn-row">' + dtlBtn(t("card.view"), "window._launcher.viewPublished('" + escapeHtml(viewU) + "', '" + jsArg(filename) + "')") + (isLatest ? "" : dtlBtn(t("card.restore"), "window._launcher.restoreVersion(" + ownerArg + ", " + fileArg + ", " + v.version_number + ")")) + dtlBtn(t("card.fork"), "window._launcher.forkVersion(" + ownerArg + ", " + fileArg + ", " + v.version_number + ")") + "</div></div>";
       }
       detailVersionsHtml = html;
       listEl.innerHTML = html;
@@ -8964,7 +9035,7 @@
         statusEl.textContent = "No versions found.";
         return;
       }
-      statusEl.textContent = versions.length + " " + t("versions.stored");
+      statusEl.textContent = versions.length + " " + t("versions.stored") + versionSpanText(versions);
       statusEl.style.color = "var(--text-muted)";
       var ownerArg = "'" + jsArg(owner) + "'";
       var fileArg = "'" + jsArg(filename) + "'";
@@ -8974,8 +9045,9 @@
         var isLatest = i === 0;
         var kb = v.size ? Math.round(v.size / 102.4) / 10 + " KB" : "";
         var when = v.created_at ? new Date(v.created_at).toLocaleString() : "";
+        var since = versionSinceText(versions, i);
         var viewU = aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "?version=" + v.version_number + "&mode=inline";
-        html += '<div class="version-row"><div class="version-meta"><span class="version-num">v' + v.version_number + (isLatest ? ' <span class="version-current">' + t("versions.current") + "</span>" : "") + '</span><span class="version-sub">' + escapeHtml(v.version || "") + (kb ? " · " + kb : "") + (when ? " · " + when : "") + `</span></div><div class="version-actions"><button onclick="window._launcher.viewPublished('` + escapeHtml(viewU) + "', '" + jsArg(filename) + `')">` + t("card.view") + "</button>" + (isLatest ? "" : '<button onclick="window._launcher.restoreVersion(' + ownerArg + ", " + fileArg + ", " + v.version_number + ')" title="Re-publish this version as the new latest">' + t("card.restore") + "</button>") + '<button onclick="window._launcher.forkVersion(' + ownerArg + ", " + fileArg + ", " + v.version_number + ')" title="Copy this version into a new app">' + t("card.fork") + "</button></div></div>";
+        html += '<div class="version-row"><div class="version-meta"><span class="version-num">v' + v.version_number + (isLatest ? ' <span class="version-current">' + t("versions.current") + "</span>" : "") + '</span><span class="version-sub">' + escapeHtml(v.version || "") + (kb ? " · " + kb : "") + (when ? " · " + when : "") + since + `</span></div><div class="version-actions"><button onclick="window._launcher.viewPublished('` + escapeHtml(viewU) + "', '" + jsArg(filename) + `')">` + t("card.view") + "</button>" + (isLatest ? "" : '<button onclick="window._launcher.restoreVersion(' + ownerArg + ", " + fileArg + ", " + v.version_number + ')" title="Re-publish this version as the new latest">' + t("card.restore") + "</button>") + '<button onclick="window._launcher.forkVersion(' + ownerArg + ", " + fileArg + ", " + v.version_number + ')" title="Copy this version into a new app">' + t("card.fork") + "</button></div></div>";
       }
       listEl.innerHTML = html;
     }).catch(function(err) {
