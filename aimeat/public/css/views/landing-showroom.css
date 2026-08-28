@@ -18,27 +18,27 @@
 
 /* ── Shared vocabulary ─────────────────────────────────────────────────────────────────────── */
 .ld-sh-h2 {
-  font-family: var(--font-display); font-weight: 400; text-transform: uppercase;
+  font-family: var(--font-showroom); font-weight: 400; text-transform: uppercase;
   font-size: clamp(1.7rem, 3.2vw, 2.5rem); line-height: 1.05; margin: 0; color: var(--text);
   display: flex; flex-direction: column; gap: .1em;
 }
-.ld-sh-h3 { font-family: var(--font-display); font-weight: 400; text-transform: uppercase; font-size: 1.5rem; line-height: 1.1; margin: 0; }
+.ld-sh-h3 { font-family: var(--font-showroom); font-weight: 400; text-transform: uppercase; font-size: 1.5rem; line-height: 1.1; margin: 0; }
 .ld-sh-accent { color: var(--accent); }
-.ld-sh-text { margin: 0; font-family: var(--font-marketing); font-size: 1.1rem; line-height: 1.6; color: var(--text); }
+.ld-sh-text { margin: 0; font-family: var(--font-showroom-body); font-size: 1.1rem; line-height: 1.6; color: var(--text); }
 .ld-sh-text a, .ld-sh-box a { color: var(--accent); font-weight: 800; text-decoration: none; }
 .ld-sh-text a:hover, .ld-sh-box a:hover { text-decoration: underline; }
 
 /* A dashed box: the aside that says the thing out loud (the money angle, the house rules). */
 .ld-sh-box {
   padding: 1rem 1.25rem; border: 3px dashed var(--accent); background: var(--card-bg);
-  font-family: var(--font-marketing); font-size: .95rem; line-height: 1.6; color: var(--text);
+  font-family: var(--font-showroom-body); font-size: .95rem; line-height: 1.6; color: var(--text);
 }
-.ld-sh-box-label { font-family: var(--font-display); text-transform: uppercase; font-size: .8rem; letter-spacing: .04em; color: var(--accent); }
+.ld-sh-box-label { font-family: var(--font-showroom); text-transform: uppercase; font-size: .8rem; letter-spacing: .04em; color: var(--accent); }
 
 /* A sticker: the yellow tag, tilted, with a hard shadow. */
 .ld-sh-sticker {
   position: absolute; top: -1.1rem; right: -.6rem;
-  font-family: var(--font-display); text-transform: uppercase; font-size: .85rem; letter-spacing: .04em;
+  font-family: var(--font-showroom); text-transform: uppercase; font-size: .85rem; letter-spacing: .04em;
   padding: .55rem 1rem; background: var(--sun); color: #1A1A2E;
   border: 3px solid var(--text); box-shadow: 4px 4px 0 var(--text); transform: rotate(6deg);
   white-space: nowrap;
@@ -46,7 +46,7 @@
 
 /* The buttons: Bungee on a hard-shadowed slab. Hover presses the slab into its shadow. */
 .ld-sh-btn {
-  display: inline-block; font-family: var(--font-display); text-transform: uppercase; font-size: 1rem;
+  display: inline-block; font-family: var(--font-showroom); text-transform: uppercase; font-size: 1rem;
   padding: 1rem 1.75rem; border: 3px solid var(--text); box-shadow: 6px 6px 0 var(--text);
   text-decoration: none; transition: transform 120ms ease, box-shadow 120ms ease; text-align: center;
 }
@@ -57,33 +57,33 @@
 .ld-sh-btn--ink:hover { box-shadow: 3px 3px 0 var(--accent); }
 
 .ld-sh-star { flex: 0 0 auto; margin-top: 3px; color: var(--accent); }
-.ld-sh-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .5rem; font-family: var(--font-marketing); font-size: 1rem; font-weight: 600; line-height: 1.5; }
+.ld-sh-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .5rem; font-family: var(--font-showroom-body); font-size: 1rem; font-weight: 600; line-height: 1.5; }
 .ld-sh-list li { display: flex; gap: .6rem; }
 
 /* ── The hero ──────────────────────────────────────────────────────────────────────────────── */
 .ld-sh-hero { display: flex; flex-direction: column; align-items: flex-start; gap: 1.4rem; padding: 2.5rem 0 0; }
 .ld-sh-kicker {
-  display: inline-block; font-family: var(--font-display); text-transform: uppercase; font-size: .8rem; letter-spacing: .06em;
+  display: inline-block; font-family: var(--font-showroom); text-transform: uppercase; font-size: .8rem; letter-spacing: .06em;
   padding: .5rem .9rem; background: var(--sun); color: #1A1A2E;
   border: 3px solid var(--text); box-shadow: 5px 5px 0 var(--text); transform: rotate(-2deg);
 }
 .ld-sh-title {
-  margin: 0; font-family: var(--font-display); font-weight: 400; text-transform: uppercase;
+  margin: 0; font-family: var(--font-showroom); font-weight: 400; text-transform: uppercase;
   font-size: clamp(2.4rem, 6.6vw, 6rem); line-height: .96; color: var(--text);
   text-shadow: .075em .075em 0 var(--accent); display: flex; flex-direction: column;
 }
-.ld-sh-position { margin: 0; font-family: var(--font-display); text-transform: uppercase; font-size: clamp(.85rem, 1.2vw, 1.05rem); letter-spacing: .04em; color: var(--accent); }
+.ld-sh-position { margin: 0; font-family: var(--font-showroom); text-transform: uppercase; font-size: clamp(.85rem, 1.2vw, 1.05rem); letter-spacing: .04em; color: var(--accent); }
 .ld-sh-hero-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3.5rem; width: 100%; align-items: start; }
 @media (max-width: 900px) { .ld-sh-hero-cols { grid-template-columns: 1fr; gap: 1.5rem; } }
-.ld-sh-sub { margin: 0; font-family: var(--font-marketing); font-size: 1.25rem; line-height: 1.5; font-weight: 600; color: var(--text); }
+.ld-sh-sub { margin: 0; font-family: var(--font-showroom-body); font-size: 1.25rem; line-height: 1.5; font-weight: 600; color: var(--text); }
 .ld-sh-action { display: flex; flex-direction: column; gap: .9rem; }
 .ld-sh-action .ld-wish { margin: 0; }
-.ld-sh-lead { margin: 0; font-family: var(--font-marketing); font-size: .95rem; line-height: 1.5; color: var(--text-dim); }
+.ld-sh-lead { margin: 0; font-family: var(--font-showroom-body); font-size: .95rem; line-height: 1.5; color: var(--text-dim); }
 .ld-sh-doors { display: flex; gap: 1.75rem; flex-wrap: wrap; }
-.ld-sh-door { font-family: var(--font-marketing); font-size: .95rem; font-weight: 800; color: var(--text); text-decoration: none; border-bottom: 3px solid var(--accent); }
+.ld-sh-door { font-family: var(--font-showroom-body); font-size: .95rem; font-weight: 800; color: var(--text); text-decoration: none; border-bottom: 3px solid var(--accent); }
 .ld-sh-door:hover { color: var(--accent); }
 .ld-sh-agentdoor { display: flex; flex-direction: column; gap: .75rem; align-items: flex-start; padding: 1rem 1.25rem; border: 3px dashed var(--accent); background: var(--card-bg); }
-.ld-sh-agentdoor-sub, .ld-sh-agentdoor-note { margin: 0; font-family: var(--font-marketing); font-size: .92rem; line-height: 1.5; color: var(--text-dim); }
+.ld-sh-agentdoor-sub, .ld-sh-agentdoor-note { margin: 0; font-family: var(--font-showroom-body); font-size: .92rem; line-height: 1.5; color: var(--text-dim); }
 
 /* The showroom picture at full width, so it carries the weight of the headline. */
 .ld-sh-picture { position: relative; width: 100%; margin: 1.25rem 0 1rem; }
@@ -130,11 +130,11 @@
   background: var(--card-bg); border: 3px solid var(--text); box-shadow: 4px 4px 0 var(--text);
 }
 .ld-sh-tier:nth-child(even) { box-shadow: 4px 4px 0 var(--accent); }
-.ld-sh-tier-name { font-family: var(--font-display); text-transform: uppercase; font-size: .72rem; color: var(--text-dim); }
+.ld-sh-tier-name { font-family: var(--font-showroom); text-transform: uppercase; font-size: .72rem; color: var(--text-dim); }
 /* "from 2 000 €" is the longest price and it wraps rather than leaving its box: on a phone the
    boxes are 160px wide and Bungee is a wide face. */
-.ld-sh-tier-price { font-family: var(--font-display); font-size: clamp(1.15rem, 1.6vw, 1.5rem); line-height: 1.1; color: var(--text); overflow-wrap: anywhere; }
-.ld-sh-tier-unit { font-family: var(--font-marketing); font-size: .75rem; color: var(--text-dim); }
+.ld-sh-tier-price { font-family: var(--font-showroom); font-size: clamp(1.15rem, 1.6vw, 1.5rem); line-height: 1.1; color: var(--text); overflow-wrap: anywhere; }
+.ld-sh-tier-unit { font-family: var(--font-showroom-body); font-size: .75rem; color: var(--text-dim); }
 @media (max-width: 900px) {
   .ld-sh-store { grid-template-columns: 1fr; gap: 2rem; padding: 2.5rem 1.25rem; }
   .ld-sh-store-img { box-shadow: -8px 8px 0 var(--text); }
@@ -143,16 +143,16 @@
 
 /* ── The safety list ───────────────────────────────────────────────────────────────────────── */
 .ld-sh-trust { display: flex; flex-direction: column; gap: 1.6rem; padding: 3.5rem 3rem; background: var(--text); color: var(--bg); }
-.ld-sh-trust-title { margin: 0; font-family: var(--font-display); font-weight: 400; text-transform: uppercase; font-size: clamp(1.3rem, 2.4vw, 1.9rem); line-height: 1.15; color: var(--sun); text-align: center; }
+.ld-sh-trust-title { margin: 0; font-family: var(--font-showroom); font-weight: 400; text-transform: uppercase; font-size: clamp(1.3rem, 2.4vw, 1.9rem); line-height: 1.15; color: var(--sun); text-align: center; }
 .ld-sh-trust-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1.1rem; }
 .ld-sh-trust-item {
   display: flex; flex-direction: column; gap: .4rem; padding: 1.1rem 1.25rem;
   border: 2px solid color-mix(in srgb, var(--bg) 28%, transparent);
-  font-family: var(--font-marketing);
+  font-family: var(--font-showroom-body);
 }
 .ld-sh-trust-item-title { font-size: 1rem; font-weight: 800; color: var(--sun); }
 .ld-sh-trust-item-text { font-size: .9rem; line-height: 1.55; }
-.ld-sh-trust-line { margin: 0; text-align: center; font-family: var(--font-marketing); font-size: .9rem; line-height: 1.6; color: color-mix(in srgb, var(--bg) 70%, transparent); }
+.ld-sh-trust-line { margin: 0; text-align: center; font-family: var(--font-showroom-body); font-size: .9rem; line-height: 1.6; color: color-mix(in srgb, var(--bg) 70%, transparent); }
 .ld-sh-trust-line a { color: var(--sun); font-weight: 700; text-decoration: none; }
 .ld-sh-trust-line a:hover { text-decoration: underline; }
 @media (max-width: 980px) { .ld-sh-trust-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -168,7 +168,7 @@
 
 /* ── The last word ─────────────────────────────────────────────────────────────────────────── */
 .ld-sh-close { display: flex; flex-direction: column; align-items: center; gap: 1.4rem; padding: 3.5rem 3rem; background: var(--text); color: var(--bg); text-align: center; }
-.ld-sh-close-text { margin: 0; max-width: 44rem; font-family: var(--font-marketing); font-size: 1.1rem; line-height: 1.6; }
+.ld-sh-close-text { margin: 0; max-width: 44rem; font-family: var(--font-showroom-body); font-size: 1.1rem; line-height: 1.6; }
 .ld-sh-close-actions { display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; }
 .ld-sh-close .ld-sh-btn { border-color: var(--bg); box-shadow: 6px 6px 0 var(--bg); }
 .ld-sh-close .ld-sh-btn:hover { box-shadow: 3px 3px 0 var(--bg); }

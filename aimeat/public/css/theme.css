@@ -12,6 +12,9 @@
    @usage Loaded first in spa.html <head>; the theme is toggled by /js/theme.js
      which flips the data-theme attribute on <html>.
    @version-history
+     v1.30.1 — 2026-08-28 — The two font tokens renamed --font-showroom / --font-showroom-body:
+       --font-display was already the variable lib/aimeat-theme.css reads for every heading, so
+       defining it here put Bungee on the whole shell.
      v1.30.0 — 2026-08-28 — Three tokens for the showroom front page: --font-display (Bungee),
        --font-marketing (Archivo) and --sun, the sticker yellow. Additive only.
      v1.29.0 — 2026-08-27 — .start-page replaces .ui-switch: the start-page setting
@@ -180,9 +183,12 @@
   --font: 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
   /* The showroom voice: Bungee for the front page's headlines and stickers, Archivo for its body.
-     Loaded with the shell's other faces in spa.html; only the front page wears them today. */
-  --font-display: 'Bungee', 'Archivo', 'DM Sans', system-ui, sans-serif;
-  --font-marketing: 'Archivo', 'DM Sans', system-ui, sans-serif;
+     Loaded with the shell's other faces in spa.html; only the front page and its companions wear
+     them. NOT named --font-display: lib/aimeat-theme.css (the palette bridge, loaded on every
+     page) already styles h1-h6 with var(--font-display, …), and a token by that name put Bungee
+     on every heading in the shell for one afternoon. */
+  --font-showroom: 'Bungee', 'Archivo', 'DM Sans', system-ui, sans-serif;
+  --font-showroom-body: 'Archivo', 'DM Sans', system-ui, sans-serif;
 
   /* The sticker yellow of the showroom front page. Used for the kicker, the price sticker and the
      live counters; not a semantic colour (that is --warn) and it does not flip in dark mode. */
