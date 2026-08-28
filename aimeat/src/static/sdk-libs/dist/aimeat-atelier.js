@@ -248,7 +248,12 @@
       aideFailed: "That did not go through. Try again.",
       aideRun: "Run it",
       aideUnknownAction: "The model proposed something this app does not declare — nothing was run.",
-      explainTitle: "What this screen holds"
+      explainTitle: "What this screen holds",
+      delegateGo: "Let AI handle it",
+      delegateHanded: "Handed over",
+      delegateFailed: "The agent could not finish it.",
+      delegateNoAgents: "No agent is connected to this account yet.",
+      agentActivityNone: "No agent activity yet."
     },
     fi: {
       loading: "Ladataan…",
@@ -288,7 +293,12 @@
       aideFailed: "Se ei mennyt läpi. Yritä uudelleen.",
       aideRun: "Aja",
       aideUnknownAction: "Malli ehdotti jotain mitä tämä appsi ei tunne — mitään ei ajettu.",
-      explainTitle: "Mitä tällä näytöllä on"
+      explainTitle: "Mitä tällä näytöllä on",
+      delegateGo: "Anna tekoälyn hoitaa",
+      delegateHanded: "Annettu hoidettavaksi",
+      delegateFailed: "Agentti ei saanut sitä valmiiksi.",
+      delegateNoAgents: "Tähän tiliin ei ole vielä kytketty agenttia.",
+      agentActivityNone: "Ei agenttitoimintaa vielä."
     },
     es: {
       loading: "Cargando…",
@@ -328,7 +338,12 @@
       aideFailed: "No ha funcionado. Inténtalo otra vez.",
       aideRun: "Ejecutar",
       aideUnknownAction: "El modelo propuso algo que esta app no declara — no se ejecutó nada.",
-      explainTitle: "Qué hay en esta pantalla"
+      explainTitle: "Qué hay en esta pantalla",
+      delegateGo: "Deja que la IA lo haga",
+      delegateHanded: "Encargado",
+      delegateFailed: "El agente no pudo terminarlo.",
+      delegateNoAgents: "Esta cuenta aún no tiene ningún agente conectado.",
+      agentActivityNone: "Sin actividad de agentes todavía."
     }
   };
   var HOST = { en: {}, fi: {}, es: {} };
@@ -1230,6 +1245,183 @@
     };
   }
 
+  // src/static/sdk-libs/atelier/timeline.js
+  function fmtTs(ts) {
+    if (typeof ts === "string" && /^\d{4}-\d{2}-\d{2}$/.test(ts)) {
+      return (/* @__PURE__ */ new Date(ts + "T12:00:00")).toLocaleDateString(void 0, { dateStyle: "medium" });
+    }
+    const d = ts instanceof Date ? ts : new Date(ts);
+    if (Number.isNaN(d.getTime())) return String(ts);
+    return d.toLocaleString(void 0, { dateStyle: "medium", timeStyle: "short" });
+  }
+  function timeline(spec) {
+    const fmt = spec.format || fmtTs;
+    const root = el("ol", { class: "ak-root ak-timeline" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let emptyCard = null;
+    function render(items) {
+      if (emptyCard) {
+        emptyCard.destroy();
+        emptyCard = null;
+      }
+      clear(root);
+      if (!items.length) {
+        const e = spec.empty || {};
+        emptyCard = emptyState({
+          target: root,
+          tone: "quiet",
+          title: e.title || t("empty"),
+          hint: e.hint || t("emptyHint")
+        });
+        return;
+      }
+      for (const item of items) {
+        root.appendChild(el("li", { class: "ak-timeline__item", "data-ak-id": item.id }, [
+          el("span", { class: "ak-timeline__dot ak-timeline__dot--" + (item.tone || "plain"), "aria-hidden": "true" }),
+          el("div", { class: "ak-timeline__body" }, [
+            el("span", { class: "ak-timeline__when", text: fmt(item.ts) }),
+            el("span", { class: "ak-timeline__title", text: item.title }),
+            item.sub != null ? el("span", { class: "ak-timeline__sub", text: item.sub }) : null
+          ])
+        ]));
+      }
+      enter(root);
+    }
+    render(spec.items || []);
+    return {
+      el: root,
+      /** @param {{ items: TimelineItem[] }} patch */
+      set(patch) {
+        if (!patch || !patch.items) return;
+        render(patch.items);
+      },
+      destroy() {
+        if (emptyCard) emptyCard.destroy();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/agentic.js
+  function agentsNs() {
+    const ns = (
+      /** @type {any} */
+      window.AIMEAT
+    );
+    return ns && ns.agents && typeof ns.agents.createTask === "function" ? ns.agents : null;
+  }
+  function delegate(spec) {
+    const status = el("span", { class: "ak-delegate__status", "aria-live": "polite" });
+    const btn = (
+      /** @type {HTMLButtonElement} */
+      el("button", {
+        type: "button",
+        class: "ak-btn ak-btn--ghost",
+        on: { click: run }
+      }, "✦ " + (spec.label || t("delegateGo")))
+    );
+    const root = el("div", { class: "ak-root ak-delegate" }, [btn, status]);
+    if (spec.target) resolve(spec.target).appendChild(root);
+    enter(root);
+    let stopWatch = null;
+    async function run() {
+      const agents = agentsNs();
+      if (!agents) {
+        status.textContent = t("delegateNoAgents");
+        return;
+      }
+      btn.disabled = true;
+      status.textContent = "…";
+      try {
+        const created = await agents.createTask(spec.agent, {
+          title: spec.task.title,
+          description: spec.task.description
+        }, { confirm: true });
+        const id = created && (created.id || created.task_id);
+        status.textContent = t("delegateHanded") + " (" + spec.agent + ")";
+        if (id && typeof agents.watch === "function") {
+          stopWatch = agents.watch(spec.agent, id, function(task) {
+            if (task.status === "done") {
+              status.textContent = t("ready");
+              btn.disabled = false;
+              if (stopWatch) {
+                stopWatch();
+                stopWatch = null;
+              }
+              if (spec.onDone) spec.onDone({ task, deliverable: null });
+            } else if (task.status === "failed" || task.status === "stalled") {
+              status.textContent = t("delegateFailed");
+              btn.disabled = false;
+              if (stopWatch) {
+                stopWatch();
+                stopWatch = null;
+              }
+            }
+          });
+        } else {
+          btn.disabled = false;
+        }
+      } catch (err) {
+        const code = err && /** @type {any} */
+        err.code;
+        status.textContent = code === "SPEND_CANCELLED" ? t("cancel") + "." : t("delegateFailed");
+        btn.disabled = false;
+      }
+    }
+    return {
+      el: root,
+      destroy() {
+        if (stopWatch) stopWatch();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+  function agentActivity(spec) {
+    const root = el("div", { class: "ak-root ak-agentactivity" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let inner = null;
+    async function refresh() {
+      const agents = agentsNs();
+      if (inner && inner.destroy) inner.destroy();
+      clear(root);
+      if (!agents) {
+        inner = emptyState({ target: root, tone: "quiet", title: t("agentActivityNone"), hint: t("delegateNoAgents") });
+        return;
+      }
+      let tasks;
+      try {
+        tasks = await agents.tasks(spec.agent, {});
+      } catch (err) {
+        console.warn("aimeat-atelier: agent activity could not be read", err);
+        inner = emptyState({ target: root, tone: "quiet", title: t("agentActivityNone") });
+        return;
+      }
+      const rows = (tasks || []).slice(0, spec.limit || 8).map(function(task) {
+        return {
+          id: String(task.id || task.title),
+          ts: task.updated_at || task.created_at || (/* @__PURE__ */ new Date()).toISOString(),
+          title: task.title || task.description || "",
+          sub: task.status,
+          tone: task.status === "failed" ? "err" : task.status === "done" ? "ok" : "warn"
+        };
+      });
+      if (!rows.length) {
+        inner = emptyState({ target: root, tone: "quiet", title: t("agentActivityNone") });
+        return;
+      }
+      inner = timeline({ target: root, items: rows });
+    }
+    refresh();
+    return {
+      el: root,
+      refresh,
+      destroy() {
+        if (inner && inner.destroy) inner.destroy();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+
   // src/static/sdk-libs/atelier/list.js
   function fillRow(row, item) {
     clear(row);
@@ -1916,63 +2108,6 @@
       },
       destroy() {
         if (timer) clearTimeout(timer);
-        if (root.parentNode) root.parentNode.removeChild(root);
-      }
-    };
-  }
-
-  // src/static/sdk-libs/atelier/timeline.js
-  function fmtTs(ts) {
-    if (typeof ts === "string" && /^\d{4}-\d{2}-\d{2}$/.test(ts)) {
-      return (/* @__PURE__ */ new Date(ts + "T12:00:00")).toLocaleDateString(void 0, { dateStyle: "medium" });
-    }
-    const d = ts instanceof Date ? ts : new Date(ts);
-    if (Number.isNaN(d.getTime())) return String(ts);
-    return d.toLocaleString(void 0, { dateStyle: "medium", timeStyle: "short" });
-  }
-  function timeline(spec) {
-    const fmt = spec.format || fmtTs;
-    const root = el("ol", { class: "ak-root ak-timeline" });
-    if (spec.target) resolve(spec.target).appendChild(root);
-    let emptyCard = null;
-    function render(items) {
-      if (emptyCard) {
-        emptyCard.destroy();
-        emptyCard = null;
-      }
-      clear(root);
-      if (!items.length) {
-        const e = spec.empty || {};
-        emptyCard = emptyState({
-          target: root,
-          tone: "quiet",
-          title: e.title || t("empty"),
-          hint: e.hint || t("emptyHint")
-        });
-        return;
-      }
-      for (const item of items) {
-        root.appendChild(el("li", { class: "ak-timeline__item", "data-ak-id": item.id }, [
-          el("span", { class: "ak-timeline__dot ak-timeline__dot--" + (item.tone || "plain"), "aria-hidden": "true" }),
-          el("div", { class: "ak-timeline__body" }, [
-            el("span", { class: "ak-timeline__when", text: fmt(item.ts) }),
-            el("span", { class: "ak-timeline__title", text: item.title }),
-            item.sub != null ? el("span", { class: "ak-timeline__sub", text: item.sub }) : null
-          ])
-        ]));
-      }
-      enter(root);
-    }
-    render(spec.items || []);
-    return {
-      el: root,
-      /** @param {{ items: TimelineItem[] }} patch */
-      set(patch) {
-        if (!patch || !patch.items) return;
-        render(patch.items);
-      },
-      destroy() {
-        if (emptyCard) emptyCard.destroy();
         if (root.parentNode) root.parentNode.removeChild(root);
       }
     };
@@ -2768,7 +2903,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.15.0",
+    version: "0.16.0",
     // ── Shell and navigation ──
     app,
     section,
@@ -2782,6 +2917,8 @@
     statRow,
     figure,
     aide,
+    delegate,
+    agentActivity,
     /**
      * Read something aloud through the platform's speech library, when the page carries it.
      * Opt-in by construction: nothing speaks until the app puts a control on the screen and a
