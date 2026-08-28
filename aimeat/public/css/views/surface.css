@@ -12,6 +12,7 @@
  * @structure .sf-band · .sf-free · .sf-portal-text · .sf-portal-board · .sf-settings-door
  * @usage Linked from public/spa.html beside the other view stylesheets.
  * @version-history
+ *   v1.1.1 — 2026-08-29 — The band title reads --font-poster-weight (theme.css) instead of a literal 400.
  *   v1.1.0 — 2026-08-28 — The band wears the poster home's face: no rule above it, the title in
  *     --font-poster at the size of the home's own band titles. Matched to .koti-band as before.
  *   v1.0.0 — 2026-08-26 — Initial.
@@ -28,7 +29,7 @@
 
 .sf-band-title {
   font-family: var(--font-poster);
-  font-weight: 400;
+  font-weight: var(--font-poster-weight);
   font-size: 2.4rem;
   line-height: 0.95;
   letter-spacing: -0.03em;

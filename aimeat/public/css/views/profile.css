@@ -6,6 +6,9 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v3.0.1 — 2026-08-29 — Poster headlines read --font-poster-weight (theme.css) instead of a literal 400;
+ *     the index's item weights read --font-poster-text-weight / --font-poster-strong-weight; the content
+ *     column takes the canvas's gutter (3rem left, 2.75rem right) so a page has the room the design has.
  *   v3.0.0 — 2026-08-28 — The overview and the sidebar wear the poster face (design canvas "AIMEAT
  *     Home, Settings and Chat", direction C): the sidebar is an index with coral group words and
  *     the open item on the sun; the profile card is a masthead in --font-poster with its four
@@ -1911,7 +1914,7 @@
 .pf .pf-lp-info { flex: 1; min-width: 0; }
 .pf .pf-lp-name-row { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .pf .pf-lp-name {
-  font-family: var(--font-poster); font-weight: 400;
+  font-family: var(--font-poster); font-weight: var(--font-poster-weight);
   font-size: 4.4rem; line-height: 0.9; letter-spacing: -0.035em; text-transform: uppercase;
   color: var(--text); max-width: 14ch;
 }
@@ -1943,7 +1946,7 @@
 .pf .pf-lp-stat:hover .pf-lp-stat-val { color: var(--sun); }
 .pf .pf-lp-stat-ico { display: none; }
 .pf .pf-lp-stat-val {
-  font-family: var(--font-poster); font-weight: 400;
+  font-family: var(--font-poster); font-weight: var(--font-poster-weight);
   font-size: 4.2rem; line-height: 0.85; letter-spacing: -0.04em;
   color: var(--bg); font-variant-numeric: tabular-nums;
 }
@@ -1992,7 +1995,7 @@
 /* --- Suggested next steps (home dashboard): a numbered index under a headline --- */
 .pf .pf-next { background: none; padding: 2.5rem 0 0; }
 .pf .pf-next-title {
-  font-family: var(--font-poster); font-weight: 400;
+  font-family: var(--font-poster); font-weight: var(--font-poster-weight);
   font-size: 2.1rem; line-height: 0.95; letter-spacing: -0.03em; text-transform: uppercase;
   color: var(--text); margin-bottom: 1.2rem;
 }
@@ -2433,7 +2436,7 @@
   box-sizing: border-box;
   max-height: calc(100dvh - var(--nav-height, 56px));
   overflow-y: auto;
-  padding: 1.5rem 1.25rem 2rem 1.5rem;
+  padding: 1.5rem 1.25rem 2rem 2rem;
   font-family: var(--font-showroom-body);
 }
 /* The index: a table of contents rather than a menu. One rule on top, group words in coral,
@@ -2442,18 +2445,18 @@
 .pf-side-identity { display: flex; align-items: center; gap: 0.6rem; padding: 0.4rem 0 1rem; }
 .pf-side-avatar { width: 38px; height: 38px; flex: 0 0 auto; background: var(--card); border: 3px solid var(--text); overflow: hidden; }
 .pf-side-avatar svg { width: 100%; height: 100%; }
-.pf-side-id-name { font-family: var(--font-poster); font-weight: 400; font-size: 1rem; line-height: 1.1; text-transform: uppercase; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-side-id-name { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1rem; line-height: 1.1; text-transform: uppercase; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .pf-side-group { margin-top: 1.1rem; }
-.pf-side-group-title { font-size: 0.66rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); padding: 0 0 0.35rem; border-bottom: 2px solid var(--text); }
+.pf-side-group-title { font-size: 0.66rem; font-weight: var(--font-poster-strong-weight); letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); padding: 0 0 0.35rem; border-bottom: 2px solid var(--text); }
 .pf-side-item {
   display: flex; align-items: center; gap: 0.6rem; width: 100%;
   padding: 0.45rem 0; border: none; border-bottom: 1px solid var(--border); background: none; color: var(--text);
-  cursor: pointer; font: inherit; font-size: 0.98rem; font-weight: 700; text-align: left;
+  cursor: pointer; font: inherit; font-size: 0.98rem; font-weight: var(--font-poster-text-weight); text-align: left;
   border-radius: 0;
 }
 .pf-side-item:hover { color: var(--accent); }
-.pf-side-item--active { background: var(--sun); color: var(--text); font-weight: 800; padding-left: 0.5rem; border-bottom-color: var(--text); }
+.pf-side-item--active { background: var(--sun); color: var(--on-sun); font-weight: var(--font-poster-strong-weight); padding-left: 0.5rem; border-bottom-color: var(--text); }
 /* The one toggle between the basic menu and every tool (K5). Reads as an action, not a tab. */
 .pf-side-more { margin-top: 0.9rem; border-bottom: 0; font-family: var(--font-mono); font-size: 0.8rem; font-weight: 400; color: var(--accent); text-decoration: underline; text-underline-offset: 4px; }
 .pf-side-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -2463,7 +2466,9 @@
    ~1360px so the total usable width settles around 1600px on ultra-wide
    monitors — readable line lengths, no full-bleed stretch. Extra space falls
    to the right; the sidebar stays flush to the screen's left edge. */
-.pf-content { flex: 1 1 auto; min-width: 0; max-width: 1360px; padding: 1.25rem 1.5rem; }
+/* The room the design canvas gives a page: a wide gutter between the index and the page, and
+   air under the header, so the rules and the headlines have somewhere to sit. */
+.pf-content { flex: 1 1 auto; min-width: 0; max-width: 1360px; padding: 1.5rem 2.75rem 3rem 3rem; }
 /* The overview wears the poster face; a tab opened from the index keeps its own. */
 .pf-content > .pf-lp-card, .pf-content > .pf-next, .pf-content > .pf-home-grid, .pf-content > .pf-start-page { font-family: var(--font-showroom-body); }
 .pf-content-head { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
@@ -3228,7 +3233,7 @@
    home dashboard — wider than a narrow phone, overflowing the right edge. */
 .pf-home-card { border: 0; background: none; padding: 0; min-width: 0; }
 .pf-home-card-title {
-  font-family: var(--font-poster); font-weight: 400;
+  font-family: var(--font-poster); font-weight: var(--font-poster-weight);
   font-size: 2.1rem; line-height: 0.95; letter-spacing: -0.03em; text-transform: uppercase;
   color: var(--text); margin-bottom: 1rem; background: none; border: none; padding: 0; text-align: left;
   display: flex; align-items: baseline; gap: 0.8rem; flex-wrap: wrap;
@@ -3260,14 +3265,14 @@
 .pf-usage-chip { display: inline-flex; flex-direction: row; align-items: baseline; gap: 0.5rem; padding: 0; border: 0; border-radius: 0; background: none; cursor: pointer; text-align: left; font-family: inherit; }
 .pf-usage-chip[disabled] { cursor: default; }
 .pf-usage-chip:not([disabled]):hover .pf-usage-chip-val { color: var(--accent); }
-.pf-usage-chip-val { font-family: var(--font-poster); font-weight: 400; font-size: 1.5rem; line-height: 1; color: var(--text); font-variant-numeric: tabular-nums; }
+.pf-usage-chip-val { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.5rem; line-height: 1; color: var(--text); font-variant-numeric: tabular-nums; }
 .pf-usage-chip-label { font-size: 0.74rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-dim); }
 /* Home "AI apps spend" card — 24h/7d/30d as big numerals + per-app stacked bar + top apps */
 .pf-ai-card { grid-column: 1 / -1; }
 .pf-ai-windows { display: flex; flex-wrap: wrap; gap: 2.5rem; margin: 0.4rem 0 1.4rem; }
 .pf-ai-win { display: flex; flex-direction: column; gap: 0.35rem; padding: 0; border: 0; border-radius: 0; background: none; }
 .pf-ai-win-label { order: 2; font-size: 0.74rem; font-weight: 800; color: var(--text); text-transform: uppercase; letter-spacing: 0.08em; }
-.pf-ai-win-cost { font-family: var(--font-poster); font-weight: 400; font-size: 3rem; line-height: 0.9; letter-spacing: -0.03em; color: var(--text); font-variant-numeric: tabular-nums; }
+.pf-ai-win-cost { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 3rem; line-height: 0.9; letter-spacing: -0.03em; color: var(--text); font-variant-numeric: tabular-nums; }
 .pf-ai-windows .pf-ai-win:first-child .pf-ai-win-cost { color: var(--accent); }
 .pf-ai-win-sub { order: 3; font-family: var(--font-mono); font-size: 0.74rem; color: var(--text-dim); font-variant-numeric: tabular-nums; }
 .pf-ai-chart { margin: 0.2rem 0 1rem; border-top: 3px solid var(--text); padding-top: 0.6rem; }

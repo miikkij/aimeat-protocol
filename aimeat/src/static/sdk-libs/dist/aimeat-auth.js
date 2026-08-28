@@ -290,23 +290,46 @@
     if (document.getElementById("aimeat-auth-pill-css")) return;
     var st = document.createElement("style");
     st.id = "aimeat-auth-pill-css";
+    var ink = "var(--aimeat-pill-fg,var(--text,#1A1A2E))";
+    var paper = "var(--aimeat-pill-bg,var(--bg,#FAFAF8))";
+    var font = "var(--aimeat-pill-font,var(--font-showroom-body,var(--font,system-ui,sans-serif)))";
     st.textContent = [
+      ".aimeat-auth-pill{display:inline-flex;align-items:center;gap:10px;padding:4px 11px;",
+      "border:2px solid " + ink + ";background:" + paper + ";color:" + ink + ";",
+      "border-radius:var(--aimeat-pill-radius,0);font-family:" + font + ";font-size:13px;line-height:1.4}",
+      ".aimeat-auth-dot{display:inline-block;flex:0 0 auto;width:9px;height:9px;",
+      "background:var(--aimeat-pill-live,var(--success,#10B981))}",
+      ".aimeat-auth-label{display:inline-flex;align-items:center;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}",
+      ".aimeat-auth-ghii{font-weight:800;font-size:13px;color:var(--aimeat-pill-name,var(--accent,#E8564A))}",
+      ".aimeat-auth-fed{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;letter-spacing:.04em;",
+      "padding:1px 6px;border:2px solid currentColor}",
+      ".aimeat-auth-gear{appearance:none;background:none;border:2px solid currentColor;color:inherit;border-radius:0;",
+      "padding:2px 7px;cursor:pointer;font-size:13px;line-height:1}",
+      ".aimeat-auth-logout{appearance:none;background:none;border:0;border-bottom:2px solid currentColor;border-radius:0;",
+      "padding:0 0 1px;margin:0;cursor:pointer;color:inherit;font-family:inherit;font-size:11px;font-weight:800;",
+      "letter-spacing:.04em;text-transform:uppercase;line-height:1.4}",
+      ".aimeat-auth-logout:hover,.aimeat-auth-gear:hover{color:var(--aimeat-pill-name,var(--accent,#E8564A))}",
+      /* Signed out: the cluster beside one ink slab with the sun's offset shadow. */
+      ".aimeat-auth-out{display:inline-flex;align-items:center;gap:10px;color:" + ink + "}",
+      ".aimeat-sign-btn{appearance:none;padding:8px 16px;background:var(--aimeat-pill-cta-bg," + ink + ");",
+      "color:var(--aimeat-pill-cta-fg," + paper + ");border:0;border-radius:var(--aimeat-pill-radius,0);cursor:pointer;",
+      "font-family:" + font + ";font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;line-height:1.4;",
+      "box-shadow:4px 4px 0 var(--aimeat-pill-cta-shadow,var(--sun,#FFB52E));transition:transform .12s,box-shadow .12s}",
+      ".aimeat-sign-btn:hover{transform:translate(2px,2px);box-shadow:2px 2px 0 var(--aimeat-pill-cta-shadow,var(--sun,#FFB52E))}",
+      /* Compact: the account button, and the pill as its popover. */
       ".aimeat-auth-wrap{position:relative;display:inline-flex;align-items:center}",
       ".aimeat-auth-compact{display:none;align-items:center;gap:7px;padding:5px 11px 5px 9px;cursor:pointer;",
-      "background:linear-gradient(160deg,#3d2e1a 0%,#6b4c2a 15%,#c9a84c 30%,#f5e6a3 45%,#c9a84c 55%,#8b6914 70%,#4a3520 100%);",
-      "border:1px solid rgba(201,168,76,.6);border-top-color:rgba(245,230,163,.5);border-bottom-color:rgba(75,53,32,.8);",
-      "border-radius:10px;box-shadow:0 1px 0 rgba(245,230,163,.3) inset,0 -1px 0 rgba(75,53,32,.5) inset,0 3px 10px rgba(0,0,0,.4);",
-      "font-family:system-ui;font-size:13px;color:#2a1800;text-shadow:0 1px 0 rgba(245,230,163,.5)}",
-      ".aimeat-auth-compact .cdot{width:8px;height:8px;border-radius:50%;flex:0 0 auto;",
-      "background:radial-gradient(circle at 35% 35%,#b0ffc8,#00c853 40%,#00802e 80%,#003d15);box-shadow:0 0 5px rgba(0,200,83,.6)}",
+      "background:" + paper + ";color:" + ink + ";border:2px solid " + ink + ";border-radius:var(--aimeat-pill-radius,0);",
+      "font-family:" + font + ";font-size:13px}",
+      ".aimeat-auth-compact .cdot{width:8px;height:8px;flex:0 0 auto;background:var(--aimeat-pill-live,var(--success,#10B981))}",
       ".aimeat-auth-compact .cini{font-weight:800;letter-spacing:.3px;max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
       ".aimeat-auth-compact .ccar{font-size:9px;opacity:.75;transition:transform .18s}",
       ".aimeat-auth-wrap.aimeat-open .aimeat-auth-compact .ccar{transform:rotate(180deg)}",
       "@media (max-width:600px){",
       ".aimeat-auth-compact{display:inline-flex}",
       ".aimeat-auth-wrap>.aimeat-auth-pill{position:absolute;top:calc(100% + 8px);right:0;z-index:1000;",
-      "display:none!important;flex-wrap:wrap!important;justify-content:flex-start;row-gap:9px;",
-      "min-width:210px;max-width:calc(100vw - 24px)}",
+      "display:none!important;flex-wrap:wrap!important;justify-content:flex-start;row-gap:9px;padding:10px 12px;",
+      "min-width:210px;max-width:calc(100vw - 24px);box-shadow:6px 6px 0 var(--aimeat-pill-cta-shadow,var(--sun,#FFB52E))}",
       ".aimeat-auth-wrap.aimeat-open>.aimeat-auth-pill{display:flex!important}",
       "}"
     ].join("");
@@ -884,9 +907,9 @@
       /* The cluster row. Inherits text colour from its host (gold pill or page header). */
       ".aimeat-ctl{display:inline-flex;align-items:center;gap:6px}",
       /* Segmented group: one bordered pill, every option a button. */
-      ".aimeat-seg{display:inline-flex;align-items:stretch;height:30px;flex:0 0 auto;",
-      "border:1px solid color-mix(in oklab,currentColor 38%,transparent);border-radius:999px;",
-      "overflow:hidden;background:color-mix(in oklab,currentColor 5%,transparent)}",
+      ".aimeat-seg{display:inline-flex;align-items:stretch;height:26px;flex:0 0 auto;",
+      "border:2px solid currentColor;border-radius:var(--aimeat-pill-radius,0);",
+      "overflow:hidden;background:transparent}",
       ".aimeat-seg button{appearance:none;border:0;background:transparent;color:currentColor;",
       'opacity:.6;font:700 11px/1 "Inter","Segoe UI",system-ui,sans-serif;letter-spacing:.4px;',
       "padding:0 10px;margin:0;cursor:pointer;display:inline-flex;align-items:center;gap:4px;",
@@ -894,14 +917,14 @@
       ".aimeat-seg button:hover{opacity:.9}",
       ".aimeat-seg button:focus-visible{outline:2px solid currentColor;outline-offset:-2px;opacity:1}",
       '.aimeat-seg button[aria-pressed="true"]{opacity:1;',
-      "background:color-mix(in oklab,currentColor 16%,transparent)}",
-      ".aimeat-seg button+button{border-left:1px solid color-mix(in oklab,currentColor 22%,transparent)}",
+      "background:var(--aimeat-pill-fg,var(--text,#1A1A2E));color:var(--aimeat-pill-bg,var(--bg,#FAFAF8))}",
+      ".aimeat-seg button+button{border-left:0}",
       ".aimeat-seg .seg-ico{font-size:13px;line-height:1}",
       /* Popover trigger (palette picker; language picker when 4+ languages). */
       ".aimeat-pop-wrap{position:relative;display:inline-flex;flex:0 0 auto}",
       ".aimeat-pop-btn{appearance:none;display:inline-flex;align-items:center;justify-content:center;",
-      "gap:5px;height:30px;min-width:30px;padding:0 7px;background:color-mix(in oklab,currentColor 5%,transparent);",
-      "border:1px solid color-mix(in oklab,currentColor 38%,transparent);border-radius:999px;",
+      "gap:5px;height:26px;min-width:26px;padding:0 6px;background:transparent;",
+      "border:2px solid currentColor;border-radius:var(--aimeat-pill-radius,0);",
       'cursor:pointer;color:currentColor;font:700 11px/1 "Inter","Segoe UI",system-ui,sans-serif;letter-spacing:.4px;',
       "transition:background var(--motion-fast,120ms) ease}",
       ".aimeat-pop-btn:hover{background:color-mix(in oklab,currentColor 12%,transparent)}",
@@ -1282,9 +1305,9 @@
       i = Object.assign({}, pillStrings(aimeatReadLang(locales.length ? locales : ["en"])), opts.i18n);
       const stored = auth2.getSession() || load("session");
       if (stored) {
-        var pillHtml = '<div class="aimeat-auth-pill" style="display:inline-flex;align-items:center;gap:10px;padding:8px 18px;background:linear-gradient(160deg,#3d2e1a 0%,#6b4c2a 15%,#c9a84c 30%,#f5e6a3 45%,#c9a84c 55%,#8b6914 70%,#4a3520 100%);border:1px solid rgba(201,168,76,.6);border-top-color:rgba(245,230,163,.5);border-bottom-color:rgba(75,53,32,.8);border-radius:10px;box-shadow:0 1px 0 rgba(245,230,163,.3) inset,0 -1px 0 rgba(75,53,32,.5) inset,0 3px 10px rgba(0,0,0,.4),0 0 20px rgba(201,168,76,.15);font-family:system-ui;font-size:14px"><span class="aimeat-auth-dot" style="display:inline-block;flex:0 0 auto;width:9px;height:9px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#b0ffc8,#00c853 40%,#00802e 80%,#003d15);box-shadow:0 0 5px rgba(0,200,83,.7),0 0 12px rgba(0,200,83,.3),inset 0 -1px 2px rgba(0,0,0,.3)"></span><span class="aimeat-auth-label" style="display:inline-flex;align-items:center;font-size:12px;font-weight:600;letter-spacing:.5px;color:#a0ffb8;text-shadow:0 0 4px rgba(0,210,80,.6),0 0 10px rgba(0,180,70,.3)">' + escHtml(i.loggedIn || "logged in") + '</span><span class="aimeat-auth-ghii" style="color:rgba(90,65,20,.7);font-weight:700;letter-spacing:.5px;font-size:13px;text-shadow:0 1px 0 rgba(245,230,163,.6),0 -1px 0 rgba(50,35,10,.3);-webkit-text-stroke:.2px rgba(120,85,20,.3)">' + escHtml(stored.displayName || stored.ghii || stored.owner) + "</span>" + (stored.federated ? '<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;letter-spacing:.5px;color:#7dd3fc;background:rgba(56,189,248,.15);padding:2px 6px;border-radius:4px;border:1px solid rgba(56,189,248,.3)">🌐 ' + escHtml(i.federated || "Federated") + "</span>" : "") + (stored._appOrigin && stored._app && !stored._own ? '<button id="aimeat-grant-gear" title="' + escHtml(i.manageAccess || "Manage permissions") + '" aria-label="' + escHtml(i.manageAccess || "Manage permissions") + '" style="background:rgba(90,65,20,.18);color:#5a4114;border:1px solid rgba(120,85,20,.35);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:13px;line-height:1">⚙️</button>' : "") + '<span class="aimeat-ctl">' + langSwitchHtml(i, locales) + modeSwitchHtml(i) + paletteControlHtml(i) + '</span><button id="aimeat-logout-btn" class="aimeat-auth-logout" style="background:radial-gradient(ellipse at 50% 30%,#ff6b6b 0%,#dc2626 35%,#991b1b 70%,#7f1d1d 100%);color:#ffd7d7;border:1px solid rgba(220,38,38,.6);border-top-color:rgba(255,130,130,.4);border-bottom-color:rgba(100,20,20,.8);border-radius:6px;padding:3px 10px;cursor:pointer;font-size:11px;font-weight:700;letter-spacing:.3px;box-shadow:0 1px 0 rgba(255,140,140,.25) inset,0 -1px 0 rgba(80,10,10,.4) inset,0 2px 6px rgba(153,27,27,.5);text-shadow:0 1px 1px rgba(0,0,0,.4)">' + escHtml(i.logoutBtn || "Logout") + "</button></div>";
+        var pillHtml = '<div class="aimeat-auth-pill"><span class="aimeat-auth-dot" aria-hidden="true"></span><span class="aimeat-auth-label">' + escHtml(i.loggedIn || "logged in") + '</span><span class="aimeat-auth-ghii">' + escHtml(stored.displayName || stored.ghii || stored.owner) + "</span>" + (stored.federated ? '<span class="aimeat-auth-fed">🌐 ' + escHtml(i.federated || "Federated") + "</span>" : "") + (stored._appOrigin && stored._app && !stored._own ? '<button id="aimeat-grant-gear" class="aimeat-auth-gear" title="' + escHtml(i.manageAccess || "Manage permissions") + '" aria-label="' + escHtml(i.manageAccess || "Manage permissions") + '">⚙️</button>' : "") + '<span class="aimeat-ctl">' + langSwitchHtml(i, locales) + modeSwitchHtml(i) + paletteControlHtml(i) + '</span><button id="aimeat-logout-btn" class="aimeat-auth-logout">' + escHtml(i.logoutBtn || "Logout") + "</button></div>";
+        ensureAuthPillStyles();
         if (useCompact) {
-          ensureAuthPillStyles();
           var ini = pillInitials(stored.displayName || stored.ghii || stored.owner);
           container.innerHTML = '<div class="aimeat-auth-wrap"><button class="aimeat-auth-compact" id="aimeat-auth-compact" aria-haspopup="true" aria-expanded="false" aria-label="' + escHtml(i.account || "Account") + '"><span class="cdot" aria-hidden="true"></span><span class="cini">' + escHtml(ini) + '</span><span class="ccar" aria-hidden="true">▾</span></button>' + pillHtml + "</div>";
         } else {
@@ -1309,7 +1332,8 @@
           compactBtn.setAttribute("aria-expanded", open ? "true" : "false");
         });
       } else {
-        container.innerHTML = '<style>.aimeat-sign-btn{padding:8px 18px;background:linear-gradient(160deg,#3d2e1a 0%,#6b4c2a 15%,#c9a84c 30%,#f5e6a3 45%,#c9a84c 55%,#8b6914 70%,#4a3520 100%);color:#2a1800;border:1px solid rgba(201,168,76,.6);border-top-color:rgba(245,230,163,.5);border-bottom-color:rgba(75,53,32,.8);border-radius:10px;cursor:pointer;font-weight:800;font-family:system-ui;font-size:14px;letter-spacing:.3px;box-shadow:0 1px 0 rgba(245,230,163,.3) inset,0 -1px 0 rgba(75,53,32,.5) inset,0 3px 10px rgba(0,0,0,.4),0 0 20px rgba(201,168,76,.15);text-shadow:0 1px 0 rgba(245,230,163,.5);transition:transform .15s,box-shadow .15s}.aimeat-sign-btn:hover{transform:translateY(-1px);box-shadow:0 1px 0 rgba(245,230,163,.3) inset,0 -1px 0 rgba(75,53,32,.5) inset,0 5px 16px rgba(0,0,0,.5),0 0 30px rgba(201,168,76,.3)}</style><span style="display:inline-flex;align-items:center;gap:10px"><span class="aimeat-ctl">' + langSwitchHtml(i, locales) + modeSwitchHtml(i) + paletteControlHtml(i) + '</span><button id="aimeat-login-btn" class="aimeat-sign-btn">' + (opts.buttonText || i.signInBtn || "❤️ Sign In") + "</button></span>";
+        ensureAuthPillStyles();
+        container.innerHTML = '<span class="aimeat-auth-out"><span class="aimeat-ctl">' + langSwitchHtml(i, locales) + modeSwitchHtml(i) + paletteControlHtml(i) + '</span><button id="aimeat-login-btn" class="aimeat-sign-btn">' + (opts.buttonText || i.signInBtn || "❤️ Sign In") + "</button></span>";
         document.getElementById("aimeat-login-btn").addEventListener("click", () => {
           if (isAppOrigin()) {
             restoreSessionFromAppOrigin(true).then((s) => {

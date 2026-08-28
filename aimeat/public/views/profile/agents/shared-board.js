@@ -9,6 +9,8 @@
  *   an "ID card" face (renderIdCard): full GAII with its expansion, issued date, last seen,
  *   task/message tallies, trust + morsels — teaching display-name-vs-GAII at a glance.
  * @version-history
+ *   v3.2.1 -- 2026-08-29 -- The board card name takes its colour from --agd-state in the stylesheet
+ *     instead of an inline style, so a skin can decide (the poster skin keeps names in ink).
  *   v3.2.0 -- 2026-08-09 -- Buckets and sort order come from the server verdict. The local
  *     BUCKET_OF map had no `system` key, so `|| 'quiet'` filed every internal agent under quiet
  *     on the one surface meant to be read at a glance; there is now an `internal` pill.
@@ -109,7 +111,7 @@ export default function SharedBoard({ agents, onboardings, onAgentClick }) {
               onKeyDown=${(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onAgentClick?.(agent.name); } }}
             >
               <div class="pf-agd-board-card-face">
-                <div class="pf-agd-board-card-name" style="color: ${color}">${agent.display_name || agent.name}</div>
+                <div class="pf-agd-board-card-name">${agent.display_name || agent.name}</div>
                 <div class="pf-agd-board-card-activity">
                   ${glanceFigure(state, agent, onboarding)}
                 </div>
