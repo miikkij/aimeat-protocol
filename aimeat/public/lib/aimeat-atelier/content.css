@@ -12,6 +12,8 @@
  * @structure ak-list · ak-listdetail · ak-grid + ak-card · ak-mediacard · ak-timeline
  * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
  * @version-history
+ *   v0.9.0 — 2026-08-29 — THE THINGS THAT OPEN: the dialog department (modal, sheet, actions
+ *     row, backdrop), the drawer that slides from an edge, and the reveal fan.
  *   v0.8.0 — 2026-08-28 — The volume rule freed: the tilt becomes a hover/focus/current
  *     greeting (straight at rest, smooth lift), the monogram grounds go to real spectrum
  *     chroma with a light pop, and the letter wears the brand gradient cut into the glyph.
@@ -435,3 +437,138 @@ button.ak-card:hover { box-shadow: var(--ak-elev-2); transform: translateY(-2px)
   box-shadow: var(--ak-elev-1);
 }
 .ak-waveform__svg { display: block; width: 100%; height: 96px; }
+
+/* ── The dialog department: modal, sheet, and the drawer that slides ──────────────────────── */
+.ak-dialog, .ak-drawer { border: 0; padding: 0; background: none; max-width: none; max-height: none; }
+.ak-dialog::backdrop, .ak-drawer::backdrop {
+  background: color-mix(in oklab, var(--ak-ink) 55%, transparent);
+  backdrop-filter: blur(var(--ak-blur));
+}
+.ak-dialog {
+  margin: auto;
+  width: min(34rem, calc(100vw - 2 * var(--ak-pad)));
+}
+.ak-dialog--bottom {
+  margin: auto auto 0;
+  width: min(42rem, 100vw);
+  max-height: 88dvh;
+}
+.ak-dialog__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ak-pad);
+  padding: var(--ak-pad);
+  border-radius: var(--ak-radius);
+  background: var(--ak-surface);
+  background-image: var(--ak-surface-image);
+  border: var(--ak-line-w) solid var(--ak-line);
+  box-shadow: var(--ak-elev-2);
+  color: var(--ak-ink);
+}
+.ak-dialog--bottom .ak-dialog__panel {
+  border-radius: var(--ak-radius) var(--ak-radius) 0 0;
+  padding-bottom: max(var(--ak-pad), env(safe-area-inset-bottom));
+}
+.ak-dialog__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.ak-dialog__title { margin: 0; font-family: var(--ak-font-display); font-size: var(--ak-text-title); }
+.ak-dialog__x { min-width: var(--ak-touch); min-height: var(--ak-touch); }
+.ak-dialog__body { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+.ak-dialog__text { margin: 0; color: var(--ak-ink-dim); }
+.ak-dialog__field { width: 100%; }
+.ak-dialog__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+
+.ak-drawer { margin: 0; height: 100dvh; max-height: 100dvh; width: 100vw; }
+.ak-drawer--bottom { height: auto; margin-top: auto; }
+.ak-drawer__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: min(20rem, 86vw);
+  height: 100dvh;
+  padding: var(--ak-pad);
+  background: var(--ak-surface);
+  background-image: var(--ak-surface-image);
+  border-right: var(--ak-line-w) solid var(--ak-line);
+  box-shadow: var(--ak-elev-2);
+  overflow-y: auto;
+  color: var(--ak-ink);
+}
+.ak-drawer--right .ak-drawer__panel {
+  margin-left: auto;
+  border-right: 0;
+  border-left: var(--ak-line-w) solid var(--ak-line);
+}
+.ak-drawer--bottom .ak-drawer__panel {
+  width: 100vw;
+  height: auto;
+  max-height: 80dvh;
+  border: 0;
+  border-top: var(--ak-line-w) solid var(--ak-line);
+  border-radius: var(--ak-radius) var(--ak-radius) 0 0;
+  padding-bottom: max(var(--ak-pad), env(safe-area-inset-bottom));
+}
+.ak-drawer__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ak-drawer__title { font-family: var(--ak-font-display); font-weight: 650; }
+.ak-drawer__x { min-width: var(--ak-touch); min-height: var(--ak-touch); }
+.ak-drawer__list { display: flex; flex-direction: column; gap: 2px; }
+.ak-drawer__item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-height: var(--ak-touch);
+  padding: 10px var(--ak-pad);
+  border: 0;
+  border-radius: var(--ak-radius-sm);
+  background: none;
+  color: var(--ak-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--ak-motion) var(--ak-ease);
+}
+.ak-drawer__item:hover { background: var(--ak-surface-2); }
+.ak-drawer__item[aria-current] {
+  background: color-mix(in oklab, var(--ak-accent) 12%, var(--ak-surface));
+  color: var(--ak-accent-text);
+}
+.ak-drawer__sub { font-size: var(--ak-text-fine); color: var(--ak-ink-dim); }
+.ak-drawer__body { padding-top: 4px; }
+
+/* ── Reveal: the fan of panels ────────────────────────────────────────────────────────────── */
+.ak-reveal { display: flex; flex-direction: column; gap: 6px; }
+.ak-reveal__pane {
+  border-radius: var(--ak-radius);
+  background: var(--ak-surface);
+  background-image: var(--ak-surface-image);
+  border: var(--ak-line-w) solid var(--ak-line);
+  overflow: hidden;
+}
+.ak-reveal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: var(--ak-touch);
+  padding: 12px var(--ak-pad);
+  border: 0;
+  background: none;
+  color: var(--ak-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ak-reveal__titles { display: flex; flex-direction: column; gap: 1px; }
+.ak-reveal__title { font-weight: 650; }
+.ak-reveal__sub { font-size: var(--ak-text-fine); color: var(--ak-ink-dim); }
+.ak-reveal__chevron {
+  color: var(--ak-accent-text);
+  transition: transform var(--ak-motion) var(--ak-ease);
+}
+.ak-reveal__head[aria-expanded='true'] .ak-reveal__chevron { transform: rotate(180deg); }
+.ak-reveal__panel { overflow: hidden; }
+.ak-reveal__inner { padding: 0 var(--ak-pad) var(--ak-pad); }
+.ak-reveal__text { margin: 0; color: var(--ak-ink-dim); }
+@media (prefers-reduced-motion: reduce) {
+  .ak-reveal__chevron { transition: none; }
+}
