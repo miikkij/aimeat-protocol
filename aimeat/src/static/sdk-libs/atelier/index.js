@@ -28,6 +28,7 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.30.0 — 2026-08-29 — The bones freed (CSS-side): press-sheet and marquee compositions.
  *   v0.29.0 — 2026-08-29 — WORLDS OWN THEIR GROUNDS (CSS-side): riso paper, terminal phosphor,
  *     stage night — literal ground pairs proven by the matrix in both modes, glass re-declared
  *     per block so chrome follows the world.
@@ -160,7 +161,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.29.0',
+  version: '0.30.0',
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,
