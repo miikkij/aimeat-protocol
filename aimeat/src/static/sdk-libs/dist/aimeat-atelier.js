@@ -2895,7 +2895,7 @@
     if (threePromise) return threePromise;
     threePromise = new Promise(function(ok, fail) {
       const s = document.createElement("script");
-      s.src = APEX_URL + "/lib/three-world@1.min.js";
+      s.src = NODE_URL + "/lib/three-world@1.min.js";
       s.onload = function() {
         ok(window.THREE);
       };
@@ -3888,7 +3888,7 @@
   var geoPromise = null;
   function ensureGeometry() {
     if (geoPromise) return geoPromise;
-    geoPromise = fetch(APEX_URL + "/lib/aimeat-atlas@1.json").then(function(res) {
+    geoPromise = fetch(NODE_URL + "/lib/aimeat-atlas@1.json").then(function(res) {
       if (!res.ok) throw new Error("atlas geometry " + res.status);
       return res.json();
     }).catch(function(err) {

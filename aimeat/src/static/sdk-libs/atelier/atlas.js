@@ -22,7 +22,7 @@
  *     a tile server).
  */
 import { el, clear, resolve, reducedMotion } from './dom.js';
-import { APEX_URL } from '../_core/config.js';
+import { NODE_URL } from '../_core/config.js';
 import { t } from './i18n.js';
 import { skeleton, emptyState } from './state.js';
 
@@ -39,7 +39,9 @@ const TONES = ['ok', 'warn', 'err'];
 let geoPromise = null;
 function ensureGeometry() {
   if (geoPromise) return geoPromise;
-  geoPromise = fetch(APEX_URL + '/lib/aimeat-atlas@1.json')
+  // NODE_URL, not APEX_URL: an app subdomain proxies this node's /lib, and a SAME-ORIGIN read
+  // needs no CORS grant — the apex fetch from an app origin was blocked by exactly that.
+  geoPromise = fetch(NODE_URL + '/lib/aimeat-atlas@1.json')
     .then(function (res) { if (!res.ok) throw new Error('atlas geometry ' + res.status); return res.json(); })
     .catch(function (err) { geoPromise = null; throw err; });
   return geoPromise;

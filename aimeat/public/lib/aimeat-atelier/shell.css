@@ -16,6 +16,9 @@
  *   ak-loading · ak-skeleton · shared primitives (ak-btn, ak-scroll, focus, ak-busy)
  * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
  * @version-history
+ *   v0.7.0 — 2026-08-29 — The figure numeral sizes against its own container (cqi), never the
+ *     viewport: an 11vw numeral in a narrow side span overflowed 30px at mid widths the
+ *     390/1280 bench never measures.
  *   v0.6.0 — 2026-08-29 — The page ground gains the GRAIN LAYER: --ak-page-grain rides over the
  *     ambient as a small repeating tile (paper for riso, phosphor for terminal), none for
  *     everyone else.
@@ -539,7 +542,10 @@
 }
 
 /* ── Figure: the data IS the hero ─────────────────────────────────────────────────────────── */
-.ak-figure { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+/* container-type: the numeral sizes against the FIGURE'S OWN width (cqi below), never the
+   viewport — an 11vw numeral inside a narrow `side` span overflowed 30px at mid widths while
+   the 390/1280 bench passed either side of it. */
+.ak-figure { display: flex; flex-direction: column; gap: 2px; min-width: 0; container-type: inline-size; }
 .ak-figure__label {
   font-family: var(--ak-font-mono);
   font-size: var(--ak-text-fine);
@@ -552,7 +558,7 @@
 .ak-figure__value {
   font-family: var(--ak-font-display);
   font-weight: var(--ak-weight-display);
-  font-size: clamp(3.4rem, 11vw, 6.8rem);
+  font-size: clamp(2.6rem, 22cqi, 6.8rem);
   line-height: 0.95;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
