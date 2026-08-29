@@ -264,6 +264,7 @@ const GOOD_LAYOUT = {
                 { id: 'where', component: 'atlas', props: { source: 'geo.regions', fit: 'world' } },
                 { id: 'split', component: 'chart', props: { source: 'money.split', kind: 'donut' } },
                 { id: 'year', component: 'chart', props: { source: 'activity.days', kind: 'calendar' } },
+                { id: 'pair', component: 'chart', props: { source: 'quality.points', kind: 'scatter' } },
             ],
         });
         assert(good.status === 200 && good.body.data.ok === true,
@@ -284,6 +285,13 @@ const GOOD_LAYOUT = {
         });
         assert(good.status === 200 && good.body.data.ok === true,
             `a bars scene must validate: ${JSON.stringify(good.body.data)}`);
+
+        const model = await validate({
+            v: 1,
+            blocks: [{ id: 'shot', component: 'scene3d', props: { kind: 'model', source: 'product.bottle', title: 'The product' } }],
+        });
+        assert(model.status === 200 && model.body.data.ok === true,
+            `a model scene must validate: ${JSON.stringify(model.body.data)}`);
 
         const bad = await validate({
             v: 1,

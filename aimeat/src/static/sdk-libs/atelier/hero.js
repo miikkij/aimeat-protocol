@@ -175,10 +175,13 @@ function drawTrend(entry, trend) {
     entry.spark.setAttribute('class', 'ak-statrow__spark');
     entry.spark.setAttribute('viewBox', '0 0 ' + W2 + ' ' + H2);
     entry.spark.setAttribute('aria-hidden', 'true');
+    entry.spark.appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'polygon'));
     entry.spark.appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'polyline'));
     entry.tile.appendChild(entry.spark);
   }
-  entry.spark.firstChild.setAttribute('points', points);
+  // The soft ground under the line — the same fill the big charts wear.
+  entry.spark.firstChild.setAttribute('points', '0,' + H2 + ' ' + points + ' ' + W2 + ',' + H2);
+  entry.spark.lastChild.setAttribute('points', points);
 }
 
 /**
