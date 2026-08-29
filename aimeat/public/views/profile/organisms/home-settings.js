@@ -17,6 +17,7 @@
  *   import { OrganismSettings } from '/views/profile/organisms/home-settings.js';
  *   <OrganismSettings org ghii isCreator isMember canEdit showToast confirm onBack onChanged onLeave onDeleted />
  * @version-history
+ *   v1.0.1 — 2026-08-29 — The rail scrolls the content region only (poster-parts scrollTo), never the window.
  *   v1.0.0 — 2026-08-29 — Extracted from home.js and redrawn on the canvas; the type is a preset or any
  *     word of the owner's own.
  */
@@ -25,6 +26,7 @@ import { useState, useEffect, useMemo, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { scrollTo } from '/views/profile/organisms/poster-parts.js';
 import { TagInput } from '/views/profile/shared.js';
 import * as orgService from '/js/services/organisms.js';
 import { copyToClipboard } from '/js/utils.js';
@@ -286,10 +288,10 @@ export function OrganismSettings({ org, isCreator, isMember, canEdit, showToast,
         <nav class="og-rail" aria-label=${t('organisms.settings') || 'Settings'}>
           <span class="og-rail-label">${t('organisms.settings') || 'Settings'}</span>
           ${canEdit ? html`
-            <a class="og-rail-link on" href="#og-set-name" onClick=${(e) => { e.preventDefault(); document.getElementById('og-set-name')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}><i>01</i>${label('setNameDesc', 'Name and description')}</a>
-            <a class="og-rail-link" href="#og-set-access" onClick=${(e) => { e.preventDefault(); document.getElementById('og-set-access')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}><i>02</i>${label('setAccess', 'Who gets in')}</a>
-            <a class="og-rail-link" href="#og-set-vis" onClick=${(e) => { e.preventDefault(); document.getElementById('og-set-vis')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}><i>03</i>${label('setVisibility', 'Who sees')}</a>
-            <a class="og-rail-link" href="#og-set-danger" onClick=${(e) => { e.preventDefault(); document.getElementById('og-set-danger')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}><i>04</i>${label('setDanger', 'Archive and delete')}</a>
+            <a class="og-rail-link on" href="#og-set-name" onClick=${(e) => { e.preventDefault(); scrollTo('og-set-name'); }}><i>01</i>${label('setNameDesc', 'Name and description')}</a>
+            <a class="og-rail-link" href="#og-set-access" onClick=${(e) => { e.preventDefault(); scrollTo('og-set-access'); }}><i>02</i>${label('setAccess', 'Who gets in')}</a>
+            <a class="og-rail-link" href="#og-set-vis" onClick=${(e) => { e.preventDefault(); scrollTo('og-set-vis'); }}><i>03</i>${label('setVisibility', 'Who sees')}</a>
+            <a class="og-rail-link" href="#og-set-danger" onClick=${(e) => { e.preventDefault(); scrollTo('og-set-danger'); }}><i>04</i>${label('setDanger', 'Archive and delete')}</a>
             <hr />` : null}
           <button type="button" class="og-rail-link" onClick=${leave}><i>←</i>${label('backToOrganism', 'Back to the organism')}</button>
         </nav>
