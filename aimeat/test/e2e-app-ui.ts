@@ -185,6 +185,24 @@ const GOOD_LAYOUT = {
             `other colour tokens refuse pointing at the pair door: ${other.body.data.message}`);
     });
 
+    await test('a DIALOG SHAPE is data: the enums validate, an invented tone is refused by name', async () => {
+        const good = await validate({
+            v: 1,
+            dialog: { title: 'Delete the draft?', tone: 'danger', size: 'compact', from: 'center' },
+            blocks: [{ id: 'what', component: 'section', props: { title: 'Twelve rows go' } }],
+        });
+        assert(good.status === 200 && good.body.data.ok === true,
+            `a dialog shape must validate: ${JSON.stringify(good.body.data)}`);
+
+        const bad = await validate({
+            v: 1, dialog: { title: 'Hm', tone: 'screaming' },
+            blocks: [{ id: 'a', component: 'list', props: { source: 'x' } }],
+        });
+        assert(bad.body.data.ok === false && /dialog tone/.test(bad.body.data.message)
+            && /celebrate/.test(bad.body.data.message),
+        `an invented tone is refused naming the real ones: ${bad.body.data.message}`);
+    });
+
     await test('an unknown component is refused with the NEAREST real name suggested', async () => {
         const r = await validate({ v: 1, blocks: [{ id: 'g', component: 'cardgird' }] });
         assert(r.status === 200 && r.body.data.ok === false, `expected an ok:false result, got ${r.status}`);
