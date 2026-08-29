@@ -29,7 +29,7 @@ import { monetizeAddTool, monetizeEditTool, monetizeCancelEdit, monetizeSaveTool
   odpsGenerateSampleUi, odpsUseMeasuredUi } from './monetize.js';
 import { seoToggle, seoSave, seoToggleEditor } from './seo.js';
 import { marksToggle, marksDeclare, marksWithdraw } from './marks.js';
-import { legalEdit, legalCancel, legalSave, legalRemove, legalFormatHint, auditMore } from './legal.js';
+import { legalEdit, legalCancel, legalSave, legalRemove, legalFormatHint, legalScrollTo, auditMore } from './legal.js';
 import { loadCortexExtensions, showCortexPopup, cortexCopy, getCortexOwnerToken, openCortexEditor, cortexEditorAddLib, cortexEditorSave, cortexEditorExport, closeCortexEditor, openPromptBuilder, closePbPanel, buildPromptFromBuilder, updatePbPreview } from './cortex.js';
 import { initSettings, applyTheme, updateThemeToggle, toggleTheme, getThemePref, openSettings, saveSettings, syncConfigToServer, loadConfigFromServer, closeSettings, openHelp, closeHelp } from './settings.js';
 import { initAppsIo, setEditingAppId, showModal, requireSignInThen, prefillFromHtml, closeModal, switchTab, handleFileDrop, handleSave } from './apps-io.js';
@@ -164,6 +164,7 @@ import { toggleFavorite } from './favorites.js';
     legalSave: legalSave,
     legalRemove: legalRemove,
     legalFormatHint: legalFormatHint,
+    legalScrollTo: legalScrollTo,
     auditMore: auditMore,
     monetizeAddTool: monetizeAddTool,
     monetizeEditTool: monetizeEditTool,

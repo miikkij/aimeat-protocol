@@ -68,7 +68,7 @@ import { monetizeSectionInner, monetizeOnOpen, odpsSectionInner } from './moneti
 import { costSectionInner, costOnOpen } from './cost.js';
 import { seoSectionInner, seoOnOpen } from './seo.js';
 import { marksSectionInner, marksOnOpen } from './marks.js';
-import { legalSectionInner, auditSectionInner, legalOnOpen } from './legal.js';
+import { legalSectionInner, auditSectionInner, legalOnOpen, legalChipHtml } from './legal.js';
 import { appManifestAgents } from './app-agents.js';
 import { isFavorite } from './favorites.js';
 import { saveWorkingCopy, loadCheckpoints, getCheckpoints, readCheckpoint, deleteCheckpoint, discardWorkingCopy, getDraft } from './workcopy.js';
@@ -717,6 +717,8 @@ function renderDetailView() {
   var draftWaits = !!(svrFacts && svrFacts.hasDraft) || wcState !== 'clean';
   if (draftWaits) chips += '<span class="dtl-chip dtl-chip--hot">■ ' + escapeHtml(t('detail.draftWaiting')) + '</span>';
   if (favRef && isFavorite(favRef)) chips += '<span class="dtl-chip">★ ' + escapeHtml(t('detail.favBadge')) + '</span>';
+  // "N legal pages still to write" — legal.js knows; empty until its load has answered.
+  chips += legalChipHtml();
   var mastParts = [];
   if (heroOwner && app.publishedFilename) mastParts.push(heroOwner + ' / ' + app.publishedFilename);
   if (svrFacts && svrFacts.category) mastParts.push(svrFacts.category);
