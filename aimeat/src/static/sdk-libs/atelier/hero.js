@@ -29,7 +29,7 @@
  *     pseudo cannot sit between another pseudo and the children, a child can.
  *   v0.1.0 — 2026-08-27 — Initial (TARGET-074 phase 1, slice 1).
  */
-import { el, clear, resolve, uid, enter, countUp } from './dom.js';
+import { el, clear, resolve, uid, enter, kinetic, countUp } from './dom.js';
 import { i18n } from './i18n.js';
 
 /**
@@ -118,6 +118,9 @@ export function hero(spec) {
   }
   render();
   enter(inner);
+  // The look decides whether this masthead arrives one letter at a time (--ak-kinetic). It must
+  // run after the hero is in the document, or the computed style has no look to read.
+  requestAnimationFrame(function () { kinetic(title); });
 
   return {
     el: root,
