@@ -10,6 +10,12 @@
  * @structure PRIMARY_FIELD (const), Workspace
  * @usage import { Workspace } from '/views/profile/organisms/workspace.js';
  * @version-history
+ *   v2.0.0 — 2026-08-29 — The poster face (design canvas "AIMEAT Työtilan sivu", direction A). The render
+ *     is one call into workspace/cover.js: the cover with its tables, the adaptive "New for you"
+ *     section, the folds and the rail (or the tree, a home.prefs choice), and every space, panel and
+ *     the settings as a page of its own. Gone: the 21-tab block, the overview accordion, the
+ *     README/map/toc stack above every space, the group view and its scroll, the mobile inline
+ *     document. The tab state and every callback are unchanged, so the deep links still land.
  *   v1.x — 2026-07-10 — TARGET-025: Share tab gains the access-mode picker (open / password /
  *     account) + share-password set/change/clear controls (server stores only a hash; the UI sees
  *     has_password). Members' own access is never affected — the choice gates the public link only.
@@ -51,27 +57,16 @@ import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t, getLocale } from '/js/i18n.js';
-import { Spinner, KebabMenu } from '/views/profile/shared.js';
+import { Spinner } from '/views/profile/shared.js';
 import { useConfirm } from '/components/Modal.js';
-import { EmptyState } from '/components/EmptyState.js';
-import { SearchBar } from '/components/SearchBar.js';
 import * as orgService from '/js/services/organisms.js';
 import { getGhii } from '/js/services/auth.js';
 import { copyToClipboard } from '/js/utils.js';
 import { recordRecent } from '/js/recents.js';
-import { StructureOverview } from '/views/profile/organisms/widgets.js';
-import { ReadmePanel } from '/views/profile/organisms/readme-panel.js';
-import { StructureMindmap } from '/views/profile/organisms/mindmap.js';
-import { ParticipantsPanel } from '/views/profile/organisms/participants-panel.js';
-import { SourcesPanel } from '/views/profile/organisms/sources-panel.js';
-import { SkillsPanel } from '/views/profile/organisms/skills-panel.js';
+import { useHomePrefs } from '/views/surface/home-prefs.js';
 // Extracted sibling modules (relative imports — no importmap entry needed).
 import { WorkspaceGenerator } from './workspace/generator.js';
-import { renderSpaceNotice } from './workspace/helpers.js';
-import { renderDocSpace } from './workspace/doc-space.js';
-import { renderRecordSpace } from './workspace/record-space.js';
-import { renderOverview, renderObjectives, renderWsSearchResults, renderOvSection } from './workspace/overview.js';
-import { renderTabsNav, renderSpacesAdd, renderSettingsPanel, renderShareTab, renderReviewTab, renderActivityTab } from './workspace/panels.js';
+import { renderWorkspaceView } from './workspace/cover.js';
 import { buildBreadcrumb, buildWorkspaceModel } from './workspace/model.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -151,10 +146,17 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
   const [share, setShare] = useState(null);                   // { public, spaces, docs, access, has_password } — lazy-loaded when Settings opens
   const [shareBusy, setShareBusy] = useState(false);
   const [sharePw, setSharePw] = useState('');                 // share-password input (never stored beyond the PUT)
-  const [wsEvents, setWsEvents] = useState([]);               // activity events — Overview strip + per-tab unseen badges
-  const [ovOpen, setOvOpen] = useState({});                   // Overview accordion: { spaceName: bool } (mobile starts collapsed)
-  const [ovDoc, setOvDoc] = useState(null);                   // Overview inline document (mobile): { type, id, mode }
-  const [pendingScroll, setPendingScroll] = useState(null);   // a space name to scroll to inside the active stacked-group view
+  const [wsEvents, setWsEvents] = useState([]);               // activity events — the cover's strip and sections + per-space unseen marks
+  // The cover's three folds and its search row (cover.js). Closed until asked for, like the organism's.
+  const [openReadme, setOpenReadme] = useState(false);
+  const [openMap, setOpenMap] = useState(false);
+  const [openAi, setOpenAi] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  // "Show as a tree": the rail swapped for the whole structure. A personal reading choice, so it
+  // lives in the same home.prefs record as the margin pattern and follows the person to every workspace.
+  const { prefs, writePrefs } = useHomePrefs();
+  const railTree = !!prefs?.wsTree;
+  const setRailTree = (v) => writePrefs({ wsTree: !!v });
 
   // ── Unseen-change tracking: per-tab "seen" marks in localStorage (they survive sessions).
   // A tab's badge counts items changed since the tab was last opened; opening it (or changes
@@ -179,11 +181,15 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
     const me = getGhii();
     const meBare = String(me || '').split('@')[0];
     const isOwn = (e) => !e.agent && me && (e.actor === me || e.actor === meBare);
-    const match = tabId.startsWith('space:') ? (e) => e.type === tabId.slice(6)
+    // An event names its space by the manifest name in some workspaces and by the namespace in
+    // others (shared.goals for a space called goal), so a space matches on either.
+    const name = tabId.startsWith('space:') ? tabId.slice(6) : '';
+    const ns = name ? ((ws?.manifest?.objectTypes || []).find(o => o.name === name)?.namespace || '') : '';
+    const match = name ? (e) => e.type === name || (ns && e.type === ns)
       : (tabId === 'activity' ? () => true : () => false);
     const evs = wsEvents.filter(e => (e.at || '') > base && match(e) && !isOwn(e));
     return new Set(evs.map(e => (e.type || '') + ':' + (e.instance || ''))).size;
-  }, [seen, wsEvents]);
+  }, [seen, wsEvents, ws]);
 
   const load = useCallback(async () => {
     // In the archived view, request ONLY archived content (read-only); otherwise the normal active set.
@@ -320,21 +326,6 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
     const off = onLiveUpdate(['organisms'], () => { clearTimeout(timer); timer = setTimeout(() => commentsLiveRef.current(), 1500); });
     return () => { clearTimeout(timer); off(); };
   }, []);
-
-  // Clicking a single space inside a stacked group view opens that group, then scrolls to (and
-  // expands) the clicked space's section. The anchor wrapper is id="ws-sec-<name>"; a short timeout
-  // lets the group content render before we look for it.
-  useEffect(() => {
-    if (!pendingScroll || !String(tab).startsWith('group:')) return;
-    const name = pendingScroll;
-    setOvOpen(s => ({ ...s, [name]: true }));
-    const id = setTimeout(() => {
-      const el = document.getElementById('ws-sec-' + name);
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 60);
-    setPendingScroll(null);
-    return () => clearTimeout(id);
-  }, [pendingScroll, tab]);
 
   // First-ever visit: seed the seen baseline once the workspace has loaded — no badges for history.
   useEffect(() => {
@@ -680,114 +671,36 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
   const {
     allTypes, isDocSpace, draftsFor, objectsFor, mergedDocs, mergedRecords, docTypes,
     patchShare, isDocPublic, anythingPublic, instanceTitle, spaceDesc, groups,
-    activeTab, activeSpace, activeGroup, pickTab, openGroup, scrollToSpace, REL_DESC, agentMenuItems,
+    activeTab, activeSpace, pickTab, REL_DESC, agentMenuItems,
   } = buildWorkspaceModel({
     ws, share, setShare, setShareBusy, orgId, wsId, showToast, tab, showSettings, approvals, wsT,
-    guardWsDirty, setShowSettings, setTab, markSeen, setPendingScroll, copyAccessPrompt, copyContractPrompt,
+    guardWsDirty, setShowSettings, setTab, markSeen, copyAccessPrompt, copyContractPrompt,
   });
 
-  // One ctx bag threaded to every extracted render function (doc-space, record-space, overview,
-  // panels). Assembled once per render; the parent still owns all hooks/state/callbacks above.
+  // One ctx bag threaded to every extracted render function (cover, doc-space, record-space,
+  // overview, panels). Assembled once per render; the parent still owns all hooks/state/callbacks above.
   const rctx = {
-    orgId, wsId, org, ws, busy, showArchived, allTypes, wsCanEdit, showToast, load,
-    activeDoc, setActiveDoc, expandedSeries, setExpandedSeries, editingSec, setEditingSec,
+    orgId, wsId, org, ws, wsName, busy, showArchived, setShowArchived, allTypes, wsCanEdit, showToast, load,
+    onBack, onBackToList, activeDoc, setActiveDoc, expandedSeries, setExpandedSeries, editingSec, setEditingSec,
     expandedRec, setExpandedRec, adding, addingId, addingSchema, addingInitial, draggedDoc,
-    sectionsByType, ovOpen, setOvOpen, ovDoc, setOvDoc, wsEvents, wsObjectives,
+    sectionsByType, wsEvents, wsObjectives, wsGraph, wsTocSeed, saveWsReadme, onWsMapNav,
+    openReadme, setOpenReadme, openMap, setOpenMap, openAi, setOpenAi, showSearch, setShowSearch, railTree, setRailTree,
     share, shareBusy, sharePw, setSharePw, gateOn, showFlow, setShowFlow, showRegenerate, setShowRegenerate,
     delConfirm, setDelConfirm, sName, setSName, sSummary, setSSummary, sAutonomy, setSAutonomy,
-    newSpaceName, setNewSpaceName, genBusy, setGenBusy, wsHits, wsSearching, setWsQuery, setWsHits,
-    wsSearchCounts, approvals, groups, activeTab, unseenOf, setShowSettings, setShowSpaces,
+    newSpaceName, setNewSpaceName, genBusy, setGenBusy, wsQuery, wsHits, wsSearching, setWsQuery, setWsHits,
+    wsSearchCounts, approvals, groups, activeTab, activeSpace, unseenOf, setShowSettings, showSpaces, setShowSpaces,
     mergedDocs, mergedRecords, itemColor, setItemColor, setRecordArchived, removeObject, moveDocToSection,
     setSecName, commitSecName, setSectionColor, addSection, removeSection, spaceDesc, wsT,
     savePage, publish, popOut, reloadComments, cKey, commentsByKey, startAdd, saveDraft, cancelForm,
-    draftsFor, objectsFor, toggleExpand, startEdit, reopen, isDocSpace, pickTab, openGroup, scrollToSpace,
+    draftsFor, objectsFor, toggleExpand, startEdit, reopen, isDocSpace, pickTab, REL_DESC, agentMenuItems,
     guardWsDirty, saveSettings, wsDirty, resetSettingsForm, removeSpaceHandler, addSpaceHandler, delWorkspace,
-    patchShare, isDocPublic, anythingPublic, docTypes, toggleGate, resolve, instanceTitle,
+    patchShare, isDocPublic, anythingPublic, docTypes, toggleGate, resolve, instanceTitle, showSettings,
   };
 
   return html`
     <div class="pj-ws">
       <${ConfirmUI} />
-      ${back}
-      <div class="pj-ws-titlerow">
-        <span class="section-title pj-ws-title">${(ws.manifest?.name || org.name || 'Workspace')}</span>
-        ${showArchived
-          ? html`<span class="pj-tab-pill" title=${t('organisms.archivedViewHint') || 'Showing archived (read-only) records — restore one with ♻️'}>${'🗄️ '}${t('organisms.archivedView') || 'Archived view'}</span>`
-          : html`<span class="badge badge-success">${(ws.manifest?.status || 'active')}</span>`}
-        <span class="pj-ws-head-actions">
-          <button class="btn-outline btn-sm ${showArchived ? 'pj-org-btn-active' : ''}" title=${t('organisms.toggleArchivedHint') || 'View/hide archived records'} onClick=${() => setShowArchived(s => !s)}>${showArchived ? `↩ ${t('organisms.viewActive') || 'Active'}` : `🗄️ ${t('organisms.viewArchived') || 'Archived'}`}</button>
-          <${KebabMenu} label=${t('organisms.forAgentsHint') || 'Copy a ready prompt that teaches an AI to use this workspace'}
-            btnClass="btn-outline btn-sm" trigger=${'🤖 ' + (t('organisms.agentAccess') || 'Agent access') + ' ▾'} items=${agentMenuItems} />
-          <button class="btn-outline btn-sm ${showSettings ? 'pj-org-btn-active' : ''}" onClick=${() => guardWsDirty(() => setShowSettings(s => !s))}>${'⚙ '}${t('organisms.settings') || 'Settings'}</button>
-        </span>
-      </div>
-      ${ws.manifest?.summary ? html`<div class="section-desc">${(ws.manifest.summary)}</div>` : null}
-
-      ${wsObjectives.length ? renderObjectives(rctx) : null}
-
-      <${ReadmePanel} markdown=${ws.readme || ''} canEdit=${wsCanEdit} kind="workspace" name=${ws.manifest?.name || 'Workspace'}
-        aiPromptSeed=${wsTocSeed} onSave=${saveWsReadme} />
-
-      <${StructureMindmap} scope="workspace" graph=${wsGraph} onNavigate=${onWsMapNav} storageKey=${'ws.' + orgId + '.' + wsId} />
-
-      <${StructureOverview} label=${t('organisms.structureOverviewWs') || 'Workspace structure — table of contents'}
-        load=${() => orgService.getWorkspaceOverview(orgId, wsId)} />
-
-      ${approvals.length > 0 && activeTab !== 'review' ? html`
-        <div class="pj-ws-banner" role="status">
-          <span class="pj-ws-banner-text">
-            <b>${(t('organisms.reviewBanner') || '{n} waiting for review').replace('{n}', String(approvals.length))}</b>
-            <span class="pj-ws-banner-sub">${t('organisms.reviewBannerSub') || 'Publishes are gated and need a human decision.'}</span>
-          </span>
-          <button class="btn-outline btn-sm" onClick=${() => setTab('review')}>${t('organisms.reviewQueue') || 'Review queue'}</button>
-        </div>` : null}
-
-      <div class="pj-ws-searchbar">
-        <${SearchBar} value=${wsQuery} onInput=${e => setWsQuery(e.target.value)}
-          placeholder=${t('search.wsPlaceholder') || 'Search this workspace…'} ariaLabel=${t('search.wsPlaceholder') || 'Search this workspace'} />
-        ${wsHits !== null ? html`<button class="btn-ghost btn-sm" onClick=${() => { setWsQuery(''); setWsHits(null); }}>${t('search.clear') || 'Clear'}</button>` : null}
-      </div>
-
-      ${renderTabsNav(rctx)}
-
-      ${showSpaces ? renderSpacesAdd(rctx) : null}
-
-      ${showSettings ? renderSettingsPanel(rctx) : null}
-
-      ${wsHits !== null ? renderWsSearchResults(rctx) : html`
-        ${REL_DESC[activeTab] ? html`<div class="section-desc pj-tab-desc">${REL_DESC[activeTab]}</div>` : null}
-
-        ${activeTab === 'overview' ? renderOverview(rctx) : null}
-
-        ${activeGroup ? html`
-          <div class="pj-ov pj-group-view">
-            <div class="pj-group-head">
-              <div class="section-title">${activeGroup.label}</div>
-              ${activeGroup.desc ? html`<div class="section-desc">${activeGroup.desc}</div>` : null}
-            </div>
-            ${activeGroup.spaces.map(ot => html`
-              <div class="pj-group-sec" id=${'ws-sec-' + ot.name} key=${'gs-' + ot.name}>${renderOvSection(rctx, ot)}</div>`)}
-            ${activeGroup.spaces.length === 0 ? html`<${EmptyState} text=${t('organisms.noneYet') || 'none yet'} />` : null}
-          </div>` : null}
-
-        ${activeSpace
-          ? (!orgService.isMemorySpace(activeSpace)
-            ? renderSpaceNotice(activeSpace)
-            : (isDocSpace(activeSpace) ? renderDocSpace(rctx, activeSpace) : renderRecordSpace(rctx, activeSpace)))
-          : null}
-      `}
-
-      ${activeTab === 'sources' ? html`<${SourcesPanel} orgId=${orgId} wsId=${wsId} showToast=${showToast} />` : null}
-
-      ${activeTab === 'skills' ? html`<${SkillsPanel} orgId=${orgId} wsId=${wsId} showToast=${showToast} />` : null}
-
-      ${activeTab === 'share' ? renderShareTab(rctx) : null}
-
-      ${activeTab === 'review' ? renderReviewTab(rctx) : null}
-
-      ${activeTab === 'activity' ? renderActivityTab(rctx) : null}
-
-      ${activeTab === 'people' ? html`<${ParticipantsPanel} orgId=${orgId} wsId=${wsId} showToast=${showToast} />` : null}
+      ${renderWorkspaceView(rctx)}
     </div>
   `;
 }

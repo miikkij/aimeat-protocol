@@ -2,15 +2,16 @@
  * @file public/views/profile/organisms/workspace/panels.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The fixed panels + chrome of the organism workspace view: the grouped tab nav, the
- *   add-document-space form, the Settings panel (manifest form, spaces, process/restructure, danger
- *   zone), the public Share tab, the Review (publish-gate + approvals) tab, and the Activity tab.
- *   Pure render functions driven by a ctx bag assembled by the parent Workspace. Extracted from
- *   workspace.js to satisfy max-file-lines with no behaviour change.
- * @structure renderTabsNav, renderSpacesAdd, renderSettingsPanel, renderShareTab, renderReviewTab,
- *   renderActivityTab
+ * @description The fixed panels of the organism workspace view: the add-document-space form, the
+ *   Settings panel (manifest form, spaces, process/restructure, danger zone), the public Share
+ *   panel, the Review (publish-gate + approvals) panel, and the Activity panel. Pure render
+ *   functions driven by a ctx bag assembled by the parent Workspace; cover.js frames each one as
+ *   a page. Extracted from workspace.js to satisfy max-file-lines with no behaviour change.
+ * @structure renderSpacesAdd, renderSettingsPanel, renderShareTab, renderReviewTab, renderActivityTab
  * @usage import { renderSettingsPanel } from '/views/profile/organisms/workspace/panels.js';
  * @version-history
+ *   v2.0.0 — 2026-08-29 — renderTabsNav removed: the cover (cover.js) replaced the 21-tab block with
+ *     tables and a rail, and a panel is a page of its own.
  *   v1.0.0 — 2026-07-13 — Extracted from workspace.js (max-file-lines)
  *   v1.1.0 — 2026-08-08 — The public-viewer share link is a shared <CopyButton> (common.copyLink + onCopied toast)
  *       instead of the ctx.copyShareLink handler.
@@ -26,44 +27,6 @@ import * as orgService from '/js/services/organisms.js';
 import { fmtDate } from '/views/profile/organisms/helpers.js';
 import { ActivityPanel } from '/views/profile/organisms/activity-panel.js';
 import { WorkspaceGenerator } from './generator.js';
-
-export function renderTabsNav(ctx) {
-  const { groups, activeTab, wsSearchCounts, unseenOf, openGroup, pickTab, scrollToSpace, guardWsDirty, setShowSettings, setShowSpaces } = ctx;
-  return html`
-    <div class="pj-org-groups" role="tablist">
-      ${groups.map(g => {
-        const stacked = g.kind === 'stacked';
-        const groupActive = activeTab === g.id;
-        // While searching, a stacked (content) group shows only the spaces that have matches.
-        const members = (wsSearchCounts && stacked) ? g.members.filter(tb => wsSearchCounts[tb.ot.name]) : g.members;
-        if (wsSearchCounts && stacked && !members.length) return null;
-        return html`
-          <div class="pj-org-group ${groupActive ? 'active' : ''}" key=${g.id}>
-            ${stacked
-              ? html`<button class="pj-org-group-cap ${groupActive ? 'active' : ''}" title=${g.desc || ''} onClick=${() => openGroup(g.id)}>
-                  ${g.label}${g.count !== null && g.count !== undefined ? html`<span class="pj-org-tab-count">${g.count}</span>` : null}
-                </button>`
-              : html`<span class="pj-org-group-cap pj-org-group-cap-static">${g.label}</span>`}
-            <div class="pj-org-group-tabs">
-              ${members.map(tb => {
-                // Related members are independent panels; a stacked member scrolls within its group.
-                const isActive = activeTab === tb.id;
-                const u = isActive ? 0 : unseenOf(tb.id);
-                const matchCount = (wsSearchCounts && stacked) ? wsSearchCounts[tb.ot.name] : null;
-                const onClick = stacked ? () => scrollToSpace(g.id, tb.ot.name) : () => pickTab(tb.id);
-                return html`
-                  <button class="pj-org-tab ${isActive ? 'active' : ''}" role="tab" aria-selected=${isActive} key=${tb.id} onClick=${onClick}>
-                    ${(tb.label)}${matchCount != null ? html`<span class="pj-org-tab-count pj-org-tab-match">${matchCount}</span>`
-                      : (tb.count !== null && tb.count !== undefined ? html`<span class="pj-org-tab-count">${tb.count}</span>` : null)}
-                    ${u > 0 ? html`<span class="pj-org-tab-unseen" title=${t('organisms.unseenHint') || 'Changed since your last visit'}>${u}</span>` : null}
-                  </button>`;
-              })}
-            </div>
-          </div>`;
-      })}
-      <button class="pj-org-tab pj-ws-tab-add" title=${t('organisms.addDocSpaceTitle') || 'Add a document space'} onClick=${() => guardWsDirty(() => { setShowSettings(false); setShowSpaces(s => !s); })}>+</button>
-    </div>`;
-}
 
 export function renderSpacesAdd(ctx) {
   const { newSpaceName, setNewSpaceName, addSpaceHandler, busy, setShowSpaces } = ctx;

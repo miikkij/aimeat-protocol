@@ -2,15 +2,15 @@
  * @file public/views/profile/organisms/workspace/overview.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The organism-workspace Overview landing (the whole workspace on one vertical scroll —
- *   a "what happened here" strip, then every manifest space as its own stacked section), the
- *   measurability Objectives card, the in-workspace search results, and the jump handlers that route
- *   an event/hit/row to its space tab. Pure render functions driven by a ctx bag assembled by the
- *   parent Workspace. Extracted from workspace.js to satisfy max-file-lines with no behaviour change.
- * @structure gotoEvent, openOvRec, gotoHit, renderWsSearchResults, openOvDoc, ovAddNew,
- *   renderOvDocInline, renderOvSection, renderObjectives, renderOverview
- * @usage import { renderOverview, renderOvSection } from '/views/profile/organisms/workspace/overview.js';
+ * @description The workspace's jump handlers (an event, a search hit or a row to its space page),
+ *   the measurability Objectives card and the in-workspace search results. Pure render functions
+ *   driven by a ctx bag assembled by the parent Workspace. The Overview landing that used to live
+ *   here (the accordion of every space) became the cover's tables in cover.js.
+ * @structure gotoEvent, openOvRec, gotoHit, renderWsSearchResults, openOvDoc, ovAddNew, renderObjectives
+ * @usage import { gotoEvent, renderObjectives } from '/views/profile/organisms/workspace/overview.js';
  * @version-history
+ *   v2.0.0 — 2026-08-29 — renderOverview, renderOvSection and the mobile inline document removed with
+ *     the tab block; a document opens on its space page on every screen size.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 3: the AI-transparency chip on every record and document
  *     row here, from the shared /components/ai-label.js. This landing view — not the per-space tab —
  *     is where a reader first meets a record, so a label only on the tab would be one most people
@@ -23,12 +23,8 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { Spinner } from '/views/profile/shared.js';
 import { EmptyState } from '/components/EmptyState.js';
-import { AiLabel } from '/components/ai-label.js';
 import * as orgService from '/js/services/organisms.js';
-import { relTime } from '/views/profile/organisms/helpers.js';
-import { DocumentView, DocumentEditor } from '/views/profile/organisms/document.js';
-import { WorkspaceApps } from '/views/profile/organisms/workspace-apps.js';
-import { cap, isMobileView, groupDocs, firstLine, shortActor, kpiMeets, kpiTargetText, PRIMARY_FIELD } from './helpers.js';
+import { cap, kpiMeets, kpiTargetText } from './helpers.js';
 
 // Strip event → jump straight to the changed item in its space tab.
 export function gotoEvent(ctx, e) {
@@ -71,109 +67,16 @@ export function renderWsSearchResults(ctx) {
       </div>`)}
   </div>`;
 }
-// A document opens in its space tab on desktop; on mobile it expands INLINE right here —
-// view and edit both — so no window juggling is ever needed on a phone.
+// A document opens on its space page.
 export function openOvDoc(ctx, ot, d) {
-  const { setOvDoc, setActiveDoc, pickTab } = ctx;
-  if (isMobileView()) setOvDoc(v => (v && v.type === ot.name && v.id === d.id) ? null : { type: ot.name, id: d.id, mode: 'view' });
-  else { setActiveDoc({ type: ot.name, mode: 'view', page: { id: d.id } }); pickTab('space:' + ot.name); }
+  const { setActiveDoc, pickTab } = ctx;
+  setActiveDoc({ type: ot.name, mode: 'view', page: { id: d.id } }); pickTab('space:' + ot.name);
 }
 export function ovAddNew(ctx, ot, docMode) {
   const { setActiveDoc, startAdd, pickTab } = ctx;
   if (docMode) setActiveDoc({ type: ot.name, mode: 'edit', page: { id: '', title: '', markdown: '' } });
   else startAdd(ot);
   pickTab('space:' + ot.name);
-}
-
-export function renderOvDocInline(ctx, ot, d) {
-  const { ovDoc, orgId, busy, savePage, setOvDoc, publish, mergedDocs } = ctx;
-  return ovDoc.mode === 'edit'
-    ? html`<div class="pj-ov-doc-inline"><${DocumentEditor} key=${'oved-' + d.id} orgId=${orgId} page=${d} busy=${busy}
-        onSave=${(p) => { savePage(ot, p); setOvDoc({ type: ot.name, id: d.id, mode: 'view' }); }}
-        onCancel=${() => setOvDoc({ type: ot.name, id: d.id, mode: 'view' })} /></div>`
-    : html`<div class="pj-ov-doc-inline"><${DocumentView} key=${'ovv-' + d.id} page=${d} busy=${busy}
-        onEdit=${() => setOvDoc({ type: ot.name, id: d.id, mode: 'edit' })}
-        onPublish=${() => publish(ot, d.id)}
-        onWikiLink=${(content) => {
-          const title = String(content).split('#')[0].trim();
-          const targetDoc = title && mergedDocs(ot).find(x => (x.title || '').toLowerCase() === title.toLowerCase());
-          if (targetDoc) setOvDoc({ type: ot.name, id: targetDoc.id, mode: 'view' });
-        }} /></div>`;
-}
-
-export function renderOvSection(ctx, ot) {
-  const { isDocSpace, mergedDocs, mergedRecords, wsT, pickTab, ovOpen, setOvOpen, spaceDesc, ovDoc } = ctx;
-  const memory = orgService.isMemorySpace(ot);
-  const docMode = memory && isDocSpace(ot);
-  const items = memory ? (docMode ? mergedDocs(ot) : mergedRecords(ot)) : [];
-  const label = cap(wsT('type.' + ot.name) || ot.name);
-  // A space the manifest declares but memory doesn't back → one notice row, never hidden.
-  if (!memory) return html`
-    <div class="pj-ov-row" key=${ot.name}>
-      <button class="pj-ov-name pj-ov-name-link" onClick=${() => pickTab('space:' + ot.name)}>${label}</button>
-      <span class="badge badge-warn">${String(ot.backing)}</span>
-    </div>`;
-  // Empty space → a single compact row (name + none + add), not an empty box.
-  if (items.length === 0) return html`
-    <div class="pj-ov-row" key=${ot.name}>
-      <span class="pj-ov-name">${label}</span>
-      <span class="pj-muted">${t('organisms.noneYet') || 'none yet'}</span>
-      <button class="btn-ghost btn-sm" onClick=${() => ovAddNew(ctx, ot, docMode)}>${'+ '}${docMode ? (t('organisms.newPage') || 'New document') : (t('organisms.addDraft') || 'Add draft')}</button>
-    </div>`;
-  const open = ovOpen[ot.name] ?? !isMobileView();
-  // Multi-part documents collapse into one series row here too (see groupDocs); records pass through.
-  const display = docMode ? groupDocs(items) : items.map(d => ({ single: d }));
-  const shown = display.slice(0, 5);
-  return html`
-    <div class="pj-ov-sec" key=${ot.name}>
-      <div class="pj-ov-sec-head" onClick=${() => setOvOpen(s => ({ ...s, [ot.name]: !open }))}>
-        <span class="pj-ov-chevron">${open ? '▾' : '▸'}</span>
-        <span class="pj-ov-name">${label}</span>
-        <span class="pj-org-tab-count">${items.length}</span>
-        ${docMode ? html`<span class="pj-doc-tag">${t('organisms.docs') || 'docs'}</span>` : null}
-        <span class="pj-ov-spacer"></span>
-        <button class="btn-ghost btn-sm" onClick=${(ev) => { ev.stopPropagation(); ovAddNew(ctx, ot, docMode); }}>${'+ '}${docMode ? (t('organisms.newPage') || 'New document') : (t('organisms.addDraft') || 'Add draft')}</button>
-      </div>
-      ${open ? html`
-        ${spaceDesc(ot) ? html`<div class="section-desc pj-ov-desc">${spaceDesc(ot)}</div>` : null}
-        <div class="pj-ov-items">
-          ${shown.map((g) => {
-            // A collapsed multi-part series (docMode only) → one row; clicking opens the first part
-            // in the space tab, where the full series index lives.
-            if (g.parts) return html`
-              <div class="pj-ov-doc" key=${'ser-' + g.base}>
-                <button class="pj-ov-item" onClick=${() => openOvDoc(ctx, ot, g.parts[0])}>
-                  ${g.parts.some(p => p._draft) ? html`<span class="badge badge-warn pj-mini">${t('organisms.draft') || 'draft'}</span>` : null}
-                  <span class="pj-ov-item-title">${g.base}</span>
-                  <span class="pj-org-tab-count">${g.parts.length}</span>
-                  <span class="pj-ov-preview">${firstLine(g.parts[0].markdown)}</span>
-                </button>
-              </div>`;
-            const d = g.single;
-            return docMode ? html`
-              <div class="pj-ov-doc" key=${d.id}>
-                <button class="pj-ov-item" onClick=${() => openOvDoc(ctx, ot, d)}>
-                  ${d._draft ? html`<span class="badge badge-warn pj-mini">${t('organisms.draft') || 'draft'}</span>` : null}
-                  <span class="pj-ov-item-title">${d.title || d.id}</span>
-                  <${AiLabel} record=${d._aiProvenance} variant="inline" />
-                  <span class="pj-ov-preview">${firstLine(d.markdown)}</span>
-                </button>
-                ${ovDoc && ovDoc.type === ot.name && ovDoc.id === d.id ? renderOvDocInline(ctx, ot, d) : null}
-              </div>` : html`
-              <button class="pj-ov-item" key=${d.id} onClick=${() => openOvRec(ctx, ot, d)}>
-                ${d._draft ? html`<span class="badge badge-warn pj-mini">${t('organisms.draft') || 'draft'}</span>` : null}
-                <span class="pj-ov-item-title">${String(d[PRIMARY_FIELD[ot.name] || 'title'] || d.summary || d.id || '')}</span>
-                ${/* TARGET-058: the SAME component the space tab uses. This overview is the landing
-                      view, so it is where "at first exposure" actually happens for a record — a label
-                      only on the space tab would be a label most readers never reach. */''}
-                <${AiLabel} record=${d._aiProvenance} variant="inline" />
-                ${d.status ? html`<span class="badge badge-info">${String(d.status)}</span>` : null}
-              </button>`;
-          })}
-          ${display.length > 5 ? html`
-            <button class="pj-ov-more" onClick=${() => pickTab('space:' + ot.name)}>${(t('organisms.ovShowAll') || 'Show all {n} →').replace('{n}', String(items.length))}</button>` : null}
-        </div>` : null}
-    </div>`;
 }
 
 export function renderObjectives(ctx) {
@@ -206,29 +109,5 @@ export function renderObjectives(ctx) {
               })}
             </div>` : null}
         </div>`)}
-    </div>`;
-}
-
-export function renderOverview(ctx) {
-  const { wsEvents, wsT, instanceTitle, orgId, wsId, ws, wsCanEdit, showToast, load, allTypes } = ctx;
-  const recent = wsEvents.slice(0, 8);
-  return html`
-    <div class="pj-ov">
-      ${recent.length > 0 ? html`
-        <div class="pj-ov-strip">
-          <div class="pj-ov-strip-title">${t('organisms.ovRecent') || 'What happened here'}</div>
-          ${recent.map((e, i) => html`
-            <button class="pj-ov-event" key=${i} onClick=${() => gotoEvent(ctx, e)}>
-              <span class="pj-act-dot ${e.action}"></span>
-              <span class="pj-ov-event-who">${shortActor(e.actor)}${e.agent ? html` <span class="pj-act-agent" title=${t('organisms.viaAgent') || 'via this agent'}>🤖 ${e.agent}</span>` : null}</span>
-              <span class="pj-ov-event-act">${e.action === 'publish' ? (t('organisms.publishedVerb') || 'published') : (t('organisms.editedVerb') || 'edited')}</span>
-              <span class="pj-ov-event-what">${e.mode === 'document' ? '📄' : '🗂'} ${(wsT('type.' + e.type) || e.type)}${' / '}${instanceTitle(e.type, e.instance)}</span>
-              <span class="pj-ov-event-time">${relTime(e.at)}</span>
-            </button>`)}
-        </div>` : null}
-      <${WorkspaceApps} orgId=${orgId} wsId=${wsId} apps=${ws.apps || []} canEdit=${wsCanEdit}
-        showToast=${showToast} onChanged=${load} />
-      ${allTypes.map(ot => renderOvSection(ctx, ot))}
-      ${allTypes.length === 0 ? html`<${EmptyState} text=${t('organisms.noneYet') || 'none yet'} />` : null}
     </div>`;
 }
