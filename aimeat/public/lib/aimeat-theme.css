@@ -174,8 +174,10 @@
 
   /* Surfaces. base-100 = page AND the default form-control fill, base-200 = card (elevated),
      base-300 = wells + borders. The page must be a real step off a white card, or cards and the
-     inputs daisyUI fills with base-100 vanish (the v1.0.0 lesson — see check:theme). */
-  --color-base-100: #efeee8;
+     inputs daisyUI fills with base-100 vanish (the v1.0.0 lesson — see check:theme). COOL, not
+     warm (2026-08-29): the beige #efeee8 that satisfied the same step read as weak coffee and
+     dulled the coral; this ground carries identical numbers and lets the accent sing. */
+  --color-base-100: #eaeef7;
   --color-base-200: #ffffff;
   --color-base-300: #d9dbe1;
   --color-base-content: #1a1a2e;              /* 14.7:1 on base-100, 17.1:1 on base-200 */
