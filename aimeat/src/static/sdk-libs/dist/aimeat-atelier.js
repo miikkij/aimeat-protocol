@@ -178,15 +178,56 @@
     if (dist === 0 && step === 0) return;
     const max = opts && opts.max || ENTER_MAX;
     const kids = Array.prototype.slice.call(root.children, 0, max);
+    const ease = (cs.getPropertyValue("--ak-ease") || "").trim() || "cubic-bezier(0.2, 0.7, 0.3, 1)";
     for (let i = 0; i < kids.length; i++) {
       kids[i].animate(
         [
           { opacity: 0, transform: "translateY(" + dist + "px)" },
           { opacity: 1, transform: "translateY(0)" }
         ],
-        { duration: span, delay: i * step, easing: "cubic-bezier(0.2, 0.7, 0.3, 1)", fill: "backwards" }
+        { duration: span, delay: i * step, easing: ease, fill: "backwards" }
       );
     }
+  }
+  function attention(target, kind) {
+    const node = typeof target === "string" ? document.querySelector(target) : target;
+    if (!node || reducedMotion() || typeof node.animate !== "function") return false;
+    const cs = getComputedStyle(node);
+    const span = (parseFloat(cs.getPropertyValue("--ak-motion")) || 200) * 1.6;
+    const accent = (cs.getPropertyValue("--ak-accent") || "").trim() || cs.color;
+    const gesture = kind || "pulse";
+    if (gesture === "shake") {
+      node.animate([
+        { transform: "translateX(0)" },
+        { transform: "translateX(-7px)" },
+        { transform: "translateX(7px)" },
+        { transform: "translateX(-4px)" },
+        { transform: "translateX(4px)" },
+        { transform: "translateX(0)" }
+      ], { duration: span, easing: "ease-in-out" });
+      return true;
+    }
+    if (gesture === "flash") {
+      node.animate([
+        { boxShadow: "0 0 0 0 " + accent },
+        { boxShadow: "0 0 0 12px transparent" }
+      ], { duration: span, iterations: 2, easing: "ease-out" });
+      return true;
+    }
+    if (gesture === "rise") {
+      node.animate([
+        { transform: "translateY(0) scale(1)" },
+        { transform: "translateY(-8px) scale(1.02)", offset: 0.45 },
+        { transform: "translateY(0) scale(1)" }
+      ], { duration: span, easing: "cubic-bezier(0.2, 0.7, 0.3, 1)" });
+      return true;
+    }
+    node.animate([
+      { transform: "scale(1)" },
+      { transform: "scale(1.06)", offset: 0.5 },
+      { transform: "scale(1)" }
+    ], { duration: span / 2, iterations: 2, easing: "ease-in-out" });
+    return true;
   }
   function countUp(node, from, to, opts) {
     if (!node) return;
@@ -1823,6 +1864,7 @@
       c.error.hidden = false;
       c.wrap.classList.add("ak-form__field--invalid");
       c.input.setAttribute("aria-invalid", "true");
+      attention(c.wrap, "shake");
     }
     function clearErrors() {
       for (const [, c] of controls) {
@@ -3339,7 +3381,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.23.0",
+    version: "0.24.0",
     // ── Shell and navigation ──
     app,
     section,
@@ -3404,7 +3446,8 @@
     guardButtons,
     reducedMotion,
     enter,
-    countUp
+    countUp,
+    attention
   };
   attach("atelier", atelier);
 })();
