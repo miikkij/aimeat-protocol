@@ -5,6 +5,11 @@
  * @description Profile tab for memory entries and file management — CRUD, search,
  *   visibility cycling, tag editing, sharing rules, and file upload with drag-and-drop.
  * @version-history
+ *   v3.0.0 — 2026-08-29 — The poster face (design canvas "AIMEAT Muistin sivu", direction A). The render
+ *     is one call into memory-tab/cover.js: the cover (the store in four parts, what has happened,
+ *     what is stale, who else sees), a key space and a record as pages, and the old list, discovery,
+ *     remote nodes, the collection and export/import as pages from the rail. The two tab rows and
+ *     the Entries/Files split are gone; every handler and every loader is unchanged.
  *   v2.9.0 — 2026-08-11 — Key-space sharing (./memory-tab/sharing.js): rows show which of them a
  *     group can read and offer "share this key space"; the visibility menus dropped "group".
  *   v2.8.0 — 2026-07-31 — File upload goes through the PRESIGNED path (mint URL, raw PUT) instead of
@@ -85,7 +90,6 @@ import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import * as memoryService from '/js/services/memory.js';
 import { apiGet } from '/js/api.js';
 import { listAgents } from '/js/services/agents.js';
@@ -98,10 +102,9 @@ import { listOrganisms, currentGhii } from '/js/services/organisms.js';
 import { useConfirm } from '/components/Modal.js';
 import { shortTok } from './memory-tab/helpers.js';
 import { fetchFileBytes, uploadFilesPresigned } from './memory-tab/file-helpers.js';
-import { CartTray, EditMemoryModal, FilePreviewModal } from './memory-tab/components.js';
-import { renderEntries } from './memory-tab/entries-view.js';
-import { renderFilesList } from './memory-tab/files-view.js';
-import { renderBrowsePanel, loadBrowseHome, initBrowseRemote, initDiscover, closeBrowse } from './memory-tab/browse-view.js';
+import { EditMemoryModal, FilePreviewModal } from './memory-tab/components.js';
+import { loadBrowseHome, initBrowseRemote, initDiscover, closeBrowse } from './memory-tab/browse-view.js';
+import { renderMemoryView } from './memory-tab/cover.js';
 import { swallowed } from '/js/swallowed.js';
 
 export default function MemoryTab({ session, showToast, onStats }) {
@@ -110,7 +113,6 @@ export default function MemoryTab({ session, showToast, onStats }) {
   const [memories, setMemories] = useState(null);
   const [files, setFiles] = useState(null);
   const [fileSizeLimitMb, setFileSizeLimitMb] = useState(null);   // what the NODE accepts, not a constant
-  const [memSubTab, setMemSubTab] = useState('entries');
   const [showMemForm, setShowMemForm] = useState(false);
   const [showFileForm, setShowFileForm] = useState(false);
   const [expandedMem, setExpandedMem] = useState(null);
@@ -166,6 +168,17 @@ export default function MemoryTab({ session, showToast, onStats }) {
   const [discoverSearch, setDiscoverSearch] = useState('');
   const [copyingKeys, setCopyingKeys] = useState(new Set());
   const [expandedDiscover, setExpandedDiscover] = useState(null);
+  // The poster face (memory-tab/cover.js): the cover, or one page under it. { kind: 'cover' } |
+  // { kind: 'space', id } | { kind: 'record', key } | { kind: 'page', id }. Not persisted: opening
+  // the tab shows the cover.
+  const [view, setView] = useState({ kind: 'cover' });
+  const [spaceSort, setSpaceSort] = useState('updated');   // a key space page's order
+  const [showRaw, setShowRaw] = useState(false);            // a record page: raw JSON instead of the readable form
+  const [sysOpen, setSysOpen] = useState(false);            // the bookkeeping fold on the cover
+  const [showSearch, setShowSearch] = useState(false);      // the search row under the masthead
+  const [staleAll, setStaleAll] = useState(false);          // the stale section past its first eight
+  const [moreOpen, setMoreOpen] = useState(new Set());      // the cover tables opened past their first twelve rows
+  const toggleMore = (id) => setMoreOpen(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
 
   useEffect(() => {
     if (session) loadTab();   // ONE composite call seeds all six sections (loadMemories owns later filter changes)
@@ -674,19 +687,32 @@ export default function MemoryTab({ session, showToast, onStats }) {
     } catch (e) { showToast(e.message, true); }
   }
 
-  // Three states of the same list = tabs, not inline panels with their own Cancel buttons.
+  // The public discovery and the remote-node browse keep their own loaders; a page that shows one
+  // of them starts it, and leaving the page closes it.
   const pickMainTab = (id) => {
     setMainTab(id);
     if (id === 'discover') initDiscover(ctx);
     else if (id === 'remote') { if (session.federated) loadBrowseHome(ctx); else initBrowseRemote(ctx); }
     else closeBrowse(ctx);
   };
+  const pickView = (v) => {
+    setView(v);
+    setShowRaw(false);
+    if (v.kind === 'page' && (v.id === 'discover' || v.id === 'remote')) pickMainTab(v.id);
+    else if (mainTab !== 'own') pickMainTab('own');
+    if (v.kind === 'page' && v.id === 'archived') setMemArchived(true);
+    else if (v.kind !== 'page' && memArchived) setMemArchived(false);
+    if (v.kind === 'record') ensureValue(v.key);
+  };
 
   // Shared render context — the entries / files / browse render functions and browse handlers live
   // in ./memory-tab/ sibling modules; they read the component's state + handlers through this bag.
   const ctx = {
     // shared
-    session, showToast, confirm, NODE_URL, loadMemories,
+    session, showToast, confirm, NODE_URL, loadMemories, currentGhii,
+    // the poster face
+    view, pickView, spaceSort, setSpaceSort, showRaw, setShowRaw, sysOpen, setSysOpen, showSearch, setShowSearch,
+    staleAll, setStaleAll, moreOpen, toggleMore, agents, selectedAgent, setSelectedAgent, cart, cartOrgs, removeCartItem, clearCart, mainTab,
     // entries
     memories, valueOf, valueCopyText, sortBy, setSortBy, memTagFilter, setMemTagFilter, filterText, setFilterText,
     expandedMem, setExpandedMem, ensureValue, selectedKeys, toggleSelected, setSelectedKeys, visPopoverFor,
@@ -711,40 +737,13 @@ export default function MemoryTab({ session, showToast, onStats }) {
   };
 
   return html`
-    <div class="section-title">${t('profile.memory.title')}</div>
-    <div class="section-desc">${t('profile.memory.desc')}</div>
-
-    <div class="sub-tabs">
-      <button class="sub-tab ${mainTab === 'own' ? 'active' : ''}" onClick=${() => pickMainTab('own')}>${t('profile.memory.tabOwn')}</button>
-      <button class="sub-tab ${mainTab === 'discover' ? 'active' : ''}" onClick=${() => pickMainTab('discover')}>${t('profile.memory.tabPublic')}</button>
-      <button class="sub-tab ${mainTab === 'remote' ? 'active' : ''}" onClick=${() => pickMainTab('remote')}>${session.federated ? t('profile.memory.browseHome') : t('profile.memory.tabRemote')}</button>
-    </div>
-
     ${session.federated && html`
       <div class="alert alert-info mb-half">
         <span class="alert-msg">${t('profile.memory.federatedSession')}</span>
       </div>
     `}
 
-    ${mainTab !== 'own' ? renderBrowsePanel(ctx) : html`
-      ${agents.length > 1 && html`
-        <div class="agent-selector mb-half">
-          <label class="text-meta pf-mr-half">${t('profile.memory.agent') || 'Agent'}:</label>
-          <select class="input-field pf-select-inline"
-            value=${selectedAgent} onChange=${e => { setSelectedAgent(e.target.value); setExpandedMem(null); setMemTagFilter(new Set()); setFullLoaded(false); clearServerSearch(); }}>
-            <option value="">${t('profile.memory.defaultAgent') || 'Default agent'}</option>
-            ${agents.map(a => html`<option key=${a.gaii} value=${a.gaii}>${escHtml(a.name || a.gaii)}${a.display_name ? ` — ${escHtml(a.display_name)}` : ''}</option>`)}
-          </select>
-        </div>
-      `}
-
-      <div class="sub-tabs">
-        <button class="sub-tab ${memSubTab === 'entries' ? 'active' : ''}" onClick=${() => setMemSubTab('entries')}>${t('profile.memory.entries')}</button>
-        <button class="sub-tab ${memSubTab === 'files' ? 'active' : ''}" onClick=${() => setMemSubTab('files')}>${t('profile.memory.files')}</button>
-      </div>
-      ${cart.length > 0 && html`<${CartTray} cart=${cart} nodeUrl=${NODE_URL} orgs=${cartOrgs} onRemove=${removeCartItem} onClear=${clearCart} showToast=${showToast} />`}
-      ${memSubTab === 'entries' ? renderEntries(ctx) : renderFilesList(ctx)}
-    `}
+    ${renderMemoryView(ctx)}
 
     ${editModal && html`<${EditMemoryModal}
       memKey=${editModal.key}
