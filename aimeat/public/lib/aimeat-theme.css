@@ -28,9 +28,9 @@
  *   base-100 (page) in both modes. base-300 is the strongest separation — borders and dividers.
  *
  *   FONTS are self-hosted at /lib/fonts/ (SIL OFL 1.1, latin + latin-ext so ä/ö render) and
- *   lazy-load per family: a page only downloads the faces its palette actually uses.
- * @structure @font-face (Archivo Black, Archivo, Inter, Space Grotesk, Fraunces, JetBrains
- *   Mono) · shared tokens
+ *   lazy-load per family: a page only downloads the faces its palette actually uses. Their
+ *   @font-face rules live in /lib/aimeat-fonts.css, imported at the top of this sheet.
+ * @structure @import aimeat-fonts.css · shared tokens
  *   (type scale, motion, spacing) · per-mode elevation · 5 palettes x 2 modes (each tagged
  *   `@theme-block <palette> <mode>` for the verifier) · typography application rules
  * @usage  <link href="/lib/daisyui@5.css" rel="stylesheet" />
@@ -40,6 +40,10 @@
  *   Deliberately UNLAYERED: daisyUI declares its themes inside `@layer base`, and any unlayered
  *   rule beats every layered one regardless of order or specificity.
  * @version-history
+ *   v2.5.0 — 2026-08-29 — The @font-face rules move to /lib/aimeat-fonts.css (imported here), where
+ *     Fjalla One, DM Sans and VT323 join them: the headline face of the design language had been the
+ *     one face not vendored, fetched from fonts.googleapis.com by sixteen HTML files. Nothing on the
+ *     node links a font CDN now, and the CSP no longer allows one.
  *   v2.4.0 — 2026-08-29 — The AIMEAT palette's display face follows the shell's one headline token:
  *     --font-display is var(--font-headline, 'Archivo Black', …), so on the node (where theme.css
  *     defines --font-headline) every h1-h6 of the classic shell wears the same face as the front
@@ -66,74 +70,9 @@
  *   v1.0.0 — 2026-07-25 — Initial AIMEAT daisyUI theme (single coral palette, light + dark).
  */
 
-/* ── SELF-HOSTED FACES (/lib/fonts/, SIL OFL 1.1 — see /lib/fonts/LICENSE.md) ──
-   Variable fonts, latin + latin-ext subsets. Browsers fetch a face only when a rendered
-   element actually uses it, so unused palettes cost nothing. */
-@font-face {
-  font-family: 'Inter'; font-style: normal; font-weight: 100 900; font-display: swap;
-  src: url('/lib/fonts/inter-var-latin.woff2') format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-  font-family: 'Inter'; font-style: normal; font-weight: 100 900; font-display: swap;
-  src: url('/lib/fonts/inter-var-latin-ext.woff2') format('woff2');
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-/* THE HOUSE FACES. Archivo Black is the poster display face and Archivo the body face of the
- * AIMEAT design language — the same pair the SPA has carried since 2026-08-28. They were only
- * ever linked from Google Fonts in spa.html, so everything served from /lib (every published
- * app, the whole Atelier kit) spoke Inter instead and looked like nobody's product. Vendored
- * here, they reach every surface the node serves. */
-@font-face {
-  font-family: 'Archivo Black'; font-style: normal; font-weight: 400; font-display: swap;
-  src: url('/lib/fonts/archivo-black-latin.woff2') format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-  font-family: 'Archivo Black'; font-style: normal; font-weight: 400; font-display: swap;
-  src: url('/lib/fonts/archivo-black-latin-ext.woff2') format('woff2');
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-@font-face {
-  font-family: 'Archivo'; font-style: normal; font-weight: 400 700; font-display: swap;
-  src: url('/lib/fonts/archivo-var-latin.woff2') format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-  font-family: 'Archivo'; font-style: normal; font-weight: 400 700; font-display: swap;
-  src: url('/lib/fonts/archivo-var-latin-ext.woff2') format('woff2');
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-@font-face {
-  font-family: 'Space Grotesk'; font-style: normal; font-weight: 300 700; font-display: swap;
-  src: url('/lib/fonts/space-grotesk-var-latin.woff2') format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-  font-family: 'Space Grotesk'; font-style: normal; font-weight: 300 700; font-display: swap;
-  src: url('/lib/fonts/space-grotesk-var-latin-ext.woff2') format('woff2');
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-@font-face {
-  font-family: 'Fraunces'; font-style: normal; font-weight: 100 900; font-display: swap;
-  src: url('/lib/fonts/fraunces-var-latin.woff2') format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-  font-family: 'Fraunces'; font-style: normal; font-weight: 100 900; font-display: swap;
-  src: url('/lib/fonts/fraunces-var-latin-ext.woff2') format('woff2');
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-@font-face {
-  font-family: 'JetBrains Mono'; font-style: normal; font-weight: 100 800; font-display: swap;
-  src: url('/lib/fonts/jetbrains-mono-var-latin.woff2') format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-  font-family: 'JetBrains Mono'; font-style: normal; font-weight: 100 800; font-display: swap;
-  src: url('/lib/fonts/jetbrains-mono-var-latin-ext.woff2') format('woff2');
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
+/* ── THE FACES live in /lib/aimeat-fonts.css (every family the node serves, self-hosted);
+   the @import keeps every page and app that reads this sheet supplied with them. ── */
+@import url('/lib/aimeat-fonts.css');
 
 /* ── SHARED TOKENS (palette-independent) ─────────────────────────────────────
    Type scale: a real hierarchy an app can lean on instead of inventing sizes.
