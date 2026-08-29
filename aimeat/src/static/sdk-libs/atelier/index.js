@@ -28,6 +28,10 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.31.0 — 2026-08-29 — THE SCENIC LAYER: scenics.css/js (ticker, stamp, torn edge, flap
+ *     board, polaroid, plaque, spotlight, receipt roll, ransom letters, VU, barcode, scanlines
+ *     — with builders flapify/ransom/vu/typeout/dealIn) and patterns.css (eight gradient-built
+ *     pattern recipes × three volumes on kit tokens; technique after Temani Afif, MIT).
  *   v0.30.0 — 2026-08-29 — The bones freed (CSS-side): press-sheet and marquee compositions.
  *   v0.29.0 — 2026-08-29 — WORLDS OWN THEIR GROUNDS (CSS-side): riso paper, terminal phosphor,
  *     stage night — literal ground pairs proven by the matrix in both modes, glass re-declared
@@ -137,6 +141,7 @@
 import { attach } from '../_core/namespace.js';
 import { el, append, $, $$, clear, uid, busy, guardButtons, whileBusy, injectStyle, reducedMotion, enter, kinetic, countUp, attention } from './dom.js';
 import { i18n } from './i18n.js';
+import { flapify, ransom, vu, typeout, dealIn } from './scenics.js';
 import { app, section, tabs, bottomNav } from './shell.js';
 import { hero, statRow, figure } from './hero.js';
 import { aide } from './aide.js';
@@ -161,7 +166,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.30.0',
+  version: '0.31.0',
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,
@@ -204,6 +209,9 @@ const atelier = {
   // ── Theme, i18n, helpers ──
   injectStyle, i18n, el, append, $, $$, clear, uid, busy, whileBusy, guardButtons,
   reducedMotion, enter, kinetic, countUp, attention,
+
+  // ── Scenic props (the genre stagecraft) ──
+  flapify, ransom, vu, typeout, dealIn,
 };
 
 attach('atelier', atelier);
