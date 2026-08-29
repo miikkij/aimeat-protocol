@@ -139,7 +139,7 @@ function unknownName(kind: string, given: string, known: string[]): never {
  * tokens: a layout's top-level `tokens`, and the Design Book's `look` and `motion` part kinds.
  * Returns the validated map (accent pair normalized); throws with the same worded refusals.
  */
-export function validateSignatureTokens(raw: unknown): Record<string, string> {
+export function validateSignatureTokens(raw: unknown, look?: string): Record<string, string> {
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
     fail('tokens is one object of { "--ak-…": "value" } overrides — the catalogue\'s signature_tokens lists the legal names.');
   }
@@ -162,7 +162,7 @@ export function validateSignatureTokens(raw: unknown): Record<string, string> {
       fail(`the value of ${name} may not carry urls, comments or declaration characters — a token is one value, never a vehicle.`);
     }
     if (name === '--ak-accent') {
-      out[name] = validateAccentPair(value);
+      out[name] = validateAccentPair(value, look);
       continue;
     }
     out[name] = value;
@@ -241,14 +241,18 @@ const ACCENT_PAIR_RE = /^(#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?)\s*\/\s*(#[0-9a-fA-
  * (text tint, gradient, spectrum, focus) from the accent, so proving the accent proves them all.
  * A failing half refuses with the first measured numbers; the normalized "light/dark" survives.
  */
-function validateAccentPair(value: string): string {
+function validateAccentPair(value: string, look?: string): string {
   const m = ACCENT_PAIR_RE.exec(value.trim());
   if (!m) {
     fail('--ak-accent is a light/dark PAIR "#hex/#hex" — the light-mode value first, the dark-mode value second, like "#0e7c66/#e8564a". A single value cannot stay readable in both modes (measured), so both halves are required.');
   }
   const [light, dark] = [m[1]!.toLowerCase(), m[2]!.toLowerCase()];
+  // The pair is proven WHERE IT LIVES: against the layout's own look (vivid when none is
+  // named). Sweeping every registered look would let each new WORLD (paper, phosphor, night)
+  // shrink the accent space of apps that never wear it.
+  const presets = [look && look.length ? look : 'vivid'];
   for (const [half, mode] of [[light, 'light'], [dark, 'dark']] as const) {
-    const bad = runMatrix({ '--ak-accent': half })
+    const bad = runMatrix({ '--ak-accent': half }, { presets })
       .filter((r) => !r.ok && r.combo.includes('/dark') === (mode === 'dark'));
     if (bad.length > 0) {
       const first = bad[0]!;
@@ -292,7 +296,7 @@ export function validateUiLayout(raw: unknown): AppUiLayout {
   }
 
   if (input.tokens !== undefined) {
-    out.tokens = validateSignatureTokens(input.tokens);
+    out.tokens = validateSignatureTokens(input.tokens, out.look);
     if (Object.keys(out.tokens).length === 0) delete out.tokens;
   }
 
