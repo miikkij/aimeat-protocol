@@ -362,8 +362,6 @@ export function applySchemaTables2(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_consents_ownerGaii ON consents(ownerGaii);
     CREATE INDEX IF NOT EXISTS idx_consent_audit_ownerGaii ON consent_audit(ownerGaii);
     CREATE INDEX IF NOT EXISTS idx_flags_target ON flags(targetType, targetId);
-    CREATE INDEX IF NOT EXISTS idx_matches_profileA ON matches(profileA);
-    CREATE INDEX IF NOT EXISTS idx_matches_profileB ON matches(profileB);
     CREATE INDEX IF NOT EXISTS idx_memberships_organismId ON organism_memberships(organismId);
     CREATE INDEX IF NOT EXISTS idx_memberships_ghii ON organism_memberships(ghii);
     CREATE INDEX IF NOT EXISTS idx_join_requests_organismId ON join_requests(organismId);

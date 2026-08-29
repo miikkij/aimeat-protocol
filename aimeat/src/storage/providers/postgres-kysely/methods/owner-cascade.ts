@@ -95,10 +95,6 @@ export async function cascadeDeleteIdentityData(db: Db, gaii: string): Promise<v
   // Files
   await db.deleteFrom('StorageFile').where('ownerGaii', '=', gaii).execute();
 
-  // Matches on either side
-  await db.deleteFrom('Match')
-    .where(eb => eb.or([eb('profileA', '=', gaii), eb('profileB', '=', gaii)])).execute();
-
   // Moderation flags raised by this identity
   await db.deleteFrom('Flag').where('flaggedBy', '=', gaii).execute();
 

@@ -2,7 +2,7 @@
  * @file src/cli/init-wizard/steps-advanced.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Economy + advanced-settings wizard steps (quotas, federation, consent, CORS, TOTP, matching, marketplace, realtime, extensions, app/portfolio origin) for `aimeat init`. Extracted from src/cli/init-wizard.ts to satisfy max-file-lines.
+ * @description Economy + advanced-settings wizard steps (quotas, federation, consent, CORS, TOTP, marketplace, realtime, extensions, app/portfolio origin) for `aimeat init`. Extracted from src/cli/init-wizard.ts to satisfy max-file-lines.
  * @version-history
  *   v1.2.0 — 2026-08-08 — Ask whether THIS operator signed the EU Code of Practice and which
  *     sections (AIMEAT_AI_COP_SECTIONS / _SIGNED_ON). Defaults to no: it is a public compliance
@@ -462,58 +462,6 @@ export async function askAllAdvancedSettings(
       t,
     );
     if (totpLockout !== '300') settings.AIMEAT_TOTP_LOCKOUT_SECONDS = totpLockout;
-  }
-
-  // ── AI Matching ──
-  const matchingEnabled = checkCancel(
-    await p.confirm({
-      message: t('init.matchingEnabled'),
-      initialValue: cfg.matchingEnabled,
-    }),
-    t,
-  );
-  if (!matchingEnabled) settings.AIMEAT_MATCHING_ENABLED = 'false';
-
-  if (matchingEnabled) {
-    const matchInterval = checkCancel(
-      await p.text({
-        message: t('init.matchIntervalHours'),
-        defaultValue: String(cfg.matchIntervalHours),
-        validate: val => validatePositiveNum(val, t),
-      }),
-      t,
-    );
-    if (matchInterval !== '24') settings.AIMEAT_MATCH_INTERVAL_HOURS = matchInterval;
-
-    const matchThreshold = checkCancel(
-      await p.text({
-        message: t('init.matchThreshold'),
-        defaultValue: String(cfg.matchThreshold),
-        validate: val => validateBurnRate(val, t),
-      }),
-      t,
-    );
-    if (matchThreshold !== '0.5') settings.AIMEAT_MATCH_THRESHOLD = matchThreshold;
-
-    const matchMaxSuggestions = checkCancel(
-      await p.text({
-        message: t('init.matchMaxSuggestions'),
-        defaultValue: String(cfg.matchMaxSuggestions),
-        validate: val => validatePositiveNum(val, t),
-      }),
-      t,
-    );
-    if (matchMaxSuggestions !== '5') settings.AIMEAT_MATCH_MAX_SUGGESTIONS = matchMaxSuggestions;
-
-    const matchMaxDistance = checkCancel(
-      await p.text({
-        message: t('init.matchMaxDistanceKm'),
-        defaultValue: String(cfg.matchMaxDistanceKm),
-        validate: val => validatePositiveNum(val, t),
-      }),
-      t,
-    );
-    if (matchMaxDistance !== '100') settings.AIMEAT_MATCH_MAX_DISTANCE_KM = matchMaxDistance;
   }
 
   // ── Marketplace ──

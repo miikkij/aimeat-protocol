@@ -1391,19 +1391,6 @@ export interface MailboxItem {
   type: string;
 }
 
-export interface Match {
-  breakdown: Json;
-  createdAt: Generated<Timestamp>;
-  expiresAt: Timestamp;
-  id: Generated<string>;
-  notifiedAt: Timestamp | null;
-  profileA: string;
-  profileB: string;
-  respondedAt: Timestamp | null;
-  score: number;
-  status: Generated<string>;
-}
-
 export interface Memory {
   aiProvenanceId: string | null;
   allowedOrigins: string[] | null;
@@ -2141,7 +2128,6 @@ export interface DB {
   KnowledgeReview: KnowledgeReview;
   Listing: Listing;
   MailboxItem: MailboxItem;
-  Match: Match;
   Memory: Memory;
   MemoryVersion: MemoryVersion;
   MessageDeliveryLog: MessageDeliveryLog;

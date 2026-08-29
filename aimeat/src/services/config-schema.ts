@@ -175,12 +175,6 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'totpSecretEncryptionKey', dotPath: 'totp.encryption_key', envVar: 'AIMEAT_TOTP_ENCRYPTION_KEY', type: 'string', validate: () => true, immutable: true, description: 'TOTP encryption key (secret)', adminDisplay: 'configured' },
 
   // ── Matching (Phase 2.1, mutable) ──
-  { key: 'matchingEnabled', dotPath: 'matching.enabled', envVar: 'AIMEAT_MATCHING_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'AI matching engine enabled' },
-  { key: 'matchIntervalHours', dotPath: 'matching.interval_hours', envVar: 'AIMEAT_MATCH_INTERVAL_HOURS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 168, immutable: false, description: 'Hours between matching rounds', range: '1-168' },
-  { key: 'matchThreshold', dotPath: 'matching.threshold', envVar: 'AIMEAT_MATCH_THRESHOLD', type: 'float', validate: v => typeof v === 'number' && (v as number) >= 0 && (v as number) <= 1, immutable: false, description: 'Minimum match score threshold', range: '0.0-1.0' },
-  { key: 'matchMaxSuggestions', dotPath: 'matching.max_suggestions', envVar: 'AIMEAT_MATCH_MAX_SUGGESTIONS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 50, immutable: false, description: 'Max match suggestions per user', range: '1-50' },
-  { key: 'matchMaxDistanceKm', dotPath: 'matching.max_distance_km', envVar: 'AIMEAT_MATCH_MAX_DISTANCE_KM', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 50000, immutable: false, description: 'Max geographic distance for matches in km', range: '1-50000' },
-  { key: 'matchCooldownDays', dotPath: 'matching.cooldown_days', envVar: 'AIMEAT_MATCH_COOLDOWN_DAYS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 365, immutable: false, description: 'Days before re-matching same pair', range: '1-365' },
 
   // ── Proactive guidance (mutable) ──
   { key: 'proactiveGuidanceEnabled', dotPath: 'proactive.guidance_enabled', envVar: 'AIMEAT_PROACTIVE_GUIDANCE', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Connected AIs are told what this node makes possible, so they can offer it when it fits (each owner still has their own switch; off here is off for everybody)' },
@@ -271,8 +265,6 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'personalNodeMaxSlots', dotPath: 'personal_nodes.max_slots', envVar: 'AIMEAT_PERSONAL_NODE_MAX_SLOTS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 10000, immutable: false, description: 'Max personal node slots', range: '1-10000' },
 
   // ── Match Notifications (Phase 1.6, mutable) ──
-  { key: 'matchNotificationEnabled', dotPath: 'match_notifications.enabled', envVar: 'AIMEAT_MATCH_NOTIFICATION_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Match notification emails enabled' },
-  { key: 'matchNotificationIntervalHours', dotPath: 'match_notifications.interval_hours', envVar: 'AIMEAT_MATCH_NOTIFICATION_INTERVAL_HOURS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 168, immutable: false, description: 'Hours between match notification batches', range: '1-168' },
 
   // ── Encrypted Chat (mutable) ──
   { key: 'echatAnonymous', dotPath: 'echat.anonymous', envVar: 'AIMEAT_ECHAT_ANONYMOUS', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Allow anonymous encrypted chat WebSocket connections' },

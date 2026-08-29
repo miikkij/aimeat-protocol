@@ -174,16 +174,6 @@ export function generateEnvContent(settings: Record<string, string>): string {
       ],
     },
     {
-      title: 'AI Matching',
-      vars: [
-        { key: 'AIMEAT_MATCHING_ENABLED', comment: 'Enable AI-powered interest matching' },
-        { key: 'AIMEAT_MATCH_INTERVAL_HOURS', comment: 'Hours between matching runs' },
-        { key: 'AIMEAT_MATCH_THRESHOLD', comment: 'Min similarity score (0-1)' },
-        { key: 'AIMEAT_MATCH_MAX_SUGGESTIONS', comment: 'Max match suggestions per user' },
-        { key: 'AIMEAT_MATCH_MAX_DISTANCE_KM', comment: 'Max distance for location matching (km)' },
-      ],
-    },
-    {
       title: 'Marketplace',
       vars: [
         { key: 'AIMEAT_MARKETPLACE_ENABLED', comment: 'Enable marketplace features' },

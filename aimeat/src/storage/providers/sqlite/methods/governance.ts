@@ -11,7 +11,7 @@
  */
 import type {
   ArchiveFilter, SchemaRecord, CsmRecord, MsmRecord,
-  FlagRecord, FlagSummary, MatchRecord, OrganismRecord
+  FlagRecord, FlagSummary, OrganismRecord
 } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
 import { consentMethods } from './consent.js';
@@ -371,101 +371,6 @@ export const governanceMethods = {
     if (row.reviewedBy) record.reviewedBy = row.reviewedBy as string;
     if (row.reviewedAt) record.reviewedAt = row.reviewedAt as string;
     return record;
-  },
-
-  // ══════════════════════════════════════════════════════════
-  // ── Matches ──
-  // ══════════════════════════════════════════════════════════
-
-  async createMatch(this: SqliteStorage, record: MatchRecord): Promise<MatchRecord> {
-    this.db.prepare(
-      `INSERT INTO matches (id, profileA, profileB, score, breakdown, status, notifiedAt, respondedAt, expiresAt, createdAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(
-      record.id, record.profileA, record.profileB, record.score,
-      JSON.stringify(record.breakdown), record.status,
-      record.notifiedAt, record.respondedAt,
-      record.expiresAt, record.createdAt,
-    );
-    return record;
-  },
-
-  async getMatch(this: SqliteStorage, id: string): Promise<MatchRecord | null> {
-    const row = this.db.prepare('SELECT * FROM matches WHERE id = ?').get(id) as Record<string, unknown> | undefined;
-    return row ? this.deserializeMatch(row) : null;
-  },
-
-  async getMatchByPair(this: SqliteStorage, profileA: string, profileB: string): Promise<MatchRecord | null> {
-    const row = this.db.prepare(
-      'SELECT * FROM matches WHERE (profileA = ? AND profileB = ?) OR (profileA = ? AND profileB = ?)'
-    ).get(profileA, profileB, profileB, profileA) as Record<string, unknown> | undefined;
-    return row ? this.deserializeMatch(row) : null;
-  },
-
-  async listMatchesByProfile(this: SqliteStorage, profile: string, opts?: { status?: string; page?: number; perPage?: number }): Promise<MatchRecord[]> {
-    const page = opts?.page ?? 1;
-    const perPage = opts?.perPage ?? 10;
-    let sql = 'SELECT * FROM matches WHERE (profileA = ? OR profileB = ?)';
-    const params: unknown[] = [profile, profile];
-
-    if (opts?.status) { sql += ' AND status = ?'; params.push(opts.status); }
-
-    sql += ' ORDER BY createdAt DESC LIMIT ? OFFSET ?';
-    params.push(perPage, (page - 1) * perPage);
-
-    const rows = this.db.prepare(sql).all(...params) as Record<string, unknown>[];
-    return rows.map(r => this.deserializeMatch(r));
-  },
-
-  async updateMatch(this: SqliteStorage, id: string, updates: Partial<MatchRecord>): Promise<MatchRecord | null> {
-    const existing = await this.getMatch(id);
-    if (!existing) return null;
-    const updated = { ...existing, ...updates };
-    this.db.prepare(
-      `UPDATE matches SET profileA = ?, profileB = ?, score = ?, breakdown = ?,
-       status = ?, notifiedAt = ?, respondedAt = ?, expiresAt = ?, createdAt = ? WHERE id = ?`
-    ).run(
-      updated.profileA, updated.profileB, updated.score,
-      JSON.stringify(updated.breakdown), updated.status,
-      updated.notifiedAt, updated.respondedAt,
-      updated.expiresAt, updated.createdAt, id,
-    );
-    return updated;
-  },
-
-  async deleteExpiredMatches(this: SqliteStorage): Promise<number> {
-    const now = new Date().toISOString();
-    const result = this.db.prepare(
-      `DELETE FROM matches WHERE expiresAt < ? AND status != 'accepted'`
-    ).run(now);
-    return result.changes;
-  },
-
-  async deleteMatchesByProfile(this: SqliteStorage, profile: string): Promise<number> {
-    const result = this.db.prepare(
-      `DELETE FROM matches WHERE profileA = ? OR profileB = ?`
-    ).run(profile, profile);
-    return result.changes;
-  },
-
-  async listAllMatches(this: SqliteStorage, limit = 10000): Promise<MatchRecord[]> {
-    const rows = this.db.prepare('SELECT * FROM matches ORDER BY createdAt DESC LIMIT ?').all(Math.min(limit, 10000)) as Record<string, unknown>[];
-    return rows.map(r => this.deserializeMatch(r));
-  },
-
-  deserializeMatch(this: SqliteStorage, row: Record<string, unknown>): MatchRecord {
-    return {
-      id: row.id as string,
-      profileA: row.profileA as string,
-      profileB: row.profileB as string,
-      score: row.score as number,
-      breakdown: JSON.parse(row.breakdown as string),
-      status: row.status as MatchRecord['status'],
-      notifiedAt: (row.notifiedAt as string) ?? null,
-      respondedAt: (row.respondedAt as string) ?? null,
-      expiresAt: row.expiresAt as string,
-      createdAt: row.createdAt as string,
-    };
   },
 
   // ══════════════════════════════════════════════════════════

@@ -255,26 +255,6 @@ export interface FlagSummary {
   hidden?: boolean;  // Phase 2.4 — auto-hide when flag count >= threshold
 }
 
-export interface MatchRecord {
-  id: string;
-  profileA: string;       // GHII of suggestion recipient
-  profileB: string;       // GHII of matched profile
-  score: number;          // 0.0-1.0
-  breakdown: {
-    sharedInterests: string[];
-    distanceKm: number | null;
-    activityDays: number;
-    sharedInterestsScore: number;
-    distanceScore: number;
-    activityScore: number;
-    compatibilityScore: number;
-  };
-  status: 'suggested' | 'notified' | 'accepted' | 'dismissed' | 'expired';
-  notifiedAt: string | null;
-  respondedAt: string | null;
-  expiresAt: string;
-  createdAt: string;
-}
 
 // Phase 2.6 — Marketplace (DEPRECATED: listings now live in extension memory via marketplace-behaviors extension)
 /** @deprecated Use marketplace-behaviors extension instead */

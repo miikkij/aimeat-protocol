@@ -95,6 +95,19 @@ export interface ConnectionRepository {
   deleteConnection(id: string): Promise<void>;
 
   /**
+   * Erase every connection one principal holds, and the delegations hanging off them. Returns how
+   * many connections went.
+   *
+   * WHY THIS IS ONE CALL AND NOT A LOOP IN THE CALLER. It exists for account erasure, where leaving
+   * a row behind is not an untidy leftover but a live credential: a connection stores a sealed
+   * refresh token for somebody's mailbox, it is addressed by the GHII string, and a deleted
+   * username is released for reuse — so a surviving row would hand the next person to register that
+   * name the previous person's inbox. The delegations have no foreign key onto the connection, so
+   * deleting one without the other leaves an app pointed at a connection that no longer exists.
+   */
+  deleteConnectionsByPrincipal(principal: string): Promise<number>;
+
+  /**
    * SINGLE-FLIGHT REFRESH, claim half. Returns true only to the caller that won the claim; every
    * other concurrent caller gets false and must wait for the winner rather than refresh too.
    *

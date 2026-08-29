@@ -165,8 +165,6 @@ export function cascadeDeleteAgentData(db: Database.Database, gaii: string): voi
   db.prepare('DELETE FROM consents WHERE ownerGaii = ?').run(gaii);
   // Storage files
   db.prepare('DELETE FROM storage_files WHERE ownerGaii = ?').run(gaii);
-  // Matches (as profileA or profileB)
-  db.prepare('DELETE FROM matches WHERE profileA = ? OR profileB = ?').run(gaii, gaii);
   // Flags raised by this agent
   db.prepare('DELETE FROM flags WHERE flaggedBy = ?').run(gaii);
   // Escrow holds

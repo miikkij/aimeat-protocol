@@ -163,8 +163,6 @@ export const getDirectoryStats = ()     => apiGet('/v1/admin/directory/stats');
 export const rebuildDirectory  = ()     => apiPost('/v1/admin/directory/rebuild');
 
 // ── Matching ──
-export const getMatchingStats  = ()     => apiGet('/v1/admin/matching');
-export const runMatching       = ()     => apiPost('/v1/admin/matching/run');
 
 // ── Marketplace ──
 export const getMarketplaceStats = ()   => apiGet('/v1/admin/marketplace');

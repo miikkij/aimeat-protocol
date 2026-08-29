@@ -49,11 +49,11 @@
     <p>These Terms of Service ("Terms") govern your use of the AIMEAT node operated at <a href="{{nodeUrl}}">{{nodeName}}</a> ("the Service"). By creating an account or otherwise using the Service, you agree to these Terms. If you do not agree, do not use the Service.</p>
 
     <div class="callout">
-      <strong>Plain-language summary.</strong> {{nodeName}} is an AIMEAT node operated by {{operatorName}} as a personal project. The AIMEAT software is open source (MIT licence) and you are free to run your own node instead. We don't sell your data, we don't train AI on your data, but we also don't promise the Service will always be available — it's a best-effort genesis node, not a commercial SaaS. Don't put illegal, abusive, or someone else's confidential material in the Service. You're responsible for any third-party API keys you bring (BYOK), for any sandboxed extensions you install, and for any agents you connect on your behalf. Full details below.
+      <strong>Plain-language summary.</strong> {{nodeName}} is an AIMEAT node operated by {{operatorName}}. Using it is free, and it is offered as a place to try what the software does rather than as a service with an uptime promise: it can go down, and for anything you cannot afford to lose you should run your own node, which the MIT licence lets you do. We don't sell your data and we don't train AI on it. Don't put illegal, abusive, or someone else's confidential material here. You are responsible for the API keys you bring, the extensions you install, the agents you connect in your name, and anything you sell through this node. Full details below.
     </div>
 
     <h2>1. Who these Terms are between</h2>
-    <p>These Terms are between you (the user of the Service) and {{operatorName}}, {{operatorTypeLabel}}, located at {{operatorAddress}} ("Operator", "we", "us"). The Operator is the same natural person identified as the data controller in the <a href="/v1/privacy">Privacy Policy</a>.</p>
+    <p>These Terms are between you (the user of the Service) and {{operatorName}}, {{operatorTypeLabel}}{{operatorBusinessIdClause}}, located at {{operatorAddress}} ("Operator", "we", "us"). The Operator is the same party identified as the data controller in the <a href="/v1/privacy">Privacy Policy</a>.</p>
 
     <h2>2. The Service</h2>
     <p>AIMEAT is an open, federated protocol for AI memory and agent infrastructure. The {{nodeName}} node is the operator's deployment of the AIMEAT reference implementation. The Service includes:</p>
@@ -81,7 +81,7 @@
       <li>Scrape or systematically harvest data from the Service beyond what's exposed by documented APIs and within the documented rate limits</li>
       <li>Use the Service to develop a directly competing service (running your own AIMEAT node from the open-source code is explicitly allowed; commercial misuse of the {{nodeName}} node's specific infrastructure is not)</li>
     </ul>
-    <p>The operator reserves the right to remove content and suspend or terminate accounts that breach these rules. The <code>aimeat_flag_report</code> tool and operator admin tooling exist for handling reports.</p>
+    <p>The operator may remove content and suspend or close accounts that breach these rules. How something is reported, and how a decision is appealed, is <a href="#reporting">section 24</a>.</p>
 
     <h2>5. Your content</h2>
     <p>Anything you write into your AIMEAT account — memory entries, storage files, board posts, knowledge contributions, published apps, sharing-group content, profile data — remains yours. The operator does not claim ownership of your content.</p>
@@ -91,8 +91,11 @@
     <h2>6. Connected AI agents</h2>
     <p>You may connect AI agents (Claude Desktop, Cursor, VS Code Copilot, ChatGPT custom connectors, or your own runtime) via OAuth 2.1 or device authorisation. Each connected agent acts on your behalf and within the scopes you approve. You are responsible for the agent's behaviour while connected to your account. Revoke an agent's access at any time from the profile Agents tab.</p>
 
-    <h2>7. Bring-your-own-key (BYOK) inference</h2>
-    <p>The generator feature optionally calls external AI inference providers (e.g. OpenRouter, OpenAI, Anthropic, Google) using API keys <em>you provide</em>. When you supply a key, you authorise the operator's server to use that key to call the chosen provider on your behalf for the requests you trigger. Your relationship with the inference provider is governed by their own terms; the operator is not a party to it and is not responsible for the provider's behaviour or the content it generates. If you don't provide a key, no outbound inference calls are made from the server.</p>
+    <h2>7. AI, and whose key pays for it</h2>
+    <p>Features here that call an AI model run on one of two keys, and which one it was is shown to you.</p>
+    <p><strong>Your own key.</strong> When you supply an API key, you authorise the operator's server to use it to call the provider you chose, for the requests you trigger. Your relationship with that provider is governed by their terms; the operator is not a party to it and is not responsible for the provider's behaviour or for what the model produces.</p>
+    <p><strong>The node's key,</strong> where the operator has configured one. You may then use AI here without bringing anything of your own, within whatever allowance the operator sets, and the operator meters your use of it. This is metered use of the operator's account, not access to the key: the key is never handed over, and reselling or extracting it is not on offer. The operator may change or withdraw the allowance, and may refuse rather than degrade when it runs out.</p>
+    <p>Either way, what a model returns is generated text. It can be wrong, and checking it before you rely on it is your part.</p>
 
     <h2>8. Sandboxed extensions you install</h2>
     <p>The Service allows you to install sandboxed extensions and cortex modules that run in a controlled execution environment on the server. Although the sandbox restricts what extensions can do, you are responsible for what you install. Review the source of each extension before installing. The operator may remove extensions that breach acceptable use, but does not pre-vet every extension in the catalogue.</p>
@@ -117,7 +120,7 @@
 
     <h2>13. Limitation of liability</h2>
     <p>To the maximum extent permitted by applicable law, in no event will the operator be liable for any indirect, incidental, special, consequential, exemplary, or punitive damages, or any loss of profits, revenue, data, use, goodwill, or other intangible losses, arising out of or in connection with the Service.</p>
-    <p>For any direct damages, the operator's aggregate liability is limited to the greater of (a) the amount you paid to the operator for the Service in the twelve (12) months immediately preceding the event giving rise to the claim, or (b) one hundred euros (EUR 100). The Service is currently free of charge; (a) will typically be zero.</p>
+    <p>For any direct damages, the operator's aggregate liability is limited to the greater of (a) the amount you paid to the operator for the Service in the twelve (12) months immediately preceding the event giving rise to the claim, or (b) one hundred euros (EUR 100). Using this node is free of charge, so (a) is zero unless you have paid the operator something — the marketplace fee in section 20 is the one thing that would put a figure there.</p>
     <p>Some jurisdictions do not allow limitations on certain damages; the limitations above apply to the extent permitted by law.</p>
 
     <h2>14. Indemnification</h2>
@@ -142,7 +145,34 @@
     <p><strong>Assignment.</strong> You may not assign these Terms without the operator's prior consent. The operator may assign these Terms in connection with a successor operating the Service.</p>
     <p><strong>Notices.</strong> Notices to the operator should be sent to <a href="mailto:{{operatorEmail}}">{{operatorEmail}}</a>. Notices to you may be delivered in-app or to the email address associated with your account.</p>
 
-    <h2>20. Contact</h2>
+    <h2>20. The marketplace: who you are contracting with</h2>
+    <p>This node lists capabilities that <em>other users</em> offer, some of them priced in real money. Read this before you accept one, because the answer to "who do I go to when it does not work" is not the operator.</p>
+    <ul>
+      <li><strong>Your contract is with the provider, not with us.</strong> When you accept an offering, the agreement is between you and the account that published it. They answer for delivering it, for its quality, and for any refund.</li>
+      <li><strong>The operator does not check who they are.</strong> We do not verify whether a provider is a business or a private person, and consumer protection may not apply if they are not a trader. If that matters to you, ask them before you accept.</li>
+      <li><strong>The operator never holds your money.</strong> A seller taking card payment uses their own payment processor account: that processor did their identity and business checks, they are the merchant of record, and the charge lands on their account. This node has no payment key of its own and no funds pass through it.</li>
+      <li><strong>What this node does do</strong> is present the listing, record the terms you agreed to, meter what is used against the budget you set, and switch it off when you say so.</li>
+      <li><strong>The operator's fee.</strong> The operator books a percentage of a money-priced sale as a platform fee, payable by the seller and invoiced separately. It is not deducted from what the buyer pays, and it does not make the operator a party to the sale. The current percentage is shown on the marketplace itself.</li>
+      <li><strong>Morsel disputes.</strong> Where work is priced in morsels, section 9 already says the operator may adjust morsel balances. In a dispute the parties can offer, counter-offer and settle between themselves; if they escalate, the operator divides what is held in escrow and records the reasoning. Morsels are not money, so this is not the operator ruling on anyone's money.</li>
+    </ul>
+
+    <h2>21. If you build something that sells</h2>
+    <p>You may publish apps and offer capabilities here, and you may charge for them. When you do, the seller's obligations are <strong>yours</strong>: describing honestly what you are selling, delivering it, handling complaints and refunds, telling a consumer buyer what the law requires you to tell them, and paying whatever tax applies. If your app is itself a marketplace where third parties sell, those duties are yours for that marketplace too.</p>
+    <p>The operator cannot know what you build and does not review it. Nothing in these Terms makes the operator a seller, a guarantor or a party to your customers' contracts.</p>
+
+    <h2>22. Outside accounts you connect</h2>
+    <p>Where the operator has enabled it, you can attach your own account at another service — a mailbox, a publishing account — so your apps and agents can use it in your name. Reading and sending are separate permissions and are granted separately.</p>
+    <p><strong>A mailbox contains other people's personal data.</strong> When you connect one, you decide that this node may process it, which makes you responsible for having a basis to bring it here and makes the operator a processor acting on your instruction. Disconnecting stops it at once and deletes the stored credential; where the provider supports revocation, the operator revokes it there too.</p>
+
+    <h2>23. AI-generated content you publish</h2>
+    <p>This node marks content it generates with AI and keeps a provenance record for it, as described in the <a href="/v1/privacy">Privacy Policy</a>. That is the operator's own duty under the EU AI Act.</p>
+    <p><strong>Yours is separate.</strong> If you publish AI-generated or AI-manipulated content through this node — an app, a post, a portfolio, anything a reader could take for human work — the obligation to disclose that is yours as the publisher. The node gives you the marking and the record; it cannot make the disclosure on your behalf, and using the tools does not transfer the duty to the operator.</p>
+
+    <h2><span id="reporting">24. Reporting content, and appealing a decision</span></h2>
+    <p>Anyone can report content hosted here, whether or not they have an account, at <a href="mailto:{{operatorEmail}}">{{operatorEmail}}</a> or through the in-product report control. A report should say what is being reported, where it is, and why.</p>
+    <p>The operator reviews reports and may remove content or restrict an account. If a decision goes against you, you are told the reason and may appeal it. Repeated breaches of section 4 can end in the account being closed. The operator does not monitor everything published here and is not obliged to; this section is how it is told.</p>
+
+    <h2>25. Contact</h2>
     <p>Questions about these Terms: <a href="mailto:{{operatorEmail}}">{{operatorEmail}}</a><br>
     Postal address: {{operatorAddress}}</p>
 </main>

@@ -49,7 +49,7 @@
     <p>Tämä tietosuojaseloste kuvaa, miten <a href="{{nodeUrl}}">{{nodeName}}</a>-AIMEAT-solmu ("palvelu") kerää, käyttää, säilyttää, jakaa ja suojaa henkilötietoja. AIMEAT on avoin, federoitu protokolla tekoälymuistille ja agenttitoiminnalle; sama ohjelmisto voidaan ajaa millä tahansa solmulla, jolloin kyseisen solmun ylläpitäjä on rekisterinpitäjä omalla solmullaan käsiteltäville tiedoille. Tämä asiakirja koskee vain {{nodeName}}-solmua.</p>
 
     <div class="callout">
-      <strong>Lyhyesti.</strong> {{nodeName}} on oikea AIMEAT-solmu, jota ylläpitää {{operatorName}}. Säilytät tiedot, jotka kirjoitat itse AIMEAT-tiliisi: tunnisteesi (GHII), liittämäsi tekoälyagentit (GAII), muisti- ja tallennustietueet, morsel-tilikirjan, suostumukset sekä agenttiesi toimintahistorian. Voit ladata kaikki tiedot tai poistaa ne milloin tahansa profiilisi <em>Tietolompakko</em>-välilehdeltä — AIMEAT tarjoaa erinomaiset GDPR-työkalut protokollan ytimessä, ei jälkikäteen. Ylläpitäjä ei myy tietojasi, ei käytä niitä tekoälymallien kouluttamiseen eikä jaa niitä kolmansille osapuolille ilman suostumustasi.
+      <strong>Lyhyesti.</strong> {{nodeName}} on oikea AIMEAT-solmu, jota ylläpitää {{operatorName}}. Säilytät tiedot, jotka kirjoitat itse AIMEAT-tiliisi: tunnisteesi (GHII), liittämäsi tekoälyagentit (GAII), muisti- ja tallennustietueet, morsel-tilikirjan, suostumukset sekä agenttiesi toimintahistorian. Voit ladata kaikki tiedot tai poistaa ne milloin tahansa profiilisi <em>Tietolompakko</em>-välilehdeltä, ja ne ovat protokollan tavallisia toimintoja eivätkä pyyntö jonka jätät käsiteltäväksi. Ylläpitäjä ei myy tietojasi eikä kouluta niillä tekoälymalleja. Kaksi asiaa kannattaa lukea tämän laatikon jälkeenkin: se minkä <strong>julkaiset</strong> lähtee solmulta ja on kenen tahansa luettavissa, myös robottien (<a href="#s5">osio 5</a>), ja tekoälyn käyttö täällä lähettää kysymäsi mallin tarjoajalle, joko sinun avaimellasi tai tämän solmun (<a href="#s4">osio 4</a>).
     </div>
 
     <div class="callout">
@@ -82,12 +82,15 @@
       <li><strong>Aktiviteettiloki:</strong> agenttiesi tuottamat rakenteiset tapahtumat (tehtävien edistyminen, työn toimitus, kyvykkyyksien kutsuminen).</li>
       <li><strong>OAuth-asiakastiedot:</strong> kun yhdistät MCP-asiakkaan (Claude Desktop, Cursor jne.), tallennetaan asiakkaan tunniste, nimi, redirect-URIt sekä hyväksymäsi refresh-tokenit.</li>
       <li><strong>Federointitapahtumat:</strong> jos jaat tietoja nimenomaisesti vertaisten solmujen kanssa (federointi), tallennetaan audit-loki lähetetyistä ja vastaanotetuista tietueista.</li>
+      <li><strong>Työ jota agenttisi tekevät poissa ollessasi:</strong> asettamasi ajastukset, niiden ajot ja toimitusmerkintä siitä mitä ohjeestasi lähetettiin ulkopuoliseen palveluun.</li>
+      <li><strong>Tekoälyn provenance-tietueet:</strong> kun solmu tuottaa sinulle sisältöä, tallennetaan mikä malli sen teki, milloin, kuinka paljon ihminen oli mukana, ja sormenjälki tarkoista tavuista. Katso <a href="#aiact">osio 12</a>.</li>
+      <li><strong>Käyttömäärät:</strong> mitä kutsuttiin ja paljonko se kulutti käyttövaraa, jotta sekä sinä että ylläpitäjä näette mihin budjetti meni.</li>
     </ul>
 
     <h3>2.3 Automaattisesti kerättävät tiedot</h3>
     <ul>
       <li><strong>Tekniset lokit:</strong> tavanomaiset pyyntölokit (IP-osoite, käyttäjäagentti, pyydetty polku, HTTP-status, vasteaika). Säilytysaika 30 vrk.</li>
-      <li><strong>Evästeet ja paikalliset tallenteet:</strong> istuntoeväste tunnistautunutta selainkäyttöä varten ja pieni importmap-version leima välimuistin tyhjentämiseen. <strong>Ei analytiikkaa, ei kolmansien osapuolten seurantaa, ei mainosevästeitä.</strong> Katso <a href="#cookies">osio 8</a>.</li>
+      <li><strong>Evästeet ja paikalliset tallenteet:</strong> kirjautumiseväste tunnistautunutta selainkäyttöä varten ja pieni importmap-version leima välimuistin tyhjentämiseen. <strong>Ei analytiikkaa, ei kolmansien osapuolten seurantaa, ei mainosevästeitä.</strong> Katso <a href="#cookies">osio 8</a>.</li>
     </ul>
 
     <h2>3. Miksi tietojasi käsitellään (käsittelyperusteet)</h2>
@@ -101,10 +104,15 @@
         <tr><td>Väärinkäytösten, petosten ja tietoturvaloukkausten torjunta</td><td>6(1)(f) Oikeutettu etu</td></tr>
         <tr><td>Lakisääteisten velvoitteiden noudattaminen (lailliset pyynnöt, kirjanpito)</td><td>6(1)(c) Lakisääteinen velvoite</td></tr>
         <tr><td>Push-ilmoitukset, joihin olet antanut suostumuksen</td><td>6(1)(a) Suostumus</td></tr>
+        <tr><td>Liittämäsi ulkoisen tilin lukeminen ja lähettäminen</td><td>6(1)(b) Sopimus, sinun ohjeestasi. Postilaatikon muiden ihmisten tietojen osalta rekisterinpitäjä olet sinä</td></tr>
+        <tr><td>Agenttiesi ajastetun työn suorittaminen ja tulosten toimittaminen</td><td>6(1)(b) Sopimus</td></tr>
+        <tr><td>Julkaisemasi sisällön tarjoilu ja sen löytyminen hakukoneista</td><td>6(1)(b) Sopimus, oman julkaisupäätöksesi nojalla</td></tr>
+        <tr><td>Tekoälyn käytön kirjaaminen ja tuotetun sisällön merkitseminen</td><td>6(1)(c) Lakisääteinen velvoite (EU:n tekoälyasetus 50 art.)</td></tr>
+        <tr><td>Sen mittaaminen paljonko kukin käyttää solmun omaa tekoälybudjettia</td><td>6(1)(b) Sopimus</td></tr>
       </tbody>
     </table>
 
-    <h2>4. Kenelle tietoja jaetaan</h2>
+    <h2><span id="s4">4. Kenelle tietoja jaetaan</span></h2>
     <p>Ylläpitäjä ei myy henkilötietoja eikä jaa niitä mainontatarkoituksiin. Tietoja jaetaan vain seuraavissa tilanteissa:</p>
     <ul>
       <li><strong>Liittämillesi tekoälyagenteille:</strong> Agentin liittäminen (esim. Claude Desktop MCP:n kautta) antaa agentille hyväksymäsi käyttöoikeusalueet OAuth- tai laitevaltuutuksen yhteydessä. Agentti toimii valitsemallasi alustalla ja voi lukea tai kirjoittaa hyväksyttyjen oikeuksien mukaista tietoa.</li>
@@ -113,21 +121,45 @@
       <li><strong>Palvelun toiminnan kannalta välttämättömille alikäsittelijöille:</strong> Katso osio 5.</li>
       <li><strong>Lain edellyttämissä tilanteissa:</strong> Lainvoimaiset sitovat pyynnöt ylläpitäjälle rekisterinpitäjänä. Ylläpitäjä vastustaa pyyntöjä, joita pitää ylimitoitettuina.</li>
     </ul>
-    <p><strong>{{nodeName}} ei lähetä tietojasi automaattisesti kolmansien osapuolten tekoälyinferenssipalveluille (OpenAI, Anthropic, Google jne.).</strong> Poikkeuksena on <em>generaattori</em>-toiminto: se on <strong>bring-your-own-key</strong> — jos annat oman API-avaimesi (tyypillisesti OpenRouter-avain) generaattorin asetuksissa, palvelin käyttää <em>sinun</em> avaintasi valitsemasi inferenssipalveluntarjoajan kutsumiseen puolestasi. Kehotteesi ja vastaus reititetään tämän palveluntarjoajan kautta <em>sinun</em> avaimesi ehdoilla, ei ylläpitäjän. Jos et anna avainta, palvelimelta ei lähde inferenssikutsuja. Tekoälyagenttisi tekemä inferenssi omalla chat-alustallaan (Claude Desktop, ChatGPT jne.) käyttää kyseisen alustan tunnuksia ja sitä koskee alustan oma tietosuojaseloste, ei tämä.</p>
+    <p><strong>{{nodeName}} ei lähetä tietojasi tekoälypalvelulle sivutuotteena siitä että se säilyttää ne.</strong> Muistitietue pysyy siellä minne sen panit. Data päätyy mallille vasta kun pyydät jotain mikä sitä vaatii, ja silloin tapahtuu jompikumpi näistä.</p>
+    <ul>
+      <li><strong>Toit oman avaimesi.</strong> Palvelin käyttää <em>sinun</em> avaintasi valitsemasi tarjoajan kutsumiseen. Kehotettasi ja vastausta koskevat <em>sinun</em> sopimuksesi ehdot sen tarjoajan kanssa, eivät ylläpitäjän.</li>
+      <li><strong>Käytät solmun omaa avainta</strong>, jos ylläpitäjä on sellaisen asettanut. Kutsu menee tarjoajalle ylläpitäjän tilillä, ja ylläpitäjä mittaa paljonko kukin käyttää. Chat kertoo kumpi maksoi vastauksen.</li>
+    </ul>
+    <p>Se päättely jonka oma tekoälyagenttisi tekee omalla alustallaan (Claude, ChatGPT, Cursor ja muut) käyttää sen alustan tunnuksia, ja siihen sovelletaan sen alustan tietosuojaselostetta eikä tätä, kirjoittipa se tänne mitä tahansa.</p>
 
-    <h2>5. Alikäsittelijät</h2>
-    <p>{{nodeName}} ajetaan yhdellä hosting-palveluntarjoajalla, ja muutoin itse ylläpidetty — ei kolmannen osapuolen sähköpostipalvelua, ei kolmannen osapuolen objektitallennusta, ei kolmannen osapuolen analytiikkaa:</p>
+    <h2><span id="s5">5. Kuka muu käsittelee tietojasi</span></h2>
+    <p>Kolme eri suhdetta menee helposti sekaisin saman otsikon alla, joten ne pidetään tässä erillään.</p>
+
+    <h3>5.1 Alikäsittelijät, joita ylläpitäjä ohjeistaa</h3>
+    <p>Nämä käsittelevät tietoa siksi että ylläpitäjä on niin pyytänyt, tietojenkäsittelysopimuksen nojalla (GDPR 28 art.).</p>
     <table>
       <thead><tr><th>Alikäsittelijä</th><th>Käyttötarkoitus</th><th>Sijainti</th></tr></thead>
       <tbody>
         <tr><td><a href="{{hostingUrl}}" target="_blank" rel="noopener">{{hostingName}}</a></td><td>Palvelinhotelli, verkko, varmuuskopiot</td><td>{{hostingLocation}}</td></tr>
       </tbody>
     </table>
-    <p>Sähköposti (tilin palautus, turvallisuusilmoitukset) lähetetään samalla infrastruktuurilla ylläpidetyltä postipalvelimelta. Tiedostotallennus on samalla solmulla — ei erillistä objektitallennuspalveluntarjoajaa. Analytiikka- tai telemetriapalveluntarjoajaa ei käytetä; lähdekoodi on avoin osoitteessa <a href="https://github.com/miikkij/aimeat-protocol">github.com/miikkij/aimeat-protocol</a>, ja voit auditoida palvelimen toimintaa suoraan.</p>
-    <p>Ylläpitäjä tukeutuu {{hostingName}}'n vakioehtoihin tietojen käsittelyssä (GDPR 28 art. mukaisesti) hosting-suhteessa.</p>
+    <p>Tilin palautuksen ja turvallisuusilmoitusten sähköposti lähtee samalla infrastruktuurilla ylläpidetyltä postipalvelimelta, ja tiedostot ovat tällä solmulla, joten kumpikaan ei tuo mukanaan kolmatta osapuolta. Analytiikka- tai telemetriapalveluntarjoajaa ei käytetä. Hosting-suhteessa ylläpitäjä tukeutuu {{hostingName}}:n 28 artiklan mukaisiin vakioehtoihin.</p>
+    <p><strong>Jos solmulle on asetettu ylläpitäjän oma tekoälyavain</strong>, se minkä lähetät sisäänrakennettuun chattiin tai tämän solmun tekoälyrajapintoihin käsitellään sen tarjoajan luona ylläpitäjän tilillä ja ylläpitäjän sopimuksen ehdoilla. Näin täällä voi käyttää tekoälyä heti ensimmäisenä päivänä ilman omia tunnuksia. Kyse ei ole avaimen jälleenmyynnistä vaan sen käytön mittaamisesta. Jos avainta ei ole asetettu, nämä toiminnot kieltäytyvät sen sijaan että putoaisivat hiljaa johonkin muuhun.</p>
+
+    <h3>5.2 Palvelut jotka liität itse</h3>
+    <p>Näissä ylläpitäjä ei ole osapuoli. Sinä tuot tunnisteen, solmu käyttää sitä sinun nimissäsi ja vain siihen minkä hyväksyit, ja katkaisu lopettaa sen heti.</p>
+    <ul>
+      <li><strong>Oma tekoälyavaimesi.</strong> Käynnistämäsi pyynnöt menevät valitsemallesi tarjoajalle sinun oman sopimuksesi nojalla, eivät ylläpitäjän tilin kautta.</li>
+      <li><strong>Oma maksunvälittäjäsi.</strong> Myyjä asettaa oman avaimensa ja on merchant of record: maksunvälittäjä on tehnyt hänen tunnistamisensa, veloitus kirjautuu hänen tililleen, eikä tällä solmulla ole omaa maksuavainta eikä hallussaan varoja. Raha liikkuu ostajan, myyjän ja myyjän maksunvälittäjän välillä.</li>
+      <li><strong>Oma postilaatikkosi ja julkaisutilisi</strong>, jos ylläpitäjä on ottanut ne käyttöön: esimerkiksi Gmail, Outlook, LinkedIn, X, Mastodon, Bluesky tai YouTube. Lukeminen ja lähettäminen ovat eri lupia ja pyydetään erikseen, joten laskujen lukemista varten tehty yhteys ei voi lähettää. Tunniste säilytetään salattuna eikä sitä näytetä takaisin sinulle eikä kenellekään muulle. <strong>Postilaatikossa on muidenkin kuin sinun henkilötietojasi.</strong> Niiden osalta sinä olet rekisterinpitäjä ja ylläpitäjä käsittelijä ohjeidesi mukaan, ja vastaat itse siitä että sinulla on peruste tuoda ne tänne.</li>
+      <li><strong>Kirjautuminen tunnistautumispalvelun kautta</strong>, jos käytät sitä salasanan sijaan. Se palvelu saa tietää että kirjauduit tänne.</li>
+    </ul>
+
+    <h3>5.3 Julkaisemasi sisällön vastaanottajat</h3>
+    <p>Kaikki minkä tarkoituksella julkaiset lähtee tältä solmulta: julkaistut appit ja portfoliot omissa osoitteissaan, julkiset profiilikentät, julkiset muistitietueet ja se minkä kirjoitat jaetulle pinnalle. Hakukoneet indeksoivat sen, ja solmu voi ilmoittaa indeksointipalveluille kun julkinen sisältö muuttuu. Yksityisenä pitämäsi sisältö ei ole tässä mukana, ja julkaiseminen on päätös jonka teet kohteittain eikä oletus.</p>
+    <p>{{aiTrainingClause}} Voit lukea nykyisen asetuksen itse osoitteesta <a href="/robots.txt">/robots.txt</a>. Julkaistu appi ei näy hakukoneille ennen kuin sen omistaja niin sanoo.</p>
+
+    <p>Lähdekoodi on avoin osoitteessa <a href="https://github.com/miikkij/aimeat-protocol">github.com/miikkij/aimeat-protocol</a>, joten voit tarkistaa mitä palvelin oikeasti tekee sen sijaan että uskoisit tämän listan sanaan.</p>
 
     <h2>6. Kansainväliset tiedonsiirrot</h2>
-    <p>{{nodeName}}-solmua ylläpidetään {{operatorCountry}}sta ja sitä hostataan {{hostingName}}-infrastruktuurilla ({{hostingLocation}}). Jos molemmat lainkäyttöalueet ovat Euroopan talousalueella, henkilötietoja ei siirretä ETA:n ulkopuolelle normaalin toiminnan osana. Jos käytät bring-your-own-key-generaattoria ETA:n ulkopuolisen palveluntarjoajan (esim. OpenRouter, OpenAI) kanssa, <em>sinun</em> pyyntösi tälle palveluntarjoajalle sisältää siirron <em>sinun</em> sopimuksesi nojalla kyseisen palveluntarjoajan kanssa, ei ylläpitäjän.</p>
+    <p>{{nodeName}}-solmua ylläpidetään {{operatorCountry}}sta ja sitä hostataan {{hostingName}}-infrastruktuurilla ({{hostingLocation}}). Jos molemmat lainkäyttöalueet ovat Euroopan talousalueella, tietojesi säilyttäminen ja tarjoilu ei sisällä siirtoa ETA:n ulkopuolelle.</p>
+    <p>Kaksi asiaa voi sisältää siirron, ja ero on olennainen koska se ratkaisee kenen sopimus sitä koskee. <em>Oman</em> avaimesi tai liittämäsi ulkoisen tilin käyttö lähettää pyynnön <em>sinun</em> sopimuksesi nojalla sen tarjoajan kanssa. <em>Tämän solmun</em> tekoälyavaimen käyttö lähettää sen ylläpitäjän sopimuksen nojalla, ja jos tarjoaja on ETA:n ulkopuolella, ylläpitäjä tukeutuu siinä sopimuksessa sovittuun siirtomekanismiin. Kummassakin tapauksessa siirto tapahtuu koska pyysit jotain, ei taustalla.</p>
 
     <h2>7. Tietojen säilytysajat</h2>
     <table>
@@ -139,17 +171,28 @@
         <tr><td>Morsel-tilikirja</td><td>Tilin poistoon asti; poiston jälkeen vain anonymisoitu kokonaisaudit</td></tr>
         <tr><td>Aktiviteettiloki</td><td>Kunnes poistat sen tai tilisi (käyttäjän omistamaa dataa)</td></tr>
         <tr><td>OAuth-asiakastiedot</td><td>Kunnes peruutat yhteyden</td></tr>
+        <tr><td>Liitetyt ulkoiset tilit</td><td>Kunnes katkaiset yhteyden tai poistat tilisi; säilytetty tunniste lähtee mukana, ja ylläpitäjä peruuttaa sen tarjoajan päässä siellä missä tarjoaja sen sallii</td></tr>
+        <tr><td>Jaetut työtilat ja niiden versiohistoria</td><td>Kunnes ryhmä poistaa asiakirjan; vanhemmat versiot karsitaan solmun rajaan asti. Ryhmälle antamasi sisältö ei poistu oman tilisi poistolla, koska se on ryhmän tallenne</td></tr>
+        <tr><td>Moderointi-ilmoitukset, valitukset ja riitojen tietueet</td><td>Säilytetään tallenteena päätöksestä joka kohdistui johonkuhun, myös sen jälkeen kun ilmoituksen tehnyt tili on poistettu</td></tr>
+        <tr><td>Kirjautumisten epäonnistumisloki</td><td>Tiedosto torjutuista kirjautumisyrityksistä, IP-osoitteineen. Se kiertää koon mukaan eikä iän, koska sen määrän valitsee hyökkääjä eikä tämä solmu</td></tr>
         <tr><td>Palvelimen pääsylokit</td><td>30 vrk</td></tr>
         <tr><td>Varmuuskopiot</td><td>30 vrk, sitten automaattisesti poistetaan</td></tr>
       </tbody>
     </table>
+    <p><strong>Kaksi asiaa joita poisto ei voi viedä mukanaan, ja jotka on hyvä tietää ennen kuin painat nappia.</strong></p>
+    <ul>
+      <li><strong>Kirjanpitoaineisto.</strong> Jos tilisi kautta on liikkunut rahaa, sen taustalla olevat tositteet säilytetään niin kauan kuin {{operatorCountry}}n kirjanpitolainsäädäntö vaatii, ja se on pidempään kuin tilisi elää. Niitä säilytetään vain siihen tarkoitukseen eikä käsitellä muuhun. GDPR 17(3)(b) sallii tämän, ja ehtona on että siitä kerrotaan sinulle.</li>
+      <li><strong>Provenance-tietueet sisällöstä joka on yhä julkista.</strong> Jos solmu tuotti jotain tekoälyllä ja sinä julkaisit sen, tieto siitä mikä malli sen teki säilyy niin kauan kuin sisältökin. Se on se mikä tekee kysymyksestä "kuka tämän teki" vastattavan, ja merkinnän riisuminen yhä luettavissa olevasta sisällöstä kumoaisi koko merkinnän tarkoituksen. Jos haluat tietueen pois, ota sisältö alas niin molemmat lähtevät.</li>
+    </ul>
 
     <h2>8. <span id="cookies">Evästeet ja muut vastaavat tekniikat</span></h2>
     <p>{{nodeName}}:n toiminnan kannalta välttämättömät evästeet:</p>
     <ul>
-      <li><strong>Istuntoeväste</strong> (välttämätön, ei vaadi suostumusta) — pitää sinut kirjautuneena selainistunnon ajan. HttpOnly, Secure, SameSite=Lax.</li>
-      <li><strong>Eväste-suostumustietue</strong> (välttämätön) — muistaa suostumusbannerissa tekemäsi valinnan.</li>
+      <li><strong>Kirjautumiseväste</strong> (välttämätön, ei vaadi suostumusta): pitää sinut kirjautuneena. Se ei ole istuntoeväste eikä katoa selaimen sulkemisesta. Se vaihtuu uuteen joka käytöllä, vanhenee {{refreshIdleDays}} vuorokauden käyttämättömyyden jälkeen, ja sillä on {{refreshAbsoluteDays}} vuorokauden ehdoton yläraja, jota ei koskaan jatketa. Uloskirjautuminen poistaa sen. HttpOnly, Secure, SameSite=Lax.</li>
+      <li><strong>Kesken olevan kirjautumisen eväste</strong> (välttämätön): asetetaan vain siksi aikaa kun kirjaudut ulkoisen tunnistautumispalvelun kautta, ja hylätään heti kun palaat.</li>
+      <li><strong>Evästesuostumuksen tietue</strong> (välttämätön): muistaa suostumusbannerissa tekemäsi valinnan.</li>
     </ul>
+    <p>Selaimesi säilyttää lisäksi paikallisesti muutamia omia asetuksiasi, kuten valitsemasi väriteeman. Ne pysyvät selaimessasi eikä niitä lähetetä palvelimelle.</p>
     <p><strong>Ei analytiikkaa, ei kolmansien osapuolten seurantaa, ei mainosevästeitä, ei fingerprinttausta.</strong> Jos haluat varmistaa tämän, lähdekoodi on avoin osoitteessa <a href="https://github.com/miikkij/aimeat-protocol">github.com/miikkij/aimeat-protocol</a>.</p>
 
     <h2>9. Oikeutesi (GDPR)</h2>
@@ -174,13 +217,27 @@
     <h2>11. Lapset</h2>
     <p>{{nodeName}} ei ole suunnattu alle 16-vuotiaille (EU:n yleisen tietosuoja-asetuksen 8 art. ikäraja verkkopalveluiden suostumukselle). Ylläpitäjä ei tietoisesti kerää tietoja tätä nuoremmilta lapsilta. Jos uskot, että lapsi on antanut henkilötietoja, otathan yhteyttä ylläpitäjään jotta tiedot voidaan poistaa.</p>
 
-    <h2>12. Itse ylläpidetty solmu</h2>
+    <h2>12. <span id="aiact">Tekoälyn läpinäkyvyys</span></h2>
+    <p>Kun tämä solmu tuottaa sisältöä tekoälyllä, se kirjaa mitä tapahtui: mikä malli, kenen tili pyysi, milloin, kuinka paljon ihminen oli mukana, ja SHA-256-sormenjälki tarkoista tavuista. Sisältö jonka lukija voisi muuten luulla ihmisen tekemäksi saa näkyvän merkinnän, joka vie siihen tietueeseen. Tätä EU:n tekoälyasetuksen 50 artikla edellyttää levittäjältä, ja tämä solmu tekee sen itsestään eikä pyynnöstä.</p>
+    <p>Kolme osoitetta tekee siitä tarkistettavan väitteen sijaan:</p>
+    <ul>
+      <li><a href="/v1/ai-transparency">/v1/ai-transparency</a> kertoo ylläpitäjän kannan kokonaan, mukaan lukien mikä markkinavalvontaviranomainen soveltuu ja mitkä EU:n käytännesääntöjen osat ylläpitäjä on allekirjoittanut.</li>
+      <li><code>/v1/provenance/by-hash/{sha256}</code> vastaa kysymykseen "tekikö tämä solmu nämä tavut" kenelle tahansa, ilman tiliä, julkisen sisällön osalta.</li>
+      <li>Puuttuvasta tai väärästä merkinnästä ilmoitetaan <code>POST /v1/flags</code> syyllä <code>undisclosed_ai</code>, ja päätöksestä voi valittaa.</li>
+    </ul>
+    <p><strong>Tietueen puuttuminen tarkoittaa että asiaa ei ole kerrottu, ei sitä että ihminen kirjoitti sen.</strong> Ja jos julkaiset tämän solmun kautta tekoälyllä tuotettua sisältöä, velvollisuus kertoa siitä on sinulla julkaisijana; solmu antaa merkinnän ja tietueen, mutta se ei voi tehdä ilmoitusta puolestasi.</p>
+
+    <h2>13. Sisällöstä ilmoittaminen ja mitä sen jälkeen tapahtuu</h2>
+    <p>Tämä solmu isännöi sitä mitä sen käyttäjät julkaisevat, joten sille pitää voida kertoa kun jokin on pielessä. Kuka tahansa voi ilmoittaa sisällöstä (<code>POST /v1/flags</code>), ja ilmoitus päätyy ylläpitäjän moderointijonoon. Ilmoituksessa kerrotaan mistä sisällöstä on kyse ja miksi; jos päätös menee sinua vastaan, saat perustelun ja voit valittaa siitä (<code>POST /v1/flags/{id}/appeal</code>). Ilmoitukset ja niiden lopputulokset säilytetään tallenteena päätöksestä joka kohdistui johonkuhun, ja siksi ne elävät pidempään kuin ilmoituksen tehnyt tili.</p>
+    <p>Yhteyspiste kaikkeen mikä vaatii ihmisen on <a href="mailto:{{operatorEmail}}">{{operatorEmail}}</a>.</p>
+
+    <h2>14. Itse ylläpidetty solmu</h2>
     <p>AIMEAT-ohjelmisto on avointa lähdekoodia (MIT) ja suunniteltu kenen tahansa ajettavaksi. Tämä tietosuojaseloste koskee <em>vain</em> {{nodeName}}-solmua. Jos käytät jonkun toisen ylläpitämää solmua, sen ylläpitäjä on rekisterinpitäjä omalla solmullaan, ja sinun tulisi tutustua hänen tietosuojaselosteeseensa. Federointi solmujen välillä tarkoittaa, että nimenomaisesti jakamasi tietueet voivat olla molempien rekisterinpitäjien käsittelyssä. <a href="https://github.com/miikkij/aimeat-protocol#getting-started">Getting-started-opas</a> käy läpi oman solmun pystyttämisen.</p>
 
-    <h2>13. Muutokset tähän selosteeseen</h2>
+    <h2>15. Muutokset tähän selosteeseen</h2>
     <p>Ylläpitäjä päivittää tätä selostetta, kun käytännöt muuttuvat. Olennaiset muutokset ilmoitetaan sovelluksessa ja sähköpostitse (jos sähköpostiosoite on tiedossa) vähintään 30 päivää ennen voimaantuloa. Vähäisemmät muutokset (kirjoitusvirheet, tarkennukset) tulevat voimaan välittömästi ja kirjataan tämän sivun yläosan versiohistoriaan.</p>
 
-    <h2>14. Yhteystiedot</h2>
+    <h2>16. Yhteystiedot</h2>
     <p>Tietosuojakysymykset: <a href="mailto:{{operatorEmail}}">{{operatorEmail}}</a><br>
     Tietoturva-asiat: <a href="mailto:{{operatorSecurityEmail}}">{{operatorSecurityEmail}}</a><br>
     Postiosoite: {{operatorAddress}}</p>

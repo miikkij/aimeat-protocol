@@ -2,7 +2,7 @@
  * @file src/utils/env-config/sections-features.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Indexing, personal-node, site, consent, push, email, TOTP, matching, marketplace, EUDIW, social-login config sections. Extracted from src/utils/env-config.ts to satisfy max-file-lines.
+ * @description Indexing, personal-node, site, consent, push, email, TOTP, marketplace, EUDIW, social-login config sections. Extracted from src/utils/env-config.ts to satisfy max-file-lines.
  * @version-history
  *   v1.3.0 — 2026-08-01 — AI Transparency section gains AIMEAT_AI_LABEL_PUBLIC and
  *     AIMEAT_AI_SUPERVISORY_NAME/_URL (TARGET-058 Phase 3)
@@ -351,59 +351,6 @@ export function featureSections(config: AimeatConfig): ConfigSection[] {
           description: 'ISO date the Code of Practice was signed',
           value: config.aiCopSignedOn,
           defaultVal: '',
-        },
-      ],
-    },
-    {
-      title: 'AI Matching',
-      entries: [
-        {
-          envVar: 'AIMEAT_MATCHING_ENABLED',
-          description: 'Enable AI-powered interest matching',
-          value: config.matchingEnabled ? 'true' : 'false',
-          defaultVal: 'true',
-        },
-        {
-          envVar: 'AIMEAT_MATCH_INTERVAL_HOURS',
-          description: 'Hours between matching runs',
-          value: String(config.matchIntervalHours),
-          defaultVal: '24',
-        },
-        {
-          envVar: 'AIMEAT_MATCH_THRESHOLD',
-          description: 'Minimum similarity score for a match (0-1)',
-          value: String(config.matchThreshold),
-          defaultVal: '0.5',
-        },
-        {
-          envVar: 'AIMEAT_MATCH_MAX_SUGGESTIONS',
-          description: 'Maximum match suggestions per user',
-          value: String(config.matchMaxSuggestions),
-          defaultVal: '5',
-        },
-        {
-          envVar: 'AIMEAT_MATCH_MAX_DISTANCE_KM',
-          description: 'Maximum distance for location-based matching (km)',
-          value: String(config.matchMaxDistanceKm),
-          defaultVal: '100',
-        },
-        {
-          envVar: 'AIMEAT_MATCH_COOLDOWN_DAYS',
-          description: 'Days before re-suggesting a dismissed match',
-          value: String(config.matchCooldownDays),
-          defaultVal: '7',
-        },
-        {
-          envVar: 'AIMEAT_MATCH_NOTIFICATION_ENABLED',
-          description: 'Send notifications for new matches',
-          value: config.matchNotificationEnabled ? 'true' : 'false',
-          defaultVal: 'true',
-        },
-        {
-          envVar: 'AIMEAT_MATCH_NOTIFICATION_INTERVAL_HOURS',
-          description: 'Hours between match notification digests',
-          value: String(config.matchNotificationIntervalHours),
-          defaultVal: '24',
         },
       ],
     },

@@ -627,7 +627,6 @@ export function bootstrapRouter(
           chat_instances: { method: 'CRUD', url: '/v1/chat-instances', description: 'Register and track AI chat session instances', tier: 1 },
           realtime: { method: 'CRUD', url: '/v1/realtime/rooms', description: 'WebRTC rooms for peer-to-peer audio/video with YJS CRDT support', tier: 1 },
           push: { method: 'POST/DELETE', url: '/v1/push/subscribe', description: 'Web Push notification subscriptions (VAPID)', tier: 1, vapid_key: '/v1/push/vapid-key' },
-          matches: { method: 'GET/POST', url: '/v1/matches', description: 'AI-generated match suggestions between profiles with consent checks', tier: 1 },
           flags: { method: 'POST', url: '/v1/flags', description: 'Content moderation — flag inappropriate content, file appeals', tier: 1, appeals: '/v1/appeals' },
           feedback: { method: 'POST/GET', url: '/v1/feedback', description: 'Platform feedback to the node operator — report bugs, blockers, and ideas about the PLATFORM itself; the operator triages and replies (read replies at /v1/feedback/mine). Blockers notify the operator immediately.', tier: 1, mine: '/v1/feedback/mine' },
         },

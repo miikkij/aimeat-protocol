@@ -380,7 +380,6 @@ Additional shipped user-facing surfaces that are **clients of the generic APIs**
 - **Notebook** (`notebook-tab.js`, `services/notebook-*.ts`) — free-text capture → AI classify/enrich → distribute into organisms; a primary consumer of the librarian.
 - **Living Docs** (`living.ts`) — AI author for plain-language → living-document templates.
 - **Portfolio** (`portfolio.ts`) — per-user public portfolio builder + content catalog + themes.
-- **Matching** (`matches.ts`) — consent-gated shared-interest matching between owners.
 - **Package marketplace & instances** (`packages.ts`, `instances.ts`) — versioned package CRUD/export-import/reviews + install-and-track running instances (the v3-era package system; distinct from knowledge/skill packs).
 - **Chat Sessions** (`chat-instances.ts`) — persisted store of live chat-session registrations.
 - **Calibrator** (`calibrator.ts`) — a prompt-calibration workbench (projects/versions/batches, LLM editor, charts).
@@ -388,7 +387,7 @@ Additional shipped user-facing surfaces that are **clients of the generic APIs**
 
 ### 7.2 Operator Admin Dashboard
 
-The single operator control plane (`admin-*.ts`, ~17 routes; `public/views/admin/`, ~45 tabs) — the deliberate exception to the no-SSR rule (Core §1.3). It curates the same generic APIs, grouped as **Node** (Overview/Economy/Config/Security/CORS/Maintenance/Hooks/Portal/Subdomains/Stats/Usage/System-Prompts), **Identity** (Owners/Agents/GHII/Agent-Integration), **Data** (Actions/Boards/Chat-Instances/Realtime/Work/Messages/Memory/Agent-Tasks/Sharing-Groups/Capabilities/Applications), **Infrastructure** (Email/Push/Consul/Scheduler/Generator-Debug), **Services** (Directory/Matching/Services/Cortex/CSM/Knowledge/Skills/Packages), and **Integrations/Federation** (MSM/Federation/Genesis-Peers). It defines no protocol — operator tooling only.
+The single operator control plane (`admin-*.ts`, ~17 routes; `public/views/admin/`, ~45 tabs) — the deliberate exception to the no-SSR rule (Core §1.3). It curates the same generic APIs, grouped as **Node** (Overview/Economy/Config/Security/CORS/Maintenance/Hooks/Portal/Subdomains/Stats/Usage/System-Prompts), **Identity** (Owners/Agents/GHII/Agent-Integration), **Data** (Actions/Boards/Chat-Instances/Realtime/Work/Messages/Memory/Agent-Tasks/Sharing-Groups/Capabilities/Applications), **Infrastructure** (Email/Push/Consul/Scheduler/Generator-Debug), **Services** (Directory/Services/Cortex/CSM/Knowledge/Skills/Packages), and **Integrations/Federation** (MSM/Federation/Genesis-Peers). It defines no protocol — operator tooling only.
 
 ---
 

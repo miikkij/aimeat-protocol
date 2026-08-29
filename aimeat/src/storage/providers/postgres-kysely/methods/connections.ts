@@ -214,6 +214,17 @@ export const connectionMethods = {
     await this.db.deleteFrom('Connection').where('id', '=', id).execute();
   },
 
+  async deleteConnectionsByPrincipal(this: PostgresKyselyStorage, principal: string): Promise<number> {
+    // Delegations first: they key on connectionId with no foreign key, so deleting the connections
+    // first would leave rows pointing at nothing.
+    const ids = (await this.db.selectFrom('Connection').select('id').where('principal', '=', principal).execute())
+      .map(r => r.id);
+    if (!ids.length) return 0;
+    await this.db.deleteFrom('ConnectionDelegation').where('connectionId', 'in', ids).execute();
+    const r = await this.db.deleteFrom('Connection').where('principal', '=', principal).executeTakeFirst();
+    return Number(r.numDeletedRows ?? 0);
+  },
+
   /**
    * One conditional UPDATE. The `where` accepts the claim only when nobody holds it or the holder's
    * claim has gone stale, and Postgres serialises the row, so exactly one concurrent caller comes

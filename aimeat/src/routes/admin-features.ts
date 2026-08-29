@@ -3,13 +3,13 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Operator-only admin API surface — GHII user administration, email/notification
- *   templates and sending, directory rebuild, matching-engine control, push config, and genesis
+ *   templates and sending, directory rebuild, push config, and genesis
  *   peering management. All routes gated by requireAuth() + requireRole('operator').
  *
  * @structure
  *   - adminFeaturesRouter(config, storage, services): mounts /v1/admin/* routes
  *   - handle(): DRY try/catch wrapper returning a standard 500 envelope
- *   - Route groups: GHII users, notification templates, directory, matching, push, genesis peering
+ *   - Route groups: GHII users, notification templates, directory, push, genesis peering
  *
  * @version-history
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
@@ -21,9 +21,8 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import type { EmailService } from '../services/email.js';
-import { verificationEmailHtml, magicLinkEmailHtml, notificationEmailHtml, matchSuggestionEmailHtml } from '../services/email-templates.js';
+import { verificationEmailHtml, magicLinkEmailHtml, notificationEmailHtml } from '../services/email-templates.js';
 import type { DirectoryService } from '../services/directory.js';
-import type { MatchingEngine } from '../services/matching.js';
 import type { PushService } from '../services/push.js';
 import type { GenesisPeeringService } from '../services/genesis-peering.js';
 import { TEMPLATE_IDS, SUPPORTED_LOCALES, getDefaultTemplate, seedDefaultTemplates } from '../services/notification-templates.js';
@@ -40,7 +39,6 @@ export function adminFeaturesRouter(
     services: {
         emailService: EmailService;
         directoryService: DirectoryService;
-        matchingEngine: MatchingEngine;
         pushService: PushService;
         genesisPeeringService: GenesisPeeringService;
     },
@@ -212,12 +210,6 @@ export function adminFeaturesRouter(
                 const r = magicLinkEmailHtml('https://example.com/login?token=sample', tplLocale);
                 subject = 'AIMEAT Test — Magic Link'; html = r.html; text = r.text; break;
             }
-            case 'match_suggestion': {
-                const r = matchSuggestionEmailHtml([
-                    { ghii: 'gaii:example:alice', displayName: 'Alice', sharedInterests: ['hiking', 'photography'], distance: '12 km' },
-                ], tplLocale);
-                subject = 'AIMEAT Test — Match Suggestion'; html = r.html; text = r.text; break;
-            }
             default: {
                 const r = notificationEmailHtml('AIMEAT Test Email', 'This is a test email from your AIMEAT node.', tplLocale);
                 subject = 'AIMEAT Test Email'; html = r.html; text = r.text; break;
@@ -276,11 +268,6 @@ export function adminFeaturesRouter(
               params: ['{{url}}'], paramDescriptions: { '{{url}}': 'Magic login URL' } },
             { id: 'notification', usedIn: 'system', ...notificationEmailHtml('AIMEAT Notification', 'This is a sample notification message.', locale),
               params: ['{{subject}}', '{{body}}'], paramDescriptions: { '{{subject}}': 'Notification subject', '{{body}}': 'Notification body text' } },
-            { id: 'match_suggestion', usedIn: 'matching', ...matchSuggestionEmailHtml([
-                { ghii: 'gaii:example:alice', displayName: 'Alice', sharedInterests: ['hiking', 'photography'], distance: '12 km' },
-                { ghii: 'gaii:example:bob', displayName: 'Bob', sharedInterests: ['cooking'], distance: '5 km' },
-            ], locale),
-              params: ['{{matches}}'], paramDescriptions: { '{{matches}}': 'Array of match cards (name, GHII, interests, distance)' } },
         ];
     }
 
@@ -335,7 +322,7 @@ export function adminFeaturesRouter(
 
     // POST /v1/admin/email/templates/reset — Delete all custom, re-seed defaults
     router.post('/v1/admin/email/templates/reset', ...auth, handle(async (_req, res) => {
-        const validIds = ['verification', 'magic_link', 'notification', 'match_suggestion'];
+        const validIds = ['verification', 'magic_link', 'notification'];
         for (const locale of LOCALES) {
             for (const id of validIds) {
                 await storage.deleteMemory('__site__', `_email_tpl/${id}/${locale}/html`);
@@ -360,7 +347,7 @@ export function adminFeaturesRouter(
         const locale = (req.body.locale as string) || 'en';
         const { html: htmlContent, text: textContent } = req.body;
 
-        const validIds = ['verification', 'magic_link', 'notification', 'match_suggestion'];
+        const validIds = ['verification', 'magic_link', 'notification'];
         if (!validIds.includes(id)) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `Invalid template id: ${id}`));
             return;
@@ -401,25 +388,6 @@ export function adminFeaturesRouter(
         await services.directoryService.rebuildIndex();
         const stats = services.directoryService.getStats();
         res.json(success(config.nodeId, { rebuilt: true, stats }));
-        emitChange('features');
-    }));
-
-    // ── Matching ────────────────────────────────────────────
-
-    router.get('/v1/admin/matching', ...auth, handle(async (_req, res) => {
-        res.json(success(config.nodeId, {
-            enabled: config.matchingEnabled,
-            interval_hours: config.matchIntervalHours,
-            threshold: config.matchThreshold,
-            max_suggestions: config.matchMaxSuggestions,
-            max_distance_km: config.matchMaxDistanceKm,
-            cooldown_days: config.matchCooldownDays,
-        }));
-    }));
-
-    router.post('/v1/admin/matching/run', ...auth, handle(async (_req, res) => {
-        const result = await services.matchingEngine.runMatchingRound();
-        res.json(success(config.nodeId, result));
         emitChange('features');
     }));
 

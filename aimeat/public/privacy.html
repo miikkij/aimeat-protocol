@@ -49,7 +49,7 @@
     <p>This Privacy Policy describes how the AIMEAT node operated at <a href="{{nodeUrl}}">{{nodeName}}</a> ("the Service") collects, uses, stores, shares, and protects personal data. AIMEAT is an open, federated protocol for AI memory and agent infrastructure; the same software can be run on any node, in which case the operator of that node is the controller of data processed there. This document covers the {{nodeName}} node only.</p>
 
     <div class="callout">
-      <strong>TL;DR.</strong> {{nodeName}} is a real AIMEAT node operated by {{operatorName}}. You hold the data you explicitly write into your AIMEAT account: your identity (GHII), the AI agents you connect (GAII), memory and storage entries, your morsel wallet ledger, consents you've granted, and your agents' activity history. You can export or delete everything at any time from the <em>Data Wallet</em> tab in your profile — AIMEAT ships strong GDPR compliance tools as core protocol functionality, not as an afterthought. The operator does not sell data, does not train AI models on your data, and does not share data with third parties without your consent.
+      <strong>TL;DR.</strong> {{nodeName}} is a real AIMEAT node operated by {{operatorName}}. You hold the data you explicitly write into your AIMEAT account: your identity (GHII), the AI agents you connect (GAII), memory and storage entries, your morsel wallet ledger, consents you've granted, and your agents' activity history. You can export or delete everything at any time from the <em>Data Wallet</em> tab in your profile, and those are ordinary features of the protocol rather than a request you file. The operator does not sell your data and does not train AI models on it. Two things are worth reading past this box for: what you deliberately <strong>publish</strong> leaves the node and can be read by anyone, including crawlers (<a href="#s5">section 5</a>), and using AI here sends what you asked about to a model provider, either on your key or on this node's (<a href="#s4">section 4</a>).
     </div>
 
     <div class="callout">
@@ -82,12 +82,15 @@
       <li><strong>Activity log:</strong> structured events emitted by your agents (task progress, work delivery, capability invocations).</li>
       <li><strong>OAuth client records:</strong> when you connect an MCP client (Claude Desktop, Cursor, etc.), the client identifier, name, redirect URIs, and the refresh-token grants you approved.</li>
       <li><strong>Federation events:</strong> if your data is explicitly shared with peer nodes (federation), the audit trail of which records were sent or received.</li>
+      <li><strong>Work your agents do while you are away:</strong> schedules you set, the runs they produce, and the delivery record of anything sent to an outside service on your instruction.</li>
+      <li><strong>AI provenance records:</strong> when this node generates content for you, a record of which model made it, when, how much a person was involved, and a fingerprint of the exact bytes. See <a href="#aiact">section 12</a>.</li>
+      <li><strong>Usage counts:</strong> what was called and how much of an allowance it spent, so both you and the operator can see where a budget went.</li>
     </ul>
 
     <h3>2.3 Data automatically collected</h3>
     <ul>
       <li><strong>Technical logs:</strong> standard request logs (IP address, user agent, requested path, HTTP status, response time). Retained 30 days.</li>
-      <li><strong>Cookies and local storage:</strong> a session cookie for authenticated browser use and a small importmap-version stamp for cache-busting. <strong>No analytics, no third-party tracking, no advertising cookies.</strong> See <a href="#cookies">section 8</a>.</li>
+      <li><strong>Cookies and local storage:</strong> a sign-in cookie for authenticated browser use and a small importmap-version stamp for cache-busting. <strong>No analytics, no third-party tracking, no advertising cookies.</strong> See <a href="#cookies">section 8</a>.</li>
     </ul>
 
     <h2>3. Why your data is used (legal bases)</h2>
@@ -101,10 +104,15 @@
         <tr><td>Detect and prevent abuse, fraud, and security incidents</td><td>Art. 6(1)(f) Legitimate interest</td></tr>
         <tr><td>Comply with legal obligations (lawful requests, accounting)</td><td>Art. 6(1)(c) Legal obligation</td></tr>
         <tr><td>Push notifications you opted in to</td><td>Art. 6(1)(a) Consent</td></tr>
+        <tr><td>Reading and sending through an outside account you connected</td><td>Art. 6(1)(b) Contract, on your instruction. For other people's data in that mailbox, you are the controller</td></tr>
+        <tr><td>Running your agents' scheduled work and delivering its results</td><td>Art. 6(1)(b) Contract</td></tr>
+        <tr><td>Serving what you chose to publish, and letting search engines find it</td><td>Art. 6(1)(b) Contract, on your own publishing decision</td></tr>
+        <tr><td>Recording how AI was used here, and marking generated content</td><td>Art. 6(1)(c) Legal obligation (EU AI Act Art. 50)</td></tr>
+        <tr><td>Metering what each person spends of the node's own AI budget</td><td>Art. 6(1)(b) Contract</td></tr>
       </tbody>
     </table>
 
-    <h2>4. Who data is shared with</h2>
+    <h2><span id="s4">4. Who data is shared with</span></h2>
     <p>The operator does not sell personal data and does not share it for advertising purposes. Data is shared only in the following situations:</p>
     <ul>
       <li><strong>With AI agents you connect:</strong> Connecting an agent (e.g. Claude Desktop via MCP) grants that agent the scopes you approved during OAuth or device authorization. The agent runs on your chosen platform and can read or write the data covered by its scopes.</li>
@@ -113,21 +121,45 @@
       <li><strong>With sub-processors necessary to run the Service:</strong> See section 5.</li>
       <li><strong>When required by law:</strong> Lawful binding requests addressed to the operator as the controller. The operator will challenge requests considered overbroad.</li>
     </ul>
-    <p><strong>{{nodeName}} does not automatically send your data to third-party AI inference providers (OpenAI, Anthropic, Google, etc.).</strong> The exception is the <em>generator</em> feature: it is <strong>bring-your-own-key</strong> — if you provide your own API key (typically an OpenRouter key) in your generator settings, the server uses <em>your</em> key to call the inference provider you chose on your behalf. Your prompt and the response are then routed through that provider under <em>your</em> key's terms, not under the operator's. If you don't provide a key, no outbound inference calls are made from the server. Any inference your AI agent does in its own chat platform (Claude Desktop, ChatGPT, etc.) uses that platform's credentials and is governed by that platform's privacy policy, not this one.</p>
+    <p><strong>{{nodeName}} never sends your data to an AI provider as a side effect of storing it.</strong> A memory entry sits where you put it. Data reaches a model only when you ask for something that needs one, and then one of two things happens.</p>
+    <ul>
+      <li><strong>You brought your own key.</strong> The server uses <em>your</em> key to call the provider you chose. Your prompt and the response are governed by <em>your</em> agreement with that provider, not the operator's.</li>
+      <li><strong>You are using the node's own key</strong>, where the operator has configured one. The call goes to that provider on the operator's account, and the operator meters what each person uses. The chat says which of the two paid for the answer.</li>
+    </ul>
+    <p>Inference your own AI agent does on its own platform — Claude, ChatGPT, Cursor and the like — uses that platform's credentials and is governed by that platform's privacy policy rather than this one, whatever it then chooses to write here.</p>
 
-    <h2>5. Sub-processors</h2>
-    <p>{{nodeName}} is run on a single hosting provider and otherwise self-contained — no third-party email service, no third-party object storage, no third-party analytics:</p>
+    <h2><span id="s5">5. Who else handles your data</span></h2>
+    <p>Three different relationships get filed under one heading and then argued about, so they are kept apart here.</p>
+
+    <h3>5.1 Sub-processors the operator instructs</h3>
+    <p>These handle data because the operator asked them to, under a data processing agreement (GDPR Art. 28).</p>
     <table>
       <thead><tr><th>Sub-processor</th><th>Purpose</th><th>Location</th></tr></thead>
       <tbody>
         <tr><td><a href="{{hostingUrl}}" target="_blank" rel="noopener">{{hostingName}}</a></td><td>Server hosting, network, backups</td><td>{{hostingLocation}}</td></tr>
       </tbody>
     </table>
-    <p>Email (account recovery, security alerts) is sent from a mail server operated on the same infrastructure. File storage is on the same node — no external object-storage provider. There is no analytics or telemetry provider; the source code is open at <a href="https://github.com/miikkij/aimeat-protocol">github.com/miikkij/aimeat-protocol</a> and you can audit what the server does directly.</p>
-    <p>The operator relies on {{hostingName}}'s standard data processing terms (GDPR Art. 28-compliant) for the hosting relationship.</p>
+    <p>Email for account recovery and security alerts is sent from a mail server on the same infrastructure, and files are stored on this node itself, so neither adds a third party. There is no analytics or telemetry provider. The operator relies on {{hostingName}}'s standard Art. 28 processing terms for the hosting relationship.</p>
+    <p><strong>Where this node is configured with the operator's own AI provider key</strong>, what you send to the built-in chat or to this node's AI endpoints is processed by that provider on the operator's account and under the operator's agreement with them. This is how someone can use AI here on the day they arrive without bringing anything of their own; the operator is not reselling access to a key, it is metering the use of one. Where no such key is configured, those features refuse rather than quietly falling back to something else.</p>
+
+    <h3>5.2 Services you connect yourself</h3>
+    <p>The operator is not a party to any of these. You bring the credential, this node uses it in your name and only for what you approved, and disconnecting it stops that at once.</p>
+    <ul>
+      <li><strong>Your own AI provider key.</strong> Requests you trigger go to the provider you chose, under your own agreement with them, and not through the operator's account.</li>
+      <li><strong>Your own payment processor.</strong> A seller sets their own key and is the merchant of record: the processor did their identity checks, the charge lands on their account, and this node holds no funds and has no payment key of its own. The money moves between the buyer, the seller and the seller's processor.</li>
+      <li><strong>Your own mailbox and publishing accounts</strong>, where the operator has enabled them: for example Gmail, Outlook, LinkedIn, X, Mastodon, Bluesky or YouTube. Reading and sending are separate permissions and are asked for separately, so a connection made to read invoices cannot send. The credential is stored encrypted and is never shown back to you or to anyone else. <strong>A mailbox holds other people's personal data as well as your own.</strong> For that content you are the controller and the operator is the processor acting on your instruction, and it is your responsibility that you may bring it here at all.</li>
+      <li><strong>Signing in through an identity provider</strong>, if you use one instead of a password. That provider learns that you signed in here.</li>
+    </ul>
+
+    <h3>5.3 Recipients of what you publish</h3>
+    <p>Anything you deliberately make public leaves this node by design: published apps and portfolios on their own addresses, public profile fields, public memory entries, and anything you post to a shared surface. Search engines index it, and this node may notify indexing services when public content changes. Content you keep private is not affected, and publishing is a decision you make per item rather than a default.</p>
+    <p>{{aiTrainingClause}} You can read the current setting yourself at <a href="/robots.txt">/robots.txt</a>. A published app is not search-visible until its owner says so.</p>
+
+    <p>The source code is open at <a href="https://github.com/miikkij/aimeat-protocol">github.com/miikkij/aimeat-protocol</a>, so you can check what the server actually does rather than take this list on trust.</p>
 
     <h2>6. International transfers</h2>
-    <p>The {{nodeName}} node is operated from {{operatorCountry}}, on {{hostingName}} infrastructure in {{hostingLocation}}. If both jurisdictions are within the European Economic Area, no personal data is transferred outside the EEA as part of normal operation. If you choose to use the bring-your-own-key generator feature with a provider located outside the EEA (e.g. OpenRouter, OpenAI), <em>your</em> request to that provider involves a transfer under <em>your</em> agreement with that provider, not under the operator's.</p>
+    <p>The {{nodeName}} node is operated from {{operatorCountry}}, on {{hostingName}} infrastructure in {{hostingLocation}}. If both jurisdictions are within the European Economic Area, storing and serving your data involves no transfer outside the EEA.</p>
+    <p>Two things you do can involve one, and the difference matters because it decides whose agreement covers it. Using <em>your own</em> provider key, or your own connected account, sends the request under <em>your</em> agreement with that provider. Using <em>this node's</em> AI key sends it under the operator's agreement with theirs, and where that provider is outside the EEA the operator relies on the transfer mechanism in that agreement. Either way the transfer happens because you asked for something, not in the background.</p>
 
     <h2>7. How long data is kept</h2>
     <table>
@@ -139,17 +171,28 @@
         <tr><td>Morsel ledger</td><td>Until account deletion; aggregate-only after deletion (audit trail anonymized)</td></tr>
         <tr><td>Activity log</td><td>Until you delete it or your account (user-owned data)</td></tr>
         <tr><td>OAuth client grants</td><td>Until you revoke the connection</td></tr>
+        <tr><td>Connected outside accounts</td><td>Until you disconnect one or delete your account; the stored credential goes with it, and the operator revokes it at the provider where the provider supports that</td></tr>
+        <tr><td>Shared workspaces and their version history</td><td>Until the group deletes the document; older versions are pruned to a per-node limit. Content you contributed to a group is not removed by deleting your own account, because it is the group's record</td></tr>
+        <tr><td>Moderation reports, appeals and dispute records</td><td>Kept as the record of a decision that affected someone, including after the account that filed it is gone</td></tr>
+        <tr><td>Authentication-failure log</td><td>A file of refused sign-in attempts, with IP addresses. It rotates by size rather than by age, because its volume is chosen by whoever is attacking rather than by this node</td></tr>
         <tr><td>Server access logs</td><td>30 days</td></tr>
         <tr><td>Backups</td><td>30 days, then automatically purged</td></tr>
       </tbody>
     </table>
+    <p><strong>Two things deletion cannot take with it, and you should know before you press the button.</strong></p>
+    <ul>
+      <li><strong>Accounting records.</strong> If money has moved through your account, the invoices and payment records behind it are kept for as long as accounting law in {{operatorCountry}} requires, which is longer than your account lives. They are kept for that purpose and processed for nothing else. GDPR Art. 17(3)(b) is what allows this, and telling you is the condition.</li>
+      <li><strong>Provenance records for content that is still public.</strong> If this node generated something with AI and you published it, the record saying which model made it stays as long as the content does. It is what makes "who made this?" answerable, and stripping the label off content that is still readable would defeat the point of the marking. If you want the record gone, take the content down and both go.</li>
+    </ul>
 
     <h2>8. <span id="cookies">Cookies and similar technologies</span></h2>
     <p>The minimum cookies necessary to operate {{nodeName}}:</p>
     <ul>
-      <li><strong>Session cookie</strong> (strictly necessary, no consent required) — keeps you logged in for the duration of your browser session. HttpOnly, Secure, SameSite=Lax.</li>
-      <li><strong>Cookie consent record</strong> (strictly necessary) — remembers your choice in the consent banner.</li>
+      <li><strong>Sign-in cookie</strong> (strictly necessary, no consent required): keeps you signed in. It is not a session cookie and does not end when you close the browser. It is replaced with a fresh one each time it is used, expires after {{refreshIdleDays}} days without use, and has an absolute maximum of {{refreshAbsoluteDays}} days that is never extended. Signing out deletes it. HttpOnly, Secure, SameSite=Lax.</li>
+      <li><strong>Sign-in-in-progress cookie</strong> (strictly necessary): set only while you are signing in through an outside identity provider, and discarded as soon as you return.</li>
+      <li><strong>Cookie consent record</strong> (strictly necessary): remembers your choice in the consent banner.</li>
     </ul>
+    <p>Your browser also keeps a few of your own settings locally, such as the colour theme you picked. Those stay in your browser and are not sent to the server.</p>
     <p><strong>No analytics, no third-party trackers, no advertising cookies, no fingerprinting.</strong> If you want to verify this, the source code is open at <a href="https://github.com/miikkij/aimeat-protocol">github.com/miikkij/aimeat-protocol</a>.</p>
 
     <h2>9. Your rights (GDPR)</h2>
@@ -174,13 +217,27 @@
     <h2>11. Children</h2>
     <p>{{nodeName}} is not directed at children under 16 (the EU GDPR age-of-consent default for online services per Art. 8). The operator does not knowingly collect data from children below that age. If you believe a child has provided personal data, please contact the operator so it can be deleted.</p>
 
-    <h2>12. Self-hosting</h2>
+    <h2>12. <span id="aiact">AI transparency</span></h2>
+    <p>When this node generates content with AI, it mints a record of what happened: which model, which account asked, when, how much a person was involved, and a SHA-256 fingerprint of the exact bytes. Content that a person would otherwise mistake for human-made carries a visible label linking to that record. This is what the EU AI Act's Article 50 asks of a deployer, and this node does it as a matter of course rather than on request.</p>
+    <p>Three addresses make it checkable rather than a claim:</p>
+    <ul>
+      <li><a href="/v1/ai-transparency">/v1/ai-transparency</a> states the operator's position in full, including which market-surveillance authority applies and which parts of the EU Code of Practice the operator has signed.</li>
+      <li><code>/v1/provenance/by-hash/{sha256}</code> answers "did this node make these bytes?" for anyone, without an account, for content that is public.</li>
+      <li>Reporting a missing or wrong label is <code>POST /v1/flags</code> with reason <code>undisclosed_ai</code>, and a decision can be appealed.</li>
+    </ul>
+    <p><strong>Absence of a record means unstated, never "a human wrote it".</strong> And if you publish AI-generated content through this node, the duty to say so is yours as the publisher; this node gives you the marking, it cannot make the disclosure on your behalf.</p>
+
+    <h2>13. Reporting content, and what happens then</h2>
+    <p>This node hosts what its users publish, so it needs a way to be told when something is wrong. Anyone can report content with <code>POST /v1/flags</code>, and the operator's moderation queue is where it lands. A report names what is being reported and why; if a decision goes against you, you are told the reason and can appeal it with <code>POST /v1/flags/{id}/appeal</code>. Reports and their outcomes are kept as the record of a decision that affected somebody, which is why they outlive the account that filed them.</p>
+    <p>The point of contact for anything that needs a person is <a href="mailto:{{operatorEmail}}">{{operatorEmail}}</a>.</p>
+
+    <h2>14. Self-hosting</h2>
     <p>The AIMEAT software is open source (MIT) and designed to be run by anyone. This Privacy Policy applies <em>only</em> to the {{nodeName}} node. If you use a node operated by someone else, that node's operator is the controller for data on that node, and you should review their privacy policy. Federation between nodes means records you explicitly share across nodes may be processed by both controllers. The <a href="https://github.com/miikkij/aimeat-protocol#getting-started">getting-started guide</a> walks through running your own node.</p>
 
-    <h2>13. Changes to this policy</h2>
+    <h2>15. Changes to this policy</h2>
     <p>The operator will update this policy when practices change. Material changes will be announced in-app and by email (if your email is on file) at least 30 days before they take effect. Non-material edits (typo fixes, clarifications) take effect immediately and are recorded in the version history at the top of this page.</p>
 
-    <h2>14. Contact</h2>
+    <h2>16. Contact</h2>
     <p>Privacy questions: <a href="mailto:{{operatorEmail}}">{{operatorEmail}}</a><br>
     Security issues: <a href="mailto:{{operatorSecurityEmail}}">{{operatorSecurityEmail}}</a><br>
     Postal address: {{operatorAddress}}</p>

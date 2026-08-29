@@ -15,6 +15,12 @@
  *   updateSessionItems · cancelSession · completeSession
  * @usage import { createSession, completeSession } from '../commerce/session-service.js';
  * @version-history
+ *   v2.4.0 — 2026-08-29 — A money platform fee is always booked `receivable`. The Stripe branch wrote
+ *     `connect`, which named the EE Connect platform removed on 2026-07-28: with the seller as
+ *     merchant of record on their own key, nothing deducts the fee from the charge, so the label told
+ *     the operator's dashboard the money had been collected when it had only been earned. Found while
+ *     auditing the legal texts, where the same stale model had reached the operator's own
+ *     understanding of where the 2 % goes. No stored record changes meaning: nothing reads `mode`.
  *   v2.3.0 — 2026-08-10 — Security audit H-3: completeSession asks appSpendRefusal before collecting.
  *     It is the one place money leaves the buyer, and all four completion doors (REST, UCP, ACP, MCP)
  *     reached handler.collect() without the spend scope or the per-app ceiling ever being checked.
@@ -180,8 +186,15 @@ export async function listOrders(storage: Storage, sellerGhii: string, limit = 5
 /**
  * Record the operator's platform fee on a MONEY sale (never touches the morsel ledger). Stored as
  * a memory record under the operator's GHII (or the seller's, if no operator resolves) so the admin
- * dashboard can total the operator's real-money cut per currency. `mode` notes how it is collected:
- * `connect` when the Stripe handler routed an application-fee, otherwise `receivable` (invoice).
+ * dashboard can total the operator's real-money cut per currency.
+ *
+ * `mode` says whether the fee has been COLLECTED or is still OWED, and on this node every money fee
+ * is owed. It read `connect` for the Stripe handler, which described the removed EE Connect platform
+ * that routed an application fee out of the card charge. That platform went with the 2026-07-28
+ * refactor: there is no node-level Stripe key and the seller is merchant of record, so the fee is
+ * never deducted from the charge (see `commerce/stripe-handler.ts`). The label survived and told the
+ * dashboard the money had been taken when nobody had invoiced it. A fee that has to be collected out
+ * of band is a `receivable` whichever rail carried the sale.
  */
 export async function recordMoneyPlatformFee(
   storage: Storage,
@@ -190,7 +203,7 @@ export async function recordMoneyPlatformFee(
 ): Promise<void> {
   const operatorGhii = await resolveOperatorFeeGhii(storage, config);
   const ownerGhii = operatorGhii ?? args.sellerGhii;
-  const mode = args.handler === 'com.stripe.spt' ? 'connect' : 'receivable';
+  const mode = 'receivable';
   await putRecord(storage, ownerGhii, `commerce.platform-fee.${args.trackingCode}`, {
     fee: args.fee, currency: args.currency, mode, handler: args.handler,
     sellerGhii: args.sellerGhii, buyerGhii: args.buyerGhii, trackingCode: args.trackingCode,
@@ -433,8 +446,9 @@ export async function completeSession(
       });
     }
     // Fee leg. Morsels: route to operator|burn on the ledger. Money: no ledger movement — record
-    // the operator's platform-fee entry (collected live via Stripe Connect application-fee, or an
-    // invoice receivable otherwise) so the operator's cut is ACCOUNTED and shows in the dashboard.
+    // the operator's platform-fee entry as a receivable, so the cut is ACCOUNTED and shows in the
+    // dashboard as OWED. No rail collects it here: the seller charges on their own account and the
+    // fee is invoiced out of band.
     if (!isMoneyCurrency(session.currency)) {
       await settleMarketplaceFee(storage, config, { fee: totalFee, payerGhii: session.buyerGhii, trackingCode: collected.trackingCode, source: 'commerce' });
     } else if (totalFee > 0) {
