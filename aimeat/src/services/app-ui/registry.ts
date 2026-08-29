@@ -25,6 +25,9 @@
  * @usage
  *   import { UI_COMPONENTS, componentById, buildUiCatalogue } from './registry.js';
  * @version-history
+ *   v1.12.0 — 2026-08-29 — `map` joins the components (append-only): the REAL map, Leaflet
+ *     over OpenStreetMap — the developer's words, after the atlas abstraction missed them:
+ *     "a map" means the real one.
  *   v1.11.0 — 2026-08-29 — THE OPS FAMILY joins the components (append-only): `health`,
  *     `queue`, `gauge`, `console` — an admin panel becomes an arrangement — plus `atlas`
  *     (the offline data map) and the chart family (`kind`: axes / donut / calendar; area
@@ -304,6 +307,17 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
       title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
       fit: { type: 'enum', values: ['auto', 'world'], default: 'auto', description: 'auto frames the matched regions and markers; world pins the whole map.' },
       emptyTitle: text('What the empty state says.', 80),
+      emptyHint: text('The line under it.', 160),
+    },
+  },
+  {
+    id: 'map',
+    summary: 'The REAL map: Leaflet over OpenStreetMap street tiles (the node serves Leaflet; the tiles carry their required attribution). The source resolves to ONE record: { markers: [{ label?, lon, lat, tone? }], center?: { lon, lat }, zoom? }. Two or more markers frame themselves; one centres on itself. Pins and popups ride the look\'s tokens, dark mode re-tones the tiles. When the owner says "a map", this is the block — the atlas is the offline country choropleth for data-by-country.',
+    props: {
+      source: source(),
+      title: text('The floating chip naming the map, and the block\'s name in tabs and decks.', 80),
+      zoom: { type: 'number', min: 1, max: 19, default: 12, description: 'Zoom used when the data does not decide the frame (a single marker, or a bare center).' },
+      emptyTitle: text('What the empty state says when the map cannot load.', 80),
       emptyHint: text('The line under it.', 160),
     },
   },

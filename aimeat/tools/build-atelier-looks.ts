@@ -74,7 +74,8 @@ export function emitLooksCss(): string {
     // A WORLD's ground rides in the same block (light) plus a `@dark` twin the dark cascade
     // layers on top. Only the ground tokens may carry literals; the tool refuses anything else
     // so the freed purity rule cannot leak.
-    const GROUND_TOKENS = ['--ak-bg', '--ak-surface', '--ak-surface-2', '--ak-ink', '--ak-ink-dim', '--ak-line'];
+    const GROUND_TOKENS = ['--ak-bg', '--ak-surface', '--ak-surface-2', '--ak-ink', '--ak-ink-dim', '--ak-line',
+      '--ak-ok', '--ak-warn', '--ak-err'];
     if (look.grounds) {
       for (const half of [look.grounds.light, look.grounds.dark]) {
         for (const name of Object.keys(half)) {

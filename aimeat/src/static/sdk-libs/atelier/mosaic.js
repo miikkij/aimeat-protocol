@@ -90,6 +90,7 @@ import { projectCanvas } from './mosaic-canvas.js';
 import { health, queue, gauge } from './ops.js';
 import { konsole } from './konsole.js';
 import { atlas } from './atlas.js';
+import { map } from './map.js';
 
 export { appRef };
 
@@ -217,6 +218,10 @@ export function mosaic(spec) {
       case 'atlas':
         return bound('atlas', function (data) {
           return atlas({ target: into, data: patchFor('atlas', data).data, title: p.title, fit: p.fit, empty: empty, onPick: pick });
+        });
+      case 'map':
+        return bound('map', function (data) {
+          return map({ target: into, data: patchFor('map', data).data, title: p.title, zoom: p.zoom, empty: empty, onPick: pick });
         });
       case 'matrix':
         return bound('matrix', function (data) {

@@ -10,6 +10,9 @@
     const meta = document.querySelector('meta[name="aimeat-node"]');
     if (meta) return (meta.getAttribute("content") || "").replace(/\/$/, "");
     if (location.protocol === "http:" || location.protocol === "https:") return location.origin;
+    if (typeof self !== "undefined" && typeof self.origin === "string" && self.origin.indexOf("http") === 0) {
+      return self.origin;
+    }
     return cfg().baseUrl;
   }
   var NODE_URL = resolveNodeUrl();
@@ -103,7 +106,7 @@
     this._setStatus("connecting");
     var session = getSession2();
     var wsUrl = NODE_URL.replace(/^http/, "ws") + "/v1/personal/tunnel?token=" + encodeURIComponent(session.jwt);
-    var self = this;
+    var self2 = this;
     try {
       this._ws = new WebSocket(wsUrl);
     } catch (e) {
@@ -113,28 +116,28 @@
       return;
     }
     this._ws.onopen = function() {
-      self._reconnectAttempts = 0;
-      self._lastHeartbeatAck = Date.now();
-      self._setStatus("online");
-      self._startHeartbeat();
+      self2._reconnectAttempts = 0;
+      self2._lastHeartbeatAck = Date.now();
+      self2._setStatus("online");
+      self2._startHeartbeat();
     };
     this._ws.onmessage = function(event) {
       try {
         var msg = JSON.parse(event.data);
-        self._handleMessage(msg);
+        self2._handleMessage(msg);
       } catch (e) {
         console.error("[aimeat-tunnel] Invalid message:", e);
       }
     };
     this._ws.onclose = function() {
-      self._cleanup();
-      self._setStatus("offline");
-      if (!self._closed) {
-        self._scheduleReconnect();
+      self2._cleanup();
+      self2._setStatus("offline");
+      if (!self2._closed) {
+        self2._scheduleReconnect();
       }
     };
     this._ws.onerror = function(err) {
-      if (self._opts.onError) self._opts.onError(err);
+      if (self2._opts.onError) self2._opts.onError(err);
     };
   };
   TunnelClient.prototype._handleMessage = function(msg) {
@@ -252,17 +255,17 @@
   };
   TunnelClient.prototype._startHeartbeat = function() {
     this._stopHeartbeat();
-    var self = this;
+    var self2 = this;
     var interval = this._opts.heartbeatIntervalMs;
     this._heartbeatTimer = setInterval(function() {
-      if (!self._ws || self._ws.readyState !== WebSocket.OPEN) return;
-      var sinceLast = Date.now() - self._lastHeartbeatAck;
+      if (!self2._ws || self2._ws.readyState !== WebSocket.OPEN) return;
+      var sinceLast = Date.now() - self2._lastHeartbeatAck;
       if (sinceLast > interval * 3) {
         console.warn("[aimeat-tunnel] Heartbeat ack timeout (" + sinceLast + "ms), reconnecting...");
-        self._ws.close(4e3, "heartbeat_timeout");
+        self2._ws.close(4e3, "heartbeat_timeout");
         return;
       }
-      self._send({
+      self2._send({
         type: "heartbeat",
         id: uuid(),
         timestamp: (/* @__PURE__ */ new Date()).toISOString()
@@ -290,12 +293,12 @@
       var jitter = delay * 0.25 * (Math.random() * 2 - 1);
       delay = Math.max(base, delay + jitter);
     }
-    var self = this;
+    var self2 = this;
     this._reconnectAttempts++;
     console.log("[aimeat-tunnel] Reconnecting in " + Math.round(delay) + "ms (attempt " + this._reconnectAttempts + ")");
     this._reconnectTimer = setTimeout(function() {
-      self._reconnectTimer = null;
-      self.connect();
+      self2._reconnectTimer = null;
+      self2.connect();
     }, delay);
   };
   TunnelClient.prototype._send = function(msg) {
@@ -304,19 +307,19 @@
     }
   };
   TunnelClient.prototype.sendRequest = function(payload, timeoutMs) {
-    var self = this;
+    var self2 = this;
     var timeout = timeoutMs || this._opts.requestTimeoutMs;
     var id = uuid();
     return new Promise(function(resolve, reject) {
-      if (!self._ws || self._ws.readyState !== WebSocket.OPEN) {
+      if (!self2._ws || self2._ws.readyState !== WebSocket.OPEN) {
         return reject(new Error("Tunnel not connected"));
       }
       var timer = setTimeout(function() {
-        self._pendingResponses.delete(id);
+        self2._pendingResponses.delete(id);
         reject(new Error("Request timeout (" + timeout + "ms)"));
       }, timeout);
-      self._pendingResponses.set(id, { resolve, timer });
-      self._send({
+      self2._pendingResponses.set(id, { resolve, timer });
+      self2._send({
         type: "request",
         id,
         payload: JSON.stringify(payload),

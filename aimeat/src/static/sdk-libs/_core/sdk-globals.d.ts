@@ -40,6 +40,8 @@ interface Window {
   /* eslint-disable @typescript-eslint/no-explicit-any */
   /** three-world@1 vendored bundle, lazy-loaded by atelier/scene3d.js — untyped external lib. */
   THREE?: any;
+  /** leaflet@1 vendored pack, lazy-loaded by atelier/map.js — untyped external lib. */
+  L?: any;
   markdownit?: any;
   markdownitTaskLists?: any;
   markdownitFootnote?: any;
