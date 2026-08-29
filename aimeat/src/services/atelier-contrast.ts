@@ -327,7 +327,7 @@ export function parseAtelier(css: string): AtelierSheet {
     return { body: css.slice(open + 1, close) };
   };
   const presets = new Map<string, { decls: Map<string, string>; raw: string }>();
-  const marker = /\/\*\s*@preset-block\s+([a-z0-9-]+)\b[^*]*\*\//g;
+  const marker = /\/\*\s*@preset-block\s+([a-z0-9@-]+)\b[^*]*\*\//g;
   let m: RegExpExecArray | null;
   let base: Map<string, string> | null = null;
   let dark: Map<string, string> | null = null;
@@ -353,6 +353,13 @@ export const SURFACE_TINT_CAP = 8;
 /** The hero mesh budget is wider: text never sits on raw mesh (AK-SCRIM covers text). An
  *  aesthetic bound (a mesh, not a solid poster fill); the readability guarantee is AK-SCRIM. */
 export const HERO_MESH_CAP = 36;
+/** The GROUND TOKENS a world-look may claim with literal values — the one licence to bring a
+ *  colour of its own (paper, phosphor, night), because every check in this matrix then runs
+ *  against exactly those values in both modes. Anything else stays var()/color-mix only. */
+export const GROUND_TOKENS = [
+  '--ak-bg', '--ak-surface', '--ak-surface-2', '--ak-ink', '--ak-ink-dim', '--ak-line',
+] as const;
+
 /** Tokens the base contract must declare — a look can never inherit half its identity. */
 export const REQUIRED_BASE = [
   '--ak-bg', '--ak-surface', '--ak-surface-2', '--ak-surface-image', '--ak-ink', '--ak-ink-dim',
@@ -389,7 +396,11 @@ export function loadAtelierSheets(): AtelierSheets {
   const atelierCss = readFileSync(new URL('../../public/lib/aimeat-atelier.css', import.meta.url), 'utf8') + '\n' + looksCss;
   const themes = parseThemes(themeCss);
   const sheet = parseAtelier(atelierCss);
-  sheetsCache = { themes, sheet, presetNames: [...new Set(['vivid', ...sheet.presets.keys()])] };
+  // A `name@dark` block is a WORLD's dark ground, layered under dark mode — never its own look.
+  sheetsCache = {
+    themes, sheet,
+    presetNames: [...new Set(['vivid', ...[...sheet.presets.keys()].filter((n) => !n.endsWith('@dark'))])],
+  };
   return sheetsCache;
 }
 
@@ -399,8 +410,17 @@ export function loadAtelierSheets(): AtelierSheets {
  * app frame wins over every stylesheet). Returns every check's result; the caller decides what a
  * failure means (the tool prints and exits, the validator refuses with the first numbers).
  */
-export function runMatrix(overrides?: Record<string, string>): Result[] {
-  const { themes, sheet, presetNames } = loadAtelierSheets();
+export function runMatrix(
+  overrides?: Record<string, string>,
+  opts?: { presets?: readonly string[] },
+): Result[] {
+  const { themes, sheet, presetNames: allPresets } = loadAtelierSheets();
+  // A signature is proven WHERE IT LIVES: an accent pair chosen for one look validates against
+  // that look, not against every world in the registry — otherwise each new world (paper,
+  // phosphor, night) would shrink the legal accent space for apps that never wear it.
+  const presetNames = opts?.presets?.length
+    ? allPresets.filter((p) => opts.presets!.includes(p))
+    : allPresets;
   const results: Result[] = [];
   // Two floor classes, and only under an OVERRIDE do they differ. The 4.5:1 floors are WCAG
   // readability and never move (beyond float noise). The 1.10/1.30 step-and-edge floors are the
@@ -435,11 +455,18 @@ export function runMatrix(overrides?: Record<string, string>): Result[] {
           failR(`preset ${name}`, `AK-COMPLETE ${token}`, 'sets a token the contract does not declare — add it to the contract first');
         }
       }
-      if (/#[0-9a-fA-F]{3,6}\b|rgba?\s*\(/.test(block.raw)) {
-        failR(`preset ${name}`, 'AK-PURE', 'a preset never introduces a colour — only var() and color-mix over theme tokens');
-      } else {
-        passR(`preset ${name}`, 'AK-PURE');
+      // THE FREED PURITY RULE (2026-08-29, the developer's direction): a look may OWN ITS GROUND
+      // — paper, phosphor, night — as literal values on the ground tokens, because every check
+      // in this matrix then runs against them. What stays forbidden is an UNPROVEN colour: a
+      // literal on any non-ground token still refuses, since nothing would prove it.
+      let pure = true;
+      for (const [token, value] of block.decls) {
+        if (/#[0-9a-fA-F]{3,6}\b|rgba?\s*\(/.test(value) && !(GROUND_TOKENS as readonly string[]).includes(token)) {
+          failR(`preset ${name}`, `AK-PURE ${token}`, 'a literal colour outside the ground tokens is unproven — use var()/color-mix, or move it to the look\'s grounds');
+          pure = false;
+        }
       }
+      if (pure) passR(`preset ${name}`, 'AK-PURE');
     }
   }
 
@@ -454,6 +481,11 @@ export function runMatrix(overrides?: Record<string, string>): Result[] {
       for (const [k, v] of sheet.base) vars.set(k, v);
       if (mode === 'dark') for (const [k, v] of sheet.dark) vars.set(k, v);
       if (preset !== 'vivid') for (const [k, v] of sheet.presets.get(preset)!.decls) vars.set(k, v);
+      // A world's dark ground layers over its look block in dark mode, exactly as the cascade
+      // does — so every check below runs against the ground a person will actually see.
+      if (mode === 'dark' && sheet.presets.has(`${preset}@dark`)) {
+        for (const [k, v] of sheet.presets.get(`${preset}@dark`)!.decls) vars.set(k, v);
+      }
       if (overrides) for (const [k, v] of Object.entries(overrides)) vars.set(k, v);
 
       const colorOf = (token: string): string => {
@@ -545,9 +577,15 @@ export function runMatrix(overrides?: Record<string, string>): Result[] {
           for (const s of gradientStops(pageRaw, vars, `${combo} --ak-page-image`)) {
             add(combo, 'AK-PAGE ink on ambient ground', ratio(ink, s.alpha === 1 ? s.hex : over(s, bg)), MIN_TEXT, 'body text on the ambient page ground');
           }
-          for (const p of groundMixPercents(pageRaw, '--ak-bg')) {
-            if (p <= SURFACE_TINT_CAP) passR(combo, 'AK-PAGE ambient %');
-            else failR(combo, 'AK-PAGE ambient %', `the page ambient above ${SURFACE_TINT_CAP}% stops being a whisper (uses ${p}%)`);
+          // A world that owns its ground may light it as it pleases — the ink-on-ambient check
+          // above still proves every stop readable. The whisper cap guards only the looks that
+          // stand on the palette's own page.
+          const ownsGround = preset !== 'vivid' && sheet.presets.get(preset)!.decls.has('--ak-bg');
+          if (!ownsGround) {
+            for (const p of groundMixPercents(pageRaw, '--ak-bg')) {
+              if (p <= SURFACE_TINT_CAP) passR(combo, 'AK-PAGE ambient %');
+              else failR(combo, 'AK-PAGE ambient %', `the page ambient above ${SURFACE_TINT_CAP}% stops being a whisper (uses ${p}%)`);
+            }
           }
         }
 

@@ -18,13 +18,21 @@
  *   gap plain, and because hand-writing a preset block, a prompt row and a catalogue row for
  *   every look made each new look a project instead of a decision.
  *
- *   A LOOK NEVER INTRODUCES A COLOUR: every colour value is an expression over the theme tokens
- *   (color-mix in oklab, the OKLCh spectrum rotations). That rule is what makes the matrix able
- *   to prove all of this arithmetically.
+ *   A LOOK NEVER SHIPS AN UNPROVEN COLOUR. Two legal forms: an EXPRESSION over the theme tokens
+ *   (color-mix in oklab, the OKLCh spectrum rotations), or — for a WORLD — literal GROUNDS
+ *   (bg/surface/surface-2/ink/ink-dim/line, one set per mode) plus dark-mode expressions
+ *   (dusk), because the matrix runs every check against exactly those values. Freed from
+ *   "never a colour" on 2026-08-29 at the developer's direction: the old rule protected
+ *   readability by forbidding paper, phosphor and night, and the proof mechanism replaces the
+ *   prohibition.
  * @structure AtelierStructure / AtelierLook · STRUCTURES · LOOKS · lookById()
  * @usage
  *   import { LOOKS, STRUCTURES } from '../data/atelier-looks.js';
  * @version-history
+ *   v1.4.0 — 2026-08-29 — WORLDS OWN THEIR GROUNDS: grounds (proven literal ground pairs) and
+ *     dusk (dark-mode expressions) join the entry shape; riso gets its paper, terminal goes
+ *     permanently phosphor-on-black, stage permanently night, and the purity rule is reframed
+ *     from "never a colour" to "never an UNPROVEN colour".
  *   v1.3.0 — 2026-08-28 — BILLBOARD: the whole screen is the poster — carnival's language with
  *     the measure column dropped (--ak-main-max 100%) and a half-viewport banner. The
  *     developer's ask: not everything is a lane in the middle of the screen.
@@ -61,6 +69,16 @@ export interface AtelierLook {
   structures: string[];
   /** Token overrides on the --ak-* contract. Empty for the base look (vivid IS the contract). */
   tokens: Record<string, string>;
+  /** A WORLD owns its ground: literal values for the ground tokens (bg, surface, surface-2,
+   *  ink, ink-dim, line), one set per mode — paper for a print world, phosphor for a machine
+   *  one, night for a stage. The matrix runs every check against these in both modes, which is
+   *  what makes the literals legal: a look never ships an UNPROVEN colour. A world that is
+   *  always dark simply declares the same set twice. */
+  grounds?: { light: Record<string, string>; dark: Record<string, string> };
+  /** Dark-mode token EXPRESSIONS layered with the dark ground (var()/color-mix only — the
+   *  purity check covers them): for the values whose polarity flips with the palette's accent,
+   *  like the action band. */
+  dusk?: Record<string, string>;
   /** The comment above the generated block — why this look is what it is. */
   note: string;
 }
@@ -386,7 +404,31 @@ export const LOOKS: readonly AtelierLook[] = [
     feel: 'the machine speaks: mono everything, joined cells, dense, grain like phosphor',
     imagery: 'ASCII and wireframe schematics, phosphor glow',
     structures: ['joined'],
+    dusk: {
+      '--ak-grad': 'linear-gradient(160deg, color-mix(in oklab, var(--ak-accent) 82%, var(--ak-ink)), color-mix(in oklab, var(--ak-accent) 76%, var(--ak-ink)))',
+    },
+    grounds: {
+      light: {
+        '--ak-bg': '#04120a',
+        '--ak-surface': '#0f2416',
+        '--ak-surface-2': '#020a05',
+        '--ak-ink': '#aef2c4',
+        '--ak-ink-dim': '#5fae7f',
+      },
+      dark: {
+        '--ak-bg': '#04120a',
+        '--ak-surface': '#0f2416',
+        '--ak-surface-2': '#020a05',
+        '--ak-ink': '#aef2c4',
+        '--ak-ink-dim': '#5fae7f',
+      },
+    },
     tokens: {
+      '--ak-grad': 'linear-gradient(160deg, color-mix(in oklab, var(--ak-accent) 82%, var(--ak-surface-2)), color-mix(in oklab, var(--ak-accent) 76%, var(--ak-surface-2)))',
+      '--ak-accent-text': 'color-mix(in oklab, var(--ak-accent) 52%, var(--ak-ink))',
+      '--ak-hero-ink': 'var(--ak-accent-ink)',
+      '--ak-hero-ink-dim': 'var(--ak-accent-ink)',
+      '--ak-scrim': 'color-mix(in oklab, var(--ak-surface-2) 16%, transparent)',
       '--ak-page-grain': 'var(--ak-grain)',
       '--ak-main-max': '80rem',
       '--ak-font': 'var(--ak-font-mono)',
@@ -479,7 +521,27 @@ export const LOOKS: readonly AtelierLook[] = [
     feel: 'two inks printed slightly off register: flat blocks, a hard second-hue type shadow, paper grain everywhere, no shadows because print has none — the miss is the style',
     imagery: 'risograph print, two-colour overprint, flat shapes, visible paper grain, slight misregistration',
     structures: ['full-bleed-hero'],
+    dusk: {
+      '--ak-accent-text': 'color-mix(in oklab, var(--ak-accent) 72%, var(--ak-ink))',
+    },
+    grounds: {
+      light: {
+        '--ak-bg': '#efe6d2',
+        '--ak-surface': '#fbf6ea',
+        '--ak-surface-2': '#e6dabf',
+        '--ak-ink': '#241e13',
+        '--ak-ink-dim': '#655a44',
+      },
+      dark: {
+        '--ak-bg': '#211a10',
+        '--ak-surface': '#2d2517',
+        '--ak-surface-2': '#171208',
+        '--ak-ink': '#f2e9d4',
+        '--ak-ink-dim': '#bfb297',
+      },
+    },
     tokens: {
+      '--ak-accent-text': 'color-mix(in oklab, var(--ak-accent) 58%, var(--ak-ink))',
       '--ak-kinetic': 'words',
       '--ak-page-grain': 'var(--ak-grain)',
       '--ak-line-w': '2px',
@@ -512,8 +574,28 @@ export const LOOKS: readonly AtelierLook[] = [
     feel: 'the lit stage: a spotlight falls from above, panels float as glass with a glowing edge, depth everywhere — the room a digital twin lives in',
     imagery: 'spotlit dark stage, wireframe schematics, floating glass panels, atmospheric depth',
     structures: ['full-bleed-hero'],
+    dusk: {
+      '--ak-grad': 'linear-gradient(160deg, color-mix(in oklab, var(--ak-accent) 80%, var(--ak-ink)), color-mix(in oklab, var(--ak-spectrum-3) 70%, var(--ak-ink)))',
+    },
+    grounds: {
+      light: {
+        '--ak-bg': '#0b0d16',
+        '--ak-surface': '#171b2b',
+        '--ak-surface-2': '#060810',
+        '--ak-ink': '#e9ecf6',
+        '--ak-ink-dim': '#a6abc2',
+      },
+      dark: {
+        '--ak-bg': '#0b0d16',
+        '--ak-surface': '#171b2b',
+        '--ak-surface-2': '#060810',
+        '--ak-ink': '#e9ecf6',
+        '--ak-ink-dim': '#a6abc2',
+      },
+    },
     tokens: {
-      '--ak-page-image': 'radial-gradient(at 50% 0%, color-mix(in oklab, var(--ak-accent) 8%, var(--ak-bg)), transparent 55%), radial-gradient(at 86% 92%, color-mix(in oklab, var(--ak-spectrum-3) 6%, var(--ak-bg)), transparent 52%)',
+      '--ak-accent-text': 'color-mix(in oklab, var(--ak-accent) 55%, var(--ak-ink))',
+      '--ak-page-image': 'radial-gradient(at 50% 0%, color-mix(in oklab, var(--ak-accent) 16%, var(--ak-bg)), transparent 58%), radial-gradient(at 86% 92%, color-mix(in oklab, var(--ak-spectrum-3) 11%, var(--ak-bg)), transparent 54%)',
       '--ak-surface-image': 'none',
       '--ak-hero-image': 'none',
       '--ak-line': 'color-mix(in oklab, var(--ak-accent) 22%, var(--ak-ink-dim))',
@@ -523,8 +605,8 @@ export const LOOKS: readonly AtelierLook[] = [
       '--ak-blur': '10px',
       '--ak-elev-1': '0 6px 24px color-mix(in oklab, var(--ak-ink) 28%, transparent)',
       '--ak-elev-2': '0 14px 44px color-mix(in oklab, var(--ak-ink) 42%, transparent), 0 0 30px color-mix(in oklab, var(--ak-accent) 18%, transparent)',
-      '--ak-grad': 'linear-gradient(160deg, color-mix(in oklab, var(--ak-accent) 78%, var(--ak-ink)), color-mix(in oklab, var(--ak-spectrum-3) 66%, var(--ak-ink)))',
-      '--ak-scrim': 'color-mix(in oklab, var(--ak-ink) 16%, transparent)',
+      '--ak-grad': 'linear-gradient(160deg, color-mix(in oklab, var(--ak-accent) 80%, var(--ak-surface-2)), color-mix(in oklab, var(--ak-spectrum-3) 70%, var(--ak-surface-2)))',
+      '--ak-scrim': 'color-mix(in oklab, var(--ak-surface-2) 18%, transparent)',
       '--ak-hero-ink': 'var(--ak-accent-ink)',
       '--ak-hero-ink-dim': 'var(--ak-accent-ink)',
       '--ak-hero-min': '38dvh',
