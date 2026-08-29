@@ -363,7 +363,7 @@ export const REQUIRED_BASE = [
   '--ak-radius', '--ak-radius-sm', '--ak-radius-pill', '--ak-elev-1', '--ak-elev-2',
   '--ak-font', '--ak-font-display', '--ak-font-mono',
   '--ak-text-hero', '--ak-text-title', '--ak-text-body', '--ak-text-fine', '--ak-weight-display',
-  '--ak-display-shadow', '--ak-display-stroke', '--ak-tilt',
+  '--ak-display-shadow', '--ak-display-stroke', '--ak-tilt', '--ak-kinetic', '--ak-page-grain',
   '--ak-gap', '--ak-pad', '--ak-touch', '--ak-motion', '--ak-ease',
   '--ak-enter-distance', '--ak-enter-stagger', '--ak-chrome-bottom', '--ak-main-max', '--ak-hero-min',
 ];

@@ -16,6 +16,12 @@
  *   ak-loading · ak-skeleton · shared primitives (ak-btn, ak-scroll, focus, ak-busy)
  * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
  * @version-history
+ *   v0.6.0 — 2026-08-29 — The page ground gains the GRAIN LAYER: --ak-page-grain rides over the
+ *     ambient as a small repeating tile (paper for riso, phosphor for terminal), none for
+ *     everyone else.
+ *   v0.5.0 — 2026-08-29 — HIDDEN MEANS HIDDEN: one kit-wide rule makes the standard attribute
+ *     win over every surface's own display (found in the Design Book, where a hidden section
+ *     stayed on screen).
  *   v0.4.0 — 2026-08-28 — The first AEB review's kit fixes: the bar heading goes screen-reader-only
  *     when a hero carries the same name (.ak-app--hero-titled, set by hero.js); the bar wraps at
  *     narrow widths so the account pill can never crush the title to one letter; the short-viewport
@@ -62,9 +68,12 @@
   flex-direction: column;
   overflow-x: clip;
   background-color: var(--ak-bg);
-  /* The ambient: the page ground carries the spectrum, whisper-quiet. Flat turns it off. */
-  background-image: var(--ak-page-image);
-  background-size: cover;
+  /* The ambient: the page ground carries the spectrum, whisper-quiet. Flat turns it off.
+   * The grain layer rides on top as a small repeating tile — paper for the print looks,
+   * phosphor for the machine ones — and stays `none` for everyone else. */
+  background-image: var(--ak-page-grain, none), var(--ak-page-image);
+  background-size: 160px 160px, cover;
+  background-repeat: repeat, no-repeat;
   background-attachment: local;
 }
 .ak-app__bar {

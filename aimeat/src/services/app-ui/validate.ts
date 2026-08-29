@@ -39,7 +39,7 @@
  */
 import type { BlockPropValue } from '../surface-layout/types.js';
 import { propProblem } from '../surface-layout/validate.js';
-import { componentById, NAV_MODES, LOOKS, BLOCK_SPANS, UI_COMPONENTS, SIGNATURE_TOKENS } from './registry.js';
+import { componentById, NAV_MODES, CHOREOGRAPHIES, LOOKS, BLOCK_SPANS, UI_COMPONENTS, SIGNATURE_TOKENS } from './registry.js';
 import { runMatrix } from '../atelier-contrast.js';
 
 /** More blocks than this is a page nobody reads — and a payload nobody meant. */
@@ -69,6 +69,9 @@ export interface AppUiLayout {
   v: 1;
   look?: string;
   nav?: string;
+  /** How the page moves under the reader's hand: 'still' (default) or 'cinema' — the opening
+   *  band recedes and each section rises as it enters, all CSS scroll timelines, zero idle. */
+  choreography?: string;
   /** The app's SIGNATURE: bounded token overrides (shape, typography, density, motion). */
   tokens?: Record<string, string>;
   /** Art direction for the imagery pipeline: a prompt fragment and optional colour words. */
@@ -279,6 +282,13 @@ export function validateUiLayout(raw: unknown): AppUiLayout {
       unknownName('navigation mode', String(input.nav), [...NAV_MODES]);
     }
     out.nav = input.nav;
+  }
+  if (input.choreography !== undefined) {
+    if (typeof input.choreography !== 'string'
+      || !(CHOREOGRAPHIES as readonly string[]).includes(input.choreography)) {
+      unknownName('choreography', String(input.choreography), [...CHOREOGRAPHIES]);
+    }
+    out.choreography = input.choreography;
   }
 
   if (input.tokens !== undefined) {

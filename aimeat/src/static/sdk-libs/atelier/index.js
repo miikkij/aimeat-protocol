@@ -28,6 +28,9 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.28.0 — 2026-08-29 — THE NEXT LEVEL, first landing: kinetic() (the masthead arrives one
+ *     letter at a time, opted in per look), the chart mural presentation, the cinema scroll
+ *     choreography, the page-grain layer, and two new worlds in the look registry (riso, stage).
  *   v0.27.0 — 2026-08-29 — The milk-coffee film removed from every card and the page ambient;
  *     [hidden] finally hides inside the kit (CSS-side).
  *   v0.26.0 — 2026-08-29 — The lane and the band (CSS-side): a page takes the whole window by
@@ -128,7 +131,7 @@
  *     emptyState, skeleton, dom + i18n layers (TARGET-074 phase 1, slice 1).
  */
 import { attach } from '../_core/namespace.js';
-import { el, append, $, $$, clear, uid, busy, guardButtons, whileBusy, injectStyle, reducedMotion, enter, countUp, attention } from './dom.js';
+import { el, append, $, $$, clear, uid, busy, guardButtons, whileBusy, injectStyle, reducedMotion, enter, kinetic, countUp, attention } from './dom.js';
 import { i18n } from './i18n.js';
 import { app, section, tabs, bottomNav } from './shell.js';
 import { hero, statRow, figure } from './hero.js';
@@ -154,7 +157,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.27.0',
+  version: '0.28.0',
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,
@@ -196,7 +199,7 @@ const atelier = {
 
   // ── Theme, i18n, helpers ──
   injectStyle, i18n, el, append, $, $$, clear, uid, busy, whileBusy, guardButtons,
-  reducedMotion, enter, countUp, attention,
+  reducedMotion, enter, kinetic, countUp, attention,
 };
 
 attach('atelier', atelier);

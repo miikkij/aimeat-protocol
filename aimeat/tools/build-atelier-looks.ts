@@ -34,6 +34,8 @@ const NEVER_INHERITED: Record<string, string> = {
   '--ak-hero-ink': 'var(--ak-ink)',
   '--ak-hero-ink-dim': 'var(--ak-hero-ink)',
   '--ak-scrim': 'color-mix(in oklab, var(--ak-bg) 78%, transparent)',
+  // A calm look nested inside a loud one must not inherit the letter-throw masthead.
+  '--ak-kinetic': 'none',
 };
 
 /** The whole generated stylesheet, deterministically — the drift gate compares against this. */
