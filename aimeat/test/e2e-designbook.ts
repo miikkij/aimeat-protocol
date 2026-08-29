@@ -97,9 +97,12 @@ const GOOD_BODY = {
         }
     });
 
-    await test('an unauthenticated browse is refused', async () => {
-        const { status } = await json('/v1/designbook');
-        assert(status === 401, `unauthenticated list is 401, got ${status}`);
+    await test('the published shelf is public: an unauthenticated browse answers, published parts only', async () => {
+        const r = await json('/v1/designbook');
+        assert(r.status === 200, `unauthenticated list is 200, got ${r.status}`);
+        const parts = r.body?.data?.parts ?? [];
+        assert(parts.every((p: any) => p.status === 'published'),
+            `an anonymous reader sees only published parts — found: ${[...new Set(parts.map((p: any) => p.status))].join(', ')}`);
     });
 
     await test('the bench refuses a body the validator refuses, in its words', async () => {
@@ -128,6 +131,13 @@ const GOOD_BODY = {
         assert(r.status === 201, `propose ${r.status}: ${JSON.stringify(r.body?.error)}`);
         assert(r.body.data.status === 'proposed', `lands proposed, got ${r.body.data.status}`);
         assert(r.body.data.version === 1, `first version is 1, got ${r.body.data.version}`);
+    });
+
+    await test('a part still in proposal is invisible without a session: anonymous read answers 404', async () => {
+        const anon = await json(`/v1/designbook/${partId}`);
+        assert(anon.status === 404, `an anonymous read of a proposed part is 404, got ${anon.status}`);
+        const signed = await json(`/v1/designbook/${partId}`, { headers: auth(op.token) });
+        assert(signed.status === 200, `the signed-in read still answers, got ${signed.status}`);
     });
 
     await test('re-proposing your own part updates it in place (200, version 2)', async () => {

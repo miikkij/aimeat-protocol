@@ -13,6 +13,10 @@
  * @structure designbookRouter(config, storage): Router
  * @usage mounted by server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.1.0 — 2026-08-29 — The published shelf is PUBLIC: the two GET routes read without a
+ *     session (a visitor browses the finished Book instead of a blank wall — the sessionless
+ *     /ui layout read's reasoning), while unpublished parts stay signed-in-only. The check
+ *     reads the normalized req.auth the global optionalAuth() resolved, never a raw header.
  *   v1.0.0 — 2026-08-28 — Initial (TARGET-074 phase 5, slice 1).
  */
 import { Router, type Request, type Response } from 'express';
@@ -55,12 +59,20 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
     };
   }
 
-  // The catalogue view. Signed-in browsing: the gallery app and every agent reads this.
-  router.get('/v1/designbook', requireAuth(), requireScope('memory:read'), async (req: Request, res: Response) => {
+  /** Whether this request carries a REAL authenticated principal (the global optionalAuth()
+   *  already validated any presented token, so this reads the normalized value, never a raw
+   *  header). Anonymous-mode sessions count as signed out here. */
+  const isSignedIn = (req: Request) => !!req.auth && !req.auth.anonymous;
+
+  // The catalogue view — PUBLIC for the published shelf, the way an app's stored layout is
+  // (the sessionless /ui read set the precedent): a visitor who has not signed in browses the
+  // finished Book read-only instead of meeting a blank wall. A signed-in caller also sees the
+  // parts still in proposal.
+  router.get('/v1/designbook', async (req: Request, res: Response) => {
     try {
       const rows = await book.list({
         kind: req.query.kind as string | undefined,
-        status: req.query.status as string | undefined,
+        status: isSignedIn(req) ? (req.query.status as string | undefined) : 'published',
         q: req.query.q as string | undefined,
         limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
       });
@@ -71,10 +83,14 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
     } catch (err) { refuse(res, err); }
   });
 
-  // One part, whole — the body is what an adopt writes.
-  router.get('/v1/designbook/:id', requireAuth(), requireScope('memory:read'), async (req: Request, res: Response) => {
+  // One part, whole — the body is what an adopt writes. Public for published parts, on the
+  // same reasoning as the listing; a part still in proposal needs a signed-in reader.
+  router.get('/v1/designbook/:id', async (req: Request, res: Response) => {
     try {
       const out = await book.get(req.params.id as string);
+      if (out.part.status !== 'published' && !isSignedIn(req)) {
+        return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No published part has this id.'));
+      }
       res.json(success(config.nodeId, out, [
         { description: 'Adopt into one of your apps', method: 'POST', url: `/v1/designbook/${encodeURIComponent(out.part.id)}/adopt` },
       ]));
