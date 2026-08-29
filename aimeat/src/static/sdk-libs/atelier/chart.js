@@ -10,11 +10,17 @@
  *   The bound source resolves to ONE record: { labels: string[], series: [{ id, label,
  *   kind: 'bar'|'line', values: number[] }] }. Negative values are legal (a cash curve dips);
  *   the zero line is drawn whenever the range crosses it.
+ *   THREE SHAPES, ONE BLOCK (spec.kind): 'axes' (the default — bars, lines and areas over one
+ *   label axis), 'donut' (parts of a whole: { slices: [{ label, value }] }, the total in the
+ *   middle), 'calendar' (a year of days as a heat grid: { days: [{ date, value }] }, intensity
+ *   riding the accent). The Book carries all three as data.
  * @structure chart(spec) → { el, set, destroy }
  * @usage  AIMEAT.atelier.chart({ target: host, data: { labels: ['Jan','Feb'], series: [
  *           { id: 'in', label: 'Income', kind: 'bar', values: [1200, 1400] },
  *           { id: 'cash', label: 'Cash', kind: 'line', values: [300, 900] } ] } });
  * @version-history
+ *   v0.33.0 — 2026-08-29 — The chart family: spec.kind 'donut' and 'calendar' join 'axes', and
+ *     an axes series may be kind 'area' (the line with its ground filled).
  *   v0.19.0 — 2026-08-28 — Initial (TARGET-074: the harvest — budjetti's chart shape becomes a
  *     kit component so the Design Book can carry it as data).
  */
@@ -26,7 +32,7 @@ import { emptyState } from './state.js';
  * @typedef {object} ChartSeries
  * @property {string} id
  * @property {string} label
- * @property {'bar'|'line'} [kind]
+ * @property {'bar'|'line'|'area'} [kind]
  * @property {number[]} values
  */
 /**
@@ -69,10 +75,12 @@ function fmtTick(v) {
  *   target?: string|Element, data?: ChartData|null, title?: string,
  *   empty?: { title?: string, hint?: string },
  *   presentation?: 'tile'|'mural',
+ *   kind?: 'axes'|'donut'|'calendar',
  * }} spec
  * @returns {{ el: HTMLElement, set: (patch: { data: ChartData|null }) => void, destroy: () => void }}
  */
 export function chart(spec) {
+  const kind = spec.kind === 'donut' || spec.kind === 'calendar' ? spec.kind : 'axes';
   const root = el('figure', {
     class: 'ak-root ak-chart' + (spec.presentation === 'mural' ? ' ak-chart--mural' : ''),
     role: 'img',
@@ -80,10 +88,17 @@ export function chart(spec) {
   if (spec.target) resolve(spec.target).appendChild(root);
   let emptyCard = null;
 
+  function showEmpty() {
+    const e = spec.empty || {};
+    emptyCard = emptyState({ target: root, tone: 'quiet', title: e.title || t('empty'), hint: e.hint || t('emptyHint') });
+  }
+
   /** @param {ChartData|null|undefined} data */
   function render(data) {
     if (emptyCard) { emptyCard.destroy(); emptyCard = null; }
     clear(root);
+    if (kind === 'donut') return renderDonut(data);
+    if (kind === 'calendar') return renderCalendar(data);
     const labels = data && Array.isArray(data.labels) ? data.labels : [];
     const series = (data && Array.isArray(data.series) ? data.series : [])
       .filter((s) => s && Array.isArray(s.values) && s.values.length > 0);
@@ -128,7 +143,21 @@ export function chart(spec) {
 
     const still = reducedMotion();
     const bars = series.filter((s) => (s.kind || 'bar') === 'bar');
-    const lines = series.filter((s) => s.kind === 'line');
+    const lines = series.filter((s) => s.kind === 'line' || s.kind === 'area');
+
+    // Area grounds first, behind everything drawn on the same axis.
+    for (const s of series) {
+      if (s.kind !== 'area') continue;
+      const colour = SERIES_VARS[series.indexOf(s) % SERIES_VARS.length];
+      const pts = s.values.slice(0, labels.length).map((v, i) => `${x(i) + slotW / 2},${y(v)}`);
+      const first = x(0) + slotW / 2;
+      const last = x(Math.min(s.values.length, labels.length) - 1) + slotW / 2;
+      const poly = svg('polygon', {
+        points: `${first},${y(0)} ` + pts.join(' ') + ` ${last},${y(0)}`,
+        class: 'ak-chart__area', style: `fill:${colour}`,
+      });
+      node.appendChild(poly);
+    }
     const groupPad = slotW * 0.18;
     const barW = bars.length ? (slotW - groupPad * 2) / bars.length : 0;
 
@@ -180,6 +209,94 @@ export function chart(spec) {
         requestAnimationFrame(() => line.classList.add('ak-chart__line--drawn'));
       }
     }
+  }
+
+  /** Parts of a whole: { slices: [{ label, value }] } — the total sits in the middle. */
+  function renderDonut(data) {
+    const slices = (data && Array.isArray(data.slices) ? data.slices : [])
+      .filter((s) => s && typeof s.value === 'number' && s.value > 0);
+    if (!slices.length) return showEmpty();
+    const total = slices.reduce((sum, s) => sum + s.value, 0);
+    root.setAttribute('aria-label', (spec.title ? spec.title + ' — ' : '')
+      + slices.map((s) => s.label + ' ' + s.value).join(', '));
+
+    const R2 = 84;
+    const STROKE = 30;
+    const C = 2 * Math.PI * R2;
+    const node = svg('svg', { viewBox: '0 0 240 240', class: 'ak-chart__svg ak-chart__svg--donut', 'aria-hidden': 'true' });
+    let offset = 0;
+    slices.forEach((s, i) => {
+      const frac = s.value / total;
+      const ring = svg('circle', {
+        cx: 120, cy: 120, r: R2, class: 'ak-chart__slice',
+        style: `stroke:${SERIES_VARS[i % SERIES_VARS.length]}`,
+        'stroke-width': STROKE,
+        'stroke-dasharray': `${Math.max(frac * C - 3, 0.5)} ${C}`,
+        'stroke-dashoffset': String(-offset * C),
+        transform: 'rotate(-90 120 120)',
+      });
+      if (!reducedMotion()) { ring.classList.add('ak-chart__slice--enter'); ring.style.animationDelay = (i * 70) + 'ms'; }
+      node.appendChild(ring);
+      offset += frac;
+    });
+    const totalText = svg('text', { x: 120, y: 126, class: 'ak-chart__total', 'text-anchor': 'middle' });
+    totalText.textContent = fmtTick(total);
+    node.appendChild(totalText);
+    root.appendChild(node);
+
+    const legend = el('figcaption', { class: 'ak-chart__legend' },
+      slices.map((s) => el('span', { class: 'ak-chart__key' }, [
+        el('span', { class: 'ak-chart__swatch' }),
+        el('span', { text: s.label + ' · ' + fmtTick(s.value) }),
+      ])));
+    slices.forEach((s, i) => {
+      const sw = legend.children[i] && legend.children[i].firstChild;
+      if (sw) /** @type {HTMLElement} */ (sw).style.background = SERIES_VARS[i % SERIES_VARS.length];
+    });
+    root.appendChild(legend);
+  }
+
+  /** A stretch of days as a heat grid: { days: [{ date: 'YYYY-MM-DD', value }] }. Weeks are
+   *  columns, weekdays rows — the GitHub-calendar shape, intensity riding the accent. */
+  function renderCalendar(data) {
+    const days = (data && Array.isArray(data.days) ? data.days : [])
+      .map((d) => ({ date: new Date(d.date), value: Number(d.value) || 0 }))
+      .filter((d) => !isNaN(d.date.getTime()))
+      .sort((a, b) => a.date.getTime() - b.date.getTime());
+    if (!days.length) return showEmpty();
+    const max = days.reduce((m, d) => Math.max(m, d.value), 0) || 1;
+    const first = days[0].date;
+    const start = new Date(first);
+    start.setDate(start.getDate() - ((start.getDay() + 6) % 7)); // back to Monday
+    const spanDays = Math.round((days[days.length - 1].date.getTime() - start.getTime()) / 86400000) + 1;
+    const weeks = Math.min(Math.ceil(spanDays / 7), 53);
+    const CELL = 13;
+    const GAP = 3;
+    const width = weeks * (CELL + GAP) + GAP;
+    const height = 7 * (CELL + GAP) + GAP;
+    root.setAttribute('aria-label', (spec.title ? spec.title + ' — ' : '') + days.length + ' d');
+
+    const byKey = new Map();
+    for (const d of days) byKey.set(d.date.toISOString().slice(0, 10), d.value);
+    const node = svg('svg', { viewBox: `0 0 ${width} ${height}`, class: 'ak-chart__svg ak-chart__svg--calendar', 'aria-hidden': 'true' });
+    const cursor = new Date(start);
+    for (let w = 0; w < weeks; w++) {
+      for (let dow = 0; dow < 7; dow++) {
+        const key = cursor.toISOString().slice(0, 10);
+        const value = byKey.get(key);
+        const cell = svg('rect', {
+          x: GAP + w * (CELL + GAP), y: GAP + dow * (CELL + GAP), width: CELL, height: CELL, rx: 3,
+          class: 'ak-chart__day' + (value === undefined ? ' ak-chart__day--blank' : ''),
+        });
+        if (value !== undefined) {
+          // Intensity as opacity over the accent: the ramp follows every palette for free.
+          cell.setAttribute('style', 'fill: var(--ak-accent); fill-opacity: ' + (0.15 + 0.85 * (value / max)).toFixed(3));
+        }
+        node.appendChild(cell);
+        cursor.setDate(cursor.getDate() + 1);
+      }
+    }
+    root.appendChild(node);
   }
 
   render(spec.data);

@@ -26,6 +26,9 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.14.0 — 2026-08-29 — The machine room taught: the ops family (health / queue / gauge /
+ *     console), the chart family (kind + area + trend sparklines), the offline atlas, and
+ *     LIVE BY DECLARATION (the mosaic's `live` map over aimeat-live).
  *   v1.13.0 — 2026-08-29 — scene3d taught beside the mural: the one-per-layout showpiece
  *     (orb / sky / bars-as-terrain) on the three-world bundle, a statement rather than a
  *     default.
@@ -230,6 +233,7 @@ function composeBody(config: AimeatConfig): string {
     + 'var m = AIMEAT.atelier.mosaic({\n'
     + '  app: a,\n'
     + "  sources: { 'errands.': loadErrandRows },   // name → rows (or a Promise of rows)\n"
+    + "  live: { 'errands.': { keyPrefix: 'errands.' } },   // see below — optional\n"
     + '  onPick: function (blockId, item) { open(item); },\n'
     + "  fallback: { v: 1, blocks: [\n"
     + "    { id: 'top', component: 'hero', props: { title: 'Errands' } },\n"
@@ -238,6 +242,14 @@ function composeBody(config: AimeatConfig): string {
     + '});\n'
     + "m.refresh('errands.');   // after your data changed — the change paints with motion\n"
     + '```\n\n'
+    + 'LIVE BY DECLARATION: load `' + base + '/v1/libs/aimeat-live.js` beside the kit and give '
+    + 'the mosaic a `live` map — source name → { keyPrefix } naming the memory keys whose change '
+    + 'means that source moved. When anything writes those keys (the owner\'s agent, another '
+    + 'device, a schedule), the source re-resolves and the screen repaints with the components\' '
+    + 'own motion — you never poll, never open a socket, never write a listener. The wiring '
+    + 'refuses a memory subscription without a keyPrefix (that would re-fetch on every write '
+    + 'anyone makes) and never fires more often than every few seconds. Without the live '
+    + 'library on the page the declaration is inert, so it is always safe to write.\n\n'
     + 'The layout\'s `nav` field projects the same blocks as stacked sections, a tab row, a bottom '
     + 'bar, a swipeable deck, a step-by-step flow, a pan-zoom canvas, a desktop-grade left rail '
     + '(`rail`) or a full-screen menu in display type (`overlay`) — all of them work on every '
@@ -249,6 +261,20 @@ function composeBody(config: AimeatConfig): string {
     + 'and free at idle because it is pure CSS scroll timelines. And a chart block may carry '
     + '`presentation: "mural"`: the chart stops living in a tile and becomes the section\'s '
     + 'full-bleed ground — the data as the decor, one mural per screen.\n\n'
+    + 'THE MACHINE ROOM IS AN ARRANGEMENT, NOT APP CODE. Four blocks make any admin or '
+    + 'monitoring screen: `health` (one row per watched thing — lamp, name, latest reading), '
+    + '`queue` (work items with states, counted in a strip), `gauge` (ONE value on a dial, '
+    + 'bands turning the tone) and `console` (the log vane — monospace, capped, follows the '
+    + 'tail only while the reader is at the tail). Their tones ride the theme\'s ok/warn/err '
+    + 'colours, so a status screen reads at a glance in every look and mode.\n\n'
+    + 'CHARTS ARE A FAMILY on one block: `chart` with `kind: "axes"` (bars, lines and filled '
+    + 'areas — a series may be kind "area"), `"donut"` (parts of a whole, the total in the '
+    + 'middle) or `"calendar"` (a stretch of days as a heat grid). A statRow tile carrying '
+    + '`trend: [numbers]` draws its short history as a sparkline under the figure. And the '
+    + '`atlas` block is the DATA MAP, fully offline: country shapes ship on this node, regions '
+    + 'fill with the accent by value (match by English country name), markers sit at lon/lat, '
+    + 'and the view frames the data\'s extent on its own — no tile server, no key, no external '
+    + 'host.\n\n'
     + 'And when a screen has earned a SHOWPIECE, the `scene3d` block gives it real depth: '
     + '`kind: "orb"` (a signature object turning under the hand), `"sky"` (a procedural '
     + 'atmosphere band) or `"bars"` (the bound rows stand up as a field of columns — the 3D '
