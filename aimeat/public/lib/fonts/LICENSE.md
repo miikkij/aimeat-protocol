@@ -13,10 +13,17 @@ full text: https://openfontlicense.org/open-font-license-official-text/
 | Space Grotesk | v22 (variable wght 300–700) | `space-grotesk-var-latin.woff2`, `space-grotesk-var-latin-ext.woff2` | © Florian Karsten (https://floriankarsten.com) | https://fonts.google.com/specimen/Space+Grotesk |
 | Fraunces | v38 (variable opsz 9–144, wght 100–900) | `fraunces-var-latin.woff2`, `fraunces-var-latin-ext.woff2` | © The Fraunces Project Authors (https://github.com/undercasetype/fraunces) | https://fonts.google.com/specimen/Fraunces |
 | JetBrains Mono | v24 (variable wght 100–800) | `jetbrains-mono-var-latin.woff2`, `jetbrains-mono-var-latin-ext.woff2` | © The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono) | https://fonts.google.com/specimen/JetBrains+Mono |
+| Fjalla One | v16 (400, the only cut) | `fjalla-one-latin.woff2`, `fjalla-one-latin-ext.woff2` | © Sorkin Type (https://www.sorkintype.com) | https://fonts.google.com/specimen/Fjalla+One |
+| DM Sans | v17 (variable opsz 9–40, wght 100–1000) | `dm-sans-var-latin.woff2`, `dm-sans-var-latin-ext.woff2` | © Colophon Foundry (https://www.colophon-foundry.org), Indian Type Foundry | https://fonts.google.com/specimen/DM+Sans |
+| VT323 | v18 (400) | `vt323-latin.woff2`, `vt323-latin-ext.woff2` | © Peter Hull | https://fonts.google.com/specimen/VT323 |
 
 Baloo 2 + Bangers vendored 2026-07-19 for the self-hosted `fonts` capability pack
 (game/display faces, loaded via `/lib/fonts.css`). Inter, Space Grotesk, Fraunces and
-JetBrains Mono vendored 2026-07-25 for the AIMEAT theme system — `/lib/aimeat-theme.css`
-declares their `@font-face` rules and each palette names its display/body/mono faces, so
-apps load them implicitly and never from an external CDN (the app CSP forbids
-cross-origin font loads). All subsets are latin + latin-ext, so Finnish ä/ö render.
+JetBrains Mono vendored 2026-07-25 for the AIMEAT theme system, Archivo and Archivo Black on
+2026-08-29 as the house faces, and on the same day Fjalla One (the headline face,
+`--font-headline` in theme.css), DM Sans (the body fallback and the older static pages) and
+VT323 (the OS front page): the last three had still been fetched from fonts.googleapis.com by
+sixteen HTML files. Every `@font-face` lives in `/lib/aimeat-fonts.css`, which
+`/lib/aimeat-theme.css` imports and the standalone pages link, so nothing on the node reaches
+an external CDN and the CSP no longer allows one. All subsets are latin + latin-ext, so
+Finnish ä/ö render.

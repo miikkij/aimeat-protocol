@@ -11,6 +11,8 @@
  *   - setupStaticFiles() -- main entry, applied during server bootstrap
  *   - STATIC_HTML_REDIRECTS -- map of legacy .html paths to canonical /v1/ routes
  * @version-history
+ *   v1.7.0 -- 2026-08-29 -- The CSP drops fonts.googleapis.com from style-src and fonts.gstatic.com
+ *     from font-src: every face is self-hosted under /lib/fonts now and no page links the CDN.
  *   v1.6.0 -- 2026-08-23 -- The silent SSO bridge is framable from a company address too. The
  *     frame-ancestors list enumerated the app and portfolio families, and the co family is a
  *     SIBLING of the app one rather than a child, so an app served as a company's front page
@@ -234,10 +236,12 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
       res.setHeader('Content-Security-Policy', [
         "default-src 'self'",
         `script-src 'self' 'nonce-${nonce}' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net`,
-        `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
+        // Every face the node serves is self-hosted under /lib/fonts (2026-08-29); no page links a
+        // font CDN any more, so the policy no longer allows one.
+        "style-src 'self' 'unsafe-inline'",
         "connect-src 'self' wss: ws:",
         "img-src 'self' data: blob:",
-        "font-src 'self' https://fonts.gstatic.com",
+        "font-src 'self'",
         `frame-src 'self' blob: data:${appFrameSrc}`,
         "object-src 'none'",
         "base-uri 'self'",
