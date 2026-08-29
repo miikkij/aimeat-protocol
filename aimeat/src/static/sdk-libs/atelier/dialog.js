@@ -26,14 +26,26 @@
  */
 import { el, reducedMotion } from './dom.js';
 import { t } from './i18n.js';
+import { mosaic } from './mosaic.js';
 
 /** How far a dialog travels on entry, and from where — the sheet arrives from the edge. */
 const ENTER_FROM = { center: '12px', bottom: '100%' };
 
+/** The tones a dialog can carry: what KIND of moment this is, before a word is read. */
+const TONES = ['plain', 'danger', 'celebrate', 'ai'];
+/** How much room the surface takes — a question is not a form is not a report. */
+const SIZES = ['compact', 'roomy', 'wide'];
+
 /**
  * One modal surface. Returns immediately with a handle; the caller decides when it closes.
+ *
+ * A dialog's SHAPE is design data, not behaviour: `tone`, `size`, `from` and a `layout` body
+ * describe what kind of moment this is and what stands in it, which is why the same four
+ * fields travel as a Design Book part and can be adopted like any other arrangement.
  * @param {{
  *   title: string, body?: (host: HTMLElement) => void, text?: string,
+ *   layout?: object, sources?: Record<string, () => unknown>,
+ *   tone?: 'plain'|'danger'|'celebrate'|'ai', size?: 'compact'|'roomy'|'wide',
  *   actions?: Array<{ id: string, label: string, tone?: 'primary'|'ghost'|'danger', run?: () => unknown }>,
  *   from?: 'center'|'bottom', dismissible?: boolean,
  *   onClose?: (reason: string) => void,
@@ -42,9 +54,11 @@ const ENTER_FROM = { center: '12px', bottom: '100%' };
  */
 export function dialog(spec) {
   const from = spec.from === 'bottom' ? 'bottom' : 'center';
+  const tone = TONES.indexOf(spec.tone || '') >= 0 ? spec.tone : 'plain';
+  const size = SIZES.indexOf(spec.size || '') >= 0 ? spec.size : 'compact';
   const dismissible = spec.dismissible !== false;
   const node = /** @type {HTMLDialogElement} */ (el('dialog', {
-    class: 'ak-root ak-dialog ak-dialog--' + from,
+    class: 'ak-root ak-dialog ak-dialog--' + from + ' ak-dialog--' + tone + ' ak-dialog--' + size,
     'aria-labelledby': 'ak-dlg-title',
   }));
 
@@ -57,6 +71,11 @@ export function dialog(spec) {
   ]);
   const body = el('div', { class: 'ak-dialog__body' });
   if (spec.text) body.appendChild(el('p', { class: 'ak-dialog__text', text: spec.text }));
+  // A STORED ARRANGEMENT can be the dialog's body: the same mosaic every screen uses, rendered
+  // inside the modal. This is what makes a dialog shape adoptable from the Design Book.
+  if (spec.layout) {
+    mosaic({ target: body, layout: spec.layout, sources: spec.sources || {} });
+  }
   if (spec.body) spec.body(body);
 
   const foot = el('div', { class: 'ak-dialog__actions' });
@@ -135,6 +154,7 @@ export function confirm(spec) {
       title: spec.title,
       text: spec.text,
       from: 'center',
+      tone: spec.tone === 'danger' ? 'danger' : 'plain',
       actions: [
         { id: 'cancel', label: spec.cancelLabel || t('cancel'), tone: 'ghost', run: function () { handle.close('cancel'); } },
         {

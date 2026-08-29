@@ -304,6 +304,7 @@ export function buildUiCatalogue(): {
   structures: Array<{ id: string; summary: string }>;
   layouts: readonly AppUiLayoutPreset[];
   signature_tokens: { values: Record<string, string>; summary: string };
+  dialog: { tones: string[]; sizes: string[]; from: string[]; summary: string };
   imagery: { summary: string };
 } {
   return {
@@ -335,6 +336,18 @@ export function buildUiCatalogue(): {
         + '"#hex/#hex", proven by the full contrast matrix at validation — every other colour '
         + 'derives from it. The design pass: propose two or three token-sets as whole layouts, '
         + 'dry-run each, show the owner, store the one they pick.',
+    },
+    dialog: {
+      tones: ['plain', 'danger', 'celebrate', 'ai'],
+      sizes: ['compact', 'roomy', 'wide'],
+      from: ['center', 'bottom'],
+      summary: 'Optional top-level `dialog`: this arrangement is the INSIDE OF A MODAL rather '
+        + 'than a screen — { title?, tone?, size?, from? }. The tone says what kind of moment it '
+        + 'is before a word is read (plain, danger, celebrate, ai), the size how much room it '
+        + 'takes, and from whether it arrives centred or up from the bottom edge for a phone. '
+        + 'Open it with AIMEAT.atelier.dialog({ layout, sources, ...the shape }); the buttons and '
+        + 'when it opens stay your app\'s. A dialog SHAPE travels through the Design Book like '
+        + 'any other arrangement.',
     },
     imagery: {
       summary: 'Optional top-level `imagery`: art direction for the imagery pipeline as data — '

@@ -145,7 +145,14 @@ function benchPageHtml(body: Record<string, unknown>): string {
     'frame.className = "ak-root";',
     'frame.setAttribute("data-ak-look", BODY.look || "vivid");',
     'document.body.appendChild(frame);',
-    'AIMEAT.atelier.mosaic({ target: frame, layout: BODY, sources: sources });',
+    // A DIALOG SHAPE is benched as what it is: opened as a real modal, so the guarantees are
+    // measured on the surface a person will actually see, not on a flattened copy of it.
+    'if (BODY.dialog) {',
+    '  AIMEAT.atelier.dialog(Object.assign({ title: BODY.dialog.title || "Dialog" }, BODY.dialog,',
+    '    { layout: BODY, sources: sources }));',
+    '} else {',
+    '  AIMEAT.atelier.mosaic({ target: frame, layout: BODY, sources: sources });',
+    '}',
     '</scr' + 'ipt></body></html>',
   ].join('\n');
 }

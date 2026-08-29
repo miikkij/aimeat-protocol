@@ -73,6 +73,9 @@ export interface AppUiLayout {
   tokens?: Record<string, string>;
   /** Art direction for the imagery pipeline: a prompt fragment and optional colour words. */
   imagery?: { style: string; palette_words?: string };
+  /** This arrangement is a DIALOG's inside: what kind of moment it is and how much room it
+   *  takes. Absent means the arrangement is a screen. */
+  dialog?: { title?: string; tone?: string; size?: string; from?: string };
   blocks: AppUiBlockInstance[];
   meta?: { note?: string };
 }
@@ -192,6 +195,40 @@ export function validateImageryStyle(raw: unknown): { style: string; palette_wor
   return out;
 }
 
+/** The dialog shapes a node can prove — enums, so a shape is data and never a stylesheet. */
+export const DIALOG_TONES = ['plain', 'danger', 'celebrate', 'ai'] as const;
+export const DIALOG_SIZES = ['compact', 'roomy', 'wide'] as const;
+export const DIALOG_FROM = ['center', 'bottom'] as const;
+
+/**
+ * A dialog SHAPE: what kind of moment this arrangement is the inside of. Behaviour (when it
+ * opens, what the buttons do) stays the app's; the shape is design data, which is what lets a
+ * dialog travel through the Design Book like any other arrangement.
+ */
+export function validateDialogShape(raw: unknown): { title?: string; tone?: string; size?: string; from?: string } {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    fail('dialog is one object: { title?, tone?, size?, from? } — the shape of the modal this arrangement stands inside.');
+  }
+  const o = raw as Record<string, unknown>;
+  const out: { title?: string; tone?: string; size?: string; from?: string } = {};
+  if (o.title !== undefined) {
+    const title = typeof o.title === 'string' ? o.title.trim() : '';
+    if (!title || title.length > 120) fail('dialog.title is the modal\'s heading: 1-120 characters.');
+    out.title = title;
+  }
+  const named: Array<[string, readonly string[]]> = [
+    ['tone', DIALOG_TONES], ['size', DIALOG_SIZES], ['from', DIALOG_FROM],
+  ];
+  for (const [key, values] of named) {
+    if (o[key] === undefined) continue;
+    if (typeof o[key] !== 'string' || !values.includes(o[key] as string)) {
+      unknownName('dialog ' + key, String(o[key]), [...values]);
+    }
+    out[key as 'tone' | 'size' | 'from'] = o[key] as string;
+  }
+  return out;
+}
+
 /** The signature colour: "#hex/#hex", light first, dark second. */
 const ACCENT_PAIR_RE = /^(#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?)\s*\/\s*(#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?)$/;
 
@@ -251,6 +288,10 @@ export function validateUiLayout(raw: unknown): AppUiLayout {
 
   if (input.imagery !== undefined) {
     out.imagery = validateImageryStyle(input.imagery);
+  }
+
+  if (input.dialog !== undefined) {
+    out.dialog = validateDialogShape(input.dialog);
   }
 
   if (!Array.isArray(input.blocks)) fail('blocks must be a list of block instances.');
