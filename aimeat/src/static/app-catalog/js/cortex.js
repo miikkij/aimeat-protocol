@@ -392,7 +392,7 @@ function openPromptBuilder(app) {
   if (pbSourceApp) {
     radios[1].checked = true;
     if (improving) {
-      improving.textContent = '✏️ ' + (t('pb.improving') || 'Improving') + ': ' + (pbSourceApp.name || pbSourceApp.filename || 'this app');
+      improving.textContent = (t('pb.improving') || 'Improving') + ': ' + (pbSourceApp.name || pbSourceApp.filename || 'this app');
       improving.style.display = '';
     }
   } else {

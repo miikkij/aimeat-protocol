@@ -368,6 +368,20 @@ import { toggleFavorite } from './favorites.js';
       closeCreateMenu();
       openPromptBuilder(null);
     });
+    // The word "generated" in the Add dialog's paste label leads to the same flow.
+    var pasteGen = document.getElementById('paste-generate-link');
+    if (pasteGen) pasteGen.addEventListener('click', function (e) { e.preventDefault(); closeModal(); openPromptBuilder(null); });
+    // The icon picks: press one and it lands in the field.
+    var iconPicks = document.getElementById('icon-picks');
+    if (iconPicks) iconPicks.addEventListener('click', function (e) {
+      var b = e.target.closest('.icon-pick');
+      if (!b) return;
+      var field = document.getElementById('app-icon');
+      if (field) field.value = b.textContent;
+      var on = iconPicks.querySelectorAll('.icon-pick.is-on');
+      for (var i = 0; i < on.length; i++) on[i].classList.remove('is-on');
+      b.classList.add('is-on');
+    });
 
     // ── Settings button ─────────────────────────────
     document.getElementById('settings-btn').addEventListener('click', function () {

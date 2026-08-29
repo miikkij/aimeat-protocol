@@ -2538,12 +2538,15 @@ h1.cat-title {
 .cat-masthead .backup-menu { border: 2px solid var(--text); border-radius: 0; box-shadow: 4px 4px 0 var(--sun); }
 
 /* The band: the diagonal coral stripe with the numbers, as on the profile. */
-.cat-band { position: relative; overflow: hidden; margin: 8px 0 0; padding: 64px 0 56px; color: var(--bg); }
+/* The stripe is as tall as its numbers: a full-height rotated block, so a second row of numbers
+   (the detail's five) still lands on the coral, and the top row never rides the upper edge. */
+.cat-band { position: relative; overflow: hidden; margin: 8px 0 0; padding: 72px 0 68px; color: var(--bg); }
 .cat-band[hidden] { display: none; }
-.cat-band::before, .cat-band::after { content: ''; position: absolute; left: -10%; right: -10%; top: 50%; z-index: 0; }
-.cat-band::before { height: 190px; background: var(--accent); transform: translateY(-50%) rotate(-2.5deg); }
-.cat-band::after { height: 20px; background: var(--sun); transform: translateY(calc(-50% + 104px)) rotate(-2.5deg); }
-.cat-band-in { position: relative; z-index: 1; display: flex; gap: 56px; align-items: flex-end; padding: 0 16px; flex-wrap: wrap; }
+.cat-band::before, .cat-band::after { content: ''; position: absolute; left: -10%; right: -10%; z-index: 0; }
+.cat-band::before { top: 0; bottom: 0; background: var(--accent); transform: rotate(-2.5deg); }
+.cat-band::after { bottom: 6px; height: 20px; background: var(--sun); transform: rotate(-2.5deg); }
+.cat-band-in { position: relative; z-index: 1; display: flex; gap: 36px 56px; align-items: flex-end; padding: 0 16px; flex-wrap: wrap; }
+.dtl-band .cat-band-n { font-size: 3.2rem; }
 .cat-band-item { display: flex; flex-direction: column; gap: 6px; }
 .cat-band-n { font-family: var(--font-poster); font-size: 4rem; line-height: .85; letter-spacing: -.04em; color: var(--bg); }
 .cat-band-l { font-size: .78rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--bg); }
@@ -2884,6 +2887,18 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
 .protect-row b { color: var(--text); }
 .protect-row span { color: var(--text-dim); }
 .version-row { padding: 12px 0; }
+/* The rhythm of the work above the list: one line, one small bar chart, one line of caveat. */
+.version-span { font-family: var(--font-mono); font-size: .8rem; color: var(--text-dim); margin: 0 0 14px; }
+.version-chart { margin: 0 0 8px; }
+.version-chart-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+.version-chart-title { font-size: .72rem; color: var(--accent); text-transform: uppercase; letter-spacing: .1em; font-weight: 800; }
+.version-chart-max { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
+.version-chart-svg { display: block; width: auto; max-width: 100%; height: 96px; overflow: visible; }
+.version-chart-base { stroke: var(--border); stroke-width: 1; }
+.version-bar-mark { fill: var(--accent); }
+.version-bar:hover .version-bar-mark { fill: var(--text); }
+.version-chart-axis { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); margin-top: 6px; }
+.version-span-hint { font-size: .8rem; font-weight: 600; line-height: 1.5; color: var(--text-dim); margin: 0 0 22px; max-width: 70ch; }
 .version-num { font-family: var(--font-poster); font-size: 1rem; }
 .version-current { background: var(--sun); color: var(--text); border: 0; padding: 2px 8px; }
 .version-sub { font-family: var(--font-mono); font-size: .72rem; }
@@ -2915,6 +2930,21 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
 .pb-trackname { font-family: var(--font-poster); font-weight: 400; text-transform: uppercase; font-size: .95rem; }
 .pb-tracknew { background: var(--accent); color: #fff; border-radius: 0; font-family: var(--font-mono); }
 .pb-trackdesc { opacity: 1; color: var(--text-dim); font-weight: 600; }
+/* On the sun the words are ink; the dim grey of the unchosen card would vanish there. */
+.pb-trackcard.is-on, .pb-trackcard.is-on .pb-trackname, .pb-trackcard.is-on .pb-trackdesc { color: #1A1A2E; }
+.pb-trackcard.is-on .pb-tracknew { background: #1A1A2E; color: var(--sun); }
+
+/* A word in the running text that opens something: dashed under, never a button. */
+.cat-dashed { background: none; border: 0; border-bottom: 2px dashed var(--accent); border-radius: 0; padding: 0; margin: 0; font: inherit; color: var(--accent); cursor: pointer; }
+.cat-dashed:hover { border-bottom-style: solid; }
+
+/* The icon field: a big glyph, a row of ready icons to press, and a line on how to type any other. */
+.icon-field { display: flex; gap: 14px; align-items: flex-start; }
+.icon-field #app-icon { width: 64px; height: 56px; text-align: center; font-size: 1.6rem; flex: 0 0 auto; }
+.icon-picks { display: flex; flex-wrap: wrap; gap: 6px; flex: 1 1 auto; }
+.icon-pick { width: 36px; height: 36px; border: 2px solid var(--border); background: var(--surface); font-size: 1.1rem; cursor: pointer; padding: 0; border-radius: 0; }
+.icon-pick:hover, .icon-pick.is-on { border-color: var(--text); background: var(--sun); }
+.icon-hint { margin-top: 6px; font-size: .8rem; font-weight: 600; line-height: 1.5; color: var(--text-dim); }
 .pb-desc-area { border: 0; border-bottom: 3px solid var(--text); border-radius: 0; background: transparent; font-family: var(--font-body); font-weight: 700; font-size: 1rem; padding: 8px 0; }
 .pb-desc-area:focus { border-color: var(--accent); }
 .pb-template-select { margin: 6px 0 14px; }
@@ -3226,7 +3256,9 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
 
       <!-- Paste tab content (default) -->
       <div class="tab-content active" id="tab-paste">
-        <label class="modal-label" for="app-paste-code" data-i18n="addModal.paste">Paste HTML Source Code</label>
+        <!-- "generated" is a door: pressing it opens the generate-with-AI flow, which is where the
+             code comes from. Three pieces so each language can order the words its own way. -->
+        <label class="modal-label" for="app-paste-code"><span data-i18n="addModal.pasteBefore">Paste the </span><button type="button" class="cat-dashed" id="paste-generate-link" data-i18n="addModal.pasteWord">generated</button><span data-i18n="addModal.pasteAfter"> HTML source</span></label>
         <textarea id="app-paste-code" class="modal-input" rows="10" placeholder="Paste your HTML source code here..." data-i18n-ph="addModal.pastePh" style="font-family:'Consolas','Monaco','Courier New',monospace;font-size:.8rem;resize:vertical;min-height:160px;line-height:1.4"></textarea>
       </div>
 
@@ -3237,10 +3269,18 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
             <label class="modal-label" for="app-name" data-i18n="addModal.name">App Name</label>
             <input type="text" id="app-name" class="modal-input" placeholder="My App" data-i18n-ph="addModal.namePh" autocomplete="off"/>
           </div>
-          <div class="modal-field" style="width:72px">
-            <label class="modal-label" for="app-icon" data-i18n="addModal.icon">Icon</label>
-            <input type="text" id="app-icon" class="modal-input" maxlength="4" placeholder="&#x1F4DD;" style="text-align:center;font-size:1.2rem"/>
+        </div>
+        <!-- The icon: a row of ready ones to press, the field for any other, and the line that says
+             how to type one (nobody knew what to put here). -->
+        <div class="modal-field">
+          <label class="modal-label" for="app-icon" data-i18n="addModal.icon">Icon</label>
+          <div class="icon-field">
+            <input type="text" id="app-icon" class="modal-input" maxlength="4" placeholder="&#x1F4DD;"/>
+            <div class="icon-picks" id="icon-picks" role="group">
+              <button type="button" class="icon-pick">&#x1F4DD;</button><button type="button" class="icon-pick">&#x1F4CA;</button><button type="button" class="icon-pick">&#x1F4C7;</button><button type="button" class="icon-pick">&#x1F4C8;</button><button type="button" class="icon-pick">&#x1F5C2;</button><button type="button" class="icon-pick">&#x1F4CB;</button><button type="button" class="icon-pick">&#x1F4D6;</button><button type="button" class="icon-pick">&#x1F4EE;</button><button type="button" class="icon-pick">&#x1F5FA;</button><button type="button" class="icon-pick">&#x1F9ED;</button><button type="button" class="icon-pick">&#x1F3AE;</button><button type="button" class="icon-pick">&#x1F3A8;</button><button type="button" class="icon-pick">&#x1F3B5;</button><button type="button" class="icon-pick">&#x1F4F7;</button><button type="button" class="icon-pick">&#x1F6D2;</button><button type="button" class="icon-pick">&#x1F3E0;</button><button type="button" class="icon-pick">&#x1F48A;</button><button type="button" class="icon-pick">&#x1F527;</button><button type="button" class="icon-pick">&#x1F9EA;</button><button type="button" class="icon-pick">&#x1F30D;</button><button type="button" class="icon-pick">&#x20AC;</button><button type="button" class="icon-pick">&#x2696;</button><button type="button" class="icon-pick">&#x1F3DB;</button><button type="button" class="icon-pick">&#x1F9F1;</button>
+            </div>
           </div>
+          <div class="icon-hint" data-i18n="addModal.iconHint">Press one above, or type any emoji into the box: on Windows Win + . opens the emoji keyboard, on a Mac Ctrl + Cmd + Space.</div>
         </div>
         <div class="modal-field">
           <label class="modal-label" for="app-tags"><span data-i18n="addModal.tags">Tags</span> <span class="label-hint" data-i18n="addModal.tagsHint">(comma separated)</span></label>
@@ -3453,7 +3493,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
   <!-- Versions Modal -->
   <div id="versions-overlay" hidden>
     <div class="modal" id="versions-modal">
-      <h2>&#x1F551; <span id="versions-title">App Versions</span></h2>
+      <h2><span id="versions-title">App Versions</span></h2>
       <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:8px" data-i18n="versions.help">Every publish is kept. Restore re-publishes an older version as the new latest; Fork copies it into a new app. Older versions are never lost.</div>
       <div id="versions-status" style="margin:6px 0;font-size:.85rem;min-height:1.1em"></div>
       <div id="versions-list" style="max-height:48vh;overflow-y:auto"></div>
@@ -3466,7 +3506,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
   <!-- Fork lineage modal: cross-owner tree of forks (ancestry + descendants) with each node's live status -->
   <div id="lineage-overlay" hidden>
     <div class="modal" id="lineage-modal">
-      <h2>&#x2942; <span id="lineage-title" data-i18n="lineage.title">Fork lineage</span></h2>
+      <h2><span id="lineage-title" data-i18n="lineage.title">Fork lineage</span></h2>
       <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:6px" data-i18n="lineage.help">Every app that was forked from this one (and where this one came from), with each fork's current status. The chain survives a fork being parked or deleted.</div>
       <div id="lineage-summary" style="font-size:.82rem;color:var(--text-muted);margin-bottom:8px"></div>
       <div id="lineage-status" style="margin:6px 0;font-size:.85rem;min-height:1.1em"></div>
@@ -3481,7 +3521,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
        public offer prices + "deploy your own" (runner/organism pickers) onto the owner's fleet -->
   <div id="agents-overlay" hidden>
     <div class="modal" id="agents-modal">
-      <h2>&#x1F916; <span data-i18n="agents.title">Bundled agents</span> <span id="agents-modal-app" class="aga-app-ref"></span></h2>
+      <h2><span data-i18n="agents.title">Bundled agents</span> <span id="agents-modal-app" class="aga-app-ref"></span></h2>
       <div id="agents-modal-body" class="aga-body"></div>
       <div class="modal-actions">
         <button type="button" class="modal-btn secondary" onclick="document.getElementById('agents-overlay').hidden = true" data-i18n="common.close">Close</button>
@@ -3492,7 +3532,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
   <!-- Copy-protection modal: opt-in per-app flags applied to the runnable HTML at serve time -->
   <div id="protection-overlay" hidden>
     <div class="modal" id="protection-modal">
-      <h2>&#x1F6E1;&#xFE0F; <span id="protection-title" data-i18n="protect.title">Copy protection</span></h2>
+      <h2><span id="protection-title" data-i18n="protect.title">Copy protection</span></h2>
       <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:10px" data-i18n="protect.help">Optional, per-app. These raise the cost of casual copying and make leaks traceable — they cannot stop someone who can view the app from copying its HTML. To truly protect logic or data, put it in a server-side extension.</div>
       <label class="protect-row"><input type="checkbox" id="protect-obfuscate"> <span><b data-i18n="protect.obfuscate">Obfuscate</b> — <span data-i18n="protect.obfuscateHint">mangle the app's inline scripts so the source is hard to read.</span></span></label>
       <label class="protect-row"><input type="checkbox" id="protect-domainLock"> <span><b data-i18n="protect.domainLock">Domain-lock</b> — <span data-i18n="protect.domainLockHint">only run on this node's app origin; a rehosted copy is sent home.</span></span></label>
@@ -3700,9 +3740,9 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "header.title": "My Apps",
       "cta.backHome": "Back to home",
       "cta.publishOwn": "Publish your own app",
-      "mode.global": "🌐 Shared",
+      "mode.global": "Shared",
       "mode.global.title": "Browser-local apps shared across all accounts on this browser",
-      "mode.personal": "👤 Mine",
+      "mode.personal": "Mine",
       "mode.personal.title": "Browser-local apps private to your account",
       "mode.personal.needsLogin": "Sign in to use your account's local apps",
       "mode.caption": "Local apps",
@@ -3735,13 +3775,13 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "datamap.personal.yes": "Yes",
       "datamap.personal.no": "No",
       "datamap.personal.unstated": "Not said",
-      "action.add": "➕ Add app",
+      "action.add": "Add app",
       "action.create": "Create",
-      "action.generate": "✨ Generate with AI",
-      "action.homepage": "🏠 Generate homepage",
+      "action.generate": "Generate with AI",
+      "action.homepage": "Generate homepage",
       "action.settings": "Settings",
       "action.help": "Help",
-      "help.title": "❓ How this catalog works",
+      "help.title": "How this catalog works",
       "help.modesTitle": "Creating an app",
       "help.modes": "Add app lets you paste HTML or upload an HTML/ZIP file (or Generate with AI). It publishes straight to your account as UNLISTED — on the server but not yet public — so you can review it before listing. Nothing is stored only in your browser.",
       "help.whereTitle": "Where your apps live",
@@ -3768,13 +3808,13 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "common.save": "Save",
       "common.or": "or",
       "common.toggle": "toggle",
-      "cortex.active": "🔌 Active Extensions",
-      "cortex.editorTitle": "🛠️ Extension Editor",
+      "cortex.active": "Active Extensions",
+      "cortex.editorTitle": "Extension Editor",
       "cortex.manifest": "Manifest (YAML)",
       "cortex.addLib": "+ Add Lib File",
-      "cortex.exportFiles": "📥 Export Files",
+      "cortex.exportFiles": "Export Files",
       "cortex.saveReinstall": "Save & Re-install",
-      "sec.published": "🚀 Published Apps",
+      "sec.published": "Published Apps",
       "sec.community": "Community apps",
       "view.library": "Your apps",
       "view.community": "Community",
@@ -3835,6 +3875,16 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "action.portfolio": "A portfolio page of your apps",
       "homepage.title": "A portfolio page of your apps: copy this prompt to your AI",
       "homepage.needApps": "Publish an app first; the portfolio page is built from your apps.",
+      "addModal.pasteBefore": "Paste the ",
+      "addModal.pasteWord": "generated",
+      "addModal.pasteAfter": " HTML source",
+      "addModal.iconHint": "Press one above, or type any emoji into the box: on Windows, Win + . opens the emoji keyboard; on a Mac, Ctrl + Cmd + Space.",
+      "versions.sittings": "{n} sittings",
+      "versions.worked": "about {t} of work between publishes",
+      "versions.chartTitle": "Publishes per day",
+      "versions.chartHint": "A sitting is a run of publishes less than two hours apart; the time counted is the time between them, so what happened before the first publish of a sitting is not in it.",
+      "versions.perDay": "{n} publishes",
+      "versions.chartMax": "up to {n} a day",
       "mz.group.what": "What the tool is",
       "mz.group.price": "What a call costs",
       "mz.group.market": "On the marketplace",
@@ -3848,7 +3898,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "view.communityHint": "Community apps are apps other people on this node have published. When someone publishes one, it shows up here.",
       "sec.parked": "Unlisted apps",
       "sec.parkedBlurb": "Only you can see and use these — they stay usable but are hidden from the public catalogue. Press Publish to move one back to Published Apps.",
-      "sec.recent": "🕒 Recently Opened",
+      "sec.recent": "Recently Opened",
       "sec.local": "Your apps",
       "sec.localNote": "One card per app. The badge shows its publication state — Listed (public in the catalogue) or Unlisted (on the server but hidden from the public catalogue). A purple Staging pill marks an app that also has an unpublished draft.",
       "sec.localHint": "Add app publishes to your account as unlisted. List it when it is ready for the world; a draft waits beside the live version until you publish it.",
@@ -3879,14 +3929,14 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "addModal.openMode": "Open Mode",
       "openMode.tab": "New Tab",
       "openMode.iframe": "Inline (iframe)",
-      "ctx.edit": "✏️ Edit",
-      "ctx.favorite": "⭐ Toggle favorite",
-      "ctx.toggleMode": "🔄 Switch open mode",
-      "ctx.viewSource": "👁 View / Edit Source",
-      "ctx.improveAi": "✨ Improve with AI",
-      "ctx.sharePrompt": "📤 Share as Prompt",
-      "ctx.publish": "🚀 Publish to server",
-      "ctx.delete": "🗑️ Delete",
+      "ctx.edit": "Edit",
+      "ctx.favorite": "Toggle favorite",
+      "ctx.toggleMode": "Switch open mode",
+      "ctx.viewSource": "View / Edit Source",
+      "ctx.improveAi": "Improve with AI",
+      "ctx.sharePrompt": "Share as Prompt",
+      "ctx.publish": "Publish to server",
+      "ctx.delete": "Delete",
       "settings.title": "Settings",
       "settings.appearance": "Appearance",
       "settings.theme": "Theme",
@@ -3909,7 +3959,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "source.save": "Save working copy",
       "import.title": "Import from AIMEAT",
       "import.selected": "Import Selected",
-      "publish.title": "🚀 Publish App",
+      "publish.title": "Publish App",
       "publish.filename": "Filename",
       "publish.filenameHint": "Letters, numbers, dots, hyphens, underscores. Must end in .html",
       "publish.description": "Description",
@@ -3922,7 +3972,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "publish.loginRequired": "Sign in to publish to AIMEAT. Anonymous publishing is disabled — use the Sign in button in the top bar.",
       "publish.savedUnlisted": "Saved — your app is on the server as unlisted. Open it and press List when you want it public.",
       "migrate.found": "You have {n} app(s) saved only in this browser from the old local catalog. The catalog is now server-only, so they no longer appear here. Download them as a JSON backup now? You can re-publish any you still want.",
-      "auth.signIn": "❤️ Sign In",
+      "auth.signIn": "Sign In",
       "auth.loggedIn": "logged in",
       "auth.logout": "Logout",
       "versions.title": "App Versions",
@@ -3938,7 +3988,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "dur.min": "min",
       "dur.h": "h",
       "dur.d": "d",
-      "pb.title": "✨ Generate App with AI",
+      "pb.title": "Generate App with AI",
       "pb.intro": "No coding. Describe your idea, copy the prompt, and paste it into any AI chat (Claude, ChatGPT…). The AI asks a few questions, builds a ready-to-use app, and gives you one HTML file — then add it here to put it live.",
       "pb.step1": "Describe your app",
       "pb.step2": "Copy the prompt & paste it into your AI",
@@ -3950,7 +4000,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "pb.packsHint": "Charts, editable flow diagrams, games, 3D… — self-hosted libraries with AI instructions baked into the prompt. Your idea text pre-selects matching packs.",
       "pb.noneTemplate": "(none — build from scratch)",
       "pb.promptPreview": "Prompt preview",
-      "pb.addBtn": "➕ Add your app — paste it or upload the file",
+      "pb.addBtn": "Add your app — paste it or upload the file",
       "pb.improving": "Improving",
       "pb.tier.any": "ANY MODEL",
       "pb.tier.frontier": "VERSION TRAP",
@@ -3968,7 +4018,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "pb.atelierLoading": "Fetching the Atelier build guide from your node…",
       "pb.includeCortex": "Include Cortex Extensions",
       "pb.livePreview": "Live Preview",
-      "pb.copy": "📋 Copy Prompt",
+      "pb.copy": "Copy Prompt",
       "card.view": "Open",
       "card.open": "Open",
       "card.openHint": "Open this app",
@@ -3983,24 +4033,24 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "status.published": "Listed",
       "status.parked": "Unlisted",
       "status.serverOnly": "Server only",
-      "card.remove": "🗑 Remove",
-      "card.versions": "🕑 Versions",
-      "card.fork": "⑂ Fork",
+      "card.remove": "Remove",
+      "card.versions": "Versions",
+      "card.fork": "Fork",
       "card.forkHint": "Copy this app into your own catalogue as a new app (its origin is recorded).",
-      "card.forkableOn": "⑂ Forking: on",
-      "card.forkableOff": "⑂ Allow forking",
+      "card.forkableOn": "Forking: on",
+      "card.forkableOff": "Allow forking",
       "card.forkableOnHint": "Others can fork this app. Click to restrict forking to you and your agents.",
       "card.forkableOffHint": "Only you and your agents can fork this app. Click to let anyone fork it.",
-      "card.restore": "↺ Restore",
-      "card.subdomain": "🌐 Subdomain",
-      "card.park": "🙈 Unlist",
-      "card.unpark": "📢 List publicly",
+      "card.restore": "Restore",
+      "card.subdomain": "Subdomain",
+      "card.park": "Unlist",
+      "card.unpark": "List publicly",
       "fork.prompt": "Fork this app into your catalogue.\n\nNew filename:",
       "fork.success": "Forked to",
       "fork.failed": "Fork failed",
-      "detail.forkedFrom": "⑂ Forked from",
+      "detail.forkedFrom": "Forked from",
       "card.forksHint": "View the fork lineage (who forked this, and where it came from)",
-      "card.agent": "🤖 Agent",
+      "card.agent": "Agent",
       "card.agentHint": "This app ships its own agent - inspect it, use a hosted instance, or deploy your own",
       "card.aiGenerative": "AI",
       "card.aiGenerativeHint": "This app generates content with an AI model and tells its users so",
@@ -4046,11 +4096,11 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "lineage.status.hidden": "hidden",
       "lineage.status.deleted": "deleted",
       "card.protectHint": "Copy-protection options (obfuscate, domain-lock, watermark, no raw download)",
-      "card.protect": "🛡 Protection",
-      "card.removeServer": "🗑 Remove from server",
-      "card.consents": "🔑 App access",
+      "card.protect": "Protection",
+      "card.removeServer": "Remove from server",
+      "card.consents": "App access",
       "card.consentsHint": "See and revoke the scoped access you granted this app to your data (H-2 app grants).",
-      "card.subdomain": "🌐 Subdomain",
+      "card.subdomain": "Subdomain",
       "card.subdomainHint": "Assign or change this app's subdomain (operator only).",
       "detail.serverMgmt": "Manage on server",
       "protect.title": "Copy protection",
@@ -4066,7 +4116,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "protect.save": "Save",
       "protect.saving": "Saving…",
       "protect.saved": "Saved",
-      "detail.editDetails": "✏️ Edit",
+      "detail.editDetails": "Edit",
       "detail.favorite": "Add to favorites",
       "detail.unfavorite": "Remove from favorites",
       "detail.nameLabel": "App name",
@@ -4094,7 +4144,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "detail.renameHint": "The app link stays the same — only the displayed name and description change.",
       "detail.nameRequired": "Name cannot be empty.",
       "detail.descRequired": "Description cannot be empty.",
-      "detail.saveDetails": "💾 Save",
+      "detail.saveDetails": "Save",
       "detail.cancelEdit": "Cancel",
       "detail.detailsUpdated": "App details updated.",
       "card.parkHint": "Hide from the public catalogue + Community listing — still fully usable by you and anyone with the link. Does NOT publish a new version.",
@@ -4108,8 +4158,8 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "consents.granted": "You granted this app permission to:",
       "consents.revoke": "Revoke access",
       "consents.hint": "Revoking cuts the app off. It will ask for these again the next time it needs them — individual scopes aren’t edited here.",
-      "ctx.details": "🔎 Details",
-      "detail.launch": "▶ Launch",
+      "ctx.details": "Details",
+      "detail.launch": "Launch",
       "detail.status": "Status",
       "detail.statusLocal": "Local copy",
       "detail.statusPublished": "Published",
@@ -4139,10 +4189,10 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "detail.skillDetached": "Skill detached.",
       "detail.skillDetach": "Detach",
       "detail.skillAttachError": "Failed to attach skill",
-      "monetize.title": "💰 Monetize — sell tool calls",
+      "monetize.title": "Monetize — sell tool calls",
       "monetize.hint": "Declare tools agents can buy per call through the commerce checkout. A tool bound to a capability (action id) runs instantly and returns its result to the buyer; without a binding the purchase becomes a task for your agent. Priced tools are listed publicly in the commerce feed.",
       "monetize.empty": "No tools declared yet.",
-      "monetize.addTool": "➕ Add tool",
+      "monetize.addTool": "Add tool",
       "monetize.name": "Tool name",
       "monetize.desc": "Description",
       "monetize.priceCol": "Price / call",
@@ -4273,7 +4323,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "monetize.saved": "Tool manifest saved.",
       "monetize.saveFailed": "Saving the tool manifest failed",
       "monetize.needLogin": "Sign in to edit the tool manifest.",
-      "cost.title": "📊 Cost & contracts — what this app sources",
+      "cost.title": "Cost & contracts — what this app sources",
       "cost.hint": "This app’s EXCHANGE contracts: durable metered entitlements it calls, with live spend against each budget and the platform rake. The per-call price comes from the provider; you set only the budget cap.",
       "cost.empty": "No EXCHANGE contracts yet — this app sources nothing priced.",
       "cost.summary": "{n} contract(s) · {spent} morsels spent · {calls} call(s)",
@@ -4297,25 +4347,25 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "detail.accessCodeSet": "Access code set — this app now requires the code.",
       "detail.accessCodeCleared": "Access code removed — this app is public again.",
       "detail.needServerVersions": "Set the AIMEAT server URL in Settings to see published versions.",
-      "detail.editAi": "✨ Edit with AI",
+      "detail.editAi": "Edit with AI",
       "detail.editAiHint": "Describe a change. The AI rewrites the app with your own OpenRouter key and proposes it — nothing changes until you save it to your working copy.",
       "detail.aiInteractionTitle": "You are talking to an AI assistant.",
       "detail.aiInteractionBody": "It can be wrong, so read what it gives you before you keep it. Your text goes to a language model on your own API key.",
       "detail.editAiPh": "e.g. add a dark mode toggle in the top-right corner",
-      "detail.run": "✨ Generate change",
+      "detail.run": "Generate change",
       "detail.running": "Generating…",
-      "detail.test": "▶ Test draft",
-      "detail.testLive": "▶ Open test version",
-      "detail.publishTested": "🚀 Publish tested version",
-      "detail.keep": "✔ Keep draft",
-      "detail.discard": "✕ Discard",
+      "detail.test": "Test draft",
+      "detail.testLive": "Open test version",
+      "detail.publishTested": "Publish tested version",
+      "detail.keep": "Keep draft",
+      "detail.discard": "Discard",
       "detail.draftReady": "AI proposal ready — nothing is saved yet.",
       "detail.draftUploading": "Preparing your test version…",
       "detail.draftOpened": "Draft opened in a new tab — it runs just like the published app. Your live app is unchanged.",
       "detail.draftNeedsPublished": "Publish this app first, then you can test edits before they go live.",
       "detail.draftNeedsSignin": "Sign in to test a draft.",
       "detail.draftPublishConfirm": "Publish the tested draft as the new live version?",
-      "detail.draftPublished": "✔ Published as v{v}. It is now the live app.",
+      "detail.draftPublished": "Published as v{v}. It is now the live app.",
       "detail.kept": "Draft kept as your local copy.",
       // ── Working copy → published (TARGET-048). One vocabulary for the whole edit loop: the
       //    word "draft" is deliberately gone — it used to mean three different things here. ──
@@ -4336,18 +4386,18 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "wc.explainSavedUnpublished": "You have a saved working copy. Publish it when it is ready.",
       "wc.explainClean": "Your working copy matches the published app. Edit it below — every save keeps the previous state, so nothing gets lost.",
       "wc.explainUnpublished": "This app is not published yet. Publish it to give it a version other people can open.",
-      "wc.save": "💾 Save to working copy",
+      "wc.save": "Save to working copy",
       "wc.saving": "Saving…",
       "wc.saved": "Saved to your working copy — it survives a reload and stays private until you publish.",
       "wc.savedShort": "Saved!",
       "wc.saveFailed": "Could not save",
       "wc.keptLocalOnly": "Kept in this tab only — publish the app first to get a working copy that lasts.",
-      "wc.try": "▶ Try it safely",
-      "wc.tryLocal": "▶ Quick preview",
-      "wc.publishAs": "🚀 Publish as v{v}",
-      "wc.publishNew": "🚀 Publish as a new version",
-      "wc.discardProposal": "✕ Discard proposal",
-      "wc.discardWork": "✕ Discard working copy",
+      "wc.try": "Try it safely",
+      "wc.tryLocal": "Quick preview",
+      "wc.publishAs": "Publish as v{v}",
+      "wc.publishNew": "Publish as a new version",
+      "wc.discardProposal": "Discard proposal",
+      "wc.discardWork": "Discard working copy",
       "wc.confirmDiscardWork": "Throw away your saved working copy and go back to the published app?",
       "wc.discardedWork": "Working copy discarded — you are back on the published app.",
       "wc.verbsHint": "Save keeps it for you only. Try opens it on its real address without changing the live app. Publish is what other people see.",
@@ -4378,23 +4428,23 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "detail.deleteHint": "Removes the app and all its versions from the server. You cannot undo this.",
       "detail.setScreenshot": "Set screenshot",
       "detail.refreshScreenshot": "New screenshot",
-      "detail.publish": "🚀 Publish",
-      "detail.publishAs": "🚀 Publish as",
+      "detail.publish": "Publish",
+      "detail.publishAs": "Publish as",
       "detail.urlCantEdit": "This is a URL-linked app — there is no local source to edit with AI.",
-      "jsonImport.title": "📥 Import JSON backup",
+      "jsonImport.title": "Import JSON backup",
       "jsonImport.desc": "Choose which apps to import. Apps already in this catalog are marked as duplicates and unchecked — nothing is imported without your selection.",
       "jsonImport.statusDup": "duplicate",
       "jsonImport.config": "Also import settings (theme, language, server URL)",
       "jsonImport.done": "Imported",
-      "dedup.btn": "🧹 Remove duplicate apps",
+      "dedup.btn": "Remove duplicate apps",
       "dedup.none": "No duplicate apps found.",
       "dedup.confirm": "Delete duplicate copies (favorites and oldest copies are kept)? Copies to delete:",
       "dedup.done": "Duplicates removed",
       "srvImport.import": "Import selected",
       "backup.menu": "Backup",
-      "backup.exportAll": "📦 Export all (.zip)",
-      "backup.importFrom": "📥 Import from backup...",
-      "backup.title": "📥 Import from backup",
+      "backup.exportAll": "Export all (.zip)",
+      "backup.importFrom": "Import from backup...",
+      "backup.title": "Import from backup",
       "backup.inspecting": "Reading backup...",
       "backup.exporting": "Building backup...",
       "backup.from": "Backup from",
@@ -4412,7 +4462,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "backup.conflictSkip": "Skip",
       "backup.conflictAppend": "Append versions",
       "backup.conflictCopy": "Import as copy",
-      "backup.extensions": "🔌 Extensions",
+      "backup.extensions": "Extensions",
       "backup.restore": "Restore selected",
       "backup.resultTitle": "Restore complete",
       "backup.resCreated": "Created",
@@ -4424,7 +4474,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "backup.loginRequired": "Sign in first to use backups.",
       "backup.nothingSelected": "Nothing selected.",
       "backup.empty": "The backup contains no apps or extensions.",
-      "subModal.title": "🌐 Assign Subdomain",
+      "subModal.title": "Assign Subdomain",
       "subModal.label": "Subdomain",
       "subModal.hint": "Lowercase letters, numbers and hyphens (2-63 chars). The app is served at the subdomain root.",
       "subModal.unassign": "Unassign",
@@ -4434,7 +4484,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "subModal.ph": "e.g. sanomat",
       "subModal.empty": "Enter a subdomain first",
       "tag.all": "All",
-      "tag.favorites": "⭐ Favorites",
+      "tag.favorites": "Favorites",
       "empty.noApps": "No apps yet",
       "empty.noAppsDesc": "Add your first app using the + button above",
       "empty.formats": "Supports: HTML files and ZIP packages",
@@ -4573,9 +4623,9 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "header.title": "Omat sovellukset",
       "cta.backHome": "Takaisin etusivulle",
       "cta.publishOwn": "Julkaise oma sovelluksesi",
-      "mode.global": "🌐 Jaetut",
+      "mode.global": "Jaetut",
       "mode.global.title": "Selain-paikalliset appit jaettu kaikille tämän selaimen tileille",
-      "mode.personal": "👤 Omat",
+      "mode.personal": "Omat",
       "mode.personal.title": "Selain-paikalliset appit yksityisiä tilillesi",
       "mode.personal.needsLogin": "Kirjaudu sisään käyttääksesi tilisi paikallisia appeja",
       "mode.caption": "Paikalliset appit",
@@ -4608,13 +4658,13 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "datamap.personal.yes": "Kyllä",
       "datamap.personal.no": "Ei",
       "datamap.personal.unstated": "Ei kerrottu",
-      "action.add": "➕ Lisää sovellus",
+      "action.add": "Lisää sovellus",
       "action.create": "Luo",
-      "action.generate": "✨ Luo tekoälyllä",
-      "action.homepage": "🏠 Luo kotisivu",
+      "action.generate": "Luo tekoälyllä",
+      "action.homepage": "Luo kotisivu",
       "action.settings": "Asetukset",
       "action.help": "Ohje",
-      "help.title": "❓ Miten tämä katalogi toimii",
+      "help.title": "Miten tämä katalogi toimii",
       "help.modesTitle": "Sovelluksen luominen",
       "help.modes": "Lisää sovellus antaa liittää HTML:ää tai ladata HTML/ZIP-tiedoston (tai luoda sen tekoälyllä). Se julkaistaan suoraan tilillesi EI LISTALLA — palvelimelle mutta ei vielä julkiseksi — joten voit tarkistaa sen ennen listaamista. Mitään ei tallenneta vain selaimeesi.",
       "help.whereTitle": "Missä appisi asuvat",
@@ -4641,13 +4691,13 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "common.save": "Tallenna",
       "common.or": "tai",
       "common.toggle": "näytä/piilota",
-      "cortex.active": "🔌 Aktiiviset laajennukset",
-      "cortex.editorTitle": "🛠️ Laajennuseditori",
+      "cortex.active": "Aktiiviset laajennukset",
+      "cortex.editorTitle": "Laajennuseditori",
       "cortex.manifest": "Manifesti (YAML)",
       "cortex.addLib": "+ Lisää lib-tiedosto",
-      "cortex.exportFiles": "📥 Vie tiedostot",
+      "cortex.exportFiles": "Vie tiedostot",
       "cortex.saveReinstall": "Tallenna & asenna uudelleen",
-      "sec.published": "🚀 Julkaistut sovellukset",
+      "sec.published": "Julkaistut sovellukset",
       "sec.community": "Yhteisön sovellukset",
       "view.library": "Omat sovellukset",
       "view.community": "Yhteisö",
@@ -4708,6 +4758,16 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "action.portfolio": "Portfoliosivu sovelluksistasi",
       "homepage.title": "Portfoliosivu sovelluksistasi: kopioi tämä prompti tekoälyllesi",
       "homepage.needApps": "Julkaise ensin sovellus; portfoliosivu kootaan sovelluksistasi.",
+      "addModal.pasteBefore": "Liitä ",
+      "addModal.pasteWord": "generoitu",
+      "addModal.pasteAfter": " HTML-lähdekoodi",
+      "addModal.iconHint": "Paina yhtä ylläolevista tai kirjoita kenttään mikä tahansa emoji: Windowsissa Win + . avaa emojinäppäimistön, Macissa Ctrl + Cmd + välilyönti.",
+      "versions.sittings": "{n} istuntoa",
+      "versions.worked": "noin {t} työtä julkaisujen välissä",
+      "versions.chartTitle": "Julkaisuja päivässä",
+      "versions.chartHint": "Istunto on jono julkaisuja alle kahden tunnin välein; laskettu aika on niiden välinen aika, joten se, mitä tapahtui ennen istunnon ensimmäistä julkaisua, ei ole mukana.",
+      "versions.perDay": "{n} julkaisua",
+      "versions.chartMax": "enimmillään {n} päivässä",
       "mz.group.what": "Mikä työkalu on",
       "mz.group.price": "Mitä kutsu maksaa",
       "mz.group.market": "Markkinalla",
@@ -4721,7 +4781,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "view.communityHint": "Yhteisön sovellukset ovat sovelluksia, joita muut tämän noden käyttäjät ovat julkaisseet. Kun joku julkaisee sellaisen, se näkyy täällä.",
       "sec.parked": "Listaamattomat sovellukset",
       "sec.parkedBlurb": "Vain sinä näet ja voit käyttää näitä — ne pysyvät käytettävissä mutta eivät näy julkisessa katalogissa. Paina Julkaise siirtääksesi takaisin julkaistuihin.",
-      "sec.recent": "🕒 Viimeksi avatut",
+      "sec.recent": "Viimeksi avatut",
       "sec.local": "Sinun sovelluksesi",
       "sec.localNote": "Yksi kortti per sovellus. Merkki kertoo julkaisutilan — Listalla (näkyy julkisessa katalogissa) tai Ei listalla (palvelimella mutta piilossa julkisesta katalogista). Violetti Staging-merkki kertoo että apilla on myös julkaisematon luonnos.",
       "sec.localHint": "Lisää sovellus julkaisee sen tilillesi listaamattomana. Listaa se, kun se on valmis muille; luonnos odottaa julkaistun version rinnalla, kunnes julkaiset sen.",
@@ -4752,14 +4812,14 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "addModal.openMode": "Avaustapa",
       "openMode.tab": "Uusi välilehti",
       "openMode.iframe": "Upotettu (iframe)",
-      "ctx.edit": "✏️ Muokkaa",
-      "ctx.favorite": "⭐ Lisää/poista suosikki",
-      "ctx.toggleMode": "🔄 Vaihda avaustapa",
-      "ctx.viewSource": "👁 Näytä / muokkaa lähdekoodia",
-      "ctx.improveAi": "✨ Paranna tekoälyllä",
-      "ctx.sharePrompt": "📤 Jaa promptina",
-      "ctx.publish": "🚀 Julkaise palvelimelle",
-      "ctx.delete": "🗑️ Poista",
+      "ctx.edit": "Muokkaa",
+      "ctx.favorite": "Lisää/poista suosikki",
+      "ctx.toggleMode": "Vaihda avaustapa",
+      "ctx.viewSource": "Näytä / muokkaa lähdekoodia",
+      "ctx.improveAi": "Paranna tekoälyllä",
+      "ctx.sharePrompt": "Jaa promptina",
+      "ctx.publish": "Julkaise palvelimelle",
+      "ctx.delete": "Poista",
       "settings.title": "Asetukset",
       "settings.appearance": "Ulkoasu",
       "settings.theme": "Teema",
@@ -4782,7 +4842,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "source.save": "Tallenna paikallinen kopio",
       "import.title": "Tuo AIMEATista",
       "import.selected": "Tuo valitut",
-      "publish.title": "🚀 Julkaise sovellus",
+      "publish.title": "Julkaise sovellus",
       "publish.filename": "Tiedostonimi",
       "publish.filenameHint": "Kirjaimia, numeroita, pisteitä, viivoja, alaviivoja. Päätteen oltava .html",
       "publish.description": "Kuvaus",
@@ -4795,7 +4855,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "publish.loginRequired": "Kirjaudu sisään julkaistaksesi AIMEATiin. Anonyymi julkaisu on poistettu käytöstä — käytä yläpalkin Kirjaudu-painiketta.",
       "publish.savedUnlisted": "Tallennettu — sovelluksesi on palvelimella ei-listalla. Avaa se ja paina Listaa kun haluat sen julkiseksi.",
       "migrate.found": "Sinulla on {n} sovellus(ta) tallennettuna vain tähän selaimeen vanhasta paikallisesta katalogista. Katalogi on nyt vain palvelinpohjainen, joten ne eivät enää näy täällä. Ladataanko ne nyt JSON-varmuuskopiona? Voit julkaista uudelleen ne jotka haluat säilyttää.",
-      "auth.signIn": "❤️ Kirjaudu",
+      "auth.signIn": "Kirjaudu",
       "auth.loggedIn": "kirjautunut",
       "auth.logout": "Kirjaudu ulos",
       "versions.title": "Sovelluksen versiot",
@@ -4808,7 +4868,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "dur.min": "min",
       "dur.h": "t",
       "dur.d": "pv",
-      "pb.title": "✨ Luo sovellus tekoälyllä",
+      "pb.title": "Luo sovellus tekoälyllä",
       "pb.intro": "Ei koodausta. Kuvaile ideasi, kopioi prompti ja liitä se mihin tahansa tekoälykeskusteluun (Claude, ChatGPT…). Tekoäly kysyy muutaman kysymyksen, rakentaa valmiin sovelluksen ja antaa sinulle yhden HTML-tiedoston — lisää se sitten tästä julkaistaksesi.",
       "pb.step1": "Kuvaile sovelluksesi",
       "pb.step2": "Kopioi prompti & liitä se tekoälyysi",
@@ -4820,7 +4880,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "pb.packsHint": "Kaaviot, muokattavat vuokaaviot, pelit, 3D… — itse isännöidyt kirjastot, joiden AI-ohjeet leivotaan promptiin. Ideatekstisi esivalitsee sopivat paketit.",
       "pb.noneTemplate": "(ei mitään — rakenna tyhjästä)",
       "pb.promptPreview": "Promptin esikatselu",
-      "pb.addBtn": "➕ Lisää sovelluksesi — liitä se tai lataa tiedosto",
+      "pb.addBtn": "Lisää sovelluksesi — liitä se tai lataa tiedosto",
       "pb.improving": "Parannetaan",
       "pb.tier.any": "KAIKILLE MALLEILLE",
       "pb.tier.frontier": "VERSIOANSA",
@@ -4838,7 +4898,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "pb.atelierLoading": "Haetaan Atelier-rakennusohjetta nodeltasi…",
       "pb.includeCortex": "Sisällytä Cortex-laajennukset",
       "pb.livePreview": "Esikatselu",
-      "pb.copy": "📋 Kopioi prompti",
+      "pb.copy": "Kopioi prompti",
       "card.view": "Avaa",
       "card.open": "Avaa",
       "card.openHint": "Avaa tämä sovellus",
@@ -4853,24 +4913,24 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "status.published": "Listalla",
       "status.parked": "Ei listalla",
       "status.serverOnly": "Vain serverillä",
-      "card.remove": "🗑 Poista",
-      "card.versions": "🕑 Versiot",
-      "card.fork": "⑂ Haaroita",
+      "card.remove": "Poista",
+      "card.versions": "Versiot",
+      "card.fork": "Haaroita",
       "card.forkHint": "Kopioi tämä sovellus omaan katalogiisi uudeksi sovellukseksi (alkuperä tallennetaan).",
-      "card.forkableOn": "⑂ Haaroitus: päällä",
-      "card.forkableOff": "⑂ Salli haaroitus",
+      "card.forkableOn": "Haaroitus: päällä",
+      "card.forkableOff": "Salli haaroitus",
       "card.forkableOnHint": "Muut voivat haaroittaa tämän sovelluksen. Napsauta rajataksesi haaroituksen sinuun ja agentteihisi.",
       "card.forkableOffHint": "Vain sinä ja agenttisi voitte haaroittaa tämän. Napsauta salliaksesi kaikkien haaroittaa sen.",
-      "card.restore": "↺ Palauta",
-      "card.subdomain": "🌐 Alidomain",
-      "card.park": "🙈 Poista listalta",
-      "card.unpark": "📢 Listaa julkisesti",
+      "card.restore": "Palauta",
+      "card.subdomain": "Alidomain",
+      "card.park": "Poista listalta",
+      "card.unpark": "Listaa julkisesti",
       "fork.prompt": "Haaroita tämä sovellus katalogiisi.\n\nUusi tiedostonimi:",
       "fork.success": "Haaroitettu:",
       "fork.failed": "Haaroitus epäonnistui",
-      "detail.forkedFrom": "⑂ Haaroitettu kohteesta",
+      "detail.forkedFrom": "Haaroitettu kohteesta",
       "card.forksHint": "Näytä haaroitushistoria (kuka haaroitti ja mistä tämä on peräisin)",
-      "card.agent": "🤖 Agentti",
+      "card.agent": "Agentti",
       "card.agentHint": "Tämä sovellus tuo mukanaan oman agentin - tutki sitä, käytä valmiiksi ylläpidettyä tai ota käyttöön oma",
       "card.aiGenerative": "Tekoäly",
       "card.aiGenerativeHint": "Sovellus tuottaa sisältöä tekoälymallilla ja kertoo siitä käyttäjilleen",
@@ -4916,11 +4976,11 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "lineage.status.hidden": "piilotettu",
       "lineage.status.deleted": "poistettu",
       "card.protectHint": "Kopiosuojausasetukset (obfuskointi, domain-lukko, vesileima, ei raakalatausta)",
-      "card.protect": "🛡 Suojaus",
-      "card.removeServer": "🗑 Poista palvelimelta",
-      "card.consents": "🔑 Sovelluksen pääsy",
+      "card.protect": "Suojaus",
+      "card.removeServer": "Poista palvelimelta",
+      "card.consents": "Sovelluksen pääsy",
       "card.consentsHint": "Katso ja peru tälle sovellukselle antamasi rajattu pääsy tietoihisi (H-2 app-grantit).",
-      "card.subdomain": "🌐 Alidomain",
+      "card.subdomain": "Alidomain",
       "card.subdomainHint": "Aseta tai vaihda tämän sovelluksen alidomain (vain operaattori).",
       "detail.serverMgmt": "Hallinta palvelimella",
       "protect.title": "Kopiosuojaus",
@@ -4936,7 +4996,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "protect.save": "Tallenna",
       "protect.saving": "Tallennetaan…",
       "protect.saved": "Tallennettu",
-      "detail.editDetails": "✏️ Muokkaa",
+      "detail.editDetails": "Muokkaa",
       "detail.favorite": "Lisää suosikkeihin",
       "detail.unfavorite": "Poista suosikeista",
       "detail.nameLabel": "Sovelluksen nimi",
@@ -4964,7 +5024,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "detail.renameHint": "Sovelluksen linkki pysyy samana — vain näytettävä nimi ja kuvaus muuttuvat.",
       "detail.nameRequired": "Nimi ei voi olla tyhjä.",
       "detail.descRequired": "Kuvaus ei voi olla tyhjä.",
-      "detail.saveDetails": "💾 Tallenna",
+      "detail.saveDetails": "Tallenna",
       "detail.cancelEdit": "Peruuta",
       "detail.detailsUpdated": "Sovelluksen tiedot päivitetty.",
       "card.parkHint": "Piilota julkisesta katalogista + Yhteisö-listalta — sinä (ja kuka tahansa linkillä) voit yhä käyttää. EI julkaise uutta versiota.",
@@ -4978,8 +5038,8 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "consents.granted": "Annoit tälle sovellukselle luvan:",
       "consents.revoke": "Peru pääsy",
       "consents.hint": "Peruminen katkaisee sovelluksen pääsyn. Se pyytää nämä uudelleen kun seuraavan kerran tarvitsee niitä — yksittäisiä oikeuksia ei muokata täältä.",
-      "ctx.details": "🔎 Tiedot",
-      "detail.launch": "▶ Käynnistä",
+      "ctx.details": "Tiedot",
+      "detail.launch": "Käynnistä",
       "detail.status": "Tila",
       "detail.statusLocal": "Paikallinen kopio",
       "detail.statusPublished": "Julkaistu",
@@ -5007,10 +5067,10 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "detail.skillAttaching": "Liitetään…",
       "detail.skillAttached": "Taito liitetty tähän sovellukseen.",
       "detail.skillDetached": "Taito irrotettu.",
-      "monetize.title": "💰 Kaupallista — myy työkalukutsuja",
+      "monetize.title": "Kaupallista — myy työkalukutsuja",
       "monetize.hint": "Julista työkalut, joita agentit voivat ostaa kutsu kerrallaan commerce-kassan kautta. Kyvykkyyteen sidottu työkalu (action id) ajetaan heti ja tulos palautuu ostajalle; ilman sidontaa ostosta syntyy tehtävä agentillesi. Hinnoitellut työkalut listataan julkisesti commerce-feedissä.",
       "monetize.empty": "Ei vielä julistettuja työkaluja.",
-      "monetize.addTool": "➕ Lisää työkalu",
+      "monetize.addTool": "Lisää työkalu",
       "monetize.name": "Työkalun nimi",
       "monetize.desc": "Kuvaus",
       "monetize.priceCol": "Hinta / kutsu",
@@ -5141,7 +5201,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "monetize.saved": "Työkalumanifesti tallennettu.",
       "monetize.saveFailed": "Työkalumanifestin tallennus epäonnistui",
       "monetize.needLogin": "Kirjaudu sisään muokataksesi työkalumanifestia.",
-      "cost.title": "📊 Kulut & sopimukset — mitä tämä appi hankkii",
+      "cost.title": "Kulut & sopimukset — mitä tämä appi hankkii",
       "cost.hint": "Tämän appin EXCHANGE-sopimukset: pysyvät mitatut käyttöoikeudet joita se kutsuu, live-kulutus kutakin budjettia vasten ja alustan siivu. Kutsukohtainen hinta tulee tarjoajalta; sinä asetat vain budjettikaton.",
       "cost.empty": "Ei vielä EXCHANGE-sopimuksia — tämä appi ei hanki mitään hinnoiteltua.",
       "cost.summary": "{n} sopimus(ta) · {spent} morselia käytetty · {calls} kutsu(a)",
@@ -5167,25 +5227,25 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "detail.accessCodeSet": "Pääsykoodi asetettu — sovellus vaatii nyt koodin.",
       "detail.accessCodeCleared": "Pääsykoodi poistettu — sovellus on taas julkinen.",
       "detail.needServerVersions": "Aseta AIMEAT-palvelimen osoite asetuksissa nähdäksesi julkaistut versiot.",
-      "detail.editAi": "✨ Muokkaa tekoälyllä",
+      "detail.editAi": "Muokkaa tekoälyllä",
       "detail.editAiHint": "Kuvaile muutos. Tekoäly kirjoittaa sovelluksen uudelleen omalla OpenRouter-avaimellasi, tallentaa luonnoksen jota voit testata, ja sitten säilytät tai hylkäät sen.",
       "detail.aiInteractionTitle": "Keskustelet tekoälyavustajan kanssa.",
       "detail.aiInteractionBody": "Se voi erehtyä, joten lue mitä se antaa ennen kuin otat sen käyttöön. Tekstisi menee kielimallille omalla API-avaimellasi.",
       "detail.editAiPh": "esim. lisää tumman tilan vaihtokytkin oikeaan yläkulmaan",
-      "detail.run": "✨ Luo muutos",
+      "detail.run": "Luo muutos",
       "detail.running": "Luodaan…",
-      "detail.test": "▶ Testaa luonnos",
-      "detail.testLive": "▶ Avaa testiversio",
-      "detail.publishTested": "🚀 Julkaise testattu versio",
-      "detail.keep": "✔ Säilytä luonnos",
-      "detail.discard": "✕ Hylkää",
+      "detail.test": "Testaa luonnos",
+      "detail.testLive": "Avaa testiversio",
+      "detail.publishTested": "Julkaise testattu versio",
+      "detail.keep": "Säilytä luonnos",
+      "detail.discard": "Hylkää",
       "detail.draftReady": "AI-ehdotus valmis — mitään ei ole vielä tallennettu.",
       "detail.draftUploading": "Valmistellaan testiversiota…",
       "detail.draftOpened": "Luonnos avattu uuteen välilehteen — toimii kuten julkaistu appi. Live-appi pysyy ennallaan.",
       "detail.draftNeedsPublished": "Julkaise appi ensin, niin voit testata muutoksia ennen kuin ne menevät liveksi.",
       "detail.draftNeedsSignin": "Kirjaudu sisään testataksesi luonnosta.",
       "detail.draftPublishConfirm": "Julkaistaanko testattu luonnos uutena live-versiona?",
-      "detail.draftPublished": "✔ Julkaistu versiona v{v}. Se on nyt live-appi.",
+      "detail.draftPublished": "Julkaistu versiona v{v}. Se on nyt live-appi.",
       "detail.kept": "Luonnos säilytetty paikallisena kopiona.",
       // ── Työkopio → julkaistu (TARGET-048). Yksi sanasto koko muokkaussilmukalle: sana
       //    "luonnos" on tarkoituksella poissa — se tarkoitti täällä kolmea eri asiaa. ──
@@ -5206,18 +5266,18 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "wc.explainSavedUnpublished": "Sinulla on tallennettu työkopio. Julkaise se, kun se on valmis.",
       "wc.explainClean": "Työkopiosi on sama kuin julkaistu appi. Muokkaa alla — jokainen tallennus säilyttää edellisen tilan, joten mikään ei katoa.",
       "wc.explainUnpublished": "Tätä appia ei ole vielä julkaistu. Julkaise se, niin sillä on versio jonka muut voivat avata.",
-      "wc.save": "💾 Tallenna työkopioon",
+      "wc.save": "Tallenna työkopioon",
       "wc.saving": "Tallennetaan…",
       "wc.saved": "Tallennettu työkopioon — säilyy sivun päivityksen yli ja pysyy yksityisenä kunnes julkaiset.",
       "wc.savedShort": "Tallennettu!",
       "wc.saveFailed": "Tallennus ei onnistunut",
       "wc.keptLocalOnly": "Säilytetty vain tässä välilehdessä — julkaise appi ensin, niin saat pysyvän työkopion.",
-      "wc.try": "▶ Kokeile turvallisesti",
-      "wc.tryLocal": "▶ Pikaesikatselu",
-      "wc.publishAs": "🚀 Julkaise versiona v{v}",
-      "wc.publishNew": "🚀 Julkaise uutena versiona",
-      "wc.discardProposal": "✕ Hylkää ehdotus",
-      "wc.discardWork": "✕ Hylkää työkopio",
+      "wc.try": "Kokeile turvallisesti",
+      "wc.tryLocal": "Pikaesikatselu",
+      "wc.publishAs": "Julkaise versiona v{v}",
+      "wc.publishNew": "Julkaise uutena versiona",
+      "wc.discardProposal": "Hylkää ehdotus",
+      "wc.discardWork": "Hylkää työkopio",
       "wc.confirmDiscardWork": "Heitetäänkö tallennettu työkopio pois ja palataan julkaistuun appiin?",
       "wc.discardedWork": "Työkopio hylätty — olet takaisin julkaistussa apissa.",
       "wc.verbsHint": "Tallenna säilyttää muutoksen vain sinulle. Kokeile avaa sen oikeassa osoitteessa muuttamatta live-appia. Julkaise on se minkä muut näkevät.",
@@ -5248,23 +5308,23 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "detail.deleteHint": "Poistaa sovelluksen ja kaikki sen versiot palvelimelta. Tätä ei voi perua.",
       "detail.setScreenshot": "Aseta kuvakaappaus",
       "detail.refreshScreenshot": "Ota uusi kuvakaappaus",
-      "detail.publish": "🚀 Julkaise",
-      "detail.publishAs": "🚀 Julkaise versiona",
+      "detail.publish": "Julkaise",
+      "detail.publishAs": "Julkaise versiona",
       "detail.urlCantEdit": "Tämä on URL-linkitetty sovellus — paikallista lähdekoodia ei voi muokata tekoälyllä.",
-      "jsonImport.title": "📥 Tuo JSON-varmuuskopio",
+      "jsonImport.title": "Tuo JSON-varmuuskopio",
       "jsonImport.desc": "Valitse mitkä appit tuodaan. Katalogissa jo olevat on merkitty duplikaateiksi ja jätetty valitsematta — mitään ei tuoda ilman valintaasi.",
       "jsonImport.statusDup": "duplikaatti",
       "jsonImport.config": "Tuo myös asetukset (teema, kieli, palvelimen osoite)",
       "jsonImport.done": "Tuotu",
-      "dedup.btn": "🧹 Poista duplikaattiappit",
+      "dedup.btn": "Poista duplikaattiappit",
       "dedup.none": "Duplikaattiappeja ei löytynyt.",
       "dedup.confirm": "Poistetaanko duplikaattikopiot (suosikit ja vanhimmat kopiot säilytetään)? Poistettavia kopioita:",
       "dedup.done": "Duplikaatit poistettu",
       "srvImport.import": "Tuo valitut",
       "backup.menu": "Varmuuskopio",
-      "backup.exportAll": "📦 Vie kaikki (.zip)",
-      "backup.importFrom": "📥 Tuo varmuuskopiosta...",
-      "backup.title": "📥 Tuo varmuuskopiosta",
+      "backup.exportAll": "Vie kaikki (.zip)",
+      "backup.importFrom": "Tuo varmuuskopiosta...",
+      "backup.title": "Tuo varmuuskopiosta",
       "backup.inspecting": "Luetaan varmuuskopiota...",
       "backup.exporting": "Kootaan varmuuskopiota...",
       "backup.from": "Varmuuskopio lähteestä",
@@ -5282,7 +5342,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "backup.conflictSkip": "Ohita",
       "backup.conflictAppend": "Lisää versiot päälle",
       "backup.conflictCopy": "Tuo kopiona",
-      "backup.extensions": "🔌 Laajennukset",
+      "backup.extensions": "Laajennukset",
       "backup.restore": "Palauta valitut",
       "backup.resultTitle": "Palautus valmis",
       "backup.resCreated": "Luotiin",
@@ -5294,7 +5354,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "backup.loginRequired": "Kirjaudu ensin sisään käyttääksesi varmuuskopioita.",
       "backup.nothingSelected": "Mitään ei ole valittu.",
       "backup.empty": "Varmuuskopiossa ei ole appeja eikä laajennuksia.",
-      "subModal.title": "🌐 Liitä alidomain",
+      "subModal.title": "Liitä alidomain",
       "subModal.label": "Alidomain",
       "subModal.hint": "Pienet kirjaimet, numerot ja viivat (2-63 merkkiä). Appi tarjoillaan alidomainin juuresta.",
       "subModal.unassign": "Poista liitos",
@@ -5304,7 +5364,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "subModal.ph": "esim. sanomat",
       "subModal.empty": "Syötä ensin alidomain",
       "tag.all": "Kaikki",
-      "tag.favorites": "⭐ Suosikit",
+      "tag.favorites": "Suosikit",
       "empty.noApps": "Ei vielä sovelluksia",
       "empty.noAppsDesc": "Lisää ensimmäinen sovellus yllä olevalla +-painikkeella",
       "empty.formats": "Tukee: HTML-tiedostot ja ZIP-paketit",
@@ -6264,7 +6324,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     if (pbSourceApp) {
       radios[1].checked = true;
       if (improving) {
-        improving.textContent = "✏️ " + (t("pb.improving") || "Improving") + ": " + (pbSourceApp.name || pbSourceApp.filename || "this app");
+        improving.textContent = (t("pb.improving") || "Improving") + ": " + (pbSourceApp.name || pbSourceApp.filename || "this app");
         improving.style.display = "";
       }
     } else {
@@ -8388,7 +8448,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     var descFiVal = descs.fi || "";
     var aboutBody;
     if (detailEditingAbout) {
-      aboutBody = '<label class="dtl-stat-label" for="detail-name-input">' + t("detail.nameLabel") + '</label><input id="detail-name-input" class="modal-input" maxlength="120" value="' + escapeHtml(app.name || "") + '" style="margin:4px 0 10px" /><label class="dtl-stat-label" for="detail-desc-en">' + t("detail.descEn") + '</label><textarea id="detail-desc-en" class="modal-input" rows="3" maxlength="2000" style="margin:4px 0 6px;resize:vertical">' + escapeHtml(descEnVal) + '</textarea><label class="dtl-stat-label" for="detail-desc-fi">' + t("detail.descFi") + '</label><textarea id="detail-desc-fi" class="modal-input" rows="3" maxlength="2000" style="margin:4px 0 6px;resize:vertical">' + escapeHtml(descFiVal) + '</textarea><div class="dtl-btn-row" style="margin:0 0 4px">' + dtlBtn("🌐 " + t("detail.translateEnFi"), "window._launcher.detailTranslateDesc('en','fi')", { id: "detail-tr-enfi" }) + dtlBtn("🌐 " + t("detail.translateFiEn"), "window._launcher.detailTranslateDesc('fi','en')", { id: "detail-tr-fien" }) + '</div><div class="dtl-ai-status" id="detail-tr-status" style="margin:0 0 8px"></div><label class="dtl-stat-label" for="detail-icon-input">' + t("detail.iconLabel") + '</label><input id="detail-icon-input" class="modal-input" maxlength="4" value="' + escapeHtml(app.icon || "") + '" style="margin:4px 0 10px;text-align:center;font-size:1.2rem" /><label class="dtl-stat-label" for="detail-tags-input">' + t("detail.tagsLabel") + '</label><input id="detail-tags-input" class="modal-input" value="' + escapeHtml((app.tags || []).join(", ")) + '" placeholder="tools, productivity" style="margin:4px 0 8px" /><div class="dtl-sync none" style="margin:0 0 10px">' + t("detail.renameHint") + '</div><div class="dtl-btn-row">' + dtlBtn(t("detail.saveDetails"), "window._launcher.detailAboutSave()", { variant: "primary" }) + dtlBtn(t("detail.cancelEdit"), "window._launcher.detailAboutCancel()") + "</div>";
+      aboutBody = '<label class="dtl-stat-label" for="detail-name-input">' + t("detail.nameLabel") + '</label><input id="detail-name-input" class="modal-input" maxlength="120" value="' + escapeHtml(app.name || "") + '" style="margin:4px 0 10px" /><label class="dtl-stat-label" for="detail-desc-en">' + t("detail.descEn") + '</label><textarea id="detail-desc-en" class="modal-input" rows="3" maxlength="2000" style="margin:4px 0 6px;resize:vertical">' + escapeHtml(descEnVal) + '</textarea><label class="dtl-stat-label" for="detail-desc-fi">' + t("detail.descFi") + '</label><textarea id="detail-desc-fi" class="modal-input" rows="3" maxlength="2000" style="margin:4px 0 6px;resize:vertical">' + escapeHtml(descFiVal) + '</textarea><div class="dtl-btn-row" style="margin:0 0 4px">' + dtlBtn(t("detail.translateEnFi"), "window._launcher.detailTranslateDesc('en','fi')", { id: "detail-tr-enfi" }) + dtlBtn(t("detail.translateFiEn"), "window._launcher.detailTranslateDesc('fi','en')", { id: "detail-tr-fien" }) + '</div><div class="dtl-ai-status" id="detail-tr-status" style="margin:0 0 8px"></div><label class="dtl-stat-label" for="detail-icon-input">' + t("detail.iconLabel") + '</label><input id="detail-icon-input" class="modal-input" maxlength="4" value="' + escapeHtml(app.icon || "") + '" style="margin:4px 0 10px;text-align:center;font-size:1.2rem" /><label class="dtl-stat-label" for="detail-tags-input">' + t("detail.tagsLabel") + '</label><input id="detail-tags-input" class="modal-input" value="' + escapeHtml((app.tags || []).join(", ")) + '" placeholder="tools, productivity" style="margin:4px 0 8px" /><div class="dtl-sync none" style="margin:0 0 10px">' + t("detail.renameHint") + '</div><div class="dtl-btn-row">' + dtlBtn(t("detail.saveDetails"), "window._launcher.detailAboutSave()", { variant: "primary" }) + dtlBtn(t("detail.cancelEdit"), "window._launcher.detailAboutCancel()") + "</div>";
     } else {
       var shownDesc = app.descriptions && app.descriptions[getLang()] || app.description || "";
       aboutBody = (shownDesc ? '<p class="dtl-desc">' + escapeHtml(shownDesc) + "</p>" : "") + '<div class="dtl-meta-grid">' + metaItem(t("detail.category"), app.category || "utility") + metaItem(t("detail.tags"), tags) + metaItem(t("detail.sourceLabel"), sourceLabelText(app.source)) + metaItem(t("detail.size"), app.blob ? fmtSize(localBytes) : "—") + metaItem(t("detail.created"), created) + metaItem(t("detail.usesCortex"), cortex) + // Provenance: if this app was forked from another, credit the source app.
@@ -8408,7 +8468,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     }
     var versionsHtml = '<div class="dtl-section"><h3>' + t("detail.versions") + '</h3><p class="dtl-desc">' + t("versions.publishedHint") + '</p><div id="detail-versions-list">' + (detailVersionsHtml !== null ? detailVersionsHtml : !hasServer ? '<span class="dtl-sync none">' + t("detail.needServerVersions") + "</span>" : app.published ? '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.loadingVersions") + "</span>" : '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.noVersions") + "</span>") + "</div></div>";
     var publishLabel = app.published && app.publishedVersionNumber ? t("detail.publishAs") + " v" + (app.publishedVersionNumber + 1) : t("detail.publish");
-    var actionsHtml = '<div class="dtl-section"><h3>' + t("detail.actions") + '</h3><div class="dtl-btn-row">' + (isUrlApp ? "" : dtlBtn(t("ctx.viewSource"), "window._launcher.detailEditSource()")) + (isUrlApp ? "" : dtlBtn(t("ctx.improveAi"), "window._launcher.detailImproveExternal()")) + dtlBtn(t("ctx.sharePrompt"), "window._launcher.detailSharePrompt()") + (isUrlApp ? "" : dtlBtn(escapeHtml(publishLabel), "window._launcher.detailPublish()", { variant: "primary" })) + (app.published && !isUrlApp ? dtlBtn("📷 " + t("detail.setScreenshot"), "window._launcher.detailSetScreenshot()", { title: "Upload a custom thumbnail for this app" }) : "") + (app.published && !isUrlApp ? dtlBtn("🔄 " + t("detail.refreshScreenshot"), "window._launcher.detailRefreshScreenshot()", { title: "Clear the screenshot; the node re-takes it on its next scheduled run" }) : "") + // Offered only where it can do something: our own published app (deleted on the node) or a
+    var actionsHtml = '<div class="dtl-section"><h3>' + t("detail.actions") + '</h3><div class="dtl-btn-row">' + (isUrlApp ? "" : dtlBtn(t("ctx.viewSource"), "window._launcher.detailEditSource()")) + (isUrlApp ? "" : dtlBtn(t("ctx.improveAi"), "window._launcher.detailImproveExternal()")) + dtlBtn(t("ctx.sharePrompt"), "window._launcher.detailSharePrompt()") + (isUrlApp ? "" : dtlBtn(escapeHtml(publishLabel), "window._launcher.detailPublish()", { variant: "primary" })) + (app.published && !isUrlApp ? dtlBtn(t("detail.setScreenshot"), "window._launcher.detailSetScreenshot()", { title: "Upload a custom thumbnail for this app" }) : "") + (app.published && !isUrlApp ? dtlBtn(t("detail.refreshScreenshot"), "window._launcher.detailRefreshScreenshot()", { title: "Clear the screenshot; the node re-takes it on its next scheduled run" }) : "") + // Offered only where it can do something: our own published app (deleted on the node) or a
     // record that was never published. Someone else's published app is not ours to delete, and
     // the button used to appear there and close the view having changed nothing.
     (detailIsOwnPublished(app) || !app.published ? dtlBtn(t("ctx.delete"), "window._launcher.detailDelete()", { variant: "danger", title: t("detail.deleteHint") }) : "") + "</div></div>";
@@ -8431,10 +8491,10 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       var agFile = app.publishedFilename || "";
       var agDefs = appManifestAgents(agOwner, agFile);
       if (agDefs.length) {
-        agentsHtml = '<div class="dtl-section"><h3>🤖 ' + (t("agents.title") || "Bundled agents") + '</h3><div style="font-size:.85rem;color:var(--text-muted);margin-bottom:6px">' + (t("agents.declares") || "") + '</div><div style="margin-bottom:8px">' + agDefs.map(function(d) {
+        agentsHtml = '<div class="dtl-section"><h3>' + (t("agents.title") || "Bundled agents") + '</h3><div style="font-size:.85rem;color:var(--text-muted);margin-bottom:6px">' + (t("agents.declares") || "") + '</div><div style="margin-bottom:8px">' + agDefs.map(function(d) {
           return '<span class="aga-chip">' + escapeHtml(d.agent_name || "") + "</span>";
         }).join(" ") + "</div>" + dtlBtn(
-          "🤖 " + (t("agents.manage") || "Inspect & deploy"),
+          t("agents.manage") || "Inspect & deploy",
           "window._launcher.showAppAgentsModal('" + jsArg(agOwner) + "', '" + jsArg(agFile) + "')"
         ) + "</div>";
       }
@@ -8592,7 +8652,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     var ref = promoteRef(app);
     var cur = getPromotion(ref) || {};
     var on = !!(cur.en || cur.fi);
-    return '<div class="dtl-section" id="detail-promote"><h3 style="display:flex;align-items:center;gap:8px">📣 ' + t("promote.title") + (on ? ' <span class="dtl-badge-on">' + t("promote.on") + "</span>" : "") + '</h3><p class="dtl-desc">' + t("promote.hint") + '</p><label class="dtl-stat-label" for="detail-promo-en">' + t("promote.en") + '</label><textarea id="detail-promo-en" class="modal-input" rows="2" maxlength="500" style="margin:4px 0 6px;resize:vertical">' + escapeHtml(cur.en || "") + '</textarea><label class="dtl-stat-label" for="detail-promo-fi">' + t("promote.fi") + '</label><textarea id="detail-promo-fi" class="modal-input" rows="2" maxlength="500" style="margin:4px 0 6px;resize:vertical">' + escapeHtml(cur.fi || "") + '</textarea><div class="dtl-btn-row" style="margin:0 0 4px">' + dtlBtn("🌐 " + t("detail.translateEnFi"), "window._launcher.detailTranslateDesc('en','fi','detail-promo-','detail-promo-tr-status')") + dtlBtn("🌐 " + t("detail.translateFiEn"), "window._launcher.detailTranslateDesc('fi','en','detail-promo-','detail-promo-tr-status')") + '</div><div class="dtl-ai-status" id="detail-promo-tr-status" style="margin:0 0 8px"></div><div class="dtl-btn-row">' + dtlBtn(t("promote.save"), "window._launcher.detailPromoteSave()", { variant: "primary" }) + (on ? dtlBtn(t("promote.remove"), "window._launcher.detailPromoteClear()") : "") + '</div><div class="dtl-ai-status" id="detail-promo-status"></div></div>';
+    return '<div class="dtl-section" id="detail-promote"><h3 style="display:flex;align-items:center;gap:8px">' + t("promote.title") + (on ? ' <span class="dtl-badge-on">' + t("promote.on") + "</span>" : "") + '</h3><p class="dtl-desc">' + t("promote.hint") + '</p><label class="dtl-stat-label" for="detail-promo-en">' + t("promote.en") + '</label><textarea id="detail-promo-en" class="modal-input" rows="2" maxlength="500" style="margin:4px 0 6px;resize:vertical">' + escapeHtml(cur.en || "") + '</textarea><label class="dtl-stat-label" for="detail-promo-fi">' + t("promote.fi") + '</label><textarea id="detail-promo-fi" class="modal-input" rows="2" maxlength="500" style="margin:4px 0 6px;resize:vertical">' + escapeHtml(cur.fi || "") + '</textarea><div class="dtl-btn-row" style="margin:0 0 4px">' + dtlBtn(t("detail.translateEnFi"), "window._launcher.detailTranslateDesc('en','fi','detail-promo-','detail-promo-tr-status')") + dtlBtn(t("detail.translateFiEn"), "window._launcher.detailTranslateDesc('fi','en','detail-promo-','detail-promo-tr-status')") + '</div><div class="dtl-ai-status" id="detail-promo-tr-status" style="margin:0 0 8px"></div><div class="dtl-btn-row">' + dtlBtn(t("promote.save"), "window._launcher.detailPromoteSave()", { variant: "primary" }) + (on ? dtlBtn(t("promote.remove"), "window._launcher.detailPromoteClear()") : "") + '</div><div class="dtl-ai-status" id="detail-promo-status"></div></div>';
   }
   function detailPromoteSave() {
     var app = detailGetApp();
@@ -9195,10 +9255,94 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     var span = durationLabel(gapMs(newest, oldest), durationUnits());
     return " · " + when + (span ? " · " + t("versions.span") + " " + span : "");
   }
+  var SITTING_GAP_MS = 2 * 60 * 60 * 1e3;
+  function versionSittings(versions) {
+    var stamps = [];
+    for (var i = versions.length - 1; i >= 0; i--) {
+      var ms = versions[i].created_at ? Date.parse(versions[i].created_at) : NaN;
+      if (isFinite(ms)) stamps.push(ms);
+    }
+    var out = [], cur = null;
+    for (var j = 0; j < stamps.length; j++) {
+      if (!cur || stamps[j] - cur.end > SITTING_GAP_MS) {
+        cur = { start: stamps[j], end: stamps[j], n: 1 };
+        out.push(cur);
+      } else {
+        cur.end = stamps[j];
+        cur.n++;
+      }
+    }
+    return out;
+  }
+  function versionChartHtml(sittings) {
+    if (!sittings.length) return "";
+    var DAY = 24 * 60 * 60 * 1e3;
+    var dayOf = function(ms) {
+      var d2 = new Date(ms);
+      return Date.UTC(d2.getFullYear(), d2.getMonth(), d2.getDate());
+    };
+    var counts = {};
+    var first = Infinity, last = -Infinity;
+    for (var s = 0; s < sittings.length; s++) {
+      var st = sittings[s];
+      for (var k = 0; k < st.stamps.length; k++) {
+        var d = dayOf(st.stamps[k]);
+        counts[d] = (counts[d] || 0) + 1;
+        if (d < first) first = d;
+        if (d > last) last = d;
+      }
+    }
+    var days = Math.round((last - first) / DAY) + 1;
+    var bucket = days > 120 ? 7 : 1;
+    var bars = [];
+    var max = 0;
+    for (var day = first; day <= last; day += DAY * bucket) {
+      var n = 0;
+      for (var b = 0; b < bucket; b++) n += counts[day + b * DAY] || 0;
+      bars.push({ day, n });
+      if (n > max) max = n;
+    }
+    if (!max) return "";
+    var W = 720, H = 96, PAD = 2, BASE = H - 1;
+    var bw = Math.min(28, Math.max(2, Math.floor((W - PAD * (bars.length - 1)) / bars.length)));
+    var svgW = bars.length * bw + PAD * (bars.length - 1);
+    var rects = "";
+    for (var i = 0; i < bars.length; i++) {
+      var h = bars[i].n ? Math.max(4, Math.round(bars[i].n / max * (H - 14))) : 0;
+      var x = i * (bw + PAD);
+      var when = new Date(bars[i].day).toLocaleDateString();
+      var label2 = when + (bucket > 1 ? " +" + (bucket - 1) : "") + " · " + t("versions.perDay").replace("{n}", String(bars[i].n));
+      rects += '<g class="version-bar"><title>' + escapeHtml(label2) + '</title><rect class="version-bar-hit" x="' + x + '" y="0" width="' + bw + '" height="' + H + '" fill="transparent"></rect>' + (h ? '<rect class="version-bar-mark" x="' + x + '" y="' + (BASE - h) + '" width="' + bw + '" height="' + h + '" rx="' + Math.min(2, bw / 2) + '"></rect>' : "") + "</g>";
+    }
+    return '<div class="version-chart"><div class="version-chart-head"><span class="version-chart-title">' + escapeHtml(t("versions.chartTitle")) + '</span><span class="version-chart-max">' + escapeHtml(t("versions.chartMax").replace("{n}", String(max))) + '</span></div><svg class="version-chart-svg" width="' + svgW + '" height="' + H + '" viewBox="0 0 ' + svgW + " " + H + '" role="img" aria-label="' + escapeHtml(t("versions.chartTitle")) + '"><line class="version-chart-base" x1="0" y1="' + BASE + '" x2="' + svgW + '" y2="' + BASE + '"></line>' + rects + "</svg>" + // A short chart (a few days) cannot hold a date at each end, so it says the span in one line.
+    (svgW < 240 ? '<div class="version-chart-axis"><span>' + escapeHtml(new Date(first).toLocaleDateString() + (first === last ? "" : " – " + new Date(last).toLocaleDateString())) + "</span></div>" : '<div class="version-chart-axis" style="max-width:' + svgW + 'px"><span>' + escapeHtml(new Date(first).toLocaleDateString()) + "</span><span>" + escapeHtml(new Date(last).toLocaleDateString()) + "</span></div>") + "</div>";
+  }
   function versionSpanHtml(versions) {
-    var text = versionSpanText(versions);
-    if (!text) return "";
-    return '<div class="version-span" style="color:var(--text-muted);font-size:.8rem;margin-bottom:.5rem">' + escapeHtml(versions.length + " " + t("versions.stored") + text) + "</div>";
+    if (!versions.length) return "";
+    var sittings = versionSittings(versions);
+    var asc = [];
+    for (var i = versions.length - 1; i >= 0; i--) {
+      var ms = Date.parse(versions[i].created_at || "");
+      if (isFinite(ms)) asc.push(ms);
+    }
+    var idx = 0;
+    for (var s = 0; s < sittings.length; s++) {
+      sittings[s].stamps = asc.slice(idx, idx + sittings[s].n);
+      idx += sittings[s].n;
+    }
+    var worked = 0;
+    for (var w = 0; w < sittings.length; w++) worked += sittings[w].end - sittings[w].start;
+    var parts = [versions.length + " " + t("versions.stored")];
+    if (asc.length) {
+      var firstDay = new Date(asc[0]).toLocaleDateString(), lastDay = new Date(asc[asc.length - 1]).toLocaleDateString();
+      parts.push(firstDay === lastDay ? firstDay : firstDay + " – " + lastDay);
+    }
+    if (sittings.length) {
+      var sit = t("versions.sittings").replace("{n}", String(sittings.length));
+      var lab = durationLabel(worked, durationUnits());
+      parts.push(lab ? sit + ", " + t("versions.worked").replace("{t}", lab) : sit);
+    }
+    return '<div class="version-span">' + escapeHtml(parts.join(" · ")) + "</div>" + versionChartHtml(sittings) + '<div class="version-span-hint">' + escapeHtml(t("versions.chartHint")) + "</div>";
   }
   function detailLoadVersions(owner, filename) {
     var config = loadConfig();
@@ -12552,6 +12696,22 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     document.getElementById("generate-btn").addEventListener("click", function() {
       closeCreateMenu();
       openPromptBuilder(null);
+    });
+    var pasteGen = document.getElementById("paste-generate-link");
+    if (pasteGen) pasteGen.addEventListener("click", function(e) {
+      e.preventDefault();
+      closeModal();
+      openPromptBuilder(null);
+    });
+    var iconPicks = document.getElementById("icon-picks");
+    if (iconPicks) iconPicks.addEventListener("click", function(e) {
+      var b = e.target.closest(".icon-pick");
+      if (!b) return;
+      var field = document.getElementById("app-icon");
+      if (field) field.value = b.textContent;
+      var on = iconPicks.querySelectorAll(".icon-pick.is-on");
+      for (var i = 0; i < on.length; i++) on[i].classList.remove("is-on");
+      b.classList.add("is-on");
     });
     document.getElementById("settings-btn").addEventListener("click", function() {
       openSettings();

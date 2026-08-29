@@ -221,7 +221,9 @@
 
       <!-- Paste tab content (default) -->
       <div class="tab-content active" id="tab-paste">
-        <label class="modal-label" for="app-paste-code" data-i18n="addModal.paste">Paste HTML Source Code</label>
+        <!-- "generated" is a door: pressing it opens the generate-with-AI flow, which is where the
+             code comes from. Three pieces so each language can order the words its own way. -->
+        <label class="modal-label" for="app-paste-code"><span data-i18n="addModal.pasteBefore">Paste the </span><button type="button" class="cat-dashed" id="paste-generate-link" data-i18n="addModal.pasteWord">generated</button><span data-i18n="addModal.pasteAfter"> HTML source</span></label>
         <textarea id="app-paste-code" class="modal-input" rows="10" placeholder="Paste your HTML source code here..." data-i18n-ph="addModal.pastePh" style="font-family:'Consolas','Monaco','Courier New',monospace;font-size:.8rem;resize:vertical;min-height:160px;line-height:1.4"></textarea>
       </div>
 
@@ -232,10 +234,18 @@
             <label class="modal-label" for="app-name" data-i18n="addModal.name">App Name</label>
             <input type="text" id="app-name" class="modal-input" placeholder="My App" data-i18n-ph="addModal.namePh" autocomplete="off"/>
           </div>
-          <div class="modal-field" style="width:72px">
-            <label class="modal-label" for="app-icon" data-i18n="addModal.icon">Icon</label>
-            <input type="text" id="app-icon" class="modal-input" maxlength="4" placeholder="&#x1F4DD;" style="text-align:center;font-size:1.2rem"/>
+        </div>
+        <!-- The icon: a row of ready ones to press, the field for any other, and the line that says
+             how to type one (nobody knew what to put here). -->
+        <div class="modal-field">
+          <label class="modal-label" for="app-icon" data-i18n="addModal.icon">Icon</label>
+          <div class="icon-field">
+            <input type="text" id="app-icon" class="modal-input" maxlength="4" placeholder="&#x1F4DD;"/>
+            <div class="icon-picks" id="icon-picks" role="group">
+              <button type="button" class="icon-pick">&#x1F4DD;</button><button type="button" class="icon-pick">&#x1F4CA;</button><button type="button" class="icon-pick">&#x1F4C7;</button><button type="button" class="icon-pick">&#x1F4C8;</button><button type="button" class="icon-pick">&#x1F5C2;</button><button type="button" class="icon-pick">&#x1F4CB;</button><button type="button" class="icon-pick">&#x1F4D6;</button><button type="button" class="icon-pick">&#x1F4EE;</button><button type="button" class="icon-pick">&#x1F5FA;</button><button type="button" class="icon-pick">&#x1F9ED;</button><button type="button" class="icon-pick">&#x1F3AE;</button><button type="button" class="icon-pick">&#x1F3A8;</button><button type="button" class="icon-pick">&#x1F3B5;</button><button type="button" class="icon-pick">&#x1F4F7;</button><button type="button" class="icon-pick">&#x1F6D2;</button><button type="button" class="icon-pick">&#x1F3E0;</button><button type="button" class="icon-pick">&#x1F48A;</button><button type="button" class="icon-pick">&#x1F527;</button><button type="button" class="icon-pick">&#x1F9EA;</button><button type="button" class="icon-pick">&#x1F30D;</button><button type="button" class="icon-pick">&#x20AC;</button><button type="button" class="icon-pick">&#x2696;</button><button type="button" class="icon-pick">&#x1F3DB;</button><button type="button" class="icon-pick">&#x1F9F1;</button>
+            </div>
           </div>
+          <div class="icon-hint" data-i18n="addModal.iconHint">Press one above, or type any emoji into the box: on Windows Win + . opens the emoji keyboard, on a Mac Ctrl + Cmd + Space.</div>
         </div>
         <div class="modal-field">
           <label class="modal-label" for="app-tags"><span data-i18n="addModal.tags">Tags</span> <span class="label-hint" data-i18n="addModal.tagsHint">(comma separated)</span></label>
@@ -448,7 +458,7 @@
   <!-- Versions Modal -->
   <div id="versions-overlay" hidden>
     <div class="modal" id="versions-modal">
-      <h2>&#x1F551; <span id="versions-title">App Versions</span></h2>
+      <h2><span id="versions-title">App Versions</span></h2>
       <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:8px" data-i18n="versions.help">Every publish is kept. Restore re-publishes an older version as the new latest; Fork copies it into a new app. Older versions are never lost.</div>
       <div id="versions-status" style="margin:6px 0;font-size:.85rem;min-height:1.1em"></div>
       <div id="versions-list" style="max-height:48vh;overflow-y:auto"></div>
@@ -461,7 +471,7 @@
   <!-- Fork lineage modal: cross-owner tree of forks (ancestry + descendants) with each node's live status -->
   <div id="lineage-overlay" hidden>
     <div class="modal" id="lineage-modal">
-      <h2>&#x2942; <span id="lineage-title" data-i18n="lineage.title">Fork lineage</span></h2>
+      <h2><span id="lineage-title" data-i18n="lineage.title">Fork lineage</span></h2>
       <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:6px" data-i18n="lineage.help">Every app that was forked from this one (and where this one came from), with each fork's current status. The chain survives a fork being parked or deleted.</div>
       <div id="lineage-summary" style="font-size:.82rem;color:var(--text-muted);margin-bottom:8px"></div>
       <div id="lineage-status" style="margin:6px 0;font-size:.85rem;min-height:1.1em"></div>
@@ -476,7 +486,7 @@
        public offer prices + "deploy your own" (runner/organism pickers) onto the owner's fleet -->
   <div id="agents-overlay" hidden>
     <div class="modal" id="agents-modal">
-      <h2>&#x1F916; <span data-i18n="agents.title">Bundled agents</span> <span id="agents-modal-app" class="aga-app-ref"></span></h2>
+      <h2><span data-i18n="agents.title">Bundled agents</span> <span id="agents-modal-app" class="aga-app-ref"></span></h2>
       <div id="agents-modal-body" class="aga-body"></div>
       <div class="modal-actions">
         <button type="button" class="modal-btn secondary" onclick="document.getElementById('agents-overlay').hidden = true" data-i18n="common.close">Close</button>
@@ -487,7 +497,7 @@
   <!-- Copy-protection modal: opt-in per-app flags applied to the runnable HTML at serve time -->
   <div id="protection-overlay" hidden>
     <div class="modal" id="protection-modal">
-      <h2>&#x1F6E1;&#xFE0F; <span id="protection-title" data-i18n="protect.title">Copy protection</span></h2>
+      <h2><span id="protection-title" data-i18n="protect.title">Copy protection</span></h2>
       <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:10px" data-i18n="protect.help">Optional, per-app. These raise the cost of casual copying and make leaks traceable — they cannot stop someone who can view the app from copying its HTML. To truly protect logic or data, put it in a server-side extension.</div>
       <label class="protect-row"><input type="checkbox" id="protect-obfuscate"> <span><b data-i18n="protect.obfuscate">Obfuscate</b> — <span data-i18n="protect.obfuscateHint">mangle the app's inline scripts so the source is hard to read.</span></span></label>
       <label class="protect-row"><input type="checkbox" id="protect-domainLock"> <span><b data-i18n="protect.domainLock">Domain-lock</b> — <span data-i18n="protect.domainLockHint">only run on this node's app origin; a rehosted copy is sent home.</span></span></label>
