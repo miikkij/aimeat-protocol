@@ -2443,6 +2443,11 @@
     foot · detail view · phone
   @version-history
     v1.0.0 — 2026-08-28 — Initial.
+    v1.1.0 — 2026-08-29 — The detail page's insides and every dialog: the data map as a paragraph, fact
+      rows and a key table; the monetize rows and the four-question form; the ODPS defaults on an
+      even two-column grid; the skills as rows with air; the masthead's screenshot; the dialogs on
+      the same paper with an ink frame and a sun shadow (add, help, settings, protection, versions,
+      subdomain, source, generate-with-AI, portfolio prompt); air under the last actions.
 */
 
 /* ── Tokens the poster needs on top of the catalog's own ─────────────────────────────────── */
@@ -2744,6 +2749,186 @@ footer .footer-brand { grid-column: 1 / -1; font-family: var(--font-poster); fon
 .aga-chip, .dtl-badge-on { border-radius: 0; font-family: var(--font-mono); }
 .dtl-meta-grid { gap: 18px 24px; }
 
+/* The page ends with air under the last row of actions, not with the actions on the edge. */
+#detail-view .dtl-body { padding-bottom: 80px; }
+
+/* The masthead picture: the node's own screenshot of the app, the icon only until there is one. */
+.dtl-mast-icon--shot { width: 224px; height: 140px; overflow: hidden; }
+.dtl-mast-icon--shot img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top center; }
+.dtl-mast-icon--shot .dtl-mast-glyph { display: none; }
+
+/* Labels: the coral small caps belong to the facts and the lifecycle stops. A form's label is a
+   plain bold word above its field, so a form reads as a form and not as a wall of headings. */
+label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, .dtl-skill-attach .dtl-stat-label {
+  display: block; font-size: .9rem; font-weight: 700; color: var(--text); text-transform: none; letter-spacing: 0; margin: 14px 0 2px;
+}
+.od-attest .od-attest-head { font-size: .72rem; color: var(--accent); text-transform: uppercase; letter-spacing: .1em; font-weight: 800; margin: 0 0 6px; }
+.dtl-sync.none { display: block; background: transparent; padding: 4px 0 0; font-size: .8rem; color: var(--text-dim); font-family: var(--font-body); font-weight: 600; line-height: 1.5; }
+.dtl-ac-editor { margin-top: 18px; }
+.dtl-ac-editor .modal-input, .od-form .modal-input { margin: 0; width: 100%; }
+
+/* ── Where this app puts what: a paragraph, then facts as rows, then the keys as a table ─── */
+.dtl-dm-body > p.dtl-dm-what { font-family: var(--font-body); font-size: 1.05rem; font-weight: 600; line-height: 1.55; color: var(--text); margin: 0 0 14px; max-width: 66ch; }
+.dtl-dm-usedfor, .dtl-dm-form { display: flex; gap: 12px; align-items: baseline; margin: 0; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: .95rem; font-weight: 600; color: var(--text); line-height: 1.5; }
+.dtl-dm-usedfor b, .dtl-dm-form b { flex: 0 0 176px; font-size: .72rem; color: var(--accent); text-transform: uppercase; letter-spacing: .1em; font-weight: 800; }
+.dtl-dm-body h4 { font-size: .72rem; color: var(--accent); text-transform: uppercase; letter-spacing: .1em; font-weight: 800; margin: 32px 0 8px; padding-bottom: 6px; border-bottom: 2px solid var(--text); }
+.dtl-dm-body .dtl-desc { font-size: .95rem; font-weight: 600; line-height: 1.55; max-width: 66ch; margin: 0; }
+.dtl-dm-places { list-style: none; margin: 10px 0 0; padding: 0; display: flex; gap: 8px 18px; flex-wrap: wrap; font-family: var(--font-mono); font-size: .78rem; color: var(--text-dim); }
+.dtl-dm-row { padding: 14px 0; border-top: 0; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.dtl-dm-row-unexplained { border-left: 3px solid var(--accent); padding-left: 12px; }
+.dtl-dm-head { display: grid; grid-template-columns: 260px minmax(0, 1fr) 200px; gap: 16px; align-items: baseline; }
+.dtl-dm-head .dtl-dm-what { font-family: var(--font-mono); font-size: .8rem; color: var(--text); overflow-wrap: anywhere; }
+.dtl-dm-holds { font-size: .95rem; font-weight: 600; line-height: 1.5; color: var(--text); }
+.dtl-dm-where { font-family: var(--font-mono); font-size: .75rem; color: var(--text-dim); text-align: right; }
+.dtl-dm-where-exact { display: block; font-size: .7rem; color: var(--text-muted); }
+.dtl-dm-facts { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); grid-column: 1 / -1; }
+.dtl-dm-personal { color: var(--accent); }
+.dtl-dm-why { grid-column: 1 / -1; font-size: .88rem; font-weight: 600; line-height: 1.5; color: var(--text-dim); max-width: 72ch; }
+.dtl-dm-why-missing { font-style: normal; color: var(--accent); }
+.dtl-dm-leaves, .dtl-dm-findings { margin: 0; padding-left: 18px; font-size: .9rem; font-weight: 600; line-height: 1.6; color: var(--text-dim); }
+.dtl-dm-contradiction { border: 3px solid var(--accent); padding: 10px 14px; font-weight: 700; margin: 0 0 14px; }
+
+/* ── Monetize: one tool per row, and a form that asks four questions in order ─────────────── */
+.mz-tool { display: grid; grid-template-columns: minmax(0, 1fr) 150px 180px auto; gap: 8px 22px; align-items: start; padding: 14px 0; border-bottom: 1px solid var(--border); }
+.mz-tool:first-of-type { border-top: 3px solid var(--text); }
+.mz-tool-name { font-weight: 800; font-size: 1rem; color: var(--text); }
+.mz-desc { font-size: .88rem; font-weight: 600; line-height: 1.5; color: var(--text-dim); margin-top: 3px; max-width: 60ch; }
+.mz-fact { display: flex; flex-direction: column; gap: 3px; }
+.mz-fact-label { font-size: .68rem; color: var(--accent); text-transform: uppercase; letter-spacing: .1em; font-weight: 800; }
+.mz-fact-val { font-weight: 700; font-size: .95rem; color: var(--text); }
+.mz-fact-val--small { font-family: var(--font-mono); font-size: .75rem; font-weight: 400; color: var(--text-dim); overflow-wrap: anywhere; }
+.mz-fact .dtl-sync.ok { display: inline; padding: 0 0 0 6px; font-family: var(--font-mono); font-size: .72rem; background: transparent; }
+.mz-tool-doors { display: flex; gap: 16px; align-items: center; justify-content: flex-end; white-space: nowrap; }
+.mz-tool-blocked { grid-column: 1 / -1; }
+.mz-form { margin-top: 24px; border-top: 3px solid var(--text); padding-top: 4px; }
+.mz-group { padding: 22px 0; border-bottom: 1px solid var(--border); }
+.mz-group-head { display: flex; align-items: center; gap: 12px; }
+.mz-group-n { width: 28px; height: 28px; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; background: var(--text); color: var(--bg); font-family: var(--font-mono); font-size: .8rem; }
+.mz-group-title { font-family: var(--font-poster); text-transform: uppercase; font-size: 1.1rem; letter-spacing: -.01em; color: var(--text); }
+.mz-group-lede { margin: 8px 0 0 40px; font-size: .88rem; font-weight: 600; line-height: 1.5; color: var(--text-dim); max-width: 66ch; }
+.mz-group > .mz-field, .mz-group > .mz-grid, .mz-group > .mz-more, .mz-group > .mz-check, .mz-group > .mz-hint, .mz-group > .od-tool-head, .mz-group > .od-form { margin-left: 40px; }
+.mz-field { margin-top: 14px; }
+.mz-label { display: block; font-size: .9rem; font-weight: 700; color: var(--text); margin: 0 0 2px; }
+.mz-hint { margin-top: 6px; font-size: .8rem; font-weight: 600; line-height: 1.5; color: var(--text-dim); max-width: 66ch; }
+.mz-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; }
+.mz-grid--price { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 120px; }
+.mz-form .modal-input { margin: 0; width: 100%; }
+.mz-more { margin-top: 14px; }
+.mz-more-head { cursor: pointer; font-family: var(--font-mono); font-size: .8rem; color: var(--accent); text-decoration: underline; text-underline-offset: 4px; list-style: none; }
+.mz-more-head::-webkit-details-marker { display: none; }
+.mz-more[open] .mz-more-head { color: var(--text); }
+.mz-check { display: flex; align-items: center; gap: 10px; margin-top: 14px; font-weight: 800; font-size: .95rem; cursor: pointer; }
+.mz-check input { width: 18px; height: 18px; accent-color: var(--text); }
+.mz-actions { margin-top: 22px; }
+.od-tool-head { margin-top: 14px; display: flex; gap: 18px; align-items: center; }
+.od-link { font-family: var(--font-mono); font-size: .8rem; }
+
+/* ── The ODPS defaults: every row two equal columns, the short fields on rows of their own ── */
+.od-form { margin-top: 14px; }
+.od-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; }
+.od-col, .od-col-narrow { min-width: 0; }
+.od-note { margin-bottom: 6px; }
+.od-attest { margin-top: 22px; padding: 16px 18px 18px; border: 3px solid var(--text); }
+.od-actions { margin-top: 18px; }
+.od-measured { font-family: var(--font-mono); font-size: .8rem; margin: 8px 0; }
+
+/* ── Skills: each one its own row with air around it ─────────────────────────────────────── */
+.dtl-skill { padding: 14px 0; border-bottom: 1px solid var(--border); }
+.dtl-skill:first-child { border-top: 3px solid var(--text); }
+.dtl-skill-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.dtl-skill-ref { font-family: var(--font-mono); font-size: .85rem; font-weight: 700; color: var(--text); }
+.dtl-skill-ver { font-family: var(--font-mono); font-size: .75rem; color: var(--text-dim); }
+.dtl-skill-desc { margin-top: 6px; font-size: .92rem; font-weight: 600; line-height: 1.55; color: var(--text-dim); max-width: 70ch; }
+#detail-skill-attach { margin-top: 18px; }
+
+/* ── Dialogs: the same paper as the page, an ink frame, a sun shadow ─────────────────────── */
+.modal {
+  background: var(--bg); border: 3px solid var(--text); border-radius: 0; box-shadow: 8px 8px 0 var(--sun);
+  padding: 28px 32px 30px; font-family: var(--font-body); animation: none;
+}
+.modal h2 {
+  font-family: var(--font-poster); font-weight: 400; text-transform: uppercase; font-size: 1.6rem; line-height: 1; letter-spacing: -.02em;
+  color: var(--text); margin: 0 0 18px; padding-bottom: 12px; border-bottom: 3px solid var(--text);
+}
+.modal h2 .aga-app-ref { font-family: var(--font-mono); font-size: .8rem; text-transform: none; letter-spacing: 0; color: var(--text-dim); }
+.modal p, .help-p, .confirm-message, .parked-blurb { font-size: .95rem; font-weight: 600; line-height: 1.55; color: var(--text); }
+.help-p { color: var(--text-dim); margin: 6px 0 0; }
+.modal-label, .modal .settings-row label, .modal label:not(.protect-row):not(.mz-check):not(.pb-trackcard):not(.pb-pack-item):not(.pb-ext-toggle):not(.pb-mode-radio) { display: block; font-size: .9rem; font-weight: 700; color: var(--text); margin: 14px 0 2px; text-transform: none; letter-spacing: 0; }
+.label-hint { font-weight: 600; color: var(--text-dim); }
+.modal-input { margin: 0; }
+.modal-fields, .modal-row { gap: 0 24px; }
+.modal-tabs { display: flex; gap: 22px; margin: 0 0 14px; border: 0; }
+.modal-tab { padding: 0 0 2px; border: 0 !important; border-bottom: 3px solid transparent !important; border-radius: 0; background: transparent; font-family: var(--font-body); font-weight: 800; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-dim); }
+.modal-tab:hover { color: var(--text); background: transparent; }
+.modal-tab.active { color: var(--text); background: transparent; border-bottom-color: var(--accent) !important; }
+.modal-actions { display: flex; gap: 22px; align-items: center; justify-content: flex-start; flex-wrap: wrap; margin-top: 24px; }
+.modal-btn, .modal-btn.secondary, .modal-btn.danger {
+  background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0; box-shadow: none; padding: 0 0 1px;
+  font-family: var(--font-body); font-weight: 800; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text);
+}
+.modal-btn:hover, .modal-btn.secondary:hover { color: var(--accent); border-color: var(--accent); background: none; }
+.modal-btn.danger { color: var(--accent); border-color: var(--accent); }
+.modal-btn.primary, .modal-btn.success {
+  display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 18px;
+  background: var(--text); color: var(--bg); border: 0; box-shadow: 4px 4px 0 var(--sun);
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.modal-btn.primary:hover:not(:disabled), .modal-btn.success:hover:not(:disabled) { color: var(--sun); transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--sun); background: var(--text); }
+.modal-btn:disabled { opacity: .45; transform: none; }
+.settings-section { margin-top: 18px; }
+.settings-section-title { font-size: .72rem; color: var(--accent); text-transform: uppercase; letter-spacing: .1em; font-weight: 800; margin: 0 0 6px; padding-bottom: 6px; border-bottom: 2px solid var(--text); }
+.settings-row { padding: 10px 0; border-bottom: 1px solid var(--border); }
+.settings-row label { margin: 0; }
+.protect-row { padding: 12px 0; border-bottom: 1px solid var(--border); font-size: .92rem; font-weight: 600; line-height: 1.5; gap: 12px; }
+.protect-row input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--text); margin-top: 2px; }
+.protect-row b { color: var(--text); }
+.protect-row span { color: var(--text-dim); }
+.version-row { padding: 12px 0; }
+.version-num { font-family: var(--font-poster); font-size: 1rem; }
+.version-current { background: var(--sun); color: var(--text); border: 0; padding: 2px 8px; }
+.version-sub { font-family: var(--font-mono); font-size: .72rem; }
+.drop-zone { border: 3px dashed var(--text); border-radius: 0; background: var(--surface); }
+.drop-zone.dragover { border-color: var(--accent); background: var(--surface); }
+.browse-btn { border: 2px solid var(--text); border-radius: 0; background: var(--bg); color: var(--text); font-weight: 800; }
+.source-modal { max-width: 840px; }
+#source-code { border: 3px solid var(--text); border-radius: 0; background: var(--surface); font-family: var(--font-mono); font-size: .8rem; }
+.backup-menu, #context-menu { border: 2px solid var(--text); border-radius: 0; box-shadow: 4px 4px 0 var(--sun); background: var(--bg); padding: 6px 0; }
+.backup-menu button, #context-menu button { font-family: var(--font-body); font-weight: 700; font-size: .9rem; border-radius: 0; }
+.backup-menu button:hover, #context-menu button:hover { background: var(--sun); color: var(--text); }
+.notice { border-radius: 0; border: 2px solid var(--text); border-left-width: 6px; box-shadow: 4px 4px 0 var(--sun); font-family: var(--font-body); font-weight: 700; }
+
+/* The generate-with-AI dialog: three numbered steps, the same numerals as the monetize form. */
+.prompt-builder-modal { max-width: 860px; background: var(--bg); border: 3px solid var(--text); border-radius: 0; box-shadow: 8px 8px 0 var(--sun); padding: 28px 32px 30px; }
+.prompt-builder-modal h2 {
+  font-family: var(--font-poster); font-weight: 400; text-transform: uppercase; font-size: 1.6rem; line-height: 1; letter-spacing: -.02em;
+  color: var(--text); margin: 0 0 18px; padding-bottom: 12px; border-bottom: 3px solid var(--text);
+}
+.pb-intro { font-size: .95rem; font-weight: 600; line-height: 1.55; color: var(--text-dim); margin: 0 0 20px; }
+.pb-step { border-top: 3px solid var(--text); padding-top: 18px; margin-bottom: 22px; }
+.pb-step:first-of-type { border-top: 3px solid var(--text); padding-top: 18px; }
+.pb-step-head { font-family: var(--font-poster); font-weight: 400; text-transform: uppercase; font-size: 1.1rem; letter-spacing: -.01em; gap: 12px; }
+.pb-step-num { width: 28px; height: 28px; border-radius: 0; background: var(--text); color: var(--bg); font-family: var(--font-mono); font-size: .8rem; display: inline-flex; align-items: center; justify-content: center; }
+.pb-step-hint, .pb-legend, .pb-packinfo-line { font-size: .85rem; font-weight: 600; line-height: 1.5; color: var(--text-dim); }
+.pb-trackcard { border: 3px solid var(--text); border-radius: 0; background: var(--bg); padding: 12px 14px; box-shadow: none; }
+.pb-trackcard.is-on { background: var(--sun); border-color: var(--text); box-shadow: 4px 4px 0 var(--text); }
+.pb-trackcard:has(input:focus-visible) { outline: 2px solid var(--accent); }
+.pb-trackname { font-family: var(--font-poster); font-weight: 400; text-transform: uppercase; font-size: .95rem; }
+.pb-tracknew { background: var(--accent); color: #fff; border-radius: 0; font-family: var(--font-mono); }
+.pb-trackdesc { opacity: 1; color: var(--text-dim); font-weight: 600; }
+.pb-desc-area { border: 0; border-bottom: 3px solid var(--text); border-radius: 0; background: transparent; font-family: var(--font-body); font-weight: 700; font-size: 1rem; padding: 8px 0; }
+.pb-desc-area:focus { border-color: var(--accent); }
+.pb-template-select { margin: 6px 0 14px; }
+.pb-pack-item, .pb-ext-chip { border: 2px solid var(--text); border-radius: 0; background: var(--bg); font-weight: 700; font-family: var(--font-body); }
+.pb-pack-item:hover, .pb-ext-chip:hover { background: var(--surface); border-color: var(--text); }
+.pb-pack-item:has(input:checked), .pb-ext-chip.selected { background: var(--sun); border-color: var(--text); }
+.pb-pack-tier { border-radius: 0; font-family: var(--font-mono); }
+.pb-mode-radio input, .pb-ext-toggle input, .pb-pack-item input { accent-color: var(--text); }
+.pb-preview-label { font-size: .72rem; color: var(--accent); text-transform: uppercase; letter-spacing: .1em; font-weight: 800; border-bottom: 2px solid var(--text); padding-bottom: 6px; }
+.pb-preview { border: 3px solid var(--text); border-radius: 0; background: var(--surface); font-family: var(--font-mono); font-size: .78rem; }
+.pb-step-btn { width: auto; margin-top: 14px; }
+.pb-improving { color: var(--accent); font-weight: 800; }
+.pb-step .modal-btn:not(.primary) { display: inline-block; }
+
 /* ── Phone: the rail becomes chip strips, the band a solid block, the rows stack ──────────── */
 @media (max-width: 900px) {
   header.cat-bar { padding: 0 16px; }
@@ -2815,6 +3000,15 @@ footer .footer-brand { grid-column: 1 / -1; font-family: var(--font-poster); fon
   .dtl-section h3 { font-size: 1.8rem; }
   .wc-stop-label { flex: 0 0 100%; }
   .wc-explain, .wc-size { margin-left: 0; }
+  .dtl-mast-icon--shot { width: 100%; height: auto; aspect-ratio: 16 / 10; }
+  .dtl-dm-head { grid-template-columns: 1fr; gap: 4px; }
+  .dtl-dm-where { text-align: left; }
+  .dtl-dm-usedfor, .dtl-dm-form { flex-direction: column; gap: 2px; }
+  .mz-tool { grid-template-columns: 1fr; gap: 8px; }
+  .mz-tool-doors { justify-content: flex-start; }
+  .mz-grid, .mz-grid--price, .od-grid { grid-template-columns: 1fr; }
+  .mz-group > .mz-field, .mz-group > .mz-grid, .mz-group > .mz-more, .mz-group > .mz-check, .mz-group > .mz-hint, .mz-group > .od-tool-head, .mz-group > .od-form, .mz-group-lede { margin-left: 0; }
+  .modal { padding: 20px 18px 22px; box-shadow: 5px 5px 0 var(--sun); }
 }
 </style>
 </head>
@@ -2866,14 +3060,12 @@ footer .footer-brand { grid-column: 1 / -1; font-family: var(--font-poster); fon
       <div id="cat-mastline" class="cat-mastline"></div>
     </div>
     <div class="cat-masthead-actions">
-      <!-- Create menu: Add app / Generate with AI / Generate homepage grouped under one slab -->
-      <div class="backup-menu-wrap">
-        <button type="button" class="cat-slab" id="create-btn" data-i18n-title="action.create" title="Create" onclick="window._launcher.toggleCreateMenu(event)">+ <span data-i18n="action.createApp">Create an app</span></button>
-        <div id="create-menu" class="backup-menu" hidden>
-          <button id="add-btn" data-i18n="action.add">&#x2795; Add app</button>
-          <button id="generate-btn" data-i18n="action.generate">&#x2728; Generate with AI</button>
-          <button id="homepage-btn" data-i18n="action.homepage">&#x1F3E0; Generate homepage</button>
-        </div>
+      <!-- The one loud control opens the generate-with-AI flow straight away: that is how an app
+           gets made here. Adding a finished file, and the portfolio page, are the quiet words. -->
+      <button type="button" class="cat-slab" id="generate-btn" data-i18n-title="action.generate" title="Generate with AI">+ <span data-i18n="action.createApp">Create an app</span></button>
+      <div class="cat-masthead-links cat-masthead-links--create">
+        <button type="button" class="cat-word" id="add-btn" data-i18n="action.haveApp">I have a finished app, add it</button>
+        <button type="button" class="cat-word" id="homepage-btn" data-i18n="action.portfolio">A portfolio page of your apps</button>
       </div>
       <div class="cat-masthead-links">
         <!-- Data menu: backups + imports -->
@@ -3308,7 +3500,7 @@ footer .footer-brand { grid-column: 1 / -1; font-family: var(--font-poster); fon
       <label class="protect-row"><input type="checkbox" id="protect-noRawDownload"> <span><b data-i18n="protect.noRawDownload">No raw download</b> — <span data-i18n="protect.noRawDownloadHint">block the raw source download; deliver the runnable app only.</span></span></label>
       <div id="protection-status" style="margin:8px 0 0;font-size:.85rem;min-height:1.1em"></div>
       <div class="modal-actions">
-        <button type="button" class="modal-btn" onclick="window._launcher.saveProtection()" data-i18n="protect.save">Save</button>
+        <button type="button" class="modal-btn primary" onclick="window._launcher.saveProtection()" data-i18n="protect.save">Save</button>
         <button type="button" class="modal-btn secondary" onclick="document.getElementById('protection-overlay').hidden = true" data-i18n="common.close">Close</button>
       </div>
     </div>
@@ -3639,6 +3831,19 @@ footer .footer-brand { grid-column: 1 / -1; font-family: var(--font-poster); fon
       "list.foot": "One row per app. The number is its place in the order above; press a row for its doors and a line about where the work is.",
       "foot.p1": "Every one of your {n} apps is one HTML file you own. Publishing puts it on this node under your name; listing puts it in the public catalogue. Unlisting keeps it usable by link.",
       "foot.p2": "An app that generates content with an AI model says so on its own page.",
+      "action.haveApp": "I have a finished app, add it",
+      "action.portfolio": "A portfolio page of your apps",
+      "homepage.title": "A portfolio page of your apps: copy this prompt to your AI",
+      "homepage.needApps": "Publish an app first; the portfolio page is built from your apps.",
+      "mz.group.what": "What the tool is",
+      "mz.group.price": "What a call costs",
+      "mz.group.market": "On the marketplace",
+      "mz.group.delivery": "How a bought call is delivered",
+      "mz.descHint": "One or two sentences a buyer reads before paying. What goes in, what comes back.",
+      "mz.priceLede": "In morsels, in money, or both. Leave every price empty and the tool is declared but not for sale.",
+      "mz.more.price": "A second currency and the pacing burn",
+      "mz.marketLede": "Listing puts the tool on EXCHANGE with the price above. The ODPS description is what the marketplace shows beside it.",
+      "mz.deliveryLede": "A capability binding runs the call at once and returns the result. Without one, a purchase becomes a task for your agent.",
       "view.communityEmpty": "No community apps on this node yet.",
       "view.communityHint": "Community apps are apps other people on this node have published. When someone publishes one, it shows up here.",
       "sec.parked": "Unlisted apps",
@@ -4499,6 +4704,19 @@ footer .footer-brand { grid-column: 1 / -1; font-family: var(--font-poster); fon
       "list.foot": "Yksi rivi per sovellus. Numero on sen paikka yllä olevassa järjestyksessä; paina riviä, niin näet ovet ja rivin siitä, missä työ on.",
       "foot.p1": "Jokainen {n} sovelluksestasi on yksi HTML-tiedosto, jonka omistat. Julkaisu vie sen tälle nodelle sinun nimissäsi; listaus vie sen julkiseen katalogiin. Listalta poisto pitää sen käytössä linkillä.",
       "foot.p2": "Sovellus, joka tuottaa sisältöä tekoälymallilla, kertoo sen omalla sivullaan.",
+      "action.haveApp": "Minulla on valmis sovellus, lisää se",
+      "action.portfolio": "Portfoliosivu sovelluksistasi",
+      "homepage.title": "Portfoliosivu sovelluksistasi: kopioi tämä prompti tekoälyllesi",
+      "homepage.needApps": "Julkaise ensin sovellus; portfoliosivu kootaan sovelluksistasi.",
+      "mz.group.what": "Mikä työkalu on",
+      "mz.group.price": "Mitä kutsu maksaa",
+      "mz.group.market": "Markkinalla",
+      "mz.group.delivery": "Miten ostettu kutsu toimitetaan",
+      "mz.descHint": "Lause tai kaksi, jotka ostaja lukee ennen maksamista. Mitä menee sisään, mitä tulee ulos.",
+      "mz.priceLede": "Morseleina, rahana tai molempina. Jätä jokainen hinta tyhjäksi, niin työkalu on julistettu mutta ei myynnissä.",
+      "mz.more.price": "Toinen valuutta ja tahdistuspoltto",
+      "mz.marketLede": "Listaus vie työkalun EXCHANGEen yllä olevalla hinnalla. ODPS-kuvaus on se, minkä markkina näyttää sen vieressä.",
+      "mz.deliveryLede": "Kyvykkyyssidonta ajaa kutsun heti ja palauttaa tuloksen. Ilman sitä ostosta syntyy tehtävä agentillesi.",
       "view.communityEmpty": "Tällä nodella ei ole vielä yhteisön sovelluksia.",
       "view.communityHint": "Yhteisön sovellukset ovat sovelluksia, joita muut tämän noden käyttäjät ovat julkaisseet. Kun joku julkaisee sellaisen, se näkyy täällä.",
       "sec.parked": "Listaamattomat sovellukset",
@@ -7020,9 +7238,9 @@ footer .footer-brand { grid-column: 1 / -1; font-family: var(--font-poster); fon
   function toolRow(tool, i) {
     var mode = tool.action_id ? t("monetize.fulfillCall") : t("monetize.fulfillTask");
     var binding = tool.action_id ? escapeHtml(tool.action_id) : tool.agent ? "→ " + escapeHtml(tool.agent) : t("monetize.taskToOwner");
-    return '<div class="dtl-status-row" style="align-items:center;gap:10px;flex-wrap:wrap"><div class="dtl-stat" style="flex:1;min-width:160px"><span class="dtl-stat-val">' + escapeHtml(tool.name) + "</span>" + (tool.description ? '<span class="dtl-stat-label">' + escapeHtml(tool.description) + "</span>" : "") + '</div><div class="dtl-stat"><span class="dtl-stat-label">' + t("monetize.priceCol") + '</span><span class="dtl-stat-val">' + escapeHtml(priceLabel(tool)) + (tool.exchange ? ' <span class="dtl-sync ok" style="display:inline">' + t("monetize.exchangeOn") + "</span>" : "") + '</span></div><div class="dtl-stat"><span class="dtl-stat-label">' + mode + '</span><span class="dtl-stat-val" style="font-size:.8rem">' + binding + '</span></div><div class="dtl-btn-row" style="margin:0">' + dtlBtn(t("detail.editDetails"), "window._launcher.monetizeEditTool(" + i + ")") + dtlBtn("✕", "window._launcher.monetizeDeleteTool(" + i + ")", { variant: "danger", title: t("monetize.deleteHint") }) + "</div>" + // A tool flagged for EXCHANGE that the projection will skip: say so here instead of leaving the
+    return '<div class="mz-tool"><div class="mz-tool-main"><div class="mz-tool-name">' + escapeHtml(tool.name) + "</div>" + (tool.description ? '<div class="mz-desc">' + escapeHtml(tool.description) + "</div>" : "") + '</div><div class="mz-fact"><span class="mz-fact-label">' + t("monetize.priceCol") + '</span><span class="mz-fact-val">' + escapeHtml(priceLabel(tool)) + (tool.exchange ? ' <span class="dtl-sync ok">' + t("monetize.exchangeOn") + "</span>" : "") + '</span></div><div class="mz-fact"><span class="mz-fact-label">' + mode + '</span><span class="mz-fact-val mz-fact-val--small">' + binding + '</span></div><div class="mz-tool-doors">' + dtlBtn(t("detail.editDetails"), "window._launcher.monetizeEditTool(" + i + ")") + dtlBtn("✕", "window._launcher.monetizeDeleteTool(" + i + ")", { variant: "danger", title: t("monetize.deleteHint") }) + "</div>" + // A tool flagged for EXCHANGE that the projection will skip: say so here instead of leaving the
     // owner with a ticked box and an empty marketplace.
-    (odpsBlockedReason(tool) ? '<div class="od-blocked">⚠ ' + escapeHtml(odpsBlockedReason(tool)) + "</div>" : "") + "</div>";
+    (odpsBlockedReason(tool) ? '<div class="od-blocked mz-tool-blocked">⚠ ' + escapeHtml(odpsBlockedReason(tool)) + "</div>" : "") + "</div>";
   }
   function currencySelect(id, selected) {
     var html = '<select id="' + id + '" class="modal-input" style="margin:4px 0 8px">';
@@ -7039,14 +7257,42 @@ footer .footer-brand { grid-column: 1 / -1; font-family: var(--font-poster); fon
     })[0];
     var money2Major = second ? String(second.amount / MONEY_UNIT) : "";
     var cur2 = second && second.currency || (cur === "EUR" ? "USD" : "EUR");
-    return '<div class="dtl-ac-editor" style="margin-top:10px"><label class="dtl-stat-label" for="mz-name">' + t("monetize.name") + '</label><input id="mz-name" class="modal-input" maxlength="80" value="' + escapeHtml(tool.name || "") + '" placeholder="summarize" style="margin:4px 0 8px" /><label class="dtl-stat-label" for="mz-desc">' + t("monetize.desc") + '</label><input id="mz-desc" class="modal-input" maxlength="500" value="' + escapeHtml(tool.description || "") + '" style="margin:4px 0 8px" /><div style="display:flex;gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:130px"><label class="dtl-stat-label" for="mz-morsels">' + t("monetize.priceMorsels") + '</label><input id="mz-morsels" class="modal-input" type="number" min="0" step="1" value="' + (tool.price && tool.price.morsels || "") + '" placeholder="0" style="margin:4px 0 8px" /></div><div style="flex:1;min-width:130px"><label class="dtl-stat-label" for="mz-money">' + t("monetize.priceMoney") + '</label><input id="mz-money" class="modal-input" inputmode="decimal" value="' + escapeHtml(moneyMajor) + '" placeholder="0.002" style="margin:4px 0 8px" /></div><div style="min-width:90px"><label class="dtl-stat-label" for="mz-currency">' + t("monetize.currency") + "</label>" + currencySelect("mz-currency", cur) + '</div></div><div style="display:flex;gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:130px"><label class="dtl-stat-label" for="mz-money2">' + t("monetize.money2") + '</label><input id="mz-money2" class="modal-input" inputmode="decimal" value="' + escapeHtml(money2Major) + '" placeholder="0.002" style="margin:4px 0 4px" /></div><div style="min-width:90px"><label class="dtl-stat-label" for="mz-currency2">' + t("monetize.currency2") + "</label>" + currencySelect("mz-currency2", cur2) + '</div></div><div class="dtl-sync none" style="margin:0 0 8px">' + t("monetize.money2Hint") + '</div><label class="dtl-stat-label" style="display:flex;align-items:center;gap:8px;cursor:pointer"><input id="mz-exchange" type="checkbox"' + (tool.exchange ? " checked" : "") + " />" + t("monetize.exchange") + '</label><div class="dtl-sync none" style="margin:4px 0 8px">' + t("monetize.exchangeHint") + '</div><label class="dtl-stat-label" for="mz-toll">' + t("monetize.toll") + '</label><input id="mz-toll" class="modal-input" type="number" min="0" max="100" step="1" value="' + (typeof tool.tollMorsels === "number" ? tool.tollMorsels : "") + '" placeholder="0" style="margin:4px 0 4px" /><div class="dtl-sync none" style="margin:0 0 8px">' + t("monetize.tollHint") + "</div>" + odpsToolFieldsHtml(tool, mzOfferings[tool.name || ""] || "", {
-      appId: mzAppId,
-      ownerGhii: mzOwnerGhiiOf(),
-      toolName: tool.name || "",
-      actionId: tool.action_id || "",
-      appProvenance: mzDoc && mzDoc.provenance || null,
-      timing: mzTiming[tool.name || ""] || null
-    }) + '<label class="dtl-stat-label" for="mz-action">' + t("monetize.actionId") + '</label><input id="mz-action" class="modal-input" maxlength="200" value="' + escapeHtml(tool.action_id || "") + '" placeholder="ext:my-extension:summarize" style="margin:4px 0 4px" /><div class="dtl-sync none" style="margin:0 0 8px">' + t("monetize.actionIdHint") + '</div><label class="dtl-stat-label" for="mz-agent">' + t("monetize.agent") + '</label><input id="mz-agent" class="modal-input" maxlength="100" value="' + escapeHtml(tool.agent || "") + '" placeholder="assistant" style="margin:4px 0 4px" /><div class="dtl-sync none" style="margin:0 0 10px">' + t("monetize.agentHint") + '</div><div class="dtl-btn-row">' + dtlBtn(t("detail.saveDetails"), "window._launcher.monetizeSaveTool()", { variant: "primary", disabled: mzBusy }) + dtlBtn(t("detail.cancelEdit"), "window._launcher.monetizeCancelEdit()") + '</div><div class="dtl-ai-status" id="mz-status"></div></div>';
+    var field = function(id, label2, control, hint) {
+      return '<div class="mz-field"><label class="mz-label" for="' + id + '">' + escapeHtml(label2) + "</label>" + control + (hint ? '<div class="mz-hint">' + escapeHtml(hint) + "</div>" : "") + "</div>";
+    };
+    var group = function(n, title, lede, body) {
+      return '<div class="mz-group"><div class="mz-group-head"><span class="mz-group-n">' + n + '</span><span class="mz-group-title">' + escapeHtml(title) + "</span></div>" + (lede ? '<div class="mz-group-lede">' + escapeHtml(lede) + "</div>" : "") + body + "</div>";
+    };
+    return '<div class="dtl-ac-editor mz-form">' + group(
+      1,
+      t("mz.group.what"),
+      "",
+      field("mz-name", t("monetize.name"), '<input id="mz-name" class="modal-input" maxlength="80" value="' + escapeHtml(tool.name || "") + '" placeholder="summarize" />', "") + field("mz-desc", t("monetize.desc"), '<input id="mz-desc" class="modal-input" maxlength="500" value="' + escapeHtml(tool.description || "") + '" />', t("mz.descHint"))
+    ) + group(
+      2,
+      t("mz.group.price"),
+      t("mz.priceLede"),
+      '<div class="mz-grid mz-grid--price">' + field("mz-morsels", t("monetize.priceMorsels"), '<input id="mz-morsels" class="modal-input" type="number" min="0" step="1" value="' + (tool.price && tool.price.morsels || "") + '" placeholder="0" />', "") + field("mz-money", t("monetize.priceMoney"), '<input id="mz-money" class="modal-input" inputmode="decimal" value="' + escapeHtml(moneyMajor) + '" placeholder="0.002" />', "") + field("mz-currency", t("monetize.currency"), currencySelect("mz-currency", cur), "") + '</div><details class="mz-more"><summary class="mz-more-head">' + escapeHtml(t("mz.more.price")) + '</summary><div class="mz-grid mz-grid--price">' + field("mz-money2", t("monetize.money2"), '<input id="mz-money2" class="modal-input" inputmode="decimal" value="' + escapeHtml(money2Major) + '" placeholder="0.002" />', "") + field("mz-currency2", t("monetize.currency2"), currencySelect("mz-currency2", cur2), "") + '</div><div class="mz-hint">' + escapeHtml(t("monetize.money2Hint")) + "</div>" + // Pacing, not price: this is what a call BURNS to bound how fast the tool can be consumed. It is
+      // separate from every price above precisely because it is not revenue — nobody is credited it.
+      field("mz-toll", t("monetize.toll"), '<input id="mz-toll" class="modal-input" type="number" min="0" max="100" step="1" value="' + (typeof tool.tollMorsels === "number" ? tool.tollMorsels : "") + '" placeholder="0" />', t("monetize.tollHint")) + "</details>"
+    ) + group(
+      3,
+      t("mz.group.market"),
+      t("mz.marketLede"),
+      '<label class="mz-check"><input id="mz-exchange" type="checkbox"' + (tool.exchange ? " checked" : "") + " /><span>" + escapeHtml(t("monetize.exchange")) + '</span></label><div class="mz-hint">' + escapeHtml(t("monetize.exchangeHint")) + "</div>" + odpsToolFieldsHtml(tool, mzOfferings[tool.name || ""] || "", {
+        appId: mzAppId,
+        ownerGhii: mzOwnerGhiiOf(),
+        toolName: tool.name || "",
+        actionId: tool.action_id || "",
+        appProvenance: mzDoc && mzDoc.provenance || null,
+        timing: mzTiming[tool.name || ""] || null
+      })
+    ) + group(
+      4,
+      t("mz.group.delivery"),
+      t("mz.deliveryLede"),
+      '<div class="mz-grid">' + field("mz-action", t("monetize.actionId"), '<input id="mz-action" class="modal-input" maxlength="200" value="' + escapeHtml(tool.action_id || "") + '" placeholder="ext:my-extension:summarize" />', t("monetize.actionIdHint")) + field("mz-agent", t("monetize.agent"), '<input id="mz-agent" class="modal-input" maxlength="100" value="' + escapeHtml(tool.agent || "") + '" placeholder="assistant" />', t("monetize.agentHint")) + "</div>"
+    ) + '<div class="dtl-btn-row mz-actions">' + dtlBtn(t("detail.saveDetails"), "window._launcher.monetizeSaveTool()", { variant: "primary", disabled: mzBusy }) + dtlBtn(t("detail.cancelEdit"), "window._launcher.monetizeCancelEdit()") + '</div><div class="dtl-ai-status" id="mz-status"></div></div>';
   }
   function monetizeSectionInner() {
     if (mzState === "off") return "";
@@ -8210,7 +8456,7 @@ footer .footer-brand { grid-column: 1 / -1; font-family: var(--font-poster); fon
     if (svrFacts && svrFacts.category) mastParts.push(svrFacts.category);
     if (app.tags && app.tags.length) mastParts.push(app.tags.join(", "));
     var draftWord = svrFacts && svrFacts.hasDraft && heroOwner && app.publishedFilename ? `<button type="button" class="cat-word" onclick="window._launcher.openStagingPreview('` + jsArg(heroOwner) + "', '" + jsArg(app.publishedFilename) + `')" title="` + escapeHtml(t("card.openStagingHint")) + '">' + escapeHtml(t("detail.openDraft")) + "</button>" : "";
-    var heroHtml = '<button type="button" class="dtl-back" onclick="window._launcher.closeDetailView()">← ' + escapeHtml(t("view.library")) + '</button><div class="dtl-mast"><div class="dtl-mast-main"><div class="dtl-mast-icon">' + escapeHtml(icon) + '</div><div class="dtl-mast-copy"><div class="dtl-mast-name">' + escapeHtml(app.name || "App") + "</div>" + (mastParts.length ? '<div class="dtl-mast-line">' + escapeHtml(mastParts.join(" · ")) + "</div>" : "") + (heroDesc ? '<div class="dtl-mast-desc">' + escapeHtml(heroDesc) + "</div>" : "") + '<div class="dtl-chips">' + chips + '</div></div></div><div class="dtl-mast-side"><button type="button" class="cat-slab" onclick="window._launcher.detailLaunch()">' + escapeHtml(t("detail.launch")) + "</button>" + draftWord + (app.published ? '<div class="dtl-mast-hint">' + escapeHtml(t(draftWord ? "detail.heroHint" : "detail.heroHintClean")) + "</div>" : "") + "</div></div>";
+    var heroHtml = '<button type="button" class="dtl-back" onclick="window._launcher.closeDetailView()">← ' + escapeHtml(t("view.library")) + '</button><div class="dtl-mast"><div class="dtl-mast-main"><div class="dtl-mast-icon' + (shotUrl ? " dtl-mast-icon--shot" : "") + '">' + (shotUrl ? '<img src="' + escapeHtml(shotUrl) + `" alt="" loading="lazy" onerror="this.parentNode.classList.remove('dtl-mast-icon--shot'); this.remove()" />` : "") + '<span class="dtl-mast-glyph">' + escapeHtml(icon) + '</span></div><div class="dtl-mast-copy"><div class="dtl-mast-name">' + escapeHtml(app.name || "App") + "</div>" + (mastParts.length ? '<div class="dtl-mast-line">' + escapeHtml(mastParts.join(" · ")) + "</div>" : "") + (heroDesc ? '<div class="dtl-mast-desc">' + escapeHtml(heroDesc) + "</div>" : "") + '<div class="dtl-chips">' + chips + '</div></div></div><div class="dtl-mast-side"><button type="button" class="cat-slab" onclick="window._launcher.detailLaunch()">' + escapeHtml(t("detail.launch")) + "</button>" + draftWord + (app.published ? '<div class="dtl-mast-hint">' + escapeHtml(t(draftWord ? "detail.heroHint" : "detail.heroHintClean")) + "</div>" : "") + "</div></div>";
     var bandItem = function(n, label2) {
       return '<div class="cat-band-item"><div class="cat-band-n">' + escapeHtml(n) + '</div><div class="cat-band-l">' + escapeHtml(label2) + "</div></div>";
     };
@@ -8405,7 +8651,7 @@ footer .footer-brand { grid-column: 1 / -1; font-family: var(--font-poster); fon
       for (var i = 0; i < skills.length; i++) {
         var s = skills[i];
         var detach = ownPub && s.scope === "user" ? ' <button class="rename-pencil" title="' + escapeHtml(t("detail.skillDetach")) + `" onclick="window._launcher.detailSkillDetach('` + jsArg(s.name) + `')">×</button>` : "";
-        out += '<div style="margin-bottom:.4rem"><code>' + escapeHtml(s.ref || s.name) + '</code> <span style="color:var(--text-muted);font-size:.8rem">v' + escapeHtml(String(s.version || "")) + "</span>" + detach + '<div style="color:var(--text-muted);font-size:.85rem">' + escapeHtml(s.description || "") + "</div></div>";
+        out += '<div class="dtl-skill"><div class="dtl-skill-head"><code class="dtl-skill-ref">' + escapeHtml(s.ref || s.name) + '</code> <span class="dtl-skill-ver">v' + escapeHtml(String(s.version || "")) + "</span>" + detach + '</div><div class="dtl-skill-desc">' + escapeHtml(s.description || "") + "</div></div>";
       }
       detailSkillsHtml = out;
       if (listEl) listEl.innerHTML = detailSkillsHtml;
@@ -11838,24 +12084,20 @@ footer .footer-brand { grid-column: 1 / -1; font-family: var(--font-poster); fon
     });
   }
   function generateHomepagePrompt() {
-    if (getMainApps4().length === 0) {
-      showNotice("Add some apps first before generating a homepage.");
+    var apps = buildLibraryEntries([], ownServerApps);
+    if (apps.length === 0) {
+      showNotice(t("homepage.needApps"));
       return;
     }
-    var appList = getMainApps4().map(function(app) {
-      var launchInfo = "";
-      if (app.url) {
-        launchInfo = "URL: " + app.url;
-      } else {
-        launchInfo = "Local HTML app (user will open it from their launcher)";
-      }
-      return "- " + (app.icon || "") + " " + app.name + (app.description ? " (" + app.description + ")" : "") + " [" + launchInfo + "]" + (app.tags.length ? " Tags: " + app.tags.join(", ") : "");
+    var appList = apps.map(function(app) {
+      var launchInfo = app.viewUrl ? "URL: " + app.viewUrl : "Local HTML app (user will open it from their launcher)";
+      return "- " + (app.icon || "") + " " + app.name + (app.description ? " (" + app.description + ")" : "") + " [" + launchInfo + "]" + ((app.tags || []).length ? " Tags: " + app.tags.join(", ") : "");
     }).join("\n");
     var prompt2 = "Create a single HTML file that serves as my personal homepage/dashboard.\n\nMy apps:\n" + appList + "\n\nRequirements:\n- Show each app as a clickable card with its icon and name\n- For URL-based apps, clicking opens the URL in a new tab\n- For local apps, show a note that they can be opened from the App Launcher\n- Modern, responsive design with light theme\n- Group apps by their tags if they have tags\n- Everything in one self-contained HTML file, no external dependencies\n- Add a header with my name/title (I will customize this)\n- Make it visually distinctive and professional";
     var overlay = document.getElementById("source-overlay");
     var textarea2 = document.getElementById("source-code");
     var title = document.getElementById("source-title");
-    title.textContent = "Generate Homepage - Copy this prompt to AI";
+    title.textContent = t("homepage.title");
     textarea2.value = prompt2;
     overlay.dataset.appName = "Homepage";
     overlay.hidden = false;

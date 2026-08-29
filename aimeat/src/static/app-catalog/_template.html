@@ -55,14 +55,12 @@
       <div id="cat-mastline" class="cat-mastline"></div>
     </div>
     <div class="cat-masthead-actions">
-      <!-- Create menu: Add app / Generate with AI / Generate homepage grouped under one slab -->
-      <div class="backup-menu-wrap">
-        <button type="button" class="cat-slab" id="create-btn" data-i18n-title="action.create" title="Create" onclick="window._launcher.toggleCreateMenu(event)">+ <span data-i18n="action.createApp">Create an app</span></button>
-        <div id="create-menu" class="backup-menu" hidden>
-          <button id="add-btn" data-i18n="action.add">&#x2795; Add app</button>
-          <button id="generate-btn" data-i18n="action.generate">&#x2728; Generate with AI</button>
-          <button id="homepage-btn" data-i18n="action.homepage">&#x1F3E0; Generate homepage</button>
-        </div>
+      <!-- The one loud control opens the generate-with-AI flow straight away: that is how an app
+           gets made here. Adding a finished file, and the portfolio page, are the quiet words. -->
+      <button type="button" class="cat-slab" id="generate-btn" data-i18n-title="action.generate" title="Generate with AI">+ <span data-i18n="action.createApp">Create an app</span></button>
+      <div class="cat-masthead-links cat-masthead-links--create">
+        <button type="button" class="cat-word" id="add-btn" data-i18n="action.haveApp">I have a finished app, add it</button>
+        <button type="button" class="cat-word" id="homepage-btn" data-i18n="action.portfolio">A portfolio page of your apps</button>
       </div>
       <div class="cat-masthead-links">
         <!-- Data menu: backups + imports -->
@@ -497,7 +495,7 @@
       <label class="protect-row"><input type="checkbox" id="protect-noRawDownload"> <span><b data-i18n="protect.noRawDownload">No raw download</b> — <span data-i18n="protect.noRawDownloadHint">block the raw source download; deliver the runnable app only.</span></span></label>
       <div id="protection-status" style="margin:8px 0 0;font-size:.85rem;min-height:1.1em"></div>
       <div class="modal-actions">
-        <button type="button" class="modal-btn" onclick="window._launcher.saveProtection()" data-i18n="protect.save">Save</button>
+        <button type="button" class="modal-btn primary" onclick="window._launcher.saveProtection()" data-i18n="protect.save">Save</button>
         <button type="button" class="modal-btn secondary" onclick="document.getElementById('protection-overlay').hidden = true" data-i18n="common.close">Close</button>
       </div>
     </div>
