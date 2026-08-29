@@ -17,7 +17,7 @@
  * @version-history
  *   v0.3.0 — 2026-08-27 — Initial (TARGET-074 phase 1, slice 3).
  */
-import { el, clear, resolve, uid, enter, whileBusy } from './dom.js';
+import { el, clear, resolve, uid, enter, whileBusy, attention } from './dom.js';
 import { t } from './i18n.js';
 
 /**
@@ -113,6 +113,9 @@ export function form(spec) {
     c.error.hidden = false;
     c.wrap.classList.add('ak-form__field--invalid');
     c.input.setAttribute('aria-invalid', 'true');
+    // The refusal moves as well as speaks: the message (role=alert) is what a screen reader
+    // gets, the shake is what an eye already on the form gets. Never one without the other.
+    attention(c.wrap, 'shake');
   }
 
   function clearErrors() {
