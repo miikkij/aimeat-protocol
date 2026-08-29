@@ -20657,6 +20657,8 @@ paths:
         pipeline), with its lifecycle status and how many builds have adopted it. Published parts
         are what everyone builds from. PUBLIC for the published shelf — a caller without a
         session sees published parts only; signing in adds the parts still in proposal.
+        Retired parts appear in NO default listing (dead is invisible); ask for them by name
+        with status=retired.
       tags: [Apps]
       security: []
       parameters:
@@ -20710,6 +20712,25 @@ paths:
         '422': { description: The bench refusal, in the validator's words }
 
   /v1/designbook/{id}:
+    delete:
+      operationId: deleteDesignbookPart
+      summary: Delete a part outright
+      description: >-
+        Real cleanup, for junk: removes the part and its whole version history. Allowed to the
+        node operator, or to the proposer on their own part. A part any build has adopted
+        answers 409 PART_IN_USE — its address must keep meaning something, so it is retired
+        instead. This exists because a system that can be littered but never cleaned drifts
+        toward a graveyard nobody can read.
+      tags: [Apps]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: "{ id, deleted: true }" }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: 'PART_IN_USE — adopted builds point at it; retire instead' }
     get:
       operationId: getDesignbookPart
       summary: One part, whole

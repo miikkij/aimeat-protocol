@@ -13,6 +13,10 @@
  * @structure designbookRouter(config, storage): Router
  * @usage mounted by server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.2.0 — 2026-08-29 — DELETE /v1/designbook/:id: real cleanup for junk with zero
+ *     adoptions (memory:delete; the service decides who and refuses adopted parts with
+ *     PART_IN_USE → retire). A system that can be littered but never cleaned drifts to a
+ *     graveyard nobody can read — the developer's words.
  *   v1.1.0 — 2026-08-29 — The published shelf is PUBLIC: the two GET routes read without a
  *     session (a visitor browses the finished Book instead of a blank wall — the sessionless
  *     /ui layout read's reasoning), while unpublished parts stay signed-in-only. The check
@@ -157,6 +161,16 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
         ? (req.body as Record<string, string>).status : '';
       const isOperator = req.auth!.roles.includes('operator');
       const out = await book.setStatus(caller(req), isOperator, req.params.id as string, status);
+      res.json(success(config.nodeId, out));
+    } catch (err) { refuse(res, err); }
+  });
+
+  // DELETE outright — the cleanup retire cannot be: junk with zero adoptions is removed whole,
+  // history included; an adopted part answers PART_IN_USE and points at retire instead.
+  router.delete('/v1/designbook/:id', requireAuth(), requireScope('memory:delete'), async (req: Request, res: Response) => {
+    try {
+      const isOperator = req.auth!.roles.includes('operator');
+      const out = await book.delete(caller(req), isOperator, req.params.id as string);
       res.json(success(config.nodeId, out));
     } catch (err) { refuse(res, err); }
   });

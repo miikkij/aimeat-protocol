@@ -421,6 +421,39 @@ const GOOD_BODY = {
         assert(again.status === 409 && again.body.error?.code === 'PART_RETIRED', `PART_RETIRED 409, got ${again.status} ${again.body.error?.code}`);
     });
 
+    await test('delete refuses an adopted part with PART_IN_USE — its address must keep meaning something', async () => {
+        const r = await json(`/v1/designbook/${partId}`, { method: 'DELETE', headers: auth(op.token) });
+        assert(r.status === 409 && r.body.error?.code === 'PART_IN_USE',
+            `PART_IN_USE 409, got ${r.status} ${r.body.error?.code}: ${r.body.error?.message}`);
+    });
+
+    await test('junk with zero adoptions is DELETED whole: gone from the list, gone from GET', async () => {
+        const junkId = `junk-${Date.now()}`;
+        const prop = await json('/v1/designbook', {
+            method: 'POST', headers: auth(op.token),
+            body: JSON.stringify({ part: { id: junkId, kind: 'fill', title: 'Junk', summary: 'A mistake, caught.', body: GOOD_BODY } }),
+        });
+        assert(prop.status === 201, `propose junk ${prop.status}`);
+        const bystander = await json(`/v1/designbook/${junkId}`, { method: 'DELETE', headers: auth(other.token) });
+        assert(bystander.status === 403, `a bystander cannot delete someone else's part, got ${bystander.status}`);
+        const del = await json(`/v1/designbook/${junkId}`, { method: 'DELETE', headers: auth(op.token) });
+        assert(del.status === 200 && del.body.data.deleted === true, `delete ${del.status}: ${JSON.stringify(del.body.error)}`);
+        const read = await json(`/v1/designbook/${junkId}`, { headers: auth(op.token) });
+        assert(read.status === 404, `deleted means gone: GET is 404, got ${read.status}`);
+        const browse = await json('/v1/designbook?limit=200', { headers: auth(op.token) });
+        assert(!browse.body.data.parts.some((p: any) => p.id === junkId), 'deleted means gone from the browse too');
+    });
+
+    await test('dead is invisible: a retired part leaves the default browse, and only ?status=retired shows the graveyard', async () => {
+        const browse = await json('/v1/designbook?limit=200', { headers: auth(op.token) });
+        assert(browse.status === 200, `browse ${browse.status}`);
+        assert(!browse.body.data.parts.some((p: any) => p.id === partId),
+            'a retired part must not appear in the default listing, signed in or not');
+        const graveyard = await json('/v1/designbook?status=retired&limit=200', { headers: auth(op.token) });
+        assert(graveyard.body.data.parts.some((p: any) => p.id === partId),
+            'asking for status=retired by name still finds it');
+    });
+
     console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);
     if (failed > 0) process.exit(1);
 })();

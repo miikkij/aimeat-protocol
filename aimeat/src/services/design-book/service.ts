@@ -34,6 +34,8 @@
  *   const book = new DesignBookService(storage, config);
  *   const out = await book.propose(callerGaii, raw, provenance);
  * @version-history
+ *   v1.2.0 — 2026-08-29 — Retired parts leave every default listing: dead is invisible, and
+ *     only an explicit ?status=retired asks for the graveyard.
  *   v1.1.0 — 2026-08-28 — The new kinds land in the lifecycle: propose stamps the checks the
  *     kind's own bench ran (tokens-valid / contrast-matrix / style-valid), and adopt() MERGES a
  *     look, motion recipe or illustration style into the app's existing arrangement (refusing
@@ -246,6 +248,11 @@ export class DesignBookService {
       try { part = this.parsePart(record); } catch { continue; }
       if (filters.kind && part.kind !== filters.kind) continue;
       if (filters.status && part.status !== filters.status) continue;
+      // A retired part is DEAD: nothing adopts it and no browse should show it. It survives
+      // only so its address cannot be re-proposed. It appears in a listing only when asked
+      // for by name (?status=retired) — the developer met his own retirees in the gallery,
+      // which is exactly the shelf litter this line removes.
+      if (!filters.status && part.status === 'retired') continue;
       if (filters.q) {
         const q = filters.q.toLowerCase();
         const hay = `${part.id} ${part.title} ${part.summary} ${part.tags.join(' ')}`.toLowerCase();
@@ -392,5 +399,39 @@ export class DesignBookService {
       trackable: true,
     });
     return { id, status: next.status, previous };
+  }
+
+  /**
+   * DELETE a part outright — the cleanup retire cannot be. A system that can be littered but
+   * never cleaned drifts toward a graveyard nobody can read (the developer's words, after six
+   * bad parts had only a "retired" to go to). The rule: junk with ZERO adoptions is deleted
+   * whole, history included; a part some app has adopted keeps its address and is retired
+   * instead, because the adopters' history points at it.
+   */
+  async delete(
+    callerGaii: string, isOperator: boolean, id: string,
+  ): Promise<{ id: string; deleted: true }> {
+    const record = await this.findRecord(id);
+    if (!record) throw new DesignBookError('NOT_FOUND', `No Design Book part "${id}".`, 404);
+    const part = this.parsePart(record);
+    if (!isOperator) {
+      const ownerGhii = await this.ownerOf(callerGaii);
+      if (part.proposed_by_owner !== ownerGhii) {
+        throw new DesignBookError('NOT_ALLOWED',
+          'Deleting is the node operator\'s call, or the proposer\'s on their own part.', 403);
+      }
+    }
+    const usage = await this.usageOf(id);
+    if (usage > 0) {
+      throw new DesignBookError('PART_IN_USE',
+        `"${id}" is adopted by ${usage} build${usage === 1 ? '' : 's'} whose history points at it — retire it instead of deleting it.`, 409);
+    }
+    if (this.storage.deleteMemorySubtree) {
+      // The subtree takes the version history with it — deleted means gone, not haunting.
+      await this.storage.deleteMemorySubtree(this.bookOwner(), record.key);
+    } else {
+      await this.storage.deleteMemory(this.bookOwner(), record.key);
+    }
+    return { id, deleted: true };
   }
 }
