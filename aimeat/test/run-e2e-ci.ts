@@ -244,6 +244,9 @@ const ALL_SUITES = [
     'test/e2e-hello-mcp.ts',
     'test/e2e-device-token-grace.ts',
     'test/e2e-agent-reapproval.ts',
+    // What the agent ASKED FOR reaching the person who approves it — and not reaching the
+    // unauthenticated door, and not rewriting a grant already made.
+    'test/e2e-device-auth-requested-scopes.ts',
     'test/e2e-agent-health.ts',
     'test/e2e-open-items.ts',
     'test/e2e-app-access-code.ts',

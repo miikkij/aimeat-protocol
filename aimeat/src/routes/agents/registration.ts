@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: MIT
  * @description Agent registration routes (connectivity-key connect, owner-authed create, pending list, consent HTML page). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 — 2026-08-29 — The pending listing carries `requested_scopes`: what the agent asked for,
+ *     beside `current_scopes`, which is what it already holds. The request was dropped at authorize
+ *     time until now, so the owner was asked to grant access without being shown what was wanted.
+ *     Authenticated door only — the unauthenticated /v1/agents/verify/info discloses no scopes.
  *   v1.3.0 — 2026-08-24 — Both registration paths create the Hello Integration test task (via
  *     services/onboarding-test-task.ts) instead of an onboarding whose required step 9 had nothing
  *     to accept; the direct path also passes the agent's mode to createDefaultSteps so a
@@ -338,6 +342,12 @@ export function registerRegistrationRoutes(
         status: r.status,
         existing_agent: !!existing[i],
         current_scopes: existing[i]?.defaultScopes ?? null,
+        // What the agent ASKED FOR, which is not what it currently holds. Null when it named
+        // nothing. The request was thrown away at authorize time until 2026-08-29, so the card
+        // asked the owner to grant something without being able to say what was wanted, and an
+        // approval that named no scopes fell back to the node default. Authenticated surface only:
+        // the unauthenticated /v1/agents/verify/info still discloses no scopes of any kind.
+        requested_scopes: r.requestedScopes ?? null,
         created_at: r.createdAt,
         expires_in: Math.max(0, Math.ceil((new Date(r.expiresAt).getTime() - Date.now()) / 1000)),
       })),

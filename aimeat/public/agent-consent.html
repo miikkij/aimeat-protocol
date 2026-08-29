@@ -7,6 +7,11 @@
     scope model and the shared consent vocabulary, so its presets and sentences can never diverge
     from the SPA's AgentConsent panel again.
   @version-history
+    v1.3.0 — 2026-08-29 — The page shows what the agent ASKED FOR and offers it as a choice,
+        preselected on a first approval. The list comes from the owner's own pending listing
+        (authenticated) and never from /verify/info, which is unauthenticated and must keep
+        disclosing no scopes at all. Until the node started keeping the request, this door asked
+        the owner to pick a template for an agent whose stated needs nobody could see.
     v1.2.0 — 2026-08-24 — The light theme the page never had, same treatment as oauth-consent
         the same day: light-first tokens with a [data-theme="dark"] override, the no-flash boot
         snippet on the SPA's 'aimeat-theme' storage key (unset = light, an explicit dark choice
@@ -155,7 +160,7 @@
   <script type="module">
     import { loadTranslations, t as translate } from '/js/i18n.js';
     import { getTheme, setTheme } from '/js/theme.js';
-    import { scopeSentence, presetSummary, boundaryLines } from '/js/consent-vocab.js';
+    import { scopeSentence, presetSummary, requestedSummary, boundaryLines } from '/js/consent-vocab.js';
     import { SCOPE_TEMPLATES, SCOPE_DOMAINS } from '/views/profile/agents/scope-model.js';
 
     const escHtml = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -191,11 +196,14 @@
     // Preset button labels come from the SPA's own label keys, so the two doors use one word.
     const presetLabel = (p) => p === 'keep'
       ? translate('profile.agents.pendingRequests.keepCurrent')
-      : translate(`profile.agents.scopeUi.${{ readonly: 'readOnly', standard: 'standard', full: 'fullAccess', custom: 'custom' }[p]}`);
+      : p === 'asked'
+        ? translate('profile.agents.pendingRequests.asRequested')
+        : translate(`profile.agents.scopeUi.${{ readonly: 'readOnly', standard: 'standard', full: 'fullAccess', custom: 'custom' }[p]}`);
 
     const app = document.getElementById('app');
     let session = null;
     let requestInfo = null;
+    let requestedScopes = [];
     let selectedPreset = 'standard';
     let customScopes = ['memory:read', 'wallet:read'];
 
@@ -233,6 +241,30 @@
       const d = await r.json();
       if (!d.ok) return null;
       return d.data;
+    }
+
+    /**
+     * What the agent asked for. Deliberately NOT read from /verify/info: that endpoint is
+     * unauthenticated and rate-limited against user-code enumeration, and it must never say what a
+     * request wants. The owner's own pending listing is the authenticated door, so this runs only
+     * once there is a session. An empty list on any failure — the page still works, it just cannot
+     * offer the "what it asked for" choice.
+     */
+    async function fetchRequestedScopes(userCode) {
+      try {
+        const jwt = session?.jwt || session?.token;
+        if (!jwt) return [];
+        const r = await fetch('/v1/agents/device-authorize/pending', {
+          headers: { Authorization: `Bearer ${jwt}` },
+        });
+        const d = await r.json();
+        if (!d.ok) return [];
+        const row = (d.data?.requests || []).find((x) => x.user_code === userCode);
+        return Array.isArray(row?.requested_scopes)
+          ? row.requested_scopes.filter((s) => typeof s === 'string') : [];
+      } catch {
+        return [];
+      }
     }
 
     const getOwnerName = () => {
@@ -294,6 +326,7 @@
       // null = "nothing chosen", which is how the server reads an approval with no `scopes` field:
       // an existing agent keeps exactly what it holds.
       if (selectedPreset === 'keep') return null;
+      if (selectedPreset === 'asked') return [...requestedScopes];
       if (selectedPreset === 'custom') return [...customScopes];
       return SCOPE_TEMPLATES[selectedPreset] || SCOPE_TEMPLATES.standard;
     }
@@ -306,9 +339,21 @@
       // narrowed it on a click that meant "yes, this is my agent".
       // Presets, labels and descriptions all come from the shared model + vocabulary, so this door
       // and the SPA's AgentConsent grant the same sets and describe them with the same sentences.
-      const presetKeys = [...(info.existing_agent ? ['keep'] : []), 'readonly', 'standard', 'full', 'custom'];
-      const scopeOptions = presetKeys.map((p) => ({ key: p, name: presetLabel(p), desc: presetSummary(p, t) }));
+      // What the agent asked for is a choice of its own, first in the list and preselected on a
+      // FIRST approval: an agent that names its scopes has said what it needs, and handing it the
+      // Standard template instead is how one arrives connected and unable to do its job. A
+      // returning agent still lands on 'keep' — a request does not rewrite a grant already made.
+      const askedDesc = requestedSummary(requestedScopes, t);
+      const presetKeys = [
+        ...(info.existing_agent ? ['keep'] : []),
+        ...(askedDesc ? ['asked'] : []),
+        'readonly', 'standard', 'full', 'custom',
+      ];
+      const scopeOptions = presetKeys.map((p) => ({
+        key: p, name: presetLabel(p), desc: p === 'asked' ? askedDesc : presetSummary(p, t),
+      }));
       if (info.existing_agent && selectedPreset === 'standard') selectedPreset = 'keep';
+      else if (askedDesc && selectedPreset === 'standard') selectedPreset = 'asked';
 
       const scopeRadiosHtml = scopeOptions.map(o => `
         <label class="scope-radio ${selectedPreset === o.key ? 'selected' : ''}" data-preset="${escHtml(o.key)}">
@@ -507,6 +552,10 @@
         renderError(t('errorOwnerMismatch'));
         return;
       }
+
+      // Only now, with a session and the owner confirmed, is there a door that may say what the
+      // agent asked for.
+      requestedScopes = await fetchRequestedScopes(code);
 
       renderConsent();
     }

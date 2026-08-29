@@ -629,6 +629,7 @@
       "standard": "Voi lukea ja kirjoittaa: {areas}. Saldosi, viestisi ja tilisi asetukset pysyvät sen ulottumattomissa.",
       "full": "Voi tehdä lähes kaiken minkä sinäkin täällä. Kirjautumisesi ja tilisi turva-asetukset, rahojesi maksatusasetukset, tietojesi jakaminen uusille ihmisille ja muiden agenttiesi oikeuksien muuttaminen vaativat kukin oman erillisen rastinsa.",
       "keep": "Jättää oikeudet täsmälleen ennalleen.",
+      "asked": "Juuri se mitä se pyysi: {areas}. Ei mitään sen yli.",
       "custom": "Valitse tarkat oikeudet itse listasta."
     }
   },
@@ -5024,6 +5025,34 @@
   "organisms": {
     "title": "Organismit",
     "backToList": "Kaikki organismit",
+    "ws": {
+      "railTitle": "Tässä työtilassa",
+      "newForYou": "Uutta sinulle",
+      "newChip": "{n} uutta sinulle",
+      "waiting": "Odottaa päätöstäsi",
+      "reviewDoor": "Tarkastus →",
+      "figRecords": "tietuetta",
+      "figDocs": "dokumenttia",
+      "figReview": "tarkastettavaa",
+      "figReviewSub": "julkaisu odottaa päätöstäsi",
+      "figTypes": "{n} tyyppiä",
+      "figSpaces": "{n} tilaa",
+      "docsTitle": "Dokumentit",
+      "colType": "Tyyppi",
+      "colLatest": "Viimeisin",
+      "latest": "viimeksi",
+      "open": "Avaa",
+      "addFirst": "+ Lisää",
+      "fullActivity": "Koko aktiviteetti {n} →",
+      "searchDoor": "Hae tästä työtilasta",
+      "forAiLead": "Yksi ohje, joka tuo tekoälysi tähän työtilaan sen oikeilla tunnuksilla ja rakenteella. Liitä se chattiin, anna koodausagentille tai tee siitä sopimusagentti.",
+      "showTree": "Näytä puuna",
+      "showRail": "Näytä sisällys",
+      "backToWorkspace": "Takaisin työtilaan",
+      "kindDoc": "dokumenttitila",
+      "kindRecord": "tietuetyyppi",
+      "more": "… {n} lisää"
+    },
     "railTitle": "Tässä organismissa",
     "figWorkspaces": "työtilaa",
     "figMembers": "jäsentä",
@@ -6590,7 +6619,7 @@
             "read": "Lue niiden jaettujen tilojen julkaistu sisältö joihin kuulut.",
             "write": "Luo jaettuja tiloja, kirjoita ja julkaise niissä dokumentteja sekä kommentoi.",
             "invite": "Päästä muita mukaan: kutsu jäseniä ja jaa pääsy jaettuun tilaan.",
-        "rows": "Lisää rivejä jaetun tilan tapahtumalokiin ja lue niitä takaisin, kun tila on avattu tälle apille tai agentille nimeltä. Mikään muu tilassa ei avaudu."
+            "rows": "Lisää rivejä jaetun tilan tapahtumalokiin ja lue niitä takaisin, kun tila on avattu tälle apille tai agentille nimeltä. Mikään muu tilassa ei avaudu."
           },
           "outbound": {
             "send": "Lähetä sähköpostia yrityksesi osoitteesta tallennetuille yhteystiedoillesi."
@@ -6715,6 +6744,8 @@
         "denied": "Pyyntö hylätty",
         "approveError": "Agentin hyväksyminen epäonnistui",
         "keepCurrent": "Pidä nykyiset oikeudet",
+        "asRequested": "Mitä se pyysi",
+        "requestedNote": "Tämä agentti pyysi: {scopes}",
         "returningAgent": "Tämä agentti on jo käytössä. Hyväksyminen ilman muutoksia jättää sen oikeudet täsmälleen ennalleen."
       },
       "mode": {

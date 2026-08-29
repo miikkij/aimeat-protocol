@@ -629,6 +629,7 @@
       "standard": "Can read and write {areas}. Your balance, your messages and your account settings stay out of its reach.",
       "full": "Can do almost everything you can do here. Your sign-in and account security, your money's payout settings, sharing your data with new people, and rewriting your other agents' permissions each need their own separate tick.",
       "keep": "Leaves its permissions exactly as they are now.",
+      "asked": "Exactly what it asked for: {areas}. Nothing beyond that.",
       "custom": "Pick the exact permissions yourself from the list."
     }
   },
@@ -5036,6 +5037,34 @@
   "organisms": {
     "title": "Organisms",
     "backToList": "All organisms",
+    "ws": {
+      "railTitle": "In this workspace",
+      "newForYou": "New for you",
+      "newChip": "{n} new for you",
+      "waiting": "Waiting for your decision",
+      "reviewDoor": "Review →",
+      "figRecords": "records",
+      "figDocs": "documents",
+      "figReview": "to review",
+      "figReviewSub": "a publish waits for your decision",
+      "figTypes": "{n} types",
+      "figSpaces": "{n} spaces",
+      "docsTitle": "Documents",
+      "colType": "Type",
+      "colLatest": "Latest",
+      "latest": "latest",
+      "open": "Open",
+      "addFirst": "+ Add",
+      "fullActivity": "Full activity {n} →",
+      "searchDoor": "Search this workspace",
+      "forAiLead": "One instruction that brings your AI into this workspace with its real ids and structure. Paste it into a chat, hand it to a coding agent, or make a contract agent from it.",
+      "showTree": "Show as a tree",
+      "showRail": "Show the contents",
+      "backToWorkspace": "Back to the workspace",
+      "kindDoc": "document space",
+      "kindRecord": "record type",
+      "more": "… {n} more"
+    },
     "railTitle": "In this organism",
     "figWorkspaces": "workspaces",
     "figMembers": "members",
@@ -6727,6 +6756,8 @@
         "denied": "Request denied",
         "approveError": "Failed to approve agent",
         "keepCurrent": "Keep its current access",
+        "asRequested": "What it asked for",
+        "requestedNote": "This agent asked for: {scopes}",
         "returningAgent": "This agent is already set up. Approving without changing anything leaves its permissions exactly as they are."
       },
       "mode": {

@@ -7,6 +7,8 @@
  *   minted credentials live in the jsonb `agentCredentials`. Translated 1:1 from the Prisma provider.
  * @version-history
  *   v1.0.0 — 2026-07-15 — Phase 5: device-auth on Postgres+Kysely.
+ *   v1.1.0 — 2026-08-29 — `requestedScopes` (migration 0056): what the agent asked for, carried
+ *     apart from `scopes`, which is what the approval granted.
  */
 import type { Selectable } from 'kysely';
 import type { DeviceAuthorizationRecord } from '../../../interface.js';
@@ -21,7 +23,8 @@ function toRecord(r: Selectable<DeviceAuth>): DeviceAuthorizationRecord {
   return {
     deviceCode: r.deviceCode, userCode: r.userCode, ownerName: r.ownerName, agentName: r.agentName,
     displayName: r.displayName ?? undefined, description: r.description ?? undefined, status: r.status as DeviceAuthorizationRecord['status'],
-    scopes: r.scopes ?? undefined, createdAt: iso(r.createdAt), expiresAt: iso(r.expiresAt), lastPolledAt: isoOpt(r.lastPolledAt),
+    scopes: r.scopes ?? undefined, requestedScopes: r.requestedScopes ?? undefined,
+    createdAt: iso(r.createdAt), expiresAt: iso(r.expiresAt), lastPolledAt: isoOpt(r.lastPolledAt),
     pollInterval: r.pollInterval, approvedBy: r.approvedBy ?? undefined, mode: (r.mode ?? undefined) as DeviceAuthorizationRecord['mode'],
     agentCredentials: (r.agentCredentials ?? undefined) as DeviceAuthorizationRecord['agentCredentials'],
   };
@@ -32,6 +35,9 @@ export const deviceAuthMethods = {
     await this.db.insertInto('DeviceAuth').values({
       deviceCode: req.deviceCode, userCode: req.userCode, ownerName: req.ownerName, agentName: req.agentName,
       displayName: req.displayName ?? null, description: req.description ?? null, status: req.status, scopes: req.scopes ?? [],
+      // null, not []: "the agent named nothing" has to stay distinguishable from "it asked for an
+      // empty set", because the approval fallback reads exactly that difference.
+      requestedScopes: req.requestedScopes ?? null,
       createdAt: new Date(req.createdAt), expiresAt: new Date(req.expiresAt), lastPolledAt: req.lastPolledAt ? new Date(req.lastPolledAt) : null,
       pollInterval: req.pollInterval, approvedBy: req.approvedBy ?? null, agentCredentials: jsonb(req.agentCredentials ?? null), mode: req.mode ?? 'interactive',
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -49,6 +55,7 @@ export const deviceAuthMethods = {
     const data: Record<string, unknown> = {};
     if (updates.status !== undefined) data.status = updates.status;
     if (updates.scopes !== undefined) data.scopes = updates.scopes;
+    if (updates.requestedScopes !== undefined) data.requestedScopes = updates.requestedScopes;
     if (updates.lastPolledAt !== undefined) data.lastPolledAt = updates.lastPolledAt ? new Date(updates.lastPolledAt) : null;
     if (updates.pollInterval !== undefined) data.pollInterval = updates.pollInterval;
     if (updates.approvedBy !== undefined) data.approvedBy = updates.approvedBy;

@@ -5,6 +5,8 @@
  * @description Operator-review, Scheduler, Execution-log, Extension-instance, Federation-peer, Replication, Device-auth, Ecosystem-app, OAuth methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from providers/sqlite/index.ts (max-file-lines)
+ *   v1.1.0 — 2026-08-29 — device_auth carries `requestedScopes`: what the agent asked for at
+ *     authorize time, kept apart from `scopes`, which is what the approval granted.
  */
 import type {
   EcosystemAppRecord, EcoAuthorizationRecord, EcoAutomationRecipe, OperatorReviewRecord, ScheduledJobRecord, ExtensionInstanceRecord,
@@ -468,12 +470,13 @@ export const federationOauthMethods = {
 
   async createDeviceAuth(this: SqliteStorage, req: DeviceAuthorizationRecord): Promise<void> {
     this.db.prepare(
-      `INSERT INTO device_auth (deviceCode, userCode, ownerName, agentName, displayName, description, status, scopes, createdAt, expiresAt, lastPolledAt, pollInterval, approvedBy, agentCredentials, mode)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO device_auth (deviceCode, userCode, ownerName, agentName, displayName, description, status, scopes, requestedScopes, createdAt, expiresAt, lastPolledAt, pollInterval, approvedBy, agentCredentials, mode)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       req.deviceCode, req.userCode, req.ownerName, req.agentName,
       req.displayName ?? null, req.description ?? null,
       req.status, req.scopes ? JSON.stringify(req.scopes) : null,
+      req.requestedScopes ? JSON.stringify(req.requestedScopes) : null,
       req.createdAt, req.expiresAt, req.lastPolledAt ?? null,
       req.pollInterval, req.approvedBy ?? null,
       req.agentCredentials ? JSON.stringify(req.agentCredentials) : null,
@@ -496,6 +499,7 @@ export const federationOauthMethods = {
     const values: unknown[] = [];
     if (updates.status !== undefined) { fields.push('status = ?'); values.push(updates.status); }
     if (updates.scopes !== undefined) { fields.push('scopes = ?'); values.push(JSON.stringify(updates.scopes)); }
+    if (updates.requestedScopes !== undefined) { fields.push('requestedScopes = ?'); values.push(JSON.stringify(updates.requestedScopes)); }
     if (updates.lastPolledAt !== undefined) { fields.push('lastPolledAt = ?'); values.push(updates.lastPolledAt); }
     if (updates.pollInterval !== undefined) { fields.push('pollInterval = ?'); values.push(updates.pollInterval); }
     if (updates.approvedBy !== undefined) { fields.push('approvedBy = ?'); values.push(updates.approvedBy); }
@@ -594,6 +598,7 @@ export const federationOauthMethods = {
       description: row.description as string | undefined,
       status: row.status as DeviceAuthorizationRecord['status'],
       scopes: row.scopes ? JSON.parse(row.scopes as string) : undefined,
+      requestedScopes: row.requestedScopes ? JSON.parse(row.requestedScopes as string) : undefined,
       createdAt: row.createdAt as string,
       expiresAt: row.expiresAt as string,
       lastPolledAt: row.lastPolledAt as string | undefined,

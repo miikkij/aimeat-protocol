@@ -1003,7 +1003,10 @@ export interface DeviceAuth {
   mode: string | null;
   ownerName: string;
   pollInterval: Generated<number>;
+  /** What the approval GRANTED. */
   scopes: string[] | null;
+  /** What the agent ASKED FOR at authorize time. Null = it named nothing. See migration 0056. */
+  requestedScopes: string[] | null;
   status: Generated<string>;
   userCode: string;
 }

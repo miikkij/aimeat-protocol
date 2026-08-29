@@ -6694,9 +6694,21 @@ paths:
                   type: array
                   items: { type: string }
                   description: |
-                    Requested scopes — honored ONLY on the same-owner auto-approval path
-                    (defaults to the node's default agent scopes). The manual consent flow
-                    keeps scope selection with the owner on the consent page.
+                    What this agent is asking for. Kept with the request and shown to the owner:
+                    the authenticated pending listing returns it as `requested_scopes`, and both
+                    consent surfaces offer it as a preselected choice on a first approval.
+
+                    The owner still decides. An approval that names its own `scopes` applies those
+                    verbatim; an approval that names none grants what was requested here, falling
+                    back to the node's default agent scopes only when the agent asked for nothing.
+                    Re-approving an EXISTING agent is unchanged — silence there keeps the grant it
+                    already holds, and a request never rewrites one.
+
+                    On the same-owner auto-approval path these are granted directly, still bounded
+                    by the approver's own scopes when an agent is the approver.
+
+                    A list exceeding the node maximum (AIMEAT_MAX_AGENT_SCOPES) is refused with 400
+                    INVALID_SCOPES before anything is stored.
       responses:
         '200':
           description: Device authorization initiated
@@ -44978,6 +44990,17 @@ paths:
                                     Null when the agent does not exist yet. Owner-authenticated
                                     listing only — the unauthenticated consent-page endpoint
                                     (/v1/agents/verify/info/{userCode}) never returns scopes.
+                                requested_scopes:
+                                  type: array
+                                  nullable: true
+                                  items: { type: string }
+                                  description: >
+                                    What the agent ASKED FOR in its device-authorize call, which is
+                                    a different claim from what it currently holds. Null when it
+                                    named nothing. The consent surfaces offer this as a preselected
+                                    choice on a first approval, and an approval that names no
+                                    scopes grants it. Owner-authenticated listing only, for the
+                                    same reason as current_scopes.
                                 created_at: { type: string }
                                 expires_in: { type: integer }
         '401':
