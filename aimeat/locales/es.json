@@ -6239,6 +6239,7 @@
         "manage": "Gestionar",
         "scopes": "permisos",
         "scopeProfile": "Perfil de permisos",
+        "all": "todo",
         "readOnly": "Solo lectura",
         "standard": "Estándar",
         "fullAccess": "Acceso total",

@@ -12,6 +12,10 @@
    @usage Loaded first in spa.html <head>; the theme is toggled by /js/theme.js
      which flips the data-theme attribute on <html>.
    @version-history
+     v1.36.0 — 2026-08-29 — --font-wordmark (Archivo Black) for AIME♥AT, which is a mark and not a headline;
+       --font-poster-tracking (.01em) and --font-poster-leading (1) for the headline face, read by every
+       poster headline instead of the -.035em / .9 that had been measured for Archivo Black and made
+       Fjalla One's letters touch.
      v1.35.0 — 2026-08-29 — Three master type tokens: --font-headline (Fjalla One), --font-body (Archivo) and
        --font-mono; --font, --font-showroom, --font-showroom-body, --font-poster and --font-poster-section
        are aliases of them. The inside pages' headlines move from Archivo Black to the same face the
@@ -241,6 +245,16 @@
   --font-poster-weight: 400;
   --font-poster-text-weight: 400;
   --font-poster-strong-weight: 600;
+  /* How the headline face is set. Archivo Black wanted to be squeezed (-.035em, line-height .9);
+     Fjalla One is condensed already and its letters touch at that tracking and its lines collide
+     at that leading (Jouni, 2026-08-29: "as if the letters ran into each other"). Every poster
+     headline reads these two, so a change of face brings its own spacing here, not in ten sheets. */
+  --font-poster-tracking: 0.01em;
+  --font-poster-leading: 1;
+  /* The wordmark is a mark, not a headline: AIME♥AT stays in Archivo Black whatever the headline
+     face is, on the top bar, the served pages and the sign-in dialog (the auth library carries the
+     same stack as its fallback). */
+  --font-wordmark: 'Archivo Black', 'Archivo', 'DM Sans', system-ui, sans-serif;
   /* The section face: the headline under the page title ("My skills", "Node library") is the
      same uppercase and tracking as the page title but in the body face's regular cut, which is
      what gives the reviewed canvas its air. One face, one weight, changed here. */
@@ -781,7 +795,7 @@ a { color: inherit; text-decoration: none; }
    morsel count on a sun chip, the bell and the pill in ink frames. Everything reads the shell's
    tokens, so the dark theme and the palettes keep working. */
 .topnav { border-bottom: 3px solid var(--text); font-family: var(--font-showroom-body); }
-.topnav-brand { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.25rem; letter-spacing: -0.01em; }
+.topnav-brand { font-family: var(--font-wordmark); font-weight: 400; font-size: 1.25rem; letter-spacing: -0.01em; }
 .topnav-right a, .topnav-menu > a { font-weight: 700; font-size: 0.88rem; color: var(--text-dim); padding: 6px 4px; border-radius: 0; }
 .topnav-right a:hover, .topnav-menu > a:hover { color: var(--text); background: none; }
 .topnav-right .profile-link { color: var(--text); background: none; }

@@ -17,6 +17,8 @@
  *     editor has no row for is listed under "other permissions" so it can be seen and removed
  *     rather than silently kept; and the dialog states that a change takes effect on the agent's
  *     next connection, which is what the session-scope snapshot actually does.
+ *   v1.3.0 — 2026-08-29 — The poster face (profile.css "Scope Management UI"): the envelope is an
+ *     inline SVG, the always-on mark and the "all" toggle are words in a mono chip, no emoji.
  */
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
@@ -31,6 +33,9 @@ import {
   wildcardScopes, bulkScopes, expandScopes, collapseScopes, detectTemplate, unknownScopes,
   templateLabel, domainLabel, permLabel,
 } from './scope-config.js';
+
+// The envelope beside the agent's address: the door to its inbox thread.
+const MAIL_ICON = html`<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14"/><path d="M3 7l9 6 9-6"/></svg>`;
 
 export default function ScopesModal({ agent, session, onSave, onCancel }) {
   const scopes = agent.default_scopes ?? ['*'];
@@ -86,7 +91,7 @@ export default function ScopesModal({ agent, session, onSave, onCancel }) {
   return html`
     <${Modal} open=${true} onClose=${onCancel} className="scope-modal" title=${`${t('profile.agents.scopeUi.scopeProfile')}: ${agent.display_name || agent.name}`}>
         <div class="scope-agent-info">${escHtml(agent.gaii || '')}
-          ${agent.gaii ? html`<${InboxLink} to=${agent.gaii} title=${t('inbox.messageThis')} className="scope-agent-msg">✉️</${InboxLink}>` : null}
+          ${agent.gaii ? html`<${InboxLink} to=${agent.gaii} title=${t('inbox.messageThis')} className="scope-agent-msg">${MAIL_ICON}</${InboxLink}>` : null}
         </div>
 
         ${isReadOnly ? html`
@@ -121,7 +126,7 @@ export default function ScopesModal({ agent, session, onSave, onCancel }) {
                   <div class="scope-domain">
                     <div class="scope-domain-header" onClick=${() => !isCatalogue && toggleDomain(d.key)}>
                       <span class="domain-label">${domainLabel(d.key)}</span>
-                      ${!isCatalogue && html`<span class="domain-toggle">${allChecked ? '☑ all' : '☐'}</span>`}
+                      ${!isCatalogue && html`<span class=${`domain-toggle ${allChecked ? 'on' : ''}`}>${allChecked ? '✓ ' : ''}${t('profile.agents.scopeUi.all')}</span>`}
                     </div>
                     ${d.permissions.map(p => {
                       const scope = `${d.key}:${p}`;
@@ -137,7 +142,7 @@ export default function ScopesModal({ agent, session, onSave, onCancel }) {
                             />
                             <span class="scope-friendly">${permLabel(p, d.key)}</span>
                             <span class="scope-technical">${scope}</span>
-                            ${isLocked && html`<span class="scope-lock" title=${t('profile.agents.scopeUi.alwaysOn')}>🔒</span>`}
+                            ${isLocked && html`<span class="scope-lock">${t('profile.agents.scopeUi.alwaysOn')}</span>`}
                             ${isExtra && html`<span class="scope-extra-note">${t('profile.agents.scopeUi.notInFullAccess')}</span>`}
                           </label>
                         </div>`;
