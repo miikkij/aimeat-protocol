@@ -10,6 +10,8 @@
  *   Extracted from inbox-tab.js to satisfy max-file-lines.
  * @usage import { useThreadAutoScroll, useMobileComposerKeyboard } from './inbox-tab/use-thread-ux.js';
  * @version-history
+ *   v1.7.0 — 2026-08-29 — --inbox-desk-avail is published on every width, so the phone's list view is
+ *     measured too instead of assuming a header height.
  *   v1.6.1 — 2026-08-29 — The desktop pane is measured against .page-content's bottom edge minus the
  *     shell's padding, not the window: the window measure overshot by the padding and the page scrolled.
  *   v1.6.0 — 2026-08-18 — useMobileComposerKeyboard also measures the DESKTOP pane: --inbox-desk-avail
@@ -168,30 +170,28 @@ export function useMobileComposerKeyboard(mode) {
       // Measured on a 1280x900 window it left 94px of dead space below the pane AND still scrolled the
       // page, while the conversation itself got 229px. The distance to the top edge is a thing the
       // browser knows, so ask it instead of guessing: everything below the pane is the pane's.
-      if (!isNarrow()) {
-        root.style.removeProperty('--inbox-avail');
-        const top = body.getBoundingClientRect().top;
-        // The pane ends where its SCROLL REGION ends, not where the window does: .page-content is the
-        // only thing that scrolls and the profile shell pads its bottom, so a pane measured against
-        // the window overshot by that padding and the page scrolled by exactly that much (33px on a
-        // 1440x900 window, the messenger sliding under the crumb). Ask the region and its padding.
-        const region = body.closest('.page-content');
-        const shell = body.closest('.pf-content') || body.closest('.pf');
-        const bottom = region ? region.getBoundingClientRect().bottom : window.innerHeight;
-        const pad = shell ? (parseFloat(getComputedStyle(shell).paddingBottom) || 0) : 20;
-        const avail = Math.max(320, Math.round(bottom - top - pad - 8));
-        root.style.setProperty('--inbox-desk-avail', `${avail}px`);
-        return;
-      }
-      root.style.removeProperty('--inbox-desk-avail');
+      // The pane ends where its SCROLL REGION ends, not where the window does: .page-content is the
+      // only thing that scrolls and the profile shell pads its bottom, so a pane measured against
+      // the window overshot by that padding and the page scrolled by exactly that much (33px on a
+      // 1440x900 window, the messenger sliding under the crumb). Ask the region and its padding.
+      // The same number serves the phone's list view, where a fixed "100dvh - 168px" assumed a
+      // header the poster mast no longer matches.
+      const top = body.getBoundingClientRect().top;
+      const region = body.closest('.page-content');
+      const shell = body.closest('.pf-content') || body.closest('.pf');
+      const bottom = region ? region.getBoundingClientRect().bottom : window.innerHeight;
+      const pad = shell ? (parseFloat(getComputedStyle(shell).paddingBottom) || 0) : 20;
+      const deskAvail = Math.max(isNarrow() ? 240 : 320, Math.round(bottom - top - pad - 8));
+      root.style.setProperty('--inbox-desk-avail', `${deskAvail}px`);
+      if (!isNarrow()) { root.style.removeProperty('--inbox-avail'); return; }
       if (!vv || !body.classList.contains('inbox-body--panel')) {
         root.style.removeProperty('--inbox-avail');
         return;
       }
       // Distance from the body's top edge to the top of the visible (keyboard-excluded) area, then the
       // remaining height below it. Clamp so a mid-animation reading can't collapse the pane.
-      const top = body.getBoundingClientRect().top - (vv.offsetTop || 0);
-      const avail = Math.max(220, Math.round(vv.height - top));
+      const vvTop = top - (vv.offsetTop || 0);
+      const avail = Math.max(220, Math.round(vv.height - vvTop));
       root.style.setProperty('--inbox-avail', `${avail}px`);
     };
     syncRef.current = sync;
