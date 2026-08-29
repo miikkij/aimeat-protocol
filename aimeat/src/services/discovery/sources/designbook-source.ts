@@ -12,6 +12,8 @@
  * @structure createDesignbookSource(storage, config) → DiscoverySource
  * @usage registry.register(createDesignbookSource(storage, config));
  * @version-history
+ *   v1.1.0 — 2026-08-30 — A query narrows the parts to the ones whose title, summary or tags carry
+ *     the words. Every search used to return the whole Book beside its real hits.
  *   v1.0.0 — 2026-08-28 — Initial (TARGET-074 phase 5, slice 1).
  */
 import type { AimeatConfig } from '../../../config.js';
@@ -39,8 +41,19 @@ export function createDesignbookSource(storage: Storage, config: AimeatConfig): 
       // the storage address is the system's, not the proposer's.
       const records = await storage.listMemory(systemGhiiFor(config.nodeId), { prefix: PART_KEY_PREFIX, tags: ['designbook'] });
       const ownerGhii = ctx.caller.ownerName ? `${ctx.caller.ownerName}@${config.nodeId}` : null;
+      const words = (ctx.filters.q ?? '').toLowerCase().split(/\s+/).filter(Boolean);
+      const matches = (r: MemoryRecord) => {
+        if (!words.length) return true;
+        let part: Partial<DesignBookPart>;
+        try { part = (typeof r.value === 'string' ? JSON.parse(r.value) : r.value) as Partial<DesignBookPart>; }
+        // eslint-disable-next-line aimeat/no-silent-catch -- an unreadable part carries no words to match; the service refuses it with words on a direct read
+        catch { return false; }
+        const hay = `${part.title ?? ''} ${part.summary ?? ''} ${(part.tags ?? []).join(' ')} ${part.id ?? ''}`.toLowerCase();
+        return words.every(w => hay.includes(w));
+      };
       return records
         .filter((r) => PART_KEY_RE.test(r.key))
+        .filter(matches)
         .filter((r) => {
           if (ctx.scope === 'public') return true;
           if (!ownerGhii) return false;

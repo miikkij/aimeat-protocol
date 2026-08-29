@@ -13216,11 +13216,14 @@ paths:
           schema: { type: string }
           description: >
             CSV of types to include (capability, workflow, knowledge, decision, research, material,
-            company, offering, document, organism, app, memory).
+            company, offering, document, organism, app, template, skill, designbook, memory).
         - name: segment
           in: query
           schema: { type: string }
-          description: CSV of segments (coarse area within a type) to include.
+          description: >
+            CSV of segments (coarse area within a type) to include. A `memory` entry the machine keeps
+            for itself (an agent's statistics, a workflow run, a notice, a meter) has segment
+            `bookkeeping`, so a directory can count it and keep it out of the way.
         - name: tags
           in: query
           schema: { type: string }
@@ -13229,6 +13232,13 @@ paths:
           in: query
           schema: { type: string }
           description: Restrict to a single owner GHII (`owner@node-id`).
+        - name: organism
+          in: query
+          schema: { type: string }
+          description: >
+            Only records living in this organism (by id). A workspace record carries `place`
+            (organismId, organism, workspaceId, workspace, by name); a document is listed once, its
+            versions and history are not entries. The facets carry `places` (records per place).
         - name: scope
           in: query
           schema:
@@ -13281,6 +13291,10 @@ paths:
         - name: owner
           in: query
           schema: { type: string }
+        - name: organism
+          in: query
+          schema: { type: string }
+          description: Only records living in this organism (by id).
         - name: scope
           in: query
           schema:
