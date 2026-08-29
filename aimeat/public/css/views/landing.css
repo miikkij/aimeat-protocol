@@ -5,6 +5,10 @@
  * @description Logged-out landing + pricing pages (ld- prefix). Theme tokens only;
  *   path cards stack on mobile, ticker truncates to one line.
  * @version-history
+ *   v2.1.0 — 2026-08-29 — The index pages join the showroom (design canvas "AIMEAT Index Pages"): the
+ *       hero, the explainer cards, the proof block, the business hero, the cases, the group titles,
+ *       the ink and sun bands (.ld-band--ink / .ld-band--sun) and the contact box on the front page's
+ *       shapes. The app wall's cards stand straight; nothing tilts any more.
  *   v1.0.0 — 2026-06-10 — Initial (landing/portal split).
  *   v1.1.0 — 2026-06-16 — Add public activity feed styles (pa- prefix).
  *   v1.2.0 — 2026-06-16 — Add reward-first Hero v2 styles (ld-hero2-*): newspaper-framed
@@ -54,9 +58,11 @@
 .ld-hero2-more { display: flex; gap: 1.2rem; justify-content: center; flex-wrap: wrap; margin-top: .85rem; }
 .ld-hero2-more a { color: var(--text-dim); font-size: .88rem; text-decoration: none; }
 .ld-hero2-more a:hover { color: var(--accent); text-decoration: underline; }
-.ld-hero { text-align: center; padding: 2.5rem 0 1.25rem; }
-.ld-h1 { font-size: 2.1rem; font-weight: 800; letter-spacing: -0.5px; margin: 0 0 .6rem; }
-.ld-hero-sub { color: var(--text-dim); font-size: 1.05rem; margin: 0; }
+/* The index pages' hero (how it works, business, transparency) in the showroom face: the sentence as
+   a headline in the display face, the line under it in bold Archivo, left-aligned. */
+.ld-hero { display: flex; flex-direction: column; align-items: flex-start; gap: 1.4rem; text-align: left; padding: 2.75rem 0 .5rem; max-width: 1040px; }
+.ld-h1 { margin: 0; font-family: var(--font-showroom); font-weight: 400; text-transform: uppercase; font-size: clamp(2rem, 3.6vw, 2.9rem); line-height: 1.04; letter-spacing: .01em; color: var(--text); }
+.ld-hero-sub { margin: 0; font-family: var(--font-showroom-body); font-size: 1.25rem; line-height: 1.5; font-weight: 600; color: var(--text); max-width: 56rem; }
 /* "Ask your own AI what AIMEAT is" prompt box */
 .ld-askai { max-width: 760px; margin: 1.25rem auto 2rem; text-align: center; }
 .ld-askai-title { font-size: 1.25rem; font-weight: 700; margin: 0 0 .4rem; }
@@ -71,17 +77,33 @@
 .ld-ticker { display: flex; align-items: center; gap: .5rem; justify-content: center; margin: 1rem auto; max-width: 760px; padding: .45rem .9rem; border: 1px solid var(--border); border-radius: 999px; background: var(--card); font-size: .85rem; color: var(--text-dim); white-space: nowrap; overflow: hidden; }
 .ld-ticker-text { overflow: hidden; text-overflow: ellipsis; }
 .ld-ticker-dot { color: var(--success-fg, #2E9E5B); flex: none; }
-.ld-stats { max-width: 760px; margin: 1.25rem auto 2rem; padding: 1rem 1.25rem; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-surface, var(--bg-dim)); text-align: center; }
-.ld-stats-line { font-size: 1.05rem; font-weight: 600; }
-.ld-stats-own { margin-top: .6rem; color: var(--text-dim); font-size: .95rem; }
-.ld-stats-cta { color: var(--accent); font-weight: 700; text-decoration: none; margin-left: .35rem; }
-.ld-stats-cta:hover { text-decoration: underline; }
-.ld-paths { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin: 1.5rem 0; }
+/* The proof block: a claim line in the display face and the examples under it, each with its door.
+   With the picture (how it works) it is two columns, the picture framed and shadowed on the left. */
+.ld-stats { margin: 4rem 0 0; padding: 0; border: 0; background: none; text-align: center; display: flex; flex-direction: column; gap: 1.25rem; align-items: center; }
+.ld-stats-line { font-family: var(--font-showroom-body); font-size: 1.25rem; font-weight: 600; line-height: 1.5; }
+.ld-stats-own { margin: 0; color: var(--text); font-family: var(--font-showroom-body); font-size: .95rem; line-height: 1.6; }
+.ld-stats-cta { display: inline-block; margin-left: .35rem; color: var(--text); font-weight: 800; text-decoration: none; border-bottom: 3px solid var(--accent); }
+.ld-stats-cta:hover { color: var(--accent); text-decoration: none; }
+.ld-stats--withimg { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 1.25rem 3.5rem; align-items: center; text-align: left; }
+.ld-stats--withimg .ld-example-img { grid-column: 1; grid-row: 1 / span 4; align-self: center; }
+.ld-stats--withimg .ld-stats-line, .ld-stats--withimg .ld-stats-own { grid-column: 2; }
+.ld-stats--withimg .ld-stats-line { font-family: var(--font-showroom); font-weight: 400; text-transform: uppercase; font-size: clamp(1.4rem, 2.2vw, 1.75rem); line-height: 1.05; letter-spacing: .01em; }
+.ld-stats--withimg .ld-stats-own { display: flex; flex-direction: column; gap: .5rem; align-items: flex-start; }
+.ld-stats--withimg .ld-stats-cta { margin-left: 0; }
+@media (max-width: 900px) {
+  .ld-stats--withimg { grid-template-columns: 1fr; }
+  .ld-stats--withimg .ld-example-img { grid-row: auto; }
+  .ld-stats--withimg .ld-stats-line, .ld-stats--withimg .ld-stats-own { grid-column: 1; }
+}
+/* The explainer cards: an ink frame and a solid shadow whose colour turns down the row. */
+.ld-paths { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.75rem; margin: 4rem 0 0; }
 @media (max-width: 760px) { .ld-paths { grid-template-columns: 1fr; } }
-.ld-path { border: 1px solid var(--border); border-radius: 12px; background: var(--card); padding: 1.1rem 1.2rem; display: flex; flex-direction: column; }
-.ld-path--hot { border-color: var(--accent); border-width: 2px; }
-.ld-path h3 { margin: 0 0 .4rem; font-size: 1.05rem; }
-.ld-path p { margin: 0 0 .9rem; color: var(--text-dim); font-size: .9rem; flex: 1; }
+.ld-path { border: 3px solid var(--text); border-radius: 0; background: var(--card-bg); padding: 1.1rem 1.25rem; display: flex; flex-direction: column; gap: .6rem; box-shadow: 6px 6px 0 var(--accent); }
+.ld-path:nth-child(3n+2) { box-shadow: 6px 6px 0 var(--text); }
+.ld-path:nth-child(3n+3) { box-shadow: 6px 6px 0 var(--sun); }
+.ld-path--hot { border-color: var(--text); border-width: 3px; }
+.ld-path h3 { margin: 0; font-family: var(--font-showroom); font-weight: 400; text-transform: uppercase; font-size: 1.25rem; line-height: 1.1; letter-spacing: .01em; }
+.ld-path p { margin: 0; color: var(--text); font-family: var(--font-showroom-body); font-size: .95rem; line-height: 1.6; flex: 1; }
 .ld-path-cta { color: var(--accent); font-weight: 700; text-decoration: none; font-size: .92rem; }
 .ld-path-cta:hover { text-decoration: underline; }
 .ld-loop { display: flex; align-items: center; justify-content: center; gap: .6rem; flex-wrap: wrap; margin: 1.5rem 0 2rem; padding: .8rem 1rem; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-surface, var(--bg-dim)); font-size: .9rem; }
@@ -109,8 +131,8 @@
   box-shadow: 6px 6px 0 var(--accent);
   transition: transform 120ms ease, box-shadow 120ms ease;
 }
-.ld-app-card:nth-child(4n+2) { box-shadow: 6px 6px 0 var(--text); transform: rotate(.6deg); }
-.ld-app-card:nth-child(4n+3) { box-shadow: 6px 6px 0 var(--sun); transform: rotate(-.6deg); }
+.ld-app-card:nth-child(4n+2) { box-shadow: 6px 6px 0 var(--text); }
+.ld-app-card:nth-child(4n+3) { box-shadow: 6px 6px 0 var(--sun); }
 .ld-app-card:hover, .ld-app-card:focus-visible { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--text); outline: none; }
 /* Search and order on one row; the order buttons wrap under the search on a narrow screen. */
 .ld-wall-bar { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin-bottom: .8rem; }
@@ -152,46 +174,79 @@
    the store is its own AIMEAT instance and the one place a price exists. */
 
 /* ── How it works ── */
-.hiw-diagram { margin: 1.5rem 0; }
+.hiw-diagram { margin: 2.75rem 0 0; }
 .hiw-svg { width: 100%; height: auto; display: block; }
 .hiw-svg--tall { display: none; max-width: 360px; margin: 0 auto; }
 @media (max-width: 700px) { .hiw-svg--wide { display: none; } .hiw-svg--tall { display: block; } }
-.ld-ctarow { display: flex; gap: .9rem; justify-content: center; flex-wrap: wrap; margin: 2rem 0 1rem; }
+/* The diagram's words: the box titles in the display face, the lines under them in Archivo. */
+.hiw-block-title { font-family: var(--font-showroom); font-weight: 400; text-transform: uppercase; letter-spacing: .01em; }
+.hiw-block-line, .hiw-caption { font-family: var(--font-showroom-body); }
+.ld-ctarow { display: flex; gap: 2rem; align-items: center; justify-content: center; flex-wrap: wrap; margin: 4rem 0 1rem; }
 .ld-ctarow a { text-decoration: none; }
 
 /* ── Business ── */
-.ld-bhero { position: relative; display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 1.25rem; margin: 1rem 0 2rem; border-radius: 14px; overflow: hidden; background: var(--bg-surface, var(--bg-dim)); border: 1px solid var(--border); }
-.ld-bhero-img { width: 100%; height: 100%; object-fit: cover; min-height: 260px; }
-.ld-bhero-text { padding: 1.5rem 1.5rem 1.5rem .25rem; }
-.ld-bhero--noimg { grid-template-columns: 1fr; text-align: center; }
-.ld-bhero--noimg .ld-bhero-text { padding: 2.25rem 1.5rem; }
-@media (max-width: 700px) { .ld-bhero { grid-template-columns: 1fr; } .ld-bhero-text { padding: 1.25rem; } .ld-bhero-img { max-height: 220px; } }
-.ld-cases { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin: 1.5rem 0; }
+/* The hero: the night-shift picture framed and shadowed on the left, the headline with the coral
+   offset on the right, the demo button under it. */
+.ld-bhero { position: relative; display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 3.5rem; margin: 2.75rem 0 .5rem; border: 0; border-radius: 0; overflow: visible; background: none; }
+.ld-bhero-img { display: block; width: calc(100% - 14px); height: auto; min-height: 0; margin: 0 0 14px 14px; object-fit: cover; border: 4px solid var(--text); box-shadow: -14px 14px 0 var(--text); }
+.ld-bhero-text { padding: 0; display: flex; flex-direction: column; gap: 1.4rem; align-items: flex-start; }
+.ld-bhero .ld-h1 { font-size: clamp(2.4rem, 4.6vw, 4rem); line-height: .98; text-shadow: .075em .075em 0 var(--accent); }
+.ld-bhero--noimg { grid-template-columns: 1fr; }
+.ld-bhero--noimg .ld-bhero-text { padding: 1rem 0; }
+@media (max-width: 700px) { .ld-bhero { grid-template-columns: 1fr; gap: 1.75rem; } .ld-bhero-img { box-shadow: -8px 8px 0 var(--text); margin-left: 8px; width: calc(100% - 8px); } }
+/* The cases: ink-framed cards whose shadow colour turns down the row; the proof is a door, the
+   quote and the example note are dashed boxes. */
+.ld-cases { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.9rem 2rem; margin: 1.5rem 0; }
 @media (max-width: 760px) { .ld-cases { grid-template-columns: 1fr; } }
-.ld-case { border: 1px solid var(--border); border-radius: 12px; background: var(--card); padding: 1.1rem 1.2rem; display: flex; flex-direction: column; gap: .55rem; }
-.ld-case-title { margin: 0; font-size: 1.05rem; }
-.ld-case-text { margin: 0; color: var(--text-dim); font-size: .9rem; flex: 1; }
-.ld-case-quote { margin: 0; padding: .5rem .8rem; border-left: 3px solid var(--accent); background: var(--bg-surface, var(--bg-dim)); border-radius: 6px; font-size: .88rem; }
-.ld-case-quote footer { color: var(--text-dim); font-size: .78rem; margin-top: .25rem; }
-.ld-case-proof { font-size: .85rem; color: var(--accent); text-decoration: none; font-weight: 600; }
-.ld-case-proof:hover { text-decoration: underline; }
-.ld-case-proofnote { font-size: .8rem; color: var(--text-dim); font-style: italic; background: var(--bg-surface, var(--bg-dim)); border-radius: 6px; padding: .45rem .7rem; }
+.ld-case { border: 3px solid var(--text); border-radius: 0; background: var(--card-bg); padding: 1.1rem 1.25rem; display: flex; flex-direction: column; gap: .7rem; box-shadow: 6px 6px 0 var(--accent); }
+.ld-case:nth-child(3n+2) { box-shadow: 6px 6px 0 var(--text); }
+.ld-case:nth-child(3n+3) { box-shadow: 6px 6px 0 var(--sun); }
+.ld-case-title { margin: 0; font-family: var(--font-showroom-body); font-size: 1.19rem; font-weight: 800; line-height: 1.3; }
+.ld-case-text { margin: 0; color: var(--text); font-family: var(--font-showroom-body); font-size: .95rem; line-height: 1.6; flex: 1; }
+.ld-case-quote { margin: 0; padding: .75rem 1rem; border: 3px dashed var(--accent); background: var(--card-bg); border-radius: 0; font-family: var(--font-showroom-body); font-size: .95rem; line-height: 1.6; }
+.ld-case-quote footer { color: var(--text-dim); font-size: .85rem; margin-top: .25rem; }
+.ld-case-proof { align-self: flex-start; font-family: var(--font-showroom-body); font-size: .95rem; color: var(--text); text-decoration: none; font-weight: 800; border-bottom: 3px solid var(--accent); }
+.ld-case-proof:hover { color: var(--accent); text-decoration: none; }
+.ld-case-proofnote { font-family: var(--font-showroom-body); font-size: .9rem; line-height: 1.6; color: var(--text); font-style: normal; border: 3px dashed var(--accent); background: var(--card-bg); border-radius: 0; padding: .75rem 1rem; }
 
 /* Cases grouped by how far up the value ladder they sit: work happens without you →
    the company runs on it → the company earns on it. A group with no cases is dropped in
    JS (Group() returns null), not here — htm leaves whitespace nodes, so :empty never matches. */
-.ld-casegroup { margin: 2.5rem 0 0; }
-.ld-casegroup-title { font-size: 1.1rem; font-weight: 700; color: var(--accent); margin: 0; }
-.ld-casegroup .ld-cases { margin-top: .9rem; }
+.ld-casegroup { margin: 4rem 0 0; }
+.ld-casegroup-title { margin: 0; font-family: var(--font-showroom); font-weight: 400; text-transform: uppercase; font-size: clamp(1.5rem, 2.6vw, 2rem); line-height: 1.05; letter-spacing: .01em; color: var(--text); }
+.ld-casegroup .ld-cases { margin-top: 1.5rem; }
 
-/* Why owning it is the reason to buy — the regulated-buyer argument. */
-.ld-sovereignty { margin: 2.75rem 0 0; }
-.ld-sov-list { margin: .9rem 0 0; padding-left: 1.2rem; display: grid; gap: .5rem; }
-.ld-sov-list li { color: var(--text-dim); font-size: .9rem; line-height: 1.5; }
+/* Why owning it is the reason to buy — the regulated-buyer argument. Three sections share the
+   shape; the first is the ink band and the second the sun band (business.js adds the modifier),
+   the third stays on the page. */
+.ld-sovereignty { margin: 4rem 0 0; }
+.ld-sovereignty .ld-case-text { max-width: 58rem; margin-top: 1rem; font-size: 1.1rem; }
+.ld-sovereignty .ld-path-cta { display: inline-block; margin-top: 1rem; }
+.ld-sov-list { list-style: none; margin: 1.25rem 0 0; padding: 0; display: grid; gap: .9rem; }
+.ld-sov-list li { display: flex; gap: .6rem; color: var(--text); font-family: var(--font-showroom-body); font-size: .95rem; line-height: 1.55; }
+.ld-sov-list li::before { content: ''; flex: 0 0 auto; width: 10px; height: 10px; margin-top: .45rem; background: var(--accent); }
+.ld-band--ink { margin: 4.5rem -1.25rem 0; padding: 3.5rem 3rem; background: var(--text); color: var(--bg); }
+.ld-band--ink .ld-casegroup-title { color: var(--sun); text-align: center; }
+.ld-band--ink .ld-sov-list { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1.1rem; margin-top: 1.75rem; }
+.ld-band--ink .ld-sov-list li { display: block; padding: 1.1rem 1.25rem; border: 2px solid color-mix(in srgb, var(--bg) 28%, transparent); color: var(--bg); font-size: .9rem; }
+.ld-band--ink .ld-sov-list li::before { display: none; }
+.ld-band--sun { margin: 0 -1.25rem; padding: 3rem; background: var(--sun); color: var(--on-sun); border-bottom: 3px solid var(--text); }
+.ld-band--sun .ld-casegroup-title { color: var(--on-sun); }
+.ld-band--sun .ld-sov-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .9rem 2.5rem; max-width: 1100px; }
+.ld-band--sun .ld-sov-list li { color: var(--on-sun); }
+.ld-band--sun .ld-sov-list li::before { background: var(--on-sun); }
+.ld-band--sun .ld-path-cta { color: var(--on-sun); border-bottom: 3px solid var(--on-sun); font-size: .95rem; }
+.ld-band--sun .ld-path-cta:hover { color: var(--accent); border-bottom-color: var(--accent); text-decoration: none; }
+@media (max-width: 980px) { .ld-band--ink .ld-sov-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 760px) {
+  .ld-band--ink, .ld-band--sun { padding: 2rem 1.25rem; }
+  .ld-band--ink .ld-sov-list, .ld-band--sun .ld-sov-list { grid-template-columns: 1fr; }
+  .ld-band--ink .ld-casegroup-title { text-align: left; }
+}
 
-/* ── Contact card (business + pricing only) ── */
-.ld-contact { max-width: 460px; margin: 2.25rem auto 0; padding: 1.25rem 1.5rem; border: 2px solid var(--accent); border-radius: 14px; background: var(--card); text-align: center; }
-.ld-contact-title { font-size: 1.15rem; font-weight: 800; margin-bottom: .4rem; }
+/* ── Contact card (business + pricing only): the dashed box that says the thing out loud ── */
+.ld-contact { max-width: 560px; margin: 3rem auto 0; padding: 1.25rem 1.5rem; border: 3px dashed var(--accent); border-radius: 0; background: var(--card-bg); text-align: center; font-family: var(--font-showroom-body); }
+.ld-contact-title { font-family: var(--font-showroom); font-weight: 400; text-transform: uppercase; font-size: 1.4rem; letter-spacing: .01em; margin-bottom: .75rem; }
 /* Two people side by side on a wide screen, stacked on a phone. */
 .ld-contact-people { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: .5rem; }
 .ld-contact-person { display: flex; flex-direction: column; gap: .2rem; }
@@ -203,7 +258,7 @@
 .ld-contact-links a { color: var(--accent); text-decoration: none; font-weight: 600; }
 .ld-contact-links a:hover { text-decoration: underline; }
 .ld-contact-sub { color: var(--text-dim); font-size: .88rem; }
-.ld-example-img { width: 100%; max-height: 260px; object-fit: cover; border-radius: 10px; margin-bottom: .9rem; }
+.ld-example-img { display: block; width: calc(100% - 16px); height: auto; max-height: none; object-fit: cover; border-radius: 0; margin: 0 16px 16px 0; border: 4px solid var(--text); box-shadow: 16px 16px 0 var(--accent); }
 .ld-app-badge { font-size: .68rem; font-weight: 600; color: var(--text-dim); border: 1px solid var(--border); border-radius: 999px; padding: 1px 7px; vertical-align: 2px; }
 
 /* ── Public activity feed (pa- prefix) ── */

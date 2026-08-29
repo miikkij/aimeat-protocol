@@ -19,7 +19,7 @@
   <meta name="description" content="aimeat.io on maailman rehellisin demo: täysin toimiva AIMEAT, jota kuka tahansa saa ajaa tänään ilmaiseksi. Kun haluat omasi, jossa ei ole ketään muita kuin sinä ja kutsumasi, kauppa on oven takana." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Archivo:ital,wght@0,400;0,600;0,800;1,400&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Fjalla+One&family=Archivo:ital,wght@0,400;0,600;0,800;1,400&display=swap" rel="stylesheet" />
   <script src="/front-demo.js" defer></script>
   <style>
     :root {
@@ -35,12 +35,11 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html { scroll-behavior: smooth; }
     body { font-family: 'Archivo', system-ui, sans-serif; color: var(--ink); background: var(--cream); overflow-x: hidden; }
-    h1, h2, .fd-kicker, .fd-sticker, .fd-btn, .fd-ribbon, .fd-chip { font-family: 'Bungee', 'Archivo', sans-serif; font-weight: 400; text-transform: uppercase; }
+    h1, h2, .fd-kicker, .fd-sticker, .fd-btn, .fd-ribbon, .fd-chip { font-family: 'Fjalla One', 'Archivo', sans-serif; font-weight: 400; text-transform: uppercase; }
 
     /* ---------- the demo ribbon: the one thing every visitor must not miss ---------- */
     .fd-ribbon {
       position: fixed; top: 26px; left: -64px; z-index: 20;
-      transform: rotate(-45deg);
       background: var(--sun); color: var(--shadow);
       border-top: 3px solid var(--shadow); border-bottom: 3px solid var(--shadow);
       padding: 0.35rem 4.5rem;
@@ -55,14 +54,14 @@
       display: flex; gap: 0.4rem; align-items: center;
     }
     .fd-chip, .fd-lang a {
-      font-family: 'Bungee', 'Archivo', sans-serif;
+      font-family: 'Fjalla One', 'Archivo', sans-serif;
       font-size: 0.75rem; text-decoration: none; text-transform: uppercase;
       color: var(--cream); border: 2px solid var(--cream);
       padding: 0.25rem 0.55rem; opacity: 0.85;
     }
     .fd-chip:hover, .fd-lang a:hover { opacity: 1; }
     .fd-lang { display: flex; gap: 0.4rem; }
-    .fd-lang a.fd-lang-on { background: var(--sun); color: var(--shadow); border-color: var(--shadow); opacity: 1; transform: rotate(-2deg); }
+    .fd-lang a.fd-lang-on { background: var(--sun); color: var(--shadow); border-color: var(--shadow); opacity: 1; }
 
     /* ---------- hero ---------- */
     .fd-hero {
@@ -75,7 +74,7 @@
     .fd-kicker {
       display: inline-block; background: var(--sun); color: var(--shadow);
       padding: 0.35rem 1rem; border: 3px solid var(--shadow);
-      box-shadow: 5px 5px 0 var(--shadow); transform: rotate(-2deg);
+      box-shadow: 5px 5px 0 var(--shadow);
       font-size: 0.85rem; letter-spacing: 0.06em;
     }
     .fd-hero h1 {
@@ -139,14 +138,12 @@
       width: 100%; display: block;
       border: 5px solid var(--shadow); border-radius: 14px;
       box-shadow: 12px 12px 0 var(--coral);
-      transform: rotate(-1.5deg);
     }
-    .fd-section:nth-of-type(even) .fd-art img { transform: rotate(1.5deg); box-shadow: -12px 12px 0 var(--teal); }
+    .fd-section:nth-of-type(even) .fd-art img { box-shadow: -12px 12px 0 var(--teal); }
     .fd-sticker {
       position: absolute; top: -1.2rem; right: -0.6rem;
       background: var(--sun); color: var(--shadow);
-      border: 3px solid var(--shadow); padding: 0.5rem 0.9rem;
-      transform: rotate(6deg); font-size: 0.85rem;
+      border: 3px solid var(--shadow); padding: 0.5rem 0.9rem; font-size: 0.85rem;
       box-shadow: 4px 4px 0 var(--shadow);
     }
     .fd-copy h2 {
@@ -182,8 +179,8 @@
       transition: transform 120ms ease, box-shadow 120ms ease;
       display: flex; flex-direction: column; gap: 0.4rem;
     }
-    .fd-app:nth-child(4n+2) { box-shadow: 5px 5px 0 var(--teal); transform: rotate(0.5deg); }
-    .fd-app:nth-child(4n+3) { box-shadow: 5px 5px 0 var(--sun); transform: rotate(-0.5deg); }
+    .fd-app:nth-child(4n+2) { box-shadow: 5px 5px 0 var(--teal); }
+    .fd-app:nth-child(4n+3) { box-shadow: 5px 5px 0 var(--sun); }
     .fd-app:nth-child(4n) { box-shadow: 5px 5px 0 var(--coral); }
     .fd-app:hover { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--shadow); }
     .fd-app-name { font-weight: 800; font-size: 1.02rem; }

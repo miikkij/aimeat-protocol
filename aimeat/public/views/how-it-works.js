@@ -9,6 +9,9 @@
  *   vertical variant renders on mobile. No protocol terms in body copy.
  * @usage routed at /v1/how-it-works by spa.html
  * @version-history
+ *   v2.1.0 — 2026-08-29 — The showroom face (design canvas "AIMEAT Index Pages"): the diagram's boxes
+ *     are square with a 3px ink frame and a solid offset shadow (coral on the hot ones), the human
+ *     at the gate a dashed frame, the arrows 3px ink; the CTA row is one hot slab and two doors.
  *   v1.0.0 — 2026-06-10 — Initial (owner spec).
  *   v1.1.0 — 2026-06-20 — H-2: the live-example app link opens in a sandboxed opaque-origin
  *     iframe (openAppSandboxed) instead of a top-level apex ?mode=inline tab.
@@ -33,15 +36,18 @@ const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fa
 /* Diagram block: rect + up to 5 short text lines. Colors via CSS vars so dark mode works.
  * NB: htm passes attribute values as STRINGS — coerce before arithmetic, or "10" + 95
  * becomes "1095" and every text lands far outside its box (the empty-boxes bug). */
-function Block({ x, y, w, h: hh, title, lines, hot }) {
-  const X = Number(x), Y = Number(y), W = Number(w);
+function Block({ x, y, w, h: hh, title, lines, hot, gate }) {
+  const X = Number(x), Y = Number(y), W = Number(w), H = Number(hh);
+  // The showroom box: a 3px ink frame over a solid offset shadow, coral on the hot boxes. The
+  // gate (the human) is a dashed coral frame with no shadow, because it is not a stage.
   return html`
     <g>
-      <rect x=${X} y=${Y} width=${W} height=${Number(hh)} rx="10"
-        fill="var(--card)" stroke=${hot ? 'var(--accent, #E8564A)' : 'var(--border)'} stroke-width=${hot ? 2 : 1.5} />
-      <text x=${X + W / 2} y=${Y + 22} text-anchor="middle" font-size="13" font-weight="700" fill="var(--text)">${title}</text>
+      ${gate ? '' : html`<rect x=${X + 6} y=${Y + 6} width=${W} height=${H} fill=${hot ? 'var(--accent, #E8564A)' : 'var(--text)'} />`}
+      <rect x=${X} y=${Y} width=${W} height=${H} fill="var(--card-bg)"
+        stroke=${gate ? 'var(--accent, #E8564A)' : 'var(--text)'} stroke-width="3" stroke-dasharray=${gate ? '8 5' : null} />
+      <text class="hiw-block-title" x=${X + W / 2} y=${Y + 25} text-anchor="middle" font-size="15" fill="var(--text)">${title}</text>
       ${lines.map((l, i) => html`
-        <text key=${i} x=${X + W / 2} y=${Y + 42 + i * 16} text-anchor="middle" font-size="11" fill="var(--text-dim)">${l}</text>
+        <text class="hiw-block-line" key=${i} x=${X + W / 2} y=${Y + 45 + i * 16} text-anchor="middle" font-size="11.5" font-weight="600" fill="var(--text-dim)">${l}</text>
       `)}
     </g>
   `;
@@ -54,7 +60,7 @@ function Caption({ x, y, note }) {
   return html`
     <g>
       ${lines.map((l, i) => html`
-        <text key=${i} x=${Number(x)} y=${Number(y) + i * 13} text-anchor="middle" font-size="10" font-style="italic" fill="var(--text-dim)">${l}</text>
+        <text class="hiw-caption" key=${i} x=${Number(x)} y=${Number(y) + i * 13} text-anchor="middle" font-size="10.5" font-style="italic" fill="var(--text-dim)">${l}</text>
       `)}
     </g>
   `;
@@ -65,9 +71,9 @@ function Caption({ x, y, note }) {
 const Arrow = (props) => {
   const x1 = Number(props.x1), y1 = Number(props.y1), x2 = Number(props.x2), y2 = Number(props.y2);
   return html`
-    <g stroke="var(--text-dim)" stroke-width="1.5" fill="var(--text-dim)">
+    <g stroke="var(--text)" stroke-width="3" fill="var(--text)">
       <line x1=${x1} y1=${y1} x2=${x2} y2=${y2} />
-      <polygon points=${`${x2},${y2} ${x2 - 7},${y2 - 4} ${x2 - 7},${y2 + 4}`}
+      <polygon points=${`${x2},${y2} ${x2 - 9},${y2 - 5} ${x2 - 9},${y2 + 5}`}
         transform=${y1 === y2 ? '' : `rotate(90 ${x2} ${y2})`} />
     </g>
   `;
@@ -94,32 +100,32 @@ function Diagram() {
         <${Block} x="240" y="30" w="200" h="130" title=${agents.title} lines=${agents.lines} hot />
         <${Arrow} x1="440" y1="95" x2="480" y2="95" />
         <${Block} x="480" y="30" w="200" h="130" title=${org.title} lines=${org.lines} />
-        <line x1="580" y1="160" x2="580" y2="200" stroke="var(--text-dim)" stroke-width="1.5" />
-        <polygon points="580,205 576,198 584,198" fill="var(--text-dim)" />
+        <line x1="580" y1="160" x2="580" y2="200" stroke="var(--text)" stroke-width="3" />
+        <polygon points="580,205 576,198 584,198" fill="var(--text)" />
         <${Block} x="480" y="205" w="200" h="85" title=${assets.title} lines=${assets.lines} hot />
-        <${Block} x="710" y="50" w="160" h="70" title=${human.title} lines=${human.lines} />
-        <line x1="710" y1="85" x2="680" y2="85" stroke="var(--accent, #E8564A)" stroke-width="1.5" stroke-dasharray="4 3" />
-        <line x1="580" y1="290" x2="580" y2="325" stroke="var(--text-dim)" stroke-width="1.5" />
-        <polygon points="580,330 576,323 584,323" fill="var(--text-dim)" />
+        <${Block} x="710" y="50" w="160" h="70" title=${human.title} lines=${human.lines} gate />
+        <line x1="710" y1="85" x2="680" y2="85" stroke="var(--accent, #E8564A)" stroke-width="3" stroke-dasharray="6 4" />
+        <line x1="580" y1="290" x2="580" y2="325" stroke="var(--text)" stroke-width="3" />
+        <polygon points="580,330 576,323 584,323" fill="var(--text)" />
         <${Block} x="480" y="330" w="200" h="90" title=${exch.title} lines=${exch.lines} hot />
       </svg>
       <!-- Mobile: same content stacked vertically. -->
       <svg class="hiw-svg hiw-svg--tall" viewBox="0 0 320 810" role="img" aria-label=${tr('hiw.dAria', 'How AIMEAT works')}>
         <${Block} x="40" y="10" w="240" h="105" title=${models.title} lines=${models.lines} />
-        <${Caption} x="160" y="128" note=${note} />
-        <line x1="160" y1="140" x2="160" y2="165" stroke="var(--text-dim)" stroke-width="1.5" />
-        <polygon points="160,170 156,163 164,163" fill="var(--text-dim)" />
+        <${Caption} x="160" y="130" note=${note} />
+        <line x1="160" y1="150" x2="160" y2="165" stroke="var(--text)" stroke-width="3" />
+        <polygon points="160,170 156,163 164,163" fill="var(--text)" />
         <${Block} x="40" y="172" w="240" h="125" title=${agents.title} lines=${agents.lines} hot />
-        <line x1="160" y1="297" x2="160" y2="322" stroke="var(--text-dim)" stroke-width="1.5" />
-        <polygon points="160,327 156,320 164,320" fill="var(--text-dim)" />
+        <line x1="160" y1="297" x2="160" y2="322" stroke="var(--text)" stroke-width="3" />
+        <polygon points="160,327 156,320 164,320" fill="var(--text)" />
         <${Block} x="40" y="330" w="240" h="125" title=${org.title} lines=${org.lines} />
-        <${Block} x="40" y="470" w="240" h="70" title=${human.title} lines=${human.lines} />
-        <line x1="160" y1="455" x2="160" y2="470" stroke="var(--accent, #E8564A)" stroke-width="1.5" stroke-dasharray="4 3" />
-        <line x1="160" y1="540" x2="160" y2="565" stroke="var(--text-dim)" stroke-width="1.5" />
-        <polygon points="160,570 156,563 164,563" fill="var(--text-dim)" />
+        <${Block} x="40" y="470" w="240" h="70" title=${human.title} lines=${human.lines} gate />
+        <line x1="160" y1="455" x2="160" y2="470" stroke="var(--accent, #E8564A)" stroke-width="3" stroke-dasharray="6 4" />
+        <line x1="160" y1="540" x2="160" y2="565" stroke="var(--text)" stroke-width="3" />
+        <polygon points="160,570 156,563 164,563" fill="var(--text)" />
         <${Block} x="40" y="575" w="240" h="90" title=${assets.title} lines=${assets.lines} hot />
-        <line x1="160" y1="665" x2="160" y2="690" stroke="var(--text-dim)" stroke-width="1.5" />
-        <polygon points="160,695 156,688 164,688" fill="var(--text-dim)" />
+        <line x1="160" y1="665" x2="160" y2="690" stroke="var(--text)" stroke-width="3" />
+        <polygon points="160,695 156,688 164,688" fill="var(--text)" />
         <${Block} x="40" y="700" w="240" h="95" title=${exch.title} lines=${exch.lines} hot />
       </svg>
     </div>
@@ -187,10 +193,10 @@ export default function HowItWorks({ navigate }) {
 
       <div class="ld-ctarow">
         ${hasSite('learn')
-          ? html`<a class="btn-primary" href=${siteLink('learn')} target="_blank" rel="noopener">${tr('hiw.ctaLearn', 'Learn it hands-on, free →')}</a>`
-          : html`<a class="btn-primary" href="/v1/portal" onClick=${(e) => { e.preventDefault(); navigate('/v1/portal'); }}>${tr('hiw.ctaTry', 'Try it free →')}</a>`}
-        ${storeHref() ? html`<a class="btn-outline" href=${storeHref()} target="_blank" rel="noopener">${tr('hiw.ctaPricing', 'See pricing →')}</a>` : ''}
-        <a class="btn-outline" href="/v1/business" onClick=${(e) => { e.preventDefault(); navigate('/v1/business'); }}>${tr('hiw.ctaBusiness', 'For your business →')}</a>
+          ? html`<a class="ld-sh-btn ld-sh-btn--hot" href=${siteLink('learn')} target="_blank" rel="noopener">${tr('hiw.ctaLearn', 'Learn it hands-on, free →')}</a>`
+          : html`<a class="ld-sh-btn ld-sh-btn--hot" href="/v1/portal" onClick=${(e) => { e.preventDefault(); navigate('/v1/portal'); }}>${tr('hiw.ctaTry', 'Try it free →')}</a>`}
+        ${storeHref() ? html`<a class="ld-sh-door" href=${storeHref()} target="_blank" rel="noopener">${tr('hiw.ctaPricing', 'See pricing →')}</a>` : ''}
+        <a class="ld-sh-door" href="/v1/business" onClick=${(e) => { e.preventDefault(); navigate('/v1/business'); }}>${tr('hiw.ctaBusiness', 'For your business →')}</a>
       </div>
     </div>
   `;

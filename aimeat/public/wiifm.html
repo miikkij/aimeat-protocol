@@ -28,7 +28,7 @@
   <meta name="robots" content="noindex, nofollow" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Archivo:ital,wght@0,400;0,600;0,800;1,400&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Fjalla+One&family=Archivo:ital,wght@0,400;0,600;0,800;1,400&display=swap" rel="stylesheet" />
   <style>
     :root {
       --ink: #2b1230;
@@ -49,7 +49,7 @@
       overflow-x: hidden;
     }
     h1, h2, .wf-kicker, .wf-sticker, .wf-btn {
-      font-family: 'Bungee', 'Archivo', sans-serif;
+      font-family: 'Fjalla One', 'Archivo', sans-serif;
       font-weight: 400;
       text-transform: uppercase;
     }
@@ -64,7 +64,7 @@
       z-index: 5;
     }
     .wf-lang a {
-      font-family: 'Bungee', 'Archivo', sans-serif;
+      font-family: 'Fjalla One', 'Archivo', sans-serif;
       font-size: 0.75rem;
       text-decoration: none;
       color: var(--cream);
@@ -78,7 +78,6 @@
       color: var(--shadow);
       border-color: var(--shadow);
       opacity: 1;
-      transform: rotate(-2deg);
     }
 
     /* ---------- hero ---------- */
@@ -96,7 +95,6 @@
       padding: 0.35rem 1rem;
       border: 3px solid var(--shadow);
       box-shadow: 5px 5px 0 var(--shadow);
-      transform: rotate(-2deg);
       font-size: 0.85rem;
       letter-spacing: 0.06em;
     }
@@ -171,9 +169,8 @@
       border: 5px solid var(--shadow);
       border-radius: 14px;
       box-shadow: 12px 12px 0 var(--coral);
-      transform: rotate(-1.5deg);
     }
-    .wf-section:nth-of-type(even) .wf-art img { transform: rotate(1.5deg); box-shadow: -12px 12px 0 var(--teal); }
+    .wf-section:nth-of-type(even) .wf-art img { box-shadow: -12px 12px 0 var(--teal); }
     .wf-sticker {
       position: absolute;
       top: -1.2rem;
@@ -182,7 +179,6 @@
       color: var(--shadow);
       border: 3px solid var(--shadow);
       padding: 0.5rem 0.9rem;
-      transform: rotate(6deg);
       font-size: 0.85rem;
       box-shadow: 4px 4px 0 var(--shadow);
     }
@@ -266,10 +262,9 @@
       width: 100%;
       border: 4px solid var(--sun);
       border-radius: 12px;
-      transform: rotate(-2deg);
       box-shadow: 8px 8px 0 var(--coral);
     }
-    .wf-notes-head h2 { font-family: 'Bungee'; font-size: clamp(1.5rem, 3.2vw, 2.2rem); color: var(--sun); margin-bottom: 0.8rem; text-transform: uppercase; }
+    .wf-notes-head h2 { font-family: 'Fjalla One'; font-size: clamp(1.5rem, 3.2vw, 2.2rem); color: var(--sun); margin-bottom: 0.8rem; text-transform: uppercase; }
     .wf-notes-head p { line-height: 1.6; opacity: 0.92; }
     .wf-note-grid { max-width: 68rem; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.4rem; }
     .wf-note {
@@ -279,10 +274,9 @@
       border-radius: 12px;
       padding: 1.3rem 1.3rem 1.1rem;
       box-shadow: 6px 6px 0 var(--magenta);
-      transform: rotate(-0.6deg);
     }
-    .wf-note:nth-child(2) { transform: rotate(0.8deg); box-shadow: 6px 6px 0 var(--teal); }
-    .wf-note:nth-child(3) { transform: rotate(-1deg); box-shadow: 6px 6px 0 var(--sun); }
+    .wf-note:nth-child(2) { box-shadow: 6px 6px 0 var(--teal); }
+    .wf-note:nth-child(3) { box-shadow: 6px 6px 0 var(--sun); }
     .wf-note time { font-size: 0.78rem; font-weight: 800; letter-spacing: 0.08em; color: var(--magenta); }
     .wf-note h3 { margin: 0.4rem 0 0.6rem; font-size: 1.08rem; line-height: 1.3; }
     .wf-note p { font-size: 0.95rem; line-height: 1.55; }
@@ -301,27 +295,25 @@
       border: 3px solid var(--shadow);
       border-radius: 6px;
       box-shadow: 10px 12px 0 rgba(26, 11, 31, 0.55);
-      transform: rotate(-0.8deg);
       padding: 2.2rem 2rem 1.6rem;
     }
     .wf-menu-head { text-align: center; border-bottom: 3px double var(--shadow); padding-bottom: 1.1rem; margin-bottom: 1.4rem; }
     .wf-menu-head .wf-menu-open {
       display: inline-block;
-      font-family: 'Bungee';
+      font-family: 'Fjalla One';
       font-size: 0.8rem;
       color: var(--cream);
       background: #c0392b;
       padding: 0.25rem 0.8rem;
-      transform: rotate(-2deg);
       margin-bottom: 0.7rem;
     }
-    .wf-menu-head h2 { font-family: 'Bungee'; font-size: clamp(1.4rem, 3vw, 2rem); color: #c0392b; text-transform: uppercase; }
+    .wf-menu-head h2 { font-family: 'Fjalla One'; font-size: clamp(1.4rem, 3vw, 2rem); color: #c0392b; text-transform: uppercase; }
     .wf-menu-head p { font-size: 0.92rem; margin-top: 0.5rem; font-style: italic; }
     .wf-dish { margin-bottom: 1.35rem; }
     .wf-dish-row { display: flex; align-items: baseline; gap: 0.5rem; }
     .wf-dish-name { font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em; font-size: 1.02rem; }
     .wf-dish-dots { flex: 1; border-bottom: 3px dotted var(--shadow); opacity: 0.45; transform: translateY(-4px); }
-    .wf-dish-price { font-family: 'Bungee'; font-size: 0.85rem; color: #c0392b; white-space: nowrap; }
+    .wf-dish-price { font-family: 'Fjalla One'; font-size: 0.85rem; color: #c0392b; white-space: nowrap; }
     .wf-dish-desc { font-size: 0.95rem; line-height: 1.5; margin: 0.25rem 0 0.15rem; }
     .wf-dish-contains { font-size: 0.78rem; font-family: ui-monospace, 'Cascadia Code', Consolas, monospace; opacity: 0.62; }
     .wf-menu-foot { text-align: center; border-top: 3px double var(--shadow); padding-top: 0.9rem; font-size: 0.85rem; font-style: italic; }

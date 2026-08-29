@@ -13,6 +13,9 @@
  *   The blocks the showroom restyled but did not replace (the wish box, the app wall, the counters,
  *   the change log) keep their rules in landing.css.
  * @version-history
+ *   v1.1.0 — 2026-08-29 — Nothing tilts any more: the sticker, the kicker and the three pictures sit
+ *     straight (design canvas "AIMEAT Index Pages"; the tilt read as mess). The face is whatever
+ *     --font-showroom says, Fjalla One since theme.css v1.34.0.
  *   v1.0.0 — 2026-08-28 — Initial.
  */
 
@@ -40,7 +43,7 @@
   position: absolute; top: -1.1rem; right: -.6rem;
   font-family: var(--font-showroom); text-transform: uppercase; font-size: .85rem; letter-spacing: .04em;
   padding: .55rem 1rem; background: var(--sun); color: #1A1A2E;
-  border: 3px solid var(--text); box-shadow: 4px 4px 0 var(--text); transform: rotate(6deg);
+  border: 3px solid var(--text); box-shadow: 4px 4px 0 var(--text);
   white-space: nowrap;
 }
 
@@ -65,7 +68,7 @@
 .ld-sh-kicker {
   display: inline-block; font-family: var(--font-showroom); text-transform: uppercase; font-size: .8rem; letter-spacing: .06em;
   padding: .5rem .9rem; background: var(--sun); color: #1A1A2E;
-  border: 3px solid var(--text); box-shadow: 5px 5px 0 var(--text); transform: rotate(-2deg);
+  border: 3px solid var(--text); box-shadow: 5px 5px 0 var(--text);
 }
 .ld-sh-title {
   margin: 0; font-family: var(--font-showroom); font-weight: 400; text-transform: uppercase;
@@ -89,7 +92,7 @@
 .ld-sh-picture { position: relative; width: 100%; margin: 1.25rem 0 1rem; }
 .ld-sh-picture-img {
   display: block; width: 100%; height: auto; aspect-ratio: 1100 / 471; object-fit: cover; object-position: center 40%;
-  border: 4px solid var(--text); box-shadow: 16px 16px 0 var(--accent); transform: rotate(.6deg);
+  border: 4px solid var(--text); box-shadow: 16px 16px 0 var(--accent);
 }
 .ld-sh-sticker--live { top: -.9rem; right: 1.2rem; }
 @media (max-width: 600px) {
@@ -102,7 +105,7 @@
 .ld-sh-wallintro { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 3rem; align-items: center; padding: 3rem 0 1.5rem; }
 .ld-sh-wallintro-img {
   display: block; width: 100%; height: auto; aspect-ratio: 1 / 1; object-fit: cover;
-  border: 4px solid var(--text); box-shadow: 10px 10px 0 var(--sun); transform: rotate(-1.5deg);
+  border: 4px solid var(--text); box-shadow: 10px 10px 0 var(--sun);
 }
 .ld-sh-wallintro-copy { display: flex; flex-direction: column; gap: .9rem; }
 .ld-sh-wallintro-copy .ld-sh-h2 { flex-direction: row; flex-wrap: wrap; gap: .3em; }
@@ -120,7 +123,7 @@
 .ld-sh-store-art { position: relative; }
 .ld-sh-store-img {
   display: block; width: 100%; height: auto; aspect-ratio: 1 / 1; object-fit: cover;
-  border: 4px solid var(--text); box-shadow: -14px 14px 0 var(--text); transform: rotate(-1.5deg);
+  border: 4px solid var(--text); box-shadow: -14px 14px 0 var(--text);
 }
 .ld-sh-sticker--price { font-size: .95rem; padding: .6rem 1rem; }
 .ld-sh-store-copy { display: flex; flex-direction: column; gap: 1.1rem; align-items: flex-start; }

@@ -14,6 +14,9 @@
  *   explained on first use.
  * @usage routed at /v1/business by spa.html
  * @version-history
+ *   v2.2.0 — 2026-08-29 — The showroom face (design canvas "AIMEAT Index Pages"): the demo button
+ *     sits in the hero, the ownership section is the ink band and the money section the sun band
+ *     (.ld-band--ink / .ld-band--sun), and the closing row is one hot slab and two doors.
  *   v1.0.0 — 2026-06-10 — Initial (owner spec).
  *   v1.1.0 — 2026-06-20 — H-2: published-app proof links open in a sandboxed opaque-origin
  *     iframe (openAppSandboxed) instead of a top-level apex ?mode=inline tab.
@@ -102,6 +105,7 @@ export default function Business({ navigate }) {
         <div class="ld-bhero-text">
           <h1 class="ld-h1">${tr('biz.heroTitle', 'A digital employee that never sleeps')}</h1>
           <p class="ld-hero-sub">${tr('biz.heroSub', 'Scheduled agents fetch, write, report and ship while you do something else. Every step traceable, and what they produce is yours.')}</p>
+          ${CONTACT ? html`<a class="ld-sh-btn ld-sh-btn--hot" href=${CONTACT}>${tr('biz.ctaDemo', 'Book a demo →')}</a>` : ''}
         </div>
       </section>
 
@@ -187,7 +191,7 @@ export default function Business({ navigate }) {
       <//>
 
       <!-- The reason a regulated buyer signs. Often decisive before any of the cases above. -->
-      <section class="ld-sovereignty">
+      <section class="ld-sovereignty ld-band--ink">
         <h2 class="ld-casegroup-title">${tr('biz.sovTitle', 'Why owning it is the reason to buy')}</h2>
         <ul class="ld-sov-list">
           <li>${tr('biz.sov0', 'A company here is a node, not an account type. You take your own AIMEAT node, put your business identity and your own payment keys on it, invite your people and build the apps your work needs. Nothing about it is a separate product tier.')}</li>
@@ -202,7 +206,7 @@ export default function Business({ navigate }) {
            the agent-to-agent case that has no equivalent on a normal shop platform. Every claim
            here names a payment handler that is registered and running, and the proof link only
            appears on a node that actually has the app. -->
-      <section class="ld-sovereignty">
+      <section class="ld-sovereignty ld-band--sun">
         <h2 class="ld-casegroup-title">${tr('biz.payTitle', 'Sell to people and to their agents, through one checkout')}</h2>
         <ul class="ld-sov-list">
           <li>${tr('biz.pay0', 'Cards, through your own payment provider. The money is yours from the start: your account, your payouts, and no platform sitting between you and it.')}</li>
@@ -231,9 +235,9 @@ export default function Business({ navigate }) {
         <div class="ld-stats-line">${tr('biz.allLive', 'Everything above runs in production right now. No proof is a mockup.')}</div>
         <div class="ld-ctarow">
           ${hasSite('assessment') ? html`
-            <a class="btn-primary" href=${siteLink('assessment')} target="_blank" rel="noopener">${tr('biz.ctaAssessment', 'Free: where is your AI right now? →')}</a>` : ''}
-          ${CONTACT ? html`<a class=${hasSite('assessment') ? 'btn-outline' : 'btn-primary'} href=${CONTACT}>${tr('biz.ctaDemo', 'Book a demo →')}</a>` : ''}
-          ${storeHref() ? html`<a class="btn-outline" href=${storeHref()} target="_blank" rel="noopener">${tr('biz.ctaPricing', 'See pricing →')}</a>` : ''}
+            <a class="ld-sh-btn ld-sh-btn--hot" href=${siteLink('assessment')} target="_blank" rel="noopener">${tr('biz.ctaAssessment', 'Free: where is your AI right now? →')}</a>` : ''}
+          ${CONTACT ? html`<a class=${hasSite('assessment') ? 'ld-sh-door' : 'ld-sh-btn ld-sh-btn--hot'} href=${CONTACT}>${tr('biz.ctaDemo', 'Book a demo →')}</a>` : ''}
+          ${storeHref() ? html`<a class="ld-sh-door" href=${storeHref()} target="_blank" rel="noopener">${tr('biz.ctaPricing', 'See pricing →')}</a>` : ''}
         </div>
       </div>
 

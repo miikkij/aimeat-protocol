@@ -13,6 +13,8 @@
  *   - AgentHelp — the copyable prompt + the machine-readable entry points
  * @usage import HelpView from '/views/help.js'
  * @version-history
+ *   v2.3.0 — 2026-08-29 — The showroom face (design canvas "AIMEAT Index Pages"): the two actions under
+ *       "still stuck" are the sun slab (.hlp-btn) and a door (.hlp-door), styled in help.css.
  *   v1.0.0 — 2026-03-23 — Initial implementation
  *   v1.1.0 — 2026-06-02 — Migrate bespoke copy button to canonical CopyButton component
  *   v2.0.0 — 2026-07-28 — Split into "For me" / "For my AI". Human tab is new; the prompt is
@@ -74,8 +76,8 @@ function HumanHelp({ onAskAi }) {
 
       <h2 class="section-title">${tr('help.stuckTitle', 'Still stuck')}</h2>
       <div class="hlp-stuck">
-        <button class="btn-outline" type="button" onClick=${onAskAi}>${tr('help.stuckAi', 'Ask your own AI: get the help prompt →')}</button>
-        ${contact ? html`<a class="btn-ghost" href=${contact}>${tr('help.stuckHuman', 'Ask a human →')}</a>` : ''}
+        <button class="hlp-btn" type="button" onClick=${onAskAi}>${tr('help.stuckAi', 'Ask your own AI: get the help prompt →')}</button>
+        ${contact ? html`<a class="hlp-door" href=${contact}>${tr('help.stuckHuman', 'Ask a human →')}</a>` : ''}
       </div>
     </div>
   `;

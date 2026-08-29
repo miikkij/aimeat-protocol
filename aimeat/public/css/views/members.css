@@ -6,52 +6,67 @@
  *   card: identicon + name + full GHII + bio, linking to their portfolio. Plus the "you can have
  *   one too" panel above the grid.
  * @version-history
+ *   v3.0.0 — 2026-08-29 — The showroom face (design canvas "AIMEAT Index Pages"): the title in the
+ *     display face with the coral offset, the invitation as a dashed coral box with the hot slab,
+ *     the cards ink-framed with a solid shadow whose colour turns down the row, square faces.
  *   v1.0.0 — 2026-06-23 — Initial.
  *   v2.0.0 — 2026-07-28 — ID-card layout (avatar beside the identity lines instead of a centred
  *     column) so the identifier is readable, and the .mbr-yours panel that tells a visitor the
  *     page is available to them.
  */
-.mbr { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
-.mbr-title { font-size: 1.6rem; margin: 0 0 6px; }
-.mbr-desc { color: var(--text-dim); margin: 0 0 20px; }
+.mbr { max-width: 1140px; margin: 0 auto; padding: 44px 20px 48px; font-family: var(--font-showroom-body); }
+.mbr-title {
+  margin: 0 0 1rem; font-family: var(--font-showroom); font-weight: 400; text-transform: uppercase;
+  font-size: clamp(2.4rem, 5vw, 3.5rem); line-height: 1; letter-spacing: .01em; color: var(--text);
+  text-shadow: .075em .075em 0 var(--accent);
+}
+.mbr-desc { margin: 0 0 2rem; font-size: 1.25rem; line-height: 1.5; font-weight: 600; color: var(--text); }
 
 /* "You can be on this page too." The list is only interesting to a visitor once they know
-   they can join it. */
+   they can join it. The dashed coral box is the showroom's aside; the slab is its one hot button. */
 .mbr-yours {
-  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
-  padding: 16px 18px; margin: 0 0 28px;
-  border: 1px solid var(--accent-border, var(--border)); border-radius: var(--radius-md, 12px);
-  background: var(--accent-subtle, var(--bg-surface, var(--bg-dim)));
+  display: flex; align-items: center; justify-content: space-between; gap: 2rem; flex-wrap: wrap;
+  padding: 1.25rem 1.5rem; margin: 0 0 2.75rem;
+  border: 3px dashed var(--accent); border-radius: 0; background: var(--card-bg);
 }
-.mbr-yours-text { margin: 0; font-size: 0.92rem; line-height: 1.55; max-width: 62ch; }
+.mbr-yours-text { margin: 0; font-size: 0.95rem; line-height: 1.6; max-width: 66ch; }
 .mbr-yours-cta { white-space: nowrap; }
+.mbr .mbr-yours-cta.btn-primary {
+  font-family: var(--font-showroom); font-weight: 400; text-transform: uppercase; font-size: 1.05rem; letter-spacing: .04em;
+  padding: .9rem 1.5rem; border: 3px solid var(--text); border-radius: 0; box-shadow: 6px 6px 0 var(--text);
+  background: var(--accent); color: #FFFFFF; transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.mbr .mbr-yours-cta.btn-primary:hover { transform: translate(2px, 2px); box-shadow: 3px 3px 0 var(--text); background: var(--accent); }
 
 /* Wider minimum than a plain avatar grid: an identifier is long, and truncating the thing that
    makes the card an ID card would defeat it. */
 .mbr-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1.9rem 1.6rem;
 }
 .mbr-card {
-  display: flex; flex-direction: column; gap: 10px;
-  padding: 16px; border: 1px solid var(--card-border, var(--border)); border-radius: var(--radius-md, 12px);
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 1rem 1.1rem; border: 3px solid var(--text); border-radius: 0;
   background: var(--card-bg); text-decoration: none; color: inherit;
-  transition: border-color 0.12s, transform 0.12s;
+  box-shadow: 6px 6px 0 var(--accent);
+  transition: transform 120ms ease, box-shadow 120ms ease;
 }
-.mbr-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+.mbr-card:nth-child(3n+2) { box-shadow: 6px 6px 0 var(--text); }
+.mbr-card:nth-child(3n+3) { box-shadow: 6px 6px 0 var(--sun); }
+.mbr-card:hover { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--text); }
 
 /* Avatar beside the identity lines, the way a card carries a photo next to a number. */
 .mbr-card-head { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .mbr-avatar {
-  width: 52px; height: 52px; flex: 0 0 auto; border-radius: var(--radius-full, 50%);
+  width: 52px; height: 52px; flex: 0 0 auto; border-radius: 0; box-sizing: border-box; padding: 6px;
   display: flex; align-items: center; justify-content: center; overflow: hidden;
-  background: var(--accent-subtle); border: 1px solid var(--accent-border);
+  background: var(--card-bg); border: 2px solid var(--text);
 }
 .mbr-avatar svg { width: 100%; height: 100%; }
 .mbr-avatar--emoji { font-size: 26px; }
-.mbr-idlines { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.mbr-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mbr-idlines { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.mbr-name { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The identifier is the card's number: monospace, quiet, and allowed to wrap rather than be cut,
    because a half-shown identifier is worse than a two-line one. */
 .mbr-ghii {
