@@ -36,6 +36,12 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.27.0 — 2026-08-29 — THE MILK-COFFEE FILM IS GONE. --ak-surface-image painted 4% of the
+ *     accent over EVERY card, and five looks repeated it — cards are most of a screen, so that
+ *     film was the warm cast the developer kept seeing after the page ground was already cool.
+ *     A card separates by its EDGE and its SHADOW now; the page ambient carries the rotated
+ *     hues only, never the accent itself. Also: `hidden` finally hides — every kit surface sets
+ *     a display, which beat the attribute, so an app that hid a section watched it stay.
  *   v0.26.0 — 2026-08-29 — THE LANE AND THE BAND, both rules the developer never chose:
  *     --ak-main-max goes 68rem → 100% (room by default; the reading looks keep their measure
  *     and the main column gains growing side air), and --ak-hero-min goes 30dvh → 11rem, so a
@@ -181,9 +187,7 @@
   /* Vivid: a card is tinted toward the brand, never flat. Flat zeroes this. 4% is the
      check:atelier ceiling in practice: at 5% the mist palette's tinted card no longer
      stepped off the page. */
-  --ak-surface-image: linear-gradient(180deg,
-                        color-mix(in oklab, var(--ak-accent) 4%, var(--ak-surface)),
-                        var(--ak-surface));
+  --ak-surface-image: none;
   --ak-ink:           var(--color-base-content, #151a21);
   /* 68%: the check:atelier floor — at 62% the mist palette's dimmed text fell to 4.37:1. */
   --ak-ink-dim:       color-mix(in oklab, var(--ak-ink) 68%, var(--ak-surface));
@@ -228,9 +232,11 @@
                       radial-gradient(at 4% 86%,  color-mix(in oklab, var(--ak-spectrum-2) 22%, var(--ak-bg)), transparent 46%);
   /* The page's own ambient: the same spectrum, whisper-quiet, under everything — the ground
    * stops being a dead flat and the app has weather. Presets that mean flatness turn it off. */
-  --ak-page-image:    radial-gradient(at 10% 0%,   color-mix(in oklab, var(--ak-accent) 8%, var(--ak-bg)), transparent 46%),
-                      radial-gradient(at 96% 12%,  color-mix(in oklab, var(--ak-spectrum-2) 8%, var(--ak-bg)), transparent 48%),
-                      radial-gradient(at 50% 110%, color-mix(in oklab, var(--ak-spectrum-3) 8%, var(--ak-bg)), transparent 52%);
+  /* The page ambient carries the ROTATED hues only — never the accent itself. Leading with the
+   * accent at 8% was what smeared warm milk over the whole ground; the spectrum's rotations
+   * drift cool and warm against each other, which reads as weather instead of as a stain. */
+  --ak-page-image:    radial-gradient(at 96% 8%,   color-mix(in oklab, var(--ak-spectrum-2) 7%, var(--ak-bg)), transparent 46%),
+                      radial-gradient(at 6% 104%,  color-mix(in oklab, var(--ak-spectrum-3) 6%, var(--ak-bg)), transparent 50%);
   /* Chrome glass: the bar and the bottom nav float on a blurred, saturated pane. */
   --ak-glass:         color-mix(in oklab, var(--ak-surface) 74%, transparent);
   --ak-blur:          14px;
