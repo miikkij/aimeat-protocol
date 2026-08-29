@@ -19,7 +19,15 @@ Mandatory when the surface has a dialog or overlay, or reads live data. A clean 
 
 Run all three and report the numbers.
 
-1. **Three viewports, every interactive surface:** 390x844, 1280x900, and **1280x460**. The short one catches centring and overlay bugs (clipped top, unscrollable, rendered below the page). At each: `scrollWidth - clientWidth === 0`, dialog top edge >= 0, close control reachable.
+1. **Three viewports, every interactive surface:** 390x844, 1280x900, and **1280x460**. The short one catches centring and overlay bugs (clipped top, unscrollable, rendered below the page). At each: `scrollWidth - clientWidth === 0`, dialog top edge >= 0, close control reachable. When the overflow is not zero, do not guess the culprit; list it. The element whose right edge passes the viewport is usually not the one you expect (a flex or grid item whose automatic `min-width` is its content, so a horizontally scrolling strip inside it holds the whole page open):
+   ```js
+   () => { const w = document.documentElement.clientWidth; const out = [];
+     document.querySelectorAll('body *').forEach(el => { const r = el.getBoundingClientRect();
+       if (r.right > w + 2 && r.width > 0 && getComputedStyle(el).position !== 'fixed')
+         out.push((el.id ? '#' + el.id : '') + '.' + String(el.className).slice(0, 36) + ' r=' + Math.round(r.right)); });
+     return out.slice(0, 12); }
+   ```
+   The outermost entry is the one to fix (`min-width: 0` on the item, `align-items: stretch` on a column container); the rest are its children. → `docs/pitfalls.md` §30
 2. **Live channel connected, dialog open, count repaints:** `MutationObserver` on the open panel's content node, 20 seconds while other activity happens on the account. Expected zero. Above zero means a live event is repainting what the user is reading.
 3. **Network log after 60 idle seconds:** a repeating full listing is a bug even when nothing visibly breaks. It is an unintended poll.
 
