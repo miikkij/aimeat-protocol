@@ -21,6 +21,7 @@
  *   import { HomeSettingsDialog } from '/views/home/settings-dialog.js';
  *   html`<${HomeSettingsDialog} open=${open} onClose=${close} />`
  * @version-history
+ *   v2.1.1 — 2026-08-29 — A preview box above the chips shows the chosen figure without leaving the dialog.
  *   v2.1.0 — 2026-08-29 — The margin pattern: off or one of eight figures for the empty margins of the
  *     home, the chat and the settings. Same home.prefs record (marginPattern), applied to the page
  *     the moment it is chosen.
@@ -71,6 +72,11 @@ function MarginPatternSetting() {
       <div class="koti-settings-pattern-words">
         <span class="koti-settings-pattern-title">${tr('home.settings.pattern', 'Margin pattern')}</span>
         <span class="koti-settings-pattern-hint">${tr('home.settings.patternHint', 'A figure on the empty margins, fading toward the middle.')}</span>
+      </div>
+      ${/* The preview: the same variables the page's strips read, so it shows what the margin
+            will show, fading to the right the way the left strip fades toward the middle. */''}
+      <div class="koti-settings-pattern-preview" aria-hidden="true">
+        ${current ? html`<div class=${`mp-swatch mp-swatch--${current}`}></div>` : html`<span class="koti-settings-pattern-none">${tr('home.settings.patternOff', 'Off')}</span>`}
       </div>
       <div class="koti-settings-pattern-choices" role="radiogroup" aria-label=${tr('home.settings.pattern', 'Margin pattern')}>
         <button type="button" class=${`koti-settings-pattern-choice ${current === '' ? 'active' : ''}`}
