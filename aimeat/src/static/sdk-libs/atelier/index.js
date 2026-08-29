@@ -28,6 +28,8 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.27.0 — 2026-08-29 — The milk-coffee film removed from every card and the page ambient;
+ *     [hidden] finally hides inside the kit (CSS-side).
  *   v0.26.0 — 2026-08-29 — The lane and the band (CSS-side): a page takes the whole window by
  *     default and a hero is sized by its content; the AIMEAT palette speaks the house faces.
  *   v0.25.0 — 2026-08-29 — THE THINGS THAT OPEN: reveal() (the fan — animated true-height
@@ -152,7 +154,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.26.0',
+  version: '0.27.0',
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,

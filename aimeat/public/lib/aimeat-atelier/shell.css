@@ -452,6 +452,10 @@
   box-shadow: var(--ak-elev-1);
   font-weight: 650;
 }
+/* HIDDEN MEANS HIDDEN. Every kit surface sets its own `display`, and a `display` beats the
+ * `hidden` attribute — so an app that hid a section with the standard attribute watched it stay
+ * on screen (found in the Design Book, 2026-08-29). One rule, once, for the whole kit. */
+.ak-root[hidden], .ak-root [hidden] { display: none !important; }
 .ak-btn--ghost { background: none; border-color: transparent; color: var(--ak-accent-text); }
 /* The destructive answer. Outlined, never a solid fill: the ink is built the same way
  * --ak-accent-text is (74% of the hue pulled toward the ink), which is the construction the
