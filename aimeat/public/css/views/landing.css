@@ -5,6 +5,8 @@
  * @description Logged-out landing + pricing pages (ld- prefix). Theme tokens only;
  *   path cards stack on mobile, ticker truncates to one line.
  * @version-history
+ *   v2.1.1 — 2026-08-29 — The business hero's shadow is the sun (with the front page), and the "why it
+ *     improves this fast" label on the sun band is ink rather than coral on yellow.
  *   v2.1.0 — 2026-08-29 — The index pages join the showroom (design canvas "AIMEAT Index Pages"): the
  *       hero, the explainer cards, the proof block, the business hero, the cases, the group titles,
  *       the ink and sun bands (.ld-band--ink / .ld-band--sun) and the contact box on the front page's
@@ -190,7 +192,7 @@
 .ld-bhero { position: relative; display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 3.5rem; margin: 2.75rem 0 .5rem; border: 0; border-radius: 0; overflow: visible; background: none; }
 .ld-bhero-img { display: block; width: calc(100% - 14px); height: auto; min-height: 0; margin: 0 0 14px 14px; object-fit: cover; border: 4px solid var(--text); box-shadow: -14px 14px 0 var(--text); }
 .ld-bhero-text { padding: 0; display: flex; flex-direction: column; gap: 1.4rem; align-items: flex-start; }
-.ld-bhero .ld-h1 { font-size: clamp(2.4rem, 4.6vw, 4rem); line-height: .98; text-shadow: .075em .075em 0 var(--accent); }
+.ld-bhero .ld-h1 { font-size: clamp(2.4rem, 4.6vw, 4rem); line-height: .98; text-shadow: .075em .075em 0 var(--sun); }
 .ld-bhero--noimg { grid-template-columns: 1fr; }
 .ld-bhero--noimg .ld-bhero-text { padding: 1rem 0; }
 @media (max-width: 700px) { .ld-bhero { grid-template-columns: 1fr; gap: 1.75rem; } .ld-bhero-img { box-shadow: -8px 8px 0 var(--text); margin-left: 8px; width: calc(100% - 8px); } }
@@ -394,7 +396,8 @@
   display: flex; flex-direction: column; gap: 1.25rem;
 }
 .ld-log-dogfood { margin: 0 auto; max-width: 54rem; text-align: center; font-family: var(--font-showroom-body); font-size: 1.1rem; line-height: 1.6; font-weight: 600; }
-.ld-log-dogfood-label { font-family: var(--font-showroom); text-transform: uppercase; font-size: .9rem; letter-spacing: .02em; color: var(--accent); }
+/* Ink, not coral: coral on the sun band is 2:1 and the label was the least readable line on the page. */
+.ld-log-dogfood-label { font-family: var(--font-showroom); text-transform: uppercase; font-size: .9rem; letter-spacing: .02em; color: var(--on-sun); }
 .ld-log .collapsible {
   max-width: 54rem; width: 100%; margin: 0 auto;
   border: 3px solid var(--text); box-shadow: 6px 6px 0 var(--text);
