@@ -10,6 +10,7 @@
  * @structure MODAL_CSS (one string, injected by modal.js into its own <style>).
  * @usage import { MODAL_CSS } from './modal-styles.js';
  * @version-history
+ *   v1.1.0 — 2026-08-29 — The close control (.aimeat-close): a 26px ink-framed X beside the language switch.
  *   v1.0.2 — 2026-08-29 — A field's hint waits for focus or a value (.has-value), so the create form is
  *     not a wall of small print.
  *   v1.0.1 — 2026-08-29 — Ink and paper through ink.js, so the fallback follows the theme on an app
@@ -51,6 +52,11 @@ export var MODAL_CSS = [
   '.aimeat-mark svg{width:13px;height:13px;fill:' + accent + '}',
   '.aimeat-mark b{font-weight:inherit;color:' + accent + '}',
   '.aimeat-host{font:400 12px/1 ' + mono + ';color:' + dim + ';overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+  '.aimeat-crumb-right{display:flex;align-items:center;gap:8px;flex:0 0 auto}',
+  '.aimeat-close{appearance:none;width:26px;height:26px;padding:0;margin:0;display:inline-flex;align-items:center;justify-content:center;',
+    'border:2px solid ' + ink + ';background:transparent;color:' + ink + ';cursor:pointer;transition:color .12s,border-color .12s}',
+  '.aimeat-close svg{width:12px;height:12px;stroke:currentColor;stroke-width:2.5;fill:none;stroke-linecap:square}',
+  '.aimeat-close:hover{color:' + accent + ';border-color:' + accent + '}',
   '.aimeat-langsw{display:inline-flex;align-items:stretch;height:26px;flex:0 0 auto;border:2px solid ' + ink + '}',
   '.aimeat-lang{appearance:none;border:0;background:transparent;color:' + ink + ';opacity:.6;font:700 11px/1 ' + font + ';',
     'letter-spacing:.4px;padding:0 10px;margin:0;cursor:pointer;display:inline-flex;align-items:center;transition:opacity .12s}',

@@ -4902,7 +4902,8 @@
     "usernameRuleEdges": "Starts and ends with a letter or digit",
     "usernameLowercase": "Capital letters become lowercase.",
     "displayNameWhy": "Worth filling in: without it, your username is the name everyone sees.",
-    "errUserInvalid": "A username is 3 to 64 characters: letters a to z, digits and hyphens, starting and ending with a letter or digit."
+    "errUserInvalid": "A username is 3 to 64 characters: letters a to z, digits and hyphens, starting and ending with a letter or digit.",
+    "closeDialog": "Close"
   },
   "morsels": {
     "name": "heart morsel",
