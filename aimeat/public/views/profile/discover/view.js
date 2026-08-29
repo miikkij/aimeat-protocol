@@ -12,6 +12,7 @@
  * @structure renderDiscoverView · renderCover · secKinds · secRecent · secPlaces · secBookkeeping · renderResults · renderKind · renderPlace
  * @usage import { renderDiscoverView } from './discover/view.js';
  * @version-history
+ *   v1.0.1 — 2026-08-30 — Says it is counting, searching or loading rows instead of an ellipsis.
  *   v1.0.0 — 2026-08-30 — Initial. Replaces the scope buttons, the thirteen type chips and the
  *     newest-first dump of every record.
  */
@@ -78,7 +79,7 @@ function renderCover(ctx) {
             .map(([n, id, label, count]) => html`<button type="button" class="og-rail-link" key=${id} onClick=${() => scrollTo(id)}><i>${n}</i>${label}<em>${count}</em></button>`)}
           <hr />
           <span class="og-rail-label">${c('scopes')}</span>
-          ${['own', 'public', 'shared'].map(s => html`<button type="button" class=${`og-rail-link ${ctx.scope === s ? 'on' : ''}`} key=${s} onClick=${() => ctx.setScope(s)}><i>→</i>${t('discover.scope.' + s)}<em>${ctx.facets[s] ? num(ctx.facets[s].total) : '…'}</em></button>`)}
+          ${['own', 'public', 'shared'].map(s => html`<button type="button" class=${`og-rail-link ${ctx.scope === s ? 'on' : ''}`} key=${s} onClick=${() => ctx.setScope(s)}><i>→</i>${t('discover.scope.' + s)}<em>${ctx.facets[s] ? num(ctx.facets[s].total) : '→'}</em></button>`)}
         </nav>
       </div>
     </div>`;
@@ -93,7 +94,7 @@ function secKinds(ctx, kinds) {
   const f = ctx.facets[ctx.scope];
   const capped = ctx.scope === 'public';
   return html`<${Section} id="dv-kinds" num="01" title=${c('secKinds')} count=${c('secKindsSub', { n: kinds.length })} first=${true}>
-    ${!f ? html`<p class="og-empty">…</p>` : !kinds.length ? html`<p class="og-empty">${t('discover.empty')}</p>` : html`
+    ${!f ? html`<p class="og-empty dv-loading">${c('loading')}</p>` : !kinds.length ? html`<p class="og-empty">${t('discover.empty')}</p>` : html`
       <div class="dv-kinds dv-kinds--head"><div></div><div>${c('colKind')}</div><div>${c('colWhere')}</div><div></div></div>
       <div class="dv-kinds">
         ${kinds.map(k => html`
@@ -115,7 +116,7 @@ function secRecent(ctx) {
   const doorFor = (type, label) => html`<button type="button" key=${type || 'all'} class=${`og-door og-door--quiet ${filt === type ? 'on' : ''}`} onClick=${() => ctx.setRecentType(type)}>${label}</button>`;
   const doors = html`${doorFor('', c('allKinds'))}${['document', 'knowledge', 'skill', 'decision'].filter(x => present.includes(x)).map(x => doorFor(x, kindName(x)))}`;
   return html`<${Section} id="dv-recent" num="02" title=${c('secRecent')} count=${c('secRecentSub')} doors=${doors}>
-    ${!all ? html`<p class="og-empty">…</p>` : !list.length ? html`<p class="og-empty">${c('noneRecent')}</p>` : html`${rowsHead()}${entryRows(ctx, shown)}`}
+    ${!all ? html`<p class="og-empty dv-loading">${c('loadingRecent')}</p>` : !list.length ? html`<p class="og-empty">${c('noneRecent')}</p>` : html`${rowsHead()}${entryRows(ctx, shown)}`}
     ${list.length > RECENT_ROWS ? html`<p class="dv-more"><button type="button" onClick=${() => ctx.setRecentOpen(v => !v)}>${ctx.recentOpen ? c('showFewer') : c('showMore', { n: list.length - RECENT_ROWS })}</button></p>` : null}
     <p class="dv-hint">${c('recentHint')}</p>
   <//>`;
@@ -171,7 +172,7 @@ function renderResults(ctx) {
     rail: html`<hr /><span class="og-rail-label">${c('scopes')}</span>
       ${['own', 'public', 'shared'].map(s => html`<button type="button" class=${`og-rail-link ${ctx.scope === s ? 'on' : ''}`} key=${s} onClick=${() => ctx.setScope(s)}><i>→</i>${t('discover.scope.' + s)}<em>${ctx.scope === s ? num(human.length) : (ctx.otherCounts[s] ?? '…')}</em></button>`)}`,
     children: html`
-      ${!r ? html`<p class="og-empty">…</p>` : !human.length ? html`<p class="og-empty">${t('discover.empty')}</p>` : html`
+      ${!r ? html`<p class="og-empty dv-loading">${c('searching')}</p>` : !human.length ? html`<p class="og-empty">${t('discover.empty')}</p>` : html`
         <div class="dv-rows dv-rows--hits">
           ${order.map(k => { const list = groups.get(k); const open = ctx.moreOpen.has(k); const shown = open ? list : list.slice(0, 5); return html`
             <div class="dv-lbl" key=${'l' + k}>${kindName(k)}<em>${list.length}</em></div>
@@ -189,7 +190,7 @@ function renderResults(ctx) {
 function browseBody(ctx) {
   const b = ctx.browse;
   return html`
-    ${!b ? html`<p class="og-empty">…</p>` : !b.entries.length ? html`<p class="og-empty">${t('discover.empty')}</p>` : html`${rowsHead()}${entryRows(ctx, b.entries)}`}
+    ${!b || (b.loading && !b.entries.length) ? html`<p class="og-empty dv-loading">${c('loadingRows')}</p>` : !b.entries.length ? html`<p class="og-empty">${t('discover.empty')}</p>` : html`${rowsHead()}${entryRows(ctx, b.entries)}`}
     ${b && b.entries.length < b.total ? html`<p class="dv-more"><button type="button" disabled=${b.loading} onClick=${ctx.browseMore}>${c('showMore', { n: num(b.total - b.entries.length) })}</button></p>` : null}`;
 }
 function renderKind(ctx, type) {

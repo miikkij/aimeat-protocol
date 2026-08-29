@@ -50,9 +50,9 @@ export function desk(ctx) {
       <input type="search" class="dv-field" value=${ctx.q} placeholder=${ctx.scope === 'public' ? c('askPublic') : c('ask')}
         onInput=${(e) => ctx.setQ(e.target.value)} onKeyDown=${(e) => { if (e.key === 'Enter') ctx.submit(); }} />
       <div class="og-choice dv-scope">
-        ${SCOPES.map(s => html`<button type="button" key=${s} class=${`og-choice-btn ${ctx.scope === s ? 'on' : ''}`} onClick=${() => ctx.setScope(s)}>${t('discover.scope.' + s)}<i>${count(s)}</i></button>`)}
+        ${SCOPES.map(s => html`<button type="button" key=${s} class=${`og-choice-btn ${ctx.scope === s ? 'on' : ''}`} onClick=${() => ctx.setScope(s)}>${t('discover.scope.' + s)}<i>${count(s) || (s === ctx.scope ? '…' : '')}</i></button>`)}
       </div>
-      <p class="dv-hint">${ctx.query ? c('hintResults') : c('hint')}</p>
+      <p class="dv-hint">${!ctx.facets[ctx.scope] ? html`<span class="dv-loading">${c('loading')}</span>` : ctx.query ? c('hintResults') : c('hint')}</p>
     </div>`;
 }
 
