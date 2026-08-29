@@ -933,6 +933,11 @@
             <a href="/v1/portal?view=dev" onClick=${(e) => go(e, '/v1/portal?view=dev')}>${tr('nav.devView', 'For Developers')}</a>
             <a href="https://github.com/miikkij/aimeat-protocol/releases/latest" target="_blank" rel="noopener">${tr('footer.ownNode', 'Run your own node')}</a>
             <a href="/v1/transparency" onClick=${(e) => go(e, '/v1/transparency')}>${tr('footer.transparency', 'AI transparency')}</a>
+            ${/* The privacy policy and the terms are the server's own pages, one per language the
+                  node ships (English at the bare path). No onClick: the router's interceptor leaves
+                  a /v1/ address no view owns to the browser. */''}
+            <a href=${getLocale() === 'en' ? '/v1/privacy' : '/v1/privacy/' + getLocale()}>${tr('footer.privacy', 'Privacy')}</a>
+            <a href=${getLocale() === 'en' ? '/v1/terms' : '/v1/terms/' + getLocale()}>${tr('footer.terms', 'Terms')}</a>
             <a href="https://github.com/miikkij/aimeat-protocol" target="_blank" rel="noopener">GitHub</a>
           </div>
           ${/* For machines, and for the person who wants the contract. /v1/spec, /sitemap.md,

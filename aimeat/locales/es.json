@@ -3065,7 +3065,9 @@
     "glossary": "Glosario",
     "sitemap": "Mapa del sitio",
     "apiContract": "Contrato de la API",
-    "store": "Tienda"
+    "store": "Tienda",
+    "privacy": "Privacidad",
+    "terms": "Términos"
   },
   "glossary.example": "Por ejemplo",
   "glossary.failed": "No se pudo cargar el glosario.",
