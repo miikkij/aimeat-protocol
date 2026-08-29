@@ -28,6 +28,11 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.24.0 — 2026-08-29 — MOTION grows up: attention() — the notice-me gesture (pulse, shake,
+ *     flash, rise) exported for the moment something needs the eye, and wired into the form's
+ *     own refusal; entrances ride the look's `--ak-ease`; the signature opens `--ak-ease` and
+ *     `--ak-enter-stagger`, so a motion recipe can change the curve and the deal, not just the
+ *     speed.
  *   v0.23.0 — 2026-08-28 — Billboard (the full-canvas look) and the Voltage palette land beside
  *     the kit (CSS-side; the palette rides the golden pill like every other).
  *   v0.22.0 — 2026-08-28 — The volume rule freed (CSS-side): tilt becomes a hover greeting,
@@ -115,7 +120,7 @@
  *     emptyState, skeleton, dom + i18n layers (TARGET-074 phase 1, slice 1).
  */
 import { attach } from '../_core/namespace.js';
-import { el, append, $, $$, clear, uid, busy, guardButtons, whileBusy, injectStyle, reducedMotion, enter, countUp } from './dom.js';
+import { el, append, $, $$, clear, uid, busy, guardButtons, whileBusy, injectStyle, reducedMotion, enter, countUp, attention } from './dom.js';
 import { i18n } from './i18n.js';
 import { app, section, tabs, bottomNav } from './shell.js';
 import { hero, statRow, figure } from './hero.js';
@@ -139,7 +144,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.23.0',
+  version: '0.24.0',
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,
@@ -178,7 +183,7 @@ const atelier = {
 
   // ── Theme, i18n, helpers ──
   injectStyle, i18n, el, append, $, $$, clear, uid, busy, whileBusy, guardButtons,
-  reducedMotion, enter, countUp,
+  reducedMotion, enter, countUp, attention,
 };
 
 attach('atelier', atelier);
