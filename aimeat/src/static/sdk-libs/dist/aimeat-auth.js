@@ -1327,7 +1327,7 @@
   var AIMEAT_PALETTE_KEY = "aimeat-palette";
   var PALETTES = [
     { id: "aimeat", label: "AIMEAT", swatch: {
-      light: { bg: "#efeee8", card: "#ffffff", accent: "#e8564a" },
+      light: { bg: "#eaeef7", card: "#ffffff", accent: "#e8564a" },
       dark: { bg: "#14151a", card: "#21232e", accent: "#ff6f62" }
     } },
     { id: "paper", label: "Paper", swatch: {
