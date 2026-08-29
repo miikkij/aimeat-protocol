@@ -25,6 +25,8 @@
  * @usage
  *   import { UI_COMPONENTS, componentById, buildUiCatalogue } from './registry.js';
  * @version-history
+ *   v1.10.0 — 2026-08-29 — `scene3d` joins the components (append-only): the 3D band on the
+ *     three-world bundle — orb, sky, bars-as-terrain — one per layout, lazy-loaded.
  *   v1.9.0 — 2026-08-29 — The catalogue carries the pattern shelf: every patterns.css recipe
  *     described from the registry (atelier-patterns.ts) — what it looks like, what it evokes,
  *     which volume it belongs in — so an AI can choose a pattern by intent.
@@ -244,6 +246,21 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
       emptyTitle: text('What the empty state says.', 80),
       emptyHint: text('The line under it.', 160),
     },
+  },
+  {
+    id: 'scene3d',
+    summary: 'Real depth: a 3D band on the node\'s own three-world bundle (lazy-loaded, ~745 kB, so use it as the ONE showpiece a screen gets). kind "orb" is a signature object turning under the hand; "sky" is a procedural atmosphere band; "bars" stands the bound rows up as a field of columns — the 3D chart, source rows { label?, value }. Colours come from the look\'s tokens and the render loop stops at rest, so an idle scene costs nothing.',
+    props: {
+      kind: { type: 'enum', values: ['orb', 'sky', 'bars'], default: 'orb', description: 'What the scene is: a signature object, an atmosphere band, or data as terrain.' },
+      source: {
+        type: 'string', maxLength: 120,
+        description: 'For kind "bars": the data binding the app resolves to rows of { label?, value }. Omit for orb and sky.',
+      },
+      title: text('The floating chip naming the scene, and the block\'s name in tabs and decks.', 80),
+      emptyTitle: text('What the empty state says when 3D cannot load.', 80),
+      emptyHint: text('The line under it.', 160),
+    },
+    maxPerLayout: 1,
   },
   {
     id: 'reveal',

@@ -34,6 +34,8 @@
  *   });
  *   // later, when the app's data changed:  m.refresh('errands.');
  * @version-history
+ *   v0.17.0 — 2026-08-29 — The `scene3d` block (bars bind a source; orb and sky mount bare);
+ *     transition/morph extracted whole to mosaic-motion.js under the 800-line rule.
  *   v0.16.0 — 2026-08-28 — The harvest trio joins the vocabulary: `matrix`, `graph` and
  *     `waveform` blocks, each riding its bound record whole like the chart.
  *   v0.15.0 — 2026-08-28 — The `chart` block: the bound record ({ labels, series }) rides to the
@@ -75,8 +77,10 @@ import { chart } from './chart.js';
 import { matrix } from './matrix.js';
 import { graph } from './graph.js';
 import { waveform } from './waveform.js';
+import { scene3d } from './scene3d.js';
 import { reveal } from './disclose.js';
 import { patchFor, derivedColumns } from './mosaic-bind.js';
+import { transition, morph } from './mosaic-motion.js';
 import { aide } from './aide.js';
 import { projectCanvas } from './mosaic-canvas.js';
 
@@ -242,6 +246,16 @@ export function mosaic(spec) {
         return bound('waveform', function (data) {
           return waveform({ target: into, data: patchFor('waveform', data).data, title: p.title, empty: empty });
         });
+      case 'scene3d': {
+        // bars binds a source (rows stand up as columns); orb and sky need no data at all.
+        if (p.source) {
+          return bound('scene3d', function (data) {
+            return scene3d({ target: into, kind: p.kind, data: { items: patchFor('scene3d', data).items }, title: p.title, empty: empty });
+          });
+        }
+        alive.handles.push(scene3d({ target: into, kind: p.kind, title: p.title }));
+        return;
+      }
       case 'reveal':
         return bound('reveal', function (data) {
           return reveal({ target: into, items: patchFor('reveal', data).items, mode: p.mode === 'many' ? 'many' : 'one' });
@@ -294,29 +308,6 @@ export function mosaic(spec) {
         // A component newer than this kit build: name it rather than break the screen.
         console.warn('aimeat-atelier: this kit build has no renderer for "' + block.component + '" — skipping block "' + block.id + '".');
     }
-  }
-
-  /** Swap visible units through a View Transition when the browser has one. */
-  function transition(run) {
-    if (typeof document.startViewTransition === 'function' && !reducedMotion()) {
-      document.startViewTransition(run);
-    } else {
-      run();
-    }
-  }
-
-  /**
-   * The SHARED-ELEMENT morph: the element that exists on both sides of the change carries one
-   * view-transition-name for the duration, so the browser animates it from where it WAS to where
-   * it IS — a tile grows into the full screen instead of crossfading. Falls back to the plain
-   * swap when the browser has no View Transitions or the person asked for reduced motion.
-   * @param {HTMLElement} moving @param {() => void} run
-   */
-  function morph(moving, run) {
-    if (typeof document.startViewTransition !== 'function' || reducedMotion()) { run(); return; }
-    moving.style.viewTransitionName = 'ak-morph';
-    const vt = document.startViewTransition(run);
-    vt.finished.finally(function () { moving.style.viewTransitionName = ''; });
   }
 
   // ── The five projections ─────────────────────────────────────────────────────────────────────
