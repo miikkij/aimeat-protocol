@@ -65,7 +65,7 @@ export interface LibraryPack {
   id: string;
   /** sdk = /v1/libs wrapper · cortex = node-bundled cortex lib · vendored = /lib third-party · bundle = multi-file set. */
   kind: 'sdk' | 'cortex' | 'vendored' | 'bundle';
-  category: 'core' | 'ai' | 'ui' | 'visualization' | 'diagrams' | 'canvas' | 'game' | '3d' | 'realtime' | 'economy' | 'media';
+  category: 'core' | 'ai' | 'ui' | 'visualization' | 'diagrams' | 'canvas' | 'game' | '3d' | 'maps' | 'realtime' | 'economy' | 'media';
   title: string;
   /** One line (English) — shown in the index, catalogue and pack pickers. */
   description: string;

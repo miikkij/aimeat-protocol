@@ -11,6 +11,8 @@
  *   COMP_MERMAID_DIAGRAM · COMP_THREE_SCENE · COMP_P5_SKETCH · COMP_PIXI_STAGE · COMP_PHASER_ARCADE ·
  *   COMP_FLOW_EDITOR
  * @version-history
+ *   v1.2.0 — 2026-08-29 — COMP_LEAFLET_MAP: the real-map recipe (leaflet pack) with the two
+ *     classic traps and the licence attribution written in.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 5: COMP_AI_ACTION discloses. The component every app
  *     copies its AI call from is the highest-leverage place to put the label call.
  *   v1.0.0 — 2026-07-13 — Extracted from src/data/app-templates.ts (max-file-lines)
@@ -241,6 +243,31 @@ function mountWorldScene(container) {
 // InstancedMesh for repeated objects (setMatrixAt + setColorAt); RGBELoader (THREE.Addons) for HDR/equirect skyboxes:
 //   new THREE.Addons.RGBELoader().load(url, function (tex) { tex.mapping = THREE.EquirectangularReflectionMapping; scene.background = tex; });
 // Dispose geometries/materials you remove; cap pixelRatio on mobile.`;
+
+export const COMP_LEAFLET_MAP = `// leaflet-map — a real interactive map on OpenStreetMap tiles (leaflet pack: /lib/leaflet@1/).
+// Load BOTH files: <link rel="stylesheet" href="/lib/leaflet@1/leaflet.css">
+//                  <script src="/lib/leaflet@1/leaflet.js"></script>
+function mountMap(container, points) {
+  // THE TRAP: the container needs an explicit height or the map renders 0px tall.
+  container.style.height = container.style.height || '420px';
+  var m = L.map(container);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    // REQUIRED by the tile licence — never remove the attribution.
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 19,
+  }).addTo(m);
+  // Leaflet wants [lat, lon] — most data is (lon, lat); a marker in the ocean means you swapped them.
+  var markers = (points || []).map(function (p) {
+    return L.marker([p.lat, p.lon]).addTo(m).bindPopup(p.label || '');
+  });
+  if (markers.length > 1) m.fitBounds(L.latLngBounds(points.map(function (p) { return [p.lat, p.lon]; })), { padding: [30, 30] });
+  else if (markers.length === 1) m.setView([points[0].lat, points[0].lon], 12);
+  else m.setView([60.17, 24.94], 11);
+  return m; // call m.invalidateSize() if the container was hidden or resized while mounting
+}
+// Themed pins: L.divIcon({ className: 'my-pin', html: '<span></span>' }) styled in your CSS,
+// so markers follow the app's theme instead of Leaflet's blue PNG.
+// GeoJSON: L.geoJSON(data, { style: f, onEachFeature: f2 }).addTo(m).`;
 
 export const COMP_P5_SKETCH = `// p5-sketch — an instance-mode p5.js sketch mounted into a container (p5 pack: /lib/p5@1.min.js).
 // INSTANCE MODE always (global mode pollutes window and collides with AIMEAT libs).

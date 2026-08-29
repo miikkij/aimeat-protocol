@@ -21,7 +21,7 @@
  *     bundle universe proved, nothing newly vendored).
  */
 import { el, clear, resolve, reducedMotion } from './dom.js';
-import { APEX_URL } from '../_core/config.js';
+import { NODE_URL } from '../_core/config.js';
 import { skeleton, emptyState } from './state.js';
 
 /** One shared load of the three-world bundle, whoever asks first. */
@@ -31,7 +31,8 @@ function ensureThree() {
   if (threePromise) return threePromise;
   threePromise = new Promise(function (ok, fail) {
     const s = document.createElement('script');
-    s.src = APEX_URL + '/lib/three-world@1.min.js';
+    // NODE_URL: the app subdomain proxies this node's /lib, so the load is same-origin.
+    s.src = NODE_URL + '/lib/three-world@1.min.js';
     s.onload = function () { ok(window.THREE); };
     s.onerror = function () { threePromise = null; fail(new Error('three-world failed to load')); };
     document.head.appendChild(s);

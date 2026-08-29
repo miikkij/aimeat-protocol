@@ -13,6 +13,7 @@
  *     - use-case   : composes an app-shell + components (+ optional package) (future).
  * @structure AppTemplate · getAppTemplates() · getAppTemplateIndex()
  * @version-history
+ *   v1.14.0 — 2026-08-29 — comp-leaflet-map: the real-map component template (leaflet pack).
  *   v1.13.0 — 2026-08-29 — kind `genre` + the thirteen approved genre scaffolds (bodies in
  *     ./app-templates/genres.ts) and the `track` field: genres are Atelier-only in the prompts.
  *   v1.0.0 — 2026-06-26 — initial registry + first app-shell (T1 pure-client).
@@ -55,6 +56,7 @@ import {
   COMP_MERMAID_DIAGRAM,
   COMP_THREE_SCENE,
   COMP_THREE_WORLD_SCENE,
+  COMP_LEAFLET_MAP,
   COMP_P5_SKETCH,
   COMP_PIXI_STAGE,
   COMP_PHASER_ARCADE,
@@ -152,6 +154,7 @@ const TEMPLATES: AppTemplate[] = [
   { id: 'comp-mermaid-diagram', kind: 'component', title: 'Mermaid diagram', description: 'Render flowcharts / sequence / gantt / mindmap diagrams from text definitions (self-hosted mermaid pack), theme-aware, definitions saved to memory.', libs: [], packs: ['mermaid'], content: COMP_MERMAID_DIAGRAM },
   { id: 'comp-three-scene', kind: 'component', title: '3D scene (three.js)', description: 'A themed, resizable WebGL 3D scene on the self-hosted three.js pack (r128 UMD) — lights, camera, animation loop, theme-aware background.', libs: [], packs: ['three'], content: COMP_THREE_SCENE },
   { id: 'comp-three-world-scene', kind: 'component', title: '3D world scene (modern three + addons)', description: 'A modern three.js scene on the self-hosted three-world bundle (r185): OrbitControls, procedural Sky, ACES tone mapping, HDR skybox loading — the pack for beauty-first 3D worlds.', libs: [], packs: ['three-world'], content: COMP_THREE_WORLD_SCENE },
+  { id: 'comp-leaflet-map', kind: 'component', title: 'Real map (Leaflet + OpenStreetMap)', description: 'An interactive map of the actual world on the self-hosted Leaflet pack and OpenStreetMap tiles: markers with popups, auto-fit bounds, the required attribution, and the two classic traps (container height, lat/lon order) already handled.', libs: [], packs: ['leaflet'], content: COMP_LEAFLET_MAP },
   { id: 'comp-p5-sketch', kind: 'component', title: 'p5.js sketch', description: 'An instance-mode p5.js creative-coding sketch (generative art, particles) with parameter persistence and image export via AIMEAT.', libs: [], packs: ['p5'], content: COMP_P5_SKETCH },
   { id: 'comp-pixi-stage', kind: 'component', title: 'PixiJS stage', description: 'A PixiJS v8 WebGL stage (async init, app.canvas, v8 Graphics chain) rendering hundreds of animated sprites.', libs: [], packs: ['pixi'], content: COMP_PIXI_STAGE },
   { id: 'comp-phaser-arcade', kind: 'component', title: 'Phaser arcade shell', description: 'A Phaser 3 game shell: generated textures (no asset files), FIT scaling, arcade physics, and an AIMEAT public high-score leaderboard.', libs: ['aimeat-auth', 'aimeat-data'], packs: ['phaser'], content: COMP_PHASER_ARCADE },

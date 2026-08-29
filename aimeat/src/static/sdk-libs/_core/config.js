@@ -10,6 +10,9 @@
  * @structure resolveNodeUrl() · NODE_URL · APEX_URL · NODE_ID · HEARTBEAT_MS
  * @usage import { NODE_URL, APEX_URL, NODE_ID } from '../_core/config.js';
  * @version-history
+ *   v1.1.0 — 2026-08-29 — resolveNodeUrl falls through to self.origin before the apex: a
+ *     srcdoc preview's location is about:srcdoc, and the apex fallback sent an app-subdomain
+ *     preview cross-origin (the atlas met the CORS wall).
  *   v1.0.0 — 2026-07-19 — Initial: extracted from the per-lib inline bootstrap (SDK-libs migration Phase 0).
  */
 
@@ -36,6 +39,12 @@ export function resolveNodeUrl() {
   const meta = document.querySelector('meta[name="aimeat-node"]');
   if (meta) return (meta.getAttribute('content') || '').replace(/\/$/, '');
   if (location.protocol === 'http:' || location.protocol === 'https:') return location.origin;
+  // A srcdoc document's location is about:srcdoc, but self.origin still names the REAL origin
+  // it inherited from its parent — the right node for same-origin reads, where the apex
+  // fallback below sent an app-subdomain preview cross-origin (found by the atlas: CORS).
+  if (typeof self !== 'undefined' && typeof self.origin === 'string' && self.origin.indexOf('http') === 0) {
+    return self.origin;
+  }
   return cfg().baseUrl;
 }
 

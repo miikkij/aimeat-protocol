@@ -36,6 +36,7 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.34.0 — 2026-08-29 — .ak-map (data.css): the real map's chrome on the tokens.
  *   v0.33.0 — 2026-08-29 — The ops family, the atlas and the chart family (data.css): health
  *     lamps, queue states, the gauge dial, the console vane, the offline map, donut and
  *     calendar shapes, KPI trend sparklines. Tones ride --ak-ok/-warn/-err throughout.
@@ -229,6 +230,12 @@
   --ak-ok:            var(--color-success, #0f7a45);
   --ak-warn:          var(--color-warning, #8a5300);
   --ak-err:           var(--color-error, #b3261e);
+  /* The tones as TEXT (console lines, gauge readings): pulled toward the ink the way
+     --ak-accent-text is, so they darken on paper, lighten in the dark, and follow a world's
+     own ink (phosphor text on a terminal) — AK-TONE proves every combination. */
+  --ak-ok-text:       color-mix(in oklab, var(--ak-ok) 42%, var(--ak-ink));
+  --ak-warn-text:     color-mix(in oklab, var(--ak-warn) 36%, var(--ak-ink));
+  --ak-err-text:      color-mix(in oklab, var(--ak-err) 42%, var(--ak-ink));
   --ak-focus:         var(--ak-accent);
   /* The one brand gradient — hero band, primary CTA fill. One region per screen. Two HUES now,
    * not two darknesses of one: the spectrum is what makes it read as energy. */

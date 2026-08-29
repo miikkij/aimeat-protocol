@@ -10,6 +10,9 @@
     const meta = document.querySelector('meta[name="aimeat-node"]');
     if (meta) return (meta.getAttribute("content") || "").replace(/\/$/, "");
     if (location.protocol === "http:" || location.protocol === "https:") return location.origin;
+    if (typeof self !== "undefined" && typeof self.origin === "string" && self.origin.indexOf("http") === 0) {
+      return self.origin;
+    }
     return cfg().baseUrl;
   }
   var NODE_URL = resolveNodeUrl();
@@ -543,7 +546,7 @@
     var defFence = m.renderer.rules.fence || function(t, i, o, e, s) {
       return s.renderToken(t, i, o);
     };
-    m.renderer.rules.fence = function(tokens, idx, options, env, self) {
+    m.renderer.rules.fence = function(tokens, idx, options, env, self2) {
       var t = tokens[idx];
       var info = String(t.info || "").trim().toLowerCase();
       if (info === "mermaid") {
@@ -552,7 +555,7 @@
       if (info === "aimeat-memory") {
         return '<pre class="md-mem-src">' + m.utils.escapeHtml(t.content) + "</pre>\n";
       }
-      return defFence(tokens, idx, options, env, self);
+      return defFence(tokens, idx, options, env, self2);
     };
     _mdit = m;
     return m;
