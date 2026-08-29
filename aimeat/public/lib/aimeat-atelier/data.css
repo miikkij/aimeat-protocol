@@ -286,9 +286,9 @@ button.ak-queue__row:hover { background: var(--ak-surface-2); }
 .ak-gauge__value--drawn { transition: stroke-dashoffset calc(var(--ak-motion) * 4) var(--ak-ease); stroke-dashoffset: 0 !important; }
 .ak-gauge__words { display: flex; flex-direction: column; gap: 2px; margin-top: -10px; }
 .ak-gauge__reading { font-family: var(--ak-font-display, inherit); font-size: var(--ak-text-title); font-weight: 700; color: var(--ak-ink); }
-.ak-gauge__reading--ok { color: var(--ak-ok); }
-.ak-gauge__reading--warn { color: var(--ak-warn); }
-.ak-gauge__reading--err { color: var(--ak-err); }
+.ak-gauge__reading--ok { color: var(--ak-ok-text); }
+.ak-gauge__reading--warn { color: var(--ak-warn-text); }
+.ak-gauge__reading--err { color: var(--ak-err-text); }
 .ak-gauge__label { color: var(--ak-ink-dim); font-size: var(--ak-text-fine); }
 
 /* ── The console (konsole.js) ──────────────────────────────────────────────────────────────── */
@@ -305,9 +305,9 @@ button.ak-queue__row:hover { background: var(--ak-surface-2); }
 .ak-console__line { display: flex; gap: 10px; color: var(--ak-ink); }
 .ak-console__ts { flex: none; color: var(--ak-ink-dim); }
 .ak-console__text { min-width: 0; overflow-wrap: anywhere; }
-.ak-console__line--ok .ak-console__text { color: var(--ak-ok); }
-.ak-console__line--warn .ak-console__text { color: var(--ak-warn); }
-.ak-console__line--err .ak-console__text { color: var(--ak-err); }
+.ak-console__line--ok .ak-console__text { color: var(--ak-ok-text); }
+.ak-console__line--warn .ak-console__text { color: var(--ak-warn-text); }
+.ak-console__line--err .ak-console__text { color: var(--ak-err-text); }
 .ak-console__line--enter { animation: ak-console-in calc(var(--ak-motion) * 2) var(--ak-ease); }
 @keyframes ak-console-in { from { opacity: 0; transform: translateY(4px); } }
 

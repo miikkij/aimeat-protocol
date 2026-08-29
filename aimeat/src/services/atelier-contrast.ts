@@ -361,6 +361,10 @@ export const HERO_MESH_CAP = 36;
  *  against exactly those values in both modes. Anything else stays var()/color-mix only. */
 export const GROUND_TOKENS = [
   '--ak-bg', '--ak-surface', '--ak-surface-2', '--ak-ink', '--ak-ink-dim', '--ak-line',
+  // The tone trio joined when the ops family arrived: a world that owns its ground must be
+  // able to own its ok/warn/err too — the theme's light-mode tones vanish on a forced-dark
+  // world, and AK-TONE below now proves whichever values stand.
+  '--ak-ok', '--ak-warn', '--ak-err',
 ] as const;
 
 /** Tokens the base contract must declare — a look can never inherit half its identity. */
@@ -369,7 +373,8 @@ export const REQUIRED_BASE = [
   '--ak-line', '--ak-line-w', '--ak-accent', '--ak-accent-2', '--ak-spectrum-2', '--ak-spectrum-3',
   '--ak-page-image', '--ak-glass', '--ak-blur', '--ak-grain', '--ak-accent-ink', '--ak-accent-text',
   '--ak-hero-ink', '--ak-hero-ink-dim',
-  '--ak-ok', '--ak-warn', '--ak-err', '--ak-focus', '--ak-grad', '--ak-scrim', '--ak-hero-image',
+  '--ak-ok', '--ak-warn', '--ak-err', '--ak-ok-text', '--ak-warn-text', '--ak-err-text',
+  '--ak-focus', '--ak-grad', '--ak-scrim', '--ak-hero-image',
   '--ak-radius', '--ak-radius-sm', '--ak-radius-pill', '--ak-elev-1', '--ak-elev-2',
   '--ak-font', '--ak-font-display', '--ak-font-mono',
   '--ak-text-hero', '--ak-text-title', '--ak-text-body', '--ak-text-fine', '--ak-weight-display',
@@ -610,6 +615,19 @@ export function runMatrix(
         add(combo, 'AK-PAT ink on ground weave', ratio(ink, patGround.hex), MIN_TEXT, 'body text on a whisper-volume pattern page');
         const patProp = evalColor('color-mix(in oklab, var(--ak-accent) 22%, var(--ak-surface))', vars, `${combo} ak-pat--prop c1`);
         add(combo, 'AK-PAT ink on prop weave', ratio(ink, patProp.hex), MIN_TEXT, 'a chip label on a card-strength pattern fill');
+
+        // AK-TONE: the ops family speaks in ok/warn/err. The RAW tones stay fills (lamps,
+        // pill grounds) and carry no text floor; what a person READS is the ink-anchored
+        // *-text derivation — console lines on the vane's ground (surface-2), gauge readings
+        // on the card — and those are proven for every combination, worlds included.
+        for (const tone of ['ok', 'warn', 'err']) {
+          const raw = vars.get(`--ak-${tone}-text`);
+          if (raw === undefined) continue; // pre-toned sheets; REQUIRED_BASE keeps the base honest
+          const c = evalColor(raw, vars, `${combo} --ak-${tone}-text`);
+          const hex = c.alpha === 1 ? c.hex : over(c, surface);
+          add(combo, `AK-TONE ${tone} text on card`, ratio(hex, surface), MIN_TEXT, 'a tone-coloured reading on a card');
+          add(combo, `AK-TONE ${tone} text on vane`, ratio(hex, surface2), MIN_TEXT, 'a tone-coloured log line on the console ground');
+        }
       } catch (e) {
         failR(combo, 'resolve', (e as Error).message);
       }

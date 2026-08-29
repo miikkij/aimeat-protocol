@@ -17,11 +17,19 @@
  *   canvaswrap/canvas/field/tile/zoombar/focus
  * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
  * @version-history
+ *   v0.5.0 — 2026-08-29 — The mosaic root clips horizontal overflow: the full-bleed 100vw
+ *     trick pokes past the layout viewport by the scrollbar width when the mosaic renders
+ *     outside the app shell (bench, gallery preview) on a classic-scrollbar browser.
  *   v0.4.0 — 2026-08-27 — Initial (TARGET-074 phase 2, the client renderer).
  */
 
 /* ── The frame every projection shares ────────────────────────────────────────────────────── */
-.ak-mosaic { display: flex; flex-direction: column; gap: var(--ak-gap); min-width: 0; }
+/* overflow-x clip: a full-bleed band's 100vw includes the window scrollbar, so on a browser
+   with classic scrollbars the bleed pokes 8px past the layout viewport whenever the page
+   scrolls. Inside the app shell .ak-app already clips this; the mosaic carries its own guard
+   for the places it renders BARE — the Book's bench and the gallery preview — where headless
+   overlay scrollbars had hidden the poke from every measurement. */
+.ak-mosaic { display: flex; flex-direction: column; gap: var(--ak-gap); min-width: 0; overflow-x: clip; }
 .ak-mosaic__band { display: flex; flex-direction: column; gap: var(--ak-gap); min-width: 0; }
 .ak-mosaic__units { display: flex; flex-direction: column; gap: var(--ak-gap); min-width: 0; }
 .ak-mosaic__unit { display: flex; flex-direction: column; gap: var(--ak-gap); min-width: 0; }
