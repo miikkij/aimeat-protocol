@@ -136,6 +136,11 @@ export interface AppRepository {
              */
             authorship?: import('../types/apps.js').AppAuthorship | null;
             authorshipLog?: import('../types/apps.js').AppAuthorshipLogEntry[];
+            /**
+             * The app's legal pages, by kind. Merged per kind: a kind set to a document replaces
+             * that kind, null removes it, an absent kind is untouched.
+             */
+            legal?: Partial<Record<import('../types/apps.js').AppLegalKind, import('../types/apps.js').AppLegalDoc | null>>;
         },
     ): Promise<boolean>;
     /**

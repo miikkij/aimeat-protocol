@@ -271,6 +271,19 @@ const AI_PROVENANCE_REVIEWED_WITHOUT = [
   // visibility is not authorship. The bytes a reader eventually gets are the app's, and
   // aimeat_app_publish stamps those.
   'aimeat_app_seo_set',
+  // DECIDED, 2026-08-29, with the reasoning written down and one question left to the developer.
+  //
+  // An app's own legal page (terms, privacy notice, imprint, …) is the OWNER's standing statement
+  // in their own name; it is served under the app with a line saying who publishes it and answers
+  // for it, and the app's audit log records who set it, when, the format, the size and a hash of
+  // the text. It is not a memory record, so the memory-write provenance mint does not run for it,
+  // and the ai_provenance parameter would have nowhere to land without a second write path.
+  //
+  // OPEN: whether a legal page drafted by an AI should carry its own provenance record and a
+  // visible label. The catalog's editor already tells the owner to read an AI draft before
+  // publishing it; if the answer is yes, the write moves to the provenance-minting path and this
+  // entry comes out. Until then the tool is listed here rather than left to trip the gate.
+  'aimeat_app_legal_set',
   // DECIDED, 2026-08-26, after the developer asked what the law actually requires.
   //
   // NOT OBLIGED. Article 50(4) — the paragraph that makes a DEPLOYER disclose AI-generated text —

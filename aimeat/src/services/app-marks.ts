@@ -36,6 +36,7 @@
  *   const out = await applyOwnerMarksUpdate(storage, { ownerGaii, filename },
  *     { marks: body.marks, author: body.author, actor: { ghii, ownerPrincipal } });
  * @version-history
+ *   v1.1.0 — 2026-08-29 — Every change also lands in the app's audit log (services/app-audit.ts).
  *   v1.0.0 — 2026-08-29 — Initial: badge and install switches, the named reviewer, the log.
  */
 import type { AimeatConfig } from '../config.js';
@@ -46,6 +47,7 @@ import type {
 import { AUTHORSHIP_LOG_MAX } from '../storage/types/apps.js';
 import { resolveAppOwnerScope } from './app-lifecycle.js';
 import { emitChange } from './event-bus.js';
+import { recordAppAudit, type AppAuditAction } from './app-audit.js';
 
 export const AUTHOR_NAME_MAX = 120;
 
@@ -204,6 +206,14 @@ export async function applyOwnerMarksUpdate(
 
   if (update.marks || update.authorship !== undefined) {
     await storage.updateAppMeta(target.ownerGaii, target.filename, update);
+    // The app's audit log (services/app-audit.ts): the reviewer entries land there as well as on
+    // the manifest's own log, so one place answers "what happened to this app".
+    const audit = (action: AppAuditAction, detail?: Record<string, string | number | boolean | null>) =>
+      recordAppAudit(storage, { ownerGhii: target.ownerGaii, filename: target.filename, by: input.actor.ghii, action, detail });
+    if (update.marks?.badge !== undefined && update.marks.badge !== before.marks.badge) await audit('marks.badge', { on: update.marks.badge });
+    if (update.marks?.install !== undefined && update.marks.install !== before.marks.install) await audit('marks.install', { on: update.marks.install });
+    if (update.authorship === null) await audit('authorship.cleared', { name: before.authorship?.name ?? null });
+    else if (update.authorship) await audit('authorship.declared', { name: update.authorship.name });
     // The catalogue card and the details view read these, so the views watching 'apps' have to
     // hear about it — emitted here so the MCP door announces it without restating it.
     emitChange('apps');

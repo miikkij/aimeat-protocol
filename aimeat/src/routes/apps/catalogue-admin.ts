@@ -6,6 +6,7 @@
  *   /v1/admin/apps/similar, /v1/admin/apps/watermark/decode, /v1/admin/apps/:owner/:filename/moderate,
  *   DELETE /v1/admin/apps/:owner/:filename. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.8.0 — 2026-08-29 — The listing carries the legal pages as their state; the text is stripped.
  *   v1.7.0 — 2026-08-29 — The public listing strips `authorshipLog`; the reviewer's name stays public.
  *   v1.6.0 — 2026-08-24 — The catalogue carries `data_map`, on exactly the terms the AI posture
  *     travels on: the rows are public, because where an app puts data is the promise it makes to
@@ -38,6 +39,7 @@ import { publicPosture } from '../../services/app-ai-posture.js';
 import type { CanonicalOwner } from './helpers.js';
 import { logger } from '../../utils/logger.js';
 import { appSeoState } from '../../services/app-seo.js';
+import { stripLegalContent } from '../../services/app-legal.js';
 
 export function registerCatalogueAdminRoutes(
     router: Router,
@@ -125,6 +127,9 @@ export function registerCatalogueAdminRoutes(
                 // The reviewer's NAME is public — it is served in the app's own source. The log of
                 // who declared and withdrew it is the owner's audit trail, not a stranger's.
                 ...(app.manifest.authorshipLog ? { authorshipLog: undefined } : {}),
+                // The legal pages travel as their STATE (kind, format, when); the text is read at
+                // /legal/:kind, not carried on every row of every listing.
+                ...(app.manifest.legal ? { legal: stripLegalContent(app.manifest).legal } : {}),
             };
             return {
                 owner: app.ownerName,

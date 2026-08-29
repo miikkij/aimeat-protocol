@@ -18,6 +18,7 @@
  *   appMayWriteKey(roles, key, delegatedOwnerWrite?, reservedAllowed?)
  * @usage import { appMayWriteKey } from '../utils/reserved-keys.js';
  * @version-history
+ *   v1.6.0 — 2026-08-29 — `audit.` joins the list: the per-app audit log a granted app must not rewrite.
  *   v1.5.0 — 2026-08-24 — `signals.` joins the list. `signals.stream.*` is what an UNAUTHENTICATED
  *     public door reads before it agrees to write into this owner's namespace: it decides whether
  *     the stream exists, whether it is on, and whether per-recipient detail is kept. A granted app
@@ -72,6 +73,11 @@
  */
 export const RESERVED_OWNER_KEY_PREFIXES = [
   'openrouter.', 'ai-usage.', 'profile.', 'finance.', 'commerce.', 'chat.', 'signals.',
+  // `audit.apps.<filename>` is the per-app audit log (services/app-audit.ts): what the owner shows
+  // when asked what was in force on a given day. Only the service writes it, server-side; a
+  // granted app or a delegated agent must not be able to erase or forge the record of its own
+  // changes. Measured 2026-08-29: nothing wrote an `audit.*` key through the memory API.
+  'audit.',
 ] as const;
 
 /** True iff `key` falls under a reserved, server-trusted owner-namespace prefix. */

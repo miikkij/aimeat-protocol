@@ -5,6 +5,7 @@
  * @description Public memory reads, organism + workspace lifecycle, wallet transactions, HTML apps, extensions, IAM design, and cortex tool definitions (incl. operator-only aimeat_admin_mint).
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.4.0 — 2026-08-29 — aimeat_app_legal_set (the app's own legal pages) and aimeat_app_audit (its log).
  *   v1.3.0 — 2026-08-29 — aimeat_app_marks_set: the badge and install-chip switches on one app.
  *   v1.2.0 — 2026-08-16 — the four incremental app-draft tools (write/replace/read/seed), reachable
  *     from all three doors. `content` is plain text here where aimeat_app_draft_save takes base64:
@@ -728,6 +729,29 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
             filename: { type: 'string', required: true, description: 'The app to change, with its extension (e.g. "notes.html").' },
             badge: { type: 'boolean', description: 'false takes the "publish your own app" badge off this app; true puts it back.' },
             install: { type: 'boolean', description: 'false stops offering visitors to install this app in their browser; true offers it again.' },
+        },
+    },
+    {
+        name: 'aimeat_app_legal_set',
+        description: 'Publish, replace or remove one of an app\'s own legal pages: terms of use, privacy notice, imprint (who is behind the app), refunds and withdrawal, accessibility statement, cookies, or support. The app answers for what it does — a shop for its sales, an app that handles personal data for that data — and not the node it runs on, so these pages are the app\'s: written in markdown (rendered by the node with every character escaped), as an HTML document (served as written, on the app\'s own origin), or as a link to where the page already lives. Each page is served at /terms, /privacy and so on under the app\'s address, linked from the app\'s head, and named in its llms.txt. Every change lands in the app\'s audit log with who made it, when, the format, the size and a hash of the text. Naming no kind reports where the app stands and which pages it still ought to have: every published app its terms and privacy notice, and one that sells anything also who is selling, how to withdraw, the accessibility statement and a support contact.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            filename: { type: 'string', required: true, description: 'The app, with its extension (e.g. "shop.html").' },
+            kind: { type: 'string', description: 'terms, privacy, imprint, refunds, accessibility, cookies or support. Omit to only read where the app stands.' },
+            format: { type: 'string', description: 'markdown, html or url.' },
+            content: { type: 'string', description: 'The page text, the HTML document, or the absolute https URL.' },
+            remove: { type: 'boolean', description: 'true removes the named page.' },
+        },
+    },
+    {
+        name: 'aimeat_app_audit',
+        description: 'Read one of your apps\' audit log: every change to how the app is offered, newest first, with who made it (you, or which agent in your name), when, and what — a legal page set or removed (with the format, size and a hash of the text), the badge or install offer switched, a reviewer declared or withdrawn, search visibility, parked or unparked, forking, an access code set or cleared (never the code), copy-protection flags, the name or description. The log is the owner\'s and nobody else\'s; it is what lets an app that sells something or handles personal data show what was in force on a given day.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            filename: { type: 'string', required: true, description: 'The app, with its extension.' },
+            limit: { type: 'number', description: 'How many of the newest entries to return. Default 50, at most 500.' },
         },
     },
     {

@@ -23,6 +23,9 @@
  *     which is what keeps the import between the two files one-directional)
  * @usage registerAppOriginDocs(router, config, storage, { resolveApp, isRestricted });
  * @version-history
+ *   v1.1.0 — 2026-08-29 — The app's own legal pages at /terms, /privacy, /imprint, /refunds,
+ *     /accessibility, /cookies and /support (answered only when the app has the page), and the
+ *     Legal section of llms.txt.
  *   v1.0.0 — 2026-08-16 — Extracted from subdomains.ts (max-file-lines); the manifest + icon
  *     routes (installable apps) landed in the same change, in subdomains.ts v1.16.0.
  */
@@ -34,6 +37,10 @@ import { buildAppAgentFace } from '../services/agent-face.js';
 import { appLlmsTxt, appAgentsMd, appSitemapMd, appRootMirrorMd } from '../services/app-agent-surfaces.js';
 import { sendMarkdown } from '../services/markdown-negotiation.js';
 import { appSeoIndexable } from '../services/app-seo.js';
+import { legalLinksFor, renderLegalPage, LEGAL_KIND_INFO } from '../services/app-legal.js';
+import { APP_LEGAL_KINDS } from '../storage/types/apps.js';
+import { detectLocale } from '../i18n.js';
+import { appCsp } from '../utils/app-csp.js';
 
 export interface AppOriginDocDeps {
   resolveApp: (target: string) => Promise<AppRecord | null>;
@@ -83,8 +90,31 @@ export function registerAppOriginDocs(
     const tools = await appToolNames(storage, app.ownerGaii, app.filename);
     // text/plain, not text/markdown: llmstxt.org names that content type, and this path was
     // answering markdown — a conformance failure on a document whose whole job is conformance.
+    const origin = appOriginFor(req, config);
     res.type('text/plain; charset=utf-8')
-      .send(appLlmsTxt(config, app, appOriginFor(req, config), tools, face?.markdown));
+      .send(appLlmsTxt(config, app, origin, tools, face?.markdown, legalLinksFor(app, origin)));
+  });
+
+  // The app's own legal pages, on the app's own origin: /terms, /privacy, /imprint, /refunds,
+  // /accessibility, /cookies, /support. Registered for every kind and answered only when the app
+  // has that page; otherwise the request falls through to whatever served the path before, so an
+  // app that routes /terms itself keeps doing so until its owner writes one here. Served without
+  // the app's access code: a legal page is pre-contract information.
+  router.get(APP_LEGAL_KINDS.map((k) => LEGAL_KIND_INFO[k].path), async (req: Request, res: Response, next) => {
+    const app = await appForOrigin(req);
+    if (!app) return next();
+    const kind = APP_LEGAL_KINDS.find((k) => LEGAL_KIND_INFO[k].path === req.path);
+    const doc = kind ? app.manifest?.legal?.[kind] : undefined;
+    if (!kind || !doc) return next();
+    const page = renderLegalPage(app, kind, doc, { baseUrl: config.baseUrl, locale: detectLocale(req.headers['accept-language']) });
+    if ('redirect' in page) { res.redirect(302, page.redirect); return; }
+    // The app's base CSP (no apex framing, no frame grant): the owner's document on the owner's
+    // app, with no more reach than the app itself has on the apex.
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Content-Security-Policy', appCsp());
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+    res.send(page.html);
   });
 
   router.get('/robots.txt', async (req: Request, res: Response, next) => {

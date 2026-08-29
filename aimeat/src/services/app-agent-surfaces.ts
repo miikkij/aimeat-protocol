@@ -22,6 +22,7 @@
  *   const face = await buildAppAgentFace(config, storage, app);
  *   res.type('text/plain; charset=utf-8').send(appLlmsTxt(config, app, tools, face?.markdown));
  * @version-history
+ *   v1.1.0 — 2026-08-29 — llms.txt gains a Legal section naming the app's own pages when it has any.
  *   v1.0.0 — 2026-07-28 — Initial (agent-readability phase 12b)
  */
 import type { AimeatConfig } from '../config.js';
@@ -52,6 +53,7 @@ function identifiers(app: AppRecord): string {
  */
 export function appLlmsTxt(
   config: AimeatConfig, app: AppRecord, origin: string, tools: string[], face?: string,
+  legal: Array<{ title: string; href: string }> = [],
 ): string {
   const b = config.baseUrl.replace(/\/$/, '');
   const o = encodeURIComponent(app.ownerName);
@@ -59,6 +61,11 @@ export function appLlmsTxt(
   const toolLines = tools.length
     ? tools.map((t) => `- \`${t}\` — call via \`aimeat_app_tool_invoke { owner: "${app.ownerName}", app: "${app.filename}", tool: "${t}" }\``).join('\n')
     : '- This app publishes no priced tools.';
+  // The app's own legal pages, when it has any: an agent deciding whether to use a shop reads the
+  // terms and the privacy notice of the SHOP, which are the app's and not the node's.
+  const legalSection = legal.length
+    ? `\n## Legal\n\nThese pages are the app's own; the app answers for them, not the node.\n\n${legal.map((l) => `- [${l.title}](${l.href})`).join('\n')}\n`
+    : '';
 
   return `# ${appDisplayName(app)}
 
@@ -73,7 +80,7 @@ export function appLlmsTxt(
 - [Site map](${origin}/sitemap.md): every document this origin serves
 - [Full content](${origin}/llms-full.txt): this document, at the conventional full path
 - [MCP Server Card](${origin}/.well-known/mcp.json): the server, transport and this app's tools
-
+${legalSection}
 ## Discovery
 
 - [Tool listing](${b}/v1/apps/${o}/${f}/webmcp): every tool with its input and output schema

@@ -8,6 +8,7 @@
  *   injected once via initDetail(deps) — so there is no import cycle back through the entry module.
  * @usage import { initDetail, openDetailView, mountLoginPill, ... } from './detail.js'; initDetail({...})
  * @version-history
+ *   2026-08-29 — The "Legal pages" and "Audit log" sections (legal.js) after Marks, own published apps only.
  *   2026-08-29 — The "Marks and authorship" section (marks.js) after Search, own published apps only.
  *   2026-08-29 — Chapter numbers over the section headlines: the total is counted after the assembly
  *     and handed to the stylesheet as --dtl-chapters; the numbering itself is a CSS counter.
@@ -67,6 +68,7 @@ import { monetizeSectionInner, monetizeOnOpen, odpsSectionInner } from './moneti
 import { costSectionInner, costOnOpen } from './cost.js';
 import { seoSectionInner, seoOnOpen } from './seo.js';
 import { marksSectionInner, marksOnOpen } from './marks.js';
+import { legalSectionInner, auditSectionInner, legalOnOpen } from './legal.js';
 import { appManifestAgents } from './app-agents.js';
 import { isFavorite } from './favorites.js';
 import { saveWorkingCopy, loadCheckpoints, getCheckpoints, readCheckpoint, deleteCheckpoint, discardWorkingCopy, getDraft } from './workcopy.js';
@@ -235,6 +237,7 @@ function openDetailView(appId) {
   costOnOpen(detailServerOwner(app), app.publishedFilename || '', detailIsOwnPublished(app));
   seoOnOpen(detailServerOwner(app), app.publishedFilename || '', detailIsOwnPublished(app));
   marksOnOpen(detailServerOwner(app), app.publishedFilename || '', detailIsOwnPublished(app));
+  legalOnOpen(detailServerOwner(app), app.publishedFilename || '', detailIsOwnPublished(app));
   document.getElementById('detail-view').hidden = false;
   renderDetailView();
   // AI availability + published versions load asynchronously and re-render in place.
@@ -651,6 +654,14 @@ function renderDetailView() {
     ? '<div class="dtl-section" id="detail-marks">' + marksSectionInner() + '</div>'
     : '';
 
+  // ── LEGAL PAGES and AUDIT LOG — the app's own terms, privacy notice, imprint and the rest (the
+  //   app answers for what it does, not the node), and every change to how the app is offered.
+  //   Stable containers: legal.js re-renders both in place after a save or a load.
+  var legalHtml = (app.published && detailIsOwnPublished(app))
+    ? '<div class="dtl-section" id="detail-legal">' + legalSectionInner() + '</div>'
+      + '<div class="dtl-section" id="detail-audit">' + auditSectionInner() + '</div>'
+    : '';
+
   // ── COST & CONTRACTS (EXCHANGE G3 / TARGET-045) — what this app SOURCES (own published apps only) ──
   // Stable container: cost.js re-renders #detail-cost in place after the async load.
   var costHtml = (app.published && detailIsOwnPublished(app))
@@ -758,7 +769,7 @@ function renderDetailView() {
   bodyEl.innerHTML =
     heroHtml + bandHtml +
     statusHtml + aiHtml + aboutHtml + dataMapHtml + historyHtml + versionsHtml +
-    mgmtHtml + skillsHtml + seoHtml + marksHtml + promoteHtml + odpsHtml + monetizeHtml + costHtml + agentsHtml + actionsHtml;
+    mgmtHtml + skillsHtml + seoHtml + marksHtml + legalHtml + promoteHtml + odpsHtml + monetizeHtml + costHtml + agentsHtml + actionsHtml;
   // The chapter number over every headline ("03 / 09") is a CSS counter; only the total needs
   // counting here, and it goes on the body as a string so the stylesheet can print it. Counted
   // AFTER the assembly so a section a later load re-renders in place keeps its number.

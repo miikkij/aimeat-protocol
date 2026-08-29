@@ -5,6 +5,8 @@
  * @description MCP tool registrations for app/package management -- publishing,
  *   listing, retrieving, archiving versions, version history, sanctioned forks, and drafts (staging).
  * @version-history
+ *   v1.7.0 -- 2026-08-29 -- aimeat_app_legal_set over PATCH and GET /v1/apps/me/:filename/legal;
+ *     aimeat_app_audit over GET /v1/apps/me/:filename/audit?limit=N.
  *   v1.6.0 -- 2026-08-29 -- aimeat_app_marks_set: the badge and install-chip switches over PATCH.
  *   v1.5.0 -- 2026-08-23 -- aimeat_package_install, and aimeat_package_publish given the route's own
  *     parameters. Publish declared {name, description, content} while POST /v1/packages requires a
@@ -354,6 +356,39 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
       if (args[k] !== undefined) marks[k] = args[k];
     }
     return out(await client.patch(`/v1/apps/${encodeURIComponent(args.filename)}`, { marks }));
+  });
+
+  // → PATCH /v1/apps/:filename { legal } — one of the app's own legal pages, set or removed; with no
+  //   kind, GET /v1/apps/:owner/:filename/legal reports where the app stands. The node MCP calls
+  //   the same service the route does.
+  mcp.tool('aimeat_app_legal_set', descriptionFor('aimeat_app_legal_set'), {
+    filename: z.string().describe('The app, with its extension (e.g. "shop.html").'),
+    kind: z.enum(['terms', 'privacy', 'imprint', 'refunds', 'accessibility', 'cookies', 'support']).optional()
+      .describe('Which page. Omit to only read where the app stands.'),
+    format: z.enum(['markdown', 'html', 'url']).optional().describe('markdown, html or url.'),
+    content: z.string().optional().describe('The page text, the HTML document, or the absolute https URL.'),
+    remove: z.boolean().optional().describe('true removes the named page.'),
+  }, annotationsFor('aimeat_app_legal_set'), async (args) => {
+    if (!args.kind) {
+      // `me` in the owner slot: the node resolves the account from the token.
+      return out(await client.get(`/v1/apps/me/${encodeURIComponent(args.filename)}/legal`));
+    }
+    // Every declared field travels inside the kind object; the node reads `remove: true` as the
+    // same act as null.
+    const doc: Record<string, unknown> = {};
+    if (args.format !== undefined) doc.format = args.format;
+    if (args.content !== undefined) doc.content = args.content;
+    if (args.remove !== undefined) doc.remove = args.remove;
+    return out(await client.patch(`/v1/apps/${encodeURIComponent(args.filename)}`, { legal: { [args.kind]: doc } }));
+  });
+
+  // → GET /v1/apps/:owner/:filename/audit — the owner's audit log of the app's settings.
+  mcp.tool('aimeat_app_audit', descriptionFor('aimeat_app_audit'), {
+    filename: z.string().describe('The app, with its extension.'),
+    limit: z.number().int().min(1).max(500).optional().describe('How many of the newest entries to return. Default 50.'),
+  }, annotationsFor('aimeat_app_audit'), async (args) => {
+    // `?limit=N` makes the node answer newest-first, the same order the node MCP door gives.
+    return out(await client.get(`/v1/apps/me/${encodeURIComponent(args.filename)}/audit?limit=${args.limit ?? 50}`));
   });
 
   // → GET /v1/admin/seo/status — is this node findable, and what is left to do. Operator-only.
