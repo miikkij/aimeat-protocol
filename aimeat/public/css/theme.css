@@ -12,6 +12,10 @@
    @usage Loaded first in spa.html <head>; the theme is toggled by /js/theme.js
      which flips the data-theme attribute on <html>.
    @version-history
+     v1.37.0 — 2026-08-29 — html { overflow: clip }: a scrollIntoView() inside .page-content could scroll the
+       WINDOW by the header's height (the static agent-footer makes the document taller than the
+       viewport, and overflow: hidden does not stop programmatic scrolling), which hid the top bar and
+       left a blank band at the bottom. clip makes the window unscrollable outright.
      v1.36.0 — 2026-08-29 — --font-wordmark (Archivo Black) for AIME♥AT, which is a mark and not a headline;
        --font-poster-tracking (.01em) and --font-poster-leading (1) for the headline face, read by every
        poster headline instead of the -.035em / .9 that had been measured for Archivo Black and made
@@ -514,7 +518,13 @@ html[data-palette][data-theme] {
 }
 
 /* ── Base ── */
-html { scroll-behavior: smooth; height: 100%; }
+/* overflow: clip, not hidden. `hidden` still lets a programmatic scroll move the window, and the
+   static agent-footer below #app makes the document 70 px taller than the viewport, so every
+   scrollIntoView() inside .page-content (the organism rail, a wiki anchor, a fresh record form)
+   also slid the whole page up by the header's height: the top bar vanished and a blank band
+   appeared at the bottom. `clip` clips without creating a scroll container, so the window cannot
+   move at all and only .page-content scrolls (2026-08-29, measured on the organism page). */
+html { scroll-behavior: smooth; height: 100%; overflow: clip; }
 
 body {
   font-family: var(--font);
@@ -528,8 +538,11 @@ body {
      .page-content). This is what stops view content sliding under the header and
      removes the ~nav-height phantom overscroll that body-scroll + an in-flow
      (sticky) header produced — the content fills the space below the header and
-     scrolls within it. overflow:hidden also subsumes the old overflow-x clip. */
-  overflow: hidden;
+     scrolls within it. `clip` rather than `hidden`: hidden makes body a scroll container that a
+     scrollIntoView() can still move (the static agent-footer below #app gives it 70 px to move),
+     clip cannot scroll at all. Both html and body carry it, because once html stops propagating,
+     body's own value is what a programmatic scroll finds. */
+  overflow: clip;
   -webkit-font-smoothing: antialiased;
 }
 
