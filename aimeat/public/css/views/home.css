@@ -14,6 +14,7 @@
  *   over the showroom-sticker and night-shift alternatives. The onboarding steps keep their plain
  *   card shape: one job at a time, nothing pulling the eye away from the open step.
  * @version-history
+ *   v3.2.0 — 2026-08-29 — The margin-pattern chips in the home settings dialog (.koti-settings-pattern*).
  *   v3.1.0 — 2026-08-29 — Set for the condensed headline face: every headline reads the poster tracking
  *     and leading tokens; the nameplate centres on the avatar; the big numeral keeps .6rem from its
  *     sentence; the "what would you set up" rows sit at the strong weight, under their headline
@@ -688,6 +689,18 @@ a.koti-feed-line:hover { color: var(--accent); }
   margin-top: 1.1rem; padding-top: 1.1rem;
   border-top: 1px solid var(--border);
 }
+/* The margin pattern: nine chips, the chosen one on the sun. */
+.koti-settings-pattern { margin-top: 1.1rem; padding-top: 1.1rem; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 0.7rem; }
+.koti-settings-pattern-words { display: flex; flex-direction: column; gap: 0.2rem; }
+.koti-settings-pattern-title { font-weight: var(--font-poster-strong-weight); color: var(--text); }
+.koti-settings-pattern-hint { font-size: 0.85rem; color: var(--text-dim); line-height: 1.5; }
+.koti-settings-pattern-choices { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.koti-settings-pattern-choice {
+  background: var(--card-bg); border: 2px solid var(--text); color: var(--text); cursor: pointer;
+  padding: 0.35rem 0.7rem; font-family: var(--font-showroom-body); font-size: 0.8rem; font-weight: 700;
+}
+.koti-settings-pattern-choice:hover { box-shadow: 3px 3px 0 var(--text); }
+.koti-settings-pattern-choice.active { background: var(--sun); color: var(--on-sun); box-shadow: 3px 3px 0 var(--text); }
 .koti-settings-door {
   display: flex; flex-direction: column; gap: 0.2rem;
   margin-top: 1.4rem; padding: 0.85rem 1rem;

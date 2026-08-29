@@ -3725,6 +3725,19 @@
       "open": "Kodin asetukset",
       "title": "Kodin asetukset",
       "showAch": "Näytä saavutukset kotona",
+      "pattern": "Reunakuvio",
+      "patternHint": "Kuvio kodin, chatin ja asetusten tyhjillä reunoilla, haalenee keskelle päin. Näkyy vain leveällä näytöllä.",
+      "patternOff": "Pois",
+      "patterns": {
+        "a": "Pikseliruutu",
+        "b": "Vinoviiva",
+        "c": "Kohdistusmerkit",
+        "d": "Sydämet",
+        "e": "Kuutiot",
+        "f": "Siksak",
+        "g": "Punos",
+        "h": "Ristikko"
+      },
       "allControls": "Kaikki asetukset ja hallinta",
       "allControlsHint": "Agentit, muisti, sovellukset, pääsy ja laskutus: kaikki, mitä kodin takana on."
     },

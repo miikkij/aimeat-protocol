@@ -68,6 +68,9 @@
        tokens, and it re-declares --border — a width here, a color there — so order is the tiebreak. -->
   <link rel="stylesheet" href="/lib/aimeat-theme.css">
   <link rel="stylesheet" href="/css/theme.css">
+  <!-- The margin pattern on the home, the chat and the settings pages: a personal choice, set on
+       <html> by js/margin-pattern.js once the session is known. -->
+  <link rel="stylesheet" href="/css/margin-pattern.css">
   <!-- Canonical styles for the shared <Markdown> component — load before views so it styles
        rendered markdown everywhere the component is used (no per-view re-definition). -->
   <link rel="stylesheet" href="/css/components/markdown.css">
@@ -147,6 +150,7 @@
       "/views/surface/shared-read.js": "/views/surface/shared-read.js",
       "/js/swallowed.js": "/js/swallowed.js",
       "/js/site.js": "/js/site.js",
+      "/js/margin-pattern.js": "/js/margin-pattern.js",
       "/js/theme.js": "/js/theme.js",
       "/js/utils.js": "/js/utils.js",
       "/js/app-sandbox.js": "/js/app-sandbox.js",
@@ -372,6 +376,7 @@
     import { LOCALES } from '/js/utils.js';
     import { initThemeSystem } from '/js/theme.js';
     import { siteLink } from '/js/site.js';
+    import { loadMarginPattern } from '/js/margin-pattern.js';
     import { NotificationBell, openNotificationLink } from '/components/NotificationBell.js';
     import { OpenItemsButton } from '/components/OpenItemsButton.js';
     import { useSession } from '/js/use-session.js';
@@ -991,6 +996,11 @@
       if (window.AIMEAT?.auth?.login) {
         try { await window.AIMEAT.auth.login(); } catch (_) {}
       }
+
+      // The margin pattern is the person's own choice: read once the session is known, again
+      // whenever the sign-in changes (a sign-out takes it away).
+      loadMarginPattern();
+      window.addEventListener('aimeat-auth-change', () => { loadMarginPattern(); });
 
       // Listen for session expiry — show notification and trigger re-login
       if (window.AIMEAT?.auth?.on) {

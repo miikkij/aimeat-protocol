@@ -20,6 +20,7 @@
  *   const spaPath = resolvePublicFile('spa.html');
  *   if (spaPath) serveSpa(res, spaPath, config, '/v1/glossary');
  * @version-history
+ *   v1.1.0 — 2026-08-29 — The build stamp reaches /css/margin-pattern.css as well as theme.css.
  *   v1.0.0 — 2026-08-25 — Extracted from portal.ts (line ceiling)
  */
 import { readFileSync, existsSync } from 'node:fs';
@@ -169,9 +170,9 @@ export function serveSpa(
     /(<link rel="stylesheet" href=")(\/css\/views\/[^"?]+\.css)(")/g,
     `$1$2${v}$3`
   );
-  // Also stamp theme.css
+  // Also stamp theme.css and the margin-pattern sheet, the two shell-level sheets that change.
   html = html.replace(
-    /(<link rel="stylesheet" href=")(\/css\/theme\.css)(")/,
+    /(<link rel="stylesheet" href=")(\/css\/(?:theme|margin-pattern)\.css)(")/g,
     `$1$2${v}$3`
   );
 

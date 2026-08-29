@@ -3737,6 +3737,19 @@
       "open": "Home settings",
       "title": "Home settings",
       "showAch": "Show achievements on the home",
+      "pattern": "Margin pattern",
+      "patternHint": "A figure on the empty margins of the home, the chat and the settings, fading toward the middle. Shows on wide screens only.",
+      "patternOff": "Off",
+      "patterns": {
+        "a": "Pixel grid",
+        "b": "Diagonal hatch",
+        "c": "Registration marks",
+        "d": "Hearts",
+        "e": "Cubes",
+        "f": "Zigzag",
+        "g": "Weave",
+        "h": "Crosses"
+      },
       "allControls": "All settings and controls",
       "allControlsHint": "Agents, memory, apps, access, billing: everything behind the home."
     },
