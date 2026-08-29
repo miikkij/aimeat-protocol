@@ -3370,7 +3370,7 @@
     if (kind === "statRow") return { tiles: Array.isArray(data) ? data : [] };
     if (kind === "table") return { rows: Array.isArray(data) ? data : data && data.rows || [] };
     if (kind === "figure") return data && typeof data === "object" ? data : { value: 0 };
-    if (kind === "chart" || kind === "matrix" || kind === "graph" || kind === "waveform" || kind === "gauge" || kind === "console" || kind === "atlas" || kind === "scene3d") {
+    if (kind === "chart" || kind === "matrix" || kind === "graph" || kind === "waveform" || kind === "gauge" || kind === "console" || kind === "atlas" || kind === "map" || kind === "scene3d") {
       return { data: data && typeof data === "object" && !Array.isArray(data) ? data : null };
     }
     if (kind === "health" || kind === "queue") {
@@ -4044,6 +4044,117 @@
     };
   }
 
+  // src/static/sdk-libs/atelier/map.js
+  var leafletPromise = null;
+  function ensureLeaflet() {
+    if (window.L && window.L.map) return Promise.resolve(window.L);
+    if (leafletPromise) return leafletPromise;
+    leafletPromise = new Promise(function(ok, fail) {
+      const css = document.createElement("link");
+      css.rel = "stylesheet";
+      css.href = NODE_URL + "/lib/leaflet@1/leaflet.css";
+      document.head.appendChild(css);
+      const s = document.createElement("script");
+      s.src = NODE_URL + "/lib/leaflet@1/leaflet.js";
+      s.onload = function() {
+        ok(window.L);
+      };
+      s.onerror = function() {
+        leafletPromise = null;
+        fail(new Error("leaflet failed to load"));
+      };
+      document.head.appendChild(s);
+    });
+    return leafletPromise;
+  }
+  var TONES5 = ["ok", "warn", "err"];
+  function map(spec) {
+    const root = el("figure", { class: "ak-root ak-map" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    if (spec.title) root.appendChild(el("figcaption", { class: "ak-map__title" }, spec.title));
+    const stage = el("div", { class: "ak-map__stage" });
+    root.appendChild(stage);
+    const wait = skeleton({ target: stage, rows: 3 });
+    let destroyed = false;
+    let world = null;
+    let pending = spec.data === void 0 ? null : spec.data;
+    ensureLeaflet().then(function(L) {
+      if (destroyed) return;
+      wait.destroy();
+      const leaflet = L.map(stage, { zoomControl: true, attributionControl: true });
+      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        // The licence's condition, and simple honesty about whose map this is.
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 19
+      }).addTo(leaflet);
+      const layer = L.layerGroup().addTo(leaflet);
+      world = { L, leaflet, layer };
+      render(pending);
+    }).catch(function() {
+      if (destroyed) return;
+      wait.destroy();
+      emptyState({
+        target: stage,
+        title: spec.empty && spec.empty.title || t("atlasDown"),
+        hint: spec.empty && spec.empty.hint || ""
+      });
+    });
+    function pinIcon(L, tone) {
+      const cls = TONES5.indexOf(tone) >= 0 ? " ak-map__pin--" + tone : "";
+      return L.divIcon({
+        className: "ak-map__pinwrap",
+        html: '<span class="ak-map__pin' + cls + '"></span>',
+        iconSize: [22, 30],
+        iconAnchor: [11, 28],
+        popupAnchor: [0, -26]
+      });
+    }
+    function render(data) {
+      if (!world) {
+        pending = data;
+        return;
+      }
+      const L = world.L;
+      world.layer.clearLayers();
+      const markers = data && Array.isArray(data.markers) ? data.markers.filter(function(m) {
+        return typeof m.lon === "number" && typeof m.lat === "number";
+      }) : [];
+      for (const m of markers) {
+        const pin = L.marker([m.lat, m.lon], { icon: pinIcon(L, m.tone) });
+        if (m.label) pin.bindPopup(String(m.label));
+        if (spec.onPick) pin.on("click", function() {
+          spec.onPick(m);
+        });
+        pin.addTo(world.layer);
+      }
+      if (markers.length > 1) {
+        world.leaflet.fitBounds(L.latLngBounds(markers.map(function(m) {
+          return [m.lat, m.lon];
+        })), { padding: [36, 36] });
+      } else if (markers.length === 1) {
+        world.leaflet.setView([markers[0].lat, markers[0].lon], data && data.zoom || spec.zoom || 12);
+      } else if (data && data.center) {
+        world.leaflet.setView([data.center.lat, data.center.lon], data.zoom || spec.zoom || 10);
+      } else {
+        world.leaflet.setView([30, 10], 2);
+      }
+    }
+    return {
+      el: root,
+      set: function(patch) {
+        if (!patch || !("data" in patch)) return;
+        pending = patch.data;
+        render(patch.data);
+      },
+      destroy: function() {
+        destroyed = true;
+        if (world) world.leaflet.remove();
+        root.remove();
+        clear(stage);
+      }
+    };
+  }
+
   // src/static/sdk-libs/atelier/mosaic.js
   function mosaic(spec) {
     const host = spec.app ? spec.app.main : resolve(spec.target, document.body);
@@ -4138,6 +4249,10 @@
         case "atlas":
           return bound("atlas", function(data) {
             return atlas({ target: into, data: patchFor("atlas", data).data, title: p.title, fit: p.fit, empty, onPick: pick });
+          });
+        case "map":
+          return bound("map", function(data) {
+            return map({ target: into, data: patchFor("map", data).data, title: p.title, zoom: p.zoom, empty, onPick: pick });
           });
         case "matrix":
           return bound("matrix", function(data) {
@@ -4722,11 +4837,11 @@
 
   // src/static/sdk-libs/atelier/dialog.js
   var ENTER_FROM = { center: "12px", bottom: "100%" };
-  var TONES5 = ["plain", "danger", "celebrate", "ai"];
+  var TONES6 = ["plain", "danger", "celebrate", "ai"];
   var SIZES = ["compact", "roomy", "wide"];
   function dialog(spec) {
     const from = spec.from === "bottom" ? "bottom" : "center";
-    const tone = TONES5.indexOf(spec.tone || "") >= 0 ? spec.tone : "plain";
+    const tone = TONES6.indexOf(spec.tone || "") >= 0 ? spec.tone : "plain";
     const size = SIZES.indexOf(spec.size || "") >= 0 ? spec.size : "compact";
     const dismissible = spec.dismissible !== false;
     const node = (
@@ -4905,7 +5020,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.33.0",
+    version: "0.34.0",
     // ── Shell and navigation ──
     app,
     section,
@@ -4950,12 +5065,13 @@
     graph,
     waveform,
     scene3d,
-    // ── The ops family and the map (an admin panel is an arrangement, not app code) ──
+    // ── The ops family and the maps (an admin panel is an arrangement, not app code) ──
     health,
     queue,
     gauge,
     console: konsole,
     atlas,
+    map,
     // ── The things that open ──
     reveal,
     drawer,
