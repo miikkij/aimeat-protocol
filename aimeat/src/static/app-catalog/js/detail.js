@@ -8,6 +8,8 @@
  *   injected once via initDetail(deps) — so there is no import cycle back through the entry module.
  * @usage import { initDetail, openDetailView, mountLoginPill, ... } from './detail.js'; initDetail({...})
  * @version-history
+ *   2026-08-29 — The masthead shows the node's screenshot of the app where the icon stood (the icon
+ *     stays the fallback), and the bound skills render as rows with classes instead of inline styles.
  *   2026-08-28 — The poster face (design canvas "App Catalog Poster"): a back link, a masthead
  *     (icon, name, mono line, description, state chips, the two openers as a slab and a word) and
  *     the band with the numbers, then the sections as one column of bands. Replaces the same
@@ -703,7 +705,12 @@ function renderDetailView() {
     '<button type="button" class="dtl-back" onclick="window._launcher.closeDetailView()">← ' + escapeHtml(t('view.library')) + '</button>' +
     '<div class="dtl-mast">' +
       '<div class="dtl-mast-main">' +
-        '<div class="dtl-mast-icon">' + escapeHtml(icon) + '</div>' +
+        // The node takes a screenshot of every published app, so the picture stands where the icon
+        // would; the icon is the fallback while the shot is missing (the img removes itself on error).
+        '<div class="dtl-mast-icon' + (shotUrl ? ' dtl-mast-icon--shot' : '') + '">' +
+          (shotUrl ? '<img src="' + escapeHtml(shotUrl) + '" alt="" loading="lazy" onerror="this.parentNode.classList.remove(\'dtl-mast-icon--shot\'); this.remove()" />' : '') +
+          '<span class="dtl-mast-glyph">' + escapeHtml(icon) + '</span>' +
+        '</div>' +
         '<div class="dtl-mast-copy">' +
           '<div class="dtl-mast-name">' + escapeHtml(app.name || 'App') + '</div>' +
           (mastParts.length ? '<div class="dtl-mast-line">' + escapeHtml(mastParts.join(' · ')) + '</div>' : '') +
@@ -952,10 +959,10 @@ function detailLoadSkills(owner, filename) {
         var detach = (ownPub && s.scope === 'user')
           ? ' <button class="rename-pencil" title="' + escapeHtml(t('detail.skillDetach')) + '" onclick="window._launcher.detailSkillDetach(\'' + jsArg(s.name) + '\')">×</button>'
           : '';
-        out += '<div style="margin-bottom:.4rem">' +
-          '<code>' + escapeHtml(s.ref || s.name) + '</code>' +
-          ' <span style="color:var(--text-muted);font-size:.8rem">v' + escapeHtml(String(s.version || '')) + '</span>' + detach +
-          '<div style="color:var(--text-muted);font-size:.85rem">' + escapeHtml(s.description || '') + '</div>' +
+        out += '<div class="dtl-skill">' +
+          '<div class="dtl-skill-head"><code class="dtl-skill-ref">' + escapeHtml(s.ref || s.name) + '</code>' +
+          ' <span class="dtl-skill-ver">v' + escapeHtml(String(s.version || '')) + '</span>' + detach + '</div>' +
+          '<div class="dtl-skill-desc">' + escapeHtml(s.description || '') + '</div>' +
         '</div>';
       }
       detailSkillsHtml = out;

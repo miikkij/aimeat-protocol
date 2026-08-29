@@ -10,6 +10,10 @@
  *   this module re-renders #detail-monetize in place after loads/saves.
  * @usage import { monetizeSectionInner, monetizeOnOpen, monetizeAddTool, ... } from './monetize.js'
  * @version-history
+ *   v1.4.0 — 2026-08-29 — The poster face: a tool is one row (name and description as prose, price and
+ *     delivery as two labelled facts, the doors on the right), and the editor asks four questions in
+ *     order — what, cost, market, delivery — with the second currency and the pacing burn folded.
+ *     Every input keeps its id; the save path is untouched.
  *   v1.3.0 — 2026-07-25 — ODPS: the app-level EXCHANGE status + ODPS defaults section, the per-tool ODPS
  *     descriptor block (with an AI draft and a link to the live odps.yaml), and the blocked-listing reason
  *     on a tool row. Also fixes a data loss of the same family as v1.1.0: a tool save rebuilt the manifest
@@ -134,21 +138,23 @@ function toolRow(tool, i) {
   var binding = tool.action_id
     ? escapeHtml(tool.action_id)
     : (tool.agent ? ('→ ' + escapeHtml(tool.agent)) : t('monetize.taskToOwner'));
-  return '<div class="dtl-status-row" style="align-items:center;gap:10px;flex-wrap:wrap">' +
-      '<div class="dtl-stat" style="flex:1;min-width:160px">' +
-        '<span class="dtl-stat-val">' + escapeHtml(tool.name) + '</span>' +
-        (tool.description ? '<span class="dtl-stat-label">' + escapeHtml(tool.description) + '</span>' : '') +
+  // One tool, one row: the name and what it does on the left, the price and the delivery as two
+  // labelled facts, the two doors on the right. The description is prose, not a label.
+  return '<div class="mz-tool">' +
+      '<div class="mz-tool-main">' +
+        '<div class="mz-tool-name">' + escapeHtml(tool.name) + '</div>' +
+        (tool.description ? '<div class="mz-desc">' + escapeHtml(tool.description) + '</div>' : '') +
       '</div>' +
-      '<div class="dtl-stat"><span class="dtl-stat-label">' + t('monetize.priceCol') + '</span><span class="dtl-stat-val">' + escapeHtml(priceLabel(tool)) +
-        (tool.exchange ? ' <span class="dtl-sync ok" style="display:inline">' + t('monetize.exchangeOn') + '</span>' : '') + '</span></div>' +
-      '<div class="dtl-stat"><span class="dtl-stat-label">' + mode + '</span><span class="dtl-stat-val" style="font-size:.8rem">' + binding + '</span></div>' +
-      '<div class="dtl-btn-row" style="margin:0">' +
+      '<div class="mz-fact"><span class="mz-fact-label">' + t('monetize.priceCol') + '</span><span class="mz-fact-val">' + escapeHtml(priceLabel(tool)) +
+        (tool.exchange ? ' <span class="dtl-sync ok">' + t('monetize.exchangeOn') + '</span>' : '') + '</span></div>' +
+      '<div class="mz-fact"><span class="mz-fact-label">' + mode + '</span><span class="mz-fact-val mz-fact-val--small">' + binding + '</span></div>' +
+      '<div class="mz-tool-doors">' +
         dtlBtn(t('detail.editDetails'), 'window._launcher.monetizeEditTool(' + i + ')') +
         dtlBtn('✕', 'window._launcher.monetizeDeleteTool(' + i + ')', { variant: 'danger', title: t('monetize.deleteHint') }) +
       '</div>' +
       // A tool flagged for EXCHANGE that the projection will skip: say so here instead of leaving the
       // owner with a ticked box and an empty marketplace.
-      (odpsBlockedReason(tool) ? '<div class="od-blocked">⚠ ' + escapeHtml(odpsBlockedReason(tool)) + '</div>' : '') +
+      (odpsBlockedReason(tool) ? '<div class="od-blocked mz-tool-blocked">⚠ ' + escapeHtml(odpsBlockedReason(tool)) + '</div>' : '') +
     '</div>';
 }
 
@@ -168,58 +174,52 @@ function editorHtml(tool) {
   var second = (tool.pricesMoney || []).filter(function (p) { return p && p.currency !== cur && p.amount > 0; })[0];
   var money2Major = second ? String(second.amount / MONEY_UNIT) : '';
   var cur2 = (second && second.currency) || (cur === 'EUR' ? 'USD' : 'EUR');
-  return '<div class="dtl-ac-editor" style="margin-top:10px">' +
-      '<label class="dtl-stat-label" for="mz-name">' + t('monetize.name') + '</label>' +
-      '<input id="mz-name" class="modal-input" maxlength="80" value="' + escapeHtml(tool.name || '') + '" placeholder="summarize" style="margin:4px 0 8px" />' +
-      '<label class="dtl-stat-label" for="mz-desc">' + t('monetize.desc') + '</label>' +
-      '<input id="mz-desc" class="modal-input" maxlength="500" value="' + escapeHtml(tool.description || '') + '" style="margin:4px 0 8px" />' +
-      '<div style="display:flex;gap:10px;flex-wrap:wrap">' +
-        '<div style="flex:1;min-width:130px">' +
-          '<label class="dtl-stat-label" for="mz-morsels">' + t('monetize.priceMorsels') + '</label>' +
-          '<input id="mz-morsels" class="modal-input" type="number" min="0" step="1" value="' + ((tool.price && tool.price.morsels) || '') + '" placeholder="0" style="margin:4px 0 8px" />' +
+  // The form walks the owner through four questions in order — what the tool is, what a call costs,
+  // whether it goes on the market, and how a bought call is delivered — with the pacing burn and the
+  // ODPS description folded under the question they belong to. Every field keeps its id, so the
+  // save path below reads the same inputs it always did.
+  var field = function (id, label, control, hint) {
+    return '<div class="mz-field"><label class="mz-label" for="' + id + '">' + escapeHtml(label) + '</label>' + control +
+      (hint ? '<div class="mz-hint">' + escapeHtml(hint) + '</div>' : '') + '</div>';
+  };
+  var group = function (n, title, lede, body) {
+    return '<div class="mz-group"><div class="mz-group-head"><span class="mz-group-n">' + n + '</span><span class="mz-group-title">' + escapeHtml(title) + '</span></div>' +
+      (lede ? '<div class="mz-group-lede">' + escapeHtml(lede) + '</div>' : '') + body + '</div>';
+  };
+  return '<div class="dtl-ac-editor mz-form">' +
+      group(1, t('mz.group.what'), '',
+        field('mz-name', t('monetize.name'), '<input id="mz-name" class="modal-input" maxlength="80" value="' + escapeHtml(tool.name || '') + '" placeholder="summarize" />', '') +
+        field('mz-desc', t('monetize.desc'), '<input id="mz-desc" class="modal-input" maxlength="500" value="' + escapeHtml(tool.description || '') + '" />', t('mz.descHint'))) +
+      group(2, t('mz.group.price'), t('mz.priceLede'),
+        '<div class="mz-grid mz-grid--price">' +
+          field('mz-morsels', t('monetize.priceMorsels'), '<input id="mz-morsels" class="modal-input" type="number" min="0" step="1" value="' + ((tool.price && tool.price.morsels) || '') + '" placeholder="0" />', '') +
+          field('mz-money', t('monetize.priceMoney'), '<input id="mz-money" class="modal-input" inputmode="decimal" value="' + escapeHtml(moneyMajor) + '" placeholder="0.002" />', '') +
+          field('mz-currency', t('monetize.currency'), currencySelect('mz-currency', cur), '') +
         '</div>' +
-        '<div style="flex:1;min-width:130px">' +
-          '<label class="dtl-stat-label" for="mz-money">' + t('monetize.priceMoney') + '</label>' +
-          '<input id="mz-money" class="modal-input" inputmode="decimal" value="' + escapeHtml(moneyMajor) + '" placeholder="0.002" style="margin:4px 0 8px" />' +
-        '</div>' +
-        '<div style="min-width:90px">' +
-          '<label class="dtl-stat-label" for="mz-currency">' + t('monetize.currency') + '</label>' +
-          currencySelect('mz-currency', cur) +
-        '</div>' +
-      '</div>' +
-      '<div style="display:flex;gap:10px;flex-wrap:wrap">' +
-        '<div style="flex:1;min-width:130px">' +
-          '<label class="dtl-stat-label" for="mz-money2">' + t('monetize.money2') + '</label>' +
-          '<input id="mz-money2" class="modal-input" inputmode="decimal" value="' + escapeHtml(money2Major) + '" placeholder="0.002" style="margin:4px 0 4px" />' +
-        '</div>' +
-        '<div style="min-width:90px">' +
-          '<label class="dtl-stat-label" for="mz-currency2">' + t('monetize.currency2') + '</label>' +
-          currencySelect('mz-currency2', cur2) +
-        '</div>' +
-      '</div>' +
-      '<div class="dtl-sync none" style="margin:0 0 8px">' + t('monetize.money2Hint') + '</div>' +
-      '<label class="dtl-stat-label" style="display:flex;align-items:center;gap:8px;cursor:pointer">' +
-        '<input id="mz-exchange" type="checkbox"' + (tool.exchange ? ' checked' : '') + ' />' +
-        t('monetize.exchange') +
-      '</label>' +
-      '<div class="dtl-sync none" style="margin:4px 0 8px">' + t('monetize.exchangeHint') + '</div>' +
-      // Pacing, not price: this is what a call BURNS to bound how fast the tool can be consumed. It is
-      // separate from every price above precisely because it is not revenue — nobody is credited it.
-      '<label class="dtl-stat-label" for="mz-toll">' + t('monetize.toll') + '</label>' +
-      '<input id="mz-toll" class="modal-input" type="number" min="0" max="100" step="1" value="'
-        + (typeof tool.tollMorsels === 'number' ? tool.tollMorsels : '') + '" placeholder="0" style="margin:4px 0 4px" />' +
-      '<div class="dtl-sync none" style="margin:0 0 8px">' + t('monetize.tollHint') + '</div>' +
-      odpsToolFieldsHtml(tool, mzOfferings[tool.name || ''] || '', {
-        appId: mzAppId, ownerGhii: mzOwnerGhiiOf(), toolName: tool.name || '', actionId: tool.action_id || '',
-        appProvenance: (mzDoc && mzDoc.provenance) || null, timing: mzTiming[tool.name || ''] || null,
-      }) +
-      '<label class="dtl-stat-label" for="mz-action">' + t('monetize.actionId') + '</label>' +
-      '<input id="mz-action" class="modal-input" maxlength="200" value="' + escapeHtml(tool.action_id || '') + '" placeholder="ext:my-extension:summarize" style="margin:4px 0 4px" />' +
-      '<div class="dtl-sync none" style="margin:0 0 8px">' + t('monetize.actionIdHint') + '</div>' +
-      '<label class="dtl-stat-label" for="mz-agent">' + t('monetize.agent') + '</label>' +
-      '<input id="mz-agent" class="modal-input" maxlength="100" value="' + escapeHtml(tool.agent || '') + '" placeholder="assistant" style="margin:4px 0 4px" />' +
-      '<div class="dtl-sync none" style="margin:0 0 10px">' + t('monetize.agentHint') + '</div>' +
-      '<div class="dtl-btn-row">' +
+        '<details class="mz-more"><summary class="mz-more-head">' + escapeHtml(t('mz.more.price')) + '</summary>' +
+          '<div class="mz-grid mz-grid--price">' +
+            field('mz-money2', t('monetize.money2'), '<input id="mz-money2" class="modal-input" inputmode="decimal" value="' + escapeHtml(money2Major) + '" placeholder="0.002" />', '') +
+            field('mz-currency2', t('monetize.currency2'), currencySelect('mz-currency2', cur2), '') +
+          '</div>' +
+          '<div class="mz-hint">' + escapeHtml(t('monetize.money2Hint')) + '</div>' +
+          // Pacing, not price: this is what a call BURNS to bound how fast the tool can be consumed. It is
+          // separate from every price above precisely because it is not revenue — nobody is credited it.
+          field('mz-toll', t('monetize.toll'), '<input id="mz-toll" class="modal-input" type="number" min="0" max="100" step="1" value="'
+            + (typeof tool.tollMorsels === 'number' ? tool.tollMorsels : '') + '" placeholder="0" />', t('monetize.tollHint')) +
+        '</details>') +
+      group(3, t('mz.group.market'), t('mz.marketLede'),
+        '<label class="mz-check"><input id="mz-exchange" type="checkbox"' + (tool.exchange ? ' checked' : '') + ' /><span>' + escapeHtml(t('monetize.exchange')) + '</span></label>' +
+        '<div class="mz-hint">' + escapeHtml(t('monetize.exchangeHint')) + '</div>' +
+        odpsToolFieldsHtml(tool, mzOfferings[tool.name || ''] || '', {
+          appId: mzAppId, ownerGhii: mzOwnerGhiiOf(), toolName: tool.name || '', actionId: tool.action_id || '',
+          appProvenance: (mzDoc && mzDoc.provenance) || null, timing: mzTiming[tool.name || ''] || null,
+        })) +
+      group(4, t('mz.group.delivery'), t('mz.deliveryLede'),
+        '<div class="mz-grid">' +
+          field('mz-action', t('monetize.actionId'), '<input id="mz-action" class="modal-input" maxlength="200" value="' + escapeHtml(tool.action_id || '') + '" placeholder="ext:my-extension:summarize" />', t('monetize.actionIdHint')) +
+          field('mz-agent', t('monetize.agent'), '<input id="mz-agent" class="modal-input" maxlength="100" value="' + escapeHtml(tool.agent || '') + '" placeholder="assistant" />', t('monetize.agentHint')) +
+        '</div>') +
+      '<div class="dtl-btn-row mz-actions">' +
         dtlBtn(t('detail.saveDetails'), 'window._launcher.monetizeSaveTool()', { variant: 'primary', disabled: mzBusy }) +
         dtlBtn(t('detail.cancelEdit'), 'window._launcher.monetizeCancelEdit()') +
       '</div>' +

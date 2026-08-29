@@ -861,22 +861,20 @@ function generateSharePrompt(app) {
 // ── Generate Homepage Prompt ──────────────────────
 
 function generateHomepagePrompt() {
-  if (getMainApps().length === 0) {
-    showNotice('Add some apps first before generating a homepage.');
+  // The catalog is server-only, so the apps are the owner's server apps; the old browser-local
+  // list is always empty now and the button did nothing but say "add some apps first".
+  var apps = buildLibraryEntries([], ownServerApps);
+  if (apps.length === 0) {
+    showNotice(t('homepage.needApps'));
     return;
   }
 
-  var appList = getMainApps().map(function(app) {
-    var launchInfo = '';
-    if (app.url) {
-      launchInfo = 'URL: ' + app.url;
-    } else {
-      launchInfo = 'Local HTML app (user will open it from their launcher)';
-    }
+  var appList = apps.map(function(app) {
+    var launchInfo = app.viewUrl ? ('URL: ' + app.viewUrl) : 'Local HTML app (user will open it from their launcher)';
     return '- ' + (app.icon || '') + ' ' + app.name +
       (app.description ? ' (' + app.description + ')' : '') +
       ' [' + launchInfo + ']' +
-      (app.tags.length ? ' Tags: ' + app.tags.join(', ') : '');
+      ((app.tags || []).length ? ' Tags: ' + app.tags.join(', ') : '');
   }).join('\n');
 
   var prompt = 'Create a single HTML file that serves as my personal homepage/dashboard.\n\n' +
@@ -896,7 +894,7 @@ function generateHomepagePrompt() {
   var textarea = document.getElementById('source-code');
   var title = document.getElementById('source-title');
 
-  title.textContent = 'Generate Homepage - Copy this prompt to AI';
+  title.textContent = t('homepage.title');
   textarea.value = prompt;
   overlay.dataset.appName = 'Homepage';
   overlay.hidden = false;
