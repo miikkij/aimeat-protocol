@@ -13,6 +13,8 @@
  *   openEmailCompletion, sendEmailCode, showView, capture/restoreInputs }.
  * @usage import { showLoginModal } from './modal.js';
  * @version-history
+ *   v1.6.0 — 2026-08-29 — Three ways out: an X in the top-right corner (the one people look for first),
+ *     Escape, and a click on the page behind; the last two close only while nothing has been typed.
  *   v1.5.1 — 2026-08-29 — A field's hint shows only while the person is in that field or has written in
  *     it (the has-value class modal-styles.js reads); the create tab's headline is "Welcome in.".
  *   v1.5.0 — 2026-08-29 — The poster face (design canvas "AIMEAT Sign-in Dialog", headline-led): the
@@ -170,11 +172,17 @@ export function showLoginModal(opts, renderBtn) {
       // that node's /locales/<tag>.json, so the list of buttons and the list of files are the same
       // list. Writing the languages out here is how the switch came to offer two while the node
       // served three.
+      + '<div class="aimeat-crumb-right">'
       + '<div class="aimeat-langsw" role="group" aria-label="' + escHtml(i.switchLanguage || 'Language') + '">'
       + MODAL_LANGS.map(function (l) {
         return '<button type="button" class="aimeat-lang' + (lang === l ? ' active' : '')
           + '" data-lang="' + l + '">' + l.toUpperCase() + '</button>';
       }).join('')
+      + '</div>'
+      // The close control people look for first: top-right, always there. Cancel under the
+      // form stays for the people who read.
+      + '<button type="button" id="aimeat-close-btn" class="aimeat-close" aria-label="' + escHtml(i.closeDialog || 'Close') + '">'
+      + '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13"></path></svg></button>'
       + '</div>'
       + '</div>'
       // The masthead: one sentence in the poster face, and the line under it. Which tab is open
@@ -332,10 +340,28 @@ export function showLoginModal(opts, renderBtn) {
       b.addEventListener('click', function () { switchLang(b.getAttribute('data-lang')); });
     });
 
-    ['aimeat-cancel-btn', 'aimeat-reg-cancel-btn'].forEach(function (id) {
+    ['aimeat-cancel-btn', 'aimeat-reg-cancel-btn', 'aimeat-close-btn'].forEach(function (id) {
       var el = document.getElementById(id);
       if (el) el.addEventListener('click', function () { modal.remove(); });
     });
+
+    // Three ways out, and one rule: the X and Cancel always close; a click on the dim page
+    // behind the dialog, and Escape, close only while nothing has been typed, because losing
+    // a half-filled form to a stray click is worse than a dialog that stays.
+    function holdsTypedInput() {
+      var inputs = modal.querySelectorAll('.aimeat-inp');
+      for (var k = 0; k < inputs.length; k++) if (/** @type {any} */ (inputs[k]).value) return true;
+      return false;
+    }
+    var scrim = modal.querySelector('.aimeat-scrim');
+    if (scrim) scrim.addEventListener('mousedown', function (e) {
+      if (e.target === scrim && !holdsTypedInput()) modal.remove();
+    });
+    function onKey(e) {
+      if (!document.body.contains(modal)) { document.removeEventListener('keydown', onKey); return; }
+      if (e.key === 'Escape' && !holdsTypedInput()) modal.remove();
+    }
+    document.addEventListener('keydown', onKey);
 
     // Tab switch. Re-renders (so the header line, the body and the benefits footer all follow) and
     // carries every typed value across, because switching tabs is not a reason to lose your work.

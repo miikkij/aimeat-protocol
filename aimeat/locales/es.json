@@ -4686,7 +4686,8 @@
     "usernameRuleEdges": "Empieza y termina con una letra o un dígito",
     "usernameLowercase": "Las mayúsculas se convierten en minúsculas.",
     "displayNameWhy": "Vale la pena llenarlo: sin él, tu nombre de usuario es el nombre que todos ven.",
-    "errUserInvalid": "Un nombre de usuario tiene de 3 a 64 caracteres: letras de la a a la z, dígitos y guiones, y empieza y termina con una letra o un dígito."
+    "errUserInvalid": "Un nombre de usuario tiene de 3 a 64 caracteres: letras de la a a la z, dígitos y guiones, y empieza y termina con una letra o un dígito.",
+    "closeDialog": "Cerrar"
   },
   "morsels": {
     "name": "morsel de corazón",

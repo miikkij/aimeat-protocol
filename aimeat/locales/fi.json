@@ -4890,7 +4890,8 @@
     "usernameRuleEdges": "Alkaa ja päättyy kirjaimeen tai numeroon",
     "usernameLowercase": "Isot kirjaimet muuttuvat pieniksi.",
     "displayNameWhy": "Kannattaa täyttää: ilman sitä käyttäjänimesi on se nimi, jonka kaikki näkevät.",
-    "errUserInvalid": "Käyttäjänimessä on 3–64 merkkiä: kirjaimia a–z, numeroita ja väliviivoja, ja se alkaa ja päättyy kirjaimeen tai numeroon."
+    "errUserInvalid": "Käyttäjänimessä on 3–64 merkkiä: kirjaimia a–z, numeroita ja väliviivoja, ja se alkaa ja päättyy kirjaimeen tai numeroon.",
+    "closeDialog": "Sulje"
   },
   "morsels": {
     "name": "sydänmurunen",

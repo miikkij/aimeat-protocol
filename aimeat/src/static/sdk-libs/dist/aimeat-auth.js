@@ -440,6 +440,11 @@
     ".aimeat-mark svg{width:13px;height:13px;fill:" + accent + "}",
     ".aimeat-mark b{font-weight:inherit;color:" + accent + "}",
     ".aimeat-host{font:400 12px/1 " + mono + ";color:" + dim + ";overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
+    ".aimeat-crumb-right{display:flex;align-items:center;gap:8px;flex:0 0 auto}",
+    ".aimeat-close{appearance:none;width:26px;height:26px;padding:0;margin:0;display:inline-flex;align-items:center;justify-content:center;",
+    "border:2px solid " + ink + ";background:transparent;color:" + ink + ";cursor:pointer;transition:color .12s,border-color .12s}",
+    ".aimeat-close svg{width:12px;height:12px;stroke:currentColor;stroke-width:2.5;fill:none;stroke-linecap:square}",
+    ".aimeat-close:hover{color:" + accent + ";border-color:" + accent + "}",
     ".aimeat-langsw{display:inline-flex;align-items:stretch;height:26px;flex:0 0 auto;border:2px solid " + ink + "}",
     ".aimeat-lang{appearance:none;border:0;background:transparent;color:" + ink + ";opacity:.6;font:700 11px/1 " + font + ";",
     "letter-spacing:.4px;padding:0 10px;margin:0;cursor:pointer;display:inline-flex;align-items:center;transition:opacity .12s}",
@@ -617,9 +622,9 @@
       function field(label, input, hint, opt) {
         return '<div class="aimeat-field"><label class="aimeat-label"><span>' + escHtml(label) + "</span>" + (opt ? '<span class="aimeat-opt">' + escHtml(opt) + "</span>" : "") + "</label>" + input + (hint || "") + "</div>";
       }
-      return "<style>" + MODAL_CSS + '</style><div class="aimeat-scrim"><div class="aimeat-dlg' + (anim ? " aimeat-in" : "") + '"><div class="aimeat-head"><div class="aimeat-crumb"><div class="aimeat-brand"><span class="aimeat-mark">AIME' + HEART_SVG + "<b>AT</b></span>" + (NODE_HOST ? '<span class="aimeat-host">' + escHtml(NODE_HOST) + " /</span>" : "") + '</div><div class="aimeat-langsw" role="group" aria-label="' + escHtml(i2.switchLanguage || "Language") + '">' + MODAL_LANGS.map(function(l) {
+      return "<style>" + MODAL_CSS + '</style><div class="aimeat-scrim"><div class="aimeat-dlg' + (anim ? " aimeat-in" : "") + '"><div class="aimeat-head"><div class="aimeat-crumb"><div class="aimeat-brand"><span class="aimeat-mark">AIME' + HEART_SVG + "<b>AT</b></span>" + (NODE_HOST ? '<span class="aimeat-host">' + escHtml(NODE_HOST) + " /</span>" : "") + '</div><div class="aimeat-crumb-right"><div class="aimeat-langsw" role="group" aria-label="' + escHtml(i2.switchLanguage || "Language") + '">' + MODAL_LANGS.map(function(l) {
         return '<button type="button" class="aimeat-lang' + (lang2 === l ? " active" : "") + '" data-lang="' + l + '">' + l.toUpperCase() + "</button>";
-      }).join("") + '</div></div><h2 class="aimeat-headline">' + escHtml(isReg ? i2.headlineNew || "Welcome in." : i2.headlineReturning || "Welcome back.") + '</h2><p class="aimeat-line">' + escHtml(isReg ? i2.lineNew || "Pick a username and password." : i2.descReturning || "Enter the username or email you signed up with.") + '</p><div class="aimeat-tabs" role="tablist"><button type="button" role="tab" class="aimeat-tab' + (isReg ? "" : " active") + '" data-tab="signin" aria-selected="' + (isReg ? "false" : "true") + '">' + escHtml(i2.tabSignIn || "Sign in") + '</button><button type="button" role="tab" class="aimeat-tab' + (isReg ? " active" : "") + '" data-tab="register" aria-selected="' + (isReg ? "true" : "false") + '">' + escHtml(i2.tabRegister || "Create account") + '</button></div></div><div id="aimeat-modal-body" class="aimeat-body"><div id="aimeat-tab-signin"' + (isReg ? ' style="display:none"' : "") + ">" + field(
+      }).join("") + '</div><button type="button" id="aimeat-close-btn" class="aimeat-close" aria-label="' + escHtml(i2.closeDialog || "Close") + '"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13"></path></svg></button></div></div><h2 class="aimeat-headline">' + escHtml(isReg ? i2.headlineNew || "Welcome in." : i2.headlineReturning || "Welcome back.") + '</h2><p class="aimeat-line">' + escHtml(isReg ? i2.lineNew || "Pick a username and password." : i2.descReturning || "Enter the username or email you signed up with.") + '</p><div class="aimeat-tabs" role="tablist"><button type="button" role="tab" class="aimeat-tab' + (isReg ? "" : " active") + '" data-tab="signin" aria-selected="' + (isReg ? "false" : "true") + '">' + escHtml(i2.tabSignIn || "Sign in") + '</button><button type="button" role="tab" class="aimeat-tab' + (isReg ? " active" : "") + '" data-tab="register" aria-selected="' + (isReg ? "true" : "false") + '">' + escHtml(i2.tabRegister || "Create account") + '</button></div></div><div id="aimeat-modal-body" class="aimeat-body"><div id="aimeat-tab-signin"' + (isReg ? ' style="display:none"' : "") + ">" + field(
         i2.identifierLabel || "Username or email",
         '<input id="aimeat-username" class="aimeat-inp" autocomplete="username" placeholder="' + escHtml(i2.identifierPlaceholder || "Username or email") + '">'
       ) + field(
@@ -651,12 +656,32 @@
           switchLang(b.getAttribute("data-lang"));
         });
       });
-      ["aimeat-cancel-btn", "aimeat-reg-cancel-btn"].forEach(function(id) {
+      ["aimeat-cancel-btn", "aimeat-reg-cancel-btn", "aimeat-close-btn"].forEach(function(id) {
         var el = document.getElementById(id);
         if (el) el.addEventListener("click", function() {
           modal.remove();
         });
       });
+      function holdsTypedInput() {
+        var inputs = modal.querySelectorAll(".aimeat-inp");
+        for (var k = 0; k < inputs.length; k++) if (
+          /** @type {any} */
+          inputs[k].value
+        ) return true;
+        return false;
+      }
+      var scrim = modal.querySelector(".aimeat-scrim");
+      if (scrim) scrim.addEventListener("mousedown", function(e) {
+        if (e.target === scrim && !holdsTypedInput()) modal.remove();
+      });
+      function onKey(e) {
+        if (!document.body.contains(modal)) {
+          document.removeEventListener("keydown", onKey);
+          return;
+        }
+        if (e.key === "Escape" && !holdsTypedInput()) modal.remove();
+      }
+      document.addEventListener("keydown", onKey);
       modal.querySelectorAll(".aimeat-tab").forEach(function(b) {
         b.addEventListener("click", function() {
           var next = b.getAttribute("data-tab");
