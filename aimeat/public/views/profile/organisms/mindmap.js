@@ -15,6 +15,9 @@
  *   buildOrganismMindmap / buildWorkspaceMindmap (chart-type aware, used here + by the timeline)
  * @usage import { StructureMindmap } from '/views/profile/organisms/mindmap.js';
  * @version-history
+ *   v1.2.0 — 2026-08-29 — `defaultOpen`: the organism home puts the map inside a fold of its own, so
+ *     the map opens with the fold instead of asking for a second click. The toggle names the map
+ *     without an emoji in front of it.
  *   v1.0.0 — 2026-06-22 — Initial: clickable organism/workspace mindmap with level/users/activity/heatmap.
  *   v1.1.0 — 2026-06-22 — Chart types (mindmap default + flowchart LR/TD), per-org/ws localStorage
  *     persistence, label-text click resolution for mindmap mode.
@@ -241,10 +244,10 @@ function saveOpts(storageKey, opts) {
  * StructureMindmap — collapsible interactive map. Default collapsed so the Mermaid bundle only loads
  * when asked for. scope 'organism' (root → workspaces → spaces + members/agents) or 'workspace'.
  * onNavigate(target): { type:'workspace', wsId } | { type:'space', wsId?, space } | { type:'members' }.
- * @param {{ scope:'organism'|'workspace', graph:object, onNavigate:(t:object)=>void, label?:string, storageKey?:string }} props
+ * @param {{ scope:'organism'|'workspace', graph:object, onNavigate:(t:object)=>void, label?:string, storageKey?:string, defaultOpen?:boolean }} props
  */
-export function StructureMindmap({ scope, graph, onNavigate, label, storageKey }) {
-  const [open, setOpen] = useState(false);
+export function StructureMindmap({ scope, graph, onNavigate, label, storageKey, defaultOpen }) {
+  const [open, setOpen] = useState(!!defaultOpen);
   const [opts, setOpts] = useState(() => loadOpts(storageKey));
 
   if (!graph) return null;
@@ -273,7 +276,7 @@ export function StructureMindmap({ scope, graph, onNavigate, label, storageKey }
     <div class="pj-mindmap">
       <button class="pj-struct-toggle" aria-expanded=${open} onClick=${() => setOpen(o => !o)}>
         <span class="pj-struct-caret">${open ? '▾' : '▸'}</span>
-        <span>${'🗺️ '}${lbl}</span>
+        <span>${lbl}</span>
       </button>
       ${open ? html`
         <div class="pj-mindmap-body card-detail">

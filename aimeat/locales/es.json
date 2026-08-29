@@ -4819,6 +4819,39 @@
   "organisms": {
     "title": "Organismos",
     "backToList": "Todos los organismos",
+    "railTitle": "En este organismo",
+    "figWorkspaces": "espacios de trabajo",
+    "figMembers": "miembros",
+    "figAgents": "agentes",
+    "figLast": "último cambio",
+    "noAgentsYet": "Ninguno todavía",
+    "happened": "Qué ha pasado",
+    "fullTimeline": "Línea de tiempo completa →",
+    "mapAndToc": "Mapa e índice",
+    "mapAndTocHint": "La misma estructura de dos formas, que se abren solo si las pides: un dibujo en el que puedes hacer clic y una tabla fila por fila.",
+    "forAi": "Para tu IA",
+    "forAiTitle": "Trae tu IA aquí",
+    "forAiHint": "Una instrucción hecha a partir de la estructura real de este organismo",
+    "exportBackup": "Exportar copia de seguridad",
+    "readmeFold": "README",
+    "readmeEmpty": "Todavía no hay README: una página que dice de qué trata este organismo, escrita por ti o por tu agente.",
+    "policyShort": {
+      "open": "abierto",
+      "approval_required": "con aprobación",
+      "invite_only": "solo por invitación"
+    },
+    "setNameDesc": "Nombre y descripción",
+    "setAccess": "Quién entra",
+    "setVisibility": "Quién ve",
+    "setDanger": "Archivar y eliminar",
+    "setJoin": "Unirse",
+    "setOrganismVis": "Organismo",
+    "savesNote": "Los cambios se aplican al momento; un agente los ve en su próxima conexión.",
+    "reversible": "Reversible",
+    "irreversible": "No se puede deshacer",
+    "backToOrganism": "Volver al organismo",
+    "typeCustom": "Otro",
+    "typeCustomPlaceholder": "Tu propia palabra, p. ej. banda, familia, gremio",
     "noWorkspace": "El espacio de trabajo está creado, pero todavía está vacío. Dale una estructura: la plantilla de proyecto de un clic cubre objetivos, planes, entregas y decisiones, o describe abajo para qué es este espacio y una IA le diseña la estructura.",
     "setupWorkspace": "Preparar el espacio de trabajo",
     "workspaceReady": "Espacio de trabajo listo",
@@ -6335,7 +6368,8 @@
           "organism": {
             "read": "Leer el contenido publicado de los espacios compartidos a los que perteneces.",
             "write": "Crear espacios compartidos, escribir y publicar documentos en ellos, y comentar.",
-            "invite": "Dejar entrar a otras personas: invitar miembros y repartir acceso a un espacio compartido."
+            "invite": "Dejar entrar a otras personas: invitar miembros y repartir acceso a un espacio compartido.",
+        "rows": "Añadir filas al registro de eventos de un espacio compartido y leerlas, cuando el espacio se ha abierto a esta app o agente por su nombre. Nada más del espacio se abre."
           },
           "outbound": {
             "send": "Mandar correo desde la dirección de tu empresa a los contactos que tienes guardados."

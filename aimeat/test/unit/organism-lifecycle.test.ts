@@ -7,6 +7,8 @@
  * @structure describe('organism lifecycle') — create, update, join, leave.
  * @usage cd aimeat && pnpm exec vitest run test/unit/organism-lifecycle.test.ts
  * @version-history
+ *   v1.1.0 — 2026-08-29 — The type is free text: the create case asserts the word is kept (trimmed,
+ *     cut at 40) instead of replaced by "community"; a blank one still falls back.
  *   v1.0.0 — 2026-08-11 — Initial (August 2026 MCP audit step 8).
  */
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -88,15 +90,27 @@ describe('organism lifecycle (shared by /v1/organisms and the aimeat_organism_* 
         expect(board?.visibility).toBe('shared');
     });
 
-    it('create falls back to the defaults for an unrecognised type or policy', async () => {
+    it('create keeps a free-text type and falls back to the defaults for an unrecognised policy', async () => {
+        // The type is the person's own word since 2026-08-29 (40 characters, trimmed); the policy
+        // and the visibility are still enums with a safe default.
         const out = await createOrganismRecord({ storage, config }, CREATOR, {
-            name: 'Fallbacks', type: 'guild', joinPolicy: 'whenever', visibility: 'secret',
+            name: 'Fallbacks', type: '  guild ', joinPolicy: 'whenever', visibility: 'secret',
         });
         expect(out.ok).toBe(true);
         if (!out.ok) return;
-        expect(out.organism.type).toBe('community');
+        expect(out.organism.type).toBe('guild');
         expect(out.organism.joinPolicy).toBe('open');
         expect(out.organism.visibility).toBe('public');
+
+        const blank = await createOrganismRecord({ storage, config }, CREATOR, { name: 'Blank type', type: '   ' });
+        expect(blank.ok).toBe(true);
+        if (!blank.ok) return;
+        expect(blank.organism.type).toBe('community');
+
+        const long = await createOrganismRecord({ storage, config }, CREATOR, { name: 'Long type', type: 'x'.repeat(60) });
+        expect(long.ok).toBe(true);
+        if (!long.ok) return;
+        expect(long.organism.type).toHaveLength(40);
     });
 
     it('update refuses an unrecognised visibility instead of dropping it', async () => {

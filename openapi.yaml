@@ -2381,8 +2381,11 @@ components:
           description: Long description of the organism
         type:
           type: string
-          enum: [club, team, community, project]
-          description: Type of group entity
+          maxLength: 40
+          description: >-
+            What kind of group this is, in the owner's own word (free text since 2026-08-29).
+            Five presets come with a translation on screen: community, team, club, cooperative,
+            project.
           example: club
         location:
           type: object
@@ -25090,7 +25093,8 @@ paths:
                   maxLength: 2000
                 type:
                   type: string
-                  enum: [club, team, community, project]
+                  maxLength: 40
+                  description: Free text; the presets are community, team, club, cooperative, project.
                 location:
                   type: object
                   properties:
@@ -27031,6 +27035,13 @@ paths:
         updates rather than duplicates. `occurred_at` is when the thing happened in the world and
         defaults to now; it is the search axis, and it is deliberately not the same as when the row
         landed here, which is what retention keys on.
+
+        An APP (a role-'app' session, the token a published app holds in a person's browser) reaches
+        a row space by the two-hand rule: the organism names the app in the space's manifest
+        (`objectTypes[].apps: ["owner/filename"]`) and the person approved the `organism:rows` scope
+        at sign-in. With both, and while the person is an active member, the app appends to and
+        reads back that one space; a space that does not name the app answers 403 and says so, a
+        grant without the scope is refused at the door, and nothing else on the organism opens.
 
         Refuses before writing: the space must exist and be a row space, the caller must pass the
         organism namespace rule and the space's `writeRole`, every row must be inside

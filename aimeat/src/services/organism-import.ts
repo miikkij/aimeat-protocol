@@ -9,6 +9,8 @@
  * @structure importOrganism(storage, config, { importerGaii, importerOwner, zip }) ·
  *   restoreOrganismFromFiles(storage, config, { importerGaii, importerOwner, files })
  * @version-history
+ *   v1.2.0 -- 2026-08-29 -- An imported type is kept as written (free text, cut to 40 characters); only an
+ *     empty one falls back to "project".
  *   v1.1.0 -- 2026-06-24 -- Secretary P5 (S-B): extract restoreOrganismFromFiles() (the create-org +
  *     restore-workspaces core operating on an already-unzipped file map) so the use-case template
  *     instantiate flow can reuse it without re-implementing organism creation. importOrganism now
@@ -66,7 +68,9 @@ export async function restoreOrganismFromFiles(
 
   const o = oj.organism;
   const name = (o.name && String(o.name).trim()) || 'Imported organism';
-  const type = ['community', 'team', 'club', 'cooperative', 'project'].includes(o.type ?? '') ? (o.type as string) : 'project';
+  // A type is free text (2026-08-29): keep the exported word, cut to a label; only an empty one
+  // falls back.
+  const type = typeof o.type === 'string' && o.type.trim() ? o.type.trim().slice(0, 40) : 'project';
   const joinPolicy = ['open', 'approval_required', 'invite_only'].includes(o.joinPolicy ?? '') ? (o.joinPolicy as string) : 'invite_only';
   const visibility = ['public', 'listed', 'private'].includes(o.visibility ?? '') ? (o.visibility as string) : 'private';
 
@@ -79,7 +83,7 @@ export async function restoreOrganismFromFiles(
     visibility: visibility === 'public' ? 'public' : 'shared', ownerGaii: importerGaii, allowedGaiis: [], createdAt: now,
   });
   await storage.createOrganism({
-    id, name, description: o.description || '', type: type as 'community' | 'team' | 'club' | 'cooperative' | 'project',
+    id, name, description: o.description || '', type,
     location: {}, interests: Array.isArray(o.interests) ? o.interests as string[] : [],
     // An import makes a NEW organism here, so the importer both made it and holds it. The exporting
     // node's creator is not carried over: they have no account on this node to be an owner of.

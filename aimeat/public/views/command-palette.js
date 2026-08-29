@@ -13,13 +13,14 @@
  * @structure CommandPalette({ navigate })
  * @usage import { CommandPalette } from '/views/command-palette.js';  html`<${CommandPalette} navigate=${navigate} />`
  * @version-history
+ *   v1.0.1 — 2026-08-29 — A free-text organism type shows as written, not as a raw locale key.
  *   v1.0.0 — 2026-06-22 — Initial: Cmd-K quick-switcher over librarian search + organism names + recents.
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t } from '/js/i18n.js';
+import { t, tOr } from '/js/i18n.js';
 import { Modal } from '/components/Modal.js';
 import { SearchBar } from '/components/SearchBar.js';
 import { Spinner } from '/components/Spinner.js';
@@ -98,7 +99,7 @@ export function CommandPalette({ navigate }) {
   const query = q.trim();
   const orgMatches = query.length >= 2
     ? orgs.filter(o => (o.name || '').toLowerCase().includes(query.toLowerCase())).slice(0, 6)
-        .map(o => ({ kind: 'org', orgId: o.id, label: o.name, sub: t(`organisms.types.${o.type}`) || o.type }))
+        .map(o => ({ kind: 'org', orgId: o.id, label: o.name, sub: tOr(`organisms.types.${o.type}`, o.type) }))
     : [];
   const contentItems = (hits || []).map(hh => ({
     kind: 'hit', orgId: hh.organismId, wsId: hh.workspaceId, label: hh.title || hh.key,
