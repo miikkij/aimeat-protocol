@@ -1,0 +1,139 @@
+/**
+ * @file scheduler-poster.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The Scheduler in the poster face (sc- prefix; design canvas "AIMEAT Ajastimen sivu",
+ *   direction A). The shared parts (crumb, masthead, strip, sections, folds, rail) come from
+ *   organism.css's og- rules; this file carries what the scheduler adds: the agenda of what fires
+ *   next, the week's rhythm table, the continuous jobs as framed chips, the register, the prompt
+ *   box and the key/value facts on a schedule's page, and the new-schedule form. NOTE: this file
+ *   must be linked in spa.html (useViewCSS is a no-op).
+ * @version-history
+ *   v1.0.0 — 2026-08-30 — Initial.
+ */
+
+.og-sc .og-chip--coral { border-color: var(--accent); color: var(--accent); }
+.og-sc .og-door.on { color: var(--accent); border-bottom-color: var(--accent); }
+.og-sc .og-empty { margin: 0; font-size: .9rem; color: var(--text-dim); }
+.og-sc .sc-hint { margin: .6rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--text-dim); }
+.og-sc .sc-more { margin: .8rem 0 0; font-size: .85rem; }
+.og-sc .sc-more button { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; font-weight: 800; color: var(--text); border-bottom: 2px solid var(--text); }
+.og-sc .sc-more button:hover { color: var(--accent); border-bottom-color: var(--accent); }
+.sc-res--success { color: var(--success, #10B981); }
+.sc-res--error { color: var(--accent); }
+.sc-res--skipped { color: var(--text-dim); }
+.og-sc .og-strip b.sc-res--success { color: var(--success, #10B981); }
+.og-sc .og-strip b.sc-res--error { color: var(--accent); }
+.sc-res { font-weight: 500; }
+.og-sc .sc-chip--mono { text-transform: none; }
+.og-title.sc-title--page { font-size: 2.2rem; overflow-wrap: anywhere; }
+.sc-side { display: flex; flex-direction: column; gap: 1rem; }
+
+/* ── The agenda: what fires next, what ran, what is coming ─────────────────────────────────── */
+.sc-agenda { display: grid; grid-template-columns: 6rem minmax(0, 1fr) minmax(0, 12rem) 6.5rem; gap: 0 1.1rem; align-items: center; }
+.sc-agenda > div { padding: .55rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
+.sc-agenda--coming { grid-template-columns: 6rem minmax(0, 1fr); }
+.sc-at { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.35rem; line-height: 1; color: var(--text); }
+.sc-at small { display: block; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); margin-top: .2rem; }
+.sc-agenda .sc-nm { font-weight: 800; font-size: .95rem; color: var(--text); }
+.sc-agenda .sc-nm small { display: block; font-size: .8rem; font-weight: 400; color: var(--text-dim); margin-top: .1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sc-nm--run { font-weight: 400; }
+.sc-nm--run .sc-err { white-space: normal; color: var(--accent); }
+.sc-who { font-family: var(--font-mono); font-size: .75rem; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sc-in { font-family: var(--font-mono); font-size: .75rem; color: var(--accent); text-align: right; white-space: nowrap; }
+
+/* ── The week's rhythm: one row per schedule, a mark on each day it fires ───────────────────── */
+.sc-rhythm { display: grid; grid-template-columns: 5.6rem minmax(0, 1fr) repeat(7, 2.2rem) minmax(0, 9rem); gap: 0 .6rem; align-items: center; }
+.sc-rhythm > div { padding: .45rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
+.sc-rhythm .sc-hd { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.sc-rhythm .sc-hd--day { text-align: center; }
+.sc-rhythm .sc-hd--day small { display: block; font-family: var(--font-mono); font-size: .68rem; letter-spacing: 0; color: var(--text-dim); }
+.sc-rhythm .sc-hd.sc-today { background: var(--sun); color: var(--on-sun); }
+.sc-rhythm .sc-hd.sc-today small { color: var(--on-sun); }
+.sc-rhythm .sc-t { font-family: var(--font-mono); font-weight: 500; font-size: .8rem; color: var(--text); white-space: nowrap; }
+.sc-rhythm .sc-nm { font-weight: 700; font-size: .9rem; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sc-rhythm .sc-nm i { font-family: var(--font-mono); font-size: .7rem; font-style: normal; color: var(--text-dim); margin-left: .5rem; }
+.sc-rhythm .sc-d { text-align: center; font-size: .95rem; line-height: 1; color: var(--text); }
+.sc-rhythm .sc-d--no { color: var(--border); }
+.sc-rhythm .sc-d--agent { color: var(--accent); }
+.sc-rhythm .sc-d.sc-today { background: color-mix(in srgb, var(--sun) 30%, transparent); }
+.sc-rhythm .sc-last { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── Continuous jobs ────────────────────────────────────────────────────────────────────────── */
+.sc-cont { display: flex; flex-wrap: wrap; gap: .5rem .6rem; }
+.sc-job { display: inline-flex; align-items: baseline; gap: .5rem; max-width: 100%; padding: .3rem .65rem; border: 2px solid var(--text); background: none; cursor: pointer; font-family: var(--font-showroom-body); font-weight: 700; font-size: .8rem; color: var(--text); text-align: left; }
+.sc-job:hover { border-color: var(--accent); color: var(--accent); }
+.sc-job i { font-family: var(--font-mono); font-size: .7rem; font-style: normal; color: var(--text-dim); white-space: nowrap; }
+.sc-job--warn { border-color: var(--accent); }
+
+/* ── The register ───────────────────────────────────────────────────────────────────────────── */
+.sc-reg { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 10rem) minmax(0, 12rem) minmax(0, 11rem) 3.5rem 3.5rem; gap: 0 1rem; align-items: center; }
+.sc-reg > div { padding: .55rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
+.sc-reg--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.sc-reg .sc-nm { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; font-weight: 800; font-size: .92rem; color: var(--text); }
+.sc-reg .sc-nm small { display: block; flex-basis: 100%; font-size: .78rem; font-weight: 400; color: var(--text-dim); }
+.sc-reg .sc-w { font-size: .82rem; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sc-reg .sc-m { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sc-reg .sc-n { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.2rem; line-height: 1; text-align: right; color: var(--text); }
+.sc-reg--internal { grid-template-columns: minmax(0, 1fr) minmax(0, 14rem) 6rem; }
+.sc-internal { margin-top: .4rem; }
+.sc-internal-agent { font-weight: 800; font-size: .9rem; margin: .6rem 0 .2rem; }
+.sc-search { margin-bottom: .8rem; }
+.sc-search input { width: 100%; box-sizing: border-box; border: 0; border-bottom: 3px solid var(--text); background: transparent; padding: .4rem 0; font: inherit; font-size: 1rem; color: var(--text); }
+.sc-search input:focus { outline: none; border-bottom-color: var(--accent); }
+
+/* ── A schedule's page ──────────────────────────────────────────────────────────────────────── */
+.sc-prompt { padding: .9rem 1.1rem; border: 2px solid var(--text); background: var(--card-bg); font-size: .95rem; line-height: 1.6; }
+.sc-prompt .og-label { display: block; margin-bottom: .4rem; }
+.sc-prompt-title { white-space: pre-wrap; overflow-wrap: anywhere; }
+.sc-prompt-body { margin-top: .4rem; font-size: .88rem; color: var(--text-dim); white-space: pre-wrap; overflow-wrap: anywhere; }
+.sc-kv { display: grid; grid-template-columns: minmax(8rem, 11rem) minmax(0, 1fr); gap: .5rem 1.2rem; margin-top: 1rem; font-size: .95rem; line-height: 1.5; }
+.sc-kv .k { font-size: .68rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); padding-top: .25rem; }
+.sc-kv code { font-family: var(--font-mono); font-size: .82rem; background: var(--bg-dim); padding: 2px 5px; overflow-wrap: anywhere; }
+.og-sc .og-fold-body .sch-edit { border-top: 0; padding-top: 0; }
+
+/* ── The new-schedule form ──────────────────────────────────────────────────────────────────── */
+.sc-form { display: grid; grid-template-columns: minmax(9rem, 12rem) minmax(0, 1fr); gap: 1.1rem 1.5rem; align-items: start; }
+.sc-form-k { padding-top: .5rem; font-size: .68rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.sc-form-k small { display: block; font-size: .78rem; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--text-dim); margin-top: .15rem; }
+.sc-form-v { min-width: 0; display: flex; flex-direction: column; gap: .6rem; }
+.sc-form-v input[type="text"], .sc-form-v input[type="time"], .sc-form-v select, .sc-form-v textarea { width: 100%; box-sizing: border-box; border: 0; border-bottom: 2px solid var(--text); background: transparent; padding: .4rem 0; font: inherit; font-size: .95rem; color: var(--text); }
+.sc-form-v textarea { border: 2px solid var(--text); padding: .6rem .7rem; }
+.sc-form-v input:focus, .sc-form-v select:focus, .sc-form-v textarea:focus { outline: none; border-color: var(--accent); }
+.sc-choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .7rem; }
+.sc-choice { padding: .7rem .8rem; border: 2px solid var(--text); background: var(--card-bg); cursor: pointer; text-align: left; font-family: var(--font-showroom-body); font-size: .8rem; line-height: 1.45; color: var(--text-dim); }
+.sc-choice b { display: block; font-weight: 800; font-size: .88rem; color: var(--text); margin-bottom: .2rem; }
+.sc-choice:hover { border-color: var(--accent); }
+.sc-choice.on { background: var(--sun); color: var(--on-sun); box-shadow: 4px 4px 0 var(--text); }
+.sc-choice.on b { color: var(--on-sun); }
+.og-sc .sc-cad-chip { background: none; cursor: pointer; font-size: .75rem; padding: 3px 9px; text-transform: none; }
+.og-sc .sc-cad-chip:hover { border-color: var(--accent); color: var(--accent); }
+.sc-when { display: grid; grid-template-columns: 7rem minmax(0, 1fr) minmax(0, 1fr); gap: 1rem; align-items: end; }
+.sc-when label { display: flex; flex-direction: column; gap: .2rem; min-width: 0; }
+.sc-label { font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.sc-limits { display: flex; flex-wrap: wrap; gap: .6rem 1.6rem; }
+.sc-form-actions { grid-column: 1 / -1; display: flex; align-items: center; gap: 1.4rem; padding-top: 1rem; border-top: 3px solid var(--text); }
+
+@media (max-width: 1100px) {
+  .og-sc .og-fold { flex-wrap: wrap; row-gap: .35rem; }
+  .og-sc .og-fold-r { white-space: normal; margin-left: 0; flex-basis: 100%; }
+  .og-sc .og-tbl-name { white-space: normal; overflow-wrap: anywhere; }
+  .sc-agenda { grid-template-columns: 5rem minmax(0, 1fr) 5.5rem; }
+  .sc-agenda .sc-who { display: none; }
+  .sc-agenda--coming { grid-template-columns: 5rem minmax(0, 1fr); }
+  .sc-agenda--coming .sc-who { display: block; }
+  .sc-rhythm { grid-template-columns: 4.6rem minmax(0, 1fr) repeat(7, 1.5rem); gap: 0 .3rem; }
+  .sc-rhythm .sc-last, .sc-rhythm .sc-hd:last-child { display: none; }
+  .sc-rhythm .sc-nm i { display: none; }
+  .sc-reg { grid-template-columns: minmax(0, 1fr) minmax(0, 9rem) 3rem; }
+  .sc-reg > .sc-m, .sc-reg--head > div:nth-child(3), .sc-reg--head > div:nth-child(4), .sc-reg--head > div:nth-child(5), .sc-reg > .sc-n { display: none; }
+  .sc-reg--internal { grid-template-columns: minmax(0, 1fr) minmax(0, 9rem); }
+  .sc-reg--internal > .sc-m { display: none; }
+  .sc-form { grid-template-columns: 1fr; gap: .4rem 0; }
+  .sc-form-k { padding-top: .8rem; }
+  .sc-choices { grid-template-columns: 1fr; }
+  .sc-when { grid-template-columns: 1fr; }
+  .sc-kv { grid-template-columns: 1fr; }
+  .og-sc .og-strip { flex-wrap: wrap; }
+  .og-sc .og-strip > div { flex: 1 1 45%; }
+}
