@@ -17,6 +17,8 @@
  *     the template box; reload the preview iframe after every change + Clear Cache.
  *   v1.4.0 — 2026-06-19 — Add Header Navigation section: operator show/hide + reorder
  *     of the public header links (persisted via /v1/site/header-nav).
+ *   v1.5.0 — 2026-08-29 — `exchange` leaves the configurable header links: the EXCHANGE app is a
+ *     site-footer link now, like the store.
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -38,14 +40,13 @@ import { swallowed } from '/js/swallowed.js';
 // and PUBLIC_NAV_LINK_IDS in src/services/site.ts). Gated links are not configurable.
 // These are the LOGGED-OUT bar (plus Help, which shows in both states). A signed-in person's
 // links — Apps, Profile, Admin — are forced by the session and role, and the pages that left
-// the header on 2026-08-09 (For Developers, Members) are site-footer links now, so neither set
-// appears here.
+// the header (For Developers and Members on 2026-08-09, EXCHANGE on 2026-08-29) are site-footer
+// links now, so neither set appears here.
 const HEADER_LINK_LABELS = {
   howItWorks: 'nav.howItWorks',
-  // learn/exchange render only when this node configured AIMEAT_SITE_LEARN_URL /
-  // AIMEAT_SITE_EXCHANGE_URL; hiding them here is a second, independent switch.
+  // learn renders only when this node configured AIMEAT_SITE_LEARN_URL; hiding it here is a
+  // second, independent switch.
   learn: 'nav.learn',
-  exchange: 'nav.exchange',
   business: 'nav.business',
   help: 'nav.help',
 };

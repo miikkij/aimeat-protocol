@@ -5,6 +5,7 @@
  * @description Styles for the classic portal landing view (scoped under .cl) — hero,
  *   welcome board, cards grid, mega-prompt, and economy footer.
  * @version-history
+ *   v1.3.0 — 2026-08-29 — The mega-prompt block reads var(--font-mono) instead of Courier New.
  *   v1.1.0 — 2026-06-02 — Phase 5: tokenize for dark mode (replace bare light-only
  *     surface/border/text literals with theme tokens that flip between light/dark)
  *   v1.2.0 — 2026-08-08 — .cl-copy-prompt-btn deleted — the copy button is the shared .btn-primary now, and the one
@@ -331,7 +332,7 @@
   border: 1px solid var(--border);
   border-radius: 10px;
   color: var(--text, #374151);
-  font-family: 'Courier New', monospace;
+  font-family: var(--font-mono);
   font-size: 0.82rem;
   line-height: 1.6;
   resize: vertical;

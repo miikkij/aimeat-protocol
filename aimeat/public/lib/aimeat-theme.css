@@ -40,6 +40,11 @@
  *   Deliberately UNLAYERED: daisyUI declares its themes inside `@layer base`, and any unlayered
  *   rule beats every layered one regardless of order or specificity.
  * @version-history
+ *   v2.4.0 — 2026-08-29 — The AIMEAT palette's display face follows the shell's one headline token:
+ *     --font-display is var(--font-headline, 'Archivo Black', …), so on the node (where theme.css
+ *     defines --font-headline) every h1-h6 of the classic shell wears the same face as the front
+ *     page and the poster pages, and a published app without theme.css keeps the vendored Archivo
+ *     Black. The other palettes keep their own faces; a palette's personality is still its own.
  *   v2.3.0 — 2026-08-29 — THE HOUSE FACES REACH THE NODE'S OWN LIBRARY: Archivo Black (display)
  *     and Archivo (body) are vendored here and are the AIMEAT palette's pair. They had lived
  *     only in spa.html's Google Fonts line, so everything served from /lib — every published
@@ -210,7 +215,7 @@
   --border-w: 1px;
   --depth: 0;
   --noise: 0;
-  --font-display: 'Archivo Black', 'Segoe UI', system-ui, sans-serif;
+  --font-display: var(--font-headline, 'Archivo Black', 'Segoe UI', system-ui, sans-serif);
   --font-body: 'Archivo', 'Segoe UI', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
   --display-tracking: -0.01em;
@@ -253,7 +258,7 @@
   --border-w: 1px;
   --depth: 0;
   --noise: 0;
-  --font-display: 'Archivo Black', 'Segoe UI', system-ui, sans-serif;
+  --font-display: var(--font-headline, 'Archivo Black', 'Segoe UI', system-ui, sans-serif);
   --font-body: 'Archivo', 'Segoe UI', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
   --display-tracking: -0.01em;

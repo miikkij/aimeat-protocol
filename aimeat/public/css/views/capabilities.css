@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Styles for the profile capabilities tab
  * @version-history
+ *   v1.1.0 — 2026-08-29 — The two monospace rules read var(--font-mono) instead of the --mono alias.
  *   v1.0.0 — 2026-05-02 — Initial styles
  */
 
@@ -122,7 +123,7 @@
   color: var(--text-dim);
 }
 .cap-detail-code {
-  font-family: var(--mono);
+  font-family: var(--font-mono);
   font-size: .78rem;
   background: var(--bg-dim);
   padding: 1px 5px;
@@ -138,7 +139,7 @@
   color: var(--accent);
 }
 .cap-schema-pre {
-  font-family: var(--mono);
+  font-family: var(--font-mono);
   font-size: .75rem;
   background: var(--bg-dim);
   padding: 8px;

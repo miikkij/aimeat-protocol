@@ -737,15 +737,15 @@ components:
       description: |
         Public header navigation configuration. `order` lists the public link ids in
         display order; `hidden` is the subset that should not be rendered. Known ids:
-        `howItWorks`, `learn`, `exchange`, `business`, `help`. (`try` and `devView` were
-        removed on 2026-08-09; a stored order naming either is filtered out on read, so no
-        node needed a migration.)
+        `howItWorks`, `learn`, `business`, `help`. (`try` and `devView` were removed on
+        2026-08-09 and `exchange` moved to the site footer on 2026-08-29; a stored order
+        naming any of them is filtered out on read, so no node needed a migration.)
       properties:
         order:
           type: array
           items:
             type: string
-          example: [howItWorks, learn, exchange, business, help]
+          example: [howItWorks, learn, business, help]
         hidden:
           type: array
           items:

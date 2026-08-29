@@ -14,6 +14,8 @@
  *   over the showroom-sticker and night-shift alternatives. The onboarding steps keep their plain
  *   card shape: one job at a time, nothing pulling the eye away from the open step.
  * @version-history
+ *   v3.0.2 — 2026-08-29 — The star button inherits the page face; a button's default is the system font,
+ *     and six stars on the home were the only Arial on the page.
  *   v3.0.1 — 2026-08-29 — Every poster headline reads --font-poster-weight instead of a literal 400,
  *     so the face and its weight change together in theme.css.
  *   v3.0.0 — 2026-08-28 — The poster face. .koti drops its card frame for a wide paper column;
@@ -462,7 +464,7 @@ body:has(.koti) .page-content { background: var(--bg); }
 }
 .koti-star {
   background: none; border: none; cursor: pointer; padding: 0 0.2rem;
-  font-size: 0.9rem; color: var(--muted); line-height: 1;
+  font-family: inherit; font-size: 0.9rem; color: var(--muted); line-height: 1;
 }
 .koti-star:hover { color: var(--sun); }
 .koti-star--on { color: var(--sun); }
