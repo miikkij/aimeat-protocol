@@ -198,7 +198,11 @@
   /* Typography */
   --font: 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
-  /* The showroom voice: Bungee for the front page's headlines and stickers, Archivo for its body.
+  /* THE DESIGN LANGUAGE IS WRITTEN DOWN ONCE: skill `aimeat-design-language` (in this repo under
+     .claude/skills and on the node's skill library) names the faces, colours and shapes and maps
+     each token below to the surfaces that read it. Change a value here; read the skill to know how
+     far it reaches. */
+  /* The showroom voice: Fjalla One for the front page's headlines and stickers, Archivo for its body.
      Loaded with the shell's other faces in spa.html; only the front page and its companions wear
      them. NOT named --font-display: lib/aimeat-theme.css (the palette bridge, loaded on every
      page) already styles h1-h6 with var(--font-display, …), and a token by that name put Bungee
