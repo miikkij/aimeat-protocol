@@ -913,9 +913,9 @@
     function SiteFooter({ navigate }) {
       const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
       const go = (e, path) => { e.preventDefault(); navigate(path); };
-      // The dev view is /v1/portal?view=dev, which shares its path with the landing and renders
-      // its own full-page surface. Match on the query too, or the landing check lets it through.
-      if (!FOOTER_ROUTES.has(location.pathname) || location.search.includes('view=dev')) return null;
+      // The dev view is /v1/portal?view=dev and shares its path with the landing; it gets the
+      // footer too since 2026-08-29, when it stopped painting its own full-page background.
+      if (!FOOTER_ROUTES.has(location.pathname)) return null;
       return html`
         <footer class="site-footer">
           <div class="site-footer-row">

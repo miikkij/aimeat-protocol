@@ -2988,6 +2988,7 @@
     "surfacePreviewMember": "This is a page members see once they have signed in. Open your own home in another tab to look at it."
   },
   "dev": {
+    "crumb": "For developers",
     "title": "Connect your AI to your home",
     "subtitle": "One line if your AI speaks MCP, a copy-paste prompt for everything else. Then build on it, or run a node of your own.",
     "repos": {

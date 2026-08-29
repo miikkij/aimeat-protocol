@@ -2976,6 +2976,7 @@
     "surfacePreviewMember": "Tämä on sivu, jonka jäsenet näkevät kirjauduttuaan. Avaa oma aloitussivusi toiseen välilehteen nähdäksesi sen."
   },
   "dev": {
+    "crumb": "Kehittäjille",
     "title": "Yhdistä tekoälysi tähän nodeen",
     "subtitle": "Yksi rivi jos tekoälysi osaa MCP:n, kopioitava kehote kaikelle muulle. Sen jälkeen rakenna päälle tai pystytä oma node.",
     "repos": {

@@ -1,0 +1,100 @@
+/**
+ * @file static-page.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The served information pages (privacy, terms; one file per language) in the showroom
+ *   face (sp- prefix): the site's own top bar and footer instead of a bar of their own, the title in
+ *   the display face with the sun behind it, the meta line in mono, the summary as a dashed coral
+ *   box, each section under a 3px ink rule, coral square bullets, and a sticky contents rail so a
+ *   twenty-section document can be navigated. Every colour is a theme.css token, so the page inverts
+ *   with the rest of the site. The pages carry the same app-shell frame as spa.html (#app, .topnav,
+ *   .page-content), because theme.css makes body itself never scroll.
+ *   The vocabulary is the one .claude/skills/aimeat-design-language names as the showroom face.
+ * @version-history
+ *   v1.0.0 — 2026-08-29 — Initial (design canvas "AIMEAT Dev and Terms Pages").
+ */
+
+/* ── Frame ─────────────────────────────────────────────────────────────────────────────────── */
+.sp-wrap { max-width: 1180px; margin: 0 auto; padding: 0 1.5rem; }
+.sp-grid { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 3.5rem; align-items: start; padding: 2.75rem 0 2rem; }
+.sp-body { display: flex; flex-direction: column; gap: 1.6rem; min-width: 0; }
+/* The static pages have no burger script of their own beyond the toggle below the footer, so the
+   menu keeps the shell's own behaviour: a row on desktop, a dropdown behind the burger on a phone. */
+.sp-pill { display: inline-flex; align-items: center; }
+
+/* ── Hero ──────────────────────────────────────────────────────────────────────────────────── */
+.sp-hero { display: flex; flex-direction: column; gap: 1rem; align-items: flex-start; }
+.sp-hero-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; width: 100%; }
+.sp-crumb { font-family: var(--font-mono); font-size: .8rem; color: var(--accent); }
+.sp-seg { display: inline-flex; align-items: stretch; height: 26px; border: 2px solid var(--text); }
+.sp-seg a {
+  display: inline-flex; align-items: center; padding: 0 10px;
+  font-family: var(--font-showroom-body); font-size: .7rem; font-weight: 700; letter-spacing: .4px; line-height: 1;
+  color: var(--text); opacity: .6; text-decoration: none;
+}
+.sp-seg a:hover { opacity: 1; }
+.sp-seg a.on { opacity: 1; background: var(--text); color: var(--bg); pointer-events: none; }
+.sp-title {
+  margin: 0; font-family: var(--font-showroom); font-weight: 400; text-transform: uppercase;
+  font-size: clamp(2.2rem, 5vw, 3.5rem); line-height: 1; color: var(--text);
+  text-shadow: .075em .075em 0 var(--sun);
+}
+.sp-meta { margin: 0; font-family: var(--font-mono); font-size: .8rem; line-height: 1.6; color: var(--text-dim); }
+
+/* ── The document ──────────────────────────────────────────────────────────────────────────── */
+.sp-main { font-family: var(--font-showroom-body); font-size: 1rem; line-height: 1.6; color: var(--text); }
+.sp-main > p:first-child { max-width: 62ch; font-size: 1.05rem; }
+.sp-main p { margin: 0 0 .9rem; }
+.sp-main h2 {
+  margin: 2rem 0 .8rem; padding-top: 1.6rem; border-top: 3px solid var(--text); scroll-margin-top: 1rem;
+  font-family: var(--font-showroom); font-weight: 400; text-transform: uppercase; font-size: 1.6rem; line-height: 1.05; letter-spacing: .01em;
+}
+.sp-main h3 { margin: 1.4rem 0 .5rem; font-family: var(--font-showroom-body); font-size: 1.1rem; font-weight: 800; }
+.sp-main ul, .sp-main ol { margin: 0 0 1.1rem; padding: 0 0 0 1.2rem; display: flex; flex-direction: column; gap: .5rem; }
+.sp-main ul { list-style: none; padding-left: 0; }
+.sp-main ul > li { position: relative; padding-left: 1.2rem; }
+.sp-main ul > li::before { content: ''; position: absolute; left: 0; top: .5em; width: 9px; height: 9px; background: var(--accent); }
+.sp-main ol > li::marker { color: var(--accent); font-weight: 800; }
+.sp-main a { color: var(--text); font-weight: 800; text-decoration: none; border-bottom: 3px solid var(--accent); }
+.sp-main a:hover { color: var(--accent); }
+.sp-main code { font-family: var(--font-mono); font-size: .82rem; padding: 1px 6px; border: 2px solid var(--text); background: var(--code-bg); }
+.sp-main strong { font-weight: 800; }
+
+/* The summary and the asides: a dashed coral box, its first bold run lifted out as the label. */
+.sp-main .callout {
+  margin: 1.2rem 0; padding: 1rem 1.25rem; border: 3px dashed var(--accent); background: var(--card-bg);
+  font-size: .95rem; line-height: 1.6;
+}
+.sp-main .callout > strong:first-child {
+  display: block; margin-bottom: .35rem;
+  font-family: var(--font-showroom); font-weight: 400; text-transform: uppercase; font-size: .8rem; letter-spacing: .04em; color: var(--accent);
+}
+
+/* ── The contents rail ─────────────────────────────────────────────────────────────────────── */
+.sp-rail {
+  position: sticky; top: 1rem; display: flex; flex-direction: column; gap: .4rem;
+  padding: 1.1rem 1.25rem; background: var(--text); color: var(--bg);
+  border: 3px solid var(--text); box-shadow: 8px 8px 0 var(--sun);
+}
+.sp-rail-label { font-family: var(--font-showroom); text-transform: uppercase; font-size: .75rem; letter-spacing: .06em; color: var(--sun); margin-bottom: .25rem; }
+.sp-rail a {
+  display: flex; align-items: baseline; gap: .6rem;
+  font-family: var(--font-showroom-body); font-size: .8rem; font-weight: 800; line-height: 1.4;
+  color: var(--bg); text-decoration: none; opacity: .6;
+}
+.sp-rail a:hover, .sp-rail a.on { opacity: 1; }
+.sp-rail a i { flex: 0 0 auto; min-width: 18px; font-family: var(--font-mono); font-size: .7rem; font-style: normal; color: var(--sun); }
+
+/* ── Small screens: one column, and the rail folds to a row of numbered chips ──────────────── */
+@media (max-width: 900px) {
+  .sp-grid { grid-template-columns: 1fr; gap: 1.5rem; padding-top: 1.5rem; }
+  .sp-rail { position: static; order: -1; flex-direction: row; flex-wrap: wrap; gap: .4rem; box-shadow: 6px 6px 0 var(--sun); }
+  .sp-rail-label { width: 100%; }
+  .sp-rail a { padding: .2rem .5rem; border: 2px solid var(--bg); font-size: 0; gap: 0; }
+  .sp-rail a i { font-size: .75rem; min-width: 0; }
+  .sp-title { text-shadow: .06em .06em 0 var(--sun); }
+}
+@media (max-width: 480px) {
+  .sp-wrap { padding: 0 1rem; }
+  .sp-hero-row { flex-wrap: wrap; }
+}

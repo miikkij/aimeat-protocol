@@ -10,89 +10,43 @@
 <link rel="alternate" hreflang="en" href="{{nodeUrl}}/v1/privacy">
 <link rel="alternate" hreflang="fi" href="{{nodeUrl}}/v1/privacy/fi">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --bg: #FAFAF8;
-    --fg: #1a1a18;
-    --fg-muted: #6b6b66;
-    --fg-hint: #9c9c96;
-    --coral: #E8564A;
-    --indigo: #6366F1;
-    --border: rgba(0,0,0,0.08);
-    --card-bg: #ffffff;
-    --surface: #f4f4f0;
-  }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    font-family: 'DM Sans', system-ui, sans-serif;
-    background: var(--bg);
-    color: var(--fg);
-    line-height: 1.65;
-    -webkit-font-smoothing: antialiased;
-  }
-  .container { max-width: 780px; margin: 0 auto; padding: 0 24px; }
-  nav {
-    padding: 20px 0;
-    border-bottom: 1px solid var(--border);
-    position: sticky; top: 0;
-    background: rgba(250,250,248,0.92);
-    backdrop-filter: blur(12px);
-    z-index: 10;
-  }
-  nav .container { display: flex; align-items: center; justify-content: space-between; }
-  .nav-brand { font-weight: 700; color: var(--fg); text-decoration: none; font-size: 18px; }
-  .nav-brand span { color: var(--coral); }
-  .lang-switch { font-size: 14px; color: var(--fg-muted); }
-  .lang-switch a { color: var(--indigo); text-decoration: none; margin-left: 12px; }
-  .lang-switch a:hover { text-decoration: underline; }
-  .lang-switch .active { color: var(--fg); font-weight: 600; pointer-events: none; }
-  header.page { padding: 64px 0 32px; }
-  header.page h1 { font-size: 36px; line-height: 1.2; letter-spacing: -0.02em; margin-bottom: 12px; }
-  header.page p.meta { color: var(--fg-muted); font-size: 14px; }
-  main { padding: 24px 0 96px; }
-  h2 { font-size: 22px; margin: 40px 0 12px; letter-spacing: -0.01em; }
-  h3 { font-size: 17px; margin: 24px 0 8px; color: var(--fg); }
-  p { margin: 0 0 14px; color: var(--fg); }
-  ul { margin: 0 0 18px 22px; }
-  li { margin-bottom: 6px; }
-  a { color: var(--indigo); }
-  .callout {
-    background: var(--surface);
-    border-left: 3px solid var(--coral);
-    padding: 14px 18px;
-    margin: 18px 0;
-    border-radius: 4px;
-    font-size: 15px;
-  }
-  table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 14px; }
-  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
-  th { color: var(--fg-muted); font-weight: 600; }
-  footer { padding: 40px 0; border-top: 1px solid var(--border); color: var(--fg-muted); font-size: 14px; }
-  footer a { color: var(--indigo); text-decoration: none; }
-  code { font-family: 'JetBrains Mono', monospace; background: var(--surface); padding: 1px 6px; border-radius: 3px; font-size: 13px; }
-</style>
+<link href="https://fonts.googleapis.com/css2?family=Fjalla+One&family=Archivo:ital,wght@0,400;0,600;0,800;1,400&family=JetBrains+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/lib/aimeat-theme.css">
+<link rel="stylesheet" href="/css/theme.css">
+<link rel="stylesheet" href="/css/static-page.css">
 </head>
 <body>
-<nav>
-  <div class="container">
-    <a href="/v1/portal" class="nav-brand">AIMEAT<span>.</span></a>
-    <div class="lang-switch">
-      <a href="/v1/privacy" class="active">EN</a>
-      <a href="/v1/privacy/fi">FI</a>
+<div id="app">
+<nav class="topnav">
+  <div class="topnav-left">
+    <a href="/" class="topnav-brand">AIME<span class="heart">&#9829;</span><span class="brand-at">AT</span></a>
+  </div>
+  <div class="topnav-right">
+    <button class="topnav-burger" type="button" aria-label="Menu" aria-expanded="false">&#9776;</button>
+    <div class="topnav-menu">
+      <a href="/v1/how-it-works">How it works</a>
+      <a href="/v1/business">For your business</a>
+      <a href="/v1/help">Help</a>
+      <a href="/v1/members">Members</a>
     </div>
+    <div class="sp-pill" id="sp-pill"></div>
   </div>
 </nav>
+<div class="page-content">
+<div class="sp-wrap">
+<div class="sp-grid">
+<div class="sp-body">
 
-<header class="page">
-  <div class="container">
-    <h1>Privacy Policy</h1>
-    <p class="meta">Effective date: {{effectiveDate}} &nbsp;·&nbsp; Last updated: {{effectiveDate}} &nbsp;·&nbsp; Version {{policyVersion}}</p>
+<section class="sp-hero">
+  <div class="sp-hero-row">
+    <span class="sp-crumb">{{nodeName}} /</span>
+    <div class="sp-seg"><a href="/v1/privacy" class="on">EN</a><a href="/v1/privacy/fi">FI</a></div>
   </div>
-</header>
+  <h1 class="sp-title">Privacy Policy</h1>
+  <p class="sp-meta">Effective date: {{effectiveDate}} &nbsp;·&nbsp; Last updated: {{effectiveDate}} &nbsp;·&nbsp; Version {{policyVersion}}</p>
+</section>
 
-<main>
-  <div class="container">
+<main class="sp-main">
 
     <p>This Privacy Policy describes how the AIMEAT node operated at <a href="{{nodeUrl}}">{{nodeName}}</a> ("the Service") collects, uses, stores, shares, and protects personal data. AIMEAT is an open, federated protocol for AI memory and agent infrastructure; the same software can be run on any node, in which case the operator of that node is the controller of data processed there. This document covers the {{nodeName}} node only.</p>
 
@@ -232,15 +186,80 @@
     <p>Privacy questions: <a href="mailto:{{operatorEmail}}">{{operatorEmail}}</a><br>
     Security issues: <a href="mailto:{{operatorSecurityEmail}}">{{operatorSecurityEmail}}</a><br>
     Postal address: {{operatorAddress}}</p>
-
-  </div>
 </main>
 
-<footer>
-  <div class="container">
-    <p><a href="/v1/portal">Home</a> &nbsp;·&nbsp; <a href="/v1/terms">Terms</a> &nbsp;·&nbsp; <a href="https://github.com/miikkij/aimeat-protocol" target="_blank" rel="noopener">GitHub</a> &nbsp;·&nbsp; <a href="/v1/privacy/fi">Suomeksi</a></p>
+</div>
+<nav class="sp-rail" data-label="Contents" aria-label="Contents"></nav>
+</div>
+</div>
+
+<footer class="site-footer">
+  <div class="site-footer-row">
+    <a href="/v1/help">Help</a>
+    <a href="/v1/how-it-works">How it works</a>
+    <a href="/v1/how-an-app-builds">How an app gets built</a>
+    <a href="/v1/changelog">What shipped</a>
+    <a href="/v1/business">For your business</a>
+    <a href="/v1/members">Members</a>
+    <a href="/v1/portal?view=dev">For Developers</a>
+    <a href="https://github.com/miikkij/aimeat-protocol/releases/latest" target="_blank" rel="noopener">Run your own node</a>
+    <a href="/v1/transparency">AI transparency</a>
+    <a href="/v1/privacy">Privacy</a>
+    <a href="/v1/terms">Terms</a>
+    <a href="https://github.com/miikkij/aimeat-protocol" target="_blank" rel="noopener">GitHub</a>
+  </div>
+  <div class="site-footer-row site-footer-machine">
+    <a href="/v1/glossary">Glossary</a>
+    <a href="/sitemap.md" target="_blank" rel="noopener">Site map</a>
+    <a href="/llms.txt" target="_blank" rel="noopener">llms.txt</a>
+    <a href="/AGENTS.md" target="_blank" rel="noopener">AGENTS.md</a>
+    <a href="/v1/spec" target="_blank" rel="noopener">API contract</a>
   </div>
 </footer>
+</div>
+</div>
+
+<script src="/v1/libs/aimeat-auth.js"></script>
+<script>
+(function () {
+  // The contents rail is built from the document's own headings, so the list and the text can
+  // never disagree; a heading without an id gets one so the rail can point at it.
+  var rail = document.querySelector('.sp-rail');
+  var heads = Array.prototype.slice.call(document.querySelectorAll('.sp-main h2'));
+  if (rail && heads.length) {
+    var label = document.createElement('span');
+    label.className = 'sp-rail-label';
+    label.textContent = rail.getAttribute('data-label') || '';
+    rail.appendChild(label);
+    var links = heads.map(function (h, i) {
+      if (!h.id) h.id = 's' + (i + 1);
+      var a = document.createElement('a');
+      a.href = '#' + h.id;
+      var n = document.createElement('i');
+      n.textContent = (i + 1 < 10 ? '0' : '') + (i + 1);
+      a.appendChild(n);
+      a.appendChild(document.createTextNode(h.textContent.replace(/^\d+\.\s*/, '')));
+      rail.appendChild(a);
+      return a;
+    });
+    var scroller = document.querySelector('.page-content') || window;
+    var mark = function () {
+      var cur = 0;
+      heads.forEach(function (h, i) { if (h.getBoundingClientRect().top <= 140) cur = i; });
+      links.forEach(function (a, i) { a.classList.toggle('on', i === cur); });
+    };
+    scroller.addEventListener('scroll', mark, { passive: true });
+    mark();
+  }
+  var burger = document.querySelector('.topnav-burger');
+  var menu = document.querySelector('.topnav-menu');
+  if (burger && menu) burger.addEventListener('click', function () {
+    var open = menu.classList.toggle('open');
+    burger.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+  if (window.AIMEAT && AIMEAT.auth && AIMEAT.auth.mountLoginButton) AIMEAT.auth.mountLoginButton('#sp-pill', {});
+})();
+</script>
 
 </body>
 </html>
