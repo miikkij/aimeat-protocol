@@ -13,6 +13,8 @@
  *   openEmailCompletion, sendEmailCode, showView, capture/restoreInputs }.
  * @usage import { showLoginModal } from './modal.js';
  * @version-history
+ *   v1.6.1 — 2026-08-29 — The hints and the username rules show only while the person is in the field
+ *     (modal-styles.js, :focus-within); the has-value class that kept them on screen is gone.
  *   v1.6.0 — 2026-08-29 — Three ways out: an X in the top-right corner (the one people look for first),
  *     Escape, and a click on the page behind; the last two close only while nothing has been typed.
  *   v1.5.1 — 2026-08-29 — A field's hint shows only while the person is in that field or has written in
@@ -404,16 +406,6 @@ export function showLoginModal(opts, renderBtn) {
       });
     }
     if (regUser) regUser.addEventListener('input', syncUsernameRules);
-
-    // Every field's hint shows only while the person is in that field or has written in it
-    // (modal-styles.js reads the class), so the form is not read as a wall of small print.
-    modal.querySelectorAll('.aimeat-field .aimeat-inp').forEach(function (inp) {
-      var field = inp.closest('.aimeat-field');
-      if (!field) return;
-      var sync = function () { field.classList.toggle('has-value', !!/** @type {any} */ (inp).value); };
-      inp.addEventListener('input', sync);
-      sync();
-    });
 
     // Social sign-in — full-page navigation to the provider's OIDC start endpoint.
     modal.querySelectorAll('.aimeat-oauth-btn').forEach(function (btn) {

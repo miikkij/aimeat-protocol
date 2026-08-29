@@ -10,6 +10,8 @@
  * @structure MODAL_CSS (one string, injected by modal.js into its own <style>).
  * @usage import { MODAL_CSS } from './modal-styles.js';
  * @version-history
+ *   v1.1.1 — 2026-08-29 — A hint and the username rules show only while the field has focus; leaving
+ *     the field folds them away, so the form stays as short as its labels.
  *   v1.1.0 — 2026-08-29 — The close control (.aimeat-close): a 26px ink-framed X beside the language switch.
  *   v1.0.2 — 2026-08-29 — A field's hint waits for focus or a value (.has-value), so the create form is
  *     not a wall of small print.
@@ -84,10 +86,11 @@ export var MODAL_CSS = [
      reads as four labels and four lines until one of them is being filled. */
   '.aimeat-hint{margin:7px 0 0;font:400 12.5px/1.45 ' + font + ';color:' + dim + '}',
   '.aimeat-field .aimeat-hint{display:none}',
-  '.aimeat-field:focus-within .aimeat-hint,.aimeat-field.has-value .aimeat-hint{display:block}',
-  /* The username rules: hidden until the person starts typing, each turning green as it is met. */
+  '.aimeat-field:focus-within .aimeat-hint{display:block}',
+  /* The username rules: shown only while the person is in the field and has typed something,
+     each turning green as it is met; leaving the field folds them away again. */
   '.aimeat-rules{display:none;margin-top:8px;flex-direction:column;gap:3px}',
-  '.aimeat-rules.on{display:flex}',
+  '.aimeat-field:focus-within .aimeat-rules.on{display:flex}',
   '.aimeat-rule{display:flex;align-items:center;gap:7px;font:400 12.5px/1.45 ' + font + ';color:' + dim + '}',
   '.aimeat-rule svg{width:12px;height:12px;flex:0 0 auto}',
   '.aimeat-rule .r-ok{display:none}',
