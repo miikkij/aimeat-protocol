@@ -90,12 +90,13 @@ export function map(spec) {
 
   function pinIcon(L, tone) {
     const cls = TONES.indexOf(tone) >= 0 ? ' ak-map__pin--' + tone : '';
+    // The icon BOX is the touch target: 24px is WCAG 2.2's floor and the bench's rule.
     return L.divIcon({
       className: 'ak-map__pinwrap',
       html: '<span class="ak-map__pin' + cls + '"></span>',
-      iconSize: [22, 30],
-      iconAnchor: [11, 28],
-      popupAnchor: [0, -26],
+      iconSize: [26, 32],
+      iconAnchor: [13, 30],
+      popupAnchor: [0, -28],
     });
   }
 
