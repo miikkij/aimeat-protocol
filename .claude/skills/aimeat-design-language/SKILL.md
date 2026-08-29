@@ -97,8 +97,13 @@ prism: AI and ME, at work on something, and AI-MEAT, the substance an AI is made
 
 ## What is not done
 
-- No emoji and no dingbat as an icon; icons are inline SVG on a 16/20/24 grid. The four glyphs
-  that carry meaning in text are `✓ ✗ → ↩`.
+- **No emoji anywhere in the interface.** Not as an icon, not in front of a heading, a button, a
+  menu item, a dialog title, a section label or a notice, and not inside a translation string,
+  where they hide from a reviewer until the screen is up. They read as noise and cheapen the
+  product (Jouni, 2026-08-29, after 142 of them were stripped from the app catalog's strings in
+  one pass). Icons are inline SVG on a 16/20/24 grid. The four glyphs that carry meaning in text
+  are `✓ ✗ → ↩`; a fifth is a decision, not a habit. The one emoji that stays is data: the icon
+  a person chose for their own app.
 - No tilt, no rotation, no gradient, no drop-shadow blur, no `rgba(255,255,255,…)`, no radius on a
   poster or showroom surface.
 - No second loud action on a page. No colour in a single place written as a hex in a view sheet.

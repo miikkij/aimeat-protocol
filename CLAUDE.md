@@ -216,7 +216,7 @@ Full architecture, component library, cache-busting and SSE: `docs/frontend-deve
   }, []);
   ```
 
-Styling, in short: no inline `style=""` and no CSS constants in JS; colours and spacing from `theme.css` variables; no `rgba(255,255,255,…)`; button classes are `.btn-primary`, `.btn-outline`, `.btn-ghost`, `.btn-danger` and friends, with no `.btn` base class; all user-visible text through `t()`. Full conventions and the browser verification protocol: skill `aimeat-frontend-verify`.
+Styling, in short: no inline `style=""` and no CSS constants in JS; colours and spacing from `theme.css` variables; no `rgba(255,255,255,…)`; button classes are `.btn-primary`, `.btn-outline`, `.btn-ghost`, `.btn-danger` and friends, with no `.btn` base class; all user-visible text through `t()`. **No emoji in the interface**: not in a heading, a button, a menu item, a dialog title, a label or a locale string; icons are inline SVG and the only symbols in text are `✓ ✗ → ↩` (the one that stays is the icon a person chose for their own app). Fonts, colours and shapes come from skill `aimeat-design-language`; full conventions and the browser verification protocol: skill `aimeat-frontend-verify`.
 
 ## Commands
 
