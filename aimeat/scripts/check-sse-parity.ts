@@ -29,7 +29,10 @@
  * @structure EXEMPT (with reasons) · DELEGATES (files whose emit happens downstream) · main()
  * @usage pnpm check:sse-parity  ·  --strict fails the build
  * @version-history
- *   v1.1.1 — 2026-08-29 — DELEGATES names src/mcp/app-marks.ts (services/app-marks.ts emits 'apps').
+ *   v1.2.0 — 2026-08-29 — One hop of delegation is READ from the imports: a tool file that imports a
+ *     services/ or routes/ module which itself calls emitChange() counts as announcing, and the
+ *     summary names the pair. DELEGATES stays for deeper chains. This is what "one capability, one
+ *     implementation" produces on every new tool file, and each one used to trip the gate first.
  *   v1.1.0 — 2026-08-11 — The rule reads the tool ANNOTATIONS as well as storage calls. The first
  *     version looked only for storage.*, and four files walked past it — companies, skills,
  *     workflows and the email invitations all write through a service, and each was silently
@@ -37,7 +40,7 @@
  *   v1.0.0 — 2026-08-11 — Initial (August 2026 audit, the side-effect sweep).
  */
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
-import { join, relative, dirname } from 'node:path';
+import { join, relative, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -103,8 +106,10 @@ const EXEMPT: Record<string, string> = {
 
 /**
  * Files whose write announces itself DOWNSTREAM: they call a service or a route function that emits.
- * Named rather than inferred, because "somewhere below this there is an emit" is exactly the kind of
- * claim that rots — each entry says which function carries it.
+ * One hop is read from the imports (emittingImport, below): a tool file importing a services/ or
+ * routes/ module that emits needs no entry here. Anything deeper is named rather than inferred,
+ * because "somewhere below this there is an emit" is exactly the kind of claim that rots — each
+ * entry says which function carries it.
  */
 const DELEGATES: Record<string, string> = {
     'src/mcp/agent-crew.ts': "services/crew-ops.ts → services/crew-def-store.ts, which emits 'agents' "
@@ -143,10 +148,6 @@ const DELEGATES: Record<string, string> = {
         + 'render — the catalogue card is what changes, and it changes for everyone who can see the '
         + 'app rather than only for the caller. Verified by reading the domain out of the service '
         + 'rather than trusting the delegation.',
-    'src/mcp/app-marks.ts': "services/app-marks.ts, whose applyOwnerMarksUpdate() emits 'apps' right "
-        + 'after the write, the same way app-seo.ts does and for the same reason: the catalogue card '
-        + 'and the details view read the switches, and the REST twin (PATCH /v1/apps/:filename) '
-        + 'reaches the same function, so the two doors emit the same domain by construction.',
     'src/mcp/seo.ts': "services/app-seo.ts, whose applyOwnerSeoUpdate() emits 'apps' right after "
         + 'the write. The catalogue card carries the search-visibility state, so the views watching '
         + "that domain are the ones that change, and they change for everyone who can see the app "
@@ -202,10 +203,28 @@ function stripComments(source: string): string {
     return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
 }
 
+/**
+ * The first module this file imports from services/ or routes/ that itself calls emitChange(), as a
+ * repo-relative path — or null. One hop only, on purpose: a chain the eye cannot follow from the
+ * import line is exactly what DELEGATES exists to write down.
+ */
+function emittingImport(file: string, strippedSource: string): string | null {
+    const imports = [...strippedSource.matchAll(/from\s+['"](\.[^'"]+\.js)['"]/g)].map(m => m[1]);
+    for (const spec of imports) {
+        if (!/\/(services|routes)\//.test(spec)) continue;
+        const target = resolve(dirname(file), spec.replace(/\.js$/, '.ts'));
+        if (!existsSync(target)) continue;
+        const targetSource = stripComments(readFileSync(target, 'utf-8'));
+        if (/emitChange\(/.test(targetSource)) return relative(ROOT, target).replace(/\\/g, '/');
+    }
+    return null;
+}
+
 function main(): void {
     const strict = process.argv.includes('--strict');
     const mutating = mutatingTools();
     const silent: string[] = [];
+    const derived: string[] = [];
     let writers = 0;
     let emitters = 0;
 
@@ -229,6 +248,14 @@ function main(): void {
         if (rel in EXEMPT) continue;
         if (/emitChange\(/.test(source)) { emitters++; continue; }
         if (rel in DELEGATES) { emitters++; continue; }
+        // One level of delegation, READ rather than declared: "one capability, one implementation"
+        // puts the emit in the service both doors call, so a tool file that follows the rule has no
+        // emitChange of its own. Every such file used to need a hand-written DELEGATES entry, and
+        // every new one tripped the gate first (app-marks.ts, 2026-08-29). A module this file
+        // imports from services/ or routes/ that itself emits is the announcement; the table stays
+        // for chains deeper than one hop, with the reason written down.
+        const via = emittingImport(file, source);
+        if (via) { emitters++; derived.push(`${rel} → ${via}`); continue; }
         silent.push(rel);
     }
 
@@ -238,6 +265,8 @@ function main(): void {
     console.log(`  tool-surface files that write            ${String(writers).padStart(4)}`);
     console.log(`  of those, exempt with a reason           ${String(Object.keys(EXEMPT).length).padStart(4)}`);
     console.log(`  announcing the change                    ${String(emitters).padStart(4)}`);
+    console.log(`    of which through an imported emitter   ${String(derived.length).padStart(4)}`);
+    for (const d of derived) console.log(`      ${d}`);
     console.log(`  SILENT                                   ${String(silent.length).padStart(4)}`);
     console.log('');
 

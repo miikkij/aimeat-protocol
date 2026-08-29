@@ -44,7 +44,8 @@
  * @version-history
  *   v1.6.0 — 2026-08-29 — aiDisclosureParts takes `reviewedBy`: with a named reviewer the visible
  *     label is decided again under editorial responsibility (reviewedForLabel); the machine marks
- *     stay as minted, and the interaction and deep-fake reasons are left untouched.
+ *     stay as minted, and the interaction and deep-fake reasons are left untouched. The reviewer
+ *     is added to the provenance JSON-LD as `editor` (a Person), the way a byline scanner reads it.
  *   v1.5.0 — 2026-08-02 — Mobile presentation of the visible label: collapsed icon-only pill on the
  *     same 34px row as the attribution badge (was: full-text chip on its own row at bottom:58px,
  *     ~90px of every phone viewport), tap-to-expand to the full statement via a hidden-checkbox
@@ -241,7 +242,7 @@ function escAscii(s: string): string {
  * `digitalSourceType` is the IPTC URI, from the adapter — the same value a C2PA manifest would
  * carry, so a reader that understands one understands both.
  */
-function jsonLd(p: ServedProvenance): string {
+function jsonLd(p: ServedProvenance, reviewedBy?: string): string {
   const doc: Record<string, unknown> = {
     '@context': 'https://schema.org',
     '@type': 'CreativeWork',
@@ -255,6 +256,11 @@ function jsonLd(p: ServedProvenance): string {
     },
     subjectOf: { '@type': 'CreativeWork', url: p.recordUrl },
   };
+  // The declared reviewer is the EDITOR, never the author: a person examined what the model
+  // produced and answers for it, which is exactly what schema.org's `editor` says, and it is the
+  // second field a byline scanner reads (Luotain reads schema.org author and editor, meta author
+  // and rel=author, the way the press is read). `creator` above stays the model.
+  if (reviewedBy) doc.editor = { '@type': 'Person', name: reviewedBy };
   const iptc = toIptc(p.record);
   if (iptc) doc.digitalSourceType = iptc;
   if (p.record.sources?.length) doc.isBasedOn = p.record.sources.map((s) => s.url);
@@ -459,7 +465,7 @@ export function aiDisclosureParts(
   const block =
     (w3c ? `<meta name="ai-disclosure" content="${esc(w3c)}">` : '')
     + `<link rel="ai-provenance" href="${esc(p.recordUrl)}">`
-    + `<script type="application/ld+json" ${PROVENANCE_HTML_MARK}>${jsonLd(p)}</script>`
+    + `<script type="application/ld+json" ${PROVENANCE_HTML_MARK}>${jsonLd(p, visible?.reviewedBy)}</script>`
     + (visible ? visibleLabelMarkup(forLabel, visible.config, visible.locale) : '');
   return { block, w3c };
 }

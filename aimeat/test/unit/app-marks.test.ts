@@ -110,6 +110,27 @@ describe('the served bytes with a named reviewer', () => {
     expect(out).toContain(LABEL);
   });
 
+  it('the reviewer is the schema.org EDITOR of the provenance record, never its author', () => {
+    const out = applyServeMarks(DOC, { provenance: provFixture('labelled'), visibleLabel: visible, reviewedBy: 'Maija Meikäläinen' }).toString();
+    const ld = JSON.parse(out.match(/<script type="application\/ld\+json"[^>]*>([^<]*)<\/script>/)![1]);
+    expect(ld.editor).toEqual({ '@type': 'Person', name: 'Maija Meikäläinen' });
+    expect(ld.author).toBeUndefined();
+    expect(ld.creator['@type']).toBe('SoftwareApplication');
+    const plain = applyServeMarks(DOC, { provenance: provFixture('labelled'), visibleLabel: visible }).toString();
+    expect(JSON.parse(plain.match(/<script type="application\/ld\+json"[^>]*>([^<]*)<\/script>/)![1]).editor).toBeUndefined();
+  });
+
+  it('on the app origin the reviewer is the JSON-LD author and editor; without one the account name stays author', () => {
+    const spec = { owner: 'alice', filename: 'demo.html', origin: 'https://demo.apps.aimeat.io', baseUrl: 'https://aimeat.io' };
+    const ldOf = (html: string) => JSON.parse(html.match(/<script type="application\/ld\+json"[^>]*>([^<]*)<\/script>/)![1]);
+    const reviewed = ldOf(applyAppHeadMeta(DOC, { ...spec, author: 'Maija Meikäläinen' }));
+    expect(reviewed.author).toEqual({ '@type': 'Person', name: 'Maija Meikäläinen' });
+    expect(reviewed.editor).toEqual({ '@type': 'Person', name: 'Maija Meikäläinen' });
+    const plain = ldOf(applyAppHeadMeta(DOC, spec));
+    expect(plain.author).toEqual({ '@type': 'Person', name: 'alice' });
+    expect(plain.editor).toBeUndefined();
+  });
+
   it('a quiet record stays quiet, and the raw form (no visibleLabel) never gets a chip', () => {
     const quiet = applyServeMarks(DOC, { provenance: provFixture('quiet'), visibleLabel: visible, reviewedBy: 'Maija' }).toString();
     expect(quiet).not.toContain(LABEL);
