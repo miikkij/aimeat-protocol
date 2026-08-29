@@ -225,7 +225,10 @@ export function mosaic(spec) {
         });
       case 'chart':
         return bound('chart', function (data) {
-          return chart({ target: into, data: patchFor('chart', data).data, title: p.title, empty: empty });
+          return chart({
+            target: into, data: patchFor('chart', data).data, title: p.title, empty: empty,
+            presentation: p.presentation === 'mural' ? 'mural' : 'tile',
+          });
         });
       case 'matrix':
         return bound('matrix', function (data) {
@@ -593,6 +596,9 @@ export function mosaic(spec) {
 
     if (layout.look && spec.app && spec.app.set) spec.app.set({ look: layout.look });
     root.setAttribute('data-ak-nav', layout.nav || 'stack');
+    // The choreography is a class the stylesheet reads: scroll timelines live entirely in CSS,
+    // so 'cinema' costs the page nothing at idle and reduced motion switches it off wholesale.
+    root.setAttribute('data-ak-choreo', layout.choreography === 'cinema' ? 'cinema' : 'still');
 
     // The SIGNATURE: the layout's bounded token overrides land as inline custom properties on the
     // app frame (or this root, when there is no frame), so one app's shape, type, density and

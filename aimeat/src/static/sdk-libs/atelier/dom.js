@@ -15,10 +15,13 @@
  *   prefers-reduced-motion. Finished WAAPI animations leave nothing running, so an idle Atelier
  *   surface repaints zero times — the finish gate measures exactly that.
  * @structure el · append · $ · $$ · clear · uid · reducedMotion · resolve · injectStyle ·
- *   busy · guardButtons · whileBusy · enter · countUp · attention
+ *   busy · guardButtons · whileBusy · enter · kinetic · countUp · attention
  * @usage  import { el, $, injectStyle, enter } from './dom.js';
  *   el('div', { class: 'ak-card', vars: { '--ak-fill': '42%' }, on: { click: fn } }, ['text']);
  * @version-history
+ *   v0.3.0 — 2026-08-29 — kinetic(): the headline that arrives one letter at a time on the
+ *     look's spring and then behaves — opted in by the look via `--ak-kinetic`, capped at 80
+ *     characters, aria-label preserves the word, reduced motion is a no-op.
  *   v0.2.0 — 2026-08-29 — attention(): the NOTICE-ME gesture (pulse / shake / flash / rise),
  *     one finite Web Animation per call, a no-op under reduced motion and honest about it
  *     (returns false), pace and curve from the look. enter() now rides `--ak-ease` too, so a
@@ -317,6 +320,55 @@ export function attention(target, kind) {
     { transform: 'scale(1.06)', offset: 0.5 },
     { transform: 'scale(1)' },
   ], { duration: span / 2, iterations: 2, easing: 'ease-in-out' });
+  return true;
+}
+
+/**
+ * KINETIC TYPE — a headline arrives one letter at a time and then behaves. The element's text is
+ * split into per-letter (or per-word) spans, each thrown in on the look's spring; after the run
+ * the spans are inert text and nothing animates again. The original text is preserved as the
+ * element's aria-label, so a screen reader hears one word, not thirty letters. Finite by
+ * construction, a no-op under reduced motion, and refuses long text — one kinetic headline per
+ * screen is the rule, and 80 characters is where a headline stops being one.
+ * @param {Element|string|null} target
+ * @param {{ mode?: 'letters'|'words' }} [opts]  Omitted: the look decides via `--ak-kinetic`.
+ * @returns {boolean} whether anything ran
+ */
+export function kinetic(target, opts) {
+  const node = typeof target === 'string' ? document.querySelector(target) : target;
+  if (!node || reducedMotion() || typeof node.animate !== 'function') return false;
+  if (node.getAttribute('data-ak-kinetic') === 'done') return false;
+  const cs = getComputedStyle(node);
+  const mode = ((opts && opts.mode) || cs.getPropertyValue('--ak-kinetic') || '').trim();
+  if (mode !== 'letters' && mode !== 'words') return false;
+  const text = node.textContent || '';
+  if (!text.trim() || text.length > 80) return false;
+  const span = (parseFloat(cs.getPropertyValue('--ak-motion')) || 200) * 1.8;
+  const ease = (cs.getPropertyValue('--ak-ease') || '').trim() || 'cubic-bezier(0.34, 1.56, 0.64, 1)';
+  const pieces = mode === 'words' ? text.split(/(\s+)/) : Array.from(text);
+  node.setAttribute('aria-label', text);
+  node.setAttribute('data-ak-kinetic', 'done');
+  clear(node);
+  let i = 0;
+  for (const piece of pieces) {
+    const s = el('span', { 'aria-hidden': 'true' }, piece);
+    s.style.display = 'inline-block';
+    s.style.whiteSpace = 'pre';
+    node.appendChild(s);
+    if (!piece.trim()) continue;
+    // Each glyph gets its own small throw: depth and twist vary by index so the line lands like
+    // a hand of cards, not like a curtain. Everything is transform/opacity and runs once.
+    const drop = 22 + (i % 3) * 8;
+    const twist = (i % 2 ? 1 : -1) * (3 + (i % 3));
+    s.animate(
+      [
+        { opacity: 0, transform: 'translateY(' + drop + 'px) rotate(' + twist + 'deg)' },
+        { opacity: 1, transform: 'translateY(0) rotate(0deg)' },
+      ],
+      { duration: span, delay: 34 * i, easing: ease, fill: 'backwards' },
+    );
+    i++;
+  }
   return true;
 }
 

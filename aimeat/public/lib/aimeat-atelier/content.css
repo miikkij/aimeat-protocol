@@ -12,6 +12,10 @@
  * @structure ak-list · ak-listdetail · ak-grid + ak-card · ak-mediacard · ak-timeline
  * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
  * @version-history
+ *   v0.10.0 — 2026-08-29 — THE NEXT LEVEL, first pieces: the chart mural (data as the decor —
+ *     card chrome off, full-bleed band, quiet ticks) and the cinema choreography (the opening
+ *     band recedes on scroll, sections rise as they enter; pure CSS scroll timelines behind
+ *     @supports, so an idle page still repaints zero times).
  *   v0.9.0 — 2026-08-29 — THE THINGS THAT OPEN: the dialog department (modal, sheet, actions
  *     row, backdrop), the drawer that slides from an edge, and the reveal fan.
  *   v0.8.0 — 2026-08-28 — The volume rule freed: the tilt becomes a hover/focus/current
@@ -336,6 +340,22 @@ button.ak-card:hover { box-shadow: var(--ak-elev-2); transform: translateY(-2px)
   box-shadow: var(--ak-elev-1);
 }
 .ak-chart__svg { display: block; width: 100%; height: auto; }
+/* MURAL — the data as the decor: the chart stops living in a tile and becomes the room. The
+ * card chrome goes, the drawing bleeds to the main column's edges and grows to a band; the
+ * ticks quiet down so the bars read as a wall, not as a report. One mural per screen is the
+ * registry's rule, and the contrast matrix already proves the ink on every bar hue. */
+.ak-chart--mural {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  margin-inline: calc(-1 * max(var(--ak-pad), 3vw));
+}
+.ak-chart--mural .ak-chart__svg { min-height: min(46dvh, 30rem); height: auto; }
+.ak-chart--mural .ak-chart__tick { opacity: 0.45; }
+.ak-chart--mural .ak-chart__grid { opacity: 0.25; }
+.ak-chart--mural .ak-chart__legend { padding-inline: max(var(--ak-pad), 3vw); }
 .ak-chart__grid { stroke: var(--ak-line); stroke-width: 1; opacity: 0.55; }
 .ak-chart__zero { stroke: var(--ak-ink-dim); stroke-width: 1.25; }
 .ak-chart__tick { fill: var(--ak-ink-dim); font-family: var(--ak-font-mono); font-size: 11px; }
@@ -597,4 +617,35 @@ button.ak-card:hover { box-shadow: var(--ak-elev-2); transform: translateY(-2px)
 .ak-reveal__text { margin: 0; color: var(--ak-ink-dim); }
 @media (prefers-reduced-motion: reduce) {
   .ak-reveal__chevron { transition: none; }
+}
+
+/* ── Choreography: scroll is the camera ──────────────────────────────────────────────────────
+ * Opted in per layout (`choreography: "cinema"` → data-ak-choreo on the mosaic root). Everything
+ * here is a CSS scroll timeline: no JS, no ticking clock, zero repaints at idle — the browser
+ * drives the animation off scroll position on the compositor. A browser without scroll
+ * timelines simply gets the still page, which is why the whole block sits behind @supports. */
+@supports (animation-timeline: view()) {
+  [data-ak-choreo='cinema'] .ak-mosaic__unit,
+  [data-ak-choreo='cinema'] .ak-mosaic__units--grid > * {
+    animation: ak-choreo-rise both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 55%;
+  }
+  [data-ak-choreo='cinema'] .ak-hero {
+    animation: ak-choreo-recede both;
+    animation-timeline: scroll();
+    animation-range: 0 70vh;
+    transform-origin: 50% 0;
+  }
+}
+@keyframes ak-choreo-rise {
+  from { opacity: 0.15; transform: translateY(28px) scale(0.985); }
+}
+@keyframes ak-choreo-recede {
+  to { opacity: 0.4; transform: translateY(-4vh) scale(0.95); }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-ak-choreo='cinema'] .ak-mosaic__unit,
+  [data-ak-choreo='cinema'] .ak-mosaic__units--grid > *,
+  [data-ak-choreo='cinema'] .ak-hero { animation: none; }
 }

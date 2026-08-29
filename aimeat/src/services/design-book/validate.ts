@@ -44,7 +44,7 @@ export type PartKind = (typeof PART_KINDS)[number];
 
 /** The motion recipe's vocabulary: the signature tokens that ARE motion. */
 export const MOTION_TOKENS = [
-  '--ak-motion', '--ak-ease', '--ak-enter-distance', '--ak-enter-stagger', '--ak-tilt',
+  '--ak-motion', '--ak-ease', '--ak-enter-distance', '--ak-enter-stagger', '--ak-tilt', '--ak-kinetic',
 ] as const;
 
 export const PART_STATUSES = ['proposed', 'published', 'aging', 'retired'] as const;

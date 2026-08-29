@@ -229,6 +229,41 @@
     ], { duration: span / 2, iterations: 2, easing: "ease-in-out" });
     return true;
   }
+  function kinetic(target, opts) {
+    const node = typeof target === "string" ? document.querySelector(target) : target;
+    if (!node || reducedMotion() || typeof node.animate !== "function") return false;
+    if (node.getAttribute("data-ak-kinetic") === "done") return false;
+    const cs = getComputedStyle(node);
+    const mode = (opts && opts.mode || cs.getPropertyValue("--ak-kinetic") || "").trim();
+    if (mode !== "letters" && mode !== "words") return false;
+    const text = node.textContent || "";
+    if (!text.trim() || text.length > 80) return false;
+    const span = (parseFloat(cs.getPropertyValue("--ak-motion")) || 200) * 1.8;
+    const ease = (cs.getPropertyValue("--ak-ease") || "").trim() || "cubic-bezier(0.34, 1.56, 0.64, 1)";
+    const pieces = mode === "words" ? text.split(/(\s+)/) : Array.from(text);
+    node.setAttribute("aria-label", text);
+    node.setAttribute("data-ak-kinetic", "done");
+    clear(node);
+    let i = 0;
+    for (const piece of pieces) {
+      const s = el("span", { "aria-hidden": "true" }, piece);
+      s.style.display = "inline-block";
+      s.style.whiteSpace = "pre";
+      node.appendChild(s);
+      if (!piece.trim()) continue;
+      const drop = 22 + i % 3 * 8;
+      const twist = (i % 2 ? 1 : -1) * (3 + i % 3);
+      s.animate(
+        [
+          { opacity: 0, transform: "translateY(" + drop + "px) rotate(" + twist + "deg)" },
+          { opacity: 1, transform: "translateY(0) rotate(0deg)" }
+        ],
+        { duration: span, delay: 34 * i, easing: ease, fill: "backwards" }
+      );
+      i++;
+    }
+    return true;
+  }
   function countUp(node, from, to, opts) {
     if (!node) return;
     const fmt = opts && opts.format || function(n) {
@@ -918,6 +953,9 @@
     }
     render();
     enter(inner);
+    requestAnimationFrame(function() {
+      kinetic(title);
+    });
     return {
       el: root,
       /** @param {{ title?: string, sub?: string, image?: string|null, actions?: HeroAction[] }} patch */
@@ -2179,7 +2217,10 @@
     return v.toLocaleString(void 0, { maximumFractionDigits: 2 });
   }
   function chart(spec) {
-    const root = el("figure", { class: "ak-root ak-chart", role: "img" });
+    const root = el("figure", {
+      class: "ak-root ak-chart" + (spec.presentation === "mural" ? " ak-chart--mural" : ""),
+      role: "img"
+    });
     if (spec.target) resolve(spec.target).appendChild(root);
     let emptyCard = null;
     function render(data) {
@@ -2998,7 +3039,13 @@
           });
         case "chart":
           return bound("chart", function(data) {
-            return chart({ target: into, data: patchFor("chart", data).data, title: p.title, empty });
+            return chart({
+              target: into,
+              data: patchFor("chart", data).data,
+              title: p.title,
+              empty,
+              presentation: p.presentation === "mural" ? "mural" : "tile"
+            });
           });
         case "matrix":
           return bound("matrix", function(data) {
@@ -3394,6 +3441,7 @@
       layout = applyViewerOverlay(layout, viewerOverlay);
       if (layout.look && spec.app && spec.app.set) spec.app.set({ look: layout.look });
       root.setAttribute("data-ak-nav", layout.nav || "stack");
+      root.setAttribute("data-ak-choreo", layout.choreography === "cinema" ? "cinema" : "still");
       const tokenHost = (
         /** @type {any} */
         spec.app && spec.app.el ? spec.app.el : root
@@ -3769,7 +3817,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.27.0",
+    version: "0.28.0",
     // ── Shell and navigation ──
     app,
     section,
@@ -3841,6 +3889,7 @@
     guardButtons,
     reducedMotion,
     enter,
+    kinetic,
     countUp,
     attention
   };

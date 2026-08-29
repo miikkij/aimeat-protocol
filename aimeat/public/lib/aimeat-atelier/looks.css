@@ -15,6 +15,7 @@
   --ak-hero-ink:      var(--ak-ink);
   --ak-hero-ink-dim:  var(--ak-hero-ink);
   --ak-scrim:         color-mix(in oklab, var(--ak-bg) 78%, transparent);
+  --ak-kinetic:       none;
 }
 
 /* @preset-block flat — the deliberate opt-out: no decoration, no entrance.
@@ -34,6 +35,7 @@
   --ak-hero-ink:        var(--ak-ink);
   --ak-hero-ink-dim:    var(--ak-hero-ink);
   --ak-scrim:           color-mix(in oklab, var(--ak-bg) 78%, transparent);
+  --ak-kinetic:         none;
 }
 
 /* @preset-block calm-card — quiet professional product.
@@ -52,6 +54,7 @@
   --ak-hero-ink:        var(--ak-ink);
   --ak-hero-ink-dim:    var(--ak-hero-ink);
   --ak-scrim:           color-mix(in oklab, var(--ak-bg) 78%, transparent);
+  --ak-kinetic:         none;
 }
 
 /* @preset-block editorial — magazine: masthead on rules, giant joined numerals, cells in one frame, slow fades.
@@ -77,6 +80,7 @@
   --ak-hero-ink:        var(--ak-ink);
   --ak-hero-ink-dim:    var(--ak-hero-ink);
   --ak-scrim:           color-mix(in oklab, var(--ak-bg) 78%, transparent);
+  --ak-kinetic:         none;
 }
 /* structure: masthead — The hero is a front-page masthead: giant display type on rules, no card, no mesh — and the news under it separates with RULES, not boxes (a card widget inside a newspaper was the first design review's finding). */
 [data-ak-look='editorial'] .ak-hero:not(.ak-hero--image) {
@@ -155,6 +159,7 @@
 /* @preset-block sticker — playful: pill corners, the whole grid tilts, extruded titles, chunky offset shadows.
    The playful form language the game kit proved. The 3% secondary tint is deliberate: at 4% the aimeat palette's near-white card sank into the page (check:atelier, step 1.09). */
 [data-ak-look='sticker'] {
+  --ak-kinetic:         letters;
   --ak-radius:          24px;
   --ak-radius-sm:       16px;
   --ak-surface-image:   none;
@@ -190,6 +195,7 @@
   --ak-hero-ink:        var(--ak-ink);
   --ak-hero-ink-dim:    var(--ak-hero-ink);
   --ak-scrim:           color-mix(in oklab, var(--ak-bg) 78%, transparent);
+  --ak-kinetic:         none;
 }
 
 /* @preset-block poster — one giant focal statement on the brand gradient, edge to edge; everything else recedes.
@@ -208,6 +214,7 @@
   --ak-hero-ink:        var(--ak-ink);
   --ak-hero-ink-dim:    var(--ak-hero-ink);
   --ak-scrim:           color-mix(in oklab, var(--ak-bg) 78%, transparent);
+  --ak-kinetic:         none;
 }
 /* structure: full-bleed-hero — The focal band runs edge to edge, out of the measure column. */
 [data-ak-look='poster'] .ak-mosaic__band .ak-hero {
@@ -245,6 +252,7 @@
   --ak-hero-ink:        var(--ak-ink);
   --ak-hero-ink-dim:    var(--ak-hero-ink);
   --ak-scrim:           color-mix(in oklab, var(--ak-bg) 78%, transparent);
+  --ak-kinetic:         none;
 }
 /* structure: masthead — The hero is a front-page masthead: giant display type on rules, no card, no mesh — and the news under it separates with RULES, not boxes (a card widget inside a newspaper was the first design review's finding). */
 [data-ak-look='broadsheet'] .ak-hero:not(.ak-hero--image) {
@@ -341,6 +349,7 @@
   --ak-hero-ink:        var(--ak-ink);
   --ak-hero-ink-dim:    var(--ak-hero-ink);
   --ak-scrim:           color-mix(in oklab, var(--ak-bg) 78%, transparent);
+  --ak-kinetic:         none;
 }
 /* structure: full-bleed-hero — The focal band runs edge to edge, out of the measure column. */
 [data-ak-look='gallery'] .ak-mosaic__band .ak-hero {
@@ -377,11 +386,13 @@
   --ak-hero-ink:        var(--ak-ink);
   --ak-hero-ink-dim:    var(--ak-hero-ink);
   --ak-scrim:           color-mix(in oklab, var(--ak-bg) 78%, transparent);
+  --ak-kinetic:         none;
 }
 
 /* @preset-block terminal — the machine speaks: mono everything, joined cells, dense, grain like phosphor.
    Everything is the mono face and a hairline grid; the grain stays on, like phosphor. */
 [data-ak-look='terminal'] {
+  --ak-page-grain:      var(--ak-grain);
   --ak-main-max:        80rem;
   --ak-font:            var(--ak-font-mono);
   --ak-font-display:    var(--ak-font-mono);
@@ -404,6 +415,7 @@
   --ak-hero-ink:        var(--ak-ink);
   --ak-hero-ink-dim:    var(--ak-hero-ink);
   --ak-scrim:           color-mix(in oklab, var(--ak-bg) 78%, transparent);
+  --ak-kinetic:         none;
 }
 /* structure: joined — Cells share hairlines inside one bordered frame — a laid-out page, not floating cards. */
 [data-ak-look='terminal'] .ak-mosaic__units--grid {
@@ -428,6 +440,7 @@
 /* @preset-block carnival — the fairground at full volume: a saturated three-hue banner, thick ink borders, hard offset shadows, tilted stickers, maximum energy.
    The front-demo2 register as arithmetic: a three-hue brand banner (every stop mixed over ink, so the mesh cap never applies and AK-GRAD proves the action ink on each), the INVERSE BAND (light hero ink on the saturated ground, a thin dark scrim instead of the pale wash — the pair AK-SCRIM now proves), depth as printed offset like brutalist, the tilt doing the sticker work. Loud is a look, not an accident. */
 [data-ak-look='carnival'] {
+  --ak-kinetic:         letters;
   --ak-hero-min:        44dvh;
   --ak-hero-image:      none;
   --ak-grad:            linear-gradient(150deg, color-mix(in oklab, var(--ak-accent) 82%, var(--ak-ink)), color-mix(in oklab, var(--ak-spectrum-2) 76%, var(--ak-ink)) 55%, color-mix(in oklab, var(--ak-spectrum-3) 70%, var(--ak-ink)));
@@ -465,6 +478,7 @@
 /* @preset-block billboard — the whole screen is the poster: carnival's energy edge to edge, no measure column, a half-screen banner — for fronts, showcases and anything that should fill the room.
    The developer's ask, verbatim in spirit: why is everything a lane in the middle of the screen? Billboard drops the measure column entirely (--ak-main-max 100%) and grows the banner to half the viewport — carnival's inverse band and printed depth, at room scale. The narrow-screen story is unchanged: the column was never narrower than the phone. */
 [data-ak-look='billboard'] {
+  --ak-kinetic:         letters;
   --ak-main-max:        100%;
   --ak-hero-min:        52dvh;
   --ak-hero-image:      none;
@@ -501,6 +515,84 @@
   padding-inline: max(var(--ak-pad), calc((100vw - min(var(--ak-main-max), 100vw)) / 2 + var(--ak-pad)));
 }
 
+/* @preset-block riso — two inks printed slightly off register: flat blocks, a hard second-hue type shadow, paper grain everywhere, no shadows because print has none — the miss is the style.
+   The print-shop world: separation comes from the 2px accent-mixed edge and the paper grain, never from a shadow (print has none). The display shadow is the second ink landing a millimetre off, and the masthead is a solid ink plate so the pair AK-SCRIM proves stays the same arithmetic carnival passes. */
+[data-ak-look='riso'] {
+  --ak-kinetic:         words;
+  --ak-page-grain:      var(--ak-grain);
+  --ak-line-w:          2px;
+  --ak-line:            color-mix(in oklab, var(--ak-accent) 72%, var(--ak-ink));
+  --ak-radius:          4px;
+  --ak-radius-sm:       2px;
+  --ak-surface-image:   none;
+  --ak-page-image:      none;
+  --ak-hero-image:      none;
+  --ak-grad:            linear-gradient(0deg, color-mix(in oklab, var(--ak-accent) 82%, var(--ak-ink)), color-mix(in oklab, var(--ak-accent) 76%, var(--ak-ink)));
+  --ak-scrim:           color-mix(in oklab, var(--ak-ink) 14%, transparent);
+  --ak-hero-ink:        var(--ak-accent-ink);
+  --ak-hero-ink-dim:    var(--ak-accent-ink);
+  --ak-elev-1:          none;
+  --ak-elev-2:          none;
+  --ak-display-shadow:  4px 3px 0 color-mix(in oklab, var(--ak-spectrum-2) 65%, transparent);
+  --ak-display-stroke:  0;
+  --ak-text-hero:       clamp(2.6rem, 9vw, 4.6rem);
+  --ak-weight-display:  900;
+  --ak-tilt:            -1.2deg;
+  --ak-enter-distance:  18px;
+  --ak-enter-stagger:   50ms;
+  --ak-ease:            cubic-bezier(0.2, 0.9, 0.3, 1);
+  --ak-hero-min:        30dvh;
+}
+/* structure: full-bleed-hero — The focal band runs edge to edge, out of the measure column. */
+[data-ak-look='riso'] .ak-mosaic__band .ak-hero {
+  border-radius: 0;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+}
+/* The band escapes the column; its TEXT stays aligned to it — found in the first
+ * real-data experiment run, where the title clipped at the viewport edge. */
+[data-ak-look='riso'] .ak-mosaic__band .ak-hero .ak-hero__inner {
+  padding-inline: max(var(--ak-pad), calc((100vw - min(var(--ak-main-max), 100vw)) / 2 + var(--ak-pad)));
+}
+
+/* @preset-block stage — the lit stage: a spotlight falls from above, panels float as glass with a glowing edge, depth everywhere — the room a digital twin lives in.
+   The atmosphere half of the lit-stage direction: spotlight ambient, glass panels, glow depth — proven in both modes by the matrix, truest in the dark. The WebGL ground (universe camera, twin scenes) arrives as a vendored lib on top; this look is its guaranteed flat fallback. */
+[data-ak-look='stage'] {
+  --ak-page-image:      radial-gradient(at 50% 0%, color-mix(in oklab, var(--ak-accent) 8%, var(--ak-bg)), transparent 55%), radial-gradient(at 86% 92%, color-mix(in oklab, var(--ak-spectrum-3) 6%, var(--ak-bg)), transparent 52%);
+  --ak-surface-image:   none;
+  --ak-hero-image:      none;
+  --ak-line:            color-mix(in oklab, var(--ak-accent) 22%, var(--ak-ink-dim));
+  --ak-line-w:          1px;
+  --ak-radius:          14px;
+  --ak-radius-sm:       10px;
+  --ak-blur:            10px;
+  --ak-elev-1:          0 6px 24px color-mix(in oklab, var(--ak-ink) 28%, transparent);
+  --ak-elev-2:          0 14px 44px color-mix(in oklab, var(--ak-ink) 42%, transparent), 0 0 30px color-mix(in oklab, var(--ak-accent) 18%, transparent);
+  --ak-grad:            linear-gradient(160deg, color-mix(in oklab, var(--ak-accent) 78%, var(--ak-ink)), color-mix(in oklab, var(--ak-spectrum-3) 66%, var(--ak-ink)));
+  --ak-scrim:           color-mix(in oklab, var(--ak-ink) 16%, transparent);
+  --ak-hero-ink:        var(--ak-accent-ink);
+  --ak-hero-ink-dim:    var(--ak-accent-ink);
+  --ak-hero-min:        38dvh;
+  --ak-text-hero:       clamp(2.6rem, 9vw, 4.8rem);
+  --ak-weight-display:  800;
+  --ak-enter-distance:  34px;
+  --ak-enter-stagger:   70ms;
+  --ak-motion:          260ms;
+  --ak-ease:            cubic-bezier(0.22, 1, 0.36, 1);
+  --ak-kinetic:         none;
+}
+/* structure: full-bleed-hero — The focal band runs edge to edge, out of the measure column. */
+[data-ak-look='stage'] .ak-mosaic__band .ak-hero {
+  border-radius: 0;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+}
+/* The band escapes the column; its TEXT stays aligned to it — found in the first
+ * real-data experiment run, where the title clipped at the viewport edge. */
+[data-ak-look='stage'] .ak-mosaic__band .ak-hero .ak-hero__inner {
+  padding-inline: max(var(--ak-pad), calc((100vw - min(var(--ak-main-max), 100vw)) / 2 + var(--ak-pad)));
+}
+
 /* @preset-block aurora — vivid at full volume: a taller drifting aurora, wider spectrum, deeper glass, edge to edge.
    The spectrum spreads wider (+120/-90), the band grows, the glass deepens — the look for an app that wants to feel like weather. */
 [data-ak-look='aurora'] {
@@ -516,6 +608,7 @@
   --ak-hero-ink:        var(--ak-ink);
   --ak-hero-ink-dim:    var(--ak-hero-ink);
   --ak-scrim:           color-mix(in oklab, var(--ak-bg) 78%, transparent);
+  --ak-kinetic:         none;
 }
 /* structure: full-bleed-hero — The focal band runs edge to edge, out of the measure column. */
 [data-ak-look='aurora'] .ak-mosaic__band .ak-hero {

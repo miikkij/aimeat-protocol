@@ -68,11 +68,15 @@ function fmtTick(v) {
  * @param {{
  *   target?: string|Element, data?: ChartData|null, title?: string,
  *   empty?: { title?: string, hint?: string },
+ *   presentation?: 'tile'|'mural',
  * }} spec
  * @returns {{ el: HTMLElement, set: (patch: { data: ChartData|null }) => void, destroy: () => void }}
  */
 export function chart(spec) {
-  const root = el('figure', { class: 'ak-root ak-chart', role: 'img' });
+  const root = el('figure', {
+    class: 'ak-root ak-chart' + (spec.presentation === 'mural' ? ' ak-chart--mural' : ''),
+    role: 'img',
+  });
   if (spec.target) resolve(spec.target).appendChild(root);
   let emptyCard = null;
 

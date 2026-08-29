@@ -80,6 +80,12 @@ export interface AppUiComponentDef {
  *  append-only additions, 2026-08-27). */
 export const NAV_MODES = ['tabs', 'bottom-bar', 'canvas', 'deck', 'flow', 'rail', 'overlay'] as const;
 
+/** How the page moves under the reader's hand. 'still' is the default and what every layout has
+ *  been until now. 'cinema' is scroll-as-the-camera: the opening band recedes as you leave it and
+ *  each section rises to meet you — pure CSS scroll timelines, so an idle page repaints zero
+ *  times and reduced motion collapses the whole thing to end states. */
+export const CHOREOGRAPHIES = ['still', 'cinema'] as const;
+
 /** How much of the composition grid one block takes. The default is the full line; the other
  *  values are what turn a stack of cards into a COMPOSED PAGE — an asymmetric editorial split
  *  is two blocks, `main` beside `side`. */
@@ -193,12 +199,16 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
   },
   {
     id: 'chart',
-    summary: 'Grouped bars and drawn lines over one label axis — the costs/income/cash-curve shape. The source resolves to ONE record: { labels: string[], series: [{ id, label, kind: "bar"|"line", values: number[] }] }. Colours come from the look\'s own accent spectrum; negatives are legal and the zero line appears when crossed.',
+    summary: 'Grouped bars and drawn lines over one label axis — the costs/income/cash-curve shape. The source resolves to ONE record: { labels: string[], series: [{ id, label, kind: "bar"|"line", values: number[] }] }. Colours come from the look\'s own accent spectrum; negatives are legal and the zero line appears when crossed. presentation "mural" makes the chart the room instead of a tile: full-bleed behind its section, ticks quieted, one per screen.',
     props: {
       source: source(),
       title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
       emptyTitle: text('What the empty state says.', 80),
       emptyHint: text('The line under it.', 160),
+      presentation: {
+        type: 'enum', values: ['tile', 'mural'], default: 'tile',
+        description: 'tile: the chart lives in its card. mural: it becomes the section\'s full-bleed ground — the data as the decor.',
+      },
     },
   },
   {
@@ -298,6 +308,7 @@ export function componentById(id: string): AppUiComponentDef | undefined {
 export function buildUiCatalogue(): {
   components: Array<{ id: string; summary: string; props: Record<string, AppUiPropDef>; max_per_layout?: number }>;
   nav_modes: readonly string[];
+  choreographies: { values: readonly string[]; summary: string };
   looks: readonly string[];
   spans: { values: readonly string[]; summary: string };
   look_sheets: Array<{ id: string; feel: string; structures: string[] }>;
@@ -315,6 +326,10 @@ export function buildUiCatalogue(): {
       ...(c.maxPerLayout !== undefined ? { max_per_layout: c.maxPerLayout } : {}),
     })),
     nav_modes: NAV_MODES,
+    choreographies: {
+      values: CHOREOGRAPHIES,
+      summary: 'How the page moves under the reader\'s hand. still: nothing scroll-driven. cinema: the opening band recedes and each section rises as it enters the view — right for fronts, stories and reports; wrong for a tool someone lives in.',
+    },
     looks: LOOKS,
     spans: {
       values: BLOCK_SPANS,
