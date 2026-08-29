@@ -379,6 +379,26 @@ const GOOD_BODY = {
         assert(r.status === 409 && r.body.error?.code === 'NO_LAYOUT', `NO_LAYOUT 409, got ${r.status} ${r.body.error?.code}`);
     });
 
+    await test('a GENRE part: names a served template, benches as the page, and adopt refuses with the fork address', async () => {
+        const good = await json('/v1/designbook', { method: 'POST', headers: auth(other.token), body: JSON.stringify({
+            id: 'genre-test-departures', kind: 'genre', title: 'The departure board',
+            summary: 'A split-flap hall board — fork it, swap the rows.',
+            body: { template: 'genre-departures' }, tags: ['genre'] }) });
+        assert(good.status === 201, `a genre part must propose: ${JSON.stringify(good.body)}`);
+
+        const bad = await json('/v1/designbook', { method: 'POST', headers: auth(other.token), body: JSON.stringify({
+            id: 'genre-test-bogus', kind: 'genre', title: 'X', summary: 'x',
+            body: { template: 'genre-does-not-exist' }, tags: [] }) });
+        assert(bad.status === 422 && /genre template/.test(bad.body.error.message),
+            `an unknown template refuses by name: ${JSON.stringify(bad.body)}`);
+
+        const adopt = await json('/v1/designbook/genre-test-departures/adopt', { method: 'POST', headers: auth(other.token),
+            body: JSON.stringify({ filename: otherApp }) });
+        assert(adopt.status === 409 && /forked, not adopted/.test(adopt.body.error.message)
+            && /app-templates\/genre-departures/.test(adopt.body.error.message),
+            `adopt refuses a genre with the fork address: ${JSON.stringify(adopt.body)}`);
+    });
+
     await test('the operator retires it, and a retired address stays retired', async () => {
         const r = await json(`/v1/designbook/${partId}/status`, {
             method: 'POST', headers: auth(op.token), body: JSON.stringify({ status: 'retired' }),

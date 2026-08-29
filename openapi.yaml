@@ -9774,14 +9774,15 @@ paths:
       summary: Authoring-template registry index
       description: >-
         Curated app-building starting points (app shells T1/T2/T3, components, use-case
-        scaffolds) the prompt builders inject so an AI copies from a model instead of building
+        scaffolds, big-app project layouts and Atelier GENRE pages — complete committed
+        registers to fork) the prompt builders inject so an AI copies from a model instead of building
         from scratch. Index without template content. Public (CORS *).
       tags:
         - Discovery
       parameters:
         - name: kind
           in: query
-          schema: { type: string, enum: [app-shell, component, use-case] }
+          schema: { type: string, enum: [app-shell, component, use-case, project, genre] }
         - name: lang
           in: query
           schema: { type: string }
@@ -20643,7 +20644,7 @@ paths:
       tags: [Apps]
       security: [{ bearerAuth: [] }]
       parameters:
-        - { name: kind, in: query, schema: { type: string, enum: [layout, fill, look, motion, illustration] } }
+        - { name: kind, in: query, schema: { type: string, enum: [layout, fill, look, motion, illustration, genre] } }
         - { name: status, in: query, schema: { type: string, enum: [proposed, published, aging, retired] } }
         - { name: q, in: query, schema: { type: string }, description: Matched against id, title, summary and tags }
         - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 200 } }
@@ -20674,7 +20675,7 @@ paths:
                 part:
                   type: object
                   description: >-
-                    { id, kind: layout|fill|look|motion|illustration, title, summary, body,
+                    { id, kind: layout|fill|look|motion|illustration|genre, title, summary, body,
                     tags? } — the kind decides the body: a whole mosaic layout (layout/fill),
                     { tokens, look? } (look), { tokens } of motion tokens only (motion), or
                     { style, palette_words? } (illustration)

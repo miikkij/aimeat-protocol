@@ -296,6 +296,13 @@ export class DesignBookService {
     // style MERGES into the one it already has — those kinds are seasoning, and seasoning with
     // no dish to land on refuses with words. Every path writes through the same validated,
     // versioned, provenance-stamped door, so an adopted accent pair re-proves its matrix here.
+    // A GENRE is a whole page: taking one home is a FORK of its template, never a merge into a
+    // stored arrangement — adopting it would overwrite an app with a scaffold.
+    if (part.kind === 'genre') {
+      const tid = (part.body as { template?: string }).template || '';
+      throw new DesignBookError('GENRE_IS_FORKED',
+        `A genre is forked, not adopted: fetch GET /v1/app-templates/${tid} , swap the words and sources for your app, and publish it as its own file. The Book shows it; the template registry hands it over.`, 409);
+    }
     let nextLayout: unknown = part.body;
     if (part.kind === 'look' || part.kind === 'motion' || part.kind === 'illustration') {
       const current = await apps.read(app.ownerGaii, filename);
