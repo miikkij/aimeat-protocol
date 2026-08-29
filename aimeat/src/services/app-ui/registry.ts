@@ -284,6 +284,7 @@ export const SIGNATURE_TOKENS: Record<string, string> = {
   '--ak-font-display': 'The display face for titles and figures.',
   '--ak-weight-display': 'The display weight, e.g. "900" for a heavy masthead.',
   '--ak-text-hero': 'The hero title size, e.g. "clamp(2.2rem, 7vw, 4.4rem)".',
+  '--ak-kinetic': 'The masthead letter-throw: "letters" (each glyph arrives on the look\'s spring), "words", or "none". One kinetic headline per screen; the hero runs it, apps call nothing.',
   '--ak-tilt': 'The playful tilt of cards and tiles, e.g. "1.2deg". "0deg" is calm.',
   '--ak-motion': 'The base transition duration, e.g. "120ms" for a snappy hand.',
   '--ak-ease': 'The curve every transition and entrance rides, e.g. "cubic-bezier(0.34, 1.56, 0.64, 1)" for a springy overshoot, "linear" for a machine hand.',
