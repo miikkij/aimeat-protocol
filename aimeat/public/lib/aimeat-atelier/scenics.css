@@ -1,0 +1,225 @@
+/*
+ * @file aimeat-atelier/scenics.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description THE SCENIC PROPS — the shared stagecraft the thirteen genre probes taught us:
+ *   the ticker that moves with the scroll, the tilted stamp, the torn paper edge, the split-flap
+ *   cell, the taped polaroid, the brass plaque under a spotlight, the receipt roll, the ransom
+ *   letter, the VU bar, the barcode, the scanline film. Every colour is a token or a mix over
+ *   tokens, so a prop follows whatever world it stands in; every rotation is small and DELIBERATE
+ *   (a prop is a sticker by nature — the tilt-at-rest ruling for cards does not apply to props,
+ *   the developer approved the register on the probes).
+ *
+ *   MOTION STAYS THE HOUSE PHYSICS: the ticker rides a CSS scroll timeline (zero idle), flap and
+ *   deal entrances are finite WAAPI runs the scenics.js builders own, hovers are transitions.
+ * @structure ticker · stamp · torn · flap · polaroid · plaque · spotlight · receipt · ransom ·
+ *   vu · barcode · scanlines
+ * @usage
+ *   <div class="ak-ticker"><div class="ak-ticker__rail">…repeated copy…</div></div>
+ *   <span class="ak-stamp ak-stamp--hot">SOLD OUT</span>
+ *   AIMEAT.atelier.flapify(el) · AIMEAT.atelier.ransom(el) · AIMEAT.atelier.vu(el, values)
+ * @version-history
+ *   v0.1.0 — 2026-08-29 — Initial: extracted from the approved genre probes (Drop 04, the Night
+ *     Floor, PRESSCTL, the Index, the Wall, the Fanzine, the Receipt, Departures).
+ */
+
+/* ── THE TICKER: a strip of repeated copy that moves as the page scrolls ───────────────────── */
+
+.ak-ticker {
+  overflow: hidden;
+  border-block: 3px solid var(--ak-ink);
+  background: color-mix(in oklab, var(--ak-spectrum-2) 70%, var(--ak-bg));
+}
+.ak-ticker__rail {
+  display: inline-flex;
+  gap: 3rem;
+  white-space: nowrap;
+  padding: 12px 0;
+  font-family: var(--ak-font-mono);
+  font-size: clamp(1rem, 2.4vw, 1.5rem);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ak-ink);
+  will-change: transform;
+}
+@supports (animation-timeline: scroll()) {
+  .ak-ticker__rail { animation: ak-ticker-run linear both; animation-timeline: scroll(); }
+  @keyframes ak-ticker-run { from { transform: translateX(2%); } to { transform: translateX(-42%); } }
+}
+@media (prefers-reduced-motion: reduce) { .ak-ticker__rail { animation: none; } }
+
+/* ── THE STAMP: a bordered chip slapped on at an angle ─────────────────────────────────────── */
+
+.ak-stamp {
+  display: inline-block;
+  padding: 8px 14px;
+  background: var(--ak-surface);
+  border: 2.5px solid var(--ak-ink);
+  box-shadow: 5px 5px 0 color-mix(in oklab, var(--ak-ink) 85%, transparent);
+  font-family: var(--ak-font-mono);
+  font-size: var(--ak-text-fine);
+  letter-spacing: 0.08em;
+  rotate: -3deg;
+}
+.ak-stamp--hot {
+  background: var(--ak-accent);
+  color: var(--ak-accent-ink);
+  border-color: var(--ak-accent-ink);
+  font-family: var(--ak-font-display);
+  font-weight: var(--ak-weight-display);
+  rotate: 6deg;
+}
+.ak-stamp--paid {
+  background: none;
+  box-shadow: none;
+  border: 5px solid var(--ak-accent-text);
+  color: var(--ak-accent-text);
+  font-family: var(--ak-font-display);
+  font-weight: var(--ak-weight-display);
+  font-size: clamp(1.4rem, 4vw, 2.4rem);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  border-radius: 6px;
+  rotate: -12deg;
+  mix-blend-mode: multiply;
+  opacity: 0.88;
+}
+
+/* ── THE TORN EDGE: a strip of paper with ripped top and bottom ───────────────────────────── */
+
+.ak-torn {
+  background: var(--ak-surface);
+  padding: 22px clamp(16px, 4vw, 40px) 26px;
+  box-shadow: 0 8px 24px color-mix(in oklab, var(--ak-ink) 22%, transparent);
+  clip-path: polygon(0 12%, 4% 4%, 9% 11%, 15% 3%, 22% 10%, 30% 2%, 38% 9%, 47% 4%, 55% 11%,
+    63% 2%, 71% 9%, 79% 4%, 86% 11%, 93% 3%, 100% 8%, 100% 92%, 95% 98%, 89% 90%, 81% 97%,
+    72% 89%, 63% 97%, 54% 90%, 45% 98%, 36% 88%, 27% 96%, 18% 89%, 10% 98%, 4% 90%, 0 96%);
+}
+.ak-torn--loud { background: var(--ak-accent); color: var(--ak-accent-ink); }
+
+/* ── THE FLAP: one split-flap character cell (scenics.js flapify() builds the row) ─────────── */
+
+.ak-flaps { display: inline-flex; gap: 2px; }
+.ak-flap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15ch;
+  padding: 6px 2px;
+  border-radius: 3px;
+  font-family: var(--ak-font-mono);
+  background: linear-gradient(180deg,
+    color-mix(in oklab, var(--ak-ink) 10%, var(--ak-surface-2)) 48%,
+    var(--ak-surface-2) 52%);
+  color: var(--ak-accent-text);
+  box-shadow: inset 0 -1px 0 color-mix(in oklab, var(--ak-ink) 60%, transparent);
+}
+.ak-flap--space { background: transparent; box-shadow: none; }
+
+/* ── THE POLAROID: a taped snapshot thrown on the desk ─────────────────────────────────────── */
+
+.ak-polaroid {
+  position: relative;
+  background: var(--ak-surface);
+  padding: 12px 12px 40px;
+  box-shadow: 0 14px 34px color-mix(in oklab, var(--ak-ink) 30%, transparent);
+  transition: transform var(--ak-motion) var(--ak-ease);
+}
+.ak-polaroid img { display: block; width: 100%; object-fit: cover; }
+.ak-polaroid figcaption {
+  position: absolute; left: 12px; right: 12px; bottom: 10px;
+  font-family: var(--ak-font-mono); font-size: var(--ak-text-fine); letter-spacing: 0.06em;
+}
+.ak-polaroid:hover { transform: rotate(0deg) scale(1.05); z-index: 5; }
+.ak-polaroid .ak-tape {
+  position: absolute; top: -12px; left: 50%; translate: -50% 0; rotate: -4deg;
+  width: 92px; height: 28px;
+  background: color-mix(in oklab, var(--ak-spectrum-2) 26%, var(--ak-surface));
+  opacity: 0.75;
+  box-shadow: 0 2px 6px color-mix(in oklab, var(--ak-ink) 18%, transparent);
+}
+
+/* ── THE PLAQUE AND THE SPOTLIGHT: museum furniture ───────────────────────────────────────── */
+
+.ak-plaque {
+  display: inline-block;
+  background: linear-gradient(180deg,
+    color-mix(in oklab, var(--ak-spectrum-2) 55%, var(--ak-surface)),
+    color-mix(in oklab, var(--ak-spectrum-2) 68%, var(--ak-ink)));
+  color: color-mix(in oklab, var(--ak-ink) 92%, var(--ak-spectrum-2));
+  padding: 10px 16px;
+  min-width: 14rem;
+  border: 1px solid color-mix(in oklab, var(--ak-ink) 55%, var(--ak-spectrum-2));
+  box-shadow: 0 6px 18px color-mix(in oklab, var(--ak-ink) 40%, transparent);
+  font-size: var(--ak-text-fine);
+}
+.ak-spotlit { position: relative; }
+.ak-spotlit::before {
+  content: '';
+  position: absolute; top: 0; left: 50%; translate: -50% 0;
+  width: 130%; height: 100%;
+  background: radial-gradient(ellipse 60% 46% at 50% 12%,
+    color-mix(in oklab, var(--ak-spectrum-2) 18%, transparent), transparent 70%);
+  pointer-events: none;
+}
+
+/* ── THE RECEIPT: the till-roll surface with perforated ends ──────────────────────────────── */
+
+.ak-receipt {
+  background: var(--ak-surface);
+  font-family: var(--ak-font-mono);
+  box-shadow: 0 30px 80px color-mix(in oklab, var(--ak-ink) 70%, transparent);
+}
+.ak-receipt__tear { height: 16px; background: var(--ak-surface); }
+.ak-receipt__tear--top { clip-path: polygon(0 100%, 100% 100%, 100% 55%, 96% 15%, 92% 65%, 88% 20%,
+  84% 70%, 80% 25%, 76% 60%, 72% 10%, 68% 65%, 64% 30%, 60% 70%, 56% 15%, 52% 60%, 48% 25%,
+  44% 70%, 40% 20%, 36% 65%, 32% 30%, 28% 60%, 24% 15%, 20% 70%, 16% 25%, 12% 60%, 8% 20%, 4% 65%, 0 40%); }
+.ak-receipt__tear--bottom { clip-path: polygon(0 0, 100% 0, 100% 45%, 96% 85%, 92% 35%, 88% 80%,
+  84% 30%, 80% 75%, 76% 40%, 72% 90%, 68% 35%, 64% 70%, 60% 30%, 56% 85%, 52% 40%, 48% 75%,
+  44% 30%, 40% 80%, 36% 35%, 32% 70%, 28% 40%, 24% 85%, 20% 30%, 16% 75%, 12% 40%, 8% 80%, 4% 35%, 0 60%); }
+.ak-receipt__rule { border: 0; border-top: 2px dashed var(--ak-ink); opacity: 0.5; margin: 18px 0; }
+.ak-receipt__line { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; padding: 5px 0; }
+.ak-receipt__line .fill { flex: 1; border-bottom: 2px dotted color-mix(in oklab, var(--ak-ink) 35%, transparent); transform: translateY(-4px); }
+
+/* ── THE RANSOM LETTER: one cut-out character (scenics.js ransom() cuts the word) ─────────── */
+
+.ak-ransom i {
+  font-style: normal;
+  display: inline-block;
+  padding: 0.04em 0.12em;
+  margin: 0.02em 0.01em;
+  font-family: var(--ak-font-display);
+  font-weight: var(--ak-weight-display);
+}
+.ak-ransom .cut-a { background: var(--ak-ink); color: var(--ak-bg); rotate: -3deg; }
+.ak-ransom .cut-b { background: var(--ak-accent); color: var(--ak-accent-ink); rotate: 2deg; translate: 0 0.06em; font-size: 0.9em; }
+.ak-ransom .cut-c { background: var(--ak-spectrum-2); color: var(--ak-ink); rotate: -1.5deg; font-size: 1.08em; }
+.ak-ransom .cut-d { color: var(--ak-ink); rotate: 1deg; font-family: var(--ak-font-mono); font-weight: 700; text-decoration: underline 4px; }
+.ak-ransom .cut-e { background: var(--ak-spectrum-3); color: var(--ak-bg); rotate: 3deg; translate: 0 -0.05em; font-size: 0.86em; }
+.ak-ransom .cut-f { color: transparent; -webkit-text-stroke: 3px var(--ak-ink); rotate: -2deg; }
+
+/* ── THE VU BARS (scenics.js vu() draws them once) ─────────────────────────────────────────── */
+
+.ak-vu { display: flex; align-items: flex-end; gap: 6px; height: 74px; }
+.ak-vu i {
+  width: 12px;
+  border-radius: 3px 3px 0 0;
+  background: linear-gradient(180deg, var(--ak-accent),
+    color-mix(in oklab, var(--ak-spectrum-2) 80%, var(--ak-ink)) 60%);
+}
+
+/* ── THE BARCODE AND THE SCANLINES ─────────────────────────────────────────────────────────── */
+
+.ak-barcode {
+  height: 58px;
+  background: repeating-linear-gradient(90deg,
+    var(--ak-ink) 0 2px, transparent 2px 5px, var(--ak-ink) 5px 9px, transparent 9px 11px,
+    var(--ak-ink) 11px 12px, transparent 12px 16px, var(--ak-ink) 16px 21px, transparent 21px 23px);
+}
+.ak-scanlines { position: relative; }
+.ak-scanlines::after {
+  content: '';
+  position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(180deg, transparent 0 2px,
+    color-mix(in oklab, var(--ak-ink) 30%, transparent) 2px 4px);
+}

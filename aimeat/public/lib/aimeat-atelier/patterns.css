@@ -1,0 +1,128 @@
+/*
+ * @file aimeat-atelier/patterns.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description THE PATTERN DEPARTMENT — gradient-built background patterns on the kit's tokens.
+ *   Technique after Temani Afif's CSS-Pattern collection (https://github.com/Afif13/CSS-Pattern,
+ *   MIT, © 2022 Temani Afif): every pattern is nothing but CSS gradients over two colours and a
+ *   size. The recipes here are REWRITTEN on the --ak-* contract, which is what makes them legal
+ *   in this system — the two colours are colour-mix expressions over the look's own tokens, so a
+ *   world's patterns follow its ground and the contrast arithmetic can reason about them.
+ *
+ *   ONE RECIPE, THREE VOLUMES. A pattern class (.ak-pat-*) picks the geometry; a volume class
+ *   picks how loud the two inks are:
+ *     .ak-pat--ground   the whisper: ~6% ink over the page — a WHOLE page may stand on it and
+ *                       body text stays readable (the pair stays inside the surface-tint budget).
+ *     .ak-pat--prop     the fill: card-strength — one object (a chip, an empty state, an edge)
+ *                       wears it as texture. Never under running text.
+ *     .ak-pat--zone     the statement: full ink — a banner or a divider, ONE per screen, and
+ *                       words on it live inside a solid chip, never on the raw pattern.
+ *   Zone hue variants pick which ink pair shouts: accent (default), spectrum-2, spectrum-3, ink.
+ *
+ *   The element sets `--ak-pat-size` to scale a recipe (each has a sane default). Patterns are
+ *   pure backgrounds: zero JS, zero images, zero idle repaints.
+ * @structure volumes (--ak-pat-c1/-c2 pairs) · recipes (.ak-pat-*)
+ * @usage
+ *   <div class="ak-pat-zigzag ak-pat--zone"> … </div>
+ *   <body class="ak-pat-graph ak-pat--ground">          (the page stands on a whisper)
+ *   <span class="ak-pat-halftone ak-pat--prop" style="--ak-pat-size: 18px">
+ * @version-history
+ *   v0.1.0 — 2026-08-29 — Initial: eight recipes (zigzag, check, halftone, hazard, waves,
+ *     triangles, graph, scallop) × three volumes, born from the Pattern Dept. probe the
+ *     developer approved ("just noi").
+ */
+
+/* ── The volumes: who the two inks are ─────────────────────────────────────────────────────── */
+
+[class*='ak-pat-'] {
+  /* Default volume is PROP — accent-tinted card texture. */
+  --ak-pat-c1: color-mix(in oklab, var(--ak-accent) 22%, var(--ak-surface));
+  --ak-pat-c2: var(--ak-surface);
+}
+.ak-pat--ground {
+  --ak-pat-c1: color-mix(in oklab, var(--ak-ink) 6%, var(--ak-bg));
+  --ak-pat-c2: var(--ak-bg);
+}
+.ak-pat--prop {
+  --ak-pat-c1: color-mix(in oklab, var(--ak-accent) 22%, var(--ak-surface));
+  --ak-pat-c2: var(--ak-surface);
+}
+.ak-pat--zone {
+  --ak-pat-c1: var(--ak-accent);
+  --ak-pat-c2: color-mix(in oklab, var(--ak-accent) 80%, var(--ak-ink));
+}
+.ak-pat--zone-2 {
+  --ak-pat-c1: var(--ak-spectrum-2);
+  --ak-pat-c2: color-mix(in oklab, var(--ak-spectrum-2) 78%, var(--ak-ink));
+}
+.ak-pat--zone-3 {
+  --ak-pat-c1: var(--ak-spectrum-3);
+  --ak-pat-c2: color-mix(in oklab, var(--ak-spectrum-3) 78%, var(--ak-ink));
+}
+.ak-pat--zone-ink {
+  --ak-pat-c1: var(--ak-ink);
+  --ak-pat-c2: color-mix(in oklab, var(--ak-ink) 82%, var(--ak-bg));
+}
+
+/* ── The recipes: geometry only — colours always come from the volume ──────────────────────── */
+
+.ak-pat-zigzag {
+  --ak-pat-size: 60px;
+  --_akp: var(--ak-pat-c1) 90deg, #0000 90.5deg;
+  background:
+    conic-gradient(from -45deg, var(--_akp)),
+    conic-gradient(from 135deg, var(--_akp)) calc(var(--ak-pat-size) / 2) 0,
+    var(--ak-pat-c2);
+  background-size: var(--ak-pat-size) var(--ak-pat-size);
+}
+
+.ak-pat-check {
+  --ak-pat-size: 46px;
+  background: conic-gradient(var(--ak-pat-c1) 25%, var(--ak-pat-c2) 0 50%,
+    var(--ak-pat-c1) 0 75%, var(--ak-pat-c2) 0);
+  background-size: var(--ak-pat-size) var(--ak-pat-size);
+}
+
+.ak-pat-halftone {
+  --ak-pat-size: 34px;
+  background:
+    radial-gradient(var(--ak-pat-c1) 22%, #0000 23%) 0 0 / var(--ak-pat-size) var(--ak-pat-size),
+    radial-gradient(var(--ak-pat-c1) 22%, #0000 23%)
+      calc(var(--ak-pat-size) / 2) calc(var(--ak-pat-size) / 2) / var(--ak-pat-size) var(--ak-pat-size),
+    var(--ak-pat-c2);
+}
+
+.ak-pat-hazard {
+  --ak-pat-size: 26px;
+  background: repeating-linear-gradient(45deg,
+    var(--ak-pat-c1) 0 calc(var(--ak-pat-size) / 2), var(--ak-pat-c2) 0 var(--ak-pat-size));
+}
+
+.ak-pat-ribbon {
+  --ak-pat-size: 68px;
+  background: repeating-linear-gradient(135deg,
+    var(--ak-pat-c1) 0 25%, var(--ak-pat-c2) 0 50%);
+  background-size: var(--ak-pat-size) var(--ak-pat-size);
+}
+
+.ak-pat-diamonds {
+  --ak-pat-size: 52px;
+  background: repeating-conic-gradient(from 45deg,
+    var(--ak-pat-c1) 0 25%, var(--ak-pat-c2) 0 50%);
+  background-size: var(--ak-pat-size) var(--ak-pat-size);
+}
+
+.ak-pat-graph {
+  --ak-pat-size: 44px;
+  background:
+    linear-gradient(var(--ak-pat-c1) 2px, #0000 2px) 0 0 / 100% var(--ak-pat-size),
+    linear-gradient(90deg, var(--ak-pat-c1) 2px, #0000 2px) 0 0 / var(--ak-pat-size) 100%,
+    var(--ak-pat-c2);
+}
+
+.ak-pat-scallop {
+  --ak-pat-size: 44px;
+  background: radial-gradient(circle at 50% 0,
+    var(--ak-pat-c2) 34%, var(--ak-pat-c1) 35% 60%, var(--ak-pat-c2) 61%)
+    0 0 / var(--ak-pat-size) var(--ak-pat-size);
+}
