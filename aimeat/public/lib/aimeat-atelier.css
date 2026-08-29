@@ -36,6 +36,7 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.34.0 — 2026-08-29 — .ak-map (data.css): the real map's chrome on the tokens.
  *   v0.33.0 — 2026-08-29 — The ops family, the atlas and the chart family (data.css): health
  *     lamps, queue states, the gauge dial, the console vane, the offline map, donut and
  *     calendar shapes, KPI trend sparklines. Tones ride --ak-ok/-warn/-err throughout.

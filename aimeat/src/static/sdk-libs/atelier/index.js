@@ -28,6 +28,9 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.34.0 — 2026-08-29 — `map`: the REAL map — Leaflet over OpenStreetMap tiles, served by
+ *     this node, one clean card, token pins and popups, dark-mode tile toning. The atlas
+ *     stays the offline world choropleth; the map is what "a map" means.
  *   v0.33.0 — 2026-08-29 — THE NEXT LEVEL, second wave: the ops family (health wall, work
  *     queue, gauge, console), the offline atlas (Natural Earth shapes served by the node —
  *     no tile server), the chart family (donut, calendar; area series; statRow trend
@@ -169,6 +172,7 @@ import { scene3d } from './scene3d.js';
 import { health, queue, gauge } from './ops.js';
 import { konsole } from './konsole.js';
 import { atlas } from './atlas.js';
+import { map } from './map.js';
 import { mosaic, appRef } from './mosaic.js';
 
 const atelier = {
@@ -177,7 +181,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.33.0',
+  version: '0.34.0',
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,
@@ -208,8 +212,8 @@ const atelier = {
   // ── Content ──
   list, listDetail, cardGrid, mediaCard, timeline, chart, matrix, graph, waveform, scene3d,
 
-  // ── The ops family and the map (an admin panel is an arrangement, not app code) ──
-  health, queue, gauge, console: konsole, atlas,
+  // ── The ops family and the maps (an admin panel is an arrangement, not app code) ──
+  health, queue, gauge, console: konsole, atlas, map,
 
   // ── The things that open ──
   reveal, drawer, dialog, confirm, prompt, sheet,

@@ -26,6 +26,8 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.16.0 — 2026-08-29 — "A map" means the REAL map: the `map` block (Leaflet + OSM) taught
+ *     as the answer to the word, the atlas demoted to its narrow choropleth truth.
  *   v1.15.0 — 2026-08-29 — THE DEMO TRAP named in the genre section: a block stack wearing a
  *     look is never a statement — subject first, genre fork, components serving the page
  *     (docs/pitfalls.md §34, learned the hard way twice in one day).
@@ -273,11 +275,13 @@ function composeBody(config: AimeatConfig): string {
     + 'CHARTS ARE A FAMILY on one block: `chart` with `kind: "axes"` (bars, lines and filled '
     + 'areas — a series may be kind "area"), `"donut"` (parts of a whole, the total in the '
     + 'middle) or `"calendar"` (a stretch of days as a heat grid). A statRow tile carrying '
-    + '`trend: [numbers]` draws its short history as a sparkline under the figure. And the '
-    + '`atlas` block is the DATA MAP, fully offline: country shapes ship on this node, regions '
-    + 'fill with the accent by value (match by English country name), markers sit at lon/lat, '
-    + 'and the view frames the data\'s extent on its own — no tile server, no key, no external '
-    + 'host.\n\n'
+    + '`trend: [numbers]` draws its short history as a sparkline under the figure.\n\n'
+    + 'WHEN THE OWNER SAYS "A MAP", THEY MEAN THE REAL ONE: the `map` block is Leaflet over '
+    + 'OpenStreetMap street tiles — pins with popups at real addresses, the view framing the '
+    + 'markers on its own, the licence\'s attribution built in, dark mode re-toning the tiles. '
+    + 'The `atlas` block is the different, narrower thing: an offline choropleth of countries '
+    + 'for data-by-country, no streets on it. Reaching for atlas when the owner asked for a '
+    + 'map is a wrong answer with a confident face.\n\n'
     + 'And when a screen has earned a SHOWPIECE, the `scene3d` block gives it real depth: '
     + '`kind: "orb"` (a signature object turning under the hand), `"sky"` (a procedural '
     + 'atmosphere band) or `"bars"` (the bound rows stand up as a field of columns — the 3D '
