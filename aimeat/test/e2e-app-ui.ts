@@ -236,6 +236,22 @@ const GOOD_LAYOUT = {
             `an invented presentation is refused: ${bad.body.data.message}`);
     });
 
+    await test('scene3d is a component: bars with a source validates, an invented kind is refused', async () => {
+        const good = await validate({
+            v: 1,
+            blocks: [{ id: 'depth', component: 'scene3d', props: { kind: 'bars', source: 'season.numbers', title: 'The season' } }],
+        });
+        assert(good.status === 200 && good.body.data.ok === true,
+            `a bars scene must validate: ${JSON.stringify(good.body.data)}`);
+
+        const bad = await validate({
+            v: 1,
+            blocks: [{ id: 'depth', component: 'scene3d', props: { kind: 'globe' } }],
+        });
+        assert(bad.body.data.ok === false && /kind/.test(bad.body.data.message),
+            `an invented scene kind is refused naming the real ones: ${bad.body.data.message}`);
+    });
+
     await test('an unknown component is refused with the NEAREST real name suggested', async () => {
         const r = await validate({ v: 1, blocks: [{ id: 'g', component: 'cardgird' }] });
         assert(r.status === 200 && r.body.data.ok === false, `expected an ok:false result, got ${r.status}`);

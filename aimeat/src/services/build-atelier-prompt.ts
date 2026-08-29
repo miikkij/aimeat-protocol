@@ -26,6 +26,9 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.13.0 — 2026-08-29 — scene3d taught beside the mural: the one-per-layout showpiece
+ *     (orb / sky / bars-as-terrain) on the three-world bundle, a statement rather than a
+ *     default.
  *   v1.12.0 — 2026-08-29 — THE PATTERN SHELF: every patterns.css recipe rendered from the
  *     registry (atelier-patterns.ts) with what it looks like, what it evokes and which volume
  *     it belongs in — a pattern is chosen by intent, never by trying them all.
@@ -246,6 +249,12 @@ function composeBody(config: AimeatConfig): string {
     + 'and free at idle because it is pure CSS scroll timelines. And a chart block may carry '
     + '`presentation: "mural"`: the chart stops living in a tile and becomes the section\'s '
     + 'full-bleed ground — the data as the decor, one mural per screen.\n\n'
+    + 'And when a screen has earned a SHOWPIECE, the `scene3d` block gives it real depth: '
+    + '`kind: "orb"` (a signature object turning under the hand), `"sky"` (a procedural '
+    + 'atmosphere band) or `"bars"` (the bound rows stand up as a field of columns — the 3D '
+    + 'chart). One per layout, loaded lazily, colours from the look\'s tokens, and the render '
+    + 'loop stops at rest so an idle scene costs nothing. It is a statement, not a default: '
+    + 'most screens want a chart, not a scene.\n\n'
     + 'COMPOSE, do not pile: a block may carry `span` — `full` (default), `main` + `side` for the '
     + 'asymmetric editorial split, or `half` — and the screen becomes a laid-out page instead of a '
     + 'column of cards. Narrow screens fold every span to one column on their own.\n\n'

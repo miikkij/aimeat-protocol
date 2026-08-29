@@ -1043,7 +1043,7 @@ await test('GET /v1/libs/aimeat-atelier.js — serves the Atelier kit with every
     for (const part of [
         'app', 'section', 'tabs', 'bottomNav',
         'hero', 'statRow', 'figure', 'emptyState', 'skeleton',
-        'list', 'listDetail', 'cardGrid', 'mediaCard', 'timeline', 'chart', 'matrix', 'graph', 'waveform',
+        'list', 'listDetail', 'cardGrid', 'mediaCard', 'timeline', 'chart', 'matrix', 'graph', 'waveform', 'scene3d',
         'reveal', 'drawer', 'dialog', 'confirm', 'prompt', 'sheet',
         'form', 'table', 'searchBar',
         'mosaic', 'appRef',

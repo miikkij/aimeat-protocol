@@ -13,6 +13,8 @@
  *   ak-table · ak-search
  * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
  * @version-history
+ *   v0.4.0 — 2026-08-29 — .ak-scene: the 3D band (scene3d.js) — a framed stage with a fixed
+ *     aspect so the canvas never reflows the page, the caption as a floating chip.
  *   v0.3.0 — 2026-08-27 — Initial (TARGET-074 phase 1, slice 3).
  */
 
@@ -112,3 +114,45 @@
   touch-action: manipulation;
 }
 .ak-search__clear:hover { color: var(--ak-ink); }
+
+/* ── The 3D scene (scene3d.js): a framed stage with a fixed aspect ─────────────────────────── */
+.ak-scene {
+  position: relative;
+  margin: 0;
+  border: var(--ak-line-w) solid var(--ak-line);
+  border-radius: var(--ak-radius);
+  box-shadow: var(--ak-elev-1);
+  overflow: hidden;
+  background: var(--ak-surface);
+}
+.ak-scene__stage {
+  position: relative;
+  /* Width is the container's, ALWAYS — with min-height flooring the aspect, an auto width
+     would grow from the height and burst a narrow card sideways. */
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  min-height: 220px;
+}
+.ak-scene__stage canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+.ak-scene__title {
+  position: absolute;
+  top: var(--ak-gap);
+  left: var(--ak-gap);
+  z-index: 1;
+  padding: 4px 10px;
+  border-radius: var(--ak-radius-pill);
+  background: var(--ak-surface);
+  border: var(--ak-line-w) solid var(--ak-line);
+  color: var(--ak-ink);
+  font-size: var(--ak-text-fine);
+  font-weight: 700;
+}
+/* The sky kind is a wide-open band, not a card. */
+.ak-scene[data-ak-scene='sky'] .ak-scene__stage { aspect-ratio: 21 / 9; min-height: 180px; }
