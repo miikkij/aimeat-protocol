@@ -14,6 +14,7 @@
  *   over the showroom-sticker and night-shift alternatives. The onboarding steps keep their plain
  *   card shape: one job at a time, nothing pulling the eye away from the open step.
  * @version-history
+ *   v3.2.1 — 2026-08-29 — The margin-pattern preview box (.koti-settings-pattern-preview) above the chips.
  *   v3.2.0 — 2026-08-29 — The margin-pattern chips in the home settings dialog (.koti-settings-pattern*).
  *   v3.1.0 — 2026-08-29 — Set for the condensed headline face: every headline reads the poster tracking
  *     and leading tokens; the nameplate centres on the avatar; the big numeral keeps .6rem from its
@@ -694,6 +695,10 @@ a.koti-feed-line:hover { color: var(--accent); }
 .koti-settings-pattern-words { display: flex; flex-direction: column; gap: 0.2rem; }
 .koti-settings-pattern-title { font-weight: var(--font-poster-strong-weight); color: var(--text); }
 .koti-settings-pattern-hint { font-size: 0.85rem; color: var(--text-dim); line-height: 1.5; }
+/* The preview: a strip of the page's paper, 2px ink frame, the figure fading to the right. */
+.koti-settings-pattern-preview { position: relative; height: 96px; border: 2px solid var(--text); background: var(--bg); overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.koti-settings-pattern-preview .mp-swatch { position: absolute; inset: 0; }
+.koti-settings-pattern-none { font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-dim); }
 .koti-settings-pattern-choices { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .koti-settings-pattern-choice {
   background: var(--card-bg); border: 2px solid var(--text); color: var(--text); cursor: pointer;
