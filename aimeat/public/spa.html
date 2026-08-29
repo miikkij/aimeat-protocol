@@ -471,6 +471,13 @@
     };
 
     // Match route, handling query params for special views
+    // The view a path belongs to, or null when no view owns it. The link interceptor asks this
+    // before taking a click: /v1/privacy, /v1/terms, /v1/connect and /v1/spec are the server's
+    // own pages, and routing them in the SPA showed the front page under the privacy address.
+    function findRoute(pathname, search) {
+      const r = matchRoute(pathname, search);
+      return r === ROUTES['/v1/portal'] && pathname !== '/v1/portal' ? null : r;
+    }
     function matchRoute(pathname, search) {
       // Dev portal is ?view=dev on /v1/portal
       if (pathname === '/v1/portal' && search.includes('view=dev')) {
@@ -609,6 +616,9 @@
           const target = a.getAttribute('target');
           if (target && target !== '_self' && target !== '') return;
           if (a.hasAttribute('download')) return;
+          // A /v1/ address no view owns is the server's page: let the browser go there.
+          const url = new URL(href, location.origin);
+          if (!findRoute(url.pathname, url.search)) return;
           e.preventDefault();
           navigate(href);
         };
@@ -894,7 +904,9 @@
     // where that hurts. Work surfaces (profile, admin, home, the pop-outs) get no footer: a
     // page you work in is not a page you leave from.
     const FOOTER_ROUTES = new Set([
-      '/v1/portal', '/v1/how-it-works', '/v1/business', '/v1/changelog', '/v1/how-an-app-builds',
+      // The front page is served at the root as well as at /v1/portal, and it is the page most
+      // visitors leave from; without '/' here the footer was missing exactly there.
+      '/', '/v1/portal', '/v1/how-it-works', '/v1/business', '/v1/changelog', '/v1/how-an-app-builds',
       '/v1/connect-your-ai', '/v1/members', '/v1/help', '/v1/glossary', '/v1/transparency',
     ]);
 

@@ -472,10 +472,11 @@
        reads as four labels and four lines until one of them is being filled. */
     ".aimeat-hint{margin:7px 0 0;font:400 12.5px/1.45 " + font + ";color:" + dim + "}",
     ".aimeat-field .aimeat-hint{display:none}",
-    ".aimeat-field:focus-within .aimeat-hint,.aimeat-field.has-value .aimeat-hint{display:block}",
-    /* The username rules: hidden until the person starts typing, each turning green as it is met. */
+    ".aimeat-field:focus-within .aimeat-hint{display:block}",
+    /* The username rules: shown only while the person is in the field and has typed something,
+       each turning green as it is met; leaving the field folds them away again. */
     ".aimeat-rules{display:none;margin-top:8px;flex-direction:column;gap:3px}",
-    ".aimeat-rules.on{display:flex}",
+    ".aimeat-field:focus-within .aimeat-rules.on{display:flex}",
     ".aimeat-rule{display:flex;align-items:center;gap:7px;font:400 12.5px/1.45 " + font + ";color:" + dim + "}",
     ".aimeat-rule svg{width:12px;height:12px;flex:0 0 auto}",
     ".aimeat-rule .r-ok{display:none}",
@@ -725,16 +726,6 @@
         });
       }
       if (regUser) regUser.addEventListener("input", syncUsernameRules);
-      modal.querySelectorAll(".aimeat-field .aimeat-inp").forEach(function(inp) {
-        var field = inp.closest(".aimeat-field");
-        if (!field) return;
-        var sync = function() {
-          field.classList.toggle("has-value", !!/** @type {any} */
-          inp.value);
-        };
-        inp.addEventListener("input", sync);
-        sync();
-      });
       modal.querySelectorAll(".aimeat-oauth-btn").forEach(function(btn) {
         btn.addEventListener("click", function() {
           var id = btn.getAttribute("data-provider") || "";
