@@ -8,6 +8,8 @@
  *   injected once via initDetail(deps) — so there is no import cycle back through the entry module.
  * @usage import { initDetail, openDetailView, mountLoginPill, ... } from './detail.js'; initDetail({...})
  * @version-history
+ *   2026-08-29 — Chapter numbers over the section headlines: the total is counted after the assembly
+ *     and handed to the stylesheet as --dtl-chapters; the numbering itself is a CSS counter.
  *   2026-08-29 — The masthead shows the node's screenshot of the app where the icon stood (the icon
  *     stays the fallback), and the bound skills render as rows with classes instead of inline styles.
  *   2026-08-28 — The poster face (design canvas "App Catalog Poster"): a back link, a masthead
@@ -742,10 +744,16 @@ function renderDetailView() {
 
   // One column of bands, the way the home page reads: where the work is, edit it, what it is,
   // its versions, then the switches on the server, and the rest.
-  document.getElementById('detail-body').innerHTML =
+  var bodyEl = document.getElementById('detail-body');
+  bodyEl.innerHTML =
     heroHtml + bandHtml +
     statusHtml + aiHtml + aboutHtml + dataMapHtml + historyHtml + versionsHtml +
     mgmtHtml + skillsHtml + seoHtml + promoteHtml + odpsHtml + monetizeHtml + costHtml + agentsHtml + actionsHtml;
+  // The chapter number over every headline ("03 / 09") is a CSS counter; only the total needs
+  // counting here, and it goes on the body as a string so the stylesheet can print it. Counted
+  // AFTER the assembly so a section a later load re-renders in place keeps its number.
+  var chapters = bodyEl.querySelectorAll('.dtl-section').length;
+  bodyEl.style.setProperty('--dtl-chapters', '"' + (chapters < 10 ? '0' : '') + chapters + '"');
 
   var dmOwner = detailServerOwner(app);
   var dmFile = app.publishedFilename || '';
