@@ -4677,7 +4677,16 @@
     "errIdentifierRequired": "Escribe tu nombre de usuario o tu correo.",
     "errPassRequired": "Escribe tu contraseña.",
     "errWrongCredentials": "Ese nombre de usuario o correo y esa contraseña no coinciden con ninguna cuenta de aquí.",
-    "errNameTaken": "Ese nombre de usuario está ocupado. Si es tuyo, inicia sesión."
+    "errNameTaken": "Ese nombre de usuario está ocupado. Si es tuyo, inicia sesión.",
+    "headlineNew": "Tu cuenta vive aquí.",
+    "lineNew": "Elige un nombre de usuario y una contraseña.",
+    "headlineReturning": "Hola de nuevo.",
+    "usernameRuleLength": "De 3 a 64 caracteres",
+    "usernameRuleChars": "Letras de la a a la z, dígitos y guiones",
+    "usernameRuleEdges": "Empieza y termina con una letra o un dígito",
+    "usernameLowercase": "Las mayúsculas se convierten en minúsculas.",
+    "displayNameWhy": "Vale la pena llenarlo: sin él, tu nombre de usuario es el nombre que todos ven.",
+    "errUserInvalid": "Un nombre de usuario tiene de 3 a 64 caracteres: letras de la a a la z, dígitos y guiones, y empieza y termina con una letra o un dígito."
   },
   "morsels": {
     "name": "morsel de corazón",

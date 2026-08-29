@@ -4881,7 +4881,16 @@
     "errIdentifierRequired": "Kirjoita käyttäjänimesi tai sähköpostiosoitteesi.",
     "errPassRequired": "Kirjoita salasanasi.",
     "errWrongCredentials": "Tuo käyttäjänimi tai sähköposti ja salasana eivät täsmää yhteenkään tiliin täällä.",
-    "errNameTaken": "Käyttäjänimi on varattu. Jos se on sinun, kirjaudu sisään."
+    "errNameTaken": "Käyttäjänimi on varattu. Jos se on sinun, kirjaudu sisään.",
+    "headlineNew": "Tilisi asuu täällä.",
+    "lineNew": "Valitse käyttäjänimi ja salasana.",
+    "headlineReturning": "Tervetuloa takaisin.",
+    "usernameRuleLength": "3–64 merkkiä",
+    "usernameRuleChars": "Kirjaimet a–z, numerot ja väliviiva",
+    "usernameRuleEdges": "Alkaa ja päättyy kirjaimeen tai numeroon",
+    "usernameLowercase": "Isot kirjaimet muuttuvat pieniksi.",
+    "displayNameWhy": "Kannattaa täyttää: ilman sitä käyttäjänimesi on se nimi, jonka kaikki näkevät.",
+    "errUserInvalid": "Käyttäjänimessä on 3–64 merkkiä: kirjaimia a–z, numeroita ja väliviivoja, ja se alkaa ja päättyy kirjaimeen tai numeroon."
   },
   "morsels": {
     "name": "sydänmurunen",

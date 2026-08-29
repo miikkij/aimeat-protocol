@@ -290,13 +290,13 @@
     if (document.getElementById("aimeat-auth-pill-css")) return;
     var st = document.createElement("style");
     st.id = "aimeat-auth-pill-css";
-    var ink = "var(--aimeat-pill-fg,var(--text,#1A1A2E))";
-    var paper = "var(--aimeat-pill-bg,var(--bg,#FAFAF8))";
-    var font = "var(--aimeat-pill-font,var(--font-showroom-body,var(--font,system-ui,sans-serif)))";
+    var ink2 = "var(--aimeat-pill-fg,var(--text,#1A1A2E))";
+    var paper2 = "var(--aimeat-pill-bg,var(--bg,#FAFAF8))";
+    var font2 = "var(--aimeat-pill-font,var(--font-showroom-body,var(--font,system-ui,sans-serif)))";
     st.textContent = [
       ".aimeat-auth-pill{display:inline-flex;align-items:center;gap:10px;padding:4px 11px;",
-      "border:2px solid " + ink + ";background:" + paper + ";color:" + ink + ";",
-      "border-radius:var(--aimeat-pill-radius,0);font-family:" + font + ";font-size:13px;line-height:1.4}",
+      "border:2px solid " + ink2 + ";background:" + paper2 + ";color:" + ink2 + ";",
+      "border-radius:var(--aimeat-pill-radius,0);font-family:" + font2 + ";font-size:13px;line-height:1.4}",
       ".aimeat-auth-dot{display:inline-block;flex:0 0 auto;width:9px;height:9px;",
       "background:var(--aimeat-pill-live,var(--success,#10B981))}",
       ".aimeat-auth-label{display:inline-flex;align-items:center;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}",
@@ -310,17 +310,17 @@
       "letter-spacing:.04em;text-transform:uppercase;line-height:1.4}",
       ".aimeat-auth-logout:hover,.aimeat-auth-gear:hover{color:var(--aimeat-pill-name,var(--accent,#E8564A))}",
       /* Signed out: the cluster beside one ink slab with the sun's offset shadow. */
-      ".aimeat-auth-out{display:inline-flex;align-items:center;gap:10px;color:" + ink + "}",
-      ".aimeat-sign-btn{appearance:none;padding:8px 16px;background:var(--aimeat-pill-cta-bg," + ink + ");",
-      "color:var(--aimeat-pill-cta-fg," + paper + ");border:0;border-radius:var(--aimeat-pill-radius,0);cursor:pointer;",
-      "font-family:" + font + ";font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;line-height:1.4;",
+      ".aimeat-auth-out{display:inline-flex;align-items:center;gap:10px;color:" + ink2 + "}",
+      ".aimeat-sign-btn{appearance:none;padding:8px 16px;background:var(--aimeat-pill-cta-bg," + ink2 + ");",
+      "color:var(--aimeat-pill-cta-fg," + paper2 + ");border:0;border-radius:var(--aimeat-pill-radius,0);cursor:pointer;",
+      "font-family:" + font2 + ";font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;line-height:1.4;",
       "box-shadow:4px 4px 0 var(--aimeat-pill-cta-shadow,var(--sun,#FFB52E));transition:transform .12s,box-shadow .12s}",
       ".aimeat-sign-btn:hover{transform:translate(2px,2px);box-shadow:2px 2px 0 var(--aimeat-pill-cta-shadow,var(--sun,#FFB52E))}",
       /* Compact: the account button, and the pill as its popover. */
       ".aimeat-auth-wrap{position:relative;display:inline-flex;align-items:center}",
       ".aimeat-auth-compact{display:none;align-items:center;gap:7px;padding:5px 11px 5px 9px;cursor:pointer;",
-      "background:" + paper + ";color:" + ink + ";border:2px solid " + ink + ";border-radius:var(--aimeat-pill-radius,0);",
-      "font-family:" + font + ";font-size:13px}",
+      "background:" + paper2 + ";color:" + ink2 + ";border:2px solid " + ink2 + ";border-radius:var(--aimeat-pill-radius,0);",
+      "font-family:" + font2 + ";font-size:13px}",
       ".aimeat-auth-compact .cdot{width:8px;height:8px;flex:0 0 auto;background:var(--aimeat-pill-live,var(--success,#10B981))}",
       ".aimeat-auth-compact .cini{font-weight:800;letter-spacing:.3px;max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
       ".aimeat-auth-compact .ccar{font-size:9px;opacity:.75;transition:transform .18s}",
@@ -395,8 +395,119 @@
     return out;
   }
 
+  // src/static/sdk-libs/auth/modal-styles.js
+  var ink = "var(--text,#1A1A2E)";
+  var paper = "var(--bg,#FAFAF8)";
+  var dim = "var(--text-dim,#6B7280)";
+  var line = "var(--border,#E5E7EB)";
+  var accent = "var(--accent,#E8564A)";
+  var sun = "var(--sun,#FFB52E)";
+  var onSun = "var(--on-sun,#1A1A2E)";
+  var okc = "var(--success-fg,#047857)";
+  var font = "var(--font-showroom-body,'Archivo','DM Sans',system-ui,sans-serif)";
+  var poster = "var(--font-poster,'Archivo Black','Archivo',system-ui,sans-serif)";
+  var section = "var(--font-poster-section,'Archivo','DM Sans',system-ui,sans-serif)";
+  var mono = "var(--font-mono,'JetBrains Mono','SF Mono',monospace)";
+  var MODAL_CSS = [
+    ".aimeat-scrim{position:fixed;inset:0;background:rgba(26,26,46,.4);backdrop-filter:blur(8px);display:flex;",
+    "align-items:flex-start;justify-content:center;overflow-y:auto;z-index:99999;padding:24px;font-family:" + font + "}",
+    ".aimeat-dlg{background:" + paper + ";color:" + ink + ";border:3px solid " + ink + ";box-shadow:12px 12px 0 " + sun + ";",
+    "max-width:420px;width:100%;margin:auto;box-sizing:border-box}",
+    ".aimeat-dlg.aimeat-in{animation:aimeatModalIn .3s ease}",
+    "@keyframes aimeatModalIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}",
+    /* The head: the crumb, the masthead, the tabs. */
+    ".aimeat-head{padding:22px 28px 0}",
+    ".aimeat-crumb{display:flex;align-items:center;justify-content:space-between;gap:12px}",
+    ".aimeat-brand{display:flex;align-items:baseline;gap:10px;min-width:0}",
+    ".aimeat-mark{display:inline-flex;align-items:center;gap:1px;font-family:" + poster + ";font-weight:var(--font-poster-weight,400);",
+    "font-size:15px;letter-spacing:-.01em;line-height:1;color:" + ink + "}",
+    ".aimeat-mark svg{width:13px;height:13px;fill:" + accent + "}",
+    ".aimeat-mark b{font-weight:inherit;color:" + accent + "}",
+    ".aimeat-host{font:400 12px/1 " + mono + ";color:" + dim + ";overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
+    ".aimeat-langsw{display:inline-flex;align-items:stretch;height:26px;flex:0 0 auto;border:2px solid " + ink + "}",
+    ".aimeat-lang{appearance:none;border:0;background:transparent;color:" + ink + ";opacity:.6;font:700 11px/1 " + font + ";",
+    "letter-spacing:.4px;padding:0 10px;margin:0;cursor:pointer;display:inline-flex;align-items:center;transition:opacity .12s}",
+    ".aimeat-lang:hover{opacity:.9}",
+    ".aimeat-lang.active{opacity:1;background:" + ink + ";color:" + paper + ";cursor:default}",
+    ".aimeat-headline{margin:18px 0 0;font-family:" + poster + ";font-weight:var(--font-poster-weight,400);font-size:34px;",
+    "line-height:.92;letter-spacing:-.035em;color:" + ink + ";text-wrap:pretty}",
+    ".aimeat-line{margin:10px 0 0;font-size:14px;line-height:1.5;font-weight:400;color:" + dim + "}",
+    ".aimeat-tabs{display:flex;margin-top:18px;border-top:3px solid " + ink + "}",
+    ".aimeat-tab{appearance:none;flex:1;background:none;border:0;border-bottom:2px solid transparent;border-radius:0;padding:10px 12px;",
+    "cursor:pointer;font:600 13px/1.4 " + font + ";text-transform:uppercase;letter-spacing:.04em;color:" + dim + ";transition:color .15s}",
+    ".aimeat-tab:hover{color:" + ink + "}",
+    ".aimeat-tab.active{background:" + sun + ";color:" + onSun + ";border-bottom-color:" + ink + ";cursor:default}",
+    /* The body and the sub-views share one padding; fields are underlines. */
+    ".aimeat-body{padding:22px 28px 26px}",
+    ".aimeat-field{margin-bottom:18px}",
+    ".aimeat-label{display:flex;align-items:baseline;gap:8px;margin:0 0 2px;font:700 11.5px/1.4 " + font + ";",
+    "letter-spacing:.1em;text-transform:uppercase;color:" + accent + "}",
+    ".aimeat-opt{font:400 11px/1.4 " + mono + ";letter-spacing:0;text-transform:none;color:" + dim + "}",
+    ".aimeat-inp{display:block;width:100%;box-sizing:border-box;background:transparent;border:0;border-bottom:3px solid " + ink + ";",
+    "border-radius:0;padding:9px 0;font:400 16px/1.4 " + font + ";color:" + ink + ";outline:none;transition:border-color .15s}",
+    ".aimeat-inp:focus{border-bottom-color:" + accent + "}",
+    ".aimeat-inp::placeholder{color:" + dim + ";font-weight:600}",
+    ".aimeat-hint{margin:7px 0 0;font:400 12.5px/1.45 " + font + ";color:" + dim + "}",
+    /* The username rules: hidden until the person starts typing, each turning green as it is met. */
+    ".aimeat-rules{display:none;margin-top:8px;flex-direction:column;gap:3px}",
+    ".aimeat-rules.on{display:flex}",
+    ".aimeat-rule{display:flex;align-items:center;gap:7px;font:400 12.5px/1.45 " + font + ";color:" + dim + "}",
+    ".aimeat-rule svg{width:12px;height:12px;flex:0 0 auto}",
+    ".aimeat-rule .r-ok{display:none}",
+    ".aimeat-rule.ok{color:" + okc + "}",
+    ".aimeat-rule.ok .r-ok{display:block}",
+    ".aimeat-rule.ok .r-no{display:none}",
+    /* The loud action is an ink slab; the quiet ones are underlined words. */
+    ".aimeat-actions{display:flex;align-items:center;gap:22px;margin-top:4px}",
+    ".aimeat-go{appearance:none;background:" + ink + ";color:" + paper + ";border:0;border-radius:0;padding:13px 20px;cursor:pointer;",
+    "font:600 13px/1.4 " + font + ";text-transform:uppercase;letter-spacing:.04em;box-shadow:4px 4px 0 " + sun + ";",
+    "transition:transform .12s,box-shadow .12s}",
+    ".aimeat-go:hover{transform:translate(2px,2px);box-shadow:2px 2px 0 " + sun + "}",
+    ".aimeat-go:disabled{opacity:.45;transform:none;cursor:default}",
+    ".aimeat-cancel{appearance:none;background:none;border:0;border-bottom:2px solid " + ink + ";border-radius:0;padding:0 0 1px;",
+    "cursor:pointer;font:600 12.5px/1.5 " + font + ";text-transform:uppercase;letter-spacing:.04em;color:" + ink + "}",
+    ".aimeat-cancel:hover{color:" + accent + ";border-bottom-color:" + accent + "}",
+    ".aimeat-links{display:flex;align-items:center;gap:18px;margin-top:16px}",
+    ".aimeat-link{font:600 11.5px/1.5 " + font + ";text-transform:uppercase;letter-spacing:.04em;color:" + dim + ";",
+    "text-decoration:none;border-bottom:2px solid " + dim + ";padding-bottom:1px;cursor:pointer}",
+    ".aimeat-link:hover{color:" + accent + ";border-bottom-color:" + accent + "}",
+    ".aimeat-err{margin:10px 0 0;font:600 13px/1.45 " + font + ";color:" + accent + ";display:none}",
+    ".aimeat-msg{margin:10px 0 0;font:600 13px/1.45 " + font + ";color:" + okc + ";display:none}",
+    /* Social sign-in: a mono "or" between hairlines, then ink-framed boxes. */
+    ".aimeat-or{display:flex;align-items:center;gap:12px;margin:22px 0 18px}",
+    ".aimeat-or span{flex:1;height:1px;background:" + line + "}",
+    ".aimeat-or b{flex:0 0 auto;font:500 11px/1 " + mono + ";letter-spacing:.1em;text-transform:uppercase;color:" + accent + "}",
+    ".aimeat-oauth-btn{appearance:none;width:100%;box-sizing:border-box;min-height:44px;display:flex;align-items:center;justify-content:center;",
+    "gap:10px;margin-bottom:8px;padding:8px 12px;background:transparent;border:2px solid " + ink + ";border-radius:0;color:" + ink + ";",
+    "cursor:pointer;font:600 14px/1.2 " + font + ";transition:border-color .15s,color .15s}",
+    ".aimeat-oauth-btn:hover{border-color:" + accent + ";color:" + accent + "}",
+    /* The sub-views (reset, recover, email code) open with a section headline. */
+    ".aimeat-sub-title{margin:0 0 8px;font-family:" + section + ";font-weight:var(--font-poster-section-weight,400);font-size:21px;",
+    "line-height:.95;text-transform:uppercase;letter-spacing:-.02em;color:" + ink + "}",
+    ".aimeat-sub-desc{margin:0 0 16px;font:400 13.5px/1.5 " + font + ";color:" + dim + "}",
+    /* What you get: a numbered index under an ink rule, the last line in bold. */
+    ".aimeat-why{padding:18px 28px 22px;border-top:3px solid " + ink + "}",
+    ".aimeat-why-title{margin:0 0 6px;font-family:" + section + ";font-weight:var(--font-poster-section-weight,400);font-size:21px;",
+    "line-height:.95;text-transform:uppercase;letter-spacing:-.02em;color:" + ink + "}",
+    ".aimeat-why-row{display:grid;grid-template-columns:28px minmax(0,1fr);gap:0 8px;align-items:baseline;padding:9px 0;",
+    "border-bottom:1px solid " + line + ";font:400 13.5px/1.45 " + font + ";color:" + ink + "}",
+    ".aimeat-why-row:last-child{border-bottom:0}",
+    ".aimeat-why-row.strong{font-weight:600}",
+    ".aimeat-why-num{font:400 12px/1.45 " + mono + ";color:" + accent + "}"
+  ].join("");
+
   // src/static/sdk-libs/auth/modal.js
   var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  var OWNER_NAME_RE = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
+  var NODE_HOST = (function() {
+    try {
+      return new URL(NODE_URL).host;
+    } catch {
+      return typeof location !== "undefined" && location.host || "";
+    }
+  })();
+  var HEART_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.8 8.2 3 4.5 6.7 4.5c2 0 3.6 1.1 4.5 2.6.9-1.5 2.5-2.6 4.5-2.6 3.7 0 5.9 3.7 4.3 7.3C19.5 16.4 12 21 12 21z"></path></svg>';
+  var RULE_MARKS = '<svg class="r-ok" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3"></path></svg><svg class="r-no" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="2" width="8" height="8"></rect></svg>';
   function showLoginModal(opts, renderBtn) {
     var i = opts.i18n || {};
     var lang = currentModalLang();
@@ -428,7 +539,12 @@
           /** @type {any} */
           document.getElementById(id)
         );
-        if (el && val) el.value = val;
+        if (!el || !val) return;
+        el.value = val;
+        try {
+          el.dispatchEvent(new Event("input"));
+        } catch {
+        }
       };
       s("aimeat-username", vals.u);
       s("aimeat-password", vals.p);
@@ -475,11 +591,39 @@
     });
     function buildModalInner(i2, lang2, anim, tab2) {
       var isReg = tab2 === "register";
-      return '<style>.aimeat-inp{width:100%;padding:11px 14px;border:1.5px solid #E5E7EB;border-radius:10px;font-family:DM Sans,system-ui,sans-serif;font-size:15px;color:#1A1A2E;background:#FAFAF8;box-sizing:border-box;transition:all .15s;outline:none}.aimeat-inp:focus{border-color:#E8564A;box-shadow:0 0 0 3px rgba(232,86,74,.1)}.aimeat-inp::placeholder{color:#9CA3AF}.aimeat-go{flex:1;padding:12px;background:linear-gradient(135deg,#E8564A,#D4493F);color:#fff;border:none;border-radius:10px;cursor:pointer;font-weight:700;font-size:15px;font-family:DM Sans,system-ui,sans-serif;box-shadow:0 2px 8px rgba(232,86,74,.25);transition:transform .15s,box-shadow .15s}.aimeat-go:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(232,86,74,.35)}.aimeat-label{display:block;margin-bottom:5px;font-size:12px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:#6B7280}.aimeat-cancel{padding:12px 20px;background:none;color:#1A1A2E;border:1px solid #E5E7EB;border-radius:10px;cursor:pointer;font-size:15px;font-weight:500;font-family:DM Sans,system-ui,sans-serif;transition:background .15s}.aimeat-cancel:hover{background:#F3F4F6}.aimeat-fi{width:20px;height:20px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;margin-top:1px}.aimeat-langsw{position:absolute;top:24px;right:28px;display:flex;gap:5px}.aimeat-lang{padding:4px 9px;border:1px solid #E5E7EB;background:#fff;color:#6B7280;border-radius:7px;cursor:pointer;font-size:11px;font-weight:700;letter-spacing:.4px;line-height:1;font-family:DM Sans,system-ui,sans-serif;transition:all .15s}.aimeat-lang:hover{border-color:#E8564A;color:#E8564A}.aimeat-lang.active{background:#E8564A;color:#fff;border-color:#E8564A;cursor:default}.aimeat-tabs{display:flex;gap:0;margin:18px 0 0;border-bottom:1.5px solid #E5E7EB}.aimeat-tab{flex:1;padding:11px 8px;background:none;border:none;border-bottom:2.5px solid transparent;margin-bottom:-1.5px;cursor:pointer;font-family:DM Sans,system-ui,sans-serif;font-size:15px;font-weight:600;color:#6B7280;transition:color .15s,border-color .15s}.aimeat-tab:hover{color:#1A1A2E}.aimeat-tab.active{color:#E8564A;border-bottom-color:#E8564A;cursor:default}@keyframes aimeatModalIn{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}</style><div style="position:fixed;inset:0;background:rgba(26,26,46,.4);backdrop-filter:blur(8px);display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;z-index:99999;font-family:DM Sans,system-ui,sans-serif;padding:24px"><div style="background:#FFFFFF;border-radius:16px;max-width:420px;width:100%;margin:auto;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.15),0 0 0 1px rgba(0,0,0,.05);' + (anim ? "animation:aimeatModalIn .3s ease" : "") + '"><div style="padding:28px 32px 0;position:relative"><div class="aimeat-langsw">' + MODAL_LANGS.map(function(l) {
+      function rule(key, text) {
+        return '<div class="aimeat-rule" data-rule="' + key + '">' + RULE_MARKS + "<span>" + escHtml(text) + "</span></div>";
+      }
+      function field(label, input, hint, opt) {
+        return '<div class="aimeat-field"><label class="aimeat-label"><span>' + escHtml(label) + "</span>" + (opt ? '<span class="aimeat-opt">' + escHtml(opt) + "</span>" : "") + "</label>" + input + (hint || "") + "</div>";
+      }
+      return "<style>" + MODAL_CSS + '</style><div class="aimeat-scrim"><div class="aimeat-dlg' + (anim ? " aimeat-in" : "") + '"><div class="aimeat-head"><div class="aimeat-crumb"><div class="aimeat-brand"><span class="aimeat-mark">AIME' + HEART_SVG + "<b>AT</b></span>" + (NODE_HOST ? '<span class="aimeat-host">' + escHtml(NODE_HOST) + " /</span>" : "") + '</div><div class="aimeat-langsw" role="group" aria-label="' + escHtml(i2.switchLanguage || "Language") + '">' + MODAL_LANGS.map(function(l) {
         return '<button type="button" class="aimeat-lang' + (lang2 === l ? " active" : "") + '" data-lang="' + l + '">' + l.toUpperCase() + "</button>";
-      }).join("") + '</div><h2 style="margin:0;font-size:22px;font-weight:800;display:flex;align-items:center;gap:8px;color:#1A1A2E">AIME <span style="width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,#E8564A,#D4493F);display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:14px">♥</span> AT</h2><p style="margin:8px 0 0;font-size:14px;color:#6B7280;line-height:1.5">' + escHtml(isReg ? i2.descNew || "Pick a username and password to create an account." : i2.descReturning || "Enter the username or email you signed up with.") + '</p><div class="aimeat-tabs" role="tablist"><button type="button" role="tab" class="aimeat-tab' + (isReg ? "" : " active") + '" data-tab="signin" aria-selected="' + (isReg ? "false" : "true") + '">' + escHtml(i2.tabSignIn || "Sign in") + '</button><button type="button" role="tab" class="aimeat-tab' + (isReg ? " active" : "") + '" data-tab="register" aria-selected="' + (isReg ? "true" : "false") + '">' + escHtml(i2.tabRegister || "Create account") + '</button></div></div><div id="aimeat-modal-body" style="padding:24px 32px"><div id="aimeat-tab-signin" style="' + (isReg ? "display:none" : "") + '"><div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i2.identifierLabel || "Username or email") + '</label><input id="aimeat-username" class="aimeat-inp" autocomplete="username" placeholder="' + escHtml(i2.identifierPlaceholder || "Username or email") + '"></div><div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i2.passwordLabel || "Password") + '</label><input id="aimeat-password" type="password" autocomplete="current-password" class="aimeat-inp" placeholder="' + escHtml(i2.passwordPlaceholder || "Password") + '"></div><div style="display:flex;gap:10px;margin-top:20px"><button id="aimeat-go-btn" class="aimeat-go">' + escHtml(i2.signInOnlyBtn || "Sign in") + '</button><button id="aimeat-cancel-btn" class="aimeat-cancel">' + escHtml(i2.cancelBtn || "Cancel") + '</button></div><p id="aimeat-error" style="margin:8px 0 0;font-size:13px;color:#ef4444;display:none"></p><div style="margin-top:14px;display:flex;gap:16px"><a href="#" id="aimeat-forgot-pw" style="font-size:13px;color:#6B7280;cursor:pointer;text-decoration:underline">' + escHtml(i2.forgotPassword || "Forgot password?") + '</a><a href="#" id="aimeat-forgot-user" style="font-size:13px;color:#6B7280;cursor:pointer;text-decoration:underline">' + escHtml(i2.forgotUsername || "Forgot username?") + '</a></div></div><div id="aimeat-tab-register" style="' + (isReg ? "" : "display:none") + '"><div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i2.usernameLabel || "Username") + '</label><input id="aimeat-reg-username" class="aimeat-inp" autocomplete="username" placeholder="' + escHtml(i2.usernamePlaceholder || "Username") + '"><p style="margin:5px 0 0;font-size:12px;color:#9CA3AF">' + escHtml(i2.usernameHint || "This becomes your permanent identity on this node.") + "</p></div>" + (EMAIL_REQUIRED ? '<div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i2.emailLabel || "Email") + '</label><input id="aimeat-reg-email" type="email" autocomplete="email" class="aimeat-inp" placeholder="you@example.com"><p style="margin:5px 0 0;font-size:12px;color:#9CA3AF">' + escHtml(i2.registerEmailHint || "We send a 6-digit code here to confirm the address. You can sign in with it later.") + "</p></div>" : "") + '<div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i2.passwordLabel || "Password") + '</label><input id="aimeat-reg-password" type="password" autocomplete="new-password" class="aimeat-inp" placeholder="' + escHtml(i2.passwordPlaceholder || "Password (min 8 chars)") + '"></div><div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i2.displayNameLabel || "Display Name") + ' <span style="font-weight:400;text-transform:none;letter-spacing:0">(' + escHtml(i2.displayNameOptional || "optional") + ')</span></label><input id="aimeat-reg-displayname" class="aimeat-inp" placeholder="' + escHtml(i2.displayNamePlaceholder || "Display Name") + '"></div><div style="display:flex;gap:10px;margin-top:20px"><button id="aimeat-reg-btn" class="aimeat-go">' + escHtml(i2.createAccountBtn || "Create account") + '</button><button id="aimeat-reg-cancel-btn" class="aimeat-cancel">' + escHtml(i2.cancelBtn || "Cancel") + '</button></div><p id="aimeat-reg-error" style="margin:8px 0 0;font-size:13px;color:#ef4444;display:none"></p></div>' + (AUTH_PROVIDERS.length ? '<div style="display:flex;align-items:center;gap:12px;margin:18px 0 14px;color:#9CA3AF;font-size:12px;font-weight:600;letter-spacing:.5px"><span style="flex:1;height:1px;background:#E5E7EB"></span>' + escHtml(i2.orLabel || "OR") + '<span style="flex:1;height:1px;background:#E5E7EB"></span></div>' + AUTH_PROVIDERS.map(function(p) {
-        return '<button type="button" class="aimeat-oauth-btn" data-provider="' + escHtml(p.id) + '" style="width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:11px;margin-bottom:8px;background:#fff;color:#1A1A2E;border:1.5px solid #E5E7EB;border-radius:10px;cursor:pointer;font-weight:600;font-size:15px;font-family:DM Sans,system-ui,sans-serif;transition:background .15s,border-color .15s">' + (PROVIDER_ICONS[p.id] || "") + escHtml(i2[p.i18nKey] || p.label) + "</button>";
-      }).join("") : "") + '</div><div id="aimeat-forgot-pw-view" style="padding:24px 32px;display:none"><div id="aimeat-fpw-step1"><h3 style="margin:0 0 8px;font-size:17px;font-weight:700;color:#1A1A2E">' + escHtml(i2.resetPasswordTitle || "Reset Password") + '</h3><p style="font-size:13px;color:#6B7280;margin-bottom:14px">' + escHtml(i2.resetPasswordDesc || "Enter your username to receive a reset code by email.") + '</p><div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i2.usernameLabel || "Username") + '</label><input id="aimeat-fpw-username" class="aimeat-inp" placeholder="' + escHtml(i2.usernamePlaceholder || "Username") + '"></div><div style="display:flex;gap:10px"><button id="aimeat-fpw-send" class="aimeat-go">' + escHtml(i2.sendResetCode || "Send Reset Code") + '</button><button id="aimeat-fpw-back" class="aimeat-cancel">' + escHtml(i2.backToLogin || "Back to Login") + '</button></div><p id="aimeat-fpw-msg" style="margin:8px 0 0;font-size:13px;color:#22C55E;display:none"></p><p id="aimeat-fpw-err" style="margin:8px 0 0;font-size:13px;color:#ef4444;display:none"></p></div><div id="aimeat-fpw-step2" style="display:none"><h3 style="margin:0 0 8px;font-size:17px;font-weight:700;color:#1A1A2E">' + escHtml(i2.enterNewPasswordTitle || "Enter New Password") + '</h3><p style="font-size:13px;color:#6B7280;margin-bottom:14px">' + escHtml(i2.resetCodeSent || "A reset code was sent to your email. Enter it below with your new password.") + '</p><div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i2.codeLabel || "Reset Code") + '</label><input id="aimeat-fpw-code" class="aimeat-inp" placeholder="123456" maxlength="6"></div><div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i2.newPasswordLabel || "New Password") + '</label><input id="aimeat-fpw-newpass" type="password" class="aimeat-inp" placeholder="' + escHtml(i2.newPasswordPlaceholder || "New password (min 8 chars)") + '"></div><div style="display:flex;gap:10px"><button id="aimeat-fpw-reset" class="aimeat-go">' + escHtml(i2.resetPassword || "Reset Password") + '</button><button id="aimeat-fpw-back2" class="aimeat-cancel">' + escHtml(i2.backToLogin || "Back to Login") + '</button></div><p id="aimeat-fpw-msg2" style="margin:8px 0 0;font-size:13px;color:#22C55E;display:none"></p><p id="aimeat-fpw-err2" style="margin:8px 0 0;font-size:13px;color:#ef4444;display:none"></p></div></div><div id="aimeat-forgot-user-view" style="padding:24px 32px;display:none"><h3 style="margin:0 0 8px;font-size:17px;font-weight:700;color:#1A1A2E">' + escHtml(i2.recoverUsernameTitle || "Recover Username") + '</h3><p style="font-size:13px;color:#6B7280;margin-bottom:14px">' + escHtml(i2.recoverUsernameDesc || "Enter the email address associated with your account.") + '</p><div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i2.emailLabel || "Email") + '</label><input id="aimeat-fu-email" class="aimeat-inp" type="email" placeholder="you@example.com"></div><div style="display:flex;gap:10px"><button id="aimeat-fu-send" class="aimeat-go">' + escHtml(i2.sendUsername || "Send My Username") + '</button><button id="aimeat-fu-back" class="aimeat-cancel">' + escHtml(i2.backToLogin || "Back to Login") + '</button></div><p id="aimeat-fu-msg" style="margin:8px 0 0;font-size:13px;color:#22C55E;display:none"></p></div><div id="aimeat-email-view" style="padding:24px 32px;display:none"><div id="aimeat-em-step1"><h3 style="margin:0 0 8px;font-size:17px;font-weight:700;color:#1A1A2E">' + escHtml(i2.completeAccountTitle || "One last step") + '</h3><p style="font-size:13px;color:#6B7280;margin-bottom:14px">' + escHtml(i2.completeAccountDesc || "Add an email to finish setting up your account. We’ll send a verification code to confirm it.") + '</p><div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i2.emailLabel || "Email") + '</label><input id="aimeat-em-email" class="aimeat-inp" type="email" placeholder="you@example.com"></div><div style="display:flex;gap:10px"><button id="aimeat-em-send" class="aimeat-go">' + escHtml(i2.sendVerificationCode || "Send Verification Code") + '</button><button id="aimeat-em-back" class="aimeat-cancel">' + escHtml(i2.backToLogin || "Back to Login") + '</button></div><p id="aimeat-em-err" style="margin:8px 0 0;font-size:13px;color:#ef4444;display:none"></p></div><div id="aimeat-em-step2" style="display:none"><h3 style="margin:0 0 8px;font-size:17px;font-weight:700;color:#1A1A2E">' + escHtml(i2.enterCodeTitle || "Enter Verification Code") + '</h3><p style="font-size:13px;color:#6B7280;margin-bottom:14px">' + escHtml(i2.enterCodeDesc || "We sent a 6-digit code to your email. Enter it below to finish and sign in.") + '</p><div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i2.codeLabel || "Verification Code") + '</label><input id="aimeat-em-code" class="aimeat-inp" placeholder="123456" maxlength="6" inputmode="numeric"></div><div style="display:flex;gap:10px"><button id="aimeat-em-confirm" class="aimeat-go">' + escHtml(i2.confirmAndSignIn || "Confirm & Sign In") + '</button><button id="aimeat-em-back2" class="aimeat-cancel">' + escHtml(i2.backToLogin || "Back to Login") + '</button></div><p id="aimeat-em-msg2" style="margin:8px 0 0;font-size:13px;color:#22C55E;display:none"></p><p id="aimeat-em-err2" style="margin:8px 0 0;font-size:13px;color:#ef4444;display:none"></p></div></div><div id="aimeat-why" style="padding:20px 32px 28px;background:#F9FAFB;border-top:1px solid #E5E7EB;' + (isReg ? "" : "display:none") + '"><h4 style="margin:0 0 12px;font-size:13px;font-weight:700;color:#1A1A2E;display:flex;align-items:center;gap:6px">' + escHtml(i2.whyTitle || "What do you get?") + '</h4><div style="display:flex;align-items:flex-start;gap:10px;font-size:13.5px;color:#6B7280;margin-bottom:8px;line-height:1.45"><div class="aimeat-fi" style="background:#FFF1F0;color:#E8564A">♥</div><span>' + escHtml(i2.whyGhii || "A free GHII (Global Human Intelligence Identifier), your personal AI identity") + '</span></div><div style="display:flex;align-items:flex-start;gap:10px;font-size:13.5px;color:#6B7280;margin-bottom:8px;line-height:1.45"><div class="aimeat-fi" style="background:#EFF6FF;color:#3B82F6">🔒</div><span>' + escHtml(i2.whyPrivacy || "Your own private memory space, protected by your password") + '</span></div><div style="display:flex;align-items:flex-start;gap:10px;font-size:13.5px;color:#6B7280;margin-bottom:8px;line-height:1.45"><div class="aimeat-fi" style="background:#F0FDF4;color:#22C55E">🤖</div><span>' + escHtml(i2.whyAgents || "Connect AI agents that remember you and work on your behalf") + '</span></div><div style="display:flex;align-items:flex-start;gap:10px;font-size:13.5px;color:#6B7280;line-height:1.45"><div class="aimeat-fi" style="background:#FFF1F0;color:#E8564A">♥</div><span><strong>' + escHtml(i2.whyMorsels || "Your own AI-built apps and agents work for you: your own AI operating system.") + "</strong></span></div></div></div></div>";
+      }).join("") + '</div></div><h2 class="aimeat-headline">' + escHtml(isReg ? i2.headlineNew || "Your account lives right here." : i2.headlineReturning || "Welcome back.") + '</h2><p class="aimeat-line">' + escHtml(isReg ? i2.lineNew || "Pick a username and password." : i2.descReturning || "Enter the username or email you signed up with.") + '</p><div class="aimeat-tabs" role="tablist"><button type="button" role="tab" class="aimeat-tab' + (isReg ? "" : " active") + '" data-tab="signin" aria-selected="' + (isReg ? "false" : "true") + '">' + escHtml(i2.tabSignIn || "Sign in") + '</button><button type="button" role="tab" class="aimeat-tab' + (isReg ? " active" : "") + '" data-tab="register" aria-selected="' + (isReg ? "true" : "false") + '">' + escHtml(i2.tabRegister || "Create account") + '</button></div></div><div id="aimeat-modal-body" class="aimeat-body"><div id="aimeat-tab-signin"' + (isReg ? ' style="display:none"' : "") + ">" + field(
+        i2.identifierLabel || "Username or email",
+        '<input id="aimeat-username" class="aimeat-inp" autocomplete="username" placeholder="' + escHtml(i2.identifierPlaceholder || "Username or email") + '">'
+      ) + field(
+        i2.passwordLabel || "Password",
+        '<input id="aimeat-password" type="password" autocomplete="current-password" class="aimeat-inp" placeholder="' + escHtml(i2.passwordPlaceholder || "Password") + '">'
+      ) + '<div class="aimeat-actions"><button id="aimeat-go-btn" class="aimeat-go">' + escHtml(i2.signInOnlyBtn || "Sign in") + '</button><button id="aimeat-cancel-btn" class="aimeat-cancel">' + escHtml(i2.cancelBtn || "Cancel") + '</button></div><p id="aimeat-error" class="aimeat-err"></p><div class="aimeat-links"><a href="#" id="aimeat-forgot-pw" class="aimeat-link">' + escHtml(i2.forgotPassword || "Forgot password?") + '</a><a href="#" id="aimeat-forgot-user" class="aimeat-link">' + escHtml(i2.forgotUsername || "Forgot username?") + '</a></div></div><div id="aimeat-tab-register"' + (isReg ? "" : ' style="display:none"') + ">" + field(
+        i2.usernameLabel || "Username",
+        '<input id="aimeat-reg-username" class="aimeat-inp" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="64" placeholder="' + escHtml(i2.usernamePlaceholder || "Username") + '"><div id="aimeat-reg-rules" class="aimeat-rules">' + rule("len", i2.usernameRuleLength || "3 to 64 characters") + rule("chars", i2.usernameRuleChars || "Letters a to z, digits and hyphens") + rule("edges", i2.usernameRuleEdges || "Starts and ends with a letter or digit") + "</div>",
+        '<p class="aimeat-hint">' + escHtml(i2.usernameLowercase || "Capital letters become lowercase.") + " " + escHtml(i2.usernameHint || "This becomes your permanent name here.") + "</p>"
+      ) + (EMAIL_REQUIRED ? field(
+        i2.emailLabel || "Email",
+        '<input id="aimeat-reg-email" type="email" autocomplete="email" class="aimeat-inp" placeholder="you@example.com">',
+        '<p class="aimeat-hint">' + escHtml(i2.registerEmailHint || "We send a 6-digit code here to confirm the address. You can sign in with it later.") + "</p>"
+      ) : "") + field(
+        i2.passwordLabel || "Password",
+        '<input id="aimeat-reg-password" type="password" autocomplete="new-password" class="aimeat-inp" placeholder="' + escHtml(i2.passwordPlaceholder || "Password (min 8 chars)") + '">'
+      ) + field(
+        i2.displayNameLabel || "Display Name",
+        '<input id="aimeat-reg-displayname" class="aimeat-inp" placeholder="' + escHtml(i2.displayNamePlaceholder || "Display Name") + '">',
+        '<p class="aimeat-hint">' + escHtml(i2.displayNameWhy || "Worth filling in: without it, your username is the name everyone sees.") + "</p>",
+        i2.displayNameOptional || "optional"
+      ) + '<div class="aimeat-actions"><button id="aimeat-reg-btn" class="aimeat-go">' + escHtml(i2.createAccountBtn || "Create account") + '</button><button id="aimeat-reg-cancel-btn" class="aimeat-cancel">' + escHtml(i2.cancelBtn || "Cancel") + '</button></div><p id="aimeat-reg-error" class="aimeat-err"></p></div>' + (AUTH_PROVIDERS.length ? '<div class="aimeat-or"><span></span><b>' + escHtml(i2.orLabel || "OR") + "</b><span></span></div>" + AUTH_PROVIDERS.map(function(p) {
+        return '<button type="button" class="aimeat-oauth-btn" data-provider="' + escHtml(p.id) + '">' + (PROVIDER_ICONS[p.id] || "") + escHtml(i2[p.i18nKey] || p.label) + "</button>";
+      }).join("") : "") + '</div><div id="aimeat-forgot-pw-view" class="aimeat-body" style="display:none"><div id="aimeat-fpw-step1"><h3 class="aimeat-sub-title">' + escHtml(i2.resetPasswordTitle || "Reset Password") + '</h3><p class="aimeat-sub-desc">' + escHtml(i2.resetPasswordDesc || "Enter your username to receive a reset code by email.") + "</p>" + field(i2.usernameLabel || "Username", '<input id="aimeat-fpw-username" class="aimeat-inp" placeholder="' + escHtml(i2.usernamePlaceholder || "Username") + '">') + '<div class="aimeat-actions"><button id="aimeat-fpw-send" class="aimeat-go">' + escHtml(i2.sendResetCode || "Send Reset Code") + '</button><button id="aimeat-fpw-back" class="aimeat-cancel">' + escHtml(i2.backToLogin || "Back to Login") + '</button></div><p id="aimeat-fpw-msg" class="aimeat-msg"></p><p id="aimeat-fpw-err" class="aimeat-err"></p></div><div id="aimeat-fpw-step2" style="display:none"><h3 class="aimeat-sub-title">' + escHtml(i2.enterNewPasswordTitle || "Enter New Password") + '</h3><p class="aimeat-sub-desc">' + escHtml(i2.resetCodeSent || "A reset code was sent to your email. Enter it below with your new password.") + "</p>" + field(i2.codeLabel || "Reset Code", '<input id="aimeat-fpw-code" class="aimeat-inp" placeholder="123456" maxlength="6">') + field(i2.newPasswordLabel || "New Password", '<input id="aimeat-fpw-newpass" type="password" class="aimeat-inp" placeholder="' + escHtml(i2.newPasswordPlaceholder || "New password (min 8 chars)") + '">') + '<div class="aimeat-actions"><button id="aimeat-fpw-reset" class="aimeat-go">' + escHtml(i2.resetPassword || "Reset Password") + '</button><button id="aimeat-fpw-back2" class="aimeat-cancel">' + escHtml(i2.backToLogin || "Back to Login") + '</button></div><p id="aimeat-fpw-msg2" class="aimeat-msg"></p><p id="aimeat-fpw-err2" class="aimeat-err"></p></div></div><div id="aimeat-forgot-user-view" class="aimeat-body" style="display:none"><h3 class="aimeat-sub-title">' + escHtml(i2.recoverUsernameTitle || "Recover Username") + '</h3><p class="aimeat-sub-desc">' + escHtml(i2.recoverUsernameDesc || "Enter the email address associated with your account.") + "</p>" + field(i2.emailLabel || "Email", '<input id="aimeat-fu-email" class="aimeat-inp" type="email" placeholder="you@example.com">') + '<div class="aimeat-actions"><button id="aimeat-fu-send" class="aimeat-go">' + escHtml(i2.sendUsername || "Send My Username") + '</button><button id="aimeat-fu-back" class="aimeat-cancel">' + escHtml(i2.backToLogin || "Back to Login") + '</button></div><p id="aimeat-fu-msg" class="aimeat-msg"></p></div><div id="aimeat-email-view" class="aimeat-body" style="display:none"><div id="aimeat-em-step1"><h3 class="aimeat-sub-title">' + escHtml(i2.completeAccountTitle || "One last step") + '</h3><p class="aimeat-sub-desc">' + escHtml(i2.completeAccountDesc || "Add an email to finish setting up your account. We’ll send a verification code to confirm it.") + "</p>" + field(i2.emailLabel || "Email", '<input id="aimeat-em-email" class="aimeat-inp" type="email" placeholder="you@example.com">') + '<div class="aimeat-actions"><button id="aimeat-em-send" class="aimeat-go">' + escHtml(i2.sendVerificationCode || "Send Verification Code") + '</button><button id="aimeat-em-back" class="aimeat-cancel">' + escHtml(i2.backToLogin || "Back to Login") + '</button></div><p id="aimeat-em-err" class="aimeat-err"></p></div><div id="aimeat-em-step2" style="display:none"><h3 class="aimeat-sub-title">' + escHtml(i2.enterCodeTitle || "Enter Verification Code") + '</h3><p class="aimeat-sub-desc">' + escHtml(i2.enterCodeDesc || "We sent a 6-digit code to your email. Enter it below to finish and sign in.") + "</p>" + field(i2.codeLabel || "Verification Code", '<input id="aimeat-em-code" class="aimeat-inp" placeholder="123456" maxlength="6" inputmode="numeric">') + '<div class="aimeat-actions"><button id="aimeat-em-confirm" class="aimeat-go">' + escHtml(i2.confirmAndSignIn || "Confirm & Sign In") + '</button><button id="aimeat-em-back2" class="aimeat-cancel">' + escHtml(i2.backToLogin || "Back to Login") + '</button></div><p id="aimeat-em-msg2" class="aimeat-msg"></p><p id="aimeat-em-err2" class="aimeat-err"></p></div></div><div id="aimeat-why" class="aimeat-why"' + (isReg ? "" : ' style="display:none"') + '><h4 class="aimeat-why-title">' + escHtml(i2.whyTitle || "What do you get?") + '</h4><div class="aimeat-why-row"><span class="aimeat-why-num">01</span><span>' + escHtml(i2.whyGhii || "Your own digital identity. Only you control it") + '</span></div><div class="aimeat-why-row"><span class="aimeat-why-num">02</span><span>' + escHtml(i2.whyPrivacy || "Your own private memory space, protected by your password") + '</span></div><div class="aimeat-why-row"><span class="aimeat-why-num">03</span><span>' + escHtml(i2.whyAgents || "Connect AI agents that remember you and work on your behalf") + '</span></div><div class="aimeat-why-row strong"><span class="aimeat-why-num">04</span><span>' + escHtml(i2.whyMorsels || "Your own AI-built apps and agents work for you: your own AI operating system.") + "</span></div></div></div></div>";
     }
     function wireModal() {
       modal.querySelectorAll(".aimeat-lang").forEach(function(b) {
@@ -508,6 +652,34 @@
           }, 30);
         });
       });
+      var regUser = (
+        /** @type {any} */
+        document.getElementById("aimeat-reg-username")
+      );
+      var rulesEl = document.getElementById("aimeat-reg-rules");
+      function syncUsernameRules() {
+        if (!regUser || !rulesEl) return;
+        var raw = String(regUser.value || "");
+        var clean = raw.toLowerCase().replace(/[^a-z0-9-]/g, "");
+        if (clean !== raw) {
+          var pos = Math.max(0, (regUser.selectionStart == null ? raw.length : regUser.selectionStart) - (raw.length - clean.length));
+          regUser.value = clean;
+          try {
+            regUser.setSelectionRange(pos, pos);
+          } catch {
+          }
+        }
+        rulesEl.classList.toggle("on", clean.length > 0);
+        var met = {
+          len: clean.length >= 3 && clean.length <= 64,
+          chars: clean.length > 0,
+          edges: /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(clean)
+        };
+        rulesEl.querySelectorAll(".aimeat-rule").forEach(function(r) {
+          r.classList.toggle("ok", !!met[r.getAttribute("data-rule") || ""]);
+        });
+      }
+      if (regUser) regUser.addEventListener("input", syncUsernameRules);
       modal.querySelectorAll(".aimeat-oauth-btn").forEach(function(btn) {
         btn.addEventListener("click", function() {
           var id = btn.getAttribute("data-provider") || "";
@@ -855,6 +1027,11 @@
         errEl.style.display = "none";
         if (!username || username.length < 3) {
           errEl.textContent = i.errUserShort || "Username must be at least 3 characters";
+          errEl.style.display = "block";
+          return;
+        }
+        if (!OWNER_NAME_RE.test(username)) {
+          errEl.textContent = i.errUserInvalid || "A username is 3 to 64 characters: letters a to z, digits and hyphens, starting and ending with a letter or digit.";
           errEl.style.display = "block";
           return;
         }

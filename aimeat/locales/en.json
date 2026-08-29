@@ -4893,7 +4893,16 @@
     "errIdentifierRequired": "Enter your username or email.",
     "errPassRequired": "Enter your password.",
     "errWrongCredentials": "That username or email and password do not match an account here.",
-    "errNameTaken": "That username is taken. If it is yours, sign in instead."
+    "errNameTaken": "That username is taken. If it is yours, sign in instead.",
+    "headlineNew": "Your account lives right here.",
+    "lineNew": "Pick a username and password.",
+    "headlineReturning": "Welcome back.",
+    "usernameRuleLength": "3 to 64 characters",
+    "usernameRuleChars": "Letters a to z, digits and hyphens",
+    "usernameRuleEdges": "Starts and ends with a letter or digit",
+    "usernameLowercase": "Capital letters become lowercase.",
+    "displayNameWhy": "Worth filling in: without it, your username is the name everyone sees.",
+    "errUserInvalid": "A username is 3 to 64 characters: letters a to z, digits and hyphens, starting and ending with a letter or digit."
   },
   "morsels": {
     "name": "heart morsel",

@@ -13,6 +13,11 @@
  *   openEmailCompletion, sendEmailCode, showView, capture/restoreInputs }.
  * @usage import { showLoginModal } from './modal.js';
  * @version-history
+ *   v1.5.0 — 2026-08-29 — The poster face (design canvas "AIMEAT Sign-in Dialog", headline-led): the
+ *     wordmark and the node's domain as a crumb, the sentence as the masthead, ink frame and sun
+ *     shadow, underlined fields, the styles class-based and token-driven in modal-styles.js. The
+ *     username field keeps only what the server accepts and shows the three name rules from the
+ *     first typed character; the display-name hint says why it is worth filling in.
  *   v1.4.1 — 2026-08-24 — SECURITY (CodeQL js/xss-through-dom): the provider id is read back from the
  *     DOM before it is spliced into the login URL, so it is validated to the provider-id shape (a
  *     slug, optionally scheme:tenant) first; a tampered data-provider no longer steers navigation.
@@ -35,10 +40,26 @@ import { auth, api } from './session.js';
 import { escHtml } from './theme.js';
 import { currentModalLang, loadModalI18n, MODAL_LANG_KEY, MODAL_LANGS } from './i18n.js';
 import { NODE_URL, NODE_ID, AUTH_PROVIDERS, PROVIDER_ICONS, EMAIL_REQUIRED } from './config.js';
+import { MODAL_CSS } from './modal-styles.js';
 
 /** An identifier is an email when it carries a dot-bearing domain. A GHII (`alice@node-id`) never
  *  does, so this separates the two without asking the person which one they typed. */
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** The server's owner-name rule (OWNER_RE in src/utils/gaii.ts): lowercase letters, digits and
+ *  hyphens, a letter or digit at both ends, 3 to 64 characters. Mirrored here so the field can say
+ *  what it wants while the person types instead of in a refusal afterwards. */
+const OWNER_NAME_RE = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
+
+/** The domain in the crumb above the headline: this node's own, so a self-hosted node shows its
+ *  domain there and the wordmark beside it says what the software is. */
+const NODE_HOST = (function () {
+  try { return new URL(NODE_URL).host; } catch { return (typeof location !== 'undefined' && location.host) || ''; }
+})();
+
+const HEART_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.8 8.2 3 4.5 6.7 4.5c2 0 3.6 1.1 4.5 2.6.9-1.5 2.5-2.6 4.5-2.6 3.7 0 5.9 3.7 4.3 7.3C19.5 16.4 12 21 12 21z"></path></svg>';
+const RULE_MARKS = '<svg class="r-ok" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3"></path></svg>'
+  + '<svg class="r-no" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="2" width="8" height="8"></rect></svg>';
 
 export function showLoginModal(opts, renderBtn) {
   var i = opts.i18n || {};
@@ -67,7 +88,14 @@ export function showLoginModal(opts, renderBtn) {
     };
   }
   function restoreInputs(vals) {
-    var s = function (id, val) { var el = /** @type {any} */ (document.getElementById(id)); if (el && val) el.value = val; };
+    // The input event is what keeps the username rules in step with the value, so a restored value
+    // announces itself the way a typed one would.
+    var s = function (id, val) {
+      var el = /** @type {any} */ (document.getElementById(id));
+      if (!el || !val) return;
+      el.value = val;
+      try { el.dispatchEvent(new Event('input')); } catch { /* no Event constructor */ }
+    };
     s('aimeat-username', vals.u); s('aimeat-password', vals.p);
     s('aimeat-reg-username', vals.ru); s('aimeat-reg-password', vals.rp);
     s('aimeat-reg-displayname', vals.rd); s('aimeat-reg-email', vals.re);
@@ -116,45 +144,45 @@ export function showLoginModal(opts, renderBtn) {
 
   function buildModalInner(i, lang, anim, tab) {
     var isReg = tab === 'register';
-    return '<style>'
-      + '.aimeat-inp{width:100%;padding:11px 14px;border:1.5px solid #E5E7EB;border-radius:10px;font-family:DM Sans,system-ui,sans-serif;font-size:15px;color:#1A1A2E;background:#FAFAF8;box-sizing:border-box;transition:all .15s;outline:none}'
-      + '.aimeat-inp:focus{border-color:#E8564A;box-shadow:0 0 0 3px rgba(232,86,74,.1)}'
-      + '.aimeat-inp::placeholder{color:#9CA3AF}'
-      + '.aimeat-go{flex:1;padding:12px;background:linear-gradient(135deg,#E8564A,#D4493F);color:#fff;border:none;border-radius:10px;cursor:pointer;font-weight:700;font-size:15px;font-family:DM Sans,system-ui,sans-serif;box-shadow:0 2px 8px rgba(232,86,74,.25);transition:transform .15s,box-shadow .15s}'
-      + '.aimeat-go:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(232,86,74,.35)}'
-      + '.aimeat-label{display:block;margin-bottom:5px;font-size:12px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:#6B7280}'
-      + '.aimeat-cancel{padding:12px 20px;background:none;color:#1A1A2E;border:1px solid #E5E7EB;border-radius:10px;cursor:pointer;font-size:15px;font-weight:500;font-family:DM Sans,system-ui,sans-serif;transition:background .15s}'
-      + '.aimeat-cancel:hover{background:#F3F4F6}'
-      + '.aimeat-fi{width:20px;height:20px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;margin-top:1px}'
-      + '.aimeat-langsw{position:absolute;top:24px;right:28px;display:flex;gap:5px}'
-      + '.aimeat-lang{padding:4px 9px;border:1px solid #E5E7EB;background:#fff;color:#6B7280;border-radius:7px;cursor:pointer;font-size:11px;font-weight:700;letter-spacing:.4px;line-height:1;font-family:DM Sans,system-ui,sans-serif;transition:all .15s}'
-      + '.aimeat-lang:hover{border-color:#E8564A;color:#E8564A}'
-      + '.aimeat-lang.active{background:#E8564A;color:#fff;border-color:#E8564A;cursor:default}'
-      + '.aimeat-tabs{display:flex;gap:0;margin:18px 0 0;border-bottom:1.5px solid #E5E7EB}'
-      + '.aimeat-tab{flex:1;padding:11px 8px;background:none;border:none;border-bottom:2.5px solid transparent;margin-bottom:-1.5px;cursor:pointer;font-family:DM Sans,system-ui,sans-serif;font-size:15px;font-weight:600;color:#6B7280;transition:color .15s,border-color .15s}'
-      + '.aimeat-tab:hover{color:#1A1A2E}'
-      + '.aimeat-tab.active{color:#E8564A;border-bottom-color:#E8564A;cursor:default}'
-      + '@keyframes aimeatModalIn{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}'
-      + '</style>'
-      + '<div style="position:fixed;inset:0;background:rgba(26,26,46,.4);backdrop-filter:blur(8px);display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;z-index:99999;font-family:DM Sans,system-ui,sans-serif;padding:24px">'
-      + '<div style="background:#FFFFFF;border-radius:16px;max-width:420px;width:100%;margin:auto;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.15),0 0 0 1px rgba(0,0,0,.05);' + (anim ? 'animation:aimeatModalIn .3s ease' : '') + '">'
-      + '<div style="padding:28px 32px 0;position:relative">'
+    // One rule line under the username: the mark on the left flips from a hollow square to a
+    // check when the rule is met (wireModal keeps it in step with the typed value).
+    function rule(key, text) {
+      return '<div class="aimeat-rule" data-rule="' + key + '">' + RULE_MARKS + '<span>' + escHtml(text) + '</span></div>';
+    }
+    function field(label, input, hint, opt) {
+      return '<div class="aimeat-field"><label class="aimeat-label"><span>' + escHtml(label) + '</span>'
+        + (opt ? '<span class="aimeat-opt">' + escHtml(opt) + '</span>' : '') + '</label>'
+        + input + (hint || '') + '</div>';
+    }
+    return '<style>' + MODAL_CSS + '</style>'
+      + '<div class="aimeat-scrim">'
+      + '<div class="aimeat-dlg' + (anim ? ' aimeat-in' : '') + '">'
+      + '<div class="aimeat-head">'
+      // The crumb: the wordmark (AIME, the heart, AT) and this node's own domain, so a self-hosted
+      // node shows its domain here and the wordmark beside it says what the software is.
+      + '<div class="aimeat-crumb">'
+      + '<div class="aimeat-brand"><span class="aimeat-mark">AIME' + HEART_SVG + '<b>AT</b></span>'
+      + (NODE_HOST ? '<span class="aimeat-host">' + escHtml(NODE_HOST) + ' /</span>' : '')
+      + '</div>'
       // One button per language the NODE ships, from MODAL_LANGS — the modal loads its strings from
       // that node's /locales/<tag>.json, so the list of buttons and the list of files are the same
       // list. Writing the languages out here is how the switch came to offer two while the node
       // served three.
-      + '<div class="aimeat-langsw">'
+      + '<div class="aimeat-langsw" role="group" aria-label="' + escHtml(i.switchLanguage || 'Language') + '">'
       + MODAL_LANGS.map(function (l) {
         return '<button type="button" class="aimeat-lang' + (lang === l ? ' active' : '')
           + '" data-lang="' + l + '">' + l.toUpperCase() + '</button>';
       }).join('')
       + '</div>'
-      + '<h2 style="margin:0;font-size:22px;font-weight:800;display:flex;align-items:center;gap:8px;color:#1A1A2E">'
-      + 'AIME <span style="width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,#E8564A,#D4493F);display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:14px">♥</span> AT'
+      + '</div>'
+      // The masthead: one sentence in the poster face, and the line under it. Which tab is open
+      // decides both.
+      + '<h2 class="aimeat-headline">'
+      + escHtml(isReg ? (i.headlineNew || 'Your account lives right here.') : (i.headlineReturning || 'Welcome back.'))
       + '</h2>'
-      + '<p style="margin:8px 0 0;font-size:14px;color:#6B7280;line-height:1.5">'
+      + '<p class="aimeat-line">'
       + escHtml(isReg
-        ? (i.descNew || 'Pick a username and password to create an account.')
+        ? (i.lineNew || 'Pick a username and password.')
         : (i.descReturning || 'Enter the username or email you signed up with.'))
       + '</p>'
       // Two tabs, two jobs. Which one is showing decides what the body asks for.
@@ -164,132 +192,133 @@ export function showLoginModal(opts, renderBtn) {
       + '</div>'
       + '</div>'
       // Body
-      + '<div id="aimeat-modal-body" style="padding:24px 32px">'
+      + '<div id="aimeat-modal-body" class="aimeat-body">'
       // ── Sign-in tab: an identifier the person actually remembers, and a password.
-      + '<div id="aimeat-tab-signin" style="' + (isReg ? 'display:none' : '') + '">'
-      + '<div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i.identifierLabel || 'Username or email') + '</label>'
-      + '<input id="aimeat-username" class="aimeat-inp" autocomplete="username" placeholder="' + escHtml(i.identifierPlaceholder || 'Username or email') + '"></div>'
-      + '<div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i.passwordLabel || 'Password') + '</label>'
-      + '<input id="aimeat-password" type="password" autocomplete="current-password" class="aimeat-inp" placeholder="' + escHtml(i.passwordPlaceholder || 'Password') + '"></div>'
-      + '<div style="display:flex;gap:10px;margin-top:20px">'
+      + '<div id="aimeat-tab-signin"' + (isReg ? ' style="display:none"' : '') + '>'
+      + field(i.identifierLabel || 'Username or email',
+        '<input id="aimeat-username" class="aimeat-inp" autocomplete="username" placeholder="' + escHtml(i.identifierPlaceholder || 'Username or email') + '">')
+      + field(i.passwordLabel || 'Password',
+        '<input id="aimeat-password" type="password" autocomplete="current-password" class="aimeat-inp" placeholder="' + escHtml(i.passwordPlaceholder || 'Password') + '">')
+      + '<div class="aimeat-actions">'
       + '<button id="aimeat-go-btn" class="aimeat-go">' + escHtml(i.signInOnlyBtn || 'Sign in') + '</button>'
       + '<button id="aimeat-cancel-btn" class="aimeat-cancel">' + escHtml(i.cancelBtn || 'Cancel') + '</button>'
       + '</div>'
-      + '<p id="aimeat-error" style="margin:8px 0 0;font-size:13px;color:#ef4444;display:none"></p>'
-      + '<div style="margin-top:14px;display:flex;gap:16px">'
-      + '<a href="#" id="aimeat-forgot-pw" style="font-size:13px;color:#6B7280;cursor:pointer;text-decoration:underline">' + escHtml(i.forgotPassword || 'Forgot password?') + '</a>'
-      + '<a href="#" id="aimeat-forgot-user" style="font-size:13px;color:#6B7280;cursor:pointer;text-decoration:underline">' + escHtml(i.forgotUsername || 'Forgot username?') + '</a>'
+      + '<p id="aimeat-error" class="aimeat-err"></p>'
+      + '<div class="aimeat-links">'
+      + '<a href="#" id="aimeat-forgot-pw" class="aimeat-link">' + escHtml(i.forgotPassword || 'Forgot password?') + '</a>'
+      + '<a href="#" id="aimeat-forgot-user" class="aimeat-link">' + escHtml(i.forgotUsername || 'Forgot username?') + '</a>'
       + '</div>'
       + '</div>'
       // ── Register tab: the account being made. The email field is here from the start when the
-      //    node's gate requires one, rather than appearing after a failed create.
-      + '<div id="aimeat-tab-register" style="' + (isReg ? '' : 'display:none') + '">'
-      + '<div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i.usernameLabel || 'Username') + '</label>'
-      + '<input id="aimeat-reg-username" class="aimeat-inp" autocomplete="username" placeholder="' + escHtml(i.usernamePlaceholder || 'Username') + '">'
-      + '<p style="margin:5px 0 0;font-size:12px;color:#9CA3AF">' + escHtml(i.usernameHint || 'This becomes your permanent identity on this node.') + '</p></div>'
+      //    node's gate requires one, rather than appearing after a failed create. The username's
+      //    three rules sit under it, shown from the first typed character.
+      + '<div id="aimeat-tab-register"' + (isReg ? '' : ' style="display:none"') + '>'
+      + field(i.usernameLabel || 'Username',
+        '<input id="aimeat-reg-username" class="aimeat-inp" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="64" placeholder="' + escHtml(i.usernamePlaceholder || 'Username') + '">'
+        + '<div id="aimeat-reg-rules" class="aimeat-rules">'
+        + rule('len', i.usernameRuleLength || '3 to 64 characters')
+        + rule('chars', i.usernameRuleChars || 'Letters a to z, digits and hyphens')
+        + rule('edges', i.usernameRuleEdges || 'Starts and ends with a letter or digit')
+        + '</div>',
+        '<p class="aimeat-hint">' + escHtml(i.usernameLowercase || 'Capital letters become lowercase.') + ' ' + escHtml(i.usernameHint || 'This becomes your permanent name here.') + '</p>')
       + (EMAIL_REQUIRED
-        ? '<div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i.emailLabel || 'Email') + '</label>'
-          + '<input id="aimeat-reg-email" type="email" autocomplete="email" class="aimeat-inp" placeholder="you@example.com">'
-          + '<p style="margin:5px 0 0;font-size:12px;color:#9CA3AF">' + escHtml(i.registerEmailHint || 'We send a 6-digit code here to confirm the address. You can sign in with it later.') + '</p></div>'
+        ? field(i.emailLabel || 'Email',
+          '<input id="aimeat-reg-email" type="email" autocomplete="email" class="aimeat-inp" placeholder="you@example.com">',
+          '<p class="aimeat-hint">' + escHtml(i.registerEmailHint || 'We send a 6-digit code here to confirm the address. You can sign in with it later.') + '</p>')
         : '')
-      + '<div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i.passwordLabel || 'Password') + '</label>'
-      + '<input id="aimeat-reg-password" type="password" autocomplete="new-password" class="aimeat-inp" placeholder="' + escHtml(i.passwordPlaceholder || 'Password (min 8 chars)') + '"></div>'
-      + '<div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i.displayNameLabel || 'Display Name') + ' <span style="font-weight:400;text-transform:none;letter-spacing:0">(' + escHtml(i.displayNameOptional || 'optional') + ')</span></label>'
-      + '<input id="aimeat-reg-displayname" class="aimeat-inp" placeholder="' + escHtml(i.displayNamePlaceholder || 'Display Name') + '"></div>'
-      + '<div style="display:flex;gap:10px;margin-top:20px">'
+      + field(i.passwordLabel || 'Password',
+        '<input id="aimeat-reg-password" type="password" autocomplete="new-password" class="aimeat-inp" placeholder="' + escHtml(i.passwordPlaceholder || 'Password (min 8 chars)') + '">')
+      + field(i.displayNameLabel || 'Display Name',
+        '<input id="aimeat-reg-displayname" class="aimeat-inp" placeholder="' + escHtml(i.displayNamePlaceholder || 'Display Name') + '">',
+        '<p class="aimeat-hint">' + escHtml(i.displayNameWhy || 'Worth filling in: without it, your username is the name everyone sees.') + '</p>',
+        i.displayNameOptional || 'optional')
+      + '<div class="aimeat-actions">'
       + '<button id="aimeat-reg-btn" class="aimeat-go">' + escHtml(i.createAccountBtn || 'Create account') + '</button>'
       + '<button id="aimeat-reg-cancel-btn" class="aimeat-cancel">' + escHtml(i.cancelBtn || 'Cancel') + '</button>'
       + '</div>'
-      + '<p id="aimeat-reg-error" style="margin:8px 0 0;font-size:13px;color:#ef4444;display:none"></p>'
+      + '<p id="aimeat-reg-error" class="aimeat-err"></p>'
       + '</div>'
       // Social login — one button per enabled OIDC provider, baked from config. Outside both tabs:
       // the same button both creates an account and signs an existing one in.
       + (AUTH_PROVIDERS.length ? (
-        '<div style="display:flex;align-items:center;gap:12px;margin:18px 0 14px;color:#9CA3AF;font-size:12px;font-weight:600;letter-spacing:.5px">'
-        + '<span style="flex:1;height:1px;background:#E5E7EB"></span>' + escHtml(i.orLabel || 'OR') + '<span style="flex:1;height:1px;background:#E5E7EB"></span>'
-        + '</div>'
+        '<div class="aimeat-or"><span></span><b>' + escHtml(i.orLabel || 'OR') + '</b><span></span></div>'
         + AUTH_PROVIDERS.map(function (p) {
-          return '<button type="button" class="aimeat-oauth-btn" data-provider="' + escHtml(p.id) + '" style="width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:11px;margin-bottom:8px;background:#fff;color:#1A1A2E;border:1.5px solid #E5E7EB;border-radius:10px;cursor:pointer;font-weight:600;font-size:15px;font-family:DM Sans,system-ui,sans-serif;transition:background .15s,border-color .15s">'
+          return '<button type="button" class="aimeat-oauth-btn" data-provider="' + escHtml(p.id) + '">'
             + (PROVIDER_ICONS[p.id] || '')
             + escHtml((i[p.i18nKey]) || p.label) + '</button>';
         }).join('')
       ) : '')
       + '</div>'
       // Forgot password sub-view (hidden by default)
-      + '<div id="aimeat-forgot-pw-view" style="padding:24px 32px;display:none">'
+      + '<div id="aimeat-forgot-pw-view" class="aimeat-body" style="display:none">'
       + '<div id="aimeat-fpw-step1">'
-      + '<h3 style="margin:0 0 8px;font-size:17px;font-weight:700;color:#1A1A2E">' + escHtml(i.resetPasswordTitle || 'Reset Password') + '</h3>'
-      + '<p style="font-size:13px;color:#6B7280;margin-bottom:14px">' + escHtml(i.resetPasswordDesc || 'Enter your username to receive a reset code by email.') + '</p>'
-      + '<div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i.usernameLabel || 'Username') + '</label>'
-      + '<input id="aimeat-fpw-username" class="aimeat-inp" placeholder="' + escHtml(i.usernamePlaceholder || 'Username') + '"></div>'
-      + '<div style="display:flex;gap:10px">'
+      + '<h3 class="aimeat-sub-title">' + escHtml(i.resetPasswordTitle || 'Reset Password') + '</h3>'
+      + '<p class="aimeat-sub-desc">' + escHtml(i.resetPasswordDesc || 'Enter your username to receive a reset code by email.') + '</p>'
+      + field(i.usernameLabel || 'Username', '<input id="aimeat-fpw-username" class="aimeat-inp" placeholder="' + escHtml(i.usernamePlaceholder || 'Username') + '">')
+      + '<div class="aimeat-actions">'
       + '<button id="aimeat-fpw-send" class="aimeat-go">' + escHtml(i.sendResetCode || 'Send Reset Code') + '</button>'
       + '<button id="aimeat-fpw-back" class="aimeat-cancel">' + escHtml(i.backToLogin || 'Back to Login') + '</button>'
       + '</div>'
-      + '<p id="aimeat-fpw-msg" style="margin:8px 0 0;font-size:13px;color:#22C55E;display:none"></p>'
-      + '<p id="aimeat-fpw-err" style="margin:8px 0 0;font-size:13px;color:#ef4444;display:none"></p>'
+      + '<p id="aimeat-fpw-msg" class="aimeat-msg"></p>'
+      + '<p id="aimeat-fpw-err" class="aimeat-err"></p>'
       + '</div>'
       + '<div id="aimeat-fpw-step2" style="display:none">'
-      + '<h3 style="margin:0 0 8px;font-size:17px;font-weight:700;color:#1A1A2E">' + escHtml(i.enterNewPasswordTitle || 'Enter New Password') + '</h3>'
-      + '<p style="font-size:13px;color:#6B7280;margin-bottom:14px">' + escHtml(i.resetCodeSent || 'A reset code was sent to your email. Enter it below with your new password.') + '</p>'
-      + '<div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i.codeLabel || 'Reset Code') + '</label>'
-      + '<input id="aimeat-fpw-code" class="aimeat-inp" placeholder="123456" maxlength="6"></div>'
-      + '<div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i.newPasswordLabel || 'New Password') + '</label>'
-      + '<input id="aimeat-fpw-newpass" type="password" class="aimeat-inp" placeholder="' + escHtml(i.newPasswordPlaceholder || 'New password (min 8 chars)') + '"></div>'
-      + '<div style="display:flex;gap:10px">'
+      + '<h3 class="aimeat-sub-title">' + escHtml(i.enterNewPasswordTitle || 'Enter New Password') + '</h3>'
+      + '<p class="aimeat-sub-desc">' + escHtml(i.resetCodeSent || 'A reset code was sent to your email. Enter it below with your new password.') + '</p>'
+      + field(i.codeLabel || 'Reset Code', '<input id="aimeat-fpw-code" class="aimeat-inp" placeholder="123456" maxlength="6">')
+      + field(i.newPasswordLabel || 'New Password', '<input id="aimeat-fpw-newpass" type="password" class="aimeat-inp" placeholder="' + escHtml(i.newPasswordPlaceholder || 'New password (min 8 chars)') + '">')
+      + '<div class="aimeat-actions">'
       + '<button id="aimeat-fpw-reset" class="aimeat-go">' + escHtml(i.resetPassword || 'Reset Password') + '</button>'
       + '<button id="aimeat-fpw-back2" class="aimeat-cancel">' + escHtml(i.backToLogin || 'Back to Login') + '</button>'
       + '</div>'
-      + '<p id="aimeat-fpw-msg2" style="margin:8px 0 0;font-size:13px;color:#22C55E;display:none"></p>'
-      + '<p id="aimeat-fpw-err2" style="margin:8px 0 0;font-size:13px;color:#ef4444;display:none"></p>'
+      + '<p id="aimeat-fpw-msg2" class="aimeat-msg"></p>'
+      + '<p id="aimeat-fpw-err2" class="aimeat-err"></p>'
       + '</div>'
       + '</div>'
       // Forgot username sub-view (hidden by default)
-      + '<div id="aimeat-forgot-user-view" style="padding:24px 32px;display:none">'
-      + '<h3 style="margin:0 0 8px;font-size:17px;font-weight:700;color:#1A1A2E">' + escHtml(i.recoverUsernameTitle || 'Recover Username') + '</h3>'
-      + '<p style="font-size:13px;color:#6B7280;margin-bottom:14px">' + escHtml(i.recoverUsernameDesc || 'Enter the email address associated with your account.') + '</p>'
-      + '<div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i.emailLabel || 'Email') + '</label>'
-      + '<input id="aimeat-fu-email" class="aimeat-inp" type="email" placeholder="you@example.com"></div>'
-      + '<div style="display:flex;gap:10px">'
+      + '<div id="aimeat-forgot-user-view" class="aimeat-body" style="display:none">'
+      + '<h3 class="aimeat-sub-title">' + escHtml(i.recoverUsernameTitle || 'Recover Username') + '</h3>'
+      + '<p class="aimeat-sub-desc">' + escHtml(i.recoverUsernameDesc || 'Enter the email address associated with your account.') + '</p>'
+      + field(i.emailLabel || 'Email', '<input id="aimeat-fu-email" class="aimeat-inp" type="email" placeholder="you@example.com">')
+      + '<div class="aimeat-actions">'
       + '<button id="aimeat-fu-send" class="aimeat-go">' + escHtml(i.sendUsername || 'Send My Username') + '</button>'
       + '<button id="aimeat-fu-back" class="aimeat-cancel">' + escHtml(i.backToLogin || 'Back to Login') + '</button>'
       + '</div>'
-      + '<p id="aimeat-fu-msg" style="margin:8px 0 0;font-size:13px;color:#22C55E;display:none"></p>'
+      + '<p id="aimeat-fu-msg" class="aimeat-msg"></p>'
       + '</div>'
       // Complete-account sub-view (hidden) — email verification (legacy accounts + register-under-gate).
-      + '<div id="aimeat-email-view" style="padding:24px 32px;display:none">'
+      + '<div id="aimeat-email-view" class="aimeat-body" style="display:none">'
       + '<div id="aimeat-em-step1">'
-      + '<h3 style="margin:0 0 8px;font-size:17px;font-weight:700;color:#1A1A2E">' + escHtml(i.completeAccountTitle || 'One last step') + '</h3>'
-      + '<p style="font-size:13px;color:#6B7280;margin-bottom:14px">' + escHtml(i.completeAccountDesc || 'Add an email to finish setting up your account. We’ll send a verification code to confirm it.') + '</p>'
-      + '<div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i.emailLabel || 'Email') + '</label>'
-      + '<input id="aimeat-em-email" class="aimeat-inp" type="email" placeholder="you@example.com"></div>'
-      + '<div style="display:flex;gap:10px">'
+      + '<h3 class="aimeat-sub-title">' + escHtml(i.completeAccountTitle || 'One last step') + '</h3>'
+      + '<p class="aimeat-sub-desc">' + escHtml(i.completeAccountDesc || 'Add an email to finish setting up your account. We’ll send a verification code to confirm it.') + '</p>'
+      + field(i.emailLabel || 'Email', '<input id="aimeat-em-email" class="aimeat-inp" type="email" placeholder="you@example.com">')
+      + '<div class="aimeat-actions">'
       + '<button id="aimeat-em-send" class="aimeat-go">' + escHtml(i.sendVerificationCode || 'Send Verification Code') + '</button>'
       + '<button id="aimeat-em-back" class="aimeat-cancel">' + escHtml(i.backToLogin || 'Back to Login') + '</button>'
       + '</div>'
-      + '<p id="aimeat-em-err" style="margin:8px 0 0;font-size:13px;color:#ef4444;display:none"></p>'
+      + '<p id="aimeat-em-err" class="aimeat-err"></p>'
       + '</div>'
       + '<div id="aimeat-em-step2" style="display:none">'
-      + '<h3 style="margin:0 0 8px;font-size:17px;font-weight:700;color:#1A1A2E">' + escHtml(i.enterCodeTitle || 'Enter Verification Code') + '</h3>'
-      + '<p style="font-size:13px;color:#6B7280;margin-bottom:14px">' + escHtml(i.enterCodeDesc || 'We sent a 6-digit code to your email. Enter it below to finish and sign in.') + '</p>'
-      + '<div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i.codeLabel || 'Verification Code') + '</label>'
-      + '<input id="aimeat-em-code" class="aimeat-inp" placeholder="123456" maxlength="6" inputmode="numeric"></div>'
-      + '<div style="display:flex;gap:10px">'
+      + '<h3 class="aimeat-sub-title">' + escHtml(i.enterCodeTitle || 'Enter Verification Code') + '</h3>'
+      + '<p class="aimeat-sub-desc">' + escHtml(i.enterCodeDesc || 'We sent a 6-digit code to your email. Enter it below to finish and sign in.') + '</p>'
+      + field(i.codeLabel || 'Verification Code', '<input id="aimeat-em-code" class="aimeat-inp" placeholder="123456" maxlength="6" inputmode="numeric">')
+      + '<div class="aimeat-actions">'
       + '<button id="aimeat-em-confirm" class="aimeat-go">' + escHtml(i.confirmAndSignIn || 'Confirm & Sign In') + '</button>'
       + '<button id="aimeat-em-back2" class="aimeat-cancel">' + escHtml(i.backToLogin || 'Back to Login') + '</button>'
       + '</div>'
-      + '<p id="aimeat-em-msg2" style="margin:8px 0 0;font-size:13px;color:#22C55E;display:none"></p>'
-      + '<p id="aimeat-em-err2" style="margin:8px 0 0;font-size:13px;color:#ef4444;display:none"></p>'
+      + '<p id="aimeat-em-msg2" class="aimeat-msg"></p>'
+      + '<p id="aimeat-em-err2" class="aimeat-err"></p>'
       + '</div>'
       + '</div>'
       // Features footer — an argument FOR creating an account, so it rides with the Register tab.
-      // A returning person signing in does not need to be sold the thing they already have.
-      + '<div id="aimeat-why" style="padding:20px 32px 28px;background:#F9FAFB;border-top:1px solid #E5E7EB;' + (isReg ? '' : 'display:none') + '">'
-      + '<h4 style="margin:0 0 12px;font-size:13px;font-weight:700;color:#1A1A2E;display:flex;align-items:center;gap:6px">' + escHtml(i.whyTitle || 'What do you get?') + '</h4>'
-      + '<div style="display:flex;align-items:flex-start;gap:10px;font-size:13.5px;color:#6B7280;margin-bottom:8px;line-height:1.45"><div class="aimeat-fi" style="background:#FFF1F0;color:#E8564A">♥</div><span>' + escHtml(i.whyGhii || 'A free GHII (Global Human Intelligence Identifier), your personal AI identity') + '</span></div>'
-      + '<div style="display:flex;align-items:flex-start;gap:10px;font-size:13.5px;color:#6B7280;margin-bottom:8px;line-height:1.45"><div class="aimeat-fi" style="background:#EFF6FF;color:#3B82F6">🔒</div><span>' + escHtml(i.whyPrivacy || 'Your own private memory space, protected by your password') + '</span></div>'
-      + '<div style="display:flex;align-items:flex-start;gap:10px;font-size:13.5px;color:#6B7280;margin-bottom:8px;line-height:1.45"><div class="aimeat-fi" style="background:#F0FDF4;color:#22C55E">🤖</div><span>' + escHtml(i.whyAgents || 'Connect AI agents that remember you and work on your behalf') + '</span></div>'
-      + '<div style="display:flex;align-items:flex-start;gap:10px;font-size:13.5px;color:#6B7280;line-height:1.45"><div class="aimeat-fi" style="background:#FFF1F0;color:#E8564A">♥</div><span><strong>' + escHtml(i.whyMorsels || 'Your own AI-built apps and agents work for you: your own AI operating system.') + '</strong></span></div>'
+      // A returning person signing in does not need to be sold the thing they already have. A
+      // numbered index under an ink rule, the last line in bold.
+      + '<div id="aimeat-why" class="aimeat-why"' + (isReg ? '' : ' style="display:none"') + '>'
+      + '<h4 class="aimeat-why-title">' + escHtml(i.whyTitle || 'What do you get?') + '</h4>'
+      + '<div class="aimeat-why-row"><span class="aimeat-why-num">01</span><span>' + escHtml(i.whyGhii || 'Your own digital identity. Only you control it') + '</span></div>'
+      + '<div class="aimeat-why-row"><span class="aimeat-why-num">02</span><span>' + escHtml(i.whyPrivacy || 'Your own private memory space, protected by your password') + '</span></div>'
+      + '<div class="aimeat-why-row"><span class="aimeat-why-num">03</span><span>' + escHtml(i.whyAgents || 'Connect AI agents that remember you and work on your behalf') + '</span></div>'
+      + '<div class="aimeat-why-row strong"><span class="aimeat-why-num">04</span><span>' + escHtml(i.whyMorsels || 'Your own AI-built apps and agents work for you: your own AI operating system.') + '</span></div>'
       + '</div>'
       + '</div></div>';
   } // end buildModalInner
@@ -320,6 +349,33 @@ export function showLoginModal(opts, renderBtn) {
         setTimeout(function () { var el = document.getElementById(focusId); if (el) el.focus(); }, 30);
       });
     });
+
+    // The username rules, live. The field keeps only what the server's owner-name rule accepts
+    // (lowercase a to z, digits and hyphens; capitals are lowered as typed) and the three rules
+    // under it turn green as they are met, from the first typed character. The person sees what
+    // the name may be while choosing it rather than in a refusal afterwards.
+    var regUser = /** @type {any} */ (document.getElementById('aimeat-reg-username'));
+    var rulesEl = document.getElementById('aimeat-reg-rules');
+    function syncUsernameRules() {
+      if (!regUser || !rulesEl) return;
+      var raw = String(regUser.value || '');
+      var clean = raw.toLowerCase().replace(/[^a-z0-9-]/g, '');
+      if (clean !== raw) {
+        var pos = Math.max(0, (regUser.selectionStart == null ? raw.length : regUser.selectionStart) - (raw.length - clean.length));
+        regUser.value = clean;
+        try { regUser.setSelectionRange(pos, pos); } catch { /* not a text control */ }
+      }
+      rulesEl.classList.toggle('on', clean.length > 0);
+      var met = {
+        len: clean.length >= 3 && clean.length <= 64,
+        chars: clean.length > 0,
+        edges: /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(clean),
+      };
+      rulesEl.querySelectorAll('.aimeat-rule').forEach(function (r) {
+        r.classList.toggle('ok', !!met[r.getAttribute('data-rule') || '']);
+      });
+    }
+    if (regUser) regUser.addEventListener('input', syncUsernameRules);
 
     // Social sign-in — full-page navigation to the provider's OIDC start endpoint.
     modal.querySelectorAll('.aimeat-oauth-btn').forEach(function (btn) {
@@ -630,6 +686,13 @@ export function showLoginModal(opts, renderBtn) {
 
       if (!username || username.length < 3) {
         errEl.textContent = i.errUserShort || 'Username must be at least 3 characters';
+        errEl.style.display = 'block';
+        return;
+      }
+      // The field filters as the person types, so this only fires on a value that arrived some
+      // other way (autofill, a paste the input event did not see). Same rule as the server's.
+      if (!OWNER_NAME_RE.test(username)) {
+        errEl.textContent = i.errUserInvalid || 'A username is 3 to 64 characters: letters a to z, digits and hyphens, starting and ending with a letter or digit.';
         errEl.style.display = 'block';
         return;
       }
