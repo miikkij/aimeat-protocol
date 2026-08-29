@@ -10,6 +10,8 @@
  * @structure WorkspaceList
  * @usage import { WorkspaceList } from '/views/profile/organisms/workspace-list.js';
  * @version-history
+ *   v1.0.1 — 2026-08-29 — The description line above the bar is gone: the organism home's Workspaces
+ *     section carries it under the list, where it reads as a note rather than a preface.
  *   v1.0.0 — 2026-06-19 — Extracted from organisms-tab.js during the module split; the hidden file
  *     input uses the .pj-hidden-input class instead of an inline style (Rule 8).
  *   v1.1.0 — 2026-06-22 — Kill the per-workspace fetch storm: one discoverWorkspaces({include:'enrichment'})
@@ -272,7 +274,6 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
     <div class="pj-ws-embedded">
       <${ConfirmUI} />
       <input type="file" accept=".zip,application/zip" ref=${fileRef} class="pj-hidden-input" onChange=${(e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; doImport(f); }} />
-      <div class="section-desc">${t('organisms.workspacesDesc') || 'Workspaces in this organism — each is an independent space with its own documents, records and history.'}</div>
 
       <div class="pj-ws-bar">
         ${creating ? html`

@@ -2,93 +2,118 @@
  * @file home.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Organism home page — breadcrumb header (avatar, name, badges, description, Export +
- *   Settings) and tabs (Workspaces / Members / Agents / Board). The Settings panel hosts the
- *   labelled+grouped edit form, the read-only metadata line, and the danger zone (leave / delete).
- *   Extracted from organisms-tab.js with no behaviour change.
+ * @description Organism home page in the poster face (design canvas "AIMEAT Organismin sivu",
+ *   direction A "Kansi ja sisällys"). One page that answers, in order: what is here (workspaces),
+ *   who is here (members, agents), what has happened (the latest changes), how to bring an AI in
+ *   (the instruction block), and only then how it is run (settings, a page of its own). A masthead
+ *   with the name, the chips and the description, a strip of four figures, the sections under ink
+ *   rules, and a sticky contents rail on the right that names each section with its count. The map
+ *   and the table of contents are one folded row (two views of the same structure), the README
+ *   another, and the AI instruction a third, opened by the hot slab in the masthead.
  * @structure OrganismHome
  * @usage import { OrganismHome } from '/views/profile/organisms/home.js';
  * @version-history
- *   v1.0.0 — 2026-06-19 — Extracted from organisms-tab.js during the module split.
- *   v1.1.0 — 2026-06-22 — Add the free-form README panel, the interactive structure mindmap, and the
- *     development timeline; rename the structure overview to "table of contents" (Osa A/C/D).
- *   v1.1.1 — 2026-06-23 — Mindmap space-node click now deep-links into the workspace on that space's
- *     tab (onOpenWs gained a second `space` arg); was opening the workspace overview.
- *   v1.2.0 — 2026-07-03 — Roster privacy: Settings → Access gains the "Member list" visibility
- *     select (member_visibility: signed-in default / members / admins / public) with an honest
- *     hint (hides the LIST, not content authorship); isMember now prefers `your_membership` from
- *     GET /:id since members[] can be roster-redacted for this caller.
- *   v1.3.0 — 2026-08-08 — Copy labels now resolve from the shared common.copy / common.copied / common.copyPrompt /
- *       common.copyLink / common.copyUrl keys; the per-view copy label keys this file used were
- *       removed from both locales. Same words on screen.
+ *   v3.0.0 — 2026-08-29 — The poster face. Before this the AI instruction block, the README, the map,
+ *     the table of contents and the timeline all stacked above the tabs (opened, the first workspace
+ *     ended 3 000 px down), settings replaced the tab content while the tabs stayed lit, and the
+ *     breadcrumb appeared twice. Settings moved to home-settings.js as a page; the timeline's latest
+ *     rows are a section and the full panel is a door; the tabs are sections with a rail.
+ *     (Earlier history: the tabbed home with the settings panel, the development timeline and the
+ *     table of contents; the member-visibility select; `your_membership` from GET /:id.)
  */
 import { h } from 'preact';
-import { useState, useEffect, useMemo, useRef } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
-import { t } from '/js/i18n.js';
-import { TagInput } from '/views/profile/shared.js';
+import { t, tOr } from '/js/i18n.js';
+import { useViewCSS } from '/components/useViewCSS.js';
 import { useConfirm } from '/components/Modal.js';
 import * as orgService from '/js/services/organisms.js';
-import { copyToClipboard } from '/js/utils.js';
 import { recordRecent } from '/js/recents.js';
-import { fmtDate, orgInitials, exportOrganismZip } from '/views/profile/organisms/helpers.js';
+import { fmtDate, exportOrganismZip } from '/views/profile/organisms/helpers.js';
 import { StructureOverview } from '/views/profile/organisms/widgets.js';
 import { ReadmePanel } from '/views/profile/organisms/readme-panel.js';
 import { StructureMindmap } from '/views/profile/organisms/mindmap.js';
-import { TimelinePanel } from '/views/profile/organisms/timeline-panel.js';
+import { TimelinePanel, TimelineRecent, loadTimelineRows } from '/views/profile/organisms/timeline-panel.js';
 import { WorkspaceList } from '/views/profile/organisms/workspace-list.js';
 import { OrgMemberManager } from '/views/profile/organisms/members.js';
 import { OrgAgentsPanel } from '/views/profile/organisms/agents.js';
 import { BoardPreview } from '/views/profile/organisms/panels.js';
 import { InstructionBlock } from '/views/profile/instruction-block.js';
+import { OrganismSettings } from '/views/profile/organisms/home-settings.js';
 import { swallowed } from '/js/swallowed.js';
 
-/* ───────────────── Organism home page ─────────────────
- * One home per organism: breadcrumb header (avatar, name, badges, description,
- * Export + Settings) and tabs — Workspaces (the workspace list + content search),
- * Members (invite/approve/roster/blocked), Agents (attach/detach), Board (link to
- * the Boards tab). The Settings panel hosts the edit form, the metadata that used
- * to live in the expanded list card, and the danger zone (leave / delete). */
+const tr = (key, fb) => t(key) || fb;
+const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+/** A section under an ink rule: the numbered headline, the doors on the right, the body. */
+function Section({ id, num, title, count, doors, first, children }) {
+  return html`
+    <section class=${`og-sec ${first ? 'og-sec--first' : ''}`} id=${id}>
+      <div class="og-sec-h">
+        <h2>${title}${count !== null && count !== undefined ? html`<small>${count}</small>` : html`<small>${num}</small>`}</h2>
+        ${doors ? html`<div class="og-doors">${doors}</div>` : null}
+      </div>
+      ${children}
+    </section>`;
+}
+
+/** A folded row that opens into its body: the map, the README, the AI instruction. */
+function Fold({ id, num, title, sub, open, onToggle, children }) {
+  return html`
+    <section class=${`og-sec og-fold-sec ${open ? 'is-open' : ''}`} id=${id}>
+      <button type="button" class="og-fold og-fold--toggle" aria-expanded=${open ? 'true' : 'false'} onClick=${onToggle}>
+        <i>${num}</i><span>${title}</span>${sub ? html`<span class="og-fold-r">${sub}</span>` : null}<span class="og-fold-arrow">${open ? '↓' : '→'}</span>
+      </button>
+      ${open ? html`<div class="og-fold-body">${children}</div>` : null}
+    </section>`;
+}
+
 export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, onBack, onChanged, onLeave }) {
+  useViewCSS('/css/views/organism.css');
   const { confirm, ConfirmUI } = useConfirm();
-  const [tab, setTab] = useState(() => { try { return sessionStorage.getItem('aimeat.org.tab') || 'workspaces'; } catch { return 'workspaces'; } });
-  const [showSettings, setShowSettings] = useState(!!initialSettings);
-  const [showInstr, setShowInstr] = useState(false);   // AI instruction block, folded until asked for
+  const [view, setView] = useState(initialSettings ? 'settings' : 'home');
   const [wsCount, setWsCount] = useState(null);
-  const [pendingJoin, setPendingJoin] = useState(0);   // Members tab pill — visible without opening the tab
-  useEffect(() => { try { sessionStorage.setItem('aimeat.org.tab', tab); } catch { /* noop */ } }, [tab]);   // eslint-disable-line aimeat/no-silent-catch -- noop
+  const [pendingJoin, setPendingJoin] = useState(0);
+  const [openReadme, setOpenReadme] = useState(false);
+  const [openMap, setOpenMap] = useState(false);
+  const [openAi, setOpenAi] = useState(false);
+  const [fullTimeline, setFullTimeline] = useState(false);
+  const [timeline, setTimeline] = useState(null);
 
   // Ownership is plural. `owners` is the truth; `creatorGhii` is the deprecated mirror of owners[0]
   // and is only read for an organism served by a node that predates the split.
   const isCreator = (org.owners?.length ? org.owners : [org.creatorGhii]).includes(ghii);
   const isAdmin = org.admins?.includes(ghii);
-  // members[] can be roster-redacted (memberVisibility) — your_membership from GET /:id is the
+  // members[] can be roster-redacted (memberVisibility): your_membership from GET /:id is the
   // caller-scoped truth, with the array as fallback for orgs whose roster this caller CAN see.
   const [yourMembership, setYourMembership] = useState(null);
   const isMember = (yourMembership?.status === 'active') || org.members?.includes(ghii);
   const canEdit = isCreator || isAdmin;
-  const typeLabel = t(`organisms.types.${org.type}`) || org.type;
+  // A preset type has a translation; a free-text one is shown as the person wrote it.
+  const typeLabel = tOr(`organisms.types.${org.type}`, org.type);
 
-  // README (free-form description), structure GRAPH (mindmap data), and the OKF table-of-contents
-  // markdown (seed for the AI-fill prompt). Loaded together and refreshed on live updates.
+  // README, the structure graph (the map's data), the table-of-contents seed for the README prompt,
+  // and the history rows. Loaded together and refreshed on live updates.
   const [readme, setReadme] = useState(org.readme || '');
   const [graph, setGraph] = useState(null);
   const [tocSeed, setTocSeed] = useState('');
   useEffect(() => {
     let cancelled = false;
     const loadExtras = async () => {
-      const [g, full, toc] = await Promise.all([
+      const [g, full, toc, rows] = await Promise.all([
         orgService.getOrganismGraph(org.id),
         orgService.getOrganism(org.id),
         orgService.getOrganismOverview(org.id),
+        loadTimelineRows(org.id).catch(err => { swallowed('home: timeline', err); return []; }),
       ]);
       if (cancelled) return;
       setGraph(g);
       setReadme(full?.data?.readme || '');
       setYourMembership(full?.data?.your_membership ?? null);
       setTocSeed(toc || '');
+      setTimeline(rows);
     };
     loadExtras();
     const off = onLiveUpdate(['organisms'], loadExtras);
@@ -101,10 +126,9 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
     showToast?.(t('readme.saved') || 'README saved', 'success');
   };
 
-  // Mindmap node click → navigate: a workspace node opens that workspace; a space node opens its
-  // workspace straight on that space's tab; a user node jumps to the Members tab.
+  // A map node opens what it names: a workspace, a space's tab in its workspace, or the members.
   const onMapNav = (target) => {
-    if (target?.type === 'members') { setShowSettings(false); setTab('members'); }
+    if (target?.type === 'members') scrollTo('og-members');
     else if (target?.wsId) onOpenWs(target.wsId, target.type === 'space' ? target.space : undefined);
   };
 
@@ -124,319 +148,125 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
     if (org.name) recordRecent({ type: 'organism', id: org.id, label: org.name, data: { orgId: org.id } });
   }, [org.id, org.name]);
 
-  /* ── Settings: labelled + grouped form (Identity / Access) with live dirty-check, a one-line
-   * read-only metadata row, per-choice access hints, and a clearly separated danger zone whose
-   * delete needs the organism's name typed and states exactly what gets removed. ── */
-  const baseline = useMemo(() => ({
-    name: org.name || '', description: org.description || '', type: org.type || 'community',
-    join_policy: org.joinPolicy || 'open', visibility: org.visibility || 'public',
-    member_visibility: org.memberVisibility || 'authenticated',
-    interests: [...(org.interests || [])],
-  }), [org]);
-  const [form, setForm] = useState(baseline);
-  const [saving, setSaving] = useState(false);
-  // Sync the form whenever fresher org data arrives (e.g. the home mounted from an F5 with only a
-  // {id} stub before the list loaded) — but ONLY while the user hasn't touched the fields, so a
-  // live-update reload never clobbers typing.
-  const prevBaselineRef = useRef(baseline);
-  useEffect(() => {
-    const prev = prevBaselineRef.current;
-    const untouched = form.name === prev.name && form.description === prev.description
-      && form.type === prev.type && form.join_policy === prev.join_policy
-      && form.visibility === prev.visibility && form.member_visibility === prev.member_visibility
-      && form.interests.join(' ') === prev.interests.join(' ');
-    if (untouched) setForm(baseline);
-    prevBaselineRef.current = baseline;
-    // Reconcile the form to fresher org data ONLY when a new baseline arrives — not on
-    // every keystroke. The form.* reads are an intentional untouched-check snapshot, so
-    // this effect deliberately keys on [baseline] alone.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseline]);
-  const dirty = form.name !== baseline.name || form.description !== baseline.description
-    || form.type !== baseline.type || form.join_policy !== baseline.join_policy
-    || form.visibility !== baseline.visibility
-    || form.member_visibility !== baseline.member_visibility
-    || form.interests.join(' ') !== baseline.interests.join(' ');
-  // Save doubles as the unsaved-changes indicator: enabled ⇔ something actually changed.
-  const saveEdit = async () => {
-    if (!form.name.trim()) { showToast(t('organisms.nameRequired') || 'Name is required'); return; }
-    setSaving(true);
-    try {
-      const result = await orgService.updateOrganism(org.id, {
-        name: form.name.trim(), description: form.description.trim(),
-        type: form.type, join_policy: form.join_policy, visibility: form.visibility,
-        member_visibility: form.member_visibility, interests: form.interests,
-      });
-      if (result?.ok !== false) { showToast(t('organisms.updated') || 'Organism updated'); onChanged?.(); }
-      else showToast(result?.error?.message || (t('organisms.updateError') || 'Failed to update'));
-    } catch (err) { swallowed('home', err); showToast(t('organisms.updateError') || 'Failed to update'); }
-    finally { setSaving(false); }
-  };
-  // Leaving a dirty form (closing settings / breadcrumb back) asks before dropping the changes.
-  const guardDirty = (fn) => {
-    if (showSettings && dirty) confirm(t('organisms.discardChanges') || 'Discard unsaved changes?', () => { setForm(baseline); fn(); }, { danger: true });
-    else fn();
-  };
+  if (view === 'settings') {
+    return html`
+      <${OrganismSettings} org=${org} ghii=${ghii} isCreator=${isCreator} isMember=${isMember} canEdit=${canEdit}
+        showToast=${showToast} confirm=${confirm} onBack=${() => setView('home')} onChanged=${onChanged}
+        onLeave=${onLeave} onDeleted=${() => { onBack(); onChanged?.(); }} />
+      <${ConfirmUI} />`;
+  }
 
-  const boardIdShort = org.boardId && org.boardId.length > 20
-    ? `${org.boardId.slice(0, 12)}…${org.boardId.slice(-6)}` : (org.boardId || '');
-  const copyBoardId = async () => {
-    const ok = await copyToClipboard(org.boardId);
-    showToast(ok ? (t('common.copied') || 'Copied') : (t('organisms.copyFailed') || 'Could not copy'));
-  };
-
-  // What a delete actually removes (counted from the accessible workspaces when settings opens).
-  const [delStats, setDelStats] = useState(null);   // { ws, recs, docs }
-  const [delOpen, setDelOpen] = useState(false);
-  const [delName, setDelName] = useState('');
-  useEffect(() => {
-    if (!showSettings || !isCreator) return undefined;
-    let cancelled = false;
-    (async () => {
-      try {
-        const wss = (await orgService.discoverWorkspaces(org.id)).filter(w => w.access !== 'none');
-        let recs = 0, docs = 0;
-        await Promise.all(wss.map(async (w) => {
-          const wsData = await orgService.getWorkspace(org.id, w.id).catch(err => { swallowed('home: wss', err); return null; });
-          for (const ot of (wsData?.manifest?.objectTypes || []).filter(orgService.isMemorySpace)) {
-            const n = new Set([...(wsData.drafts?.[ot.name] || []), ...(wsData.objects?.[ot.name] || [])].map(d => d.id)).size;
-            if (orgService.isDocSpace(ot)) docs += n; else recs += n;
-          }
-        }));
-        if (!cancelled) setDelStats({ ws: wss.length, recs, docs });
-      } catch (err) { swallowed('home: wss', err); }
-    })();
-    return () => { cancelled = true; };
-  }, [org.id, showSettings, isCreator]);
-  const delStatsText = delStats
-    ? (t('organisms.deleteOrganismStats') || 'Deletes {w} workspaces, {r} records and {d} documents. This cannot be undone.')
-        .replace('{w}', String(delStats.ws)).replace('{r}', String(delStats.recs)).replace('{d}', String(delStats.docs))
-    : (t('organisms.deleteWarnGeneric') || 'Deletes the organism with all its workspaces and content. This cannot be undone.');
-  const doDelete = () => {
-    confirm(`${(t('organisms.confirmDeleteName') || 'Delete “{name}”?').replace('{name}', org.name || org.id)} ${delStatsText}`, async () => {
-      try {
-        await orgService.deleteOrganism(org.id);
-        showToast(t('organisms.deleted') || 'Organism deleted');
-        onBack(); onChanged?.();
-      } catch (err) { swallowed('home', err); showToast(t('organisms.deleteError') || 'Failed to delete'); }
-    }, { danger: true, title: t('organisms.deleteOrganismTitle') || 'Delete this organism' });
-  };
-  // Archive / unarchive the whole organism (creator/admin) — read-only + hidden from AI materials,
-  // cascades to its workspaces, fully reversible (smart restore). Unlike delete, nothing is destroyed.
-  const doArchive = (archived) => {
-    confirm(
-      (archived
-        ? (t('organisms.confirmArchive') || 'Archive “{name}”? It becomes read-only and is hidden from AI operations until you unarchive it. Its workspaces are archived too.')
-        : (t('organisms.confirmUnarchive') || 'Unarchive “{name}”? It and the workspaces archived with it become active again.')
-      ).replace('{name}', org.name || org.id),
-      async () => {
-        try {
-          if (archived) await orgService.archiveContent(org.id, { level: 'organism' });
-          else await orgService.unarchiveContent(org.id, { level: 'organism' });
-          showToast(archived ? (t('organisms.organismArchived') || 'Organism archived') : (t('organisms.organismUnarchived') || 'Organism restored'));
-          onChanged?.();
-        } catch (e) { showToast((e && e.message) || 'Failed'); }
-      },
-      { title: archived ? (t('organisms.archive') || 'Archive') : (t('organisms.unarchive') || 'Unarchive') },
-    );
-  };
-
-  const extraAdmins = (org.admins || []).filter(a => a !== org.creatorGhii);
-  const visHint = t(`organisms.visHint.${form.visibility}`);
-  const policyHint = t(`organisms.policyHint.${form.join_policy}`);
-  const hintText = [visHint, policyHint].filter(h => h && !h.startsWith('organisms.')).join(' ');
-
-  const renderSettings = () => html`
-    <div class="card-detail pj-org-settings">
-      <div class="pj-meta-line">
-        ${org.createdAt ? html`<span>${t('organisms.createdAt') || 'Created'} ${fmtDate(org.createdAt)}</span>` : null}
-        <span>${t('organisms.creator') || 'Creator'} ${(org.creatorGhii || '-')}</span>
-        ${extraAdmins.length > 0 ? html`<span>${t('organisms.admins') || 'Admins'} ${(extraAdmins.join(', '))}</span>` : null}
-        ${org.boardId ? html`
-          <span>${t('organisms.board') || 'Board'} <span class="mono" title=${(org.boardId)}>${(boardIdShort)}</span>
-            <button class="pj-icon-btn" title=${t('organisms.copyId') || 'Copy ID'} onClick=${copyBoardId}>${'📋'}</button>
-          </span>` : null}
-      </div>
-
-      ${canEdit ? html`
-        <div class="pj-form-group">${t('organisms.formIdentity') || 'Identity'}</div>
-        <label class="pj-field"><span>${t('organisms.fieldName') || 'Name'}</span>
-          <input type="text" class="input-field input-sm" value=${form.name} onInput=${(e) => setForm(f => ({ ...f, name: e.target.value }))} /></label>
-        <label class="pj-field"><span>${t('organisms.fieldDescription') || 'Description'}</span>
-          <textarea class="input-field input-sm" rows="2" value=${form.description} onInput=${(e) => setForm(f => ({ ...f, description: e.target.value }))}></textarea></label>
-        <div class="pj-field"><span>${t('organisms.fieldInterests') || 'Interests'}</span>
-          <${TagInput} tags=${form.interests} onChange=${(tags) => setForm(f => ({ ...f, interests: tags }))} placeholder=${t('organisms.addTag') || 'Add…'} /></div>
-
-        <div class="pj-form-group">${t('organisms.formAccess') || 'Access'}</div>
-        <div class="pj-form-row">
-          <label class="pj-field"><span>${t('organisms.fieldType') || 'Type'}</span>
-            <select class="input-field input-sm" value=${form.type} onChange=${(e) => setForm(f => ({ ...f, type: e.target.value }))}>
-              <option value="community">${t('organisms.types.community') || 'Community'}</option>
-              <option value="team">${t('organisms.types.team') || 'Team'}</option>
-              <option value="club">${t('organisms.types.club') || 'Club'}</option>
-              <option value="cooperative">${t('organisms.types.cooperative') || 'Cooperative'}</option>
-              <option value="project">${t('organisms.types.project') || 'Project'}</option>
-            </select></label>
-          <label class="pj-field"><span>${t('organisms.policyLabel') || 'Join policy'}</span>
-            <select class="input-field input-sm" value=${form.join_policy} onChange=${(e) => setForm(f => ({ ...f, join_policy: e.target.value }))}>
-              <option value="open">${t('organisms.policyOpen') || 'Open (anyone can join)'}</option>
-              <option value="approval_required">${t('organisms.policyApproval') || 'Approval required'}</option>
-              <option value="invite_only">${t('organisms.policyInvite') || 'Invite only'}</option>
-            </select></label>
-          <label class="pj-field"><span>${t('organisms.fieldVisibility') || 'Visibility'}</span>
-            <select class="input-field input-sm" value=${form.visibility} onChange=${(e) => setForm(f => ({ ...f, visibility: e.target.value }))}>
-              <option value="public">${t('organisms.visPublic') || 'Public'}</option>
-              <option value="listed">${t('organisms.visListed') || 'Listed'}</option>
-              <option value="private">${t('organisms.visPrivate') || 'Private'}</option>
-            </select></label>
-          <label class="pj-field"><span>${t('organisms.memberVisLabel') || 'Member list'}</span>
-            <select class="input-field input-sm" value=${form.member_visibility} onChange=${(e) => setForm(f => ({ ...f, member_visibility: e.target.value }))}>
-              <option value="authenticated">${t('organisms.memberVis.authenticated') || 'Signed-in users'}</option>
-              <option value="members">${t('organisms.memberVis.members') || 'Members only'}</option>
-              <option value="admins">${t('organisms.memberVis.admins') || 'Admins only'}</option>
-              <option value="public">${t('organisms.memberVis.public') || 'Public (anyone)'}</option>
-            </select></label>
-        </div>
-        ${hintText ? html`<div class="pj-form-hint">${hintText}</div>` : null}
-        <div class="pj-form-hint">${t('organisms.memberVisHint') || 'Who can see who belongs here. Hides the member LIST only — content authorship (comments, records, activity) stays visible, and the creator/admins are always shown.'}</div>
-
-        <div class="form-actions">
-          <button class="btn-primary btn-sm" onClick=${saveEdit} disabled=${saving || !dirty || !form.name.trim()}>
-            ${saving ? '...' : (t('organisms.saveChanges') || 'Save changes')}</button>
-          <button class="btn-ghost btn-sm" onClick=${() => { setForm(baseline); setShowSettings(false); }}>${t('organisms.cancel') || 'Cancel'}</button>
-        </div>
-      ` : null}
-    </div>
-
-    ${canEdit ? html`
-      <div class="pj-danger-box">
-        <div class="pj-danger-row">
-          <div class="pj-danger-text">
-            <div class="pj-danger-title">${org.archived ? (t('organisms.unarchiveOrganismTitle') || 'Unarchive this organism') : (t('organisms.archiveOrganismTitle') || 'Archive this organism')}</div>
-            <div class="pj-danger-sub">${org.archived
-              ? (t('organisms.unarchiveOrganismSub') || 'Make it active again. Workspaces archived together with it are restored.')
-              : (t('organisms.archiveOrganismSub') || 'Make it read-only and hide it (and its workspaces) from AI operations. Reversible — nothing is deleted.')}</div>
-          </div>
-          <button class="btn-outline btn-sm" onClick=${() => doArchive(!org.archived)}>${org.archived ? `♻️ ${t('organisms.unarchive') || 'Unarchive'}` : `🗄️ ${t('organisms.archive') || 'Archive'}`}</button>
-        </div>
-      </div>` : null}
-
-    ${(isCreator || isMember) ? html`
-      <div class="pj-danger pj-danger-box">
-        ${isCreator ? html`
-          <div class="pj-danger-row">
-            <div class="pj-danger-text">
-              <div class="pj-danger-title">${t('organisms.deleteOrganismTitle') || 'Delete this organism'}</div>
-              <div class="pj-danger-sub">${delStatsText}</div>
-            </div>
-            <button class="btn-danger btn-sm" onClick=${() => { setDelOpen(o => !o); setDelName(''); }}>${t('organisms.deleteDots') || 'Delete…'}</button>
-          </div>
-          ${delOpen ? html`
-            <div class="pj-danger-confirm">
-              <label class="pj-field"><span>${(t('organisms.confirmTypeName') || 'Type the organism’s name to confirm') + ': ' + (org.name || '')}</span>
-                <input type="text" class="input-field input-sm" value=${delName} onInput=${(e) => setDelName(e.target.value)} placeholder=${org.name || ''} /></label>
-              <button class="btn-danger btn-sm" disabled=${delName.trim() !== (org.name || '').trim()} onClick=${doDelete}>${t('organisms.delete') || 'Delete'}</button>
-            </div>` : null}
-        ` : null}
-        ${isMember && !isCreator ? html`
-          <div class="pj-danger-row">
-            <div class="pj-danger-text">
-              <div class="pj-danger-title">${t('organisms.leave') || 'Leave'}</div>
-            </div>
-            <button class="btn-danger btn-sm" onClick=${onLeave}>${t('organisms.leave') || 'Leave'}</button>
-          </div>` : null}
-      </div>` : null}
-  `;
-
-  const reqPill = pendingJoin > 0
-    ? (pendingJoin === 1 ? (t('organisms.reqOne') || '1 request') : (t('organisms.reqMany') || '{n} requests').replace('{n}', String(pendingJoin)))
-    : null;
-  const tabs = [
-    { id: 'workspaces', label: t('organisms.tabWorkspaces') || 'Workspaces', count: wsCount },
-    { id: 'members', label: t('organisms.tabMembers') || 'Members', count: (org.members || []).length, pill: reqPill },
-    { id: 'agents', label: t('organisms.tabAgents') || 'Agents', count: (org.agentGaiis || []).length },
-    { id: 'board', label: t('organisms.tabBoard') || 'Board', count: null },
+  const reqText = pendingJoin > 0
+    ? (pendingJoin === 1 ? tr('organisms.reqOne', '1 request') : tr('organisms.reqMany', '{n} requests').replace('{n}', String(pendingJoin)))
+    : '';
+  const last = timeline && timeline[0];
+  const memberCount = (org.members || []).length;
+  const agentCount = (org.agentGaiis || []).length;
+  const openAiSection = () => { setOpenAi(true); setTimeout(() => scrollTo('og-ai'), 30); };
+  const readmeTitle = (readme.match(/^#\s+(.+)$/m) || [])[1] || '';
+  const rail = [
+    ['og-workspaces', '01', tr('organisms.tabWorkspaces', 'Workspaces'), wsCount ?? ''],
+    ['og-members', '02', tr('organisms.tabMembers', 'Members'), memberCount],
+    ['og-agents', '03', tr('organisms.tabAgents', 'Agents'), agentCount],
+    ['og-board', '04', tr('organisms.tabBoard', 'Board'), '·'],
+    ['og-history', '05', tr('organisms.happened', 'What has happened'), timeline ? timeline.length : ''],
+    ['og-readme', '06', tr('organisms.readmeFold', 'README'), '→'],
+    ['og-map', '07', tr('organisms.mapAndToc', 'Map and table of contents'), '→'],
+    ['og-ai', '08', tr('organisms.forAi', 'For your AI'), '→'],
   ];
 
-  // Settings REPLACES the tab content — while it is open no tab is highlighted (a lit tab above
-  // settings content lies about what the user is looking at), and the breadcrumb says so.
-  const activeHomeTab = showSettings ? '' : tab;
-  const pickHomeTab = (id) => guardDirty(() => { setShowSettings(false); setTab(id); });
-
   return html`
-    <div class="pj-ws">
-      <div class="pj-org-breadcrumb">
-        <button class="pj-org-crumb-link" onClick=${() => guardDirty(onBack)}>${t('organisms.title') || 'Organisms'}</button>
-        <span class="pj-org-crumb-sep">/</span>
-        ${showSettings ? html`
-          <button class="pj-org-crumb-link" onClick=${() => guardDirty(() => setShowSettings(false))}>${(org.name || org.id)}</button>
-          <span class="pj-org-crumb-sep">/</span>
-          <span>${t('organisms.settings') || 'Settings'}</span>
-        ` : html`<span>${(org.name || org.id)}</span>`}
+    <div class="og">
+      <div class="og-crumb">
+        <button type="button" class="og-crumb-link" onClick=${onBack}>${tr('organisms.title', 'Organisms')}</button>
+        <span>/</span>
+        <span class="og-crumb-here">${org.name || org.id}</span>
       </div>
 
-      <div class="pj-org-home-head">
-        <div class="pj-org-avatar pj-org-avatar-lg" aria-hidden="true">${orgInitials(org.name)}</div>
-        <div class="pj-org-home-title">
-          <div class="pj-org-titlerow">
-            <span class="pj-org-home-name">${(org.name || org.id)}</span>
-            <span class="badge badge-info">${typeLabel}</span>
-            <span class="badge ${org.visibility === 'public' ? 'badge-success' : 'badge-warn'}">${org.visibility || ''}</span>
+      <div class="og-mast">
+        <div class="og-mast-words">
+          <h1 class="og-title">${org.name || org.id}</h1>
+          <div class="og-chips">
+            <span class="og-chip">${typeLabel}</span>
+            <span class="og-chip">${t(`organisms.vis${(org.visibility || 'public')[0].toUpperCase()}${(org.visibility || 'public').slice(1)}`) || org.visibility}</span>
+            ${org.joinPolicy ? html`<span class="og-chip og-chip--dim">${t(`organisms.policyShort.${org.joinPolicy}`) || org.joinPolicy}</span>` : null}
+            ${org.createdAt ? html`<span class="og-chip og-chip--dim">${tr('organisms.createdAt', 'Created')} ${fmtDate(org.createdAt)}</span>` : null}
+            ${org.archived ? html`<span class="og-chip og-chip--sun">${tr('organisms.archived', 'Archived')}</span>` : null}
           </div>
-          ${org.description ? html`<div class="section-desc pj-org-home-desc">${(org.description)}</div>` : null}
+          ${org.description ? html`<p class="og-desc">${org.description}</p>` : null}
         </div>
-        <div class="pj-org-home-actions">
-          <button class="btn-outline btn-sm ${showInstr ? 'pj-org-btn-active' : ''}"
-            title=${t('organisms.instrBlockHint') || 'A ready block for your AI chat instructions, generated from this organism’s real structure'}
-            onClick=${() => setShowInstr(s => !s)}>${t('organisms.instrBlockBtn') || 'AI instructions'}</button>
-          <button class="btn-outline btn-sm" title=${t('organisms.exportOrgHint') || 'Download a ZIP backup of the whole organism (all workspaces)'}
-            onClick=${() => exportOrganismZip(org, showToast)}>${'⬇ '}${t('organisms.exportOrg') || 'Export'}</button>
-          <button class="btn-outline btn-sm ${showSettings ? 'pj-org-btn-active' : ''}" onClick=${() => guardDirty(() => setShowSettings(s => !s))}>${'⚙ '}${t('organisms.settings') || 'Settings'}</button>
+        <div class="og-mast-actions">
+          <button type="button" class="og-slab" onClick=${openAiSection}>${tr('organisms.forAi', 'For your AI')}</button>
+          <div class="og-doors">
+            <button type="button" class="og-door" onClick=${() => setView('settings')}>${tr('organisms.settings', 'Settings')}</button>
+            <button type="button" class="og-door og-door--quiet" onClick=${() => exportOrganismZip(org, showToast)}>${tr('organisms.exportBackup', 'Export backup')}</button>
+          </div>
         </div>
       </div>
 
-      ${showInstr ? html`
-        <div class="pj-org-instr">
-          <div class="pj-org-instr-lead">${t('organisms.instrBlockLead')
-            || 'Paste this into your AI’s instructions and every conversation starts already knowing this organism’s structure. Less re-explaining, fewer tokens spent re-sending the same context, and your agents write into the same places so they can build on each other’s work.'}</div>
-          <${InstructionBlock} orgId=${org.id} />
-        </div>` : null}
-
-      <${ReadmePanel} markdown=${readme} canEdit=${canEdit} kind="organism" name=${org.name}
-        aiPromptSeed=${tocSeed} onSave=${saveReadme} />
-
-      <${StructureMindmap} scope="organism" graph=${graph} onNavigate=${onMapNav} storageKey=${'org.' + org.id} />
-
-      <${StructureOverview} label=${t('organisms.structureOverviewOrg') || 'Organism structure — table of contents'}
-        load=${() => orgService.getOrganismOverview(org.id)} />
-
-      <${TimelinePanel} orgId=${org.id} />
-
-      <div class="pj-org-tabs" role="tablist">
-        ${tabs.map(tb => html`
-          <button class="pj-org-tab ${activeHomeTab === tb.id ? 'active' : ''}" role="tab" aria-selected=${activeHomeTab === tb.id} key=${tb.id}
-            onClick=${() => pickHomeTab(tb.id)}>
-            ${tb.label}${tb.count !== null && tb.count !== undefined ? html`<span class="pj-org-tab-count">${tb.count}</span>` : null}
-            ${tb.pill ? html`<span class="pj-tab-pill">${tb.pill}</span>` : null}
-          </button>`)}
+      <div class="og-strip">
+        <div><b>${wsCount ?? '·'}</b><span>${tr('organisms.figWorkspaces', 'workspaces')}</span></div>
+        <div><b>${memberCount}</b><span>${tr('organisms.figMembers', 'members')}</span>${reqText ? html`<small>${reqText}</small>` : null}</div>
+        <div><b>${agentCount}</b><span>${tr('organisms.figAgents', 'agents')}</span></div>
+        <div><b class=${last ? 'og-strip-coral' : ''}>${last ? (last.isCurrent ? tr('timeline.now', 'now') : String(last.at).slice(0, 10)) : '·'}</b><span>${tr('organisms.figLast', 'last change')}</span>${last ? html`<small>${last.event}</small>` : null}</div>
       </div>
 
-      ${showSettings ? renderSettings() : null}
+      <div class="og-grid">
+        <div class="og-main">
+          <${Section} id="og-workspaces" num="01" first=${true} title=${tr('organisms.tabWorkspaces', 'Workspaces')} count=${wsCount}>
+            <${WorkspaceList} org=${org} showToast=${showToast} onOpen=${onOpenWs} onCount=${setWsCount} />
+            <p class="og-hint">${tr('organisms.workspacesDesc', 'Each workspace is an independent space with its own documents, records and history.')}</p>
+          <//>
 
-      ${activeHomeTab === 'workspaces' ? html`
-        <${WorkspaceList} org=${org} showToast=${showToast} onOpen=${onOpenWs} onCount=${setWsCount} />
-      ` : null}
+          <${Section} id="og-members" num="02" title=${tr('organisms.tabMembers', 'Members')} count=${memberCount}>
+            <${OrgMemberManager} org=${org} ghii=${ghii} canManage=${canEdit} isCreator=${isCreator}
+              showToast=${showToast} confirm=${confirm} onChanged=${onChanged} show="members" />
+          <//>
 
-      ${activeHomeTab === 'members' ? html`
-        <${OrgMemberManager} org=${org} ghii=${ghii} canManage=${canEdit} isCreator=${isCreator}
-          showToast=${showToast} confirm=${confirm} onChanged=${onChanged} show="members" />` : null}
+          <${Section} id="og-agents" num="03" title=${tr('organisms.tabAgents', 'Agents')} count=${agentCount}>
+            <${OrgAgentsPanel} org=${org} ghii=${ghii} canManage=${canEdit} showToast=${showToast} onChanged=${onChanged} />
+          <//>
 
-      ${activeHomeTab === 'agents' ? html`
-        <${OrgAgentsPanel} org=${org} ghii=${ghii} canManage=${canEdit} showToast=${showToast} onChanged=${onChanged} />` : null}
+          <${Section} id="og-board" num="04" title=${tr('organisms.tabBoard', 'Board')}>
+            ${org.boardId
+              ? html`<${BoardPreview} boardId=${org.boardId} showToast=${showToast} />`
+              : html`<p class="og-hint">${tr('organisms.noBoard', 'This organism has no board.')}</p>`}
+          <//>
 
-      ${activeHomeTab === 'board' ? (org.boardId
-        ? html`<${BoardPreview} boardId=${org.boardId} showToast=${showToast} />`
-        : html`<div class="card-detail"><div class="section-desc">${t('organisms.noBoard') || 'This organism has no board.'}</div></div>`) : null}
+          <${Section} id="og-history" num="05" title=${tr('organisms.happened', 'What has happened')} count=${timeline ? timeline.length : null}
+            doors=${fullTimeline ? null : html`<button type="button" class="og-door og-door--quiet" onClick=${() => setFullTimeline(true)}>${tr('organisms.fullTimeline', 'Full timeline →')}</button>`}>
+            ${fullTimeline ? html`<${TimelinePanel} orgId=${org.id} defaultOpen=${true} />` : html`<${TimelineRecent} rows=${timeline} limit=${5} />`}
+          <//>
+
+          <${Fold} id="og-readme" num="06" title=${tr('organisms.readmeFold', 'README')} sub=${readmeTitle} open=${openReadme} onToggle=${() => setOpenReadme(o => !o)}>
+            ${readme || canEdit
+              ? html`<${ReadmePanel} markdown=${readme} canEdit=${canEdit} kind="organism" name=${org.name} aiPromptSeed=${tocSeed} onSave=${saveReadme} />`
+              : html`<p class="og-hint">${tr('organisms.readmeEmpty', 'No README yet.')}</p>`}
+          <//>
+
+          <${Fold} id="og-map" num="07" title=${tr('organisms.mapAndToc', 'Map and table of contents')} open=${openMap} onToggle=${() => setOpenMap(o => !o)}>
+            <p class="og-hint">${tr('organisms.mapAndTocHint', 'The same structure two ways.')}</p>
+            <${StructureMindmap} scope="organism" graph=${graph} onNavigate=${onMapNav} storageKey=${'org.' + org.id} defaultOpen />
+            <${StructureOverview} label=${tr('organisms.structureOverviewOrg', 'Organism structure — table of contents')}
+              load=${() => orgService.getOrganismOverview(org.id)} defaultOpen />
+          <//>
+
+          <${Fold} id="og-ai" num="08" title=${tr('organisms.forAiTitle', 'Bring your AI here')} sub=${tr('organisms.forAiHint', '')} open=${openAi} onToggle=${() => setOpenAi(o => !o)}>
+            <p class="og-lead">${tr('organisms.instrBlockLead', 'Paste this into your AI’s instructions and every conversation starts already knowing this organism’s structure.')}</p>
+            <${InstructionBlock} orgId=${org.id} />
+          <//>
+        </div>
+
+        <nav class="og-rail" aria-label=${tr('organisms.railTitle', 'In this organism')}>
+          <span class="og-rail-label">${tr('organisms.railTitle', 'In this organism')}</span>
+          ${rail.map(([id, num, label, count]) => html`
+            <a class="og-rail-link" key=${id} href=${'#' + id} onClick=${(e) => { e.preventDefault(); if (id === 'og-readme') setOpenReadme(true); if (id === 'og-map') setOpenMap(true); if (id === 'og-ai') setOpenAi(true); setTimeout(() => scrollTo(id), 30); }}>
+              <i>${num}</i>${label}<em>${count}</em>
+            </a>`)}
+          <hr />
+          <button type="button" class="og-rail-link" onClick=${() => setView('settings')}><i>09</i>${tr('organisms.settings', 'Settings')}<em>→</em></button>
+        </nav>
+      </div>
 
       <${ConfirmUI} />
     </div>`;

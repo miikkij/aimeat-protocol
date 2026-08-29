@@ -11,6 +11,7 @@
  *   import { registerOrganismsTools } from './organisms.js';
  *   registerOrganismsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.8.1 — 2026-08-29 — aimeat_organism_create's `type` is described as free text with five presets.
  *   v1.8.0 — 2026-08-11 — create/update/join/leave call services/organism-lifecycle.ts, the same
  *     writer the REST routes use (August 2026 MCP audit step 8). The tools keep their gates and their
  *     text; four side effects the copies disagreed on now happen on both surfaces: the join-request
@@ -521,7 +522,7 @@ export function registerOrganismsTools(
         {
             name: z.string().describe('Organism name (min 2 chars)'),
             description: z.string().optional(),
-            type: z.string().optional().describe('community | team | club | cooperative | project'),
+            type: z.string().optional().describe('What kind of group, in your own word (1 to 40 characters). Presets with a translation: community | team | club | cooperative | project'),
             join_policy: z.string().optional().describe('open | approval_required | invite_only'),
             visibility: z.string().optional().describe('public | listed | private'),
         },

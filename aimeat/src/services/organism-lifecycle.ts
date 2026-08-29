@@ -28,6 +28,8 @@
  *   const r = await createOrganismRecord({ storage, config }, ownerName, { name, visibility });
  *   if (!r.ok) { res.status(r.status).json(error(config.nodeId, r.code, r.message)); return; }
  * @version-history
+ *   v1.1.0 — 2026-08-29 — The type is free text (1 to 40 characters, trimmed) on create and update; the
+ *     five names that used to be the whole list are presets the settings offer with a translation.
  *   v1.0.0 — 2026-08-11 — Initial: extracted from routes/organisms/crud.ts + mcp/organisms.ts
  *     (August 2026 MCP audit step 8). Collapses four differences between the copies: the board owner
  *     (now always the creator's GHII), the join-request notifications and the change-bus emits (were
@@ -64,7 +66,10 @@ function refuse(status: number, code: string, message: string): OrganismRefusal 
   return { ok: false, status, code, message };
 }
 
+// The five presets the settings offer; a type is free text since 2026-08-29, and these only name
+// the choices that come with a translation.
 const ORGANISM_TYPES: OrganismRecord['type'][] = ['community', 'team', 'club', 'cooperative', 'project'];
+const ORGANISM_TYPE_MAX = 40;
 const JOIN_POLICIES: OrganismRecord['joinPolicy'][] = ['open', 'approval_required', 'invite_only'];
 const VISIBILITIES: OrganismRecord['visibility'][] = ['public', 'listed', 'private'];
 
@@ -103,7 +108,9 @@ export async function createOrganismRecord(
   if (name.length < 2) return refuse(400, 'INVALID_INPUT', 'Name is required (min 2 characters)');
 
   const description = typeof input.description === 'string' ? input.description : '';
-  const type = pickEnum(ORGANISM_TYPES, input.type, 'community');
+  // The type is the owner's own word (the five presets are suggestions the UI translates); empty
+  // means the first preset, and anything longer than a label is cut to one.
+  const type = typeof input.type === 'string' && input.type.trim() ? input.type.trim().slice(0, ORGANISM_TYPE_MAX) : 'community';
   const joinPolicy = pickEnum(JOIN_POLICIES, input.joinPolicy, 'open');
   const visibility = pickEnum(VISIBILITIES, input.visibility, 'public');
   // Roster privacy tier; unset = 'authenticated' (see services/organism-privacy.ts).
@@ -226,10 +233,11 @@ export async function updateOrganismRecord(
     updates.description = input.description;
   }
   if (input.type !== undefined) {
-    if (!ORGANISM_TYPES.includes(input.type as OrganismRecord['type'])) {
-      return refuse(400, 'INVALID_INPUT', `type must be one of: ${ORGANISM_TYPES.join(', ')}`);
+    const type = typeof input.type === 'string' ? input.type.trim() : '';
+    if (!type || type.length > ORGANISM_TYPE_MAX) {
+      return refuse(400, 'INVALID_INPUT', `type must be a word of 1 to ${ORGANISM_TYPE_MAX} characters (the presets are ${ORGANISM_TYPES.join(', ')})`);
     }
-    updates.type = input.type as OrganismRecord['type'];
+    updates.type = type;
   }
   if (input.location !== undefined) {
     if (typeof input.location !== 'object' || input.location === null || Array.isArray(input.location)) {

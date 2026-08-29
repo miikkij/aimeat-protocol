@@ -13,9 +13,12 @@
  *   v1.0.0 — 2026-06-22 — Initial: structure timeline view over trackable-memory history (Osa D3).
  *   v1.1.0 — 2026-06-22 — Add a Mermaid `timeline` diagram of the changes; the selected-snapshot map
  *     honours the chart type the user picked for this organism's mindmap (localStorage).
+ *   v1.2.0 — 2026-08-29 — loadTimelineRows() and TimelineRecent (the latest few changes as plain rows) for
+ *     the organism home's "what has happened" section; the panel takes `defaultOpen` so the home's
+ *     "full timeline" door opens it already loaded and without its own toggle. The toggle lost its emoji.
  */
 import { h } from 'preact';
-import { useState } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
@@ -69,8 +72,36 @@ function buildTimelineDiagram(rows) {
   return lines.join('\n');
 }
 
-export function TimelinePanel({ orgId }) {
-  const [open, setOpen] = useState(false);
+/** The history as rows, newest first, the current shape marked. Shared by the panel and the
+ *  organism home's "what has happened" list, so both read one fetch's worth of truth. */
+export async function loadTimelineRows(orgId) {
+  const { current, history } = await getStructureHistory(orgId);
+  const all = [];
+  if (current) all.push({ ...row({ version: current.version, value: current.value, recordedAt: current.recordedAt }), isCurrent: true });
+  for (const e of (history || [])) all.push(row(e));
+  return all;
+}
+
+/** The latest few changes as plain rows: date, what changed, the shape's counts. */
+export function TimelineRecent({ rows, limit = 5 }) {
+  const list = (rows || []).slice(0, limit);
+  if (!list.length) return html`<p class="og-hint">${t('timeline.empty') || 'No structural history yet.'}</p>`;
+  return html`
+    <div class="og-folds">
+      ${list.map(r => {
+        const tt = totals(r.fingerprint);
+        return html`
+          <div class="og-fold" key=${r.fingerprint + r.at}>
+            <i>${r.isCurrent ? (t('timeline.now') || 'now') : String(r.at).slice(0, 10)}</i>
+            <span>${r.event}</span>
+            ${tt ? html`<span class="og-fold-r">${tt.workspaces} ws · ${tt.documents}d · ${tt.records}r · ${tt.members}</span>` : null}
+          </div>`;
+      })}
+    </div>`;
+}
+
+export function TimelinePanel({ orgId, defaultOpen = false }) {
+  const [open, setOpen] = useState(defaultOpen);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [rows, setRows] = useState([]);
@@ -79,15 +110,14 @@ export function TimelinePanel({ orgId }) {
   const load = async () => {
     setBusy(true);
     try {
-      const { current, history } = await getStructureHistory(orgId);
-      const all = [];
-      if (current) all.push({ ...row({ version: current.version, value: current.value, recordedAt: current.recordedAt }), isCurrent: true });
-      for (const e of (history || [])) all.push(row(e));
+      const all = await loadTimelineRows(orgId);
       setRows(all);
       setSelected(all[0]?.fingerprint || null);
       setLoaded(true);
     } finally { setBusy(false); }
   };
+  // Opened by its parent (the home's "full timeline" door), the panel loads at once.
+  useEffect(() => { if (defaultOpen && !loaded && !busy) load(); }, []);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggle = async () => {
     const next = !open;
@@ -97,10 +127,10 @@ export function TimelinePanel({ orgId }) {
 
   return html`
     <div class="pj-timeline">
-      <button class="pj-struct-toggle" aria-expanded=${open} onClick=${toggle}>
+      ${defaultOpen ? null : html`<button class="pj-struct-toggle" aria-expanded=${open} onClick=${toggle}>
         <span class="pj-struct-caret">${open ? '▾' : '▸'}</span>
-        <span>${'📈 '}${t('timeline.title') || 'Development timeline'}</span>
-      </button>
+        <span>${t('timeline.title') || 'Development timeline'}</span>
+      </button>`}
       ${open ? html`
         <div class="pj-timeline-body card-detail">
           ${busy ? html`<${Spinner} text=${t('organisms.loading') || 'Loading...'} />`

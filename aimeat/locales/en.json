@@ -5036,6 +5036,39 @@
   "organisms": {
     "title": "Organisms",
     "backToList": "All organisms",
+    "railTitle": "In this organism",
+    "figWorkspaces": "workspaces",
+    "figMembers": "members",
+    "figAgents": "agents",
+    "figLast": "last change",
+    "noAgentsYet": "None yet",
+    "happened": "What has happened",
+    "fullTimeline": "Full timeline →",
+    "mapAndToc": "Map and table of contents",
+    "mapAndTocHint": "The same structure two ways, opened only when asked for: a drawing you can click into, and a table row by row.",
+    "forAi": "For your AI",
+    "forAiTitle": "Bring your AI here",
+    "forAiHint": "One instruction, made from this organism's real structure",
+    "exportBackup": "Export backup",
+    "readmeFold": "README",
+    "readmeEmpty": "No README yet: a page that says what this organism is about, written by you or your agent.",
+    "policyShort": {
+      "open": "open",
+      "approval_required": "by approval",
+      "invite_only": "invite only"
+    },
+    "setNameDesc": "Name and description",
+    "setAccess": "Who gets in",
+    "setVisibility": "Who sees",
+    "setDanger": "Archive and delete",
+    "setJoin": "Joining",
+    "setOrganismVis": "Organism",
+    "savesNote": "Changes apply at once; an agent sees them on its next connection.",
+    "reversible": "Reversible",
+    "irreversible": "Cannot be undone",
+    "backToOrganism": "Back to the organism",
+    "typeCustom": "Other",
+    "typeCustomPlaceholder": "Your own word, e.g. band, family, guild",
     "noWorkspace": "The workspace is created, but it is still empty. Give it a structure: the one-click project template covers goals, plans, deliverables and decisions, or describe below what this workspace is for and an AI designs the structure.",
     "setupWorkspace": "Set up workspace",
     "workspaceReady": "Workspace ready",
@@ -6568,7 +6601,8 @@
           "organism": {
             "read": "Read the published content of the shared spaces you belong to.",
             "write": "Create shared spaces, write and publish documents in them, and comment.",
-            "invite": "Let other people in: invite members and hand out access to a shared space."
+            "invite": "Let other people in: invite members and hand out access to a shared space.",
+        "rows": "Add to, and read back, the event logs of a shared space that has been opened to this app or agent by name. Nothing else in the space opens."
           },
           "outbound": {
             "send": "Send email from your company address to your saved contacts."

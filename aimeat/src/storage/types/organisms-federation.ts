@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Organism, federation/peering, notification, extension, scheduler, cortex, and knowledge record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-08-29 — OrganismRecord.type is a string: the owner's own word, with five presets the
+ *     settings translate; it was a five-value union.
  *   v1.2.0 — 2026-08-01 — KnowledgeSynthesisLevel now aliases AiProvenanceLevel rather than
  *     re-spelling the four strings (TARGET-058: one definition of the vocabulary).
  *   v1.1.0 — 2026-07-25 — Extension action commercial gains `provenance` + `odps` (ODPS v4.0 adoption,
@@ -36,7 +38,10 @@ export interface OrganismRecord {
   id: string;
   name: string;
   description: string;
-  type: 'community' | 'team' | 'club' | 'cooperative' | 'project';
+  /** What kind of group this is, in the owner's own words (1 to 40 characters). Five presets are
+   *  offered in the settings and translated on screen (community, team, club, cooperative,
+   *  project); any other word is kept as written (2026-08-29, free-text types). */
+  type: string;
   location?: {
     city?: string;
     area?: string;

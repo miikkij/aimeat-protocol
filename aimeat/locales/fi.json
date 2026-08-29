@@ -5024,6 +5024,39 @@
   "organisms": {
     "title": "Organismit",
     "backToList": "Kaikki organismit",
+    "railTitle": "Tässä organismissa",
+    "figWorkspaces": "työtilaa",
+    "figMembers": "jäsentä",
+    "figAgents": "agenttia",
+    "figLast": "viimeksi",
+    "noAgentsYet": "Ei vielä yhtään",
+    "happened": "Mitä on tapahtunut",
+    "fullTimeline": "Koko aikajana →",
+    "mapAndToc": "Kartta ja sisällysluettelo",
+    "mapAndTocHint": "Sama rakenne kahdella tavalla, avataan vain pyydettäessä: piirros, jonka kohtia voi klikata, ja taulukko rivi riviltä.",
+    "forAi": "Tekoälylle",
+    "forAiTitle": "Tuo tekoälysi tänne",
+    "forAiHint": "Yksi ohje, joka tehdään tämän organismin oikeasta rakenteesta",
+    "exportBackup": "Vie varmuuskopio",
+    "readmeFold": "README",
+    "readmeEmpty": "Ei vielä README:tä: sivu, joka kertoo, mistä tässä organismissa on kyse, sinun tai agenttisi kirjoittamana.",
+    "policyShort": {
+      "open": "avoin",
+      "approval_required": "hyväksynnällä",
+      "invite_only": "vain kutsulla"
+    },
+    "setNameDesc": "Nimi ja kuvaus",
+    "setAccess": "Kuka pääsee",
+    "setVisibility": "Kuka näkee",
+    "setDanger": "Arkistointi ja poisto",
+    "setJoin": "Liittyminen",
+    "setOrganismVis": "Organismi",
+    "savesNote": "Muutokset tulevat voimaan heti, agentille sen seuraavassa yhteydessä.",
+    "reversible": "Palautettavissa",
+    "irreversible": "Ei peruttavissa",
+    "backToOrganism": "Takaisin organismiin",
+    "typeCustom": "Muu",
+    "typeCustomPlaceholder": "Oma sana, esim. bändi, perhe, kilta",
     "noWorkspace": "Työtila on luotu, mutta se on vielä tyhjä. Anna sille rakenne: yhden klikkauksen projektipohja kattaa tavoitteet, suunnitelmat, tuotokset ja päätökset, tai kuvaile alle mihin tämä työtila on, niin tekoäly suunnittelee rakenteen.",
     "setupWorkspace": "Luo työtila",
     "workspaceReady": "Työtila valmis",
@@ -6556,7 +6589,8 @@
           "organism": {
             "read": "Lue niiden jaettujen tilojen julkaistu sisältö joihin kuulut.",
             "write": "Luo jaettuja tiloja, kirjoita ja julkaise niissä dokumentteja sekä kommentoi.",
-            "invite": "Päästä muita mukaan: kutsu jäseniä ja jaa pääsy jaettuun tilaan."
+            "invite": "Päästä muita mukaan: kutsu jäseniä ja jaa pääsy jaettuun tilaan.",
+        "rows": "Lisää rivejä jaetun tilan tapahtumalokiin ja lue niitä takaisin, kun tila on avattu tälle apille tai agentille nimeltä. Mikään muu tilassa ei avaudu."
           },
           "outbound": {
             "send": "Lähetä sähköpostia yrityksesi osoitteesta tallennetuille yhteystiedoillesi."

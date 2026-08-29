@@ -19,6 +19,9 @@
  *   import OrganismsTab from '/views/profile/organisms-tab.js';
  *   <OrganismsTab session={session} showToast={showToast} onStats={onStats} />
  * @version-history
+ *   v2.5.0 — 2026-08-29 — The organism type is free text (40 chars): the create form gains an "Other"
+ *     option with a text field, and the list row shows an unknown type as written instead of the
+ *     raw locale key (tOr).
  *   v2.4.0 — 2026-07-16 — Mount folds my-orgs + public + list-order prefs into GET /v1/organisms/tab
  *     (getOrganismsTab); individual reads kept as fallback.
  *   v2.3.0 — 2026-06-23 — Thread an `openSpace` deep-link from the organism mindmap through onOpenWs
@@ -92,6 +95,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
   const [formName, setFormName] = useState('');
   const [formDesc, setFormDesc] = useState('');
   const [formType, setFormType] = useState('community');
+  const [formTypeCustom, setFormTypeCustom] = useState('');
   const [formPolicy, setFormPolicy] = useState('open');
   const [formVisibility, setFormVisibility] = useState('public');
   const [formInterests, setFormInterests] = useState('');
@@ -260,7 +264,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
       const result = await orgService.createOrganism({
         name: formName.trim(),
         description: formDesc.trim(),
-        type: formType,
+        type: formType === '__custom' ? (formTypeCustom.trim() || 'community') : formType,
         join_policy: formPolicy,
         visibility: formVisibility,
         interests,
@@ -277,7 +281,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
       swallowed('organisms-tab: onOpen', err);
       showToast(t('organisms.createError') || 'Failed to create');
     } finally { setCreating(false); }
-  }, [formName, formDesc, formType, formPolicy, formVisibility, formInterests, showToast, loadData]);
+  }, [formName, formDesc, formType, formTypeCustom, formPolicy, formVisibility, formInterests, showToast, loadData]);
 
   const handleJoin = useCallback(async (id) => {
     try {
@@ -395,7 +399,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
     const isAdmin = org.admins?.includes(ghii);
     const isMember = org.members?.includes(ghii);
     const canEdit = isCreator || isAdmin;
-    const typeLabel = t(`organisms.types.${org.type}`) || org.type;
+    const typeLabel = tOr(`organisms.types.${org.type}`, org.type);
     const isExpanded = !isMine && expanded === org.id;
     const visLabel = org.visibility === 'private' ? (t('organisms.visPrivate') || 'Private') : (t('organisms.visListed') || 'Listed');
     const openHome = (withSettings) => { setOpenSettings(!!withSettings); setOpenWs(null); setOpenId(org.id); };
@@ -530,7 +534,12 @@ export default function OrganismsTab({ session, showToast, onStats }) {
                 <option value="club">${t('organisms.types.club') || 'Club'}</option>
                 <option value="cooperative">${t('organisms.types.cooperative') || 'Cooperative'}</option>
                 <option value="project">${t('organisms.types.project') || 'Project'}</option>
+                <option value="__custom">${t('organisms.typeCustom') || 'Other'}</option>
               </select>
+              ${formType === '__custom' ? html`
+                <input type="text" maxlength="40" class="input-field input-sm" value=${formTypeCustom}
+                  placeholder=${t('organisms.typeCustomPlaceholder') || 'Type, in your own words'}
+                  onInput=${(e) => setFormTypeCustom(e.target.value)} />` : null}
               <select value=${formPolicy} onChange=${(e) => setFormPolicy(e.target.value)}
                 class="input-field input-sm">
                 <option value="open">${t('organisms.policyOpen') || 'Open (anyone can join)'}</option>

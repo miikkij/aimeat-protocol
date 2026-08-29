@@ -5,6 +5,7 @@
  * @description MCP tool registrations for organism (collective) management --
  *   listing, viewing, joining, leaving, and member listing.
  * @version-history
+ *   v1.7.1 -- 2026-08-29 -- aimeat_organism_create's `type` is described as free text with five presets.
  *   v1.7.0 -- 2026-08-25 -- aimeat_organism_member_remove (DELETE /v1/organisms/:id/members/:ghii,
  *     ?ban=1), parity with the server MCP and the CLI dispatch.
  *   v1.6.1 -- 2026-08-15 -- owner_add / owner_remove: plural organism ownership over the
@@ -122,7 +123,7 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
   mcp.tool('aimeat_organism_create', descriptionFor('aimeat_organism_create'), {
     name: z.string().describe('Organism name (min 2 chars)'),
     description: z.string().optional().describe('What this organism is for'),
-    type: z.string().optional().describe('community | team | club | cooperative | project'),
+    type: z.string().optional().describe('What kind of group, in your own word (1 to 40 characters). Presets with a translation: community | team | club | cooperative | project'),
     join_policy: z.string().optional().describe('open | approval_required | invite_only'),
     visibility: z.string().optional().describe('public | listed | private'),
   }, annotationsFor('aimeat_organism_create'), async ({ name, description, type, join_policy, visibility }) => {
