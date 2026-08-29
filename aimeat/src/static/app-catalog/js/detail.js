@@ -465,8 +465,8 @@ function renderDetailView() {
       '<label class="dtl-stat-label" for="detail-desc-fi">' + t('detail.descFi') + '</label>' +
       '<textarea id="detail-desc-fi" class="modal-input" rows="3" maxlength="2000" style="margin:4px 0 6px;resize:vertical">' + escapeHtml(descFiVal) + '</textarea>' +
       '<div class="dtl-btn-row" style="margin:0 0 4px">' +
-        dtlBtn('🌐 ' + t('detail.translateEnFi'), 'window._launcher.detailTranslateDesc(\'en\',\'fi\')', {id:'detail-tr-enfi'}) +
-        dtlBtn('🌐 ' + t('detail.translateFiEn'), 'window._launcher.detailTranslateDesc(\'fi\',\'en\')', {id:'detail-tr-fien'}) +
+        dtlBtn(t('detail.translateEnFi'), 'window._launcher.detailTranslateDesc(\'en\',\'fi\')', {id:'detail-tr-enfi'}) +
+        dtlBtn(t('detail.translateFiEn'), 'window._launcher.detailTranslateDesc(\'fi\',\'en\')', {id:'detail-tr-fien'}) +
       '</div>' +
       '<div class="dtl-ai-status" id="detail-tr-status" style="margin:0 0 8px"></div>' +
       '<label class="dtl-stat-label" for="detail-icon-input">' + t('detail.iconLabel') + '</label>' +
@@ -582,8 +582,8 @@ function renderDetailView() {
         (isUrlApp ? '' : dtlBtn(t('ctx.improveAi'), 'window._launcher.detailImproveExternal()')) +
         dtlBtn(t('ctx.sharePrompt'), 'window._launcher.detailSharePrompt()') +
         (isUrlApp ? '' : dtlBtn(escapeHtml(publishLabel), 'window._launcher.detailPublish()', {variant:'primary'})) +
-        (app.published && !isUrlApp ? dtlBtn('📷 ' + t('detail.setScreenshot'), 'window._launcher.detailSetScreenshot()', {title:'Upload a custom thumbnail for this app'}) : '') +
-        (app.published && !isUrlApp ? dtlBtn('🔄 ' + t('detail.refreshScreenshot'), 'window._launcher.detailRefreshScreenshot()', {title:'Clear the screenshot; the node re-takes it on its next scheduled run'}) : '') +
+        (app.published && !isUrlApp ? dtlBtn(t('detail.setScreenshot'), 'window._launcher.detailSetScreenshot()', {title:'Upload a custom thumbnail for this app'}) : '') +
+        (app.published && !isUrlApp ? dtlBtn(t('detail.refreshScreenshot'), 'window._launcher.detailRefreshScreenshot()', {title:'Clear the screenshot; the node re-takes it on its next scheduled run'}) : '') +
         // Offered only where it can do something: our own published app (deleted on the node) or a
         // record that was never published. Someone else's published app is not ours to delete, and
         // the button used to appear there and close the view having changed nothing.
@@ -661,12 +661,12 @@ function renderDetailView() {
     if (agDefs.length) {
       agentsHtml =
         '<div class="dtl-section">' +
-          '<h3>\u{1F916} ' + (t('agents.title') || 'Bundled agents') + '</h3>' +
+          '<h3>' + (t('agents.title') || 'Bundled agents') + '</h3>' +
           '<div style="font-size:.85rem;color:var(--text-muted);margin-bottom:6px">' + (t('agents.declares') || '') + '</div>' +
           '<div style="margin-bottom:8px">' + agDefs.map(function(d) {
             return '<span class="aga-chip">' + escapeHtml(d.agent_name || '') + '</span>';
           }).join(' ') + '</div>' +
-          dtlBtn('\u{1F916} ' + (t('agents.manage') || 'Inspect & deploy'),
+          dtlBtn((t('agents.manage') || 'Inspect & deploy'),
             'window._launcher.showAppAgentsModal(\'' + jsArg(agOwner) + '\', \'' + jsArg(agFile) + '\')') +
         '</div>';
     }
@@ -886,7 +886,7 @@ function buildPromoteSection(app) {
   var cur = getPromotion(ref) || {};
   var on = !!(cur.en || cur.fi);
   return '<div class="dtl-section" id="detail-promote">' +
-      '<h3 style="display:flex;align-items:center;gap:8px">📣 ' + t('promote.title') +
+      '<h3 style="display:flex;align-items:center;gap:8px">' + t('promote.title') +
         (on ? ' <span class="dtl-badge-on">' + t('promote.on') + '</span>' : '') + '</h3>' +
       '<p class="dtl-desc">' + t('promote.hint') + '</p>' +
       '<label class="dtl-stat-label" for="detail-promo-en">' + t('promote.en') + '</label>' +
@@ -894,8 +894,8 @@ function buildPromoteSection(app) {
       '<label class="dtl-stat-label" for="detail-promo-fi">' + t('promote.fi') + '</label>' +
       '<textarea id="detail-promo-fi" class="modal-input" rows="2" maxlength="500" style="margin:4px 0 6px;resize:vertical">' + escapeHtml(cur.fi || '') + '</textarea>' +
       '<div class="dtl-btn-row" style="margin:0 0 4px">' +
-        dtlBtn('🌐 ' + t('detail.translateEnFi'), 'window._launcher.detailTranslateDesc(\'en\',\'fi\',\'detail-promo-\',\'detail-promo-tr-status\')') +
-        dtlBtn('🌐 ' + t('detail.translateFiEn'), 'window._launcher.detailTranslateDesc(\'fi\',\'en\',\'detail-promo-\',\'detail-promo-tr-status\')') +
+        dtlBtn(t('detail.translateEnFi'), 'window._launcher.detailTranslateDesc(\'en\',\'fi\',\'detail-promo-\',\'detail-promo-tr-status\')') +
+        dtlBtn(t('detail.translateFiEn'), 'window._launcher.detailTranslateDesc(\'fi\',\'en\',\'detail-promo-\',\'detail-promo-tr-status\')') +
       '</div>' +
       '<div class="dtl-ai-status" id="detail-promo-tr-status" style="margin:0 0 8px"></div>' +
       '<div class="dtl-btn-row">' +
@@ -1491,12 +1491,121 @@ function versionSpanText(versions) {
   return ' · ' + when + (span ? ' · ' + t('versions.span') + ' ' + span : '');
 }
 
-/** The same line as a block above the detail view's list, where no count is shown otherwise. */
+/**
+ * Publishes grouped into sittings. A gap of two hours or more ends a sitting: publishes usually
+ * come inside two hours of each other while someone is at it, and a longer gap means they went to
+ * do something else, or came back another day. The time a sitting took is the time between its
+ * first and last publish, which is what the stamps can honestly say; what happened before the
+ * first publish is not on record and is not counted.
+ *
+ * @param {Array<{ created_at?: string }>} versions newest first
+ * @returns {Array<{ start: number, end: number, n: number }>} oldest first
+ */
+var SITTING_GAP_MS = 2 * 60 * 60 * 1000;
+function versionSittings(versions) {
+  var stamps = [];
+  for (var i = versions.length - 1; i >= 0; i--) {
+    var ms = versions[i].created_at ? Date.parse(versions[i].created_at) : NaN;
+    if (isFinite(ms)) stamps.push(ms);
+  }
+  var out = [], cur = null;
+  for (var j = 0; j < stamps.length; j++) {
+    if (!cur || stamps[j] - cur.end > SITTING_GAP_MS) { cur = { start: stamps[j], end: stamps[j], n: 1 }; out.push(cur); }
+    else { cur.end = stamps[j]; cur.n++; }
+  }
+  return out;
+}
+
+/**
+ * Publishes per day from the first day to the last, as one small bar chart: the rhythm of the
+ * work at a glance, before the list of every version. Days with nothing stay empty so a pause
+ * reads as a pause. Past four months the days are folded into weeks, so the bars stay readable.
+ *
+ * One series, so the bar colour is the accent and the text wears the text tokens; every bar carries
+ * its day and its count as a title for the hover.
+ */
+function versionChartHtml(sittings) {
+  if (!sittings.length) return '';
+  var DAY = 24 * 60 * 60 * 1000;
+  var dayOf = function (ms) { var d = new Date(ms); return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()); };
+  var counts = {};
+  var first = Infinity, last = -Infinity;
+  // Every publish counted on its own day; the sittings already hold the stamps in order.
+  for (var s = 0; s < sittings.length; s++) {
+    var st = sittings[s];
+    for (var k = 0; k < st.stamps.length; k++) {
+      var d = dayOf(st.stamps[k]);
+      counts[d] = (counts[d] || 0) + 1;
+      if (d < first) first = d; if (d > last) last = d;
+    }
+  }
+  var days = Math.round((last - first) / DAY) + 1;
+  var bucket = days > 120 ? 7 : 1;
+  var bars = [];
+  var max = 0;
+  for (var day = first; day <= last; day += DAY * bucket) {
+    var n = 0;
+    for (var b = 0; b < bucket; b++) n += counts[day + b * DAY] || 0;
+    bars.push({ day: day, n: n });
+    if (n > max) max = n;
+  }
+  if (!max) return '';
+  // Bars are drawn in CSS pixels and never stretched: two days are two narrow bars, not two slabs.
+  var W = 720, H = 96, PAD = 2, BASE = H - 1;
+  var bw = Math.min(28, Math.max(2, Math.floor((W - PAD * (bars.length - 1)) / bars.length)));
+  var svgW = bars.length * bw + PAD * (bars.length - 1);
+  var rects = '';
+  for (var i = 0; i < bars.length; i++) {
+    var h = bars[i].n ? Math.max(4, Math.round((bars[i].n / max) * (H - 14))) : 0;
+    var x = i * (bw + PAD);
+    var when = new Date(bars[i].day).toLocaleDateString();
+    var label = when + (bucket > 1 ? ' +' + (bucket - 1) : '') + ' · ' + t('versions.perDay').replace('{n}', String(bars[i].n));
+    rects += '<g class="version-bar"><title>' + escapeHtml(label) + '</title>' +
+      '<rect class="version-bar-hit" x="' + x + '" y="0" width="' + bw + '" height="' + H + '" fill="transparent"></rect>' +
+      (h ? '<rect class="version-bar-mark" x="' + x + '" y="' + (BASE - h) + '" width="' + bw + '" height="' + h + '" rx="' + Math.min(2, bw / 2) + '"></rect>' : '') +
+      '</g>';
+  }
+  return '<div class="version-chart">' +
+      '<div class="version-chart-head"><span class="version-chart-title">' + escapeHtml(t('versions.chartTitle')) + '</span>' +
+        '<span class="version-chart-max">' + escapeHtml(t('versions.chartMax').replace('{n}', String(max))) + '</span></div>' +
+      '<svg class="version-chart-svg" width="' + svgW + '" height="' + H + '" viewBox="0 0 ' + svgW + ' ' + H + '" role="img" aria-label="' + escapeHtml(t('versions.chartTitle')) + '">' +
+        '<line class="version-chart-base" x1="0" y1="' + BASE + '" x2="' + svgW + '" y2="' + BASE + '"></line>' + rects +
+      '</svg>' +
+      // A short chart (a few days) cannot hold a date at each end, so it says the span in one line.
+      (svgW < 240
+        ? '<div class="version-chart-axis"><span>' + escapeHtml(new Date(first).toLocaleDateString() + (first === last ? '' : ' – ' + new Date(last).toLocaleDateString())) + '</span></div>'
+        : '<div class="version-chart-axis" style="max-width:' + svgW + 'px"><span>' + escapeHtml(new Date(first).toLocaleDateString()) + '</span><span>' + escapeHtml(new Date(last).toLocaleDateString()) + '</span></div>') +
+    '</div>';
+}
+
+/**
+ * The block above the detail view's list: the count, the days it covers, the sittings and the
+ * time worked between publishes, then the chart. "first to last" is gone from here: a summer
+ * between two publishes is not time spent, and the sittings say what is.
+ */
 function versionSpanHtml(versions) {
-  var text = versionSpanText(versions);
-  if (!text) return '';
-  return '<div class="version-span" style="color:var(--text-muted);font-size:.8rem;margin-bottom:.5rem">' +
-    escapeHtml(versions.length + ' ' + t('versions.stored') + text) + '</div>';
+  if (!versions.length) return '';
+  var sittings = versionSittings(versions);
+  // Keep the stamps on each sitting for the chart.
+  var asc = [];
+  for (var i = versions.length - 1; i >= 0; i--) { var ms = Date.parse(versions[i].created_at || ''); if (isFinite(ms)) asc.push(ms); }
+  var idx = 0;
+  for (var s = 0; s < sittings.length; s++) { sittings[s].stamps = asc.slice(idx, idx + sittings[s].n); idx += sittings[s].n; }
+  var worked = 0;
+  for (var w = 0; w < sittings.length; w++) worked += sittings[w].end - sittings[w].start;
+  var parts = [versions.length + ' ' + t('versions.stored')];
+  if (asc.length) {
+    var firstDay = new Date(asc[0]).toLocaleDateString(), lastDay = new Date(asc[asc.length - 1]).toLocaleDateString();
+    parts.push(firstDay === lastDay ? firstDay : firstDay + ' – ' + lastDay);
+  }
+  if (sittings.length) {
+    var sit = t('versions.sittings').replace('{n}', String(sittings.length));
+    var lab = durationLabel(worked, durationUnits());
+    parts.push(lab ? sit + ', ' + t('versions.worked').replace('{t}', lab) : sit);
+  }
+  return '<div class="version-span">' + escapeHtml(parts.join(' · ')) + '</div>' +
+    versionChartHtml(sittings) +
+    '<div class="version-span-hint">' + escapeHtml(t('versions.chartHint')) + '</div>';
 }
 
 function detailLoadVersions(owner, filename) {

@@ -109,12 +109,15 @@ h1.cat-title {
 .cat-masthead .backup-menu { border: 2px solid var(--text); border-radius: 0; box-shadow: 4px 4px 0 var(--sun); }
 
 /* The band: the diagonal coral stripe with the numbers, as on the profile. */
-.cat-band { position: relative; overflow: hidden; margin: 8px 0 0; padding: 64px 0 56px; color: var(--bg); }
+/* The stripe is as tall as its numbers: a full-height rotated block, so a second row of numbers
+   (the detail's five) still lands on the coral, and the top row never rides the upper edge. */
+.cat-band { position: relative; overflow: hidden; margin: 8px 0 0; padding: 72px 0 68px; color: var(--bg); }
 .cat-band[hidden] { display: none; }
-.cat-band::before, .cat-band::after { content: ''; position: absolute; left: -10%; right: -10%; top: 50%; z-index: 0; }
-.cat-band::before { height: 190px; background: var(--accent); transform: translateY(-50%) rotate(-2.5deg); }
-.cat-band::after { height: 20px; background: var(--sun); transform: translateY(calc(-50% + 104px)) rotate(-2.5deg); }
-.cat-band-in { position: relative; z-index: 1; display: flex; gap: 56px; align-items: flex-end; padding: 0 16px; flex-wrap: wrap; }
+.cat-band::before, .cat-band::after { content: ''; position: absolute; left: -10%; right: -10%; z-index: 0; }
+.cat-band::before { top: 0; bottom: 0; background: var(--accent); transform: rotate(-2.5deg); }
+.cat-band::after { bottom: 6px; height: 20px; background: var(--sun); transform: rotate(-2.5deg); }
+.cat-band-in { position: relative; z-index: 1; display: flex; gap: 36px 56px; align-items: flex-end; padding: 0 16px; flex-wrap: wrap; }
+.dtl-band .cat-band-n { font-size: 3.2rem; }
 .cat-band-item { display: flex; flex-direction: column; gap: 6px; }
 .cat-band-n { font-family: var(--font-poster); font-size: 4rem; line-height: .85; letter-spacing: -.04em; color: var(--bg); }
 .cat-band-l { font-size: .78rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--bg); }
@@ -455,6 +458,18 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
 .protect-row b { color: var(--text); }
 .protect-row span { color: var(--text-dim); }
 .version-row { padding: 12px 0; }
+/* The rhythm of the work above the list: one line, one small bar chart, one line of caveat. */
+.version-span { font-family: var(--font-mono); font-size: .8rem; color: var(--text-dim); margin: 0 0 14px; }
+.version-chart { margin: 0 0 8px; }
+.version-chart-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+.version-chart-title { font-size: .72rem; color: var(--accent); text-transform: uppercase; letter-spacing: .1em; font-weight: 800; }
+.version-chart-max { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
+.version-chart-svg { display: block; width: auto; max-width: 100%; height: 96px; overflow: visible; }
+.version-chart-base { stroke: var(--border); stroke-width: 1; }
+.version-bar-mark { fill: var(--accent); }
+.version-bar:hover .version-bar-mark { fill: var(--text); }
+.version-chart-axis { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); margin-top: 6px; }
+.version-span-hint { font-size: .8rem; font-weight: 600; line-height: 1.5; color: var(--text-dim); margin: 0 0 22px; max-width: 70ch; }
 .version-num { font-family: var(--font-poster); font-size: 1rem; }
 .version-current { background: var(--sun); color: var(--text); border: 0; padding: 2px 8px; }
 .version-sub { font-family: var(--font-mono); font-size: .72rem; }
@@ -486,6 +501,21 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
 .pb-trackname { font-family: var(--font-poster); font-weight: 400; text-transform: uppercase; font-size: .95rem; }
 .pb-tracknew { background: var(--accent); color: #fff; border-radius: 0; font-family: var(--font-mono); }
 .pb-trackdesc { opacity: 1; color: var(--text-dim); font-weight: 600; }
+/* On the sun the words are ink; the dim grey of the unchosen card would vanish there. */
+.pb-trackcard.is-on, .pb-trackcard.is-on .pb-trackname, .pb-trackcard.is-on .pb-trackdesc { color: #1A1A2E; }
+.pb-trackcard.is-on .pb-tracknew { background: #1A1A2E; color: var(--sun); }
+
+/* A word in the running text that opens something: dashed under, never a button. */
+.cat-dashed { background: none; border: 0; border-bottom: 2px dashed var(--accent); border-radius: 0; padding: 0; margin: 0; font: inherit; color: var(--accent); cursor: pointer; }
+.cat-dashed:hover { border-bottom-style: solid; }
+
+/* The icon field: a big glyph, a row of ready icons to press, and a line on how to type any other. */
+.icon-field { display: flex; gap: 14px; align-items: flex-start; }
+.icon-field #app-icon { width: 64px; height: 56px; text-align: center; font-size: 1.6rem; flex: 0 0 auto; }
+.icon-picks { display: flex; flex-wrap: wrap; gap: 6px; flex: 1 1 auto; }
+.icon-pick { width: 36px; height: 36px; border: 2px solid var(--border); background: var(--surface); font-size: 1.1rem; cursor: pointer; padding: 0; border-radius: 0; }
+.icon-pick:hover, .icon-pick.is-on { border-color: var(--text); background: var(--sun); }
+.icon-hint { margin-top: 6px; font-size: .8rem; font-weight: 600; line-height: 1.5; color: var(--text-dim); }
 .pb-desc-area { border: 0; border-bottom: 3px solid var(--text); border-radius: 0; background: transparent; font-family: var(--font-body); font-weight: 700; font-size: 1rem; padding: 8px 0; }
 .pb-desc-area:focus { border-color: var(--accent); }
 .pb-template-select { margin: 6px 0 14px; }
