@@ -2,7 +2,7 @@
 name: aimeat-design-language
 description: "The AIMEAT design language in words and in numbers: the two faces (showroom outside, poster inside), the four shapes, the colours, the wordmark, and the one place a value is changed (theme.css tokens) with the map of every surface a token reaches. Use before designing or styling anything that carries the AIMEAT name, before changing a font or a colour, and to judge whether a screen looks like this product."
 metadata:
-  version: 1.0.0
+  version: 1.1.0
   updated: 2026-08-29
   owner: Jouni Miikki
 ---
@@ -82,7 +82,14 @@ is written for a palette.
 
 Fields on the poster face are one 3px ink underline (coral on focus), a placeholder in `--text-dim`
 at 600; a many-line field is the 2px box. The small coral label above a field is the only place
-the accent appears at that size.
+the accent appears at that size. A field's hint (the line under it) shows only while the person
+is in that field or has written in it; a form is read as its labels until one is being filled.
+
+**A dialog has three ways out, and one rule.** An X in the top-right corner, always, drawn as a
+26px ink-framed square with a 2.5px stroke (people look there first; Jouni went hunting for it
+on 2026-08-29 and found Cancel only by reading). Escape. And a click on the dim page behind the
+dialog. The last two close only while nothing has been typed: a half-filled form must never be
+lost to a stray click or key. Cancel under the form stays for the people who read.
 
 **Bands.** An ink band (`--text` ground, `--bg` words, the headline in `--sun`, items in 2px
 frames at 28 % opacity) for the argument that closes a page; a sun band (`--sun` ground, ink
