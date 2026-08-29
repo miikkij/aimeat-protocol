@@ -9,6 +9,9 @@
  *   ensureAuthPillStyles · pillInitials.
  * @usage import { escHtml, modeSwitchHtml, wireModeSwitch } from './theme.js';
  * @version-history
+ *   v1.3.1 — 2026-08-29 — The pill's ink and paper come from ink.js: the page's --text / --bg first, then
+ *     a fallback that follows the theme. On a dark app page that named --text but not --bg the pill was
+ *     a pale slab with pale words (KOTILO).
  *   v1.3.0 — 2026-08-29 — ensureAuthPillStyles carries the whole pill (signed in, signed out, compact),
  *     class-based and drawn from the page's tokens with fallbacks, in place of the gold gradients
  *     that were inline in pill.js.
@@ -19,6 +22,8 @@
  *     visible, active marked), styled by cluster.js instead of inline styles.
  *   v1.0.0 — 2026-07-19 — Extracted from src/routes/libs/auth-lib-part2.ts (SDK-libs migration Phase 3).
  */
+
+import { inkVarsCss } from './ink.js';
 
 export function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
@@ -109,10 +114,13 @@ export function ensureAuthPillStyles() {
   if (document.getElementById('aimeat-auth-pill-css')) return;
   var st = document.createElement('style');
   st.id = 'aimeat-auth-pill-css';
-  var ink = 'var(--aimeat-pill-fg,var(--text,#1A1A2E))';
-  var paper = 'var(--aimeat-pill-bg,var(--bg,#FAFAF8))';
+  // Ink and paper are defined on the pill's roots by ink.js, with a fallback that follows the
+  // theme; every rule below reads them, so the pill cannot end up pale-on-pale on a dark app page.
+  var ink = 'var(--aimeat-ink)';
+  var paper = 'var(--aimeat-paper)';
   var font = 'var(--aimeat-pill-font,var(--font-showroom-body,var(--font,system-ui,sans-serif)))';
   st.textContent = [
+    inkVarsCss(['.aimeat-auth-wrap', '.aimeat-auth-out', '.aimeat-auth-pill']),
     '.aimeat-auth-pill{display:inline-flex;align-items:center;gap:10px;padding:4px 11px;',
       'border:2px solid ' + ink + ';background:' + paper + ';color:' + ink + ';',
       'border-radius:var(--aimeat-pill-radius,0);font-family:' + font + ';font-size:13px;line-height:1.4}',

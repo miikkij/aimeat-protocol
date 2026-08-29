@@ -217,6 +217,20 @@
     return { verifier, challenge: verifier, method: "plain" };
   }
 
+  // src/static/sdk-libs/auth/ink.js
+  var LIGHT = "--aimeat-ink:var(--aimeat-pill-fg,var(--text,#1A1A2E));--aimeat-paper:var(--aimeat-pill-bg,var(--bg,#FAFAF8))";
+  var DARK = "--aimeat-ink:var(--aimeat-pill-fg,var(--text,#EDEEF2));--aimeat-paper:var(--aimeat-pill-bg,var(--bg,#14151A))";
+  function inkVarsCss(roots) {
+    var light = roots.join(",");
+    var dark = roots.map(function(r) {
+      return 'html[data-theme="dark"] ' + r;
+    }).join(",");
+    var system = roots.map(function(r) {
+      return 'html:not([data-theme="light"]) ' + r;
+    }).join(",");
+    return light + "{" + LIGHT + "}" + dark + "{" + DARK + "}@media (prefers-color-scheme:dark){" + system + "{" + DARK + "}}";
+  }
+
   // src/static/sdk-libs/auth/theme.js
   function escHtml(s) {
     const d = document.createElement("div");
@@ -290,10 +304,11 @@
     if (document.getElementById("aimeat-auth-pill-css")) return;
     var st = document.createElement("style");
     st.id = "aimeat-auth-pill-css";
-    var ink2 = "var(--aimeat-pill-fg,var(--text,#1A1A2E))";
-    var paper2 = "var(--aimeat-pill-bg,var(--bg,#FAFAF8))";
+    var ink2 = "var(--aimeat-ink)";
+    var paper2 = "var(--aimeat-paper)";
     var font2 = "var(--aimeat-pill-font,var(--font-showroom-body,var(--font,system-ui,sans-serif)))";
     st.textContent = [
+      inkVarsCss([".aimeat-auth-wrap", ".aimeat-auth-out", ".aimeat-auth-pill"]),
       ".aimeat-auth-pill{display:inline-flex;align-items:center;gap:10px;padding:4px 11px;",
       "border:2px solid " + ink2 + ";background:" + paper2 + ";color:" + ink2 + ";",
       "border-radius:var(--aimeat-pill-radius,0);font-family:" + font2 + ";font-size:13px;line-height:1.4}",
@@ -396,8 +411,8 @@
   }
 
   // src/static/sdk-libs/auth/modal-styles.js
-  var ink = "var(--text,#1A1A2E)";
-  var paper = "var(--bg,#FAFAF8)";
+  var ink = "var(--aimeat-ink)";
+  var paper = "var(--aimeat-paper)";
   var dim = "var(--text-dim,#6B7280)";
   var line = "var(--border,#E5E7EB)";
   var accent = "var(--accent,#E8564A)";
@@ -409,6 +424,7 @@
   var section = "var(--font-poster-section,'Archivo','DM Sans',system-ui,sans-serif)";
   var mono = "var(--font-mono,'JetBrains Mono','SF Mono',monospace)";
   var MODAL_CSS = [
+    inkVarsCss([".aimeat-scrim"]),
     ".aimeat-scrim{position:fixed;inset:0;background:rgba(26,26,46,.4);backdrop-filter:blur(8px);display:flex;",
     "align-items:flex-start;justify-content:center;overflow-y:auto;z-index:99999;padding:24px;font-family:" + font + "}",
     ".aimeat-dlg{background:" + paper + ";color:" + ink + ";border:3px solid " + ink + ";box-shadow:12px 12px 0 " + sun + ";",
@@ -1094,7 +1110,7 @@
       ".aimeat-seg button:hover{opacity:.9}",
       ".aimeat-seg button:focus-visible{outline:2px solid currentColor;outline-offset:-2px;opacity:1}",
       '.aimeat-seg button[aria-pressed="true"]{opacity:1;',
-      "background:var(--aimeat-pill-fg,var(--text,#1A1A2E));color:var(--aimeat-pill-bg,var(--bg,#FAFAF8))}",
+      "background:var(--aimeat-ink);color:var(--aimeat-paper)}",
       ".aimeat-seg button+button{border-left:0}",
       ".aimeat-seg .seg-ico{font-size:13px;line-height:1}",
       /* Popover trigger (palette picker; language picker when 4+ languages). */

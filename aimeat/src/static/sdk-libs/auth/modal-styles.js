@@ -10,12 +10,17 @@
  * @structure MODAL_CSS (one string, injected by modal.js into its own <style>).
  * @usage import { MODAL_CSS } from './modal-styles.js';
  * @version-history
+ *   v1.0.1 — 2026-08-29 — Ink and paper through ink.js, so the fallback follows the theme on an app
+ *     page that named --text but not --bg.
  *   v1.0.0 — 2026-08-29 — Extracted from modal.js and redrawn on the design canvas "AIMEAT Sign-in
  *     Dialog" (headline-led): replaces the DM Sans, 10px radii and coral-gradient skin.
  */
+import { inkVarsCss } from './ink.js';
 
-var ink = 'var(--text,#1A1A2E)';
-var paper = 'var(--bg,#FAFAF8)';
+// Ink and paper are defined on the scrim by ink.js: the page's --text / --bg first, then a
+// fallback that follows the theme, so the dialog is never pale-on-pale on a dark app page.
+var ink = 'var(--aimeat-ink)';
+var paper = 'var(--aimeat-paper)';
 var dim = 'var(--text-dim,#6B7280)';
 var line = 'var(--border,#E5E7EB)';
 var accent = 'var(--accent,#E8564A)';
@@ -28,6 +33,7 @@ var section = "var(--font-poster-section,'Archivo','DM Sans',system-ui,sans-seri
 var mono = "var(--font-mono,'JetBrains Mono','SF Mono',monospace)";
 
 export var MODAL_CSS = [
+  inkVarsCss(['.aimeat-scrim']),
   '.aimeat-scrim{position:fixed;inset:0;background:rgba(26,26,46,.4);backdrop-filter:blur(8px);display:flex;',
     'align-items:flex-start;justify-content:center;overflow-y:auto;z-index:99999;padding:24px;font-family:' + font + '}',
   '.aimeat-dlg{background:' + paper + ';color:' + ink + ';border:3px solid ' + ink + ';box-shadow:12px 12px 0 ' + sun + ';',
