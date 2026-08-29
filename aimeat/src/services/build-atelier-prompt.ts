@@ -26,6 +26,9 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.11.0 — 2026-08-29 — THE GENRE MENU: thirteen complete committed registers rendered from
+ *     the template registry — "fork a genre, swap the words, keep the physics" becomes the
+ *     first move whenever the owner wants the app to look like something.
  *   v1.10.0 — 2026-08-29 — The next-level vocabulary: the choreography field (scroll as the
  *     camera), the chart mural, and the note that the loud looks throw their masthead in one
  *     letter at a time on their own — nothing for the builder to call.
@@ -60,6 +63,7 @@
 import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import { LOOKS as LOOK_REGISTRY } from '../data/atelier-looks.js';
+import { getAppTemplateIndex } from '../data/app-templates.js';
 
 /** Slot the publish gate's token is substituted into (mirrors build-app-prompt.ts). */
 const SPEC_TOKEN_SLOT = '{{aimeat_spec_token}}';
@@ -246,6 +250,23 @@ function composeBody(config: AimeatConfig): string {
     + 'story-deck, guided-flow). Pick the one nearest the app, replace every <angle-bracketed> '
     + 'value with the app\'s own words and source names, and use it as the fallback — and as the '
     + 'first stored layout when the owner wants one.\n\n';
+
+  // THE GENRES — rendered from the template registry, never hand-listed (the surface-layout
+  // lesson: a hand-written menu drifts and the builder reads the refusal as a broken AI).
+  const genres = getAppTemplateIndex().filter((t) => t.kind === 'genre');
+  body += '## Or start from a GENRE — a complete committed register\n\n';
+  body += 'When the owner wants the app to LOOK LIKE SOMETHING — a poster, a console, a departure '
+    + 'board — do not assemble blocks: FORK A GENRE. Each genre is a finished free-composition '
+    + 'page in a committed register; fetch it with `GET ' + base + '/v1/app-templates/<id>`, swap '
+    + 'the words, sources and images for the app at hand, and KEEP THE PHYSICS (finite entrances, '
+    + 'motion only under the hand or the scroll, zero idle repaints, reduced-motion honesty). '
+    + 'The kit\'s scenic props (`flapify`, `ransom`, `vu`, `typeout`, `dealIn`, the `.ak-stamp` / '
+    + '`.ak-ticker` / `.ak-torn` / `.ak-polaroid` family) and the pattern recipes '
+    + '(`.ak-pat-*` × ground/prop/zone volumes) carry the shared stagecraft.\n\n';
+  for (const g of genres) {
+    body += '- `' + g.id + '` — **' + g.title + '**: ' + g.description + '\n';
+  }
+  body += '\n';
 
   body += '## The look\n\n';
   body += 'One field chooses the whole art direction: `app({ look: … })`. Vivid is the default '

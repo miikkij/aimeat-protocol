@@ -30,6 +30,7 @@ import {
   validateUiLayout, validateSignatureTokens, validateImageryStyle, AppUiError,
 } from '../app-ui/validate.js';
 import { LOOKS } from '../app-ui/registry.js';
+import { getAppTemplates } from '../../data/app-templates.js';
 
 export class DesignBookError extends Error {
   constructor(public code: string, message: string, public status = 400) {
@@ -39,7 +40,7 @@ export class DesignBookError extends Error {
 }
 
 /** The kinds the node can PROVE. Growing this list means growing the bench first. */
-export const PART_KINDS = ['layout', 'fill', 'look', 'motion', 'illustration'] as const;
+export const PART_KINDS = ['layout', 'fill', 'look', 'motion', 'illustration', 'genre'] as const;
 export type PartKind = (typeof PART_KINDS)[number];
 
 /** The motion recipe's vocabulary: the signature tokens that ARE motion. */
@@ -117,6 +118,18 @@ function benchBodyFor(kind: PartKind, raw: unknown): Record<string, unknown> {
     const o = raw as Record<string, unknown>;
     if (kind === 'illustration') {
       return validateImageryStyle(o) as unknown as Record<string, unknown>;
+    }
+    // A GENRE points at one of the registry's genre templates — a complete committed page.
+    // The Book PROVES and SHOWS it; taking one home is a FORK of the template, never a merge,
+    // so adopt refuses this kind with the address (service.ts).
+    if (kind === 'genre') {
+      const id = typeof o.template === 'string' ? o.template : '';
+      const known = getAppTemplates().filter((t) => t.kind === 'genre').map((t) => t.id);
+      if (!known.includes(id)) {
+        throw new DesignBookError('BODY_INVALID',
+          `A genre part's body is { "template": "<id>" } naming a genre template this node serves. It serves: ${known.join(', ')}.`, 422);
+      }
+      return { template: id };
     }
     // look and motion: a token sheet — the same bench a layout's signature runs, including the
     // contrast-matrix proof of an `--ak-accent` pair.
