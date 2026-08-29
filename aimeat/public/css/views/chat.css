@@ -17,6 +17,8 @@
  *
  *   NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v2.0.3 — 2026-08-29 — body overflow: clip (was hidden) on a phone, the same reason as theme.css v1.37.0: a
+ *     hidden body is still a scroll container a scrollIntoView() can move; clip is not.
  *   v2.0.2 — 2026-08-29 — The headline reads --font-poster-tracking / --font-poster-leading (theme.css) instead
  *     of the -.03em / .95 measured for Archivo Black.
  *   v2.0.1 — 2026-08-29 — Poster headlines read --font-poster-weight (theme.css) instead of a literal 400.
@@ -708,7 +710,7 @@
     background: var(--bg);
   }
 
-  body:has(.chat-view) { overflow: hidden; }
+  body:has(.chat-view) { overflow: clip; }
   body:has(.chat-view) .topnav { display: none; }
 
   /* The list is a place you go to, not a column that would leave neither pane readable. */
