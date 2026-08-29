@@ -36,6 +36,10 @@ const NEVER_INHERITED: Record<string, string> = {
   '--ak-scrim': 'color-mix(in oklab, var(--ak-bg) 78%, transparent)',
   // A calm look nested inside a loud one must not inherit the letter-throw masthead.
   '--ak-kinetic': 'none',
+  // Substitution happens at the DECLARING element: --ak-glass declared only at :root resolves
+  // against the PALETTE surface, so a world's chrome floated on white glass over a night page
+  // (found by the terminal ground). Re-declared per block, it follows the block's own surface.
+  '--ak-glass': 'color-mix(in oklab, var(--ak-surface) 74%, transparent)',
 };
 
 /** The whole generated stylesheet, deterministically — the drift gate compares against this. */
@@ -67,7 +71,20 @@ export function emitLooksCss(): string {
       out.push(`/* @preset-block ${look.id} — ${look.feel}.`);
     }
     out.push(`   ${look.note} */`);
-    const tokens: Record<string, string> = { ...look.tokens };
+    // A WORLD's ground rides in the same block (light) plus a `@dark` twin the dark cascade
+    // layers on top. Only the ground tokens may carry literals; the tool refuses anything else
+    // so the freed purity rule cannot leak.
+    const GROUND_TOKENS = ['--ak-bg', '--ak-surface', '--ak-surface-2', '--ak-ink', '--ak-ink-dim', '--ak-line'];
+    if (look.grounds) {
+      for (const half of [look.grounds.light, look.grounds.dark]) {
+        for (const name of Object.keys(half)) {
+          if (!GROUND_TOKENS.includes(name)) {
+            throw new Error(`look "${look.id}" grounds may only set ${GROUND_TOKENS.join(', ')} — got ${name}`);
+          }
+        }
+      }
+    }
+    const tokens: Record<string, string> = { ...look.tokens, ...(look.grounds ? look.grounds.light : {}) };
     for (const [name, fallback] of Object.entries(NEVER_INHERITED)) {
       if (!(name in tokens)) tokens[name] = fallback;
     }
@@ -77,6 +94,16 @@ export function emitLooksCss(): string {
       out.push(`  ${(name + ':').padEnd(width + 1)} ${value};`);
     }
     out.push('}');
+    if (look.grounds || look.dusk) {
+      out.push(`/* @preset-block ${look.id}@dark — the world's dark ground (layered by the dark cascade). */`);
+      out.push(`[data-theme='dark'] ${sel}, ${sel}[data-theme='dark'] {`);
+      const darkDecls = { ...(look.grounds ? look.grounds.dark : {}), ...(look.dusk || {}) };
+      const dw = Math.max(...Object.keys(darkDecls).map((k) => k.length)) + 1;
+      for (const [name, value] of Object.entries(darkDecls)) {
+        out.push(`  ${(name + ':').padEnd(dw + 1)} ${value};`);
+      }
+      out.push('}');
+    }
     for (const sid of look.structures) {
       const s = structById.get(sid);
       if (!s) throw new Error(`look "${look.id}" uses unknown structure "${sid}"`);
