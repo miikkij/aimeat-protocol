@@ -28,6 +28,13 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.35.0 — 2026-08-30 — THE APPROVED LEVEL: the chart family grown whole (stacked and
+ *     horizontal bars, scatter with an honest trend, the note bubble, a touch tooltip on every
+ *     axes chart, sheened rounded bars, the donut's total-and-delta centre, named calendar
+ *     months) — chart.js split into chart-core/chart/chart-shapes; the gauge redrawn as a real
+ *     half-dial; hero sparklines gain area fills; and scene3d kind `model`: a loaded .glb/.gltf
+ *     fitted, grounded and studio-lit like a product shot (three-world-loaders bundle,
+ *     lazy-loaded).
  *   v0.34.0 — 2026-08-29 — `map`: the REAL map — Leaflet over OpenStreetMap tiles, served by
  *     this node, one clean card, token pins and popups, dark-mode tile toning. The atlas
  *     stays the offline world choropleth; the map is what "a map" means.
@@ -181,7 +188,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.34.0',
+  version: '0.35.0',
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,

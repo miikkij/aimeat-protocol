@@ -328,6 +328,20 @@
       "queue.failed": "failed",
       consoleEmpty: "Nothing logged yet",
       atlasDown: "The map could not load",
+      heatLess: "less",
+      heatMore: "more",
+      m1: "JAN",
+      m2: "FEB",
+      m3: "MAR",
+      m4: "APR",
+      m5: "MAY",
+      m6: "JUN",
+      m7: "JUL",
+      m8: "AUG",
+      m9: "SEP",
+      m10: "OCT",
+      m11: "NOV",
+      m12: "DEC",
       aideNotice: "You are talking with an AI. Answers can be wrong; actions run only when you confirm them.",
       aideNoAi: "AI is not set up on this account yet. Connect a key under Profile, and the aide wakes up.",
       aideFailed: "That did not go through. Try again.",
@@ -382,6 +396,20 @@
       "queue.failed": "epäonnistui",
       consoleEmpty: "Ei vielä lokirivejä",
       atlasDown: "Kartta ei latautunut",
+      heatLess: "vähän",
+      heatMore: "paljon",
+      m1: "TAM",
+      m2: "HEL",
+      m3: "MAA",
+      m4: "HUH",
+      m5: "TOU",
+      m6: "KES",
+      m7: "HEI",
+      m8: "ELO",
+      m9: "SYY",
+      m10: "LOK",
+      m11: "MAR",
+      m12: "JOU",
       aideNotice: "Keskustelet tekoälyn kanssa. Vastaus voi olla väärin; toiminnot ajetaan vasta kun vahvistat ne.",
       aideNoAi: "Tälle tilille ei ole vielä kytketty tekoälyä. Liitä avain profiilissa, niin apuri herää.",
       aideFailed: "Se ei mennyt läpi. Yritä uudelleen.",
@@ -436,6 +464,20 @@
       "queue.failed": "falló",
       consoleEmpty: "Sin líneas de registro todavía",
       atlasDown: "El mapa no se cargó",
+      heatLess: "menos",
+      heatMore: "más",
+      m1: "ENE",
+      m2: "FEB",
+      m3: "MAR",
+      m4: "ABR",
+      m5: "MAY",
+      m6: "JUN",
+      m7: "JUL",
+      m8: "AGO",
+      m9: "SEP",
+      m10: "OCT",
+      m11: "NOV",
+      m12: "DIC",
       aideNotice: "Estás hablando con una IA. Las respuestas pueden fallar; las acciones solo se ejecutan cuando las confirmas.",
       aideNoAi: "Esta cuenta aún no tiene IA configurada. Conecta una clave en el perfil y el ayudante despierta.",
       aideFailed: "No ha funcionado. Inténtalo otra vez.",
@@ -1153,10 +1195,12 @@
       entry.spark.setAttribute("class", "ak-statrow__spark");
       entry.spark.setAttribute("viewBox", "0 0 " + W22 + " " + H22);
       entry.spark.setAttribute("aria-hidden", "true");
+      entry.spark.appendChild(document.createElementNS("http://www.w3.org/2000/svg", "polygon"));
       entry.spark.appendChild(document.createElementNS("http://www.w3.org/2000/svg", "polyline"));
       entry.tile.appendChild(entry.spark);
     }
-    entry.spark.firstChild.setAttribute("points", points);
+    entry.spark.firstChild.setAttribute("points", "0," + H22 + " " + points + " " + W22 + "," + H22);
+    entry.spark.lastChild.setAttribute("points", points);
   }
   function statRow(spec) {
     const shown = /* @__PURE__ */ new Map();
@@ -2372,17 +2416,14 @@
     };
   }
 
-  // src/static/sdk-libs/atelier/chart.js
-  var W = 720;
-  var H = 300;
-  var PAD = { top: 14, right: 12, bottom: 34, left: 46 };
-  var SERIES_VARS = ["var(--ak-accent)", "var(--ak-spectrum-2)", "var(--ak-spectrum-3)", "var(--ak-accent-2)"];
+  // src/static/sdk-libs/atelier/chart-core.js
   var SVG_NS = "http://www.w3.org/2000/svg";
   function svg(name, attrs) {
     const node = document.createElementNS(SVG_NS, name);
     for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
     return node;
   }
+  var SERIES_VARS = ["var(--ak-accent)", "var(--ak-spectrum-2)", "var(--ak-spectrum-3)", "var(--ak-accent-2)"];
   function tickStep(span) {
     const raw = span / 4;
     const pow = Math.pow(10, Math.floor(Math.log10(raw)));
@@ -2395,125 +2436,414 @@
     if (Math.abs(v) >= 1e3) return (v / 1e3).toLocaleString(void 0, { maximumFractionDigits: 1 }) + "k";
     return v.toLocaleString(void 0, { maximumFractionDigits: 2 });
   }
+  function smoothPath(pts) {
+    if (pts.length < 2) return pts.length ? `M ${pts[0].x} ${pts[0].y}` : "";
+    let d = `M ${pts[0].x} ${pts[0].y}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[Math.max(0, i - 1)];
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const p3 = pts[Math.min(pts.length - 1, i + 2)];
+      const c1x = p1.x + (p2.x - p0.x) / 6;
+      const c1y = p1.y + (p2.y - p0.y) / 6;
+      const c2x = p2.x - (p3.x - p1.x) / 6;
+      const c2y = p2.y - (p3.y - p1.y) / 6;
+      d += ` C ${c1x.toFixed(1)} ${c1y.toFixed(1)}, ${c2x.toFixed(1)} ${c2y.toFixed(1)}, ${p2.x} ${p2.y}`;
+    }
+    return d;
+  }
+  var defsCounter = 0;
+  function defsFor(node, seriesCount) {
+    const stamp2 = ++defsCounter;
+    const defs = svg("defs", {});
+    const sheenId = `ak-sheen-${stamp2}`;
+    const sheen = svg("linearGradient", { id: sheenId, x1: 0, y1: 0, x2: 0, y2: 1 });
+    const s1 = svg("stop", { offset: "0", "stop-opacity": "0.22" });
+    s1.style.stopColor = "var(--ak-chart-sheen)";
+    const s2 = svg("stop", { offset: "1", "stop-opacity": "0" });
+    s2.style.stopColor = "var(--ak-chart-sheen)";
+    sheen.appendChild(s1);
+    sheen.appendChild(s2);
+    defs.appendChild(sheen);
+    for (let i = 0; i < seriesCount; i++) {
+      const fade = svg("linearGradient", { id: `ak-fade-${stamp2}-${i}`, x1: 0, y1: 0, x2: 0, y2: 1 });
+      const f1 = svg("stop", { offset: "0", "stop-opacity": "0.20" });
+      f1.style.stopColor = SERIES_VARS[i % SERIES_VARS.length];
+      const f2 = svg("stop", { offset: "1", "stop-opacity": "0" });
+      f2.style.stopColor = SERIES_VARS[i % SERIES_VARS.length];
+      fade.appendChild(f1);
+      fade.appendChild(f2);
+      defs.appendChild(fade);
+    }
+    node.appendChild(defs);
+    return { sheen: `url(#${sheenId})`, fade: (i) => `url(#ak-fade-${stamp2}-${i % SERIES_VARS.length})` };
+  }
+
+  // src/static/sdk-libs/atelier/chart-shapes.js
+  var TONES = { ok: "var(--ak-ok-text)", warn: "var(--ak-warn-text)", err: "var(--ak-err-text)" };
+  function renderDonut(ctx, data) {
+    const slices = (data && Array.isArray(data.slices) ? data.slices : []).filter((s) => s && typeof s.value === "number" && s.value > 0);
+    if (!slices.length) return ctx.empty();
+    const total = slices.reduce((sum, s) => sum + s.value, 0);
+    ctx.root.setAttribute("aria-label", (ctx.title ? ctx.title + " — " : "") + slices.map((s) => s.label + " " + s.value).join(", "));
+    const R = 88;
+    const STROKE = 26;
+    const C = 2 * Math.PI * R;
+    const GAP = 4;
+    const wrap = el("div", { class: "ak-chart__donutwrap" });
+    const node = svg("svg", { viewBox: "0 0 230 230", class: "ak-chart__svg ak-chart__svg--donut", "aria-hidden": "true" });
+    node.appendChild(svg("circle", { cx: 115, cy: 115, r: R, class: "ak-chart__ring", "stroke-width": STROKE }));
+    let offset = 0;
+    slices.forEach((s, i) => {
+      const frac = s.value / total;
+      const ring = svg("circle", {
+        cx: 115,
+        cy: 115,
+        r: R,
+        class: "ak-chart__slice",
+        style: `stroke:${SERIES_VARS[i % SERIES_VARS.length]}`,
+        "stroke-width": STROKE,
+        "stroke-linecap": slices.length > 1 ? "round" : "butt",
+        "stroke-dasharray": `${Math.max(frac * C - GAP, 0.5)} ${C}`,
+        "stroke-dashoffset": String(-offset * C),
+        transform: "rotate(-90 115 115)"
+      });
+      if (!ctx.still()) {
+        ring.classList.add("ak-chart__slice--enter");
+        ring.style.animationDelay = `${i * 70}ms`;
+      }
+      node.appendChild(ring);
+      offset += frac;
+    });
+    wrap.appendChild(node);
+    const centre = el("div", { class: "ak-chart__centre" }, [
+      el("b", { text: fmtTick(total) }),
+      data.delta && data.delta.text ? el("span", { class: "ak-chart__delta", text: String(data.delta.text) }) : null
+    ]);
+    if (data.delta && TONES[data.delta.tone]) {
+      centre.lastChild.style.color = TONES[data.delta.tone];
+    }
+    wrap.appendChild(centre);
+    ctx.root.appendChild(wrap);
+    const legend = el(
+      "figcaption",
+      { class: "ak-chart__legend" },
+      slices.map((s) => el("span", { class: "ak-chart__key" }, [
+        el("span", { class: "ak-chart__swatch" }),
+        el("span", { text: `${s.label} · ${fmtTick(s.value)}` })
+      ]))
+    );
+    slices.forEach((s, i) => {
+      const sw = legend.children[i] && legend.children[i].firstChild;
+      if (sw) sw.style.background = SERIES_VARS[i % SERIES_VARS.length];
+    });
+    ctx.root.appendChild(legend);
+  }
+  function renderCalendar(ctx, data) {
+    const days = (data && Array.isArray(data.days) ? data.days : []).map((d) => ({ date: new Date(d.date), value: Number(d.value) || 0 })).filter((d) => !isNaN(d.date.getTime())).sort((a, b) => a.date.getTime() - b.date.getTime());
+    if (!days.length) return ctx.empty();
+    const max = days.reduce((m, d) => Math.max(m, d.value), 0) || 1;
+    const start = new Date(days[0].date);
+    start.setDate(start.getDate() - (start.getDay() + 6) % 7);
+    const spanDays = Math.round((days[days.length - 1].date.getTime() - start.getTime()) / 864e5) + 1;
+    const weeks = Math.min(Math.ceil(spanDays / 7), 53);
+    const CELL = 13;
+    const GAP = 3;
+    const width = weeks * (CELL + GAP) + GAP;
+    const height = 7 * (CELL + GAP) + GAP + 16;
+    ctx.root.setAttribute("aria-label", (ctx.title ? ctx.title + " — " : "") + days.length + " d");
+    const byKey = /* @__PURE__ */ new Map();
+    for (const d of days) byKey.set(d.date.toISOString().slice(0, 10), d.value);
+    const node = svg("svg", { viewBox: `0 0 ${width} ${height}`, class: "ak-chart__svg ak-chart__svg--calendar", "aria-hidden": "true" });
+    const cursor = new Date(start);
+    const monthAt = [];
+    for (let w = 0; w < weeks; w++) {
+      for (let dow = 0; dow < 7; dow++) {
+        const key = cursor.toISOString().slice(0, 10);
+        const value = byKey.get(key);
+        if (cursor.getDate() === 1) monthAt.push({ w, m: cursor.getMonth() });
+        const cell = svg("rect", {
+          x: GAP + w * (CELL + GAP),
+          y: GAP + dow * (CELL + GAP),
+          width: CELL,
+          height: CELL,
+          rx: 3,
+          class: "ak-chart__day" + (value === void 0 ? " ak-chart__day--blank" : "")
+        });
+        if (value !== void 0) {
+          cell.setAttribute("style", `fill: var(--ak-accent); fill-opacity: ${(0.15 + 0.85 * (value / max)).toFixed(3)}`);
+        }
+        node.appendChild(cell);
+        cursor.setDate(cursor.getDate() + 1);
+      }
+    }
+    const MONTHS = [t("m1"), t("m2"), t("m3"), t("m4"), t("m5"), t("m6"), t("m7"), t("m8"), t("m9"), t("m10"), t("m11"), t("m12")];
+    for (const mark of monthAt) {
+      const label = svg("text", { x: GAP + mark.w * (CELL + GAP), y: height - 4, class: "ak-chart__tick" });
+      label.textContent = MONTHS[mark.m];
+      node.appendChild(label);
+    }
+    ctx.root.appendChild(node);
+    const ramp = el("figcaption", { class: "ak-chart__ramp" }, [
+      el("span", { text: t("heatLess") }),
+      ...[0.15, 0.43, 0.71, 1].map((o) => {
+        const sw = el("span", { class: "ak-chart__rampcell" });
+        sw.style.opacity = String(o);
+        return sw;
+      }),
+      el("span", { text: t("heatMore") })
+    ]);
+    ctx.root.appendChild(ramp);
+  }
+  function renderScatter(ctx, data) {
+    const points = (data && Array.isArray(data.points) ? data.points : []).filter((p) => p && typeof p.x === "number" && typeof p.y === "number");
+    if (!points.length) return ctx.empty();
+    ctx.root.setAttribute("aria-label", (ctx.title ? ctx.title + " — " : "") + points.length + " pts");
+    const W4 = 560;
+    const H4 = 300;
+    const PAD3 = { top: 16, right: 16, bottom: 36, left: 50 };
+    let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
+    for (const p of points) {
+      if (p.x < xMin) xMin = p.x;
+      if (p.x > xMax) xMax = p.x;
+      if (p.y < yMin) yMin = p.y;
+      if (p.y > yMax) yMax = p.y;
+    }
+    if (xMax === xMin) xMax = xMin + 1;
+    if (yMax === yMin) yMax = yMin + 1;
+    const xStep = tickStep(xMax - xMin);
+    const yStep = tickStep(yMax - yMin);
+    xMin = Math.floor(xMin / xStep) * xStep;
+    xMax = Math.ceil(xMax / xStep) * xStep;
+    yMin = Math.floor(yMin / yStep) * yStep;
+    yMax = Math.ceil(yMax / yStep) * yStep;
+    const X = (v) => PAD3.left + (W4 - PAD3.left - PAD3.right) * ((v - xMin) / (xMax - xMin));
+    const Y = (v) => PAD3.top + (H4 - PAD3.top - PAD3.bottom) * (1 - (v - yMin) / (yMax - yMin));
+    const node = svg("svg", { viewBox: `0 0 ${W4} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
+    for (let v = yMin; v <= yMax + yStep / 2; v += yStep) {
+      node.appendChild(svg("line", { x1: PAD3.left, x2: W4 - PAD3.right, y1: Y(v), y2: Y(v), class: "ak-chart__grid" }));
+      const tk = svg("text", { x: PAD3.left - 8, y: Y(v) + 4, class: "ak-chart__tick", "text-anchor": "end" });
+      tk.textContent = fmtTick(v);
+      node.appendChild(tk);
+    }
+    for (let v = xMin; v <= xMax + xStep / 2; v += xStep) {
+      const tk = svg("text", { x: X(v), y: H4 - PAD3.bottom + 16, class: "ak-chart__tick", "text-anchor": "middle" });
+      tk.textContent = fmtTick(v);
+      node.appendChild(tk);
+    }
+    if (points.length >= 3) {
+      const n = points.length;
+      let sx = 0, sy = 0, sxy = 0, sxx = 0;
+      for (const p of points) {
+        sx += p.x;
+        sy += p.y;
+        sxy += p.x * p.y;
+        sxx += p.x * p.x;
+      }
+      const slope = (n * sxy - sx * sy) / Math.max(n * sxx - sx * sx, 1e-9);
+      const icept = (sy - slope * sx) / n;
+      node.appendChild(svg("line", {
+        x1: X(xMin),
+        y1: Y(slope * xMin + icept),
+        x2: X(xMax),
+        y2: Y(slope * xMax + icept),
+        class: "ak-chart__trend"
+      }));
+    }
+    const still = ctx.still();
+    points.forEach((p, i) => {
+      const dot = svg("circle", { cx: X(p.x), cy: Y(p.y), r: 6, class: "ak-chart__point" });
+      if (p.label) {
+        const cap = svg("title", {});
+        cap.textContent = String(p.label);
+        dot.appendChild(cap);
+      }
+      if (!still) {
+        dot.classList.add("ak-chart__point--enter");
+        dot.style.animationDelay = `${i * 22}ms`;
+      }
+      node.appendChild(dot);
+    });
+    ctx.root.appendChild(node);
+    if (data.xLabel || data.yLabel) {
+      ctx.root.appendChild(el("figcaption", { class: "ak-chart__legend" }, [
+        data.xLabel ? el("span", { class: "ak-chart__key", text: `x · ${data.xLabel}` }) : null,
+        data.yLabel ? el("span", { class: "ak-chart__key", text: `y · ${data.yLabel}` }) : null
+      ]));
+    }
+  }
+
+  // src/static/sdk-libs/atelier/chart.js
+  var W = 560;
+  var H = 300;
+  var PAD = { top: 16, right: 14, bottom: 34, left: 46 };
   function chart(spec) {
-    const kind = spec.kind === "donut" || spec.kind === "calendar" ? spec.kind : "axes";
+    const kind = ["donut", "calendar", "scatter"].indexOf(spec.kind) >= 0 ? spec.kind : "axes";
     const root = el("figure", {
       class: "ak-root ak-chart" + (spec.presentation === "mural" ? " ak-chart--mural" : ""),
       role: "img"
     });
     if (spec.target) resolve(spec.target).appendChild(root);
     let emptyCard = null;
-    function showEmpty() {
-      const e = spec.empty || {};
-      emptyCard = emptyState({ target: root, tone: "quiet", title: e.title || t("empty"), hint: e.hint || t("emptyHint") });
-    }
+    const ctx = {
+      root,
+      still: () => reducedMotion(),
+      empty: () => {
+        const e = spec.empty || {};
+        emptyCard = emptyState({ target: root, tone: "quiet", title: e.title || t("empty"), hint: e.hint || t("emptyHint") });
+      },
+      title: spec.title
+    };
     function render(data) {
       if (emptyCard) {
         emptyCard.destroy();
         emptyCard = null;
       }
       clear(root);
-      if (kind === "donut") return renderDonut(data);
-      if (kind === "calendar") return renderCalendar(data);
+      if (kind === "donut") return renderDonut(ctx, data);
+      if (kind === "calendar") return renderCalendar(ctx, data);
+      if (kind === "scatter") return renderScatter(ctx, data);
+      renderAxes(data);
+    }
+    function renderAxes(data) {
       const labels = data && Array.isArray(data.labels) ? data.labels : [];
       const series = (data && Array.isArray(data.series) ? data.series : []).filter((s) => s && Array.isArray(s.values) && s.values.length > 0);
-      if (!labels.length || !series.length) {
-        const e = spec.empty || {};
-        emptyCard = emptyState({ target: root, tone: "quiet", title: e.title || t("empty"), hint: e.hint || t("emptyHint") });
-        return;
-      }
+      if (!labels.length || !series.length) return ctx.empty();
+      const stacked = !!data.stacked;
+      const horizontal = !!data.horizontal;
       root.setAttribute("aria-label", (spec.title ? spec.title + " — " : "") + series.map((s) => s.label).join(", "));
+      const bars = series.filter((s) => (s.kind || "bar") === "bar");
+      const lines = series.filter((s) => s.kind === "line" || s.kind === "area");
       let min = 0;
       let max = 0;
-      for (const s of series) for (const v of s.values) {
-        if (v < min) min = v;
-        if (v > max) max = v;
+      if (stacked && bars.length) {
+        for (let i = 0; i < labels.length; i++) {
+          let up = 0;
+          let down = 0;
+          for (const s of bars) {
+            const v = s.values[i] || 0;
+            if (v >= 0) up += v;
+            else down += v;
+          }
+          if (up > max) max = up;
+          if (down < min) min = down;
+        }
+        for (const s of lines) for (const v of s.values) {
+          if (v < min) min = v;
+          if (v > max) max = v;
+        }
+      } else {
+        for (const s of series) for (const v of s.values) {
+          if (v < min) min = v;
+          if (v > max) max = v;
+        }
       }
       if (max === min) max = min + 1;
       const step = tickStep(max - min);
       min = Math.floor(min / step) * step;
       max = Math.ceil(max / step) * step;
-      const innerW = W - PAD.left - PAD.right;
-      const innerH = H - PAD.top - PAD.bottom;
-      const x = (i) => PAD.left + innerW * i / labels.length;
-      const slotW = innerW / labels.length;
-      const y = (v) => PAD.top + innerH * (1 - (v - min) / (max - min));
-      const node = svg("svg", { viewBox: `0 0 ${W} ${H}`, class: "ak-chart__svg", "aria-hidden": "true" });
+      const width = horizontal ? H : W;
+      const height = horizontal ? W : H;
+      const pad = horizontal ? { top: 14, right: 20, bottom: 16, left: 86 } : PAD;
+      const innerAlong = horizontal ? height - pad.top - pad.bottom : width - pad.left - pad.right;
+      const innerCross = horizontal ? width - pad.left - pad.right : height - pad.top - pad.bottom;
+      const along = (i) => (horizontal ? pad.top : pad.left) + innerAlong * i / labels.length;
+      const slot = innerAlong / labels.length;
+      const cross = (v) => horizontal ? pad.left + innerCross * ((v - min) / (max - min)) : pad.top + innerCross * (1 - (v - min) / (max - min));
+      const node = svg("svg", { viewBox: `0 0 ${horizontal ? width : W} ${horizontal ? height : H}`, class: "ak-chart__svg", "aria-hidden": "true" });
+      const defs = defsFor(node, series.length);
       for (let v = min; v <= max + step / 2; v += step) {
-        const gy = y(v);
-        node.appendChild(svg("line", { x1: PAD.left, x2: W - PAD.right, y1: gy, y2: gy, class: v === 0 ? "ak-chart__zero" : "ak-chart__grid" }));
-        const tick = svg("text", { x: PAD.left - 6, y: gy + 4, class: "ak-chart__tick", "text-anchor": "end" });
+        const g = cross(v);
+        node.appendChild(horizontal ? svg("line", { x1: g, x2: g, y1: pad.top, y2: height - pad.bottom, class: v === 0 ? "ak-chart__zero" : "ak-chart__grid" }) : svg("line", { x1: pad.left, x2: width - pad.right, y1: g, y2: g, class: v === 0 ? "ak-chart__zero" : "ak-chart__grid" }));
+        const tick = horizontal ? svg("text", { x: g, y: height - pad.bottom + 14, class: "ak-chart__tick", "text-anchor": "middle" }) : svg("text", { x: pad.left - 8, y: g + 4, class: "ak-chart__tick", "text-anchor": "end" });
         tick.textContent = fmtTick(v);
         node.appendChild(tick);
       }
       labels.forEach((label, i) => {
-        const tx = svg("text", { x: x(i) + slotW / 2, y: H - PAD.bottom + 18, class: "ak-chart__tick", "text-anchor": "middle" });
+        const tx = horizontal ? svg("text", { x: pad.left - 10, y: along(i) + slot / 2 + 4, class: "ak-chart__tick", "text-anchor": "end" }) : svg("text", { x: along(i) + slot / 2, y: height - pad.bottom + 18, class: "ak-chart__tick", "text-anchor": "middle" });
         tx.textContent = String(label);
         node.appendChild(tx);
       });
-      const still = reducedMotion();
-      const bars = series.filter((s) => (s.kind || "bar") === "bar");
-      const lines = series.filter((s) => s.kind === "line" || s.kind === "area");
+      const still = ctx.still();
       for (const s of series) {
-        if (s.kind !== "area") continue;
-        const colour = SERIES_VARS[series.indexOf(s) % SERIES_VARS.length];
-        const pts = s.values.slice(0, labels.length).map((v, i) => `${x(i) + slotW / 2},${y(v)}`);
-        const first = x(0) + slotW / 2;
-        const last = x(Math.min(s.values.length, labels.length) - 1) + slotW / 2;
-        const poly = svg("polygon", {
-          points: `${first},${y(0)} ` + pts.join(" ") + ` ${last},${y(0)}`,
-          class: "ak-chart__area",
-          style: `fill:${colour}`
-        });
-        node.appendChild(poly);
+        if (s.kind !== "area" || horizontal) continue;
+        const si = series.indexOf(s);
+        const pts = s.values.slice(0, labels.length).map((v, i) => ({ x: along(i) + slot / 2, y: cross(v) }));
+        const path = smoothPath(pts) + ` L ${pts[pts.length - 1].x} ${cross(0)} L ${pts[0].x} ${cross(0)} Z`;
+        node.appendChild(svg("path", { d: path, class: "ak-chart__area", fill: defs.fade(si) }));
       }
-      const groupPad = slotW * 0.18;
-      const barW = bars.length ? (slotW - groupPad * 2) / bars.length : 0;
-      bars.forEach((s, si) => {
-        const colour = SERIES_VARS[series.indexOf(s) % SERIES_VARS.length];
-        s.values.slice(0, labels.length).forEach((v, i) => {
-          const top = Math.min(y(v), y(0));
-          const height = Math.abs(y(v) - y(0));
-          const rect = svg("rect", {
-            x: x(i) + groupPad + si * barW + 1,
-            y: top,
-            width: Math.max(barW - 2, 1),
-            height: Math.max(height, 0.5),
-            class: "ak-chart__bar",
-            style: `fill:${colour}`
+      const groupPad = slot * 0.16;
+      const radius = Math.min(7, Math.max(3, (slot - groupPad * 2) / (stacked ? 1 : Math.max(bars.length, 1)) * 0.28));
+      if (stacked) {
+        const stackW = Math.max(slot - groupPad * 2, 2);
+        for (let i = 0; i < labels.length; i++) {
+          let acc = 0;
+          bars.forEach((s, bi) => {
+            const v = s.values[i] || 0;
+            if (!v) return;
+            const from = cross(acc);
+            const to = cross(acc + v);
+            acc += v;
+            const topMost = bi === bars.length - 1;
+            const rect = barRect(along(i) + groupPad, from, to, stackW, topMost ? radius : 0);
+            rect.setAttribute("style", `fill:${SERIES_VARS[series.indexOf(s) % SERIES_VARS.length]}`);
+            decorateBar(rect, i);
+            node.appendChild(rect);
+            if (topMost) node.appendChild(sheenOver(rect));
           });
-          if (!still) {
-            rect.setAttribute("style", `fill:${colour}; transform-origin: center ${y(0)}px; animation-delay: ${i * 40}ms`);
-            rect.classList.add("ak-chart__bar--enter");
-          }
-          node.appendChild(rect);
+        }
+      } else {
+        const barW = bars.length ? (slot - groupPad * 2) / bars.length : 0;
+        bars.forEach((s, bi) => {
+          const colour = SERIES_VARS[series.indexOf(s) % SERIES_VARS.length];
+          s.values.slice(0, labels.length).forEach((v, i) => {
+            const rect = barRect(along(i) + groupPad + bi * barW + 1, cross(0), cross(v), Math.max(barW - 2, 1), radius);
+            rect.setAttribute("style", `fill:${colour}`);
+            decorateBar(rect, i);
+            node.appendChild(rect);
+            node.appendChild(sheenOver(rect));
+          });
         });
-      });
-      lines.forEach((s) => {
+      }
+      function barRect(alongPos, fromCross, toCross, thickness, r) {
+        const lo = Math.min(fromCross, toCross);
+        const span = Math.max(Math.abs(toCross - fromCross), 0.5);
+        return horizontal ? svg("rect", { x: lo, y: alongPos, width: span, height: thickness, rx: r, class: "ak-chart__bar" }) : svg("rect", { x: alongPos, y: lo, width: thickness, height: span, rx: r, class: "ak-chart__bar" });
+      }
+      function sheenOver(rect) {
+        const s = (
+          /** @type {SVGRectElement} */
+          rect.cloneNode(false)
+        );
+        s.setAttribute("style", `fill:${defs.sheen}`);
+        s.setAttribute("class", "ak-chart__sheen");
+        return s;
+      }
+      function decorateBar(rect, i) {
+        if (!still) {
+          rect.classList.add("ak-chart__bar--enter");
+          rect.style.transformOrigin = horizontal ? `${cross(0)}px center` : `center ${cross(0)}px`;
+          rect.style.animationDelay = `${i * 36}ms`;
+        }
+      }
+      for (const s of lines) {
+        if (horizontal) continue;
         const colour = SERIES_VARS[series.indexOf(s) % SERIES_VARS.length];
-        const points = s.values.slice(0, labels.length).map((v, i) => `${x(i) + slotW / 2},${y(v)}`).join(" ");
-        const line = svg("polyline", { points, class: "ak-chart__line", style: `stroke:${colour}` });
+        const pts = s.values.slice(0, labels.length).map((v, i) => ({ x: along(i) + slot / 2, y: cross(v) }));
+        const line = svg("path", { d: smoothPath(pts), class: "ak-chart__line", style: `stroke:${colour}` });
         if (!still) line.classList.add("ak-chart__line--enter");
         node.appendChild(line);
-      });
+        const last = pts[pts.length - 1];
+        node.appendChild(svg("circle", { cx: last.x, cy: last.y, r: 5, class: "ak-chart__dot", style: `stroke:${colour}` }));
+      }
       root.appendChild(node);
-      const legend = el(
-        "figcaption",
-        { class: "ak-chart__legend" },
-        series.map((s) => el("span", { class: "ak-chart__key" }, [
-          el("span", { class: "ak-chart__swatch" + (s.kind === "line" ? " ak-chart__swatch--line" : "") }),
-          el("span", { text: s.label })
-        ]))
-      );
-      series.forEach((s, i) => {
-        const sw = legend.children[i] && legend.children[i].firstChild;
-        if (sw) sw.style.background = SERIES_VARS[i % SERIES_VARS.length];
-      });
-      root.appendChild(legend);
+      legendFor(series);
+      if (!horizontal) wireTooltip(node, labels, series, along, slot);
+      if (data.note && !horizontal) noteBubble(node, data.note, labels, along, slot);
       if (!still) {
         for (const line of node.querySelectorAll(".ak-chart__line--enter")) {
           const len = (
-            /** @type {SVGPolylineElement} */
+            /** @type {SVGPathElement} */
             line.getTotalLength()
           );
           line.setAttribute("stroke-dasharray", String(len));
@@ -2522,97 +2852,69 @@
         }
       }
     }
-    function renderDonut(data) {
-      const slices = (data && Array.isArray(data.slices) ? data.slices : []).filter((s) => s && typeof s.value === "number" && s.value > 0);
-      if (!slices.length) return showEmpty();
-      const total = slices.reduce((sum, s) => sum + s.value, 0);
-      root.setAttribute("aria-label", (spec.title ? spec.title + " — " : "") + slices.map((s) => s.label + " " + s.value).join(", "));
-      const R2 = 84;
-      const STROKE = 30;
-      const C = 2 * Math.PI * R2;
-      const node = svg("svg", { viewBox: "0 0 240 240", class: "ak-chart__svg ak-chart__svg--donut", "aria-hidden": "true" });
-      let offset = 0;
-      slices.forEach((s, i) => {
-        const frac = s.value / total;
-        const ring = svg("circle", {
-          cx: 120,
-          cy: 120,
-          r: R2,
-          class: "ak-chart__slice",
-          style: `stroke:${SERIES_VARS[i % SERIES_VARS.length]}`,
-          "stroke-width": STROKE,
-          "stroke-dasharray": `${Math.max(frac * C - 3, 0.5)} ${C}`,
-          "stroke-dashoffset": String(-offset * C),
-          transform: "rotate(-90 120 120)"
-        });
-        if (!reducedMotion()) {
-          ring.classList.add("ak-chart__slice--enter");
-          ring.style.animationDelay = i * 70 + "ms";
-        }
-        node.appendChild(ring);
-        offset += frac;
-      });
-      const totalText = svg("text", { x: 120, y: 126, class: "ak-chart__total", "text-anchor": "middle" });
-      totalText.textContent = fmtTick(total);
-      node.appendChild(totalText);
-      root.appendChild(node);
+    function legendFor(series) {
       const legend = el(
         "figcaption",
         { class: "ak-chart__legend" },
-        slices.map((s) => el("span", { class: "ak-chart__key" }, [
-          el("span", { class: "ak-chart__swatch" }),
-          el("span", { text: s.label + " · " + fmtTick(s.value) })
+        series.map((s) => el("span", { class: "ak-chart__key" }, [
+          el("span", { class: "ak-chart__swatch" + (s.kind === "line" || s.kind === "area" ? " ak-chart__swatch--line" : "") }),
+          el("span", { text: s.label })
         ]))
       );
-      slices.forEach((s, i) => {
+      series.forEach((s, i) => {
         const sw = legend.children[i] && legend.children[i].firstChild;
         if (sw) sw.style.background = SERIES_VARS[i % SERIES_VARS.length];
       });
       root.appendChild(legend);
     }
-    function renderCalendar(data) {
-      const days = (data && Array.isArray(data.days) ? data.days : []).map((d) => ({ date: new Date(d.date), value: Number(d.value) || 0 })).filter((d) => !isNaN(d.date.getTime())).sort((a, b) => a.date.getTime() - b.date.getTime());
-      if (!days.length) return showEmpty();
-      const max = days.reduce((m, d) => Math.max(m, d.value), 0) || 1;
-      const first = days[0].date;
-      const start = new Date(first);
-      start.setDate(start.getDate() - (start.getDay() + 6) % 7);
-      const spanDays = Math.round((days[days.length - 1].date.getTime() - start.getTime()) / 864e5) + 1;
-      const weeks = Math.min(Math.ceil(spanDays / 7), 53);
-      const CELL = 13;
-      const GAP = 3;
-      const width = weeks * (CELL + GAP) + GAP;
-      const height = 7 * (CELL + GAP) + GAP;
-      root.setAttribute("aria-label", (spec.title ? spec.title + " — " : "") + days.length + " d");
-      const byKey = /* @__PURE__ */ new Map();
-      for (const d of days) byKey.set(d.date.toISOString().slice(0, 10), d.value);
-      const node = svg("svg", { viewBox: `0 0 ${width} ${height}`, class: "ak-chart__svg ak-chart__svg--calendar", "aria-hidden": "true" });
-      const cursor = new Date(start);
-      for (let w = 0; w < weeks; w++) {
-        for (let dow = 0; dow < 7; dow++) {
-          const key = cursor.toISOString().slice(0, 10);
-          const value = byKey.get(key);
-          const cell = svg("rect", {
-            x: GAP + w * (CELL + GAP),
-            y: GAP + dow * (CELL + GAP),
-            width: CELL,
-            height: CELL,
-            rx: 3,
-            class: "ak-chart__day" + (value === void 0 ? " ak-chart__day--blank" : "")
-          });
-          if (value !== void 0) {
-            cell.setAttribute("style", "fill: var(--ak-accent); fill-opacity: " + (0.15 + 0.85 * (value / max)).toFixed(3));
-          }
-          node.appendChild(cell);
-          cursor.setDate(cursor.getDate() + 1);
-        }
-      }
-      root.appendChild(node);
+    function wireTooltip(node, labels, series, along, slot) {
+      const tip = el("div", { class: "ak-chart__tip", hidden: true });
+      root.appendChild(tip);
+      node.addEventListener("pointermove", (ev) => {
+        const box = node.getBoundingClientRect();
+        const sx = (ev.clientX - box.left) * (W / box.width);
+        const i = Math.max(0, Math.min(labels.length - 1, Math.floor((sx - along(0)) / slot)));
+        clear(tip);
+        tip.appendChild(el("div", { class: "ak-chart__tip-label", text: String(labels[i]) }));
+        series.forEach((s, si) => {
+          const row = el("div", { class: "ak-chart__tip-row" }, [
+            el("span", { class: "ak-chart__tip-swatch" }),
+            el("span", { text: s.label }),
+            el("b", { text: fmtTick(s.values[i] ?? 0) })
+          ]);
+          row.firstChild.style.background = SERIES_VARS[si % SERIES_VARS.length];
+          tip.appendChild(row);
+        });
+        tip.hidden = false;
+        const rootBox = root.getBoundingClientRect();
+        const px = (along(i) + slot / 2) / W * box.width + (box.left - rootBox.left);
+        tip.style.left = `${Math.max(8, Math.min(rootBox.width - tip.offsetWidth - 8, px - tip.offsetWidth / 2))}px`;
+        tip.style.top = `${box.top - rootBox.top + 6}px`;
+      });
+      node.addEventListener("pointerleave", () => {
+        tip.hidden = true;
+      });
+    }
+    function noteBubble(node, note, labels, along, slot) {
+      const i = labels.indexOf(note.label);
+      if (i < 0 || !note.text) return;
+      const bubble = el("div", { class: "ak-chart__note" }, [
+        el("span", { class: "ak-chart__note-label", text: String(note.label) }),
+        el("span", { text: String(note.text) })
+      ]);
+      root.appendChild(bubble);
+      requestAnimationFrame(() => {
+        const box = node.getBoundingClientRect();
+        const rootBox = root.getBoundingClientRect();
+        const px = (along(i) + slot / 2) / W * box.width + (box.left - rootBox.left);
+        bubble.style.left = `${Math.max(8, Math.min(rootBox.width - bubble.offsetWidth - 8, px - bubble.offsetWidth / 2))}px`;
+        bubble.style.top = `${box.top - rootBox.top + 4}px`;
+      });
     }
     render(spec.data);
     return {
       el: root,
-      /** @param {{ data: ChartData|null }} patch */
+      /** @param {{ data: object|null }} patch */
       set(patch) {
         if (!patch) return;
         render(patch.data);
@@ -2625,7 +2927,7 @@
   }
 
   // src/static/sdk-libs/atelier/matrix.js
-  var TONES = ["ok", "warn", "err", "accent", "plain"];
+  var TONES2 = ["ok", "warn", "err", "accent", "plain"];
   function matrix(spec) {
     const root = el("div", { class: "ak-root ak-matrix" });
     if (spec.target) resolve(spec.target).appendChild(root);
@@ -2663,7 +2965,7 @@
         tr.appendChild(label);
         for (const col of cols) {
           const cell = cellsByCol.get(col.id);
-          const tone = cell && TONES.includes(cell.tone || "") ? cell.tone : cell ? "plain" : null;
+          const tone = cell && TONES2.includes(cell.tone || "") ? cell.tone : cell ? "plain" : null;
           tr.appendChild(el("td", { class: "ak-matrix__cell" }, [
             tone === null ? null : el("span", {
               class: "ak-matrix__chip ak-matrix__cell--" + tone,
@@ -2910,6 +3212,26 @@
     });
     return threePromise;
   }
+  var loadersPromise = null;
+  function ensureLoaders() {
+    return ensureThree().then(function(THREE) {
+      if (THREE.Addons.GLTFLoader) return THREE;
+      if (loadersPromise) return loadersPromise;
+      loadersPromise = new Promise(function(ok, fail) {
+        const s = document.createElement("script");
+        s.src = NODE_URL + "/lib/three-world-loaders@1.min.js";
+        s.onload = function() {
+          ok(THREE);
+        };
+        s.onerror = function() {
+          loadersPromise = null;
+          fail(new Error("three-world-loaders failed to load"));
+        };
+        document.head.appendChild(s);
+      });
+      return loadersPromise;
+    });
+  }
   var colorCtx = null;
   function tokenColor(node, name, fallbackName) {
     const probe = document.createElement("span");
@@ -2928,7 +3250,7 @@
     return 1 - Math.pow(1 - x, 3);
   }
   function scene3d(spec) {
-    const kind = spec.kind === "sky" || spec.kind === "bars" ? spec.kind : "orb";
+    const kind = ["sky", "bars", "model"].indexOf(spec.kind) >= 0 ? spec.kind : "orb";
     const root = el("figure", { class: "ak-root ak-scene", "data-ak-scene": kind });
     if (spec.target) resolve(spec.target).appendChild(root);
     if (spec.title) root.appendChild(el("figcaption", { class: "ak-scene__title" }, spec.title));
@@ -2937,7 +3259,7 @@
     const wait = skeleton({ target: stage, rows: 2 });
     let destroyed = false;
     let world = null;
-    ensureThree().then(function(THREE) {
+    (kind === "model" ? ensureLoaders() : ensureThree()).then(function(THREE) {
       if (destroyed) return;
       wait.destroy();
       world = buildWorld(THREE, stage, kind, spec, root);
@@ -2973,10 +3295,19 @@
     const controls = new THREE.Addons.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = !reducedMotion();
     controls.enablePan = false;
-    controls.enableZoom = kind === "bars";
+    controls.enableZoom = kind === "bars" || kind === "model";
     if (kind === "sky") {
       controls.enableZoom = false;
       controls.rotateSpeed = -0.35;
+    }
+    if (kind === "model") {
+      renderer.toneMappingExposure = 1.15;
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      scene.environment = pmrem.fromScene(new THREE.Addons.RoomEnvironment(), 0.04).texture;
+      const inkC = new THREE.Color(tokenColor(root, "--ak-ink"));
+      const bgC = new THREE.Color(tokenColor(root, "--ak-bg"));
+      const luma = (c) => c.r + c.g + c.b;
+      scene.background = luma(inkC) < luma(bgC) ? inkC : bgC;
     }
     let raf = 0;
     let entranceUntil = 0;
@@ -3032,6 +3363,12 @@
       scene.add(group);
     }
     function frameCamera(cols) {
+      if (kind === "model") {
+        camera.position.set(2.6, 1.7, 4.6);
+        controls.target.set(0, 1.1, 0);
+        controls.update();
+        return;
+      }
       if (kind === "sky") {
         camera.position.set(0, 2, 0.5);
         controls.target.set(0, 16, -22);
@@ -3051,6 +3388,68 @@
       const surface = tokenColor(root, "--ak-surface-2", "--ak-surface");
       scene.fog = null;
       let barCols = 3;
+      if (kind === "model") {
+        const url = data && data.url ? String(data.url) : "";
+        if (!url) {
+          applyEntrance = function() {
+          };
+          wake(0);
+          return;
+        }
+        const shimmer = skeleton({ target: stage, rows: 2 });
+        new THREE.Addons.GLTFLoader().load(url, function(gltf) {
+          shimmer.destroy();
+          const model = gltf.scene;
+          const box = new THREE.Box3().setFromObject(model);
+          const size = box.getSize(new THREE.Vector3());
+          const centre = box.getCenter(new THREE.Vector3());
+          const scale = 2.6 / Math.max(size.x, size.y, size.z, 1e-6);
+          model.scale.setScalar(scale);
+          model.position.set(-centre.x * scale, -box.min.y * scale, -centre.z * scale);
+          group.add(model);
+          const c = document.createElement("canvas");
+          c.width = c.height = 128;
+          const g2 = c.getContext("2d");
+          const grad = g2.createRadialGradient(64, 64, 8, 64, 64, 64);
+          const channels = function(s) {
+            return (s.match(/\d+/g) || ["0", "0", "0"]).map(Number);
+          };
+          const inkCh = channels(ink);
+          const surfCh = channels(surface);
+          const shadow = (inkCh[0] + inkCh[1] + inkCh[2] <= surfCh[0] + surfCh[1] + surfCh[2] ? inkCh : surfCh).map(function(v) {
+            return Math.round(v * 0.3);
+          }).join(",");
+          grad.addColorStop(0, "rgba(" + shadow + ",0.42)");
+          grad.addColorStop(1, "rgba(" + shadow + ",0)");
+          g2.fillStyle = grad;
+          g2.fillRect(0, 0, 128, 128);
+          const disc = new THREE.Mesh(
+            new THREE.PlaneGeometry(3.6, 3.6).rotateX(-Math.PI / 2),
+            new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false })
+          );
+          disc.position.y = 1e-3;
+          group.add(disc);
+          applyEntrance = function(p) {
+            model.rotation.y = (1 - p) * 1.2;
+            model.position.y = -box.min.y * scale + (1 - p) * 0.35;
+          };
+          frameCamera(3);
+          clock.start = performance.now();
+          entranceUntil = reducedMotion() ? clock.start : clock.start + 900;
+          if (reducedMotion()) applyEntrance(1);
+          wake(reducedMotion() ? 0 : 950);
+        }, void 0, function() {
+          shimmer.destroy();
+          emptyState({
+            target: stage,
+            title: spec.empty && spec.empty.title || "3D is resting",
+            hint: spec.empty && spec.empty.hint || "The model could not load from its address."
+          });
+        });
+        applyEntrance = function() {
+        };
+        return;
+      }
       if (kind === "sky") {
         const sky = new THREE.Addons.Sky();
         sky.scale.setScalar(300);
@@ -3600,9 +3999,9 @@
     for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
     return node;
   }
-  var TONES2 = ["ok", "warn", "err", "plain"];
+  var TONES3 = ["ok", "warn", "err", "plain"];
   function toneOf(value) {
-    return TONES2.indexOf(value) >= 0 ? value : "plain";
+    return TONES3.indexOf(value) >= 0 ? value : "plain";
   }
   function health(spec) {
     const root = el("div", { class: "ak-root ak-health", role: "list" });
@@ -3723,22 +4122,17 @@
     const root = el("figure", { class: "ak-root ak-gauge", role: "img" });
     if (spec.target) resolve(spec.target).appendChild(root);
     let emptyCard = null;
-    const R = 84;
-    const CX = 100;
-    const CY = 104;
-    const SWEEP = 240;
-    function angleAt(frac) {
-      return -SWEEP / 2 - 90 + SWEEP * frac;
-    }
-    function pointAt(deg, radius) {
-      const rad = deg * Math.PI / 180;
+    const R = 96;
+    const CX = 120;
+    const CY = 118;
+    function pointAt(frac, radius) {
+      const rad = Math.PI + Math.PI * Math.max(0, Math.min(1, frac));
       return [CX + radius * Math.cos(rad), CY + radius * Math.sin(rad)];
     }
     function arcPath(fromFrac, toFrac, radius) {
-      const [x1, y1] = pointAt(angleAt(fromFrac), radius);
-      const [x2, y2] = pointAt(angleAt(toFrac), radius);
-      const large = (toFrac - fromFrac) * SWEEP > 180 ? 1 : 0;
-      return "M " + x1 + " " + y1 + " A " + radius + " " + radius + " 0 " + large + " 1 " + x2 + " " + y2;
+      const [x1, y1] = pointAt(fromFrac, radius);
+      const [x2, y2] = pointAt(toFrac, radius);
+      return "M " + x1.toFixed(1) + " " + y1.toFixed(1) + " A " + radius + " " + radius + " 0 0 1 " + x2.toFixed(1) + " " + y2.toFixed(1);
     }
     function render(data) {
       if (emptyCard) {
@@ -3754,7 +4148,7 @@
       const min = typeof data.min === "number" ? data.min : 0;
       const max = typeof data.max === "number" && data.max > min ? data.max : min + 100;
       const frac = Math.max(0, Math.min(1, (data.value - min) / (max - min)));
-      const bands = Array.isArray(data.bands) && data.bands.length ? data.bands : [{ upTo: max, tone: "plain" }];
+      const bands = Array.isArray(data.bands) && data.bands.length ? data.bands : [];
       let tone = "plain";
       for (const band of bands) {
         if (data.value <= band.upTo) {
@@ -3762,19 +4156,20 @@
           break;
         }
       }
-      if (data.value > bands[bands.length - 1].upTo) tone = toneOf(bands[bands.length - 1].tone);
+      if (bands.length && data.value > bands[bands.length - 1].upTo) tone = toneOf(bands[bands.length - 1].tone);
       root.setAttribute("aria-label", (data.label ? data.label + ": " : "") + data.value + (data.unit || ""));
-      const node = svg4("svg", { viewBox: "0 0 200 160", class: "ak-gauge__svg", "aria-hidden": "true" });
+      const node = svg4("svg", { viewBox: "0 0 240 132", class: "ak-gauge__svg", "aria-hidden": "true" });
       node.appendChild(svg4("path", { d: arcPath(0, 1, R), class: "ak-gauge__track" }));
-      let from = min;
-      for (const band of bands) {
-        const f0 = Math.max(0, Math.min(1, (from - min) / (max - min)));
-        const f1 = Math.max(0, Math.min(1, (band.upTo - min) / (max - min)));
-        if (f1 > f0) node.appendChild(svg4("path", { d: arcPath(f0, f1, R), class: "ak-gauge__band ak-gauge__band--" + toneOf(band.tone) }));
-        from = band.upTo;
-      }
-      const value = svg4("path", { d: arcPath(0, Math.max(frac, 4e-3), R - 14), class: "ak-gauge__value ak-gauge__value--" + tone });
+      const value = svg4("path", { d: arcPath(0, Math.max(frac, 5e-3), R), class: "ak-gauge__value ak-gauge__value--" + tone });
       node.appendChild(value);
+      for (const band of bands.slice(0, -1)) {
+        const f = Math.max(0, Math.min(1, (band.upTo - min) / (max - min)));
+        const [x1, y1] = pointAt(f, R - 12);
+        const [x2, y2] = pointAt(f, R + 12);
+        node.appendChild(svg4("line", { x1, y1, x2, y2, class: "ak-gauge__tickmark" }));
+      }
+      const [dx, dy] = pointAt(frac, R);
+      node.appendChild(svg4("circle", { cx: dx, cy: dy, r: 8, class: "ak-gauge__marker ak-gauge__marker--" + tone }));
       root.appendChild(node);
       if (!reducedMotion()) {
         const len = (
@@ -3793,7 +4188,8 @@
           { class: "ak-gauge__reading ak-gauge__reading--" + tone },
           [el("strong", { text: String(data.value) }), data.unit ? el("span", { text: data.unit }) : null]
         ),
-        data.label ? el("span", { class: "ak-gauge__label", text: data.label }) : null
+        data.label ? el("span", { class: "ak-gauge__label", text: data.label }) : null,
+        data.sub ? el("span", { class: "ak-gauge__label", text: data.sub }) : null
       ]));
     }
     render(spec.data);
@@ -3811,7 +4207,7 @@
 
   // src/static/sdk-libs/atelier/konsole.js
   var CAP_DEFAULT = 400;
-  var TONES3 = ["ok", "warn", "err", "plain"];
+  var TONES4 = ["ok", "warn", "err", "plain"];
   function stamp(ts) {
     if (ts == null) return "";
     const d = ts instanceof Date ? ts : new Date(ts);
@@ -3829,7 +4225,7 @@
       return vane.scrollHeight - vane.scrollTop - vane.clientHeight < 24;
     }
     function lineNode(line, entering) {
-      const tone = TONES3.indexOf(line.tone) >= 0 ? line.tone : "plain";
+      const tone = TONES4.indexOf(line.tone) >= 0 ? line.tone : "plain";
       const node = el("div", { class: "ak-console__line ak-console__line--" + tone }, [
         line.ts != null ? el("span", { class: "ak-console__ts", text: stamp(line.ts) }) : null,
         el("span", { class: "ak-console__text", text: String(line.text == null ? "" : line.text) })
@@ -3887,7 +4283,7 @@
     for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
     return node;
   }
-  var TONES4 = ["ok", "warn", "err"];
+  var TONES5 = ["ok", "warn", "err"];
   var geoPromise = null;
   function ensureGeometry() {
     if (geoPromise) return geoPromise;
@@ -3989,7 +4385,7 @@
       const still = reducedMotion();
       for (const c of geo.countries) node.appendChild(svg5("path", { d: c.d, class: "ak-atlas__land" }));
       matched.forEach(function(m, i) {
-        const tone = TONES4.indexOf(m.row.tone) >= 0 ? m.row.tone : null;
+        const tone = TONES5.indexOf(m.row.tone) >= 0 ? m.row.tone : null;
         const attrs = { d: m.country.d, class: "ak-atlas__region" + (tone ? " ak-atlas__region--" + tone : "") };
         if (!tone) {
           const frac = maxValue > 0 && typeof m.row.value === "number" ? m.row.value / maxValue : 1;
@@ -4012,7 +4408,7 @@
       markers.forEach(function(m, i) {
         if (typeof m.lon !== "number" || typeof m.lat !== "number") return;
         const [x, y] = project(m.lon, m.lat);
-        const tone = TONES4.indexOf(m.tone) >= 0 ? m.tone : null;
+        const tone = TONES5.indexOf(m.tone) >= 0 ? m.tone : null;
         const dot = svg5("circle", { cx: x, cy: y, r: dotR, class: "ak-atlas__marker" + (tone ? " ak-atlas__marker--" + tone : "") });
         if (!still) {
           dot.classList.add("ak-atlas__marker--enter");
@@ -4067,7 +4463,7 @@
     });
     return leafletPromise;
   }
-  var TONES5 = ["ok", "warn", "err"];
+  var TONES6 = ["ok", "warn", "err"];
   function map(spec) {
     const root = el("figure", { class: "ak-root ak-map" });
     if (spec.target) resolve(spec.target).appendChild(root);
@@ -4100,7 +4496,7 @@
       });
     });
     function pinIcon(L, tone) {
-      const cls = TONES5.indexOf(tone) >= 0 ? " ak-map__pin--" + tone : "";
+      const cls = TONES6.indexOf(tone) >= 0 ? " ak-map__pin--" + tone : "";
       return L.divIcon({
         className: "ak-map__pinwrap",
         html: '<span class="ak-map__pin' + cls + '"></span>',
@@ -4837,11 +5233,11 @@
 
   // src/static/sdk-libs/atelier/dialog.js
   var ENTER_FROM = { center: "12px", bottom: "100%" };
-  var TONES6 = ["plain", "danger", "celebrate", "ai"];
+  var TONES7 = ["plain", "danger", "celebrate", "ai"];
   var SIZES = ["compact", "roomy", "wide"];
   function dialog(spec) {
     const from = spec.from === "bottom" ? "bottom" : "center";
-    const tone = TONES6.indexOf(spec.tone || "") >= 0 ? spec.tone : "plain";
+    const tone = TONES7.indexOf(spec.tone || "") >= 0 ? spec.tone : "plain";
     const size = SIZES.indexOf(spec.size || "") >= 0 ? spec.size : "compact";
     const dismissible = spec.dismissible !== false;
     const node = (
@@ -5020,7 +5416,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.34.0",
+    version: "0.35.0",
     // ── Shell and navigation ──
     app,
     section,
