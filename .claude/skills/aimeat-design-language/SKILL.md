@@ -2,7 +2,7 @@
 name: aimeat-design-language
 description: "The AIMEAT design language in words and in numbers: the two faces (showroom outside, poster inside), the three type tokens every font on the site descends from, the four shapes, the colours, the wordmark, and the one place a value is changed (theme.css tokens) with the map of every surface a token reaches. Use before designing or styling anything that carries the AIMEAT name, before changing a font or a colour, and to judge whether a screen looks like this product."
 metadata:
-  version: 1.3.0
+  version: 1.3.1
   updated: 2026-08-29
   owner: Jouni Miikki
 ---
@@ -34,8 +34,11 @@ alias of one of them, so a face changes once and reaches every page, outside and
 The aliases a view sheet reads, and what they resolve to: `--font-showroom` and `--font-poster` are
 `--font-headline`; `--font-showroom-body`, `--font-poster-section` and `--font` are `--font-body`.
 A sheet picks the alias that names its face (showroom outside, poster inside), and never writes a
-family name. A face has to be loaded to be used: `spa.html`'s font link and the served
-information pages (`privacy`, `terms`) carry the three families; change the link with the token.
+family name. A face has to be served to be used: every family is self-hosted under
+`aimeat/public/lib/fonts/` (woff2, latin and latin-ext, SIL OFL) and declared in
+`aimeat/public/lib/aimeat-fonts.css`, which `aimeat-theme.css` imports and the standalone pages
+link. Nothing on the node links a font CDN, and the CSP refuses one; a new face is vendored
+there, with its row in `lib/fonts/LICENSE.md`, before a token names it.
 
 Fjalla One is condensed and ships one cut, so a headline is short: one sentence, the second half in
 coral when it carries the point. Never synthesise a bold on a single-weight face. A monospace family
@@ -137,11 +140,12 @@ prism: AI and ME, at work on something, and AI-MEAT, the substance an AI is made
 
 ## Changing a value, and how far it reaches
 
-Change the token in `aimeat/public/css/theme.css` and add the face to the Google Fonts line in
-`aimeat/public/spa.html` if it is a new face. Then the surfaces below follow on their own. Static
-pages that carry their own font link (`public/front-demo*.html`, `public/wiifm*.html`,
-`src/static/app-catalog.html`) are the exception: they are edited by hand, and the list here is
-the checklist.
+Change the token in `aimeat/public/css/theme.css`; a new face is first vendored into
+`aimeat/public/lib/fonts/` and declared in `aimeat/public/lib/aimeat-fonts.css`. Then the surfaces
+below follow on their own. The standalone pages (`public/connect*.html`, `public/front-*.html`,
+`public/wiifm*.html`, `public/aimeat-developers.html`, the app catalog's template) link that
+same sheet and name their faces in their own inline CSS, so a change of face reaches them only
+by hand; the list here is the checklist.
 
 | Token | Read by |
 |---|---|
