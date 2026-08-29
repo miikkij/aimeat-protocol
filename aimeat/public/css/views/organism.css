@@ -11,6 +11,9 @@
  *   views/profile/organisms/home.js and read by home-settings.js. The inner panels (workspace list,
  *   roster, agents, board, map, timeline) keep their own pj- rules; a few are quieted here.
  * @version-history
+ *   v1.1.0 — 2026-08-29 — The workspace cover and its pages (design canvas "AIMEAT Työtilan sivu"): the
+ *     tables of spaces, the event rows, the tree that replaces the rail on request, and the page
+ *     overrides that take the card off the document index, the document and the record rows.
  *   v1.0.0 — 2026-08-29 — Initial.
  */
 
@@ -117,9 +120,78 @@
 .og .pj-ws-bar { margin-bottom: .6rem; }
 .og .pj-struct-toggle, .og .pj-timeline > .pj-struct-toggle { font-weight: 800; }
 
+/* ── The workspace cover: the tables of spaces ─────────────────────────────────────────────── */
+.og-tbl { display: grid; grid-template-columns: 2.6rem minmax(0, 1fr) auto minmax(0, 18rem) auto; gap: 0 1.1rem; align-items: center; }
+.og-tbl > div { padding: .55rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
+.og-tbl--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.og-tbl-n { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.5rem; line-height: 1; text-align: right; color: var(--text); }
+.og-tbl-nm { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+.og-tbl-name { background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit; font-size: .97rem; font-weight: 800; color: var(--text); text-align: left; }
+.og-tbl-name:hover { color: var(--accent); }
+.og-tbl-last { font-family: var(--font-mono); font-size: .75rem; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.og-tbl-go { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; color: var(--text-dim); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.og-tbl-go:hover { color: var(--accent); }
+.og-tbl-dot { color: var(--border); }
+.og-tbl-door { text-align: right; }
+.og-tbl-door .og-door { font-size: .72rem; }
+.og-chip--xs { font-size: .6rem; padding: 0 5px; }
+.og-hint--label { margin-top: 1.1rem; font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: .8rem; letter-spacing: .05em; text-transform: uppercase; color: var(--text); }
+.og-hint--label small { font-family: var(--font-mono); font-size: .75rem; color: var(--accent); margin-left: .4rem; }
+.og-fold-name { font-weight: 700; min-width: 0; }
+.og-fold-door { font-size: .72rem; flex: none; }
+.og-fold--event { width: 100%; background: none; border-left: 0; border-right: 0; border-top: 0; cursor: pointer; text-align: left; font-family: inherit; font-size: .95rem; }
+.og-fold--event:hover b { color: var(--accent); }
+.og-fold--event b { font-weight: 800; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.og-fold-who { color: var(--text-dim); font-weight: 600; white-space: nowrap; }
+.og-search { display: flex; align-items: center; gap: 1.2rem; margin-top: 1.2rem; }
+.og-search > :first-child { flex: 1 1 auto; }
+.og-apps { margin-top: 1.2rem; }
+
+/* ── The tree, when the rail is asked to show the whole structure ─────────────────────────── */
+.og-tree { position: sticky; top: 1rem; max-height: calc(100vh - 6rem); overflow-y: auto; display: flex; flex-direction: column; gap: .2rem; padding: .2rem 0 0; border-top: 3px solid var(--text); }
+.og-tree-group { display: flex; flex-direction: column; margin-bottom: .8rem; }
+.og-tree-label { display: flex; align-items: baseline; gap: .6rem; padding: .6rem 0 .35rem; font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: .78rem; letter-spacing: .05em; text-transform: uppercase; color: var(--text); }
+.og-tree-label em { margin-left: auto; font-family: var(--font-mono); font-size: .7rem; font-style: normal; color: var(--text-dim); }
+.og-tree-space { display: flex; flex-direction: column; }
+.og-tree-link { display: flex; align-items: baseline; gap: .6rem; width: 100%; background: none; border: 0; border-bottom: 1px solid var(--border); padding: .35rem 0; cursor: pointer; text-align: left; font-family: inherit; font-size: .82rem; font-weight: 700; color: var(--text); }
+.og-tree-link.on { background: var(--sun); color: var(--on-sun); margin: 0 -.4rem; padding: .35rem .4rem; }
+.og-tree-link:hover span { color: var(--accent); }
+.og-tree-link em { margin-left: auto; font-family: var(--font-mono); font-size: .7rem; font-style: normal; color: var(--text-dim); white-space: nowrap; }
+.og-tree-link em b { color: var(--accent); }
+.og-tree-doc { display: flex; align-items: center; gap: .4rem; width: 100%; background: none; border: 0; border-left: 3px solid transparent; padding: .3rem .4rem .3rem .7rem; cursor: pointer; text-align: left; font-family: inherit; font-size: .78rem; font-weight: 600; line-height: 1.3; color: var(--text-dim); }
+.og-tree-doc:hover { color: var(--text); }
+.og-tree-doc.on { background: var(--sun); border-left-color: var(--text); color: var(--on-sun); font-weight: 800; }
+.og-tree-more { font-weight: 400; }
+.og-tree hr { border: 0; border-top: 1px solid var(--border); margin: .2rem 0; width: 100%; }
+.og-tree .og-rail-toggle { color: var(--text); opacity: 1; padding: .4rem 0; }
+.og-tree .og-rail-toggle i { color: var(--accent); }
+
+/* ── A page of the workspace: a space, a panel, the settings ───────────────────────────────── */
+.og-mast--page { align-items: flex-end; }
+.og-mast--page .og-mast-actions { padding-top: 0; }
+.og-desc--page { margin-top: .6rem; }
+.og-page .og-main { padding-top: .9rem; border-top: 3px solid var(--text); }
+/* The space panels carry their own head (title + buttons); the page head already says both. */
+.og-page .pj-section > .pj-section-head { display: none; }
+.og-page .pj-section > .section-desc:first-of-type { display: none; }
+/* The document index and the document lose the card: paper, an ink rule, the sun on the open one. */
+.og-page .pj-doc-index { flex: 0 0 250px; border: 0; border-top: 3px solid var(--text); border-radius: 0; background: transparent; padding: .4rem 0 0; max-height: none; }
+.og-page .pj-doc-item { border-radius: 0; border-left: 3px solid transparent; padding: .3rem .4rem .3rem .6rem; }
+.og-page .pj-doc-item.active { background: var(--sun); border-left-color: var(--text); }
+.og-page .pj-doc-item.active .pj-doc-link { color: var(--on-sun); font-weight: 800; }
+.og-page .pj-doc-item .pj-doc-link { font-size: .88rem; font-weight: 600; }
+.og-page .pj-sec-name-text { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: .8rem; letter-spacing: .05em; text-transform: uppercase; }
+.og-page .pj-docspace { gap: 2.75rem; }
+.og-page .pj-doc-view { border: 0; border-radius: 0; box-shadow: none; background: transparent; padding: 0; margin: 0; }
+.og-page .pj-rec { border-radius: 0; border: 0; border-bottom: 1px solid var(--border); box-shadow: none; background: transparent; }
+
 @media (max-width: 1100px) {
   .og-grid { grid-template-columns: 1fr; }
   .og-rail { position: static; box-shadow: 6px 6px 0 var(--sun); }
+  .og-tree { position: static; }
+  .og-tbl { grid-template-columns: 2.6rem minmax(0, 1fr) auto; }
+  .og-tbl-last { display: none; }
+  .og-tbl--head { display: none; }
   .og-mast { flex-direction: column; }
   .og-mast-actions { align-items: flex-start; }
   .og-strip { flex-wrap: wrap; }

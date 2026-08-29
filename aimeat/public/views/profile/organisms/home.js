@@ -13,6 +13,8 @@
  * @structure OrganismHome
  * @usage import { OrganismHome } from '/views/profile/organisms/home.js';
  * @version-history
+ *   v3.0.1 — 2026-08-29 — Section, Fold, tr and scrollTo moved to poster-parts.js so the workspace cover is
+ *     built from the same pieces; pure extraction.
  *   v3.0.0 — 2026-08-29 — The poster face. Before this the AI instruction block, the README, the map,
  *     the table of contents and the timeline all stacked above the tabs (opened, the first workspace
  *     ended 3 000 px down), settings replaced the tab content while the tabs stayed lit, and the
@@ -43,32 +45,7 @@ import { BoardPreview } from '/views/profile/organisms/panels.js';
 import { InstructionBlock } from '/views/profile/instruction-block.js';
 import { OrganismSettings } from '/views/profile/organisms/home-settings.js';
 import { swallowed } from '/js/swallowed.js';
-
-const tr = (key, fb) => t(key) || fb;
-const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-/** A section under an ink rule: the numbered headline, the doors on the right, the body. */
-function Section({ id, num, title, count, doors, first, children }) {
-  return html`
-    <section class=${`og-sec ${first ? 'og-sec--first' : ''}`} id=${id}>
-      <div class="og-sec-h">
-        <h2>${title}${count !== null && count !== undefined ? html`<small>${count}</small>` : html`<small>${num}</small>`}</h2>
-        ${doors ? html`<div class="og-doors">${doors}</div>` : null}
-      </div>
-      ${children}
-    </section>`;
-}
-
-/** A folded row that opens into its body: the map, the README, the AI instruction. */
-function Fold({ id, num, title, sub, open, onToggle, children }) {
-  return html`
-    <section class=${`og-sec og-fold-sec ${open ? 'is-open' : ''}`} id=${id}>
-      <button type="button" class="og-fold og-fold--toggle" aria-expanded=${open ? 'true' : 'false'} onClick=${onToggle}>
-        <i>${num}</i><span>${title}</span>${sub ? html`<span class="og-fold-r">${sub}</span>` : null}<span class="og-fold-arrow">${open ? '↓' : '→'}</span>
-      </button>
-      ${open ? html`<div class="og-fold-body">${children}</div>` : null}
-    </section>`;
-}
+import { Section, Fold, tr, scrollTo } from '/views/profile/organisms/poster-parts.js';
 
 export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, onBack, onChanged, onLeave }) {
   useViewCSS('/css/views/organism.css');

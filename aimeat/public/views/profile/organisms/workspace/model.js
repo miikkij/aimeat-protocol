@@ -11,6 +11,8 @@
  * @structure buildBreadcrumb, buildWorkspaceModel
  * @usage import { buildWorkspaceModel } from '/views/profile/organisms/workspace/model.js';
  * @version-history
+ *   v1.2.0 — 2026-08-29 — openGroup and scrollToSpace removed with the tab block (cover.js opens a space
+ *     as a page; a group is a table on the cover).
  *   v1.0.0 — 2026-07-13 — Extracted from workspace.js (max-file-lines)
  *   v1.1.0 — 2026-08-08 — copyShareLink removed — the share panel uses a shared <CopyButton>. Its "Copy failed" branch
  *       is not a loss: it only fired when navigator.clipboard rejected, exactly the case the shared
@@ -46,7 +48,7 @@ export function buildBreadcrumb(ctx) {
 export function buildWorkspaceModel(ctx) {
   const {
     ws, share, setShare, setShareBusy, orgId, wsId, showToast, tab, showSettings, approvals, wsT,
-    guardWsDirty, setShowSettings, setTab, markSeen, setPendingScroll, copyAccessPrompt, copyContractPrompt,
+    guardWsDirty, setShowSettings, setTab, markSeen, copyAccessPrompt, copyContractPrompt,
   } = ctx;
 
   // Memory-backed spaces render normally (missing backing counts as memory — the shared service
@@ -157,9 +159,6 @@ export function buildWorkspaceModel(ctx) {
   const activeGroup = activeTab.startsWith('group:') ? groups.find(g => g.id === activeTab) : null;
   // Opening a tab clears its unseen badge (the seen mark persists across sessions).
   const pickTab = (id) => guardWsDirty(() => { setShowSettings(false); setTab(id); markSeen(id); });
-  // A stacked group opens at its top; clicking one of its spaces opens it scrolled to that section.
-  const openGroup = (id) => pickTab(id);
-  const scrollToSpace = (gid, name) => guardWsDirty(() => { setShowSettings(false); setTab(gid); setPendingScroll(name); markSeen(gid); });
 
   // Static one-line descriptions for the related panels that don't already carry their own.
   const REL_DESC = {
@@ -181,6 +180,6 @@ export function buildWorkspaceModel(ctx) {
   return {
     allTypes, types, isDocSpace, draftsFor, objectsFor, mergedDocs, mergedRecords, docTypes,
     patchShare, isDocPublic, anythingPublic, instanceTitle, spaceDesc, groups,
-    activeTab, activeSpace, activeGroup, pickTab, openGroup, scrollToSpace, REL_DESC, agentMenuItems,
+    activeTab, activeSpace, activeGroup, pickTab, REL_DESC, agentMenuItems,
   };
 }
