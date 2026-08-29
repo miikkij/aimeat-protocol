@@ -223,21 +223,56 @@ await test('`me` in the owner slot resolves to the caller', async () => {
     assert(s2 === 401, `anonymous me: ${s2}`);
 });
 
-await test('A priced app ought to have the whole set', async () => {
+await test('A republish carries the pages forward, and a MORSEL price makes no shop', async () => {
     const { status } = await json('/v1/apps', aAuthed({
         method: 'POST',
-        body: JSON.stringify({ filename: FILE, content: b64(HTML_V2), name: 'Legal Shop', description: 'a shop, v2', category: 'utility', tags: ['demo'], price_morsels: 5 }),
+        body: JSON.stringify({ filename: FILE, content: b64(HTML_V2), name: 'Legal Shop', description: 'a shop, v2', category: 'utility', tags: ['demo'], price_morsels: 500 }),
     }));
     assert(status === 201 || status === 200, `republish status ${status}`);
     const { body } = await json(`${appPath}/legal`, aAuthed());
     assert(body.data.legal.terms?.format === 'markdown' && body.data.legal.privacy?.format === 'html', 'pages survived the republish');
-    const rec: string[] = body.data.readiness.recommended;
-    if (rec.length > 2) {
-        assert(rec.includes('imprint') && rec.includes('refunds') && rec.includes('accessibility'), `priced set: ${rec.join(',')}`);
-        assert(!body.data.readiness.missing.includes('support'), 'support is in place');
-    }
+    // Morsels pace what agents push into the store and buy nothing. A morsel price is not money,
+    // so it creates none of the seller's duties: the recommended set stays terms + privacy.
+    assert(JSON.stringify(body.data.readiness.recommended) === '["terms","privacy"]', `recommended after a morsel price: ${JSON.stringify(body.data.readiness.recommended)}`);
     const p = await page('terms');
     assert(p.status === 200 && p.text.includes('<h1>Terms of use</h1>'), 'terms still served after republish');
+});
+
+await test('A page an AI drafted carries its provenance record; the named reviewer lifts the visible label', async () => {
+    const set = await patchA({
+        legal: { refunds: { format: 'markdown', content: '# Refunds\n\nFourteen days, no questions.' } },
+        ai_provenance: { level: 'ai-generated', method: 'fully-generated', human_involvement: 'none', model: 'test/model' },
+    });
+    assert(set.status === 200, `set status ${set.status}: ${JSON.stringify(set.body)}`);
+    const provId = set.body.data.legal.refunds?.aiProvenanceId;
+    assert(typeof provId === 'string' && provId.length > 0, `state carries the provenance id: ${JSON.stringify(set.body.data.legal.refunds)}`);
+    const { body: log } = await json(`${appPath}/audit?limit=1`, aAuthed());
+    assert(log.data.entries[0].detail?.provenance === provId, 'the audit entry names the record');
+
+    const labelled = await page('refunds');
+    assert(labelled.status === 200, `page status ${labelled.status}`);
+    assert(labelled.headers.get('ai-disclosure') !== null, 'AI-Disclosure header on the page');
+    assert(labelled.text.includes('<link rel="ai-provenance"'), 'machine marks on the page');
+    assert(labelled.text.includes('id="aimeat-ai-label"'), 'the visible label, nobody having reviewed it');
+
+    // The reviewer's declaration on the app reaches its pages too — the same act, the same rule
+    // (Art. 50(4)). Whether the chip then disappears depends on the NODE's label policy: under
+    // `light` it goes, under `strict` (this test node's default) the light "a model was involved"
+    // label stays on purpose. The re-decision itself, with the chip gone, is proven in
+    // test/unit/app-marks.test.ts against a light-policy config; here the page proves the reviewer
+    // is served and the machine marks stay, because synthesis did happen.
+    const declare = await patchA({ author: 'Maija Meikäläinen' });
+    assert(declare.status === 200, `declare status ${declare.status}`);
+    const reviewed = await page('refunds');
+    assert(reviewed.text.includes('<link rel="ai-provenance"'), 'machine marks kept');
+    assert(reviewed.text.includes('<meta name="aimeat-reviewed-by" content="Maija Meikäläinen">'), 'the reviewer named in the page head');
+    assert(reviewed.text.includes('<meta name="author" content="Maija Meikäläinen">'), 'and as the author tag');
+    assert((await patchA({ author: null })).status === 200, 'withdrawn again');
+    assert(!(await page('refunds')).text.includes('aimeat-reviewed-by'), 'tags gone with the withdrawal');
+
+    // A link is not text anybody wrote here: no record is minted for it.
+    const link = await patchA({ legal: { cookies: { format: 'url', content: 'https://example.org/cookies' } } });
+    assert(link.status === 200 && link.body.data.legal.cookies.aiProvenanceId === undefined, 'no record for a link');
 });
 
 console.log('\nPhase 2: the audit log');
@@ -250,8 +285,9 @@ await test('The owner reads the log: each set with kind, format, size and hash; 
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     const entries: any[] = body.data.entries;
     assert(body.data.order === 'oldest-first' && entries.length >= 8, `entries: ${entries.length}`);
+    // terms, privacy, support (Phase 1), then refunds and the cookies link (the provenance test).
     const legalSets = entries.filter(e => e.action === 'legal.set');
-    assert(legalSets.length === 3, `three legal.set: ${legalSets.length}`);
+    assert(legalSets.length === 5, `five legal.set: ${legalSets.length}`);
     const terms = legalSets.find(e => e.detail?.kind === 'terms');
     assert(terms.detail.format === 'markdown' && terms.detail.size === Buffer.byteLength(TERMS_MD) && /^[0-9a-f]{16}$/.test(terms.detail.sha256), `terms detail: ${JSON.stringify(terms.detail)}`);
     assert(terms.by === `${ownerAName}@${NODE_ID}`, `by the owner GHII: ${terms.by}`);

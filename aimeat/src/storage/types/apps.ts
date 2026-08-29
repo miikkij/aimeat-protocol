@@ -93,6 +93,13 @@ export interface AppLegalDoc {
   updatedAt: string;
   /** GHII of the principal that set it. */
   updatedBy: string;
+  /**
+   * The AI-provenance record minted for this text at the time it was set (services/app-legal.ts,
+   * through the same provenanceForWrite() every published app goes through). The served page
+   * carries the record's marks and, when the law asks for it, the visible label. Absent on a page
+   * set before 2026-08-29 or on a node with provenance switched off.
+   */
+  aiProvenanceId?: string;
 }
 
 /**

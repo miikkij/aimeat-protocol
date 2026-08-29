@@ -2874,6 +2874,8 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
 .mk-log-by { color: var(--text-dim); font-family: var(--font-mono); font-size: .72rem; padding-top: 3px; }
 
 /* ── Legal pages (legal.js): one row per kind, the editor opens inside the row ── */
+/* The masthead chip is a button (it scrolls to the section); it wears the chip, not a button. */
+.lg-chip { cursor: pointer; font: inherit; }
 .lg-rows { display: flex; flex-direction: column; margin: 14px 0 0; }
 .lg-row { display: grid; grid-template-columns: 1fr auto; gap: 6px 24px; padding: 16px 0; border-bottom: 1px solid var(--border); }
 .lg-row.is-recommended { border-left: 3px solid var(--sun); padding-left: 14px; }
@@ -4381,6 +4383,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "legal.removeConfirm": "Remove this page? Its address will stop answering. The removal is kept in the audit log.",
       "legal.readinessMissing": "{n} of the pages this app ought to have are still missing.",
       "legal.readinessOk": "Every page this app ought to have is in place.",
+      "legal.chip": "{n} legal pages still to write",
       "legal.missing": "Missing",
       "legal.none": "Not written",
       "legal.open": "Open",
@@ -5363,6 +5366,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "legal.removeConfirm": "Poistetaanko sivu? Sen osoite lakkaa vastaamasta. Poisto jää auditointilokiin.",
       "legal.readinessMissing": "Sivuista, jotka tällä apilla pitäisi olla, puuttuu vielä {n}.",
       "legal.readinessOk": "Jokainen sivu, joka tällä apilla pitäisi olla, on paikallaan.",
+      "legal.chip": "{n} lakisivua vielä kirjoittamatta",
       "legal.missing": "Puuttuu",
       "legal.none": "Ei kirjoitettu",
       "legal.open": "Avaa",
@@ -8322,6 +8326,26 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     if (el) el.innerHTML = legalSectionInner();
     var au = document.getElementById("detail-audit");
     if (au) au.innerHTML = auditSectionInner();
+    renderChip();
+  }
+  function renderChip() {
+    var chips = document.querySelector("#detail-view .dtl-chips");
+    if (!chips) return;
+    var old = document.getElementById("lg-chip");
+    if (old) old.remove();
+    if (lgState !== "ready" || !lgData || !lgData.readiness) return;
+    var n = (lgData.readiness.missing || []).length;
+    if (!n) return;
+    var chip = document.createElement("button");
+    chip.type = "button";
+    chip.id = "lg-chip";
+    chip.className = "dtl-chip dtl-chip--hot lg-chip";
+    chip.textContent = "■ " + t("legal.chip").replace("{n}", String(n));
+    chip.onclick = function() {
+      var sec = document.getElementById("detail-legal");
+      if (sec) sec.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+    chips.appendChild(chip);
   }
   function appPath() {
     return "/v1/apps/" + encodeURIComponent(lgOwner) + "/" + encodeURIComponent(lgAppId);

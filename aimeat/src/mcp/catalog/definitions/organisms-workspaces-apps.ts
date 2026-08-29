@@ -5,7 +5,8 @@
  * @description Public memory reads, organism + workspace lifecycle, wallet transactions, HTML apps, extensions, IAM design, and cortex tool definitions (incl. operator-only aimeat_admin_mint).
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
- *   v1.4.0 — 2026-08-29 — aimeat_app_legal_set (the app's own legal pages) and aimeat_app_audit (its log).
+ *   v1.4.0 — 2026-08-29 — aimeat_app_legal_set (the app's own legal pages; money, never morsels, makes
+ *     a shop; ai_provenance on the write) and aimeat_app_audit (its log).
  *   v1.3.0 — 2026-08-29 — aimeat_app_marks_set: the badge and install-chip switches on one app.
  *   v1.2.0 — 2026-08-16 — the four incremental app-draft tools (write/replace/read/seed), reachable
  *     from all three doors. `content` is plain text here where aimeat_app_draft_save takes base64:
@@ -733,7 +734,7 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_app_legal_set',
-        description: 'Publish, replace or remove one of an app\'s own legal pages: terms of use, privacy notice, imprint (who is behind the app), refunds and withdrawal, accessibility statement, cookies, or support. The app answers for what it does — a shop for its sales, an app that handles personal data for that data — and not the node it runs on, so these pages are the app\'s: written in markdown (rendered by the node with every character escaped), as an HTML document (served as written, on the app\'s own origin), or as a link to where the page already lives. Each page is served at /terms, /privacy and so on under the app\'s address, linked from the app\'s head, and named in its llms.txt. Every change lands in the app\'s audit log with who made it, when, the format, the size and a hash of the text. Naming no kind reports where the app stands and which pages it still ought to have: every published app its terms and privacy notice, and one that sells anything also who is selling, how to withdraw, the accessibility statement and a support contact.',
+        description: 'Publish, replace or remove one of an app\'s own legal pages: terms of use, privacy notice, imprint (who is behind the app), refunds and withdrawal, accessibility statement, cookies, or support. The app answers for what it does — a shop for its sales, an app that handles personal data for that data — and not the node it runs on, so these pages are the app\'s: written in markdown (rendered by the node with every character escaped), as an HTML document (served as written, on the app\'s own origin), or as a link to where the page already lives. Each page is served at /terms, /privacy and so on under the app\'s address, linked from the app\'s head, and named in its llms.txt. Every change lands in the app\'s audit log with who made it, when, the format, the size and a hash of the text. Naming no kind reports where the app stands and which pages it still ought to have: every published app its terms and privacy notice, and one that takes money in a currency (priced tools, a shop) also who is selling, how to withdraw, the accessibility statement and a support contact. Morsels are not money and create none of those duties. A page written here is text a person reads, so declare ai_provenance when a model drafted it: the served page carries the record and its label, lifted by the app\'s named reviewer.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {

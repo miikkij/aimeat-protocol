@@ -7,7 +7,8 @@
  *   Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
  *   v1.5.0 — 2026-08-29 — PATCH takes `legal` (the app's own pages) through services/app-legal.ts,
- *     and every field it changes lands in the app's audit log (services/app-audit.ts).
+ *     with `ai_provenance` / `ai_provenance_id` as every publish door takes them, and every field
+ *     it changes lands in the app's audit log (services/app-audit.ts).
  *   v1.4.0 — 2026-08-29 — PATCH takes `marks` (badge, install) and `author` (the named reviewer,
  *     owner principal only) through services/app-marks.ts; the response carries their state.
  *   v1.3.0 — 2026-08-11 — August 2026 audit step 8: the fork's copy and the delete's bucket sweep go
@@ -35,8 +36,9 @@ import { resolveIdentity, ownerGhiiOf } from '../../utils/gaii.js';
 import { sanitizeProtection, invalidateProtectionCache } from '../../utils/app-protect.js';
 import { applyOwnerSeoUpdate, appSeoState } from '../../services/app-seo.js';
 import { applyOwnerMarksUpdate, appMarksState } from '../../services/app-marks.js';
-import { applyOwnerLegalUpdate, appLegalState, legalReadiness } from '../../services/app-legal.js';
+import { applyOwnerLegalUpdate, appLegalState, legalReadiness, appSellsForMoney } from '../../services/app-legal.js';
 import { recordAppAudit, type AppAuditAction } from '../../services/app-audit.js';
+import { parseDeclaredProvenanceInput } from '../../mcp/ai-provenance-input.js';
 import type { CanonicalOwner } from './helpers.js';
 
 export function registerForkManageRoutes(
@@ -367,11 +369,21 @@ export function registerForkManageRoutes(
         // The app's own legal pages: `{ terms: { format, content }, privacy: null, … }`. One service
         // call shared with the MCP door; it validates, writes, audits and says what changed.
         if ('legal' in body) {
-            const out = await applyOwnerLegalUpdate(storage, { ownerGaii: effectiveGaii, filename }, {
+            // The same `ai_provenance` / `ai_provenance_id` block every publish door takes: a legal
+            // page is text a person reads, and an AI-drafted one carries its record.
+            const declared = parseDeclaredProvenanceInput(body.ai_provenance);
+            if (!declared.ok) {
+                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Invalid ai_provenance declaration.', 400, { violations: declared.violations }));
+                return;
+            }
+            const out = await applyOwnerLegalUpdate(storage, config, { ownerGaii: effectiveGaii, filename }, {
                 legal: body.legal, actor: { ghii: callerGaii },
+                declared: declared.declared,
+                declaredId: typeof body.ai_provenance_id === 'string' ? body.ai_provenance_id : undefined,
             });
             if ('error' in out) {
-                res.status(out.status).json(error(config.nodeId, out.status === 404 ? 'NOT_FOUND' : 'INVALID_INPUT', out.error));
+                const code = out.status === 404 ? 'NOT_FOUND' : out.status === 403 ? 'ACCESS_DENIED' : 'INVALID_INPUT';
+                res.status(out.status).json(error(config.nodeId, code, out.error, out.status, out.details));
                 return;
             }
             notes.push(out.note);
@@ -399,7 +411,10 @@ export function registerForkManageRoutes(
             // The chrome switches as they now stand, the reviewer, and the audit log of the latter.
             ...(updated ? appMarksState(updated) : {}),
             // The legal pages as their state (no content), and what the app still ought to have.
-            ...(updated ? { legal: appLegalState(updated), legal_readiness: legalReadiness(updated) } : {}),
+            ...(updated ? {
+                legal: appLegalState(updated),
+                legal_readiness: legalReadiness(updated, { sellsForMoney: await appSellsForMoney(storage, updated) }),
+            } : {}),
             download_url: `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}`,
             note: notes.join(' '),
         }));

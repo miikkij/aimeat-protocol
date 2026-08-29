@@ -15,6 +15,8 @@
  *   the person is told.
  * @usage import { legalOnOpen, legalSectionInner, auditSectionInner, legalEdit, legalCancel, legalSave, legalRemove, auditMore } from './legal.js';
  * @version-history
+ *   v1.1.0 — 2026-08-29 — A hot chip on the masthead names how many pages are still to write and
+ *     scrolls to the section. Nothing is blocked; it is meant to be noticed.
  *   v1.0.0 — 2026-08-29 — Initial.
  */
 import { escapeHtml } from './util.js';
@@ -52,6 +54,31 @@ function rerender() {
   if (el) el.innerHTML = legalSectionInner();
   var au = document.getElementById('detail-audit');
   if (au) au.innerHTML = auditSectionInner();
+  renderChip();
+}
+
+/**
+ * The one line a person sees without scrolling: a hot chip in the masthead when the app still
+ * lacks pages it ought to have. Nothing is blocked (Jouni, 2026-08-29); it is meant to be noticed.
+ */
+function renderChip() {
+  var chips = document.querySelector('#detail-view .dtl-chips');
+  if (!chips) return;
+  var old = document.getElementById('lg-chip');
+  if (old) old.remove();
+  if (lgState !== 'ready' || !lgData || !lgData.readiness) return;
+  var n = (lgData.readiness.missing || []).length;
+  if (!n) return;
+  var chip = document.createElement('button');
+  chip.type = 'button';
+  chip.id = 'lg-chip';
+  chip.className = 'dtl-chip dtl-chip--hot lg-chip';
+  chip.textContent = '■ ' + t('legal.chip').replace('{n}', String(n));
+  chip.onclick = function () {
+    var sec = document.getElementById('detail-legal');
+    if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+  chips.appendChild(chip);
 }
 function appPath() {
   return '/v1/apps/' + encodeURIComponent(lgOwner) + '/' + encodeURIComponent(lgAppId);

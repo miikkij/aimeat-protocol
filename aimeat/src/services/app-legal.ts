@@ -36,6 +36,9 @@
  * @usage
  *   const out = await applyOwnerLegalUpdate(storage, { ownerGaii, filename }, { legal: body.legal, actor });
  * @version-history
+ *   v1.1.0 — 2026-08-29 — Money decides a shop (appSellsForMoney, the tools document's currency
+ *     prices), never morsels; a page set here mints an AI-provenance record through
+ *     provenanceForWrite() and the served page carries its marks and label.
  *   v1.0.0 — 2026-08-29 — Initial.
  */
 import { createHash } from 'node:crypto';
@@ -48,6 +51,9 @@ import { emitChange } from './event-bus.js';
 import { recordAppAudit } from './app-audit.js';
 import { renderMarkdownLite } from '../utils/markdown-lite.js';
 import { appDisplayName } from './app-agent-surfaces.js';
+import { AppToolsDocSchema } from '../models/app-tool-schemas.js';
+import { provenanceForWrite, ProvenanceScopeError, type DeclaredProvenance } from './ai-provenance.js';
+import { logger } from '../utils/logger.js';
 
 export const LEGAL_CONTENT_MAX = 200_000;
 export const LEGAL_URL_MAX = 2048;
@@ -146,6 +152,8 @@ export interface LegalDocState {
   size: number;
   /** The URL, when the page lives elsewhere. */
   url?: string;
+  /** The AI-provenance record minted for this text, when the node minted one. */
+  aiProvenanceId?: string;
 }
 
 export type AppLegalState = Partial<Record<AppLegalKind, LegalDocState>>;
@@ -160,6 +168,7 @@ export function appLegalState(app: Pick<AppSummaryRecord, 'manifest'>): AppLegal
       format: d.format, updatedAt: d.updatedAt, updatedBy: d.updatedBy,
       size: Buffer.byteLength(d.content, 'utf8'),
       ...(d.format === 'url' ? { url: d.content } : {}),
+      ...(d.aiProvenanceId ? { aiProvenanceId: d.aiProvenanceId } : {}),
     };
   }
   return out;
@@ -185,14 +194,38 @@ export interface LegalReadiness {
 }
 
 /**
- * Which pages an app ought to have. Every published app: terms and privacy. An app that sells
- * anything (a price, a licence, priced tools): also who is selling, how to withdraw, and the
- * accessibility statement the EAA asks of e-commerce. Recommended, never blocked: the owner
- * decides, and the details view shows what is missing.
+ * Does this app take MONEY for anything: a tool priced in a currency in its tools document
+ * (`apps.<filename>.tools`, the record aimeat_app_tools_publish writes). Morsels are not money —
+ * they pace what agents push into the store and buy nothing — so a morsel price, an app-store
+ * licence bought with morsels, or a morsel-priced tool never makes an app a shop. Consumer law,
+ * the DSA's trader duties and the EAA's e-commerce rule attach to money changing hands.
  */
-export function legalReadiness(app: Pick<AppSummaryRecord, 'manifest'>, opts?: { pricedTools?: boolean }): LegalReadiness {
+export async function appSellsForMoney(storage: Storage, app: Pick<AppRecord, 'ownerGaii' | 'filename'>): Promise<boolean> {
+  try {
+    const rec = await storage.getMemory(app.ownerGaii, `apps.${app.filename}.tools`);
+    if (!rec) return false;
+    const parsed = AppToolsDocSchema.safeParse(rec.value);
+    if (!parsed.success) return false;
+    return parsed.data.tools.some((t) => (t.priceMoney?.amount ?? 0) > 0
+      || (Array.isArray((t as { pricesMoney?: Array<{ amount: number }> }).pricesMoney)
+        && (t as { pricesMoney?: Array<{ amount: number }> }).pricesMoney!.some((p) => p.amount > 0)));
+  } catch (err) {
+    // A failed read answers "not a shop" and says so in the log: the readiness this feeds is a
+    // recommendation, and refusing the whole details view over it would hide more than it protects.
+    logger.warn('app-legal: could not read the tools document, treating the app as not selling', { filename: app.filename, error: String(err) });
+    return false;
+  }
+}
+
+/**
+ * Which pages an app ought to have. Every published app: terms and privacy. An app that takes
+ * money (appSellsForMoney): also who is selling, how to withdraw, the accessibility statement the
+ * EAA asks of e-commerce, and a support contact. Recommended, never blocked: the owner decides,
+ * the details view shows what is missing, and a chip on the app's masthead says so.
+ */
+export function legalReadiness(app: Pick<AppSummaryRecord, 'manifest'>, opts?: { sellsForMoney?: boolean }): LegalReadiness {
   const m = app.manifest;
-  const sells = !!(m?.priceMorsels && m.priceMorsels > 0) || !!m?.licenseType || !!opts?.pricedTools;
+  const sells = opts?.sellsForMoney === true;
   const recommended: AppLegalKind[] = sells
     ? ['terms', 'privacy', 'imprint', 'refunds', 'accessibility', 'support']
     : ['terms', 'privacy'];
@@ -208,20 +241,34 @@ export function legalReadiness(app: Pick<AppSummaryRecord, 'manifest'>, opts?: {
 
 export interface LegalUpdateInput {
   legal: unknown;
+  /** The principal making the change: the owner's GHII, or an agent's GAII acting for them. */
   actor: { ghii: string };
+  /** What the caller said about how the text was made (the same block every publish door takes). */
+  declared?: DeclaredProvenance;
+  /** A provenance record the caller already holds and wants attached instead. */
+  declaredId?: string;
 }
 
 export type LegalUpdateResult =
   | { state: AppLegalState; readiness: LegalReadiness; note: string }
-  | { error: string; status: 400 | 404 };
+  | { error: string; status: 400 | 403 | 404; details?: unknown };
 
 function shortHash(s: string): string {
   return createHash('sha256').update(s, 'utf8').digest('hex').slice(0, 16);
 }
 
-/** The write, the audit entries and the note, for both doors. */
+/**
+ * The write, the provenance record, the audit entries and the note, for both doors.
+ *
+ * A legal page is text a person reads, so it goes through the same provenanceForWrite() every
+ * published app and memory record goes through (decided 2026-08-29): a page an AI drafted carries
+ * the record, and the served page carries the marks and, where the law asks, the visible label —
+ * lifted the way it is lifted everywhere else, by a named reviewer on the app. Refused, never
+ * silently downgraded, when the caller declares provenance it may not declare.
+ */
 export async function applyOwnerLegalUpdate(
   storage: Storage,
+  config: AimeatConfig,
   target: { ownerGaii: string; filename: string },
   input: LegalUpdateInput,
 ): Promise<LegalUpdateResult> {
@@ -244,6 +291,29 @@ export async function applyOwnerLegalUpdate(
       continue;
     }
     if (before && before.format === doc.format && before.content === doc.content) continue;
+    // A link is not text anybody wrote here; the page it points to carries its own marks.
+    if (doc.format !== 'url') {
+      try {
+        const id = await provenanceForWrite(storage, {
+          principal: input.actor.ghii,
+          content: doc.content,
+          declaredId: input.declaredId,
+          declared: input.declared,
+          pipeline: 'app.legal',
+          surface: { visibility: 'public', humanAudience: true, mediaKind: 'text' },
+          labelPolicy: config.aiLabelPublic,
+          nodeId: config.nodeId,
+          baseUrl: config.baseUrl,
+          enabled: config.aiProvenance,
+        });
+        if (id) doc.aiProvenanceId = id;
+      } catch (err) {
+        if (err instanceof ProvenanceScopeError) {
+          return { error: err.message, status: 403, details: { held_scopes: err.heldScopes } };
+        }
+        throw err;
+      }
+    }
     patch[kind] = doc;
     notes.push(doc.format === 'url'
       ? `${title} now points to ${doc.content}.`
@@ -257,7 +327,10 @@ export async function applyOwnerLegalUpdate(
         ownerGhii: target.ownerGaii, filename: target.filename, by: input.actor.ghii,
         action: doc ? 'legal.set' : 'legal.cleared',
         detail: doc
-          ? { kind, format: doc.format, size: Buffer.byteLength(doc.content, 'utf8'), sha256: shortHash(doc.content) }
+          ? {
+              kind, format: doc.format, size: Buffer.byteLength(doc.content, 'utf8'), sha256: shortHash(doc.content),
+              ...(doc.aiProvenanceId ? { provenance: doc.aiProvenanceId } : {}),
+            }
           : { kind },
       });
     }
@@ -267,7 +340,8 @@ export async function applyOwnerLegalUpdate(
   const after = await storage.getApp(target.ownerGaii, target.filename);
   if (!after) return { error: 'The app was not found after the update', status: 404 };
   if (!notes.length) notes.push('Nothing changed: the pages already read as you sent them.');
-  return { state: appLegalState(after), readiness: legalReadiness(after), note: notes.join(' ') };
+  const sellsForMoney = await appSellsForMoney(storage, after);
+  return { state: appLegalState(after), readiness: legalReadiness(after, { sellsForMoney }), note: notes.join(' ') };
 }
 
 /**
@@ -277,17 +351,20 @@ export async function applyOwnerLegalUpdate(
 export async function ownerAppLegal(
   storage: Storage,
   config: AimeatConfig,
-  args: { callerGaii: string; filename: string; legal?: Record<string, unknown> },
+  args: {
+    callerGaii: string; filename: string; legal?: Record<string, unknown>;
+    declared?: DeclaredProvenance; declaredId?: string;
+  },
 ): Promise<{ state: AppLegalState; readiness: LegalReadiness; note?: string } | { error: string }> {
   const scope = await resolveAppOwnerScope(storage, config, args.callerGaii);
   if (!scope) return { error: 'This connection is not acting for an owner, so it has no app catalogue to change.' };
   const app = await storage.getApp(scope.ownerGhii, args.filename);
   if (!app) return { error: `No app named "${args.filename}" in your catalogue.` };
   if (!args.legal || Object.keys(args.legal).length === 0) {
-    return { state: appLegalState(app), readiness: legalReadiness(app) };
+    return { state: appLegalState(app), readiness: legalReadiness(app, { sellsForMoney: await appSellsForMoney(storage, app) }) };
   }
-  const out = await applyOwnerLegalUpdate(storage, { ownerGaii: scope.ownerGhii, filename: args.filename },
-    { legal: args.legal, actor: { ghii: args.callerGaii } });
+  const out = await applyOwnerLegalUpdate(storage, config, { ownerGaii: scope.ownerGhii, filename: args.filename },
+    { legal: args.legal, actor: { ghii: args.callerGaii }, declared: args.declared, declaredId: args.declaredId });
   if ('error' in out) return { error: out.error };
   return out;
 }

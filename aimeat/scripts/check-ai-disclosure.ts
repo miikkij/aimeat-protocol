@@ -204,6 +204,11 @@ function checkOneLlmTransport(): void {
 const AI_PROVENANCE_REQUIRED = [
   'aimeat_app_draft_publish',
   'aimeat_app_publish',
+  // An app's own legal page (terms, privacy notice, imprint, …) is text a person reads and an AI
+  // is exactly who drafts it. DECIDED 2026-08-29: services/app-legal.ts mints through
+  // provenanceForWrite() on every door, the served page carries the marks and the visible label,
+  // and the app's named reviewer lifts the label the way it is lifted on the app itself.
+  'aimeat_app_legal_set',
   // A mosaic layout's titles, notes and empty-state wording are text a person reads on the app's
   // screen, and an agent is exactly who arranges it. The service mints the record, so the REST
   // door carries the same decision.
@@ -271,19 +276,10 @@ const AI_PROVENANCE_REVIEWED_WITHOUT = [
   // visibility is not authorship. The bytes a reader eventually gets are the app's, and
   // aimeat_app_publish stamps those.
   'aimeat_app_seo_set',
-  // DECIDED, 2026-08-29, with the reasoning written down and one question left to the developer.
-  //
-  // An app's own legal page (terms, privacy notice, imprint, …) is the OWNER's standing statement
-  // in their own name; it is served under the app with a line saying who publishes it and answers
-  // for it, and the app's audit log records who set it, when, the format, the size and a hash of
-  // the text. It is not a memory record, so the memory-write provenance mint does not run for it,
-  // and the ai_provenance parameter would have nowhere to land without a second write path.
-  //
-  // OPEN: whether a legal page drafted by an AI should carry its own provenance record and a
-  // visible label. The catalog's editor already tells the owner to read an AI draft before
-  // publishing it; if the answer is yes, the write moves to the provenance-minting path and this
-  // entry comes out. Until then the tool is listed here rather than left to trip the gate.
-  'aimeat_app_legal_set',
+  // aimeat_app_legal_set was listed here for a few hours on 2026-08-29 with an open question:
+  // should an AI-drafted legal page carry its own provenance record? The developer's answer was
+  // yes, so the tool now takes aiProvenanceInputs and services/app-legal.ts mints through
+  // provenanceForWrite like every publish door. Entry removed; the gate sees the declaration.
   // DECIDED, 2026-08-26, after the developer asked what the law actually requires.
   //
   // NOT OBLIGED. Article 50(4) — the paragraph that makes a DEPLOYER disclose AI-generated text —

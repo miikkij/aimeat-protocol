@@ -5,8 +5,9 @@
  * @description MCP tool registrations for app/package management -- publishing,
  *   listing, retrieving, archiving versions, version history, sanctioned forks, and drafts (staging).
  * @version-history
- *   v1.7.0 -- 2026-08-29 -- aimeat_app_legal_set over PATCH and GET /v1/apps/me/:filename/legal;
- *     aimeat_app_audit over GET /v1/apps/me/:filename/audit?limit=N.
+ *   v1.7.0 -- 2026-08-29 -- aimeat_app_legal_set over PATCH and GET /v1/apps/me/:filename/legal,
+ *     carrying ai_provenance in the body (the route records it); aimeat_app_audit over
+ *     GET /v1/apps/me/:filename/audit?limit=N.
  *   v1.6.0 -- 2026-08-29 -- aimeat_app_marks_set: the badge and install-chip switches over PATCH.
  *   v1.5.0 -- 2026-08-23 -- aimeat_package_install, and aimeat_package_publish given the route's own
  *     parameters. Publish declared {name, description, content} while POST /v1/packages requires a
@@ -368,18 +369,24 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     format: z.enum(['markdown', 'html', 'url']).optional().describe('markdown, html or url.'),
     content: z.string().optional().describe('The page text, the HTML document, or the absolute https URL.'),
     remove: z.boolean().optional().describe('true removes the named page.'),
+    ...aiProvenanceInputs,
   }, annotationsFor('aimeat_app_legal_set'), async (args) => {
     if (!args.kind) {
       // `me` in the owner slot: the node resolves the account from the token.
       return out(await client.get(`/v1/apps/me/${encodeURIComponent(args.filename)}/legal`));
     }
     // Every declared field travels inside the kind object; the node reads `remove: true` as the
-    // same act as null.
+    // same act as null. The provenance declaration goes in the body as PATCH takes it — the ROUTE
+    // records it (services/app-legal.ts mints the record), and the answer's
+    // `legal[kind].aiProvenanceId` is the echo, so the connector's carrier table is not consulted.
     const doc: Record<string, unknown> = {};
     if (args.format !== undefined) doc.format = args.format;
     if (args.content !== undefined) doc.content = args.content;
     if (args.remove !== undefined) doc.remove = args.remove;
-    return out(await client.patch(`/v1/apps/${encodeURIComponent(args.filename)}`, { legal: { [args.kind]: doc } }));
+    const body: Record<string, unknown> = { legal: { [args.kind]: doc } };
+    if (args.ai_provenance) body.ai_provenance = args.ai_provenance;
+    if (args.ai_provenance_id) body.ai_provenance_id = args.ai_provenance_id;
+    return out(await client.patch(`/v1/apps/${encodeURIComponent(args.filename)}`, body));
   });
 
   // → GET /v1/apps/:owner/:filename/audit — the owner's audit log of the app's settings.
