@@ -340,3 +340,34 @@ nothing on the way to the person carried it.
 - **Nothing downstream can catch it.** A key missing from a translation falls back to English by design, so `pnpm check:locales` stays green and the only visible trace is the coverage line moving the wrong way. The merge is now refused before it writes (`scripts/locale-merge.ts` v1.1.0), which is what makes this findable at all.
 - **Write the FULL dotted key, always, exactly as `locale:extract` emits it**: `"surface.blocks.home.mcp-connect.label": "…"`. The extract file is flat, and hand-writing a todo file in any other shape is the mistake.
 - **After any merge, read the diff, not the summary line.** `git diff --stat locales/<tag>.json` on a merge that only adds keys shows insertions and nothing else. A deletion count is the whole signal.
+
+## 29. A skin appended after the base sheet loses to the base sheet's ids
+
+*Symptoms: one element in the new skin still wears the old look; a phone rule you can see in the file does nothing; a rule you added last is not the one that wins.*
+
+- **The base stylesheet styles some things by id (`#add-btn`, `#tag-bar`, `#search-input`), and an id beats any number of classes.** The app catalog's poster skin (2026-08-29) restyled `.cat-word` and `.cat-rail-group`, then reused the base ids on new elements: the "add it" word came out as the old coral button, and the tag list stayed a column on a phone because `#tag-bar { flex-direction: column }` outside the media block outranked `.cat-rail-group { flex-direction: row }` inside it. When a new element inherits an old id, override BY ID (`#add-btn.cat-word`), and in a media block name the id again.
+- **Inside one media block, source order still decides between equal selectors.** Two edits to the same block put `.cat-bar-left { min-width: 60px }` above an older `.cat-bar-left { min-width: 0 }`, and the older one won. Before adding a rule to a block, grep the block for the selector.
+- **A shared library styles its mount point inline** (`aimeat-auth.js` gives the pill's host `display:flex` and lets it fill its row), so the only lever is `!important` on the host, which is allowed exactly there. On a phone, hide the controls the pill already carries (language, theme) instead of fitting two copies on one bar.
+- **A class named for a role, used for its look, breaks the day the look changes.** `dtl-stat-label` was on the small facts labels AND on a tool's description; the poster skin made labels coral small caps and every description turned into a red uppercase wall. Restyling exposes the misuse; fix the markup (`mz-desc`), not the rule.
+
+## 30. A strip that scrolls sideways holds the whole page open
+
+*Symptoms: `scrollWidth - clientWidth` is 400 px on a phone, nothing looks wide, and hiding things one by one changes nothing.*
+
+- **A flex or grid item's automatic `min-width` is its content's width, and a child with `overflow-x: auto` does not shrink that.** The catalog's rail was 909 px wide on a 390 px phone because its chip strips are wide; the strips scrolled correctly inside, the rail itself did not, and the page did. `min-width: 0` on the item, and `align-items: stretch` on a column flex container whose desktop value was `flex-start`, closed it — after two rounds of guessing at the pill and the header.
+- **Do not guess; list the elements whose right edge passes the viewport** (the snippet is in skill `aimeat-frontend-verify`). The outermost entry is the one to fix.
+
+## 31. A data source removed, a reader left standing
+
+*Symptoms: a button that works on the old node does nothing on the new one, or shows the "nothing here yet" line for everyone; nobody reports it because nobody expects it to work.*
+
+- **The server-only cutover of the app catalog (2026-07-20) emptied the browser-local app list, and the portfolio-prompt button kept reading it.** For five weeks it said "add some apps first" to every owner of thirty apps. Found on 2026-08-29 by pressing it during a restyle, not by a test: a dead affordance fails silently by design.
+- **When a source goes, grep every reader of it in the same change** (`getMainApps`, here) and either point it at the replacement or remove the door. A test that presses every primary button once on a populated account would have caught it; the catalog has none.
+
+## 32. Two sessions committing: `--only`, and a ref that moved under you
+
+*Symptoms: your commit swept in another session's staged files; or the pre-commit hook passed and the commit still failed with "cannot lock ref 'HEAD'".*
+
+- **Commit with explicit paths so the other session's index stays theirs**: `bash scripts/git-commit.sh <msg> --only -- <your files>`. Plain `git commit` takes the whole index, and on 2026-08-29 the index held another session's theme.css and CLAUDE.md beside this session's catalog files. (`git add -A` is already forbidden; this is the commit-side half of the same rule.)
+- **"cannot lock ref 'HEAD': is at X but expected Y" means the other session committed between your hook run and your ref update.** Nothing of yours was committed; the hook's 40 seconds are the window. Re-run the same commit; never `--force` or delete the lock.
+- **A merge refused for "local changes would be overwritten" names the other session's files, not yours.** Wait for their commit rather than stashing work you do not own; the merge went through untouched an hour later.
