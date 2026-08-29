@@ -228,9 +228,9 @@
                       radial-gradient(at 4% 86%,  color-mix(in oklab, var(--ak-spectrum-2) 22%, var(--ak-bg)), transparent 46%);
   /* The page's own ambient: the same spectrum, whisper-quiet, under everything — the ground
    * stops being a dead flat and the app has weather. Presets that mean flatness turn it off. */
-  --ak-page-image:    radial-gradient(at 10% 0%,   color-mix(in oklab, var(--ak-accent) 7%, var(--ak-bg)), transparent 42%),
-                      radial-gradient(at 96% 12%,  color-mix(in oklab, var(--ak-spectrum-2) 6%, var(--ak-bg)), transparent 44%),
-                      radial-gradient(at 50% 110%, color-mix(in oklab, var(--ak-spectrum-3) 5%, var(--ak-bg)), transparent 50%);
+  --ak-page-image:    radial-gradient(at 10% 0%,   color-mix(in oklab, var(--ak-accent) 8%, var(--ak-bg)), transparent 46%),
+                      radial-gradient(at 96% 12%,  color-mix(in oklab, var(--ak-spectrum-2) 8%, var(--ak-bg)), transparent 48%),
+                      radial-gradient(at 50% 110%, color-mix(in oklab, var(--ak-spectrum-3) 8%, var(--ak-bg)), transparent 52%);
   /* Chrome glass: the bar and the bottom nav float on a blurred, saturated pane. */
   --ak-glass:         color-mix(in oklab, var(--ak-surface) 74%, transparent);
   --ak-blur:          14px;

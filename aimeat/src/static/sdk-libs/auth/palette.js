@@ -37,7 +37,7 @@ export var AIMEAT_PALETTE_KEY = 'aimeat-palette';
  */
 export var PALETTES = [
   { id: 'aimeat', label: 'AIMEAT', swatch: {
-    light: { bg: '#efeee8', card: '#ffffff', accent: '#e8564a' },
+    light: { bg: '#eaeef7', card: '#ffffff', accent: '#e8564a' },
     dark: { bg: '#14151a', card: '#21232e', accent: '#ff6f62' } } },
   { id: 'paper', label: 'Paper', swatch: {
     light: { bg: '#eae2cf', card: '#fdfaf1', accent: '#a03040' },
