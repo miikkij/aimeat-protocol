@@ -36,6 +36,8 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.32.0 — 2026-08-29 — scene3d: the .ak-scene band (data.css) — real depth on the
+ *     three-world bundle, colours from the tokens, render loop parked at rest.
  *   v0.31.0 — 2026-08-29 — THE SCENIC LAYER joins the imports: scenics.css (the genre props)
  *     and patterns.css (gradient-built patterns × three volumes, technique after Temani Afif,
  *     MIT). Born from the thirteen approved genre probes.

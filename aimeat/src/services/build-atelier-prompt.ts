@@ -26,6 +26,12 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.13.0 — 2026-08-29 — scene3d taught beside the mural: the one-per-layout showpiece
+ *     (orb / sky / bars-as-terrain) on the three-world bundle, a statement rather than a
+ *     default.
+ *   v1.12.0 — 2026-08-29 — THE PATTERN SHELF: every patterns.css recipe rendered from the
+ *     registry (atelier-patterns.ts) with what it looks like, what it evokes and which volume
+ *     it belongs in — a pattern is chosen by intent, never by trying them all.
  *   v1.11.0 — 2026-08-29 — THE GENRE MENU: thirteen complete committed registers rendered from
  *     the template registry — "fork a genre, swap the words, keep the physics" becomes the
  *     first move whenever the owner wants the app to look like something.
@@ -64,6 +70,7 @@ import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import { LOOKS as LOOK_REGISTRY } from '../data/atelier-looks.js';
 import { getAppTemplateIndex } from '../data/app-templates.js';
+import { PATTERNS } from '../data/atelier-patterns.js';
 
 /** Slot the publish gate's token is substituted into (mirrors build-app-prompt.ts). */
 const SPEC_TOKEN_SLOT = '{{aimeat_spec_token}}';
@@ -242,6 +249,12 @@ function composeBody(config: AimeatConfig): string {
     + 'and free at idle because it is pure CSS scroll timelines. And a chart block may carry '
     + '`presentation: "mural"`: the chart stops living in a tile and becomes the section\'s '
     + 'full-bleed ground — the data as the decor, one mural per screen.\n\n'
+    + 'And when a screen has earned a SHOWPIECE, the `scene3d` block gives it real depth: '
+    + '`kind: "orb"` (a signature object turning under the hand), `"sky"` (a procedural '
+    + 'atmosphere band) or `"bars"` (the bound rows stand up as a field of columns — the 3D '
+    + 'chart). One per layout, loaded lazily, colours from the look\'s tokens, and the render '
+    + 'loop stops at rest so an idle scene costs nothing. It is a statement, not a default: '
+    + 'most screens want a chart, not a scene.\n\n'
     + 'COMPOSE, do not pile: a block may carry `span` — `full` (default), `main` + `side` for the '
     + 'asymmetric editorial split, or `half` — and the screen becomes a laid-out page instead of a '
     + 'column of cards. Narrow screens fold every span to one column on their own.\n\n'
@@ -261,10 +274,30 @@ function composeBody(config: AimeatConfig): string {
     + 'the words, sources and images for the app at hand, and KEEP THE PHYSICS (finite entrances, '
     + 'motion only under the hand or the scroll, zero idle repaints, reduced-motion honesty). '
     + 'The kit\'s scenic props (`flapify`, `ransom`, `vu`, `typeout`, `dealIn`, the `.ak-stamp` / '
-    + '`.ak-ticker` / `.ak-torn` / `.ak-polaroid` family) and the pattern recipes '
-    + '(`.ak-pat-*` × ground/prop/zone volumes) carry the shared stagecraft.\n\n';
+    + '`.ak-ticker` / `.ak-torn` / `.ak-polaroid` family) and the pattern shelf below '
+    + 'carry the shared stagecraft.\n\n';
   for (const g of genres) {
     body += '- `' + g.id + '` — **' + g.title + '**: ' + g.description + '\n';
+  }
+  body += '\n';
+
+  // THE PATTERN SHELF — rendered from the registry (atelier-patterns.ts), same data the
+  // catalogue serves, so the choosing guidance can never drift from what patterns.css ships.
+  body += '## The pattern shelf\n\n';
+  body += 'Backgrounds with a personality, built entirely from the `--ak-*` tokens (technique '
+    + 'after Temani Afif\'s CSS-Pattern, MIT) — so they follow every look, palette and mode, and '
+    + 'the contrast matrix has proven text readable on them. Class is `.ak-pat-<id>` plus ONE '
+    + 'volume: `.ak-pat--ground` (a whisper the whole page stands on), `.ak-pat--prop` (one '
+    + 'object\'s texture), `.ak-pat--zone` (full ink — ONE banner or divider per screen, words '
+    + 'only inside solid chips; `--zone-2`/`--zone-3` take the spectrum colours, `--zone-ink` '
+    + 'goes monochrome). Tile size is `--ak-pat-size` on the element. Choose by what it says:\n\n';
+  for (const p of PATTERNS) {
+    const uses = [
+      p.use.ground ? 'as a ground: ' + p.use.ground : '',
+      p.use.prop ? 'as a prop: ' + p.use.prop : '',
+      p.use.zone ? 'as a zone: ' + p.use.zone : '',
+    ].filter(Boolean).join(' ');
+    body += '- `' + p.id + '` — ' + p.looksLike + ' Evokes: ' + p.evokes + ' ' + uses + '\n';
   }
   body += '\n';
 
