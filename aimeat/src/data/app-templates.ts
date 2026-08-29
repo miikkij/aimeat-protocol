@@ -13,6 +13,8 @@
  *     - use-case   : composes an app-shell + components (+ optional package) (future).
  * @structure AppTemplate · getAppTemplates() · getAppTemplateIndex()
  * @version-history
+ *   v1.13.0 — 2026-08-29 — kind `genre` + the thirteen approved genre scaffolds (bodies in
+ *     ./app-templates/genres.ts) and the `track` field: genres are Atelier-only in the prompts.
  *   v1.0.0 — 2026-06-26 — initial registry + first app-shell (T1 pure-client).
  *   v1.1.0 — 2026-06-26 — app-shells T2 (cortex) + T3 (extension).
  *   v1.2.0 — 2026-06-26 — component library (auth-gated, private-store, shared-feed, ai-action, data-table, settings, dated-archive).
@@ -60,6 +62,7 @@ import {
 } from './app-templates/components.js';
 import { USECASE_REALTIME_SOCIAL, USECASE_MARKETPLACE, USECASE_HOMEPAGE, USECASE_APP_IAM } from './app-templates/use-cases.js';
 import { PROJECT_WORKSTATION } from './app-templates/workstation.js';
+import { GENRE_BODIES, GENRE_INDEX } from './app-templates/genres.js';
 
 export interface AppTemplate {
   /** Stable id, e.g. "shell-pure-client". */
@@ -70,9 +73,16 @@ export interface AppTemplate {
    * script and the guards. Kept out of the prompt's template menu (buildPromptTemplateSections)
    * because it applies to a minority of apps and the prompt is charged to every session.
    */
-  kind: 'app-shell' | 'component' | 'use-case' | 'project';
+  /**
+   * `genre` is a COMPLETE page in a committed register (the poster drop, the console, the
+   * departure board, …) — the Atelier track's answer to "make it look like something": fork
+   * one, swap the words and sources, keep the physics. Atelier-only in the prompts.
+   */
+  kind: 'app-shell' | 'component' | 'use-case' | 'project' | 'genre';
   /** Capability tier for app-shells: T1 pure client · T2 +cortex · T3 +extension. */
   tier?: 'T1' | 'T2' | 'T3';
+  /** The build track a template belongs to; absent means both. Genres are Atelier's. */
+  track?: 'classic' | 'atelier';
   title: string;
   /** One line shown in the picker and in the prompt index. */
   description: string;
@@ -190,6 +200,18 @@ const TEMPLATES: AppTemplate[] = [
     libs: ['aimeat-auth', 'aimeat-data'],
     content: PROJECT_WORKSTATION,
   },
+  // ── THE GENRES: complete committed registers, Atelier's answer to "make it look like
+  //    something". Bodies live in ./app-templates/genres.ts (generated from the approved
+  //    probes); fork one, swap the words and sources, keep the physics.
+  ...GENRE_INDEX.map(({ id, title, description }): AppTemplate => ({
+    id: `genre-${id}`,
+    kind: 'genre',
+    track: 'atelier',
+    title,
+    description,
+    libs: ['aimeat-atelier'],
+    content: GENRE_BODIES[id]!,
+  })),
 ];
 
 // Localized title/description for the picker (the templates a non-technical user
@@ -217,11 +239,11 @@ export function getAppTemplates(): AppTemplate[] {
  * a picker. Pass a `lang` (e.g. 'fi') to get localized title/description where a
  * translation exists; everything else falls back to the canonical English.
  */
-export function getAppTemplateIndex(lang?: string): Array<Pick<AppTemplate, 'id' | 'kind' | 'tier' | 'title' | 'description' | 'libs'>> {
+export function getAppTemplateIndex(lang?: string): Array<Pick<AppTemplate, 'id' | 'kind' | 'tier' | 'track' | 'title' | 'description' | 'libs'>> {
   const tr = (lang && TRANSLATIONS[lang]) || null;
-  return TEMPLATES.map(({ id, kind, tier, title, description, libs }) => {
+  return TEMPLATES.map(({ id, kind, tier, track, title, description, libs }) => {
     const o = tr && tr[id];
-    return { id, kind, tier, title: (o && o.title) || title, description: (o && o.description) || description, libs };
+    return { id, kind, tier, track, title: (o && o.title) || title, description: (o && o.description) || description, libs };
   });
 }
 

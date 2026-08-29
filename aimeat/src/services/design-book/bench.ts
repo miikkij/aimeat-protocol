@@ -32,6 +32,7 @@
  *     bench is the field validation at propose time.
  *   v1.0.0 — 2026-08-28 — Initial (TARGET-074, the guarantee bench automated).
  */
+import { getAppTemplates } from '../../data/app-templates.js';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { systemGhiiFor } from '../compliance-register.js';
@@ -89,6 +90,12 @@ const DEMO_LAYOUT_FOR_TOKENS = {
 /** What the browser renders for one part: the body itself for an arrangement, the demo
  *  arrangement wearing the sheet for a look/motion part, nothing for an illustration. */
 function renderableBodyFor(part: DesignBookPart): Record<string, unknown> | null {
+  // A genre benches AS THE PAGE IT IS: the template's own HTML, measured at three viewports.
+  if (part.kind === 'genre') {
+    const id = (part.body as { template?: string }).template || '';
+    const t = getAppTemplates().find((x) => x.id === id);
+    return t ? { __page: t.content } : null;
+  }
   if (part.kind === 'look' || part.kind === 'motion') {
     const body = part.body as { tokens?: Record<string, string>; look?: string };
     return { ...DEMO_LAYOUT_FOR_TOKENS, look: body.look ?? 'vivid', tokens: body.tokens ?? {} };
@@ -99,6 +106,8 @@ function renderableBodyFor(part: DesignBookPart): Record<string, unknown> | null
 
 /** The bench page: the kit, the part, demo rows per component — the gallery preview, inlined. */
 function benchPageHtml(body: Record<string, unknown>): string {
+  // A genre part IS its page — serve it as-is instead of wrapping the demo frame around it.
+  if (typeof body.__page === 'string') return body.__page;
   const partJson = JSON.stringify(body).replace(/<\//g, '<\\/');
   return [
     '<!DOCTYPE html><html lang="en" data-theme="light"><head><meta charset="utf-8">',
@@ -161,7 +170,7 @@ function benchPageHtml(body: Record<string, unknown>): string {
 const MEASURE_JS = `(() => {
   const doc = document.documentElement;
   const overflow = doc.scrollWidth - doc.clientWidth;
-  const units = document.querySelectorAll('.ak-mosaic__unit, .ak-mosaic__band > *').length;
+  const units = document.querySelectorAll('.ak-mosaic__unit, .ak-mosaic__band > *, main > *').length;
   let smallControls = 0;
   for (const el of document.querySelectorAll('button, [role="button"], a, input, select')) {
     const r = el.getBoundingClientRect();
