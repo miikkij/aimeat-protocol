@@ -12,6 +12,9 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   v1.7.0 — 2026-08-29 — The ai.label_public row (AIMEAT_AI_LABEL_PUBLIC), out of the coverage
+ *     backlog: the visible-label policy an operator has to be able to see and set, now that a named
+ *     reviewer's effect on an app and its legal pages depends on it.
  *   v1.6.0 — 2026-08-28 — The site links get their rows (site.learn_url … site.contacts): twelve
  *     addresses, the store, the incubator and the contact list, all mutable. They are the first
  *     nested group, addressed as 'siteLinks.<name>' through readConfigField / writeConfigField,
@@ -507,6 +510,11 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'modelDefaultExecution', dotPath: 'ai.model_default_execution', envVar: 'AIMEAT_MODEL_DEFAULT_EXECUTION', type: 'string', validate: () => true, immutable: false, description: 'Default execution model when the owner has not chosen one' },
   { key: 'modelDefaultVision', dotPath: 'ai.model_default_vision', envVar: 'AIMEAT_MODEL_DEFAULT_VISION', type: 'string', validate: () => true, immutable: false, description: 'Default model for reading images. Must accept image input' },
   { key: 'modelDefaultStt', dotPath: 'ai.model_default_stt', envVar: 'AIMEAT_MODEL_DEFAULT_STT', type: 'string', validate: () => true, immutable: false, description: 'Default speech-to-text model. Empty means nobody can use the microphone until they set one themselves' },
+  // Presentation only: the provenance record, the AI-Disclosure header and the JSON-LD are never
+  // touched by this. `off` is accepted here as a value and REFUSED at runtime on a node whose
+  // security profile is public (config.ts coerces it to strict and says so in the posture
+  // warnings), so the one combination that must be unreachable by accident stays unreachable.
+  { key: 'aiLabelPublic', dotPath: 'ai.label_public', envVar: 'AIMEAT_AI_LABEL_PUBLIC', type: 'string', validate: v => v === 'strict' || v === 'light' || v === 'off', immutable: false, description: 'How eagerly a VISIBLE AI label is shown ("strict" | "light" | "off"). strict also labels what Article 50 exempts, so an app or a legal page with a named reviewer keeps the light "a model was involved" label; light shows only what the law requires, so the reviewer lifts it; off shows none and is refused on a public node. The interactive notice and the machine planes never change' },
   { key: 'modelDefaultImage', dotPath: 'ai.model_default_image', envVar: 'AIMEAT_MODEL_DEFAULT_IMAGE', type: 'string', validate: () => true, immutable: false, description: 'Default model for generating images. Must produce image output' },
   { key: 'sttLanguageDefault', dotPath: 'ai.stt_language_default', envVar: 'AIMEAT_STT_LANGUAGE_DEFAULT', type: 'string', validate: () => true, immutable: false, description: 'Language hint for transcription (e.g. fi) when the owner has not set one' },
 
