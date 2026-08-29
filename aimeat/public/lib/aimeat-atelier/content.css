@@ -350,8 +350,11 @@ button.ak-card:hover { box-shadow: var(--ak-elev-2); transform: translateY(-2px)
   border-radius: 0;
   background: none;
   box-shadow: none;
-  margin-inline: calc(-1 * max(var(--ak-pad), 3vw));
 }
+/* The bleed knows its room: only inside the shell's main lane is there padding to bleed into.
+ * On a bare host (the bench's measuring frame, an embed) the mural stays flush and cannot
+ * overflow the document — the guarantee the bench measures. */
+.ak-app__main .ak-chart--mural { margin-inline: calc(-1 * max(var(--ak-pad), 3vw)); }
 .ak-chart--mural .ak-chart__svg { min-height: min(46dvh, 30rem); height: auto; }
 .ak-chart--mural .ak-chart__tick { opacity: 0.45; }
 .ak-chart--mural .ak-chart__grid { opacity: 0.25; }
