@@ -9,6 +9,8 @@
  * @structure tr(key, fallback) · scrollTo(id) · Section · Fold
  * @usage import { Section, Fold, tr, scrollTo } from '/views/profile/organisms/poster-parts.js';
  * @version-history
+ *   v1.1.0 — 2026-08-29 — scrollTo scrolls the content region itself instead of calling scrollIntoView,
+ *     which also moved the window and hid the top bar on aimeat.io.
  *   v1.0.0 — 2026-08-29 — Extracted from home.js v3.0.0 for the workspace cover; no behaviour change.
  */
 import { h } from 'preact';
@@ -17,7 +19,23 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 
 export const tr = (key, fb) => t(key) || fb;
-export const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+/**
+ * Bring a section to the top of the content area, and move NOTHING else. scrollIntoView() walks
+ * every scrollable ancestor, and on this shell that included the window: the static agent-footer
+ * below #app gave the document 70 px of slack, and each rail click slid the whole page up by the
+ * height of the top bar, which then sat above the viewport (aimeat.io, 2026-08-29, seen twice).
+ * Scrolling the content region by hand touches one element and cannot reach the bar.
+ * @param {string} id
+ */
+export const scrollTo = (id) => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const box = el.closest('.page-content') || el.closest('.pf-content') || null;
+  if (!box) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+  const top = box.scrollTop + el.getBoundingClientRect().top - box.getBoundingClientRect().top - 16;
+  box.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+};
 
 /** A section under an ink rule: the numbered headline, the doors on the right, the body. */
 export function Section({ id, num, title, count, doors, first, children }) {
