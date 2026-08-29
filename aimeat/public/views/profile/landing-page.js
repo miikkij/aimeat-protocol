@@ -17,6 +17,8 @@
  *   - PresencePill + PresenceDialog — header status pill that opens the availability settings dialog
  *   - LandingPage — main orchestrator (default export)
  * @version-history
+ *   v3.14.0 — 2026-08-29 — The sidebar's nameplate (avatar + name) is gone: the top bar's pill and the
+ *     overview's masthead already carry the name, and three copies on one screen read as a tic.
  *   v3.13.0 — 2026-08-27 — This page is "Settings & Controls" in the header now, with the home in
  *     front of it: a "← Home" link at the top of the sidebar, the overview tab called Overview
  *     rather than Home, and the home-or-profile switch at the foot replaced by the start-page
@@ -107,7 +109,6 @@ import { t, tOr } from "/js/i18n.js";
 import { listApps } from "/js/services/apps.js";
 import { onLiveUpdate } from "/lib/live-updates.js";
 import { getMemory, createMemory } from "/js/services/memory.js";
-import { minidenticon } from "/lib/minidenticons.min.js";
 import { syncTabHistory } from "./landing-page.helpers.js";
 import { EditProfileModal, ChangePasswordModal } from "./landing-page.modals.js";
 import { swallowed } from '/js/swallowed.js';
@@ -363,10 +364,9 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
         <a class="pf-side-item pf-side-home" href="/v1/home">
           <span class="pf-side-label">← ${t('nav.home')}</span>
         </a>
-        <div class="pf-side-identity">
-          <div class="pf-side-avatar" dangerouslySetInnerHTML=${{ __html: minidenticon(typeof owner === 'string' && owner ? owner : 'user') }}></div>
-          <div class="pf-side-id-name">${session.displayName || owner}</div>
-        </div>
+        ${/* No nameplate here: the pill in the top bar already says who is signed in and the
+              overview's masthead is the name at full size, so a third copy in the index was the
+              one Jouni counted out loud (2026-08-29). */''}
 
         <button class="pf-side-item${!openView ? ' pf-side-item--active' : ''}"
           onClick=${() => { close(); setDrawerOpen(false); }}>

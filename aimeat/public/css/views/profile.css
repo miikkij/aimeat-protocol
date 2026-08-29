@@ -6,6 +6,8 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v3.2.1 — 2026-08-29 — The sidebar nameplate rules (.pf-side-identity, -avatar, -id-name) go with the
+ *     nameplate: the pill and the masthead already carry the name.
  *   v3.2.0 — 2026-08-29 — The agent permission dialog in the poster face: presets as one segmented row with
  *     the chosen one on the sun, the advanced editor behind an underlined word, domains as sections under a
  *     3px ink rule with rows over hairlines, mono chips for the machine names and notes. Poster headlines
@@ -2458,10 +2460,6 @@
 /* The index: a table of contents rather than a menu. One rule on top, group words in coral,
    every item a hairline row, the open one on the sun. */
 .pf-side-home { border-top: 3px solid var(--text); padding-top: 0.9rem; font-family: var(--font-mono); font-size: 0.8rem; color: var(--accent); }
-.pf-side-identity { display: flex; align-items: center; gap: 0.6rem; padding: 0.4rem 0 1rem; }
-.pf-side-avatar { width: 38px; height: 38px; flex: 0 0 auto; background: var(--card); border: 3px solid var(--text); overflow: hidden; }
-.pf-side-avatar svg { width: 100%; height: 100%; }
-.pf-side-id-name { font-family: var(--font-poster-section); font-weight: var(--font-poster-section-weight); font-size: 1.05rem; line-height: 1.1; text-transform: uppercase; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .pf-side-group { margin-top: 1.1rem; }
 .pf-side-group-title { font-size: 0.66rem; font-weight: var(--font-poster-strong-weight); letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); padding: 0 0 0.35rem; border-bottom: 2px solid var(--text); }
