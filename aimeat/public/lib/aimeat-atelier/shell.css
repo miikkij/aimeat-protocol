@@ -132,6 +132,10 @@
   max-width: var(--ak-main-max);
   margin: 0 auto;
   padding: var(--ak-pad);
+  /* Full width is not "text against the bezel": the side room grows with the window, so a page
+   * that takes the whole screen still has air. A look with a measure is unaffected — its column
+   * is narrower than this padding ever reaches. */
+  padding-inline: max(var(--ak-pad), 3vw);
   padding-bottom: calc(var(--ak-chrome-bottom) + var(--ak-pad));
   display: flex;
   flex-direction: column;
