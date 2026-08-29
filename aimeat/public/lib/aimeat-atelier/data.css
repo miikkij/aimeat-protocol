@@ -359,10 +359,18 @@ button.ak-queue__row:hover { background: var(--ak-surface-2); }
   box-shadow: var(--ak-elev-2);
 }
 .ak-map .leaflet-popup-content { font: inherit; font-size: var(--ak-text-body); margin: 10px 14px; }
-.ak-map .leaflet-bar a {
+/* Leaflet's 30px default sits under the touch minimum — the bench refused it, rightly.
+   .ak-root doubled for specificity: leaflet.css loads AFTER this sheet (runtime inject) and
+   its .leaflet-touch rule would win an equal-specificity tie. */
+.ak-root.ak-map .leaflet-bar a,
+.ak-root.ak-map .leaflet-touch .leaflet-bar a {
   background: var(--ak-surface);
   color: var(--ak-ink);
   border-bottom-color: var(--ak-line);
+  width: var(--ak-touch);
+  height: var(--ak-touch);
+  line-height: var(--ak-touch);
+  font-size: 20px;
 }
 .ak-map .leaflet-bar a:hover { background: var(--ak-surface-2); }
 .ak-map .leaflet-control-attribution {
@@ -370,7 +378,16 @@ button.ak-queue__row:hover { background: var(--ak-surface-2); }
   color: var(--ak-ink-dim);
   font-size: 10px;
 }
-.ak-map .leaflet-control-attribution a { color: var(--ak-ink-dim); }
+/* The licence links are real targets: WCAG 2.2 wants 24px of them, and the bench checks. */
+.ak-map .leaflet-control-attribution a {
+  color: var(--ak-ink-dim);
+  display: inline-block;
+  padding: 7px 4px;
+  min-width: 24px;
+  min-height: 24px;
+  box-sizing: border-box;
+  line-height: 10px;
+}
 /* Dark mode re-tones the photographic tiles instead of shouting against them. */
 :root[data-theme='dark'] .ak-map .leaflet-tile {
   filter: invert(1) hue-rotate(200deg) saturate(0.5) brightness(0.92) contrast(0.92);
