@@ -2847,6 +2847,7 @@
     "surfacePreviewMember": "Esta es una página que los miembros ven una vez que han entrado. Abre tu propio inicio en otra pestaña para verla."
   },
   "dev": {
+    "crumb": "Para desarrolladores",
     "title": "Conecta tu IA a tu casa",
     "subtitle": "Una línea si tu IA habla MCP, y un prompt para copiar y pegar para todo lo demás. Después construye sobre ello, o monta tu propio nodo.",
     "repos": {
