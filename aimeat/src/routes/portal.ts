@@ -141,6 +141,12 @@ function templateVars(config: AimeatConfig, locale: Locale): Record<string, stri
     supervisoryName: config.operator.supervisoryName,
     supervisoryUrl: config.operator.supervisoryUrl,
     effectiveDate: config.operator.effectiveDate,
+    // When the text was last EDITED, which is not when it takes EFFECT. Both labels used to read
+    // effectiveDate, so an operator honouring the 30-day notice the documents themselves promise had
+    // to choose which of the two lines would be false: a future effective date made "last updated"
+    // point at a day that had not happened. Unset, it falls back to the effective date and nothing
+    // changes for a node that publishes the same day it edits.
+    lastUpdated: config.operator.policyUpdatedDate || config.operator.effectiveDate,
     policyVersion: config.operator.policyVersion,
     // The sign-in cookie's real lifetime, so the cookie section states THIS node's numbers rather
     // than the defaults. Both are operator-tunable, and a policy that hardcoded 30/90 would be
