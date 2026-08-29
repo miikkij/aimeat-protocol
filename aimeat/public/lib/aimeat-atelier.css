@@ -36,6 +36,9 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.31.0 — 2026-08-29 — THE SCENIC LAYER joins the imports: scenics.css (the genre props)
+ *     and patterns.css (gradient-built patterns × three volumes, technique after Temani Afif,
+ *     MIT). Born from the thirteen approved genre probes.
  *   v0.30.0 — 2026-08-29 — THE BONES FREED (looks.css): the press-sheet and marquee composition
  *     structures — pages composed like the design canvas posters instead of a band over a pile
  *     of boxes. Riso and stage ride them.
@@ -180,6 +183,8 @@
 @import url('./aimeat-atelier/shell.css');
 @import url('./aimeat-atelier/content.css');
 @import url('./aimeat-atelier/data.css');
+@import url('./aimeat-atelier/scenics.css');
+@import url('./aimeat-atelier/patterns.css');
 @import url('./aimeat-atelier/mosaic.css');
 /* LAST on purpose: the generated look blocks (tokens + structure recipes) override the parts. */
 @import url('./aimeat-atelier/looks.css');
