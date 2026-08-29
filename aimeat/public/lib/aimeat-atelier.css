@@ -36,6 +36,8 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.24.0 — 2026-08-29 — The looks gain their CURVES (looks.css): sticker, carnival and
+ *     billboard ride a springy overshoot, so a motion recipe is a hand and not just a speed.
  *   v0.23.0 — 2026-08-28 — BILLBOARD joins the looks (looks.css): the whole screen is the
  *     poster — no measure column, a half-viewport banner, carnival's printed depth at room
  *     scale. Matrix 4285/4285 over 14 looks × 12 palette-modes (Voltage included).

@@ -163,6 +163,7 @@
   --ak-tilt:            -2deg;
   --ak-enter-distance:  22px;
   --ak-enter-stagger:   55ms;
+  --ak-ease:            cubic-bezier(0.34, 1.56, 0.64, 1);
   --ak-weight-display:  800;
   --ak-hero-ink:        var(--ak-ink);
   --ak-hero-ink-dim:    var(--ak-hero-ink);
@@ -443,6 +444,7 @@
   --ak-tilt:            -1.6deg;
   --ak-enter-distance:  26px;
   --ak-enter-stagger:   60ms;
+  --ak-ease:            cubic-bezier(0.34, 1.56, 0.64, 1);
   --ak-scrim:           color-mix(in oklab, var(--ak-ink) 14%, transparent);
   --ak-hero-ink:        var(--ak-accent-ink);
   --ak-hero-ink-dim:    var(--ak-accent-ink);
@@ -481,6 +483,7 @@
   --ak-tilt:            -1.6deg;
   --ak-enter-distance:  30px;
   --ak-enter-stagger:   55ms;
+  --ak-ease:            cubic-bezier(0.34, 1.56, 0.64, 1);
   --ak-scrim:           color-mix(in oklab, var(--ak-ink) 14%, transparent);
   --ak-hero-ink:        var(--ak-accent-ink);
   --ak-hero-ink-dim:    var(--ak-accent-ink);

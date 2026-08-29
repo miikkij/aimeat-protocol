@@ -26,6 +26,10 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.9.0 — 2026-08-29 — A MOTION section: entrances and the hover greeting stay the
+ *     components' work, and the one call a builder makes is the attention gesture (pulse /
+ *     shake / flash / rise), with its rules — one element, never decoration, never instead of
+ *     words.
  *   v1.8.0 — 2026-08-28 — The signature section teaches the COLOUR PAIR (--ak-accent as
  *     "#light/#dark", matrix-proven per mode) and the Design Book section names the five part
  *     kinds and the replace-vs-merge adopt rule.
@@ -243,6 +247,20 @@ function composeBody(config: AimeatConfig): string {
     + 'the `--ak-*` tokens (every preset × palette × mode combination is verified arithmetically '
     + 'on this node), motion comes from the components, and the login pill owns the theme, '
     + 'palette and language controls.\n\n';
+
+  body += '## Motion, and the moment something needs the eye\n\n';
+  body += 'Entrances, live-change repaints and the hover greeting are the components\' own work: '
+    + 'you never write an animation. The one motion call you DO make is the attention gesture, '
+    + 'for the moment a thing on screen needs to be noticed: `AIMEAT.atelier.attention(el, '
+    + '"pulse" | "shake" | "flash" | "rise")`. One finite gesture, no repeat, and reduced motion '
+    + 'makes it a no-op (it returns false, so you can tell). USE IT FOR: a fresh row that '
+    + 'arrived while the person was reading (pulse), a refused action (shake — the form '
+    + 'component already shakes its own invalid fields, so this is for your own controls), the '
+    + 'one control you want found after an explanation (flash), a saved or promoted item '
+    + '(rise). NEVER use it as decoration, never on more than one element at a time, and never '
+    + 'INSTEAD of words: a gesture is on top of the message, because a person who does not see '
+    + 'motion must still be told. The pace and curve come from the look (`--ak-motion`, '
+    + '`--ak-ease`), so the same call feels springy in one app and snappy in another.\n\n';
 
   body += '## Imagery\n\n';
   body += 'Images are generated, uploaded and referenced — never inlined and never stock. The '

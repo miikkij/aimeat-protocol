@@ -15,10 +15,14 @@
  *   prefers-reduced-motion. Finished WAAPI animations leave nothing running, so an idle Atelier
  *   surface repaints zero times — the finish gate measures exactly that.
  * @structure el · append · $ · $$ · clear · uid · reducedMotion · resolve · injectStyle ·
- *   busy · guardButtons · whileBusy · enter · countUp
+ *   busy · guardButtons · whileBusy · enter · countUp · attention
  * @usage  import { el, $, injectStyle, enter } from './dom.js';
  *   el('div', { class: 'ak-card', vars: { '--ak-fill': '42%' }, on: { click: fn } }, ['text']);
  * @version-history
+ *   v0.2.0 — 2026-08-29 — attention(): the NOTICE-ME gesture (pulse / shake / flash / rise),
+ *     one finite Web Animation per call, a no-op under reduced motion and honest about it
+ *     (returns false), pace and curve from the look. enter() now rides `--ak-ease` too, so a
+ *     look's curve shapes its entrance and not only its transitions.
  *   v0.1.0 — 2026-08-27 — Initial (TARGET-074 phase 1, slice 1).
  */
 
@@ -253,15 +257,67 @@ export function enter(root, opts) {
   if (dist === 0 && step === 0) return;
   const max = (opts && opts.max) || ENTER_MAX;
   const kids = Array.prototype.slice.call(root.children, 0, max);
+  // The CURVE is the look's too: `--ak-ease` shapes every entrance (a springy overshoot and a
+  // crisp snap are different hands), with the house curve as the floor.
+  const ease = (cs.getPropertyValue('--ak-ease') || '').trim() || 'cubic-bezier(0.2, 0.7, 0.3, 1)';
   for (let i = 0; i < kids.length; i++) {
     kids[i].animate(
       [
         { opacity: 0, transform: 'translateY(' + dist + 'px)' },
         { opacity: 1, transform: 'translateY(0)' },
       ],
-      { duration: span, delay: i * step, easing: 'cubic-bezier(0.2, 0.7, 0.3, 1)', fill: 'backwards' },
+      { duration: span, delay: i * step, easing: ease, fill: 'backwards' },
     );
   }
+}
+
+/**
+ * NOTICE ME — one finite attention gesture on one element, for the moment something needs the
+ * eye: a refused field shakes, a fresh row pulses, a primary action flashes its ring, a saved
+ * card rises. Every gesture is a one-shot Web Animation (two beats at most, no CSS class, no
+ * idle repaint); reduced motion is a no-op. Returns whether anything ran, so an app can pair
+ * the gesture with words instead of relying on it.
+ * @param {Element|string|null} target
+ * @param {'pulse'|'shake'|'flash'|'rise'} [kind]
+ * @returns {boolean}
+ */
+export function attention(target, kind) {
+  const node = typeof target === 'string' ? document.querySelector(target) : target;
+  if (!node || reducedMotion() || typeof node.animate !== 'function') return false;
+  const cs = getComputedStyle(node);
+  const span = (parseFloat(cs.getPropertyValue('--ak-motion')) || 200) * 1.6;
+  // The ring colour comes from the theme or from the element's own ink — never a literal: a
+  // hardcoded hex in the kit's JavaScript is exactly what check:libs refuses, and rightly.
+  const accent = (cs.getPropertyValue('--ak-accent') || '').trim() || cs.color;
+  const gesture = kind || 'pulse';
+  if (gesture === 'shake') {
+    node.animate([
+      { transform: 'translateX(0)' }, { transform: 'translateX(-7px)' }, { transform: 'translateX(7px)' },
+      { transform: 'translateX(-4px)' }, { transform: 'translateX(4px)' }, { transform: 'translateX(0)' },
+    ], { duration: span, easing: 'ease-in-out' });
+    return true;
+  }
+  if (gesture === 'flash') {
+    node.animate([
+      { boxShadow: '0 0 0 0 ' + accent },
+      { boxShadow: '0 0 0 12px transparent' },
+    ], { duration: span, iterations: 2, easing: 'ease-out' });
+    return true;
+  }
+  if (gesture === 'rise') {
+    node.animate([
+      { transform: 'translateY(0) scale(1)' },
+      { transform: 'translateY(-8px) scale(1.02)', offset: 0.45 },
+      { transform: 'translateY(0) scale(1)' },
+    ], { duration: span, easing: 'cubic-bezier(0.2, 0.7, 0.3, 1)' });
+    return true;
+  }
+  node.animate([
+    { transform: 'scale(1)' },
+    { transform: 'scale(1.06)', offset: 0.5 },
+    { transform: 'scale(1)' },
+  ], { duration: span / 2, iterations: 2, easing: 'ease-in-out' });
+  return true;
 }
 
 /**
