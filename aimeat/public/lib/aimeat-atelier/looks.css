@@ -41,7 +41,7 @@
 [data-ak-look='calm-card'] {
   --ak-page-image:      none;
   --ak-grain:           none;
-  --ak-surface-image:   linear-gradient(180deg, color-mix(in oklab, var(--ak-accent) 3%, var(--ak-surface)), var(--ak-surface));
+  --ak-surface-image:   none;
   --ak-hero-image:      radial-gradient(at 30% 20%, color-mix(in oklab, var(--ak-accent) 8%, var(--ak-bg)), transparent 60%);
   --ak-grad:            linear-gradient(135deg, color-mix(in oklab, var(--ak-accent) 80%, var(--ak-ink)), color-mix(in oklab, var(--ak-accent) 70%, var(--ak-ink)));
   --ak-elev-2:          var(--ak-elev-1);
@@ -157,7 +157,7 @@
 [data-ak-look='sticker'] {
   --ak-radius:          24px;
   --ak-radius-sm:       16px;
-  --ak-surface-image:   linear-gradient(180deg, color-mix(in oklab, var(--ak-accent-2) 3%, var(--ak-surface)), var(--ak-surface));
+  --ak-surface-image:   none;
   --ak-display-shadow:  0 4px 0 color-mix(in oklab, var(--ak-ink) 32%, var(--ak-surface));
   --ak-elev-1:          0 5px 0 color-mix(in oklab, var(--ak-ink) 20%, transparent);
   --ak-tilt:            -2deg;
@@ -179,7 +179,7 @@
   --ak-gap:             8px;
   --ak-pad:             12px;
   --ak-font-display:    var(--ak-font-mono);
-  --ak-surface-image:   linear-gradient(180deg, color-mix(in oklab, var(--ak-accent) 4%, var(--ak-surface)), var(--ak-surface));
+  --ak-surface-image:   none;
   --ak-elev-1:          0 0 0 1px color-mix(in oklab, var(--ak-accent) 45%, var(--ak-surface)), 0 0 18px color-mix(in oklab, var(--ak-accent) 22%, transparent);
   --ak-line:            color-mix(in oklab, var(--ak-accent) 35%, var(--ak-ink-dim));
   --ak-hero-min:        18dvh;
@@ -435,7 +435,7 @@
   --ak-line:            color-mix(in oklab, var(--ak-ink) 85%, var(--ak-bg));
   --ak-radius:          12px;
   --ak-radius-sm:       8px;
-  --ak-surface-image:   linear-gradient(180deg, color-mix(in oklab, var(--ak-spectrum-2) 4%, var(--ak-surface)), var(--ak-surface));
+  --ak-surface-image:   none;
   --ak-elev-1:          5px 5px 0 color-mix(in oklab, var(--ak-ink) 88%, transparent);
   --ak-elev-2:          9px 9px 0 color-mix(in oklab, var(--ak-ink) 88%, transparent);
   --ak-display-shadow:  3px 3px 0 color-mix(in oklab, var(--ak-ink) 40%, transparent);
@@ -474,7 +474,7 @@
   --ak-radius:          14px;
   --ak-radius-sm:       10px;
   --ak-gap:             18px;
-  --ak-surface-image:   linear-gradient(180deg, color-mix(in oklab, var(--ak-spectrum-2) 4%, var(--ak-surface)), var(--ak-surface));
+  --ak-surface-image:   none;
   --ak-elev-1:          6px 6px 0 color-mix(in oklab, var(--ak-ink) 88%, transparent);
   --ak-elev-2:          10px 10px 0 color-mix(in oklab, var(--ak-ink) 88%, transparent);
   --ak-display-shadow:  3px 3px 0 color-mix(in oklab, var(--ak-ink) 40%, transparent);
