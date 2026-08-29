@@ -535,6 +535,125 @@
   };
   var t = i18n.t;
 
+  // src/static/sdk-libs/atelier/scenics.js
+  function easeOf(node) {
+    const cs = getComputedStyle(node);
+    return (cs.getPropertyValue("--ak-ease") || "").trim() || "cubic-bezier(0.34, 1.56, 0.64, 1)";
+  }
+  function flapify(target, opts) {
+    const node = typeof target === "string" ? document.querySelector(target) : target;
+    if (!node || node.getAttribute("data-ak-flapped") === "done") return false;
+    const text = node.textContent || "";
+    if (!text.trim()) return false;
+    node.setAttribute("data-ak-flapped", "done");
+    node.setAttribute("aria-label", text);
+    node.textContent = "";
+    const wrap = document.createElement("span");
+    wrap.className = "ak-flaps";
+    wrap.setAttribute("aria-hidden", "true");
+    const base = opts && opts.delay || 0;
+    let i = 0;
+    for (const ch of text) {
+      const f = document.createElement("span");
+      f.className = "ak-flap" + (ch === " " ? " ak-flap--space" : "");
+      f.textContent = ch;
+      wrap.appendChild(f);
+      if (!reducedMotion() && f.animate && ch !== " ") {
+        f.animate(
+          [{ transform: "rotateX(90deg)", opacity: 0.2 }, { transform: "rotateX(0deg)", opacity: 1 }],
+          { duration: 240, delay: base + i * 14, easing: "cubic-bezier(0.22, 1, 0.36, 1)", fill: "backwards" }
+        );
+      }
+      i++;
+    }
+    node.appendChild(wrap);
+    return true;
+  }
+  function ransom(target) {
+    const node = typeof target === "string" ? document.querySelector(target) : target;
+    if (!node || node.getAttribute("data-ak-ransomed") === "done") return false;
+    const text = node.textContent || "";
+    if (!text.trim()) return false;
+    node.setAttribute("data-ak-ransomed", "done");
+    node.setAttribute("aria-label", text);
+    node.classList.add("ak-ransom");
+    node.textContent = "";
+    const cuts = ["cut-a", "cut-b", "cut-c", "cut-d", "cut-e", "cut-f"];
+    let i = 0;
+    for (const ch of text) {
+      if (ch === " ") {
+        node.appendChild(document.createTextNode(" "));
+        continue;
+      }
+      const piece = document.createElement("i");
+      piece.className = cuts[i % cuts.length];
+      piece.textContent = ch;
+      piece.setAttribute("aria-hidden", "true");
+      node.appendChild(piece);
+      i++;
+    }
+    return true;
+  }
+  function vu(target, values) {
+    const node = typeof target === "string" ? document.querySelector(target) : target;
+    if (!node || !Array.isArray(values) || !values.length) return false;
+    node.classList.add("ak-vu");
+    node.setAttribute("aria-hidden", "true");
+    node.textContent = "";
+    const max = Math.max(...values, 1);
+    values.forEach((v, i) => {
+      const bar = document.createElement("i");
+      bar.style.height = Math.round(v / max * 100) + "%";
+      node.appendChild(bar);
+      if (!reducedMotion() && bar.animate) {
+        bar.animate(
+          [{ transform: "scaleY(0)" }, { transform: "scaleY(1)" }],
+          { duration: 260, delay: i * 18, easing: easeOf(node), fill: "backwards" }
+        );
+      }
+    });
+    return true;
+  }
+  function typeout(target, lines, opts) {
+    const node = typeof target === "string" ? document.querySelector(target) : target;
+    if (!node || !Array.isArray(lines) || !lines.length) return false;
+    const step = opts && opts.cps || 3;
+    const reduced = reducedMotion();
+    const typeLine = (li, ci) => {
+      if (li >= lines.length) return;
+      const row = node.children[li] || node.appendChild(Object.assign(document.createElement("div"), { className: lines[li][0] || "" }));
+      const text = lines[li][1];
+      if (reduced) {
+        row.textContent = text;
+        typeLine(li + 1, 0);
+        return;
+      }
+      row.textContent = text.slice(0, ci);
+      if (ci <= text.length) setTimeout(() => typeLine(li, ci + step), 12);
+      else setTimeout(() => typeLine(li + 1, 0), 90);
+    };
+    typeLine(0, 0);
+    return true;
+  }
+  function dealIn(targets, opts) {
+    const list2 = typeof targets === "string" ? Array.from(document.querySelectorAll(targets)) : targets || [];
+    if (reducedMotion()) return 0;
+    const step = opts && opts.step || 70;
+    list2.forEach((el2, i) => {
+      if (!el2.animate) return;
+      const rest = getComputedStyle(el2).transform;
+      const at = rest && rest !== "none" ? rest + " " : "";
+      el2.animate(
+        [
+          { opacity: 0, transform: at + "translateY(24px) scale(0.96)" },
+          { opacity: 1, transform: rest === "none" ? "none" : rest }
+        ],
+        { duration: 380, delay: i * step, easing: easeOf(el2), fill: "backwards" }
+      );
+    });
+    return list2.length;
+  }
+
   // src/static/sdk-libs/atelier/state.js
   function emptyState(spec) {
     const state = { title: spec.title, hint: spec.hint, action: spec.action || null };
@@ -3817,7 +3936,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.30.0",
+    version: "0.31.0",
     // ── Shell and navigation ──
     app,
     section,
@@ -3891,7 +4010,13 @@
     enter,
     kinetic,
     countUp,
-    attention
+    attention,
+    // ── Scenic props (the genre stagecraft) ──
+    flapify,
+    ransom,
+    vu,
+    typeout,
+    dealIn
   };
   attach("atelier", atelier);
 })();
