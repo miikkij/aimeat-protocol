@@ -629,6 +629,7 @@
       "standard": "Puede leer y escribir: {areas}. Tu saldo, tus mensajes y los ajustes de tu cuenta quedan fuera de su alcance.",
       "full": "Puede hacer casi todo lo que tú puedes hacer aquí. Tu inicio de sesión y la seguridad de la cuenta, los ajustes de pago de tu dinero, compartir tus datos con personas nuevas y cambiar los permisos de tus otros agentes requieren cada uno su propia marca separada.",
       "keep": "Deja los permisos exactamente como están.",
+      "asked": "Exactamente lo que pidió: {areas}. Nada más.",
       "custom": "Elige tú mismo los permisos exactos de la lista."
     }
   },
@@ -4819,6 +4820,34 @@
   "organisms": {
     "title": "Organismos",
     "backToList": "Todos los organismos",
+    "ws": {
+      "railTitle": "En este espacio de trabajo",
+      "newForYou": "Nuevo para ti",
+      "newChip": "{n} nuevo para ti",
+      "waiting": "Espera tu decisión",
+      "reviewDoor": "Revisión →",
+      "figRecords": "registros",
+      "figDocs": "documentos",
+      "figReview": "por revisar",
+      "figReviewSub": "una publicación espera tu decisión",
+      "figTypes": "{n} tipos",
+      "figSpaces": "{n} espacios",
+      "docsTitle": "Documentos",
+      "colType": "Tipo",
+      "colLatest": "Último",
+      "latest": "último",
+      "open": "Abrir",
+      "addFirst": "+ Agregar",
+      "fullActivity": "Toda la actividad {n} →",
+      "searchDoor": "Buscar en este espacio de trabajo",
+      "forAiLead": "Una sola instrucción que trae tu IA a este espacio de trabajo con sus identificadores y su estructura reales. Pégala en un chat, dásela a un agente de código o crea con ella un agente de contrato.",
+      "showTree": "Mostrar como árbol",
+      "showRail": "Mostrar el índice",
+      "backToWorkspace": "Volver al espacio de trabajo",
+      "kindDoc": "espacio de documentos",
+      "kindRecord": "tipo de registro",
+      "more": "… {n} más"
+    },
     "railTitle": "En este organismo",
     "figWorkspaces": "espacios de trabajo",
     "figMembers": "miembros",
@@ -6369,7 +6398,7 @@
             "read": "Leer el contenido publicado de los espacios compartidos a los que perteneces.",
             "write": "Crear espacios compartidos, escribir y publicar documentos en ellos, y comentar.",
             "invite": "Dejar entrar a otras personas: invitar miembros y repartir acceso a un espacio compartido.",
-        "rows": "Añadir filas al registro de eventos de un espacio compartido y leerlas, cuando el espacio se ha abierto a esta app o agente por su nombre. Nada más del espacio se abre."
+            "rows": "Añadir filas al registro de eventos de un espacio compartido y leerlas, cuando el espacio se ha abierto a esta app o agente por su nombre. Nada más del espacio se abre."
           },
           "outbound": {
             "send": "Mandar correo desde la dirección de tu empresa a los contactos que tienes guardados."
@@ -6494,6 +6523,8 @@
         "denied": "Solicitud denegada",
         "approveError": "No se pudo aprobar el agente",
         "keepCurrent": "Dejarle el acceso que ya tiene",
+        "asRequested": "Lo que pidió",
+        "requestedNote": "Este agente pidió: {scopes}",
         "returningAgent": "Este agente ya está configurado. Si lo apruebas sin tocar nada, sus permisos se quedan exactamente igual."
       },
       "mode": {

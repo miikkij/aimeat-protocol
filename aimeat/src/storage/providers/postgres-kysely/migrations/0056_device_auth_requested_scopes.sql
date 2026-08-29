@@ -1,0 +1,26 @@
+-- 0056_device_auth_requested_scopes.sql
+--
+-- What the agent ASKED FOR, which the node was throwing away.
+--
+-- POST /v1/agents/device-authorize accepts a `scopes` list. Until now that list was read by exactly
+-- one branch — same-owner auto-approval — and never written down, so on the ordinary path (the
+-- owner approves in the browser) it ceased to exist the moment the handler returned. Two things
+-- followed, and the second is the one that hurt:
+--
+--   * the consent card could not show what the agent was asking for, because the answer was
+--     nowhere on the node, so the owner approved a request they could not read; and
+--   * an approval that named no scopes fell back to the node default. An agent that asked for
+--     task:read + task:write was connected with catalogue:read + memory:delete + memory:read +
+--     memory:write: it could not take work at all, and it looked perfectly connected while doing
+--     nothing. No error anywhere. Measured against a local node on 2026-08-29.
+--
+-- A SECOND column, not a reuse of "scopes". That one is written at approval time and read back by
+-- the device-token poll, and it means "what this agent was granted". Collapsing the request and the
+-- grant into one field is how a record stops being able to say that the two differ, which is
+-- precisely the thing the owner needs to see.
+--
+-- NULL for every row written before this migration, and for an agent that named no scopes. NULL is
+-- "asked for nothing", never "asked for the default": the fallback is chosen at approval time, and
+-- writing it in here would make silence indistinguishable from a request.
+
+ALTER TABLE "DeviceAuth" ADD COLUMN IF NOT EXISTS "requestedScopes" TEXT[];

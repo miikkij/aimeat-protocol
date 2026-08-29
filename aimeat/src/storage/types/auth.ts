@@ -78,7 +78,17 @@ export interface DeviceAuthorizationRecord {
   displayName?: string;
   description?: string;
   status: 'pending' | 'approved' | 'denied' | 'expired';
+  /** What the approval GRANTED. Written when the owner approves; read back by the device-token poll. */
   scopes?: string[];
+  /**
+   * What the agent ASKED FOR at device-authorize time, which is a different claim from `scopes` and
+   * is why it needs its own field. The request used to be read only by same-owner auto-approval and
+   * dropped on the floor for everyone else, so the consent surfaces had nothing to show and an
+   * approval that named no scopes fell back to the node default: an agent that asked for
+   * `task:read`/`task:write` was connected with `memory:delete` instead and could not take work at
+   * all. Undefined = the agent named nothing, which is not the same as an empty list.
+   */
+  requestedScopes?: string[];
   createdAt: string;
   expiresAt: string;
   lastPolledAt?: string;

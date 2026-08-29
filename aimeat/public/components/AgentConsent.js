@@ -30,6 +30,12 @@
  *     preselected "Standard" for every request, so bringing a full-access agent back after its
  *     token expired — the ordinary way an agent returns — narrowed it to eight scopes on a click
  *     that meant "yes, this is my agent". A first approval is unchanged.
+ *   v1.4.0 — 2026-08-29 — The card shows what the agent ASKED FOR and offers it as the first
+ *     choice, preselected on a first approval. The request reaches the panel now that the node
+ *     keeps it (requested_scopes on the pending listing); before that the owner was choosing a
+ *     template blind, and an agent that asked for task:read/task:write was routinely approved with
+ *     the standard set — connected, and unable to take work. A returning agent still defaults to
+ *     "keep its current access": what an agent asks for does not rewrite a grant already made.
  *   v1.3.0 — 2026-08-17 — The preset buttons say what they grant. "Standard" was a bare word with
  *     no sentence under it, so the owner picked between labels; each button now carries the shared
  *     one-line summary (consent-vocab.js, generated from the real preset sets), and the expanded
@@ -42,7 +48,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { SCOPE_TEMPLATES, templateLabel } from '/views/profile/agents/scope-config.js';
-import { presetSummary, boundaryLines } from '/js/consent-vocab.js';
+import { presetSummary, requestedSummary, boundaryLines } from '/js/consent-vocab.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
@@ -65,8 +71,20 @@ function ConsentCard({ req, onApprove, onDeny, busy, variant }) {
   // 'keep' approves with NO scopes field, which is exactly how the server reads "nothing was
   // chosen" (approveDeviceAuth, scopesRequested=false).
   const returning = !!req.existing_agent;
-  const [preset, setPreset] = useState(returning ? 'keep' : 'standard');
-  const choices = returning ? ['keep', 'readonly', 'standard', 'full'] : ['readonly', 'standard', 'full'];
+  // What the agent asked for in its device-authorize call. Offered as the FIRST choice and
+  // preselected for a first approval, because an agent that names its own scopes has said exactly
+  // what it needs, and granting the 'standard' template instead is how an agent arrives able to do
+  // the wrong things and not its own. A RETURNING agent still defaults to 'keep': a request cannot
+  // quietly rewrite a grant the owner already made.
+  const asked = Array.isArray(req.requested_scopes)
+    ? req.requested_scopes.filter(s => typeof s === 'string') : [];
+  const askedSummary = requestedSummary(asked, t);
+  const [preset, setPreset] = useState(returning ? 'keep' : (askedSummary ? 'asked' : 'standard'));
+  const choices = [
+    ...(returning ? ['keep'] : []),
+    ...(askedSummary ? ['asked'] : []),
+    'readonly', 'standard', 'full',
+  ];
 
   return html`
     <div class="card mt-1 p-1 agc-card" key=${req.user_code}>
@@ -102,10 +120,18 @@ function ConsentCard({ req, onApprove, onDeny, busy, variant }) {
               <button type="button" key=${p}
                 class="${preset === p ? 'btn-primary' : 'btn-outline'} pf-scope-preset-btn"
                 onClick=${() => setPreset(p)}>
-                ${p === 'keep' ? t('profile.agents.pendingRequests.keepCurrent') : templateLabel(p)}
+                ${p === 'keep' ? t('profile.agents.pendingRequests.keepCurrent')
+                  : p === 'asked' ? t('profile.agents.pendingRequests.asRequested')
+                  : templateLabel(p)}
               </button>`)}
           </div>
-          <p class="text-caption agc-preset-desc">${presetSummary(preset, t)}</p>
+          <p class="text-caption agc-preset-desc">
+            ${preset === 'asked' ? askedSummary : presetSummary(preset, t)}
+          </p>
+          ${askedSummary && html`
+            <p class="text-caption agc-requested">
+              ${t('profile.agents.pendingRequests.requestedNote', { scopes: asked.join(', ') })}
+            </p>`}
           ${returning && html`
             <p class="text-caption agc-returning">
               ${t('profile.agents.pendingRequests.returningAgent')}
@@ -119,7 +145,9 @@ function ConsentCard({ req, onApprove, onDeny, busy, variant }) {
         <div class="flex-row mt-1">
           <button type="button" class="btn-success" disabled=${busy}
             onClick=${() => onApprove(req.user_code,
-              preset === 'keep' ? undefined : (SCOPE_TEMPLATES[preset] || SCOPE_TEMPLATES.standard))}>
+              preset === 'keep' ? undefined
+                : preset === 'asked' ? asked
+                : (SCOPE_TEMPLATES[preset] || SCOPE_TEMPLATES.standard))}>
             ${t('profile.agents.pendingRequests.confirmApprove')}
           </button>
           <button type="button" class="btn-outline" onClick=${() => setExpanded(false)}>

@@ -39,6 +39,16 @@
  *     be dropped).
  *   v1.7.0 — 2026-08-13 — The created agent records WHO authorized it (`registeredBy`), and
  *     `expires_in` comes from the shared constant now that the window is two hours.
+ *   v1.9.0 — 2026-08-29 — The `scopes` an agent sends to device-authorize are KEPT (`requestedScopes`
+ *     on the record) instead of being read by same-owner auto-approval and dropped for everyone
+ *     else. Three consequences, all of them the point: the authenticated pending listing can show
+ *     the owner what is being asked for, the consent surfaces can preselect it, and an approval that
+ *     names no scopes for a NEW agent grants what was requested rather than the node default. An
+ *     agent that asked for task:read/task:write used to arrive holding catalogue:read + memory:*,
+ *     unable to take work at all and looking perfectly connected. Re-approval of an EXISTING agent
+ *     is untouched: silence there still means "keep what it holds". The node-maximum check also
+ *     moved ahead of the record write, so an over-broad request is refused before anything is
+ *     stored rather than after. Covered by test/e2e-device-auth-requested-scopes.ts.
  *   v1.6.0 — 2026-08-08 — /verify/info reports `existing_agent`, so the consent screen can tell a
  *     RETURN from a first approval and preselect "keep its current access" instead of Standard. A
  *     boolean only — that endpoint is unauthenticated and rate-limited against user-code
@@ -340,6 +350,24 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
       return;
     }
 
+    // What the agent is ASKING FOR. Undefined when it named nothing, which the approval fallback
+    // below reads as "no request", not as "an empty request".
+    const requestedScopes: string[] | undefined = Array.isArray(scopes)
+      ? scopes.filter((s: unknown) => typeof s === 'string')
+      : undefined;
+
+    // Refuse an over-broad request BEFORE the record is written. This check used to sit inside the
+    // auto-approval branch, after createDeviceAuth, so a rejected registration left a pending row
+    // behind — and on the manual path the same over-broad list was accepted and then silently
+    // replaced by the node default at approval time. One ceiling, one place, one answer.
+    if (requestedScopes) {
+      const invalid = scopesExceedNodeMax(config, requestedScopes);
+      if (invalid.length > 0) {
+        res.status(400).json(error(config.nodeId, 'INVALID_SCOPES', `Your assistant asked for more than this node allows. Choose fewer permissions, or ask whoever runs this node.`));
+        return;
+      }
+    }
+
     // Rate limit: max 10 pending per owner name
     const pendingCount = await storage.countPendingDeviceAuthByOwner(ownerName);
     if (pendingCount >= 10) {
@@ -372,6 +400,7 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
       displayName: display_name,
       description,
       status: 'pending',
+      requestedScopes,
       createdAt: now.toISOString(),
       expiresAt: expiresAt.toISOString(),
       pollInterval: 5,
@@ -390,16 +419,12 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
     // untouched — Slice 1 forbids it anyway.
     let autoApproved = false;
     let autoApproveNote: string | undefined;
-    const requestedScopes: string[] = Array.isArray(scopes)
-      ? scopes.filter((s: unknown) => typeof s === 'string')
-      : config.defaultAgentScopes;
+    // Auto-approval grants what was asked for; an agent that asked for nothing gets the node
+    // default, because there is no owner here to choose. The ceiling was checked above, before the
+    // record was written.
+    const autoScopes: string[] = requestedScopes ?? config.defaultAgentScopes;
     const principal = config.sameOwnerAutoApprove ? autoApprovePrincipal(req, ownerName) : null;
     if (principal) {
-      const invalid = scopesExceedNodeMax(config, requestedScopes);
-      if (invalid.length > 0) {
-        res.status(400).json(error(config.nodeId, 'INVALID_SCOPES', `Your assistant asked for more than this node allows. Choose fewer permissions, or ask whoever runs this node.`));
-        return;
-      }
       // An AGENT approver may pass on only what it already holds. The filter used to exempt a '*'
       // approver outright, and to read `memory:*` as covering everything under it — both correct
       // until memory:write-reserved became the one scope no wildcard carries. Either shortcut let a
@@ -408,7 +433,7 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
       // /v1/agents/device-token poll. Coverage is decided in utils/scope-coverage.ts, so this
       // surface and the guard cannot disagree again. An OWNER approver may still grant anything.
       const escalating = principal.kind === 'agent'
-        ? uncoveredScopes(principal.scopes, requestedScopes)
+        ? uncoveredScopes(principal.scopes, autoScopes)
         : [];
       if (escalating.length > 0) {
         // No escalation via a sibling: fall through to the manual consent flow where the
@@ -417,9 +442,9 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
       } else {
         const approvedByGaii = principal.kind === 'agent' ? req.auth!.sub : ownerName;
         const result = await approveDeviceAuth(
-          config, storage, authRequest, approvedByGaii, requestedScopes,
+          config, storage, authRequest, approvedByGaii, autoScopes,
           req.headers['user-agent'] as string | undefined,
-          Array.isArray(scopes),
+          !!requestedScopes,
         );
         if (!result.ok) {
           await storage.updateDeviceAuth(deviceCode, { status: 'denied' });
@@ -667,8 +692,16 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
 
     // === APPROVE FLOW ===
 
-    // Validate scopes against config.maxAgentScopes (same pattern as POST /v1/agents)
-    const finalScopes = scopes ?? config.defaultAgentScopes;
+    // What this approval grants when the owner named nothing. Order matters: an explicit choice
+    // wins; failing that, what the AGENT asked for at authorize time; failing that, the node
+    // default. The middle step is the fix — an agent that asked for task:read/task:write used to be
+    // handed the node default (catalogue:read + memory:read/write/delete) and could take no work
+    // at all, while looking perfectly connected.
+    //
+    // For an EXISTING agent this list is only checked against the ceiling and then ignored:
+    // approveDeviceAuth reads `scopesRequested` (below, `Array.isArray(scopes)` — the OWNER's
+    // silence, not the agent's) and keeps what the agent already holds. Re-approval is unchanged.
+    const finalScopes = scopes ?? request.requestedScopes ?? config.defaultAgentScopes;
     const invalid = scopesExceedNodeMax(config, finalScopes);
     if (invalid.length > 0) {
       res.status(400).json(error(config.nodeId, 'INVALID_SCOPES', `Your assistant asked for more than this node allows. Choose fewer permissions, or ask whoever runs this node.`));

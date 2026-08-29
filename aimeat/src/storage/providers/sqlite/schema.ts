@@ -426,6 +426,15 @@ export function initializeSchema(db: Database.Database): void {
   // when the operator clearly asked for task-runner.
   safeAddColumn('device_auth', 'mode', "TEXT DEFAULT 'interactive'");
 
+  // device_auth.requestedScopes -- the scope list the AGENT asked for in its device-authorize call,
+  // as JSON. `scopes` on the same row is what the owner's approval GRANTED, which is a different
+  // claim and is why this is a second column rather than a reuse. The request used to be read only
+  // by same-owner auto-approval and dropped for everyone else, so the consent card had nothing to
+  // show and an approval naming no scopes fell back to the node default: an agent that asked for
+  // task:read/task:write was connected with memory:delete instead and could take no work at all.
+  // Same failure shape as `mode` above, one field over.
+  safeAddColumn('device_auth', 'requestedScopes', 'TEXT');
+
   // Ecosystem-app automation — persist the app's declared capabilities + automation
   // hints (JSON) so an owner can schedule an `eco-capability` job that names a real
   // capability. Additive/nullable; existing eco rows read back unchanged.
