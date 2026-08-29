@@ -38,6 +38,8 @@ interface Window {
   // Rich-renderer CDN globals loaded on demand by aimeat-markdown (markdown-it + plugins, DOMPurify,
   // highlight.js, mermaid) — untyped external libraries, hence `any`.
   /* eslint-disable @typescript-eslint/no-explicit-any */
+  /** three-world@1 vendored bundle, lazy-loaded by atelier/scene3d.js — untyped external lib. */
+  THREE?: any;
   markdownit?: any;
   markdownitTaskLists?: any;
   markdownitFootnote?: any;

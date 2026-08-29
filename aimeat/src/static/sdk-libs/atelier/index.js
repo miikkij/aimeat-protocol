@@ -28,6 +28,8 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.32.0 — 2026-08-29 — scene3d: real depth on the three-world bundle (lazy-loaded), three
+ *     kinds (orb, sky, bars-as-terrain), token colours read live, render loop stops at rest.
  *   v0.31.0 — 2026-08-29 — THE SCENIC LAYER: scenics.css/js (ticker, stamp, torn edge, flap
  *     board, polaroid, plaque, spotlight, receipt roll, ransom letters, VU, barcode, scanlines
  *     — with builders flapify/ransom/vu/typeout/dealIn) and patterns.css (eight gradient-built
@@ -158,6 +160,7 @@ import { reveal, drawer } from './disclose.js';
 import { matrix } from './matrix.js';
 import { graph } from './graph.js';
 import { waveform } from './waveform.js';
+import { scene3d } from './scene3d.js';
 import { mosaic, appRef } from './mosaic.js';
 
 const atelier = {
@@ -166,7 +169,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.31.0',
+  version: '0.32.0',
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,
@@ -195,7 +198,7 @@ const atelier = {
   },
 
   // ── Content ──
-  list, listDetail, cardGrid, mediaCard, timeline, chart, matrix, graph, waveform,
+  list, listDetail, cardGrid, mediaCard, timeline, chart, matrix, graph, waveform, scene3d,
 
   // ── The things that open ──
   reveal, drawer, dialog, confirm, prompt, sheet,

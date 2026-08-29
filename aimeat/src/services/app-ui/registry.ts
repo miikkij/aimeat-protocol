@@ -25,6 +25,11 @@
  * @usage
  *   import { UI_COMPONENTS, componentById, buildUiCatalogue } from './registry.js';
  * @version-history
+ *   v1.10.0 — 2026-08-29 — `scene3d` joins the components (append-only): the 3D band on the
+ *     three-world bundle — orb, sky, bars-as-terrain — one per layout, lazy-loaded.
+ *   v1.9.0 — 2026-08-29 — The catalogue carries the pattern shelf: every patterns.css recipe
+ *     described from the registry (atelier-patterns.ts) — what it looks like, what it evokes,
+ *     which volume it belongs in — so an AI can choose a pattern by intent.
  *   v1.8.0 — 2026-08-29 — `reveal` joins the components (append-only): the fan of panels, so a
  *     questions-and-answers or terms screen is an arrangement rather than app code. The dialog
  *     family stays component-only on purpose — a modal is behaviour, not layout.
@@ -55,6 +60,7 @@
 import type { BlockPropDef } from '../surface-layout/registry-types.js';
 import { LOOKS as LOOK_REGISTRY, STRUCTURES } from '../../data/atelier-looks.js';
 import { UI_LAYOUT_PRESETS, type AppUiLayoutPreset } from './layouts.js';
+import { PATTERNS } from '../../data/atelier-patterns.js';
 
 /** A mosaic prop: the shared grammar, plus whether a layout must supply it. */
 export type AppUiPropDef = BlockPropDef & {
@@ -242,6 +248,21 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
     },
   },
   {
+    id: 'scene3d',
+    summary: 'Real depth: a 3D band on the node\'s own three-world bundle (lazy-loaded, ~745 kB, so use it as the ONE showpiece a screen gets). kind "orb" is a signature object turning under the hand; "sky" is a procedural atmosphere band; "bars" stands the bound rows up as a field of columns — the 3D chart, source rows { label?, value }. Colours come from the look\'s tokens and the render loop stops at rest, so an idle scene costs nothing.',
+    props: {
+      kind: { type: 'enum', values: ['orb', 'sky', 'bars'], default: 'orb', description: 'What the scene is: a signature object, an atmosphere band, or data as terrain.' },
+      source: {
+        type: 'string', maxLength: 120,
+        description: 'For kind "bars": the data binding the app resolves to rows of { label?, value }. Omit for orb and sky.',
+      },
+      title: text('The floating chip naming the scene, and the block\'s name in tabs and decks.', 80),
+      emptyTitle: text('What the empty state says when 3D cannot load.', 80),
+      emptyHint: text('The line under it.', 160),
+    },
+    maxPerLayout: 1,
+  },
+  {
     id: 'reveal',
     summary: 'The fan: stacked panels that open and close on a real animated height — questions and answers, terms, a spec sheet, anything long that should arrive folded. The source resolves to rows of { id, title, sub?, text? }. The header is a real button carrying its own expanded state, so nothing about it is the app\'s to get right.',
     props: {
@@ -318,6 +339,16 @@ export function buildUiCatalogue(): {
   signature_tokens: { values: Record<string, string>; summary: string };
   dialog: { tones: string[]; sizes: string[]; from: string[]; summary: string };
   imagery: { summary: string };
+  patterns: {
+    summary: string;
+    recipes: Array<{
+      id: string;
+      looks_like: string;
+      evokes: string;
+      use: { ground?: string; prop?: string; zone?: string };
+      default_size: string;
+    }>;
+  };
 } {
   return {
     components: UI_COMPONENTS.map((c) => ({
@@ -369,6 +400,23 @@ export function buildUiCatalogue(): {
       summary: 'Optional top-level `imagery`: art direction for the imagery pipeline as data — '
         + '{ style: "the illustration prompt fragment", palette_words?: "colour words" }. '
         + 'Builders and the Design Book\'s illustration parts write it; image generation reads it.',
+    },
+    patterns: {
+      summary: 'The pattern shelf (patterns.css): gradient-built background recipes on the '
+        + '--ak-* tokens, technique after Temani Afif\'s CSS-Pattern (MIT). Class is '
+        + '.ak-pat-<id> plus ONE volume: .ak-pat--ground (a whole page stands on it, body text '
+        + 'proven readable), .ak-pat--prop (one object\'s texture — a chip, an edge, an empty '
+        + 'state), .ak-pat--zone (full ink, ONE banner or divider per screen, words only inside '
+        + 'solid chips; -2/-3 take the spectrum colours, -ink goes monochrome). Tile size: '
+        + '--ak-pat-size on the element. Both text-bearing volumes are proven by the contrast '
+        + 'matrix (AK-PAT) in every look × palette × mode.',
+      recipes: PATTERNS.map((p) => ({
+        id: p.id,
+        looks_like: p.looksLike,
+        evokes: p.evokes,
+        use: p.use,
+        default_size: p.defaultSize,
+      })),
     },
   };
 }
