@@ -1044,6 +1044,7 @@ await test('GET /v1/libs/aimeat-atelier.js — serves the Atelier kit with every
         'app', 'section', 'tabs', 'bottomNav',
         'hero', 'statRow', 'figure', 'emptyState', 'skeleton',
         'list', 'listDetail', 'cardGrid', 'mediaCard', 'timeline', 'chart', 'matrix', 'graph', 'waveform', 'scene3d',
+        'health', 'queue', 'gauge', 'atlas', 'konsole',
         'reveal', 'drawer', 'dialog', 'confirm', 'prompt', 'sheet',
         'form', 'table', 'searchBar',
         'mosaic', 'appRef',
@@ -1077,19 +1078,23 @@ await test('GET /v1/libs/aimeat-atelier.js — the version an app prints moves w
 await test('GET /v1/libs/aimeat-atelier.js — one named network call, and no hardcoded colour', async () => {
     const res = await fetch(`${BASE}/v1/libs/aimeat-atelier.js`);
     const code = withoutComments(await res.text());
-    // THE BOUNDARY, narrowed on 2026-08-27 (TARGET-074 phase 2) from "no fetch at all": the
-    // mosaic renderer's single exception is the sessionless GET of the app's OWN public layout
-    // record — as public as the app itself. Everything else still renders what the host supplies,
-    // so the assertion is "exactly this one call", not "some calls are fine now".
+    // THE BOUNDARY, narrowed on 2026-08-27 (TARGET-074 phase 2) from "no fetch at all", and
+    // widened once on 2026-08-29: the kit makes exactly TWO named calls, both to this node —
+    // the mosaic's sessionless GET of the app's OWN public layout record (as public as the app
+    // itself) and the atlas component's lazy GET of the node's own static geometry file
+    // (/lib/aimeat-atlas@1.json — vendored Natural Earth shapes, no external host). Everything
+    // else still renders what the host supplies, so the assertion stays "exactly these", never
+    // "some calls are fine now".
     const fetches = code.match(/\bfetch\s*\(/g) || [];
-    assert(fetches.length === 1,
-        `exactly one fetch — the mosaic's public layout read — found ${fetches.length}`);
+    assert(fetches.length === 2,
+        `exactly two fetches — the layout read and the atlas geometry — found ${fetches.length}`);
+    assert(code.includes('/lib/aimeat-atlas@1.json'), 'the second call targets the vendored atlas geometry');
     assert(!/XMLHttpRequest|EventSource|WebSocket/.test(code), 'must not open any other transport');
     // Every API-path reference is the layout read and nothing else.
     const paths = code.match(/\/v1\/[a-z-]+/g) || [];
     assert(paths.length > 0 && paths.every((p) => p === '/v1/apps'),
         `the only node API path is the layout read under /v1/apps — found: ${[...new Set(paths)].join(', ')}`);
-    assert(/["']\/ui["']/.test(code), 'the one call targets the /ui layout record');
+    assert(/["']\/ui["']/.test(code), 'the one API call targets the /ui layout record');
     // THE THEMING CONTRACT. Every colour is a CSS variable; a hex in the JS cannot be re-skinned.
     assert(!/#[0-9a-fA-F]{6}\b/.test(code), 'must not hardcode a colour in JavaScript');
     assert(!/rgba?\s*\(\s*\d/.test(code), 'must not hardcode a colour in JavaScript');

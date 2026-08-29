@@ -34,6 +34,10 @@
  *   });
  *   // later, when the app's data changed:  m.refresh('errands.');
  * @version-history
+ *   v0.18.0 — 2026-08-29 — The ops family (`health`, `queue`, `gauge`, `console`), the `atlas`
+ *     and the chart's `kind` join the block vocabulary; LIVE BY DECLARATION — the spec's
+ *     `live` map wires declared sources to aimeat-live with the firehose guards built in;
+ *     appRef/loadLayout/labelOf extracted whole to mosaic-layout.js under the 800-line rule.
  *   v0.17.0 — 2026-08-29 — The `scene3d` block (bars bind a source; orb and sky mount bare);
  *     transition/morph extracted whole to mosaic-motion.js under the 800-line rule.
  *   v0.16.0 — 2026-08-28 — The harvest trio joins the vocabulary: `matrix`, `graph` and
@@ -65,7 +69,6 @@
  */
 import { el, clear, resolve, enter, reducedMotion } from './dom.js';
 import { t } from './i18n.js';
-import { APEX_URL } from '../_core/config.js';
 import { section, tabs, bottomNav } from './shell.js';
 import { hero, statRow, figure } from './hero.js';
 import { emptyState, skeleton } from './state.js';
@@ -79,67 +82,27 @@ import { graph } from './graph.js';
 import { waveform } from './waveform.js';
 import { scene3d } from './scene3d.js';
 import { reveal } from './disclose.js';
-import { patchFor, derivedColumns } from './mosaic-bind.js';
+import { patchFor, derivedColumns, wireLive } from './mosaic-bind.js';
 import { transition, morph } from './mosaic-motion.js';
+import { appRef, loadLayout, labelOf } from './mosaic-layout.js';
 import { aide } from './aide.js';
 import { projectCanvas } from './mosaic-canvas.js';
+import { health, queue, gauge } from './ops.js';
+import { konsole } from './konsole.js';
+import { atlas } from './atlas.js';
+
+export { appRef };
 
 /** Canvas zoom bounds and wheel step — tight enough that a tile never vanishes or fills the sky. */
-// The canvas camera constants moved with the projection to mosaic-canvas.js (pure extraction).
-
-/**
- * The app's own identity, from the `#aimeat-app-ref` block the node injects into every served
- * app. Null when absent (a raw file open, a test page) — the mosaic then renders the fallback.
- * @returns {{ owner: string, filename: string }|null}
- */
-export function appRef() {
-  try {
-    const node = document.getElementById('aimeat-app-ref');
-    if (!node) return null;
-    // The node HTML-escapes the block on injection (a JSON value could otherwise carry a
-    // </script> breakout), and script content is raw text, so the entities arrive literal.
-    const text = (node.textContent || '')
-      .replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
-    const parsed = JSON.parse(text);
-    return parsed && parsed.owner && parsed.app_id
-      ? { owner: String(parsed.owner), filename: String(parsed.app_id) }
-      : null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * The one fetch: this app's stored layout, sessionless. Resolves to the layout object or null
- * (none stored, or the read failed — the caller falls back either way).
- * @param {string} owner @param {string} filename
- * @returns {Promise<object|null>}
- */
-async function loadLayout(owner, filename) {
-  try {
-    const base = APEX_URL || '';
-    const res = await fetch(base + '/v1/apps/' + encodeURIComponent(owner)
-      + '/' + encodeURIComponent(filename) + '/ui');
-    if (!res.ok) return null;
-    const body = await res.json();
-    return (body && body.data && body.data.layout) || null;
-  } catch {
-    return null;
-  }
-}
-
-/** The unit's tab/step/tile label: its own words first, the component name as the visible
- *  floor that nudges the layout author to give the block a `title`. */
-function labelOf(block) {
-  const p = block.props || {};
-  return p.title || p.caption || block.component;
-}
+// The canvas camera constants moved with the projection to mosaic-canvas.js (pure extraction);
+// appRef/loadLayout/labelOf moved whole to mosaic-layout.js the same way.
 
 /**
  * The mosaic.
  * @param {{
  *   app?: { main: HTMLElement, el?: HTMLElement, set?: (patch: { look?: string }) => void }, target?: string|Element,
  *   sources?: Record<string, () => any>,
+ *   live?: Record<string, { keyPrefix?: string|string[], domains?: string[], minIntervalMs?: number }>,
  *   actions?: Array<{ id: string, summary: string, params?: Record<string, string>, run?: (params: any) => any }>,
  *   overlay?: { hidden?: string[], order?: string[], nav?: string }|null,
  *   fill?: Record<string, (body: HTMLElement) => void>,
@@ -232,7 +195,28 @@ export function mosaic(spec) {
           return chart({
             target: into, data: patchFor('chart', data).data, title: p.title, empty: empty,
             presentation: p.presentation === 'mural' ? 'mural' : 'tile',
+            kind: p.kind,
           });
+        });
+      case 'health':
+        return bound('health', function (data) {
+          return health({ target: into, data: patchFor('health', data).data, empty: empty, onPick: pick });
+        });
+      case 'queue':
+        return bound('queue', function (data) {
+          return queue({ target: into, data: patchFor('queue', data).data, empty: empty, onPick: pick });
+        });
+      case 'gauge':
+        return bound('gauge', function (data) {
+          return gauge({ target: into, data: patchFor('gauge', data).data, empty: empty });
+        });
+      case 'console':
+        return bound('console', function (data) {
+          return konsole({ target: into, data: patchFor('console', data).data, cap: p.cap, empty: empty });
+        });
+      case 'atlas':
+        return bound('atlas', function (data) {
+          return atlas({ target: into, data: patchFor('atlas', data).data, title: p.title, fit: p.fit, empty: empty, onPick: pick });
         });
       case 'matrix':
         return bound('matrix', function (data) {
@@ -671,7 +655,12 @@ export function mosaic(spec) {
   }
   const booting = boot();
 
-  return {
+  // LIVE BY DECLARATION: when the spec names live sources and the app loaded aimeat-live, a
+  // change on the declared keys re-resolves that source and the components repaint with their
+  // own motion. Guarded in wireLive — no prefix, no memory subscription.
+  const stopLive = wireLive(spec, function (name) { api.refresh(name); });
+
+  const api = {
     el: root,
 
     /** Replace the whole rendered layout — what a live layout-change event calls. */
@@ -777,6 +766,7 @@ export function mosaic(spec) {
 
     destroy() {
       destroyed = true;
+      stopLive();
       for (const h of alive.handles) { if (h && h.destroy) h.destroy(); }
       for (const fn of alive.cleanup) fn();
       alive = { handles: [], bound: [], cleanup: [] };
@@ -785,4 +775,5 @@ export function mosaic(spec) {
       if (root.parentNode) root.parentNode.removeChild(root);
     },
   };
+  return api;
 }

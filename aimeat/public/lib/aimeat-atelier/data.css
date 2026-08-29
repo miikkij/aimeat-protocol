@@ -13,6 +13,9 @@
  *   ak-table · ak-search
  * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
  * @version-history
+ *   v0.5.0 — 2026-08-29 — The ops family (.ak-health/.ak-queue/.ak-gauge/.ak-console), the
+ *     atlas (.ak-atlas), the chart family (area/donut/calendar) and the KPI trend sparkline.
+ *     Tones ride --ak-ok/-warn/-err; every entrance is finite and reduced-motion drops it.
  *   v0.4.0 — 2026-08-29 — .ak-scene: the 3D band (scene3d.js) — a framed stage with a fixed
  *     aspect so the canvas never reflows the page, the caption as a floating chip.
  *   v0.3.0 — 2026-08-27 — Initial (TARGET-074 phase 1, slice 3).
@@ -156,3 +159,182 @@
 }
 /* The sky kind is a wide-open band, not a card. */
 .ak-scene[data-ak-scene='sky'] .ak-scene__stage { aspect-ratio: 21 / 9; min-height: 180px; }
+
+/* ── The chart family: areas, the donut, the calendar (chart.js) ───────────────────────────── */
+.ak-chart__area { fill-opacity: 0.16; stroke: none; }
+.ak-chart__svg--donut { max-width: 260px; margin: 0 auto; display: block; }
+.ak-chart__slice { fill: none; stroke-linecap: butt; }
+.ak-chart__slice--enter { opacity: 0; animation: ak-slice-in calc(var(--ak-motion) * 2) var(--ak-ease) forwards; }
+@keyframes ak-slice-in { to { opacity: 1; } }
+.ak-chart__total {
+  fill: var(--ak-ink);
+  font-family: var(--ak-font-display, inherit);
+  font-size: 34px;
+  font-weight: 700;
+}
+.ak-chart__svg--calendar { width: 100%; height: auto; }
+.ak-chart__day--blank { fill: color-mix(in oklab, var(--ak-ink) 5%, var(--ak-surface)); }
+
+/* ── The sparkline under a KPI number (hero.js statRow trend) ──────────────────────────────── */
+.ak-statrow__spark { width: 100%; max-width: 110px; height: 22px; margin-top: 4px; }
+.ak-statrow__spark polyline {
+  fill: none;
+  stroke: var(--ak-accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.85;
+}
+
+/* ── The health wall (ops.js) ──────────────────────────────────────────────────────────────── */
+.ak-health { display: flex; flex-direction: column; gap: 2px; }
+.ak-health__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: var(--ak-radius-sm);
+  background: var(--ak-surface);
+  color: var(--ak-ink);
+  font: inherit;
+  text-align: left;
+}
+button.ak-health__row { cursor: pointer; touch-action: manipulation; }
+button.ak-health__row:hover { background: var(--ak-surface-2); }
+.ak-health__lamp {
+  flex: none;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--ak-ink) 22%, var(--ak-surface));
+}
+.ak-health__lamp--ok { background: var(--ak-ok); }
+.ak-health__lamp--warn { background: var(--ak-warn); }
+.ak-health__lamp--err { background: var(--ak-err); }
+.ak-health__name { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.ak-health__label { font-weight: 600; }
+.ak-health__sub { color: var(--ak-ink-dim); font-size: var(--ak-text-fine); }
+.ak-health__reading {
+  font-family: var(--ak-font-mono, monospace);
+  font-size: var(--ak-text-fine);
+  color: var(--ak-ink-dim);
+  white-space: nowrap;
+}
+
+/* ── The work queue (ops.js) ───────────────────────────────────────────────────────────────── */
+.ak-queue { display: flex; flex-direction: column; gap: 10px; }
+.ak-queue__strip { display: flex; flex-wrap: wrap; gap: 8px; }
+.ak-queue__count {
+  padding: 4px 10px;
+  border-radius: var(--ak-radius-pill);
+  background: color-mix(in oklab, var(--ak-ink) 6%, var(--ak-surface));
+  font-size: var(--ak-text-fine);
+  color: var(--ak-ink);
+}
+.ak-queue__count--ok { background: color-mix(in oklab, var(--ak-ok) 16%, var(--ak-surface)); }
+.ak-queue__count--warn { background: color-mix(in oklab, var(--ak-warn) 16%, var(--ak-surface)); }
+.ak-queue__count--err { background: color-mix(in oklab, var(--ak-err) 16%, var(--ak-surface)); }
+.ak-queue__list { display: flex; flex-direction: column; gap: 2px; }
+.ak-queue__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: var(--ak-radius-sm);
+  background: var(--ak-surface);
+  color: var(--ak-ink);
+  font: inherit;
+  text-align: left;
+}
+button.ak-queue__row { cursor: pointer; touch-action: manipulation; }
+button.ak-queue__row:hover { background: var(--ak-surface-2); }
+.ak-queue__state {
+  flex: none;
+  min-width: 72px;
+  text-align: center;
+  padding: 3px 8px;
+  border-radius: var(--ak-radius-pill);
+  font-size: var(--ak-text-fine);
+  font-weight: 600;
+  background: color-mix(in oklab, var(--ak-ink) 8%, var(--ak-surface));
+  color: var(--ak-ink);
+}
+.ak-queue__state--running { background: color-mix(in oklab, var(--ak-warn) 18%, var(--ak-surface)); }
+.ak-queue__state--done { background: color-mix(in oklab, var(--ak-ok) 18%, var(--ak-surface)); }
+.ak-queue__state--failed { background: color-mix(in oklab, var(--ak-err) 18%, var(--ak-surface)); }
+.ak-queue__words { display: flex; flex-direction: column; min-width: 0; }
+.ak-queue__title { font-weight: 600; }
+.ak-queue__sub { color: var(--ak-ink-dim); font-size: var(--ak-text-fine); }
+
+/* ── The gauge (ops.js) ────────────────────────────────────────────────────────────────────── */
+.ak-gauge { margin: 0; text-align: center; }
+.ak-gauge__svg { width: 100%; max-width: 240px; height: auto; display: block; margin: 0 auto; }
+.ak-gauge__track { fill: none; stroke: color-mix(in oklab, var(--ak-ink) 8%, var(--ak-surface)); stroke-width: 10; stroke-linecap: round; }
+.ak-gauge__band { fill: none; stroke-width: 10; stroke-linecap: butt; opacity: 0.35; }
+.ak-gauge__band--ok { stroke: var(--ak-ok); }
+.ak-gauge__band--warn { stroke: var(--ak-warn); }
+.ak-gauge__band--err { stroke: var(--ak-err); }
+.ak-gauge__band--plain { stroke: color-mix(in oklab, var(--ak-ink) 20%, var(--ak-surface)); }
+.ak-gauge__value { fill: none; stroke-width: 14; stroke-linecap: round; stroke: var(--ak-accent); }
+.ak-gauge__value--ok { stroke: var(--ak-ok); }
+.ak-gauge__value--warn { stroke: var(--ak-warn); }
+.ak-gauge__value--err { stroke: var(--ak-err); }
+.ak-gauge__value--drawn { transition: stroke-dashoffset calc(var(--ak-motion) * 4) var(--ak-ease); stroke-dashoffset: 0 !important; }
+.ak-gauge__words { display: flex; flex-direction: column; gap: 2px; margin-top: -10px; }
+.ak-gauge__reading { font-family: var(--ak-font-display, inherit); font-size: var(--ak-text-title); font-weight: 700; color: var(--ak-ink); }
+.ak-gauge__reading--ok { color: var(--ak-ok); }
+.ak-gauge__reading--warn { color: var(--ak-warn); }
+.ak-gauge__reading--err { color: var(--ak-err); }
+.ak-gauge__label { color: var(--ak-ink-dim); font-size: var(--ak-text-fine); }
+
+/* ── The console (konsole.js) ──────────────────────────────────────────────────────────────── */
+.ak-console__vane {
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 12px;
+  border-radius: var(--ak-radius-sm);
+  background: var(--ak-surface-2);
+  font-family: var(--ak-font-mono, monospace);
+  font-size: var(--ak-text-fine);
+  line-height: 1.55;
+}
+.ak-console__line { display: flex; gap: 10px; color: var(--ak-ink); }
+.ak-console__ts { flex: none; color: var(--ak-ink-dim); }
+.ak-console__text { min-width: 0; overflow-wrap: anywhere; }
+.ak-console__line--ok .ak-console__text { color: var(--ak-ok); }
+.ak-console__line--warn .ak-console__text { color: var(--ak-warn); }
+.ak-console__line--err .ak-console__text { color: var(--ak-err); }
+.ak-console__line--enter { animation: ak-console-in calc(var(--ak-motion) * 2) var(--ak-ease); }
+@keyframes ak-console-in { from { opacity: 0; transform: translateY(4px); } }
+
+/* ── The atlas (atlas.js) ──────────────────────────────────────────────────────────────────── */
+.ak-atlas { margin: 0; }
+.ak-atlas__svg { width: 100%; height: auto; display: block; border-radius: var(--ak-radius-sm); }
+.ak-atlas__land {
+  fill: color-mix(in oklab, var(--ak-ink) 9%, var(--ak-surface));
+  stroke: var(--ak-surface);
+  stroke-width: 0.4;
+}
+.ak-atlas__region { stroke: var(--ak-surface); stroke-width: 0.4; }
+.ak-atlas__region--ok { fill: var(--ak-ok); }
+.ak-atlas__region--warn { fill: var(--ak-warn); }
+.ak-atlas__region--err { fill: var(--ak-err); }
+.ak-atlas__region--pick { cursor: pointer; }
+.ak-atlas__region--enter { opacity: 0; animation: ak-slice-in calc(var(--ak-motion) * 2) var(--ak-ease) forwards; }
+.ak-atlas__marker { fill: var(--ak-accent); stroke: var(--ak-surface); stroke-width: 0.6; }
+.ak-atlas__marker--ok { fill: var(--ak-ok); }
+.ak-atlas__marker--warn { fill: var(--ak-warn); }
+.ak-atlas__marker--err { fill: var(--ak-err); }
+.ak-atlas__marker--enter { opacity: 0; animation: ak-slice-in calc(var(--ak-motion) * 2) var(--ak-ease) forwards; }
+.ak-atlas__label { fill: var(--ak-ink); font-family: inherit; font-weight: 600; paint-order: stroke; stroke: var(--ak-surface); stroke-width: 0.8; }
+.ak-atlas__note { margin-top: 8px; color: var(--ak-ink-dim); font-size: var(--ak-text-fine); text-align: center; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ak-chart__slice--enter, .ak-atlas__region--enter, .ak-atlas__marker--enter { animation: none; opacity: 1; }
+  .ak-console__line--enter { animation: none; }
+  .ak-gauge__value--drawn { transition: none; }
+}

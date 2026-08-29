@@ -28,6 +28,11 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.33.0 — 2026-08-29 — THE NEXT LEVEL, second wave: the ops family (health wall, work
+ *     queue, gauge, console), the offline atlas (Natural Earth shapes served by the node —
+ *     no tile server), the chart family (donut, calendar; area series; statRow trend
+ *     sparklines), and LIVE BY DECLARATION (the mosaic's `live` map rides aimeat-live with
+ *     firehose guards built in).
  *   v0.32.0 — 2026-08-29 — scene3d: real depth on the three-world bundle (lazy-loaded), three
  *     kinds (orb, sky, bars-as-terrain), token colours read live, render loop stops at rest.
  *   v0.31.0 — 2026-08-29 — THE SCENIC LAYER: scenics.css/js (ticker, stamp, torn edge, flap
@@ -161,6 +166,9 @@ import { matrix } from './matrix.js';
 import { graph } from './graph.js';
 import { waveform } from './waveform.js';
 import { scene3d } from './scene3d.js';
+import { health, queue, gauge } from './ops.js';
+import { konsole } from './konsole.js';
+import { atlas } from './atlas.js';
 import { mosaic, appRef } from './mosaic.js';
 
 const atelier = {
@@ -169,7 +177,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.32.0',
+  version: '0.33.0',
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,
@@ -199,6 +207,9 @@ const atelier = {
 
   // ── Content ──
   list, listDetail, cardGrid, mediaCard, timeline, chart, matrix, graph, waveform, scene3d,
+
+  // ── The ops family and the map (an admin panel is an arrangement, not app code) ──
+  health, queue, gauge, console: konsole, atlas,
 
   // ── The things that open ──
   reveal, drawer, dialog, confirm, prompt, sheet,

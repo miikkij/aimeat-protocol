@@ -36,6 +36,9 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.33.0 — 2026-08-29 — The ops family, the atlas and the chart family (data.css): health
+ *     lamps, queue states, the gauge dial, the console vane, the offline map, donut and
+ *     calendar shapes, KPI trend sparklines. Tones ride --ak-ok/-warn/-err throughout.
  *   v0.32.0 — 2026-08-29 — scene3d: the .ak-scene band (data.css) — real depth on the
  *     three-world bundle, colours from the tokens, render loop parked at rest.
  *   v0.31.0 — 2026-08-29 — THE SCENIC LAYER joins the imports: scenics.css (the genre props)
