@@ -236,6 +236,47 @@ const GOOD_LAYOUT = {
             `an invented presentation is refused: ${bad.body.data.message}`);
     });
 
+    await test('the ops family validates: a health wall and a bounded console pass, an invented queue prop is refused', async () => {
+        const good = await validate({
+            v: 1,
+            blocks: [
+                { id: 'wall', component: 'health', props: { source: 'ops.services', title: 'Services' } },
+                { id: 'jobs', component: 'queue', props: { source: 'ops.jobs' } },
+                { id: 'cpu', component: 'gauge', props: { source: 'ops.cpu' } },
+                { id: 'log', component: 'console', props: { source: 'ops.log', cap: 200 } },
+            ],
+        });
+        assert(good.status === 200 && good.body.data.ok === true,
+            `an ops screen must validate: ${JSON.stringify(good.body.data)}`);
+
+        const bad = await validate({
+            v: 1,
+            blocks: [{ id: 'jobs', component: 'queue', props: { source: 'ops.jobs', lamp: 'red' } }],
+        });
+        assert(bad.body.data.ok === false && /lamp/.test(bad.body.data.message),
+            `an invented ops prop is refused by name: ${bad.body.data.message}`);
+    });
+
+    await test('the atlas and the chart family validate: fit and kind are enums that refuse invention', async () => {
+        const good = await validate({
+            v: 1,
+            blocks: [
+                { id: 'where', component: 'atlas', props: { source: 'geo.regions', fit: 'world' } },
+                { id: 'split', component: 'chart', props: { source: 'money.split', kind: 'donut' } },
+                { id: 'year', component: 'chart', props: { source: 'activity.days', kind: 'calendar' } },
+            ],
+        });
+        assert(good.status === 200 && good.body.data.ok === true,
+            `atlas + chart kinds must validate: ${JSON.stringify(good.body.data)}`);
+
+        const bad = await validate({
+            v: 1,
+            blocks: [{ id: 'split', component: 'chart', props: { source: 'money.split', kind: 'pie3d' } }],
+        });
+        assert(bad.body.data.ok === false && /kind/.test(bad.body.data.message),
+            `an invented chart kind is refused naming the real ones: ${bad.body.data.message}`);
+    });
+
     await test('scene3d is a component: bars with a source validates, an invented kind is refused', async () => {
         const good = await validate({
             v: 1,

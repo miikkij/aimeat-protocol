@@ -319,6 +319,15 @@
       send: "Send",
       aideTitle: "Aide",
       aidePlaceholder: "Ask, or say what to do…",
+      opsOk: "up",
+      opsWarn: "degraded",
+      opsDown: "down",
+      "queue.waiting": "waiting",
+      "queue.running": "running",
+      "queue.done": "done",
+      "queue.failed": "failed",
+      consoleEmpty: "Nothing logged yet",
+      atlasDown: "The map could not load",
       aideNotice: "You are talking with an AI. Answers can be wrong; actions run only when you confirm them.",
       aideNoAi: "AI is not set up on this account yet. Connect a key under Profile, and the aide wakes up.",
       aideFailed: "That did not go through. Try again.",
@@ -364,6 +373,15 @@
       send: "Lähetä",
       aideTitle: "Apuri",
       aidePlaceholder: "Kysy, tai sano mitä tehdään…",
+      opsOk: "toiminnassa",
+      opsWarn: "takkuaa",
+      opsDown: "nurin",
+      "queue.waiting": "jonossa",
+      "queue.running": "käynnissä",
+      "queue.done": "valmis",
+      "queue.failed": "epäonnistui",
+      consoleEmpty: "Ei vielä lokirivejä",
+      atlasDown: "Kartta ei latautunut",
       aideNotice: "Keskustelet tekoälyn kanssa. Vastaus voi olla väärin; toiminnot ajetaan vasta kun vahvistat ne.",
       aideNoAi: "Tälle tilille ei ole vielä kytketty tekoälyä. Liitä avain profiilissa, niin apuri herää.",
       aideFailed: "Se ei mennyt läpi. Yritä uudelleen.",
@@ -409,6 +427,15 @@
       send: "Enviar",
       aideTitle: "Ayudante",
       aidePlaceholder: "Pregunta, o di qué hacer…",
+      opsOk: "en marcha",
+      opsWarn: "degradado",
+      opsDown: "caído",
+      "queue.waiting": "en cola",
+      "queue.running": "en curso",
+      "queue.done": "hecho",
+      "queue.failed": "falló",
+      consoleEmpty: "Sin líneas de registro todavía",
+      atlasDown: "El mapa no se cargó",
       aideNotice: "Estás hablando con una IA. Las respuestas pueden fallar; las acciones solo se ejecutan cuando las confirmas.",
       aideNoAi: "Esta cuenta aún no tiene IA configurada. Conecta una clave en el perfil y el ayudante despierta.",
       aideFailed: "No ha funcionado. Inténtalo otra vez.",
@@ -1100,6 +1127,37 @@
       }
     };
   }
+  function drawTrend(entry, trend) {
+    const values = Array.isArray(trend) ? trend.filter((v) => typeof v === "number") : [];
+    if (values.length < 2) {
+      if (entry.spark) {
+        entry.spark.remove();
+        entry.spark = null;
+      }
+      return;
+    }
+    const W22 = 96;
+    const H22 = 24;
+    let min = Math.min.apply(null, values);
+    let max = Math.max.apply(null, values);
+    if (max === min) {
+      max = min + 1;
+    }
+    const points = values.map((v, i) => {
+      const px = W22 * i / (values.length - 1);
+      const py = 2 + (H22 - 4) * (1 - (v - min) / (max - min));
+      return px.toFixed(1) + "," + py.toFixed(1);
+    }).join(" ");
+    if (!entry.spark) {
+      entry.spark = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      entry.spark.setAttribute("class", "ak-statrow__spark");
+      entry.spark.setAttribute("viewBox", "0 0 " + W22 + " " + H22);
+      entry.spark.setAttribute("aria-hidden", "true");
+      entry.spark.appendChild(document.createElementNS("http://www.w3.org/2000/svg", "polyline"));
+      entry.tile.appendChild(entry.spark);
+    }
+    entry.spark.firstChild.setAttribute("points", points);
+  }
   function statRow(spec) {
     const shown = /* @__PURE__ */ new Map();
     const root = el("div", { class: "ak-root ak-statrow" });
@@ -1117,13 +1175,15 @@
           const label = el("span", { class: "ak-statrow__label", text: tile.label });
           const hint = el("span", { class: "ak-statrow__hint", text: tile.hint || "" });
           hint.hidden = !tile.hint;
-          root.appendChild(el("div", { class: "ak-statrow__tile" }, [value, label, hint]));
-          entry = { value: first ? tile.value : 0, node: value, label, hint };
+          const tileEl = el("div", { class: "ak-statrow__tile" }, [value, label, hint]);
+          root.appendChild(tileEl);
+          entry = { value: first ? tile.value : 0, node: value, label, hint, tile: tileEl, spark: null };
           shown.set(tile.id, entry);
         }
         entry.label.textContent = tile.label;
         entry.hint.textContent = tile.hint || "";
         entry.hint.hidden = !tile.hint;
+        drawTrend(entry, tile.trend);
         if (entry.value !== tile.value) {
           countUp(entry.node, entry.value, tile.value, { format: fmt });
           entry.value = tile.value;
@@ -2336,18 +2396,25 @@
     return v.toLocaleString(void 0, { maximumFractionDigits: 2 });
   }
   function chart(spec) {
+    const kind = spec.kind === "donut" || spec.kind === "calendar" ? spec.kind : "axes";
     const root = el("figure", {
       class: "ak-root ak-chart" + (spec.presentation === "mural" ? " ak-chart--mural" : ""),
       role: "img"
     });
     if (spec.target) resolve(spec.target).appendChild(root);
     let emptyCard = null;
+    function showEmpty() {
+      const e = spec.empty || {};
+      emptyCard = emptyState({ target: root, tone: "quiet", title: e.title || t("empty"), hint: e.hint || t("emptyHint") });
+    }
     function render(data) {
       if (emptyCard) {
         emptyCard.destroy();
         emptyCard = null;
       }
       clear(root);
+      if (kind === "donut") return renderDonut(data);
+      if (kind === "calendar") return renderCalendar(data);
       const labels = data && Array.isArray(data.labels) ? data.labels : [];
       const series = (data && Array.isArray(data.series) ? data.series : []).filter((s) => s && Array.isArray(s.values) && s.values.length > 0);
       if (!labels.length || !series.length) {
@@ -2386,7 +2453,20 @@
       });
       const still = reducedMotion();
       const bars = series.filter((s) => (s.kind || "bar") === "bar");
-      const lines = series.filter((s) => s.kind === "line");
+      const lines = series.filter((s) => s.kind === "line" || s.kind === "area");
+      for (const s of series) {
+        if (s.kind !== "area") continue;
+        const colour = SERIES_VARS[series.indexOf(s) % SERIES_VARS.length];
+        const pts = s.values.slice(0, labels.length).map((v, i) => `${x(i) + slotW / 2},${y(v)}`);
+        const first = x(0) + slotW / 2;
+        const last = x(Math.min(s.values.length, labels.length) - 1) + slotW / 2;
+        const poly = svg("polygon", {
+          points: `${first},${y(0)} ` + pts.join(" ") + ` ${last},${y(0)}`,
+          class: "ak-chart__area",
+          style: `fill:${colour}`
+        });
+        node.appendChild(poly);
+      }
       const groupPad = slotW * 0.18;
       const barW = bars.length ? (slotW - groupPad * 2) / bars.length : 0;
       bars.forEach((s, si) => {
@@ -2442,6 +2522,93 @@
         }
       }
     }
+    function renderDonut(data) {
+      const slices = (data && Array.isArray(data.slices) ? data.slices : []).filter((s) => s && typeof s.value === "number" && s.value > 0);
+      if (!slices.length) return showEmpty();
+      const total = slices.reduce((sum, s) => sum + s.value, 0);
+      root.setAttribute("aria-label", (spec.title ? spec.title + " — " : "") + slices.map((s) => s.label + " " + s.value).join(", "));
+      const R2 = 84;
+      const STROKE = 30;
+      const C = 2 * Math.PI * R2;
+      const node = svg("svg", { viewBox: "0 0 240 240", class: "ak-chart__svg ak-chart__svg--donut", "aria-hidden": "true" });
+      let offset = 0;
+      slices.forEach((s, i) => {
+        const frac = s.value / total;
+        const ring = svg("circle", {
+          cx: 120,
+          cy: 120,
+          r: R2,
+          class: "ak-chart__slice",
+          style: `stroke:${SERIES_VARS[i % SERIES_VARS.length]}`,
+          "stroke-width": STROKE,
+          "stroke-dasharray": `${Math.max(frac * C - 3, 0.5)} ${C}`,
+          "stroke-dashoffset": String(-offset * C),
+          transform: "rotate(-90 120 120)"
+        });
+        if (!reducedMotion()) {
+          ring.classList.add("ak-chart__slice--enter");
+          ring.style.animationDelay = i * 70 + "ms";
+        }
+        node.appendChild(ring);
+        offset += frac;
+      });
+      const totalText = svg("text", { x: 120, y: 126, class: "ak-chart__total", "text-anchor": "middle" });
+      totalText.textContent = fmtTick(total);
+      node.appendChild(totalText);
+      root.appendChild(node);
+      const legend = el(
+        "figcaption",
+        { class: "ak-chart__legend" },
+        slices.map((s) => el("span", { class: "ak-chart__key" }, [
+          el("span", { class: "ak-chart__swatch" }),
+          el("span", { text: s.label + " · " + fmtTick(s.value) })
+        ]))
+      );
+      slices.forEach((s, i) => {
+        const sw = legend.children[i] && legend.children[i].firstChild;
+        if (sw) sw.style.background = SERIES_VARS[i % SERIES_VARS.length];
+      });
+      root.appendChild(legend);
+    }
+    function renderCalendar(data) {
+      const days = (data && Array.isArray(data.days) ? data.days : []).map((d) => ({ date: new Date(d.date), value: Number(d.value) || 0 })).filter((d) => !isNaN(d.date.getTime())).sort((a, b) => a.date.getTime() - b.date.getTime());
+      if (!days.length) return showEmpty();
+      const max = days.reduce((m, d) => Math.max(m, d.value), 0) || 1;
+      const first = days[0].date;
+      const start = new Date(first);
+      start.setDate(start.getDate() - (start.getDay() + 6) % 7);
+      const spanDays = Math.round((days[days.length - 1].date.getTime() - start.getTime()) / 864e5) + 1;
+      const weeks = Math.min(Math.ceil(spanDays / 7), 53);
+      const CELL = 13;
+      const GAP = 3;
+      const width = weeks * (CELL + GAP) + GAP;
+      const height = 7 * (CELL + GAP) + GAP;
+      root.setAttribute("aria-label", (spec.title ? spec.title + " — " : "") + days.length + " d");
+      const byKey = /* @__PURE__ */ new Map();
+      for (const d of days) byKey.set(d.date.toISOString().slice(0, 10), d.value);
+      const node = svg("svg", { viewBox: `0 0 ${width} ${height}`, class: "ak-chart__svg ak-chart__svg--calendar", "aria-hidden": "true" });
+      const cursor = new Date(start);
+      for (let w = 0; w < weeks; w++) {
+        for (let dow = 0; dow < 7; dow++) {
+          const key = cursor.toISOString().slice(0, 10);
+          const value = byKey.get(key);
+          const cell = svg("rect", {
+            x: GAP + w * (CELL + GAP),
+            y: GAP + dow * (CELL + GAP),
+            width: CELL,
+            height: CELL,
+            rx: 3,
+            class: "ak-chart__day" + (value === void 0 ? " ak-chart__day--blank" : "")
+          });
+          if (value !== void 0) {
+            cell.setAttribute("style", "fill: var(--ak-accent); fill-opacity: " + (0.15 + 0.85 * (value / max)).toFixed(3));
+          }
+          node.appendChild(cell);
+          cursor.setDate(cursor.getDate() + 1);
+        }
+      }
+      root.appendChild(node);
+    }
     render(spec.data);
     return {
       el: root,
@@ -2456,21 +2623,6 @@
       }
     };
   }
-
-  // src/static/sdk-libs/_core/config.js
-  function cfg() {
-    return window.__AIMEAT_SDK_CFG__ || { nodeId: "", baseUrl: "" };
-  }
-  function resolveNodeUrl() {
-    const meta = document.querySelector('meta[name="aimeat-node"]');
-    if (meta) return (meta.getAttribute("content") || "").replace(/\/$/, "");
-    if (location.protocol === "http:" || location.protocol === "https:") return location.origin;
-    return cfg().baseUrl;
-  }
-  var NODE_URL = resolveNodeUrl();
-  var APEX_URL = cfg().baseUrl;
-  var NODE_ID = cfg().nodeId;
-  var HEARTBEAT_MS = cfg().heartbeatMs || 3e4;
 
   // src/static/sdk-libs/atelier/matrix.js
   var TONES = ["ok", "warn", "err", "accent", "plain"];
@@ -2720,6 +2872,21 @@
       }
     };
   }
+
+  // src/static/sdk-libs/_core/config.js
+  function cfg() {
+    return window.__AIMEAT_SDK_CFG__ || { nodeId: "", baseUrl: "" };
+  }
+  function resolveNodeUrl() {
+    const meta = document.querySelector('meta[name="aimeat-node"]');
+    if (meta) return (meta.getAttribute("content") || "").replace(/\/$/, "");
+    if (location.protocol === "http:" || location.protocol === "https:") return location.origin;
+    return cfg().baseUrl;
+  }
+  var NODE_URL = resolveNodeUrl();
+  var APEX_URL = cfg().baseUrl;
+  var NODE_ID = cfg().nodeId;
+  var HEARTBEAT_MS = cfg().heartbeatMs || 3e4;
 
   // src/static/sdk-libs/atelier/scene3d.js
   var threePromise = null;
@@ -3200,8 +3367,11 @@
     if (kind === "statRow") return { tiles: Array.isArray(data) ? data : [] };
     if (kind === "table") return { rows: Array.isArray(data) ? data : data && data.rows || [] };
     if (kind === "figure") return data && typeof data === "object" ? data : { value: 0 };
-    if (kind === "chart" || kind === "matrix" || kind === "graph" || kind === "waveform") {
+    if (kind === "chart" || kind === "matrix" || kind === "graph" || kind === "waveform" || kind === "gauge" || kind === "console" || kind === "atlas" || kind === "scene3d") {
       return { data: data && typeof data === "object" && !Array.isArray(data) ? data : null };
+    }
+    if (kind === "health" || kind === "queue") {
+      return { data: { items: Array.isArray(data) ? data : data && data.items || [] } };
     }
     return { items: Array.isArray(data) ? data : [] };
   }
@@ -3212,6 +3382,44 @@
     }).map(function(key) {
       return { key, label: key, sortable: true };
     });
+  }
+  var LIVE_MIN_INTERVAL_MS = 4e3;
+  var LIVE_DEFAULT_INTERVAL_MS = 8e3;
+  function wireLive(spec, refresh) {
+    const live = spec.live;
+    if (!live || typeof live !== "object") return function() {
+    };
+    const ns = (
+      /** @type {any} */
+      window.AIMEAT
+    );
+    if (!ns || !ns.live || typeof ns.live.subscribe !== "function") return function() {
+    };
+    const offs = [];
+    for (const name of Object.keys(live)) {
+      const conf = live[name] || {};
+      const domains = Array.isArray(conf.domains) && conf.domains.length ? conf.domains : ["memory"];
+      const wantsMemory = domains.indexOf("memory") >= 0;
+      if (wantsMemory && !conf.keyPrefix) {
+        console.warn('aimeat-atelier: live source "' + name + '" subscribes to memory without a keyPrefix — refused (that would re-fetch on every write anyone makes).');
+        continue;
+      }
+      const minIntervalMs = Math.max(Number(conf.minIntervalMs) || LIVE_DEFAULT_INTERVAL_MS, LIVE_MIN_INTERVAL_MS);
+      offs.push(ns.live.subscribe(domains, function() {
+        refresh(name);
+      }, {
+        keyPrefix: conf.keyPrefix,
+        minIntervalMs
+      }));
+    }
+    return function() {
+      for (const off of offs) {
+        try {
+          off();
+        } catch {
+        }
+      }
+    };
   }
 
   // src/static/sdk-libs/atelier/mosaic-motion.js
@@ -3232,6 +3440,34 @@
     vt.finished.finally(function() {
       moving.style.viewTransitionName = "";
     });
+  }
+
+  // src/static/sdk-libs/atelier/mosaic-layout.js
+  function appRef() {
+    try {
+      const node = document.getElementById("aimeat-app-ref");
+      if (!node) return null;
+      const text = (node.textContent || "").replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+      const parsed = JSON.parse(text);
+      return parsed && parsed.owner && parsed.app_id ? { owner: String(parsed.owner), filename: String(parsed.app_id) } : null;
+    } catch {
+      return null;
+    }
+  }
+  async function loadLayout(owner, filename) {
+    try {
+      const base = APEX_URL || "";
+      const res = await fetch(base + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/ui");
+      if (!res.ok) return null;
+      const body = await res.json();
+      return body && body.data && body.data.layout || null;
+    } catch {
+      return null;
+    }
+  }
+  function labelOf(block) {
+    const p = block.props || {};
+    return p.title || p.caption || block.component;
   }
 
   // src/static/sdk-libs/atelier/mosaic-canvas.js
@@ -3354,33 +3590,458 @@
     return el("div", { class: "ak-mosaic__canvaswrap" }, [viewport, zoombar, focusHost]);
   }
 
+  // src/static/sdk-libs/atelier/ops.js
+  var SVG_NS4 = "http://www.w3.org/2000/svg";
+  function svg4(name, attrs) {
+    const node = document.createElementNS(SVG_NS4, name);
+    for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
+    return node;
+  }
+  var TONES2 = ["ok", "warn", "err", "plain"];
+  function toneOf(value) {
+    return TONES2.indexOf(value) >= 0 ? value : "plain";
+  }
+  function health(spec) {
+    const root = el("div", { class: "ak-root ak-health", role: "list" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let emptyCard = null;
+    function render(data) {
+      if (emptyCard) {
+        emptyCard.destroy();
+        emptyCard = null;
+      }
+      clear(root);
+      const items = data && Array.isArray(data.items) ? data.items : [];
+      if (!items.length) {
+        const e = spec.empty || {};
+        emptyCard = emptyState({ target: root, tone: "quiet", title: e.title || t("empty"), hint: e.hint || t("emptyHint") });
+        return;
+      }
+      for (const item of items) {
+        const tone = toneOf(item.tone);
+        const row = el(spec.onPick ? "button" : "div", {
+          class: "ak-health__row",
+          role: "listitem",
+          type: spec.onPick ? "button" : void 0
+        }, [
+          el("span", { class: "ak-health__lamp ak-health__lamp--" + tone, "aria-hidden": "true" }),
+          el("span", { class: "ak-health__name" }, [
+            el("span", { class: "ak-health__label", text: item.label || item.id }),
+            item.sub ? el("span", { class: "ak-health__sub", text: item.sub }) : null
+          ]),
+          item.reading != null ? el("span", { class: "ak-health__reading", text: String(item.reading) }) : null,
+          el("span", { class: "ak-sr-only", text: tone === "ok" ? t("opsOk") : tone === "err" ? t("opsDown") : tone === "warn" ? t("opsWarn") : "" })
+        ]);
+        if (spec.onPick) row.addEventListener("click", function() {
+          spec.onPick(item);
+        });
+        root.appendChild(row);
+      }
+    }
+    render(spec.data);
+    return {
+      el: root,
+      set(patch) {
+        if (patch && "data" in patch) render(patch.data);
+      },
+      destroy() {
+        if (emptyCard) emptyCard.destroy();
+        root.remove();
+      }
+    };
+  }
+  var QUEUE_STATES = ["waiting", "running", "done", "failed"];
+  var QUEUE_TONE = { waiting: "plain", running: "warn", done: "ok", failed: "err" };
+  function queue(spec) {
+    const root = el("div", { class: "ak-root ak-queue" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let emptyCard = null;
+    function render(data) {
+      if (emptyCard) {
+        emptyCard.destroy();
+        emptyCard = null;
+      }
+      clear(root);
+      const items = data && Array.isArray(data.items) ? data.items : [];
+      if (!items.length) {
+        const e = spec.empty || {};
+        emptyCard = emptyState({ target: root, tone: "quiet", title: e.title || t("empty"), hint: e.hint || t("emptyHint") });
+        return;
+      }
+      const counts = {};
+      for (const item of items) {
+        const s = QUEUE_STATES.indexOf(item.state) >= 0 ? item.state : "waiting";
+        counts[s] = (counts[s] || 0) + 1;
+      }
+      const strip = el("div", { class: "ak-queue__strip", role: "status" });
+      for (const s of QUEUE_STATES) {
+        if (!counts[s]) continue;
+        strip.appendChild(el(
+          "span",
+          { class: "ak-queue__count ak-queue__count--" + QUEUE_TONE[s] },
+          [el("strong", { text: String(counts[s]) }), el("span", { text: " " + t("queue." + s) })]
+        ));
+      }
+      root.appendChild(strip);
+      const list2 = el("div", { class: "ak-queue__list", role: "list" });
+      for (const item of items) {
+        const s = QUEUE_STATES.indexOf(item.state) >= 0 ? item.state : "waiting";
+        const row = el(spec.onPick ? "button" : "div", {
+          class: "ak-queue__row",
+          role: "listitem",
+          type: spec.onPick ? "button" : void 0
+        }, [
+          el("span", { class: "ak-queue__state ak-queue__state--" + s, text: t("queue." + s) }),
+          el("span", { class: "ak-queue__words" }, [
+            el("span", { class: "ak-queue__title", text: item.title || item.id }),
+            item.sub ? el("span", { class: "ak-queue__sub", text: item.sub }) : null
+          ])
+        ]);
+        if (spec.onPick) row.addEventListener("click", function() {
+          spec.onPick(item);
+        });
+        list2.appendChild(row);
+      }
+      root.appendChild(list2);
+    }
+    render(spec.data);
+    return {
+      el: root,
+      set(patch) {
+        if (patch && "data" in patch) render(patch.data);
+      },
+      destroy() {
+        if (emptyCard) emptyCard.destroy();
+        root.remove();
+      }
+    };
+  }
+  function gauge(spec) {
+    const root = el("figure", { class: "ak-root ak-gauge", role: "img" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let emptyCard = null;
+    const R = 84;
+    const CX = 100;
+    const CY = 104;
+    const SWEEP = 240;
+    function angleAt(frac) {
+      return -SWEEP / 2 - 90 + SWEEP * frac;
+    }
+    function pointAt(deg, radius) {
+      const rad = deg * Math.PI / 180;
+      return [CX + radius * Math.cos(rad), CY + radius * Math.sin(rad)];
+    }
+    function arcPath(fromFrac, toFrac, radius) {
+      const [x1, y1] = pointAt(angleAt(fromFrac), radius);
+      const [x2, y2] = pointAt(angleAt(toFrac), radius);
+      const large = (toFrac - fromFrac) * SWEEP > 180 ? 1 : 0;
+      return "M " + x1 + " " + y1 + " A " + radius + " " + radius + " 0 " + large + " 1 " + x2 + " " + y2;
+    }
+    function render(data) {
+      if (emptyCard) {
+        emptyCard.destroy();
+        emptyCard = null;
+      }
+      clear(root);
+      if (!data || typeof data.value !== "number") {
+        const e = spec.empty || {};
+        emptyCard = emptyState({ target: root, tone: "quiet", title: e.title || t("empty"), hint: e.hint || t("emptyHint") });
+        return;
+      }
+      const min = typeof data.min === "number" ? data.min : 0;
+      const max = typeof data.max === "number" && data.max > min ? data.max : min + 100;
+      const frac = Math.max(0, Math.min(1, (data.value - min) / (max - min)));
+      const bands = Array.isArray(data.bands) && data.bands.length ? data.bands : [{ upTo: max, tone: "plain" }];
+      let tone = "plain";
+      for (const band of bands) {
+        if (data.value <= band.upTo) {
+          tone = toneOf(band.tone);
+          break;
+        }
+      }
+      if (data.value > bands[bands.length - 1].upTo) tone = toneOf(bands[bands.length - 1].tone);
+      root.setAttribute("aria-label", (data.label ? data.label + ": " : "") + data.value + (data.unit || ""));
+      const node = svg4("svg", { viewBox: "0 0 200 160", class: "ak-gauge__svg", "aria-hidden": "true" });
+      node.appendChild(svg4("path", { d: arcPath(0, 1, R), class: "ak-gauge__track" }));
+      let from = min;
+      for (const band of bands) {
+        const f0 = Math.max(0, Math.min(1, (from - min) / (max - min)));
+        const f1 = Math.max(0, Math.min(1, (band.upTo - min) / (max - min)));
+        if (f1 > f0) node.appendChild(svg4("path", { d: arcPath(f0, f1, R), class: "ak-gauge__band ak-gauge__band--" + toneOf(band.tone) }));
+        from = band.upTo;
+      }
+      const value = svg4("path", { d: arcPath(0, Math.max(frac, 4e-3), R - 14), class: "ak-gauge__value ak-gauge__value--" + tone });
+      node.appendChild(value);
+      root.appendChild(node);
+      if (!reducedMotion()) {
+        const len = (
+          /** @type {SVGPathElement} */
+          value.getTotalLength()
+        );
+        value.setAttribute("stroke-dasharray", String(len));
+        value.setAttribute("stroke-dashoffset", String(len));
+        requestAnimationFrame(function() {
+          value.classList.add("ak-gauge__value--drawn");
+        });
+      }
+      root.appendChild(el("figcaption", { class: "ak-gauge__words" }, [
+        el(
+          "span",
+          { class: "ak-gauge__reading ak-gauge__reading--" + tone },
+          [el("strong", { text: String(data.value) }), data.unit ? el("span", { text: data.unit }) : null]
+        ),
+        data.label ? el("span", { class: "ak-gauge__label", text: data.label }) : null
+      ]));
+    }
+    render(spec.data);
+    return {
+      el: root,
+      set(patch) {
+        if (patch && "data" in patch) render(patch.data);
+      },
+      destroy() {
+        if (emptyCard) emptyCard.destroy();
+        root.remove();
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/konsole.js
+  var CAP_DEFAULT = 400;
+  var TONES3 = ["ok", "warn", "err", "plain"];
+  function stamp(ts) {
+    if (ts == null) return "";
+    const d = ts instanceof Date ? ts : new Date(ts);
+    if (isNaN(d.getTime())) return String(ts);
+    return d.toLocaleTimeString(void 0, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  }
+  function konsole(spec) {
+    const cap = typeof spec.cap === "number" && spec.cap > 0 ? Math.min(spec.cap, 2e3) : CAP_DEFAULT;
+    const root = el("div", { class: "ak-root ak-console" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    const vane = el("div", { class: "ak-console__vane", role: "log", "aria-live": "polite", tabindex: "0" });
+    root.appendChild(vane);
+    let emptyCard = null;
+    function atTail() {
+      return vane.scrollHeight - vane.scrollTop - vane.clientHeight < 24;
+    }
+    function lineNode(line, entering) {
+      const tone = TONES3.indexOf(line.tone) >= 0 ? line.tone : "plain";
+      const node = el("div", { class: "ak-console__line ak-console__line--" + tone }, [
+        line.ts != null ? el("span", { class: "ak-console__ts", text: stamp(line.ts) }) : null,
+        el("span", { class: "ak-console__text", text: String(line.text == null ? "" : line.text) })
+      ]);
+      if (entering && !reducedMotion()) node.classList.add("ak-console__line--enter");
+      return node;
+    }
+    function trim() {
+      while (vane.children.length > cap) vane.removeChild(vane.firstChild);
+    }
+    function render(data) {
+      if (emptyCard) {
+        emptyCard.destroy();
+        emptyCard = null;
+      }
+      clear(vane);
+      const lines = data && Array.isArray(data.lines) ? data.lines : [];
+      if (!lines.length) {
+        const e = spec.empty || {};
+        emptyCard = emptyState({ target: vane, tone: "quiet", title: e.title || t("consoleEmpty"), hint: e.hint || "" });
+        return;
+      }
+      for (const line of lines.slice(-cap)) vane.appendChild(lineNode(line, false));
+      vane.scrollTop = vane.scrollHeight;
+    }
+    render(spec.data);
+    return {
+      el: root,
+      set(patch) {
+        if (patch && "data" in patch) render(patch.data);
+      },
+      /** @param {Array<{ ts?: any, tone?: string, text: string }>} lines */
+      append(lines) {
+        if (!Array.isArray(lines) || !lines.length) return;
+        if (emptyCard) {
+          emptyCard.destroy();
+          emptyCard = null;
+        }
+        const follow = atTail();
+        for (const line of lines) vane.appendChild(lineNode(line, true));
+        trim();
+        if (follow) vane.scrollTop = vane.scrollHeight;
+      },
+      destroy() {
+        if (emptyCard) emptyCard.destroy();
+        root.remove();
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/atlas.js
+  var SVG_NS5 = "http://www.w3.org/2000/svg";
+  function svg5(name, attrs) {
+    const node = document.createElementNS(SVG_NS5, name);
+    for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
+    return node;
+  }
+  var TONES4 = ["ok", "warn", "err"];
+  var geoPromise = null;
+  function ensureGeometry() {
+    if (geoPromise) return geoPromise;
+    geoPromise = fetch(APEX_URL + "/lib/aimeat-atlas@1.json").then(function(res) {
+      if (!res.ok) throw new Error("atlas geometry " + res.status);
+      return res.json();
+    }).catch(function(err) {
+      geoPromise = null;
+      throw err;
+    });
+    return geoPromise;
+  }
+  function atlas(spec) {
+    const root = el("figure", { class: "ak-root ak-atlas", role: "img" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    const wait = skeleton({ target: root, rows: 3 });
+    let destroyed = false;
+    let geo = null;
+    let pending = spec.data === void 0 ? null : spec.data;
+    ensureGeometry().then(function(loaded) {
+      if (destroyed) return;
+      wait.destroy();
+      geo = loaded;
+      render(pending);
+    }).catch(function() {
+      if (destroyed) return;
+      wait.destroy();
+      emptyState({
+        target: root,
+        title: spec.empty && spec.empty.title || t("atlasDown"),
+        hint: spec.empty && spec.empty.hint || ""
+      });
+    });
+    function matchRegion(row, byName, byId) {
+      if (row.id != null && byId.has(String(row.id))) return byId.get(String(row.id));
+      if (row.name) return byName.get(String(row.name).toLowerCase()) || null;
+      return null;
+    }
+    function project(lon, lat) {
+      return [(lon + 180) / 360 * geo.w, (90 - lat) / 180 * geo.h];
+    }
+    function render(data) {
+      clear(root);
+      const regions = data && Array.isArray(data.regions) ? data.regions : [];
+      const markers = data && Array.isArray(data.markers) ? data.markers : [];
+      const byName = /* @__PURE__ */ new Map();
+      const byId = /* @__PURE__ */ new Map();
+      for (const c of geo.countries) {
+        byName.set(c.name.toLowerCase(), c);
+        byId.set(c.id, c);
+      }
+      let maxValue = 0;
+      const matched = [];
+      const extent = [Infinity, Infinity, -Infinity, -Infinity];
+      function grow(x0, y0, x1, y1) {
+        if (x0 < extent[0]) extent[0] = x0;
+        if (y0 < extent[1]) extent[1] = y0;
+        if (x1 > extent[2]) extent[2] = x1;
+        if (y1 > extent[3]) extent[3] = y1;
+      }
+      for (const row of regions) {
+        const c = matchRegion(row, byName, byId);
+        if (!c) continue;
+        matched.push({ row, country: c });
+        if (typeof row.value === "number" && row.value > maxValue) maxValue = row.value;
+        grow(c.bbox[0], c.bbox[1], c.bbox[2], c.bbox[3]);
+      }
+      for (const m of markers) {
+        if (typeof m.lon !== "number" || typeof m.lat !== "number") continue;
+        const [x, y] = project(m.lon, m.lat);
+        grow(x - 2, y - 2, x + 2, y + 2);
+      }
+      let vb = [0, 0, geo.w, geo.h];
+      if (spec.fit !== "world" && extent[0] < extent[2]) {
+        const padX = Math.max((extent[2] - extent[0]) * 0.25, 20);
+        const padY = Math.max((extent[3] - extent[1]) * 0.25, 12);
+        let x0 = Math.max(0, extent[0] - padX);
+        let y0 = Math.max(0, extent[1] - padY);
+        let x1 = Math.min(geo.w, extent[2] + padX);
+        let y1 = Math.min(geo.h, extent[3] + padY);
+        const minW = 90;
+        if (x1 - x0 < minW) {
+          const cx = (x0 + x1) / 2;
+          x0 = Math.max(0, cx - minW / 2);
+          x1 = Math.min(geo.w, cx + minW / 2);
+        }
+        if (y1 - y0 < (x1 - x0) / 2) {
+          const cy = (y0 + y1) / 2;
+          const half = (x1 - x0) / 4;
+          y0 = Math.max(0, cy - half);
+          y1 = Math.min(geo.h, cy + half);
+        }
+        vb = [x0, y0, x1 - x0, y1 - y0];
+      }
+      root.setAttribute("aria-label", (spec.title ? spec.title + " — " : "") + matched.map(function(m) {
+        return m.country.name + (m.row.value != null ? " " + m.row.value : "");
+      }).join(", "));
+      const node = svg5("svg", { viewBox: vb.join(" "), class: "ak-atlas__svg", "aria-hidden": "true" });
+      const still = reducedMotion();
+      for (const c of geo.countries) node.appendChild(svg5("path", { d: c.d, class: "ak-atlas__land" }));
+      matched.forEach(function(m, i) {
+        const tone = TONES4.indexOf(m.row.tone) >= 0 ? m.row.tone : null;
+        const attrs = { d: m.country.d, class: "ak-atlas__region" + (tone ? " ak-atlas__region--" + tone : "") };
+        if (!tone) {
+          const frac = maxValue > 0 && typeof m.row.value === "number" ? m.row.value / maxValue : 1;
+          attrs.style = "fill: var(--ak-accent); fill-opacity: " + (0.25 + 0.75 * frac).toFixed(3);
+        }
+        const path = svg5("path", attrs);
+        if (!still) {
+          path.classList.add("ak-atlas__region--enter");
+          path.style.animationDelay = i * 40 + "ms";
+        }
+        if (spec.onPick) {
+          path.classList.add("ak-atlas__region--pick");
+          path.addEventListener("click", function() {
+            spec.onPick(m.row);
+          });
+        }
+        node.appendChild(path);
+      });
+      const dotR = Math.max(vb[2] / 220, 1.6);
+      markers.forEach(function(m, i) {
+        if (typeof m.lon !== "number" || typeof m.lat !== "number") return;
+        const [x, y] = project(m.lon, m.lat);
+        const tone = TONES4.indexOf(m.tone) >= 0 ? m.tone : null;
+        const dot = svg5("circle", { cx: x, cy: y, r: dotR, class: "ak-atlas__marker" + (tone ? " ak-atlas__marker--" + tone : "") });
+        if (!still) {
+          dot.classList.add("ak-atlas__marker--enter");
+          dot.style.animationDelay = 120 + i * 60 + "ms";
+        }
+        node.appendChild(dot);
+        if (m.label) {
+          const label = svg5("text", { x: x + dotR * 1.8, y: y + dotR * 0.8, class: "ak-atlas__label", "font-size": String(Math.max(vb[2] / 60, 4)) });
+          label.textContent = String(m.label);
+          node.appendChild(label);
+        }
+      });
+      root.appendChild(node);
+      if (!matched.length && !markers.length) {
+        root.appendChild(el("figcaption", { class: "ak-atlas__note", text: spec.empty && spec.empty.title || t("empty") }));
+      }
+    }
+    return {
+      el: root,
+      set: function(patch) {
+        if (!patch || !("data" in patch)) return;
+        pending = patch.data;
+        if (geo) render(patch.data);
+      },
+      destroy: function() {
+        destroyed = true;
+        root.remove();
+      }
+    };
+  }
+
   // src/static/sdk-libs/atelier/mosaic.js
-  function appRef() {
-    try {
-      const node = document.getElementById("aimeat-app-ref");
-      if (!node) return null;
-      const text = (node.textContent || "").replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
-      const parsed = JSON.parse(text);
-      return parsed && parsed.owner && parsed.app_id ? { owner: String(parsed.owner), filename: String(parsed.app_id) } : null;
-    } catch {
-      return null;
-    }
-  }
-  async function loadLayout(owner, filename) {
-    try {
-      const base = APEX_URL || "";
-      const res = await fetch(base + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/ui");
-      if (!res.ok) return null;
-      const body = await res.json();
-      return body && body.data && body.data.layout || null;
-    } catch {
-      return null;
-    }
-  }
-  function labelOf(block) {
-    const p = block.props || {};
-    return p.title || p.caption || block.component;
-  }
   function mosaic(spec) {
     const host = spec.app ? spec.app.main : resolve(spec.target, document.body);
     const root = el("div", { class: "ak-root ak-mosaic" });
@@ -3451,8 +4112,29 @@
               data: patchFor("chart", data).data,
               title: p.title,
               empty,
-              presentation: p.presentation === "mural" ? "mural" : "tile"
+              presentation: p.presentation === "mural" ? "mural" : "tile",
+              kind: p.kind
             });
+          });
+        case "health":
+          return bound("health", function(data) {
+            return health({ target: into, data: patchFor("health", data).data, empty, onPick: pick });
+          });
+        case "queue":
+          return bound("queue", function(data) {
+            return queue({ target: into, data: patchFor("queue", data).data, empty, onPick: pick });
+          });
+        case "gauge":
+          return bound("gauge", function(data) {
+            return gauge({ target: into, data: patchFor("gauge", data).data, empty });
+          });
+        case "console":
+          return bound("console", function(data) {
+            return konsole({ target: into, data: patchFor("console", data).data, cap: p.cap, empty });
+          });
+        case "atlas":
+          return bound("atlas", function(data) {
+            return atlas({ target: into, data: patchFor("atlas", data).data, title: p.title, fit: p.fit, empty, onPick: pick });
           });
         case "matrix":
           return bound("matrix", function(data) {
@@ -3908,7 +4590,10 @@
       render(currentLayout);
     }
     const booting = boot();
-    return {
+    const stopLive = wireLive(spec, function(name) {
+      api.refresh(name);
+    });
+    const api = {
       el: root,
       /** Replace the whole rendered layout — what a live layout-change event calls. */
       set(layout) {
@@ -4012,6 +4697,7 @@
       },
       destroy() {
         destroyed = true;
+        stopLive();
         for (const h of alive.handles) {
           if (h && h.destroy) h.destroy();
         }
@@ -4028,15 +4714,16 @@
         if (root.parentNode) root.parentNode.removeChild(root);
       }
     };
+    return api;
   }
 
   // src/static/sdk-libs/atelier/dialog.js
   var ENTER_FROM = { center: "12px", bottom: "100%" };
-  var TONES2 = ["plain", "danger", "celebrate", "ai"];
+  var TONES5 = ["plain", "danger", "celebrate", "ai"];
   var SIZES = ["compact", "roomy", "wide"];
   function dialog(spec) {
     const from = spec.from === "bottom" ? "bottom" : "center";
-    const tone = TONES2.indexOf(spec.tone || "") >= 0 ? spec.tone : "plain";
+    const tone = TONES5.indexOf(spec.tone || "") >= 0 ? spec.tone : "plain";
     const size = SIZES.indexOf(spec.size || "") >= 0 ? spec.size : "compact";
     const dismissible = spec.dismissible !== false;
     const node = (
@@ -4215,7 +4902,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.32.0",
+    version: "0.33.0",
     // ── Shell and navigation ──
     app,
     section,
@@ -4260,6 +4947,12 @@
     graph,
     waveform,
     scene3d,
+    // ── The ops family and the map (an admin panel is an arrangement, not app code) ──
+    health,
+    queue,
+    gauge,
+    console: konsole,
+    atlas,
     // ── The things that open ──
     reveal,
     drawer,

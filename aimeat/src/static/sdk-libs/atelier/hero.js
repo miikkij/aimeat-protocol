@@ -19,6 +19,8 @@
  * @usage  AIMEAT.atelier.hero({ target: a.main, title: 'Errands', sub: '3 open',
  *           actions: [{ id: 'add', label: 'Add', kind: 'primary', onClick }] });
  * @version-history
+ *   v0.33.0 — 2026-08-29 — statRow tiles accept `trend: number[]`: a sparkline under the
+ *     number, so a KPI carries its direction without a chart block.
  *   v0.10.0 — 2026-08-28 — A hero that repeats the app's title claims it: when the hero title
  *     equals the shell bar's, the bar heading goes screen-reader-only and the masthead carries the
  *     name alone. All three first-AEB Atelier builds printed the name twice, stacked.
@@ -148,16 +150,46 @@ export function hero(spec) {
  * @property {number} value
  * @property {(n: number) => string} [format]
  * @property {string} [hint]
+ * @property {number[]} [trend] - a short history drawn as a sparkline under the number
  */
+
+/** The tile's little history: a polyline under the number, drawn from `trend: number[]`. */
+function drawTrend(entry, trend) {
+  const values = Array.isArray(trend) ? trend.filter((v) => typeof v === 'number') : [];
+  if (values.length < 2) {
+    if (entry.spark) { entry.spark.remove(); entry.spark = null; }
+    return;
+  }
+  const W2 = 96;
+  const H2 = 24;
+  let min = Math.min.apply(null, values);
+  let max = Math.max.apply(null, values);
+  if (max === min) { max = min + 1; }
+  const points = values.map((v, i) => {
+    const px = (W2 * i) / (values.length - 1);
+    const py = 2 + (H2 - 4) * (1 - (v - min) / (max - min));
+    return px.toFixed(1) + ',' + py.toFixed(1);
+  }).join(' ');
+  if (!entry.spark) {
+    entry.spark = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    entry.spark.setAttribute('class', 'ak-statrow__spark');
+    entry.spark.setAttribute('viewBox', '0 0 ' + W2 + ' ' + H2);
+    entry.spark.setAttribute('aria-hidden', 'true');
+    entry.spark.appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'polyline'));
+    entry.tile.appendChild(entry.spark);
+  }
+  entry.spark.firstChild.setAttribute('points', points);
+}
 
 /**
  * The KPI row. On `set`, a tile whose value changed counts up to the new figure — the
- * state-change motion arrives with the data, not from app code.
+ * state-change motion arrives with the data, not from app code. A tile carrying `trend`
+ * shows its short history as a sparkline under the number.
  * @param {{ target?: string|Element, tiles: StatTile[] }} spec
  * @returns {{ el: HTMLElement, set: (patch: { tiles: StatTile[] }) => void, destroy: () => void }}
  */
 export function statRow(spec) {
-  /** @type {Map<string, { value: number, node: HTMLElement, label: HTMLElement, hint: HTMLElement }>} */
+  /** @type {Map<string, { value: number, node: HTMLElement, label: HTMLElement, hint: HTMLElement, tile: HTMLElement, spark: SVGElement|null }>} */
   const shown = new Map();
   const root = el('div', { class: 'ak-root ak-statrow' });
   if (spec.target) resolve(spec.target).appendChild(root);
@@ -174,13 +206,15 @@ export function statRow(spec) {
         const label = el('span', { class: 'ak-statrow__label', text: tile.label });
         const hint = el('span', { class: 'ak-statrow__hint', text: tile.hint || '' });
         hint.hidden = !tile.hint;
-        root.appendChild(el('div', { class: 'ak-statrow__tile' }, [value, label, hint]));
-        entry = { value: first ? tile.value : 0, node: value, label: label, hint: hint };
+        const tileEl = el('div', { class: 'ak-statrow__tile' }, [value, label, hint]);
+        root.appendChild(tileEl);
+        entry = { value: first ? tile.value : 0, node: value, label: label, hint: hint, tile: tileEl, spark: null };
         shown.set(tile.id, entry);
       }
       entry.label.textContent = tile.label;
       entry.hint.textContent = tile.hint || '';
       entry.hint.hidden = !tile.hint;
+      drawTrend(entry, tile.trend);
       if (entry.value !== tile.value) {
         countUp(entry.node, entry.value, tile.value, { format: fmt });
         entry.value = tile.value;

@@ -25,6 +25,10 @@
  * @usage
  *   import { UI_COMPONENTS, componentById, buildUiCatalogue } from './registry.js';
  * @version-history
+ *   v1.11.0 — 2026-08-29 — THE OPS FAMILY joins the components (append-only): `health`,
+ *     `queue`, `gauge`, `console` — an admin panel becomes an arrangement — plus `atlas`
+ *     (the offline data map) and the chart family (`kind`: axes / donut / calendar; area
+ *     series; statRow trend sparklines).
  *   v1.10.0 — 2026-08-29 — `scene3d` joins the components (append-only): the 3D band on the
  *     three-world bundle — orb, sky, bars-as-terrain — one per layout, lazy-loaded.
  *   v1.9.0 — 2026-08-29 — The catalogue carries the pattern shelf: every patterns.css recipe
@@ -123,7 +127,7 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
   },
   {
     id: 'statRow',
-    summary: 'The KPI strip; figures count up when the bound data changes.',
+    summary: 'The KPI strip; figures count up when the bound data changes. A tile carrying `trend: number[]` shows its short history as a sparkline under the number.',
     props: { source: source(), title: text('The block\'s name in tabs, decks and canvas tiles.', 80) },
   },
   {
@@ -205,10 +209,14 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
   },
   {
     id: 'chart',
-    summary: 'Grouped bars and drawn lines over one label axis — the costs/income/cash-curve shape. The source resolves to ONE record: { labels: string[], series: [{ id, label, kind: "bar"|"line", values: number[] }] }. Colours come from the look\'s own accent spectrum; negatives are legal and the zero line appears when crossed. presentation "mural" makes the chart the room instead of a tile: full-bleed behind its section, ticks quieted, one per screen.',
+    summary: 'The chart family in one block, chosen by `kind`. axes (default): grouped bars, lines and filled areas over one label axis — { labels: string[], series: [{ id, label, kind: "bar"|"line"|"area", values: number[] }] }; negatives are legal and the zero line appears when crossed. donut: parts of a whole — { slices: [{ label, value }] }, the total in the middle. calendar: a stretch of days as a heat grid — { days: [{ date: "YYYY-MM-DD", value }] }, intensity riding the accent. Colours come from the look\'s own accent spectrum. presentation "mural" makes the chart the room instead of a tile: full-bleed behind its section, ticks quieted, one per screen.',
     props: {
       source: source(),
       title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
+      kind: {
+        type: 'enum', values: ['axes', 'donut', 'calendar'], default: 'axes',
+        description: 'The chart\'s shape — and the record shape the source must resolve to (see the summary).',
+      },
       emptyTitle: text('What the empty state says.', 80),
       emptyHint: text('The line under it.', 160),
       presentation: {
@@ -243,6 +251,58 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
     props: {
       source: source(),
       title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
+      emptyTitle: text('What the empty state says.', 80),
+      emptyHint: text('The line under it.', 160),
+    },
+  },
+  {
+    id: 'health',
+    summary: 'The "is everything up" wall: one row per watched thing — a tone lamp (ok / warn / err), the name, the latest reading. The source resolves to rows of { id, label, tone?, reading?, sub? }. The first block of every monitoring screen.',
+    props: {
+      source: source(),
+      title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
+      emptyTitle: text('What the empty state says.', 80),
+      emptyHint: text('The line under it.', 160),
+    },
+  },
+  {
+    id: 'queue',
+    summary: 'Work with states: a count strip (waiting / running / done / failed) over the item list, each row wearing its state as a pill. The source resolves to rows of { id, title, state?, sub? }. The "what is the system doing" view every ops screen hand-rolls.',
+    props: {
+      source: source(),
+      title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
+      emptyTitle: text('What the empty state says.', 80),
+      emptyHint: text('The line under it.', 160),
+    },
+  },
+  {
+    id: 'gauge',
+    summary: 'ONE value on a dial, bands turning the tone — the number that owns a wall (CPU, balance, fill rate). The source resolves to ONE record: { value, max?, min?, label?, unit?, bands?: [{ upTo, tone }] }. The needle draws in once; nothing moves at idle.',
+    props: {
+      source: source(),
+      title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
+      emptyTitle: text('What the empty state says.', 80),
+      emptyHint: text('The line under it.', 160),
+    },
+  },
+  {
+    id: 'console',
+    summary: 'The log vane: monospace lines with a time, a tone and the words, newest at the tail, capped so it never grows without bound. Follows the tail only while the reader is AT the tail. The source resolves to ONE record: { lines: [{ ts?, tone?, text }] }.',
+    props: {
+      source: source(),
+      title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
+      cap: { type: 'number', min: 20, max: 2000, default: 400, description: 'How many lines the vane keeps before the oldest fall off.' },
+      emptyTitle: text('What the empty state says.', 80),
+      emptyHint: text('The line under it.', 160),
+    },
+  },
+  {
+    id: 'atlas',
+    summary: 'The data map, fully offline — country shapes ship on this node (Natural Earth), no tile server and no external host. The source resolves to ONE record: { regions?: [{ name (in English, e.g. "Finland"), value?, tone? }], markers?: [{ label?, lon, lat, tone? }] }. Regions fill with the accent at an intensity riding the value (or a tone); the view frames the data\'s extent on its own, so a Nordic dataset shows the Nordics.',
+    props: {
+      source: source(),
+      title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
+      fit: { type: 'enum', values: ['auto', 'world'], default: 'auto', description: 'auto frames the matched regions and markers; world pins the whole map.' },
       emptyTitle: text('What the empty state says.', 80),
       emptyHint: text('The line under it.', 160),
     },

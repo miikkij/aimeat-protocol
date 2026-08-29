@@ -20655,9 +20655,10 @@ paths:
         slots — a starting shape), a `look` (a signature token sheet with an optional preset), a
         `motion` (a motion-token recipe) or an `illustration` (art direction for the imagery
         pipeline), with its lifecycle status and how many builds have adopted it. Published parts
-        are what everyone builds from.
+        are what everyone builds from. PUBLIC for the published shelf — a caller without a
+        session sees published parts only; signing in adds the parts still in proposal.
       tags: [Apps]
-      security: [{ bearerAuth: [] }]
+      security: []
       parameters:
         - { name: kind, in: query, schema: { type: string, enum: [layout, fill, look, motion, illustration, genre] } }
         - { name: status, in: query, schema: { type: string, enum: [proposed, published, aging, retired] } }
@@ -20715,9 +20716,10 @@ paths:
       description: >-
         The part's body is exactly what an adopt writes into an app, so reading it IS the
         preview. Carries the record version (the part's evolution is its version history) and the
-        adoption count.
+        adoption count. PUBLIC for a published part; one still in proposal needs a session and
+        answers 404 without one.
       tags: [Apps]
-      security: [{ bearerAuth: [] }]
+      security: []
       parameters:
         - { name: id, in: path, required: true, schema: { type: string } }
       responses:
