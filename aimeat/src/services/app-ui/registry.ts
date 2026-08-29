@@ -25,6 +25,9 @@
  * @usage
  *   import { UI_COMPONENTS, componentById, buildUiCatalogue } from './registry.js';
  * @version-history
+ *   v1.8.0 — 2026-08-29 — `reveal` joins the components (append-only): the fan of panels, so a
+ *     questions-and-answers or terms screen is an arrangement rather than app code. The dialog
+ *     family stays component-only on purpose — a modal is behaviour, not layout.
  *   v1.7.0 — 2026-08-28 — The harvest trio (append-only): `matrix` (suunta's comparison grid),
  *     `graph` (suunta's node map) and `waveform` (the sound strip kaiku, band-jam and
  *     freepartylights each hand-rolled) join the components.
@@ -224,6 +227,17 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
     props: {
       source: source(),
       title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
+      emptyTitle: text('What the empty state says.', 80),
+      emptyHint: text('The line under it.', 160),
+    },
+  },
+  {
+    id: 'reveal',
+    summary: 'The fan: stacked panels that open and close on a real animated height — questions and answers, terms, a spec sheet, anything long that should arrive folded. The source resolves to rows of { id, title, sub?, text? }. The header is a real button carrying its own expanded state, so nothing about it is the app\'s to get right.',
+    props: {
+      source: source(),
+      title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
+      mode: { type: 'enum', values: ['one', 'many'], default: 'one', description: 'Whether one panel opens at a time, or several can stand open.' },
       emptyTitle: text('What the empty state says.', 80),
       emptyHint: text('The line under it.', 160),
     },

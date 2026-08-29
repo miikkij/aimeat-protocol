@@ -28,6 +28,10 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.25.0 — 2026-08-29 — THE THINGS THAT OPEN: reveal() (the fan — animated true-height
+ *     panels, one or many), drawer() (the menu that slides from an edge) and the DIALOG
+ *     DEPARTMENT — dialog(), confirm(), prompt(), sheet() — all on the native <dialog> top
+ *     layer, so the focus trap, Escape and focus return are the browser's own.
  *   v0.24.0 — 2026-08-29 — MOTION grows up: attention() — the notice-me gesture (pulse, shake,
  *     flash, rise) exported for the moment something needs the eye, and wired into the form's
  *     own refusal; entrances ride the look's `--ak-ease`; the signature opens `--ak-ease` and
@@ -133,6 +137,8 @@ import { form } from './form.js';
 import { table, searchBar } from './table.js';
 import { timeline } from './timeline.js';
 import { chart } from './chart.js';
+import { dialog, confirm, prompt, sheet } from './dialog.js';
+import { reveal, drawer } from './disclose.js';
 import { matrix } from './matrix.js';
 import { graph } from './graph.js';
 import { waveform } from './waveform.js';
@@ -144,7 +150,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.24.0',
+  version: '0.25.0',
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,
@@ -174,6 +180,9 @@ const atelier = {
 
   // ── Content ──
   list, listDetail, cardGrid, mediaCard, timeline, chart, matrix, graph, waveform,
+
+  // ── The things that open ──
+  reveal, drawer, dialog, confirm, prompt, sheet,
 
   // ── Data ──
   form, table, searchBar,

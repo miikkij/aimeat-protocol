@@ -1180,7 +1180,7 @@
       bubble("user", text, null);
       history.push({ who: "user", text });
       const thinking = bubble("assistant", "…", null);
-      const prompt = [
+      const prompt2 = [
         'You are the in-app aide of "' + (s.appName || document.title || "this app") + '" on the AIMEAT platform.',
         "You may ONLY act through the declared actions below, and only propose one when the person asked to DO something.",
         'Answer as JSON: { "reply": "<plain words for the person>", "action"?: { "id", "params" }, "panel"?: { "blocks": [...] } when a visual answer helps }.',
@@ -1196,7 +1196,7 @@
       let out;
       try {
         out = await aiNs.completeJson({
-          prompt,
+          prompt: prompt2,
           schema: ANSWER_SCHEMA,
           app_id: s.appId || s.appName || "atelier-aide",
           confirm: firstSend
@@ -2297,6 +2297,382 @@
     };
   }
 
+  // src/static/sdk-libs/atelier/dialog.js
+  var ENTER_FROM = { center: "12px", bottom: "100%" };
+  function dialog(spec) {
+    const from = spec.from === "bottom" ? "bottom" : "center";
+    const dismissible = spec.dismissible !== false;
+    const node = (
+      /** @type {HTMLDialogElement} */
+      el("dialog", {
+        class: "ak-root ak-dialog ak-dialog--" + from,
+        "aria-labelledby": "ak-dlg-title"
+      })
+    );
+    const head = el("div", { class: "ak-dialog__head" }, [
+      el("h2", { class: "ak-dialog__title", id: "ak-dlg-title", text: spec.title }),
+      dismissible ? el("button", {
+        type: "button",
+        class: "ak-btn ak-btn--ghost ak-dialog__x",
+        "aria-label": t("close"),
+        on: { click: function() {
+          close("dismiss");
+        } }
+      }, "✕") : null
+    ]);
+    const body = el("div", { class: "ak-dialog__body" });
+    if (spec.text) body.appendChild(el("p", { class: "ak-dialog__text", text: spec.text }));
+    if (spec.body) spec.body(body);
+    const foot = el("div", { class: "ak-dialog__actions" });
+    for (const action of spec.actions || []) {
+      foot.appendChild(el("button", {
+        type: "button",
+        class: "ak-btn ak-btn--" + (action.tone === "danger" ? "danger" : action.tone === "primary" ? "primary" : "ghost"),
+        "data-ak-action": action.id,
+        on: { click: function() {
+          if (action.run) action.run();
+        } }
+      }, action.label));
+    }
+    node.appendChild(el(
+      "div",
+      { class: "ak-dialog__panel" },
+      [head, body, (spec.actions || []).length ? foot : null]
+    ));
+    document.body.appendChild(node);
+    let closed = false;
+    function close(reason) {
+      if (closed) return;
+      closed = true;
+      const done = function() {
+        if (node.open) node.close();
+        if (node.parentNode) node.parentNode.removeChild(node);
+        if (spec.onClose) spec.onClose(reason || "close");
+      };
+      if (reducedMotion() || typeof node.animate !== "function") return done();
+      const span = parseFloat(getComputedStyle(node).getPropertyValue("--ak-motion")) || 200;
+      const anim = node.animate(
+        [{ opacity: 1, transform: "none" }, { opacity: 0, transform: "translateY(" + ENTER_FROM[from] + ")" }],
+        { duration: span, easing: "ease-in" }
+      );
+      anim.onfinish = done;
+      anim.oncancel = done;
+    }
+    node.addEventListener("cancel", function(ev) {
+      ev.preventDefault();
+      if (dismissible) close("dismiss");
+    });
+    if (dismissible) {
+      node.addEventListener("click", function(ev) {
+        if (ev.target === node) close("dismiss");
+      });
+    }
+    node.showModal();
+    if (!reducedMotion() && typeof node.animate === "function") {
+      const span = parseFloat(getComputedStyle(node).getPropertyValue("--ak-motion")) || 200;
+      const ease = (getComputedStyle(node).getPropertyValue("--ak-ease") || "").trim() || "cubic-bezier(0.2, 0.7, 0.3, 1)";
+      node.animate(
+        [{ opacity: 0, transform: "translateY(" + ENTER_FROM[from] + ")" }, { opacity: 1, transform: "none" }],
+        { duration: span * 1.2, easing: ease }
+      );
+    }
+    return {
+      el: node,
+      close,
+      destroy() {
+        close("destroy");
+      }
+    };
+  }
+  function confirm(spec) {
+    return new Promise(function(resolve2) {
+      let answer = false;
+      const handle = dialog({
+        title: spec.title,
+        text: spec.text,
+        from: "center",
+        actions: [
+          { id: "cancel", label: spec.cancelLabel || t("cancel"), tone: "ghost", run: function() {
+            handle.close("cancel");
+          } },
+          {
+            id: "confirm",
+            label: spec.confirmLabel || t("confirm"),
+            tone: spec.tone === "danger" ? "danger" : "primary",
+            run: function() {
+              answer = true;
+              handle.close("confirm");
+            }
+          }
+        ],
+        onClose: function() {
+          resolve2(answer);
+        }
+      });
+      const go = handle.el.querySelector('[data-ak-action="confirm"]');
+      if (go) go.focus();
+    });
+  }
+  function prompt(spec) {
+    return new Promise(function(resolve2) {
+      let answer = null;
+      let field = null;
+      const handle = dialog({
+        title: spec.title,
+        text: spec.text,
+        from: "center",
+        body: function(host) {
+          const id = "ak-prompt-" + Math.random().toString(36).slice(2, 8);
+          host.appendChild(el("label", { class: "ak-form__label", for: id, text: spec.label }));
+          field = /** @type {HTMLInputElement} */
+          el(spec.multiline ? "textarea" : "input", {
+            class: "ak-input ak-dialog__field",
+            id,
+            ...spec.placeholder ? { placeholder: spec.placeholder } : {}
+          });
+          if (spec.value != null) field.value = spec.value;
+          if (!spec.multiline) {
+            field.addEventListener("keydown", function(ev) {
+              if (
+                /** @type {KeyboardEvent} */
+                ev.key === "Enter"
+              ) {
+                ev.preventDefault();
+                submit();
+              }
+            });
+          }
+          host.appendChild(field);
+        },
+        actions: [
+          { id: "cancel", label: t("cancel"), tone: "ghost", run: function() {
+            handle.close("cancel");
+          } },
+          { id: "submit", label: spec.submitLabel || t("confirm"), tone: "primary", run: function() {
+            submit();
+          } }
+        ],
+        onClose: function() {
+          resolve2(answer);
+        }
+      });
+      function submit() {
+        answer = field ? String(field.value) : null;
+        handle.close("submit");
+      }
+      if (field) field.focus();
+    });
+  }
+  function sheet(spec) {
+    return dialog({ ...spec, from: "bottom" });
+  }
+
+  // src/static/sdk-libs/atelier/disclose.js
+  function slideOpen(panel, opening, span, ease) {
+    if (reducedMotion() || typeof panel.animate !== "function") {
+      panel.style.height = opening ? "auto" : "0px";
+      return;
+    }
+    const from = panel.getBoundingClientRect().height;
+    panel.style.height = "auto";
+    const to = opening ? panel.getBoundingClientRect().height : 0;
+    panel.style.height = from + "px";
+    const anim = panel.animate(
+      [{ height: from + "px", opacity: opening ? 0.4 : 1 }, { height: to + "px", opacity: opening ? 1 : 0.4 }],
+      { duration: span, easing: ease }
+    );
+    const settle = function() {
+      panel.style.height = opening ? "auto" : "0px";
+    };
+    anim.onfinish = settle;
+    anim.oncancel = settle;
+  }
+  function reveal(spec) {
+    const root = el("div", { class: "ak-root ak-reveal" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    const single = spec.mode !== "many";
+    const panes = /* @__PURE__ */ new Map();
+    function motion() {
+      const cs = getComputedStyle(root);
+      return {
+        span: parseFloat(cs.getPropertyValue("--ak-motion")) || 200,
+        ease: (cs.getPropertyValue("--ak-ease") || "").trim() || "cubic-bezier(0.2, 0.7, 0.3, 1)"
+      };
+    }
+    function setOpen(id, want) {
+      const pane = panes.get(id);
+      if (!pane) return;
+      const isOpen = pane.head.getAttribute("aria-expanded") === "true";
+      if (isOpen === want) return;
+      const { span, ease } = motion();
+      if (want && single) {
+        for (const [otherId, other] of panes) {
+          if (otherId !== id && other.head.getAttribute("aria-expanded") === "true") {
+            other.head.setAttribute("aria-expanded", "false");
+            slideOpen(other.panel, false, span, ease);
+          }
+        }
+      }
+      pane.head.setAttribute("aria-expanded", String(want));
+      slideOpen(pane.panel, want, span, ease);
+    }
+    function render(items) {
+      clear(root);
+      panes.clear();
+      const openIds = spec.open || [];
+      for (const item of items) {
+        const panelId = "ak-rv-" + uid();
+        const headId = panelId + "-h";
+        const startOpen = openIds.indexOf(item.id) >= 0;
+        const head = el("button", {
+          type: "button",
+          class: "ak-reveal__head",
+          id: headId,
+          "aria-expanded": String(startOpen),
+          "aria-controls": panelId,
+          on: {
+            click: function() {
+              setOpen(item.id, head.getAttribute("aria-expanded") !== "true");
+            }
+          }
+        }, [
+          el("span", { class: "ak-reveal__titles" }, [
+            el("span", { class: "ak-reveal__title", text: item.title }),
+            item.sub != null ? el("span", { class: "ak-reveal__sub", text: item.sub }) : null
+          ]),
+          el("span", { class: "ak-reveal__chevron", "aria-hidden": "true" }, "⌄")
+        ]);
+        const panel = el("div", {
+          class: "ak-reveal__panel",
+          id: panelId,
+          role: "region",
+          "aria-labelledby": headId
+        });
+        const inner = el("div", { class: "ak-reveal__inner" });
+        if (item.text) inner.appendChild(el("p", { class: "ak-reveal__text", text: item.text }));
+        if (item.body) item.body(inner);
+        panel.appendChild(inner);
+        panel.style.height = startOpen ? "auto" : "0px";
+        root.appendChild(el("div", { class: "ak-reveal__pane" }, [head, panel]));
+        panes.set(item.id, { head, panel });
+      }
+      enter(root);
+    }
+    render(spec.items || []);
+    return {
+      el: root,
+      set(patch) {
+        if (patch && patch.items) render(patch.items);
+      },
+      open(id) {
+        setOpen(id, true);
+      },
+      close(id) {
+        setOpen(id, false);
+      },
+      destroy() {
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+  function drawer(spec) {
+    const side = spec.side === "right" ? "right" : spec.side === "bottom" ? "bottom" : "left";
+    const node = (
+      /** @type {HTMLDialogElement} */
+      el("dialog", {
+        class: "ak-root ak-drawer ak-drawer--" + side,
+        "aria-label": spec.title || t("menu")
+      })
+    );
+    const panel = el("div", { class: "ak-drawer__panel" });
+    const head = el("div", { class: "ak-drawer__head" }, [
+      el("span", { class: "ak-drawer__title", text: spec.title || t("menu") }),
+      el("button", {
+        type: "button",
+        class: "ak-btn ak-btn--ghost ak-drawer__x",
+        "aria-label": t("close"),
+        on: { click: function() {
+          close();
+        } }
+      }, "✕")
+    ]);
+    panel.appendChild(head);
+    const list2 = el("nav", { class: "ak-drawer__list" });
+    for (const item of spec.items || []) {
+      list2.appendChild(el("button", {
+        type: "button",
+        class: "ak-drawer__item",
+        ...item.current ? { "aria-current": "page" } : {},
+        on: {
+          click: function() {
+            if (spec.onPick) spec.onPick(item.id);
+            close();
+          }
+        }
+      }, [
+        el("span", { class: "ak-drawer__label", text: item.label }),
+        item.sub != null ? el("span", { class: "ak-drawer__sub", text: item.sub }) : null
+      ]));
+    }
+    if ((spec.items || []).length) panel.appendChild(list2);
+    if (spec.body) {
+      const host = el("div", { class: "ak-drawer__body" });
+      spec.body(host);
+      panel.appendChild(host);
+    }
+    node.appendChild(panel);
+    document.body.appendChild(node);
+    const travel = side === "bottom" ? "0, 100%" : side === "right" ? "100%, 0" : "-100%, 0";
+    function motion() {
+      const cs = getComputedStyle(node);
+      return {
+        span: parseFloat(cs.getPropertyValue("--ak-motion")) || 200,
+        ease: (cs.getPropertyValue("--ak-ease") || "").trim() || "cubic-bezier(0.2, 0.7, 0.3, 1)"
+      };
+    }
+    function open() {
+      if (node.open) return;
+      node.showModal();
+      if (reducedMotion() || typeof panel.animate !== "function") return;
+      const { span, ease } = motion();
+      panel.animate(
+        [{ transform: "translate(" + travel + ")" }, { transform: "none" }],
+        { duration: span * 1.4, easing: ease }
+      );
+    }
+    function close() {
+      if (!node.open) return;
+      const done = function() {
+        if (node.open) node.close();
+        if (spec.onClose) spec.onClose();
+      };
+      if (reducedMotion() || typeof panel.animate !== "function") return done();
+      const { span, ease } = motion();
+      const anim = panel.animate(
+        [{ transform: "none" }, { transform: "translate(" + travel + ")" }],
+        { duration: span, easing: ease }
+      );
+      anim.onfinish = done;
+      anim.oncancel = done;
+    }
+    node.addEventListener("cancel", function(ev) {
+      ev.preventDefault();
+      close();
+    });
+    node.addEventListener("click", function(ev) {
+      if (ev.target === node) close();
+    });
+    return {
+      el: node,
+      open,
+      close,
+      destroy() {
+        if (node.open) node.close();
+        if (node.parentNode) node.parentNode.removeChild(node);
+      }
+    };
+  }
+
   // src/static/sdk-libs/atelier/matrix.js
   var TONES = ["ok", "warn", "err", "accent", "plain"];
   function matrix(spec) {
@@ -2805,6 +3181,10 @@
         case "waveform":
           return bound("waveform", function(data) {
             return waveform({ target: into, data: patchFor("waveform", data).data, title: p.title, empty });
+          });
+        case "reveal":
+          return bound("reveal", function(data) {
+            return reveal({ target: into, items: patchFor("reveal", data).items, mode: p.mode === "many" ? "many" : "one" });
           });
         case "table":
           return bound("table", function(data) {
@@ -3381,7 +3761,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.24.0",
+    version: "0.25.0",
     // ── Shell and navigation ──
     app,
     section,
@@ -3425,6 +3805,13 @@
     matrix,
     graph,
     waveform,
+    // ── The things that open ──
+    reveal,
+    drawer,
+    dialog,
+    confirm,
+    prompt,
+    sheet,
     // ── Data ──
     form,
     table,
