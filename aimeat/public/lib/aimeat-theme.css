@@ -29,7 +29,8 @@
  *
  *   FONTS are self-hosted at /lib/fonts/ (SIL OFL 1.1, latin + latin-ext so ä/ö render) and
  *   lazy-load per family: a page only downloads the faces its palette actually uses.
- * @structure @font-face (Inter, Space Grotesk, Fraunces, JetBrains Mono) · shared tokens
+ * @structure @font-face (Archivo Black, Archivo, Inter, Space Grotesk, Fraunces, JetBrains
+ *   Mono) · shared tokens
  *   (type scale, motion, spacing) · per-mode elevation · 5 palettes x 2 modes (each tagged
  *   `@theme-block <palette> <mode>` for the verifier) · typography application rules
  * @usage  <link href="/lib/daisyui@5.css" rel="stylesheet" />
@@ -39,6 +40,11 @@
  *   Deliberately UNLAYERED: daisyUI declares its themes inside `@layer base`, and any unlayered
  *   rule beats every layered one regardless of order or specificity.
  * @version-history
+ *   v2.3.0 — 2026-08-29 — THE HOUSE FACES REACH THE NODE'S OWN LIBRARY: Archivo Black (display)
+ *     and Archivo (body) are vendored here and are the AIMEAT palette's pair. They had lived
+ *     only in spa.html's Google Fonts line, so everything served from /lib — every published
+ *     app and the whole Atelier kit — spoke Inter and looked like nobody's product. The other
+ *     five palettes keep their own faces; this is the default speaking the design language.
  *   v2.2.0 — 2026-08-28 — VOLTAGE: the sixth palette — the front-demo2 register (hot magenta on
  *     warm cream; deep violet night with hot pink; electric yellow accent with dark content;
  *     2px borders; Space Grotesk display). Both gates green: check:theme 186 with accurate
@@ -66,6 +72,31 @@
 @font-face {
   font-family: 'Inter'; font-style: normal; font-weight: 100 900; font-display: swap;
   src: url('/lib/fonts/inter-var-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* THE HOUSE FACES. Archivo Black is the poster display face and Archivo the body face of the
+ * AIMEAT design language — the same pair the SPA has carried since 2026-08-28. They were only
+ * ever linked from Google Fonts in spa.html, so everything served from /lib (every published
+ * app, the whole Atelier kit) spoke Inter instead and looked like nobody's product. Vendored
+ * here, they reach every surface the node serves. */
+@font-face {
+  font-family: 'Archivo Black'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('/lib/fonts/archivo-black-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Archivo Black'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('/lib/fonts/archivo-black-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Archivo'; font-style: normal; font-weight: 400 700; font-display: swap;
+  src: url('/lib/fonts/archivo-var-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Archivo'; font-style: normal; font-weight: 400 700; font-display: swap;
+  src: url('/lib/fonts/archivo-var-latin-ext.woff2') format('woff2');
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 @font-face {
@@ -177,8 +208,8 @@
   --border-w: 1px;
   --depth: 0;
   --noise: 0;
-  --font-display: 'Inter', 'Segoe UI', system-ui, sans-serif;
-  --font-body: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Archivo Black', 'Segoe UI', system-ui, sans-serif;
+  --font-body: 'Archivo', 'Segoe UI', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
   --display-tracking: -0.01em;
 }
@@ -220,8 +251,8 @@
   --border-w: 1px;
   --depth: 0;
   --noise: 0;
-  --font-display: 'Inter', 'Segoe UI', system-ui, sans-serif;
-  --font-body: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Archivo Black', 'Segoe UI', system-ui, sans-serif;
+  --font-body: 'Archivo', 'Segoe UI', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
   --display-tracking: -0.01em;
 }
