@@ -26,6 +26,9 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.10.0 — 2026-08-29 — The next-level vocabulary: the choreography field (scroll as the
+ *     camera), the chart mural, and the note that the loud looks throw their masthead in one
+ *     letter at a time on their own — nothing for the builder to call.
  *   v1.9.0 — 2026-08-29 — A MOTION section: entrances and the hover greeting stay the
  *     components' work, and the one call a builder makes is the attention gesture (pulse /
  *     shake / flash / rise), with its rules — one element, never decoration, never instead of
@@ -229,6 +232,12 @@ function composeBody(config: AimeatConfig): string {
     + '(`rail`) or a full-screen menu in display type (`overlay`) — all of them work on every '
     + 'screen size, so never build navigation by hand. On the stacked grid, blocks below the fold '
     + 'reveal as the person scrolls; that too is the kit\'s, never yours to code.\n\n'
+    + 'Two more one-field decisions, both data and both optional. `choreography: "cinema"` makes '
+    + 'scroll the camera: the opening band recedes as the person leaves it and each section rises '
+    + 'to meet them — right for a front, a story or a report, wrong for a tool someone lives in, '
+    + 'and free at idle because it is pure CSS scroll timelines. And a chart block may carry '
+    + '`presentation: "mural"`: the chart stops living in a tile and becomes the section\'s '
+    + 'full-bleed ground — the data as the decor, one mural per screen.\n\n'
     + 'COMPOSE, do not pile: a block may carry `span` — `full` (default), `main` + `side` for the '
     + 'asymmetric editorial split, or `half` — and the screen becomes a laid-out page instead of a '
     + 'column of cards. Narrow screens fold every span to one column on their own.\n\n'

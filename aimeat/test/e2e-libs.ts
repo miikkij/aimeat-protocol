@@ -1047,7 +1047,7 @@ await test('GET /v1/libs/aimeat-atelier.js — serves the Atelier kit with every
         'reveal', 'drawer', 'dialog', 'confirm', 'prompt', 'sheet',
         'form', 'table', 'searchBar',
         'mosaic', 'appRef',
-        'injectStyle', 'guardButtons', 'whileBusy', 'enter', 'countUp', 'attention',
+        'injectStyle', 'guardButtons', 'whileBusy', 'enter', 'kinetic', 'countUp', 'attention',
     ]) {
         assert(text.includes(part), `should export ${part}`);
     }
@@ -1137,7 +1137,8 @@ await test('GET /lib/aimeat-atelier.css — serves the theming contract, light, 
     const looksText = await looksRes.text();
     const looksCss = withoutComments(looksText);
     for (const preset of ['flat', 'calm-card', 'editorial', 'sticker', 'neon-dense', 'poster',
-        'broadsheet', 'gallery', 'brutalist', 'terminal', 'aurora', 'carnival', 'billboard']) {
+        'broadsheet', 'gallery', 'brutalist', 'terminal', 'aurora', 'carnival', 'billboard',
+        'riso', 'stage']) {
         assert(looksCss.includes(`[data-ak-look='${preset}']`), `the ${preset} preset block must exist`);
         assert(looksText.includes(`@preset-block ${preset}`), `the ${preset} preset must carry its @preset-block tag`);
     }

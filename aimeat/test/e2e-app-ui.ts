@@ -203,6 +203,39 @@ const GOOD_LAYOUT = {
         `an invented tone is refused naming the real ones: ${bad.body.data.message}`);
     });
 
+    await test('CHOREOGRAPHY is a layout field: cinema validates, an invented one is refused by name', async () => {
+        const good = await validate({
+            v: 1, choreography: 'cinema',
+            blocks: [{ id: 'a', component: 'section', props: { title: 'The story' } }],
+        });
+        assert(good.status === 200 && good.body.data.ok === true,
+            `cinema must validate: ${JSON.stringify(good.body.data)}`);
+
+        const bad = await validate({
+            v: 1, choreography: 'earthquake',
+            blocks: [{ id: 'a', component: 'section', props: { title: 'x' } }],
+        });
+        assert(bad.body.data.ok === false && /choreography/.test(bad.body.data.message)
+            && /cinema/.test(bad.body.data.message),
+        `an invented choreography is refused naming the real ones: ${bad.body.data.message}`);
+    });
+
+    await test('the chart MURAL is a presentation enum: mural validates, an invented value is refused', async () => {
+        const good = await validate({
+            v: 1,
+            blocks: [{ id: 'wall', component: 'chart', props: { source: 'season.numbers', presentation: 'mural' } }],
+        });
+        assert(good.status === 200 && good.body.data.ok === true,
+            `a mural chart must validate: ${JSON.stringify(good.body.data)}`);
+
+        const bad = await validate({
+            v: 1,
+            blocks: [{ id: 'wall', component: 'chart', props: { source: 'season.numbers', presentation: 'poster' } }],
+        });
+        assert(bad.body.data.ok === false && /presentation/.test(bad.body.data.message),
+            `an invented presentation is refused: ${bad.body.data.message}`);
+    });
+
     await test('an unknown component is refused with the NEAREST real name suggested', async () => {
         const r = await validate({ v: 1, blocks: [{ id: 'g', component: 'cardgird' }] });
         assert(r.status === 200 && r.body.data.ok === false, `expected an ok:false result, got ${r.status}`);

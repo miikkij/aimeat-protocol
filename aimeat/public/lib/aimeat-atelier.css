@@ -36,6 +36,9 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.28.0 — 2026-08-29 — THE NEXT LEVEL, first landing: --ak-kinetic (masthead letter-throw,
+ *     per look), --ak-page-grain (page-wide texture tile: paper for riso, phosphor for terminal),
+ *     the chart mural, the cinema choreography, and the riso + stage worlds in looks.css.
  *   v0.27.0 — 2026-08-29 — THE MILK-COFFEE FILM IS GONE. --ak-surface-image painted 4% of the
  *     accent over EVERY card, and five looks repeated it — cards are most of a screen, so that
  *     film was the warm cast the developer kept seeing after the page ground was already cool.
@@ -262,6 +265,8 @@
   --ak-display-shadow: none;                            /* extrusion under display type      */
   --ak-display-stroke: 0;                               /* outline width around display type */
   --ak-tilt:          0deg;                             /* per-tile rotation (sticker looks) */
+  --ak-kinetic:       none;                             /* masthead letter-throw: none|letters|words */
+  --ak-page-grain:    none;                             /* page-wide texture tile (paper, phosphor) */
 
   /* ── Density, space, motion ───────────────────────────────────────────────────────────── */
   --ak-gap:           var(--gap-card, 14px);
