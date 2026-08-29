@@ -10,6 +10,9 @@
  *   timezone, purpose + the kind-specific payload). Handles pause/resume, run-now,
  *   edit (PATCH), and cancel itself; calls onChanged() to let the parent refetch.
  * @version-history
+ *   v1.3.0 — 2026-08-30 — The inline editor moved to scheduler/edit-form.js (ScheduleEditForm) so the
+ *     schedule's own page in the poster face edits through the same form; scheduleIo and
+ *     describeDispatch are exported for that page. No behaviour change on the card.
  *   2026-08-25 — What a job READS and WRITES, as two named facts on the card. They were carried
  *     all along and shown only inside the edit form, appended to the prompt as an unlabelled arrow.
  *   v1.0.0 -- 2026-06-03 -- Initial editable schedule card
@@ -24,7 +27,8 @@ import { useState } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
-import { setScheduleEnabled, triggerSchedule, deleteSchedule, updateSchedule } from '/js/services/schedules.js';
+import { setScheduleEnabled, triggerSchedule, deleteSchedule } from '/js/services/schedules.js';
+import { ScheduleEditForm } from './scheduler/edit-form.js';
 
 const html = htm.bind(h);
 
@@ -62,7 +66,7 @@ export function formatUntil(iso) {
  * `extension` writes into its own namespace, so its map is the extension's. Inventing a third answer
  * to one question is how three surfaces end up disagreeing.
  */
-function scheduleIo(s, t) {
+export function scheduleIo(s, t) {
   if (s.type !== 'ai') return null;
   const c = s.input || {};
   const reads = (c.inputKeys || []).join(', ');
@@ -73,7 +77,7 @@ function scheduleIo(s, t) {
 }
 
 /** What a schedule produces each fire (title + body) for display. */
-function describeDispatch(s) {
+export function describeDispatch(s) {
   if (s.type === 'agent_task') {
     const tmpl = (s.input && s.input.taskTemplate) || {};
     return { title: tmpl.title || '', body: tmpl.description || '' };
@@ -92,16 +96,6 @@ function describeDispatch(s) {
 export default function ScheduleItem({ schedule: s, onChanged, showToast }) {
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [f, setF] = useState(() => {
-    const c = s.input || {};
-    const tmpl = c.taskTemplate || {};
-    return {
-      display_name: s.displayName || '', cron: s.cron || '', timezone: s.timezone || '', purpose: s.purpose || '',
-      task_title: tmpl.title || '', task_description: tmpl.description || '',
-      prompt: c.prompt || '', input_keys: (c.inputKeys || []).join(', '), output_key: c.outputKey || '',
-    };
-  });
-  const set = (k, v) => setF(prev => ({ ...prev, [k]: v }));
 
   const run = async (fn) => {
     setBusy(true);
@@ -121,27 +115,6 @@ export default function ScheduleItem({ schedule: s, onChanged, showToast }) {
     else showToast?.(t('profile.scheduler.triggered')); // 'ran' (ai/extension) or older server
   });
   const onCancel = () => { if (window.confirm(t('profile.scheduler.confirmCancel'))) run(() => deleteSchedule(s.id)); };
-
-  const onSave = async () => {
-    const patch = {
-      display_name: f.display_name.trim(), cron: f.cron.trim(),
-      timezone: f.timezone.trim() || undefined, purpose: f.purpose.trim() || undefined,
-    };
-    if (s.type === 'agent_task') {
-      patch.input = { ...(s.input || {}), taskTemplate: { title: f.task_title.trim(), description: f.task_description.trim() } };
-    } else if (s.type === 'ai') {
-      patch.input = {
-        ...(s.input || {}),
-        prompt: f.prompt.trim(),
-        inputKeys: f.input_keys.split(',').map(x => x.trim()).filter(Boolean),
-        outputKey: f.output_key.trim() || undefined,
-      };
-    }
-    setBusy(true);
-    try { await updateSchedule(s.id, patch); showToast?.(t('profile.scheduler.saved')); setEditing(false); onChanged?.(); }
-    catch (e) { showToast?.(e.message, true); }
-    finally { setBusy(false); }
-  };
 
   const d = describeDispatch(s);
 
@@ -189,37 +162,7 @@ export default function ScheduleItem({ schedule: s, onChanged, showToast }) {
 
       ${s.purpose && !editing ? html`<div class="sch-muted sch-purpose">${s.purpose}</div>` : null}
 
-      ${editing && html`
-        <div class="sch-edit">
-          <div class="sch-form-row"><label>${t('profile.scheduler.field.displayName')}</label>
-            <input type="text" value=${f.display_name} onInput=${e => set('display_name', e.target.value)} /></div>
-          <div class="sch-form-row"><label>${t('profile.scheduler.field.schedule')} (cron)</label>
-            <input type="text" class="sch-cron-input" value=${f.cron} onInput=${e => set('cron', e.target.value)} placeholder="0 7 * * *" /></div>
-          <div class="sch-form-row"><label>${t('profile.scheduler.ph.timezone')}</label>
-            <input type="text" value=${f.timezone} onInput=${e => set('timezone', e.target.value)} placeholder="Europe/Helsinki" /></div>
-
-          ${s.type === 'agent_task' && html`
-            <div class="sch-form-row"><label>${t('profile.scheduler.field.taskTitle')}</label>
-              <input type="text" value=${f.task_title} onInput=${e => set('task_title', e.target.value)} /></div>
-            <div class="sch-form-row"><label>${t('profile.scheduler.field.taskDescription')}</label>
-              <textarea rows="3" value=${f.task_description} onInput=${e => set('task_description', e.target.value)}></textarea></div>
-          `}
-          ${s.type === 'ai' && html`
-            <div class="sch-form-row"><label>${t('profile.scheduler.field.inputKeys')}</label>
-              <input type="text" value=${f.input_keys} onInput=${e => set('input_keys', e.target.value)} placeholder=${t('profile.scheduler.ph.inputKeys')} /></div>
-            <div class="sch-form-row"><label>${t('profile.scheduler.field.prompt')}</label>
-              <textarea rows="3" value=${f.prompt} onInput=${e => set('prompt', e.target.value)}></textarea></div>
-            <div class="sch-form-row"><label>${t('profile.scheduler.field.outputKey')}</label>
-              <input type="text" value=${f.output_key} onInput=${e => set('output_key', e.target.value)} placeholder=${t('profile.scheduler.ph.outputKey')} /></div>
-          `}
-
-          <div class="sch-form-row"><label>${t('profile.scheduler.field.purpose')}</label>
-            <input type="text" value=${f.purpose} onInput=${e => set('purpose', e.target.value)} /></div>
-
-          <div class="sch-form-actions">
-            <button class="btn-primary btn-sm" disabled=${busy} onClick=${onSave}>${busy ? t('profile.scheduler.saving') : t('profile.scheduler.save')}</button>
-            <button class="btn-outline btn-sm" disabled=${busy} onClick=${() => setEditing(false)}>${t('profile.scheduler.close')}</button>
-          </div>
-        </div>`}
+      ${editing && html`<${ScheduleEditForm} schedule=${s} showToast=${showToast}
+        onSaved=${() => { setEditing(false); onChanged?.(); }} onClose=${() => setEditing(false)} />`}
     </div>`;
 }

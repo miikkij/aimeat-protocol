@@ -7,6 +7,7 @@
  *   internal (the agent's self-reported mirror, read-only). Lets the owner create
  *   a new schedule targeting this agent (reusing the master view's CreateForm).
  * @version-history
+ *   v1.4.0 -- 2026-08-30 -- CreateForm now lives in scheduler/create-form.js (poster face); same props.
  *   v1.3.0 -- 2026-08-24 -- Live update listens on 'scheduler'; 'schedules' is emitted by nobody.
  *   v1.2.0 -- 2026-07-17 -- Dispatched / agent-internal groups become pf-agd-cards.
  *   v1.1.0 -- 2026-07-17 -- Style unification: canonical agent-detail section headers
@@ -20,7 +21,7 @@ import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { t } from '/js/i18n.js';
 import { listAgentSchedules } from '/js/services/schedules.js';
-import { CreateForm } from '../scheduler-tab.js';
+import { CreateForm } from '../scheduler/create-form.js';
 import ScheduleItem from '../schedule-item.js';
 
 const html = htm.bind(h);
