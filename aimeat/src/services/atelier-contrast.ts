@@ -26,6 +26,9 @@
  *   v1.0.0 — 2026-08-28 — Extracted from tools/atelier-check.ts (TARGET-074: colour reaches the
  *     signature). The checks and thresholds are byte-for-byte the tool's; new here are only
  *     loadAtelierSheets' cache and runMatrix's `overrides` parameter.
+ *   v1.1.0 — 2026-08-29 — AK-PAT: the pattern volumes are proven per combo — body ink on the
+ *     ground weave and on the prop weave (the .ak-pat--ground/--prop c1 formulas, modelled
+ *     verbatim). The zone volume carries no text by rule, so it carries no floor.
  */
 import { readFileSync } from 'node:fs';
 
@@ -597,6 +600,16 @@ export function runMatrix(
           const glassGround = glass.alpha === 1 ? glass.hex : over(glass, bg);
           add(combo, 'AK-GLASS ink on chrome glass', ratio(ink, glassGround), MIN_TEXT, 'bar text on the glass pane over the page');
         }
+
+        // AK-PAT: the pattern volumes (patterns.css). A ground-volume pattern carries a whole
+        // page, so body ink must read on its darker weave; a prop-volume pattern carries chip
+        // labels, so ink must read on its accent weave. The zone volume carries no text by rule
+        // (words sit in solid chips, proven by AK-TINT), so it needs no floor here. These two
+        // expressions ARE the .ak-pat--ground / .ak-pat--prop formulas — change them together.
+        const patGround = evalColor('color-mix(in oklab, var(--ak-ink) 6%, var(--ak-bg))', vars, `${combo} ak-pat--ground c1`);
+        add(combo, 'AK-PAT ink on ground weave', ratio(ink, patGround.hex), MIN_TEXT, 'body text on a whisper-volume pattern page');
+        const patProp = evalColor('color-mix(in oklab, var(--ak-accent) 22%, var(--ak-surface))', vars, `${combo} ak-pat--prop c1`);
+        add(combo, 'AK-PAT ink on prop weave', ratio(ink, patProp.hex), MIN_TEXT, 'a chip label on a card-strength pattern fill');
       } catch (e) {
         failR(combo, 'resolve', (e as Error).message);
       }
