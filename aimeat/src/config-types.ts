@@ -126,6 +126,8 @@ export interface OperatorConfig {
   supervisoryUrl: string;
   /** Effective date of the privacy policy (YYYY-MM-DD). */
   effectiveDate: string;
+  /** When the policy text was last edited (YYYY-MM-DD). Empty falls back to effectiveDate. */
+  policyUpdatedDate: string;
   /** Privacy policy version string. */
   policyVersion: string;
 }

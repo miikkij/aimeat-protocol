@@ -1,0 +1,150 @@
+/**
+ * @file margin-pattern.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The margin pattern: a flat repeating figure on the empty margins of the home, the
+ *   chat and the settings pages, at full strength at the viewport edge and gone before the content
+ *   column, so the eye settles on the middle (design canvas "AIMEAT Reunakuvio", 2026-08-29). A
+ *   personal choice: `html[data-margin-pattern="a".."h"]` is set by js/margin-pattern.js from the
+ *   person's home.prefs record, and no attribute means no strips.
+ *
+ *   Two fixed strips are #app's pseudo-elements, under the content (#app is a stacking context, so
+ *   z-index -1 paints them above the page ground and below everything on it). Each page sets the
+ *   strips' widths through --mp-wl / --mp-wr from its own column: the home's 1180px box, the chat's
+ *   1440px grid, the settings' sidebar plus 1360px content (right side only). Below 1280px there is
+ *   no margin to speak of and the strips are gone.
+ *
+ *   Every colour is a token. Patterns a–d are shapes drawn in the strip's background-color through
+ *   a mask (the tile is a mask, the fade is a second mask, the two intersect), so --text and --accent
+ *   flip with the theme. Patterns e–h are gradient figures from css-pattern.com (Temani Afif,
+ *   MIT, https://github.com/Afif13/CSS-Pattern, copyright (c) 2022 Temani Afif) with the colours
+ *   replaced by tokens; the shapes are the author's.
+ * @version-history
+ *   v1.0.0 — 2026-08-29 — Initial: eight patterns, three pages, one personal setting.
+ */
+
+/* ── The strips ────────────────────────────────────────────────────────────────────────────── */
+/* The scroll region paints the same paper as the body (home.css says so for the home); with a
+   pattern chosen it paints nothing, so the strips under it show through and the page looks exactly
+   as before everywhere else. `body` in the selector outweighs home.css's `body:has(.koti)` rule. */
+html[data-margin-pattern] body .page-content { background: transparent; }
+html[data-margin-pattern] #app::before,
+html[data-margin-pattern] #app::after {
+  content: '';
+  position: fixed; top: var(--nav-height, 56px); bottom: 0; z-index: -1;
+  pointer-events: none;
+  width: 0;
+  opacity: var(--mp-alpha, .12);
+  background-color: var(--mp-ink, var(--text));
+}
+html[data-margin-pattern] #app::before {
+  left: 0; width: var(--mp-wl, 0px);
+  -webkit-mask-image: var(--mp-tile, linear-gradient(#000, #000)), linear-gradient(to right, #000 0%, #000 30%, transparent 92%);
+  mask-image: var(--mp-tile, linear-gradient(#000, #000)), linear-gradient(to right, #000 0%, #000 30%, transparent 92%);
+  -webkit-mask-repeat: repeat, no-repeat; mask-repeat: repeat, no-repeat;
+  -webkit-mask-size: var(--mp-tile-size, 100% 100%), 100% 100%; mask-size: var(--mp-tile-size, 100% 100%), 100% 100%;
+  -webkit-mask-composite: source-in; mask-composite: intersect;
+}
+html[data-margin-pattern] #app::after {
+  right: 0; width: var(--mp-wr, 0px);
+  -webkit-mask-image: var(--mp-tile, linear-gradient(#000, #000)), linear-gradient(to left, #000 0%, #000 30%, transparent 92%);
+  mask-image: var(--mp-tile, linear-gradient(#000, #000)), linear-gradient(to left, #000 0%, #000 30%, transparent 92%);
+  -webkit-mask-repeat: repeat, no-repeat; mask-repeat: repeat, no-repeat;
+  -webkit-mask-size: var(--mp-tile-size, 100% 100%), 100% 100%; mask-size: var(--mp-tile-size, 100% 100%), 100% 100%;
+  -webkit-mask-composite: source-in; mask-composite: intersect;
+}
+
+/* ── Where the strips are, page by page ────────────────────────────────────────────────────── */
+/* The home: a 1180px box in the middle; the strip reaches 40px into its padding. */
+#app:has(.koti) { --mp-wl: max(0px, calc((100vw - 1180px) / 2 + 40px)); --mp-wr: var(--mp-wl); }
+/* The chat: a 1440px grid plus 32px of padding a side (1504px outside); the strips stop where the
+   rail begins, so the rail and the conversation sit on clean paper. */
+#app:has(.chat-view) { --mp-wl: max(0px, calc((100vw - 1504px) / 2 + 32px)); --mp-wr: var(--mp-wl); }
+/* Settings and controls: the 250px sidebar and the content (1360px plus 92px of padding) fill the
+   left; only the right remainder is empty, and it fades toward the content, reaching 44px into
+   the content's own right padding. */
+#app:has(.pf-shell) { --mp-wl: 0px; --mp-wr: max(0px, calc(100vw - 250px - 1452px + 44px)); }
+@media (max-width: 1279px) {
+  html[data-margin-pattern] #app::before, html[data-margin-pattern] #app::after { display: none; }
+}
+
+/* ── The patterns a–d: a tile as a mask, the ink as the colour ─────────────────────────────── */
+/* a · Pikseliruutu: the identicon's pixels, a 5px square on a 24px grid. */
+html[data-margin-pattern="a"] #app { --mp-alpha: .16; --mp-tile-size: 24px 24px;
+  --mp-tile: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Crect width='5' height='5'/%3E%3C/svg%3E"); }
+/* b · Vinoviiva: the band's own tilt as a 2px hatch. */
+html[data-margin-pattern="b"] #app { --mp-alpha: .12; --mp-tile-size: 16px 16px;
+  --mp-tile: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Cpath d='M-4 20L20-4M-4 4L4-4M12 20l8-8' stroke='%23000' stroke-width='2'/%3E%3C/svg%3E"); }
+/* c · Kohdistusmerkit: a printer's registration cross on a 48px grid. */
+html[data-margin-pattern="c"] #app { --mp-alpha: .18; --mp-tile-size: 48px 48px;
+  --mp-tile: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48'%3E%3Cpath d='M24 17v14M17 24h14' stroke='%23000' stroke-width='2'/%3E%3C/svg%3E"); }
+/* d · Sydänrasteri: the wordmark's heart, sparse, in coral. */
+html[data-margin-pattern="d"] #app { --mp-alpha: .14; --mp-tile-size: 56px 56px; --mp-ink: var(--accent);
+  --mp-tile: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56'%3E%3Cpath transform='translate(22 22) scale(.5)' d='M12 21s-7.5-4.6-9.6-9.2C.8 8.2 3 4.5 6.7 4.5c2 0 3.6 1.1 4.5 2.6.9-1.5 2.5-2.6 4.5-2.6 3.7 0 5.9 3.7 4.3 7.3C19.5 16.4 12 21 12 21z'/%3E%3C/svg%3E"); }
+
+/* ── The patterns e–h: gradient figures (css-pattern.com, MIT), the ink as their colour ──────
+   These paint their own shapes, so the strip's background-color is off and the tile mask is the
+   plain fill (the fade mask still applies). */
+html[data-margin-pattern="e"] #app::before, html[data-margin-pattern="e"] #app::after,
+html[data-margin-pattern="f"] #app::before, html[data-margin-pattern="f"] #app::after,
+html[data-margin-pattern="g"] #app::before, html[data-margin-pattern="g"] #app::after,
+html[data-margin-pattern="h"] #app::before, html[data-margin-pattern="h"] #app::after { background-color: transparent; }
+
+/* e · Kuutiot (g1): isometric cubes in three strengths of ink. */
+html[data-margin-pattern="e"] #app { --mp-alpha: .14; }
+html[data-margin-pattern="e"] #app::before, html[data-margin-pattern="e"] #app::after {
+  --s: 72px;
+  --c1: color-mix(in srgb, var(--text) 20%, transparent);
+  --c2: color-mix(in srgb, var(--text) 50%, transparent);
+  --c3: var(--text);
+  --_g: 0 120deg, #0000 0;
+  background-image:
+    conic-gradient(from    0deg at calc(500%/6) calc(100%/3), var(--c3) var(--_g)),
+    conic-gradient(from -120deg at calc(100%/6) calc(100%/3), var(--c2) var(--_g)),
+    conic-gradient(from  120deg at calc(100%/3) calc(500%/6), var(--c1) var(--_g)),
+    conic-gradient(from  120deg at calc(200%/3) calc(500%/6), var(--c1) var(--_g)),
+    conic-gradient(from -180deg at calc(100%/3) 50%, var(--c2) 60deg, var(--c1) var(--_g)),
+    conic-gradient(from   60deg at calc(200%/3) 50%, var(--c1) 60deg, var(--c3) var(--_g)),
+    conic-gradient(from  -60deg at 50% calc(100%/3), var(--c1) 120deg, var(--c2) 0 240deg, var(--c3) 0);
+  background-size: calc(var(--s) * 1.732) var(--s);
+}
+/* f · Siksak (g12): a wide chevron. */
+html[data-margin-pattern="f"] #app { --mp-alpha: .12; }
+html[data-margin-pattern="f"] #app::before, html[data-margin-pattern="f"] #app::after {
+  --s: 64px;
+  --_g: var(--text) 90deg, #0000 90.5deg;
+  background-image:
+    conic-gradient(from -45deg, var(--_g)),
+    conic-gradient(from 135deg, var(--_g));
+  background-position: 0 0, calc(var(--s) / 2) 0;
+  background-size: var(--s) var(--s);
+}
+/* g · Punos (g18): two directions woven. */
+html[data-margin-pattern="g"] #app { --mp-alpha: .12; }
+html[data-margin-pattern="g"] #app::before, html[data-margin-pattern="g"] #app::after {
+  --s: 80px;
+  --c: var(--text);
+  --_g: #0000 8%, var(--c) 0 17%, #0000 0 58%;
+  background-image:
+    linear-gradient(135deg, #0000 20.5%, var(--c) 0 29.5%, #0000 0),
+    linear-gradient( 45deg, var(--_g)),
+    linear-gradient(135deg, var(--_g), var(--c) 0 67%, #0000 0),
+    linear-gradient( 45deg, var(--_g), var(--c) 0 67%, #0000 0 83%, var(--c) 0 92%, #0000 0);
+  background-position: 0 calc(var(--s) / 4), calc(var(--s) / 2) 0, 0 0, 0 0;
+  background-size: var(--s) var(--s);
+}
+/* h · Ristikko (g26): the interlocking plus. */
+html[data-margin-pattern="h"] #app { --mp-alpha: .12; }
+html[data-margin-pattern="h"] #app::before, html[data-margin-pattern="h"] #app::after {
+  --s: 56px;
+  --_c: #0000 75%, var(--text) 0;
+  --_g1: conic-gradient(at 10% 50%, var(--_c));
+  --_g2: conic-gradient(at 50% 10%, var(--_c));
+  background-image:
+    var(--_g1), var(--_g1), var(--_g1), var(--_g1), var(--_g1),
+    var(--_g2), var(--_g2), var(--_g2), var(--_g2), var(--_g2);
+  background-position:
+    0 0, calc(1 * var(--s)) calc(3 * var(--s)), calc(2 * var(--s)) calc(1 * var(--s)), calc(3 * var(--s)) calc(4 * var(--s)), calc(4 * var(--s)) calc(2 * var(--s)),
+    0 calc(4 * var(--s)), calc(1 * var(--s)) calc(2 * var(--s)), calc(2 * var(--s)) 0, calc(3 * var(--s)) calc(3 * var(--s)), calc(4 * var(--s)) calc(1 * var(--s));
+  background-size: calc(5 * var(--s)) calc(5 * var(--s));
+}

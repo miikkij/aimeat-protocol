@@ -682,6 +682,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
       supervisoryName: process.env.AIMEAT_OPERATOR_SUPERVISORY_NAME ?? '',
       supervisoryUrl: process.env.AIMEAT_OPERATOR_SUPERVISORY_URL ?? '',
       effectiveDate: process.env.AIMEAT_OPERATOR_EFFECTIVE_DATE ?? '',
+      policyUpdatedDate: process.env.AIMEAT_OPERATOR_POLICY_UPDATED ?? '',
       policyVersion: process.env.AIMEAT_OPERATOR_POLICY_VERSION ?? '1.0',
     },
 
