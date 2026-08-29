@@ -6,6 +6,8 @@
  *   PATCH /v1/apps/:filename (rename/access-code/parked/forkable/protection/cortex), DELETE /v1/apps/:filename.
  *   Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 — 2026-08-29 — PATCH takes `marks` (badge, install) and `author` (the named reviewer,
+ *     owner principal only) through services/app-marks.ts; the response carries their state.
  *   v1.3.0 — 2026-08-11 — August 2026 audit step 8: the fork's copy and the delete's bucket sweep go
  *     through services/app-lifecycle.ts, shared with aimeat_app_fork and aimeat_app_delete. The two
  *     gates stay here, because only an HTTP session carries the operator role they consult. The
@@ -30,6 +32,7 @@ import { forkApp, deleteOwnedApp } from '../../services/app-lifecycle.js';
 import { resolveIdentity, ownerGhiiOf } from '../../utils/gaii.js';
 import { sanitizeProtection, invalidateProtectionCache } from '../../utils/app-protect.js';
 import { applyOwnerSeoUpdate, appSeoState } from '../../services/app-seo.js';
+import { applyOwnerMarksUpdate, appMarksState } from '../../services/app-marks.js';
 import type { CanonicalOwner } from './helpers.js';
 
 export function registerForkManageRoutes(
@@ -322,8 +325,30 @@ export function registerForkManageRoutes(
             notes.push(out.note);
         }
 
+        // The served chrome (badge, install chip) and the named reviewer. One service call for
+        // both, shared with the MCP door. The reviewer is a legal act by a natural person, so the
+        // service refuses it from anything but an OWNER PRINCIPAL — the same test
+        // requireOwnerPrincipal() applies: an owner token with no agent, app or ecosystem role.
+        // The owner NAME is not that test; every principal here carries it.
+        if ('marks' in body || 'author' in body) {
+            const roles = req.auth!.roles;
+            const ownerPrincipal = roles.includes('owner') && !roles.includes('app')
+                && !roles.includes('agent') && !roles.includes('ecosystem');
+            const out = await applyOwnerMarksUpdate(storage, { ownerGaii: effectiveGaii, filename }, {
+                ...('marks' in body ? { marks: body.marks } : {}),
+                ...('author' in body ? { author: body.author } : {}),
+                actor: { ghii: ownerGhii, ownerPrincipal },
+            });
+            if ('error' in out) {
+                const code = out.status === 403 ? 'ACCESS_DENIED' : out.status === 404 ? 'NOT_FOUND' : 'INVALID_INPUT';
+                res.status(out.status).json(error(config.nodeId, code, out.error));
+                return;
+            }
+            notes.push(out.note);
+        }
+
         if (notes.length === 0) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Provide at least one field to update (name, description, access_code, parked, forkable, protection or seo).'));
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Provide at least one field to update (name, description, access_code, parked, forkable, protection, seo, marks or author).'));
             return;
         }
 
@@ -341,6 +366,8 @@ export function registerForkManageRoutes(
             // The STATE, not the switch. An owner who turned the switch on in review mode, or on a
             // blocked app, has to be able to see that the answer is still not "findable".
             seo: updated ? { state: appSeoState(updated, config), ...(updated.manifest?.seo ?? {}) } : null,
+            // The chrome switches as they now stand, the reviewer, and the audit log of the latter.
+            ...(updated ? appMarksState(updated) : {}),
             download_url: `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}`,
             note: notes.join(' '),
         }));

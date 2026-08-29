@@ -14,6 +14,8 @@
  *            The operator CRUD lives in subdomain-admin.ts.
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  * @version-history
+ *   v1.18.0 — 2026-08-29 — serveApp reads the owner's badge and install-chip switches and the
+ *     named reviewer from the manifest (services/app-marks.ts).
  *   v1.17.0 — 2026-08-27 — wantsWebmcpBridge() moves to utils/app-agent-discovery.ts, shared with
  *     the apex inline serve, which now injects the same discovery block this origin does
  *     (TARGET-074: the mosaic renderer reads its identity from #aimeat-app-ref).
@@ -97,6 +99,7 @@ import {
   loadServedProvenance, setProvenanceHeaders, type ServedProvenance,
 } from '../services/ai-provenance-marks.js';
 import { applyServeMarks } from '../services/app-serve-marks.js';
+import { appBadgeOn, appInstallChipOn, appReviewedBy } from '../services/app-marks.js';
 import { appCsp } from '../utils/app-csp.js';
 import { appContentType } from '../utils/app-content-type.js';
 import { appToolNames } from '../services/app-tool-names.js';
@@ -337,9 +340,13 @@ async function serveApp(res: Response, storage: Storage, app: AppRecord, csp: st
     // (measured on a live app origin: lang, canonical, description, og:*, JSON-LD all absent —
     // authors write apps, not meta tags, and author-declared tags always win).
     let buf = applyServeMarks(relaxed, {
-      badge: true,
+      // The owner's switch (services/app-marks.ts); on unless they turned it off.
+      badge: appBadgeOn(app.manifest),
       provenance: prov,
       visibleLabel: visible,
+      // The named reviewer, when the account holder declared one: served in the head, and the
+      // visible content label is decided again with that declaration.
+      reviewedBy: appReviewedBy(app.manifest),
       discovery: discover
         ? {
             owner: app.ownerName, filename: app.filename,
@@ -364,6 +371,8 @@ async function serveApp(res: Response, storage: Storage, app: AppRecord, csp: st
             seoDescription: app.manifest?.seo?.description,
             image: seoMeta.image,
             lang: seoMeta.lang,
+            // The owner's switch on the browser install offer (services/app-marks.ts).
+            installChip: appInstallChipOn(app.manifest),
           }
         : undefined,
     });

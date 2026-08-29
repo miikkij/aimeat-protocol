@@ -39,6 +39,7 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   v1.6.0 — 2026-08-29 — `marks`, `authorship` and `authorshipLog` carry forward on a republish.
  *   v1.5.0 — 2026-08-27 — The build track (TARGET-074): `<meta name="aimeat-track">` in the app's
  *     head is parsed into `manifest.track` and carried forward on silent updates, so a later edit
  *     session loads the guide the app was built with instead of mixing Classic and Atelier.
@@ -301,6 +302,13 @@ export async function publishApp(
   // stop shipping. An operator who wants to withdraw it has the seo-approve door, and the block
   // is a column that a republish cannot touch at all.
   if (prev?.seo) manifest.seo = prev.seo;
+  // The owner's chrome switches and the named reviewer travel the same road, for the same reason:
+  // PATCH-only fields that a rebuilt manifest would otherwise silently reset. The reviewer's
+  // declaration and its log survive a new version on purpose — the person answers for the app,
+  // and withdrawing that is their explicit act, never a side effect of shipping.
+  if (prev?.marks) manifest.marks = prev.marks;
+  if (prev?.authorship) manifest.authorship = prev.authorship;
+  if (prev?.authorshipLog?.length) manifest.authorshipLog = prev.authorshipLog;
 
   // What the app DECLARES survives a version whose author forgot the meta tag; what the node
   // OBSERVES is re-measured from the bytes being published, never carried. HTML only — there is

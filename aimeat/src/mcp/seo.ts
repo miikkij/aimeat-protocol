@@ -16,15 +16,18 @@
  *   and the IndexNow announcement happen where they were written once.
  *
  *   WHAT IS DELIBERATELY NOT HERE, and is a pre-existing gap rather than an omission of this work:
- *   there is no MCP door for an app's other settings. `parked`, `forkable`, `access_code`,
+ *   there is no MCP door for most of an app's other settings. `parked`, `forkable`, `access_code`,
  *   `protection` and the display name are HTTP-only on PATCH /v1/apps/:filename, so an agent cannot
  *   park its owner's app or set an access code. That door should exist; adding it is a separate
  *   piece of work with its own three surfaces to keep in step, and quietly half-building it here
- *   would leave a tool whose name promised settings and delivered one field.
+ *   would leave a tool whose name promised settings and delivered one field. The badge and the
+ *   install chip got their own door on 2026-08-29 (app-marks.ts, `aimeat_app_marks_set`), built
+ *   the same way as this one.
  *
  * @structure registerSeoTools(mcp, storage, config, getAgentGaii)
  * @usage import { registerSeoTools } from './seo.js';
  * @version-history
+ *   v1.0.1 — 2026-08-29 — The header's gap note names the marks door that now exists (app-marks.ts).
  *   v1.0.0 — 2026-08-25 — Initial.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';

@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description App, subdomain, CSM/MSM/schema, system-prompt, and package/template record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.8.0 — 2026-08-29 — AppManifest gains `marks` (the badge and install-chip switches),
+ *     `authorship` (a named person who reviewed the app and answers for it) and `authorshipLog`
+ *     (every declaration and withdrawal, for the audit). PATCH-only, JSON on both providers.
  *   v1.7.0 — 2026-08-27 — AppManifest gains `track` (TARGET-074): which build track made this app
  *     (classic | atelier), parsed from the head meta at publish, carried forward, absent = classic.
  *   v1.6.0 — 2026-08-25 — AppVersionSize: a version's three numbers without its bytes, so the
@@ -37,6 +40,35 @@ import type { DataMapStamp } from '../../services/data-map/data-map-types.js';
 export interface AppManifestCortex {
   agents?: Record<string, unknown>[];
 }
+
+/** The owner's switches on the node's served chrome. Absent = on. */
+export interface AppMarks {
+  /** The "back to the node · publish your own app" attribution badge. */
+  badge?: boolean;
+  /** The browser "Install this app" chip on the app's own origin. */
+  install?: boolean;
+}
+
+/** A natural person's declaration that they reviewed this app and answer for it. */
+export interface AppAuthorship {
+  /** The person's name as they want it served. 1-120 characters. */
+  name: string;
+  /** The GHII of the account holder who declared it. Always an owner principal, never an agent. */
+  declaredBy: string;
+  /** ISO timestamp of the declaration. */
+  declaredAt: string;
+}
+
+export interface AppAuthorshipLogEntry {
+  at: string;
+  by: string;
+  action: 'declared' | 'cleared';
+  /** The name declared, or the name that was cleared. */
+  name: string;
+}
+
+/** How many authorship changes the manifest keeps. Older ones fall off the front. */
+export const AUTHORSHIP_LOG_MAX = 50;
 
 export interface AppManifest {
   name: string;
@@ -90,6 +122,28 @@ export interface AppManifest {
    * Atelier app is still an Atelier app.
    */
   track?: 'classic' | 'atelier';
+  /**
+   * The owner's switches on the two pieces of chrome the node adds to a served app: the "publish
+   * your own app" badge and the browser-install chip. Absent means ON for both, which is what
+   * every app served before the switches existed got. On the manifest for the reasons `seo` is:
+   * PATCH-only, JSON on both providers, carried forward by every publish.
+   */
+  marks?: AppMarks;
+  /**
+   * The natural person who has reviewed this app and answers for it. Declared by the account
+   * holder in person (never by an agent), served as `<meta name="author">` and
+   * `<meta name="aimeat-reviewed-by">` in the app's head, and it is what lifts the VISIBLE
+   * AI-generated content label: a person examined the substance and can reject it, which is the
+   * Art. 50(4) exemption. The machine-readable provenance stays exactly as it was — synthesis may
+   * have happened, and the record says so. Absent means nobody has declared.
+   */
+  authorship?: AppAuthorship;
+  /**
+   * Every declaration and withdrawal of `authorship`, newest last, so the label's history is
+   * auditable: who put a name on this app, which name, and when it came off. Owner-only in the
+   * listing; capped at AUTHORSHIP_LOG_MAX entries.
+   */
+  authorshipLog?: AppAuthorshipLogEntry[];
   /**
    * The SUMMARY of this app's data map — what it stores, in how many rows, on how weak a basis, and
    * how much of it nobody has explained. Here for the same reason `aiPosture` is: a JSON blob on both

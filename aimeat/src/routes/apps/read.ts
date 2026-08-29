@@ -10,6 +10,8 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   v1.8.0 — 2026-08-29 — The apex inline serve reads the owner's badge switch and the named
+ *     reviewer from the manifest (services/app-marks.ts).
  *   v1.7.0 — 2026-08-27 — The apex inline serve injects the SAME agent-discovery block the app
  *     origin does (#aimeat-app-ref included): on a node without a provisioned app origin this is
  *     where runnable HTML is served, and the mosaic renderer reads its identity from that block
@@ -49,6 +51,7 @@ import { verifyDraftToken, DraftTokenError } from '../../services/draft-token.js
 import { generateAppAccessToken } from '../../services/app-access-token.js';
 import { decodeStrictBase64 } from '../../utils/base64.js';
 import { applyServeMarks } from '../../services/app-serve-marks.js';
+import { appBadgeOn, appReviewedBy } from '../../services/app-marks.js';
 import { appToolNames } from '../../services/app-tool-names.js';
 import { wantsWebmcpBridge } from '../../utils/app-agent-discovery.js';
 import { appCsp } from '../../utils/app-csp.js';
@@ -611,9 +614,13 @@ export function registerReadRoutes(
             // The visible label rides ONLY on the inline (runnable) form. A raw download stays
             // byte-for-byte, which is what keeps the content hash in the record verifiable.
             ? applyServeMarks(app.data, {
-                badge: true,
+                // The owner's switch (services/app-marks.ts); on unless they turned it off.
+                badge: appBadgeOn(app.manifest),
                 provenance: prov,
                 visibleLabel: { config, locale: detectLocale(req.headers['accept-language']) },
+                // The named reviewer, when the account holder declared one: served in the head,
+                // and the visible content label is decided again with that declaration.
+                reviewedBy: appReviewedBy(app.manifest),
                 // The SAME discovery block the app origin injects — on a node without a
                 // provisioned app origin this apex path is where runnable HTML is served, and
                 // the mosaic renderer reads its app identity from #aimeat-app-ref (TARGET-074).

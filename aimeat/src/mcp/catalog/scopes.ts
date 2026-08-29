@@ -20,6 +20,7 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.16.0 -- 2026-08-29 -- aimeat_app_marks_set → app:write.
  *   v1.15.0 -- 2026-08-28 -- The five crew-definition tools: get -> memory:read, validate/try/draft/
  *     publish -> memory:write, the scope the REST doors gate the definition writes on.
  *   v1.14.0 -- 2026-08-28 -- The four Design Book tools (TARGET-074 phase 5): search/get ->
@@ -176,6 +177,7 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_app_draft_seed:                    'app:write',
     aimeat_app_screenshot:                    'app:write',
     aimeat_app_seo_set:                       'app:write',
+    aimeat_app_marks_set:                     'app:write',
     aimeat_seo_status:                        'app:read',
     aimeat_image_generate:                    'ai:use',
     aimeat_app_fork:                          'app:write',

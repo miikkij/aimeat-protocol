@@ -11,6 +11,7 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   v1.20.0 -- 2026-08-29 -- registerAppMarksTools: aimeat_app_marks_set.
  *   v1.19.0 -- 2026-08-28 -- registerAgentCrewTools: the five aimeat_crew_* tools, which call
  *     services/crew-ops.ts exactly as the Crew tab's routes do.
  *   v1.18.0 -- 2026-08-23 -- The MCP door asks all FOUR credential-death questions
@@ -118,6 +119,7 @@ import { registerPromptsTools } from './prompts.js';
 import { registerCapabilitiesTools } from './capabilities.js';
 import { registerCortexTools } from './cortex.js';
 import { registerSeoTools } from './seo.js';
+import { registerAppMarksTools } from './app-marks.js';
 import { registerAppsTools } from './apps.js';
 import { registerAppDraftEditTools } from './apps-draft-edit.js';
 import { registerAppScreenshotTool } from './apps-screenshot.js';
@@ -312,6 +314,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         registerAppDraftEditTools(mcp, storage, config, () => agentGaii);
         registerAppScreenshotTool(mcp, storage, config, () => agentGaii);
         registerSeoTools(mcp, storage, config, () => agentGaii);
+        registerAppMarksTools(mcp, storage, config, () => agentGaii);
         registerAiImageTool(mcp, storage, config, () => agentGaii);
         registerSharingGroupTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
         registerAgentTaskTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);

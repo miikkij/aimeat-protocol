@@ -17,11 +17,14 @@
  *     metadata columns, and listAppsWithContent is the separate door for the copy-scan.
  *   v1.2.0 — 2026-08-25 — listAppVersionSizes: the version line without its payload, for the size
  *     trend the publish response now states.
+ *   v1.3.0 — 2026-08-29 — updateAppMeta merges `marks`, replaces or withdraws `authorship` and
+ *     writes `authorshipLog` (the owner's chrome switches and the named reviewer).
  */
 import { sql } from 'kysely';
 import type { Selectable } from 'kysely';
 import type {
   AppRecord, AppSummaryRecord, AppVersionSize, AppDraftRecord, AppListOptions, AppForkRecord, AppManifest, AppManifestCortex, AppProtection, AppSeo,
+  AppMarks, AppAuthorship, AppAuthorshipLogEntry,
 } from '../../../interface.js';
 import type { App, AppDraft, AppFork } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
@@ -308,7 +311,11 @@ export const appMethods = {
 
   async updateAppMeta(
     this: PostgresKyselyStorage, ownerGaii: string, filename: string,
-    meta: { name?: string; description?: string; descriptions?: Record<string, string>; protection?: AppProtection; cortex?: AppManifestCortex | null; dataMap?: AppManifest['dataMap']; seo?: Partial<AppSeo> },
+    meta: {
+      name?: string; description?: string; descriptions?: Record<string, string>; protection?: AppProtection;
+      cortex?: AppManifestCortex | null; dataMap?: AppManifest['dataMap']; seo?: Partial<AppSeo>;
+      marks?: Partial<AppMarks>; authorship?: AppAuthorship | null; authorshipLog?: AppAuthorshipLogEntry[];
+    },
   ): Promise<boolean> {
     // Rename/re-describe in place on the LATEST version (the one the catalogue shows). Read the current
     // manifest, merge only the supplied fields, write it back — the URL (owner/filename) is untouched.
@@ -323,6 +330,14 @@ export const appMethods = {
     // MERGED, not replaced: a route flipping the search-visibility switch must not silently drop
     // the title and keywords the owner wrote on a previous visit.
     if (meta.seo !== undefined) manifest.seo = { ...manifest.seo, ...meta.seo };
+    // The chrome switches merge like `seo`; the reviewer is one declaration, replaced whole or
+    // withdrawn with null; the log is written as the service assembled it.
+    if (meta.marks !== undefined) manifest.marks = { ...manifest.marks, ...meta.marks };
+    if (meta.authorship !== undefined) {
+      if (meta.authorship === null) delete manifest.authorship;
+      else manifest.authorship = meta.authorship;
+    }
+    if (meta.authorshipLog !== undefined) manifest.authorshipLog = meta.authorshipLog;
     // Agent-Bundled Apps: replace the crew-def section in place (null clears it).
     if (meta.cortex !== undefined) {
       if (meta.cortex === null || !meta.cortex.agents?.length) delete manifest.cortex;

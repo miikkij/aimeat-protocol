@@ -21,6 +21,7 @@
  *   import { toolsForSurface } from '../catalog/surfaces.js';
  *   const allowed = toolsForSurface('agent'); // register only these on /v2/mcp/agent
  * @version-history
+ *   2026-08-29 — aimeat_app_marks_set beside aimeat_app_seo_set.
  *   2026-08-28 — The five aimeat_crew_* tools on `appdev`, `agent` and `admin`: the chat path to
  *     building a JSON agent, beside the other owner-managed agent tools.
  *   2026-08-23 — aimeat_package_install on `appdev` beside the other package tools, and on `agent`
@@ -85,7 +86,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_package_install',
         'aimeat_app_draft_write', 'aimeat_app_draft_replace', 'aimeat_app_draft_read', 'aimeat_app_draft_seed',
         'aimeat_app_screenshot',
-        'aimeat_app_seo_set', 'aimeat_seo_status',
+        'aimeat_app_seo_set', 'aimeat_app_marks_set', 'aimeat_seo_status',
         'aimeat_image_generate',
         'aimeat_extension_install', 'aimeat_extension_invoke', 'aimeat_extension_get', 'aimeat_extension_list',
         'aimeat_extension_activate', 'aimeat_extension_deactivate', 'aimeat_extension_delete', 'aimeat_iam_define',

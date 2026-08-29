@@ -5,6 +5,7 @@
  * @description MCP tool registrations for app/package management -- publishing,
  *   listing, retrieving, archiving versions, version history, sanctioned forks, and drafts (staging).
  * @version-history
+ *   v1.6.0 -- 2026-08-29 -- aimeat_app_marks_set: the badge and install-chip switches over PATCH.
  *   v1.5.0 -- 2026-08-23 -- aimeat_package_install, and aimeat_package_publish given the route's own
  *     parameters. Publish declared {name, description, content} while POST /v1/packages requires a
  *     `components` array and reads no `content`, so every call it described was answered 400.
@@ -337,6 +338,22 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
       if (args[k] !== undefined) seo[k] = args[k];
     }
     return out(await client.patch(`/v1/apps/${encodeURIComponent(args.filename)}`, { seo }));
+  });
+
+  // → PATCH /v1/apps/:filename — the app owner's badge and install-chip switches. Only the fields
+  //   the caller named travel; naming nothing is a question. The reviewer's name is not a field
+  //   here on purpose: it is reserved to the account holder in person, and the route refuses it
+  //   from any agent token, so a parameter would be one that always refuses.
+  mcp.tool('aimeat_app_marks_set', descriptionFor('aimeat_app_marks_set'), {
+    filename: z.string().describe('The app to change, with its extension (e.g. "notes.html").'),
+    badge: z.boolean().optional().describe('false takes the "publish your own app" badge off this app; true puts it back. On until you ask.'),
+    install: z.boolean().optional().describe('false stops offering visitors to install this app in their browser; true offers it again. On until you ask.'),
+  }, annotationsFor('aimeat_app_marks_set'), async (args) => {
+    const marks: Record<string, unknown> = {};
+    for (const k of ['badge', 'install'] as const) {
+      if (args[k] !== undefined) marks[k] = args[k];
+    }
+    return out(await client.patch(`/v1/apps/${encodeURIComponent(args.filename)}`, { marks }));
   });
 
   // → GET /v1/admin/seo/status — is this node findable, and what is left to do. Operator-only.
