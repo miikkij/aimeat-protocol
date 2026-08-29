@@ -9,6 +9,8 @@
  * @structure APP_GRANTABLE_SCOPES — the one list, keyed by scope word.
  * @usage import { APP_GRANTABLE_SCOPES } from './app-grant-vocabulary.js';
  * @version-history
+ *   v1.1.0 -- 2026-08-29 -- organism:rows: the person's half of the two-hand rule that lets an app
+ *     keep an append-only trail on a row space the organism opened to it.
  *   v1.0.0 -- 2026-08-18 -- Extracted verbatim from routes/app-grants.ts (max-file-lines).
  */
 /**
@@ -34,6 +36,12 @@ export const APP_GRANTABLE_SCOPES: Record<string, string> = {
   // so it arrived inside whatever single scope the owner had approved. Named here so the consent
   // screen can say what it is and the owner can uncheck it.
   'packages:write': 'Install packages for you (registers their apps, extensions and scheduled jobs)',
+  // The app-grantable half of a two-hand rule (2026-08-29). A row space on an organism workspace
+  // names the apps it is open to (manifest objectTypes[].apps); this scope is the person's half.
+  // Only both together let the app append to and read that one space, and only while the person
+  // is an active member. Nothing else on the organism opens: no other space, no records, no
+  // documents, no membership.
+  'organism:rows': 'Append to, and read back, the organism row spaces that name this app — an event log or audit trail the app keeps on a group you belong to',
   // task:* and workflow:* let a control-plane app (e.g. AGENCY) orchestrate the owner's OWN
   // agents on their behalf. The task routes enforce an owner-match (an app may only create/read
   // tasks for agents whose owner is the app's own owner) and workflow routes already resolve to

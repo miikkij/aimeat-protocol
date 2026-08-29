@@ -15,6 +15,7 @@
  *   - checkSdkLibs()  → --check: fail (non-zero) if any committed bundle is stale vs its sources
  * @usage  pnpm build:sdk   ·   pnpm check:sdk   (also run by `pnpm dev`)
  * @version-history
+ *   v1.5.0 — 2026-08-29 — Register aimeat-rows (AIMEAT.rows: an app's door to an organism row space).
  *   v1.4.0 — 2026-08-27 — Register aimeat-atelier (the Atelier track's UI kit, TARGET-074).
  *   v1.3.0 — 2026-08-01 — `.css` files import as TEXT. aimeat-ai's disclose() needs the platform's
  *     own public/css/components/ai-label.css rather than a second copy of it, and a text import is
@@ -48,6 +49,7 @@ interface SdkLib {
 export const SDK_LIBS: SdkLib[] = [
   { name: 'speech', entry: 'speech/index.js' },
   { name: 'data', entry: 'data/index.js' },
+  { name: 'rows', entry: 'rows/index.js' },
   { name: 'wallet', entry: 'wallet/index.js' },
   { name: 'ai', entry: 'ai/index.js' },
   { name: 'capabilities', entry: 'capabilities/index.js' },

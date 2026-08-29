@@ -18,13 +18,16 @@
  * @structure registerOrganismWorkspaceRowRoutes(router, config, storage)
  * @usage registerOrganismWorkspaceRowRoutes(router, config, storage) in routes/organisms.ts
  * @version-history
+ *   v1.1.0 — 2026-08-29 — The app path: `organism:rows` accepted beside organism:write/read, and
+ *     the caller carries the grant's `app` claim for the space's `apps` list to match.
  *   v1.0.0 — 2026-08-26 — Initial.
  */
 import type { Router, Request, Response } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
-import { requireAuth, requireScope } from '../../auth/middleware.js';
+// requireScope stays on the two DELETE routes: an app never removes rows, whatever the space says.
+import { requireAuth, requireScope, requireAnyScope } from '../../auth/middleware.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import {
@@ -44,6 +47,8 @@ export function registerOrganismWorkspaceRowRoutes(
     identity: resolveIdentity(req.auth!, config.nodeId),
     owner: (req.auth?.owner as string) ?? '',
     roles: req.auth?.roles ?? [],
+    // The app's own id on a role-'app' token, which the space's `apps` list is matched against.
+    app: typeof req.auth?.app === 'string' ? req.auth.app : undefined,
   });
 
   /** The workspace id. Required: a row space belongs to one workspace, never to the organism at large. */
@@ -71,8 +76,11 @@ export function registerOrganismWorkspaceRowRoutes(
   };
 
   /** Append one or many rows. */
+  // `organism:rows` is the app-grantable half of the door: it lets a role-'app' session reach the
+  // row service, which then admits it only to a space whose `apps` list names the app
+  // (services/workspace-rows/row-service.ts, authorizeApp).
   router.post('/v1/organisms/:id/workspace/rows/:space',
-    requireAuth(), requireScope('organism:write'),
+    requireAuth(), requireAnyScope('organism:write', 'organism:rows'),
     rateLimit({ windowMs: 60_000, max: 120 }),
     async (req: Request, res: Response) => {
       const ws = wsOf(req);
@@ -105,7 +113,7 @@ export function registerOrganismWorkspaceRowRoutes(
 
   /** What the space holds, without reading a row. Declared BEFORE /:rowId — see the header. */
   router.get('/v1/organisms/:id/workspace/rows/:space/stats',
-    requireAuth(), requireScope('organism:read'),
+    requireAuth(), requireAnyScope('organism:read', 'organism:rows'),
     async (req: Request, res: Response) => {
       const ws = wsOf(req);
       if (!needWs(res, ws)) return;
@@ -119,7 +127,7 @@ export function registerOrganismWorkspaceRowRoutes(
 
   /** One page of rows. */
   router.get('/v1/organisms/:id/workspace/rows/:space',
-    requireAuth(), requireScope('organism:read'),
+    requireAuth(), requireAnyScope('organism:read', 'organism:rows'),
     async (req: Request, res: Response) => {
       const ws = wsOf(req);
       if (!needWs(res, ws)) return;
@@ -159,7 +167,7 @@ export function registerOrganismWorkspaceRowRoutes(
 
   /** One row by the id the caller named it with. */
   router.get('/v1/organisms/:id/workspace/rows/:space/:rowId',
-    requireAuth(), requireScope('organism:read'),
+    requireAuth(), requireAnyScope('organism:read', 'organism:rows'),
     async (req: Request, res: Response) => {
       const ws = wsOf(req);
       if (!needWs(res, ws)) return;
