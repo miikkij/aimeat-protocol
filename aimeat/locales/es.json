@@ -3593,6 +3593,19 @@
       "open": "Configuración del hogar",
       "title": "Configuración del hogar",
       "showAch": "Mostrar los logros en el inicio",
+      "pattern": "Patrón de los márgenes",
+      "patternHint": "Una figura en los márgenes vacíos del hogar, el chat y la configuración, que se desvanece hacia el centro. Solo se ve en pantallas anchas.",
+      "patternOff": "Sin patrón",
+      "patterns": {
+        "a": "Cuadrícula de píxeles",
+        "b": "Rayado diagonal",
+        "c": "Marcas de registro",
+        "d": "Corazones",
+        "e": "Cubos",
+        "f": "Zigzag",
+        "g": "Trenzado",
+        "h": "Cruces"
+      },
       "allControls": "Toda la configuración y los controles",
       "allControlsHint": "Agentes, memoria, aplicaciones, acceso y facturación: todo lo que hay detrás del hogar."
     },

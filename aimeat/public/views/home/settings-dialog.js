@@ -21,6 +21,9 @@
  *   import { HomeSettingsDialog } from '/views/home/settings-dialog.js';
  *   html`<${HomeSettingsDialog} open=${open} onClose=${close} />`
  * @version-history
+ *   v2.1.0 — 2026-08-29 — The margin pattern: off or one of eight figures for the empty margins of the
+ *     home, the chat and the settings. Same home.prefs record (marginPattern), applied to the page
+ *     the moment it is chosen.
  *   v2.0.0 — 2026-08-27 — Shrunk to the home's own two settings and a door to settings and
  *     controls. The start-page setting (components/StartPageSetting.js) replaces the switch between
  *     "the new home" and "the old profile", which changed the landing page every time somebody used
@@ -38,8 +41,51 @@ import { api, apiGet } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 import { Modal } from '/components/Modal.js';
 import { StartPageSetting } from '/components/StartPageSetting.js';
+import { MARGIN_PATTERNS, applyMarginPattern, marginPatternOf } from '/js/margin-pattern.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
+
+/**
+ * The margin pattern: which figure sits on the empty margins of the home, the chat and the
+ * settings, or none. Kept in the same home.prefs record; the page changes the moment the choice
+ * is made, and the record follows.
+ */
+function MarginPatternSetting() {
+  const [prefs, setPrefs] = useState(null);
+  useEffect(() => {
+    apiGet('/v1/memory/home.prefs?soft=1')
+      .then((r) => setPrefs(r?.data?.exists === false ? {} : (r?.data?.value ?? {})))
+      .catch((e) => { swallowed('home settings: prefs', e); setPrefs({}); });
+  }, []);
+  if (prefs === null) return null;
+  const current = marginPatternOf(prefs);
+  const choose = async (value) => {
+    const next = { ...prefs, marginPattern: value };
+    setPrefs(next);
+    applyMarginPattern(value);
+    await api('/v1/memory', { method: 'POST', body: JSON.stringify({ key: 'home.prefs', value: next, visibility: 'private' }) })
+      .catch((e) => swallowed('home settings: prefs write', e));
+  };
+  return html`
+    <div class="koti-settings-pattern">
+      <div class="koti-settings-pattern-words">
+        <span class="koti-settings-pattern-title">${tr('home.settings.pattern', 'Margin pattern')}</span>
+        <span class="koti-settings-pattern-hint">${tr('home.settings.patternHint', 'A figure on the empty margins, fading toward the middle.')}</span>
+      </div>
+      <div class="koti-settings-pattern-choices" role="radiogroup" aria-label=${tr('home.settings.pattern', 'Margin pattern')}>
+        <button type="button" class=${`koti-settings-pattern-choice ${current === '' ? 'active' : ''}`}
+          role="radio" aria-checked=${current === '' ? 'true' : 'false'} onClick=${() => choose('')}>
+          ${tr('home.settings.patternOff', 'Off')}
+        </button>
+        ${MARGIN_PATTERNS.map((p) => html`
+          <button type="button" key=${p} class=${`koti-settings-pattern-choice ${current === p ? 'active' : ''}`}
+            role="radio" aria-checked=${current === p ? 'true' : 'false'} onClick=${() => choose(p)}>
+            ${tr('home.settings.patterns.' + p, p.toUpperCase())}
+          </button>
+        `)}
+      </div>
+    </div>`;
+}
 
 /**
  * Whether the achievements strip shows on the home. Stored in the home.prefs memory record the
@@ -75,6 +121,7 @@ export function HomeSettingsDialog({ open, onClose }) {
       className="koti-settings-modal">
       <div class="koti-settings">
         <${AchievementsToggle} />
+        <${MarginPatternSetting} />
         <${StartPageSetting} className="koti-settings-startpage" />
         ${/* Everything that is not the home's own. A full page load rather than a router call: the
               dialog is open over the home, and the cleanest way out of a modal into another shell
