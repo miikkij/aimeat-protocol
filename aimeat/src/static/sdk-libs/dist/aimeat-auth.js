@@ -463,7 +463,11 @@
     "border-radius:0;padding:9px 0;font:400 16px/1.4 " + font + ";color:" + ink + ";outline:none;transition:border-color .15s}",
     ".aimeat-inp:focus{border-bottom-color:" + accent + "}",
     ".aimeat-inp::placeholder{color:" + dim + ";font-weight:600}",
+    /* A field's hint waits until the person is in that field or has written in it, so the form
+       reads as four labels and four lines until one of them is being filled. */
     ".aimeat-hint{margin:7px 0 0;font:400 12.5px/1.45 " + font + ";color:" + dim + "}",
+    ".aimeat-field .aimeat-hint{display:none}",
+    ".aimeat-field:focus-within .aimeat-hint,.aimeat-field.has-value .aimeat-hint{display:block}",
     /* The username rules: hidden until the person starts typing, each turning green as it is met. */
     ".aimeat-rules{display:none;margin-top:8px;flex-direction:column;gap:3px}",
     ".aimeat-rules.on{display:flex}",
@@ -615,7 +619,7 @@
       }
       return "<style>" + MODAL_CSS + '</style><div class="aimeat-scrim"><div class="aimeat-dlg' + (anim ? " aimeat-in" : "") + '"><div class="aimeat-head"><div class="aimeat-crumb"><div class="aimeat-brand"><span class="aimeat-mark">AIME' + HEART_SVG + "<b>AT</b></span>" + (NODE_HOST ? '<span class="aimeat-host">' + escHtml(NODE_HOST) + " /</span>" : "") + '</div><div class="aimeat-langsw" role="group" aria-label="' + escHtml(i2.switchLanguage || "Language") + '">' + MODAL_LANGS.map(function(l) {
         return '<button type="button" class="aimeat-lang' + (lang2 === l ? " active" : "") + '" data-lang="' + l + '">' + l.toUpperCase() + "</button>";
-      }).join("") + '</div></div><h2 class="aimeat-headline">' + escHtml(isReg ? i2.headlineNew || "Your account lives right here." : i2.headlineReturning || "Welcome back.") + '</h2><p class="aimeat-line">' + escHtml(isReg ? i2.lineNew || "Pick a username and password." : i2.descReturning || "Enter the username or email you signed up with.") + '</p><div class="aimeat-tabs" role="tablist"><button type="button" role="tab" class="aimeat-tab' + (isReg ? "" : " active") + '" data-tab="signin" aria-selected="' + (isReg ? "false" : "true") + '">' + escHtml(i2.tabSignIn || "Sign in") + '</button><button type="button" role="tab" class="aimeat-tab' + (isReg ? " active" : "") + '" data-tab="register" aria-selected="' + (isReg ? "true" : "false") + '">' + escHtml(i2.tabRegister || "Create account") + '</button></div></div><div id="aimeat-modal-body" class="aimeat-body"><div id="aimeat-tab-signin"' + (isReg ? ' style="display:none"' : "") + ">" + field(
+      }).join("") + '</div></div><h2 class="aimeat-headline">' + escHtml(isReg ? i2.headlineNew || "Welcome in." : i2.headlineReturning || "Welcome back.") + '</h2><p class="aimeat-line">' + escHtml(isReg ? i2.lineNew || "Pick a username and password." : i2.descReturning || "Enter the username or email you signed up with.") + '</p><div class="aimeat-tabs" role="tablist"><button type="button" role="tab" class="aimeat-tab' + (isReg ? "" : " active") + '" data-tab="signin" aria-selected="' + (isReg ? "false" : "true") + '">' + escHtml(i2.tabSignIn || "Sign in") + '</button><button type="button" role="tab" class="aimeat-tab' + (isReg ? " active" : "") + '" data-tab="register" aria-selected="' + (isReg ? "true" : "false") + '">' + escHtml(i2.tabRegister || "Create account") + '</button></div></div><div id="aimeat-modal-body" class="aimeat-body"><div id="aimeat-tab-signin"' + (isReg ? ' style="display:none"' : "") + ">" + field(
         i2.identifierLabel || "Username or email",
         '<input id="aimeat-username" class="aimeat-inp" autocomplete="username" placeholder="' + escHtml(i2.identifierPlaceholder || "Username or email") + '">'
       ) + field(
@@ -696,6 +700,16 @@
         });
       }
       if (regUser) regUser.addEventListener("input", syncUsernameRules);
+      modal.querySelectorAll(".aimeat-field .aimeat-inp").forEach(function(inp) {
+        var field = inp.closest(".aimeat-field");
+        if (!field) return;
+        var sync = function() {
+          field.classList.toggle("has-value", !!/** @type {any} */
+          inp.value);
+        };
+        inp.addEventListener("input", sync);
+        sync();
+      });
       modal.querySelectorAll(".aimeat-oauth-btn").forEach(function(btn) {
         btn.addEventListener("click", function() {
           var id = btn.getAttribute("data-provider") || "";

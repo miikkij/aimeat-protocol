@@ -19,6 +19,8 @@
  * @structure BEATS · BeatRail · Beat · default export BuildStory({ navigate })
  * @usage routed at /v1/how-an-app-builds by spa.html; listed in routes/portal.ts spaRoutes
  * @version-history
+ *   v1.0.1 — 2026-08-29 — The connect door leads to the connect story (/v1/connect-your-ai), not to a
+ *     profile tab that a signed-out reader cannot see.
  *   v1.0.0 — 2026-08-28 — Initial, built to the design canvas "Changelog and Build Story".
  */
 import { h } from 'preact';
@@ -180,7 +182,7 @@ export default function BuildStory({ navigate }) {
             <div class="bs-door bs-door--ink">
               <span class="bs-door-title">${tr('story.b3ByAi', 'By your AI')}</span>
               <span class="bs-door-text">${tr('landing.genStep3Mcp', 'If the AI you pasted the prompt into is connected to this node over MCP, it can publish the app for you, with no file to move by hand.')} ${tr('story.b3Connect', 'Connecting takes five minutes and is the better road for everything after this.')}</span>
-              <a class="ld-sh-door" href="/v1/profile?tab=mcp" onClick=${(e) => { e.preventDefault(); navigate('/v1/profile?tab=mcp'); }}>${tr('landing.showConnect', 'Connect the AI you already use →')}</a>
+              <a class="ld-sh-door" href="/v1/connect-your-ai" onClick=${(e) => { e.preventDefault(); navigate('/v1/connect-your-ai'); }}>${tr('landing.showConnect', 'Connect the AI you already use →')}</a>
             </div>
           </div>
         </div>

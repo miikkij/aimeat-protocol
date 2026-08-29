@@ -4678,7 +4678,7 @@
     "errPassRequired": "Escribe tu contraseña.",
     "errWrongCredentials": "Ese nombre de usuario o correo y esa contraseña no coinciden con ninguna cuenta de aquí.",
     "errNameTaken": "Ese nombre de usuario está ocupado. Si es tuyo, inicia sesión.",
-    "headlineNew": "Tu cuenta vive aquí.",
+    "headlineNew": "Te damos la bienvenida.",
     "lineNew": "Elige un nombre de usuario y una contraseña.",
     "headlineReturning": "Hola de nuevo.",
     "usernameRuleLength": "De 3 a 64 caracteres",

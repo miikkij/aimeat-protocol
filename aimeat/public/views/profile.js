@@ -10,6 +10,8 @@
  *   updateStats, navigate, renderTab) rendering LandingPage + a toast pill.
  * @usage Lazy-loaded route component for /v1/profile.
  * @version-history
+ *   2026-08-29 — A signed-out ?tab=mcp goes to the connect story (/v1/connect-your-ai) instead of the
+ *     sign-in wall, and the wall's heading lost its emoji.
  *   2026-07-19 — AppDev tab (KB UI): learned-pitfall + template management surface, start-prompt copy, model badge
  *   v1.3.0 — 2026-07-06 — Toast fix: drop the .pf.toast-container wrapper (its
  *     fixed+transform box was the containing block of the fixed .toast inside,
@@ -212,6 +214,14 @@ export default function Profile({ navigate, locale }) {
     });
   }, []);
 
+  // A signed-out visitor asking for the connections tab (the front page's "connect the AI you
+  // already use" door) gets the story of what that means, not a wall that says sign in. The
+  // stored session is read synchronously, so a signed-in person never sees the detour.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('tab') === 'mcp' && !getSession()) navigate('/v1/connect-your-ai');
+  }, [navigate]);
+
   // URL tab param (deep links bypass tier filtering)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -299,7 +309,7 @@ export default function Profile({ navigate, locale }) {
       </div>
       <div class="pf">
         <div class="login-prompt">
-          <h1>\u{1F496} ${t('profile.signInTitle')}</h1>
+          <h1>${t('profile.signInTitle')}</h1>
           <p>${t('profile.signInDesc')}</p>
         </div>
       </div>`;

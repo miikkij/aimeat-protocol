@@ -10,6 +10,8 @@
  * @structure MODAL_CSS (one string, injected by modal.js into its own <style>).
  * @usage import { MODAL_CSS } from './modal-styles.js';
  * @version-history
+ *   v1.0.2 — 2026-08-29 — A field's hint waits for focus or a value (.has-value), so the create form is
+ *     not a wall of small print.
  *   v1.0.1 — 2026-08-29 — Ink and paper through ink.js, so the fallback follows the theme on an app
  *     page that named --text but not --bg.
  *   v1.0.0 — 2026-08-29 — Extracted from modal.js and redrawn on the design canvas "AIMEAT Sign-in
@@ -72,7 +74,11 @@ export var MODAL_CSS = [
     'border-radius:0;padding:9px 0;font:400 16px/1.4 ' + font + ';color:' + ink + ';outline:none;transition:border-color .15s}',
   '.aimeat-inp:focus{border-bottom-color:' + accent + '}',
   '.aimeat-inp::placeholder{color:' + dim + ';font-weight:600}',
+  /* A field's hint waits until the person is in that field or has written in it, so the form
+     reads as four labels and four lines until one of them is being filled. */
   '.aimeat-hint{margin:7px 0 0;font:400 12.5px/1.45 ' + font + ';color:' + dim + '}',
+  '.aimeat-field .aimeat-hint{display:none}',
+  '.aimeat-field:focus-within .aimeat-hint,.aimeat-field.has-value .aimeat-hint{display:block}',
   /* The username rules: hidden until the person starts typing, each turning green as it is met. */
   '.aimeat-rules{display:none;margin-top:8px;flex-direction:column;gap:3px}',
   '.aimeat-rules.on{display:flex}',

@@ -19,6 +19,7 @@
  * @structure storeWish · hasStoredWish · hasJwt · WishBox · ConnectInvite · BuildHero
  * @usage import { WishBox, ConnectInvite, BuildHero, storeWish, hasStoredWish } from './landing-doors.js';
  * @version-history
+ *   v1.0.1 — 2026-08-29 — The connect block's button leads to the connect story (/v1/connect-your-ai).
  *   v1.0.0 — 2026-08-26 — Pure extraction from landing.js v5.3.0. No behaviour change.
  */
 import { h } from 'preact';
@@ -108,8 +109,8 @@ export function ConnectInvite({ onNavigate }) {
         </div>
         <p class="ld-connect-note">${tr('landing.connectWorks', 'Works with Claude (a free account is enough to start), ChatGPT on a paid plan, Claude Code, Cursor, VS Code, Codex CLI and Grok. The guided path checks your setup at every step.')}</p>
         <div class="ld-connect-cta">
-          <a class="btn-primary" href="/v1/profile?tab=mcp"
-            onClick=${(e) => { e.preventDefault(); onNavigate('/v1/profile?tab=mcp'); }}>
+          <a class="btn-primary" href="/v1/connect-your-ai"
+            onClick=${(e) => { e.preventDefault(); onNavigate('/v1/connect-your-ai'); }}>
             ${tr('landing.connectCta', 'Open the guided path →')}
           </a>
           <span class="ld-connect-hint">${tr('landing.connectAccount', 'Takes an account: the connection is to YOUR space, so there has to be one.')}</span>
