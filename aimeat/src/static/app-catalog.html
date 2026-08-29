@@ -8333,19 +8333,17 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     if (!chips) return;
     var old = document.getElementById("lg-chip");
     if (old) old.remove();
-    if (lgState !== "ready" || !lgData || !lgData.readiness) return;
+    chips.insertAdjacentHTML("beforeend", legalChipHtml());
+  }
+  function legalChipHtml() {
+    if (lgState !== "ready" || !lgData || !lgData.readiness) return "";
     var n = (lgData.readiness.missing || []).length;
-    if (!n) return;
-    var chip = document.createElement("button");
-    chip.type = "button";
-    chip.id = "lg-chip";
-    chip.className = "dtl-chip dtl-chip--hot lg-chip";
-    chip.textContent = "■ " + t("legal.chip").replace("{n}", String(n));
-    chip.onclick = function() {
-      var sec = document.getElementById("detail-legal");
-      if (sec) sec.scrollIntoView({ behavior: "smooth", block: "start" });
-    };
-    chips.appendChild(chip);
+    if (!n) return "";
+    return '<button type="button" id="lg-chip" class="dtl-chip dtl-chip--hot lg-chip" onclick="window._launcher.legalScrollTo()">■ ' + escapeHtml(t("legal.chip").replace("{n}", String(n))) + "</button>";
+  }
+  function legalScrollTo() {
+    var sec = document.getElementById("detail-legal");
+    if (sec) sec.scrollIntoView({ behavior: "smooth", block: "start" });
   }
   function appPath() {
     return "/v1/apps/" + encodeURIComponent(lgOwner) + "/" + encodeURIComponent(lgAppId);
@@ -9259,6 +9257,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     var draftWaits = !!(svrFacts && svrFacts.hasDraft) || wcState !== "clean";
     if (draftWaits) chips += '<span class="dtl-chip dtl-chip--hot">■ ' + escapeHtml(t("detail.draftWaiting")) + "</span>";
     if (favRef && isFavorite(favRef)) chips += '<span class="dtl-chip">★ ' + escapeHtml(t("detail.favBadge")) + "</span>";
+    chips += legalChipHtml();
     var mastParts = [];
     if (heroOwner && app.publishedFilename) mastParts.push(heroOwner + " / " + app.publishedFilename);
     if (svrFacts && svrFacts.category) mastParts.push(svrFacts.category);
@@ -13177,6 +13176,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     legalSave,
     legalRemove,
     legalFormatHint,
+    legalScrollTo,
     auditMore,
     monetizeAddTool,
     monetizeEditTool,

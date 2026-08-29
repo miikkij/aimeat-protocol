@@ -13,7 +13,7 @@
  *   PATCH /v1/apps/{filename} { legal }. The audit log is GET /v1/apps/{owner}/{filename}/audit.
  *   The server decides everything: what counts as a page, what the app ought to have, and what
  *   the person is told.
- * @usage import { legalOnOpen, legalSectionInner, auditSectionInner, legalEdit, legalCancel, legalSave, legalRemove, auditMore } from './legal.js';
+ * @usage import { legalOnOpen, legalSectionInner, auditSectionInner, legalChipHtml, legalScrollTo, legalEdit, legalCancel, legalSave, legalRemove, auditMore } from './legal.js';
  * @version-history
  *   v1.1.0 — 2026-08-29 — A hot chip on the masthead names how many pages are still to write and
  *     scrolls to the section. Nothing is blocked; it is meant to be noticed.
@@ -66,19 +66,25 @@ function renderChip() {
   if (!chips) return;
   var old = document.getElementById('lg-chip');
   if (old) old.remove();
-  if (lgState !== 'ready' || !lgData || !lgData.readiness) return;
+  chips.insertAdjacentHTML('beforeend', legalChipHtml());
+}
+
+/**
+ * The chip as markup, so the detail view's own masthead render carries it too: the masthead is
+ * rebuilt whenever an async load re-renders the whole detail, and a chip only appended after the
+ * fact would be lost on the next rebuild.
+ */
+export function legalChipHtml() {
+  if (lgState !== 'ready' || !lgData || !lgData.readiness) return '';
   var n = (lgData.readiness.missing || []).length;
-  if (!n) return;
-  var chip = document.createElement('button');
-  chip.type = 'button';
-  chip.id = 'lg-chip';
-  chip.className = 'dtl-chip dtl-chip--hot lg-chip';
-  chip.textContent = '■ ' + t('legal.chip').replace('{n}', String(n));
-  chip.onclick = function () {
-    var sec = document.getElementById('detail-legal');
-    if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
-  chips.appendChild(chip);
+  if (!n) return '';
+  return '<button type="button" id="lg-chip" class="dtl-chip dtl-chip--hot lg-chip" onclick="window._launcher.legalScrollTo()">■ '
+    + escapeHtml(t('legal.chip').replace('{n}', String(n))) + '</button>';
+}
+
+export function legalScrollTo() {
+  var sec = document.getElementById('detail-legal');
+  if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 function appPath() {
   return '/v1/apps/' + encodeURIComponent(lgOwner) + '/' + encodeURIComponent(lgAppId);
