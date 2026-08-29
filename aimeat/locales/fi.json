@@ -6460,6 +6460,7 @@
         "manage": "Hallinnoi",
         "scopes": "oikeutta",
         "scopeProfile": "Oikeusprofiili",
+        "all": "kaikki",
         "readOnly": "Vain luku",
         "standard": "Vakio",
         "fullAccess": "Täysi pääsy",

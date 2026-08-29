@@ -6,6 +6,10 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v3.2.0 — 2026-08-29 — The agent permission dialog in the poster face: presets as one segmented row with
+ *     the chosen one on the sun, the advanced editor behind an underlined word, domains as sections under a
+ *     3px ink rule with rows over hairlines, mono chips for the machine names and notes. Poster headlines
+ *     read --font-poster-tracking / --font-poster-leading.
  *   v3.1.0 — 2026-08-29 — Every monospace rule reads var(--font-mono): 53 hand-typed stacks (bare `monospace`,
  *     ui-monospace lists, the --mono alias) are gone, so the mono face changes in theme.css alone.
  *   v3.0.2 — 2026-08-29 — The name in the index wears the section face (Archivo regular), as the canvas shows it.
@@ -586,40 +590,49 @@
   .pf .consent-table,.pf .audit-table{font-size:.75rem}
   .pf .consent-table th,.pf .consent-table td,.pf .audit-table th,.pf .audit-table td{padding:.4rem}
 }
-/* === Scope Management UI === */
-.pf .scope-summary {display:flex;align-items:center;gap:.5rem;margin-top:.65rem;padding-top:.5rem;border-top:1px solid rgba(232,86,74,.1);font-size:.8rem}
-.pf .scope-summary .scope-badge {background:rgba(232,86,74,.12);color:var(--accent,#E8564A);padding:.15rem .5rem;border-radius:5px;font-weight:600;font-size:.72rem}
-.pf .scope-summary .scope-count {color:var(--text-dim,#6B7280);font-size:.78rem}
-.pf .scope-summary .scope-manage-btn {margin-left:auto;background:none;border:1px solid var(--border,#E5E7EB);color:var(--accent,#E8564A);border-radius:6px;padding:3px 10px;cursor:pointer;font-size:.72rem;font-weight:600;transition:all .2s}
-.pf .scope-summary .scope-manage-btn:hover {border-color:var(--accent,#E8564A);color:var(--accent,#E8564A)}
+/* === Scope Management UI: the permission dialog in the poster face (2026-08-29). The three
+   presets are one segmented row with the chosen one on the sun; the advanced editor opens from an
+   underlined word; each domain is a section under a 3px ink rule, its rows over hairlines; the
+   machine name of a permission and the small notes are mono chips. No fill, no radius. === */
+.pf .scope-summary {display:flex;align-items:center;gap:.5rem;margin-top:.65rem;padding-top:.5rem;border-top:1px solid var(--border);font-size:.8rem}
+.pf .scope-summary .scope-badge {border:2px solid var(--accent);color:var(--accent);padding:.1rem .45rem;font-family:var(--font-mono);font-weight:500;font-size:.68rem}
+.pf .scope-summary .scope-count {color:var(--text-dim);font-size:.78rem}
+.pf .scope-summary .scope-manage-btn {margin-left:auto;background:none;border:0;border-bottom:2px solid var(--text);color:var(--text);padding:0;cursor:pointer;font-size:.78rem;font-weight:800}
+.pf .scope-summary .scope-manage-btn:hover {color:var(--accent);border-bottom-color:var(--accent)}
 .pf .scope-readonly-list {display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.5rem}
-.pf .scope-readonly-list .scope-tag {font-size:.68rem;background:var(--accent-subtle);color:var(--text-dim,#6B7280);padding:.12rem .4rem;border-radius:4px}
-.pf .scope-modal {max-width:560px}
+.pf .scope-readonly-list .scope-tag {font-family:var(--font-mono);font-weight:500;font-size:.68rem;border:2px solid var(--text);color:var(--text);padding:1px 7px}
+.pf .scope-modal {max-width:620px}
 .pf .scope-modal h3 {margin-bottom:.25rem}
-.pf .scope-modal .scope-agent-info {color:var(--text-dim,#6B7280);font-size:.8rem;margin-bottom:1.25rem;font-family: var(--font-mono)}
-.pf .scope-agent-msg {margin-left:.5rem;text-decoration:none;font-family:initial}
-.pf .scope-templates {display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.25rem}
-.pf .scope-tpl-btn {flex:1;min-width:100px;padding:.6rem .75rem;background:var(--bg-card,#FFFFFF);border:1px solid var(--border,#E5E7EB);border-radius:8px;cursor:pointer;color:var(--text-dim,#6B7280);font-size:.8rem;font-weight:600;transition:all .2s;text-align:center}
-.pf .scope-tpl-btn:hover {color:var(--text,#1A1A2E);border-color:var(--accent,#E8564A)}
-.pf .scope-tpl-btn.active {color:var(--accent,#E8564A);border-color:var(--accent,#E8564A);background:rgba(232,86,74,.1)}
-.pf .scope-advanced-toggle {background:none;border:1px solid var(--border);color:var(--accent);border-radius:8px;padding:6px 14px;cursor:pointer;font-size:.8rem;font-weight:600;transition:all .2s;display:inline-flex;align-items:center;gap:6px;margin-bottom:1rem}
-.pf .scope-advanced-toggle:hover {border-color:var(--accent);color:var(--accent)}
-.pf .scope-domain {background:var(--bg-surface);border:1px solid rgba(232,86,74,.1);border-radius:8px;padding:.75rem;margin-bottom:.5rem}
-.pf .scope-domain-header {display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;cursor:pointer}
-.pf .scope-domain-header .domain-label {font-weight:600;font-size:.85rem;color:var(--text,#1A1A2E)}
-.pf .scope-domain-header .domain-toggle {font-size:.65rem;color:var(--text-dim,#6B7280)}
-.pf .scope-row {display:flex;align-items:center;gap:.6rem;padding:.3rem 0}
-.pf .scope-row label {display:flex;align-items:center;gap:.5rem;cursor:pointer;flex:1}
-.pf .scope-row input[type="checkbox"] {accent-color:var(--accent,#E8564A);width:16px;height:16px;cursor:pointer}
-.pf .scope-row .scope-friendly {font-size:.82rem;color:var(--text,#1A1A2E)}
-.pf .scope-row .scope-technical {font-size:.7rem;color:var(--text-dim,#6B7280);font-family: var(--font-mono)}
+.pf .scope-modal .scope-agent-info {display:flex;align-items:center;gap:.6rem;color:var(--text-dim);font-size:.8rem;margin-bottom:1.25rem;font-family:var(--font-mono);overflow-wrap:anywhere}
+.pf .scope-agent-msg {display:inline-flex;color:var(--text);text-decoration:none;flex:none}
+.pf .scope-agent-msg:hover {color:var(--accent)}
+.pf .scope-agent-msg svg {width:16px;height:16px;stroke:currentColor;stroke-width:2;fill:none}
+.pf .scope-templates {display:flex;border:2px solid var(--text);margin-bottom:1.25rem}
+.pf .scope-tpl-btn {flex:1;min-width:0;padding:.6rem .5rem;background:transparent;border:0;border-right:2px solid var(--text);cursor:pointer;color:var(--text-dim);font-family:var(--font-showroom-body);font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;text-align:center}
+.pf .scope-tpl-btn:last-child {border-right:0}
+.pf .scope-tpl-btn:hover {color:var(--text)}
+.pf .scope-tpl-btn.active {color:var(--on-sun);background:var(--sun)}
+.pf .scope-advanced-toggle {background:none;border:0;border-bottom:2px solid var(--text);color:var(--text);padding:0 0 1px;cursor:pointer;font-size:.85rem;font-weight:800;display:inline-flex;align-items:center;gap:6px;margin-bottom:1rem}
+.pf .scope-advanced-toggle:hover {color:var(--accent);border-bottom-color:var(--accent)}
+.pf .scope-advanced-toggle .pf-chevron {font-size:.6rem}
+.pf .scope-domain {border-top:3px solid var(--text);padding:.75rem 0 .5rem;margin:0}
+.pf .scope-domain-header {display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.35rem;cursor:pointer}
+.pf .scope-domain-header .domain-label {font-weight:800;font-size:.8rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text)}
+.pf .scope-domain-header .domain-toggle {font-family:var(--font-mono);font-weight:500;font-size:.66rem;color:var(--text-dim);border:2px solid var(--border);padding:0 6px;line-height:1.5}
+.pf .scope-domain-header:hover .domain-toggle {border-color:var(--text);color:var(--text)}
+.pf .scope-domain-header .domain-toggle.on {background:var(--sun);color:var(--on-sun);border-color:var(--text)}
+.pf .scope-row {display:flex;align-items:center;gap:.6rem;padding:.45rem 0;border-top:1px solid var(--border)}
+.pf .scope-row label {display:flex;align-items:center;gap:.6rem;cursor:pointer;flex:1;flex-wrap:wrap}
+.pf .scope-row input[type="checkbox"] {accent-color:var(--accent);width:16px;height:16px;margin:0;cursor:pointer;flex:none}
+.pf .scope-row .scope-friendly {font-size:.85rem;font-weight:600;color:var(--text);flex:1 1 20rem}
+.pf .scope-row .scope-technical {font-size:.66rem;color:var(--text-dim);font-family:var(--font-mono);font-weight:500}
 .pf .scope-row.disabled {opacity:.45;pointer-events:none}
-.pf .scope-row .scope-lock {font-size:.7rem;color:var(--text-dim,#6B7280)}
+.pf .scope-row .scope-lock {font-size:.62rem;color:var(--text-dim);font-family:var(--font-mono);font-weight:500;border:2px solid var(--border);padding:0 5px;line-height:1.5}
 /* A scope the "Full access" template does not carry — says so where the tick is made. */
-.pf .scope-row .scope-extra-note {font-size:.65rem;color:var(--accent,#E8564A);border:1px solid var(--border,#E5E7EB);border-radius:6px;padding:1px 6px;white-space:nowrap}
-.pf .scope-domain-desc {font-size:.72rem;color:var(--text-dim,#6B7280);margin:0 0 .4rem}
+.pf .scope-row .scope-extra-note {font-family:var(--font-mono);font-weight:500;font-size:.62rem;color:var(--accent);border:2px solid var(--accent);padding:0 5px;line-height:1.5}
+.pf .scope-domain-desc {font-size:.8rem;color:var(--text-dim);font-weight:600;margin:0 0 .4rem}
 /* Scopes take effect on the next connection — said where the Save button is, not after the fact. */
-.pf .scope-reconnect-note {font-size:.72rem;color:var(--text-dim,#6B7280);margin:.75rem 0 0}
+.pf .scope-reconnect-note {font-size:.8rem;font-weight:600;color:var(--text-dim);margin:1rem 0 0;padding-top:.75rem;border-top:3px solid var(--text)}
 /* === Extensions === */
 .pf .ext-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem}
 .pf .ext-card{background:var(--card,#FFFFFF);border:1px solid var(--border,#E5E7EB);border-radius:12px;padding:1.25rem;cursor:pointer;transition:all .2s;box-shadow:0 2px 8px rgba(0,0,0,0.08)}
@@ -1918,7 +1931,7 @@
 .pf .pf-lp-name-row { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .pf .pf-lp-name {
   font-family: var(--font-poster); font-weight: var(--font-poster-weight);
-  font-size: 4.4rem; line-height: 0.9; letter-spacing: -0.035em; text-transform: uppercase;
+  font-size: 4.4rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); text-transform: uppercase;
   color: var(--text); max-width: 14ch;
 }
 .pf .pf-lp-edit { font-size: .81rem; color: var(--accent); text-decoration: none; font-weight: 500; }
@@ -1950,7 +1963,7 @@
 .pf .pf-lp-stat-ico { display: none; }
 .pf .pf-lp-stat-val {
   font-family: var(--font-poster); font-weight: var(--font-poster-weight);
-  font-size: 4.2rem; line-height: 0.85; letter-spacing: -0.04em;
+  font-size: 4.2rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking);
   color: var(--bg); font-variant-numeric: tabular-nums;
 }
 .pf .pf-lp-stat-green { color: var(--bg); }
@@ -1999,7 +2012,7 @@
 .pf .pf-next { background: none; padding: 2.5rem 0 0; }
 .pf .pf-next-title {
   font-family: var(--font-poster); font-weight: var(--font-poster-weight);
-  font-size: 2.1rem; line-height: 0.95; letter-spacing: -0.03em; text-transform: uppercase;
+  font-size: 2.1rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); text-transform: uppercase;
   color: var(--text); margin-bottom: 1.2rem;
 }
 .pf .pf-next-grid { display: grid; grid-template-columns: repeat(1, minmax(0, 1fr)); gap: 0; border-top: 3px solid var(--text); counter-reset: pf-next; }
@@ -3237,7 +3250,7 @@
 .pf-home-card { border: 0; background: none; padding: 0; min-width: 0; }
 .pf-home-card-title {
   font-family: var(--font-poster); font-weight: var(--font-poster-weight);
-  font-size: 2.1rem; line-height: 0.95; letter-spacing: -0.03em; text-transform: uppercase;
+  font-size: 2.1rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); text-transform: uppercase;
   color: var(--text); margin-bottom: 1rem; background: none; border: none; padding: 0; text-align: left;
   display: flex; align-items: baseline; gap: 0.8rem; flex-wrap: wrap;
 }
@@ -3275,7 +3288,7 @@
 .pf-ai-windows { display: flex; flex-wrap: wrap; gap: 2.5rem; margin: 0.4rem 0 1.4rem; }
 .pf-ai-win { display: flex; flex-direction: column; gap: 0.35rem; padding: 0; border: 0; border-radius: 0; background: none; }
 .pf-ai-win-label { order: 2; font-size: 0.74rem; font-weight: 800; color: var(--text); text-transform: uppercase; letter-spacing: 0.08em; }
-.pf-ai-win-cost { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 3rem; line-height: 0.9; letter-spacing: -0.03em; color: var(--text); font-variant-numeric: tabular-nums; }
+.pf-ai-win-cost { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 3rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); color: var(--text); font-variant-numeric: tabular-nums; }
 .pf-ai-windows .pf-ai-win:first-child .pf-ai-win-cost { color: var(--accent); }
 .pf-ai-win-sub { order: 3; font-family: var(--font-mono); font-size: 0.74rem; color: var(--text-dim); font-variant-numeric: tabular-nums; }
 .pf-ai-chart { margin: 0.2rem 0 1rem; border-top: 3px solid var(--text); padding-top: 0.6rem; }

@@ -2,7 +2,7 @@
 name: aimeat-design-language
 description: "The AIMEAT design language in words and in numbers: the two faces (showroom outside, poster inside), the three type tokens every font on the site descends from, the four shapes, the colours, the wordmark, and the one place a value is changed (theme.css tokens) with the map of every surface a token reaches. Use before designing or styling anything that carries the AIMEAT name, before changing a font or a colour, and to judge whether a screen looks like this product."
 metadata:
-  version: 1.2.0
+  version: 1.3.0
   updated: 2026-08-29
   owner: Jouni Miikki
 ---
@@ -27,7 +27,7 @@ alias of one of them, so a face changes once and reaches every page, outside and
 
 | Token | Value | Where |
 |---|---|---|
-| `--font-headline` | **Fjalla One**, uppercase, one weight | every headline, big numeral, sticker, slab, tab, and the wordmark |
+| `--font-headline` | **Fjalla One**, uppercase, one weight | every headline, big numeral, sticker, slab and tab (the wordmark is its own token, below) |
 | `--font-body` | **Archivo** | everything read as a sentence on every face: body 400, emphasis 600, actions and row names 700 to 800; also form controls and the classic shell |
 | `--font-mono` | **JetBrains Mono** | identifiers, keys, crumbs, addresses, commands, small labels that name a machine thing |
 
@@ -42,10 +42,21 @@ coral when it carries the point. Never synthesise a bold on a single-weight face
 is `var(--font-mono)`, never `monospace` or a hand-typed stack; the view sheets were swept of both
 on 2026-08-29.
 
+**A headline is set with the face's own spacing, and the spacing is a token too.** Every poster
+headline reads `--font-poster-tracking` (`.01em`) and `--font-poster-leading` (`1`); a sheet never
+writes a tracking or a line-height for a headline of its own. The values that suited Archivo Black
+(`-.035em`, `.9`) made Fjalla One's letters touch and its lines collide the day the face changed
+(Jouni, 2026-08-29: "as if the letters ran into each other"), which is why they live beside the face.
+Under a headline, the running text stays lighter than the headline reads: rows and row names at
+`--font-poster-strong-weight` (600), never 800, so a list does not out-shout its own title.
+
+**The wordmark is a mark, not a headline.** `AIME♥AT` is set in `--font-wordmark` (Archivo Black)
+whatever face the headlines wear; a headline change never reaches it.
+
 Sizes that recur (rem, at 16px): showroom front hero `clamp(2.4rem, 6.6vw, 6rem)` with a coral
 offset text-shadow of `.075em`; showroom index hero `clamp(2rem, 3.6vw, 2.9rem)`; showroom section
-headline `clamp(1.5rem, 2.6vw, 2rem)`; poster page title `2.8rem`, line-height `.9`, letter-spacing
-`-.035em`; poster section headline `1.9rem`; the small coral label `.72rem`, 700, tracking `.1em`,
+headline `clamp(1.5rem, 2.6vw, 2rem)`; poster page title `2.8rem` at the poster tracking and
+leading tokens; poster section headline `1.9rem`; the small coral label `.72rem`, 700, tracking `.1em`,
 uppercase; body `.95rem` to `1.1rem`, line-height `1.6`.
 
 ## The colours
@@ -104,7 +115,7 @@ words, a 3px ink rule under it) for the money.
 
 ## The wordmark and the crumb
 
-`AIME` in ink, the heart and `AT` in coral, set in `--font-poster` with `-.01em` tracking; the
+`AIME` in ink, the heart and `AT` in coral, set in `--font-wordmark` with `-.01em` tracking; the
 heart is an inline SVG, never a glyph. On a self-hosted node the crumb next to it shows that node's
 domain in mono: the domain says where, the wordmark says what the software is. The name is a
 prism: AI and ME, at work on something, and AI-MEAT, the substance an AI is made of here.

@@ -6472,6 +6472,7 @@
         "manage": "Manage",
         "scopes": "scopes",
         "scopeProfile": "Scope Profile",
+        "all": "all",
         "readOnly": "Read-only",
         "standard": "Standard",
         "fullAccess": "Full access",

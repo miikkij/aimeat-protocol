@@ -14,6 +14,10 @@
  *   over the showroom-sticker and night-shift alternatives. The onboarding steps keep their plain
  *   card shape: one job at a time, nothing pulling the eye away from the open step.
  * @version-history
+ *   v3.1.0 — 2026-08-29 — Set for the condensed headline face: every headline reads the poster tracking
+ *     and leading tokens; the nameplate centres on the avatar; the big numeral keeps .6rem from its
+ *     sentence; the "what would you set up" rows sit at the strong weight, under their headline
+ *     rather than over it; the chat band's lede breathes at 1.12.
  *   v3.0.2 — 2026-08-29 — The star button inherits the page face; a button's default is the system font,
  *     and six stars on the home were the only Arial on the page.
  *   v3.0.1 — 2026-08-29 — Every poster headline reads --font-poster-weight instead of a literal 400,
@@ -89,10 +93,10 @@ body:has(.koti) .page-content { background: var(--bg); }
   font-family: var(--font-poster);
   font-weight: var(--font-poster-weight);
   font-size: 2.6rem;
-  letter-spacing: -0.03em;
+  letter-spacing: var(--font-poster-tracking);
   text-transform: uppercase;
   margin: 0 0 0.6rem;
-  line-height: 0.95;
+  line-height: var(--font-poster-leading);
 }
 .koti-welcome-sub { color: var(--text-dim); font-size: 1.05rem; margin: 0; font-weight: 600; }
 
@@ -343,7 +347,9 @@ body:has(.koti) .page-content { background: var(--bg); }
 
 /* ── The masthead: the name is the headline of the page ── */
 .koti-header {
-  display: flex; align-items: flex-end; justify-content: space-between; gap: 1.5rem;
+  /* The nameplate sits centred on the avatar: the name's face changed once and its box no longer
+     matched the picture's edges, so the alignment is to the middle, which no face can break. */
+  display: flex; align-items: center; justify-content: space-between; gap: 1.5rem;
   margin-bottom: 1.6rem;
 }
 .koti-avatar { width: 96px; height: 96px; border: 3px solid var(--text); overflow: hidden;
@@ -352,7 +358,7 @@ body:has(.koti) .page-content { background: var(--bg); }
 .koti-nameplate { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
 .koti-name {
   font-family: var(--font-poster); font-weight: var(--font-poster-weight);
-  font-size: 5.2rem; line-height: 0.9; letter-spacing: -0.035em; text-transform: uppercase;
+  font-size: 5.2rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); text-transform: uppercase;
   color: var(--text);
   max-width: 12ch;
 }
@@ -381,8 +387,8 @@ body:has(.koti) .page-content { background: var(--bg); }
 .koti-mailbox-icon { display: none; }
 .koti-big {
   font-family: var(--font-poster); font-weight: var(--font-poster-weight);
-  font-size: 3rem; line-height: 0.85; letter-spacing: -0.04em;
-  color: var(--text); margin-right: 0.2rem;
+  font-size: 3rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking);
+  color: var(--text); margin-right: 0.6rem;
 }
 .koti-mailbox--full .koti-big { color: var(--accent); }
 .koti-fleet-dot { flex: none; width: 0.9rem; height: 0.9rem; border: 2px solid var(--text); align-self: center; }
@@ -405,7 +411,7 @@ body:has(.koti) .page-content { background: var(--bg); }
 .koti-chatdoor-text { position: relative; z-index: 1; min-width: 0; flex: 1 1 24rem; }
 .koti-chatdoor-lede {
   margin: 0; font-family: var(--font-poster); font-weight: var(--font-poster-weight);
-  font-size: 2rem; line-height: 1.05; letter-spacing: -0.02em; text-transform: uppercase;
+  font-size: 2rem; line-height: 1.12; letter-spacing: var(--font-poster-tracking); text-transform: uppercase;
   color: var(--bg); max-width: 22ch;
 }
 .koti-chatdoor-ai { margin: 0.7rem 0 0; font-size: 0.98rem; font-weight: 600; color: var(--bg); opacity: 0.9; }
@@ -429,7 +435,7 @@ body:has(.koti) .page-content { background: var(--bg); }
 .koti-band { margin-top: 4.5rem; }
 .koti-band-title {
   font-family: var(--font-poster); font-weight: var(--font-poster-weight);
-  font-size: 2.4rem; line-height: 0.95; letter-spacing: -0.03em; text-transform: uppercase;
+  font-size: 2.4rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); text-transform: uppercase;
   color: var(--text); margin: 0 0 1.4rem;
 }
 .koti-band > * + * { margin-top: 1.5rem; }
@@ -487,7 +493,9 @@ body:has(.koti) .page-content { background: var(--bg); }
 .koti-pb .koti-fold {
   display: flex; align-items: baseline; gap: 1.4rem; width: 100%;
   padding: 0.9rem 0; border-bottom: 2px solid var(--text);
-  font-family: var(--font-showroom-body); font-weight: 800; font-size: 1.3rem; letter-spacing: -0.01em;
+  /* The row name at the strong weight, not black: heavier than the band's headline, the list
+     out-shouted its own title. */
+  font-family: var(--font-showroom-body); font-weight: var(--font-poster-strong-weight); font-size: 1.3rem; letter-spacing: -0.01em;
   color: var(--text); text-decoration: none; text-align: left;
   counter-increment: koti-pb;
 }
@@ -706,7 +714,7 @@ a.koti-feed-line:hover { color: var(--accent); }
   gap: 0.75rem; flex-wrap: wrap; margin: 0 0 0.8rem;
 }
 .open-items-title {
-  font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.4rem; letter-spacing: -0.02em;
+  font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.4rem; letter-spacing: var(--font-poster-tracking);
   text-transform: uppercase; color: var(--text); margin: 0;
 }
 .open-items-count {

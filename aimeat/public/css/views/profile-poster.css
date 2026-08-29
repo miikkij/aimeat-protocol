@@ -19,6 +19,8 @@
  *   renders in a sandboxed frame with its own stylesheet.
  * @usage Linked from public/spa.html after every other stylesheet.
  * @version-history
+ *   v1.3.1 — 2026-08-29 — Every headline reads --font-poster-tracking / --font-poster-leading (theme.css)
+ *     instead of the -.035em / .9 measured for Archivo Black, which made Fjalla One's letters touch.
  *   v1.3.0 — 2026-08-29 — Section headlines (the title under a page title, the other tabs' own section
  *     titles, the dialog title, the builder's steps) wear --font-poster-section, Archivo's regular cut;
  *     the small coral labels stay at 700 whatever the emphasis token says.
@@ -44,14 +46,14 @@
 .pf .pf-content-body > *:first-child > *:first-child > .section-title:first-child,
 .pf .pf-content-body > *:first-child > h2:not([class]):first-child, .pf .pf-content-body > *:first-child > *:first-child > h2:not([class]):first-child {
   font-family: var(--font-poster); font-weight: var(--font-poster-weight);
-  font-size: 2.8rem; line-height: 0.9; letter-spacing: -0.035em; margin-bottom: 0.6rem;
+  font-size: 2.8rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); margin-bottom: 0.6rem;
 }
 .pf .section-title, .portfolio-container h1 {
   font-family: var(--font-poster-section); font-weight: var(--font-poster-section-weight);
-  font-size: 1.9rem; line-height: 0.95; letter-spacing: -0.03em; text-transform: uppercase;
+  font-size: 1.9rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); text-transform: uppercase;
   color: var(--text); margin-bottom: 0.5rem;
 }
-.portfolio-container h1 { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 3.4rem; letter-spacing: -0.035em; }
+.portfolio-container h1 { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 3.4rem; letter-spacing: var(--font-poster-tracking); }
 .pf .section-title.section-title-spaced { margin-top: 2.6rem; }
 .pf .section-desc, .portfolio-subtitle-text { font-weight: 600; color: var(--text-dim); font-size: 0.92rem; }
 .pf .card-h3, .pf .card-title, .pf .pf-agd-section-label, .pf .pf-agd-section-title, .pf .pj-section-title,
@@ -230,7 +232,7 @@
 .pf .wallet-card, .pf .stat-card { text-align: left; }
 .pf .wallet-card .amount, .pf .stat-card-value {
   font-family: var(--font-poster); font-weight: var(--font-poster-weight);
-  font-size: 2.4rem; line-height: 0.9; letter-spacing: -0.03em; color: var(--text);
+  font-size: 2.4rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); color: var(--text);
 }
 .pf .wallet-card .amount.positive { color: var(--success-fg); }
 .pf .wallet-card .amount.neutral { color: var(--accent); }
@@ -256,7 +258,7 @@
 
 /* ── Dialogs ────────────────────────────────────────────────────────────────────────────── */
 .modal { border: 3px solid var(--text); border-radius: 0; box-shadow: 12px 12px 0 var(--sun); font-family: var(--font-showroom-body); }
-.modal-header h3 { font-family: var(--font-poster-section); font-weight: var(--font-poster-section-weight); font-size: 1.4rem; text-transform: uppercase; letter-spacing: -0.02em; }
+.modal-header h3 { font-family: var(--font-poster-section); font-weight: var(--font-poster-section-weight); font-size: 1.4rem; text-transform: uppercase; letter-spacing: var(--font-poster-tracking); }
 .modal-footer { border-top: 3px solid var(--text); padding-top: 1rem; }
 
 /* ── Words on the sun stay ink in every theme ───────────────────────────────────────────── */
@@ -268,7 +270,7 @@
 .portfolio-step { padding-top: 1.4rem; margin-bottom: 2.4rem; }
 .portfolio-step h3 {
   display: flex; align-items: baseline; gap: 1rem; margin-bottom: 1rem;
-  font-family: var(--font-poster-section); font-weight: var(--font-poster-section-weight); font-size: 1.8rem; line-height: 0.95; letter-spacing: -0.03em; text-transform: uppercase;
+  font-family: var(--font-poster-section); font-weight: var(--font-poster-section-weight); font-size: 1.8rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); text-transform: uppercase;
 }
 .portfolio-step-number { width: auto; height: auto; border-radius: 0; background: none; color: var(--accent); font-family: var(--font-mono); font-size: 0.85rem; font-weight: 400; margin: 0; }
 .portfolio-flow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 2rem; padding: 0; margin: 2rem 0 1.5rem; background: none; border: 0; border-top: 3px solid var(--text); border-radius: 0; }
@@ -307,7 +309,7 @@
 .portfolio-promoted-name { display: inline; margin: 0; color: inherit; }
 .portfolio-promoted-pitch { display: inline; margin-left: 0.4rem; font-family: var(--font-mono); font-size: 0.7rem; color: inherit; opacity: 0.8; }
 .portfolio-viewer-frame { border-radius: 0; }
-.portfolio-profile-head h2 { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 2.4rem; text-transform: uppercase; letter-spacing: -0.03em; }
+.portfolio-profile-head h2 { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 2.4rem; text-transform: uppercase; letter-spacing: var(--font-poster-tracking); }
 
 /* ── What the browser tour of 2026-08-29 added: the agents tab's details ────────────────── */
 .pf .pf-agd-board-card-name { color: var(--text); }
@@ -385,7 +387,7 @@
 /* Headings the view sheets set on their own */
 .pf .sch-section-title, .pf .wf-section-title, .pf .of-group-title, .pf .cap-section-title, .pf .mbr-section-title, .pf .pf-content-body h2:not([class]), .pf .pf-content-body h3:not([class]) {
   font-family: var(--font-poster-section); font-weight: var(--font-poster-section-weight);
-  font-size: 1.7rem; line-height: 0.95; letter-spacing: -0.03em; text-transform: uppercase; color: var(--text);
+  font-size: 1.7rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); text-transform: uppercase; color: var(--text);
 }
 /* The message tab: an ink frame around the two panes, square bubbles */
 .inbox-body { border: 3px solid var(--text); border-radius: 0; box-shadow: none; }
@@ -411,7 +413,7 @@
 }
 .pf .pf-or-section-title, .pf .pf-eco-section-title, .pf .pf-skl-section-title, .pf .pkg-section-header, .pf .cap-info-title {
   font-family: var(--font-poster-section); font-weight: var(--font-poster-section-weight);
-  font-size: 1.7rem; line-height: 0.95; letter-spacing: -0.03em; text-transform: uppercase; color: var(--text);
+  font-size: 1.7rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); text-transform: uppercase; color: var(--text);
 }
 /* Chips */
 .pf .dsc-facet, .pf .dsc-type-badge, .pf .dsc-tag, .pf .dsc-scope-btn, .pf .pf-eco-status, .pf .pf-eco-pill, .pf .pf-eco-chip, .pf .pf-eco-count-badge, .pf .pf-eco-rec-chip,

@@ -10,6 +10,9 @@
  * @structure MODAL_CSS (one string, injected by modal.js into its own <style>).
  * @usage import { MODAL_CSS } from './modal-styles.js';
  * @version-history
+ *   v1.2.0 — 2026-08-29 — The wordmark reads --font-wordmark (Archivo Black) rather than the headline
+ *     face, and the headline reads the poster tracking and leading tokens, so Fjalla One is set with
+ *     the room it needs.
  *   v1.1.1 — 2026-08-29 — A hint and the username rules show only while the field has focus; leaving
  *     the field folds them away, so the form stays as short as its labels.
  *   v1.1.0 — 2026-08-29 — The close control (.aimeat-close): a 26px ink-framed X beside the language switch.
@@ -34,6 +37,8 @@ var onSun = 'var(--on-sun,#1A1A2E)';
 var okc = 'var(--success-fg,#047857)';
 var font = "var(--font-showroom-body,'Archivo','DM Sans',system-ui,sans-serif)";
 var poster = "var(--font-poster,'Archivo Black','Archivo',system-ui,sans-serif)";
+// The wordmark is a mark, not a headline: it keeps Archivo Black whatever face the headlines wear.
+var wordmark = "var(--font-wordmark,'Archivo Black','Archivo',system-ui,sans-serif)";
 var section = "var(--font-poster-section,'Archivo','DM Sans',system-ui,sans-serif)";
 var mono = "var(--font-mono,'JetBrains Mono','SF Mono',monospace)";
 
@@ -49,7 +54,7 @@ export var MODAL_CSS = [
   '.aimeat-head{padding:22px 28px 0}',
   '.aimeat-crumb{display:flex;align-items:center;justify-content:space-between;gap:12px}',
   '.aimeat-brand{display:flex;align-items:baseline;gap:10px;min-width:0}',
-  '.aimeat-mark{display:inline-flex;align-items:center;gap:1px;font-family:' + poster + ';font-weight:var(--font-poster-weight,400);',
+  '.aimeat-mark{display:inline-flex;align-items:center;gap:1px;font-family:' + wordmark + ';font-weight:400;',
     'font-size:15px;letter-spacing:-.01em;line-height:1;color:' + ink + '}',
   '.aimeat-mark svg{width:13px;height:13px;fill:' + accent + '}',
   '.aimeat-mark b{font-weight:inherit;color:' + accent + '}',
@@ -65,7 +70,7 @@ export var MODAL_CSS = [
   '.aimeat-lang:hover{opacity:.9}',
   '.aimeat-lang.active{opacity:1;background:' + ink + ';color:' + paper + ';cursor:default}',
   '.aimeat-headline{margin:18px 0 0;font-family:' + poster + ';font-weight:var(--font-poster-weight,400);font-size:34px;',
-    'line-height:.92;letter-spacing:-.035em;color:' + ink + ';text-wrap:pretty}',
+    'line-height:var(--font-poster-leading,1);letter-spacing:var(--font-poster-tracking,.01em);color:' + ink + ';text-wrap:pretty}',
   '.aimeat-line{margin:10px 0 0;font-size:14px;line-height:1.5;font-weight:400;color:' + dim + '}',
   '.aimeat-tabs{display:flex;margin-top:18px;border-top:3px solid ' + ink + '}',
   '.aimeat-tab{appearance:none;flex:1;background:none;border:0;border-bottom:2px solid transparent;border-radius:0;padding:10px 12px;',
