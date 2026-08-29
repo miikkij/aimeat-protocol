@@ -17,6 +17,9 @@
  *   the MCP tool, both through services/app-legal.ts.
  * @structure registerLegalRoutes(router, config, storage, canonicalOwner)
  * @version-history
+ *   v1.1.0 — 2026-08-29 — The served page carries the page's provenance record (headers, marks,
+ *     label, lifted by the app's reviewer); readiness answers on money, never morsels; the `me`
+ *     forms keep the query; app:write on the three authenticated routes.
  *   v1.0.0 — 2026-08-29 — Initial.
  */
 import type { Router, Request } from 'express';
@@ -28,8 +31,12 @@ import { detectLocale } from '../../i18n.js';
 import { appCsp } from '../../utils/app-csp.js';
 import {
   appLegalState, legalReadiness, renderLegalPage, isLegalKind, LEGAL_KIND_INFO, legalLinksFor, apexLegalBase,
+  appSellsForMoney,
 } from '../../services/app-legal.js';
 import { readAppAudit } from '../../services/app-audit.js';
+import { applyServeMarks } from '../../services/app-serve-marks.js';
+import { loadServedProvenance, setProvenanceHeaders } from '../../services/ai-provenance-marks.js';
+import { appReviewedBy } from '../../services/app-marks.js';
 import type { CanonicalOwner } from './helpers.js';
 
 export function registerLegalRoutes(
@@ -88,7 +95,8 @@ export function registerLegalRoutes(
       owner: app.ownerName,
       filename: app.filename,
       legal: appLegalState(app),
-      readiness: legalReadiness(app),
+      // Money, never morsels, decides whether the app is a shop (appSellsForMoney).
+      readiness: legalReadiness(app, { sellsForMoney: await appSellsForMoney(storage, app) }),
       links: legalLinksFor(app, base),
       kinds: LEGAL_KIND_INFO,
       // The content is the owner's to edit; a reader gets the page, not the source.
@@ -114,18 +122,27 @@ export function registerLegalRoutes(
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `This app has no ${LEGAL_KIND_INFO[kind].title.toLowerCase()} page`));
       return;
     }
-    const page = renderLegalPage(app, kind, doc, { baseUrl: config.baseUrl, locale: detectLocale(req.headers['accept-language']) });
+    const locale = detectLocale(req.headers['accept-language']);
+    const page = renderLegalPage(app, kind, doc, { baseUrl: config.baseUrl, locale });
     if ('redirect' in page) {
       res.redirect(302, page.redirect);
       return;
     }
+    // The record minted for this text rides out with it, the way an app's own record does: the
+    // headers, the machine marks, and the visible label where the law asks — lifted by the app's
+    // named reviewer, the same act that lifts it on the app itself.
+    const prov = await loadServedProvenance(storage, config, doc.aiProvenanceId);
+    setProvenanceHeaders(res, prov);
+    const body = applyServeMarks(page.html, {
+      provenance: prov, visibleLabel: { config, locale }, reviewedBy: appReviewedBy(app.manifest),
+    });
     // The same CSP the app's own inline serve gets on the apex: a legal page written as HTML is the
     // owner's document on the owner's app, and gets no more reach than the app has.
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Content-Security-Policy', appCsp());
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Cache-Control', 'no-cache, must-revalidate');
-    res.send(page.html);
+    res.send(body);
   });
 
   router.get('/v1/apps/:owner/:filename/audit', requireAuth(), requireScope('app:write'), async (req, res) => {

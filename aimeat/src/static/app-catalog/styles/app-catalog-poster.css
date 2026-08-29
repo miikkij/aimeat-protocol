@@ -447,6 +447,8 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
 .mk-log-by { color: var(--text-dim); font-family: var(--font-mono); font-size: .72rem; padding-top: 3px; }
 
 /* ── Legal pages (legal.js): one row per kind, the editor opens inside the row ── */
+/* The masthead chip is a button (it scrolls to the section); it wears the chip, not a button. */
+.lg-chip { cursor: pointer; font: inherit; }
 .lg-rows { display: flex; flex-direction: column; margin: 14px 0 0; }
 .lg-row { display: grid; grid-template-columns: 1fr auto; gap: 6px 24px; padding: 16px 0; border-bottom: 1px solid var(--border); }
 .lg-row.is-recommended { border-left: 3px solid var(--sun); padding-left: 14px; }

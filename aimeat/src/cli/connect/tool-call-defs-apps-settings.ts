@@ -11,6 +11,7 @@
  * @structure appSettingsTools: ConnectCliToolDefinition[]
  * @usage import { appSettingsTools } from './tool-call-defs-apps-settings.js';
  * @version-history
+ *   v1.1.0 -- 2026-08-29 -- aimeat_app_legal_set forwards ai_provenance / ai_provenance_id in the PATCH body.
  *   v1.0.0 -- 2026-08-29 -- Extracted from tool-call-defs-apps.ts (max-file-lines), no behaviour change.
  */
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
@@ -92,7 +93,14 @@ export const appSettingsTools: ConnectCliToolDefinition[] = [
             if (content !== undefined) doc.content = content;
             const remove = optionalBoolean(input, 'remove');
             if (remove !== undefined) doc.remove = remove;
-            return client.patch(`/v1/apps/${encodeURIComponent(filename)}`, { legal: { [kind]: doc } });
+            // The provenance declaration travels in the body as PATCH takes it: the ROUTE records
+            // it and answers with `legal[kind].aiProvenanceId`. The dispatch wrapper's carrier table
+            // is for tools whose route accepts none, so this one is not listed there.
+            const body: JsonObject = { legal: { [kind]: doc } };
+            if (input.ai_provenance !== undefined) body.ai_provenance = input.ai_provenance;
+            const declaredId = optionalString(input, 'ai_provenance_id');
+            if (declaredId !== undefined) body.ai_provenance_id = declaredId;
+            return client.patch(`/v1/apps/${encodeURIComponent(filename)}`, body);
         },
     },
     {

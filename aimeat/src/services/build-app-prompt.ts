@@ -15,6 +15,9 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   2026-08-29 — ADDITIVE: "If the app sells something, or handles personal data" — the app's own
+ *     legal pages (aimeat_app_legal_set), which of the seven a given app owes and why, minimisation
+ *     written into the data map, and that money means a currency, never morsels.
  *   2026-08-26 — ADDITIVE: `organism-rows` in the closed `where` vocabulary the prompt hands the
  *     model. Without it a model writing a map for an app that uses the row store has no word for
  *     where its data went, and picks the nearest wrong one.
@@ -416,6 +419,16 @@ function composeAppPrompt(
   // aimeat-agents) are one click away, and the classic accident is five clicks on a button that
   // showed no feedback = five paid runs of the same job. The libs collapse repeats themselves; this
   // section tells the builder to keep that, to ask before a batch, and to show the cost.
+  // The app answers for what it does, not the node. An app that takes money or handles personal
+  // data has duties the node cannot carry for it, and the builder is the one who knows which
+  // category the app falls in. Money means a currency — morsels pace what agents push into the
+  // store and buy nothing, so a morsel price never makes an app a shop.
+  body += '### If the app sells something, or handles personal data — its own legal pages\n';
+  body += 'The app answers for what it does; the node it runs on does not. A shop answers for its sales, an app that handles personal data answers for that data. The node gives every published app its own legal pages, written by the owner and served at `/terms`, `/privacy`, `/imprint`, `/refunds`, `/accessibility`, `/cookies` and `/support` under the app\'s address, linked from its head and named in its llms.txt. They are set with `aimeat_app_legal_set` (or PATCH `/v1/apps/{filename}` with `legal`), as markdown, HTML or a link, and every change lands in the app\'s audit log.\n\n';
+  body += '**Ask the person which of these the app is, and say what follows.** Every published app: terms of use and a privacy notice (GDPR Art. 13: who the controller is and how to reach them, what is handled and why, on what basis, for how long, who else sees it, the person\'s rights, where to complain — the data map is where those answers come from, so write the map first). An app that takes MONEY in a currency (priced tools, a shop, a subscription): also an imprint (who is selling: name, address, contact, trade register — e-commerce directive Art. 5, DSA Art. 30(7)), refunds and withdrawal (the 14-day right, consumer rights directive), an accessibility statement (the European Accessibility Act asks it of e-commerce services since June 2025, in written and spoken form), and a support page. Morsels are not money: a morsel price paces agents and creates none of these duties.\n\n';
+  body += '**Design for minimisation and write the reasons down.** If the app handles personal data, the data map carries, for every row, why the datum is there and how long it stays; a row nobody can justify does not get stored. That is what an authority asks to see first, and it is what the privacy notice is generated from. Draft the pages with the person from the app\'s own facts, tell them to read every line before publishing, and declare `ai_provenance` on the write: the served page carries the record, and the visible label comes off when the app\'s named reviewer answers for it.\n\n';
+  body += '**When the category crosses a line you do not know, say so and look it up before building.** Comparable shops, the store policies (Apple, Google) and the regulation in force change; the node\'s list of pages is the floor, not the ceiling.\n\n';
+
   body += '### Spending the user\'s money (AI calls and agent commissions)\n';
   body += "Two things here spend real money on the signed-in user's own account: an `AIMEAT.ai.*` call (their OpenRouter credit) and an `AIMEAT.agents.createTask()`/`run()` commission (an agent run, plus that agent's own model spend). Every control that triggers one is a spending control — build it like one:\n";
   body += '- **One click, one run.** Both libraries already collapse repeats: an identical `ai.complete()` that is still in flight returns the SAME promise, and an identical commission returns THAT task for 60 seconds instead of queueing a second one. Keep that default — pass `allowDuplicate: true` only when the user genuinely asked for a second, parallel run. On top of it, disable the control while its call runs and show the in-flight state, so the screen says what actually happened.\n';

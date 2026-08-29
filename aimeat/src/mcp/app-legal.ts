@@ -19,6 +19,8 @@
  * @structure registerAppLegalTools(mcp, storage, config, getAgentGaii)
  * @usage import { registerAppLegalTools } from './app-legal.js';
  * @version-history
+ *   v1.1.0 — 2026-08-29 — aimeat_app_legal_set takes aiProvenanceInputs; the audit read goes through
+ *     ownerAppAudit() rather than storage.
  *   v1.0.0 — 2026-08-29 — Initial.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -30,6 +32,7 @@ import { descriptionFor } from './catalog/shape.js';
 import { ownerAppLegal } from '../services/app-legal.js';
 import { ownerAppAudit } from '../services/app-audit.js';
 import { APP_LEGAL_KINDS } from '../storage/types/apps.js';
+import { aiProvenanceInputs, toDeclaredProvenance, type AiProvenanceToolInput } from './ai-provenance-input.js';
 
 export function registerAppLegalTools(
   mcp: McpServer,
@@ -48,9 +51,15 @@ export function registerAppLegalTools(
         .describe('markdown (rendered by the node, every character escaped), html (served as written, on the app\'s own origin), or url (a link to where the page already lives).'),
       content: z.string().optional().describe('The page text, the HTML document, or the absolute https URL.'),
       remove: z.boolean().optional().describe('true removes the named page.'),
+      // A legal page is text a person reads: the same declaration every publish door takes, so an
+      // AI-drafted page carries its record and the served page its marks.
+      ...aiProvenanceInputs,
     },
     annotationsFor('aimeat_app_legal_set'),
-    async (args: { filename: string; kind?: string; format?: string; content?: string; remove?: boolean }) => {
+    async (args: {
+      filename: string; kind?: string; format?: string; content?: string; remove?: boolean;
+      ai_provenance?: AiProvenanceToolInput; ai_provenance_id?: string;
+    }) => {
       // One page per call, as the door is shaped; the service takes a map, so the PATCH twin can
       // set several at once. Naming no kind is a question.
       let legal: Record<string, unknown> | undefined;
@@ -61,7 +70,10 @@ export function registerAppLegalTools(
           return { content: [{ type: 'text' as const, text: 'To set a page give format and content; to remove it give remove: true.' }], isError: true };
         }
       }
-      const out = await ownerAppLegal(storage, config, { callerGaii: getAgentGaii(), filename: args.filename, legal });
+      const out = await ownerAppLegal(storage, config, {
+        callerGaii: getAgentGaii(), filename: args.filename, legal,
+        declared: toDeclaredProvenance(args.ai_provenance), declaredId: args.ai_provenance_id,
+      });
       if ('error' in out) return { content: [{ type: 'text' as const, text: out.error }], isError: true };
       return {
         content: [{ type: 'text' as const, text: JSON.stringify({

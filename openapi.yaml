@@ -20294,6 +20294,18 @@ paths:
                     properties:
                       format: { type: string, enum: [markdown, html, url] }
                       content: { type: string }
+                      remove: { type: boolean, description: true removes the page (the same act as null) }
+                ai_provenance:
+                  type: object
+                  description: >-
+                    How the legal text being set was made, the same block POST /v1/apps takes. A page
+                    is text a person reads: the node mints a provenance record for it (the answer's
+                    `legal[kind].aiProvenanceId`), and the served page carries the record's marks
+                    and, where the law asks, the visible label — lifted by the app's named reviewer.
+                    Refused with 403 when this session may not declare provenance.
+                ai_provenance_id:
+                  type: string
+                  description: A provenance record you already hold, attached instead of a new declaration
       responses:
         '200':
           description: App updated

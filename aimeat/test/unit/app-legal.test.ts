@@ -67,19 +67,23 @@ describe('the legal request shape', () => {
 describe('readiness, state, links, strip', () => {
   const doc = { format: 'markdown' as const, content: '# Terms\n\nHello.', updatedAt: '2026-08-29T10:00:00.000Z', updatedBy: 'alice@node' };
 
-  it('a plain app ought to have terms and privacy; a selling app the whole set', () => {
+  it('a plain app ought to have terms and privacy; MONEY brings the whole set, morsels never do', () => {
     expect(legalReadiness(app())).toMatchObject({ recommended: ['terms', 'privacy'], missing: ['terms', 'privacy'] });
-    const selling = legalReadiness(app({ priceMorsels: 5, legal: { terms: doc } }));
+    // Morsels pace what agents push into the store and buy nothing: a morsel price, a morsel
+    // licence or a morsel-priced tool makes no shop and creates no consumer-law duty.
+    expect(legalReadiness(app({ priceMorsels: 500, licenseType: 'lifetime' })).recommended).toEqual(['terms', 'privacy']);
+    const selling = legalReadiness(app({ legal: { terms: doc } }), { sellsForMoney: true });
     expect(selling.recommended).toEqual(['terms', 'privacy', 'imprint', 'refunds', 'accessibility', 'support']);
     expect(selling.missing).toEqual(['privacy', 'imprint', 'refunds', 'accessibility', 'support']);
-    expect(legalReadiness(app(), { pricedTools: true }).recommended).toContain('refunds');
+    expect(legalReadiness(app(), { sellsForMoney: false }).recommended).toEqual(['terms', 'privacy']);
   });
 
-  it('state carries no content; the strip empties it except for a URL', () => {
-    const a = app({ legal: { terms: doc, support: { ...doc, format: 'url', content: 'https://x.y/help' } } });
+  it('state carries no content; the strip empties it except for a URL; the provenance id rides along', () => {
+    const a = app({ legal: { terms: { ...doc, aiProvenanceId: 'prov_1' }, support: { ...doc, format: 'url', content: 'https://x.y/help' } } });
     const state = appLegalState(a);
-    expect(state.terms).toMatchObject({ format: 'markdown', size: Buffer.byteLength(doc.content), updatedBy: 'alice@node' });
+    expect(state.terms).toMatchObject({ format: 'markdown', size: Buffer.byteLength(doc.content), updatedBy: 'alice@node', aiProvenanceId: 'prov_1' });
     expect((state.terms as unknown as { content?: string }).content).toBeUndefined();
+    expect(state.support?.aiProvenanceId).toBeUndefined();
     expect(state.support?.url).toBe('https://x.y/help');
     const stripped = stripLegalContent(a.manifest);
     expect(stripped.legal?.terms?.content).toBe('');

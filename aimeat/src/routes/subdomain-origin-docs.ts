@@ -25,7 +25,7 @@
  * @version-history
  *   v1.1.0 — 2026-08-29 — The app's own legal pages at /terms, /privacy, /imprint, /refunds,
  *     /accessibility, /cookies and /support (answered only when the app has the page), and the
- *     Legal section of llms.txt.
+ *     Legal section of llms.txt. The page carries its provenance record's headers, marks and label.
  *   v1.0.0 — 2026-08-16 — Extracted from subdomains.ts (max-file-lines); the manifest + icon
  *     routes (installable apps) landed in the same change, in subdomains.ts v1.16.0.
  */
@@ -41,6 +41,9 @@ import { legalLinksFor, renderLegalPage, LEGAL_KIND_INFO } from '../services/app
 import { APP_LEGAL_KINDS } from '../storage/types/apps.js';
 import { detectLocale } from '../i18n.js';
 import { appCsp } from '../utils/app-csp.js';
+import { applyServeMarks } from '../services/app-serve-marks.js';
+import { loadServedProvenance, setProvenanceHeaders } from '../services/ai-provenance-marks.js';
+import { appReviewedBy } from '../services/app-marks.js';
 
 export interface AppOriginDocDeps {
   resolveApp: (target: string) => Promise<AppRecord | null>;
@@ -106,15 +109,23 @@ export function registerAppOriginDocs(
     const kind = APP_LEGAL_KINDS.find((k) => LEGAL_KIND_INFO[k].path === req.path);
     const doc = kind ? app.manifest?.legal?.[kind] : undefined;
     if (!kind || !doc) return next();
-    const page = renderLegalPage(app, kind, doc, { baseUrl: config.baseUrl, locale: detectLocale(req.headers['accept-language']) });
+    const locale = detectLocale(req.headers['accept-language']);
+    const page = renderLegalPage(app, kind, doc, { baseUrl: config.baseUrl, locale });
     if ('redirect' in page) { res.redirect(302, page.redirect); return; }
+    // The record minted for this text rides out with it: headers, machine marks, and the visible
+    // label where the law asks, lifted by the app's named reviewer as on the app itself.
+    const prov = await loadServedProvenance(storage, config, doc.aiProvenanceId);
+    setProvenanceHeaders(res, prov);
+    const body = applyServeMarks(page.html, {
+      provenance: prov, visibleLabel: { config, locale }, reviewedBy: appReviewedBy(app.manifest),
+    });
     // The app's base CSP (no apex framing, no frame grant): the owner's document on the owner's
     // app, with no more reach than the app itself has on the apex.
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Content-Security-Policy', appCsp());
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Cache-Control', 'no-cache, must-revalidate');
-    res.send(page.html);
+    res.send(body);
   });
 
   router.get('/robots.txt', async (req: Request, res: Response, next) => {
