@@ -8,6 +8,8 @@
  *   (.ld-sh-h2, .ld-sh-text, .ld-sh-box, .ld-sh-btn, .ld-sh-sticker, .ld-sh-door), which is the
  *   point: the story and the front page are one voice.
  * @version-history
+ *   v1.1.0 — 2026-08-29 — The connect story (views/connect-story.js) on the same shapes: the tool chips,
+ *     the three-step strip and the door, cs- prefix.
  *   v1.0.0 — 2026-08-28 — Initial.
  */
 .bs-head { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 3.5rem; align-items: end; padding: 2.5rem 0 1.5rem; }
@@ -95,6 +97,22 @@
 .bs-builder { display: flex; flex-direction: column; gap: .9rem; margin: 0 0 1rem; padding: 2.5rem 2.75rem; background: var(--bg-surface); border: 3px solid var(--text); box-shadow: 8px 8px 0 var(--accent); scroll-margin-top: 1rem; }
 .bs-builder-lead { color: var(--text-dim); }
 .bs-builder .ld-invite { max-width: none; margin: .5rem 0 0; }
+
+/* ── The connect story (views/connect-story.js) on the same shapes, cs- prefix ─────────────── */
+.cs-platforms { display: flex; flex-wrap: wrap; gap: .6rem; width: 100%; }
+.cs-platform {
+  display: inline-flex; align-items: center; gap: .5rem; padding: .45rem .8rem .45rem .55rem;
+  border: 2px solid var(--text); background: var(--card-bg);
+  font-family: var(--font-showroom-body); font-size: .9rem; font-weight: 800;
+}
+.cs-platform-icon { width: 28px; height: 28px; display: block; }
+.cs-steps { display: flex; flex-direction: column; gap: .6rem; width: 100%; }
+.cs-step { display: flex; align-items: center; gap: .8rem; padding: .8rem 1rem; border: 3px solid var(--text); background: var(--card-bg); box-shadow: 4px 4px 0 var(--text); font-family: var(--font-showroom-body); font-size: 1rem; font-weight: 800; }
+.cs-step:nth-child(2) { box-shadow: 4px 4px 0 var(--accent); }
+.cs-step:nth-child(3) { box-shadow: 4px 4px 0 var(--sun); }
+.cs-step-n { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; width: 1.8rem; height: 1.8rem; background: var(--sun); color: var(--on-sun); font-family: var(--font-showroom); font-size: .9rem; }
+.cs-door { box-shadow: 8px 8px 0 var(--sun); }
+.cs-door-actions { display: flex; align-items: center; gap: 2rem; flex-wrap: wrap; margin-top: .5rem; }
 
 @media (max-width: 900px) {
   .bs-head { grid-template-columns: 1fr; gap: 1.5rem; }

@@ -494,6 +494,9 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     // The showroom's two companions (2026-08-28): the whole change log, and how an app gets built.
     '/v1/changelog',
     '/v1/how-an-app-builds',
+    // The connect story (2026-08-29): the road from "connect the AI you already use" to the
+    // guided path, told before the account exists.
+    '/v1/connect-your-ai',
     '/v1/glossary',
     '/v1/business',
     // The human sibling of the machine-readable statement at /v1/ai-transparency. A different

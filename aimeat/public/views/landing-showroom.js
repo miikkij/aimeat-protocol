@@ -22,6 +22,8 @@
  * @structure ShowroomHero · WallIntro · ShowroomClose · AgentDoor (private)
  * @usage import { ShowroomHero, WallIntro, ShowroomClose } from '/views/landing-showroom.js';
  * @version-history
+ *   v1.0.1 — 2026-08-29 — The connect door leads to the connect story (/v1/connect-your-ai): a signed-out
+ *     visitor used to land on an empty profile that said sign in.
  *   v1.0.0 — 2026-08-28 — Initial, built to the design canvas "AIMEAT Front Page" (direction A).
  */
 import { h } from 'preact';
@@ -113,7 +115,7 @@ export function ShowroomHero({ navigate, picture = true }) {
           </p>
           <div class="ld-sh-doors">
             ${store ? html`<a class="ld-sh-door" href=${store} target="_blank" rel="noopener">${tr('landing.showGetOwn', 'Get your own →')}</a>` : ''}
-            <a class="ld-sh-door" href="/v1/profile?tab=mcp" onClick=${go('/v1/profile?tab=mcp')}>${tr('landing.showConnect', 'Connect the AI you already use →')}</a>
+            <a class="ld-sh-door" href="/v1/connect-your-ai" onClick=${go('/v1/connect-your-ai')}>${tr('landing.showConnect', 'Connect the AI you already use →')}</a>
             ${session ? '' : html`
               <a class="ld-sh-door" href="#agent-door" aria-expanded=${agentOpen}
                 onClick=${(e) => { e.preventDefault(); setAgentOpen(o => !o); }}>

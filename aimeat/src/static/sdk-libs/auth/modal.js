@@ -13,6 +13,8 @@
  *   openEmailCompletion, sendEmailCode, showView, capture/restoreInputs }.
  * @usage import { showLoginModal } from './modal.js';
  * @version-history
+ *   v1.5.1 — 2026-08-29 — A field's hint shows only while the person is in that field or has written in
+ *     it (the has-value class modal-styles.js reads); the create tab's headline is "Welcome in.".
  *   v1.5.0 — 2026-08-29 — The poster face (design canvas "AIMEAT Sign-in Dialog", headline-led): the
  *     wordmark and the node's domain as a crumb, the sentence as the masthead, ink frame and sun
  *     shadow, underlined fields, the styles class-based and token-driven in modal-styles.js. The
@@ -178,7 +180,7 @@ export function showLoginModal(opts, renderBtn) {
       // The masthead: one sentence in the poster face, and the line under it. Which tab is open
       // decides both.
       + '<h2 class="aimeat-headline">'
-      + escHtml(isReg ? (i.headlineNew || 'Your account lives right here.') : (i.headlineReturning || 'Welcome back.'))
+      + escHtml(isReg ? (i.headlineNew || 'Welcome in.') : (i.headlineReturning || 'Welcome back.'))
       + '</h2>'
       + '<p class="aimeat-line">'
       + escHtml(isReg
@@ -376,6 +378,16 @@ export function showLoginModal(opts, renderBtn) {
       });
     }
     if (regUser) regUser.addEventListener('input', syncUsernameRules);
+
+    // Every field's hint shows only while the person is in that field or has written in it
+    // (modal-styles.js reads the class), so the form is not read as a wall of small print.
+    modal.querySelectorAll('.aimeat-field .aimeat-inp').forEach(function (inp) {
+      var field = inp.closest('.aimeat-field');
+      if (!field) return;
+      var sync = function () { field.classList.toggle('has-value', !!/** @type {any} */ (inp).value); };
+      inp.addEventListener('input', sync);
+      sync();
+    });
 
     // Social sign-in — full-page navigation to the provider's OIDC start endpoint.
     modal.querySelectorAll('.aimeat-oauth-btn').forEach(function (btn) {

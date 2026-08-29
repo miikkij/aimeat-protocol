@@ -13,6 +13,7 @@
  *   - AgentHelp — the copyable prompt + the machine-readable entry points
  * @usage import HelpView from '/views/help.js'
  * @version-history
+ *   v2.3.1 — 2026-08-29 — "Connection instructions" leads to the connect story (/v1/connect-your-ai).
  *   v2.3.0 — 2026-08-29 — The showroom face (design canvas "AIMEAT Index Pages"): the two actions under
  *       "still stuck" are the sun slab (.hlp-btn) and a door (.hlp-door), styled in help.css.
  *   v1.0.0 — 2026-03-23 — Initial implementation
@@ -63,7 +64,7 @@ function HumanHelp({ onAskAi }) {
       <h2 class="section-title">${tr('help.startTitle', 'Getting started')}</h2>
       <ol class="hlp-steps">
         <li>${tr('help.start1', 'Sign in or create an account. One click with Google, or email and password.')}</li>
-        <li>${tr('help.start2', 'Connect your AI assistant so it can work here.')} <a href="/v1/portal?view=dev">${tr('help.start2Link', 'Connection instructions')}</a></li>
+        <li>${tr('help.start2', 'Connect your AI assistant so it can work here.')} <a href="/v1/connect-your-ai">${tr('help.start2Link', 'Connection instructions')}</a></li>
         <li>${tr('help.start3', 'Build your first app by describing it to your AI.')} <a href="/app-catalog.html">${tr('help.start3Link', 'Open the app catalog')}</a></li>
         ${hasSite('learn') ? html`
           <li>${tr('help.start4', 'Learn the whole platform hands-on, free, without an account.')} <a href=${siteLink('learn')} target="_blank" rel="noopener">${tr('help.start4Link', 'Open the Experience Center')}</a></li>` : ''}

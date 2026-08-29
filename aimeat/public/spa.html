@@ -449,6 +449,9 @@
       // gets built here. Both are also spaRoutes in routes/portal.ts, or F5 is a 404.
       '/v1/changelog':   () => import('/views/changelog.js' + B),
       '/v1/how-an-app-builds': () => import('/views/build-story.js' + B),
+      // The connect story (2026-08-29): what "connect the AI you already use" means, told before
+      // the account exists. A spaRoute in routes/portal.ts too, or F5 is a 404.
+      '/v1/connect-your-ai': () => import('/views/connect-story.js' + B),
       '/v1/glossary':    () => import('/views/glossary.js' + B),
       '/v1/business':    () => import('/views/business.js' + B),
       '/v1/transparency': () => import('/views/transparency.js' + B),
@@ -578,6 +581,10 @@
 
         // Intercept internal link clicks for SPA navigation
         const onClick = (e) => {
+          // A view that handled its own link (opened the sign-in dialog, scrolled to an anchor)
+          // has already called preventDefault; routing it anyway sent the connect story's
+          // "create your account" door to /v1/portal underneath the dialog it had just opened.
+          if (e.defaultPrevented) return;
           const a = e.target.closest('a[href]');
           if (!a) return;
           const href = a.getAttribute('href');
@@ -888,7 +895,7 @@
     // page you work in is not a page you leave from.
     const FOOTER_ROUTES = new Set([
       '/v1/portal', '/v1/how-it-works', '/v1/business', '/v1/changelog', '/v1/how-an-app-builds',
-      '/v1/members', '/v1/help', '/v1/glossary', '/v1/transparency',
+      '/v1/connect-your-ai', '/v1/members', '/v1/help', '/v1/glossary', '/v1/transparency',
     ]);
 
     function SiteFooter({ navigate }) {
