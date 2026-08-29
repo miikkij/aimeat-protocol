@@ -1044,6 +1044,7 @@ await test('GET /v1/libs/aimeat-atelier.js — serves the Atelier kit with every
         'app', 'section', 'tabs', 'bottomNav',
         'hero', 'statRow', 'figure', 'emptyState', 'skeleton',
         'list', 'listDetail', 'cardGrid', 'mediaCard', 'timeline', 'chart', 'matrix', 'graph', 'waveform',
+        'reveal', 'drawer', 'dialog', 'confirm', 'prompt', 'sheet',
         'form', 'table', 'searchBar',
         'mosaic', 'appRef',
         'injectStyle', 'guardButtons', 'whileBusy', 'enter', 'countUp', 'attention',

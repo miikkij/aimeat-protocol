@@ -75,6 +75,7 @@ import { chart } from './chart.js';
 import { matrix } from './matrix.js';
 import { graph } from './graph.js';
 import { waveform } from './waveform.js';
+import { reveal } from './disclose.js';
 import { patchFor, derivedColumns } from './mosaic-bind.js';
 import { aide } from './aide.js';
 import { projectCanvas } from './mosaic-canvas.js';
@@ -237,6 +238,10 @@ export function mosaic(spec) {
       case 'waveform':
         return bound('waveform', function (data) {
           return waveform({ target: into, data: patchFor('waveform', data).data, title: p.title, empty: empty });
+        });
+      case 'reveal':
+        return bound('reveal', function (data) {
+          return reveal({ target: into, items: patchFor('reveal', data).items, mode: p.mode === 'many' ? 'many' : 'one' });
         });
       case 'table':
         return bound('table', function (data) {
