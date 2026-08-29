@@ -8,12 +8,16 @@
  *   map of kinds, the rows of entries with the query words marked, the place cards and the result
  *   groups. NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v1.0.1 — 2026-08-30 — The loading mark: a blinking coral square before the counting line.
  *   v1.0.0 — 2026-08-30 — Initial.
  */
 
 .og-dv .og-chip--coral { border-color: var(--accent); color: var(--accent); }
 .og-dv .og-door.on { color: var(--accent); border-bottom-color: var(--accent); }
 .og-dv .og-empty { margin: 0; font-size: .9rem; color: var(--text-dim); }
+.og-dv .dv-loading { display: inline-block; padding-left: 1.1rem; position: relative; }
+.og-dv .dv-loading::before { content: ''; position: absolute; left: 0; top: .35em; width: .55em; height: .55em; background: var(--accent); animation: dvBlink 1s steps(2, start) infinite; }
+@keyframes dvBlink { to { visibility: hidden; } }
 .og-dv .dv-hint { margin: .6rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--text-dim); }
 .og-dv .dv-more { margin: .8rem 0 0; font-size: .85rem; }
 .og-dv .dv-more button, .og-dv .dv-morerow button { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; font-size: .85rem; font-weight: 800; color: var(--text); border-bottom: 2px solid var(--text); }

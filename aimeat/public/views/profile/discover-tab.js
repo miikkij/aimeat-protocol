@@ -10,6 +10,9 @@
  * @structure DiscoverTab() — scope, query, view and the loads → the ctx bag → renderDiscoverView
  * @usage registered in profile.js TABS as id 'discover'
  * @version-history
+ *   v1.0.1 — 2026-08-30 — The page says it is counting while the map loads, and loads less: the own
+ *     scope's counts and its recent rows on mount, the other scopes' counts only when chosen. On
+ *     aimeat.io the four parallel enumerations took eight seconds with nothing on screen.
  *   v1.0.0 — 2026-08-30 — The poster face (design canvas "AIMEAT Löydä-sivu", direction A). The scope
  *     buttons, the thirteen type chips and the newest-first dump of every record are replaced by the
  *     search desk, the map of kinds, what changed last, the places and the bookkeeping fold.
@@ -57,20 +60,25 @@ export default function DiscoverTab() {
     return res?.data || null;
   }, []);
 
-  // The map: facet counts per scope, own first; and what changed last among the kinds a person reads.
+  // The map: the own scope's counts and what changed last among the kinds a person reads. The other
+  // scopes are counted when chosen; every count is a full enumeration on the server.
+  const loadFacets = useCallback((s) => {
+    getFacets(s).then(f => { if (f) setFacets(prev => ({ ...prev, [s]: f })); }).catch(err => swallowed('discover-tab: facets', err));
+  }, [getFacets]);
   const loadMap = useCallback(async () => {
-    for (const s of SCOPES) {
-      getFacets(s).then(f => { if (f) setFacets(prev => ({ ...prev, [s]: f })); }).catch(err => swallowed('discover-tab: facets', err));
-    }
+    loadFacets('own');
     const params = new URLSearchParams({ scope: 'own', per_page: '40', type: HUMAN_TYPES.join(',') });
     get(params).then(d => { if (d) setRecent(prev => ({ ...prev, own: d.entries })); }).catch(err => swallowed('discover-tab: recent', err));
-  }, [get, getFacets]);
+  }, [get, loadFacets]);
   useEffect(() => { loadMap(); }, [loadMap]);
   useEffect(() => {
-    if (scope === 'own' || recent[scope]) return;
+    if (scope === 'own') return;
+    if (!facets[scope]) loadFacets(scope);
+    if (recent[scope]) return;
     const params = new URLSearchParams({ scope, per_page: '40', type: HUMAN_TYPES.join(',') });
     get(params).then(d => { if (d) setRecent(prev => ({ ...prev, [scope]: d.entries })); }).catch(err => swallowed('discover-tab: recent', err));
-  }, [scope, recent, get]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a scope is counted once; the facets it already has are not a reason to count again
+  }, [scope, recent, get, loadFacets]);
   const liveRef = useRef(loadMap); liveRef.current = loadMap;
   useEffect(() => {
     const handler = () => liveRef.current();
