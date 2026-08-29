@@ -8,6 +8,8 @@
  *   chat.commands), SchedulePanel (own-agent scheduler), and ReplyWithAiPopover (TARGET-031). Each is
  *   self-contained (owns its own hooks). Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.13.0 — 2026-08-29 — MessageBubble names its writer (`who`) above the body, so a bubble reads
+ *     without the avatar and the sun of one's own bubbles carries no ambiguity.
  *   v1.12.0 — 2026-08-18 — The composer opens as the thin auto-growing line on every screen, the way a
  *     chat works, and ⤢ swaps in the full editor with the draft carried both ways. Toast UI is not even
  *     loaded until asked. Each branch of the composer body carries a key: without them Preact reused the
@@ -199,7 +201,7 @@ export function PollBuilder({ questions, setQuestions }) {
     </div>`;
 }
 
-export function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack, onPark, onReplyAi, onQuote, quoted, quotedName, onJumpTo, domId, tracked, onOpenMarkdown, answeredWith, onAnswer, submitting, showLinkPreviews, onTranscribe, canTranscribe }) {
+export function MessageBubble({ msg, mine, who, urlMap, starred, onStar, onTrack, onPark, onReplyAi, onQuote, quoted, quotedName, onJumpTo, domId, tracked, onOpenMarkdown, answeredWith, onAnswer, submitting, showLinkPreviews, onTranscribe, canTranscribe }) {
   const nonInline = (msg.attachments || []).filter(a => !a.inline);
   const expiredIds = new Set((msg.attachments || []).filter(a => a.expired).map(a => a.id));
   // urlMap is keyed by `${messageId}::${attachmentId}` because per-message attachment ids (at0, at1…)
@@ -239,6 +241,7 @@ export function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack, onP
           <span class="inbox-quote-name">${escHtml(quotedName || '')}</span>
           <span class="inbox-quote-text">${escHtml(quoteSnippet(quoted.body))}</span>
         </button>` : null}
+        ${who ? html`<span class="inbox-bubble-who">${escHtml(who)}</span>` : null}
         <div class="inbox-bubble-body"><${Markdown} text=${prepareBody(msg.body, urls, expiredIds)} /></div>
         ${showLinkPreviews ? html`<${MessageLinkPreviews} msg=${msg} />` : null}
         ${msg.interactive?.role === 'questions' ? (

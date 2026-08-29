@@ -7,6 +7,8 @@
  *   ticks, and a sticky composer. All colors/spacing use theme.css variables (dark-mode safe).
  *   Classes are `inbox-` prefixed. NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v1.15.2 -- 2026-08-29 -- The phone's list view takes the measured --inbox-desk-avail too (use-thread-ux
+ *     v1.7.0) instead of "100dvh - 168px", a header height the poster mast no longer matches.
  *   v1.15.1 -- 2026-08-29 -- The -58px margin that lifted the actions onto the old shell's breadcrumb line is
  *     gone: against the poster shell's 20px crumb it put the buttons on top of the word "Messages".
  *   v1.15.0 -- 2026-08-29 -- body overflow: clip (was hidden) behind the phone overlay, the same reason as
@@ -127,7 +129,7 @@
 
 @media (max-width: 760px) {
   /* single-pane: one column, tall enough to read a thread; the open pane fills it. */
-  .inbox-body { grid-template-columns: 1fr; height: calc(100dvh - 168px); min-height: 240px; }
+  .inbox-body { grid-template-columns: 1fr; height: var(--inbox-desk-avail, calc(100dvh - 168px)); min-height: 240px; }
   /* no panel open → show the list full-height, hide the idle placeholder */
   .inbox-body:not(.inbox-body--panel) .inbox-panel { display: none; }
   .inbox-body:not(.inbox-body--panel) .inbox-list { height: 100%; }

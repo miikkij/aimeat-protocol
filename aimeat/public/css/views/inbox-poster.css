@@ -1,0 +1,71 @@
+/**
+ * @file inbox-poster.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The Messages page in the poster face (design canvas "AIMEAT Viestien sivu", direction
+ *   A), as overrides scoped to `.og-ib` over inbox.css's messenger: the two panes under an ink rule,
+ *   the list with its coral section labels and the sun on the open row, the thread head with two
+ *   doors, bubbles with an ink border (sun for one's own) that name their writer, the composer under
+ *   an ink rule, and the pages (broadcast, tracked, results) with the head the mast already carries
+ *   removed. Tokens only. NOTE: this file must be linked in spa.html after inbox.css.
+ * @version-history
+ *   v1.0.0 — 2026-08-29 — Initial.
+ */
+
+.og-ib { gap: 0; }
+.og-ib .og-mast--page { margin-top: .6rem; }
+.og-ib .og-title small { align-items: center; }
+.og-ib .og-title small .og-chip { text-transform: none; }
+.og-ib-actions { flex-wrap: nowrap; }
+.og-ib-actions .og-slab { padding: .55rem .9rem; }
+.og-ib .inbox-head { display: none; }
+
+/* ── The two panes ─────────────────────────────────────────────────────────────────────────── */
+.og-ib .inbox-body { margin-top: 1.1rem; border: 0; border-top: 3px solid var(--text); border-radius: 0; background: transparent; }
+.og-ib .inbox-list { border-right: 3px solid var(--text); padding: 0; gap: 0; }
+.og-ib .inbox-list-section { padding: .7rem .75rem .3rem; border-bottom: 1px solid var(--border); font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: .78rem; letter-spacing: .06em; color: var(--accent); }
+.og-ib .inbox-count, .og-ib .inbox-conv-badge { border-radius: 0; font-family: var(--font-mono); font-weight: 700; }
+.og-ib .inbox-avatar { border-radius: 0; border: 2px solid var(--text); box-sizing: border-box; }
+.og-ib .inbox-conv { border-radius: 0; border-bottom: 1px solid var(--border); border-left: 3px solid transparent; padding: .6rem .75rem; }
+.og-ib .inbox-conv:hover { background: var(--card-bg); }
+.og-ib .inbox-conv--active { background: var(--sun); border-left-color: var(--text); color: var(--on-sun); }
+.og-ib .inbox-conv--active .inbox-conv-preview, .og-ib .inbox-conv--active .inbox-conv-time, .og-ib .inbox-conv--active .inbox-conv-subject { color: var(--on-sun); }
+.og-ib .inbox-conv--nested { padding-left: 1.6rem; }
+.og-ib .inbox-conv-subico { width: 1.4rem; font-family: var(--font-mono); font-size: .7rem; opacity: 1; color: var(--accent); }
+.og-ib .inbox-conv-subject { font-family: var(--font-mono); }
+.og-ib .inbox-conv-group-head { padding: .6rem .75rem .2rem; }
+.og-ib .inbox-via-chip { border-radius: 0; font-family: var(--font-mono); }
+.og-ib .inbox-request { border-radius: 0; border: 0; border-left: 3px solid var(--accent); border-bottom: 1px solid var(--border); padding: .7rem .75rem; }
+.og-ib .inbox-empty-sm { padding: .7rem .75rem; }
+
+/* ── The thread ────────────────────────────────────────────────────────────────────────────── */
+.og-ib .inbox-thread-head { padding: .6rem 1rem; border-bottom: 3px solid var(--text); }
+.og-ib .inbox-thread-subject { font-family: var(--font-mono); }
+.og-ib .inbox-thread-head .og-door { font-size: .72rem; }
+.og-ib .inbox-msgs { background: transparent; padding: 1rem; }
+.og-ib .inbox-day span { border-radius: 0; background: transparent; font-family: var(--font-mono); }
+.og-ib .inbox-bubble { border-radius: 0; border: 2px solid var(--text); background: var(--card-bg); }
+.og-ib .inbox-bubble--theirs { background: var(--card-bg); }
+.og-ib .inbox-bubble--mine { background: var(--sun); border-color: var(--sun); color: var(--on-sun); }
+.og-ib .inbox-bubble--mine .inbox-bubble-meta, .og-ib .inbox-bubble--mine .inbox-tick { color: var(--on-sun); }
+.og-ib .inbox-bubble-who { display: block; font-size: .64rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: 2px; }
+.og-ib .inbox-bubble--mine .inbox-bubble-who { color: var(--on-sun); }
+.og-ib .inbox-bubble-quote { border-radius: 0; }
+.og-ib .inbox-composer { border-top: 3px solid var(--text); background: var(--card-bg); }
+.og-ib .inbox-panel--empty { border-left: 0; }
+.og-ib .inbox-empty { font-weight: 600; }
+
+/* ── The pages: broadcast, tracked responses, results ──────────────────────────────────────── */
+.og-ib-page { margin-top: 1.1rem; }
+.og-ib-page .og-main { padding-top: .9rem; border-top: 3px solid var(--text); }
+.og-ib-page .inbox-panel { height: auto; }
+.og-ib-page .inbox-panel > .inbox-thread-head { display: none; }
+.og-ib-page .inbox-compose-fields { padding: 0 0 .8rem; }
+.og-ib-page .inbox-composer { border: 2px solid var(--text); }
+.og-ib-page .inbox-bc-modeopt { border-radius: 0; }
+.og-ib-page .inbox-bc-modeopt--on { background: var(--sun); color: var(--on-sun); border-color: var(--text); }
+
+@media (max-width: 760px) {
+  .inbox--panel .og-crumb, .inbox--panel .og-mast { display: none; }
+  .og-ib .inbox-body { margin-top: .6rem; }
+}

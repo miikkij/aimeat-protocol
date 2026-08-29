@@ -14,6 +14,11 @@
  *   (./inbox-tab/use-thread-ux.js)
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v2.0.0 -- 2026-08-29 -- The poster face (design canvas "AIMEAT Viestien sivu", direction A). One title
+ *     row (the crumb, Messages with its figures, the New-message slab, Broadcast and Tracked responses
+ *     as doors) and the two panes under an ink rule. Broadcast, tracked responses and results are
+ *     PAGES under the same crumb with a rail back, not contents swapped into the right pane. The
+ *     emoji left the buttons and the row icons; every handler and loader is unchanged.
  *   v1.28.1 -- 2026-08-04 -- Fix "attachment download fails in a long-open tab": presigned attachment
  *     URLs expire after 1 h but were cached forever, so a click hit a dead token (410 → the browser's
  *     bare "Couldn't download"). useAttachmentUrlRefresh (use-thread-ux.js) re-mints entries older
@@ -140,7 +145,6 @@ import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import * as messages from '/js/services/messages.js';
 import * as tracked from '/js/services/tracked-responses.js';
 import * as agentsSvc from '/js/services/agents.js';
@@ -148,10 +152,10 @@ import { apiGet } from '/js/api.js';
 import { getSession } from '/js/services/auth.js';
 import { TrackResponseModal } from './track-response-modal.js';
 import { peerLabel } from '/js/services/messages-ai-prompts.js';
-import { peerName, ownerKeyOf, isAgentPeer, buildAnswerSummary, resolveThreadAttachmentUrls, sendFailure, parkMessage, openTrackedRecord, buildContactOptions, normalizePollQuestions, mergeThreadPage } from './inbox-tab/helpers.js';
-import { Composer, PollBuilder, MarkdownViewer, ReplyWithAiPopover, ConversationToNotebookPopover } from './inbox-tab/components.js';
+import { ownerKeyOf, isAgentPeer, buildAnswerSummary, resolveThreadAttachmentUrls, sendFailure, parkMessage, openTrackedRecord, buildContactOptions, normalizePollQuestions, mergeThreadPage } from './inbox-tab/helpers.js';
+import { Composer, MarkdownViewer, ReplyWithAiPopover, ConversationToNotebookPopover } from './inbox-tab/components.js';
 import { buildConversationReplyProps, buildMessageReplyProps, buildConversationNotebookProps } from './inbox-tab/ai-actions.js';
-import { ListPanel, ThreadPanel, TrackedPanel, ResultsPanel } from './inbox-tab/panels.js';
+import { ListPanel, ThreadPanel, TrackedPanel, ResultsPanel, renderBroadcastForm } from './inbox-tab/panels.js';
 import { useThreadAutoScroll, useMobileComposerKeyboard, useLinkPreviewToggle, useAttachmentUrlRefresh, useRecentBroadcasts } from './inbox-tab/use-thread-ux.js';
 import { useVoiceMessages } from './inbox-tab/use-voice.js';
 import { ContactPicker } from '/components/ContactPicker.js';
@@ -674,29 +678,65 @@ export default function InboxTab({ showToast }) {
   };
 
   /* ── Render ── */
+  // The poster face (design canvas "AIMEAT Viestien sivu", direction A). Messages is a work surface:
+  // one title row, then the two panes filling the screen. Broadcast, tracked responses and results
+  // are PAGES under the same crumb rather than contents swapped into the right pane, so the left
+  // list never lies about what the right side shows.
+  const unreadTotal = conversations.reduce((n, c) => n + (c.unread || 0), 0);
+  const isPage = mode === 'tracked' || mode === 'results' || mode === 'broadcast';
+  const pageTitle = mode === 'broadcast' ? t('inbox.broadcastTitle') : mode === 'results' ? t('inbox.resultsTitle') : t('inbox.trackedTitle');
+  const goIdle = () => { setMode('idle'); setActiveConv(null); setReplyQuote(null); };
+  const broadcastForm = mode !== 'broadcast' ? null : renderBroadcastForm({
+    bcType, setBcType, bcMode, setBcMode, bcQuestions, setBcQuestions, bcRecipients, removeBcRecipient, bcInput, setBcInput,
+    addBcRecipient, myGroups, bcGroupId, setBcGroupId, isOperator, bcAudience, setBcAudience, sending, doBroadcast,
+  });
+
   return html`
-    <div class=${`inbox${mode !== 'idle' ? ' inbox--panel' : ''}`}>
-      <div class="inbox-head">
-        <div class="inbox-head-text">
-          <div class="section-title">${t('inbox.title')}</div>
-          <div class="section-desc">${t('inbox.desc')}</div>
+    <div class=${`inbox og og-ib${mode !== 'idle' ? ' inbox--panel' : ''}`}>
+      <div class="og-crumb">
+        <span>${t('nav.profile') || 'Settings'}</span><span>/</span>
+        ${isPage ? html`<button type="button" class="og-crumb-link" onClick=${goIdle}>${t('inbox.title')}</button><span>/</span><span class="og-crumb-here">${pageTitle}</span>`
+          : html`<span class="og-crumb-here">${t('inbox.title')}</span>`}
+      </div>
+      <div class="og-mast og-mast--page">
+        <div class="og-mast-words">
+          <h1 class="og-title">${isPage ? pageTitle : t('inbox.title')}${!isPage ? html`<small>
+            <span>${(t('inbox.cover.figConvs') || '{n} conversations').replace('{n}', String(conversations.length))}</span>
+            ${unreadTotal ? html`<span class="og-chip og-chip--sun">${(t('inbox.cover.figUnread') || '{n} unread').replace('{n}', String(unreadTotal))}</span>` : null}
+            ${requests.length ? html`<span class="og-chip">${(t('inbox.cover.figRequests') || '{n} requests').replace('{n}', String(requests.length))}</span>` : null}
+          </small>` : null}</h1>
         </div>
-        <div class="inbox-head-actions">
-          <button class=${`btn-outline${mode === 'tracked' ? ' btn-outline--active' : ''}${awaitingCount ? ' btn-outline--active' : ''}`} onClick=${() => { setMode('tracked'); setActiveConv(null); }}
-            title=${awaitingCount ? t('inbox.trackReady') : ''}>
-            🔗 ${t('inbox.trackedTitle')}${activeTracked.length ? html` <span class="inbox-count">${activeTracked.length}</span>` : ''}
-          </button>
-          ${recentBroadcasts.length ? html`<button class=${`btn-outline${mode === 'results' ? ' btn-outline--active' : ''}`} onClick=${() => { setMode('results'); setResultsId(null); setActiveConv(null); }}>📊 ${t('inbox.results')}</button>` : null}
-          <button class=${`btn-outline${mode === 'broadcast' ? ' btn-outline--active' : ''}`} onClick=${startBroadcast}>📢 ${t('inbox.broadcast')}</button>
-          <button class="btn-primary" onClick=${startCompose}>✉️ ${t('inbox.new')}</button>
-        </div>
+        ${!isPage ? html`<div class="og-mast-actions"><div class="og-doors og-ib-actions">
+          <button type="button" class="og-slab" onClick=${startCompose}>${t('inbox.new')}</button>
+          <button type="button" class="og-door" onClick=${startBroadcast}>${t('inbox.broadcast')}</button>
+          <button type="button" class=${`og-door${awaitingCount ? '' : ' og-door--quiet'}`} onClick=${() => { setMode('tracked'); setActiveConv(null); }} title=${awaitingCount ? t('inbox.trackReady') : ''}>${t('inbox.trackedTitle')}${activeTracked.length ? ` ${activeTracked.length}` : ''}</button>
+          ${recentBroadcasts.length ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => { setMode('results'); setResultsId(null); setActiveConv(null); }}>${t('inbox.results')}</button>` : null}
+        </div></div>` : null}
       </div>
       <datalist id="inbox-contact-suggest">
         ${contactOptions.map(c => html`<option value=${c.id} key=${c.id}>${c.label}</option>`)}
       </datalist>
 
+      ${isPage ? html`
+        <div class="og-grid og-ib-page">
+          <div class="og-main">
+            ${broadcastForm}
+            ${mode === 'results' ? html`<${ResultsPanel} resultsId=${resultsId} recentBroadcasts=${recentBroadcasts}
+              results=${results} openResults=${openResults} setResultsId=${setResultsId} setResults=${setResults} />` : null}
+            ${mode === 'tracked' ? html`<${TrackedPanel} activeTracked=${activeTracked} doneCount=${doneCount}
+              openRecord=${openRecord} openTracked=${openTracked} cancelTracked=${cancelTracked} />` : null}
+          </div>
+          <nav class="og-rail" aria-label=${t('inbox.title')}>
+            <span class="og-rail-label">${t('inbox.title')}</span>
+            <button type="button" class="og-rail-link" onClick=${goIdle}><i>←</i>${t('inbox.cover.backToMessages') || 'Back to messages'}</button>
+            <hr />
+            <button type="button" class=${`og-rail-link ${mode === 'broadcast' ? 'on' : ''}`} onClick=${startBroadcast}><i>·</i>${t('inbox.broadcast')}<em>→</em></button>
+            <button type="button" class=${`og-rail-link ${mode === 'tracked' ? 'on' : ''}`} onClick=${() => { setMode('tracked'); setActiveConv(null); }}><i>·</i>${t('inbox.trackedTitle')}<em>${activeTracked.length || '→'}</em></button>
+            ${recentBroadcasts.length ? html`<button type="button" class=${`og-rail-link ${mode === 'results' ? 'on' : ''}`} onClick=${() => { setMode('results'); setResultsId(null); setActiveConv(null); }}><i>·</i>${t('inbox.results')}<em>${recentBroadcasts.length}</em></button>` : null}
+          </nav>
+        </div>` : html`
       <div class=${`inbox-body${mode !== 'idle' ? ' inbox-body--panel' : ''}`}>
-        <button class="inbox-back" onClick=${() => { setMode('idle'); setActiveConv(null); setReplyQuote(null); }}>← ${t('inbox.back')}</button>
+        <button class="inbox-back" onClick=${goIdle}>← ${t('inbox.back')}</button>
         <${ListPanel} requests=${requests} conversations=${conversations} activeConv=${activeConv}
           peerDisplay=${peerDisplay} accept=${accept} block=${block} openConversation=${openConversation} />
 
@@ -713,57 +753,6 @@ export default function InboxTab({ showToast }) {
               sending=${sending} onSend=${doSend} draftKey="aimeat.inbox.draft.new" />
           </div>` : null}
 
-        ${mode === 'broadcast' ? html`
-          <div class="inbox-panel">
-            <div class="inbox-thread-head"><div class="inbox-name">📢 ${t('inbox.broadcastTitle')}</div></div>
-            <div class="inbox-compose-fields">
-              <div class="inbox-bc-mode">
-                <label class=${`inbox-bc-modeopt${bcType === 'message' ? ' inbox-bc-modeopt--on' : ''}`}>
-                  <input type="radio" name="bctype" checked=${bcType === 'message'} onChange=${() => setBcType('message')} />
-                  <span>📨 ${t('inbox.bcTypeMessage')}</span>
-                </label>
-                <label class=${`inbox-bc-modeopt${bcType === 'poll' ? ' inbox-bc-modeopt--on' : ''}`}>
-                  <input type="radio" name="bctype" checked=${bcType === 'poll'} onChange=${() => setBcType('poll')} />
-                  <span>📊 ${t('inbox.bcTypePoll')}</span>
-                </label>
-              </div>
-              ${bcType === 'message' ? html`<div class="inbox-bc-mode">
-                <label class=${`inbox-bc-modeopt${bcMode === 'broadcast' ? ' inbox-bc-modeopt--on' : ''}`}>
-                  <input type="radio" name="bcmode" checked=${bcMode === 'broadcast'} onChange=${() => setBcMode('broadcast')} />
-                  <span>${t('inbox.bcModeBroadcast')}</span>
-                </label>
-                <label class=${`inbox-bc-modeopt${bcMode === 'announcement' ? ' inbox-bc-modeopt--on' : ''}`}>
-                  <input type="radio" name="bcmode" checked=${bcMode === 'announcement'} onChange=${() => setBcMode('announcement')} />
-                  <span>${t('inbox.bcModeAnnouncement')}</span>
-                </label>
-              </div>` : html`<${PollBuilder} questions=${bcQuestions} setQuestions=${setBcQuestions} />`}
-              ${bcRecipients.length ? html`<div class="inbox-bc-chips">
-                ${bcRecipients.map(r => html`<span class="inbox-bc-chip" key=${r}>${escHtml(peerName(r))}
-                  <button class="inbox-bc-chip-x" title=${t('inbox.bcRemove')} onClick=${() => removeBcRecipient(r)}>✕</button></span>`)}
-              </div>` : null}
-              <div class="inbox-bc-add">
-                <input class="inbox-input" type="text" list="inbox-contact-suggest" placeholder=${t('inbox.bcAddPlaceholder')}
-                  value=${bcInput} onInput=${(e) => setBcInput(e.target.value)}
-                  onKeyDown=${(e) => { if (e.key === 'Enter') { e.preventDefault(); addBcRecipient(); } }} />
-                <button class="btn-outline btn-sm" onClick=${() => addBcRecipient()}>${t('inbox.bcAdd')}</button>
-              </div>
-              ${myGroups.length ? html`<select class="inbox-input" value=${bcGroupId} onChange=${(e) => setBcGroupId(e.target.value)}>
-                <option value="">${t('inbox.bcNoGroup')}</option>
-                ${myGroups.map(g => html`<option value=${g.id} key=${g.id}>${escHtml(g.name)} (${(g.members || []).length})</option>`)}
-              </select>` : null}
-              ${isOperator ? html`<select class=${`inbox-input${bcAudience ? ' inbox-bc-audience--on' : ''}`} value=${bcAudience} onChange=${(e) => setBcAudience(e.target.value)}>
-                <option value="">${t('inbox.bcNoAudience')}</option>
-                <option value="node-users">📣 ${t('inbox.bcNodeUsers')}</option>
-                <option value="federation-users">🌐 ${t('inbox.bcFederationUsers')}</option>
-              </select>` : null}
-            </div>
-            <${Composer} key="c-bc" recipient=${(bcRecipients.length || bcGroupId || bcAudience) ? 'bc' : ''}
-              sendLabel=${bcType === 'poll' ? t('inbox.pollSend') : t('inbox.bcSend')} sending=${sending} onSend=${doBroadcast} />
-          </div>` : null}
-
-        ${mode === 'results' ? html`<${ResultsPanel} resultsId=${resultsId} recentBroadcasts=${recentBroadcasts}
-          results=${results} openResults=${openResults} setResultsId=${setResultsId} setResults=${setResults} />` : null}
-
         ${mode === 'thread' && activeConv ? html`<${ThreadPanel}
           activeConv=${activeConv} thread=${thread} urlMap=${urlMap} important=${important} trackedByMsg=${trackedByMsg}
           awaitingForConv=${awaitingForConv} awaitingDrafts=${awaitingDrafts} schedOpen=${schedOpen} setSchedOpen=${setSchedOpen}
@@ -776,17 +765,13 @@ export default function InboxTab({ showToast }) {
           threadAll=${threadAll} toggleThreadAll=${toggleThreadAll}
           onTranscribe=${transcribeVoice} canTranscribe=${canTranscribe} voiceMaxSeconds=${voiceMaxSeconds} />` : null}
 
-        ${mode === 'tracked' ? html`<${TrackedPanel} activeTracked=${activeTracked} doneCount=${doneCount}
-          openRecord=${openRecord} openTracked=${openTracked} cancelTracked=${cancelTracked} />` : null}
-
         ${mode === 'idle' ? html`
           <div class="inbox-panel inbox-panel--empty">
             <div class="inbox-empty">
-              <div class="inbox-empty-ico">📬</div>
               <div>${t('inbox.selectConversation')}</div>
             </div>
           </div>` : null}
-      </div>
+      </div>`}
 
       <${TrackResponseModal} open=${!!trackMsg} msg=${trackMsg}
         onClose=${() => setTrackMsg(null)} onDone=${loadLists} showToast=${showToast} />

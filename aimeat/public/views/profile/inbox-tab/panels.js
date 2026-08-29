@@ -8,6 +8,9 @@
  *   (broadcast/poll results). Each is a presentational component driven entirely by props from InboxTab;
  *   the stateful container keeps all hooks. Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v2.0.0 — 2026-08-29 — The poster face: the thread head keeps Listen and Reply-with-AI as doors and
+ *     puts Notebook, link previews, show-all and the schedule behind "…"; each bubble names its writer
+ *     (the `who` prop); the row marks and subject lines lost their emoji.
  *   v1.x — 2026-08-22 — A conversation row whose newest message one of my agents wrote is previewed
  *     "via <agent>: …" instead of "You: …". The copy lives in my mailbox marked outbound, so the
  *     list attributed my agent's words to me — the one thing a person needs to be able to check.
@@ -41,7 +44,8 @@ import { escHtml } from '/js/utils.js';
 import { Markdown } from '/components/Markdown.js';
 import { PresenceDot } from '/components/PresenceDot.js';
 import { getSession } from '/js/services/auth.js';
-import { Avatar, MessageBubble, Composer, CommandBar, CommandFill, SchedulePanel } from './components.js';
+import { KebabMenu } from '../shared.js';
+import { Avatar, MessageBubble, Composer, CommandBar, CommandFill, SchedulePanel, PollBuilder } from './components.js';
 import { ThreadReadAloud } from './read-aloud.js';
 import { peerName, ownerKeyOf, isAgentPeer, ownerDisplayName, subThreadLabel, groupConversations, dayKey, dayLabel, trackStateLabel, tallyPoll, quoteSnippet, stampShort, stampFull } from './helpers.js';
 
@@ -60,7 +64,8 @@ export function ListPanel({ requests, conversations, activeConv, peerDisplay, ac
     const label = via
       ? (nested ? `${t('inbox.viaAgent')} ${via}` : peerDisplay(c.peerGhii))
       : (nested ? (c.subject || (sub ? peerDisplay(c.peerGhii) : t('inbox.directThread'))) : peerDisplay(c.peerGhii));
-    const icon = (via || sub) ? '🤖' : (c.subject ? '🏷' : '💬');
+    // A nested row's mark is a word, not an emoji: an agent thread, a subject thread, or the direct one.
+    const icon = (via || sub) ? t('inbox.cover.markAgent') || 'ag' : (c.subject ? '#' : '·');
     return html`
       <button class=${`inbox-conv${active}${nested ? ' inbox-conv--nested' : ''}`} key=${c.conversationId} onClick=${() => openConversation(c)}>
         ${nested ? html`<span class="inbox-conv-subico">${icon}</span>` : html`<${Avatar} seed=${c.peerGhii} size=${40} />`}
@@ -71,7 +76,7 @@ export function ListPanel({ requests, conversations, activeConv, peerDisplay, ac
             <span class="inbox-conv-time" title=${c.updatedAt ? stampFull(c.updatedAt) : ''}>${c.updatedAt ? stampShort(c.updatedAt) : ''}</span>
           </div>
           <div class="inbox-conv-line2">
-            ${(!nested && c.subject) ? html`<span class="inbox-conv-subject">🏷 ${escHtml(c.subject)}</span>` : ''}
+            ${(!nested && c.subject) ? html`<span class="inbox-conv-subject">${escHtml(c.subject)}</span>` : ''}
             <span class="inbox-conv-preview">${byAgent ? `${t('inbox.viaAgent')} ${byAgent}: ` : (c.lastDirection === 'outbound' ? `${t('inbox.youPrefix')} ` : '')}${escHtml(c.lastMessage || '')}</span>
             ${c.unread > 0 ? html`<span class="inbox-conv-badge">${c.unread}</span>` : null}
           </div>
@@ -162,25 +167,22 @@ export function ThreadPanel({
         <${Avatar} seed=${activeConv.peerGhii} size=${36} />
         <div class="inbox-thread-id">
           <div class="inbox-name" title=${activeConv.peerGhii}>${escHtml(peerDisplay(activeConv.peerGhii))} ${activeConv.groupAlias ? null : html`<${PresenceDot} ghii=${activeConv.peerGhii} label=${true} />`}</div>
-          ${activeConv.subject ? html`<div class="inbox-thread-subject">🏷 ${escHtml(activeConv.subject)}</div>` : null}
-          ${viaAgentName ? html`<div class="inbox-thread-via">🤖 ${t('inbox.sentByAgent')} ${escHtml(viaAgentName)}</div>` : null}
+          ${activeConv.subject ? html`<div class="inbox-thread-subject">${escHtml(activeConv.subject)}</div>` : null}
+          ${viaAgentName ? html`<div class="inbox-thread-via">${t('inbox.sentByAgent')} ${escHtml(viaAgentName)}</div>` : null}
           <div class="inbox-sub">${escHtml(activeConv.peerGhii)}${activeConv.groupAlias && activeConv.groupAlias !== activeConv.peerGhii
             ? ` · ${t('inbox.viaAddress')} ${activeConv.groupAlias}` : ''}${activeConv.participants?.length
             ? ` · ${t('inbox.groupParticipants', { count: String(activeConv.participants.length) })}` : ''}</div>
         </div>
+        ${/* Two doors and the rest behind "…": the head used to carry six buttons, four of them for
+              settings and second-order actions, on the row that names who you are talking to. */''}
         <${ThreadReadAloud} thread=${thread} peerLabelText=${peerDisplay(activeConv.peerGhii)} convId=${activeConv.conversationId} />
-        ${!viaAgentName ? html`<button class="btn-ghost btn-sm inbox-ai-btn" onClick=${openConversationAi} title=${t('inbox.ai.replyWithAi')}>✨ <span class="inbox-ai-btn-label">${t('inbox.ai.replyWithAi')}</span></button>` : null}
-        ${!viaAgentName ? html`<button class="btn-ghost btn-sm inbox-ai-btn" onClick=${openConversationNotebook} title=${t('inbox.notebook.toNotebook')}>📓 <span class="inbox-ai-btn-label">${t('inbox.notebook.toNotebookShort')}</span></button>` : null}
-        <button class=${`btn-ghost btn-sm inbox-linkprev-toggle${showLinkPreviews ? ' inbox-linkprev-toggle--on' : ''}`}
-          aria-pressed=${!!showLinkPreviews} onClick=${toggleLinkPreviews}
-          title=${showLinkPreviews ? t('inbox.linkPreview.hideAll') : t('inbox.linkPreview.showAll')}>
-          <span class="inbox-ai-btn-label">${t('inbox.linkPreview.label')}</span></button>
-        ${(thread.length >= 50) ? html`<button class=${`btn-ghost btn-sm inbox-linkprev-toggle${threadAll ? ' inbox-linkprev-toggle--on' : ''}`}
-          aria-pressed=${!!threadAll} onClick=${toggleThreadAll}
-          title=${threadAll ? t('inbox.thread.showRecent') : t('inbox.thread.showAll')}>
-          <span class="inbox-ai-btn-label">${threadAll ? t('inbox.thread.showRecent') : t('inbox.thread.showAll')}</span></button>` : null}
-        ${peerIsMyAgent && !viaAgentName ? html`<button class=${`btn-ghost btn-sm inbox-sched-btn${schedOpen ? ' inbox-sched-btn--on' : ''}`}
-          onClick=${() => setSchedOpen(o => !o)} title=${t('inbox.schedTitle')}>📅</button>` : null}
+        ${!viaAgentName ? html`<button type="button" class="og-door inbox-ai-btn" onClick=${openConversationAi} title=${t('inbox.ai.replyWithAi')}><span class="inbox-ai-btn-label">${t('inbox.ai.replyWithAi')}</span></button>` : null}
+        <${KebabMenu} label=${t('inbox.cover.more') || 'More'} btnClass="og-door og-door--quiet" trigger="…" items=${[
+          !viaAgentName ? { label: t('inbox.notebook.toNotebook'), onClick: openConversationNotebook } : null,
+          { label: showLinkPreviews ? t('inbox.linkPreview.hideAll') : t('inbox.linkPreview.showAll'), onClick: toggleLinkPreviews },
+          (thread.length >= 50) ? { label: threadAll ? t('inbox.thread.showRecent') : t('inbox.thread.showAll'), onClick: toggleThreadAll } : null,
+          (peerIsMyAgent && !viaAgentName) ? { label: t('inbox.schedTitle'), onClick: () => setSchedOpen(o => !o) } : null,
+        ]} />
       </div>
       <div class="inbox-msgs" ref=${msgsRef}>
         ${thread.length === 0 ? html`<div class="inbox-empty-sm">${t('inbox.noThread')}</div>` : null}
@@ -197,6 +199,7 @@ export function ThreadPanel({
           return html`
             ${showDay ? html`<div class="inbox-day" key=${'d' + m.id}><span>${dayLabel(m.createdAt)}</span></div>` : null}
             <${MessageBubble} key=${m.id + m.direction} msg=${m} mine=${m.direction === 'outbound'} urlMap=${urlMap}
+              who=${m.direction === 'outbound' ? t('inbox.quoteYou') : peerDisplay(m.senderGhii || activeConv.peerGhii)}
               domId=${`inbox-msg-${m.id}`} quoted=${quoted} quotedName=${quoted ? quoteSender(quoted) : ''} onJumpTo=${jumpTo}
               onQuote=${(onQuoteReply && !activeConv.viaAgent) ? onQuoteReply : null}
               starred=${important.has(m.id)} onStar=${toggleImportant} onTrack=${onTrackMsg} onPark=${onParkMsg} onReplyAi=${openMessageAi} tracked=${trackedByMsg[m.id]}
@@ -240,6 +243,61 @@ export function ThreadPanel({
             sendLabel=${t('inbox.reply')} sending=${sending} onSend=${doSend} initialText=${draftPrefill}
             voiceMaxSeconds=${voiceMaxSeconds}
             focusNonce=${composerFocus} draftKey=${'aimeat.inbox.draft.' + activeConv.conversationId} />`}
+    </div>`;
+}
+
+/** The broadcast / poll compose form, a page of its own on the poster face. Pure render over the
+ *  container's state; moved here from inbox-tab.js unchanged (max-file-lines). */
+export function renderBroadcastForm({
+  bcType, setBcType, bcMode, setBcMode, bcQuestions, setBcQuestions, bcRecipients, removeBcRecipient, bcInput, setBcInput,
+  addBcRecipient, myGroups, bcGroupId, setBcGroupId, isOperator, bcAudience, setBcAudience, sending, doBroadcast,
+}) {
+  return html`
+    <div class="inbox-panel">
+      <div class="inbox-thread-head"><div class="inbox-name">${t('inbox.broadcastTitle')}</div></div>
+      <div class="inbox-compose-fields">
+        <div class="inbox-bc-mode">
+          <label class=${`inbox-bc-modeopt${bcType === 'message' ? ' inbox-bc-modeopt--on' : ''}`}>
+            <input type="radio" name="bctype" checked=${bcType === 'message'} onChange=${() => setBcType('message')} />
+            <span>${t('inbox.bcTypeMessage')}</span>
+          </label>
+          <label class=${`inbox-bc-modeopt${bcType === 'poll' ? ' inbox-bc-modeopt--on' : ''}`}>
+            <input type="radio" name="bctype" checked=${bcType === 'poll'} onChange=${() => setBcType('poll')} />
+            <span>${t('inbox.bcTypePoll')}</span>
+          </label>
+        </div>
+        ${bcType === 'message' ? html`<div class="inbox-bc-mode">
+          <label class=${`inbox-bc-modeopt${bcMode === 'broadcast' ? ' inbox-bc-modeopt--on' : ''}`}>
+            <input type="radio" name="bcmode" checked=${bcMode === 'broadcast'} onChange=${() => setBcMode('broadcast')} />
+            <span>${t('inbox.bcModeBroadcast')}</span>
+          </label>
+          <label class=${`inbox-bc-modeopt${bcMode === 'announcement' ? ' inbox-bc-modeopt--on' : ''}`}>
+            <input type="radio" name="bcmode" checked=${bcMode === 'announcement'} onChange=${() => setBcMode('announcement')} />
+            <span>${t('inbox.bcModeAnnouncement')}</span>
+          </label>
+        </div>` : html`<${PollBuilder} questions=${bcQuestions} setQuestions=${setBcQuestions} />`}
+        ${bcRecipients.length ? html`<div class="inbox-bc-chips">
+          ${bcRecipients.map(r => html`<span class="inbox-bc-chip" key=${r}>${escHtml(peerName(r))}
+            <button class="inbox-bc-chip-x" title=${t('inbox.bcRemove')} onClick=${() => removeBcRecipient(r)}>✕</button></span>`)}
+        </div>` : null}
+        <div class="inbox-bc-add">
+          <input class="inbox-input" type="text" list="inbox-contact-suggest" placeholder=${t('inbox.bcAddPlaceholder')}
+            value=${bcInput} onInput=${(e) => setBcInput(e.target.value)}
+            onKeyDown=${(e) => { if (e.key === 'Enter') { e.preventDefault(); addBcRecipient(); } }} />
+          <button class="btn-outline btn-sm" onClick=${() => addBcRecipient()}>${t('inbox.bcAdd')}</button>
+        </div>
+        ${myGroups.length ? html`<select class="inbox-input" value=${bcGroupId} onChange=${(e) => setBcGroupId(e.target.value)}>
+          <option value="">${t('inbox.bcNoGroup')}</option>
+          ${myGroups.map(g => html`<option value=${g.id} key=${g.id}>${escHtml(g.name)} (${(g.members || []).length})</option>`)}
+        </select>` : null}
+        ${isOperator ? html`<select class=${`inbox-input${bcAudience ? ' inbox-bc-audience--on' : ''}`} value=${bcAudience} onChange=${(e) => setBcAudience(e.target.value)}>
+          <option value="">${t('inbox.bcNoAudience')}</option>
+          <option value="node-users">${t('inbox.bcNodeUsers')}</option>
+          <option value="federation-users">${t('inbox.bcFederationUsers')}</option>
+        </select>` : null}
+      </div>
+      <${Composer} key="c-bc" recipient=${(bcRecipients.length || bcGroupId || bcAudience) ? 'bc' : ''}
+        sendLabel=${bcType === 'poll' ? t('inbox.pollSend') : t('inbox.bcSend')} sending=${sending} onSend=${doBroadcast} />
     </div>`;
 }
 
