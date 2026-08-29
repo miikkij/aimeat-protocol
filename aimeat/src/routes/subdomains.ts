@@ -15,7 +15,8 @@
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  * @version-history
  *   v1.18.0 — 2026-08-29 — serveApp reads the owner's badge and install-chip switches and the
- *     named reviewer from the manifest (services/app-marks.ts).
+ *     named reviewer from the manifest (services/app-marks.ts); the reviewer is also the JSON-LD
+ *     author and editor in the head-meta pass.
  *   v1.17.0 — 2026-08-27 — wantsWebmcpBridge() moves to utils/app-agent-discovery.ts, shared with
  *     the apex inline serve, which now injects the same discovery block this origin does
  *     (TARGET-074: the mosaic renderer reads its identity from #aimeat-app-ref).
@@ -373,6 +374,9 @@ async function serveApp(res: Response, storage: Storage, app: AppRecord, csp: st
             lang: seoMeta.lang,
             // The owner's switch on the browser install offer (services/app-marks.ts).
             installChip: appInstallChipOn(app.manifest),
+            // The declared reviewer becomes the JSON-LD author and editor, which is how a byline
+            // scanner reads a page (schema.org author/editor, meta author, rel=author).
+            author: appReviewedBy(app.manifest),
           }
         : undefined,
     });

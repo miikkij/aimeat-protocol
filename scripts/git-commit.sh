@@ -37,6 +37,25 @@ if [ ! -f "$MSG_FILE" ]; then
 fi
 shift
 
+# `--only -- <paths>` is how a session commits its own files while another session's staged work
+# stays in the index (docs/pitfalls.md §32). Git's --only takes TRACKED paths: a new file named
+# after `--` fails with "pathspec did not match any file(s) known to git" and nothing is committed
+# (2026-08-29, five new files). So a path the caller named that git does not know yet is staged
+# here first, by name — exactly the paths listed, never `-A` — and each one is announced.
+if printf '%s\n' "$@" | grep -qx -- '--only'; then
+  seen_dashes=0
+  for arg in "$@"; do
+    if [ "$seen_dashes" -eq 0 ]; then
+      [ "$arg" = "--" ] && seen_dashes=1
+      continue
+    fi
+    if [ -e "$arg" ] && ! git ls-files --error-unmatch -- "$arg" >/dev/null 2>&1; then
+      echo "[git-commit] staging new file by name: $arg" >&2
+      git add -- "$arg"
+    fi
+  done
+fi
+
 # No pre-flight check here on purpose. `git commit -F` copies this file to COMMIT_EDITMSG and runs
 # the commit-msg hook on it before creating anything, so the gate already sees the real message and
 # a refusal aborts the commit with the index untouched. A second copy of the check here would be a

@@ -30,7 +30,8 @@
  * @usage
  *   text = applyAppHeadMeta(text, { owner, filename, appName, description, origin, baseUrl, tools });
  * @version-history
- *   v1.4.0 — 2026-08-29 — `installChip: false` leaves the install-chip script out (the owner's switch).
+ *   v1.4.0 — 2026-08-29 — `installChip: false` leaves the install-chip script out (the owner's switch);
+ *     `author` (the declared reviewer) becomes the JSON-LD author and editor.
  *   v1.3.0 — 2026-08-16 — The app is installable from its own origin: a manifest link, a
  *     theme-color, an apple-touch-icon and the install-chip script join the gap-fill set (the
  *     manifest itself is served by subdomains.ts; the chip shows the suggestion the browser never
@@ -101,6 +102,11 @@ export interface AppHeadSpec {
    * absent means on, which is what every app got before the switch existed.
    */
   installChip?: boolean;
+  /**
+   * The natural person who reviewed this app and answers for it (manifest.authorship). Becomes
+   * the JSON-LD `author` and `editor`; absent, the account name stays the author as before.
+   */
+  author?: string;
 }
 
 function esc(t: string): string {
@@ -238,7 +244,12 @@ export function applyAppHeadMeta(text: string, spec: AppHeadSpec): string {
       url: `${origin}/`,
       applicationCategory: 'WebApplication',
       operatingSystem: 'Any',
-      author: { '@type': 'Person', name: spec.owner },
+      // The declared reviewer (manifest.authorship) is the person who answers for this app, and
+      // that is what `author` means to a reader of this vocabulary; without one, the account name.
+      // `editor` is the same person, stated separately because a scanner reading bylines the way
+      // the press is read (Luotain, 2026-08-29) looks for schema.org author AND editor.
+      author: { '@type': 'Person', name: spec.author ?? spec.owner },
+      ...(spec.author ? { editor: { '@type': 'Person', name: spec.author } } : {}),
       isPartOf: { '@type': 'WebSite', name: 'AIMEAT', url: `${spec.baseUrl.replace(/\/$/, '')}/` },
       dateModified: (spec.updatedAt ?? new Date().toISOString()).split('T')[0],
       ...(spec.image ? { image: spec.image } : {}),
