@@ -18,6 +18,8 @@
  *   const checked = expandScopes(agent.default_scopes ?? ['*']);
  *   await save(collapseScopes(checked));
  * @version-history
+ *   v1.7.0 — 2026-08-29 — organism:rows: the person's half of the two-hand rule that lets an app
+ *     keep an append-only trail on a row space the organism opened to it.
  *   v1.6.0 — 2026-08-26 — site:layout-write, in its own domain and outside every wildcard: which
  *     blocks the node's front page and every member's home are built from. Same operator-only gate
  *     as the two rows above it, and here for the same reason — the capability is meant to be used
@@ -167,7 +169,11 @@ export const SCOPE_DOMAINS = [
   // organism:invite — hand somebody else access: invite a member, grant or revoke a workspace role.
   //                   Separate from write because it changes WHO ELSE can read the owner's knowledge,
   //                   which is a different promise than changing the knowledge.
-  { key: 'organism',  permissions: ['read', 'write', 'invite'] },
+  // organism:rows — append to, and read back, the organism row spaces that NAME the holder
+  //                 (an app's event log or audit trail on a group). The person's half of a
+  //                 two-hand rule: the organism names the app in the space's manifest, the person
+  //                 grants this; neither alone opens anything (2026-08-29).
+  { key: 'organism',  permissions: ['read', 'write', 'invite', 'rows'] },
   { key: 'provenance', permissions: ['write'] },
   // cortex:write — install/activate/deactivate/delete cortex libraries (browser-side UI)
   // ext:write    — activate/deactivate/delete extensions, manage instances (server-side WASM)

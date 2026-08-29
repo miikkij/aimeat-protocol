@@ -22,6 +22,8 @@
  *   - retentionOf                 -- the declared window, normalised
  * @usage const space = resolveRowSpace(manifest, 'mailmessage');
  * @version-history
+ *   v1.1.0 — 2026-08-29 — `apps`: the apps the organism opened the space to, normalised to
+ *     lowercase owner/filename.
  *   v1.0.0 — 2026-08-26 — Initial.
  */
 import { isRowBackedSpace, isMemoryBackedSpace, MAX_INDEX_ON } from '../workspace-meta.js';
@@ -46,6 +48,13 @@ export interface RowObjectType {
   writeRole?: string;
   indexOn?: unknown;
   retention?: unknown;
+  /**
+   * Apps this space is open to, as `owner/filename`. An app running in a person's browser holds an
+   * app grant, never a membership, and the organism's data is not the person's to open with a
+   * click — so the ORGANISM names the apps here, and the person approves the `organism:rows`
+   * scope at sign-in. Both hands, or neither. Read the design in row-service.ts (authorizeApp).
+   */
+  apps?: unknown;
 }
 
 /** A resolved row space: what to store into, what is indexed, and how long rows stay. */
@@ -56,6 +65,8 @@ export interface RowSpace {
   indexOn: string[];
   writeRole: string;
   retention: { maxRows: number | null; maxDays: number | null };
+  /** The apps the organism opened this space to (`owner/filename`, lowercase). Empty = none. */
+  apps: string[];
 }
 
 /** The three columns, as the storage layer takes them. */
@@ -115,6 +126,10 @@ export function resolveRowSpace(
     indexOn,
     writeRole: typeof ot.writeRole === 'string' ? ot.writeRole : 'member',
     retention: retentionOf(ot.retention),
+    // `owner/filename`, lowercased, so the comparison with the grant's `app` claim is exact.
+    apps: Array.isArray(ot.apps)
+      ? ot.apps.filter((a): a is string => typeof a === 'string' && a.includes('/')).map((a) => a.trim().toLowerCase())
+      : [],
   };
 }
 

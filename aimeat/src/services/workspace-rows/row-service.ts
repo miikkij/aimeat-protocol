@@ -28,6 +28,9 @@
  *   - appendRows / readRows / readRow / deleteRow / sweepRows / spaceStats / workspaceRowIndex
  * @usage const res = await appendRows(deps, caller, { organismId, wsId, space, rows });
  * @version-history
+ *   v1.1.0 — 2026-08-29 — authorizeApp + gate(): a role-'app' caller reaches one row space by the
+ *     two-hand rule (the space names the app, the person holds organism:rows and an active
+ *     membership); every entry point goes through gate().
  *   v1.0.0 — 2026-08-26 — Initial.
  */
 import { randomUUID } from 'node:crypto';
@@ -64,6 +67,8 @@ export interface RowCaller {
   identity: string;
   owner: string;
   roles: string[];
+  /** For a role-'app' session: the app's own id, `owner/filename`, from the grant's `app` claim. */
+  app?: string;
 }
 
 export interface RowServiceDeps {
@@ -110,6 +115,45 @@ async function authorize(
     gateKey(organismId, wsId, namespace), mode,
   );
   if (refusal) throw new WorkspaceRowError(refusal.code, refusal.status, refusal.message);
+}
+
+/**
+ * The APP path: two hands, or neither.
+ *
+ * An app running in a person's browser holds an app grant (role 'app'), not a membership, and the
+ * organism's data is not the person's to open with a click. So a role-'app' caller reaches a row
+ * space only when (1) the ORGANISM named the app in the space's `apps` list, (2) the PERSON the app
+ * acts for is an active member, and (3) the grant carries `organism:rows`, which the route checked
+ * before the call arrived. Nothing else on this path: not the consent machinery written for
+ * agents, not the writeRole ladder — the organism's naming IS the consent, and it names one app
+ * for one space. The app appends and reads THAT space; every other space, and every other write
+ * surface of the workspace, is closed to it as before. Decided 2026-08-29 so an app can keep an
+ * append-only audit trail on the organism it belongs to (the legal-pages demo).
+ */
+async function authorizeApp(
+  deps: RowServiceDeps, caller: RowCaller, organismId: string, space: RowSpace,
+): Promise<void> {
+  const app = (caller.app ?? '').trim().toLowerCase();
+  if (!app || !space.apps.includes(app)) {
+    throw new WorkspaceRowError('ACCESS_DENIED', 403,
+      `This space is not open to ${app ? `the app ${app}` : 'apps'}. An organism admin names the apps a row space accepts in the manifest (objectTypes[].apps).`);
+  }
+  const membership = await deps.storage.getMembership(organismId, caller.owner);
+  if (!membership || membership.status !== 'active') {
+    throw new WorkspaceRowError('ACCESS_DENIED', 403, 'The person this app acts for is not an active member of this organism.');
+  }
+}
+
+/** Every entry point goes through here: the app path when the caller is one, else the member path. */
+async function gate(
+  deps: RowServiceDeps, caller: RowCaller, organismId: string, wsId: string, space: RowSpace, mode: 'read' | 'write',
+): Promise<void> {
+  if (caller.roles.includes('app')) {
+    await authorizeApp(deps, caller, organismId, space);
+    return;
+  }
+  await authorize(deps, caller, organismId, wsId, space.namespace, mode);
+  if (mode === 'write') await requireWriteRole(deps, caller, organismId, space);
 }
 
 /** The space's own writeRole, on top of membership. Read is every member's. */
@@ -190,8 +234,7 @@ export async function appendRows(
   }
 
   const space = await loadSpace(deps, organismId, wsId, input.space);
-  await authorize(deps, caller, organismId, wsId, space.namespace, 'write');
-  await requireWriteRole(deps, caller, organismId, space);
+  await gate(deps, caller, organismId, wsId, space, 'write');
 
   const now = new Date().toISOString();
   const maxRowBytes = config.wsRowsMaxRowKb * 1024;
@@ -312,7 +355,7 @@ export async function readRows(
   deps: RowServiceDeps, caller: RowCaller, input: ReadRowsInput,
 ): Promise<ReadRowsResult> {
   const space = await loadSpace(deps, input.organismId, input.wsId, input.space);
-  await authorize(deps, caller, input.organismId, input.wsId, space.namespace, 'read');
+  await gate(deps, caller, input.organismId, input.wsId, space, 'read');
 
   const cols = columnsForWhere(space, input.where);
   const page = await deps.storage.listWorkspaceRows({
@@ -342,7 +385,7 @@ export async function readRow(
   organismId: string, wsId: string, spaceName: string, rowId: string,
 ): Promise<ReadRowsResult['rows'][number]> {
   const space = await loadSpace(deps, organismId, wsId, spaceName);
-  await authorize(deps, caller, organismId, wsId, space.namespace, 'read');
+  await gate(deps, caller, organismId, wsId, space, 'read');
   const row = await deps.storage.getWorkspaceRow(organismId, wsId, space.namespace, rowId);
   if (!row) {
     throw new WorkspaceRowError('NOT_FOUND', 404, `No row "${rowId}" in ${space.name}.`);
@@ -355,8 +398,7 @@ export async function deleteRow(
   organismId: string, wsId: string, spaceName: string, rowId: string,
 ): Promise<void> {
   const space = await loadSpace(deps, organismId, wsId, spaceName);
-  await authorize(deps, caller, organismId, wsId, space.namespace, 'write');
-  await requireWriteRole(deps, caller, organismId, space);
+  await gate(deps, caller, organismId, wsId, space, 'write');
   const removed = await deps.storage.deleteWorkspaceRow(organismId, wsId, space.namespace, rowId);
   if (!removed) {
     throw new WorkspaceRowError('NOT_FOUND', 404, `No row "${rowId}" in ${space.name}.`);
@@ -369,8 +411,7 @@ export async function deleteRowsBefore(
   organismId: string, wsId: string, spaceName: string, before: string,
 ): Promise<number> {
   const space = await loadSpace(deps, organismId, wsId, spaceName);
-  await authorize(deps, caller, organismId, wsId, space.namespace, 'write');
-  await requireWriteRole(deps, caller, organismId, space);
+  await gate(deps, caller, organismId, wsId, space, 'write');
   const cutoff = isoOr(before, 'before', '');
   if (!cutoff) {
     throw new WorkspaceRowError('INVALID_ROW', 400, 'Name the cutoff as an ISO 8601 timestamp in `before`.');
@@ -385,7 +426,7 @@ export async function spaceStats(
   organismId: string, wsId: string, spaceName: string,
 ): Promise<WorkspaceRowStats> {
   const space = await loadSpace(deps, organismId, wsId, spaceName);
-  await authorize(deps, caller, organismId, wsId, space.namespace, 'read');
+  await gate(deps, caller, organismId, wsId, space, 'read');
   const [stats] = await deps.storage.workspaceRowStats(organismId, wsId, space.namespace);
   return stats ?? {
     namespace: space.namespace, rows: 0, bytes: 0, oldest: null, newest: null, lastWriteAt: null,

@@ -332,6 +332,19 @@ function composeAppPrompt(
   // Reading what the owner's AGENTS produced. This is the single most common "my app shows
   // nothing" cause for fleet-facing apps: agent output is NOT in the owner's namespace, and an
   // app-grant token gets no automatic broadening, so an unscoped list() legitimately returns [].
+  // An app's audit trail on the group it belongs to. Added 2026-08-29 with the two-hand rule:
+  // the organism names the app, the person approves the scope, and only both open ONE space.
+  body += '### An event log or audit trail the app keeps on a group: organism row spaces\n';
+  body += 'What a group ACCUMULATES — an audit trail, an event log, readings, received messages — belongs in a row space of an organism workspace (manifest `objectTypes[]` with `backing: "rows"`), not in a memory record that grows or gets rewritten: rows are append-only, indexed on up to three fields, charged to the workspace, and never edited by anyone. An app running in a person\'s browser reaches ONE such space when two hands open it: the organism\'s admin names the app in the space (`apps: ["owner/filename"]`), and the person approves the `organism:rows` scope at sign-in (declare it in `<meta name="aimeat-scopes">`). Then, while the person is an active member:\n';
+  body += '```html\n';
+  body += '<script src="' + nodeUrl + '/v1/libs/aimeat-rows.js"></' + 'script>\n';
+  body += '```\n';
+  body += '```javascript\n';
+  body += 'await AIMEAT.rows.append(organism_id, ws, "event", { app: "shop.html", kind: "order", actor: session.owner, at: new Date().toISOString(), detail: "…" }, { rowId: "order-" + id, occurredAt: when });\n';
+  body += 'const { rows } = await AIMEAT.rows.read(organism_id, ws, "event", { limit: 50, where: { kind: "order" } });\n';
+  body += '```\n';
+  body += 'A space that does not name the app answers 403 and says so — show that sentence, and tell the person which organism admin can open it. Nothing else on the organism opens through this scope: no other space, no records, no documents. Put the space in the data map as `where: "organism-rows"`, and write `rowId` for anything that may be sent twice, so a retry replaces instead of duplicating.\n\n';
+
   body += '### Reading data your AGENTS produced (not your own keys)\n';
   body += 'An agent publishes under **its own** namespace (`agentname#owner@node`), NOT the owner\'s. Your app token is role `app`, which gets no automatic owner-scope broadening — so a plain `list({prefix})` returns NOTHING for agent data and the app looks empty while the data is right there. Say which namespace you mean:\n';
   body += '```javascript\n';
