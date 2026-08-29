@@ -13,6 +13,8 @@
  *   The blocks the showroom restyled but did not replace (the wish box, the app wall, the counters,
  *   the change log) keep their rules in landing.css.
  * @version-history
+ *   v1.1.1 — 2026-08-29 — The headline's offset shadow is the sun, not coral: coral behind ink at that
+ *     size read as a blur, and the sun ties the title to the sticker above it.
  *   v1.1.0 — 2026-08-29 — Nothing tilts any more: the sticker, the kicker and the three pictures sit
  *     straight (design canvas "AIMEAT Index Pages"; the tilt read as mess). The face is whatever
  *     --font-showroom says, Fjalla One since theme.css v1.34.0.
@@ -73,7 +75,7 @@
 .ld-sh-title {
   margin: 0; font-family: var(--font-showroom); font-weight: 400; text-transform: uppercase;
   font-size: clamp(2.4rem, 6.6vw, 6rem); line-height: .96; color: var(--text);
-  text-shadow: .075em .075em 0 var(--accent); display: flex; flex-direction: column;
+  text-shadow: .075em .075em 0 var(--sun); display: flex; flex-direction: column;
 }
 .ld-sh-position { margin: 0; font-family: var(--font-showroom); text-transform: uppercase; font-size: clamp(.85rem, 1.2vw, 1.05rem); letter-spacing: .04em; color: var(--accent); }
 .ld-sh-hero-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3.5rem; width: 100%; align-items: start; }
