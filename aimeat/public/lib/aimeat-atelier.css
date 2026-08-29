@@ -36,6 +36,11 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.26.0 — 2026-08-29 — THE LANE AND THE BAND, both rules the developer never chose:
+ *     --ak-main-max goes 68rem → 100% (room by default; the reading looks keep their measure
+ *     and the main column gains growing side air), and --ak-hero-min goes 30dvh → 11rem, so a
+ *     band is sized by what stands in it instead of by a slice of the window. A page that
+ *     wants a lane back says so in one token.
  *   v0.25.0 — 2026-08-29 — The things that open, styled (content.css: the dialog department,
  *     the drawer, the reveal fan) and the DANGER button (shell.css) — outlined, its ink built
  *     the way --ak-accent-text is, so the destructive answer is readable by the same
@@ -266,11 +271,17 @@
   --ak-chrome-bottom: var(--aimeat-chrome-bottom, 56px);
 
   /* ── Component sizing (one sizing everywhere — instances never override these) ────────── */
-  --ak-main-max:      68rem;                            /* measure cap for the main column — a
-                                                           52rem tube read as "basic" on every
-                                                           desktop; the composition grid inside
-                                                           now owns the line lengths */
-  --ak-hero-min:      30dvh;                            /* the focal band's minimum height   */
+  /* ROOM BY DEFAULT (2026-08-29). This was 68rem, and before that 52rem — a lane down the
+   * middle with dead margins on every desktop, which the developer rightly called the rule
+   * nobody chose. A page now takes the WHOLE window; the composition grid's spans own the line
+   * lengths, and the looks that mean READING (editorial, broadsheet, gallery, terminal,
+   * neon-dense) set their own measure, because a paragraph at 2000px is not a design choice.
+   * Going back to a lane is one token on the look or the app's signature. */
+  --ak-main-max:      100%;
+  /* The band is sized by what STANDS IN IT, not by a slice of the window. 30dvh meant a title
+   * and one line ate a third of a laptop screen before anything was read; the poster looks
+   * (poster, carnival, billboard, aurora) still declare their tall bands on purpose. */
+  --ak-hero-min:      11rem;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════════════════

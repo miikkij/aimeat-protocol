@@ -8,6 +8,8 @@ full text: https://openfontlicense.org/open-font-license-official-text/
 | Baloo 2 | v23 (variable wght 400–800) | `baloo2-latin.woff2`, `baloo2-latin-ext.woff2` | © Ek Type (https://ektype.in) | https://fonts.google.com/specimen/Baloo+2 |
 | Bangers | v25 | `bangers-latin.woff2`, `bangers-latin-ext.woff2` | © Vernon Adams | https://fonts.google.com/specimen/Bangers |
 | Inter | v20 (variable wght 100–900) | `inter-var-latin.woff2`, `inter-var-latin-ext.woff2` | © The Inter Project Authors (https://github.com/rsms/inter) | https://fonts.google.com/specimen/Inter |
+| Archivo Black | v23 (400, the only cut) | `archivo-black-latin.woff2`, `archivo-black-latin-ext.woff2` | © Omnibus-Type (https://www.omnibus-type.com) | https://fonts.google.com/specimen/Archivo+Black |
+| Archivo | v23 (variable wght 400–700) | `archivo-var-latin.woff2`, `archivo-var-latin-ext.woff2` | © Omnibus-Type (https://www.omnibus-type.com) | https://fonts.google.com/specimen/Archivo |
 | Space Grotesk | v22 (variable wght 300–700) | `space-grotesk-var-latin.woff2`, `space-grotesk-var-latin-ext.woff2` | © Florian Karsten (https://floriankarsten.com) | https://fonts.google.com/specimen/Space+Grotesk |
 | Fraunces | v38 (variable opsz 9–144, wght 100–900) | `fraunces-var-latin.woff2`, `fraunces-var-latin-ext.woff2` | © The Fraunces Project Authors (https://github.com/undercasetype/fraunces) | https://fonts.google.com/specimen/Fraunces |
 | JetBrains Mono | v24 (variable wght 100–800) | `jetbrains-mono-var-latin.woff2`, `jetbrains-mono-var-latin-ext.woff2` | © The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono) | https://fonts.google.com/specimen/JetBrains+Mono |
