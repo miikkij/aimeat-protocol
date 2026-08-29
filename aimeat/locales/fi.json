@@ -3196,7 +3196,9 @@
     "apiContract": "API-sopimus",
     "store": "Kauppa",
     "changelog": "Mitä on julkaistu",
-    "buildStory": "Näin appi rakentuu"
+    "buildStory": "Näin appi rakentuu",
+    "privacy": "Tietosuoja",
+    "terms": "Käyttöehdot"
   },
   "glossary.example": "Esimerkiksi",
   "glossary.failed": "Sanastoa ei saatu ladattua.",

@@ -3208,7 +3208,9 @@
     "apiContract": "API contract",
     "store": "Store",
     "changelog": "What shipped",
-    "buildStory": "How an app gets built"
+    "buildStory": "How an app gets built",
+    "privacy": "Privacy",
+    "terms": "Terms"
   },
   "glossary.example": "For example",
   "glossary.failed": "The glossary could not be loaded.",
