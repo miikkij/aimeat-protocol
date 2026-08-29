@@ -120,7 +120,7 @@ function benchBodyFor(kind: PartKind, raw: unknown): Record<string, unknown> {
     }
     // look and motion: a token sheet — the same bench a layout's signature runs, including the
     // contrast-matrix proof of an `--ak-accent` pair.
-    const tokens = validateSignatureTokens(o.tokens);
+    const tokens = validateSignatureTokens(o.tokens, typeof o.look === 'string' ? o.look : undefined);
     if (Object.keys(tokens).length === 0) {
       throw new DesignBookError('BODY_INVALID',
         `A ${kind} part carries at least one token — an empty sheet changes nothing and proves nothing.`, 422);

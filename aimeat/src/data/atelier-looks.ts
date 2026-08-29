@@ -18,13 +18,26 @@
  *   gap plain, and because hand-writing a preset block, a prompt row and a catalogue row for
  *   every look made each new look a project instead of a decision.
  *
- *   A LOOK NEVER INTRODUCES A COLOUR: every colour value is an expression over the theme tokens
- *   (color-mix in oklab, the OKLCh spectrum rotations). That rule is what makes the matrix able
- *   to prove all of this arithmetically.
+ *   A LOOK NEVER SHIPS AN UNPROVEN COLOUR. Two legal forms: an EXPRESSION over the theme tokens
+ *   (color-mix in oklab, the OKLCh spectrum rotations), or — for a WORLD — literal GROUNDS
+ *   (bg/surface/surface-2/ink/ink-dim/line, one set per mode) plus dark-mode expressions
+ *   (dusk), because the matrix runs every check against exactly those values. Freed from
+ *   "never a colour" on 2026-08-29 at the developer's direction: the old rule protected
+ *   readability by forbidding paper, phosphor and night, and the proof mechanism replaces the
+ *   prohibition.
  * @structure AtelierStructure / AtelierLook · STRUCTURES · LOOKS · lookById()
  * @usage
  *   import { LOOKS, STRUCTURES } from '../data/atelier-looks.js';
  * @version-history
+ *   v1.5.0 — 2026-08-29 — THE BONES FREED: two COMPOSITION structures. press-sheet (riso) — the
+ *     masthead is giant display type ON the sheet, print-sticker KPI chips overlap its foot,
+ *     unspanned units set themselves asymmetrically. marquee (stage) — the band fills three
+ *     quarters of the window and the working surface rises over its bottom edge, staggered.
+ *     The developer's point, finally heard: the skeleton was what never changed.
+ *   v1.4.0 — 2026-08-29 — WORLDS OWN THEIR GROUNDS: grounds (proven literal ground pairs) and
+ *     dusk (dark-mode expressions) join the entry shape; riso gets its paper, terminal goes
+ *     permanently phosphor-on-black, stage permanently night, and the purity rule is reframed
+ *     from "never a colour" to "never an UNPROVEN colour".
  *   v1.3.0 — 2026-08-28 — BILLBOARD: the whole screen is the poster — carnival's language with
  *     the measure column dropped (--ak-main-max 100%) and a half-viewport banner. The
  *     developer's ask: not everything is a lane in the middle of the screen.
@@ -61,6 +74,16 @@ export interface AtelierLook {
   structures: string[];
   /** Token overrides on the --ak-* contract. Empty for the base look (vivid IS the contract). */
   tokens: Record<string, string>;
+  /** A WORLD owns its ground: literal values for the ground tokens (bg, surface, surface-2,
+   *  ink, ink-dim, line), one set per mode — paper for a print world, phosphor for a machine
+   *  one, night for a stage. The matrix runs every check against these in both modes, which is
+   *  what makes the literals legal: a look never ships an UNPROVEN colour. A world that is
+   *  always dark simply declares the same set twice. */
+  grounds?: { light: Record<string, string>; dark: Record<string, string> };
+  /** Dark-mode token EXPRESSIONS layered with the dark ground (var()/color-mix only — the
+   *  purity check covers them): for the values whose polarity flips with the palette's accent,
+   *  like the action band. */
+  dusk?: Record<string, string>;
   /** The comment above the generated block — why this look is what it is. */
   note: string;
 }
@@ -147,6 +170,121 @@ ${sel} .ak-mosaic .ak-section {
   box-shadow: none;
   background: transparent;
   padding: 0;
+}`,
+  },
+  {
+    id: 'press-sheet',
+    summary: 'The POSTER composition: the masthead is giant display type ON the sheet itself (no band), the KPI chips are print stickers overlapping its foot, and unspanned units set themselves asymmetrically — a composed page, not a pile.',
+    css: (sel) => `
+${sel} .ak-mosaic__band .ak-hero:not(.ak-hero--image) {
+  min-height: unset;
+  margin-inline: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  overflow: visible;
+}
+${sel} .ak-mosaic__band .ak-hero:not(.ak-hero--image)::before,
+${sel} .ak-mosaic__band .ak-hero:not(.ak-hero--image) .ak-hero__scrim { display: none; }
+${sel} .ak-mosaic__band .ak-hero:not(.ak-hero--image) .ak-hero__inner {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 6px;
+  padding: clamp(8px, 3vh, 28px) 0 0;
+}
+${sel} .ak-mosaic__band .ak-hero:not(.ak-hero--image) .ak-hero__title {
+  font-size: clamp(3.4rem, 12.5vw, 10.5rem);
+  line-height: 0.88;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+  color: var(--ak-accent-text);
+  text-shadow: 0.045em 0.035em 0 color-mix(in oklab, var(--ak-spectrum-2) 62%, transparent);
+  overflow-wrap: anywhere;
+}
+${sel} .ak-mosaic__band .ak-hero:not(.ak-hero--image) .ak-hero__sub {
+  font-family: var(--ak-font-mono);
+  font-size: var(--ak-text-fine);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--ak-ink-dim);
+}
+${sel} .ak-statrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: calc(-1 * clamp(0.6rem, 2.5vw, 2.4rem));
+  position: relative;
+  z-index: 2;
+}
+${sel} .ak-statrow__tile {
+  flex: 0 1 auto;
+  border: 2px solid var(--ak-accent-text);
+  border-radius: 4px;
+  background: var(--ak-surface);
+  box-shadow: none;
+  padding: 8px 18px;
+  transform: rotate(-1.2deg);
+}
+${sel} .ak-statrow__tile:nth-child(2n) {
+  transform: rotate(1deg);
+  border-color: color-mix(in oklab, var(--ak-spectrum-2) 62%, var(--ak-ink));
+}
+${sel} .ak-statrow__value { color: var(--ak-accent-text); }
+${sel} .ak-mosaic__units--grid > .ak-mosaic__unit:not([class*='ak-mosaic__unit--']) { grid-column: span 6; }
+${sel} .ak-mosaic__units--grid > .ak-mosaic__unit:not([class*='ak-mosaic__unit--']):nth-child(3n+2) { grid-column: span 4; }
+${sel} .ak-mosaic__units--grid > .ak-mosaic__unit:not([class*='ak-mosaic__unit--']):nth-child(3n) {
+  grid-column: span 2;
+  transform: translateY(clamp(6px, 1.8vw, 20px)) rotate(0.6deg);
+}
+@media (max-width: 760px) {
+  ${sel} .ak-mosaic__units--grid > .ak-mosaic__unit:not([class*='ak-mosaic__unit--']),
+  ${sel} .ak-mosaic__units--grid > .ak-mosaic__unit:not([class*='ak-mosaic__unit--']):nth-child(3n+2),
+  ${sel} .ak-mosaic__units--grid > .ak-mosaic__unit:not([class*='ak-mosaic__unit--']):nth-child(3n) {
+    grid-column: 1 / -1;
+    transform: none;
+  }
+}`,
+  },
+  {
+    id: 'marquee',
+    summary: 'The OPENING composition: the band fills three quarters of the window with the title at its foot, and the working surface RISES OVER its bottom edge — staggered, asymmetric, layered; the page opens like a curtain, not like a form.',
+    css: (sel) => `
+${sel} .ak-mosaic__band .ak-hero {
+  min-height: 74dvh;
+  border-radius: 0;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+}
+${sel} .ak-mosaic__band .ak-hero .ak-hero__inner {
+  margin-top: auto;
+  padding-inline: max(var(--ak-pad), calc((100vw - min(var(--ak-main-max), 100vw)) / 2 + var(--ak-pad)));
+  padding-bottom: clamp(3rem, 10vh, 6.5rem);
+}
+${sel} .ak-hero__title {
+  font-size: clamp(3.2rem, 11vw, 9.5rem);
+  line-height: 0.92;
+  letter-spacing: -0.025em;
+}
+${sel} .ak-mosaic__units--grid {
+  margin-top: calc(-1 * clamp(2rem, 7vh, 5rem));
+  position: relative;
+  z-index: 2;
+  align-items: start;
+}
+${sel} .ak-mosaic__units--grid > .ak-mosaic__unit:not([class*='ak-mosaic__unit--']):first-child { grid-column: span 6; }
+${sel} .ak-mosaic__units--grid > .ak-mosaic__unit:not([class*='ak-mosaic__unit--']):nth-child(2n) { grid-column: span 4; }
+${sel} .ak-mosaic__units--grid > .ak-mosaic__unit:not([class*='ak-mosaic__unit--']):nth-child(2n+3) {
+  grid-column: span 2;
+  transform: translateY(clamp(10px, 3vh, 30px));
+}
+@media (max-width: 760px) {
+  ${sel} .ak-mosaic__units--grid { margin-top: calc(-1 * clamp(1rem, 4vh, 2.4rem)); }
+  ${sel} .ak-mosaic__units--grid > .ak-mosaic__unit:not([class*='ak-mosaic__unit--']):nth-child(2n),
+  ${sel} .ak-mosaic__units--grid > .ak-mosaic__unit:not([class*='ak-mosaic__unit--']):nth-child(2n+3) {
+    grid-column: 1 / -1;
+    transform: none;
+  }
 }`,
   },
   {
@@ -386,7 +524,31 @@ export const LOOKS: readonly AtelierLook[] = [
     feel: 'the machine speaks: mono everything, joined cells, dense, grain like phosphor',
     imagery: 'ASCII and wireframe schematics, phosphor glow',
     structures: ['joined'],
+    dusk: {
+      '--ak-grad': 'linear-gradient(160deg, color-mix(in oklab, var(--ak-accent) 82%, var(--ak-ink)), color-mix(in oklab, var(--ak-accent) 76%, var(--ak-ink)))',
+    },
+    grounds: {
+      light: {
+        '--ak-bg': '#04120a',
+        '--ak-surface': '#0f2416',
+        '--ak-surface-2': '#020a05',
+        '--ak-ink': '#aef2c4',
+        '--ak-ink-dim': '#5fae7f',
+      },
+      dark: {
+        '--ak-bg': '#04120a',
+        '--ak-surface': '#0f2416',
+        '--ak-surface-2': '#020a05',
+        '--ak-ink': '#aef2c4',
+        '--ak-ink-dim': '#5fae7f',
+      },
+    },
     tokens: {
+      '--ak-grad': 'linear-gradient(160deg, color-mix(in oklab, var(--ak-accent) 82%, var(--ak-surface-2)), color-mix(in oklab, var(--ak-accent) 76%, var(--ak-surface-2)))',
+      '--ak-accent-text': 'color-mix(in oklab, var(--ak-accent) 52%, var(--ak-ink))',
+      '--ak-hero-ink': 'var(--ak-accent-ink)',
+      '--ak-hero-ink-dim': 'var(--ak-accent-ink)',
+      '--ak-scrim': 'color-mix(in oklab, var(--ak-surface-2) 16%, transparent)',
       '--ak-page-grain': 'var(--ak-grain)',
       '--ak-main-max': '80rem',
       '--ak-font': 'var(--ak-font-mono)',
@@ -478,8 +640,28 @@ export const LOOKS: readonly AtelierLook[] = [
     id: 'riso',
     feel: 'two inks printed slightly off register: flat blocks, a hard second-hue type shadow, paper grain everywhere, no shadows because print has none — the miss is the style',
     imagery: 'risograph print, two-colour overprint, flat shapes, visible paper grain, slight misregistration',
-    structures: ['full-bleed-hero'],
+    structures: ['press-sheet'],
+    dusk: {
+      '--ak-accent-text': 'color-mix(in oklab, var(--ak-accent) 72%, var(--ak-ink))',
+    },
+    grounds: {
+      light: {
+        '--ak-bg': '#efe6d2',
+        '--ak-surface': '#fbf6ea',
+        '--ak-surface-2': '#e6dabf',
+        '--ak-ink': '#241e13',
+        '--ak-ink-dim': '#655a44',
+      },
+      dark: {
+        '--ak-bg': '#211a10',
+        '--ak-surface': '#2d2517',
+        '--ak-surface-2': '#171208',
+        '--ak-ink': '#f2e9d4',
+        '--ak-ink-dim': '#bfb297',
+      },
+    },
     tokens: {
+      '--ak-accent-text': 'color-mix(in oklab, var(--ak-accent) 58%, var(--ak-ink))',
       '--ak-kinetic': 'words',
       '--ak-page-grain': 'var(--ak-grain)',
       '--ak-line-w': '2px',
@@ -511,9 +693,29 @@ export const LOOKS: readonly AtelierLook[] = [
     id: 'stage',
     feel: 'the lit stage: a spotlight falls from above, panels float as glass with a glowing edge, depth everywhere — the room a digital twin lives in',
     imagery: 'spotlit dark stage, wireframe schematics, floating glass panels, atmospheric depth',
-    structures: ['full-bleed-hero'],
+    structures: ['marquee'],
+    dusk: {
+      '--ak-grad': 'linear-gradient(160deg, color-mix(in oklab, var(--ak-accent) 80%, var(--ak-ink)), color-mix(in oklab, var(--ak-spectrum-3) 70%, var(--ak-ink)))',
+    },
+    grounds: {
+      light: {
+        '--ak-bg': '#0b0d16',
+        '--ak-surface': '#171b2b',
+        '--ak-surface-2': '#060810',
+        '--ak-ink': '#e9ecf6',
+        '--ak-ink-dim': '#a6abc2',
+      },
+      dark: {
+        '--ak-bg': '#0b0d16',
+        '--ak-surface': '#171b2b',
+        '--ak-surface-2': '#060810',
+        '--ak-ink': '#e9ecf6',
+        '--ak-ink-dim': '#a6abc2',
+      },
+    },
     tokens: {
-      '--ak-page-image': 'radial-gradient(at 50% 0%, color-mix(in oklab, var(--ak-accent) 8%, var(--ak-bg)), transparent 55%), radial-gradient(at 86% 92%, color-mix(in oklab, var(--ak-spectrum-3) 6%, var(--ak-bg)), transparent 52%)',
+      '--ak-accent-text': 'color-mix(in oklab, var(--ak-accent) 55%, var(--ak-ink))',
+      '--ak-page-image': 'radial-gradient(at 50% 0%, color-mix(in oklab, var(--ak-accent) 16%, var(--ak-bg)), transparent 58%), radial-gradient(at 86% 92%, color-mix(in oklab, var(--ak-spectrum-3) 11%, var(--ak-bg)), transparent 54%)',
       '--ak-surface-image': 'none',
       '--ak-hero-image': 'none',
       '--ak-line': 'color-mix(in oklab, var(--ak-accent) 22%, var(--ak-ink-dim))',
@@ -523,8 +725,8 @@ export const LOOKS: readonly AtelierLook[] = [
       '--ak-blur': '10px',
       '--ak-elev-1': '0 6px 24px color-mix(in oklab, var(--ak-ink) 28%, transparent)',
       '--ak-elev-2': '0 14px 44px color-mix(in oklab, var(--ak-ink) 42%, transparent), 0 0 30px color-mix(in oklab, var(--ak-accent) 18%, transparent)',
-      '--ak-grad': 'linear-gradient(160deg, color-mix(in oklab, var(--ak-accent) 78%, var(--ak-ink)), color-mix(in oklab, var(--ak-spectrum-3) 66%, var(--ak-ink)))',
-      '--ak-scrim': 'color-mix(in oklab, var(--ak-ink) 16%, transparent)',
+      '--ak-grad': 'linear-gradient(160deg, color-mix(in oklab, var(--ak-accent) 80%, var(--ak-surface-2)), color-mix(in oklab, var(--ak-spectrum-3) 70%, var(--ak-surface-2)))',
+      '--ak-scrim': 'color-mix(in oklab, var(--ak-surface-2) 18%, transparent)',
       '--ak-hero-ink': 'var(--ak-accent-ink)',
       '--ak-hero-ink-dim': 'var(--ak-accent-ink)',
       '--ak-hero-min': '38dvh',

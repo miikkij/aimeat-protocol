@@ -16,6 +16,7 @@
   --ak-hero-ink-dim:  var(--ak-hero-ink);
   --ak-scrim:         color-mix(in oklab, var(--ak-bg) 78%, transparent);
   --ak-kinetic:       none;
+  --ak-glass:         color-mix(in oklab, var(--ak-surface) 74%, transparent);
 }
 
 /* @preset-block flat — the deliberate opt-out: no decoration, no entrance.
@@ -55,6 +56,7 @@
   --ak-hero-ink-dim:    var(--ak-hero-ink);
   --ak-scrim:           color-mix(in oklab, var(--ak-bg) 78%, transparent);
   --ak-kinetic:         none;
+  --ak-glass:           color-mix(in oklab, var(--ak-surface) 74%, transparent);
 }
 
 /* @preset-block editorial — magazine: masthead on rules, giant joined numerals, cells in one frame, slow fades.
@@ -173,6 +175,7 @@
   --ak-hero-ink:        var(--ak-ink);
   --ak-hero-ink-dim:    var(--ak-hero-ink);
   --ak-scrim:           color-mix(in oklab, var(--ak-bg) 78%, transparent);
+  --ak-glass:           color-mix(in oklab, var(--ak-surface) 74%, transparent);
 }
 
 /* @preset-block neon-dense — operator console: tight, mono display face, accent ring + glow on every card, fast.
@@ -196,6 +199,7 @@
   --ak-hero-ink-dim:    var(--ak-hero-ink);
   --ak-scrim:           color-mix(in oklab, var(--ak-bg) 78%, transparent);
   --ak-kinetic:         none;
+  --ak-glass:           color-mix(in oklab, var(--ak-surface) 74%, transparent);
 }
 
 /* @preset-block poster — one giant focal statement on the brand gradient, edge to edge; everything else recedes.
@@ -215,6 +219,7 @@
   --ak-hero-ink-dim:    var(--ak-hero-ink);
   --ak-scrim:           color-mix(in oklab, var(--ak-bg) 78%, transparent);
   --ak-kinetic:         none;
+  --ak-glass:           color-mix(in oklab, var(--ak-surface) 74%, transparent);
 }
 /* structure: full-bleed-hero — The focal band runs edge to edge, out of the measure column. */
 [data-ak-look='poster'] .ak-mosaic__band .ak-hero {
@@ -350,6 +355,7 @@
   --ak-hero-ink-dim:    var(--ak-hero-ink);
   --ak-scrim:           color-mix(in oklab, var(--ak-bg) 78%, transparent);
   --ak-kinetic:         none;
+  --ak-glass:           color-mix(in oklab, var(--ak-surface) 74%, transparent);
 }
 /* structure: full-bleed-hero — The focal band runs edge to edge, out of the measure column. */
 [data-ak-look='gallery'] .ak-mosaic__band .ak-hero {
@@ -392,6 +398,11 @@
 /* @preset-block terminal — the machine speaks: mono everything, joined cells, dense, grain like phosphor.
    Everything is the mono face and a hairline grid; the grain stays on, like phosphor. */
 [data-ak-look='terminal'] {
+  --ak-grad:            linear-gradient(160deg, color-mix(in oklab, var(--ak-accent) 82%, var(--ak-surface-2)), color-mix(in oklab, var(--ak-accent) 76%, var(--ak-surface-2)));
+  --ak-accent-text:     color-mix(in oklab, var(--ak-accent) 52%, var(--ak-ink));
+  --ak-hero-ink:        var(--ak-accent-ink);
+  --ak-hero-ink-dim:    var(--ak-accent-ink);
+  --ak-scrim:           color-mix(in oklab, var(--ak-surface-2) 16%, transparent);
   --ak-page-grain:      var(--ak-grain);
   --ak-main-max:        80rem;
   --ak-font:            var(--ak-font-mono);
@@ -412,10 +423,22 @@
   --ak-enter-distance:  4px;
   --ak-enter-stagger:   15ms;
   --ak-motion:          var(--motion-fast, 120ms);
-  --ak-hero-ink:        var(--ak-ink);
-  --ak-hero-ink-dim:    var(--ak-hero-ink);
-  --ak-scrim:           color-mix(in oklab, var(--ak-bg) 78%, transparent);
+  --ak-bg:              #04120a;
+  --ak-surface:         #0f2416;
+  --ak-surface-2:       #020a05;
+  --ak-ink:             #aef2c4;
+  --ak-ink-dim:         #5fae7f;
   --ak-kinetic:         none;
+  --ak-glass:           color-mix(in oklab, var(--ak-surface) 74%, transparent);
+}
+/* @preset-block terminal@dark — the world's dark ground (layered by the dark cascade). */
+[data-theme='dark'] [data-ak-look='terminal'], [data-ak-look='terminal'][data-theme='dark'] {
+  --ak-bg:         #04120a;
+  --ak-surface:    #0f2416;
+  --ak-surface-2:  #020a05;
+  --ak-ink:        #aef2c4;
+  --ak-ink-dim:    #5fae7f;
+  --ak-grad:       linear-gradient(160deg, color-mix(in oklab, var(--ak-accent) 82%, var(--ak-ink)), color-mix(in oklab, var(--ak-accent) 76%, var(--ak-ink)));
 }
 /* structure: joined — Cells share hairlines inside one bordered frame — a laid-out page, not floating cards. */
 [data-ak-look='terminal'] .ak-mosaic__units--grid {
@@ -462,6 +485,7 @@
   --ak-hero-ink:        var(--ak-accent-ink);
   --ak-hero-ink-dim:    var(--ak-accent-ink);
   --ak-display-stroke:  0;
+  --ak-glass:           color-mix(in oklab, var(--ak-surface) 74%, transparent);
 }
 /* structure: full-bleed-hero — The focal band runs edge to edge, out of the measure column. */
 [data-ak-look='carnival'] .ak-mosaic__band .ak-hero {
@@ -502,6 +526,7 @@
   --ak-hero-ink:        var(--ak-accent-ink);
   --ak-hero-ink-dim:    var(--ak-accent-ink);
   --ak-display-stroke:  0;
+  --ak-glass:           color-mix(in oklab, var(--ak-surface) 74%, transparent);
 }
 /* structure: full-bleed-hero — The focal band runs edge to edge, out of the measure column. */
 [data-ak-look='billboard'] .ak-mosaic__band .ak-hero {
@@ -518,6 +543,7 @@
 /* @preset-block riso — two inks printed slightly off register: flat blocks, a hard second-hue type shadow, paper grain everywhere, no shadows because print has none — the miss is the style.
    The print-shop world: separation comes from the 2px accent-mixed edge and the paper grain, never from a shadow (print has none). The display shadow is the second ink landing a millimetre off, and the masthead is a solid ink plate so the pair AK-SCRIM proves stays the same arithmetic carnival passes. */
 [data-ak-look='riso'] {
+  --ak-accent-text:     color-mix(in oklab, var(--ak-accent) 58%, var(--ak-ink));
   --ak-kinetic:         words;
   --ak-page-grain:      var(--ak-grain);
   --ak-line-w:          2px;
@@ -542,23 +568,98 @@
   --ak-enter-stagger:   50ms;
   --ak-ease:            cubic-bezier(0.2, 0.9, 0.3, 1);
   --ak-hero-min:        30dvh;
+  --ak-bg:              #efe6d2;
+  --ak-surface:         #fbf6ea;
+  --ak-surface-2:       #e6dabf;
+  --ak-ink:             #241e13;
+  --ak-ink-dim:         #655a44;
+  --ak-glass:           color-mix(in oklab, var(--ak-surface) 74%, transparent);
 }
-/* structure: full-bleed-hero — The focal band runs edge to edge, out of the measure column. */
-[data-ak-look='riso'] .ak-mosaic__band .ak-hero {
+/* @preset-block riso@dark — the world's dark ground (layered by the dark cascade). */
+[data-theme='dark'] [data-ak-look='riso'], [data-ak-look='riso'][data-theme='dark'] {
+  --ak-bg:           #211a10;
+  --ak-surface:      #2d2517;
+  --ak-surface-2:    #171208;
+  --ak-ink:          #f2e9d4;
+  --ak-ink-dim:      #bfb297;
+  --ak-accent-text:  color-mix(in oklab, var(--ak-accent) 72%, var(--ak-ink));
+}
+/* structure: press-sheet — The POSTER composition: the masthead is giant display type ON the sheet itself (no band), the KPI chips are print stickers overlapping its foot, and unspanned units set themselves asymmetrically — a composed page, not a pile. */
+[data-ak-look='riso'] .ak-mosaic__band .ak-hero:not(.ak-hero--image) {
+  min-height: unset;
+  margin-inline: 0;
+  border: 0;
   border-radius: 0;
-  margin-left: calc(50% - 50vw);
-  margin-right: calc(50% - 50vw);
+  box-shadow: none;
+  background: transparent;
+  overflow: visible;
 }
-/* The band escapes the column; its TEXT stays aligned to it — found in the first
- * real-data experiment run, where the title clipped at the viewport edge. */
-[data-ak-look='riso'] .ak-mosaic__band .ak-hero .ak-hero__inner {
-  padding-inline: max(var(--ak-pad), calc((100vw - min(var(--ak-main-max), 100vw)) / 2 + var(--ak-pad)));
+[data-ak-look='riso'] .ak-mosaic__band .ak-hero:not(.ak-hero--image)::before,
+[data-ak-look='riso'] .ak-mosaic__band .ak-hero:not(.ak-hero--image) .ak-hero__scrim { display: none; }
+[data-ak-look='riso'] .ak-mosaic__band .ak-hero:not(.ak-hero--image) .ak-hero__inner {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 6px;
+  padding: clamp(8px, 3vh, 28px) 0 0;
+}
+[data-ak-look='riso'] .ak-mosaic__band .ak-hero:not(.ak-hero--image) .ak-hero__title {
+  font-size: clamp(3.4rem, 12.5vw, 10.5rem);
+  line-height: 0.88;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+  color: var(--ak-accent-text);
+  text-shadow: 0.045em 0.035em 0 color-mix(in oklab, var(--ak-spectrum-2) 62%, transparent);
+  overflow-wrap: anywhere;
+}
+[data-ak-look='riso'] .ak-mosaic__band .ak-hero:not(.ak-hero--image) .ak-hero__sub {
+  font-family: var(--ak-font-mono);
+  font-size: var(--ak-text-fine);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--ak-ink-dim);
+}
+[data-ak-look='riso'] .ak-statrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: calc(-1 * clamp(0.6rem, 2.5vw, 2.4rem));
+  position: relative;
+  z-index: 2;
+}
+[data-ak-look='riso'] .ak-statrow__tile {
+  flex: 0 1 auto;
+  border: 2px solid var(--ak-accent-text);
+  border-radius: 4px;
+  background: var(--ak-surface);
+  box-shadow: none;
+  padding: 8px 18px;
+  transform: rotate(-1.2deg);
+}
+[data-ak-look='riso'] .ak-statrow__tile:nth-child(2n) {
+  transform: rotate(1deg);
+  border-color: color-mix(in oklab, var(--ak-spectrum-2) 62%, var(--ak-ink));
+}
+[data-ak-look='riso'] .ak-statrow__value { color: var(--ak-accent-text); }
+[data-ak-look='riso'] .ak-mosaic__units--grid > .ak-mosaic__unit:not([class*='ak-mosaic__unit--']) { grid-column: span 6; }
+[data-ak-look='riso'] .ak-mosaic__units--grid > .ak-mosaic__unit:not([class*='ak-mosaic__unit--']):nth-child(3n+2) { grid-column: span 4; }
+[data-ak-look='riso'] .ak-mosaic__units--grid > .ak-mosaic__unit:not([class*='ak-mosaic__unit--']):nth-child(3n) {
+  grid-column: span 2;
+  transform: translateY(clamp(6px, 1.8vw, 20px)) rotate(0.6deg);
+}
+@media (max-width: 760px) {
+  [data-ak-look='riso'] .ak-mosaic__units--grid > .ak-mosaic__unit:not([class*='ak-mosaic__unit--']),
+  [data-ak-look='riso'] .ak-mosaic__units--grid > .ak-mosaic__unit:not([class*='ak-mosaic__unit--']):nth-child(3n+2),
+  [data-ak-look='riso'] .ak-mosaic__units--grid > .ak-mosaic__unit:not([class*='ak-mosaic__unit--']):nth-child(3n) {
+    grid-column: 1 / -1;
+    transform: none;
+  }
 }
 
 /* @preset-block stage — the lit stage: a spotlight falls from above, panels float as glass with a glowing edge, depth everywhere — the room a digital twin lives in.
    The atmosphere half of the lit-stage direction: spotlight ambient, glass panels, glow depth — proven in both modes by the matrix, truest in the dark. The WebGL ground (universe camera, twin scenes) arrives as a vendored lib on top; this look is its guaranteed flat fallback. */
 [data-ak-look='stage'] {
-  --ak-page-image:      radial-gradient(at 50% 0%, color-mix(in oklab, var(--ak-accent) 8%, var(--ak-bg)), transparent 55%), radial-gradient(at 86% 92%, color-mix(in oklab, var(--ak-spectrum-3) 6%, var(--ak-bg)), transparent 52%);
+  --ak-accent-text:     color-mix(in oklab, var(--ak-accent) 55%, var(--ak-ink));
+  --ak-page-image:      radial-gradient(at 50% 0%, color-mix(in oklab, var(--ak-accent) 16%, var(--ak-bg)), transparent 58%), radial-gradient(at 86% 92%, color-mix(in oklab, var(--ak-spectrum-3) 11%, var(--ak-bg)), transparent 54%);
   --ak-surface-image:   none;
   --ak-hero-image:      none;
   --ak-line:            color-mix(in oklab, var(--ak-accent) 22%, var(--ak-ink-dim));
@@ -568,8 +669,8 @@
   --ak-blur:            10px;
   --ak-elev-1:          0 6px 24px color-mix(in oklab, var(--ak-ink) 28%, transparent);
   --ak-elev-2:          0 14px 44px color-mix(in oklab, var(--ak-ink) 42%, transparent), 0 0 30px color-mix(in oklab, var(--ak-accent) 18%, transparent);
-  --ak-grad:            linear-gradient(160deg, color-mix(in oklab, var(--ak-accent) 78%, var(--ak-ink)), color-mix(in oklab, var(--ak-spectrum-3) 66%, var(--ak-ink)));
-  --ak-scrim:           color-mix(in oklab, var(--ak-ink) 16%, transparent);
+  --ak-grad:            linear-gradient(160deg, color-mix(in oklab, var(--ak-accent) 80%, var(--ak-surface-2)), color-mix(in oklab, var(--ak-spectrum-3) 70%, var(--ak-surface-2)));
+  --ak-scrim:           color-mix(in oklab, var(--ak-surface-2) 18%, transparent);
   --ak-hero-ink:        var(--ak-accent-ink);
   --ak-hero-ink-dim:    var(--ak-accent-ink);
   --ak-hero-min:        38dvh;
@@ -579,18 +680,59 @@
   --ak-enter-stagger:   70ms;
   --ak-motion:          260ms;
   --ak-ease:            cubic-bezier(0.22, 1, 0.36, 1);
+  --ak-bg:              #0b0d16;
+  --ak-surface:         #171b2b;
+  --ak-surface-2:       #060810;
+  --ak-ink:             #e9ecf6;
+  --ak-ink-dim:         #a6abc2;
   --ak-kinetic:         none;
+  --ak-glass:           color-mix(in oklab, var(--ak-surface) 74%, transparent);
 }
-/* structure: full-bleed-hero — The focal band runs edge to edge, out of the measure column. */
+/* @preset-block stage@dark — the world's dark ground (layered by the dark cascade). */
+[data-theme='dark'] [data-ak-look='stage'], [data-ak-look='stage'][data-theme='dark'] {
+  --ak-bg:         #0b0d16;
+  --ak-surface:    #171b2b;
+  --ak-surface-2:  #060810;
+  --ak-ink:        #e9ecf6;
+  --ak-ink-dim:    #a6abc2;
+  --ak-grad:       linear-gradient(160deg, color-mix(in oklab, var(--ak-accent) 80%, var(--ak-ink)), color-mix(in oklab, var(--ak-spectrum-3) 70%, var(--ak-ink)));
+}
+/* structure: marquee — The OPENING composition: the band fills three quarters of the window with the title at its foot, and the working surface RISES OVER its bottom edge — staggered, asymmetric, layered; the page opens like a curtain, not like a form. */
 [data-ak-look='stage'] .ak-mosaic__band .ak-hero {
+  min-height: 74dvh;
   border-radius: 0;
   margin-left: calc(50% - 50vw);
   margin-right: calc(50% - 50vw);
 }
-/* The band escapes the column; its TEXT stays aligned to it — found in the first
- * real-data experiment run, where the title clipped at the viewport edge. */
 [data-ak-look='stage'] .ak-mosaic__band .ak-hero .ak-hero__inner {
+  margin-top: auto;
   padding-inline: max(var(--ak-pad), calc((100vw - min(var(--ak-main-max), 100vw)) / 2 + var(--ak-pad)));
+  padding-bottom: clamp(3rem, 10vh, 6.5rem);
+}
+[data-ak-look='stage'] .ak-hero__title {
+  font-size: clamp(3.2rem, 11vw, 9.5rem);
+  line-height: 0.92;
+  letter-spacing: -0.025em;
+}
+[data-ak-look='stage'] .ak-mosaic__units--grid {
+  margin-top: calc(-1 * clamp(2rem, 7vh, 5rem));
+  position: relative;
+  z-index: 2;
+  align-items: start;
+}
+[data-ak-look='stage'] .ak-mosaic__units--grid > .ak-mosaic__unit:not([class*='ak-mosaic__unit--']):first-child { grid-column: span 6; }
+[data-ak-look='stage'] .ak-mosaic__units--grid > .ak-mosaic__unit:not([class*='ak-mosaic__unit--']):nth-child(2n) { grid-column: span 4; }
+[data-ak-look='stage'] .ak-mosaic__units--grid > .ak-mosaic__unit:not([class*='ak-mosaic__unit--']):nth-child(2n+3) {
+  grid-column: span 2;
+  transform: translateY(clamp(10px, 3vh, 30px));
+}
+@media (max-width: 760px) {
+  [data-ak-look='stage'] .ak-mosaic__units--grid { margin-top: calc(-1 * clamp(1rem, 4vh, 2.4rem)); }
+  [data-ak-look='stage'] .ak-mosaic__units--grid > .ak-mosaic__unit:not([class*='ak-mosaic__unit--']):nth-child(2n),
+  [data-ak-look='stage'] .ak-mosaic__units--grid > .ak-mosaic__unit:not([class*='ak-mosaic__unit--']):nth-child(2n+3) {
+    grid-column: 1 / -1;
+    transform: none;
+  }
 }
 
 /* @preset-block aurora — vivid at full volume: a taller drifting aurora, wider spectrum, deeper glass, edge to edge.
