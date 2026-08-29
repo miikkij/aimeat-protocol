@@ -469,6 +469,32 @@ button.ak-card:hover { box-shadow: var(--ak-elev-2); transform: translateY(-2px)
   border-radius: var(--ak-radius) var(--ak-radius) 0 0;
   padding-bottom: max(var(--ak-pad), env(safe-area-inset-bottom));
 }
+/* THE SIZES: a question is not a form is not a report. */
+.ak-dialog--compact { width: min(28rem, calc(100vw - 2 * var(--ak-pad))); }
+.ak-dialog--roomy   { width: min(38rem, calc(100vw - 2 * var(--ak-pad))); }
+.ak-dialog--wide    { width: min(56rem, calc(100vw - 2 * var(--ak-pad))); }
+
+/* THE TONES: what KIND of moment this is, before a word is read. Each is a top rule plus a
+ * matching title ink — the same construction --ak-accent-text uses (the hue pulled toward the
+ * ink), so every tone is readable in every palette by arithmetic the matrix already proves. */
+.ak-dialog--danger .ak-dialog__panel { border-top: 3px solid var(--ak-err); }
+.ak-dialog--danger .ak-dialog__title { color: color-mix(in oklab, var(--ak-err) 74%, var(--ak-ink)); }
+.ak-dialog--celebrate .ak-dialog__panel {
+  border-top: 3px solid transparent;
+  border-image: var(--ak-grad) 1;
+  border-image-slice: 1;
+  border-image-width: 3px 0 0 0;
+}
+.ak-dialog--celebrate .ak-dialog__title { color: var(--ak-accent-text); }
+.ak-dialog--ai .ak-dialog__panel { border-top: 3px solid color-mix(in oklab, var(--ak-spectrum-2) 60%, var(--ak-line)); }
+.ak-dialog--ai .ak-dialog__title::after {
+  content: '✦';
+  margin-left: 8px;
+  color: var(--ak-accent-text);
+  font-size: var(--ak-text-fine);
+  vertical-align: super;
+}
+
 .ak-dialog__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .ak-dialog__title { margin: 0; font-family: var(--ak-font-display); font-size: var(--ak-text-title); }
 .ak-dialog__x { min-width: var(--ak-touch); min-height: var(--ak-touch); }
