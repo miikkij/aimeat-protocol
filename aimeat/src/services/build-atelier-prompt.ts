@@ -26,6 +26,9 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.15.0 — 2026-08-29 — THE DEMO TRAP named in the genre section: a block stack wearing a
+ *     look is never a statement — subject first, genre fork, components serving the page
+ *     (docs/pitfalls.md §34, learned the hard way twice in one day).
  *   v1.14.0 — 2026-08-29 — The machine room taught: the ops family (health / queue / gauge /
  *     console), the chart family (kind + area + trend sparklines), the offline atlas, and
  *     LIVE BY DECLARATION (the mosaic's `live` map over aimeat-live).
@@ -306,6 +309,14 @@ function composeBody(config: AimeatConfig): string {
     body += '- `' + g.id + '` — **' + g.title + '**: ' + g.description + '\n';
   }
   body += '\n';
+  body += 'THE TRAP THIS SECTION EXISTS TO STOP: a mosaic block stack wearing a look is a tool '
+    + 'screen, never a statement — assembling components and applying a world reads as "the '
+    + 'same dashboard in new paint" no matter which world. When a page must IMPRESS, start '
+    + 'from the SUBJECT (whose page is this, what does it say), fork the genre that carries '
+    + 'that register, and let the components serve the page — they mount in any element, so a '
+    + 'free-composed page can still carry a live gauge or a map. If you cannot name what the '
+    + 'page is about beyond "it shows the blocks", you are building a demo, and a demo never '
+    + 'looks designed.\n\n';
 
   // THE PATTERN SHELF — rendered from the registry (atelier-patterns.ts), same data the
   // catalogue serves, so the choosing guidance can never drift from what patterns.css ships.

@@ -3962,13 +3962,13 @@
       }
       let vb = [0, 0, geo.w, geo.h];
       if (spec.fit !== "world" && extent[0] < extent[2]) {
-        const padX = Math.max((extent[2] - extent[0]) * 0.25, 20);
-        const padY = Math.max((extent[3] - extent[1]) * 0.25, 12);
+        const padX = Math.max((extent[2] - extent[0]) * 0.25, 3);
+        const padY = Math.max((extent[3] - extent[1]) * 0.25, 2);
         let x0 = Math.max(0, extent[0] - padX);
         let y0 = Math.max(0, extent[1] - padY);
         let x1 = Math.min(geo.w, extent[2] + padX);
         let y1 = Math.min(geo.h, extent[3] + padY);
-        const minW = 90;
+        const minW = Math.max((extent[2] - extent[0]) * 3, 22);
         if (x1 - x0 < minW) {
           const cx = (x0 + x1) / 2;
           x0 = Math.max(0, cx - minW / 2);
@@ -4008,7 +4008,7 @@
         }
         node.appendChild(path);
       });
-      const dotR = Math.max(vb[2] / 220, 1.6);
+      const dotR = vb[2] / 160;
       markers.forEach(function(m, i) {
         if (typeof m.lon !== "number" || typeof m.lat !== "number") return;
         const [x, y] = project(m.lon, m.lat);
