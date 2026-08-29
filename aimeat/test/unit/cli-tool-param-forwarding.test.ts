@@ -69,6 +69,11 @@ const UNREACHABLE: Record<string, Record<string, string>> = {
     aimeat_crew_publish: {
         revision: 'Conditional, not dropped: the probe sets doc as well, which publishes; revision is only read when there is no doc (restore). Both reach the node in test/e2e-agent-crew.ts.',
     },
+    aimeat_app_legal_set: {
+        format: 'Conditional, not dropped: sent inside the kind object, so only with `kind`, which names the page the format belongs to. Without a kind the tool READS the state (GET .../legal) and has nothing to attach a format to. With a kind all three travel — proven by the probe run that sets kind.',
+        content: 'Same condition.',
+        remove: 'Same condition: `remove: true` rides inside the kind object, and the node reads it as null for that kind.',
+    },
     aimeat_knowledge_contribute: {
         package_id: 'This tool is deliberately unreachable from the connector — see knowledgeContributeUnreachable().',
         entry_key: 'Same: the tool answers with a refusal rather than calling the node.',

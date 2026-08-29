@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description App, subdomain, CSM/MSM/schema, system-prompt, and package/template record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.9.0 — 2026-08-29 — AppManifest gains `legal`: the app's own legal pages by kind (terms,
+ *     privacy, imprint, refunds, accessibility, cookies, support), each markdown, HTML or a URL.
  *   v1.8.0 — 2026-08-29 — AppManifest gains `marks` (the badge and install-chip switches),
  *     `authorship` (a named person who reviewed the app and answers for it) and `authorshipLog`
  *     (every declaration and withdrawal, for the audit). PATCH-only, JSON on both providers.
@@ -69,6 +71,47 @@ export interface AppAuthorshipLogEntry {
 
 /** How many authorship changes the manifest keeps. Older ones fall off the front. */
 export const AUTHORSHIP_LOG_MAX = 50;
+
+/**
+ * The legal pages an app can publish about ITSELF, because the app and not the platform answers
+ * for what it does: a shop needs its own terms, an app that handles personal data its own privacy
+ * notice. Each kind is a page on the app's own origin (`/terms`, `/privacy`, …) and on the apex.
+ * The set is what the law and the app stores ask for (services/app-legal.ts names the source of
+ * each): terms of use, privacy notice, imprint (who is behind this, DSA Art. 30(7) and the
+ * e-commerce directive), refunds and withdrawal (consumer rights), accessibility statement (EAA),
+ * cookies (ePrivacy) and support (the contact the app stores require).
+ */
+export type AppLegalKind = 'terms' | 'privacy' | 'imprint' | 'refunds' | 'accessibility' | 'cookies' | 'support';
+export const APP_LEGAL_KINDS: readonly AppLegalKind[] =
+  ['terms', 'privacy', 'imprint', 'refunds', 'accessibility', 'cookies', 'support'];
+
+/** One legal page: written here in markdown or HTML, or a link to where it already lives. */
+export interface AppLegalDoc {
+  format: 'markdown' | 'html' | 'url';
+  /** The page text, the HTML document, or the absolute https URL. */
+  content: string;
+  updatedAt: string;
+  /** GHII of the principal that set it. */
+  updatedBy: string;
+}
+
+/**
+ * The per-kind merge both providers apply on updateAppMeta: a document replaces that kind, null
+ * removes it, an absent kind is left alone. Returns undefined when nothing is left, so a manifest
+ * with no legal pages carries no empty object.
+ */
+export function mergeLegal(
+  current: Partial<Record<AppLegalKind, AppLegalDoc>> | undefined,
+  patch: Partial<Record<AppLegalKind, AppLegalDoc | null>>,
+): Partial<Record<AppLegalKind, AppLegalDoc>> | undefined {
+  const next: Partial<Record<AppLegalKind, AppLegalDoc>> = { ...current };
+  for (const [kind, doc] of Object.entries(patch) as Array<[AppLegalKind, AppLegalDoc | null | undefined]>) {
+    if (doc === undefined) continue;
+    if (doc === null) delete next[kind];
+    else next[kind] = doc;
+  }
+  return Object.keys(next).length ? next : undefined;
+}
 
 export interface AppManifest {
   name: string;
@@ -144,6 +187,12 @@ export interface AppManifest {
    * listing; capped at AUTHORSHIP_LOG_MAX entries.
    */
   authorshipLog?: AppAuthorshipLogEntry[];
+  /**
+   * The app's own legal pages, by kind (AppLegalKind). Content lives here so it travels with the
+   * app through update, fork, backup and restore; the public listing strips the content and
+   * carries only which kinds exist, their format and when they changed.
+   */
+  legal?: Partial<Record<AppLegalKind, AppLegalDoc>>;
   /**
    * The SUMMARY of this app's data map — what it stores, in how many rows, on how weak a basis, and
    * how much of it nobody has explained. Here for the same reason `aiPosture` is: a JSON blob on both

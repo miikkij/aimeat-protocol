@@ -39,6 +39,7 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   v1.7.0 — 2026-08-29 — `legal` (the app's own pages) carries forward on a republish.
  *   v1.6.0 — 2026-08-29 — `marks`, `authorship` and `authorshipLog` carry forward on a republish.
  *   v1.5.0 — 2026-08-27 — The build track (TARGET-074): `<meta name="aimeat-track">` in the app's
  *     head is parsed into `manifest.track` and carried forward on silent updates, so a later edit
@@ -309,6 +310,8 @@ export async function publishApp(
   if (prev?.marks) manifest.marks = prev.marks;
   if (prev?.authorship) manifest.authorship = prev.authorship;
   if (prev?.authorshipLog?.length) manifest.authorshipLog = prev.authorshipLog;
+  // The app's legal pages are the owner's standing statements about the app, not about one build.
+  if (prev?.legal) manifest.legal = prev.legal;
 
   // What the app DECLARES survives a version whose author forgot the meta tag; what the node
   // OBSERVES is re-measured from the bytes being published, never carried. HTML only — there is

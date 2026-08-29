@@ -9,6 +9,7 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.24.0 -- 2026-08-29 -- Add e2e-app-legal.ts: the app's own legal pages and its audit log.
  *   v1.23.0 -- 2026-08-29 -- Add e2e-app-marks.ts: the badge and install switches and the named reviewer.
  *   v1.22.0 -- 2026-08-27 -- Add e2e-mcp-install.ts: the downloadable MCP config file per client,
  *            the name sanitizing on its query, and the promise that every install shortcut the
@@ -133,6 +134,7 @@ const ALL_SUITES = [
     'test/e2e-designbook.ts',
     'test/e2e-app-fork.ts',
     'test/e2e-app-marks.ts',
+    'test/e2e-app-legal.ts',
     'test/e2e-app-store-license.ts',
     'test/e2e-catalogue-identity.ts',
     'test/e2e-app-protect.ts',

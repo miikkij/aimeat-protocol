@@ -14,6 +14,7 @@
  *            The operator CRUD lives in subdomain-admin.ts.
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  * @version-history
+ *   v1.19.0 — 2026-08-29 — The app's legal pages ride into the head-meta pass as <link rel> tags.
  *   v1.18.0 — 2026-08-29 — serveApp reads the owner's badge and install-chip switches and the
  *     named reviewer from the manifest (services/app-marks.ts); the reviewer is also the JSON-LD
  *     author and editor in the head-meta pass.
@@ -101,6 +102,7 @@ import {
 } from '../services/ai-provenance-marks.js';
 import { applyServeMarks } from '../services/app-serve-marks.js';
 import { appBadgeOn, appInstallChipOn, appReviewedBy } from '../services/app-marks.js';
+import { legalLinksFor } from '../services/app-legal.js';
 import { appCsp } from '../utils/app-csp.js';
 import { appContentType } from '../utils/app-content-type.js';
 import { appToolNames } from '../services/app-tool-names.js';
@@ -377,6 +379,8 @@ async function serveApp(res: Response, storage: Storage, app: AppRecord, csp: st
             // The declared reviewer becomes the JSON-LD author and editor, which is how a byline
             // scanner reads a page (schema.org author/editor, meta author, rel=author).
             author: appReviewedBy(app.manifest),
+            // The app's own legal pages, on this origin, as <link rel> tags.
+            legal: legalLinksFor(app, discover.origin),
           }
         : undefined,
     });

@@ -6,6 +6,8 @@
  *   PATCH /v1/apps/:filename (rename/access-code/parked/forkable/protection/cortex), DELETE /v1/apps/:filename.
  *   Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 — 2026-08-29 — PATCH takes `legal` (the app's own pages) through services/app-legal.ts,
+ *     and every field it changes lands in the app's audit log (services/app-audit.ts).
  *   v1.4.0 — 2026-08-29 — PATCH takes `marks` (badge, install) and `author` (the named reviewer,
  *     owner principal only) through services/app-marks.ts; the response carries their state.
  *   v1.3.0 — 2026-08-11 — August 2026 audit step 8: the fork's copy and the delete's bucket sweep go
@@ -33,6 +35,8 @@ import { resolveIdentity, ownerGhiiOf } from '../../utils/gaii.js';
 import { sanitizeProtection, invalidateProtectionCache } from '../../utils/app-protect.js';
 import { applyOwnerSeoUpdate, appSeoState } from '../../services/app-seo.js';
 import { applyOwnerMarksUpdate, appMarksState } from '../../services/app-marks.js';
+import { applyOwnerLegalUpdate, appLegalState, legalReadiness } from '../../services/app-legal.js';
+import { recordAppAudit, type AppAuditAction } from '../../services/app-audit.js';
 import type { CanonicalOwner } from './helpers.js';
 
 export function registerForkManageRoutes(
@@ -166,6 +170,11 @@ export function registerForkManageRoutes(
         // Each field is independent and only touched when present in the body, so a
         // parked-only PATCH never clears the access code (and vice-versa).
         const notes: string[] = [];
+        // Every change to how this app is offered lands in its audit log (services/app-audit.ts),
+        // under the principal that made it — the agent's GAII when an agent did, so the owner can
+        // tell their own hand from their agents'.
+        const audit = (action: AppAuditAction, detail?: Record<string, string | number | boolean | null>) =>
+            recordAppAudit(storage, { ownerGhii: effectiveGaii, filename, by: callerGaii, action, detail });
 
         // Rename / re-describe in place: the display name is metadata, the URL is
         // keyed off owner/filename, so this never changes the link. Only the latest
@@ -223,6 +232,8 @@ export function registerForkManageRoutes(
         }
         if (metaUpdate.name !== undefined || metaUpdate.description !== undefined || metaUpdate.descriptions !== undefined) {
             await storage.updateAppMeta(effectiveGaii, filename, metaUpdate);
+            if (metaUpdate.name !== undefined) await audit('name', { name: metaUpdate.name });
+            if (metaUpdate.description !== undefined || metaUpdate.descriptions !== undefined) await audit('description');
             if (metaUpdate.name !== undefined && metaUpdate.description !== undefined) {
                 notes.push('Name and description updated. The app link is unchanged.');
             } else if (metaUpdate.name !== undefined) {
@@ -265,6 +276,8 @@ export function registerForkManageRoutes(
                 return;
             }
             await storage.updateAppAccessCode(effectiveGaii, filename, newCode);
+            // The fact, never the code.
+            await audit(newCode ? 'access_code.set' : 'access_code.cleared');
             notes.push(newCode
                 ? 'Access code updated. Share the new code with recipients.'
                 : 'Access code removed. The app is now publicly downloadable.');
@@ -276,6 +289,7 @@ export function registerForkManageRoutes(
                 return;
             }
             await storage.setAppParked(effectiveGaii, filename, body.parked);
+            await audit(body.parked ? 'parked' : 'unparked');
             notes.push(body.parked
                 ? 'App parked. It is now hidden from the public catalogue but stays usable by you.'
                 : 'App unparked. It is published in the public catalogue again.');
@@ -287,6 +301,7 @@ export function registerForkManageRoutes(
                 return;
             }
             await storage.setAppForkable(effectiveGaii, filename, body.forkable);
+            await audit('forkable', { on: body.forkable });
             notes.push(body.forkable
                 ? 'Forking enabled. Anyone can now fork this app into their own catalogue.'
                 : 'Forking disabled. Only you and your agents can fork this app.');
@@ -302,6 +317,7 @@ export function registerForkManageRoutes(
             await storage.updateAppMeta(effectiveGaii, filename, { protection: toStore });
             invalidateProtectionCache(owner, filename);
             const on = Object.entries(toStore).filter(([, v]) => v).map(([k]) => k);
+            await audit('protection', { flags: on.join(',') });
             notes.push(on.length
                 ? `Copy-protection updated (${on.join(', ')}). Note: these raise the cost of casual copying and make leaks traceable — they cannot stop someone who can view the app from copying its HTML. To truly protect logic/data, move it into an extension.`
                 : 'Copy-protection cleared.');
@@ -322,6 +338,7 @@ export function registerForkManageRoutes(
                 res.status(400).json(error(config.nodeId, 'INVALID_INPUT', out.error));
                 return;
             }
+            await audit('seo', { state: out.state, index: out.seo.index === true });
             notes.push(out.note);
         }
 
@@ -347,8 +364,21 @@ export function registerForkManageRoutes(
             notes.push(out.note);
         }
 
+        // The app's own legal pages: `{ terms: { format, content }, privacy: null, … }`. One service
+        // call shared with the MCP door; it validates, writes, audits and says what changed.
+        if ('legal' in body) {
+            const out = await applyOwnerLegalUpdate(storage, { ownerGaii: effectiveGaii, filename }, {
+                legal: body.legal, actor: { ghii: callerGaii },
+            });
+            if ('error' in out) {
+                res.status(out.status).json(error(config.nodeId, out.status === 404 ? 'NOT_FOUND' : 'INVALID_INPUT', out.error));
+                return;
+            }
+            notes.push(out.note);
+        }
+
         if (notes.length === 0) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Provide at least one field to update (name, description, access_code, parked, forkable, protection, seo, marks or author).'));
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Provide at least one field to update (name, description, access_code, parked, forkable, protection, seo, marks, author or legal).'));
             return;
         }
 
@@ -368,6 +398,8 @@ export function registerForkManageRoutes(
             seo: updated ? { state: appSeoState(updated, config), ...(updated.manifest?.seo ?? {}) } : null,
             // The chrome switches as they now stand, the reviewer, and the audit log of the latter.
             ...(updated ? appMarksState(updated) : {}),
+            // The legal pages as their state (no content), and what the app still ought to have.
+            ...(updated ? { legal: appLegalState(updated), legal_readiness: legalReadiness(updated) } : {}),
             download_url: `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}`,
             note: notes.join(' '),
         }));

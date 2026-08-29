@@ -14,6 +14,8 @@
  *     _launcher and hand getSortMode to server-io so the community list sorts the same way.
  *   v2.3.0 — 2026-08-28 — The poster face: expose toggleRow (a row opens its panel in place).
  *   v2.4.0 — 2026-08-29 — Marks and authorship: expose marksToggle / marksDeclare / marksWithdraw.
+ *   v2.5.0 — 2026-08-29 — Legal pages and audit log: expose legalEdit / legalCancel / legalSave /
+ *     legalRemove / legalFormatHint / auditMore.
  */
 import { t, getLang, setLang, applyI18n } from './i18n.js';
 import { escapeHtml, jsArg, sourceLabel, sourceLabelText, bareOwnerName, sameOwner, filterAttr, isSameOriginUrl, currentOwnerName, generateId, readFileAsText } from './util.js';
@@ -27,6 +29,7 @@ import { monetizeAddTool, monetizeEditTool, monetizeCancelEdit, monetizeSaveTool
   odpsGenerateSampleUi, odpsUseMeasuredUi } from './monetize.js';
 import { seoToggle, seoSave, seoToggleEditor } from './seo.js';
 import { marksToggle, marksDeclare, marksWithdraw } from './marks.js';
+import { legalEdit, legalCancel, legalSave, legalRemove, legalFormatHint, auditMore } from './legal.js';
 import { loadCortexExtensions, showCortexPopup, cortexCopy, getCortexOwnerToken, openCortexEditor, cortexEditorAddLib, cortexEditorSave, cortexEditorExport, closeCortexEditor, openPromptBuilder, closePbPanel, buildPromptFromBuilder, updatePbPreview } from './cortex.js';
 import { initSettings, applyTheme, updateThemeToggle, toggleTheme, getThemePref, openSettings, saveSettings, syncConfigToServer, loadConfigFromServer, closeSettings, openHelp, closeHelp } from './settings.js';
 import { initAppsIo, setEditingAppId, showModal, requireSignInThen, prefillFromHtml, closeModal, switchTab, handleFileDrop, handleSave } from './apps-io.js';
@@ -156,6 +159,12 @@ import { toggleFavorite } from './favorites.js';
     marksToggle: marksToggle,
     marksDeclare: marksDeclare,
     marksWithdraw: marksWithdraw,
+    legalEdit: legalEdit,
+    legalCancel: legalCancel,
+    legalSave: legalSave,
+    legalRemove: legalRemove,
+    legalFormatHint: legalFormatHint,
+    auditMore: auditMore,
     monetizeAddTool: monetizeAddTool,
     monetizeEditTool: monetizeEditTool,
     monetizeCancelEdit: monetizeCancelEdit,

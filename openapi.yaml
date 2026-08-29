@@ -203,8 +203,6 @@ tags:
     description: The node's built-in chat agent — conversations and one turn streamed as it happens
   - name: LLM Proxy
     description: An OpenAI-compatible door in front of the node's own key choice, budget and usage record
-  - name: Matches
-    description: Directory matching — match suggestions, stats, and respond-to-match
 
 components:
   securitySchemes:
@@ -20277,6 +20275,25 @@ paths:
                     is left as minted. The interactive "you are talking to an AI" notice (Art. 50(1)) is
                     never affected. Every declaration and withdrawal is appended to `authorshipLog`
                     with the name, the declaring GHII and the time.
+                legal:
+                  type: object
+                  description: >-
+                    The app's own legal pages, by kind: terms, privacy, imprint, refunds,
+                    accessibility, cookies, support. A kind set to `{ format, content }` is
+                    published or replaced; a kind set to null (or to `{ remove: true }`) is
+                    removed; an absent kind is left alone. `format` is markdown (rendered by the node, every character escaped),
+                    html (served as written, under the app's own CSP) or url (an absolute https
+                    link; the page redirects there). Content is at most 200 kB. Each page is
+                    served at /terms, /privacy, … on the app's origin and at
+                    /v1/apps/{owner}/{filename}/legal/{kind} on the apex, linked from the app's
+                    head where a registered relation exists, and named in its llms.txt. Every
+                    change lands in the app's audit log (GET /v1/apps/{owner}/{filename}/audit).
+                  additionalProperties:
+                    nullable: true
+                    type: object
+                    properties:
+                      format: { type: string, enum: [markdown, html, url] }
+                      content: { type: string }
       responses:
         '200':
           description: App updated
@@ -20321,6 +20338,24 @@ paths:
                                 by: { type: string }
                                 action: { type: string, enum: [declared, cleared] }
                                 name: { type: string }
+                          legal:
+                            type: object
+                            description: The legal pages the app has, as their state (no content)
+                            additionalProperties:
+                              type: object
+                              properties:
+                                format: { type: string, enum: [markdown, html, url] }
+                                updatedAt: { type: string, format: date-time }
+                                updatedBy: { type: string }
+                                size: { type: integer }
+                                url: { type: string }
+                          legal_readiness:
+                            type: object
+                            description: Which pages the app ought to have, given what it is, and which are missing
+                            properties:
+                              recommended: { type: array, items: { type: string } }
+                              missing: { type: array, items: { type: string } }
+                              reason: { type: string }
                           download_url: { type: string }
                           note: { type: string }
         '400':
@@ -25007,8 +25042,6 @@ paths:
           $ref: '#/components/responses/NotFound'
 
   # Phase 1.6: Hobby Portal — SSR routes removed (2026-03-03), replaced by SPA at /v1/hobbies
-
-  # Phase 2.1: Matching — Tier 3 extension (not part of core spec)
 
   # ============================================================
   # Phase 2.2: Organisms
@@ -41694,137 +41727,6 @@ paths:
           $ref: '#/components/responses/Forbidden'
 
   # ════════════ Newly documented routes (spec sync) ════════════
-  # ── Matches ──────────────────────────
-  /v1/matches:
-    get:
-      operationId: listMatches
-      tags: [Matches]
-      summary: List own match suggestions
-      description: |
-        Returns the authenticated caller's AI-generated match suggestions, paginated. An agent
-        caller is resolved to its owner's GHII. Each partner's details are consent-gated: when the
-        matched profile has no active `matching` consent (or it cannot be verified), that partner is
-        redacted (`ghii: "[redacted]"`, `consentRevoked: true`).
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: status
-          in: query
-          required: false
-          schema: { type: string }
-          description: Filter by match status (e.g. suggested, notified, accepted, dismissed, expired).
-        - name: page
-          in: query
-          required: false
-          schema: { type: integer, default: 1, minimum: 1 }
-        - name: per_page
-          in: query
-          required: false
-          schema: { type: integer, default: 10, minimum: 1, maximum: 100 }
-      responses:
-        '200':
-          description: The caller's match suggestions, consent-filtered.
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/AimeatEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          matches:
-                            type: array
-                            items:
-                              type: object
-                              properties:
-                                id: { type: string }
-                                matchedProfile: { type: object }
-                                score: { type: number }
-                                breakdown: { type: object }
-                                status: { type: string }
-                                semantic: { type: object }
-                                expiresAt: { type: string, nullable: true }
-                                createdAt: { type: string }
-                          total: { type: integer }
-                          page: { type: integer }
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-  /v1/matches/stats:
-    get:
-      operationId: getMatchesStats
-      tags: [Matches, Admin]
-      summary: Matching statistics (operator only)
-      description: |
-        Node-wide matching statistics. Requires the `operator` role.
-      security:
-        - BearerAuth: []
-      responses:
-        '200':
-          description: Aggregate matching statistics.
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/AimeatEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          lastRoundAt: { type: string, nullable: true }
-                          profilesScanned: { type: integer }
-                          totalMatchesCreated: { type: integer }
-                          matchesByStatus:
-                            type: object
-                            additionalProperties: { type: integer }
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-  /v1/matches/{id}/respond:
-    post:
-      operationId: respondToMatch
-      tags: [Matches]
-      summary: Accept or dismiss a match
-      description: |
-        Accept or dismiss one of the caller's match suggestions. The caller must be one of the two
-        matched profiles, and the match must be in `suggested` or `notified` status.
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema: { type: string }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [action]
-              properties:
-                action:
-                  type: string
-                  enum: [accept, dismiss]
-      responses:
-        '200':
-          description: The updated match record.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
   # ── Chat Instances ──────────────────────────
   /v1/chat-instances:
     post:
@@ -45266,6 +45168,136 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+  /v1/apps/{owner}/{filename}/legal:
+    get:
+      operationId: getAppLegal
+      summary: The app's own legal pages, as their state, and what it still ought to have
+      description: |
+        Which legal pages this app has (terms, privacy, imprint, refunds, accessibility, cookies,
+        support), each as its format, size and last change, with links to the served pages and the
+        readiness the node recommends: every published app its terms and privacy notice; one that
+        sells anything also who is selling, how to withdraw, an accessibility statement and a
+        support contact. The owner also receives `documents`, the content itself, for editing.
+        `me` in the owner slot resolves to the signed-in account (307 to the named form).
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+        - {}
+      parameters:
+        - { in: path, name: owner, required: true, schema: { type: string } }
+        - { in: path, name: filename, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The app's legal pages
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          owner: { type: string }
+                          filename: { type: string }
+                          legal: { type: object, additionalProperties: true }
+                          readiness:
+                            type: object
+                            properties:
+                              recommended: { type: array, items: { type: string } }
+                              missing: { type: array, items: { type: string } }
+                              reason: { type: string }
+                          links:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                kind: { type: string }
+                                rel: { type: string }
+                                title: { type: string }
+                                href: { type: string }
+                          kinds: { type: object, additionalProperties: true, description: Every kind with its path, link relation, title and the reason it exists }
+                          documents: { type: object, additionalProperties: true, description: Owner only — the pages with their content }
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/apps/{owner}/{filename}/legal/{kind}:
+    get:
+      operationId: getAppLegalPage
+      summary: One of the app's own legal pages, as a page
+      description: |
+        The page a reader gets: the owner's HTML verbatim under the app's CSP, a markdown page
+        rendered by the node (which says whose page it is and that the app, not the node, answers
+        for it), or a 302 to the URL the owner named. Served without the app's access code — a
+        legal page is pre-contract information — and for a parked app; an operator-hidden app is
+        404 to anyone but its owner. The same page is at /{kind} on the app's own origin.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+        - {}
+      parameters:
+        - { in: path, name: owner, required: true, schema: { type: string } }
+        - { in: path, name: filename, required: true, schema: { type: string } }
+        - { in: path, name: kind, required: true, schema: { type: string, enum: [terms, privacy, imprint, refunds, accessibility, cookies, support] } }
+      responses:
+        '200':
+          description: The page
+          content:
+            text/html:
+              schema: { type: string }
+        '302':
+          description: The page lives elsewhere; Location carries the URL the owner named
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/apps/{owner}/{filename}/audit:
+    get:
+      operationId: getAppAudit
+      summary: The owner's audit log of how this app is offered
+      description: |
+        Every change to the app's settings, oldest first: a legal page set or removed (kind,
+        format, size, a hash of the text), the badge or install offer switched, a reviewer declared
+        or withdrawn, search visibility, parked or unparked, forking, an access code set or
+        cleared (never the code itself), copy-protection flags, the name or description. Each entry
+        carries the principal that made it — the owner's own GHII, or the GAII of an agent acting
+        in their name — and the time. Owner only: anyone else gets 404. At most 500 entries are
+        kept; older ones fall off. `me` in the owner slot resolves to the signed-in account.
+        With `?limit=N` the newest N come back newest first; without it, the whole log oldest first.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { in: path, name: owner, required: true, schema: { type: string } }
+        - { in: path, name: filename, required: true, schema: { type: string } }
+        - { in: query, name: limit, required: false, schema: { type: integer, minimum: 1, maximum: 500 }, description: The newest N entries, newest first }
+      responses:
+        '200':
+          description: The log
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          owner: { type: string }
+                          filename: { type: string }
+                          total: { type: integer }
+                          entries:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                at: { type: string, format: date-time }
+                                by: { type: string }
+                                action: { type: string }
+                                detail: { type: object, additionalProperties: true }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /v1/apps/{owner}/{filename}/versions:
     get:
       operationId: getAppVersions
@@ -46116,55 +46148,6 @@ paths:
                         properties:
                           rebuilt: { type: boolean }
                           stats: { type: object }
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-  /v1/admin/matching:
-    get:
-      operationId: getAdminMatching
-      tags: [Admin]
-      summary: Matching engine configuration
-      description: Operator-only (requireRole('operator')). Returns the current matching-engine settings.
-      security:
-        - BearerAuth: []
-      responses:
-        '200':
-          description: Matching configuration
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/AimeatEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          enabled: { type: boolean }
-                          interval_hours: { type: number }
-                          threshold: { type: number }
-                          max_suggestions: { type: integer }
-                          max_distance_km: { type: number }
-                          cooldown_days: { type: integer }
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-  /v1/admin/matching/run:
-    post:
-      operationId: postAdminMatchingRun
-      tags: [Admin]
-      summary: Run a matching round
-      description: Operator-only (requireRole('operator')). Triggers a matching round and returns its result summary.
-      security:
-        - BearerAuth: []
-      responses:
-        '200':
-          description: Matching round result
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':

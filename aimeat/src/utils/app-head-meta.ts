@@ -31,7 +31,8 @@
  *   text = applyAppHeadMeta(text, { owner, filename, appName, description, origin, baseUrl, tools });
  * @version-history
  *   v1.4.0 — 2026-08-29 — `installChip: false` leaves the install-chip script out (the owner's switch);
- *     `author` (the declared reviewer) becomes the JSON-LD author and editor.
+ *     `author` (the declared reviewer) becomes the JSON-LD author and editor; `legal` writes the
+ *     app's own legal pages as <link rel="terms-of-service" | "privacy-policy" | "help">.
  *   v1.3.0 — 2026-08-16 — The app is installable from its own origin: a manifest link, a
  *     theme-color, an apple-touch-icon and the install-chip script join the gap-fill set (the
  *     manifest itself is served by subdomains.ts; the chip shows the suggestion the browser never
@@ -107,6 +108,12 @@ export interface AppHeadSpec {
    * the JSON-LD `author` and `editor`; absent, the account name stays the author as before.
    */
   author?: string;
+  /**
+   * The app's own legal pages (services/app-legal.ts), as `<link rel>` tags where a registered
+   * relation exists (terms-of-service, privacy-policy, help) so a store, a crawler or an agent
+   * finds them without reading the page.
+   */
+  legal?: Array<{ rel?: string; href: string; title: string }>;
 }
 
 function esc(t: string): string {
@@ -223,6 +230,13 @@ export function applyAppHeadMeta(text: string, spec: AppHeadSpec): string {
   }
   if (!has(text, /<link rel="alternate" type="text\/markdown"/i)) {
     add.push(`<link rel="alternate" type="text/markdown" href="${origin}/?format=md">`);
+  }
+  // The app's own legal pages, for the relations the platform registry has a word for. An app
+  // that already declares one keeps its own.
+  for (const l of spec.legal ?? []) {
+    if (!l.rel) continue;
+    if (has(text, new RegExp(`<link[^>]+rel="${l.rel}"`, 'i'))) continue;
+    add.push(`<link rel="${esc(l.rel)}" href="${esc(l.href)}" title="${esc(l.title)}">`);
   }
   if (!has(text, /application\/ld\+json/i)) {
     const offers = (spec.tools ?? [])

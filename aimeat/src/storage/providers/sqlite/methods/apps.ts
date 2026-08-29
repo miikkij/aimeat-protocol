@@ -13,10 +13,13 @@
  *     trend the publish response now states.
  *   v1.4.0 — 2026-08-29 — updateAppMeta merges `marks`, replaces or withdraws `authorship` and
  *     writes `authorshipLog` (the owner's chrome switches and the named reviewer).
+ *   v1.5.0 — 2026-08-29 — updateAppMeta merges `legal` per kind (mergeLegal).
  */
+import { mergeLegal } from '../../../types/apps.js';
 import type {
   AppRecord, AppSummaryRecord, AppVersionSize, AppDraftRecord, AppManifest, AppManifestCortex, AppListOptions, AppPurchaseRecord, AppForkRecord,
-  AppProtection, AppSeo, SubdomainSiteRecord, AppGrantRecord, AppMarks, AppAuthorship, AppAuthorshipLogEntry
+  AppProtection, AppSeo, SubdomainSiteRecord, AppGrantRecord, AppMarks, AppAuthorship, AppAuthorshipLogEntry,
+  AppLegalKind, AppLegalDoc
 } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
 import { SUMMARY_COLUMNS, runAppListing } from './apps-listing.js';
@@ -145,6 +148,7 @@ export const appsMethods = {
       name?: string; description?: string; descriptions?: Record<string, string>; protection?: AppProtection;
       cortex?: AppManifestCortex | null; dataMap?: AppManifest['dataMap']; seo?: Partial<AppSeo>;
       marks?: Partial<AppMarks>; authorship?: AppAuthorship | null; authorshipLog?: AppAuthorshipLogEntry[];
+      legal?: Partial<Record<AppLegalKind, AppLegalDoc | null>>;
     },
   ): Promise<boolean> {
     // Rename/re-describe in place on the LATEST version (the one the catalogue
@@ -172,6 +176,8 @@ export const appsMethods = {
       else manifest.authorship = meta.authorship;
     }
     if (meta.authorshipLog !== undefined) manifest.authorshipLog = meta.authorshipLog;
+    // Legal pages merge per kind: a document replaces that kind, null removes it, absent leaves it.
+    if (meta.legal !== undefined) manifest.legal = mergeLegal(manifest.legal, meta.legal);
     // Agent-Bundled Apps: replace the crew-def section in place (null clears it).
     if (meta.cortex !== undefined) {
       if (meta.cortex === null || !meta.cortex.agents?.length) delete manifest.cortex;

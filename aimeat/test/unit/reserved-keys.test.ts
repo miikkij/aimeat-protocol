@@ -38,9 +38,10 @@ const ACCOUNTANTS_KEY = 'finance.accountants';
 const PSP_KEY = 'commerce.psp';
 
 describe('the list holds every prefix the server reads and acts on', () => {
-    it('carries all seven, and a removal is a test failure rather than a silent regression', () => {
+    it('carries all eight, and a removal is a test failure rather than a silent regression', () => {
+        // `audit.` (2026-08-29): the per-app audit log, which a granted app must not rewrite.
         expect([...RESERVED_OWNER_KEY_PREFIXES].sort()).toEqual(
-            ['ai-usage.', 'chat.', 'commerce.', 'finance.', 'openrouter.', 'profile.', 'signals.'],
+            ['ai-usage.', 'audit.', 'chat.', 'commerce.', 'finance.', 'openrouter.', 'profile.', 'signals.'],
         );
     });
 

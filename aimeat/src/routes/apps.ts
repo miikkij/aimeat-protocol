@@ -96,6 +96,7 @@
  *     pure extraction, registration order + behavior preserved.
  *   v1.20.0 -- 2026-07-16 -- Agent-Bundled Apps Slice 1: apps/agents-deploy.ts — deploy/undeploy/
  *     status for crew-defs declared under manifest.cortex.agents (owner-scoped pointer tasks).
+ *   2026-08-29 -- registerLegalRoutes: the app's own legal pages and its audit log (apps/legal.ts).
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -108,6 +109,7 @@ import { registerReadRoutes } from './apps/read.js';
 import { registerPublishRoutes } from './apps/publish.js';
 import { registerDraftRoutes } from './apps/drafts.js';
 import { registerForkManageRoutes } from './apps/fork-manage.js';
+import { registerLegalRoutes } from './apps/legal.js';
 import { registerAppAgentRoutes } from './apps/agents-deploy.js';
 import { registerAdminSeoRoutes } from './admin-seo.js';
 
@@ -134,6 +136,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
     registerPublishRoutes(router, config, storage, canonicalOwner);
     registerDraftRoutes(router, config, storage, canonicalOwner);
     registerForkManageRoutes(router, config, storage, canonicalOwner);
+    registerLegalRoutes(router, config, storage, canonicalOwner);
     registerAppAgentRoutes(router, config, storage);
     // The operator's search-visibility surface: the node's own status, and the per-app block and
     // approval. Registered here rather than in its own mount so it reuses this router's

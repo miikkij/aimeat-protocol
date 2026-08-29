@@ -23,7 +23,7 @@
  *     async ({ key }) => { ... }
  *   );
  * @version-history
- *   2026-08-29 — aimeat_app_marks_set.
+ *   2026-08-29 — aimeat_app_marks_set, aimeat_app_legal_set, aimeat_app_audit.
  *   2026-08-28 — The five crew-definition tools.
  *   2026-08-25 — The three data-map tools.
  *   v1.x — 2026-08-23 — Annotation for aimeat_package_install: a write, not destructive, and NOT
@@ -297,6 +297,8 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_app_screenshot: { title: 'Screenshot App', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_app_seo_set: { title: 'App Search Visibility', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_app_marks_set: { title: 'App Badge and Install Chip', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_app_legal_set: { title: 'App Legal Pages', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_app_audit: { title: 'App Audit Log', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_seo_status: { title: 'Search Visibility Status', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_image_generate: { title: 'Generate Image', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     aimeat_app_draft_publish: { title: 'Publish App Draft', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },

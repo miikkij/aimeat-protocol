@@ -2456,6 +2456,8 @@
       counter (the total comes from the detail view as --dtl-chapters).
     v1.4.0 — 2026-08-29 — The "Marks and authorship" section (.mk-*): two switch rows, the reviewer's
       form, the dashed aside, the "what the node sees" list and the log.
+    v1.5.0 — 2026-08-29 — The "Legal pages" section (.lg-*): one row per kind with the editor inside
+      the row, a sun rule on the recommended ones; the audit log reuses .mk-log.
 */
 
 /* ── Tokens the poster needs on top of the catalog's own ─────────────────────────────────── */
@@ -2870,6 +2872,25 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
 .mk-log-action { text-transform: uppercase; font-family: var(--font-mono); font-size: .72rem; color: var(--accent); font-weight: 700; padding-top: 3px; }
 .mk-log-name { font-weight: 700; }
 .mk-log-by { color: var(--text-dim); font-family: var(--font-mono); font-size: .72rem; padding-top: 3px; }
+
+/* ── Legal pages (legal.js): one row per kind, the editor opens inside the row ── */
+.lg-rows { display: flex; flex-direction: column; margin: 14px 0 0; }
+.lg-row { display: grid; grid-template-columns: 1fr auto; gap: 6px 24px; padding: 16px 0; border-bottom: 1px solid var(--border); }
+.lg-row.is-recommended { border-left: 3px solid var(--sun); padding-left: 14px; }
+.lg-row-head { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline; grid-column: 1; }
+.lg-row-name { font-family: var(--font-body); font-weight: 800; font-size: .95rem; }
+.lg-state { font-family: var(--font-mono); font-size: .72rem; font-weight: 500; letter-spacing: .04em; color: var(--text-dim); }
+.lg-state-on { color: var(--success-fg); }
+.lg-state-missing { color: var(--accent); text-transform: uppercase; font-weight: 700; }
+.lg-open { font-weight: 700; text-decoration: none; border-bottom: 2px solid var(--text); color: var(--text); font-size: .85rem; }
+.lg-open:hover { color: var(--accent); border-bottom-color: var(--accent); }
+.lg-row-why { grid-column: 1; font-size: .9rem; line-height: 1.5; color: var(--text-dim); max-width: 70ch; }
+.lg-row-actions { grid-column: 2; grid-row: 1 / span 2; justify-self: end; display: flex; gap: 16px; align-items: center; white-space: nowrap; }
+.lg-editor { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.lg-editor .modal-input { margin: 0; width: 100%; }
+.lg-editor select.modal-input { max-width: 260px; }
+.lg-textarea { border: 2px solid var(--text) !important; border-radius: 0; padding: 12px 14px; font-family: var(--font-mono); font-size: .85rem; font-weight: 400; line-height: 1.55; min-height: 280px; resize: vertical; background: var(--bg-surface); }
+.lg-textarea:focus { border-color: var(--accent) !important; }
 .mz-more { margin-top: 14px; }
 .mz-more-head { cursor: pointer; font-family: var(--font-mono); font-size: .8rem; color: var(--accent); text-decoration: underline; text-underline-offset: 4px; list-style: none; }
 .mz-more-head::-webkit-details-marker { display: none; }
@@ -3095,6 +3116,9 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
   .mz-grid, .mz-grid--price, .od-grid { grid-template-columns: 1fr; }
   .mk-row, .mk-sees { grid-template-columns: 1fr; }
   .mk-row-action { justify-self: start; }
+  .lg-row { grid-template-columns: 1fr; }
+  .lg-row-actions { grid-column: 1; grid-row: auto; justify-self: start; white-space: normal; flex-wrap: wrap; }
+  .lg-editor select.modal-input { max-width: none; }
   .mz-group > .mz-field, .mz-group > .mz-grid, .mz-group > .mz-more, .mz-group > .mz-check, .mz-group > .mz-hint, .mz-group > .od-tool-head, .mz-group > .od-form, .mz-group-lede { margin-left: 0; }
   .modal { padding: 20px 18px 22px; box-shadow: 5px 5px 0 var(--sun); }
 }
@@ -4346,6 +4370,70 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "monetize.agent": "Fulfilling agent",
       "monetize.agentHint": "Task path only: the bare name of your agent that receives the order task. Empty = the task lands in your own task space.",
       // ── Search: can this app be found in a search engine (seo.js) ──
+      // ── legal pages: the app's own terms, privacy notice, imprint and the rest
+      "legal.title": "Legal pages",
+      "legal.intro": "The app answers for what it does, not the node it runs on: a shop for its sales, an app that handles personal data for that data. These pages are the app's own, served at /terms, /privacy and so on under its address, linked from its head, and named to agents in its llms.txt.",
+      "legal.loading": "Checking…",
+      "legal.loadFailed": "Could not read the legal pages for this app.",
+      "legal.saveFailed": "Could not save.",
+      "legal.saved": "Saved.",
+      "legal.empty": "Write the page first, or paste the address it lives at.",
+      "legal.removeConfirm": "Remove this page? Its address will stop answering. The removal is kept in the audit log.",
+      "legal.readinessMissing": "{n} of the pages this app ought to have are still missing.",
+      "legal.readinessOk": "Every page this app ought to have is in place.",
+      "legal.missing": "Missing",
+      "legal.none": "Not written",
+      "legal.open": "Open",
+      "legal.write": "Write",
+      "legal.edit": "Edit",
+      "legal.remove": "Remove",
+      "legal.save": "Publish page",
+      "legal.cancel": "Cancel",
+      "legal.formatLabel": "Format",
+      "legal.contentLabel": "Page",
+      "legal.format.markdown": "Markdown",
+      "legal.format.html": "HTML",
+      "legal.format.url": "Link",
+      "legal.hint.markdown": "Headings, paragraphs, lists, links. Rendered by the node on a plain page that says whose page it is; every character is escaped, so nothing here can run.",
+      "legal.hint.html": "A whole HTML document, served exactly as written on the app's own origin, under the app's own rules.",
+      "legal.hint.url": "An https address. The page redirects there. The app stores accept a link.",
+      "legal.aiHint": "Your AI can draft this: ask it to write the page for this app from what the app does, then read it before publishing. Whoever answers for the app answers for the page.",
+      "legal.kind.terms": "Terms of use",
+      "legal.kind.privacy": "Privacy notice",
+      "legal.kind.imprint": "Imprint",
+      "legal.kind.refunds": "Refunds and withdrawal",
+      "legal.kind.accessibility": "Accessibility statement",
+      "legal.kind.cookies": "Cookies and browser storage",
+      "legal.kind.support": "Support",
+      "legal.placeholder.terms": "# Terms of use\n\nWho offers this app, what a person may do with it, what is paid and how, what happens on a dispute…",
+      "legal.placeholder.privacy": "# Privacy notice\n\nWho is the controller and how to reach them, what personal data the app handles and why, on what basis, for how long, who else sees it, what rights a person has and where to complain…",
+      "legal.placeholder.imprint": "# Imprint\n\nName, address, e-mail, telephone, trade register and VAT id where there is one…",
+      "legal.placeholder.refunds": "# Refunds and withdrawal\n\nThe 14-day right of withdrawal, how to use it, how and when a refund is paid…",
+      "legal.placeholder.accessibility": "# Accessibility statement\n\nHow this app meets accessibility requirements, what does not yet, and how to report a barrier…",
+      "legal.placeholder.cookies": "# Cookies and browser storage\n\nWhat the app keeps in the browser, why, and for how long…",
+      "legal.placeholder.support": "# Support\n\nHow to reach whoever answers for this app, and when to expect an answer…",
+      // ── audit log
+      "audit.title": "Audit log",
+      "audit.intro": "Every change to how this app is offered, newest first: who made it (you, or which agent in your name) and when. Only you can read it.",
+      "audit.loading": "Reading…",
+      "audit.loadFailed": "Could not read the audit log.",
+      "audit.empty": "Nothing has been changed on this app yet.",
+      "audit.more": "Show {n} more",
+      "audit.action.legal.set": "Legal page published",
+      "audit.action.legal.cleared": "Legal page removed",
+      "audit.action.marks.badge": "Badge",
+      "audit.action.marks.install": "Install offer",
+      "audit.action.authorship.declared": "Reviewer declared",
+      "audit.action.authorship.cleared": "Reviewer withdrawn",
+      "audit.action.seo": "Search visibility",
+      "audit.action.parked": "Parked",
+      "audit.action.unparked": "Unparked",
+      "audit.action.forkable": "Forking",
+      "audit.action.access_code.set": "Access code set",
+      "audit.action.access_code.cleared": "Access code removed",
+      "audit.action.protection": "Copy-protection",
+      "audit.action.name": "Renamed",
+      "audit.action.description": "Description changed",
       // ── marks and authorship: the served chrome, the named reviewer, the log
       "marks.title": "Marks and authorship",
       "marks.intro": "What this node adds to the app when it serves it, and who answers for it.",
@@ -5264,6 +5352,70 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "monetize.agent": "Toimittava agentti",
       "monetize.agentHint": "Vain tehtäväpolku: sen oman agenttisi nimi, jolle tilaustehtävä ohjataan. Tyhjä = tehtävä jää omaan tehtävätilaasi.",
       // ── Haku: löytyykö tämä sovellus hakukoneesta (seo.js) ──
+      // ── lakisivut: appin omat ehdot, tietosuojaseloste, yhteystiedot ja loput
+      "legal.title": "Lakisivut",
+      "legal.intro": "Appi vastaa siitä mitä se tekee, ei node jolla se pyörii: kauppa myynnistään, henkilötietoja käsittelevä appi niistä tiedoista. Nämä sivut ovat appin omia; ne tarjoillaan osoitteissa /terms, /privacy ja niin edelleen appin osoitteen alla, linkitetään sen headista ja nimetään agenteille sen llms.txt:ssä.",
+      "legal.loading": "Tarkistetaan…",
+      "legal.loadFailed": "Tämän appin lakisivuja ei saatu luettua.",
+      "legal.saveFailed": "Tallennus ei onnistunut.",
+      "legal.saved": "Tallennettu.",
+      "legal.empty": "Kirjoita sivu ensin, tai liitä osoite jossa se jo on.",
+      "legal.removeConfirm": "Poistetaanko sivu? Sen osoite lakkaa vastaamasta. Poisto jää auditointilokiin.",
+      "legal.readinessMissing": "Sivuista, jotka tällä apilla pitäisi olla, puuttuu vielä {n}.",
+      "legal.readinessOk": "Jokainen sivu, joka tällä apilla pitäisi olla, on paikallaan.",
+      "legal.missing": "Puuttuu",
+      "legal.none": "Ei kirjoitettu",
+      "legal.open": "Avaa",
+      "legal.write": "Kirjoita",
+      "legal.edit": "Muokkaa",
+      "legal.remove": "Poista",
+      "legal.save": "Julkaise sivu",
+      "legal.cancel": "Peruuta",
+      "legal.formatLabel": "Muoto",
+      "legal.contentLabel": "Sivu",
+      "legal.format.markdown": "Markdown",
+      "legal.format.html": "HTML",
+      "legal.format.url": "Linkki",
+      "legal.hint.markdown": "Otsikot, kappaleet, listat, linkit. Node renderöi sen tavalliselle sivulle, joka kertoo kenen sivu on; jokainen merkki escapetaan, joten mikään ei voi suorittua.",
+      "legal.hint.html": "Kokonainen HTML-dokumentti, tarjoillaan täsmälleen kirjoitettuna appin omalla originilla, appin omilla säännöillä.",
+      "legal.hint.url": "https-osoite. Sivu ohjaa sinne. Sovelluskaupat hyväksyvät linkin.",
+      "legal.aiHint": "Tekoälysi voi luonnostella tämän: pyydä sitä kirjoittamaan sivu tälle apille sen perusteella mitä appi tekee, ja lue se ennen julkaisua. Se joka vastaa apista, vastaa sivusta.",
+      "legal.kind.terms": "Käyttöehdot",
+      "legal.kind.privacy": "Tietosuojaseloste",
+      "legal.kind.imprint": "Yhteystiedot ja vastuutaho",
+      "legal.kind.refunds": "Palautukset ja peruuttaminen",
+      "legal.kind.accessibility": "Saavutettavuusseloste",
+      "legal.kind.cookies": "Evästeet ja selaimen tallennus",
+      "legal.kind.support": "Tuki",
+      "legal.placeholder.terms": "# Käyttöehdot\n\nKuka tarjoaa tämän appin, mitä sillä saa tehdä, mitä maksetaan ja miten, mitä tapahtuu riitatilanteessa…",
+      "legal.placeholder.privacy": "# Tietosuojaseloste\n\nKuka on rekisterinpitäjä ja miten hänet tavoittaa, mitä henkilötietoja appi käsittelee ja miksi, millä perusteella, kuinka kauan, kuka muu niitä näkee, mitkä oikeudet ihmisellä on ja minne valittaa…",
+      "legal.placeholder.imprint": "# Yhteystiedot ja vastuutaho\n\nNimi, osoite, sähköposti, puhelin, kaupparekisteri- ja ALV-tunnus jos sellainen on…",
+      "legal.placeholder.refunds": "# Palautukset ja peruuttaminen\n\n14 päivän peruuttamisoikeus, miten sitä käytetään, miten ja milloin palautus maksetaan…",
+      "legal.placeholder.accessibility": "# Saavutettavuusseloste\n\nMiten tämä appi täyttää saavutettavuusvaatimukset, mikä ei vielä täytä, ja miten esteestä ilmoitetaan…",
+      "legal.placeholder.cookies": "# Evästeet ja selaimen tallennus\n\nMitä appi säilyttää selaimessa, miksi ja kuinka kauan…",
+      "legal.placeholder.support": "# Tuki\n\nMiten tavoittaa sen, joka vastaa tästä apista, ja milloin vastausta voi odottaa…",
+      // ── auditointiloki
+      "audit.title": "Auditointiloki",
+      "audit.intro": "Jokainen muutos siihen, miten tätä appia tarjotaan, uusin ensin: kuka teki (sinä, tai mikä agentti nimissäsi) ja milloin. Vain sinä voit lukea tämän.",
+      "audit.loading": "Luetaan…",
+      "audit.loadFailed": "Auditointilokia ei saatu luettua.",
+      "audit.empty": "Tähän appiin ei ole vielä tehty muutoksia.",
+      "audit.more": "Näytä {n} lisää",
+      "audit.action.legal.set": "Lakisivu julkaistu",
+      "audit.action.legal.cleared": "Lakisivu poistettu",
+      "audit.action.marks.badge": "Merkki",
+      "audit.action.marks.install": "Asennustarjous",
+      "audit.action.authorship.declared": "Katselmoija ilmoitettu",
+      "audit.action.authorship.cleared": "Katselmoija peruttu",
+      "audit.action.seo": "Hakunäkyvyys",
+      "audit.action.parked": "Parkkiin",
+      "audit.action.unparked": "Parkista",
+      "audit.action.forkable": "Haaroitus",
+      "audit.action.access_code.set": "Pääsykoodi asetettu",
+      "audit.action.access_code.cleared": "Pääsykoodi poistettu",
+      "audit.action.protection": "Kopiosuojaus",
+      "audit.action.name": "Nimi vaihdettu",
+      "audit.action.description": "Kuvaus muutettu",
       // ── merkinnät ja tekijyys
       "marks.title": "Merkinnät ja tekijyys",
       "marks.intro": "Mitä tämä node lisää appiin tarjoillessaan sen, ja kuka vastaa siitä.",
@@ -7179,7 +7331,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     var line = "responseTime " + ms + " milliseconds — " + t("odps.measuredNote");
     el.value = el.value.trim() ? el.value.trim() + "\n" + line : line;
   }
-  function odpsGenerateSample(ctx, rerender5) {
+  function odpsGenerateSample(ctx, rerender6) {
     var statusEl = document.getElementById("od-sample-status");
     var token = getCortexOwnerToken();
     if (!token) {
@@ -7255,15 +7407,15 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       }
     });
   }
-  function odpsToggleDefaults(rerender5) {
+  function odpsToggleDefaults(rerender6) {
     odDefaultsOpen = !odDefaultsOpen;
-    if (rerender5) rerender5();
+    if (rerender6) rerender6();
   }
-  function odpsToggleTool(rerender5) {
+  function odpsToggleTool(rerender6) {
     odToolOpen = !odToolOpen;
-    if (rerender5) rerender5();
+    if (rerender6) rerender6();
   }
-  function odpsSuggestForTool(ctx, rerender5) {
+  function odpsSuggestForTool(ctx, rerender6) {
     var statusEl = document.getElementById("od-tool-status");
     var token = getCortexOwnerToken();
     if (!token) {
@@ -7328,7 +7480,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
         st.textContent = "✔ " + t("odps.suggestDone");
       }
       showNotice(t("odps.suggestDone"), "success");
-      if (rerender5) {
+      if (rerender6) {
       }
     }).catch(function(e) {
       odBusy = false;
@@ -8143,6 +8295,235 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     return html;
   }
 
+  // src/static/app-catalog/js/legal.js
+  var KINDS = ["terms", "privacy", "imprint", "refunds", "accessibility", "cookies", "support"];
+  var lgOwner = "";
+  var lgAppId = "";
+  var lgState = "off";
+  var lgData = null;
+  var lgEditing = null;
+  var lgBusy = false;
+  var auState = "off";
+  var auEntries = [];
+  var auTotal = 0;
+  var auShown = 12;
+  function apiBase6() {
+    var cfg = loadConfig();
+    return (cfg.aimeatUrl || "").replace(/\/+$/, "");
+  }
+  function authHeaders(json) {
+    var token = getCortexOwnerToken();
+    var h = json ? { "Content-Type": "application/json" } : {};
+    if (token) h["Authorization"] = "Bearer " + token;
+    return h;
+  }
+  function rerender5() {
+    var el = document.getElementById("detail-legal");
+    if (el) el.innerHTML = legalSectionInner();
+    var au = document.getElementById("detail-audit");
+    if (au) au.innerHTML = auditSectionInner();
+  }
+  function appPath() {
+    return "/v1/apps/" + encodeURIComponent(lgOwner) + "/" + encodeURIComponent(lgAppId);
+  }
+  function legalOnOpen(owner, appId, isOwn) {
+    lgBusy = false;
+    lgData = null;
+    lgEditing = null;
+    auEntries = [];
+    auTotal = 0;
+    auShown = 12;
+    if (!isOwn || !owner || !appId) {
+      lgState = "off";
+      auState = "off";
+      lgOwner = "";
+      lgAppId = "";
+      return;
+    }
+    lgOwner = owner;
+    lgAppId = appId;
+    lgState = "loading";
+    auState = "loading";
+    fetch(apiBase6() + appPath() + "/legal", { headers: authHeaders(false) }).then(function(r) {
+      return r.json();
+    }).then(function(res) {
+      if (!res || !res.ok) {
+        lgState = "error";
+        rerender5();
+        return;
+      }
+      lgData = res.data;
+      lgState = "ready";
+      rerender5();
+    }).catch(function() {
+      lgState = "error";
+      rerender5();
+    });
+    loadAudit();
+  }
+  function loadAudit() {
+    fetch(apiBase6() + appPath() + "/audit", { headers: authHeaders(false) }).then(function(r) {
+      return r.json();
+    }).then(function(res) {
+      if (!res || !res.ok) {
+        auState = "error";
+        rerender5();
+        return;
+      }
+      auEntries = res.data && res.data.entries || [];
+      auTotal = res.data && res.data.total || auEntries.length;
+      auState = "ready";
+      rerender5();
+    }).catch(function() {
+      auState = "error";
+      rerender5();
+    });
+  }
+  function legalEdit(kind) {
+    if (lgBusy) return;
+    lgEditing = kind;
+    rerender5();
+  }
+  function legalCancel() {
+    lgEditing = null;
+    rerender5();
+  }
+  function legalSave(kind) {
+    if (lgBusy || !lgData) return;
+    var fmtEl = document.getElementById("lg-format");
+    var contentEl = document.getElementById("lg-content");
+    var format = fmtEl ? fmtEl.value : "markdown";
+    var content = contentEl ? contentEl.value : "";
+    if (!content.trim()) {
+      showNotice(t("legal.empty"));
+      return;
+    }
+    var body = {};
+    body[kind] = { format, content };
+    patch3(body);
+  }
+  function legalRemove(kind) {
+    if (lgBusy || !lgData) return;
+    if (!window.confirm(t("legal.removeConfirm"))) return;
+    var body = {};
+    body[kind] = null;
+    patch3(body);
+  }
+  function auditMore() {
+    auShown += 25;
+    rerender5();
+  }
+  function patch3(legal) {
+    lgBusy = true;
+    rerender5();
+    fetch(apiBase6() + "/v1/apps/" + encodeURIComponent(lgAppId), {
+      method: "PATCH",
+      headers: authHeaders(true),
+      body: JSON.stringify({ legal })
+    }).then(function(r) {
+      return r.json();
+    }).then(function(res) {
+      lgBusy = false;
+      if (!res || !res.ok) {
+        showNotice(res && res.error && res.error.message || t("legal.saveFailed"));
+        rerender5();
+        return;
+      }
+      showNotice(res.data && res.data.note || t("legal.saved"));
+      lgEditing = null;
+      legalOnOpen(lgOwner, lgAppId, true);
+    }).catch(function(err) {
+      lgBusy = false;
+      showNotice(String(err && err.message ? err.message : err));
+      rerender5();
+    });
+  }
+  function fmtLabel(format) {
+    return t("legal.format." + format);
+  }
+  function kindRow(kind) {
+    var info = lgData.kinds && lgData.kinds[kind] || { title: kind, why: "" };
+    var st = lgData.legal && lgData.legal[kind];
+    var link = null;
+    for (var i = 0; i < (lgData.links || []).length; i++) if (lgData.links[i].kind === kind) link = lgData.links[i];
+    var missing = (lgData.readiness && lgData.readiness.missing || []).indexOf(kind) >= 0;
+    var recommended = (lgData.readiness && lgData.readiness.recommended || []).indexOf(kind) >= 0;
+    var state;
+    if (st) {
+      state = '<span class="lg-state lg-state-on">' + escapeHtml(fmtLabel(st.format)) + " · " + escapeHtml(fmtDate(st.updatedAt)) + "</span>" + (link ? ' <a class="lg-open" href="' + escapeHtml(link.href) + '" target="_blank" rel="noopener">' + escapeHtml(t("legal.open")) + " →</a>" : "");
+    } else if (missing) {
+      state = '<span class="lg-state lg-state-missing">' + escapeHtml(t("legal.missing")) + "</span>";
+    } else {
+      state = '<span class="lg-state">' + escapeHtml(t("legal.none")) + "</span>";
+    }
+    var actions = lgEditing === kind ? "" : dtlBtn(t(st ? "legal.edit" : "legal.write"), "window._launcher.legalEdit('" + kind + "')", { disabled: lgBusy }) + (st ? " " + dtlBtn(t("legal.remove"), "window._launcher.legalRemove('" + kind + "')", { disabled: lgBusy }) : "");
+    var html = '<div class="lg-row' + (recommended ? " is-recommended" : "") + '"><div class="lg-row-head"><div class="lg-row-name">' + escapeHtml(t("legal.kind." + kind)) + "</div>" + state + '</div><div class="lg-row-why">' + escapeHtml(info.why) + '</div><div class="lg-row-actions">' + actions + "</div>";
+    if (lgEditing === kind) html += editorHtml2(kind, st);
+    return html + "</div>";
+  }
+  function editorHtml2(kind, st) {
+    var doc = lgData.documents && lgData.documents[kind] || null;
+    var format = doc ? doc.format : "markdown";
+    var content = doc ? doc.content : "";
+    var opts = ["markdown", "html", "url"].map(function(f) {
+      return '<option value="' + f + '"' + (f === format ? " selected" : "") + ">" + escapeHtml(fmtLabel(f)) + "</option>";
+    }).join("");
+    return '<div class="lg-editor"><label class="mz-label" for="lg-format">' + escapeHtml(t("legal.formatLabel")) + '</label><select id="lg-format" class="modal-input" onchange="window._launcher.legalFormatHint()">' + opts + '</select><p class="dtl-ai-status" id="lg-format-hint">' + escapeHtml(t("legal.hint." + format)) + '</p><label class="mz-label" for="lg-content">' + escapeHtml(t("legal.contentLabel")) + '</label><textarea id="lg-content" class="modal-input lg-textarea" rows="14" spellcheck="true" placeholder="' + escapeHtml(t("legal.placeholder." + kind)) + '">' + escapeHtml(content) + '</textarea><div class="dtl-btn-row">' + dtlBtn(t("legal.save"), "window._launcher.legalSave('" + kind + "')", { variant: "primary", disabled: lgBusy }) + dtlBtn(t("legal.cancel"), "window._launcher.legalCancel()", { disabled: lgBusy }) + "</div>" + (st ? "" : '<p class="dtl-ai-status">' + escapeHtml(t("legal.aiHint")) + "</p>") + "</div>";
+  }
+  function legalFormatHint() {
+    var fmtEl = document.getElementById("lg-format");
+    var hint = document.getElementById("lg-format-hint");
+    if (fmtEl && hint) hint.textContent = t("legal.hint." + fmtEl.value);
+  }
+  function legalSectionInner() {
+    if (lgState === "off") return "";
+    var head = "<h3>" + escapeHtml(t("legal.title")) + "</h3>";
+    if (lgState === "loading") return head + '<p class="dtl-ai-status">' + escapeHtml(t("legal.loading")) + "</p>";
+    if (lgState === "error" || !lgData) return head + '<p class="dtl-ai-status">' + escapeHtml(t("legal.loadFailed")) + "</p>";
+    var r = lgData.readiness || { missing: [], recommended: [], reason: "" };
+    var html = head + '<p class="dtl-ai-status">' + escapeHtml(t("legal.intro")) + "</p>";
+    html += '<div class="mk-aside">' + escapeHtml(r.reason) + " " + escapeHtml(r.missing.length ? t("legal.readinessMissing").replace("{n}", String(r.missing.length)) : t("legal.readinessOk")) + "</div>";
+    html += '<div class="lg-rows">';
+    for (var i = 0; i < KINDS.length; i++) html += kindRow(KINDS[i]);
+    html += "</div>";
+    return html;
+  }
+  function actionLabel(e) {
+    var key = "audit.action." + e.action;
+    var s = t(key);
+    if (s === key) s = e.action;
+    var d = e.detail || {};
+    var extra = [];
+    if (d.kind) extra.push(t("legal.kind." + d.kind));
+    if (d.format) extra.push(fmtLabel(d.format));
+    if (typeof d.size === "number") extra.push(Math.max(1, Math.round(d.size / 1e3)) + " kB");
+    if (d.sha256) extra.push("#" + String(d.sha256).slice(0, 8));
+    if (typeof d.on === "boolean") extra.push(t(d.on ? "marks.yes" : "marks.no"));
+    if (d.name) extra.push(String(d.name));
+    if (d.state) extra.push(String(d.state));
+    if (d.flags) extra.push(String(d.flags));
+    return s + (extra.length ? " · " + extra.join(" · ") : "");
+  }
+  function auditSectionInner() {
+    if (auState === "off") return "";
+    var head = "<h3>" + escapeHtml(t("audit.title")) + "</h3>";
+    if (auState === "loading") return head + '<p class="dtl-ai-status">' + escapeHtml(t("audit.loading")) + "</p>";
+    if (auState === "error") return head + '<p class="dtl-ai-status">' + escapeHtml(t("audit.loadFailed")) + "</p>";
+    var html = head + '<p class="dtl-ai-status">' + escapeHtml(t("audit.intro")) + "</p>";
+    if (!auEntries.length) return html + '<p class="dtl-ai-status">' + escapeHtml(t("audit.empty")) + "</p>";
+    html += '<ol class="mk-log">';
+    var shown = auEntries.slice().reverse().slice(0, auShown);
+    for (var i = 0; i < shown.length; i++) {
+      var e = shown[i];
+      html += '<li><span class="mk-log-when">' + escapeHtml(fmtDate(e.at)) + '</span> <span class="mk-log-name">' + escapeHtml(actionLabel(e)) + '</span> <span class="mk-log-by">' + escapeHtml(e.by) + "</span></li>";
+    }
+    html += "</ol>";
+    if (auEntries.length > auShown) {
+      html += '<div class="dtl-btn-row">' + dtlBtn(t("audit.more").replace("{n}", String(auEntries.length - auShown)), "window._launcher.auditMore()") + "</div>";
+    }
+    return html;
+  }
+
   // src/static/app-catalog/js/app-agents.js
   var getServerManifests;
   function initAppAgents(deps) {
@@ -8640,6 +9021,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     costOnOpen(detailServerOwner(app), app.publishedFilename || "", detailIsOwnPublished(app));
     seoOnOpen(detailServerOwner(app), app.publishedFilename || "", detailIsOwnPublished(app));
     marksOnOpen(detailServerOwner(app), app.publishedFilename || "", detailIsOwnPublished(app));
+    legalOnOpen(detailServerOwner(app), app.publishedFilename || "", detailIsOwnPublished(app));
     document.getElementById("detail-view").hidden = false;
     renderDetailView();
     detailCheckAiAvailability();
@@ -8824,6 +9206,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     var monetizeHtml = app.published && detailIsOwnPublished(app) ? '<div class="dtl-section" id="detail-monetize">' + monetizeSectionInner() + "</div>" : "";
     var seoHtml = app.published && detailIsOwnPublished(app) ? '<div class="dtl-section" id="detail-seo">' + seoSectionInner() + "</div>" : "";
     var marksHtml = app.published && detailIsOwnPublished(app) ? '<div class="dtl-section" id="detail-marks">' + marksSectionInner() + "</div>" : "";
+    var legalHtml = app.published && detailIsOwnPublished(app) ? '<div class="dtl-section" id="detail-legal">' + legalSectionInner() + '</div><div class="dtl-section" id="detail-audit">' + auditSectionInner() + "</div>" : "";
     var costHtml = app.published && detailIsOwnPublished(app) ? '<div class="dtl-section" id="detail-cost">' + costSectionInner() + "</div>" : "";
     var promoteHtml = app.published && detailIsOwnPublished(app) ? buildPromoteSection(app) : "";
     var agentsHtml = "";
@@ -8874,7 +9257,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     }
     var bandHtml = bandItems ? '<div class="cat-band dtl-band"><div class="cat-band-in">' + bandItems + "</div></div>" : "";
     var bodyEl = document.getElementById("detail-body");
-    bodyEl.innerHTML = heroHtml + bandHtml + statusHtml + aiHtml + aboutHtml + dataMapHtml + historyHtml + versionsHtml + mgmtHtml + skillsHtml + seoHtml + marksHtml + promoteHtml + odpsHtml + monetizeHtml + costHtml + agentsHtml + actionsHtml;
+    bodyEl.innerHTML = heroHtml + bandHtml + statusHtml + aiHtml + aboutHtml + dataMapHtml + historyHtml + versionsHtml + mgmtHtml + skillsHtml + seoHtml + marksHtml + legalHtml + promoteHtml + odpsHtml + monetizeHtml + costHtml + agentsHtml + actionsHtml;
     var chapters = bodyEl.querySelectorAll(".dtl-section").length;
     bodyEl.style.setProperty("--dtl-chapters", '"' + (chapters < 10 ? "0" : "") + chapters + '"');
     var dmOwner = detailServerOwner(app);
@@ -12765,6 +13148,12 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     marksToggle,
     marksDeclare,
     marksWithdraw,
+    legalEdit,
+    legalCancel,
+    legalSave,
+    legalRemove,
+    legalFormatHint,
+    auditMore,
     monetizeAddTool,
     monetizeEditTool,
     monetizeCancelEdit,
