@@ -17,6 +17,8 @@
  *   const sharing = useKeySpaceSharing({ groups, showToast });
  *   // spread into the render ctx; call sharing.loadShares() when the tab (re)loads
  * @version-history
+ *   v1.2.0 — 2026-08-29 — The share list itself is returned too, so the cover's "who else sees" section
+ *     can list every share once instead of asking per key.
  *   v1.1.0 — 2026-08-16 — sharesCovering() and revokeCoveringShare(): the hook could create a share
  *     and had no way to end one, so a key shared from the Memory tab could not be unshared there.
  *   v1.0.0 — 2026-08-11 — Extracted from memory-tab.js (max-file-lines).
@@ -97,7 +99,7 @@ export function useKeySpaceSharing({ groups, showToast }) {
   }, [shareGroupId, sharePattern, showToast, loadShares]);
 
   return {
-    loadShares, sharedWith, sharesCovering, revokeCoveringShare, submitShare, openSharePanel,
+    shares, loadShares, sharedWith, sharesCovering, revokeCoveringShare, submitShare, openSharePanel,
     sharePanelFor, setSharePanelFor, sharePattern, setSharePattern, shareGroupId, setShareGroupId,
   };
 }

@@ -1,0 +1,48 @@
+/**
+ * @file memory.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The Memory page in the poster face (mp- prefix; design canvas "AIMEAT Muistin sivu",
+ *   direction A). The shared parts (crumb, masthead, strip, sections, folds, rail, tables) come from
+ *   organism.css's og- rules; this file carries only what memory adds: the search row, the record's
+ *   value as prose or as key/value rows, the file rows, and the quiet forms the old list still uses
+ *   when it sits inside a page. NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
+ * @version-history
+ *   v1.0.0 — 2026-08-29 — Initial.
+ */
+
+.mp-space-name { display: inline-flex; align-items: center; gap: .5rem; }
+.mp-space-name small { font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); }
+.mp-key { font-family: var(--font-mono); font-weight: 500; font-size: .9rem; overflow-wrap: anywhere; }
+.mp-sort { margin-top: .8rem; font-size: .85rem; color: var(--text-dim); display: flex; gap: .4rem; flex-wrap: wrap; }
+.mp-sort button { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; color: var(--text); font-weight: 800; border-bottom: 2px solid var(--text); }
+.mp-sort button.on { color: var(--accent); border-bottom-color: var(--accent); }
+.og-title.mp-title--key { font-family: var(--font-mono); font-weight: 500; font-size: 1.7rem; text-transform: none; letter-spacing: 0; }
+.mp-meta { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; margin-top: .6rem; font-family: var(--font-mono); font-size: .75rem; color: var(--text-dim); }
+.mp-value { margin-top: 1.2rem; padding-top: 1rem; border-top: 3px solid var(--text); }
+.mp-prose { font-size: 1rem; line-height: 1.65; max-width: 68ch; white-space: pre-wrap; overflow-wrap: anywhere; }
+.mp-prose .md-body, .mp-prose .markdown { white-space: normal; }
+.mp-kv { display: grid; grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr); gap: .5rem 1.2rem; font-size: .95rem; line-height: 1.5; }
+.mp-kv .k { font-size: .68rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); padding-top: .25rem; overflow-wrap: anywhere; }
+.mp-kv .v { overflow-wrap: anywhere; white-space: pre-wrap; }
+.mp-raw { margin: 0; padding: .8rem 1rem; border: 2px solid var(--text); background: var(--card-bg); font-family: var(--font-mono); font-size: .8rem; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 60vh; overflow: auto; }
+.mp-side { display: flex; flex-direction: column; gap: 1rem; }
+.mp-side .og-rail { position: static; }
+.mp-side .og-choice-btn { padding: .4rem .65rem; font-size: .75rem; }
+.mp-tags { display: flex; gap: .4rem; align-items: center; flex-wrap: wrap; margin-top: .4rem; }
+.mp-file-kind { width: 2.4rem; height: 2.4rem; border: 2px solid var(--text); display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: .6rem; font-weight: 700; color: var(--text); flex: none; text-transform: uppercase; }
+.mp-file-kind img { width: 100%; height: 100%; object-fit: cover; }
+.mp-events .og-fold b { font-family: var(--font-mono); font-weight: 500; font-size: .85rem; }
+.mp-agent { display: inline-flex; align-items: center; gap: .5rem; font-size: .8rem; font-weight: 700; }
+.mp-agent select { border: 0; border-bottom: 2px solid var(--text); background: transparent; font: inherit; font-weight: 800; color: var(--text); padding: 0 0 1px; cursor: pointer; }
+/* The old list, the browse panels and the cart keep their pj-/mem- shapes inside a page; the page
+   head already names the view, so the old title, description and tab rows go. */
+.og-page .mem-page > .section-title, .og-page .mem-page > .section-desc, .og-page .mem-page > .sub-tabs { display: none; }
+.og-page .mem-cart { border: 3px solid var(--text); border-radius: 0; }
+.og-mp .og-fold-name { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 1100px) {
+  .mp-kv { grid-template-columns: 1fr; }
+  /* A file row and a stale row carry four doors; on a phone they wrap under the name. */
+  .og-mp .og-fold { flex-wrap: wrap; row-gap: .35rem; }
+  .og-mp .og-fold-r { white-space: normal; margin-left: 0; flex-basis: 100%; }
+}
