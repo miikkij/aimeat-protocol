@@ -2,163 +2,135 @@
  * @file discover-tab.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Profile tab for the master directory — a faceted browse over GET /v1/discover. One
- *   surface to find anything on the node across every domain (capabilities, workflows, knowledge,
- *   decisions, research, material, companies + offerings, documents, apps, memory). Scope toggle
- *   (own / public / shared), free-text query, clickable type facets, and a ranked result list.
- *   Reads only via cortex-free session.fetch; re-fetches on aimeat-live-update.
- * @structure DiscoverTab() — scope + query + type-facet state → /v1/discover → result list
+ * @description Profile › Discover: one field for everything a person and their agents brought here,
+ *   and under it the map of what is here. Loads the facet counts for each scope (own, public, shared)
+ *   and what changed last among the kinds a person reads; a query fetches ranked entries for the
+ *   chosen scope and counts the others; a kind or a place browses page by page. Renders the poster
+ *   face (discover/view.js). Reads only, through the session; re-fetches on aimeat-live-update.
+ * @structure DiscoverTab() — scope, query, view and the loads → the ctx bag → renderDiscoverView
  * @usage registered in profile.js TABS as id 'discover'
  * @version-history
- *   v0.1.1 — 2026-07-10 — Route result clicks to each entry's real home (workspace deep-link /
- *     public viewers / SPA tab) instead of navigating to the raw /v1/ fetch href, which needs a
- *     Bearer header and rendered an auth-error JSON in the new tab.
+ *   v1.0.0 — 2026-08-30 — The poster face (design canvas "AIMEAT Löydä-sivu", direction A). The scope
+ *     buttons, the thirteen type chips and the newest-first dump of every record are replaced by the
+ *     search desk, the map of kinds, what changed last, the places and the bookkeeping fold.
+ *   v0.1.1 — 2026-07-10 — Route result clicks to each entry's real home instead of the raw fetch href.
  *   v0.1.0 — 2026-06-23 — Phase 4: human-facing master-directory browse (design doc 2026-06-23).
  */
 import { h } from 'preact';
-import { useState, useEffect, useCallback } from 'preact/hooks';
+import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
-import { EmptyState } from '/components/EmptyState.js';
 const html = htm.bind(h);
-import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
-import { Spinner } from './shared.js';
 import { getSession } from '/js/services/auth.js';
 import { swallowed } from '/js/swallowed.js';
+import { HUMAN_TYPES } from './discover/frame.js';
+import { renderDiscoverView } from './discover/view.js';
 
 const SCOPES = ['own', 'public', 'shared'];
-const TYPE_ICONS = {
-  capability: '\u{1F9E9}', workflow: '\u{2699}\u{FE0F}', knowledge: '\u{1F4DA}', decision: '\u{2696}\u{FE0F}',
-  research: '\u{1F52C}', material: '\u{1F4E6}', company: '\u{1F3E2}', offering: '\u{1F3F7}\u{FE0F}',
-  document: '\u{1F4C4}', organism: '\u{1F9EC}', app: '\u{1F4F1}', memory: '\u{1F9E0}',
-};
+const PAGE = 50;
 
 export default function DiscoverTab() {
   const [scope, setScope] = useState('own');
-  const [query, setQuery] = useState('');
-  const [typeFilter, setTypeFilter] = useState('');
-  const [data, setData] = useState({ entries: [], total: 0, facets: { types: [], tags: [] } });
-  const [loading, setLoading] = useState(true);
+  const [q, setQ] = useState('');
+  const [query, setQuery] = useState('');          // the submitted query
+  const [view, setView] = useState({ kind: 'cover' });
+  const [facets, setFacets] = useState({});        // scope → { total, types, segments, places }
+  const [recent, setRecent] = useState({});        // scope → entries of the kinds a person reads
+  const [results, setResults] = useState(null);    // { entries, total } for query + scope
+  const [otherCounts, setOtherCounts] = useState({});
+  const [browse, setBrowse] = useState(null);      // { entries, total, page, loading } for a kind or a place
+  const [segment, setSegment] = useState('');
+  const [recentType, setRecentType] = useState('');
+  const [recentOpen, setRecentOpen] = useState(false);
+  const [bookOpen, setBookOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(() => new Set());
 
-  const load = useCallback(async () => {
+  const get = useCallback(async (params) => {
     const session = getSession();
-    if (!session) return;
-    setLoading(true);
-    const params = new URLSearchParams({ scope, per_page: '50' });
-    if (query.trim()) params.set('q', query.trim());
-    if (typeFilter) params.set('type', typeFilter);
-    try {
-      const res = await session.fetch(`/v1/discover?${params.toString()}`);
-      setData(res.data || { entries: [], total: 0, facets: { types: [], tags: [] } });
-    } catch (err) {
-      swallowed('discover-tab: DiscoverTab', err);
-      setData({ entries: [], total: 0, facets: { types: [], tags: [] } });
-    }
-    setLoading(false);
-  }, [scope, query, typeFilter]);
+    if (!session) return null;
+    const res = await session.fetch(`/v1/discover?${params.toString()}`);
+    return res?.data || null;
+  }, []);
+  const getFacets = useCallback(async (s) => {
+    const session = getSession();
+    if (!session) return null;
+    const res = await session.fetch(`/v1/discover/facets?scope=${s}`);
+    return res?.data || null;
+  }, []);
 
-  useEffect(() => { load(); }, [load]);
+  // The map: facet counts per scope, own first; and what changed last among the kinds a person reads.
+  const loadMap = useCallback(async () => {
+    for (const s of SCOPES) {
+      getFacets(s).then(f => { if (f) setFacets(prev => ({ ...prev, [s]: f })); }).catch(err => swallowed('discover-tab: facets', err));
+    }
+    const params = new URLSearchParams({ scope: 'own', per_page: '40', type: HUMAN_TYPES.join(',') });
+    get(params).then(d => { if (d) setRecent(prev => ({ ...prev, own: d.entries })); }).catch(err => swallowed('discover-tab: recent', err));
+  }, [get, getFacets]);
+  useEffect(() => { loadMap(); }, [loadMap]);
   useEffect(() => {
-    const handler = () => load();
+    if (scope === 'own' || recent[scope]) return;
+    const params = new URLSearchParams({ scope, per_page: '40', type: HUMAN_TYPES.join(',') });
+    get(params).then(d => { if (d) setRecent(prev => ({ ...prev, [scope]: d.entries })); }).catch(err => swallowed('discover-tab: recent', err));
+  }, [scope, recent, get]);
+  const liveRef = useRef(loadMap); liveRef.current = loadMap;
+  useEffect(() => {
+    const handler = () => liveRef.current();
     window.addEventListener('aimeat-live-update', handler);
     return () => window.removeEventListener('aimeat-live-update', handler);
-  }, [load]);
+  }, []);
 
-  // Open a result at its real home. The backend `href` is the canonical API *fetch* URL (for
-  // agents/MCP) — navigating a browser tab there has no Bearer header and shows an auth-error
-  // JSON, so clicks are routed by type instead (same handoff as notebook-tab's openHit).
-  const openEntry = useCallback((entry) => {
-    const id = String(entry.id || '');
-    const ws = id.match(/^organism\.([^.]+)\.w\.([^.]+)\.([^.]+)\.([^.]+)/);
-    if (ws) {
-      const [, org, wsId, space, docId] = ws;
-      if (scope === 'public') {
-        window.open(
-          `/v1/publicworkspaceviewer?org=${encodeURIComponent(org)}&ws=${encodeURIComponent(wsId)}` +
-          `&type=${encodeURIComponent(space)}&id=${encodeURIComponent(docId)}`,
-          '_blank', 'noopener'
-        );
-        return;
-      }
-      try {
-        sessionStorage.setItem('aimeat.ws.openId', org);
-        sessionStorage.setItem('aimeat.ws.openWs', wsId);
-        sessionStorage.setItem(`aimeat.ws.${org}.${wsId}.openDoc`, JSON.stringify({ namespace: space, id: docId }));
-      // eslint-disable-next-line aimeat/no-silent-catch -- noop
-      } catch { /* noop */ }
-      window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'organisms' } }));
-      return;
+  // A query: the chosen scope's ranked entries, and a count from each other scope for the rail.
+  useEffect(() => {
+    if (!query) { setResults(null); setOtherCounts({}); return; }
+    let alive = true;
+    setResults(null);
+    get(new URLSearchParams({ scope, q: query, per_page: '100' }))
+      .then(d => { if (alive) setResults(d || { entries: [], total: 0 }); })
+      .catch(err => { swallowed('discover-tab: search', err); if (alive) setResults({ entries: [], total: 0 }); });
+    for (const s of SCOPES.filter(x => x !== scope)) {
+      get(new URLSearchParams({ scope: s, q: query, per_page: '1' }))
+        .then(d => { if (alive && d) setOtherCounts(prev => ({ ...prev, [s]: d.total })); })
+        .catch(err => swallowed('discover-tab: other scope', err));
     }
-    const pkg = id.match(/^packages\/([^/]+)\//);
-    if (pkg) {
-      window.open(`/v1/publicknowledgeviewer?id=${encodeURIComponent(pkg[1])}`, '_blank', 'noopener');
-      return;
-    }
-    if (entry.type === 'app' && entry.href) {
-      window.open(entry.href, '_blank', 'noopener');
-      return;
-    }
-    const HOME_TAB = { capability: 'capabilities', workflow: 'workflows', organism: 'organisms', knowledge: 'knowledge' };
-    window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: HOME_TAB[entry.type] || 'memory' } }));
-  }, [scope]);
+    return () => { alive = false; };
+  }, [query, scope, get]);
 
-  const facetTypes = data.facets?.types || [];
+  // A kind or a place: rows page by page.
+  const browseParams = (page) => {
+    const p = new URLSearchParams({ scope, per_page: String(PAGE), page: String(page) });
+    if (view.kind === 'kind') { p.set('type', view.type); if (view.bookkeeping) p.set('segment', 'bookkeeping'); else if (segment) p.set('segment', segment); }
+    if (view.kind === 'place') p.set('organism', view.organismId);
+    return p;
+  };
+  const viewKey = `${view.kind}|${view.type || ''}|${view.organismId || ''}|${view.bookkeeping ? 'b' : ''}|${segment}|${scope}`;
+  useEffect(() => {
+    if (view.kind !== 'kind' && view.kind !== 'place') { setBrowse(null); return; }
+    let alive = true;
+    setBrowse({ entries: [], total: 0, page: 1, loading: true });
+    get(browseParams(1))
+      .then(d => { if (alive) setBrowse({ entries: d?.entries || [], total: d?.total || 0, page: 1, loading: false }); })
+      .catch(err => { swallowed('discover-tab: browse', err); if (alive) setBrowse({ entries: [], total: 0, page: 1, loading: false }); });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- viewKey names every input the browse depends on
+  }, [viewKey]);
+  const browseMore = async () => {
+    if (!browse || browse.loading) return;
+    const page = browse.page + 1;
+    setBrowse(b => ({ ...b, loading: true }));
+    try {
+      const d = await get(browseParams(page));
+      setBrowse(b => ({ entries: [...b.entries, ...(d?.entries || [])], total: d?.total || b.total, page, loading: false }));
+    } catch (err) { swallowed('discover-tab: browse more', err); setBrowse(b => ({ ...b, loading: false })); }
+  };
 
-  return html`
-    <div class="pf-section">
-      <div class="section-title">${t('discover.title')}</div>
-      <div class="section-desc">${t('discover.desc')}</div>
+  const pickView = (v) => { setView(v); setSegment(''); setBookOpen(false); };
+  const submit = () => { setQuery(q.trim()); setMoreOpen(new Set()); setBookOpen(false); };
+  const clear = () => { setQ(''); setQuery(''); };
+  const toggleMore = (id) => setMoreOpen(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const openTab = (tabId) => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } }));
 
-      <div class="dsc-controls">
-        <div class="dsc-scope">
-          ${SCOPES.map(s => html`
-            <button
-              class=${'btn-ghost dsc-scope-btn' + (scope === s ? ' dsc-scope-active' : '')}
-              onClick=${() => setScope(s)}
-            >${t('discover.scope.' + s)}</button>
-          `)}
-        </div>
-        <input
-          type="text"
-          class="dsc-search"
-          placeholder="${t('discover.searchPlaceholder')}"
-          value=${query}
-          onInput=${e => setQuery(e.target.value)}
-        />
-      </div>
-
-      <!-- Type facets (map mode) -->
-      <div class="dsc-facets">
-        <button
-          class=${'dsc-facet' + (typeFilter === '' ? ' dsc-facet-active' : '')}
-          onClick=${() => setTypeFilter('')}
-        >${t('discover.allTypes')} (${data.total})</button>
-        ${facetTypes.map(f => html`
-          <button
-            class=${'dsc-facet' + (typeFilter === f.value ? ' dsc-facet-active' : '')}
-            onClick=${() => setTypeFilter(typeFilter === f.value ? '' : f.value)}
-          >${TYPE_ICONS[f.value] || ''} ${t('discover.type.' + f.value) || f.value} (${f.count})</button>
-        `)}
-      </div>
-
-      ${loading ? html`<${Spinner} />` : html`
-        ${!data.entries.length
-          ? html`<${EmptyState} text=${t('discover.empty')} />`
-          : data.entries.map(e => html`
-            <a class="dsc-item" href="#" onClick=${ev => { ev.preventDefault(); openEntry(e); }}>
-              <div class="dsc-item-head">
-                <span class="dsc-type-badge">${TYPE_ICONS[e.type] || ''} ${t('discover.type.' + e.type) || e.type}</span>
-                <strong class="dsc-item-title">${escHtml(e.title || e.id)}</strong>
-                ${e.segment ? html`<span class="dsc-segment">${escHtml(e.segment)}</span>` : ''}
-              </div>
-              ${e.description ? html`<div class="dsc-item-desc">${escHtml(e.description)}</div>` : ''}
-              <div class="dsc-item-meta">
-                ${(e.tags || []).slice(0, 6).map(tag => html`<span class="dsc-tag">${escHtml(tag)}</span>`)}
-                <span class="dsc-owner">${escHtml(e.owner || '')}</span>
-              </div>
-            </a>
-          `)}
-      `}
-    </div>
-  `;
+  const ctx = {
+    scope, setScope, q, setQ, query, submit, clear, view, pickView, facets, recent, results, otherCounts, browse, browseMore,
+    segment, setSegment, recentType, setRecentType, recentOpen, setRecentOpen, bookOpen, setBookOpen, moreOpen, toggleMore, openTab,
+  };
+  return html`${renderDiscoverView(ctx)}`;
 }

@@ -16,6 +16,13 @@
  *   - toEntry() — classify + normalize → DiscoveryEntry
  * @usage registry.register(createMemorySource(storage, config));
  * @version-history
+ *   v0.4.0 — 2026-08-30 — Three things the Discover page needed and the API had wrong. (1) A workspace
+ *     document listed once: its `.version.N` and `.history.` keys and the `meta` space are skipped in
+ *     every scope, so 9 105 "documents" on aimeat.io stop being 4 500 documents twice. (2) A record
+ *     whose value is a JSON string is parsed before its title and description are read, so a
+ *     document is no longer called "latest" or "1" with its JSON as the description; the description
+ *     is plain text with the markdown marks stripped. (3) A workspace record carries its place, the
+ *     organism and workspace by name, resolved once per workspace per call.
  *   v0.3.1 — 2026-08-08 — The owner-set test honours wildcards (utils/scope-coverage.ts). It read
  *     `scopes.includes('memory:read')` exactly, so a FULL-ACCESS agent got the narrow own-content
  *     set while a narrowly-scoped one got the wide set: more access from less permission, which no
@@ -33,6 +40,8 @@ import type { DiscoveryContext, DiscoveryEntry, DiscoverySource, RawHit } from '
 import { classifyMemoryKey } from '../classify.js';
 import { bestTitle, bestDescription, normalizeTags, normalizeVisibility, toFullOwner } from '../normalize.js';
 import { scopeIsCovered } from '../../../utils/scope-coverage.js';
+import { readWorkspaceManifest } from '../../workspace-meta.js';
+import type { DiscoveryPlace } from '../types.js';
 
 export const MEMORY_SOURCE_ID = 'memory-fts';
 const MAX_LIMIT = 100;
@@ -54,6 +63,57 @@ interface MemHit {
   score: number;
   flagCount: number;
   contentType?: string;
+  place?: DiscoveryPlace;
+}
+
+const WS_ANY = /^organism\.([^.]+)\.w\.([^.]+)\.([^.]+)/;
+/** A workspace record that is a copy of another (a version, the history) or the workspace's own meta. */
+function isCopyOrMeta(key: string): boolean {
+  const m = WS_ANY.exec(key);
+  if (!m) return false;
+  return m[3] === 'meta' || key.includes('.version.') || key.includes('.history.');
+}
+
+/** A value stored as a JSON string is read as the object it is; anything else is left alone. */
+function parsed(value: unknown): unknown {
+  if (typeof value === 'string') {
+    const s = value.trim();
+    if ((s.startsWith('{') && s.endsWith('}')) || (s.startsWith('[') && s.endsWith(']'))) {
+      try { return JSON.parse(s); } catch { return value; }
+    }
+  }
+  return value;
+}
+
+/** Markdown marks out, one line, so a description reads as a sentence. */
+function plain(s: string): string {
+  return s.replace(/```[\s\S]*?```/g, ' ').replace(/^[#>\-*\s]+/gm, '').replace(/[*_`]+/g, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');
+}
+
+/**
+ * The organism and workspace each workspace record lives in, by name. One organism read and one
+ * manifest read per distinct pair per call; a record outside a workspace has no place.
+ */
+async function attachPlaces(storage: Storage, hits: MemHit[]): Promise<void> {
+  const orgNames = new Map<string, Promise<string>>();
+  const wsNames = new Map<string, Promise<string>>();
+  const orgName = (id: string) => {
+    let p = orgNames.get(id);
+    if (!p) { p = storage.getOrganism(id).then(o => o?.name || id).catch(() => id); orgNames.set(id, p); }
+    return p;
+  };
+  const wsName = (org: string, ws: string) => {
+    const k = `${org}|${ws}`;
+    let p = wsNames.get(k);
+    if (!p) { p = readWorkspaceManifest(storage, org, ws).then(m => (typeof m?.name === 'string' && m.name) || ws).catch(() => ws); wsNames.set(k, p); }
+    return p;
+  };
+  await Promise.all(hits.map(async h => {
+    const m = WS_ANY.exec(h.key);
+    if (!m) return;
+    const [organism, workspace] = await Promise.all([orgName(m[1]), wsName(m[1], m[2])]);
+    h.place = { organismId: m[1], organism, workspaceId: m[2], workspace };
+  }));
 }
 
 /** Plain searchable text of a value (string leaves joined) — for a fallback description. */
@@ -166,7 +226,7 @@ async function enumerateShared(storage: Storage, config: AimeatConfig, ctx: Disc
       const ws = m[2];
       const space = m[3];
       if (space === 'meta') continue;          // skip manifests / workspace meta / comments
-      if (rec.key.includes('.history.')) continue; // skip version history
+      if (rec.key.includes('.history.') || rec.key.includes('.version.')) continue; // one row per document
 
       const gk = `${orgId}|${ws}`;
       let allowed = gateCache.get(gk);
@@ -181,6 +241,7 @@ async function enumerateShared(storage: Storage, config: AimeatConfig, ctx: Disc
       if (allowed) out.push(toMemHit(rec, score));
     }
   }
+  await attachPlaces(storage, out);
   return out;
 }
 
@@ -221,20 +282,21 @@ export function createMemorySource(storage: Storage, config: AimeatConfig): Disc
         hits = items.filter(r => (r.flagCount ?? 0) === 0).map(rec => toMemHit(rec, 0));
       }
 
-      return hits
-        .filter(h => !isOwnedElsewhere(h.key))
-        .map(h => ({ sourceId: MEMORY_SOURCE_ID, record: h, score: h.score }));
+      const kept = hits.filter(h => !isOwnedElsewhere(h.key) && !isCopyOrMeta(h.key));
+      await attachPlaces(storage, kept);
+      return kept.map(h => ({ sourceId: MEMORY_SOURCE_ID, record: h, score: h.score }));
     },
 
     toEntry(raw: RawHit, _ctx: DiscoveryContext): DiscoveryEntry {
       const h = raw.record as MemHit;
       const { type, segment } = classifyMemoryKey(h.key, { tags: h.tags, contentType: h.contentType });
-      const description = bestDescription(h.value) || clip(flattenText(h.value), 240);
+      const value = parsed(h.value);
+      const description = clip(plain(bestDescription(value) || flattenText(value)), 240);
       return {
         type,
         segment,
         id: h.key,
-        title: bestTitle(h.value, h.key.split('.').pop() || h.key),
+        title: bestTitle(value, h.key.split('.').pop() || h.key),
         description,
         tags: normalizeTags({ tags: h.tags }),
         visibility: normalizeVisibility(h.visibility),
@@ -243,6 +305,7 @@ export function createMemorySource(storage: Storage, config: AimeatConfig): Disc
         score: h.score,
         updatedAt: h.updatedAt,
         href: `/v1/memory/${encodeURIComponent(h.key)}`,
+        ...(h.place ? { place: h.place } : {}),
       };
     },
   };

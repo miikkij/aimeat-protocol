@@ -12,6 +12,8 @@
  * @structure createTemplatesSource(storage, config) → DiscoverySource
  * @usage registry.register(createTemplatesSource(storage, config));
  * @version-history
+ *   v1.1.0 — 2026-08-30 — A query narrows the proposals to the ones whose title, description or tags
+ *     carry the words; they used to answer every search.
  *   v1.0.0 — 2026-07-19 — initial (AppDev KB Phase 6).
  */
 import type { AimeatConfig } from '../../../config.js';
@@ -46,8 +48,16 @@ export function createTemplatesSource(storage: Storage, config: AimeatConfig): D
         return []; // shared scope: proposals are not workspace records
       }
 
+      const words = (ctx.filters.q ?? '').toLowerCase().split(/\s+/).filter(Boolean);
+      const matches = (r: MemoryRecord) => {
+        if (!words.length) return true;
+        const m = (r.value ?? {}) as Partial<TemplateProposalManifest>;
+        const hay = `${m.title ?? ''} ${m.description ?? ''} ${(m.tags ?? []).join(' ')} ${m.id ?? ''}`.toLowerCase();
+        return words.every(w => hay.includes(w));
+      };
       return records
         .filter(r => TEMPLATE_PROPOSAL_KEY_RE.test(r.key))
+        .filter(matches)
         .slice(0, limit)
         .map(record => ({ sourceId: TEMPLATES_SOURCE_ID, record, score: 0 }));
     },

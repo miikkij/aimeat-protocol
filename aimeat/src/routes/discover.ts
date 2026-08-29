@@ -15,6 +15,8 @@
  *   - GET /v1/discover · GET /v1/discover/facets
  * @usage app.use(discoverRouter(config, storage))
  * @version-history
+ *   v0.2.0 — 2026-08-30 — `designbook` accepted as a type filter (the facet named it, the filter dropped
+ *     it, so the chip showed everything); +`organism` filter (records living in one organism).
  *   v0.1.0 — 2026-06-23 — Phase 1: /v1/discover + /facets over the memory/FTS source.
  */
 import { Router } from 'express';
@@ -34,7 +36,7 @@ import {
 const MAX_PER_PAGE = 100;
 const VALID_TYPES = new Set<DiscoveryType>([
   'capability', 'workflow', 'knowledge', 'decision', 'research', 'material',
-  'company', 'offering', 'document', 'organism', 'app', 'template', 'skill', 'memory',
+  'company', 'offering', 'document', 'organism', 'app', 'template', 'skill', 'designbook', 'memory',
 ]);
 
 /** Split a CSV query param into a trimmed, non-empty list. */
@@ -52,6 +54,7 @@ function parseFilters(query: Record<string, unknown>): DiscoveryFilters {
     segments: csv(query.segment).length ? csv(query.segment) : undefined,
     tags: csv(query.tags).length ? csv(query.tags) : undefined,
     owner: typeof query.owner === 'string' && query.owner.trim() ? query.owner.trim() : undefined,
+    organism: typeof query.organism === 'string' && query.organism.trim() ? query.organism.trim() : undefined,
     limit: Number.isFinite(limitRaw) && limitRaw > 0 ? limitRaw : undefined,
   };
 }

@@ -1,0 +1,83 @@
+/**
+ * @file discover-poster.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The Discover page in the poster face (dv- prefix; design canvas "AIMEAT Löydä-sivu",
+ *   direction A). The shared parts (crumb, masthead, sections, folds, rail, the segmented choice)
+ *   come from organism.css's og- rules; this file carries what Discover adds: the search desk, the
+ *   map of kinds, the rows of entries with the query words marked, the place cards and the result
+ *   groups. NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
+ * @version-history
+ *   v1.0.0 — 2026-08-30 — Initial.
+ */
+
+.og-dv .og-chip--coral { border-color: var(--accent); color: var(--accent); }
+.og-dv .og-door.on { color: var(--accent); border-bottom-color: var(--accent); }
+.og-dv .og-empty { margin: 0; font-size: .9rem; color: var(--text-dim); }
+.og-dv .dv-hint { margin: .6rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--text-dim); }
+.og-dv .dv-more { margin: .8rem 0 0; font-size: .85rem; }
+.og-dv .dv-more button, .og-dv .dv-morerow button { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; font-size: .85rem; font-weight: 800; color: var(--text); border-bottom: 2px solid var(--text); }
+.og-dv .dv-more button:hover, .og-dv .dv-morerow button:hover { color: var(--accent); border-bottom-color: var(--accent); }
+.og-title.dv-title--page { font-size: 2.1rem; overflow-wrap: anywhere; }
+.og-dv .dv-chip--btn { cursor: pointer; }
+.og-dv .dv-chip--btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── The search desk ────────────────────────────────────────────────────────────────────────── */
+.dv-desk { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .8rem 1.6rem; align-items: end; margin-top: 1.4rem; padding: 1.1rem 0; border-top: 3px solid var(--text); border-bottom: 3px solid var(--text); }
+.dv-field { width: 100%; min-width: 0; box-sizing: border-box; border: 0; border-bottom: 3px solid var(--text); background: transparent; padding: .5rem 0; font: inherit; font-size: 1.35rem; color: var(--text); }
+.dv-field:focus { outline: none; border-bottom-color: var(--accent); }
+.dv-field::placeholder { color: var(--text-dim); }
+.dv-scope .og-choice-btn { text-transform: uppercase; letter-spacing: .04em; font-size: .72rem; padding: .55rem .9rem; }
+.dv-scope .og-choice-btn i { font-family: var(--font-mono); font-size: .68rem; font-style: normal; margin-left: .4rem; opacity: .8; }
+.dv-desk .dv-hint { grid-column: 1 / -1; margin: 0; }
+
+/* ── The map of kinds ───────────────────────────────────────────────────────────────────────── */
+.dv-kinds { display: grid; grid-template-columns: 4.4rem minmax(0, 1fr) minmax(0, 1fr) 3.5rem; gap: 0 1.1rem; align-items: center; }
+.dv-kinds > div { padding: .6rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
+.dv-kinds--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.dv-kinds .dv-n { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.5rem; line-height: 1; text-align: right; color: var(--text); }
+.dv-kinds .dv-nm { font-weight: 800; font-size: .97rem; }
+.dv-kinds .dv-nm small { display: block; font-size: .8rem; font-weight: 400; color: var(--text-dim); margin-top: .1rem; }
+.dv-kinds .dv-where { font-family: var(--font-mono); font-size: .75rem; line-height: 1.5; color: var(--text-dim); }
+.dv-kinds .dv-where b { color: var(--text); font-weight: 500; }
+
+/* ── Rows of entries ────────────────────────────────────────────────────────────────────────── */
+.dv-rows { display: grid; grid-template-columns: 6rem minmax(0, 1fr) minmax(0, 13rem) 3.5rem; gap: 0 1.1rem; align-items: center; }
+.dv-rows > div { padding: .55rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
+.dv-rows--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.dv-rows--hits { grid-template-columns: minmax(0, 1fr) minmax(0, 13rem) 3.5rem; }
+.dv-at { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.35rem; line-height: 1; color: var(--text); }
+.dv-at small { display: block; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); margin-top: .2rem; }
+.dv-rows .dv-nm { font-weight: 800; font-size: .95rem; color: var(--text); }
+.dv-rows .dv-nm .og-tbl-name { white-space: normal; overflow-wrap: anywhere; }
+.dv-rows .dv-nm small { display: block; font-size: .8rem; font-weight: 400; color: var(--text-dim); margin-top: .1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dv-rows--hits .dv-nm small { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.dv-rows mark { background: var(--sun); color: var(--on-sun); padding: 0 2px; }
+.dv-rows .dv-where { font-family: var(--font-mono); font-size: .72rem; line-height: 1.5; color: var(--text-dim); overflow-wrap: anywhere; }
+.dv-rows .dv-where b { color: var(--accent); font-weight: 500; }
+.dv-lbl { grid-column: 1 / -1; display: flex; align-items: baseline; padding: .9rem 0 .25rem !important; border-bottom: 1px solid var(--text) !important; font-family: var(--font-poster); font-weight: var(--font-poster-weight); text-transform: uppercase; font-size: .82rem; letter-spacing: .05em; color: var(--accent); }
+.dv-lbl em { margin-left: auto; font-family: var(--font-mono); font-size: .7rem; font-style: normal; color: var(--text-dim); }
+.dv-morerow { grid-column: 1 / -1; padding: .5rem 0 !important; border-bottom: 0 !important; }
+
+/* ── Places ─────────────────────────────────────────────────────────────────────────────────── */
+.dv-places { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem; }
+.dv-place { display: flex; flex-direction: column; align-items: stretch; gap: .15rem; padding: .7rem .85rem; border: 2px solid var(--text); background: var(--card-bg); cursor: pointer; text-align: left; font-family: var(--font-showroom-body); color: var(--text); }
+.dv-place:hover { border-color: var(--accent); }
+.dv-place b { font-weight: 800; font-size: .92rem; overflow-wrap: anywhere; }
+.dv-place small { font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); margin-bottom: .35rem; }
+.dv-ws { display: flex; gap: .5rem; padding: .3rem 0; border-top: 1px solid var(--border); font-size: .8rem; font-weight: 600; min-width: 0; }
+.dv-ws span, .dv-ws i { font-style: normal; }
+.dv-ws i { margin-left: auto; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); flex: none; }
+.dv-ws--more { color: var(--text-dim); }
+
+@media (max-width: 1100px) {
+  .dv-desk { grid-template-columns: 1fr; }
+  .dv-kinds { grid-template-columns: 3.6rem minmax(0, 1fr) 3.5rem; }
+  .dv-kinds > .dv-where, .dv-kinds--head > div:nth-child(3) { display: none; }
+  .dv-rows { grid-template-columns: 5rem minmax(0, 1fr) 3.5rem; }
+  .dv-rows > .dv-where, .dv-rows--head > div:nth-child(3) { display: none; }
+  .dv-rows--hits { grid-template-columns: minmax(0, 1fr) 3.5rem; }
+  .dv-places { grid-template-columns: 1fr; }
+  .og-dv .og-fold { flex-wrap: wrap; row-gap: .35rem; }
+  .og-dv .og-fold-r { white-space: normal; margin-left: 0; flex-basis: 100%; }
+}

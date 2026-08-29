@@ -15,6 +15,9 @@
  * @usage
  *   import type { DiscoverySource, DiscoveryEntry } from '../discovery/types.js';
  * @version-history
+ *   v0.3.0 — 2026-08-30 — +`place` on an entry (the organism and workspace a record lives in, by name),
+ *     +`places` facet, +`organism` filter. For the Discover page in the poster face, whose rows say
+ *     where a thing is and whose cover lists the places.
  *   v0.2.0 — 2026-08-28 — +'designbook' (TARGET-074 phase 5). NOTE: mcp/core.ts holds a hand-copied
  *     duplicate of this union (VALID_DISCOVER_TYPES) — a new word lands in both or the type never
  *     reaches the MCP door.
@@ -67,16 +70,28 @@ export interface DiscoveryEntry {
   updatedAt: string;
   /** Canonical fetch URL for the full record. */
   href: string;
+  /** Where a workspace record lives, by name, so a row can say it without a second lookup. */
+  place?: DiscoveryPlace;
   /** Set when an entry was deduped from another representation (e.g. a company-listed offer that
    *  originates from a specific agent). Names the underlying producer. */
   provenance?: string;
 }
 
 /** Filters parsed from the query string; all optional. */
+/** The organism and workspace a record lives in. */
+export interface DiscoveryPlace {
+  organismId: string;
+  organism: string;
+  workspaceId: string;
+  workspace: string;
+}
+
 export interface DiscoveryFilters {
   q?: string;
   types?: DiscoveryType[];
   segments?: string[];
+  /** Only records living in this organism (by id). */
+  organism?: string;
   /** ALL-match: an entry must carry every listed tag. */
   tags?: string[];
   owner?: string;
@@ -139,4 +154,6 @@ export interface DiscoveryFacets {
   types: FacetCount[];
   segments: Array<{ type: DiscoveryType; segment: string; count: number }>;
   tags: FacetCount[];
+  /** Workspace records per place, most first. */
+  places: Array<DiscoveryPlace & { count: number }>;
 }

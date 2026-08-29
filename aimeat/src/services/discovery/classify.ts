@@ -13,6 +13,9 @@
  * @usage
  *   const { type, segment } = classifyMemoryKey(key, { tags, contentType });
  * @version-history
+ *   v0.2.0 — 2026-08-30 — A memory record the machine keeps for itself (an agent's statistics, a
+ *     workflow run, a notice, a meter) gets segment 'bookkeeping', so a directory can count it and keep
+ *     it out of the way. It used to top every newest-first list.
  *   v0.1.0 — 2026-06-23 — Phase 0: key-pattern + kind-tag classifier (design doc 2026-06-23).
  */
 import type { DiscoveryType } from './types.js';
@@ -25,6 +28,12 @@ const WF_KEY = /^workflows\.def\.([^.]+)/; // workflows.def.{id}
 const ORG_META = /^org\.([^.]+)\.meta$/; // org.{slug}.meta
 const ORG_OFFERS = /^org\.([^.]+)\.offerings$/; // org.{slug}.offerings
 const AGENT_OFFERS = /^agents\.([^.]+)\.offers$/; // agents.{name}.offers
+
+/** Key prefixes the machine writes for its own use: theirs to own, rarely theirs to read. */
+const BOOKKEEPING_PREFIXES = ['agents.', 'workflows.run.', 'notif.', 'ai-usage.', 'usage.', 'gate.', 'commerce.', 'onboarding.', 'generator.', 'hatchery.'];
+export function isBookkeepingKey(key: string): boolean {
+  return BOOKKEEPING_PREFIXES.some(p => key.startsWith(p));
+}
 
 export interface ClassifyHints {
   /** Native tags on the record (used for the `kind:` fallback). */
@@ -102,5 +111,5 @@ export function classifyMemoryKey(
   const kind = kindTagType(hints.tags);
   if (kind) return { type: kind, segment: null };
 
-  return { type: 'memory', segment: null };
+  return { type: 'memory', segment: isBookkeepingKey(key) ? 'bookkeeping' : null };
 }

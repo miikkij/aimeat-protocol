@@ -124,6 +124,57 @@ const hasId = (entries: any[], id: string) => entries.some((e: any) => e.id === 
         assert(byId(e, K_PKG)?.owner === `${a.name}@${NODE_ID}`, 'owner normalized to GHII');
     });
 
+    // The Discover page's four corrections (2026-08-30): a document is one row, a JSON-string value
+    // is read for its title, the machine's own records are marked, and a filter names every type.
+    const K_BOOK = `agents.bot-${stamp}.statistics.reviews`;
+    const discOrg = await json('/v1/organisms', { method: 'POST', headers: auth(a.token), body: JSON.stringify({ name: 'Disc Org', description: 'x', type: 'project', join_policy: 'open', visibility: 'private' }) });
+    assert(discOrg.status === 201, `organism ${discOrg.status}: ${JSON.stringify(discOrg.body.error)}`);
+    const ORG_ID = String(discOrg.body.data.organism?.id ?? discOrg.body.data.id);
+    const K_DOC = `organism.${ORG_ID}.w.ws1.docs.plans.doc1.latest`;
+    const K_DOC_V1 = `organism.${ORG_ID}.w.ws1.docs.plans.doc1.version.1`;
+    const K_DOC_META = `organism.${ORG_ID}.w.ws1.meta.manifest`;
+    await putMem(a.token, K_BOOK, { reviews: 0 }, 'private', ['agent-statistics']);
+    await putMem(a.token, K_DOC, JSON.stringify({ title: 'Titled doc', body: '# Heading\n**bold** words' }), 'private');
+    await putMem(a.token, K_DOC_V1, JSON.stringify({ title: 'Titled doc', body: 'older' }), 'private');
+    await putMem(a.token, K_DOC_META, { manifestVersion: '1.0', id: ORG_ID, name: 'Plans', kind: 'project', status: 'active', objectTypes: [{ name: 'plans', schemaRef: 'schema:doc@1', namespace: 'docs.plans', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true, mode: 'document' }] }, 'private');
+
+    await test('a workspace document is one entry: its version and meta keys are not listed', async () => {
+        const r = await discover('scope=own&type=document&per_page=100', a.token);
+        const e = r.body.data.entries;
+        assert(hasId(e, K_DOC), 'the latest key is listed');
+        assert(!hasId(e, K_DOC_V1), 'the version key is not an entry');
+        assert(!hasId(e, K_DOC_META), 'the meta record is not an entry');
+    });
+
+    await test('a JSON-string value is read for its title, the description is plain text, the place is named', async () => {
+        const r = await discover('scope=own&type=document&per_page=100', a.token);
+        const d = byId(r.body.data.entries, K_DOC);
+        assert(d?.title === 'Titled doc', `title from the parsed value, got ${JSON.stringify(d?.title)}`);
+        assert(!/[#*]/.test(d?.description ?? '#'), `markdown marks stripped, got ${JSON.stringify(d?.description)}`);
+        assert(d?.place?.organismId === ORG_ID && d?.place?.workspaceId === 'ws1', 'place carries the organism and workspace ids');
+        assert(d?.place?.workspace === 'Plans', `workspace named from its manifest, got ${JSON.stringify(d?.place?.workspace)}`);
+        const f = await discover('scope=own&organism=' + ORG_ID + '&per_page=100', a.token);
+        assert(f.body.data.entries.every((x: any) => x.place?.organismId === ORG_ID), 'organism filter keeps only that organism');
+        assert(hasId(f.body.data.entries, K_DOC), 'organism filter keeps the document');
+        assert((f.body.data.facets.places as any[]).some((x: any) => x.organismId === ORG_ID && x.count >= 1), 'places facet counts it');
+    });
+
+    await test("the machine's own records are memory with segment bookkeeping", async () => {
+        const r = await discover('scope=own&type=memory&per_page=100', a.token);
+        const b = byId(r.body.data.entries, K_BOOK);
+        assert(b?.segment === 'bookkeeping', `agent statistics → bookkeeping, got ${JSON.stringify(b?.segment)}`);
+        assert(byId(r.body.data.entries, K_PUB)?.segment === null, 'a plain note keeps no segment');
+    });
+
+    await test('designbook is an accepted type filter and a query narrows the constant sources', async () => {
+        const r = await discover('scope=own&type=designbook&per_page=100', a.token);
+        assert(r.status === 200, `status ${r.status}`);
+        assert(r.body.data.entries.every((x: any) => x.type === 'designbook'), 'only designbook entries (or none)');
+        const q = await discover('scope=public&q=zzqqxx-no-such-words&per_page=100');
+        assert(q.status === 200, `status ${q.status}`);
+        assert(!q.body.data.entries.some((x: any) => x.type === 'designbook' || x.type === 'template'), 'a Book part or a template answers only when the words match');
+    });
+
     await test('type filter narrows to one domain', async () => {
         const r = await discover('scope=own&type=knowledge&per_page=100', a.token);
         const e = r.body.data.entries;
