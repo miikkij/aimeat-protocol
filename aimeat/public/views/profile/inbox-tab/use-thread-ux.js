@@ -10,6 +10,8 @@
  *   Extracted from inbox-tab.js to satisfy max-file-lines.
  * @usage import { useThreadAutoScroll, useMobileComposerKeyboard } from './inbox-tab/use-thread-ux.js';
  * @version-history
+ *   v1.6.1 — 2026-08-29 — The desktop pane is measured against .page-content's bottom edge minus the
+ *     shell's padding, not the window: the window measure overshot by the padding and the page scrolled.
  *   v1.6.0 — 2026-08-18 — useMobileComposerKeyboard also measures the DESKTOP pane: --inbox-desk-avail
  *     is the real distance from the messenger top edge to the bottom of the window, so the pane stops
  *     guessing how much shell sits above it.
@@ -169,8 +171,15 @@ export function useMobileComposerKeyboard(mode) {
       if (!isNarrow()) {
         root.style.removeProperty('--inbox-avail');
         const top = body.getBoundingClientRect().top;
-        // The gap that keeps the pane off the bottom edge, matching .pf-content's own padding.
-        const avail = Math.max(320, Math.round(window.innerHeight - top - 20));
+        // The pane ends where its SCROLL REGION ends, not where the window does: .page-content is the
+        // only thing that scrolls and the profile shell pads its bottom, so a pane measured against
+        // the window overshot by that padding and the page scrolled by exactly that much (33px on a
+        // 1440x900 window, the messenger sliding under the crumb). Ask the region and its padding.
+        const region = body.closest('.page-content');
+        const shell = body.closest('.pf-content') || body.closest('.pf');
+        const bottom = region ? region.getBoundingClientRect().bottom : window.innerHeight;
+        const pad = shell ? (parseFloat(getComputedStyle(shell).paddingBottom) || 0) : 20;
+        const avail = Math.max(320, Math.round(bottom - top - pad - 8));
         root.style.setProperty('--inbox-desk-avail', `${avail}px`);
         return;
       }
