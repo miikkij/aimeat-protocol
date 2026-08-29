@@ -449,6 +449,16 @@
   font-weight: 650;
 }
 .ak-btn--ghost { background: none; border-color: transparent; color: var(--ak-accent-text); }
+/* The destructive answer. Outlined, never a solid fill: the ink is built the same way
+ * --ak-accent-text is (74% of the hue pulled toward the ink), which is the construction the
+ * contrast matrix already proves at 4.5:1 — so "danger" is readable in every palette by the
+ * same arithmetic, and it does not compete with the primary action for the eye. */
+.ak-btn--danger {
+  background: color-mix(in oklab, var(--ak-err) 8%, var(--ak-surface));
+  border-color: color-mix(in oklab, var(--ak-err) 45%, var(--ak-line));
+  color: color-mix(in oklab, var(--ak-err) 74%, var(--ak-ink));
+  font-weight: 650;
+}
 .ak-btn[disabled] { opacity: 0.55; cursor: not-allowed; }
 .ak-busy { position: relative; pointer-events: none; }
 .ak-busy::after {
