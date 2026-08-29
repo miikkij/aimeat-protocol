@@ -8,6 +8,7 @@
  *   injected once via initDetail(deps) — so there is no import cycle back through the entry module.
  * @usage import { initDetail, openDetailView, mountLoginPill, ... } from './detail.js'; initDetail({...})
  * @version-history
+ *   2026-08-29 — The "Marks and authorship" section (marks.js) after Search, own published apps only.
  *   2026-08-29 — Chapter numbers over the section headlines: the total is counted after the assembly
  *     and handed to the stylesheet as --dtl-chapters; the numbering itself is a CSS counter.
  *   2026-08-29 — The masthead shows the node's screenshot of the app where the icon stood (the icon
@@ -65,6 +66,7 @@ import { getPromotion, setPromotion, loadPromoted } from './promote.js';
 import { monetizeSectionInner, monetizeOnOpen, odpsSectionInner } from './monetize.js';
 import { costSectionInner, costOnOpen } from './cost.js';
 import { seoSectionInner, seoOnOpen } from './seo.js';
+import { marksSectionInner, marksOnOpen } from './marks.js';
 import { appManifestAgents } from './app-agents.js';
 import { isFavorite } from './favorites.js';
 import { saveWorkingCopy, loadCheckpoints, getCheckpoints, readCheckpoint, deleteCheckpoint, discardWorkingCopy, getDraft } from './workcopy.js';
@@ -232,6 +234,7 @@ function openDetailView(appId) {
   // Cost & contracts (EXCHANGE G3): async-load this app's EXCHANGE entitlements for OWN published apps.
   costOnOpen(detailServerOwner(app), app.publishedFilename || '', detailIsOwnPublished(app));
   seoOnOpen(detailServerOwner(app), app.publishedFilename || '', detailIsOwnPublished(app));
+  marksOnOpen(detailServerOwner(app), app.publishedFilename || '', detailIsOwnPublished(app));
   document.getElementById('detail-view').hidden = false;
   renderDetailView();
   // AI availability + published versions load asynchronously and re-render in place.
@@ -641,6 +644,13 @@ function renderDetailView() {
     ? '<div class="dtl-section" id="detail-seo">' + seoSectionInner() + '</div>'
     : '';
 
+  // ── MARKS AND AUTHORSHIP — the badge and install-offer switches, the named reviewer who
+  //   answers for the app (which lifts the visible AI-generated label), what the node sees of
+  //   the app's AI use, and the log. Stable container: marks.js re-renders #detail-marks in place.
+  var marksHtml = (app.published && detailIsOwnPublished(app))
+    ? '<div class="dtl-section" id="detail-marks">' + marksSectionInner() + '</div>'
+    : '';
+
   // ── COST & CONTRACTS (EXCHANGE G3 / TARGET-045) — what this app SOURCES (own published apps only) ──
   // Stable container: cost.js re-renders #detail-cost in place after the async load.
   var costHtml = (app.published && detailIsOwnPublished(app))
@@ -748,7 +758,7 @@ function renderDetailView() {
   bodyEl.innerHTML =
     heroHtml + bandHtml +
     statusHtml + aiHtml + aboutHtml + dataMapHtml + historyHtml + versionsHtml +
-    mgmtHtml + skillsHtml + seoHtml + promoteHtml + odpsHtml + monetizeHtml + costHtml + agentsHtml + actionsHtml;
+    mgmtHtml + skillsHtml + seoHtml + marksHtml + promoteHtml + odpsHtml + monetizeHtml + costHtml + agentsHtml + actionsHtml;
   // The chapter number over every headline ("03 / 09") is a CSS counter; only the total needs
   // counting here, and it goes on the body as a string so the stylesheet can print it. Counted
   // AFTER the assembly so a section a later load re-renders in place keeps its number.

@@ -30,6 +30,7 @@
  * @usage
  *   text = applyAppHeadMeta(text, { owner, filename, appName, description, origin, baseUrl, tools });
  * @version-history
+ *   v1.4.0 — 2026-08-29 — `installChip: false` leaves the install-chip script out (the owner's switch).
  *   v1.3.0 — 2026-08-16 — The app is installable from its own origin: a manifest link, a
  *     theme-color, an apple-touch-icon and the install-chip script join the gap-fill set (the
  *     manifest itself is served by subdomains.ts; the chip shows the suggestion the browser never
@@ -95,6 +96,11 @@ export interface AppHeadSpec {
    */
   seoTitle?: string;
   seoDescription?: string;
+  /**
+   * Whether to load the browser install chip. The owner's switch (manifest.marks.install);
+   * absent means on, which is what every app got before the switch existed.
+   */
+  installChip?: boolean;
 }
 
 function esc(t: string): string {
@@ -203,7 +209,7 @@ export function applyAppHeadMeta(text: string, spec: AppHeadSpec): string {
     // emoji icon is an SVG and rasterizing emoji server-side would need a font pipeline.
     add.push(`<link rel="apple-touch-icon" href="${spec.baseUrl.replace(/\/$/, '')}/icons/apple-touch-icon.png">`);
   }
-  if (!has(text, /install-chip\.js/i)) {
+  if (spec.installChip !== false && !has(text, /install-chip\.js/i)) {
     // The suggestion half of installability: when the browser hands over an install offer, this
     // shows a small "Install this app" pill above the aimeat.io badge — the browser itself never
     // proposes anything. Does nothing on browsers that make no offer.

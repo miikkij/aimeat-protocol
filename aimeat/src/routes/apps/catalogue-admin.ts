@@ -6,6 +6,7 @@
  *   /v1/admin/apps/similar, /v1/admin/apps/watermark/decode, /v1/admin/apps/:owner/:filename/moderate,
  *   DELETE /v1/admin/apps/:owner/:filename. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.0 — 2026-08-29 — The public listing strips `authorshipLog`; the reviewer's name stays public.
  *   v1.6.0 — 2026-08-24 — The catalogue carries `data_map`, on exactly the terms the AI posture
  *     travels on: the rows are public, because where an app puts data is the promise it makes to
  *     whoever installs it and an agent needs that before it touches anything; the publish check's
@@ -121,6 +122,9 @@ export function registerCatalogueAdminRoutes(
                 ...(posture ? { aiPosture: shownPosture } : {}),
                 ...(dataMap ? { dataMap: shownDataMap } : {}),
                 ...(app.manifest.specCheck ? { specCheck: undefined } : {}),
+                // The reviewer's NAME is public — it is served in the app's own source. The log of
+                // who declared and withdrew it is the owner's audit trail, not a stranger's.
+                ...(app.manifest.authorshipLog ? { authorshipLog: undefined } : {}),
             };
             return {
                 owner: app.ownerName,

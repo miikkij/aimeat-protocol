@@ -5,6 +5,7 @@
  * @description Public memory reads, organism + workspace lifecycle, wallet transactions, HTML apps, extensions, IAM design, and cortex tool definitions (incl. operator-only aimeat_admin_mint).
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.3.0 — 2026-08-29 — aimeat_app_marks_set: the badge and install-chip switches on one app.
  *   v1.2.0 — 2026-08-16 — the four incremental app-draft tools (write/replace/read/seed), reachable
  *     from all three doors. `content` is plain text here where aimeat_app_draft_save takes base64:
  *     a caller composing HTML is not moving a file, and base64 would inflate every chunk by a third.
@@ -716,6 +717,17 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
             keywords: { type: 'array', description: 'Keywords. Empty uses the app tags.' },
             image: { type: 'string', description: 'Absolute https URL for the social card. Empty uses the app screenshot.' },
             lang: { type: 'string', description: 'Language tag such as "fi". Empty reads what the app declares about itself.' },
+        },
+    },
+    {
+        name: 'aimeat_app_marks_set',
+        description: 'Switch the two pieces of chrome this node adds to one of your served apps: the "publish your own app" badge in the corner, and the offer to install the app in the visitor\'s browser. Both are on until you ask, and each is switched on its own, so taking the badge off a shop app leaves the install offer where it was. Naming nothing reports where the app stands. What this tool does NOT do: name the person who reviewed the app and answers for it, which is what lifts the visible AI-generated label. That is a legal act by a natural person and is reserved to the account holder signed in as themselves, on the app catalog\'s Details page; an agent cannot make it.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            filename: { type: 'string', required: true, description: 'The app to change, with its extension (e.g. "notes.html").' },
+            badge: { type: 'boolean', description: 'false takes the "publish your own app" badge off this app; true puts it back.' },
+            install: { type: 'boolean', description: 'false stops offering visitors to install this app in their browser; true offers it again.' },
         },
     },
     {

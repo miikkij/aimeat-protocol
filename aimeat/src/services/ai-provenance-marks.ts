@@ -42,6 +42,9 @@
  *   setProvenanceHeaders(res, prov);
  *   res.json(success(config.nodeId, data, hints, envelopeMeta(prov)));
  * @version-history
+ *   v1.6.0 — 2026-08-29 — aiDisclosureParts takes `reviewedBy`: with a named reviewer the visible
+ *     label is decided again under editorial responsibility (reviewedForLabel); the machine marks
+ *     stay as minted, and the interaction and deep-fake reasons are left untouched.
  *   v1.5.0 — 2026-08-02 — Mobile presentation of the visible label: collapsed icon-only pill on the
  *     same 34px row as the attribution badge (was: full-text chip on its own row at bottom:58px,
  *     ~90px of every phone viewport), tap-to-expand to the full statement via a hidden-checkbox
@@ -68,7 +71,8 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, AiProvenanceRecordRow } from '../storage/interface.js';
 import type { AiProvenance } from '../models/ai-provenance-schemas.js';
 import { toIetfHeader, toW3cHtml, toIptc, toEuIcon } from './ai-provenance-adapters.js';
-import { projectForDetail } from './ai-provenance.js';
+import { projectForDetail, buildDisclosure } from './ai-provenance.js';
+import type { SurfaceContext } from './ai-disclosure.js';
 import { createT, type Locale } from '../i18n.js';
 
 /** A record ready to be served, with the URL a third party resolves it at. */
@@ -446,15 +450,41 @@ function visibleLabelMarkup(p: ServedProvenance, config: AimeatConfig, locale: L
  */
 export function aiDisclosureParts(
   p: ServedProvenance,
-  visible?: { config: AimeatConfig; locale: Locale },
+  visible?: { config: AimeatConfig; locale: Locale; reviewedBy?: string },
 ): { block: string; w3c: string | undefined } {
   const w3c = toW3cHtml(p.record);
+  // The machine-readable marks come from the record AS MINTED. Only the chip a person sees is
+  // re-decided when a reviewer has been declared — see reviewedForLabel().
+  const forLabel = visible?.reviewedBy ? reviewedForLabel(p, visible.config) : p;
   const block =
     (w3c ? `<meta name="ai-disclosure" content="${esc(w3c)}">` : '')
     + `<link rel="ai-provenance" href="${esc(p.recordUrl)}">`
     + `<script type="application/ld+json" ${PROVENANCE_HTML_MARK}>${jsonLd(p)}</script>`
-    + (visible ? visibleLabelMarkup(p, visible.config, visible.locale) : '');
+    + (visible ? visibleLabelMarkup(forLabel, visible.config, visible.locale) : '');
   return { block, w3c };
+}
+
+/**
+ * The record with its visible-label decision made again, this time with editorial responsibility
+ * declared: a natural person has reviewed this app and answers for it (manifest.authorship).
+ *
+ * That is rule 5 of disclosureFor() — the Art. 50(4) exemption for content under human review or
+ * editorial control — and it lifts the CONTENT label only. Two reasons are left exactly as minted
+ * because the declaration does not reach them: a person conversing with a model is told so
+ * whoever reviewed the app (Art. 50(1)), and a deep fake is labelled regardless of review (the
+ * exemption belongs to the text limb). Under the node's `strict` policy the light "a model was
+ * involved" label still shows, with the neutral wording — buildDisclosure() chooses it from the
+ * `policy` reason, which is the same wording the record would have carried had the review been
+ * observed at mint time.
+ */
+function reviewedForLabel(p: ServedProvenance, config: AimeatConfig): ServedProvenance {
+  const reason = p.record.disclosure?.reason;
+  if (!p.record.disclosure?.required) return p;
+  if (reason === 'art50_1_interaction' || reason === 'art50_4_deepfake') return p;
+  const ctx: SurfaceContext = {
+    visibility: 'public', humanAudience: true, editorialResponsibility: true, mediaKind: 'text',
+  };
+  return { ...p, record: { ...p.record, disclosure: buildDisclosure(p.record, ctx, config.aiLabelPublic) } };
 }
 
 // ── Markdown ────────────────────────────────────────────────────────────────────────────────────

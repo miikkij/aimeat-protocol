@@ -20255,6 +20255,28 @@ paths:
                     `approvedBy` and `approvedAt` are the operator's answer in review mode and are
                     dropped from this body rather than rejected, so a client may safely echo back the
                     object it just read.
+                marks:
+                  type: object
+                  description: >-
+                    The owner's switches on the chrome the node adds to the served app. Both on until
+                    switched off; merged field by field, so flipping one leaves the other alone.
+                  properties:
+                    badge: { type: boolean, description: The "publish your own app" attribution badge }
+                    install: { type: boolean, description: The browser "Install this app" offer on the app's own origin }
+                author:
+                  type: string
+                  nullable: true
+                  maxLength: 120
+                  description: >-
+                    The natural person who has reviewed this app and answers for it. Reserved to the
+                    account holder signed in as themselves: an agent, app-grant or ecosystem token is
+                    refused with 403. A name declares; empty or null withdraws. The name is served in
+                    the app's head as `<meta name="author">` and `<meta name="aimeat-reviewed-by">`,
+                    the visible AI-generated content label is decided again with editorial
+                    responsibility declared (Art. 50(4) exemption), and the machine-readable provenance
+                    is left as minted. The interactive "you are talking to an AI" notice (Art. 50(1)) is
+                    never affected. Every declaration and withdrawal is appended to `authorshipLog`
+                    with the name, the declaring GHII and the time.
       responses:
         '200':
           description: App updated
@@ -20275,6 +20297,30 @@ paths:
                           parked: { type: boolean }
                           forkable: { type: boolean }
                           protection: { type: object, nullable: true, description: The app's current copy-protection flags (null when none) }
+                          marks:
+                            type: object
+                            description: The chrome switches as they now stand (absent on the manifest reads as true)
+                            properties:
+                              badge: { type: boolean }
+                              install: { type: boolean }
+                          authorship:
+                            type: object
+                            nullable: true
+                            description: The declared reviewer, or null when nobody has declared
+                            properties:
+                              name: { type: string }
+                              declaredBy: { type: string, description: GHII of the account holder who declared }
+                              declaredAt: { type: string, format: date-time }
+                          authorshipLog:
+                            type: array
+                            description: Every declaration and withdrawal, oldest first, at most 50
+                            items:
+                              type: object
+                              properties:
+                                at: { type: string, format: date-time }
+                                by: { type: string }
+                                action: { type: string, enum: [declared, cleared] }
+                                name: { type: string }
                           download_url: { type: string }
                           note: { type: string }
         '400':

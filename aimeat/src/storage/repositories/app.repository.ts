@@ -31,6 +31,8 @@
  *     primitives (collapse the per-app metric fan-out in the catalogue listing).
  *   v1.7.0 — 2026-07-16 — Add listAppDraftFilenames() so the catalogue listing can
  *     badge an owner's apps that have a pending staging draft in one query.
+ *   v1.9.0 — 2026-08-29 — updateAppMeta takes `marks` (merged), `authorship` (whole-value, null
+ *     withdraws) and `authorshipLog` — the owner's chrome switches and the named reviewer.
  *   v1.8.0 — 2026-08-19 — listApps returns AppSummaryRecord (no payload) and listAppsWithContent is the
  *     separate door for the operator copy-scan, the one caller that compares bytes.
  *   v1.9.0 — 2026-08-25 — Add listAppVersionSizes(): the version line without its payload, so the
@@ -122,6 +124,18 @@ export interface AppRepository {
              * setAppOperatorSeoBlocked, precisely so the owner cannot reach it from this door.
              */
             seo?: Partial<import('../interface.js').AppSeo>;
+            /**
+             * The owner's badge and install-chip switches. Merged like `seo`, so flipping one
+             * leaves the other where it was.
+             */
+            marks?: Partial<import('../types/apps.js').AppMarks>;
+            /**
+             * The named reviewer, or null to withdraw the declaration. Whole-value, never merged:
+             * a declaration is one act by one person at one time. The log entry that goes with it
+             * is appended by the service (app-marks.ts) through `authorshipLog`.
+             */
+            authorship?: import('../types/apps.js').AppAuthorship | null;
+            authorshipLog?: import('../types/apps.js').AppAuthorshipLogEntry[];
         },
     ): Promise<boolean>;
     /**

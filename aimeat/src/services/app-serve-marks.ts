@@ -39,6 +39,10 @@
  *   const body = applyServeMarks(app.data, {
  *     badge: true, provenance: prov, visibleLabel: { config, locale }, discovery, headMeta });
  * @version-history
+ *   v1.2.0 — 2026-08-29 — `reviewedBy`: the named reviewer goes into the head as two meta tags
+ *     and re-decides the visible label with editorial responsibility declared; `badge` is now
+ *     the owner's switch at every call site (services/app-marks.ts). Existing goldens unchanged:
+ *     a spec without the new member produces the same bytes.
  *   v1.1.0 — 2026-08-02 — The reserved-strip contract: whenever visible chrome is served (badge or
  *     AI label), also declare `--aimeat-chrome-bottom` (utils/app-chrome-reserve.ts) so apps can
  *     lift their own fixed bottom UI clear of the marks instead of being covered by them. Goldens
@@ -56,6 +60,20 @@ import {
   PROVENANCE_HTML_MARK, aiDisclosureParts, markDocumentElement, type ServedProvenance,
 } from './ai-provenance-marks.js';
 
+/** The attribute that names the reviewer tag, and the idempotency marker for it. */
+export const REVIEWED_MARK = 'name="aimeat-reviewed-by"';
+
+function escAttr(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/** Before `</head>` when there is one; else before the body opens; else at the front. */
+function injectIntoHead(html: string, snippet: string): string {
+  if (/<\/head\s*>/i.test(html)) return html.replace(/<\/head\s*>/i, (m) => snippet + m);
+  if (/<body[^>]*>/i.test(html)) return html.replace(/<body[^>]*>/i, (m) => m + snippet);
+  return snippet + html;
+}
+
 /** Which marks this response carries. Every member is optional; omitting one leaves it off. */
 export interface ServeMarksSpec {
   /** The permanent aimeat.io attribution pill. */
@@ -67,6 +85,15 @@ export interface ServeMarksSpec {
    * HTML face, the chip belongs only where a person is looking at a running app.
    */
   visibleLabel?: { config: AimeatConfig; locale: Locale };
+  /**
+   * The natural person who declared they reviewed this app and answer for it
+   * (manifest.authorship, services/app-marks.ts). Served as `<meta name="author">` and
+   * `<meta name="aimeat-reviewed-by">` in the head, and it re-decides the VISIBLE label with
+   * editorial responsibility declared — which lifts the Art. 50(4) content label and nothing
+   * else. The machine-readable marks (the attribute, the JSON-LD, the record link) are untouched:
+   * synthesis may have happened, and the record keeps saying so.
+   */
+  reviewedBy?: string;
   /** The static agent-discovery block, for an app served on its own origin. */
   discovery?: AppDiscoverySpec;
   /** The `<head>` metadata the app almost certainly has none of. */
@@ -99,7 +126,8 @@ export function applyServeMarks(data: Buffer | Uint8Array | string, spec: ServeM
     if (visibleChrome && !text.includes(RESERVE_MARK)) parts.push(reserveSnippet());
     if (spec.badge && !text.includes(BADGE_MARK)) parts.push(badgeSnippet());
     if (spec.provenance && !text.includes(PROVENANCE_HTML_MARK)) {
-      const { block, w3c } = aiDisclosureParts(spec.provenance, spec.visibleLabel);
+      const { block, w3c } = aiDisclosureParts(spec.provenance,
+        spec.visibleLabel ? { ...spec.visibleLabel, reviewedBy: spec.reviewedBy } : undefined);
       parts.push(block);
       // Before the head pass — see the file comment; this is what keeps a head-less document's
       // generated `<html>` element unmarked, as it has always been.
@@ -108,6 +136,15 @@ export function applyServeMarks(data: Buffer | Uint8Array | string, spec: ServeM
     if (spec.discovery && !text.includes(DISCOVERY_MARK)) parts.push(agentDiscoverySnippet(spec.discovery));
     // ONE splice, through the one helper that knows about the last-`</body>` rule.
     if (parts.length) out = injectBeforeClosingTag(out, parts.join(''));
+    // The reviewer's name, machine-readable, in the head. Before the head pass so a head-less
+    // document gets it inside the `<head>` that pass opens, and so that pass's own "already has
+    // an author" checks see it. Two tags: the standard one every crawler reads, and the one that
+    // says what it means here — a person reviewed this and answers for it.
+    if (spec.reviewedBy && !text.includes(REVIEWED_MARK)) {
+      const name = escAttr(spec.reviewedBy);
+      out = injectIntoHead(out,
+        `<meta name="author" content="${name}"><meta ${REVIEWED_MARK} content="${name}">`);
+    }
   }
 
   if (spec.headMeta) out = applyAppHeadMeta(out, spec.headMeta);

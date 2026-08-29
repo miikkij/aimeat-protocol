@@ -29,6 +29,7 @@
  * @structure EXEMPT (with reasons) · DELEGATES (files whose emit happens downstream) · main()
  * @usage pnpm check:sse-parity  ·  --strict fails the build
  * @version-history
+ *   v1.1.1 — 2026-08-29 — DELEGATES names src/mcp/app-marks.ts (services/app-marks.ts emits 'apps').
  *   v1.1.0 — 2026-08-11 — The rule reads the tool ANNOTATIONS as well as storage calls. The first
  *     version looked only for storage.*, and four files walked past it — companies, skills,
  *     workflows and the email invitations all write through a service, and each was silently
@@ -142,6 +143,10 @@ const DELEGATES: Record<string, string> = {
         + 'render — the catalogue card is what changes, and it changes for everyone who can see the '
         + 'app rather than only for the caller. Verified by reading the domain out of the service '
         + 'rather than trusting the delegation.',
+    'src/mcp/app-marks.ts': "services/app-marks.ts, whose applyOwnerMarksUpdate() emits 'apps' right "
+        + 'after the write, the same way app-seo.ts does and for the same reason: the catalogue card '
+        + 'and the details view read the switches, and the REST twin (PATCH /v1/apps/:filename) '
+        + 'reaches the same function, so the two doors emit the same domain by construction.',
     'src/mcp/seo.ts': "services/app-seo.ts, whose applyOwnerSeoUpdate() emits 'apps' right after "
         + 'the write. The catalogue card carries the search-visibility state, so the views watching '
         + "that domain are the ones that change, and they change for everyone who can see the app "

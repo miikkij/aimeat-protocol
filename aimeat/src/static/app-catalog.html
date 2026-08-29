@@ -2456,6 +2456,8 @@
     v1.3.0 — 2026-08-29 — The detail's sections read apart: 112px of air above a headline against 22px
       under its rule, and a coral mono chapter number ("03 / 09") over every headline from a CSS
       counter (the total comes from the detail view as --dtl-chapters).
+    v1.4.0 — 2026-08-29 — The "Marks and authorship" section (.mk-*): two switch rows, the reviewer's
+      form, the dashed aside, the "what the node sees" list and the log.
 */
 
 /* ── Tokens the poster needs on top of the catalog's own ─────────────────────────────────── */
@@ -2845,6 +2847,31 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
 .mz-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; }
 .mz-grid--price { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 120px; }
 .mz-form .modal-input { margin: 0; width: 100%; }
+
+/* ── Marks and authorship (marks.js): two switch rows, the reviewer, the aside, what the node sees, the log ── */
+.mk-rows { display: flex; flex-direction: column; margin: 0 0 8px; }
+#detail-marks h4 { margin: 30px 0 10px; }
+#detail-marks h4 + .dtl-ai-status, #detail-marks h4 + .mk-author-is { margin-top: 0; }
+.mk-row { display: grid; grid-template-columns: 220px 1fr auto; gap: 8px 24px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--border); }
+.mk-row-name { font-family: var(--font-body); font-weight: 800; font-size: .95rem; }
+.mk-row-meaning { font-size: .92rem; line-height: 1.5; color: var(--text-dim); }
+.mk-row-action { justify-self: end; }
+.mk-author-is { font-weight: 600; margin: 0 0 10px; line-height: 1.6; }
+.mk-author-form { display: flex; flex-direction: column; gap: 10px; max-width: 520px; margin: 14px 0 8px; }
+.mk-author-form .modal-input { margin: 0; width: 100%; }
+.mk-aside { border: 3px dashed var(--accent); background: var(--card-bg); padding: 14px 18px; margin: 22px 0 14px; font-size: .95rem; line-height: 1.6; }
+.mk-legal { font-size: .92rem; line-height: 1.6; color: var(--text-dim); margin: 0 0 8px; }
+.mk-legal-link { color: var(--text); font-weight: 700; text-decoration: none; border-bottom: 2px solid var(--text); }
+.mk-legal-link:hover { color: var(--accent); border-bottom-color: var(--accent); }
+.mk-sees { display: grid; grid-template-columns: 220px 1fr; gap: 6px 24px; margin: 0 0 8px; font-size: .92rem; line-height: 1.5; }
+.mk-sees dt { font-family: var(--font-mono); font-size: .72rem; font-weight: 500; text-transform: uppercase; letter-spacing: .06em; color: var(--text-dim); padding-top: 3px; }
+.mk-sees dd { margin: 0; font-weight: 600; }
+.mk-log { list-style: none; margin: 0; padding: 0; }
+.mk-log li { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: .9rem; }
+.mk-log-when { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); min-width: 90px; padding-top: 3px; }
+.mk-log-action { text-transform: uppercase; font-family: var(--font-mono); font-size: .72rem; color: var(--accent); font-weight: 700; padding-top: 3px; }
+.mk-log-name { font-weight: 700; }
+.mk-log-by { color: var(--text-dim); font-family: var(--font-mono); font-size: .72rem; padding-top: 3px; }
 .mz-more { margin-top: 14px; }
 .mz-more-head { cursor: pointer; font-family: var(--font-mono); font-size: .8rem; color: var(--accent); text-decoration: underline; text-underline-offset: 4px; list-style: none; }
 .mz-more-head::-webkit-details-marker { display: none; }
@@ -3068,6 +3095,8 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
   .mz-tool { grid-template-columns: 1fr; gap: 8px; }
   .mz-tool-doors { justify-content: flex-start; }
   .mz-grid, .mz-grid--price, .od-grid { grid-template-columns: 1fr; }
+  .mk-row, .mk-sees { grid-template-columns: 1fr; }
+  .mk-row-action { justify-self: start; }
   .mz-group > .mz-field, .mz-group > .mz-grid, .mz-group > .mz-more, .mz-group > .mz-check, .mz-group > .mz-hint, .mz-group > .od-tool-head, .mz-group > .od-form, .mz-group-lede { margin-left: 0; }
   .modal { padding: 20px 18px 22px; box-shadow: 5px 5px 0 var(--sun); }
 }
@@ -4319,6 +4348,46 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "monetize.agent": "Fulfilling agent",
       "monetize.agentHint": "Task path only: the bare name of your agent that receives the order task. Empty = the task lands in your own task space.",
       // ── Search: can this app be found in a search engine (seo.js) ──
+      // ── marks and authorship: the served chrome, the named reviewer, the log
+      "marks.title": "Marks and authorship",
+      "marks.intro": "What this node adds to the app when it serves it, and who answers for it.",
+      "marks.loading": "Checking…",
+      "marks.loadFailed": "Could not read the marks for this app.",
+      "marks.saveFailed": "Could not save.",
+      "marks.saved": "Saved.",
+      "marks.badge": "Publish your own app badge",
+      "marks.badgeOn": "Shown in the corner of the app: a way back to this node for whoever opens it.",
+      "marks.badgeOff": "Not shown.",
+      "marks.install": "Install this app offer",
+      "marks.installOn": "Visitors are offered to install the app in their browser.",
+      "marks.installOff": "Not offered.",
+      "marks.turnOn": "Turn on",
+      "marks.turnOff": "Turn off",
+      "marks.authorTitle": "Who answers for this app",
+      "marks.authorNone": "Nobody has declared. The AI-generated label follows the provenance record.",
+      "marks.authorIs": "Reviewed by {name}, declared {when}. The name is served in the app's source and the visible AI-generated label is off.",
+      "marks.authorLabel": "Reviewer's name",
+      "marks.authorPh": "First name Last name",
+      "marks.authorEmpty": "Write the reviewer's name first.",
+      "marks.declare": "Declare",
+      "marks.withdraw": "Withdraw",
+      "marks.audited": "This is on the record. Every declaration and withdrawal is kept with the name, the account that made it and the time, and the named person answers for what the app publishes. Only you, signed in as yourself, can make it; an agent working in your name cannot.",
+      "marks.legal": 'The declaration lifts the visible "AI-generated" label: when a person has reviewed the content and answers for it, the law does not require the label on it (EU AI Act, Article 50(4)). It does not lift the notice an app shows when it talks to a person as an AI (Article 50(1)); that stays whoever reviewed the app. The machine-readable provenance stays as well, so anyone reading the source still sees that synthesis may have happened.',
+      "marks.legalLink": "Read Article 50",
+      "marks.seesTitle": "What this node sees about AI in this app",
+      "marks.seesGenerates": "Generates",
+      "marks.seesNothing": "nothing it declares",
+      "marks.seesUsesAi": "Calls AI models (ai:use)",
+      "marks.seesDiscloses": "Shows its own AI notice",
+      "marks.seesAgents": "Bundled agents",
+      "marks.seesCortex": "Cortex libraries",
+      "marks.yes": "yes",
+      "marks.no": "no",
+      "marks.logTitle": "Declarations on record",
+      "marks.logEmpty": "No declarations yet.",
+      "marks.logDeclared": "declared",
+      "marks.logCleared": "withdrawn",
+      "marks.by": "by {by}",
       "seo.title": "Search",
       "seo.intro": "Publishing put this app online and made it shareable by link. Being found in a search engine is a separate choice, and it is off until you make it.",
       "seo.loading": "Checking…",
@@ -5197,6 +5266,46 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "monetize.agent": "Toimittava agentti",
       "monetize.agentHint": "Vain tehtäväpolku: sen oman agenttisi nimi, jolle tilaustehtävä ohjataan. Tyhjä = tehtävä jää omaan tehtävätilaasi.",
       // ── Haku: löytyykö tämä sovellus hakukoneesta (seo.js) ──
+      // ── merkinnät ja tekijyys
+      "marks.title": "Merkinnät ja tekijyys",
+      "marks.intro": "Mitä tämä node lisää appiin tarjoillessaan sen, ja kuka vastaa siitä.",
+      "marks.loading": "Tarkistetaan…",
+      "marks.loadFailed": "Tämän appin merkintöjä ei saatu luettua.",
+      "marks.saveFailed": "Tallennus ei onnistunut.",
+      "marks.saved": "Tallennettu.",
+      "marks.badge": "Julkaise oma appisi -merkki",
+      "marks.badgeOn": "Näkyy appin kulmassa: tie takaisin tähän nodeen sille, joka avaa appin.",
+      "marks.badgeOff": "Ei näy.",
+      "marks.install": "Asenna tämä appi -tarjous",
+      "marks.installOn": "Kävijöille tarjotaan appin asentamista selaimeen.",
+      "marks.installOff": "Ei tarjota.",
+      "marks.turnOn": "Ota käyttöön",
+      "marks.turnOff": "Ota pois",
+      "marks.authorTitle": "Kuka vastaa tästä apista",
+      "marks.authorNone": "Kukaan ei ole ilmoittautunut. Tekoälymerkintä seuraa alkuperätietuetta.",
+      "marks.authorIs": "Katselmoinut {name}, ilmoitettu {when}. Nimi tarjoillaan appin lähdekoodissa ja näkyvä tekoälymerkintä on pois.",
+      "marks.authorLabel": "Katselmoijan nimi",
+      "marks.authorPh": "Etunimi Sukunimi",
+      "marks.authorEmpty": "Kirjoita ensin katselmoijan nimi.",
+      "marks.declare": "Ilmoita",
+      "marks.withdraw": "Peru",
+      "marks.audited": "Tämä jää kirjaan. Jokainen ilmoitus ja peruutus säilyy nimen, tilin ja ajan kanssa, ja nimetty henkilö vastaa siitä, mitä appi julkaisee. Vain sinä itse kirjautuneena voit tehdä sen; nimissäsi toimiva agentti ei voi.",
+      "marks.legal": 'Ilmoitus poistaa näkyvän "tekoälyn tuottama" -merkinnän: kun ihminen on katselmoinut sisällön ja vastaa siitä, laki ei vaadi merkintää (EU:n tekoälyasetus, 50 artiklan 4 kohta). Se ei poista ilmoitusta, jonka appi näyttää keskustellessaan ihmisen kanssa tekoälynä (50 artiklan 1 kohta); se pysyy, katselmoi appin kuka tahansa. Koneluettava alkuperätieto pysyy myös, joten lähdekoodin lukija näkee edelleen, että synteesiä on voinut tapahtua.',
+      "marks.legalLink": "Lue 50 artikla",
+      "marks.seesTitle": "Mitä tämä node näkee appin tekoälykäytöstä",
+      "marks.seesGenerates": "Tuottaa",
+      "marks.seesNothing": "ei ilmoitettua",
+      "marks.seesUsesAi": "Kutsuu tekoälymalleja (ai:use)",
+      "marks.seesDiscloses": "Näyttää oman tekoälyilmoituksensa",
+      "marks.seesAgents": "Mukana kulkevat agentit",
+      "marks.seesCortex": "Cortex-kirjastot",
+      "marks.yes": "kyllä",
+      "marks.no": "ei",
+      "marks.logTitle": "Kirjatut ilmoitukset",
+      "marks.logEmpty": "Ei ilmoituksia vielä.",
+      "marks.logDeclared": "ilmoitettu",
+      "marks.logCleared": "peruttu",
+      "marks.by": "tili {by}",
       "seo.title": "Haku",
       "seo.intro": "Julkaisu vei sovelluksen verkkoon ja teki siitä linkillä jaettavan. Hakukoneesta löytyminen on eri asia, ja se on pois päältä kunnes valitset toisin.",
       "seo.loading": "Tarkistetaan…",
@@ -7072,7 +7181,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     var line = "responseTime " + ms + " milliseconds — " + t("odps.measuredNote");
     el.value = el.value.trim() ? el.value.trim() + "\n" + line : line;
   }
-  function odpsGenerateSample(ctx, rerender4) {
+  function odpsGenerateSample(ctx, rerender5) {
     var statusEl = document.getElementById("od-sample-status");
     var token = getCortexOwnerToken();
     if (!token) {
@@ -7148,15 +7257,15 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       }
     });
   }
-  function odpsToggleDefaults(rerender4) {
+  function odpsToggleDefaults(rerender5) {
     odDefaultsOpen = !odDefaultsOpen;
-    if (rerender4) rerender4();
+    if (rerender5) rerender5();
   }
-  function odpsToggleTool(rerender4) {
+  function odpsToggleTool(rerender5) {
     odToolOpen = !odToolOpen;
-    if (rerender4) rerender4();
+    if (rerender5) rerender5();
   }
-  function odpsSuggestForTool(ctx, rerender4) {
+  function odpsSuggestForTool(ctx, rerender5) {
     var statusEl = document.getElementById("od-tool-status");
     var token = getCortexOwnerToken();
     if (!token) {
@@ -7221,7 +7330,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
         st.textContent = "✔ " + t("odps.suggestDone");
       }
       showNotice(t("odps.suggestDone"), "success");
-      if (rerender4) {
+      if (rerender5) {
       }
     }).catch(function(e) {
       odBusy = false;
@@ -7835,6 +7944,207 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     return html;
   }
 
+  // src/static/app-catalog/js/rows.js
+  function fmtKb(bytes) {
+    if (!bytes || bytes < 0) return "";
+    if (bytes < 1024) return bytes + " B";
+    var kb = bytes / 1024;
+    if (kb < 1e3) return Math.round(kb) + " kB";
+    return Math.round(kb / 102.4) / 10 + " MB";
+  }
+  function fmtDate(iso) {
+    if (!iso) return "";
+    var d = new Date(iso);
+    return isNaN(d.getTime()) ? "" : d.toLocaleDateString();
+  }
+  function rowHtml2(m) {
+    var stateText = m.state === "unlisted" ? t("status.parked") : m.state === "local" ? t("status.local") : t("status.published");
+    if (m.draft) stateText += " · " + t("state.draftShort");
+    var doors = "";
+    for (var i = 0; i < (m.actions || []).length; i++) {
+      var a = m.actions[i];
+      var cls = a.kind === "slab" ? "cat-slab" : a.kind === "danger" ? "cat-word cat-word--danger" : "cat-word";
+      doors += '<button type="button" class="' + cls + '" onclick="event.stopPropagation(); ' + a.onclick + '"' + (a.title ? ' title="' + escapeHtml(a.title) + '"' : "") + ">" + escapeHtml(a.label) + "</button>";
+    }
+    var n = m.n ? String(m.n) : "";
+    if (n.length === 1) n = "0" + n;
+    return '<div class="cat-row' + (m.state === "unlisted" ? " is-unlisted" : "") + (m.draft ? " is-draft" : "") + '"' + filterAttr(m.name, m.tags, m.desc) + ' onclick="window._launcher.toggleRow(this)" style="animation-delay:' + ((m.n || 1) - 1) * 0.03 + 's"><div class="cat-row-n">' + n + '</div><div class="cat-row-icon">' + escapeHtml(m.icon || "📝") + '</div><div class="cat-row-main"><div class="cat-row-name">' + (m.favStar || "") + "<span>" + escapeHtml(m.name) + "</span>" + (m.nameExtra || "") + "</div>" + (m.meta ? '<div class="cat-row-meta">' + escapeHtml(m.meta) + "</div>" : "") + '</div><div class="cat-row-desc">' + escapeHtml(m.desc || "") + '</div><div class="cat-row-state">' + escapeHtml(stateText) + '</div><div class="cat-row-opens">' + (typeof m.opens === "number" ? String(m.opens) : "") + '</div><div class="cat-row-arrow" aria-hidden="true"></div></div><div class="cat-row-panel">' + doors + (m.line ? '<span class="cat-row-line">' + escapeHtml(m.line) + "</span>" : "") + "</div>";
+  }
+  function toggleRow(el) {
+    if (!el) return;
+    var wasOpen = el.classList.contains("is-open");
+    var list = el.parentNode;
+    if (list) {
+      var open = list.querySelectorAll(".cat-row.is-open");
+      for (var i = 0; i < open.length; i++) open[i].classList.remove("is-open");
+    }
+    if (!wasOpen) el.classList.add("is-open");
+  }
+
+  // src/static/app-catalog/js/marks.js
+  var LAW_URL = "https://eur-lex.europa.eu/eli/reg/2024/1689/oj#art_50";
+  var mkOwner = "";
+  var mkAppId = "";
+  var mkState = "off";
+  var mkData = null;
+  var mkBusy = false;
+  function apiBase5() {
+    var cfg = loadConfig();
+    return (cfg.aimeatUrl || "").replace(/\/+$/, "");
+  }
+  function rerender4() {
+    var el = document.getElementById("detail-marks");
+    if (el) el.innerHTML = marksSectionInner();
+  }
+  function fill(text, vars) {
+    return String(text).replace(/\{(\w+)\}/g, function(m, k) {
+      return vars[k] != null ? vars[k] : m;
+    });
+  }
+  function marksOnOpen(owner, appId, isOwn) {
+    mkBusy = false;
+    mkData = null;
+    if (!isOwn || !owner || !appId) {
+      mkState = "off";
+      mkOwner = "";
+      mkAppId = "";
+      return;
+    }
+    mkOwner = owner;
+    mkAppId = appId;
+    mkState = "loading";
+    var token = getCortexOwnerToken();
+    fetch(apiBase5() + "/v1/apps?limit=200", { headers: token ? { "Authorization": "Bearer " + token } : {} }).then(function(r) {
+      return r.json();
+    }).then(function(res) {
+      var apps = res && res.ok && res.data && res.data.apps || [];
+      var mine = null;
+      for (var i = 0; i < apps.length; i++) {
+        if (apps[i].filename === mkAppId && apps[i].owner === mkOwner) {
+          mine = apps[i];
+          break;
+        }
+      }
+      if (!mine) {
+        mkState = "error";
+        rerender4();
+        return;
+      }
+      var m = mine.manifest || {};
+      mkData = {
+        marks: { badge: !(m.marks && m.marks.badge === false), install: !(m.marks && m.marks.install === false) },
+        authorship: m.authorship || null,
+        log: m.authorshipLog || [],
+        posture: mine.ai_posture || null,
+        agents: m.cortex && m.cortex.agents && m.cortex.agents.length || 0,
+        cortex: m.usesCortex || []
+      };
+      mkState = "ready";
+      rerender4();
+    }).catch(function() {
+      mkState = "error";
+      rerender4();
+    });
+  }
+  function marksToggle(key) {
+    if (mkBusy || !mkData) return;
+    var next = {};
+    next[key] = !mkData.marks[key];
+    patch2({ marks: next });
+  }
+  function marksDeclare() {
+    if (mkBusy || !mkData) return;
+    var el = document.getElementById("mk-author");
+    var name = el ? el.value.trim() : "";
+    if (!name) {
+      showNotice(t("marks.authorEmpty"));
+      return;
+    }
+    patch2({ author: name });
+  }
+  function marksWithdraw() {
+    if (mkBusy || !mkData || !mkData.authorship) return;
+    patch2({ author: null });
+  }
+  function patch2(body) {
+    mkBusy = true;
+    rerender4();
+    var token = getCortexOwnerToken();
+    fetch(apiBase5() + "/v1/apps/" + encodeURIComponent(mkAppId), {
+      method: "PATCH",
+      headers: Object.assign({ "Content-Type": "application/json" }, token ? { "Authorization": "Bearer " + token } : {}),
+      body: JSON.stringify(body)
+    }).then(function(r) {
+      return r.json();
+    }).then(function(res) {
+      mkBusy = false;
+      if (!res || !res.ok) {
+        showNotice(res && res.error && res.error.message || t("marks.saveFailed"));
+        rerender4();
+        return;
+      }
+      var d = res.data || {};
+      if (d.marks) mkData.marks = { badge: d.marks.badge !== false, install: d.marks.install !== false };
+      if ("authorship" in d) mkData.authorship = d.authorship || null;
+      if (d.authorshipLog) mkData.log = d.authorshipLog;
+      showNotice(d.note || t("marks.saved"));
+      rerender4();
+    }).catch(function(err) {
+      mkBusy = false;
+      showNotice(String(err && err.message ? err.message : err));
+      rerender4();
+    });
+  }
+  function switchRow(key, on) {
+    return '<div class="mk-row"><div class="mk-row-name">' + escapeHtml(t("marks." + key)) + '</div><div class="mk-row-meaning">' + escapeHtml(t(on ? "marks." + key + "On" : "marks." + key + "Off")) + '</div><div class="mk-row-action">' + dtlBtn(t(on ? "marks.turnOff" : "marks.turnOn"), "window._launcher.marksToggle('" + key + "')", { disabled: mkBusy }) + "</div></div>";
+  }
+  function yesNo(v) {
+    return t(v ? "marks.yes" : "marks.no");
+  }
+  function seesHtml(d) {
+    var p = d.posture;
+    var rows = [];
+    var generates = p && p.generates && p.generates.length ? p.generates.join(", ") : t("marks.seesNothing");
+    rows.push([t("marks.seesGenerates"), generates]);
+    rows.push([t("marks.seesUsesAi"), yesNo(!!(p && p.usesAi))]);
+    rows.push([t("marks.seesDiscloses"), yesNo(!!(p && (p.discloses || p.disclosureCallFound)))]);
+    rows.push([t("marks.seesAgents"), String(d.agents)]);
+    rows.push([t("marks.seesCortex"), d.cortex.length ? d.cortex.join(", ") : t("marks.no")]);
+    var html = "<h4>" + escapeHtml(t("marks.seesTitle")) + '</h4><dl class="mk-sees">';
+    for (var i = 0; i < rows.length; i++) {
+      html += "<dt>" + escapeHtml(rows[i][0]) + "</dt><dd>" + escapeHtml(rows[i][1]) + "</dd>";
+    }
+    return html + "</dl>";
+  }
+  function logHtml(log) {
+    var html = "<h4>" + escapeHtml(t("marks.logTitle")) + "</h4>";
+    if (!log.length) return html + '<p class="dtl-ai-status">' + escapeHtml(t("marks.logEmpty")) + "</p>";
+    html += '<ol class="mk-log">';
+    for (var i = log.length - 1; i >= 0; i--) {
+      var e = log[i];
+      html += '<li><span class="mk-log-when">' + escapeHtml(fmtDate(e.at)) + '</span> <span class="mk-log-action">' + escapeHtml(t(e.action === "cleared" ? "marks.logCleared" : "marks.logDeclared")) + '</span> <span class="mk-log-name">' + escapeHtml(e.name) + '</span> <span class="mk-log-by">' + escapeHtml(fill(t("marks.by"), { by: e.by })) + "</span></li>";
+    }
+    return html + "</ol>";
+  }
+  function marksSectionInner() {
+    if (mkState === "off") return "";
+    var head = "<h3>" + escapeHtml(t("marks.title")) + "</h3>";
+    if (mkState === "loading") return head + '<p class="dtl-ai-status">' + escapeHtml(t("marks.loading")) + "</p>";
+    if (mkState === "error" || !mkData) return head + '<p class="dtl-ai-status">' + escapeHtml(t("marks.loadFailed")) + "</p>";
+    var d = mkData;
+    var html = head + '<p class="dtl-ai-status">' + escapeHtml(t("marks.intro")) + '</p><div class="mk-rows">' + switchRow("badge", d.marks.badge) + switchRow("install", d.marks.install) + "</div>";
+    html += "<h4>" + escapeHtml(t("marks.authorTitle")) + "</h4>";
+    if (d.authorship) {
+      html += '<p class="mk-author-is">' + escapeHtml(fill(t("marks.authorIs"), { name: d.authorship.name, when: fmtDate(d.authorship.declaredAt) })) + '</p><div class="dtl-btn-row">' + dtlBtn(t("marks.withdraw"), "window._launcher.marksWithdraw()", { disabled: mkBusy }) + "</div>";
+    } else {
+      html += '<p class="dtl-ai-status">' + escapeHtml(t("marks.authorNone")) + '</p><div class="mk-author-form"><label class="mz-label" for="mk-author">' + escapeHtml(t("marks.authorLabel")) + '</label><input id="mk-author" type="text" class="modal-input" maxlength="120" placeholder="' + escapeHtml(t("marks.authorPh")) + '"><div class="dtl-btn-row">' + dtlBtn(t("marks.declare"), "window._launcher.marksDeclare()", { variant: "primary", disabled: mkBusy }) + "</div></div>";
+    }
+    html += '<div class="mk-aside">' + escapeHtml(t("marks.audited")) + '</div><p class="mk-legal">' + escapeHtml(t("marks.legal")) + ' <a class="mk-legal-link" href="' + LAW_URL + '" target="_blank" rel="noopener">' + escapeHtml(t("marks.legalLink")) + " →</a></p>";
+    html += seesHtml(d);
+    html += logHtml(d.log);
+    return html;
+  }
+
   // src/static/app-catalog/js/app-agents.js
   var getServerManifests;
   function initAppAgents(deps) {
@@ -8331,6 +8641,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     monetizeOnOpen(detailServerOwner(app), app.publishedFilename || "", detailIsOwnPublished(app));
     costOnOpen(detailServerOwner(app), app.publishedFilename || "", detailIsOwnPublished(app));
     seoOnOpen(detailServerOwner(app), app.publishedFilename || "", detailIsOwnPublished(app));
+    marksOnOpen(detailServerOwner(app), app.publishedFilename || "", detailIsOwnPublished(app));
     document.getElementById("detail-view").hidden = false;
     renderDetailView();
     detailCheckAiAvailability();
@@ -8514,6 +8825,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     var odpsHtml = app.published && detailIsOwnPublished(app) ? '<div class="dtl-section" id="detail-odps">' + odpsSectionInner() + "</div>" : "";
     var monetizeHtml = app.published && detailIsOwnPublished(app) ? '<div class="dtl-section" id="detail-monetize">' + monetizeSectionInner() + "</div>" : "";
     var seoHtml = app.published && detailIsOwnPublished(app) ? '<div class="dtl-section" id="detail-seo">' + seoSectionInner() + "</div>" : "";
+    var marksHtml = app.published && detailIsOwnPublished(app) ? '<div class="dtl-section" id="detail-marks">' + marksSectionInner() + "</div>" : "";
     var costHtml = app.published && detailIsOwnPublished(app) ? '<div class="dtl-section" id="detail-cost">' + costSectionInner() + "</div>" : "";
     var promoteHtml = app.published && detailIsOwnPublished(app) ? buildPromoteSection(app) : "";
     var agentsHtml = "";
@@ -8564,7 +8876,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     }
     var bandHtml = bandItems ? '<div class="cat-band dtl-band"><div class="cat-band-in">' + bandItems + "</div></div>" : "";
     var bodyEl = document.getElementById("detail-body");
-    bodyEl.innerHTML = heroHtml + bandHtml + statusHtml + aiHtml + aboutHtml + dataMapHtml + historyHtml + versionsHtml + mgmtHtml + skillsHtml + seoHtml + promoteHtml + odpsHtml + monetizeHtml + costHtml + agentsHtml + actionsHtml;
+    bodyEl.innerHTML = heroHtml + bandHtml + statusHtml + aiHtml + aboutHtml + dataMapHtml + historyHtml + versionsHtml + mgmtHtml + skillsHtml + seoHtml + marksHtml + promoteHtml + odpsHtml + monetizeHtml + costHtml + agentsHtml + actionsHtml;
     var chapters = bodyEl.querySelectorAll(".dtl-section").length;
     bodyEl.style.setProperty("--dtl-chapters", '"' + (chapters < 10 ? "0" : "") + chapters + '"');
     var dmOwner = detailServerOwner(app);
@@ -10616,43 +10928,6 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     }
   }
 
-  // src/static/app-catalog/js/rows.js
-  function fmtKb(bytes) {
-    if (!bytes || bytes < 0) return "";
-    if (bytes < 1024) return bytes + " B";
-    var kb = bytes / 1024;
-    if (kb < 1e3) return Math.round(kb) + " kB";
-    return Math.round(kb / 102.4) / 10 + " MB";
-  }
-  function fmtDate(iso) {
-    if (!iso) return "";
-    var d = new Date(iso);
-    return isNaN(d.getTime()) ? "" : d.toLocaleDateString();
-  }
-  function rowHtml2(m) {
-    var stateText = m.state === "unlisted" ? t("status.parked") : m.state === "local" ? t("status.local") : t("status.published");
-    if (m.draft) stateText += " · " + t("state.draftShort");
-    var doors = "";
-    for (var i = 0; i < (m.actions || []).length; i++) {
-      var a = m.actions[i];
-      var cls = a.kind === "slab" ? "cat-slab" : a.kind === "danger" ? "cat-word cat-word--danger" : "cat-word";
-      doors += '<button type="button" class="' + cls + '" onclick="event.stopPropagation(); ' + a.onclick + '"' + (a.title ? ' title="' + escapeHtml(a.title) + '"' : "") + ">" + escapeHtml(a.label) + "</button>";
-    }
-    var n = m.n ? String(m.n) : "";
-    if (n.length === 1) n = "0" + n;
-    return '<div class="cat-row' + (m.state === "unlisted" ? " is-unlisted" : "") + (m.draft ? " is-draft" : "") + '"' + filterAttr(m.name, m.tags, m.desc) + ' onclick="window._launcher.toggleRow(this)" style="animation-delay:' + ((m.n || 1) - 1) * 0.03 + 's"><div class="cat-row-n">' + n + '</div><div class="cat-row-icon">' + escapeHtml(m.icon || "📝") + '</div><div class="cat-row-main"><div class="cat-row-name">' + (m.favStar || "") + "<span>" + escapeHtml(m.name) + "</span>" + (m.nameExtra || "") + "</div>" + (m.meta ? '<div class="cat-row-meta">' + escapeHtml(m.meta) + "</div>" : "") + '</div><div class="cat-row-desc">' + escapeHtml(m.desc || "") + '</div><div class="cat-row-state">' + escapeHtml(stateText) + '</div><div class="cat-row-opens">' + (typeof m.opens === "number" ? String(m.opens) : "") + '</div><div class="cat-row-arrow" aria-hidden="true"></div></div><div class="cat-row-panel">' + doors + (m.line ? '<span class="cat-row-line">' + escapeHtml(m.line) + "</span>" : "") + "</div>";
-  }
-  function toggleRow(el) {
-    if (!el) return;
-    var wasOpen = el.classList.contains("is-open");
-    var list = el.parentNode;
-    if (list) {
-      var open = list.querySelectorAll(".cat-row.is-open");
-      for (var i = 0; i < open.length; i++) open[i].classList.remove("is-open");
-    }
-    if (!wasOpen) el.classList.add("is-open");
-  }
-
   // src/static/app-catalog/js/server-io.js
   var getMainApps3;
   var getServerState2;
@@ -12489,6 +12764,9 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     seoToggle,
     seoSave,
     seoToggleEditor,
+    marksToggle,
+    marksDeclare,
+    marksWithdraw,
     monetizeAddTool,
     monetizeEditTool,
     monetizeCancelEdit,

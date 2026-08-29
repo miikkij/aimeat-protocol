@@ -8,6 +8,7 @@
  * @usage
  *   import { appTools } from './tool-call-defs-apps.js';
  * @version-history
+ *   v1.4.0 -- 2026-08-29 -- aimeat_app_marks_set: the badge and install-chip switches over PATCH.
  *   v1.3.0 -- 2026-08-28 -- The four Design Book tools (TARGET-074 phase 5) join the CLI dispatch,
  *     same third-door rule as the mosaic pair: a parameter that exists on the MCP surfaces and not
  *     here is dropped in silence, so all of them land in the same change.
@@ -534,6 +535,26 @@ export const appTools: ConnectCliToolDefinition[] = [
             const keywords = optionalArray(input, 'keywords');
             if (keywords) seo.keywords = keywords;
             return client.patch(`/v1/apps/${encodeURIComponent(requiredString(input, 'filename'))}`, { seo });
+        },
+    },
+    {
+        // → PATCH /v1/apps/:filename — the app owner's badge and install-chip switches. Only the
+        //   fields the caller named travel. The reviewer's name is not a field on purpose (see the
+        //   connector door): the route refuses it from any agent token.
+        name: 'aimeat_app_marks_set',
+        description: 'Switch the "publish your own app" badge and the browser install offer on one of your served apps. Both on until you ask; naming nothing reports where the app stands.',
+        input: {
+            filename: { type: 'string', required: true, description: 'The app to change, with its extension (e.g. "notes.html").' },
+            badge: { type: 'boolean', description: 'false takes the "publish your own app" badge off this app; true puts it back.' },
+            install: { type: 'boolean', description: 'false stops offering visitors to install this app in their browser; true offers it again.' },
+        },
+        handler: ({ client }, input) => {
+            const marks: JsonObject = {};
+            for (const field of ['badge', 'install'] as const) {
+                const v = optionalBoolean(input, field);
+                if (v !== undefined) marks[field] = v;
+            }
+            return client.patch(`/v1/apps/${encodeURIComponent(requiredString(input, 'filename'))}`, { marks });
         },
     },
     {
