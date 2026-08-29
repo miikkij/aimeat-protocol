@@ -125,14 +125,18 @@ export function atlas(spec) {
     // the whole world when nothing is matched or the layout asked for it.
     let vb = [0, 0, geo.w, geo.h];
     if (spec.fit !== 'world' && extent[0] < extent[2]) {
-      const padX = Math.max((extent[2] - extent[0]) * 0.25, 20);
-      const padY = Math.max((extent[3] - extent[1]) * 0.25, 12);
+      // Pad floors scale-free (the context floor below carries the minimum breadth): a fixed
+      // 20-unit pad forced ~800 km of margin onto an 80 km crossing.
+      const padX = Math.max((extent[2] - extent[0]) * 0.25, 3);
+      const padY = Math.max((extent[3] - extent[1]) * 0.25, 2);
       let x0 = Math.max(0, extent[0] - padX);
       let y0 = Math.max(0, extent[1] - padY);
       let x1 = Math.min(geo.w, extent[2] + padX);
       let y1 = Math.min(geo.h, extent[3] + padY);
-      // Keep the frame's shape near 2:1 so the card never shows a sliver.
-      const minW = 90;
+      // Keep the frame's shape near 2:1 so the card never shows a sliver. The context floor
+      // SCALES with the data: a lone country still gets its neighbours, while two harbours
+      // 80 km apart get their gulf instead of half a continent (the crossing finding).
+      const minW = Math.max((extent[2] - extent[0]) * 3, 22);
       if (x1 - x0 < minW) { const cx = (x0 + x1) / 2; x0 = Math.max(0, cx - minW / 2); x1 = Math.min(geo.w, cx + minW / 2); }
       if (y1 - y0 < (x1 - x0) / 2) { const cy = (y0 + y1) / 2; const half = (x1 - x0) / 4; y0 = Math.max(0, cy - half); y1 = Math.min(geo.h, cy + half); }
       vb = [x0, y0, x1 - x0, y1 - y0];
@@ -162,7 +166,9 @@ export function atlas(spec) {
       node.appendChild(path);
     });
 
-    const dotR = Math.max(vb[2] / 220, 1.6);
+    // Screen-constant: ~1/160 of the drawn width whatever the zoom, so a close-up's buoys
+    // stay pins instead of blots.
+    const dotR = vb[2] / 160;
     markers.forEach(function (m, i) {
       if (typeof m.lon !== 'number' || typeof m.lat !== 'number') return;
       const [x, y] = project(m.lon, m.lat);
