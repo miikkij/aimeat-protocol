@@ -2453,6 +2453,9 @@
       regular, uppercase, 1.9rem), running text at the text weight, the slab at 600, dialog titles
       in the section face with a 12px sun shadow, chips at 500, ink-on-sun as --on-sun, and the
       poster weight tokens repeated here because this page cannot read theme.css.
+    v1.3.0 — 2026-08-29 — The detail's sections read apart: 112px of air above a headline against 22px
+      under its rule, and a coral mono chapter number ("03 / 09") over every headline from a CSS
+      counter (the total comes from the detail view as --dtl-chapters).
 */
 
 /* ── Tokens the poster needs on top of the catalog's own ─────────────────────────────────── */
@@ -2714,13 +2717,24 @@ footer .footer-brand { grid-column: 1 / -1; font-family: var(--font-poster); fon
 .dtl-mast-hint { font-size: .78rem; font-weight: var(--font-poster-text-weight); color: var(--text-dim); text-align: right; max-width: 300px; line-height: 1.5; }
 .dtl-band { margin-top: 8px; }
 
-/* Sections as bands: a poster headline over an ink rule, sixty-four pixels apart. */
-.dtl-section { background: transparent; border: 0; border-radius: 0; padding: 0; margin: 64px 0 0; }
-.dtl-section h3 {
+/* Sections as bands: a chapter number, a poster headline, an ink rule. The rhythm is
+   asymmetric on purpose: far more air above a headline (112px) than under its rule (22px), so the
+   eye reads the gap as "the previous one ended" and not as more of the same. The number is a CSS
+   counter and the total is a string the detail view sets on its body (--dtl-chapters). */
+#detail-body { counter-reset: dtl-chapter; }
+.dtl-section { background: transparent; border: 0; border-radius: 0; padding: 0; margin: 112px 0 0; counter-increment: dtl-chapter; }
+.dtl-band + .dtl-section { margin-top: 72px; }
+.dtl-section > h3 {
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 12px;
   font-family: var(--font-poster-section); font-weight: var(--font-poster-section-weight); text-transform: uppercase; font-size: 1.9rem; line-height: .95; letter-spacing: -.03em;
-  color: var(--text); margin: 0 0 22px;
+  color: var(--text); margin: 0 0 14px;
 }
-.dtl-section > h3 + * { border-top: 3px solid var(--text); padding-top: 14px; }
+.dtl-section > h3::before {
+  content: counter(dtl-chapter, decimal-leading-zero) " / " var(--dtl-chapters, "");
+  flex: 0 0 100%; margin-bottom: 4px;
+  font-family: var(--font-mono); font-size: .72rem; font-weight: 700; letter-spacing: .1em; text-transform: none; color: var(--accent);
+}
+.dtl-section > h3 + * { border-top: 3px solid var(--text); padding-top: 22px; }
 .dtl-desc { font-size: 1rem; font-weight: var(--font-poster-text-weight); line-height: 1.55; }
 .dtl-btn-row { gap: 24px; align-items: center; }
 .dtl-btn {
@@ -3041,7 +3055,8 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
   .dtl-mast-side { align-items: stretch; }
   .dtl-mast-side .cat-slab { box-shadow: 4px 4px 0 var(--sun); }
   .dtl-mast-hint { text-align: left; max-width: none; }
-  .dtl-section { margin-top: 40px; }
+  .dtl-section { margin-top: 72px; }
+  .dtl-band + .dtl-section { margin-top: 48px; }
   .dtl-section h3 { font-size: 1.5rem; }
   .dtl-mast-name { font-size: 2.2rem; }
   .wc-stop-label { flex: 0 0 100%; }
@@ -8548,7 +8563,10 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       bandItems += bandItem(fmtSize(localBytes), t("detail.size"));
     }
     var bandHtml = bandItems ? '<div class="cat-band dtl-band"><div class="cat-band-in">' + bandItems + "</div></div>" : "";
-    document.getElementById("detail-body").innerHTML = heroHtml + bandHtml + statusHtml + aiHtml + aboutHtml + dataMapHtml + historyHtml + versionsHtml + mgmtHtml + skillsHtml + seoHtml + promoteHtml + odpsHtml + monetizeHtml + costHtml + agentsHtml + actionsHtml;
+    var bodyEl = document.getElementById("detail-body");
+    bodyEl.innerHTML = heroHtml + bandHtml + statusHtml + aiHtml + aboutHtml + dataMapHtml + historyHtml + versionsHtml + mgmtHtml + skillsHtml + seoHtml + promoteHtml + odpsHtml + monetizeHtml + costHtml + agentsHtml + actionsHtml;
+    var chapters = bodyEl.querySelectorAll(".dtl-section").length;
+    bodyEl.style.setProperty("--dtl-chapters", '"' + (chapters < 10 ? "0" : "") + chapters + '"');
     var dmOwner = detailServerOwner(app);
     var dmFile = app.publishedFilename || "";
     if (dmOwner && dmFile) loadDataMapInto(dmOwner, dmFile, { docKey: "apps." + dmFile.replace(/\.html$/i, "") + ".datamap" });
