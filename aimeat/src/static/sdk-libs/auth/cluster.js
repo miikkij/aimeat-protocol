@@ -11,6 +11,8 @@
  * @structure ensureClusterStyles() — idempotent <style> injector.
  * @usage import { ensureClusterStyles } from './cluster.js';   (pill.js calls it once per render)
  * @version-history
+ *   v1.1.1 — 2026-08-29 — The pressed segment reads --aimeat-ink / --aimeat-paper (defined on the pill's
+ *     roots by ink.js), so its fallback follows the theme instead of assuming a light page.
  *   v1.1.0 — 2026-08-29 — The segments and the popover trigger wear the pill's new frame: a 2px
  *     currentColor border, square unless --aimeat-pill-radius says otherwise, the pressed option
  *     filled with the page's text colour. Matches pill.js v1.4.0.
@@ -37,7 +39,7 @@ export function ensureClusterStyles() {
     '.aimeat-seg button:hover{opacity:.9}',
     '.aimeat-seg button:focus-visible{outline:2px solid currentColor;outline-offset:-2px;opacity:1}',
     '.aimeat-seg button[aria-pressed="true"]{opacity:1;',
-      'background:var(--aimeat-pill-fg,var(--text,#1A1A2E));color:var(--aimeat-pill-bg,var(--bg,#FAFAF8))}',
+      'background:var(--aimeat-ink);color:var(--aimeat-paper)}',
     '.aimeat-seg button+button{border-left:0}',
     '.aimeat-seg .seg-ico{font-size:13px;line-height:1}',
 
