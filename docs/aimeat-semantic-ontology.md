@@ -182,7 +182,6 @@ Some endpoints generate semantic annotations at response time even when the reco
 |---|---|---|
 | `GET /v1/organisms/:id` | `schema:Organization` | `routes/organisms.ts:208-226` |
 | `GET /v1/marketplace/listings/:id` | `schema:Offer` | `routes/marketplace.ts:198-206` |
-| `GET /v1/matches` | `schema:RecommendAction` | `routes/matches.ts:57-62` |
 | `GET /v1/organisms/:id/reputation` | `schema:Rating` | `routes/organisms.ts:741-747` |
 | `POST /v1/federation/genesis-peers` | `schema:Organization` | `routes/federation.ts:1014-1018` |
 | `GET /v1/directory/search` | `schema:Person` | `services/directory.ts:60-88` |

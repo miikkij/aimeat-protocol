@@ -458,20 +458,6 @@ export function applySchemaTables1(db: Database.Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_appeals_flagId ON appeals(flagId);
 
-    -- ── Matches ──
-    CREATE TABLE IF NOT EXISTS matches (
-      id             TEXT PRIMARY KEY,
-      profileA       TEXT NOT NULL,
-      profileB       TEXT NOT NULL,
-      score          REAL NOT NULL DEFAULT 0,
-      breakdown      TEXT NOT NULL DEFAULT '{}',
-      status         TEXT NOT NULL DEFAULT 'suggested',
-      notifiedAt     TEXT,
-      respondedAt    TEXT,
-      expiresAt      TEXT NOT NULL,
-      createdAt      TEXT NOT NULL
-    );
-
     -- ── Organisms ──
     CREATE TABLE IF NOT EXISTS organisms (
       id               TEXT PRIMARY KEY,

@@ -139,7 +139,6 @@ import { appMembersRouter } from '../routes/app-members.js';
 import { appStoreRouter } from '../routes/app-store.js';
 import { flagsRouter } from '../routes/flags.js';
 import { appealsRouter } from '../routes/appeals.js';
-import { matchesRouter } from '../routes/matches.js';
 import { personalRouter } from '../routes/personal.js';
 import { pushRouter } from '../routes/push.js';
 import { verificationRouter } from '../routes/verification.js';
@@ -223,8 +222,6 @@ import { createMyDataReceiptService } from '../services/mydata-receipt.js';
 import { createEmailService } from '../services/email.js';
 import { SiteService } from '../services/site.js';
 import { startSiteSyncJob, triggerSiteSync } from '../services/site-sync.js';
-import { startMatchNotificationJob } from '../services/match-notification.js';
-import { createMatchingEngine, startMatchingScheduler } from '../services/matching.js';
 import { createGenesisPeeringService } from '../services/genesis-peering.js';
 import { startBackgroundJobs } from './background-jobs.js';
 import { initProcessBuffers } from './process-buffers.js';
@@ -562,7 +559,6 @@ export async function mountRoutes(
   app.use(disputesRouter(config, storage));
   app.use(flagsRouter(config, storage));
   app.use(appealsRouter(config, storage));
-  app.use(matchesRouter(config, storage));
   app.use(storageFilesRouter(config, storage));
   // Data packages: the publish/validate/read door onto services/datapackage/. The CANONICAL
   // address of a package is the /v1/pub storage URL these routes hand back; this is where a
@@ -653,13 +649,6 @@ export async function mountRoutes(
     });
   }).catch(err => logger.warn('DID Document setup failed', { error: String(err) }));
 
-  // Match notification job — Phase 1.6
-  startMatchNotificationJob(config, storage, emailService, directoryService);
-
-  // AI Matching — Phase 2.1
-  const matchingEngine = createMatchingEngine(config, storage, directoryService, emailService);
-  startMatchingScheduler(config, matchingEngine);
-
   // Genesis peering service — Phase 3.4
   const genesisPeeringService = createGenesisPeeringService(config, storage);
 
@@ -667,7 +656,6 @@ export async function mountRoutes(
   app.use(adminFeaturesRouter(config, storage, {
     emailService,
     directoryService,
-    matchingEngine,
     pushService,
     genesisPeeringService,
   }));

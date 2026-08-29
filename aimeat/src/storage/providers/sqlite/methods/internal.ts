@@ -11,7 +11,7 @@ import type {
   OwnerRecord, AgentRecord, MemoryRecord, ActionRecord, WorkRecord, WalletTransaction,
   BoardRecord, BoardPostRecord, OtkRecord, DisputeRecord, PeeringRequestRecord,
   GHIIRecord, PersonalNodeRecord, MailboxItemRecord, SchemaRecord, ConsentRecord, CsmRecord,
-  MsmRecord, EmailVerificationRecord, FlagRecord, MatchRecord, OrganismRecord, OrganismMembershipRecord,
+  MsmRecord, EmailVerificationRecord, FlagRecord, OrganismRecord, OrganismMembershipRecord,
   JoinRequestRecord, PendingApprovalRecord, AppealRecord, ListingRecord, PurchaseRecord, TrustedIssuerRecord,
   GenesisPeerRecord, ChatInstanceRecord, RealtimeRoomRecord, ExtensionRecord, EscrowHoldRecord, BoardSubscriptionRecord,
   CortexExtensionRecord, PersonalPushSubscriptionRecord, NotificationPreferences, AppRecord, AppSummaryRecord, AppPurchaseRecord, SubdomainSiteRecord,
@@ -47,7 +47,6 @@ export interface SqliteInternals {
   deserializeCsm(row: Record<string, unknown>): CsmRecord ;
   deserializeMsm(row: Record<string, unknown>): MsmRecord ;
   deserializeFlag(row: Record<string, unknown>): FlagRecord ;
-  deserializeMatch(row: Record<string, unknown>): MatchRecord ;
   deserializeOrganism(row: Record<string, unknown>): OrganismRecord ;
   deserializeMembership(row: Record<string, unknown>): OrganismMembershipRecord ;
   deserializeJoinRequest(row: Record<string, unknown>): JoinRequestRecord ;

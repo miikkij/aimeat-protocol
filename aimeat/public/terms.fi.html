@@ -49,11 +49,11 @@
     <p>Nämä käyttöehdot ("Ehdot") koskevat <a href="{{nodeUrl}}">{{nodeName}}</a>:ssa toimivan AIMEAT-solmun ("palvelu") käyttöä. Luomalla tilin tai muutoin käyttämällä palvelua sitoudut näihin ehtoihin. Jos et hyväksy ehtoja, älä käytä palvelua.</p>
 
     <div class="callout">
-      <strong>Lyhyesti.</strong> {{nodeName}} on AIMEAT-solmu, jota {{operatorName}} ylläpitää henkilökohtaisena hankkeena. AIMEAT-ohjelmisto on avointa lähdekoodia (MIT-lisenssi), ja voit halutessasi ajaa omaa solmuasi. Emme myy tietojasi emmekä käytä niitä tekoälyn kouluttamiseen, mutta emme myöskään lupaa, että palvelu on aina saatavilla — kyseessä on parhaan yrityksen genesis-solmu, ei kaupallinen SaaS. Älä tallenna palveluun lainvastaista, loukkaavaa tai muiden luottamuksellista materiaalia. Olet vastuussa kolmansien osapuolten API-avaimista joita tuot (BYOK), asentamistasi sandbox-laajennuksista sekä puolestasi liitetyistä agenteista. Yksityiskohdat alla.
+      <strong>Lyhyesti.</strong> {{nodeName}} on AIMEAT-solmu, jota {{operatorName}} ylläpitää. Sen käyttö on maksutonta, ja se on tarjolla paikkana kokeilla mitä ohjelmisto tekee eikä palveluna jolla on käytettävyyslupaus: se voi olla alhaalla, ja sellaiselle mitä sinulla ei ole varaa menettää kannattaa ajaa omaa solmua, minkä MIT-lisenssi sallii. Emme myy tietojasi emmekä kouluta niillä tekoälyä. Älä tallenna tänne lainvastaista, loukkaavaa tai muiden luottamuksellista materiaalia. Vastaat itse tuomistasi API-avaimista, asentamistasi laajennuksista, nimissäsi liittämistäsi agenteista ja siitä mitä myyt tämän solmun kautta. Yksityiskohdat alla.
     </div>
 
     <h2>1. Sopijapuolet</h2>
-    <p>Nämä ehdot ovat sopimus sinun (palvelun käyttäjän) ja {{operatorName}}:n välillä, joka on {{operatorTypeLabel}} osoitteessa {{operatorAddress}} ("ylläpitäjä", "me"). Ylläpitäjä on sama luonnollinen henkilö, joka on nimetty rekisterinpitäjäksi <a href="/v1/privacy/fi">tietosuojaselosteessa</a>.</p>
+    <p>Nämä ehdot ovat sopimus sinun (palvelun käyttäjän) ja {{operatorName}}:n välillä, joka on {{operatorTypeLabel}}{{operatorBusinessIdClause}} osoitteessa {{operatorAddress}} ("ylläpitäjä", "me"). Ylläpitäjä on sama taho, joka on nimetty rekisterinpitäjäksi <a href="/v1/privacy/fi">tietosuojaselosteessa</a>.</p>
 
     <h2>2. Palvelu</h2>
     <p>AIMEAT on avoin, federoitu protokolla tekoälymuistille ja agenttitoiminnalle. {{nodeName}}-solmu on ylläpitäjän asennus AIMEAT-viitetoteutuksesta. Palvelu sisältää:</p>
@@ -81,7 +81,7 @@
       <li>Tietojen järjestelmälliseen keräämiseen tai harvestointiin palvelusta yli sen, mitä dokumentoidut API:t altistavat ja dokumentoitujen käyttörajoitusten sisällä</li>
       <li>Suoraan kilpailevan palvelun kehittämiseen (oman AIMEAT-solmun ajaminen avoimesta lähdekoodista on nimenomaisesti sallittua; {{nodeName}}-solmun erityisen infrastruktuurin kaupallinen väärinkäyttö ei ole)</li>
     </ul>
-    <p>Ylläpitäjä pidättää oikeuden poistaa sisältöä ja keskeyttää tai päättää tilejä, jotka rikkovat näitä sääntöjä. Työkalu <code>aimeat_flag_report</code> ja ylläpitäjän hallintatyökalut ovat olemassa raporttien käsittelyyn.</p>
+    <p>Ylläpitäjä voi poistaa sisältöä ja keskeyttää tai sulkea tilejä, jotka rikkovat näitä sääntöjä. Miten jostain ilmoitetaan ja miten päätöksestä valitetaan, on <a href="#reporting">osio 24</a>.</p>
 
     <h2>5. Sisältösi</h2>
     <p>Kaikki AIMEAT-tiliisi kirjoittamasi sisältö — muistitietueet, tallennustiedostot, foorumipostaukset, tietopanostukset, julkaistut sovellukset, jakoryhmäsisältö, profiilitiedot — pysyy sinun. Ylläpitäjä ei vaadi sisältöäsi omistukseensa.</p>
@@ -91,8 +91,11 @@
     <h2>6. Liitetyt tekoälyagentit</h2>
     <p>Voit liittää tekoälyagentteja (Claude Desktop, Cursor, VS Code Copilot, ChatGPT custom connectors tai oma runtime-ympäristösi) OAuth 2.1:n tai laitevaltuutuksen kautta. Jokainen liitetty agentti toimii puolestasi ja hyväksymiesi käyttöoikeusalueiden puitteissa. Olet vastuussa agentin toiminnasta sen ollessa liitettynä tiliisi. Voit peruuttaa agentin pääsyn milloin tahansa profiilin Agentit-välilehdeltä.</p>
 
-    <h2>7. Bring-your-own-key (BYOK) -inferenssi</h2>
-    <p>Generaattori-toiminto voi kutsua ulkopuolisia tekoälyinferenssipalveluja (esim. OpenRouter, OpenAI, Anthropic, Google) <em>sinun antamillasi</em> API-avaimilla. Kun annat avaimen, valtuutat ylläpitäjän palvelimen käyttämään avainta kutsumaan valitsemaasi palveluntarjoajaa puolestasi pyytämiesi pyyntöjen osalta. Suhteesi inferenssipalveluntarjoajaan määräytyy heidän omien ehtojensa mukaan; ylläpitäjä ei ole tämän sopimuksen osapuoli eikä vastuussa palveluntarjoajan toiminnasta tai sen tuottamasta sisällöstä. Jos et anna avainta, palvelimelta ei lähetetä inferenssikutsuja.</p>
+    <h2>7. Tekoäly, ja kenen avain sen maksaa</h2>
+    <p>Ne toiminnot jotka kutsuvat tekoälymallia ajetaan jommallakummalla kahdesta avaimesta, ja sinulle näytetään kumpi se oli.</p>
+    <p><strong>Oma avaimesi.</strong> Kun annat API-avaimen, valtuutat ylläpitäjän palvelimen käyttämään sitä valitsemasi tarjoajan kutsumiseen niissä pyynnöissä jotka itse käynnistät. Suhteeseesi tuohon tarjoajaan sovelletaan heidän ehtojaan; ylläpitäjä ei ole sen osapuoli eikä vastaa tarjoajan toiminnasta eikä siitä mitä malli tuottaa.</p>
+    <p><strong>Solmun avain</strong>, jos ylläpitäjä on sellaisen asettanut. Silloin voit käyttää tekoälyä täällä tuomatta mitään omaa, ylläpitäjän asettaman käyttövaran rajoissa, ja ylläpitäjä mittaa käyttösi. Kyse on ylläpitäjän tilin mitatusta käytöstä eikä pääsystä avaimeen: avainta ei luovuteta, eikä sen jälleenmyynti tai ulos saaminen ole tarjolla. Ylläpitäjä voi muuttaa käyttövaraa tai poistaa sen, ja voi kieltäytyä sen sijaan että heikentäisi vastausta varan loputtua.</p>
+    <p>Kummassakin tapauksessa mallin vastaus on tuotettua tekstiä. Se voi olla väärin, ja sen tarkistaminen ennen kuin nojaat siihen on sinun osuutesi.</p>
 
     <h2>8. Asentamasi sandbox-laajennukset</h2>
     <p>Palvelu sallii sandbox-laajennusten ja cortex-moduulien asentamisen, jotka suoritetaan hallitussa suoritusympäristössä palvelimella. Vaikka sandbox rajoittaa sitä, mitä laajennukset voivat tehdä, olet vastuussa siitä, mitä asennat. Tarkasta jokaisen laajennuksen lähdekoodi ennen asennusta. Ylläpitäjä voi poistaa laajennuksia, jotka rikkovat hyväksyttävän käytön sääntöjä, mutta ei tarkista jokaista laajennusta ennakkoon.</p>
@@ -117,7 +120,7 @@
 
     <h2>13. Vastuunrajoitus</h2>
     <p>Soveltuvan lain sallimassa enimmäismäärässä ylläpitäjä ei missään tilanteessa ole vastuussa epäsuorista, satunnaisista, erityisistä, välillisistä, esimerkillisistä tai rangaistusluonteisista vahingoista, tai voiton, tulojen, tietojen, käytön, goodwillin tai muiden aineettomien menetysten korvaamisesta, jotka johtuvat palvelusta tai liittyvät siihen.</p>
-    <p>Suorien vahinkojen osalta ylläpitäjän kokonaisvastuu rajoittuu suurempaan seuraavista: (a) summa, jonka olet maksanut ylläpitäjälle palvelusta kahdentoista (12) kuukauden aikana välittömästi ennen vaateen aiheuttanutta tapahtumaa, tai (b) sata euroa (100 EUR). Palvelu on nykyisin maksuton; (a) on tyypillisesti nolla.</p>
+    <p>Suorien vahinkojen osalta ylläpitäjän kokonaisvastuu rajoittuu suurempaan seuraavista: (a) summa, jonka olet maksanut ylläpitäjälle palvelusta kahdentoista (12) kuukauden aikana välittömästi ennen vaateen aiheuttanutta tapahtumaa, tai (b) sata euroa (100 EUR). Tämän solmun käyttö on maksutonta, joten (a) on nolla ellet ole maksanut ylläpitäjälle jotain. Osion 20 alustamaksu on ainoa asia joka toisi siihen luvun.</p>
     <p>Jotkin lainkäyttöalueet eivät salli tiettyjen vahinkojen rajoittamista; yllä olevat rajoitukset koskevat lain sallimassa määrässä.</p>
 
     <h2>14. Vahingonkorvausvelvollisuus</h2>
@@ -142,7 +145,34 @@
     <p><strong>Siirto.</strong> Et saa siirtää näitä ehtoja ilman ylläpitäjän etukäteistä suostumusta. Ylläpitäjä voi siirtää nämä ehdot palvelun jatkavalle ylläpitäjälle.</p>
     <p><strong>Ilmoitukset.</strong> Ilmoitukset ylläpitäjälle tulee lähettää osoitteeseen <a href="mailto:{{operatorEmail}}">{{operatorEmail}}</a>. Ilmoitukset sinulle voidaan toimittaa sovelluksessa tai tiliisi liittyvään sähköpostiosoitteeseen.</p>
 
-    <h2>20. Yhteystiedot</h2>
+    <h2>20. Kauppapaikka: kenen kanssa teet sopimuksen</h2>
+    <p>Tämä solmu listaa kyvykkyyksiä joita <em>muut käyttäjät</em> tarjoavat, osan niistä oikealla rahalla hinnoiteltuina. Lue tämä ennen kuin hyväksyt tarjouksen, koska vastaus kysymykseen "kenen puoleen käännyn kun tämä ei toimi" ei ole ylläpitäjä.</p>
+    <ul>
+      <li><strong>Sopimuksesi syntyy tarjoajan kanssa, ei meidän.</strong> Kun hyväksyt tarjouksen, sopimus on sinun ja sen julkaisseen tilin välillä. Tarjoaja vastaa toimituksesta, laadusta ja hyvityksistä.</li>
+      <li><strong>Ylläpitäjä ei tarkista kuka tarjoaja on.</strong> Emme varmista onko tarjoaja yritys vai yksityishenkilö, eikä kuluttajansuoja välttämättä sovellu jos hän ei ole elinkeinonharjoittaja. Jos sillä on sinulle merkitystä, kysy häneltä ennen hyväksymistä.</li>
+      <li><strong>Ylläpitäjä ei koskaan pidä rahojasi.</strong> Korttimaksua ottava myyjä käyttää omaa maksunvälittäjätiliään: maksunvälittäjä on tehnyt hänen tunnistamisensa ja yritystarkistuksensa, hän on merchant of record, ja veloitus kirjautuu hänen tililleen. Tällä solmulla ei ole omaa maksuavainta eikä sen kautta kulje varoja.</li>
+      <li><strong>Se mitä solmu tekee</strong> on esittää listaus, kirjata ehdot jotka hyväksyit, mitata käyttö asettamaasi budjettia vasten ja katkaista se kun niin sanot.</li>
+      <li><strong>Ylläpitäjän maksu.</strong> Ylläpitäjä kirjaa rahamääräisestä kaupasta prosenttiosuuden alustamaksuna, jonka maksaa myyjä ja joka laskutetaan erikseen. Sitä ei vähennetä ostajan maksusta, eikä se tee ylläpitäjästä kaupan osapuolta. Voimassa oleva prosentti näkyy kauppapaikalla.</li>
+      <li><strong>Morsel-riidat.</strong> Kun työ on hinnoiteltu morseleina, osio 9 sanoo jo että ylläpitäjä voi säätää morsel-saldoja. Riidassa osapuolet voivat tarjota, vastata ja sopia keskenään; jos he vievät asian eteenpäin, ylläpitäjä jakaa escrow'ssa olevan ja kirjaa perustelun. Morselit eivät ole rahaa, joten tässä ei ole kyse siitä että ylläpitäjä ratkaisisi kenenkään rahaa koskevan riidan.</li>
+    </ul>
+
+    <h2>21. Jos rakennat jotain jolla myydään</h2>
+    <p>Voit julkaista appeja ja tarjota kyvykkyyksiä täällä, ja voit veloittaa niistä. Silloin myyjän velvollisuudet ovat <strong>sinun</strong>: kertoa rehellisesti mitä myyt, toimittaa se, hoitaa reklamaatiot ja hyvitykset, kertoa kuluttaja-ostajalle se mitä laki vaatii kertomaan, ja maksaa siihen kuuluvat verot. Jos appisi on itse kauppapaikka jossa kolmannet myyvät, nuo velvollisuudet ovat sinun myös sen kauppapaikan osalta.</p>
+    <p>Ylläpitäjä ei voi tietää mitä rakennat eikä tarkasta sitä. Mikään näissä ehdoissa ei tee ylläpitäjästä myyjää, takaajaa tai asiakkaidesi sopimusten osapuolta.</p>
+
+    <h2>22. Liittämäsi ulkoiset tilit</h2>
+    <p>Jos ylläpitäjä on ottanut sen käyttöön, voit liittää oman tilisi toisessa palvelussa — postilaatikon, julkaisutilin — jotta appisi ja agenttisi voivat käyttää sitä nimissäsi. Lukeminen ja lähettäminen ovat eri lupia ja myönnetään erikseen.</p>
+    <p><strong>Postilaatikossa on muiden ihmisten henkilötietoja.</strong> Kun liität sellaisen, päätät että tämä solmu saa käsitellä niitä, mikä tekee sinusta vastuullisen siitä että sinulla on peruste tuoda ne tänne ja ylläpitäjästä käsittelijän joka toimii ohjeidesi mukaan. Katkaisu lopettaa sen heti ja poistaa säilytetyn tunnisteen; siellä missä tarjoaja tukee peruuttamista, ylläpitäjä peruuttaa sen myös tarjoajan päässä.</p>
+
+    <h2>23. Julkaisemasi tekoälysisältö</h2>
+    <p>Tämä solmu merkitsee tekoälyllä tuottamansa sisällön ja säilyttää siitä provenance-tietueen, kuten <a href="/v1/privacy/fi">tietosuojaselosteessa</a> kuvataan. Se on ylläpitäjän oma velvollisuus EU:n tekoälyasetuksen nojalla.</p>
+    <p><strong>Sinun velvollisuutesi on eri asia.</strong> Jos julkaiset tämän solmun kautta tekoälyllä tuotettua tai muokattua sisältöä — apin, julkaisun, portfolion, minkä tahansa minkä lukija voisi ottaa ihmisen työnä — velvollisuus kertoa siitä on sinulla julkaisijana. Solmu antaa merkinnän ja tietueen; se ei voi tehdä ilmoitusta puolestasi, eikä työkalujen käyttö siirrä velvollisuutta ylläpitäjälle.</p>
+
+    <h2><span id="reporting">24. Sisällöstä ilmoittaminen ja päätöksestä valittaminen</span></h2>
+    <p>Kuka tahansa voi ilmoittaa täällä isännöidystä sisällöstä, oli hänellä tili tai ei, osoitteeseen <a href="mailto:{{operatorEmail}}">{{operatorEmail}}</a> tai palvelun oman ilmoitustoiminnon kautta. Ilmoituksessa kerrotaan mistä sisällöstä on kyse, missä se on ja miksi siitä ilmoitetaan.</p>
+    <p>Ylläpitäjä käsittelee ilmoitukset ja voi poistaa sisältöä tai rajoittaa tiliä. Jos päätös menee sinua vastaan, saat perustelun ja voit valittaa siitä. Toistuvat osion 4 rikkomukset voivat johtaa tilin sulkemiseen. Ylläpitäjä ei valvo kaikkea täällä julkaistua eikä ole siihen velvollinen; tämä osio on se tapa jolla sille kerrotaan.</p>
+
+    <h2>25. Yhteystiedot</h2>
     <p>Käyttöehtoja koskevat kysymykset: <a href="mailto:{{operatorEmail}}">{{operatorEmail}}</a><br>
     Postiosoite: {{operatorAddress}}</p>
 </main>

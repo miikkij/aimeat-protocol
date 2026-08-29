@@ -30,8 +30,35 @@ const PG_METHODS = join(ROOT, 'src', 'storage', 'providers', 'postgres-kysely', 
 const SQLITE_METHODS = join(ROOT, 'src', 'storage', 'providers', 'sqlite', 'methods');
 const EXEMPTIONS = join(ROOT, 'security', 'storage-parity-exemptions.json');
 
-/** A column of one of these names makes a row belong to somebody. */
-const OWNER_COLUMNS = ['ownerGaii', 'ownerName', 'buyerOwner', 'sellerOwner', 'agentGaii', 'flaggedBy'];
+/**
+ * A column of one of these names makes a row belong to somebody.
+ *
+ * THE LIST IS THE GATE'S EYESIGHT, so a name missing from it is a table this check cannot see at
+ * all. `principal` was missing until 2026-08-29 and `Connection` is addressed by it, which is why a
+ * table holding sealed credentials to people's mailboxes was in neither backend's owner cascade and
+ * no gate said so. When you add a table whose owner column has a new name, add the name here in the
+ * same change — a sweep of db-types.ts on that date found 58 tables carrying an owner-ish column
+ * outside this list, so the next one is not hypothetical.
+ */
+const OWNER_COLUMNS = [
+    'ownerGaii', 'ownerName', 'buyerOwner', 'sellerOwner', 'agentGaii', 'flaggedBy',
+    'principal',
+];
+
+/**
+ * NOT YET IN THE LIST ABOVE, and the reason is scope rather than doubt. Adding `ownerGhii`,
+ * `publisher`, `createdBy` and `authorGhii` was tried on 2026-08-29 and turned this gate red with
+ * eighteen tables at once: Capability, DirectMessage, ContactConsent, Conversation, Company,
+ * WorkspaceRow, Package, PublishAttempt, UsageCall(+Archive), UsageRollup, AccountEvent(+Archive),
+ * AiProvenance and the four Finance tables.
+ *
+ * They do not share an answer. Some must be deleted and are not. Some must SURVIVE their owner —
+ * the finance tables because accounting law requires six years, the provenance records because they
+ * answer "who made this?" for content that outlives the account — and those need an exemption with
+ * the reason written down, not a deletion. Working through eighteen judgement calls belongs in its
+ * own change with the developer, so the names stay out until then rather than being exempted in a
+ * batch, which would turn the gate into a list of things nobody looked at.
+ */
 
 interface ExemptionFile { note: string; exempt: Record<string, string> }
 

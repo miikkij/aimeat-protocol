@@ -657,7 +657,6 @@ Human↔human (GHII↔GHII) direct messaging: send/inbox/threads/read-receipts/d
 - **Catalogue** (Tier 0) — aggregated index of public actions, agents, boards, and knowledge, with an integrity hash for sync verification.
 - **Directory** — searchable discovery with geographic radius (`lat`/`lon`/`radius_km`), city, interest, category, tags.
 - **Discover** (New) — `GET /v1/discover?scope=public` is a single faceted **master directory** across every domain (capabilities, workflows, knowledge, companies + offerings, apps, documents), with a `/facets` map mode. This is the recommended entry point for an AI exploring a node.
-- **Matching** (`matches.ts`) — consent-gated shared-interest matching between owners ("people with shared interests"), gated by consent purpose, surfaced in the portal and an operator tab.
 - **Stats** — `GET /v1/stats`: agents, actions, economy (minted/burned), work, peers.
 
 ### 29.1 Content Moderation

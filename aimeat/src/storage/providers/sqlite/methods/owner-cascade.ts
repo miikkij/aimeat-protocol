@@ -61,8 +61,6 @@ export const cascadeMethods = {
     this.db.prepare('DELETE FROM consents WHERE ownerGaii = ?').run(gaii);
     // Storage files
     this.db.prepare('DELETE FROM storage_files WHERE ownerGaii = ?').run(gaii);
-    // Matches (as profileA or profileB)
-    this.db.prepare('DELETE FROM matches WHERE profileA = ? OR profileB = ?').run(gaii, gaii);
     // Flags raised by this agent
     this.db.prepare('DELETE FROM flags WHERE flaggedBy = ?').run(gaii);
     // Escrow holds

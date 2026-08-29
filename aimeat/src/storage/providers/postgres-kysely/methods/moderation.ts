@@ -10,14 +10,12 @@
  *   v1.0.0 — 2026-07-15 — Phase 5: moderation (flags/appeals/matches) on Postgres+Kysely.
  */
 import type { Selectable } from 'kysely';
-import type { AppealRecord, FlagRecord, FlagSummary, MatchRecord } from '../../../interface.js';
-import type { Appeal, Flag, Match } from '../db-types.js';
+import type { AppealRecord, FlagRecord, FlagSummary } from '../../../interface.js';
+import type { Appeal, Flag } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
-import { jsonb } from '../helpers.js';
 
 const iso = (t: Date | string): string => (t instanceof Date ? t : new Date(t)).toISOString();
 const isoU = (t: Date | string | null | undefined): string | undefined => (t == null ? undefined : iso(t));
-const isoN = (t: Date | string | null | undefined): string | null => (t == null ? null : iso(t));
 
 function toFlag(r: Selectable<Flag>): FlagRecord {
   return {
@@ -30,13 +28,6 @@ function toAppeal(r: Selectable<Appeal>): AppealRecord {
   return {
     id: r.id, flagId: r.flagId, appealedBy: r.appealedBy, reason: r.reason, status: r.status as AppealRecord['status'],
     reviewedBy: r.reviewedBy ?? undefined, reviewNote: r.reviewNote ?? undefined, createdAt: iso(r.createdAt), reviewedAt: isoU(r.reviewedAt),
-  };
-}
-function toMatch(r: Selectable<Match>): MatchRecord {
-  return {
-    id: r.id, profileA: r.profileA, profileB: r.profileB, score: r.score,
-    breakdown: r.breakdown as unknown as MatchRecord['breakdown'], status: r.status as MatchRecord['status'],
-    notifiedAt: isoN(r.notifiedAt), respondedAt: isoN(r.respondedAt), expiresAt: iso(r.expiresAt), createdAt: iso(r.createdAt),
   };
 }
 
@@ -124,53 +115,5 @@ export const moderationMethods = {
     return rows[0] ? toAppeal(rows[0]) : null;
   },
 
-  // ── Matches ──
-  async createMatch(this: PostgresKyselyStorage, r: MatchRecord): Promise<MatchRecord> {
-    await this.db.insertInto('Match').values({
-      id: r.id, profileA: r.profileA, profileB: r.profileB, score: r.score, breakdown: jsonb(r.breakdown), status: r.status,
-      notifiedAt: r.notifiedAt ? new Date(r.notifiedAt) : null, respondedAt: r.respondedAt ? new Date(r.respondedAt) : null,
-      expiresAt: new Date(r.expiresAt), createdAt: new Date(r.createdAt),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any).execute();
-    return r;
-  },
-  async getMatch(this: PostgresKyselyStorage, id: string): Promise<MatchRecord | null> {
-    const r = await this.db.selectFrom('Match').selectAll().where('id', '=', id).executeTakeFirst();
-    return r ? toMatch(r) : null;
-  },
-  async getMatchByPair(this: PostgresKyselyStorage, profileA: string, profileB: string): Promise<MatchRecord | null> {
-    const r = await this.db.selectFrom('Match').selectAll().where(eb => eb.or([
-      eb.and([eb('profileA', '=', profileA), eb('profileB', '=', profileB)]),
-      eb.and([eb('profileA', '=', profileB), eb('profileB', '=', profileA)]),
-    ])).executeTakeFirst();
-    return r ? toMatch(r) : null;
-  },
-  async listMatchesByProfile(this: PostgresKyselyStorage, profile: string, opts?: { status?: string; page?: number; perPage?: number }): Promise<MatchRecord[]> {
-    const page = opts?.page ?? 1, perPage = opts?.perPage ?? 10;
-    let q = this.db.selectFrom('Match').selectAll().where(eb => eb.or([eb('profileA', '=', profile), eb('profileB', '=', profile)]));
-    if (opts?.status) q = q.where('status', '=', opts.status);
-    const rows = await q.orderBy('createdAt', 'desc').limit(perPage).offset((page - 1) * perPage).execute();
-    return rows.map(toMatch);
-  },
-  async updateMatch(this: PostgresKyselyStorage, id: string, updates: Partial<MatchRecord>): Promise<MatchRecord | null> {
-    const data: Record<string, unknown> = {};
-    if (updates.status) data.status = updates.status;
-    if (updates.notifiedAt) data.notifiedAt = new Date(updates.notifiedAt);
-    if (updates.respondedAt) data.respondedAt = new Date(updates.respondedAt);
-    if (Object.keys(data).length === 0) return this.getMatch(id);
-    const rows = await this.db.updateTable('Match').set(data as never).where('id', '=', id).returningAll().execute();
-    return rows[0] ? toMatch(rows[0]) : null;
-  },
-  async deleteExpiredMatches(this: PostgresKyselyStorage): Promise<number> {
-    const r = await this.db.deleteFrom('Match').where('expiresAt', '<', new Date()).where('status', '!=', 'accepted').executeTakeFirst();
-    return Number(r.numDeletedRows ?? 0);
-  },
-  async deleteMatchesByProfile(this: PostgresKyselyStorage, profile: string): Promise<number> {
-    const r = await this.db.deleteFrom('Match').where(eb => eb.or([eb('profileA', '=', profile), eb('profileB', '=', profile)])).executeTakeFirst();
-    return Number(r.numDeletedRows ?? 0);
-  },
-  async listAllMatches(this: PostgresKyselyStorage, limit = 10000): Promise<MatchRecord[]> {
-    const rows = await this.db.selectFrom('Match').selectAll().limit(Math.min(limit, 10000)).execute();
-    return rows.map(toMatch);
-  },
+
 };

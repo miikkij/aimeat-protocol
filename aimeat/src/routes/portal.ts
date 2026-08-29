@@ -51,6 +51,11 @@
  *   v1.12.0 — 2026-08-12 — The privacy/terms/connect language routes are generated from LOCALES
  *     rather than written out per language, and a page with no file in the language asked for is
  *     served in English instead of 404. Spanish added.
+ *   v1.14.0 — 2026-08-29 — Two placeholders for the privacy page's cookie section,
+ *     refreshIdleDays and refreshAbsoluteDays. The section described the sign-in cookie as lasting
+ *     "the duration of your browser session" while it actually rotates and lives up to 90 days, and
+ *     the numbers are operator-tunable, so stating them needed the node's own values rather than a
+ *     literal in the HTML.
  */
 import { Router } from 'express';
 import { readFileSync } from 'node:fs';
@@ -137,6 +142,26 @@ function templateVars(config: AimeatConfig, locale: Locale): Record<string, stri
     supervisoryUrl: config.operator.supervisoryUrl,
     effectiveDate: config.operator.effectiveDate,
     policyVersion: config.operator.policyVersion,
+    // The sign-in cookie's real lifetime, so the cookie section states THIS node's numbers rather
+    // than the defaults. Both are operator-tunable, and a policy that hardcoded 30/90 would be
+    // wrong on any node that shortened them.
+    refreshIdleDays: String(config.refreshIdleDays),
+    refreshAbsoluteDays: String(config.refreshAbsoluteDays),
+    // What this node tells the AI-training crawlers in robots.txt, as a whole sentence rather than
+    // a flag: the privacy page has to state the operator's actual position, and the two nodes that
+    // run this software with opposite settings must not read the same. Search and retrieval bots
+    // are always allowed and are a different question, so they are not mentioned here.
+    aiTrainingClause: config.aiTraining === 'allow'
+      ? {
+          en: 'This node allows third-party AI-training crawlers to read what you publish publicly, so public content may be used to train models this operator has no part in and cannot recall it from.',
+          fi: 'Tämä solmu sallii kolmansien osapuolten tekoälymallien koulutusrobottien lukea julkaisemasi julkisen sisällön, joten sitä voidaan käyttää mallien kouluttamiseen, joihin tällä ylläpitäjällä ei ole osuutta eikä keinoa poistaa sitä niistä.',
+          es: 'Este nodo permite que los rastreadores de entrenamiento de IA de terceros lean lo que publicas en abierto, de modo que ese contenido puede usarse para entrenar modelos ajenos a este operador, sin que pueda retirarlo de ellos.',
+        }[locale]
+      : {
+          en: 'This node refuses the third-party AI-training crawlers in robots.txt, which is a stated preference rather than an enforceable control: it keeps your public content out of what those models learn unaided, and it cannot stop somebody who ignores the file.',
+          fi: 'Tämä solmu kieltää kolmansien osapuolten tekoälymallien koulutusrobotit robots.txt-tiedostossa. Kyse on ilmaistusta tahdosta eikä teknisestä esteestä: se pitää julkisen sisältösi poissa siitä mitä nuo mallit oppivat itsestään, muttei estä sitä joka jättää tiedoston huomiotta.',
+          es: 'Este nodo rechaza en robots.txt los rastreadores de entrenamiento de IA de terceros. Es una preferencia declarada, no un control técnico: mantiene tu contenido público fuera de lo que esos modelos aprenden por su cuenta, pero no detiene a quien ignore el archivo.',
+        }[locale],
   };
 }
 

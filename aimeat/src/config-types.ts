@@ -478,16 +478,8 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   emailEnabled: boolean;
 
   // Match Notifications (Phase 1.6)
-  matchNotificationIntervalHours: number;
-  matchNotificationEnabled: boolean;
 
   // AI Matching (Phase 2.1)
-  matchingEnabled: boolean;
-  matchIntervalHours: number;
-  matchThreshold: number;
-  matchMaxSuggestions: number;
-  matchMaxDistanceKm: number;
-  matchCooldownDays: number;
 
   /** Connected AIs are equipped to offer what this node makes possible; off overrides every owner. */
   proactiveGuidanceEnabled: boolean;

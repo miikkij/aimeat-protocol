@@ -24,6 +24,14 @@
  * @structure eraseOwner(storage, nodeId, name) → { agentsDeleted, deletionLog }
  * @usage const { deletionLog } = await eraseOwner(storage, config.nodeId, name);
  * @version-history
+ *   v1.1.0 — 2026-08-29 — Outside connections and the client registrations a person brought
+ *     themselves are erased. Neither backend's cascade touched `Connection`, and that is worse than
+ *     a retention miss: the row holds a sealed refresh token for somebody's own mailbox, it is
+ *     addressed by the GHII string, ownership is a string comparison, and a deleted username is
+ *     released for reuse (owner-cascade.ts) — so registering a freed name would have inherited the
+ *     previous person's inbox. The gate that finds missing deletions could not see the table:
+ *     check-storage-parity.ts knew six owner column names and `principal` was not one, which is
+ *     fixed in the same change.
  *   v1.0.0 — 2026-08-11 — Extracted from routes/owners.ts by pure move, then wrapped in one
  *     storage.transaction() (GAP-001's route half).
  */
@@ -88,7 +96,6 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
       return memberships.length ? `memberships:${memberships.length}` : null;
     }, deletionLog);
 
-    await step('matches', async () => { await storage.deleteMatchesByProfile(ghii); return 'matches'; }, deletionLog);
     await step('sessions', async () => { await storage.revokeAllSessions(name); return 'sessions'; }, deletionLog);
 
     await step('capabilities', async () => {
@@ -105,6 +112,25 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
     }, deletionLog);
 
     await step('device_auth', async () => { await storage.deleteDeviceAuthByOwner(name); return 'device_auth'; }, deletionLog);
+
+    // Outside accounts. Each row holds a SEALED credential to somebody's own Gmail, Outlook or
+    // publishing account, addressed by the GHII string, and a deleted username is released for
+    // reuse — so a surviving row would hand the next person to register that name the previous
+    // person's mailbox. Agents connect their own accounts under their own GAII, so both identities
+    // are cleared. The storage call takes the delegations with them.
+    await step('connections', async () => {
+      let n = await storage.deleteConnectionsByPrincipal(ghii);
+      for (const agent of agents) n += await storage.deleteConnectionsByPrincipal(agent.gaii);
+      return n ? `connections:${n}` : null;
+    }, deletionLog);
+
+    // The client registrations a person brought themselves (their own Entra app, their own X app).
+    // They carry a client secret, so the same argument applies.
+    await step('provider_clients', async () => {
+      const clients = await storage.listPrincipalProviderClients(ghii);
+      for (const c of clients) await storage.deletePrincipalProviderClient(c.provider, ghii);
+      return clients.length ? `provider_clients:${clients.length}` : null;
+    }, deletionLog);
 
     await step('apps', async () => {
       const { apps } = await storage.listApps({ ownerGaii: ghii });

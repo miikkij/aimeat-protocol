@@ -13,6 +13,13 @@
  *   import { registerOwnerExportRoute } from './owners/export.js';
  *   registerOwnerExportRoute(router, config, storage);
  * @version-history
+ *   v1.2.0 — 2026-08-29 — The owner's OWN memory entries and storage files are in the export. They
+ *     never were: memory and files were read inside the per-agent loop only, so the GHII namespace
+ *     where an owner session actually writes was skipped entirely, and this route's own comment
+ *     claimed it exported ALL data types. Erasure had always known better (owner-erasure.ts calls
+ *     deleteAllMemory(ghii)), so export and delete disagreed about where a person's data lives.
+ *     Found while auditing the privacy policy, which names this button as the Article 15 and 20
+ *     mechanism. New response keys `memories` and `storage_files` sit beside `ghii`.
  *   v1.1.0 — 2026-08-11 — Security audit H-1/H-7: behind requireOwnerPrincipal(). One export is
  *     everything the account holds in one response, and the check below only refuses a DIFFERENT
  *     owner — every machine principal of the SAME owner passed it, because req.auth.owner is the
@@ -375,21 +382,34 @@ export function registerOwnerExportRoute(router: Router, config: AimeatConfig, s
       })),
     };
 
-    // ── Matches (via GHII) ──────────────────────────────────────────
-    let matchesExport: unknown[] = [];
+    // ── The owner's OWN memory and files (via GHII) ─────────────────
+    // An owner session resolves to the GHII, so everything a person writes themselves — and
+    // everything an app grant or an ecosystem token writes in their name — lands under this
+    // identity and not under any agent's. The loop above walks agents only, so until this existed
+    // the export returned the smaller half of the account while the route promised all of it, and
+    // the privacy policy pointed at it as the Article 15 and 20 mechanism. Erasure never had the
+    // bug: owner-erasure.ts clears deleteAllMemory(ghii) explicitly.
+    let ownerMemories: unknown[] = [];
+    let ownerFiles: unknown[] = [];
     if (ghii) {
-      const matches = await storage.listMatchesByProfile(ghii);
-      matchesExport = matches.map(m => ({
-        id: m.id,
-        profile_a: m.profileA,
-        profile_b: m.profileB,
-        score: m.score,
-        breakdown: m.breakdown,
-        status: m.status,
-        notified_at: m.notifiedAt,
-        responded_at: m.respondedAt,
-        expires_at: m.expiresAt,
+      const memories = await storage.listMemory(ghii);
+      ownerMemories = memories.map(m => ({
+        key: m.key,
+        value: m.value,
+        visibility: m.visibility,
+        tags: m.tags,
+        version: m.version,
         created_at: m.createdAt,
+        updated_at: m.updatedAt,
+      }));
+      // Metadata only, like the per-agent list — the bytes are downloaded from their own endpoint.
+      const files = await storage.listStorageFiles(ghii);
+      ownerFiles = files.map(f => ({
+        key: f.key,
+        mime_type: f.mimeType,
+        size: f.size,
+        visibility: f.visibility,
+        created_at: f.createdAt,
       }));
     }
 
@@ -448,6 +468,8 @@ export function registerOwnerExportRoute(router: Router, config: AimeatConfig, s
         created_at: owner.createdAt,
       },
       ghii: ghiiData,
+      memories: ownerMemories,
+      storage_files: ownerFiles,
       agents: agentData,
       disputes: disputeExport,
       personal_node: personalNodeData,
@@ -455,7 +477,6 @@ export function registerOwnerExportRoute(router: Router, config: AimeatConfig, s
       push_subscription: pushSubscription,
       listings: listingsExport,
       purchases: purchasesExport,
-      matches: matchesExport,
       organism_memberships: organismMemberships,
       chat_instances: chatInstancesExport,
       ghii_flags_filed: ghiiFlags,

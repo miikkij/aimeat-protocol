@@ -56,7 +56,6 @@ import MessagesAdminTab from './admin/messages-tab.js';
 import EmailTab        from './admin/email-tab.js';
 import PushTab         from './admin/push-tab.js';
 import DirectoryTab    from './admin/directory-tab.js';
-import MatchingTab     from './admin/matching-tab.js';
 import ServicesTab     from './admin/services-tab.js';
 import CortexTab       from './admin/cortex-tab.js';
 import CsmTab          from './admin/csm-tab.js';
@@ -127,7 +126,6 @@ const NAV_GROUPS = [
   ]},
   { key: 'dashboard.navServices', items: [
     { id: 'directory',   key: 'dashboard.directory',      component: DirectoryTab },
-    { id: 'matching',    key: 'dashboard.matching',       component: MatchingTab },
     { id: 'services',    key: 'dashboard.services',       component: ServicesTab },
     { id: 'cortex',      key: 'dashboard.cortexTab',      component: CortexTab },
     { id: 'csm',         key: 'dashboard.csmManagement',  component: CsmTab },
@@ -266,7 +264,7 @@ export default function Admin({ navigate, locale }) {
       // Phase 3: features
       const features = await Promise.allSettled([
         api.getGhiiUsers(), api.getEmailStatus(), api.getDirectoryStats(),
-        api.getMatchingStats(), api.getMarketplaceStats(), api.getPushStats(),
+        api.getMarketplaceStats(), api.getPushStats(),
         api.getCsmTemplates(), api.getMsmIntegrations(), api.getGenesisPeers(),
         api.getConfig(),
         api.getConsulStatus().catch(() => ({ data: null })),
@@ -279,17 +277,16 @@ export default function Admin({ navigate, locale }) {
       d.ghiiUsers       = features[0].status === 'fulfilled' ? (features[0].value.data.ghii_users || []) : [];
       d.email           = features[1].status === 'fulfilled' ? features[1].value.data : null;
       d.directoryStats  = features[2].status === 'fulfilled' ? features[2].value.data : null;
-      d.matchingStats   = features[3].status === 'fulfilled' ? features[3].value.data : null;
-      d.marketplaceStats = features[4].status === 'fulfilled' ? features[4].value.data : null;
-      d.push            = features[5].status === 'fulfilled' ? features[5].value.data : null;
-      d.csmTemplates    = features[6].status === 'fulfilled' ? features[6].value.data : null;
-      d.msmIntegrations = features[7].status === 'fulfilled' ? features[7].value.data : null;
-      d.genesis         = features[8].status === 'fulfilled' ? features[8].value.data : null;
-      d.configSchema    = features[9].status === 'fulfilled' ? features[9].value.data : null;
-      d.consul          = features[10].status === 'fulfilled' ? features[10].value.data : null;
-      d.schedulerJobs   = features[11].status === 'fulfilled' ? features[11].value.data : null;
-      d.extensions      = features[12].status === 'fulfilled' ? features[12].value.data : null;
-      d.systemPrompts   = features[13].status === 'fulfilled' ? features[13].value?.data : null;
+      d.marketplaceStats = features[3].status === 'fulfilled' ? features[3].value.data : null;
+      d.push            = features[4].status === 'fulfilled' ? features[4].value.data : null;
+      d.csmTemplates    = features[5].status === 'fulfilled' ? features[5].value.data : null;
+      d.msmIntegrations = features[6].status === 'fulfilled' ? features[6].value.data : null;
+      d.genesis         = features[7].status === 'fulfilled' ? features[7].value.data : null;
+      d.configSchema    = features[8].status === 'fulfilled' ? features[8].value.data : null;
+      d.consul          = features[9].status === 'fulfilled' ? features[9].value.data : null;
+      d.schedulerJobs   = features[10].status === 'fulfilled' ? features[10].value.data : null;
+      d.extensions      = features[11].status === 'fulfilled' ? features[11].value.data : null;
+      d.systemPrompts   = features[12].status === 'fulfilled' ? features[12].value?.data : null;
 
       // Scheduler execution log (non-blocking)
       d.schedulerLog = await api.fetchSchedulerExecutionLog({ limit: 50 }).catch(() => ({ entries: [], total: 0 }));

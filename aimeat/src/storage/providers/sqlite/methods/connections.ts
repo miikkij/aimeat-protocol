@@ -223,6 +223,15 @@ export const connectionMethods = {
     this.db.prepare('DELETE FROM connections WHERE id = ?').run(id);
   },
 
+  async deleteConnectionsByPrincipal(this: SqliteStorage, principal: string): Promise<number> {
+    // Delegations first: they key on connectionId with no foreign key, so deleting the connections
+    // first would leave rows pointing at nothing.
+    this.db.prepare(
+      'DELETE FROM connection_delegations WHERE connectionId IN (SELECT id FROM connections WHERE principal = ?)',
+    ).run(principal);
+    return this.db.prepare('DELETE FROM connections WHERE principal = ?').run(principal).changes;
+  },
+
   /**
    * The claim is granted by the WHERE clause and reported by `changes`. Expressing it as one
    * statement rather than a read followed by a write is what keeps this equivalent to the Postgres

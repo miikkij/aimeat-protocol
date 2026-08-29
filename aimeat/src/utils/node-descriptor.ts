@@ -43,7 +43,6 @@ export function nodeCapabilities(config: AimeatConfig): string[] {
   flag(config.packagesEnabled, 'packages');
   flag(config.realtimeEnabled, 'realtime');
   flag(config.portfolioEnabled, 'portfolio');
-  flag(config.matchingEnabled, 'matching');
   flag(config.marketplaceEnabled, 'marketplace');
   flag(config.personalNodesEnabled, 'personal-nodes');
   flag(config.crossFederationEnabled, 'cross-federation');
