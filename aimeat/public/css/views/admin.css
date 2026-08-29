@@ -6,6 +6,7 @@
  *   its distinct indigo accent and a permanently-dark sidebar, but all content
  *   surfaces map to global theme.css tokens so they flip with dark/light mode.
  * @version-history
+ *   v1.13.0 — 2026-08-29 — The four monospace rules read var(--font-mono) instead of naming the family.
  *   v1.12.0 — 2026-08-24 — Organisation sign-in tab (BR-04): .adm-sso-* — the playbook steps,
  *     copy rows and the small layout utilities the tab needs instead of inline styles.
  *   v1.11.0 — 2026-08-15 — Organism ownership tab: .adm-oo-row / .adm-oo-card. The panel first
@@ -142,7 +143,9 @@
 .adm-topbar-right { display: flex; align-items: center; gap: 12px; }
 .adm-page-title {
   font-size: 1.375rem;
-  font-weight: 800;
+  /* The one headline face of the site; it ships one cut, so a literal 800 would be a synthesised bold. */
+  font-family: var(--font-headline);
+  font-weight: var(--font-poster-weight, 800);
   color: var(--text);
   display: flex;
   align-items: center;
@@ -162,6 +165,9 @@
   box-shadow: var(--shadow-sm);
 }
 .adm-card h2 {
+  /* A card's small uppercase label is a label, not a headline: the body face, like every
+     small label on the poster pages, rather than the display face the bridge gives h1-h6. */
+  font-family: var(--font);
   font-size: .66rem;
   text-transform: uppercase;
   letter-spacing: .5px;
@@ -496,7 +502,7 @@
   width: 360px;
   max-width: 100%;
   min-height: 4.5rem;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.8rem;
   padding: 6px 8px;
   border: 1px solid var(--border, #E5E7EB);
@@ -671,7 +677,7 @@
 .adm-mem-value {
   background: var(--bg-surface); border: 1px solid var(--glass-border); border-radius: 6px;
   padding: 10px; font-size: .8rem; max-height: 300px; overflow: auto;
-  white-space: pre-wrap; word-break: break-all; font-family: 'JetBrains Mono', monospace;
+  white-space: pre-wrap; word-break: break-all; font-family: var(--font-mono);
 }
 .adm-mem-pagination {
   display: flex; align-items: center; justify-content: center; gap: 12px;
@@ -790,7 +796,7 @@
 .adm-member-remove:hover { color: var(--danger, #E8564A); }
 .adm-member-add { display: flex; gap: 8px; align-items: center; }
 .adm-member-add .adm-input { flex: 1; font-size: .85rem; }
-.adm-font-mono { font-family: 'JetBrains Mono', monospace; }
+.adm-font-mono { font-family: var(--font-mono); }
 
 /* ── Stats Time Range Selector ── */
 .adm-time-range {
@@ -913,7 +919,7 @@
 .adm-skills-body { background: var(--bg-dim); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.6rem; font-size: 0.78rem; max-height: 24rem; overflow: auto; white-space: pre-wrap; margin-top: 0.5rem; }
 .adm-skills-editor { margin: 0.5rem 0 0.75rem; }
 .adm-skills-editor-actions { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap; }
-.adm-skills-editor-md { width: 100%; min-height: 24rem; font-family: var(--mono); font-size: 0.82rem; resize: vertical; }
+.adm-skills-editor-md { width: 100%; min-height: 24rem; font-family: var(--font-mono); font-size: 0.82rem; resize: vertical; }
 .adm-skills-detail { margin-top: 0.5rem; }
 .adm-skills-frontmatter { background: var(--bg-dim); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.5rem 0.6rem; font-size: 0.74rem; color: var(--muted); white-space: pre-wrap; margin-bottom: 0.5rem; }
 .adm-skills-body-md { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem 1rem; font-size: 0.86rem; max-height: 32rem; overflow: auto; }

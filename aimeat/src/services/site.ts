@@ -12,6 +12,8 @@
  *   - validateTemplate(): the refusals an uploaded template must survive, script-tag rule included
  *
  * @version-history
+ *   v1.5.0 — 2026-08-29 — PUBLIC_NAV_LINK_IDS drops `exchange`: the EXCHANGE app is a site-footer link
+ *     now, like the store. A stored order or hidden list naming it is filtered out on read.
  *   v1.4.0 — 2026-08-26 — Pure extraction: the tag grammar (CONFIG_WHITELIST, TAG_REGEX, escapeHtml)
  *     and its resolver (resolveTemplate, resolveBoardTag, getConfigValue, extractTags,
  *     findUnresolvableTags) move to site-tags.ts as free functions, so a second surface can resolve
@@ -70,14 +72,16 @@ const HEADER_NAV_KEY = 'portal/header-nav';
 // Canonical ids of the public header links an operator may show/hide/reorder.
 // Auth/role-gated links (Apps, Profile, Admin) are NOT configurable — they stay
 // forced by their existing session/role rules in the SPA header.
-// `learn` and `exchange` point at apps this node's operator owns; the SPA renders them only
-// when AIMEAT_SITE_LEARN_URL / AIMEAT_SITE_EXCHANGE_URL are set. They are listed here so an
-// operator who HAS them can still reorder or hide them from the Portal tab.
-// All four of these are logged-out links (PUBLIC_NAV_LINKS `when: 'anon'` in spa.html); `help`
+// `learn` points at an app this node's operator owns; the SPA renders it only when
+// AIMEAT_SITE_LEARN_URL is set. It is listed here so an operator who HAS it can still reorder or
+// hide it from the Portal tab.
+// The first three are logged-out links (PUBLIC_NAV_LINKS `when: 'anon'` in spa.html); `help`
 // shows in both states. What a signed-in person needs is not configurable and not here.
 // `try` and `devView` left on 2026-08-09: the first was the brand link's destination under a
-// second name, the second moved to the site footer with `members`.
-export const PUBLIC_NAV_LINK_IDS = ['howItWorks', 'learn', 'exchange', 'business', 'help'] as const;
+// second name, the second moved to the site footer with `members`. `exchange` followed them to
+// the footer on 2026-08-29 (an app opened now and then, not a place visited every time); a
+// stored order naming it is filtered out on read like the two before it.
+export const PUBLIC_NAV_LINK_IDS = ['howItWorks', 'learn', 'business', 'help'] as const;
 
 export interface HeaderNavConfig {
     /** Display order of public link ids (always normalized to cover all known ids). */

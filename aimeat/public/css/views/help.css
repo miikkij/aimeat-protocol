@@ -5,6 +5,7 @@
  * @description Styles for the AI Help Prompt page — warm white aesthetic,
  *   DM Sans body text, JetBrains Mono for the prompt code block.
  * @version-history
+ *   v3.0.1 — 2026-08-29 — The prompt block reads var(--font-mono) instead of naming five monospace families.
  *   v3.0.0 — 2026-08-29 — The showroom face (design canvas "AIMEAT Index Pages"): no card, the title in
  *       the display face with the coral offset, the two tabs on a 3px rule with the open one on the
  *       sun, numbered steps with coral numerals, the questions as ink-framed boxes with a solid
@@ -72,7 +73,7 @@
 .hlp-prompt-text {
   margin: 0;
   padding: 20px;
-  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'SF Mono', Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 0.82rem;
   line-height: 1.6;
   color: var(--text);

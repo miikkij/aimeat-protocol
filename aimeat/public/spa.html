@@ -688,11 +688,12 @@
     //   'auth'  — signed-in only
     //   absent  — both
     // Gone from here: `try` pointed at /v1/portal, exactly where the brand link already goes,
-    // so it was the same destination twice; `members` and `devView` moved to the footer.
+    // so it was the same destination twice; `members` and `devView` moved to the footer, and so
+    // did `exchange` on 2026-08-29: it is an app a person opens now and then, not a place they go
+    // every visit, and the bar is for the second kind.
     const PUBLIC_NAV_LINKS = [
       { id: 'howItWorks', path: '/v1/how-it-works',    key: 'nav.howItWorks', fallback: 'How it works', when: 'anon' },
       { id: 'learn',      siteKey: 'learn',            key: 'nav.learn',      fallback: 'Learn', external: true, when: 'anon' },
-      { id: 'exchange',   siteKey: 'exchange',         key: 'nav.exchange',   fallback: 'EXCHANGE', external: true, when: 'anon' },
       { id: 'business',   path: '/v1/business',        key: 'nav.business',   fallback: 'For your business', when: 'anon' },
       { id: 'help',       path: '/v1/help',            key: 'nav.help' },
     ];
@@ -704,7 +705,7 @@
      * so shipping a nav item would otherwise be invisible on every node that has ever saved
      * one. Keep the operator's arrangement for the ids they know about, and slot each newcomer
      * next to the neighbour it is declared beside — appending them all to the end would bury
-     * "Learn" and "EXCHANGE" behind "Help".
+     * "Learn" behind "Help".
      */
     function mergeNavOrder(stored) {
       const known = new Set(stored);
@@ -923,6 +924,12 @@
                   it has: no store, no link. The pricing page it replaced is gone. */''}
             ${(window.__SITE && window.__SITE.store)
               ? html`<a href=${window.__SITE.store} target="_blank" rel="noopener">${tr('footer.store', 'Store')}</a>`
+              : ''}
+            ${/* The EXCHANGE is an app of this node's operator, like the store: a door a person
+                  opens now and then, so it lives here rather than on the bar (moved 2026-08-29).
+                  No configured address, no link. */''}
+            ${(window.__SITE && window.__SITE.exchange)
+              ? html`<a href=${window.__SITE.exchange} target="_blank" rel="noopener">${tr('nav.exchange', 'EXCHANGE')}</a>`
               : ''}
             <a href="/v1/help" onClick=${(e) => go(e, '/v1/help')}>${tr('nav.help', 'Help')}</a>
             <a href="/v1/how-it-works" onClick=${(e) => go(e, '/v1/how-it-works')}>${tr('nav.howItWorks', 'How it works')}</a>

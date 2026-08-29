@@ -5,6 +5,7 @@
  * @description Logged-out landing + pricing pages (ld- prefix). Theme tokens only;
  *   path cards stack on mobile, ticker truncates to one line.
  * @version-history
+ *   v2.1.2 — 2026-08-29 — The pricing code block reads var(--font-mono) instead of a Consolas stack.
  *   v2.1.1 — 2026-08-29 — The business hero's shadow is the sun (with the front page), and the "why it
  *     improves this fast" label on the sun band is ink rather than coral on yellow.
  *   v2.1.0 — 2026-08-29 — The index pages join the showroom (design canvas "AIMEAT Index Pages"): the
@@ -517,7 +518,7 @@
 .ld-gen-preview {
   min-height: 90px; max-height: 150px; overflow-y: auto; margin-bottom: 12px; padding: 12px;
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: 10px; font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  border-radius: 10px; font-family: var(--font-mono);
   font-size: .75rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
   color: var(--text-muted);
 }

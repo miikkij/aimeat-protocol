@@ -1,8 +1,8 @@
 ---
 name: aimeat-design-language
-description: "The AIMEAT design language in words and in numbers: the two faces (showroom outside, poster inside), the four shapes, the colours, the wordmark, and the one place a value is changed (theme.css tokens) with the map of every surface a token reaches. Use before designing or styling anything that carries the AIMEAT name, before changing a font or a colour, and to judge whether a screen looks like this product."
+description: "The AIMEAT design language in words and in numbers: the two faces (showroom outside, poster inside), the three type tokens every font on the site descends from, the four shapes, the colours, the wordmark, and the one place a value is changed (theme.css tokens) with the map of every surface a token reaches. Use before designing or styling anything that carries the AIMEAT name, before changing a font or a colour, and to judge whether a screen looks like this product."
 metadata:
-  version: 1.1.0
+  version: 1.2.0
   updated: 2026-08-29
   owner: Jouni Miikki
 ---
@@ -12,9 +12,9 @@ metadata:
 One product, two faces. The **showroom** is what a visitor sees before signing in: the front page,
 how it works, for your business, help, members, the change log. The **poster** is what a person sees
 once inside: the home, every profile tab, the chat, the sign-in dialog, the app catalog. They share
-the colours, the body face, the shapes and the rules; they differ in the headline face and in how
-loud they are. A third register, the **classic shell** (DM Sans, rounded controls), remains under
-the admin dashboard and the oldest views and is not extended.
+the type, the colours, the shapes and the rules; they differ in how loud they are. A third register,
+the **classic shell** (rounded controls, cards), remains under the admin dashboard and the oldest
+views and is not extended; it reads the same type tokens.
 
 Every value in this document is a token in `aimeat/public/css/theme.css`. A view sheet reads the
 token; it never writes a face or a colour out in full. When a value changes, it changes in that one
@@ -22,18 +22,25 @@ file, and the map at the end says which surfaces follow.
 
 ## The faces
 
+Three lines in `theme.css` are the whole typography; every other font token on the sheet is an
+alias of one of them, so a face changes once and reaches every page, outside and in:
+
 | Token | Value | Where |
 |---|---|---|
-| `--font-showroom` | **Fjalla One**, uppercase, one weight | showroom headlines, tabs, slabs, stickers |
-| `--font-poster` | **Archivo Black**, one weight (400 is its only cut) | poster page titles, big numerals, the wordmark |
-| `--font-poster-section` | **Archivo** regular, uppercase | the section headline under a poster page title |
-| `--font-showroom-body` | **Archivo** | everything read as a sentence on both faces: body 400, emphasis 600, actions and row names 700 to 800 |
-| `--font-mono` | **JetBrains Mono** | identifiers, keys, crumbs, small labels that name a machine thing |
-| `--font` | DM Sans | the classic shell only |
+| `--font-headline` | **Fjalla One**, uppercase, one weight | every headline, big numeral, sticker, slab, tab, and the wordmark |
+| `--font-body` | **Archivo** | everything read as a sentence on every face: body 400, emphasis 600, actions and row names 700 to 800; also form controls and the classic shell |
+| `--font-mono` | **JetBrains Mono** | identifiers, keys, crumbs, addresses, commands, small labels that name a machine thing |
 
-Fjalla One and Archivo Black are condensed or heavy, so a headline set in either is short: one
-sentence, the second half in coral when it carries the point. Never synthesise a bold on a
-single-weight face.
+The aliases a view sheet reads, and what they resolve to: `--font-showroom` and `--font-poster` are
+`--font-headline`; `--font-showroom-body`, `--font-poster-section` and `--font` are `--font-body`.
+A sheet picks the alias that names its face (showroom outside, poster inside), and never writes a
+family name. A face has to be loaded to be used: `spa.html`'s font link and the served
+information pages (`privacy`, `terms`) carry the three families; change the link with the token.
+
+Fjalla One is condensed and ships one cut, so a headline is short: one sentence, the second half in
+coral when it carries the point. Never synthesise a bold on a single-weight face. A monospace family
+is `var(--font-mono)`, never `monospace` or a hand-typed stack; the view sheets were swept of both
+on 2026-08-29.
 
 Sizes that recur (rem, at 16px): showroom front hero `clamp(2.4rem, 6.6vw, 6rem)` with a coral
 offset text-shadow of `.075em`; showroom index hero `clamp(2rem, 3.6vw, 2.9rem)`; showroom section
@@ -127,9 +134,10 @@ the checklist.
 
 | Token | Read by |
 |---|---|
-| `--font-showroom` | `landing-showroom.css`, `landing.css`, `help.css`, `members.css`, `changelog.css`, `build-story.css` |
-| `--font-poster` | `home.css`, `chat.css`, `profile.css`, `profile-poster.css`, `surface.css`, `app-catalog-poster.css`, the sign-in dialog (`sdk-libs/auth/modal-styles.js`), the top bar in `theme.css` |
-| `--font-showroom-body` | all of the above plus the top bar |
+| `--font-headline` | through `--font-showroom`: `landing-showroom.css`, `landing.css`, `help.css`, `members.css`, `changelog.css`, `build-story.css`, `static-page.css`, `portal-dev.css`; through `--font-poster`: `home.css`, `chat.css`, `profile.css`, `profile-poster.css`, `surface.css`, `app-catalog-poster.css`, the sign-in dialog (`sdk-libs/auth/modal-styles.js`), the top bar in `theme.css` |
+| `--font-body` | all of the above through `--font-showroom-body` and `--font-poster-section`, and every classic-shell sheet (admin, the older tabs, form controls) through `--font` |
+| `--font-mono` | every sheet that shows an address, a command, an id or a key; no sheet spells a monospace family |
+| `--font-headline` again, through the palette bridge | `lib/aimeat-theme.css` gives every `h1`-`h6` the palette's display face, and the house palette's display face is `var(--font-headline, 'Archivo Black', …)`: on the node the classic shell's headings follow the token; a published app without `theme.css` keeps the vendored Archivo Black; a chosen palette (paper, circuit, …) keeps its own face on purpose |
 | `--sun`, `--on-sun`, `--accent`, `--text`, `--bg` | every sheet; the auth pill and dialog read them with a fallback so an app origin without the tokens still gets the design |
 
 Code that runs **outside** the node cannot read a token: the portfolio prompt a person carries to
