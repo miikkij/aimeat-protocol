@@ -49,5 +49,9 @@ Full guide: `docs/frontend-development-guide.md`. The ones that recur:
 - Prefix view CSS classes: `pf-` profile, `gn-` portal, `adm-` admin. Profile tab section headers use `.section-title` + `.section-desc`.
 - Reuse `/components/` and the shared components in `views/profile/shared.js` and `views/admin/shared.js`.
 - All user-visible text through `t()`.
+- No emoji in the interface: not in a heading, a button, a menu item, a dialog title, a label, a
+  notice, and not inside a locale string, where they hide until the screen is up. Icons are inline
+  SVG; the only symbols in text are `✓ ✗ → ↩`. The one emoji that stays is data: the icon a
+  person chose for their own app. Full rule and the reason: skill `aimeat-design-language`.
 
 Campsite rule: fix inline styles, `btn btn-*` and `rgba(255,255,255)` in files you touch.
