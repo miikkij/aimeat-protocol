@@ -31646,6 +31646,54 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
 
+  /v1/templates/workflow-improve-mcp:
+    get:
+      operationId: getWorkflowImprovePrompt
+      summary: The prompt for improving one workflow with the owner's own AI over MCP
+      description: The owner's name, node and the workflow's id and title are substituted in. The text is the managed prompt `workflow-improve-mcp`.
+      tags: [Workflows]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/templates/workflow-create-mcp:
+    get:
+      operationId: getWorkflowCreateMcpPrompt
+      summary: The prompt for making a new workflow with the owner's own AI over MCP
+      tags: [Workflows]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/templates/workflow-create-chat:
+    get:
+      operationId: getWorkflowCreateChatPrompt
+      summary: The prompt for designing a workflow in a chat that has no MCP
+      description: The owner's agents and their workflow-compatible offers are written into the prompt; the chat answers with one JSON block the person pastes back on the Workflows page.
+      tags: [Workflows]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /v1/templates/knowledge-packager-mcp:
     get:
       operationId: getKnowledgePackagerMcpTemplate
@@ -35651,6 +35699,32 @@ paths:
                                 sample: { type: integer }
         '404':
           $ref: '#/components/responses/NotFound'
+  /v1/workflows/{id}/preflight:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      operationId: preflightWorkflow
+      summary: What a run would do now
+      description: >-
+        The confirmation before a run: the agents that would get a task, each step's state in memory
+        now (green = already produced, input-red, output-red) and whether skip_done would skip it,
+        the steps that would run, the longest chain of timeouts along the after-edges in minutes,
+        the last real run and the variables the run would resolve to. Reads memory the way a
+        signals-only check does and persists nothing.
+      tags: [Workflows]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: One of the workflow's offers has changed or gone (WORKFLOW_STALE)
+
   /v1/workflows/{id}/runs:
     parameters:
       - name: id
@@ -35660,10 +35734,21 @@ paths:
     get:
       operationId: listWorkflowRuns
       summary: List a workflow's runs
-      description: Newest first. Empty until the deterministic engine ships (Phase 4).
+      description: >-
+        Newest first. A signals-only check is not a run and is left out by default; pass
+        include=checks to list both (each record says its mode) or only=checks for the checks alone.
       tags: [Workflows]
       security:
         - BearerAuth: []
+      parameters:
+        - name: include
+          in: query
+          required: false
+          schema: { type: string, enum: [checks] }
+        - name: only
+          in: query
+          required: false
+          schema: { type: string, enum: [checks] }
       responses:
         '200':
           description: Runs

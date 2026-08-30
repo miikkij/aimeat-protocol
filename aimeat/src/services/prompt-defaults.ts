@@ -11,6 +11,8 @@
  * @version-history v1.1.3 -- 2026-05-28 -- Add shared owner-memory tag guidance.
  * @version-history v1.1.4 -- 2026-07-02 -- tier-1-appdev SDK list: add aimeat-markdown (render INTO an
  *   element / renderToString / renderRich), aimeat-organism and aimeat-editor.
+ * @version-history v1.2.0 -- 2026-08-30 -- The workflows group (./prompt-defaults/workflows.ts): the
+ *   three prompts the Workflows page hands to the owner's own AI.
  *
  * Variable reference:
  *   {{node_url}}           -- config.baseUrl or req.protocol://req.get('host')
@@ -60,8 +62,10 @@ import { PLATFORM_SEEDS } from './prompt-defaults/platform.js';
 import { MANIFEST_ARCHITECT_SEEDS } from './prompt-defaults/manifest-architect.js';
 import { PLAYBOOK_SEEDS } from './prompt-defaults/playbooks.js';
 import { PROACTIVE_SEEDS } from './prompt-defaults/proactive.js';
+import { WORKFLOW_SEEDS } from './prompt-defaults/workflows.js';
 
 export const PROMPT_SEEDS: PromptSeedEntry[] = [
+  ...WORKFLOW_SEEDS,
   ...NOTEBOOK_BUILDER_SEEDS,
   ...TIER_CORE_SEEDS,
   ...TIER_EXTENDED_SEEDS,

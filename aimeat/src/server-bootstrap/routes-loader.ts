@@ -176,6 +176,7 @@ import { uploadRouter } from '../routes/upload.js';
 import { agentTasksRouter } from '../routes/agent-tasks.js';
 import { schedulesRouter } from '../routes/schedules.js';
 import { workflowsRouter } from '../routes/workflows.js';
+import { workflowTemplatesRouter } from '../routes/workflow-templates.js';
 import { agentIntegrationRouter } from '../routes/agent-integration.js';
 import { agentDirectivesRouter } from '../routes/agent-directives.js';
 import { adminAgentTasksRouter } from '../routes/admin-agent-tasks.js';
@@ -442,6 +443,7 @@ export async function mountRoutes(
   app.use(agentTasksRouter(config, storage, webhookDispatcher));
   app.use(schedulesRouter(config, storage, scheduler));
   app.use(workflowsRouter(config, storage, scheduler, workflowEngine));
+  app.use(workflowTemplatesRouter(config, storage));
   app.use(agentDirectivesRouter(config, storage, webhookDispatcher));
   app.use(agentCapabilitiesRouter(config, storage));
   app.use(agentActivityRouter(config, storage));
