@@ -7,6 +7,15 @@ App-facing libraries here are registered as **library packs** in
 `aimeat/src/data/library-packs/vendored.ts` (served at `GET /v1/library-packs`
 with per-lib AI docs + changelogs) — keep this table and the registry in sync.
 
+**Adding a library here is distribution, so it needs a licence entry.** Serving a file to a browser
+carries the same obligation a tarball does, and most of these are minified builds with no copyright
+line left in them, so the file alone satisfies nothing. [`licenses.json`](licenses.json) is the
+machine-readable inventory — licence, copyright holder, source, and for copyleft a complete-source
+offer — and `LICENSES/` holds each licence text. `pnpm check:licenses` refuses a served file that no
+entry claims, which is the gate that stops a library arriving without its notice, and
+`pnpm gen:notices` regenerates `THIRD-PARTY-NOTICES.md` from it. This table stays the version and
+compatibility contract; the licence half lives in the JSON so tools can read it.
+
 | File | Package | Version | Pack id | Source | License |
 |------|---------|---------|---------|--------|---------|
 | `tailwindcss@4.js` | `@tailwindcss/browser` | 4.3.1 | `styling` | `https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4` | MIT |
@@ -39,9 +48,11 @@ with per-lib AI docs + changelogs) — keep this table and the registry in sync.
 
 ## Assets that are fetched, not committed
 
-Anything listed in [`vendored-assets.json`](vendored-assets.json) is **not in git** — today that is
-the 32 MB `ffmpeg-core.wasm`. A repository carries every version of every binary it has ever held,
-and one 32 MB blob per ffmpeg bump is a permanent tax on every clone.
+Anything listed in [`vendored-assets.json`](vendored-assets.json) is **not in git**, for one of two
+reasons. **Size:** a repository carries every version of every binary it has ever held, and one
+32 MB blob per ffmpeg bump is a permanent tax on every clone. **Licence:** an asset marked
+`"distribute": false` is one AIMEAT must not ship at all, and the build skips it when copying
+`public/` into `dist/` (see `scripts/copy-dist-assets.mjs`) so it cannot reach a package.
 
 ```bash
 pnpm vendor:libs       # download what is missing, verify the pinned sha256 (idempotent)
@@ -57,12 +68,23 @@ Fetched assets are **hash-pinned**, not just URL-pinned: if the registry ever se
 the script refuses them rather than shipping something nobody reviewed. Add a new one by appending
 to `vendored-assets.json` (path, url, sha256, bytes) and to the table above.
 
-This is also how a GPL binary sits next to an MIT codebase without a licence question: the ffmpeg
-core is **installed separately** by the fetch step and is in neither the repository nor any AIMEAT
-distribution. AIMEAT stays MIT; the node serves an unmodified upstream build whose source is at
-[ffmpegwasm/ffmpeg.wasm](https://github.com/ffmpegwasm/ffmpeg.wasm) (build scripts) and
+This is also how a GPL binary sits next to an MIT codebase without a licence question: all three
+ffmpeg files are **installed separately** by the fetch step and are in neither the repository nor
+any AIMEAT distribution. AIMEAT stays MIT; the node serves an unmodified upstream build whose
+source is at [ffmpegwasm/ffmpeg.wasm](https://github.com/ffmpegwasm/ffmpeg.wasm) (build scripts) and
 [ffmpeg.org](https://ffmpeg.org) (ffmpeg 5.1.4). Owner-approved 2026-07-31, same route as the
 LGPL p5 pack.
+
+**That sentence was false until 2026-08-31, and the shape of the mistake is worth keeping.** Only
+the 32 MB `.wasm` was excluded. The two emscripten loaders beside it — `ffmpeg-core.js` and
+`ffmpeg-core.umd.js`, 112 kB each — were committed, because they were judged by size rather than by
+licence, and a compiler's output of a GPL work is that work. Worse, the `.wasm` reached the npm
+package anyway: `pnpm build` runs the fetch and then copies `public/` into `dist/`, and
+`files: ["dist/"]` published all 32 MB of it. Every `aimeat` release up to 3.10.0 shipped a GPL
+ffmpeg build inside an MIT package while this file said it did not. Three things now hold the
+sentence up, and no single one of them would have: the assets are marked `"distribute": false`, the
+build's copy step skips them, and `pnpm check:licenses` fails when a GPL asset is either unmarked or
+tracked by git.
 
 Directories that pin a **full** version (`ffmpeg-core@0.12.6/`) are served `immutable` for a year —
 that path can never change, since even a patch bump ships as a new directory. Major-only pins

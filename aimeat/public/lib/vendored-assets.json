@@ -1,5 +1,5 @@
 {
-  "note": "Large vendored assets that are NOT stored in git. `pnpm vendor:libs` (also run by postinstall and by the build) downloads each one to public/<path> and verifies its sha256. Everything else under /lib/ is committed — see VENDORED.md for the vendoring and version-pin policy.",
+  "note": "Vendored assets that are NOT stored in git and NOT in any published AIMEAT package. `pnpm vendor:libs` (also run by postinstall and by the build) downloads each one to public/<path> and verifies its sha256. Two different reasons put a file here: it is too large to carry in git, or its licence means AIMEAT must not distribute it at all. Everything else under /lib/ is committed — see VENDORED.md for the vendoring and version-pin policy, and licenses.json for the licence of every served file.",
   "assets": [
     {
       "path": "lib/ffmpeg-core@0.12.6/ffmpeg-core.wasm",
@@ -8,8 +8,31 @@
       "bytes": 32129114,
       "package": "@ffmpeg/core@0.12.6",
       "license": "GPL-2.0-or-later",
+      "distribute": false,
       "licenseNote": "The COMPILED ffmpeg is GPL (--enable-gpl with libx264/libx265); npm's `license: MIT` field covers only the packaging. AIMEAT itself stays MIT: this binary is installed separately by this script, is not committed to the repository and is not part of any AIMEAT distribution. Source: https://github.com/ffmpegwasm/ffmpeg.wasm (build scripts) and https://ffmpeg.org (ffmpeg 5.1.4).",
-      "why": "32 MB. The dist/umd and dist/esm builds ship the SAME binary (verified byte-identical), so one copy serves both loaders. Too large to carry in git; the pinned URL plus the hash makes the fetch reproducible."
+      "why": "32 MB, AND GPL. The dist/umd and dist/esm builds ship the SAME binary (verified byte-identical), so one copy serves both loaders. Too large to carry in git; the pinned URL plus the hash makes the fetch reproducible."
+    },
+    {
+      "path": "lib/ffmpeg-core@0.12.6/ffmpeg-core.js",
+      "url": "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.js",
+      "sha256": "c972f5abeafcd5f3949e54edfbdc74a9badb27025809feb1945d468ffbcfb7f1",
+      "bytes": 114494,
+      "package": "@ffmpeg/core@0.12.6",
+      "license": "GPL-2.0-or-later",
+      "distribute": false,
+      "licenseNote": "Emscripten output of the same GPL ffmpeg build as the .wasm beside it, so it carries the same licence — a compiler's output of a GPL work is that work. Fetched rather than committed for that reason alone; 112 kB would have been no burden on the repository.",
+      "why": "LICENCE, not size. Until 2026-08-31 these two loaders were committed to git and therefore shipped inside the MIT-licensed `aimeat` npm package, while VENDORED.md stated that no AIMEAT distribution contains GPL code. Moving them here is what makes that sentence true."
+    },
+    {
+      "path": "lib/ffmpeg-core@0.12.6/ffmpeg-core.umd.js",
+      "url": "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js",
+      "sha256": "a34873964b0f62aec516bac75e3aa9086ec3535d4d07f0269aa94ea748b6cb71",
+      "bytes": 114673,
+      "package": "@ffmpeg/core@0.12.6",
+      "license": "GPL-2.0-or-later",
+      "distribute": false,
+      "licenseNote": "The UMD loader for the same GPL build. Same reasoning as ffmpeg-core.js; note the upstream path is dist/umd/ffmpeg-core.js and the local name keeps the .umd suffix so both loaders can sit in one directory.",
+      "why": "LICENCE, not size. See ffmpeg-core.js."
     },
     {
       "path": "lib/duckdb-wasm@1.32.0/duckdb-eh.wasm",

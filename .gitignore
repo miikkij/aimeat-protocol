@@ -188,9 +188,15 @@ scripts/.env
 # Vendored WebAssembly binaries are fetched, not committed: @ffmpeg/core alone is 32 MB and a
 # repo carries every version it ever held. `pnpm vendor:libs` (postinstall, dev and build all run
 # it) downloads them from the pinned URL in aimeat/public/lib/vendored-assets.json and verifies
-# the sha256; `pnpm check:vendored` says whether they are in place. Everything else under
-# public/lib/ IS committed, including the small .js loaders next to these.
+# the sha256; `pnpm check:vendored` says whether they are in place.
 aimeat/public/lib/**/*.wasm
+
+# The ffmpeg emscripten loaders are excluded for a DIFFERENT reason: licence, not size. They are
+# the compiler's output of the same GPL ffmpeg build as the .wasm, so committing them put GPL code
+# in an MIT repository and, through `files: ["dist/"]`, inside the published npm package. They are
+# fetched with the wasm and are in no AIMEAT distribution. Everything else under public/lib/ IS
+# committed; licenses.json says what licence each served file carries.
+aimeat/public/lib/ffmpeg-core@*/*.js
 
 # locale:extract working files — a slice being translated, never committed
 aimeat/locales/.todo-*.json
@@ -205,3 +211,9 @@ aimeat/.aimeat-manifest.json
 
 # Machine-generated security audit reports (pnpm audit:report)
 secaudit/
+
+# CycloneDX SBOM (pnpm sbom). Generated on demand for whoever asks — a procurement team, a
+# security review — from the tree that is installed at that moment. Committing one would freeze a
+# snapshot that stops being true on the next dependency bump, and THIRD-PARTY-NOTICES.md is the
+# copy that IS committed and does travel with releases.
+sbom.cdx.json

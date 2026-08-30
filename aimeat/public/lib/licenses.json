@@ -1,0 +1,390 @@
+{
+  "note": "Every third-party file this node serves from /lib/, with its licence, its copyright holder and where its bytes came from. This is the MACHINE-READABLE source of truth; VENDORED.md is the same inventory written for a person, and the two are kept in sync by `pnpm check:licenses`. THIRD-PARTY-NOTICES.md is generated from this file plus the npm dependency tree by `pnpm gen:notices` — do not edit that file by hand. A `files` entry is a path relative to public/lib/, either an exact name or a `dir/**` prefix; the check refuses a served file that no component claims, which is what stops a new vendored library from arriving without its notice.",
+  "components": [
+    {
+      "id": "tailwindcss",
+      "name": "@tailwindcss/browser",
+      "version": "4.3.1",
+      "spdx": "MIT",
+      "copyright": "Copyright (c) Tailwind Labs, Inc.",
+      "homepage": "https://tailwindcss.com",
+      "source": "https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4",
+      "licenseFile": "LICENSES/tailwindcss.txt",
+      "files": [
+        "tailwindcss@4.js"
+      ],
+      "modified": false,
+      "purl": "pkg:npm/%40tailwindcss/browser@4.3.1"
+    },
+    {
+      "id": "daisyui",
+      "name": "daisyUI",
+      "version": "5.5.23",
+      "spdx": "MIT",
+      "copyright": "Copyright (c) 2020 Pouya Saadeghi",
+      "homepage": "https://daisyui.com",
+      "source": "https://cdn.jsdelivr.net/npm/daisyui@5",
+      "licenseFile": "LICENSES/daisyui.txt",
+      "files": [
+        "daisyui@5.css"
+      ],
+      "modified": false,
+      "purl": "pkg:npm/daisyui@5.5.23"
+    },
+    {
+      "id": "chartjs",
+      "name": "Chart.js",
+      "version": "4.5.1",
+      "spdx": "MIT",
+      "copyright": "Copyright (c) 2014-2024 Chart.js Contributors",
+      "homepage": "https://www.chartjs.org",
+      "source": "https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js",
+      "licenseFile": "LICENSES/chartjs.txt",
+      "files": [
+        "chartjs@4.js"
+      ],
+      "modified": false,
+      "purl": "pkg:npm/chart.js@4.5.1"
+    },
+    {
+      "id": "d3",
+      "name": "D3",
+      "version": "7.9.0",
+      "spdx": "ISC",
+      "copyright": "Copyright 2010-2023 Mike Bostock",
+      "homepage": "https://d3js.org",
+      "source": "https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js",
+      "licenseFile": "LICENSES/d3.txt",
+      "files": [
+        "d3@7.min.js"
+      ],
+      "modified": false,
+      "purl": "pkg:npm/d3@7.9.0"
+    },
+    {
+      "id": "mermaid",
+      "name": "Mermaid",
+      "version": "11.15.0",
+      "spdx": "MIT",
+      "copyright": "Copyright (c) 2014 - 2022 Knut Sveidqvist",
+      "homepage": "https://mermaid.js.org",
+      "source": "npm mermaid@11.15.0 (dist/mermaid.min.js)",
+      "licenseFile": "LICENSES/mermaid.txt",
+      "files": [
+        "mermaid/mermaid.min.js"
+      ],
+      "modified": false,
+      "purl": "pkg:npm/mermaid@11.15.0"
+    },
+    {
+      "id": "three",
+      "name": "three.js",
+      "version": "r128",
+      "spdx": "MIT",
+      "copyright": "Copyright © 2010-2026 three.js authors",
+      "homepage": "https://threejs.org",
+      "source": "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js",
+      "licenseFile": "LICENSES/three.txt",
+      "files": [
+        "three.min.js"
+      ],
+      "modified": false,
+      "purl": "pkg:npm/three@0.128.0"
+    },
+    {
+      "id": "three-world",
+      "name": "three.js + example addons (OrbitControls, Sky, RGBELoader, GLTFLoader, RoomEnvironment, BufferGeometryUtils, SkeletonUtils)",
+      "version": "0.185.1 (r185)",
+      "spdx": "MIT",
+      "copyright": "Copyright © 2010-2026 three.js authors",
+      "homepage": "https://threejs.org",
+      "source": "built by scripts/vendor-three-world.mjs and vendor-three-loaders.mjs from the unmodified three 0.185.1 sources",
+      "licenseFile": "LICENSES/three.txt",
+      "files": [
+        "three-world@1.min.js",
+        "three-world-loaders@1.min.js"
+      ],
+      "modified": false,
+      "note": "Re-bundled with esbuild into an IIFE. The three.js sources themselves are unmodified; only the module format differs.",
+      "purl": "pkg:npm/three@0.185.1"
+    },
+    {
+      "id": "leaflet",
+      "name": "Leaflet",
+      "version": "1.9.4",
+      "spdx": "BSD-2-Clause",
+      "copyright": "Copyright (c) 2010-2023, Volodymyr Agafonkin; Copyright (c) 2010-2011, CloudMade",
+      "homepage": "https://leafletjs.com",
+      "source": "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/",
+      "licenseFile": "LICENSES/leaflet.txt",
+      "files": [
+        "leaflet@1/**"
+      ],
+      "modified": false,
+      "note": "Map TILES are fetched at runtime from OpenStreetMap and carry their own attribution requirement, which the Atelier map component renders on the map itself.",
+      "purl": "pkg:npm/leaflet@1.9.4"
+    },
+    {
+      "id": "p5",
+      "name": "p5.js",
+      "version": "1.11.13",
+      "spdx": "LGPL-2.1-only",
+      "copyright": "Copyright (c) The Processing Foundation and the p5.js contributors",
+      "homepage": "https://p5js.org",
+      "source": "https://cdn.jsdelivr.net/npm/p5@1/lib/p5.min.js",
+      "sourceOffer": "https://registry.npmjs.org/p5/-/p5-1.11.13.tgz",
+      "licenseFile": "LICENSES/p5.txt",
+      "files": [
+        "p5@1.min.js"
+      ],
+      "modified": false,
+      "note": "WEAK COPYLEFT, and the one place on this node where that matters. p5 is served unmodified as its own file at a stable URL; nothing links it statically and nothing derives from it, so an app that calls p5 stays under its own licence. The LGPL asks for three things and all three are here: the licence text (LICENSES/p5.txt), the notice that the library is used and can be replaced, and the complete source of the exact version, which is the tarball in `sourceOffer`. Anyone may substitute their own p5 build by pointing their app at a different URL. Owner-approved 2026-07-16.",
+      "purl": "pkg:npm/p5@1.11.13"
+    },
+    {
+      "id": "pixijs",
+      "name": "PixiJS",
+      "version": "8.19.0",
+      "spdx": "MIT",
+      "copyright": "Copyright (c) 2013-2023 Mathew Groves, Chad Engler",
+      "homepage": "https://pixijs.com",
+      "source": "https://cdn.jsdelivr.net/npm/pixi.js@8/dist/",
+      "licenseFile": "LICENSES/pixijs.txt",
+      "files": [
+        "pixi@8.min.js",
+        "pixi-unsafe-eval@8.min.js"
+      ],
+      "modified": false,
+      "purl": "pkg:npm/pixi.js@8.19.0"
+    },
+    {
+      "id": "phaser",
+      "name": "Phaser",
+      "version": "3.90.0",
+      "spdx": "MIT",
+      "copyright": "Copyright (c) 2024 Richard Davey, Phaser Studio Inc.",
+      "homepage": "https://phaser.io",
+      "source": "https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js",
+      "licenseFile": "LICENSES/phaser.txt",
+      "files": [
+        "phaser@3.min.js"
+      ],
+      "modified": false,
+      "purl": "pkg:npm/phaser@3.90.0"
+    },
+    {
+      "id": "drawflow",
+      "name": "Drawflow",
+      "version": "0.0.60",
+      "spdx": "MIT",
+      "copyright": "Copyright (c) 2020 Jero Soler",
+      "homepage": "https://github.com/jerosoler/Drawflow",
+      "source": "https://cdn.jsdelivr.net/npm/drawflow@0.0.60/dist/",
+      "licenseFile": "LICENSES/drawflow.txt",
+      "files": [
+        "drawflow@0.min.js",
+        "drawflow@0.min.css"
+      ],
+      "modified": false,
+      "purl": "pkg:npm/drawflow@0.0.60"
+    },
+    {
+      "id": "pdfjs",
+      "name": "PDF.js (pdfjs-dist)",
+      "version": "6.1.200",
+      "spdx": "Apache-2.0",
+      "copyright": "Copyright 2024 Mozilla Foundation",
+      "homepage": "https://mozilla.github.io/pdf.js/",
+      "source": "https://cdn.jsdelivr.net/npm/pdfjs-dist@6.1.200/build/",
+      "licenseFile": "LICENSES/pdfjs.txt",
+      "files": [
+        "pdfjs@6/**"
+      ],
+      "modified": false,
+      "purl": "pkg:npm/pdfjs-dist@6.1.200"
+    },
+    {
+      "id": "duckdb-wasm",
+      "name": "DuckDB-Wasm",
+      "version": "1.32.0",
+      "spdx": "MIT",
+      "copyright": "Copyright 2018-2025 Stichting DuckDB Foundation",
+      "homepage": "https://duckdb.org",
+      "source": "https://unpkg.com/@duckdb/duckdb-wasm@1.32.0/dist/ (loader built by scripts/vendor-duckdb-wasm.mjs; the .wasm files fetched by pnpm vendor:libs)",
+      "licenseFile": "LICENSES/duckdb-wasm.txt",
+      "files": [
+        "duckdb-wasm@1.32.0/**"
+      ],
+      "modified": false,
+      "note": "The Parquet extension under extensions/ is the same MIT DuckDB project, mirrored from extensions.duckdb.org so that reading a Parquet file does not reach a third-party CDN at runtime.",
+      "purl": "pkg:npm/%40duckdb/duckdb-wasm@1.32.0"
+    },
+    {
+      "id": "apache-arrow",
+      "name": "Apache Arrow (JS)",
+      "version": "17.0.0",
+      "spdx": "Apache-2.0",
+      "copyright": "Copyright 2016-2026 The Apache Software Foundation",
+      "homepage": "https://arrow.apache.org",
+      "source": "bundled inside duckdb-wasm@1.32.0/duckdb-browser.js",
+      "licenseFile": "LICENSES/apache-arrow.txt",
+      "noticeFile": "LICENSES/apache-arrow-NOTICE.txt",
+      "files": [],
+      "modified": false,
+      "note": "Ships INSIDE the DuckDB-Wasm browser loader rather than as a file of its own, which is exactly the kind of component a scanner reading filenames misses. Apache-2.0 section 4(d) asks for the upstream NOTICE to travel with the work, so it is reproduced here.",
+      "purl": "pkg:npm/apache-arrow@17.0.0"
+    },
+    {
+      "id": "toastui-editor",
+      "name": "TOAST UI Editor",
+      "version": "3.2.2",
+      "spdx": "MIT",
+      "copyright": "Copyright (c) 2020 NHN Cloud Corp.",
+      "homepage": "https://ui.toast.com/tui-editor",
+      "source": "https://uicdn.toast.com",
+      "licenseFile": "LICENSES/toastui-editor.txt",
+      "files": [
+        "toastui/**"
+      ],
+      "modified": false,
+      "purl": "pkg:npm/%40toast-ui/editor@3.2.2"
+    },
+    {
+      "id": "ffmpeg-core",
+      "name": "@ffmpeg/core (ffmpeg 5.1.4 compiled to WebAssembly)",
+      "version": "0.12.6",
+      "spdx": "GPL-2.0-or-later",
+      "copyright": "Copyright (c) 2000-2022 the FFmpeg developers",
+      "homepage": "https://ffmpeg.org",
+      "source": "https://unpkg.com/@ffmpeg/core@0.12.6/dist/",
+      "sourceOffer": "https://github.com/ffmpegwasm/ffmpeg.wasm (build scripts) and https://ffmpeg.org/releases/ffmpeg-5.1.4.tar.xz (the ffmpeg sources it was built from)",
+      "licenseFile": "LICENSES/GPL-2.0.txt",
+      "files": [
+        "ffmpeg-core@0.12.6/**"
+      ],
+      "fetched": true,
+      "modified": false,
+      "note": "STRONG COPYLEFT, and the reason none of these three files is in git or in any AIMEAT package. The build enables libx264 and libx265, which makes the compiled result GPL-2.0-or-later; npm's `license: MIT` field describes the packaging and not the binary. All three files (the wasm and both emscripten loaders) are installed on the operator's own machine by `pnpm vendor:libs`, byte-identical to upstream and hash-pinned, so AIMEAT never distributes them and stays MIT. An operator who serves them is distributing GPL work under the GPL, and the source offer above is what that requires.",
+      "purl": "pkg:npm/%40ffmpeg/core@0.12.6"
+    },
+    {
+      "id": "world-atlas",
+      "name": "world-atlas (Natural Earth 110m country shapes)",
+      "version": "2.0.2",
+      "spdx": "ISC",
+      "copyright": "Copyright 2013-2019 Michael Bostock; the underlying Natural Earth data is in the public domain",
+      "homepage": "https://github.com/topojson/world-atlas",
+      "source": "https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json, re-projected to SVG paths by scripts/vendor-atlas-data.mjs",
+      "licenseFile": "LICENSES/world-atlas.txt",
+      "files": [
+        "aimeat-atlas@1.json"
+      ],
+      "modified": true,
+      "note": "The GEOMETRY is derived: the TopoJSON was projected to SVG path strings so the Atelier atlas component does not have to carry a projection library. The data itself is public domain (Natural Earth); the ISC notice covers the world-atlas packaging.",
+      "purl": "pkg:npm/world-atlas@2.0.2"
+    },
+    {
+      "id": "yaml",
+      "name": "yaml",
+      "version": "2.9.0",
+      "spdx": "ISC",
+      "copyright": "Copyright Eemeli Aro <eemeli@gmail.com>",
+      "homepage": "https://eemeli.org/yaml/",
+      "source": "https://cdn.jsdelivr.net/npm/yaml@2",
+      "licenseFile": "LICENSES/yaml.txt",
+      "files": [
+        "yaml.mjs"
+      ],
+      "modified": false,
+      "purl": "pkg:npm/yaml@2.9.0"
+    },
+    {
+      "id": "preact",
+      "name": "Preact",
+      "version": "10",
+      "spdx": "MIT",
+      "copyright": "Copyright (c) 2015-present Jason Miller",
+      "homepage": "https://preactjs.com",
+      "source": "https://cdn.jsdelivr.net/npm/preact@10",
+      "licenseFile": "LICENSES/preact.txt",
+      "files": [
+        "preact.mjs",
+        "preact-hooks.mjs"
+      ],
+      "modified": false,
+      "purl": "pkg:npm/preact@10"
+    },
+    {
+      "id": "htm",
+      "name": "htm",
+      "version": "3",
+      "spdx": "Apache-2.0",
+      "copyright": "Copyright (c) Jason Miller and the htm contributors",
+      "homepage": "https://github.com/developit/htm",
+      "source": "https://cdn.jsdelivr.net/npm/htm@3",
+      "licenseFile": "LICENSES/htm.txt",
+      "files": [
+        "htm.mjs"
+      ],
+      "modified": false,
+      "purl": "pkg:npm/htm@3"
+    },
+    {
+      "id": "minidenticons",
+      "name": "minidenticons",
+      "version": "4.2.1",
+      "spdx": "MIT",
+      "copyright": "Copyright (c) 2021 Laurent Payot",
+      "homepage": "https://github.com/laurentpayot/minidenticons",
+      "source": "https://cdn.jsdelivr.net/npm/minidenticons@4",
+      "licenseFile": "LICENSES/minidenticons.txt",
+      "files": [
+        "minidenticons.min.js"
+      ],
+      "modified": false,
+      "purl": "pkg:npm/minidenticons@4.2.1"
+    },
+    {
+      "id": "fonts",
+      "name": "Baloo 2, Bangers, Inter, Archivo, Archivo Black, Space Grotesk, Fraunces, JetBrains Mono, Fjalla One, DM Sans, VT323",
+      "version": "see fonts/LICENSE.md",
+      "spdx": "OFL-1.1",
+      "copyright": "see fonts/LICENSE.md for the copyright holder of each family",
+      "homepage": "https://fonts.google.com",
+      "source": "Google Fonts, latin + latin-ext subsets, unmodified woff2",
+      "licenseFile": "LICENSES/OFL-1.1.txt",
+      "noticeFile": "fonts/LICENSE.md",
+      "files": [
+        "fonts/**"
+      ],
+      "modified": false,
+      "note": "The OFL permits bundling and selling the software that uses these fonts; it forbids selling the font files on their own and requires that a MODIFIED font be renamed. Neither applies here: the files are the upstream subsets, unchanged."
+    },
+    {
+      "id": "aimeat",
+      "name": "AIMEAT (this project's own served libraries)",
+      "version": "see each file's @version-history header",
+      "spdx": "MIT",
+      "copyright": "Copyright (c) 2026 Jouni Miikki",
+      "homepage": "https://github.com/miikkij/aimeat-protocol",
+      "source": "this repository",
+      "licenseFile": "../../../LICENSE",
+      "files": [
+        "aimeat-atelier.css",
+        "aimeat-atelier/**",
+        "aimeat-boot.js",
+        "aimeat-daisyui-bridge.css",
+        "aimeat-fonts.css",
+        "aimeat-game.css",
+        "aimeat-game/**",
+        "aimeat-theme.css",
+        "fonts.css",
+        "live-updates.js",
+        "mermaid/README.md",
+        "realtime.js",
+        "samples/**"
+      ],
+      "modified": false
+    }
+  ]
+}

@@ -10,3 +10,6 @@ src-tauri/gen/
 src-tauri/binaries/
 src-tauri/resources/server/
 src-tauri/WebView2Loader.dll
+# Staged by stage-licenses.mjs from the repo LICENSE, the generated notices and the LICENSE of the
+# very Node runtime being bundled. Copies, not sources — regenerated on every package.
+src-tauri/resources/licenses/

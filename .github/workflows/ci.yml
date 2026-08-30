@@ -136,6 +136,14 @@ jobs:
         working-directory: aimeat
         run: pnpm check:locales
 
+      # MIT plus commercial users means "can a company ship this" has to keep being answerable, and
+      # the answer had been wrong: every release up to 3.10.0 published a GPL ffmpeg build inside
+      # the MIT package. This reads the production tree AND public/lib/, which no npm licence tool
+      # looks at, and proves THIRD-PARTY-NOTICES.md followed whatever changed.
+      - name: Licences and third-party notices (check:licenses, check:notices)
+        working-directory: aimeat
+        run: pnpm check:licenses && pnpm check:notices
+
       # The August 2026 audit gates. Each is a ratchet seeded with that day's count, so it fails only
       # on a NEW offender: route authorization, outbound fetch through safeFetch, server-trusted
       # memory keys, owner-scoped tables in both deletion cascades, and every sandbox entry point
