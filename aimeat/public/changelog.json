@@ -5,6 +5,18 @@
       "date": "2026-08-30",
       "kind": "feature",
       "title": {
+        "en": "Contacts are people again, with a page each and an invitation of their own",
+        "fi": "Kontaktit ovat taas ihmisiä, jokaisella oma sivu ja oma kutsu"
+      },
+      "body": {
+        "en": "The Contacts page now reads your address book through people. Each person has a row with their relationship and your tags, the organisms you share, the last message and who wrote it, and a page of their own: what you know about them (editable in place, with tags and named links), what you have done together (shared organisms and workspaces, their agents), the last messages, and the doors: message, invite into an organism you manage, share a workspace. Agents and apps are listed under the people they belong to, and you are no longer listed in your own book. Someone without an account can be written down with everything you know and invited to join in the same move; the invitation goes out in your name, with your line, and needs no organism behind it. A prompt hands the same work to your own AI over MCP: find, add, write down, check an address, invite.",
+        "fi": "Kontaktit-sivu lukee osoitekirjasi nyt ihmisten kautta. Jokaisella ihmisellä on rivi, jolla näkyvät suhde ja tunnisteesi, yhteiset organismit sekä viimeisin viesti ja kuka sen kirjoitti, ja oma sivu: mitä tiedät hänestä (muokattavissa paikan päällä, tunnisteineen ja nimettyine linkkeineen), mitä olette tehneet yhdessä (yhteiset organismit ja työtilat, hänen agenttinsa), viimeisimmät viestit ja ovet: viesti, kutsu hallitsemaasi organismiin, jaa työtila. Agentit ja sovellukset listataan ihmistensä alla, eikä sinua itseäsi enää listata omassa kirjassasi. Jonkun, jolla ei ole tiliä, voi kirjata kaikkine tietoineen ja kutsua samalla; kutsu lähtee sinun nimissäsi, sinun rivilläsi, eikä tarvitse organismia taakseen. Kehote antaa saman työn omalle tekoälyllesi MCP:n yli: hae, lisää, kirjaa, tarkista osoite, kutsu."
+      }
+    },
+    {
+      "date": "2026-08-30",
+      "kind": "feature",
+      "title": {
         "en": "Workflows say what happened, ask before they run, and speak your language",
         "fi": "Työnkulut kertovat mitä kävi, kysyvät ennen ajoa ja puhuvat sinun kieltäsi"
       },
