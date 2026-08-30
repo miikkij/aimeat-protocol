@@ -161,19 +161,20 @@
 }
 /* The sky kind is a wide-open band, not a card. */
 .ak-scene[data-ak-scene='sky'] .ak-scene__stage { aspect-ratio: 21 / 9; min-height: 180px; }
-
-/* ── The chart family: areas, the donut, the calendar (chart.js) ───────────────────────────── */
-.ak-chart__area { fill-opacity: 0.16; stroke: none; }
-.ak-chart__svg--donut { max-width: 260px; margin: 0 auto; display: block; }
-.ak-chart__slice { fill: none; stroke-linecap: butt; }
-.ak-chart__slice--enter { opacity: 0; animation: ak-slice-in calc(var(--ak-motion) * 2) var(--ak-ease) forwards; }
-@keyframes ak-slice-in { to { opacity: 1; } }
-.ak-chart__total {
-  fill: var(--ak-ink);
-  font-family: var(--ak-font-display, inherit);
-  font-size: 34px;
-  font-weight: 700;
+/* The model kind gets the STUDIO: the scene paints its own dark ground (the darker of the
+   theme's ink/bg pair, chosen at runtime); this vignette is the lamp falloff over it —
+   pure shadow, so it is legal on any ground. */
+.ak-scene[data-ak-scene='model'] .ak-scene__stage::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(85% 78% at 50% 32%, transparent 55%, rgba(0, 0, 0, 0.42));
 }
+
+/* ── The chart family's cells (chart-shapes.js); the visual language lives in content.css ── */
+@keyframes ak-slice-in { to { opacity: 1; } }
+.ak-chart__svg--donut { max-width: 240px; margin: 0 auto; display: block; }
 .ak-chart__svg--calendar { width: 100%; height: auto; }
 .ak-chart__day--blank { fill: color-mix(in oklab, var(--ak-ink) 5%, var(--ak-surface)); }
 
@@ -182,11 +183,11 @@
 .ak-statrow__spark polyline {
   fill: none;
   stroke: var(--ak-accent);
-  stroke-width: 2;
+  stroke-width: 2.5;
   stroke-linecap: round;
   stroke-linejoin: round;
-  opacity: 0.85;
 }
+.ak-statrow__spark polygon { fill: var(--ak-accent); fill-opacity: 0.14; stroke: none; }
 
 /* ── The health wall (ops.js) ──────────────────────────────────────────────────────────────── */
 .ak-health { display: flex; flex-direction: column; gap: 2px; }
@@ -273,21 +274,27 @@ button.ak-queue__row:hover { background: var(--ak-surface-2); }
 .ak-queue__sub { color: var(--ak-ink-dim); font-size: var(--ak-text-fine); }
 
 /* ── The gauge (ops.js) ────────────────────────────────────────────────────────────────────── */
-.ak-gauge { margin: 0; text-align: center; }
-.ak-gauge__svg { width: 100%; max-width: 240px; height: auto; display: block; margin: 0 auto; }
-.ak-gauge__track { fill: none; stroke: color-mix(in oklab, var(--ak-ink) 8%, var(--ak-surface)); stroke-width: 10; stroke-linecap: round; }
-.ak-gauge__band { fill: none; stroke-width: 10; stroke-linecap: butt; opacity: 0.35; }
-.ak-gauge__band--ok { stroke: var(--ak-ok); }
-.ak-gauge__band--warn { stroke: var(--ak-warn); }
-.ak-gauge__band--err { stroke: var(--ak-err); }
-.ak-gauge__band--plain { stroke: color-mix(in oklab, var(--ak-ink) 20%, var(--ak-surface)); }
-.ak-gauge__value { fill: none; stroke-width: 14; stroke-linecap: round; stroke: var(--ak-accent); }
+.ak-gauge { margin: 0; text-align: center; container-type: inline-size; }
+.ak-gauge__svg { width: 100%; max-width: 250px; height: auto; display: block; margin: 0 auto; }
+.ak-gauge__track { fill: none; stroke: color-mix(in oklab, var(--ak-ink) 8%, var(--ak-surface)); stroke-width: 17; stroke-linecap: round; }
+.ak-gauge__value { fill: none; stroke-width: 17; stroke-linecap: round; stroke: var(--ak-accent); }
 .ak-gauge__value--ok { stroke: var(--ak-ok); }
 .ak-gauge__value--warn { stroke: var(--ak-warn); }
 .ak-gauge__value--err { stroke: var(--ak-err); }
 .ak-gauge__value--drawn { transition: stroke-dashoffset calc(var(--ak-motion) * 4) var(--ak-ease); stroke-dashoffset: 0 !important; }
-.ak-gauge__words { display: flex; flex-direction: column; gap: 2px; margin-top: -10px; }
-.ak-gauge__reading { font-family: var(--ak-font-display, inherit); font-size: var(--ak-text-title); font-weight: 700; color: var(--ak-ink); }
+.ak-gauge__tickmark { stroke: var(--ak-surface); stroke-width: 3.5; }
+.ak-gauge__marker { fill: var(--ak-surface); stroke: var(--ak-accent); stroke-width: 4.5; }
+.ak-gauge__marker--ok { stroke: var(--ak-ok); }
+.ak-gauge__marker--warn { stroke: var(--ak-warn); }
+.ak-gauge__marker--err { stroke: var(--ak-err); }
+.ak-gauge__words { display: flex; flex-direction: column; gap: 2px; margin-top: -3.2rem; position: relative; }
+.ak-gauge__reading {
+  font-family: var(--ak-font-display, inherit);
+  font-size: clamp(1.5rem, 15cqi, 2.4rem);
+  font-weight: var(--ak-weight-display, 700);
+  line-height: 1;
+  color: var(--ak-ink);
+}
 .ak-gauge__reading--ok { color: var(--ak-ok-text); }
 .ak-gauge__reading--warn { color: var(--ak-warn-text); }
 .ak-gauge__reading--err { color: var(--ak-err-text); }

@@ -331,6 +331,9 @@ button.ak-card:hover { box-shadow: var(--ak-elev-2); transform: translateY(-2px)
 
 /* ── Chart: grouped bars + drawn lines, colours from the look's spectrum ─────────────────── */
 .ak-chart {
+  /* The sheen every bar wears — a specular highlight, deliberately mode-blind (a gloss reads
+   * as light in dark mode too). The JS reads only the var; this is its one declaration. */
+  --ak-chart-sheen: #fff;
   margin: 0;
   padding: var(--ak-pad);
   border-radius: var(--ak-radius);
@@ -359,13 +362,79 @@ button.ak-card:hover { box-shadow: var(--ak-elev-2); transform: translateY(-2px)
 .ak-chart--mural .ak-chart__tick { opacity: 0.45; }
 .ak-chart--mural .ak-chart__grid { opacity: 0.25; }
 .ak-chart--mural .ak-chart__legend { padding-inline: max(var(--ak-pad), 3vw); }
-.ak-chart__grid { stroke: var(--ak-line); stroke-width: 1; opacity: 0.55; }
+.ak-chart__grid { stroke: var(--ak-line); stroke-width: 1; opacity: 0.4; }
 .ak-chart__zero { stroke: var(--ak-ink-dim); stroke-width: 1.25; }
 .ak-chart__tick { fill: var(--ak-ink-dim); font-family: var(--ak-font-mono); font-size: 11px; }
-.ak-chart__bar { rx: 2; }
 .ak-chart__bar--enter { animation: ak-chart-grow var(--ak-motion) ease-out backwards; }
-@keyframes ak-chart-grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes ak-chart-grow { from { transform: scale(0.001); } to { transform: scale(1); } }
+.ak-chart__sheen { pointer-events: none; }
 .ak-chart__line { fill: none; stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; }
+.ak-chart__dot { fill: var(--ak-surface); stroke-width: 3; }
+.ak-chart__area { stroke: none; }
+/* The touch tooltip and the story bubble: ink ground, paper words, an arrow of air. */
+.ak-chart { position: relative; }
+.ak-chart__tip, .ak-chart__note {
+  position: absolute;
+  z-index: 2;
+  max-width: 15rem;
+  padding: 8px 12px;
+  border-radius: var(--ak-radius-sm);
+  background: var(--ak-ink);
+  color: var(--ak-bg);
+  font-size: var(--ak-text-fine);
+  line-height: 1.5;
+  box-shadow: var(--ak-elev-2);
+  pointer-events: none;
+}
+.ak-chart__tip-label, .ak-chart__note-label {
+  display: block;
+  font-family: var(--ak-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.7;
+  margin-bottom: 2px;
+}
+.ak-chart__tip-row { display: flex; align-items: center; gap: 7px; }
+.ak-chart__tip-row b { margin-left: auto; padding-left: 10px; }
+.ak-chart__tip-swatch { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+/* Donut v2: rounded segments over a quiet ring, real typography in the middle. */
+.ak-chart__donutwrap { position: relative; max-width: 240px; margin: 0 auto; }
+.ak-chart__ring { fill: none; stroke: color-mix(in oklab, var(--ak-ink) 7%, var(--ak-surface)); }
+.ak-chart__slice { fill: none; }
+.ak-chart__slice--enter { opacity: 0; animation: ak-slice-pop calc(var(--ak-motion) * 2) var(--ak-ease) forwards; }
+@keyframes ak-slice-pop { to { opacity: 1; } }
+.ak-chart__centre {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  gap: 2px;
+}
+.ak-chart__centre b {
+  font-family: var(--ak-font-display);
+  font-weight: var(--ak-weight-display);
+  font-size: clamp(1.6rem, 6cqi, 2.2rem);
+  line-height: 1;
+  color: var(--ak-ink);
+}
+.ak-chart__delta { font-size: var(--ak-text-fine); font-weight: 700; color: var(--ak-ink-dim); }
+/* Calendar v2: the ramp legend under the wall. */
+.ak-chart__ramp {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  justify-content: flex-end;
+  margin-top: 8px;
+  font-size: var(--ak-text-fine);
+  color: var(--ak-ink-dim);
+}
+.ak-chart__rampcell { width: 13px; height: 13px; border-radius: 3px; background: var(--ak-accent); }
+/* Scatter: soft points, an honest dashed trend. */
+.ak-chart__point { fill: var(--ak-accent); fill-opacity: 0.8; stroke: var(--ak-surface); stroke-width: 2; }
+.ak-chart__point--enter { opacity: 0; animation: ak-slice-pop calc(var(--ak-motion) * 2) var(--ak-ease) forwards; }
+.ak-chart__trend { stroke: var(--ak-ink-dim); stroke-width: 1.5; stroke-dasharray: 6 6; opacity: 0.6; }
 .ak-chart__line--enter { transition: stroke-dashoffset 900ms ease-out; }
 .ak-chart__line--drawn { stroke-dashoffset: 0 !important; }
 .ak-chart__legend {
@@ -378,6 +447,7 @@ button.ak-card:hover { box-shadow: var(--ak-elev-2); transform: translateY(-2px)
 @media (prefers-reduced-motion: reduce) {
   .ak-chart__bar--enter { animation: none; }
   .ak-chart__line--enter { transition: none; stroke-dashoffset: 0 !important; }
+  .ak-chart__slice--enter, .ak-chart__point--enter { animation: none; opacity: 1; }
 }
 
 /* ── Matrix: labelled rows × labelled columns, every cell a toned word ────────────────────── */

@@ -25,6 +25,9 @@
  * @usage
  *   import { UI_COMPONENTS, componentById, buildUiCatalogue } from './registry.js';
  * @version-history
+ *   v1.13.0 — 2026-08-29 — The chart family grown to the approved level (stacked, horizontal,
+ *     scatter, the note bubble, tooltips) and scene3d kind "model" (a loaded .glb shown like
+ *     a product) — the Näyteikkuna canvas round, accepted by the developer.
  *   v1.12.0 — 2026-08-29 — `map` joins the components (append-only): the REAL map, Leaflet
  *     over OpenStreetMap — the developer's words, after the atlas abstraction missed them:
  *     "a map" means the real one.
@@ -212,12 +215,12 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
   },
   {
     id: 'chart',
-    summary: 'The chart family in one block, chosen by `kind`. axes (default): grouped bars, lines and filled areas over one label axis — { labels: string[], series: [{ id, label, kind: "bar"|"line"|"area", values: number[] }] }; negatives are legal and the zero line appears when crossed. donut: parts of a whole — { slices: [{ label, value }] }, the total in the middle. calendar: a stretch of days as a heat grid — { days: [{ date: "YYYY-MM-DD", value }] }, intensity riding the accent. Colours come from the look\'s own accent spectrum. presentation "mural" makes the chart the room instead of a tile: full-bleed behind its section, ticks quieted, one per screen.',
+    summary: 'The whole chart family in one block, chosen by `kind`, drawn to the approved level (rounded sheened bars, smooth curves, a touch tooltip on every axes chart). axes (default): grouped bars, lines and soft-filled areas over one label axis — { labels, series: [{ id, label, kind: "bar"|"line"|"area", values }], stacked?: true (bars pile into one column), horizontal?: true (ranked things read sideways), note?: { label, text } (a story bubble on the one point that matters) }. donut: parts of a whole — { slices: [{ label, value }], delta?: { text, tone } } with the total and its change in the middle. calendar: days as a heat grid — { days: [{ date: "YYYY-MM-DD", value }] }, months named, the ramp explained. scatter: { points: [{ x, y, label? }], xLabel?, yLabel? } with an honest least-squares trend. Colours come from the look\'s own accent spectrum. presentation "mural" makes the chart the room instead of a tile.',
     props: {
       source: source(),
       title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
       kind: {
-        type: 'enum', values: ['axes', 'donut', 'calendar'], default: 'axes',
+        type: 'enum', values: ['axes', 'donut', 'calendar', 'scatter'], default: 'axes',
         description: 'The chart\'s shape — and the record shape the source must resolve to (see the summary).',
       },
       emptyTitle: text('What the empty state says.', 80),
@@ -325,7 +328,7 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
     id: 'scene3d',
     summary: 'Real depth: a 3D band on the node\'s own three-world bundle (lazy-loaded, ~745 kB, so use it as the ONE showpiece a screen gets). kind "orb" is a signature object turning under the hand; "sky" is a procedural atmosphere band; "bars" stands the bound rows up as a field of columns — the 3D chart, source rows { label?, value }. Colours come from the look\'s tokens and the render loop stops at rest, so an idle scene costs nothing.',
     props: {
-      kind: { type: 'enum', values: ['orb', 'sky', 'bars'], default: 'orb', description: 'What the scene is: a signature object, an atmosphere band, or data as terrain.' },
+      kind: { type: 'enum', values: ['orb', 'sky', 'bars', 'model'], default: 'orb', description: 'What the scene is: a signature object, an atmosphere band, data as terrain, or a loaded 3D model shown like a product (kind "model": the source resolves to { url } — a .glb/.gltf address; it is fitted, grounded and studio-lit for you).' },
       source: {
         type: 'string', maxLength: 120,
         description: 'For kind "bars": the data binding the app resolves to rows of { label?, value }. Omit for orb and sky.',

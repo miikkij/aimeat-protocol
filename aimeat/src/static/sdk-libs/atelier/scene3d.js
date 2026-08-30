@@ -17,6 +17,9 @@
  * @structure scene3d(spec) → { el, set, destroy }
  * @usage  AIMEAT.atelier.scene3d({ target: host, kind: 'bars', data: { items: rows } });
  * @version-history
+ *   v0.35.0 — 2026-08-29 — kind "model": any .glb/.gltf by URL — fitted whole, grounded on a
+ *     soft shadow disc, lit by a real studio environment (GLTFLoader + RoomEnvironment ride
+ *     the companion bundle /lib/three-world-loaders@1.min.js), turning under the hand.
  *   v0.32.0 — 2026-08-29 — Initial (TARGET-074 next level: depth joins the vocabulary on the
  *     bundle universe proved, nothing newly vendored).
  */
@@ -38,6 +41,23 @@ function ensureThree() {
     document.head.appendChild(s);
   });
   return threePromise;
+}
+
+/** The model kind's extra: GLTFLoader + RoomEnvironment, attached onto the loaded THREE. */
+let loadersPromise = null;
+function ensureLoaders() {
+  return ensureThree().then(function (THREE) {
+    if (THREE.Addons.GLTFLoader) return THREE;
+    if (loadersPromise) return loadersPromise;
+    loadersPromise = new Promise(function (ok, fail) {
+      const s = document.createElement('script');
+      s.src = NODE_URL + '/lib/three-world-loaders@1.min.js';
+      s.onload = function () { ok(THREE); };
+      s.onerror = function () { loadersPromise = null; fail(new Error('three-world-loaders failed to load')); };
+      document.head.appendChild(s);
+    });
+    return loadersPromise;
+  });
 }
 
 /**
@@ -71,14 +91,14 @@ function easeOut(x) { return 1 - Math.pow(1 - x, 3); }
 /**
  * The 3D scene.
  * @param {{
- *   target?: string|Element, kind?: 'orb'|'sky'|'bars',
- *   data?: { items?: Array<{ label?: string, value: number }> }|null,
+ *   target?: string|Element, kind?: 'orb'|'sky'|'bars'|'model',
+ *   data?: { items?: Array<{ label?: string, value: number }>, url?: string }|null,
  *   title?: string, empty?: { title?: string, hint?: string },
  * }} spec
  * @returns {{ el: HTMLElement, set: (patch: { data?: object|null }) => void, destroy: () => void }}
  */
 export function scene3d(spec) {
-  const kind = spec.kind === 'sky' || spec.kind === 'bars' ? spec.kind : 'orb';
+  const kind = ['sky', 'bars', 'model'].indexOf(spec.kind) >= 0 ? spec.kind : 'orb';
   const root = el('figure', { class: 'ak-root ak-scene', 'data-ak-scene': kind });
   if (spec.target) resolve(spec.target).appendChild(root);
   if (spec.title) root.appendChild(el('figcaption', { class: 'ak-scene__title' }, spec.title));
@@ -89,7 +109,7 @@ export function scene3d(spec) {
   let destroyed = false;
   let world = null; // { renderer, scene, camera, controls, dispose(), rebuild(data) }
 
-  ensureThree().then(function (THREE) {
+  (kind === 'model' ? ensureLoaders() : ensureThree()).then(function (THREE) {
     if (destroyed) return;
     wait.destroy();
     world = buildWorld(THREE, stage, kind, spec, root);
@@ -130,8 +150,20 @@ function buildWorld(THREE, stage, kind, spec, root) {
   const controls = new THREE.Addons.OrbitControls(camera, renderer.domElement);
   controls.enableDamping = !reducedMotion();
   controls.enablePan = false;
-  controls.enableZoom = kind === 'bars';
+  controls.enableZoom = kind === 'bars' || kind === 'model';
   if (kind === 'sky') { controls.enableZoom = false; controls.rotateSpeed = -0.35; }
+  if (kind === 'model') {
+    // The showcase spins like a product on a table: PBR needs a real environment, so the
+    // studio light (RoomEnvironment via PMREM) stands in for the missing world. The ground
+    // is the DARKER of the theme's own ink/bg pair — a studio is dark in both modes.
+    renderer.toneMappingExposure = 1.15;
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmrem.fromScene(new THREE.Addons.RoomEnvironment(), 0.04).texture;
+    const inkC = new THREE.Color(tokenColor(root, '--ak-ink'));
+    const bgC = new THREE.Color(tokenColor(root, '--ak-bg'));
+    const luma = (c) => c.r + c.g + c.b;
+    scene.background = (luma(inkC) < luma(bgC) ? inkC : bgC);
+  }
 
   // ── The stop-at-rest loop: frames only while the entrance plays or the hand moves. ──
   let raf = 0;
@@ -189,6 +221,12 @@ function buildWorld(THREE, stage, kind, spec, root) {
 
   /** Frame the camera for what was just built — bars scale with the grid they carry. */
   function frameCamera(cols) {
+    if (kind === 'model') {
+      camera.position.set(2.6, 1.7, 4.6);
+      controls.target.set(0, 1.1, 0);
+      controls.update();
+      return;
+    }
     if (kind === 'sky') {
       // A look-around: the target sits up and away, so the gaze rests on the sky, not the haze.
       camera.position.set(0, 2, 0.5);
@@ -210,6 +248,63 @@ function buildWorld(THREE, stage, kind, spec, root) {
     const surface = tokenColor(root, '--ak-surface-2', '--ak-surface');
     scene.fog = null;
     let barCols = 3;
+
+    if (kind === 'model') {
+      // THE LOADABLE MODEL: any .glb/.gltf by URL, fitted whole, grounded on a soft disc,
+      // turning under the hand. The environment (set at build) does the material justice.
+      const url = data && data.url ? String(data.url) : '';
+      if (!url) { applyEntrance = function () {}; wake(0); return; }
+      const shimmer = skeleton({ target: stage, rows: 2 });
+      new THREE.Addons.GLTFLoader().load(url, function (gltf) {
+        shimmer.destroy();
+        const model = gltf.scene;
+        // Fit: centre on the origin, stand on the floor, span ~2.6 units whatever the file's scale.
+        const box = new THREE.Box3().setFromObject(model);
+        const size = box.getSize(new THREE.Vector3());
+        const centre = box.getCenter(new THREE.Vector3());
+        const scale = 2.6 / Math.max(size.x, size.y, size.z, 1e-6);
+        model.scale.setScalar(scale);
+        model.position.set(-centre.x * scale, -box.min.y * scale, -centre.z * scale);
+        group.add(model);
+        // The soft ground: a radial shadow disc, drawn on canvas so no asset is fetched. Its
+        // colour is the scene's own ground (the darker of ink and surface, the same rule the
+        // studio background follows) pushed further down — a shadow, derived, not hardcoded.
+        const c = document.createElement('canvas');
+        c.width = c.height = 128;
+        const g2 = c.getContext('2d');
+        const grad = g2.createRadialGradient(64, 64, 8, 64, 64, 64);
+        const channels = function (s) { return (s.match(/\d+/g) || ['0', '0', '0']).map(Number); };
+        const inkCh = channels(ink);
+        const surfCh = channels(surface);
+        const shadow = (inkCh[0] + inkCh[1] + inkCh[2] <= surfCh[0] + surfCh[1] + surfCh[2] ? inkCh : surfCh)
+          .map(function (v) { return Math.round(v * 0.3); }).join(',');
+        grad.addColorStop(0, 'rgba(' + shadow + ',0.42)');
+        grad.addColorStop(1, 'rgba(' + shadow + ',0)');
+        g2.fillStyle = grad;
+        g2.fillRect(0, 0, 128, 128);
+        const disc = new THREE.Mesh(
+          new THREE.PlaneGeometry(3.6, 3.6).rotateX(-Math.PI / 2),
+          new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false })
+        );
+        disc.position.y = 0.001;
+        group.add(disc);
+        applyEntrance = function (p) {
+          model.rotation.y = (1 - p) * 1.2;
+          model.position.y = -box.min.y * scale + (1 - p) * 0.35;
+        };
+        frameCamera(3);
+        clock.start = performance.now();
+        entranceUntil = reducedMotion() ? clock.start : clock.start + 900;
+        if (reducedMotion()) applyEntrance(1);
+        wake(reducedMotion() ? 0 : 950);
+      }, undefined, function () {
+        shimmer.destroy();
+        emptyState({ target: stage, title: (spec.empty && spec.empty.title) || '3D is resting',
+          hint: (spec.empty && spec.empty.hint) || 'The model could not load from its address.' });
+      });
+      applyEntrance = function () {};
+      return; // the loader's callback finishes the build
+    }
 
     if (kind === 'sky') {
       const sky = new THREE.Addons.Sky();
