@@ -256,7 +256,7 @@ const i18n: Record<string, Record<string, string>> = {
 };
 
 /** Minimal HTML escape for user-controlled fields interpolated into email HTML. */
-function esc(s: string): string {
+export function esc(s: string): string {
   return String(s ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -274,10 +274,12 @@ function emailLang(locale: string | undefined): string {
 function t(locale: string | undefined, key: string): string {
   return i18n[emailLang(locale)][key] ?? i18n['en'][key] ?? key;
 }
+/** The shared string table, for a template that lives in another file (the digest). */
+export const emailText = t;
 
 // ── Shared layout ────────────────────────────────────────
 
-function wrapHtml(heading: string, bodyHtml: string, locale?: string, opts?: { brand?: string; footer?: string }): string {
+export function wrapHtml(heading: string, bodyHtml: string, locale?: string, opts?: { brand?: string; footer?: string }): string {
   // brand/footer are trusted constants (never user input) — brand may carry inline HTML (e.g. a heart).
   const brand = opts?.brand ?? 'AIMEAT';
   const footer = opts?.footer ?? t(locale, 'footer');

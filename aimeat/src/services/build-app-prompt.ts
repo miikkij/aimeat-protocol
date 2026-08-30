@@ -408,6 +408,12 @@ function composeAppPrompt(
   body += '```\n';
   body += 'Always handle isAvailable()===false and catch errors; never hardcode an API key in the app.\n\n';
 
+  // NOTIFICATIONS. The route and the SDK call have existed since July; no builder was told, so no
+  // app used them. Two sentences here are what turns "a report is ready" into a push on the person's
+  // phone rather than a badge they find next week.
+  body += '### Tell the person when something happened (one call)\n';
+  body += "When your app finishes something the person waits for (a report, an import, a match), tell them: `await session.notify('Report ready', { body: 'Q2 numbers are in.' })` puts it in their bell and, if they turned push on, on their phone, and a click opens your app. Ask for the `notifications:send` scope in the meta line; the node puts your app's name in front of the title, and the person can mute your app on their Notifications page, so notify about outcomes they asked for, never about your app's own housekeeping.\n\n";
+
   // TRANSPARENCY. An app that generates content is, in EU AI Act terms, a system with a provider —
   // its owner. There are two ways to handle that: every builder learns the law, or the SDK hands
   // them the record, one call draws the label, and this prompt asks for both. Only the second

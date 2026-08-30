@@ -12,6 +12,8 @@
  *   - GET    /v1/push/vapid-key  — public VAPID key (no auth)
  * @usage app.use(pushRouter(config, storage, pushService));
  * @version-history
+ *   v1.3.0 — 2026-08-30 — GET /v1/push/subscriptions: the owner's devices, so the Notifications
+ *     page can show and remove each one instead of only this browser.
  *   v1.2.0 — 2026-08-11 — Security audit H-8: the three mutating routes require the `push:manage`
  *     scope, and DELETE can name one device instead of clearing the account.
  *   v1.1.0 — 2026-08-10 — Security audit H-8: the subscription endpoint goes through validateOutboundUrl.
@@ -107,6 +109,28 @@ export function pushRouter(config: AimeatConfig, storage: Storage, pushService: 
   });
 
   // DELETE /v1/push/subscribe — Unsubscribe one device, or all of them
+  /* GET /v1/push/subscriptions — the owner's devices. The endpoint's host names the browser family
+   * (the push service is the browser's own), which is all the record knows about the device; the
+   * endpoint itself comes back so a client can name the device it means on DELETE. */
+  router.get('/v1/push/subscriptions', requireAuth(), requireScope(PUSH_SCOPE), async (req, res) => {
+    const ownerName = req.auth!.owner as string;
+    const subs = await storage.listPushSubscriptionsByOwner(ownerName);
+    const family = (endpoint: string): string => {
+      try {
+        const host = new URL(endpoint).host;
+        if (host.includes('google') || host.includes('fcm')) return 'chrome';
+        if (host.includes('mozilla')) return 'firefox';
+        if (host.includes('apple')) return 'safari';
+        if (host.includes('windows') || host.includes('notify.windows')) return 'edge';
+        return 'other';
+      } catch { return 'other'; }
+    };
+    res.json(success(config.nodeId, {
+      subscriptions: subs.map(s => ({ endpoint: s.endpoint, family: family(s.endpoint), created_at: s.createdAt, last_used_at: s.lastUsedAt })),
+      total: subs.length,
+    }));
+  });
+
   router.delete('/v1/push/subscribe', requireAuth(), requireScope(PUSH_SCOPE), async (req, res) => {
     try {
       const ownerName = req.auth!.owner;

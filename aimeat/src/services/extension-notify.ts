@@ -12,11 +12,12 @@
  * @structure safeNotificationLink, extensionCrossNotify
  * @usage if (opts?.to) return extensionCrossNotify(storage, config, ext.name, opts.to, message, opts);
  * @version-history
+ *   v1.2.0 — 2026-08-30 — The notification names the extension as its source and lives in the bell
+ *     store only; the parallel `notifications.<owner>` list, which nothing read, is no longer written.
  *   v1.0.0 — 2026-08-06 — Initial (TINKI watch push; generic for every extension)
  *   v1.1.0 — 2026-08-06 — opts.link: the extension names where the notification leads, restricted
  *     to this node and its own app origins.
  */
-import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { notify } from './notify.js';
@@ -73,28 +74,11 @@ export async function extensionCrossNotify(
     logger.warn(`[ext:${extName}] cross-notify blocked: ${targetOwner} has no extension_notify consent for ext:${extName}`);
     return false;
   }
-  const key = `notifications.${targetOwner}`;
-  const existing = await storage.getMemory(targetGhii, key);
-  const list = Array.isArray(existing?.value) ? (existing.value as unknown[]) : [];
-  list.push({
-    id: randomUUID(),
-    message,
-    title: opts?.title || extName,
-    priority: opts?.priority || 'normal',
-    channel: opts?.channel || 'extension',
-    source: extName,
-    read: false,
-    createdAt: new Date().toISOString(),
-  });
-  const now = new Date().toISOString();
-  await storage.setMemory({
-    key, ownerGaii: targetGhii, value: list.slice(-100), visibility: 'private',
-    tags: ['notifications'], ttlHours: null,
-    version: (existing?.version || 0) + 1, createdAt: existing?.createdAt || now, updatedAt: now,
-  });
-  void notify(storage, targetGhii, {
+  // One store, the bell's (2026-08-30): the second list under `notifications.<owner>` is gone.
+  const r = await notify(storage, targetGhii, {
     type: 'extension', title: opts?.title || extName, body: message,
     link: safeNotificationLink(config, opts?.link, '/v1/profile?tab=extensions'),
+    source: { kind: 'extension', name: extName, id: extName },
   });
-  return true;
+  return r.stored;
 }

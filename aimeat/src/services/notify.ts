@@ -23,6 +23,13 @@
  * @usage import { notify } from '../services/notify.js';
  *   await notify(storage, `${creatorOwner}@${nodeId}`, { type: 'workspace_access_request', title, link });
  * @version-history
+ *   v1.4.0 -- 2026-08-30 -- The owner's settings decide what happens (notification-settings.ts): a
+ *     muted sender's notification is dropped before it is written, a sender or group with push off
+ *     stays in the bell, quiet hours hold the push (the record is marked `held` and the morning
+ *     sweep sends one summary), and one sender pushes at most once per throttle window with the
+ *     rest summarised when the window ends. A record now carries its `source` (who sent it) and,
+ *     for the node's own kinds, an `i18n` key with variables so the page can say it in the reader's
+ *     language. notify() returns what it did instead of nothing.
  *   v1.0.0 -- 2026-06-08 -- Initial: memory-backed notification inbox.
  *   v1.1.0 -- 2026-07-02 -- Bridge bell notifications to web push with deep-link URL translation.
  *   v1.2.0 -- 2026-07-18 -- Inline notification actions (reply/api/navigate); mirror up to two into
@@ -35,6 +42,7 @@ import { randomUUID } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
 import type { PushService } from './push.js';
 import { logger } from '../utils/logger.js';
+import { readNotificationSettings, prefsFor, quietState, senderKey, type NotifSource } from './notification-settings.js';
 
 export const NOTIF_PREFIX = 'notif.';
 const NOTIF_TTL_HOURS = 24 * 90;   // 90 days
@@ -67,6 +75,8 @@ let pushService: PushService | null = null;
 export function setNotifyPushService(push: PushService | null): void {
   pushService = push;
 }
+/** The push service notify() uses, for the sweeps that send on its behalf. */
+export function getNotifyPushService(): PushService | null { return pushService; }
 
 /**
  * Delete the recipient's bell notifications that deep-link to a given conversation — called when they
@@ -108,7 +118,18 @@ export interface NotifyInput {
    * MAX_NOTIF_ACTIONS; anything beyond is dropped.
    */
   actions?: NotifAction[];
+  /** Who sent it. Absent means the node itself. */
+  source?: NotifSource;
+  /** For the node's own kinds: the locale key (under `notiftext.`) and its variables, so the page
+   *  and the bell can say the title and body in the reader's language. `title`/`body` stay as the
+   *  English fallback and as what the push carries. */
+  i18n?: { key: string; vars?: Record<string, string | number> };
 }
+
+export interface NotifyResult { stored: boolean; pushed: boolean; held: boolean; muted: boolean }
+
+/** One push per sender per window, in-process: the last push time and how many were folded since. */
+const throttle = new Map<string, { at: number; folded: number; timer: NodeJS.Timeout | null; sample: { title: string; link: string } }>();
 
 /**
  * Translate a bell-vocabulary link into a URL that opens correctly from a cold start (push
@@ -130,16 +151,32 @@ export function notifLinkToUrl(link?: string): string {
  * triggered it. Also mirrors the notification to the recipient's web-push subscription (if any);
  * the push click opens the same deep link as the bell entry.
  */
-export async function notify(storage: Storage, recipientGhii: string, input: NotifyInput): Promise<void> {
+export async function notify(storage: Storage, recipientGhii: string, input: NotifyInput): Promise<NotifyResult> {
+  const result: NotifyResult = { stored: false, pushed: false, held: false, muted: false };
   try {
+    const source: NotifSource = input.source ?? { kind: 'aimeat', name: 'AIMEAT' };
+    const settings = await readNotificationSettings(storage, recipientGhii);
+    const prefs = prefsFor(settings, source, input.type);
+    if (prefs.muted) {
+      // The owner said "nothing from this one". Refuse before you write: a muted notification is
+      // not stored and not pushed, and the sender is told nothing beyond `muted: true`.
+      result.muted = true;
+      return result;
+    }
     const id = randomUUID();
     const now = new Date().toISOString();
     const actions = Array.isArray(input.actions) ? input.actions.slice(0, MAX_NOTIF_ACTIONS) : [];
+    const wantPush = !!pushService?.enabled && prefs.push;
+    const quiet = wantPush && quietState(settings, input.type).quiet;
+    result.held = quiet;
     // Key sorts lexically by time; the route sorts newest-first explicitly anyway.
     await storage.setMemory({
       key: `${NOTIF_PREFIX}${now}.${id.slice(0, 8)}`,
       ownerGaii: recipientGhii,
-      value: { id, type: input.type, title: input.title, body: input.body ?? '', link: input.link ?? '', actions, read: false, createdAt: now },
+      value: {
+        id, type: input.type, title: input.title, body: input.body ?? '', link: input.link ?? '', actions, read: false, createdAt: now,
+        source, ...(input.i18n ? { i18n: input.i18n } : {}), ...(quiet ? { held: true } : {}),
+      },
       visibility: 'private',
       tags: ['notif'],
       ttlHours: NOTIF_TTL_HOURS,
@@ -147,23 +184,54 @@ export async function notify(storage: Storage, recipientGhii: string, input: Not
       createdAt: now,
       updatedAt: now,
     });
-    if (pushService?.enabled) {
-      // Same tag per type ⇒ a newer notification of the same kind replaces the shown one instead
-      // of stacking. A recipient without a push subscription is a silent no-op inside the service.
-      // Mirror up to two actions into the OS-level push (Notification.actions caps low, and a lock
-      // screen can't take free text) — the SW turns a button click into a focus + postMessage so the
-      // open SPA runs it with the owner's session; data.actions carries the full descriptors.
-      void pushService.sendNotification(recipientGhii.split('@')[0], {
-        title: input.title,
-        body: input.body ?? '',
-        url: notifLinkToUrl(input.link),
-        tag: `notif:${input.type}`,
-        actions: actions.slice(0, 2).map(a => ({ action: a.id, title: a.label })),
-        data: { notifId: id, actions },
-      }).catch(err => { logger.warn('notify: push is best-effort', { error: String(err) }); });
+    result.stored = true;
+    if (!wantPush || quiet) return result;
+
+    // One push per sender per window. The first goes at once; the ones that follow inside the
+    // window are counted, and when it ends a single push says how many there were.
+    const windowMs = settings.throttleMinutes * 60_000;
+    const tkey = `${recipientGhii}|${senderKey(source)}`;
+    const slot = throttle.get(tkey);
+    if (windowMs > 0 && slot && Date.now() - slot.at < windowMs) {
+      slot.folded++;
+      slot.sample = { title: input.title, link: input.link ?? '' };
+      if (!slot.timer) {
+        slot.timer = setTimeout(() => {
+          const s = throttle.get(tkey);
+          if (!s) return;
+          s.timer = null;
+          const n = s.folded; s.folded = 0; s.at = Date.now();
+          if (n <= 0 || !pushService?.enabled) return;
+          void pushService.sendNotification(recipientGhii.split('@')[0], {
+            title: n === 1 ? s.sample.title : `${n} more from ${source.name}`,
+            body: n === 1 ? '' : s.sample.title,
+            url: n === 1 ? notifLinkToUrl(s.sample.link) : '/v1/profile?tab=notifications',
+            tag: `notif:${senderKey(source)}`,
+          }).catch(err => { logger.warn('notify: summary push is best-effort', { error: String(err) }); });
+        }, windowMs - (Date.now() - slot.at));
+        slot.timer.unref?.();
+      }
+      result.held = true;
+      return result;
     }
+    throttle.set(tkey, { at: Date.now(), folded: 0, timer: null, sample: { title: input.title, link: input.link ?? '' } });
+    // Same tag per type ⇒ a newer notification of the same kind replaces the shown one instead
+    // of stacking. A recipient without a push subscription is a silent no-op inside the service.
+    // Mirror up to two actions into the OS-level push (Notification.actions caps low, and a lock
+    // screen can't take free text) — the SW turns a button click into a focus + postMessage so the
+    // open SPA runs it with the owner's session; data.actions carries the full descriptors.
+    result.pushed = true;
+    void pushService!.sendNotification(recipientGhii.split('@')[0], {
+      title: input.title,
+      body: input.body ?? '',
+      url: notifLinkToUrl(input.link),
+      tag: `notif:${input.type}`,
+      actions: actions.slice(0, 2).map(a => ({ action: a.id, title: a.label })),
+      data: { notifId: id, actions },
+    }).catch(err => { logger.warn('notify: push is best-effort', { error: String(err) }); });
   } catch (err) {
     /* notifications are best-effort — swallow so the triggering action still succeeds */
     logger.warn('notify: continuing after a suppressed failure', { error: String(err) });
   }
+  return result;
 }

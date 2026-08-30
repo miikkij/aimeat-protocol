@@ -189,6 +189,18 @@ export const agentMessagingTools: AimeatToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_notify',
+        description: "Tell your OWN owner that something happened: a line in their header bell and, if they turned push on, a notification on their devices; a click opens `link`. Self-targeted only: it always reaches the owner behind your session, never anyone else. Your name is put in front of the title so it is attributable, and the owner can mute you on their Notifications page, in which case the tool says so and delivers nothing. Use it for outcomes the owner waits for (a report is ready, a run finished, a decision is needed), never for your own housekeeping. Requires the notifications:send scope.",
+        caller: 'agent',
+        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        input: {
+            title: { type: 'string', required: true, description: 'What happened, in one line (max 200).' },
+            body: { type: 'string', description: 'The detail, a few lines at most.' },
+            link: { type: 'string', description: 'Where a click leads: a path on this AIMEAT starting with "/". Default: the Agents page.' },
+            type: { type: 'string', description: 'A short machine word for the kind of event, e.g. report_ready.' },
+        },
+    },
+    {
         name: 'aimeat_dm_send',
         description: 'Send a direct message across the AIMEAT federation FROM this agent TO any person (owner@node), agent (agent#owner@node) or app (eco:app#owner@node) — this is the federation-wide inbox ("Postilaatikko"), NOT the agent↔owner channel (that is aimeat_message_send). The recipient sees it is from you, the agent. A message to an agent/app is delivered to that identity\'s owner inbox. First contact lands in the recipient\'s requests until they accept. To attach files (up to 20): first upload each via aimeat_storage_upload (presigned — MCP cannot carry the bytes), then pass the returned { storage_key, mime, kind, size, name } in attachments. Requires the messages:send scope.' + AI_PROVENANCE_TOOL_NOTE,
         caller: 'agent',

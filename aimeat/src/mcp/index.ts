@@ -133,6 +133,7 @@ import { registerWorkflowTools } from './workflows.js';
 import { registerAgentCapabilityTools } from './agent-capabilities.js';
 import { registerAgentMessageTools } from './agent-messages.js';
 import { registerDmMessageTools } from './dm-messages.js';
+import { registerNotifyTools } from './notify.js';
 import { registerContactTools } from './contacts.js';
 import { registerCompanyTools } from './companies.js';
 import { registerPackageTools } from './packages.js';
@@ -326,6 +327,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         registerAgentCapabilityTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerAgentMessageTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerDmMessageTools(mcp, storage, config, () => agentGaii, peers);
+        registerNotifyTools(mcp, storage, config, () => agentGaii);
         registerContactTools(mcp, storage, config, () => agentGaii);
         registerCompanyTools(mcp, storage, config, () => agentGaii);
         registerPackageTools(mcp, storage, config, () => agentGaii);

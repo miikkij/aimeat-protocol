@@ -21,6 +21,8 @@
  *   - appMayWriteKey: owner passes, app refused, delegated agent refused, reserved grant passes
  * @usage cd aimeat && pnpm exec vitest run test/unit/reserved-keys.test.ts
  * @version-history
+ *   v1.x — 2026-08-30 — `notifications.` is the ninth: the owner's notification settings, which
+ *     notify() acts on before it writes.
  *   v1.x — 2026-08-24 — `signals.` is the seventh: an unauthenticated public door reads
  *     `signals.stream.*` before it agrees to write into the owner's namespace.
  *   v1.x — 2026-08-16 — `chat.` is the sixth. A conversation is what the person said and what the
@@ -38,10 +40,13 @@ const ACCOUNTANTS_KEY = 'finance.accountants';
 const PSP_KEY = 'commerce.psp';
 
 describe('the list holds every prefix the server reads and acts on', () => {
-    it('carries all eight, and a removal is a test failure rather than a silent regression', () => {
+    it('carries all nine, and a removal is a test failure rather than a silent regression', () => {
         // `audit.` (2026-08-29): the per-app audit log, which a granted app must not rewrite.
+        // `notifications.` (2026-08-30): the owner's notification settings, which notify() acts on
+        // to drop a muted sender before the write; an app that could write it could silence the
+        // budget and security notifications about itself.
         expect([...RESERVED_OWNER_KEY_PREFIXES].sort()).toEqual(
-            ['ai-usage.', 'audit.', 'chat.', 'commerce.', 'finance.', 'openrouter.', 'profile.', 'signals.'],
+            ['ai-usage.', 'audit.', 'chat.', 'commerce.', 'finance.', 'notifications.', 'openrouter.', 'profile.', 'signals.'],
         );
     });
 

@@ -213,40 +213,22 @@ export function buildExtensionNotify(deps: {
     /** Bare owner name, used for the key suffix and the GHII the bell belongs to. */
     recipientOwner: string;
 }): NonNullable<ExtensionCtx['notify']> {
-    const { storage, config, extName, recipientGaii, recipientOwner } = deps;
+    const { storage, config, extName, recipientOwner } = deps;
     return async (message, opts?: { title?: string; priority?: string; channel?: string; to?: string; link?: string }) => {
         if (opts?.to) return extensionCrossNotify(storage, config, extName, opts.to, message, opts);
 
-        const key = `notifications.${recipientOwner}`;
-        const existing = await storage.getMemory(recipientGaii, key);
-        const list = Array.isArray(existing?.value) ? (existing.value as unknown[]) : [];
-        list.push({
-            id: randomUUID(),
-            message,
-            title: opts?.title || extName,
-            priority: opts?.priority || 'normal',
-            channel: opts?.channel || 'extension',
-            source: extName,
-            read: false,
-            createdAt: new Date().toISOString(),
-        });
-        const now = new Date().toISOString();
-        await storage.setMemory({
-            key, ownerGaii: recipientGaii, value: list.slice(-100),
-            visibility: 'private', tags: ['notifications'], ttlHours: null,
-            version: (existing?.version || 0) + 1,
-            createdAt: existing?.createdAt || now, updatedAt: now,
-        });
-
-        // Surface it where the owner actually looks. safeNotificationLink keeps a guest-supplied
-        // link on this node: the scheduler copy sidestepped that by ignoring opts.link entirely,
-        // which was safe but meant a scheduled notification could not deep-link anywhere.
+        // One store, the bell's (2026-08-30). This used to also append to `notifications.<owner>`,
+        // a second list nothing read, which is how an extension's notifications came to exist twice.
+        // safeNotificationLink keeps a guest-supplied link on this node: the scheduler copy
+        // sidestepped that by ignoring opts.link entirely, which was safe but meant a scheduled
+        // notification could not deep-link anywhere.
         const recipientGhii = recipientOwner.includes('@') ? recipientOwner : `${recipientOwner}@${config.nodeId}`;
-        void notify(storage, recipientGhii, {
+        const r = await notify(storage, recipientGhii, {
             type: 'extension', title: opts?.title || extName, body: message,
             link: safeNotificationLink(config, opts?.link, '/v1/profile?tab=extensions'),
+            source: { kind: 'extension', name: extName, id: extName },
         });
-        return true;
+        return r.stored;
     };
 }
 

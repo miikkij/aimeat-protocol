@@ -236,6 +236,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
       title: `${ownerName} requested access to "${entry.name ?? ws}"`,
       body: typeof message === 'string' ? message : '',
       link: '/v1/profile#organisms',
+      i18n: { key: 'workspace_access_request', vars: { who: ownerName, ws: entry.name ?? ws, message: typeof message === 'string' ? message : '' } },
       actions: [
         { id: 'approve', label: 'Approve', kind: 'api', method: 'POST', endpoint: wsDecision, body: { ws, requester: ownerName, decision: 'approve' }, style: 'primary' },
         { id: 'deny', label: 'Deny', kind: 'api', method: 'POST', endpoint: wsDecision, body: { ws, requester: ownerName, decision: 'deny' }, style: 'danger', confirm: true },
@@ -379,6 +380,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
         type: 'workspace_access_approved',
         title: `Your access to "${entry.name ?? ws}" was approved (${role})`,
         link: '/v1/profile#organisms',
+        i18n: { key: 'workspace_access_approved', vars: { ws: entry.name ?? ws, role } },
       });
       emitChange('notifications');
       res.json(success(config.nodeId, { status: 'approved', ws, requester, role }));
@@ -391,6 +393,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
         type: 'workspace_access_denied',
         title: `Your access request to "${entry.name ?? ws}" was declined`,
         link: '/v1/profile#organisms',
+        i18n: { key: 'workspace_access_denied', vars: { ws: entry.name ?? ws } },
       });
       emitChange('notifications');
       res.json(success(config.nodeId, { status: 'denied', ws, requester }));
@@ -413,6 +416,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
     await setWorkspaceRole(`${createdBy}@${config.nodeId}`, id, ws as string, grantee, role, 'grant', req.auth!.owner as string);
     await notify(storage, `${granteeOwnerName}@${config.nodeId}`, {
       type: 'workspace_access_granted', title: `You were added to "${ws}" as ${role}`, link: '/v1/profile#organisms',
+      i18n: { key: 'workspace_access_granted', vars: { ws: String(ws), role } },
     });
     emitChange('notifications');
     res.json(success(config.nodeId, { ws, grantee: granteeOwnerName, role }));

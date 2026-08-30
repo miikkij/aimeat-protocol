@@ -73,6 +73,14 @@
  */
 export const RESERVED_OWNER_KEY_PREFIXES = [
   'openrouter.', 'ai-usage.', 'profile.', 'finance.', 'commerce.', 'chat.', 'signals.',
+  // 2026-08-30: `notifications.settings` is what the owner decided about their own notifications
+  // (services/notification-settings.ts). notify() reads it to drop a muted sender's notification
+  // before it is written, so an app that could write it could silence the security and budget
+  // notifications about itself. The owner's route (PUT /v1/notifications/settings) is the one
+  // legitimate writer. The prefix is broad on purpose: the extension bell list that used to live
+  // under `notifications.<owner>` is gone (2026-08-30), so nothing legitimate writes this prefix
+  // through the memory API any more.
+  'notifications.',
   // `audit.apps.<filename>` is the per-app audit log (services/app-audit.ts): what the owner shows
   // when asked what was in force on a given day. Only the service writes it, server-side; a
   // granted app or a delegated agent must not be able to erase or forge the record of its own

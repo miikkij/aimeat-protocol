@@ -26,6 +26,19 @@ import { provenanceEchoedResult } from '../../ai-provenance-carry.js';
 
 export function registerDmMessagesTools(mcp: McpServer, registry: AgentRegistry): void {
 
+  // The agent tells its own owner something: POST /v1/notifications as the connected principal,
+  // parameter for parameter with the server tool (src/mcp/notify.ts).
+  mcp.tool('aimeat_notify', descriptionFor('aimeat_notify'), {
+    title: z.string().max(200).describe('What happened, in one line; your name is put in front of it.'),
+    body: z.string().max(10_000).optional().describe('The detail, a few lines at most.'),
+    link: z.string().max(500).optional().describe('Where a click leads: a path on this AIMEAT starting with "/".'),
+    type: z.string().max(64).optional().describe('A short machine word for the kind of event.'),
+  }, annotationsFor('aimeat_notify'), async ({ title, body, link, type }) => {
+    const { client } = registry.resolve();
+    const resp = await client.post('/v1/notifications', { title, body, link, type });
+    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
+  });
+
   mcp.tool('aimeat_dm_send', descriptionFor('aimeat_dm_send'), {
     agent_name: agentNameSchema,
     to: z.string().describe('Recipient: owner@node, agent#owner@node, or eco:app#owner@node.'),
