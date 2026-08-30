@@ -3653,6 +3653,7 @@
     "apiContract": "API-sopimus",
     "store": "Kauppa",
     "changelog": "Mitä on julkaistu",
+    "designBook": "Design Book",
     "buildStory": "Näin appi rakentuu",
     "privacy": "Tietosuoja",
     "terms": "Käyttöehdot"
@@ -12126,6 +12127,43 @@
     "noMatch": "Yksikään merkintä ei täsmää.",
     "anchor": "Tämän merkinnän osoite",
     "back": "Takaisin etusivulle →"
+  },
+  "designBook": {
+    "kicker": "Koeteltuja osia, valmiina käyttöön",
+    "title": "Design Book",
+    "position": "Jokainen osa näytetään sellaisena kuin se piirtyy, ei varastomuodossaan.",
+    "lead": "Nämä sommitelmat, ilmeet ja sivut ovat ansainneet paikkansa: jokainen läpäisi penkkinsä ennen kuin pääsi tänne. Selaa silmillä; kun jokin sopii, sen osoite riittää tekoälyllesi rakentamiseen.",
+    "filterLabel": "Näytä vain",
+    "all": "Kaikki",
+    "searchPh": "Etsi kirjasta…",
+    "loading": "Avataan kirjaa…",
+    "none": "Tänne ei ole vielä julkaistu yhtään osaa.",
+    "noMatch": "Yksikään osa ei täsmää.",
+    "openPart": "Avaa tämä osa",
+    "previewOf": "Osan esikatselu",
+    "close": "Sulje",
+    "usage": "Käyttöönottoja:",
+    "adoptLabel": "Näin käytät:",
+    "adoptText": "kerro appiasi rakentavalle tekoälylle, että se ottaa tämän osan Design Bookista osoitteella:",
+    "openFull": "Avaa täysikokoisena →",
+    "growsLabel": "Näin kirja kasvaa:",
+    "growsText": "Kun tekoäly rakentaa jotain säilyttämisen arvoista, se ehdottaa osaa takaisin kirjaan; penkki todistaa sen ja talon ylläpitäjä julkaisee. Se minkä näet on se, mistä seuraava rakennus alkaa.",
+    "kind": {
+      "layout": "Sommitelma",
+      "fill": "Aloitusmuoto",
+      "genre": "Kokonainen sivu",
+      "look": "Ilme",
+      "motion": "Liike",
+      "illustration": "Kuvitus"
+    },
+    "kindSub": {
+      "layout": "Kokonainen näytön sommitelma, otetaan sellaisenaan.",
+      "fill": "Sommitelma, jonka aukot sinun sanasi täyttävät.",
+      "genre": "Kokonainen sivu vahvalla tyylillä; otetaan kotiin kopiona.",
+      "look": "Värit, kirjaimet ja muodot, jotka puetaan jo olevan sommitelman päälle.",
+      "motion": "Miten asiat saapuvat ja liikkuvat; asettuu sen päälle mikä sinulla jo on.",
+      "illustration": "Taidesuunta kuville, joita appi tuottaa."
+    }
   },
   "story": {
     "beat1": "Sano mitä tarvitset",

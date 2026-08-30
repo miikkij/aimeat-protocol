@@ -9,6 +9,8 @@
  * @structure c · kindName · kindSub · HUMAN_TYPES · desk · entryCells · entryRows · crumb · renderPage · openEntry
  * @usage import { renderPage, desk, entryRows, openEntry } from './frame.js';
  * @version-history
+ *   v1.1.0 — 2026-08-30 — A designbook hit opens the Design Book gallery at its part
+ *     (/v1/design-book#id) instead of dead-ending on the apps tab.
  *   v1.0.0 — 2026-08-30 — Initial.
  */
 import { h } from 'preact';
@@ -128,6 +130,13 @@ export function openEntry(ctx, entry) {
   const pkg = id.match(/^packages\/([^/]+)\//);
   if (pkg) { window.open(`/v1/publicknowledgeviewer?id=${encodeURIComponent(pkg[1])}`, '_blank', 'noopener'); return; }
   if (entry.type === 'app' && entry.href) { window.open(entry.href, '_blank', 'noopener'); return; }
-  const HOME_TAB = { capability: 'capabilities', workflow: 'workflows', organism: 'organisms', knowledge: 'knowledge', skill: 'skills', offering: 'offers', material: 'offers', designbook: 'apps', template: 'apps', company: 'companies' };
+  // A Design Book part has a page of its own since 2026-08-30: the gallery renders it, and the
+  // hash opens that part. Before this, the hit dead-ended on the apps tab.
+  if (entry.type === 'designbook') {
+    const m = String(entry.href || '').match(/\/v1\/designbook\/([^/?#]+)/);
+    window.open('/v1/design-book' + (m ? '#' + m[1] : ''), '_blank', 'noopener');
+    return;
+  }
+  const HOME_TAB = { capability: 'capabilities', workflow: 'workflows', organism: 'organisms', knowledge: 'knowledge', skill: 'skills', offering: 'offers', material: 'offers', template: 'apps', company: 'companies' };
   ctx.openTab(HOME_TAB[entry.type] || 'memory');
 }

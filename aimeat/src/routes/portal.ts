@@ -56,6 +56,8 @@
  *     "the duration of your browser session" while it actually rotates and lives up to 90 days, and
  *     the numbers are operator-tunable, so stating them needed the node's own values rather than a
  *     literal in the HTML.
+ *   v1.15.0 — 2026-08-30 — /v1/design-book joins the SPA routes: the Design Book browsable as a
+ *     gallery of rendered parts (wish-designbook-graafinen-selailu).
  */
 import { Router } from 'express';
 import { readFileSync } from 'node:fs';
@@ -525,6 +527,8 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     // The showroom's two companions (2026-08-28): the whole change log, and how an app gets built.
     '/v1/changelog',
     '/v1/how-an-app-builds',
+    // The Design Book, browsable (2026-08-30): every published part shown as it renders.
+    '/v1/design-book',
     // The connect story (2026-08-29): the road from "connect the AI you already use" to the
     // guided path, told before the account exists.
     '/v1/connect-your-ai',

@@ -21,6 +21,9 @@
  * @usage
  *   const result = await runPartBench(storage, config, 'leiska-cover');
  * @version-history
+ *   v1.3.0 — 2026-08-30 — The page builder moved whole to preview.ts (pure extraction:
+ *     DEMO_LAYOUT_FOR_TOKENS, renderableBodyFor, benchPageHtml) so the gallery's preview route
+ *     and this bench render the SAME page — one implementation, per the copied-logic rule.
  *   v1.2.0 — 2026-08-28 — Three production lessons in one: the page loads from the node's own
  *     LOOPBACK (a server often cannot reach its own public hostname from inside, and the first
  *     prod run proved it), readiness is domcontentloaded + settle (a slow remote hero image must
@@ -32,13 +35,13 @@
  *     bench is the field validation at propose time.
  *   v1.0.0 — 2026-08-28 — Initial (TARGET-074, the guarantee bench automated).
  */
-import { getAppTemplates } from '../../data/app-templates.js';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { systemGhiiFor } from '../compliance-register.js';
 import { withHeadlessContext } from '../screenshot-capture.js';
 import { DesignBookService, partKey, type DesignBookPart } from './service.js';
 import { DesignBookError } from './validate.js';
+import { renderableBodyFor, benchPageHtml } from './preview.js';
 
 export const BENCH_VIEWPORTS = [
   { id: '390x844', width: 390, height: 844 },
@@ -71,99 +74,6 @@ interface BenchPage {
   route(m: string, h: (r: { request(): { resourceType(): string }; fulfill(o: unknown): void; continue(): void }) => void): Promise<void>;
   evaluate<T>(fn: string): Promise<T>;
   close(): Promise<void>;
-}
-
-/** A representative arrangement for parts that are seasoning rather than a dish: a look or
- *  motion sheet is benched by rendering THIS demo layout wearing it, so an override that breaks
- *  the render (an enormous display size, a wild tilt) is caught in a real browser, not shipped. */
-const DEMO_LAYOUT_FOR_TOKENS = {
-  v: 1,
-  blocks: [
-    { id: 'top', component: 'hero', props: { title: 'Bench', sub: 'The demo arrangement this sheet is proven on.' } },
-    { id: 'kpis', component: 'statRow', props: { source: 'demo.stats', title: 'Numbers' } },
-    { id: 'rows', component: 'list', props: { source: 'demo.rows', title: 'Rows' } },
-    { id: 'grid', component: 'cardGrid', props: { source: 'demo.cards', title: 'Cards' } },
-    { id: 'hist', component: 'timeline', props: { source: 'demo.events', title: 'History' } },
-  ],
-};
-
-/** What the browser renders for one part: the body itself for an arrangement, the demo
- *  arrangement wearing the sheet for a look/motion part, nothing for an illustration. */
-function renderableBodyFor(part: DesignBookPart): Record<string, unknown> | null {
-  // A genre benches AS THE PAGE IT IS: the template's own HTML, measured at three viewports.
-  if (part.kind === 'genre') {
-    const id = (part.body as { template?: string }).template || '';
-    const t = getAppTemplates().find((x) => x.id === id);
-    return t ? { __page: t.content } : null;
-  }
-  if (part.kind === 'look' || part.kind === 'motion') {
-    const body = part.body as { tokens?: Record<string, string>; look?: string };
-    return { ...DEMO_LAYOUT_FOR_TOKENS, look: body.look ?? 'vivid', tokens: body.tokens ?? {} };
-  }
-  if (part.kind === 'illustration') return null;
-  return part.body;
-}
-
-/** The bench page: the kit, the part, demo rows per component — the gallery preview, inlined. */
-function benchPageHtml(body: Record<string, unknown>): string {
-  // A genre part IS its page — serve it as-is instead of wrapping the demo frame around it.
-  if (typeof body.__page === 'string') return body.__page;
-  const partJson = JSON.stringify(body).replace(/<\//g, '<\\/');
-  return [
-    '<!DOCTYPE html><html lang="en" data-theme="light"><head><meta charset="utf-8">',
-    '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
-    '<link rel="stylesheet" href="/lib/aimeat-atelier.css"></head><body>',
-    '<script src="/v1/libs/aimeat-atelier.js"></scr' + 'ipt>',
-    '<script>',
-    'var BODY = ' + partJson + ';',
-    'function demoFor(component) {',
-    "  if (component === 'statRow') return function () { return [",
-    "    { id: 'a', label: 'This week', value: 12 }, { id: 'b', label: 'Open', value: 4 }, { id: 'c', label: 'Done', value: 8 } ]; };",
-    "  if (component === 'figure') return function () { return { value: 128, label: 'Sample figure', sub: 'A featured number.' }; };",
-    "  if (component === 'chart') return function () { return { labels: ['Jan', 'Feb', 'Mar', 'Apr'], series: [",
-    "    { id: 'in', label: 'Income', kind: 'bar', values: [1200, 1400, 1100, 1600] },",
-    "    { id: 'out', label: 'Costs', kind: 'bar', values: [900, 1000, 1250, 800] },",
-    "    { id: 'cash', label: 'Cash', kind: 'line', values: [300, 700, 550, 1350] } ] }; };",
-    "  if (component === 'matrix') return function () { return {",
-    "    cols: [{ id: 'us', label: 'Us' }, { id: 'a', label: 'Alpha' }, { id: 'b', label: 'Beta' }],",
-    "    rows: [",
-    "      { id: 'r1', label: 'Search', tone: 'ok', badge: 'ahead', cells: [{ col: 'us', tone: 'ok', label: 'live' }, { col: 'a', tone: 'warn', label: 'beta' }, { col: 'b', tone: 'plain' }] },",
-    "      { id: 'r2', label: 'Exports', tone: 'warn', badge: 'parity', cells: [{ col: 'us', tone: 'ok' }, { col: 'a', tone: 'ok' }, { col: 'b', tone: 'ok' }] } ] }; };",
-    "  if (component === 'graph') return function () { return {",
-    "    nodes: [{ id: 'a', label: 'Idea', tone: 'accent' }, { id: 'b', label: 'Risk', tone: 'err' }, { id: 'c', label: 'Decision', tone: 'ok' }],",
-    "    edges: [{ from: 'a', to: 'b', label: 'raises' }, { from: 'b', to: 'c', label: 'settled by' }] }; };",
-    "  if (component === 'waveform') return function () { return {",
-    "    values: [0.1, 0.3, 0.7, 1.0, 0.6, 0.8, 0.4, 0.9, 0.5, 0.2, 0.6, 0.3] }; };",
-    "  if (component === 'reveal') return function () { return [",
-    "    { id: 'r1', title: 'A question people actually ask', sub: 'The short answer', text: 'And the answer, in the words you would use out loud.' },",
-    "    { id: 'r2', title: 'A second one', sub: 'Also short', text: 'Folded until someone wants it.' } ]; };",
-    "  if (component === 'table') return function () { return [",
-    "    { id: 'r1', name: 'First row', when: '2026-08-01' }, { id: 'r2', name: 'Second row', when: '2026-08-14' } ]; };",
-    "  if (component === 'timeline') return function () { return [",
-    "    { id: 't1', ts: '2026-08-27T10:00:00Z', title: 'Something happened', tone: 'ok' } ]; };",
-    '  return function () { return [',
-    "    { id: 'i1', title: 'A sample row', sub: 'What content looks like here.', badge: 'sample' },",
-    "    { id: 'i2', title: 'Another row', sub: 'Titles and lines take this shape.' } ]; };",
-    '}',
-    'var sources = {};',
-    '(BODY.blocks || []).forEach(function (b) {',
-    '  var s = b.props && b.props.source;',
-    '  if (s) sources[s] = demoFor(b.component);',
-    '});',
-    'var frame = document.createElement("div");',
-    'frame.className = "ak-root";',
-    'frame.setAttribute("data-ak-look", BODY.look || "vivid");',
-    'document.body.appendChild(frame);',
-    // A DIALOG SHAPE is benched as what it is: opened as a real modal, so the guarantees are
-    // measured on the surface a person will actually see, not on a flattened copy of it.
-    'if (BODY.dialog) {',
-    '  AIMEAT.atelier.dialog(Object.assign({ title: BODY.dialog.title || "Dialog" }, BODY.dialog,',
-    '    { layout: BODY, sources: sources }));',
-    '} else {',
-    '  AIMEAT.atelier.mosaic({ target: frame, layout: BODY, sources: sources });',
-    '}',
-    '</scr' + 'ipt></body></html>',
-  ].join('\n');
 }
 
 /** The in-page measurements, one string so the lazy page surface needs no function serializer. */

@@ -9,6 +9,9 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=designbook
  * @version-history
+ *   v1.1.0 — 2026-08-30 — The preview route joins the contract: a published part renders as a
+ *     page (kit + body), an illustration as its words, a genre as its template's own document,
+ *     an unknown address as 404.
  *   v1.0.0 — 2026-08-28 — initial.
  */
 import * as ed from '@noble/ed25519';
@@ -215,6 +218,20 @@ const GOOD_BODY = {
         assert(g.body.data.usage === 2, `usage counted both adopts, got ${g.body.data.usage}`);
     });
 
+    await test('the preview renders the part as a page: sessionless, text/html, the kit and the body in it', async () => {
+        const res = await fetch(`${BASE}/v1/designbook/${partId}/preview`);
+        assert(res.status === 200, `preview is 200, got ${res.status}`);
+        assert((res.headers.get('content-type') ?? '').includes('text/html'), 'preview answers text/html');
+        const page = await res.text();
+        assert(page.includes('aimeat-atelier'), 'the page loads the kit');
+        assert(page.includes('"component":"hero"'), 'the page carries the part\'s own blocks');
+    });
+
+    await test('a preview of nothing is a 404 with the Book\'s words', async () => {
+        const r = await json('/v1/designbook/no-such-part-ever/preview');
+        assert(r.status === 404, `unknown id is 404, got ${r.status}`);
+    });
+
     await test('adopting into an app you do not own → the app-ui 404 in the Book\'s answer', async () => {
         const r = await json(`/v1/designbook/${partId}/adopt`, {
             method: 'POST', headers: auth(other.token), body: JSON.stringify({ filename: opApp }),
@@ -376,6 +393,14 @@ const GOOD_BODY = {
             `an illustration bench answers with words, got ${JSON.stringify(bench.body.data)}`);
     });
 
+    await test('an illustration previews as its words: the style sentence and the palette, set as a page', async () => {
+        const res = await fetch(`${BASE}/v1/designbook/illus-e2e-wash/preview`);
+        assert(res.status === 200, `illustration preview is 200, got ${res.status}`);
+        const page = await res.text();
+        assert(page.includes('soft watercolour wash, grainy paper, no text'), 'the style sentence is on the page');
+        assert(page.includes('moss') && page.includes('rust'), 'the palette words are on the page');
+    });
+
     await test('seasoning with no dish refuses: adopting a look into an app with no stored arrangement → 409', async () => {
         const bare = 'db-bare.html';
         const pub = await json('/v1/apps', {
@@ -407,6 +432,12 @@ const GOOD_BODY = {
         assert(adopt.status === 409 && /forked, not adopted/.test(adopt.body.error.message)
             && /app-templates\/genre-departures/.test(adopt.body.error.message),
             `adopt refuses a genre with the fork address: ${JSON.stringify(adopt.body)}`);
+
+        // A genre previews as the page it IS: the template's own document, not the demo frame.
+        const prev = await fetch(`${BASE}/v1/designbook/genre-test-departures/preview`);
+        assert(prev.status === 200, `genre preview is 200, got ${prev.status}`);
+        const page = await prev.text();
+        assert(/<!DOCTYPE html>/i.test(page) && !page.includes('demoFor('), 'a genre serves its template page, not the demo frame');
     });
 
     await test('the operator retires it, and a retired address stays retired', async () => {

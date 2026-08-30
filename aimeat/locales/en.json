@@ -3665,6 +3665,7 @@
     "apiContract": "API contract",
     "store": "Store",
     "changelog": "What shipped",
+    "designBook": "The Design Book",
     "buildStory": "How an app gets built",
     "privacy": "Privacy",
     "terms": "Terms"
@@ -12138,6 +12139,43 @@
     "noMatch": "No entry matches.",
     "anchor": "The address of this entry",
     "back": "Back to the front page →"
+  },
+  "designBook": {
+    "kicker": "Proven parts, ready to take",
+    "title": "The Design Book",
+    "position": "Every part shown as it renders, not as it is stored.",
+    "lead": "These are the arrangements, looks and pages that earned their place: each one passed its bench before landing here. Browse them by eye; when one fits, its address is all your AI needs to build with it.",
+    "filterLabel": "Show only",
+    "all": "All",
+    "searchPh": "Search the Book…",
+    "loading": "Opening the Book…",
+    "none": "No part has been published here yet.",
+    "noMatch": "No part matches.",
+    "openPart": "Open this part",
+    "previewOf": "Preview of this part",
+    "close": "Close",
+    "usage": "In use in builds:",
+    "adoptLabel": "To use it:",
+    "adoptText": "tell the AI that builds your app to take this part from the Design Book by its address:",
+    "openFull": "Open the render full size →",
+    "growsLabel": "How the Book grows:",
+    "growsText": "When an AI builds something worth keeping here, it proposes the part back; the bench proves it and whoever runs this place publishes it. What you see is what the next build starts from.",
+    "kind": {
+      "layout": "Arrangement",
+      "fill": "Starting shape",
+      "genre": "Whole page",
+      "look": "Look",
+      "motion": "Motion",
+      "illustration": "Imagery"
+    },
+    "kindSub": {
+      "layout": "A complete screen arrangement, adopted as-is.",
+      "fill": "An arrangement with slots your words fill.",
+      "genre": "A complete page in a strong style, taken home as a copy.",
+      "look": "Colours, type and shapes that dress an arrangement you already have.",
+      "motion": "How things enter and move, laid over what you already have.",
+      "illustration": "Art direction for the pictures an app generates."
+    }
   },
   "story": {
     "beat1": "Say what you need",
