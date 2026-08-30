@@ -20,6 +20,10 @@
  *   deterministically — otherwise every timing assertion here would be a race.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-jobs.ts
  * @version-history
+ *   v1.1.0 — 2026-08-31 — Case 16: the two AI doors are asked whether they ADMIT THE SAME PEOPLE.
+ *     They did not — one stated its word as requireScope middleware, which accepts the domain
+ *     wildcard, and the other asks assertAiUseAllowed, which does not — so an `ai:*` agent could
+ *     spend the owner's provider key through the new door and not the old one.
  *   v1.0.0 — 2026-08-31 — Initial.
  */
 import * as ed from '@noble/ed25519';
@@ -190,6 +194,25 @@ async function setupOwner(label: string): Promise<Owner> {
     });
     assert(tok.status === 200 && tok.body?.data?.token, `auth/token ${tok.status}: ${JSON.stringify(tok.body)}`);
     return { name, gaii: `${name}@${NODE_ID}`, token: tok.body.data.token as string };
+}
+
+/** Device-authorise an agent for an owner with an explicit scope set, and return its token. */
+async function connectAgent(owner: Owner, agentName: string, scopes: string[]): Promise<string> {
+    const da = await json('/v1/agents/device-authorize', {
+        method: 'POST', body: JSON.stringify({ agent_name: agentName, owner: owner.name }),
+    });
+    assert(da.status === 200, `device-authorize ${da.status}: ${JSON.stringify(da.body)}`);
+    const v = await json('/v1/agents/verify', {
+        method: 'POST',
+        body: JSON.stringify({ user_code: da.body.data.user_code, action: 'approve', scopes, owner_token: owner.token }),
+    });
+    assert(v.status === 200, `verify ${v.status}: ${JSON.stringify(v.body.error ?? v.body)}`);
+    const t = await json('/v1/agents/device-token', {
+        method: 'POST',
+        body: JSON.stringify({ device_code: da.body.data.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }),
+    });
+    assert(t.status === 200, `device-token ${t.status}: ${JSON.stringify(t.body)}`);
+    return t.body.token as string;
 }
 
 /** Point an owner at the local stub, with a budget big enough that nothing here hits it. */
@@ -563,6 +586,65 @@ const SCRIPT_THROW = `export default async function(ctx, input) {
         const after = await waitForState(a, id, ['failed', 'done', 'cancelled'], 20_000);
         assert(after.state === 'failed', `expected failed, got ${after.state}`);
         assert(after.error?.code === 'node_restarted', `code ${after.error?.code}`);
+    });
+
+
+    // ── 16. The two AI doors admit the same principals ──
+    // The money is the same money — the owner's own provider key, their daily budget, their per-app
+    // quota — so the word that opens one door has to be the word that opens the other. It was not:
+    // these routes stated `ai:use` as requireScope middleware, which asks scopeIsCovered and so
+    // accepts the DOMAIN wildcard `ai:*`, while /v1/ai/complete asks assertAiUseAllowed, which
+    // accepts the exact word or the global `*` and nothing else. An agent holding `ai:*` could spend
+    // through the new door and not the old one. This case does not name a status of its own on
+    // purpose: it asks the two doors whether they agree, so it keeps holding whichever way that
+    // shared answer is later decided to go.
+    await test('16. An `ai:*` agent gets the same answer from POST /v1/ai/jobs as from POST /v1/ai/complete', async () => {
+        const token = await connectAgent(a, `aijobwild${Date.now()}`, ['ai:*']);
+        const complete = await json('/v1/ai/complete', {
+            method: 'POST', headers: auth(token),
+            body: JSON.stringify({ prompt: 'wildcard probe', app_id: 'e2e-ai-jobs' }),
+        });
+        const jobs = await json('/v1/ai/jobs', {
+            method: 'POST', headers: auth(token),
+            body: JSON.stringify({ prompt: 'wildcard probe', result_key: 'aijob.wildcard' }),
+        });
+        assert(jobs.status === complete.status,
+            `the two doors disagree: /v1/ai/complete ${complete.status}, /v1/ai/jobs ${jobs.status}`);
+        assert(complete.status === 403, `and the shared answer is a refusal, got ${complete.status}`);
+        const wrote = await readMemory(a, 'aijob.wildcard');
+        assert(wrote.status === 404, 'a refused start writes nothing');
+    });
+
+    // The other half of the same question, so a fix cannot be "refuse everybody". An agent holding
+    // the exact word must still get IN at both doors, and then meet the same wall behind them: both
+    // resolve the identity that pays through resolveIdentity, so an agent with no provider settings
+    // of its own is refused for the key and not for the permission. The synchronous door says so in
+    // its response and the asynchronous one says so on the job, which is the whole difference
+    // between them — a start is accepted before the work begins.
+    await test('16b. An agent holding the exact `ai:use` gets IN at both, and hits the same wall behind them', async () => {
+        const token = await connectAgent(a, `aijobexact${Date.now()}`, ['ai:use']);
+        const complete = await json('/v1/ai/complete', {
+            method: 'POST', headers: auth(token),
+            body: JSON.stringify({ prompt: 'exact probe', app_id: 'e2e-ai-jobs' }),
+        });
+        assert(complete.status !== 403, `the gate must admit an exact ai:use agent, got ${complete.status}`);
+        assert(complete.body?.error?.code === 'NO_API_KEY', `refused for the key, not the permission: ${JSON.stringify(complete.body?.error)}`);
+
+        const jobs = await json('/v1/ai/jobs', {
+            method: 'POST', headers: auth(token),
+            body: JSON.stringify({ prompt: 'exact probe', result_key: 'aijob.exact' }),
+        });
+        assert(jobs.status === 202, `the gate must admit it here too, got ${jobs.status}: ${JSON.stringify(jobs.body?.error)}`);
+
+        const end = await json(`/v1/ai/jobs/${jobs.body.data.job_id}`, { headers: auth(token) });
+        assert(end.status === 200, `the agent can read its own job: ${end.status}`);
+        for (let i = 0; i < 100 && end.body.data.state !== 'failed'; i++) {
+            await sleep(120);
+            const again = await json(`/v1/ai/jobs/${jobs.body.data.job_id}`, { headers: auth(token) });
+            end.body = again.body;
+        }
+        assert(end.body.data.state === 'failed', `the job ends failed, got ${end.body.data.state}`);
+        assert(end.body.data.error?.code === 'NO_API_KEY', `for the same reason the other door gave: ${JSON.stringify(end.body.data.error)}`);
     });
 
     // ── cleanup ──
