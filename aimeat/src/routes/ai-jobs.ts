@@ -15,12 +15,19 @@
  *   implementation, and the same defect has already been fixed three separate times inside one MCP
  *   tool because two surfaces each had their own.
  *
- *   ALL FOUR TAKE `ai:use`, INCLUDING THE READS. It admits exactly who the AI route's own gate
- *   admits — an owner session, or a token carrying the word (requireScope's owner branch and
- *   assertAiUseAllowed's are the same branch, and `ai:use` is not one of the scopes a wildcard
- *   cannot carry) — and it is stated as MIDDLEWARE rather than as a call inside the handler so the
- *   route-authorization gate can see it. A check a gate cannot see is a check the next person can
- *   delete without anything going red.
+ *   ALL FOUR ASK `assertAiUseAllowed`, WHICH IS THE SAME GATE `/v1/ai/complete` ASKS. It is the same
+ *   money — the owner's own provider key, their daily budget, their per-app quota — so it has to be
+ *   the same door, and "the same word" is not enough: these four stated `ai:use` as `requireScope`
+ *   middleware for one commit, and that admits MORE people. `requireScope` asks
+ *   `scopeIsCovered` (utils/scope-coverage.ts:185), which honours the domain wildcard, so an agent
+ *   holding `ai:*` walked through here; `assertAiUseAllowed` (auth/ai-gate.ts:31-32) reads the exact
+ *   string or the global `*` and nothing else, so the same agent is refused at /v1/ai/complete. One
+ *   spend gate admitting two different sets is invariant 15 in the flesh, and the fix is to ask the
+ *   one function rather than to restate its rule.
+ *
+ *   `check:route-scopes` cannot see a call inside a handler, so the four routes carry an entry in
+ *   security/route-scope-exemptions.json naming this gate — exactly as /v1/ai/complete,
+ *   /v1/ai/transcribe and /v1/ai/available already do.
  *
  *   WHOSE JOB IS WHOSE. Every read resolves under `resolveIdentity(req.auth!, config.nodeId)` and
  *   never a client-supplied id, so a stranger asking after somebody else's job simply finds nothing.
@@ -29,13 +36,19 @@
  * @structure aiJobsRouter(config, storage, service)
  * @usage app.use(aiJobsRouter(config, storage, aiJobService));
  * @version-history
+ *   v1.1.0 — 2026-08-31 — The four doors ask assertAiUseAllowed instead of stating `ai:use` as
+ *     requireScope middleware. The two are NOT the same test: requireScope honours the domain
+ *     wildcard, so an `ai:*` agent could spend the owner's provider key here and not at
+ *     /v1/ai/complete. Same money, same gate — and the gate is the shared function, not a second
+ *     statement of its rule.
  *   v1.0.0 — 2026-08-31 — Initial.
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireScope } from '../auth/middleware.js';
+import { requireAuth } from '../auth/middleware.js';
+import { assertAiUseAllowed } from '../auth/ai-gate.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
@@ -60,8 +73,9 @@ export function aiJobsRouter(config: AimeatConfig, storage: Storage, service: Ai
 
     // ── POST /v1/ai/jobs ──
     router.post('/v1/ai/jobs',
-        requireAuth(), requireScope('ai:use'), aiRateLimit,
+        requireAuth(), aiRateLimit,
         async (req: Request, res: Response) => {
+            if (!assertAiUseAllowed(req, res, config.nodeId)) return;
             const body = req.body as {
                 prompt?: string; prompt_key?: string; input_keys?: string[];
                 result_key?: string; result_visibility?: 'private' | 'owner' | 'public';
@@ -113,8 +127,9 @@ export function aiJobsRouter(config: AimeatConfig, storage: Storage, service: Ai
 
     // ── GET /v1/ai/jobs ──
     router.get('/v1/ai/jobs',
-        requireAuth(), requireScope('ai:use'),
+        requireAuth(),
         async (req: Request, res: Response) => {
+            if (!assertAiUseAllowed(req, res, config.nodeId)) return;
             const stateParam = typeof req.query.state === 'string' ? req.query.state : undefined;
             const allowed = ['queued', 'running', 'done', 'failed', 'cancelled', 'live', 'all'];
             if (stateParam && !allowed.includes(stateParam)) {
@@ -136,8 +151,9 @@ export function aiJobsRouter(config: AimeatConfig, storage: Storage, service: Ai
 
     // ── GET /v1/ai/jobs/:id ──
     router.get('/v1/ai/jobs/:id',
-        requireAuth(), requireScope('ai:use'),
+        requireAuth(),
         async (req: Request, res: Response) => {
+            if (!assertAiUseAllowed(req, res, config.nodeId)) return;
             try {
                 const job = await service.getJob(resolve(req), req.params.id as string);
                 // 404 and not 403 on another owner's id: see the file header.
@@ -150,8 +166,9 @@ export function aiJobsRouter(config: AimeatConfig, storage: Storage, service: Ai
 
     // ── POST /v1/ai/jobs/:id/cancel ──
     router.post('/v1/ai/jobs/:id/cancel',
-        requireAuth(), requireScope('ai:use'),
+        requireAuth(),
         async (req: Request, res: Response) => {
+            if (!assertAiUseAllowed(req, res, config.nodeId)) return;
             try {
                 const job = await service.cancelJob(resolve(req), req.params.id as string);
                 return res.json(success(config.nodeId, job));
