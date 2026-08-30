@@ -32,6 +32,10 @@ export const NOTIF_GROUPS: NotifGroup[] = ['organisms', 'messages', 'workflows',
 
 export interface SenderPrefs { push?: boolean; muted?: boolean }
 export interface QuietHours { start: string; end: string; tz: string; breakthrough: NotifGroup[] }
+/** The emails the node sends to the owner's own address that are theirs to switch off. The security
+ *  mails (a code, a login link, a password reset) always go. `nudge` undefined means "never decided
+ *  here", and the inactivity nudge then falls back to the switch it read before this record existed. */
+export interface EmailPrefs { workflowEnd: boolean; nudge?: boolean }
 export interface NotificationSettings {
   /** The node's own notifications, by group. */
   groups: Partial<Record<NotifGroup, SenderPrefs>>;
@@ -41,11 +45,39 @@ export interface NotificationSettings {
   /** One push per sender per this many minutes; the rest are summarised. 0 = every push at once. */
   throttleMinutes: number;
   emailDigest: { enabled: boolean; afterHours: number };
+  email: EmailPrefs;
   lastDigestAt: string | null;
 }
 
 export function defaultSettings(): NotificationSettings {
-  return { groups: {}, senders: {}, quiet: null, throttleMinutes: 10, emailDigest: { enabled: false, afterHours: 8 }, lastDigestAt: null };
+  return { groups: {}, senders: {}, quiet: null, throttleMinutes: 10, emailDigest: { enabled: false, afterHours: 8 }, email: { workflowEnd: true }, lastDigestAt: null };
+}
+
+/** The last emails the node sent to the owner's own address: what and when, never the content. */
+export const MAIL_LOG_KEY = 'notifications.mail-log';
+export type MailLogKind = 'verification' | 'password_reset' | 'username' | 'magic_link' | 'workflow_end' | 'digest' | 'nudge' | 'invitation';
+export interface MailLogEntry { kind: MailLogKind; subject: string; at: string }
+const MAIL_LOG_MAX = 50;
+
+export async function readMailLog(storage: Storage, ownerGhii: string): Promise<MailLogEntry[]> {
+  try {
+    const rec = await storage.getMemory(ownerGhii, MAIL_LOG_KEY);
+    return Array.isArray(rec?.value) ? (rec!.value as MailLogEntry[]).filter(e => e && typeof e.kind === 'string' && typeof e.at === 'string') : [];
+  } catch (err) { logger.warn('notification-settings: mail log read failed', { error: String(err) }); return []; }
+}
+
+/** Best-effort: a failure to log never fails the send it describes. */
+export async function appendMailLog(storage: Storage, ownerGhii: string, entry: { kind: MailLogKind; subject: string }): Promise<void> {
+  try {
+    const existing = await storage.getMemory(ownerGhii, MAIL_LOG_KEY);
+    const list = Array.isArray(existing?.value) ? (existing!.value as MailLogEntry[]) : [];
+    const now = new Date().toISOString();
+    const next = [{ kind: entry.kind, subject: entry.subject.slice(0, 200), at: now }, ...list].slice(0, MAIL_LOG_MAX);
+    await storage.setMemory({
+      key: MAIL_LOG_KEY, ownerGaii: ownerGhii, value: next, visibility: 'private', tags: ['notifications'],
+      ttlHours: null, version: (existing?.version || 0) + 1, createdAt: existing?.createdAt || now, updatedAt: now,
+    });
+  } catch (err) { logger.warn('notification-settings: mail log append failed', { error: String(err) }); }
 }
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -80,8 +112,10 @@ export function normalizeSettings(raw: unknown): NotificationSettings {
     enabled: e.enabled === true,
     afterHours: typeof e.afterHours === 'number' && Number.isFinite(e.afterHours) ? Math.min(168, Math.max(1, Math.round(e.afterHours))) : d.emailDigest.afterHours,
   };
+  const em = (o.email && typeof o.email === 'object' ? o.email : {}) as Record<string, unknown>;
+  const email: EmailPrefs = { workflowEnd: em.workflowEnd !== false, ...(typeof em.nudge === 'boolean' ? { nudge: em.nudge } : {}) };
   const lastDigestAt = typeof o.lastDigestAt === 'string' ? o.lastDigestAt : null;
-  return { groups, senders, quiet, throttleMinutes, emailDigest, lastDigestAt };
+  return { groups, senders, quiet, throttleMinutes, emailDigest, email, lastDigestAt };
 }
 
 function validTz(tz: string): boolean {

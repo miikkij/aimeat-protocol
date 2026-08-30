@@ -30,6 +30,7 @@ import { hashPassword, verifyPassword } from '../../services/password.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { isValidEmail } from '../../utils/email-validator.js';
 import { logger } from '../../utils/logger.js';
+import { appendMailLog } from '../../services/notification-settings.js';
 import { validatePasswordStrength } from '../../utils/password-validation.js';
 import { promoteContactsForVerifiedEmail } from '../../services/contacts.js';
 
@@ -108,7 +109,8 @@ export function registerRecoveryRoutes(
         // Send verification email if service is available
         if (emailService?.enabled) {
             const locale = ghiiRecord.locale;
-            await emailService.sendVerificationCode(normalizedEmail, code, locale);
+            const sent = await emailService.sendVerificationCode(normalizedEmail, code, locale);
+            if (sent) await appendMailLog(storage, ghiiRecord.ghii, { kind: 'verification', subject: 'verification code' });
         }
 
         res.json(success(config.nodeId, {
@@ -234,6 +236,7 @@ export function registerRecoveryRoutes(
 
             const sent = await emailService.sendVerificationCode(ghiiRecord.notificationEmail, code, ghiiRecord.locale);
             if (sent) {
+                await appendMailLog(storage, ghiiRecord.ghii, { kind: 'password_reset', subject: 'password reset code' });
                 logger.info('Password reset code sent successfully');
             } else {
                 logger.warn('Password reset code email failed to send');
@@ -386,7 +389,8 @@ export function registerRecoveryRoutes(
                 const body = locale === 'fi'
                     ? `Käyttäjätunnuksesi on: ${ghiiRecord.username}\n\nJos et pyytänyt tätä, voit ohittaa tämän viestin.`
                     : `Your username is: ${ghiiRecord.username}\n\nIf you did not request this, you can safely ignore this email.`;
-                await emailService.sendNotification(ghiiRecord.notificationEmail, subject, body);
+                const sent = await emailService.sendNotification(ghiiRecord.notificationEmail, subject, body);
+                if (sent) await appendMailLog(storage, ghiiRecord.ghii, { kind: 'username', subject });
             }
         }
 

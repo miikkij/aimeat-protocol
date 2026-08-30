@@ -284,5 +284,33 @@ await test('20. Devices: the owner\'s push subscriptions list is theirs and empt
     assert(denied.status === 403, `push:manage is needed: ${denied.status}`);
 });
 
+
+// -- The Email page in the poster face (2026-08-30): the emails that are the owner's to switch off,
+//    the mail log, the chat prompt --
+
+await test('21. Settings carry the email choices: workflowEnd defaults on, nudge stays undecided until decided', async () => {
+    const d = await json('/v1/notifications/settings', { headers: auth(A.token) });
+    assert(d.status === 200 && d.body.data.settings.email.workflowEnd === true && d.body.data.settings.email.nudge === undefined, `defaults: ${JSON.stringify(d.body.data.settings.email)}`);
+    const put = await json('/v1/notifications/settings', { method: 'PUT', headers: auth(A.token), body: JSON.stringify({ settings: { email: { workflowEnd: false, nudge: true, bogus: 1 } } }) });
+    assert(put.status === 200, `put ${put.status}`);
+    const e = put.body.data.settings.email;
+    assert(e.workflowEnd === false && e.nudge === true && e.bogus === undefined, `kept and cleaned: ${JSON.stringify(e)}`);
+    const back = await json('/v1/notifications/settings', { method: 'PUT', headers: auth(A.token), body: JSON.stringify({ settings: { email: { workflowEnd: true } } }) });
+    assert(back.body.data.settings.email.nudge === undefined, 'nudge undecided again when left out');
+});
+
+await test('22. The mail log is the owner\'s own, empty on a node that sends no mail; an agent gets nothing', async () => {
+    const r = await json('/v1/notifications/mail', { headers: auth(A.token) });
+    assert(r.status === 200 && Array.isArray(r.body.data.entries) && r.body.data.total === r.body.data.entries.length, `mail log: ${r.status} ${JSON.stringify(r.body.data)}`);
+    const anon = await json('/v1/auth/anonymous', { method: 'POST', body: '{}' });
+    const denied = await json('/v1/notifications/mail', { headers: auth(anon.body.data.token) });
+    assert(denied.status === 403 || denied.status === 401, `owner only: ${denied.status}`);
+});
+
+await test('23. The email chat prompt is served with the owner\'s name', async () => {
+    const r = await json('/v1/templates/email-mcp', { headers: auth(A.token) });
+    assert(r.status === 200 && r.body.data.prompt.includes(A.name) && r.body.data.prompt.includes('aimeat_mail_send'), `template ${r.status}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed\n`);
 if (failed > 0) process.exit(1);

@@ -27632,8 +27632,29 @@ paths:
                         breakthrough: { type: array, items: { type: string, enum: [organisms, messages, workflows, apps, account, other] } }
                     throttleMinutes: { type: integer, minimum: 0, maximum: 120 }
                     emailDigest: { type: object, properties: { enabled: { type: boolean }, afterHours: { type: integer, minimum: 1, maximum: 168 } } }
+                    email:
+                      type: object
+                      description: The emails the node sends to the owner's own address that are theirs to switch off; a code, a login link and a password reset always go.
+                      properties:
+                        workflowEnd: { type: boolean, description: The email when a workflow run ends (default true). }
+                        nudge: { type: boolean, description: The reminder after two quiet weeks. Absent means undecided here, and the old settings.email_notifications switch answers. }
       responses:
         '200': { description: "{ settings }" }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: Not an owner session }
+
+  /v1/notifications/mail:
+    get:
+      operationId: listOwnerMailLog
+      summary: The last emails the node sent to the owner's own address
+      description: >-
+        What kind and when (verification, password_reset, username, magic_link, workflow_end,
+        digest, nudge), never the content; the newest first, at most fifty. Written by the sites
+        that address the owner. Owner only.
+      tags: [Notifications]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: "{ entries: [{ kind, subject, at }], total }" }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { description: Not an owner session }
 
@@ -31780,6 +31801,20 @@ paths:
       summary: The prompt for designing a workflow in a chat that has no MCP
       description: The owner's agents and their workflow-compatible offers are written into the prompt; the chat answers with one JSON block the person pastes back on the Workflows page.
       tags: [Workflows]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/templates/email-mcp:
+    get:
+      operationId: getEmailMcpPrompt
+      summary: The prompt for reading and sending mail from a chat connected over MCP
+      description: Search and read the owner's connected mailbox, send to a saved contact from their own address or the node's sender, with the rules the Email page follows; the caller's name and node are substituted in.
+      tags: [Notifications]
       security:
         - BearerAuth: []
       responses:

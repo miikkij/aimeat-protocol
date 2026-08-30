@@ -29,6 +29,7 @@ import type { PushService } from '../push.js';
 import type { EmailService } from '../email.js';
 import { buildGAII } from '../../utils/gaii.js';
 import { notify } from '../notify.js';
+import { readNotificationSettings, appendMailLog } from '../notification-settings.js';
 import { logger } from '../../utils/logger.js';
 import { globToRegExp } from './signal-eval.js';
 import { collectSignalKeys, runKey, type ResolvedStep } from './store.js';
@@ -716,12 +717,15 @@ export async function onRunFinished(deps: StepDeps, ownerGhii: string, run: Work
     },
   });
 
-  // 2. Email — only when configured AND the owner set a notification email.
+  // 2. Email — only when configured, the owner set a notification email, and they have not
+  //    switched the workflow email off on the Email page (notification-settings.ts, email.workflowEnd).
   try {
     if (deps.emailService?.enabled) {
       const ghii = await deps.storage.getGHII(ownerGhii);
-      if (ghii?.notificationEmail) {
-        await deps.emailService.sendNotification(ghii.notificationEmail, title, body);
+      const prefs = await readNotificationSettings(deps.storage, ownerGhii);
+      if (ghii?.notificationEmail && prefs.email.workflowEnd) {
+        const sent = await deps.emailService.sendNotification(ghii.notificationEmail, title, body);
+        if (sent) await appendMailLog(deps.storage, ownerGhii, { kind: 'workflow_end', subject: title });
       }
     }
   } catch (err) {

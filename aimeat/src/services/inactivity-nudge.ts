@@ -37,6 +37,7 @@ import type { Storage } from '../storage/interface.js';
 import type { GHIIRecord } from '../storage/types/identity.js';
 import { getActiveEmailService } from './email.js';
 import { outboundEmailHtml } from './email-templates.js';
+import { readNotificationSettings, appendMailLog } from './notification-settings.js';
 import { ONBOARDING_KEYS } from './onboarding-funnel.js';
 import { buildWelcomeMatPrompt } from './welcome-mat-prompt.js';
 import { logger } from '../utils/logger.js';
@@ -114,6 +115,10 @@ export async function mayEmailOwner(
     storage: Storage, ghii: string, defaultWhenAbsent = false,
 ): Promise<boolean> {
     try {
+        // The Email page (2026-08-30) writes the decision into notifications.settings; an owner who
+        // decided there is answered from there. One who never did falls through to the old switch.
+        const settings = await readNotificationSettings(storage, ghii);
+        if (typeof settings.email.nudge === 'boolean') return settings.email.nudge;
         const rec = await storage.getMemory(ghii, 'settings.email_notifications');
         if (!rec) return defaultWhenAbsent;
         const v = rec.value as { enabled?: boolean } | boolean | undefined;
@@ -234,7 +239,12 @@ export async function runInactivityNudgeJob(
             createdAt: marker?.createdAt ?? at,
             updatedAt: at,
         });
-        if (ok) sent++;
+        if (ok) {
+            sent++;
+            // After the marker, on purpose: the marker is the record the cooldown reads, and the
+            // owner's mail log (the Email page's "last email from here") is the second write.
+            await appendMailLog(storage, g.ghii, { kind: 'nudge', subject: c.subject });
+        }
     }
 
     // Core job successes are not written to the execution log — only errors are. Without this line

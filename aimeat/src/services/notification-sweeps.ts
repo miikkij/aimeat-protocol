@@ -18,7 +18,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { PushService } from './push.js';
 import { NOTIF_PREFIX, notifLinkToUrl } from './notify.js';
-import { NOTIF_SETTINGS_KEY, normalizeSettings, quietJustEnded, writeNotificationSettings, type NotificationSettings } from './notification-settings.js';
+import { NOTIF_SETTINGS_KEY, normalizeSettings, quietJustEnded, writeNotificationSettings, appendMailLog, type NotificationSettings } from './notification-settings.js';
 import { getActiveEmailService } from './email.js';
 import { notificationDigestEmail } from './email-templates-digest.js';
 import { logger } from '../utils/logger.js';
@@ -103,6 +103,7 @@ export async function sweepNotificationDigests(storage: Storage, config: AimeatC
       if (ok) {
         sent++;
         await writeNotificationSettings(storage, ghii, { ...settings, lastDigestAt: new Date(now).toISOString() });
+        await appendMailLog(storage, ghii, { kind: 'digest', subject });
       }
     } catch (err) { logger.warn('notification sweep: digest is best-effort', { ghii, error: String(err) }); }
   }

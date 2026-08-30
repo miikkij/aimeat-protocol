@@ -38,7 +38,7 @@ import { NOTIF_PREFIX, type NotifAction } from '../services/notify.js';
 import { emitChange } from '../services/event-bus.js';
 import { createPrincipalNotification, NotificationCreateError } from '../services/notification-create.js';
 import {
-  readNotificationSettings, writeNotificationSettings, normalizeSettings, sourceOf, groupOfType, senderKey, prefsFor,
+  readNotificationSettings, writeNotificationSettings, normalizeSettings, sourceOf, groupOfType, senderKey, prefsFor, readMailLog,
   NOTIF_GROUPS, type NotifSource,
 } from '../services/notification-settings.js';
 import { listOwnerNotifications } from '../services/notification-sweeps.js';
@@ -93,6 +93,14 @@ export function notificationsRouter(config: AimeatConfig, storage: Storage): Rou
     const saved = await writeNotificationSettings(storage, ownerGhii(req), { ...incoming, lastDigestAt: current.lastDigestAt });
     emitChange('notifications', ownerGhii(req));
     res.json(success(config.nodeId, { settings: saved }));
+  });
+
+  /* ── GET /v1/notifications/mail — the last emails the node sent to the owner's own address: what
+   * kind and when, never the content. Written by the sites that address the owner (a code, a login
+   * link, a reset, the workflow email, the digest, the nudge). ── */
+  router.get('/v1/notifications/mail', requireAuth(), requireRole('owner'), async (req, res) => {
+    const entries = await readMailLog(storage, ownerGhii(req));
+    res.json(success(config.nodeId, { entries, total: entries.length }));
   });
 
   /* ── GET /v1/notifications/senders — who may notify this owner, with what each did in 30 days:
