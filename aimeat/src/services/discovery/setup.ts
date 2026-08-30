@@ -9,6 +9,9 @@
  * @structure buildDiscoveryRegistry(storage, config) → DiscoveryRegistry (memory + capabilities + apps + agent-tasks)
  * @usage const registry = buildDiscoveryRegistry(storage, config);
  * @version-history
+ *   v0.4.0 — 2026-08-31 — Register the `app-tools` source: an app's published tools, one entry per
+ *     tool. Their manifests were already reaching the directory through the memory source as
+ *     untyped records, so this is a correction as much as an addition.
  *   v0.3.0 — 2026-07-19 — AppDev KB Phase 6: the `templates` source now actually EXISTS and is
  *     registered here (agent-proposed app templates at template.catalog.*). The v0.2.0 line below
  *     was aspirational — no templates-source file or writer existed until now.
@@ -22,6 +25,7 @@ import { createMemorySource } from './sources/memory-source.js';
 import { createCapabilitiesSource, createAppsSource, createAgentTasksSource } from './sources/table-sources.js';
 import { createTemplatesSource } from './sources/templates-source.js';
 import { createDesignbookSource } from './sources/designbook-source.js';
+import { createAppToolsSource } from './sources/app-tools-source.js';
 
 export function buildDiscoveryRegistry(storage: Storage, config: AimeatConfig): DiscoveryRegistry {
   const registry = createRegistry();
@@ -31,5 +35,6 @@ export function buildDiscoveryRegistry(storage: Storage, config: AimeatConfig): 
   registry.register(createAgentTasksSource(storage, config));    // agent_tasks table
   registry.register(createTemplatesSource(storage, config));     // agent-proposed app templates (template.catalog.*)
   registry.register(createDesignbookSource(storage, config));    // Design Book parts (atelier.book.part.*)
+  registry.register(createAppToolsSource(storage, config));      // published app tools (apps.*.tools), one entry per TOOL
   return registry;
 }

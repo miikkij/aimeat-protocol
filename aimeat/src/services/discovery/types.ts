@@ -15,6 +15,11 @@
  * @usage
  *   import type { DiscoverySource, DiscoveryEntry } from '../discovery/types.js';
  * @version-history
+ *   v0.4.0 — 2026-08-31 — +'tool' (an app's published tool, apps.{appId}.tools). Until now the one
+ *     directory that answers "what exists here that I can use?" had no word for the callable thing,
+ *     while the manifest itself was already reaching the directory as an untyped 'memory' record.
+ *     Four lists carry this vocabulary and all four have to learn the word: this union, VALID_TYPES
+ *     in routes/discover.ts, VALID_DISCOVER_TYPES in mcp/core.ts, and the openapi description.
  *   v0.3.0 — 2026-08-30 — +`place` on an entry (the organism and workspace a record lives in, by name),
  *     +`places` facet, +`organism` filter. For the Discover page in the poster face, whose rows say
  *     where a thing is and whose cover lists the places.
@@ -37,6 +42,7 @@ export type DiscoveryType =
   | 'document'
   | 'organism'
   | 'app'
+  | 'tool'
   | 'template'
   | 'skill'
   | 'designbook'

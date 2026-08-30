@@ -15,6 +15,8 @@
  *   - GET /v1/discover · GET /v1/discover/facets
  * @usage app.use(discoverRouter(config, storage))
  * @version-history
+ *   v0.3.0 — 2026-08-31 — `tool` accepted as a type filter: an app's published tool is a thing to
+ *     use, and this is the surface that answers what there is to use.
  *   v0.2.0 — 2026-08-30 — `designbook` accepted as a type filter (the facet named it, the filter dropped
  *     it, so the chip showed everything); +`organism` filter (records living in one organism).
  *   v0.1.0 — 2026-06-23 — Phase 1: /v1/discover + /facets over the memory/FTS source.
@@ -36,7 +38,7 @@ import {
 const MAX_PER_PAGE = 100;
 const VALID_TYPES = new Set<DiscoveryType>([
   'capability', 'workflow', 'knowledge', 'decision', 'research', 'material',
-  'company', 'offering', 'document', 'organism', 'app', 'template', 'skill', 'designbook', 'memory',
+  'company', 'offering', 'document', 'organism', 'app', 'tool', 'template', 'skill', 'designbook', 'memory',
 ]);
 
 /** Split a CSV query param into a trimmed, non-empty list. */

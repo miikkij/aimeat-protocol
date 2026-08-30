@@ -41,7 +41,7 @@ export const discoveryWorkBoardsTools: AimeatToolDefinition[] = [
         input: {
             mode: { type: 'string', enum: ['map', 'find'], description: '"find" (default) returns entries; "map" returns only facet counts (cheap probe).' },
             q: { type: 'string', description: 'Free-text query. Omit to browse by filters only.' },
-            type: { type: 'string', description: 'CSV of types: capability, workflow, knowledge, decision, research, material, company, offering, document, organism, app, memory.' },
+            type: { type: 'string', description: 'CSV of types: capability, workflow, knowledge, decision, research, material, company, offering, document, organism, app, tool, template, skill, designbook, memory.' },
             tags: { type: 'string', description: 'CSV of tags; an entry must carry ALL of them.' },
             segment: { type: 'string', description: 'CSV of segments (coarse area within a type) to include.' },
             scope: { type: 'string', enum: ['own', 'public', 'shared'], description: 'own (default), public, or shared.' },

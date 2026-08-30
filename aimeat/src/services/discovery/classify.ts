@@ -9,16 +9,20 @@
  * @structure
  *   - classifyMemoryKey() — key pattern → { type, segment }
  *   - kindTagType() — `kind:` tag → DiscoveryType | null (research/material taxonomy, §11.1)
- *   - key matchers (ORG / PKG / WF / ORG_META / ORG_OFFERS / AGENT_OFFERS)
+ *   - key matchers (ORG / PKG / WF / ORG_META / ORG_OFFERS / AGENT_OFFERS / APP_TOOLS)
  * @usage
  *   const { type, segment } = classifyMemoryKey(key, { tags, contentType });
  * @version-history
+ *   v0.3.0 — 2026-08-31 — apps.{appId}.tools classifies as `tool`, segment = the app. The
+ *     app-tools source owns these records now, so this pattern is the belt to its braces: should a
+ *     manifest reach the classifier by another road, it is typed rather than served raw.
  *   v0.2.0 — 2026-08-30 — A memory record the machine keeps for itself (an agent's statistics, a
  *     workflow run, a notice, a meter) gets segment 'bookkeeping', so a directory can count it and keep
  *     it out of the way. It used to top every newest-first list.
  *   v0.1.0 — 2026-06-23 — Phase 0: key-pattern + kind-tag classifier (design doc 2026-06-23).
  */
 import type { DiscoveryType } from './types.js';
+import { appIdFromToolsKey } from '../../models/app-tool-schemas.js';
 
 const ORG_KEY = /^organism\.([^.]+)\.w\.([^.]+)\.([^.]+)/; // organism.{id}.w.{ws}.{space}…
 const SKILL_KEY = /^skills\.([a-z0-9-]+)\.manifest$/; // skills.{name}.manifest (registry manifests only)
@@ -102,6 +106,17 @@ export function classifyMemoryKey(
 
   if (ORG_META.test(key)) {
     return { type: 'company', segment: null };
+  }
+
+  // An app's published tool manifest. The appId is a filename and nearly always carries dots, so the
+  // grammar is the shared one (models/app-tool-schemas.ts) rather than a fourth copy of the regex.
+  //
+  // `apps.` is NOT a bookkeeping prefix and there was no pattern for this key, so the manifest did
+  // not fall out of the directory: it fell IN, as an untyped `memory` record with its own JSON for a
+  // description. Absent would have been better than that, and typed is better than both.
+  const appId = appIdFromToolsKey(key);
+  if (appId) {
+    return { type: 'tool', segment: appId };
   }
 
   if (ORG_OFFERS.test(key) || AGENT_OFFERS.test(key)) {

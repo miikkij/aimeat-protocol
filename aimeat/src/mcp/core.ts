@@ -255,7 +255,7 @@ export function registerCoreTools(
     const discoveryRegistry = buildDiscoveryRegistry(storage, config);
     const VALID_DISCOVER_TYPES = new Set<DiscoveryType>([
         'capability', 'workflow', 'knowledge', 'decision', 'research', 'material',
-        'company', 'offering', 'document', 'organism', 'app', 'template', 'skill', 'designbook', 'memory',
+        'company', 'offering', 'document', 'organism', 'app', 'tool', 'template', 'skill', 'designbook', 'memory',
     ]);
     const discoverCsv = (v: string | undefined): string[] =>
         typeof v === 'string' ? v.split(',').map(s => s.trim()).filter(Boolean) : [];
