@@ -7,6 +7,8 @@
  *   403, and the serving half: a company host serves its front-page app, a redirect front page
  *   301s, an unclaimed label 404s, and the invoice seller prefills from the company record.
  * @version-history
+ *   v1.5.0 — 2026-08-31 — 8b: the server-side front-page reachability check (false for a host
+ *     that resolves nowhere; somebody else's company id answers the uniform 404).
  *   v1.4.0 — 2026-08-23 — Phase 7: signing in at the company address. An app served as a company's
  *     front page can start the app-grant flow with a redirect on its own `{slug}.co.<apex>`, and the
  *     address binds to that one app — another owner's app naming it is refused by the binding, an
@@ -250,6 +252,26 @@ await test('8. a redirect front page 301s; a relative target is refused', async 
   assert(ok.status === 200, `redirect set failed: ${ok.status}`);
   const served = await coFetch(slug);
   assert(served.status === 301 && (served.location ?? '').startsWith('https://example.com/yritys'), `expected 301, got ${served.status} → ${served.location}`);
+  // Put the app back for the remaining tests.
+  await json(`/v1/companies/${companyId}/front-page`, {
+    method: 'PUT', headers: authed(A.token), body: JSON.stringify({ kind: 'app', target: `${A.owner}/${APP_FILE}` }),
+  });
+});
+
+await test('8b. the front-page check probes the address server-side', async () => {
+  // The SPA cannot ask (its CSP refuses foreign origins), so the page asks the node, which probes
+  // through the same SSRF guard as every other outbound call. A host that resolves nowhere is the
+  // honest false, and somebody else's company id stays the registry's uniform 404.
+  const off = await json(`/v1/companies/${companyId}/front-page`, {
+    method: 'PUT', headers: authed(A.token), body: JSON.stringify({ kind: 'redirect', target: 'https://ei-vastaa.invalid/' }),
+  });
+  assert(off.status === 200, `redirect set failed: ${off.status} ${JSON.stringify(off.body)}`);
+  const check = await json(`/v1/companies/${companyId}/front-page/check`, { headers: authed(A.token) });
+  assert(check.status === 200, `check: ${check.status} ${JSON.stringify(check.body)}`);
+  assert(check.body.data.url === 'https://ei-vastaa.invalid/', `probed url: ${check.body.data.url}`);
+  assert(check.body.data.answers === false, 'a host that resolves nowhere must answer false');
+  const strangers = await json(`/v1/companies/${companyId}/front-page/check`, { headers: authed(B.token) });
+  assert(strangers.status === 404, `expected 404 for somebody else's company, got ${strangers.status}`);
   // Put the app back for the remaining tests.
   await json(`/v1/companies/${companyId}/front-page`, {
     method: 'PUT', headers: authed(A.token), body: JSON.stringify({ kind: 'app', target: `${A.owner}/${APP_FILE}` }),

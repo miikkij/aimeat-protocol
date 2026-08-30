@@ -13,6 +13,8 @@
  * @structure zod schemas · sendErr mapper · outboundRouter
  * @usage app.use(outboundRouter(config, storage)) in routes-loader
  * @version-history
+ *   v1.2.0 — 2026-08-30 — The log read accepts ?company=<id>: one company's sends, resolved to
+ *     its organism with the same resolveCompanyScope the finance reads use.
  *   v1.1.0 — 2026-08-07 — The send accepts company_id: the message then leaves through that
  *     company's own SMTP server when it has one.
  *   v1.0.0 — 2026-08-06 — Company-in-a-box phase 2.
@@ -33,6 +35,8 @@ import { emitChange } from '../services/event-bus.js';
 import {
   OutboundError, ensureContact, requireOwnContact, recordBounce, setOptOut, sendOutbound,
 } from '../services/outbound/outbound-service.js';
+import { resolveCompanyScope } from '../services/finance/company-scope.js';
+import { FinanceError } from '../services/finance/errors.js';
 
 const ContactSchema = z.object({
   name: z.string().min(1).max(140),
@@ -306,8 +310,24 @@ export function outboundRouter(config: AimeatConfig, storage: Storage): Router {
     const owner = resolve(req);
     const page = Math.max(1, parseInt((req.query.page as string) ?? '1', 10) || 1);
     const perPage = Math.min(200, Math.max(1, parseInt((req.query.per_page as string) ?? '50', 10) || 50));
+    // `?company=<id>` narrows the log to one company's sends, resolved to the organism its books
+    // live under — the same scoping (and the same code) GET /v1/finance/invoices uses, so the log
+    // and the invoices agree about what a company is. A company with no organism resolves to the
+    // 'no-books' sentinel and matches nothing, which is the honest answer for a book that has
+    // never been split off.
+    let organismId: string | undefined;
+    try {
+      organismId = await resolveCompanyScope(storage, owner, req.query.company);
+    } catch (e) {
+      if (e instanceof FinanceError) {
+        res.status(e.statusCode).json(error(config.nodeId, e.code, e.message));
+        return;
+      }
+      throw e;
+    }
     const query = {
       ownerGhii: owner,
+      organismId,
       contactId: typeof req.query.contact_id === 'string' ? req.query.contact_id : undefined,
       kind: (['transactional', 'marketing', 'invoice'] as const).find((k) => k === req.query.kind),
       status: (['sent', 'failed', 'suppressed', 'skipped'] as const).find((s) => s === req.query.status),

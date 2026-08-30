@@ -13,6 +13,8 @@
  * @structure zod schemas · sendErr mapper · companiesRouter
  * @usage app.use(companiesRouter(config, storage)) in routes-loader
  * @version-history
+ *   v1.3.0 — 2026-08-31 — GET /v1/companies/:id/front-page/check: does the public face answer,
+ *     probed server-side through safeFetch because the SPA's CSP cannot ask a foreign origin.
  *   v1.2.0 — 2026-08-08 — GET/PUT/DELETE /v1/companies/:id/portfolio: the company's own page.
  *   v1.1.0 — 2026-08-07 — GET/PUT/DELETE /v1/companies/:id/smtp: a company's own sending identity.
  *   v1.0.0 — 2026-08-07 — Company registry + co origin.
@@ -37,6 +39,7 @@ import { listSendableCompanies } from '../services/outbound/company-sender-acces
 import {
   publishCompanyPortfolio, getCompanyPortfolio, deleteCompanyPortfolio,
 } from '../services/company/company-portfolio.js';
+import { safeFetch } from '../utils/url-validator.js';
 
 const IdentitySchema = {
   description: z.string().max(500).nullish(),
@@ -270,6 +273,39 @@ export function companiesRouter(config: AimeatConfig, storage: Storage): Router 
       });
       emitChange('companies', resolve(req));
       res.json(success(config.nodeId, { company: withAddress(config, company) }));
+    } catch (e) {
+      if (!sendErr(res, config, e)) throw e;
+    }
+  });
+
+  /* GET /v1/companies/:id/front-page/check — does the public face answer?
+   *
+   * The browser cannot ask: the SPA's CSP (connect-src 'self') refuses every foreign origin, so
+   * the reachability probe runs here, through safeFetch — the same SSRF guard every other
+   * outbound call uses. A redirect front page is probed at its target, everything else at the
+   * company's own address. `answers` is a network-level fact (something responded); it is not a
+   * content check, and a URL the guard refuses reads as not answering, which is true for us.
+   */
+  const checkLimit = rateLimit({ windowMs: 60 * 1000, max: 20 });
+  router.get('/v1/companies/:id/front-page/check', requireAuth(), requireScope('company:read'), checkLimit, async (req, res) => {
+    try {
+      const company = await requireOwnCompany(storage, resolve(req), req.params.id as string);
+      const url = company.frontPage.kind === 'redirect' && company.frontPage.target
+        ? company.frontPage.target
+        : companyAddress(config, company);
+      if (!url) {
+        res.json(success(config.nodeId, { url: null, answers: null }));
+        return;
+      }
+      let answers = false;
+      try {
+        await safeFetch(url, { method: 'GET', maxRedirects: 3, signal: AbortSignal.timeout(6000) });
+        answers = true;
+        // eslint-disable-next-line aimeat/no-silent-catch -- the rejection IS the answer this probe collects: unreachable, timed out and guard-refused all read as "does not answer", which is the state the page shows
+      } catch {
+        answers = false;
+      }
+      res.json(success(config.nodeId, { url, answers }));
     } catch (e) {
       if (!sendErr(res, config, e)) throw e;
     }

@@ -8,6 +8,8 @@
  * @structure outboundMethods — contacts · send log
  * @usage merged onto PostgresKyselyStorage.prototype in ../index.ts
  * @version-history
+ *   v1.2.0 — 2026-08-30 — list/count filter on organismId (the column has been written since
+ *     2026-08-23; this makes it readable per company).
  *   v1.1.0 — 2026-08-17 — TARGET-063: emailHash/links/relation (migration 0041) and the
  *     cross-owner promotion lookup findUnresolvedOutboundContactsByEmailHash.
  *   v1.0.0 — 2026-08-06 — Company-in-a-box phase 2.
@@ -159,6 +161,7 @@ export const outboundMethods: OutboundRepository & ThisType<PostgresKyselyStorag
     if (query.kind) q = q.where('kind', '=', query.kind);
     if (query.status) q = q.where('status', '=', query.status);
     if (query.sentBy) q = q.where('sentBy', '=', query.sentBy);
+    if (query.organismId) q = q.where('organismId', '=', query.organismId);
     q = q.orderBy('createdAt', 'desc');
     if (query.limit !== undefined) q = q.limit(query.limit);
     if (query.offset !== undefined) q = q.offset(query.offset);
@@ -172,6 +175,7 @@ export const outboundMethods: OutboundRepository & ThisType<PostgresKyselyStorag
     if (query.kind) q = q.where('kind', '=', query.kind);
     if (query.status) q = q.where('status', '=', query.status);
     if (query.sentBy) q = q.where('sentBy', '=', query.sentBy);
+    if (query.organismId) q = q.where('organismId', '=', query.organismId);
     const r = await q.executeTakeFirst();
     return Number(r?.n ?? 0);
   },
