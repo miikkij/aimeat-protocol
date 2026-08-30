@@ -50222,6 +50222,16 @@ paths:
 
 
             Rows sent before 2026-08-26 carry no sender and match nothing.
+        - name: company
+          in: query
+          schema: { type: string }
+          description: >
+            Only this company's sends, by company id. Resolved to the organism the company's books
+            live under — the same scoping GET /v1/finance/invoices uses — so the log and the
+            invoices agree about what a company is. The company must be the caller's own (a
+            colleague reads the shared book through its owner). A company with no organism has no
+            shared book, and the scope it names is empty. Rows written before 2026-08-23 name no
+            company and match nothing.
         - { name: page, in: query, schema: { type: integer, default: 1 } }
         - { name: per_page, in: query, schema: { type: integer, default: 50, maximum: 200 } }
       responses:
@@ -50669,6 +50679,18 @@ paths:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/companies/{id}/front-page/check:
+    get:
+      operationId: checkCompanyFrontPage
+      tags: [Companies]
+      summary: Does the company's public face answer?
+      description: A server-side reachability probe, because the SPA's CSP cannot ask a foreign origin. A redirect front page is probed at its target, everything else at the company's own address, through the same SSRF-guarded fetch every outbound call uses. `answers` says something responded at the address (it is not a content check, and a guard-refused URL reads as not answering); `url` is what was probed, null when the node serves no co origin.
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
   /v1/companies/{id}/front-page:
     put:

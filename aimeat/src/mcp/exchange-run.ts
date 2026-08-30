@@ -21,6 +21,14 @@
  *   import { registerExchangeRunTools } from './exchange-run.js';
  *   registerExchangeRunTools(mcp, storage, config, () => agentGaii, () => sessionToken);
  * @version-history
+ *   v1.4.0 — 2026-08-30 — aimeat_app_tool_invoke asks the chokepoint BEFORE looking for an
+ *     entitlement, which is what its REST twin has done since webmcp.ts v1.3.0. This door kept the
+ *     pre-check that fix removed, and a pre-check reads as prudent while being the whole defect: an
+ *     owner holds no contract with themselves, so their own tool answered over HTTP and refused
+ *     NO_CONTRACT from a chat session. The owner-free rule is decided in metered-access.ts step 1,
+ *     before any entitlement lookup, so asking it first is what makes the two doors agree. The
+ *     binding then falls back to the app owner's current one when there is nothing pinned, the way
+ *     the REST twin already did. e2e-money-audit walks both doors for the provider now, together.
  *   v1.3.0 — 2026-08-01 — TARGET-058 Phase 8b. aimeat_exchange_work_deliver accepts an
  *     `ai_provenance` declaration and stamps the delivered output. This is the thing the buyer paid
  *     for, so the record travels ON the work item (`ai_provenance_id`) rather than only by hash —
@@ -142,28 +150,43 @@ export function registerExchangeRunTools(
             if (!toolDef) return fail(`TOOL_NOT_FOUND: no tool "${tool}" on app "${ownerName}/${app}"`);
 
             const coordExt = `apptool:${ownerName}/${app}`;
-            const ent = await readEntitlementForCall(storage, callerGaii, coordExt, tool);
-            if (!ent) return fail(`NO_CONTRACT: accept a contract for "${ownerName}/${app}/${tool}" first (aimeat_exchange_accept with its offering_id)`);
-
-            // Resolve the binding from the PINNED interface snapshot (the freeze), else the tool's current binding.
-            const pinnedVersion = ent.surface && ent.surface.kind === 'app-tool' ? ent.surface.ifaceVersion : undefined;
-            const iface = pinnedVersion ? await getInterfaceVersion(storage, ent.providerGhii, app, tool, pinnedVersion) : null;
-            const binding = iface?.binding ?? toolDef.action_id ?? null;
-            if (!binding) return fail('TOOL_NOT_INVOKABLE: this tool has no capability binding to invoke');
-            const cap = await storage.getCapability(binding);
-            if (!cap) return fail(`CAPABILITY_NOT_FOUND: backing capability not found (${binding})`);
 
             // The SAME decision the REST twin makes, from the same function — not a re-derivation of
             // it, and no fabricated Response to reach it through.
-            const label = `${app}/${tool}${pinnedVersion ? ` v${pinnedVersion}` : ''}`;
+            //
+            // ASKED BEFORE CHECKING WHETHER A RIGHT EXISTS. This door used to look up the
+            // entitlement first and refuse NO_CONTRACT when there was none, which reads as a
+            // reasonable pre-check and is the exact move that hid the owner-free rule on the REST
+            // twin until v1.3.0: an owner has no contract with themselves, so their own tool was
+            // unreachable from chat while the same tool answered over HTTP. The chokepoint decides
+            // owner-free BEFORE it looks for an entitlement (metered-access.ts step 1), so asking it
+            // first is what makes the two doors agree. `no_right` is the refusal that used to be
+            // fabricated here, and it keeps the hint that says what to do about it.
+            const label = `${app}/${tool}`;
             const outcome = await authoriseMeteredCall({
-                config, storage, caller: callerGaii, product: { ext: coordExt, action: tool, label },
+                config, storage, caller: callerGaii,
+                product: { ext: coordExt, action: tool, label, providerOwner: ownerName },
             });
-            if (outcome.kind === 'no_right') return fail('NO_CONTRACT: no active contract to settle against');
+            if (outcome.kind === 'no_right') {
+                return fail(`NO_CONTRACT: accept a contract for "${ownerName}/${app}/${tool}" first (aimeat_exchange_accept with its offering_id)`);
+            }
             if (outcome.kind !== 'settled' && outcome.kind !== 'free_owner') {
                 const r = meteredRefusalText(outcome, label);
                 return fail(`${r.code}: ${r.message}`);
             }
+
+            // Resolve the binding from the PINNED interface snapshot (the freeze), else the tool's
+            // current binding. A CONTRACT is pinned to the interface version it was signed at, so a
+            // provider can ship a newer app without breaking a live integration. The owner's own
+            // call has nothing to pin — they get their current binding, which is theirs to change.
+            const ent = outcome.kind === 'settled' ? outcome.entitlement : null;
+            const pinnedVersion = ent?.surface && ent.surface.kind === 'app-tool' ? ent.surface.ifaceVersion : undefined;
+            const providerGhii = ent?.providerGhii ?? `${ownerName}@${config.nodeId}`;
+            const iface = pinnedVersion ? await getInterfaceVersion(storage, providerGhii, app, tool, pinnedVersion) : null;
+            const binding = iface?.binding ?? toolDef.action_id ?? null;
+            if (!binding) return fail('TOOL_NOT_INVOKABLE: this tool has no capability binding to invoke');
+            const cap = await storage.getCapability(binding);
+            if (!cap) return fail(`CAPABILITY_NOT_FOUND: backing capability not found (${binding})`);
 
             // Settled → invoke; refund on throw (never leave a phantom charge).
             try {
@@ -182,7 +205,7 @@ export function registerExchangeRunTools(
                 // it was written, so a capability's published p50/p95 described its HTTP traffic only
                 // — and an agent calling the same tool contributed nothing to the number a buyer
                 // reads before committing.
-                recordCallDuration(storage, ent.providerGhii, coordExt, tool, Date.now() - startedAt);
+                recordCallDuration(storage, providerGhii, coordExt, tool, Date.now() - startedAt);
                 // Delivered → book whoever the provider owes a share of this call, out of their own cut.
                 const shared = takeDesignations(invoked.result);
                 if (outcome.kind === 'settled') await outcome.accrue(shared.designations);

@@ -9,6 +9,10 @@
  *   the sending identity AND the book that comes with it, and the refusals around them: a stranger
  *   to the organism, a company bound to no organism at all, and a member who has been removed.
  * @version-history
+ *   v1.1.0 — 2026-08-30 — 6c: the log read's ?company= filter (one company's sends; an
+ *     organism-less company's book is empty; somebody else's company id is 404; no token is
+ *     401 — the suite's first status-shaped denial case, which also retires its
+ *     denial-coverage exemption).
  *   v1.0.0 — 2026-08-24 — Initial, with organism-scoped sending.
  */
 
@@ -211,6 +215,30 @@ await test("6b. the colleague's send lands in the COMPANY's log, attributed to h
   const hersRows = hers.body.data.messages as Array<{ subject: string }>;
   assert(!hersRows.some(m => m.subject === 'Kevät'),
     'the row belongs to the company book, not to the colleague');
+});
+
+await test("6c. ?company= narrows the log to that company's sends", async () => {
+  // The Companies page answers "what has this company sent" with this one read. It reuses the
+  // finance scoping (company id → the organism its books live under), so the two surfaces cannot
+  // disagree about what a company is.
+  const scoped = await json(`/v1/outbound/log?company=${companyId}&per_page=200`, { headers: authed(heidi.token) });
+  assert(scoped.status === 200, `scoped log: ${scoped.status} ${JSON.stringify(scoped.body)}`);
+  const rows = scoped.body.data.messages as Array<{ subject: string; organismId: string | null }>;
+  assert(rows.some(m => m.subject === 'Kevät'), `the company's send must be in its log: ${rows.map(r => r.subject).join(', ')}`);
+  assert(rows.every(m => m.organismId === orgId), 'every row must belong to this company');
+
+  // A company with no organism has no shared book: the scope it names is empty, not everything.
+  const lonely = await json(`/v1/outbound/log?company=${loneId}&per_page=200`, { headers: authed(heidi.token) });
+  assert(lonely.status === 200, `lone company log: ${lonely.status}`);
+  assert(lonely.body.data.total === 0, `an organism-less company's book is empty, got ${lonely.body.data.total}`);
+
+  // Somebody else's company id answers 404, the same as everywhere else in the registry.
+  const strangers = await json(`/v1/outbound/log?company=${companyId}`, { headers: authed(stranger.token) });
+  assert(strangers.status === 404, `expected 404 for somebody else's company, got ${strangers.status}`);
+
+  // And with no token at all, the log refuses before it answers anything.
+  const anon = await json(`/v1/outbound/log?company=${companyId}`);
+  assert(anon.status === 401, `expected 401 without a token, got ${anon.status}`);
 });
 
 await test('7. an unsubscribe collected by one member stops the other member', async () => {

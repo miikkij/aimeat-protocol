@@ -13,6 +13,10 @@
  * @structure setup (provider ext + priced manifest + consumer contract) · one test per (surface × principal)
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=money-audit
  * @version-history
+ *   v1.2.0 — 2026-08-30 — The owner-free rule on BOTH app-tool doors, side by side. RAW had it and
+ *     the two app-tool doors did not, so the MCP twin refused a provider their own tool with
+ *     NO_CONTRACT while the REST twin served it — the same defect the REST door had already been
+ *     fixed for. Walked together so neither can be corrected alone again.
  *   v1.1.0 — 2026-07-27 — GRANTS: the third class of principal in the product rule — a member the provider
  *     approved, carried rather than billed. Proved on every door, plus the ceiling, the revocation, the
  *     "a gift never overwrites a purchase" case, and which wallet the pacing toll comes out of.
@@ -372,6 +376,29 @@ await test('APP-TOOL · MCP `aimeat_app_tool_invoke` settles the SAME contract, 
     assert(after.budget.calls === before.budget.calls + 1, `ONE settlement per call, got ${after.budget.calls - before.budget.calls}`);
     assert(after.budget.spent_units === before.budget.spent_units + 8, `spent +8, got +${after.budget.spent_units - before.budget.spent_units}`);
     assert(await balance(consumer.token) === cb - 8, `consumer debited 8 once, moved ${cb - await balance(consumer.token)}`);
+});
+
+// The owner-free rule, on both app-tool doors. RAW already proves it above; these two prove the
+// pair AGREES, which is the property that keeps going missing. A provider holds no contract with
+// themselves, so a door that looks up the entitlement before asking the chokepoint refuses its own
+// author — the REST twin carried exactly that defect until v1.3.0, and the MCP twin kept it after
+// the REST one was fixed. Both are walked here, together, so neither can be corrected alone again.
+await test('APP-TOOL · the provider calls their own tool free, holding no contract with themselves', async () => {
+    const before = await balance(provider.token);
+    const r = await toolInvoke(provider.token);
+    assert(r.status === 200, `provider on their own app-tool: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    assert(await balance(provider.token) === before, 'the provider must not be charged for their own tool');
+});
+
+await test('APP-TOOL · MCP · the provider calls their own tool free too, and is not told NO_CONTRACT', async () => {
+    const before = await balance(provider.token);
+    const res = parse(await captureTools(provider.gaii, provider.token)['aimeat_app_tool_invoke']({ owner: provider.name, app: APP, tool: 'brief', input: { q: 'hi' } }));
+    // Named rather than folded into a generic failure: NO_CONTRACT is the specific wrong answer this
+    // door gave, and a future regression should read as itself in the log rather than as "mcp failed".
+    assert(!String(res.error ?? '').includes('NO_CONTRACT'),
+        `an owner has no contract with themselves; this door must not ask for one: ${res.error}`);
+    assert(!res.error, `mcp invoke failed: ${res.error}`);
+    assert(await balance(provider.token) === before, 'the provider must not be charged through the MCP door either');
 });
 
 await test('APP-TOOL · a tool that declares NO price stays free — it must not bill a sibling tool’s contract', async () => {

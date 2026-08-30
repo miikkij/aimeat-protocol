@@ -16,6 +16,8 @@
  * @structure OutboundContactRecord · OutboundContactLink · OutboundMessageRecord (send log) · query types
  * @usage import type { OutboundContactRecord, ... } from '../models/outbound-schemas.js';
  * @version-history
+ *   v1.2.0 — 2026-08-30 — OutboundLogQuery.organismId: the send log answers "what did this
+ *     company send" with the same organism scoping the finance queries use.
  *   v1.1.0 — 2026-08-17 — TARGET-063. The record is now also the ADDRESS-BOOK entry for a person
  *     the node does not have: `emailHash` (the join key promotion uses — same hash as
  *     GHIIRecord.emailHash, so a person who registers later is found without storing a second
@@ -145,6 +147,13 @@ export interface OutboundLogQuery {
    * whole sending with no way to find their own.
    */
   sentBy?: string;
+  /**
+   * WHICH COMPANY's sends, as the organism its books live under. The routes resolve a company id
+   * to this with resolveCompanyScope — the same scoping the finance queries use, so the send log
+   * and the invoices agree about what a company is. The 'no-books' sentinel an organism-less
+   * company resolves to matches nothing, deliberately.
+   */
+  organismId?: string;
   limit?: number;
   offset?: number;
 }
