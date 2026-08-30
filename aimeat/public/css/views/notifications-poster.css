@@ -24,7 +24,10 @@
 .og-nt .nt-more { margin-top: .8rem; }
 
 /* ── The switch ─────────────────────────────────────────────────────────────────────────────── */
-.nt-sw { display: inline-flex; align-items: center; gap: .5rem; background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit; font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--text); }
+/* The word on the left, the box on the right (2026-08-30, Jouni): in a column of rows the boxes line
+   up on the right edge instead of drifting with the length of each word. */
+.nt-sw { display: inline-flex; align-items: center; justify-content: flex-end; gap: .5rem; min-width: 5.2rem; background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit; font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--text); }
+.nt-muted { min-width: 5.2rem; text-align: right; }
 .nt-sw i { width: 2.1rem; height: 1.1rem; border: 2px solid var(--text); position: relative; display: inline-block; box-sizing: border-box; }
 .nt-sw i::after { content: ''; position: absolute; top: 2px; left: 2px; width: .55rem; height: .55rem; background: var(--text); }
 .nt-sw.on i { background: var(--sun); }
