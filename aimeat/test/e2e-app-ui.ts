@@ -265,6 +265,9 @@ const GOOD_LAYOUT = {
                 { id: 'split', component: 'chart', props: { source: 'money.split', kind: 'donut' } },
                 { id: 'year', component: 'chart', props: { source: 'activity.days', kind: 'calendar' } },
                 { id: 'pair', component: 'chart', props: { source: 'quality.points', kind: 'scatter' } },
+                { id: 'drop', component: 'chart', props: { source: 'sales.stages', kind: 'funnel' } },
+                { id: 'share', component: 'chart', props: { source: 'stock.byProduct', kind: 'treemap' } },
+                { id: 'went', component: 'chart', props: { source: 'money.paths', kind: 'flow' } },
             ],
         });
         assert(good.status === 200 && good.body.data.ok === true,
@@ -293,12 +296,39 @@ const GOOD_LAYOUT = {
         assert(model.status === 200 && model.body.data.ok === true,
             `a model scene must validate: ${JSON.stringify(model.body.data)}`);
 
+        const globe = await validate({
+            v: 1,
+            blocks: [{ id: 'world', component: 'scene3d', props: { kind: 'globe', source: 'network.places', title: 'The reach' } }],
+        });
+        assert(globe.status === 200 && globe.body.data.ok === true,
+            `a globe scene must validate: ${JSON.stringify(globe.body.data)}`);
+
         const bad = await validate({
             v: 1,
-            blocks: [{ id: 'depth', component: 'scene3d', props: { kind: 'globe' } }],
+            blocks: [{ id: 'depth', component: 'scene3d', props: { kind: 'hologram' } }],
         });
         assert(bad.body.data.ok === false && /kind/.test(bad.body.data.message),
             `an invented scene kind is refused naming the real ones: ${bad.body.data.message}`);
+    });
+
+    await test('the work-planning family validates: kanban, plan and schedule with sources; an invented prop is refused', async () => {
+        const good = await validate({
+            v: 1,
+            blocks: [
+                { id: 'board', component: 'kanban', props: { source: 'work.board', title: 'The board' } },
+                { id: 'phases', component: 'plan', props: { source: 'project.phases' } },
+                { id: 'week', component: 'schedule', props: { source: 'bookings.week' } },
+            ],
+        });
+        assert(good.status === 200 && good.body.data.ok === true,
+            `the planning family must validate: ${JSON.stringify(good.body.data)}`);
+
+        const bad = await validate({
+            v: 1,
+            blocks: [{ id: 'board', component: 'kanban', props: { source: 'work.board', columns: 4 } }],
+        });
+        assert(bad.body.data.ok === false && /columns/.test(bad.body.data.message),
+            `an invented kanban prop is refused by name: ${bad.body.data.message}`);
     });
 
     await test('an unknown component is refused with the NEAREST real name suggested', async () => {

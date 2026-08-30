@@ -2,11 +2,18 @@
  * @file atelier/chart-shapes.js
  * @description The chart family's non-axes shapes, on the shared core: the DONUT (parts of a
  *   whole, the total and its change in the middle), the CALENDAR heat wall (months named, the
- *   ramp explained) and the SCATTER (points with an honest trend line). chart.js dispatches
- *   here; the visual bar is the approved Näyteikkuna board.
- * @structure renderDonut(ctx, data) · renderCalendar(ctx, data) · renderScatter(ctx, data)
- * @usage  import { renderDonut, renderCalendar, renderScatter } from './chart-shapes.js';
+ *   ramp explained), the SCATTER (points with an honest trend line), the FUNNEL (stages losing
+ *   people, the survival rate written at each step), the TREEMAP (shares as area, squarified)
+ *   and the FLOW (where the quantity went — ribbons as wide as their sums). chart.js
+ *   dispatches here; the visual bar is the approved Näyteikkuna board.
+ * @structure renderDonut · renderCalendar · renderScatter · renderFunnel · renderTreemap ·
+ *   renderFlow — each (ctx, data)
+ * @usage  import { renderDonut, renderCalendar, renderScatter, renderFunnel, renderTreemap,
+ *   renderFlow } from './chart-shapes.js';
  * @version-history
+ *   v0.36.0 — 2026-08-30 — Basket one of the approved expansion: funnel, treemap (own
+ *     squarify, no library) and flow (own layered layout — ribbons cubic, node colour carries
+ *     into its ribbons).
  *   v0.35.0 — 2026-08-29 — Initial: donut v2 (rounded segments, HTML centre with delta),
  *     calendar v2 (month labels + ramp legend), scatter (new — points + least-squares trend).
  */
@@ -203,4 +210,211 @@ export function renderScatter(ctx, data) {
       data.yLabel ? el('span', { class: 'ak-chart__key', text: `y · ${data.yLabel}` }) : null,
     ]));
   }
+}
+
+/** Stages losing people: { steps: [{ label, value }] } — the survival rate written per step. */
+export function renderFunnel(ctx, data) {
+  const steps = (data && Array.isArray(data.steps) ? data.steps : [])
+    .filter((s) => s && typeof s.value === 'number' && s.value >= 0);
+  if (!steps.length || steps[0].value <= 0) return ctx.empty();
+  ctx.root.setAttribute('aria-label', (ctx.title ? ctx.title + ' — ' : '')
+    + steps.map((s) => s.label + ' ' + s.value).join(', '));
+
+  const W = 460;
+  const STEP_H = 44;
+  const GAP = 7;
+  const BAND = 340; // widest band, centred; the right margin carries the survival rates
+  const CX = 195;
+  const H = steps.length * (STEP_H + GAP) - GAP + 8;
+  const first = steps[0].value;
+  const node = svg('svg', { viewBox: `0 0 ${W} ${H}`, class: 'ak-chart__svg', 'aria-hidden': 'true' });
+  const still = ctx.still();
+  const half = (v) => Math.max((v / first) * BAND, 18) / 2;
+  steps.forEach((s, i) => {
+    const y = 4 + i * (STEP_H + GAP);
+    const topHalf = half(s.value);
+    const nxt = steps[i + 1];
+    // The band narrows TOWARD the next step, so the loss reads as the slope of this band.
+    const botHalf = nxt ? half(nxt.value) : topHalf;
+    const band = svg('path', {
+      d: `M${CX - topHalf} ${y} L${CX + topHalf} ${y} L${CX + botHalf} ${y + STEP_H} L${CX - botHalf} ${y + STEP_H} Z`,
+      class: 'ak-chart__funnelband',
+    });
+    band.style.fill = SERIES_VARS[i % SERIES_VARS.length];
+    if (!still) { band.classList.add('ak-chart__band--enter'); band.style.animationDelay = `${i * 80}ms`; }
+    node.appendChild(band);
+    // One line per band — the halo keeps ink readable wherever the band's edge falls.
+    const name = svg('text', { x: CX, y: y + STEP_H / 2 + 5, class: 'ak-chart__funnellabel', 'text-anchor': 'middle' });
+    name.textContent = `${s.label} · ${fmtTick(s.value)}`;
+    node.appendChild(name);
+    const pct = svg('text', { x: W - 10, y: y + STEP_H / 2 + 5, class: 'ak-chart__funnelpct', 'text-anchor': 'end' });
+    pct.textContent = Math.round((s.value / first) * 100) + ' %';
+    node.appendChild(pct);
+  });
+  ctx.root.appendChild(node);
+}
+
+/** Squarify (Bruls): rows of items laid into the free rectangle, aspect ratios kept humane. */
+function squarify(items, x, y, w, h) {
+  const out = [];
+  let rest = items.slice();
+  while (rest.length) {
+    const along = Math.min(w, h);
+    let row = [rest[0]];
+    let sum = rest[0].v;
+    const total = rest.reduce((a, b) => a + b.v, 0);
+    const worst = (r, s) => {
+      const side = (s / total) * (w * h) / along;
+      let bad = 0;
+      for (const it of r) {
+        const other = ((it.v / s) * along);
+        bad = Math.max(bad, side / other, other / side);
+      }
+      return bad;
+    };
+    while (rest.length > row.length) {
+      const cand = rest[row.length];
+      if (worst(row.concat(cand), sum + cand.v) <= worst(row, sum)) { row.push(cand); sum += cand.v; }
+      else break;
+    }
+    const side = (sum / total) * (w * h) / along;
+    let run = 0;
+    for (const it of row) {
+      const span = (it.v / sum) * along;
+      out.push(w <= h
+        ? { it, x: x + run, y, w: span, h: side }
+        : { it, x, y: y + run, w: side, h: span });
+      run += span;
+    }
+    if (w <= h) { y += side; h -= side; } else { x += side; w -= side; }
+    rest = rest.slice(row.length);
+  }
+  return out;
+}
+
+/** Shares as area: { items: [{ label, value }] } — when the donut's slices would not fit. */
+export function renderTreemap(ctx, data) {
+  const items = (data && Array.isArray(data.items) ? data.items : [])
+    .filter((s) => s && typeof s.value === 'number' && s.value > 0)
+    .sort((a, b) => b.value - a.value);
+  if (!items.length) return ctx.empty();
+  ctx.root.setAttribute('aria-label', (ctx.title ? ctx.title + ' — ' : '')
+    + items.map((s) => s.label + ' ' + s.value).join(', '));
+  const W = 560;
+  const H = 320;
+  const node = svg('svg', { viewBox: `0 0 ${W} ${H}`, class: 'ak-chart__svg', 'aria-hidden': 'true' });
+  const cells = squarify(items.map((s, i) => ({ v: s.value, s, i })), 2, 2, W - 4, H - 4);
+  const still = ctx.still();
+  cells.forEach((c, n) => {
+    const G = 2.5;
+    const rect = svg('rect', {
+      x: c.x + G, y: c.y + G, width: Math.max(c.w - G * 2, 1), height: Math.max(c.h - G * 2, 1), rx: 6,
+      class: 'ak-chart__cell',
+    });
+    rect.style.fill = SERIES_VARS[c.it.i % SERIES_VARS.length];
+    const cap = svg('title', {});
+    cap.textContent = `${c.it.s.label} · ${fmtTick(c.it.s.value)}`;
+    rect.appendChild(cap);
+    if (!still) { rect.classList.add('ak-chart__band--enter'); rect.style.animationDelay = `${n * 45}ms`; }
+    node.appendChild(rect);
+    if (c.w > 86 && c.h > 44) {
+      const name = svg('text', { x: c.x + 12, y: c.y + 24, class: 'ak-chart__cellname' });
+      name.textContent = String(c.it.s.label);
+      node.appendChild(name);
+      const val = svg('text', { x: c.x + 12, y: c.y + 42, class: 'ak-chart__cellvalue' });
+      val.textContent = fmtTick(c.it.s.value);
+      node.appendChild(val);
+    }
+  });
+  ctx.root.appendChild(node);
+}
+
+/** Where it went: { nodes: [{ id, label }], links: [{ from, to, value }] } — layered ribbons. */
+export function renderFlow(ctx, data) {
+  const nodes = (data && Array.isArray(data.nodes) ? data.nodes : []).filter((n) => n && n.id);
+  const links = (data && Array.isArray(data.links) ? data.links : [])
+    .filter((l) => l && l.from && l.to && typeof l.value === 'number' && l.value > 0);
+  if (!nodes.length || !links.length) return ctx.empty();
+  const byId = new Map(nodes.map((n) => [n.id, { n, in: 0, out: 0, depth: 0 }]));
+  for (const l of links) {
+    const a = byId.get(l.from);
+    const b = byId.get(l.to);
+    if (!a || !b) continue;
+    a.out += l.value;
+    b.in += l.value;
+  }
+  // Depth: longest path from a source, settled by relaxation (cycles clamp at node count).
+  for (let pass = 0; pass < nodes.length; pass++) {
+    let moved = false;
+    for (const l of links) {
+      const a = byId.get(l.from);
+      const b = byId.get(l.to);
+      if (a && b && b.depth < a.depth + 1 && a.depth + 1 < nodes.length) { b.depth = a.depth + 1; moved = true; }
+    }
+    if (!moved) break;
+  }
+  const maxDepth = Math.max(...[...byId.values()].map((m) => m.depth));
+  ctx.root.setAttribute('aria-label', (ctx.title ? ctx.title + ' — ' : '') + nodes.map((n) => n.label || n.id).join(', '));
+
+  const W = 560;
+  const H = 320;
+  const NODE_W = 12;
+  const PAD_Y = 10;
+  const cols = [];
+  for (const m of byId.values()) (cols[m.depth] = cols[m.depth] || []).push(m);
+  const scale = (H - PAD_Y * 2 - 8 * Math.max(...cols.map((c) => (c || []).length - 1), 0))
+    / Math.max(...cols.map((c) => (c || []).reduce((a, m) => a + Math.max(m.in, m.out), 0)), 1e-9);
+  const colX = (d) => 8 + (maxDepth ? (W - NODE_W - 16) * (d / maxDepth) : 0);
+  const node = svg('svg', { viewBox: `0 0 ${W} ${H}`, class: 'ak-chart__svg', 'aria-hidden': 'true' });
+  let colourIdx = 0;
+  for (const col of cols) {
+    if (!col) continue;
+    col.sort((a, b) => Math.max(b.in, b.out) - Math.max(a.in, a.out));
+    let y = PAD_Y;
+    for (const m of col) {
+      m.h = Math.max(Math.max(m.in, m.out) * scale, 4);
+      m.x = colX(m.depth);
+      m.y = y;
+      m.colour = SERIES_VARS[colourIdx++ % SERIES_VARS.length];
+      m.spentOut = 0;
+      m.spentIn = 0;
+      y += m.h + 8;
+    }
+  }
+  // Ribbons first, so the node bars sit on top of their own colour.
+  for (const l of links) {
+    const a = byId.get(l.from);
+    const b = byId.get(l.to);
+    if (!a || !b) continue;
+    const th = l.value * scale;
+    const y1 = a.y + a.spentOut + th / 2;
+    const y2 = b.y + b.spentIn + th / 2;
+    a.spentOut += th;
+    b.spentIn += th;
+    const x1 = a.x + NODE_W;
+    const x2 = b.x;
+    const mid = (x1 + x2) / 2;
+    const ribbon = svg('path', {
+      d: `M${x1} ${y1} C${mid} ${y1} ${mid} ${y2} ${x2} ${y2}`,
+      class: 'ak-chart__ribbon',
+      'stroke-width': Math.max(th, 1.5),
+    });
+    ribbon.style.stroke = a.colour;
+    node.appendChild(ribbon);
+  }
+  for (const m of byId.values()) {
+    const bar = svg('rect', { x: m.x, y: m.y, width: NODE_W, height: m.h, rx: 4, class: 'ak-chart__flownode' });
+    bar.style.fill = m.colour;
+    node.appendChild(bar);
+    const last = m.depth === maxDepth;
+    const name = svg('text', {
+      x: last ? m.x - 6 : m.x + NODE_W + 6,
+      y: m.y + Math.min(m.h / 2 + 4, m.h + 2),
+      class: 'ak-chart__flowlabel',
+      'text-anchor': last ? 'end' : 'start',
+    });
+    name.textContent = `${m.n.label || m.n.id} · ${fmtTick(Math.max(m.in, m.out))}`;
+    node.appendChild(name);
+  }
+  ctx.root.appendChild(node);
 }

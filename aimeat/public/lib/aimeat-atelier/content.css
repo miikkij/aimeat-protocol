@@ -12,6 +12,8 @@
  * @structure ak-list · ak-listdetail · ak-grid + ak-card · ak-mediacard · ak-timeline
  * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
  * @version-history
+ *   v0.36.0 — 2026-08-30 — The funnel, treemap and flow shapes: bands with a drop-in entrance,
+ *     ink labels wearing a surface halo (paint-order) so they read on any series colour.
  *   v0.10.0 — 2026-08-29 — THE NEXT LEVEL, first pieces: the chart mural (data as the decor —
  *     card chrome off, full-bleed band, quiet ticks) and the cinema choreography (the opening
  *     band recedes on scroll, sections rise as they enter; pure CSS scroll timelines behind
@@ -437,6 +439,24 @@ button.ak-card:hover { box-shadow: var(--ak-elev-2); transform: translateY(-2px)
 .ak-chart__trend { stroke: var(--ak-ink-dim); stroke-width: 1.5; stroke-dasharray: 6 6; opacity: 0.6; }
 .ak-chart__line--enter { transition: stroke-dashoffset 900ms ease-out; }
 .ak-chart__line--drawn { stroke-dashoffset: 0 !important; }
+/* Funnel, treemap and flow. The label halo (paint-order + a surface-coloured stroke) is what
+ * lets ink text sit ON a series colour and stay readable in both modes on any spectrum. */
+.ak-chart__funnelband { fill-opacity: 0.88; }
+.ak-chart__band--enter { opacity: 0; animation: ak-band-in calc(var(--ak-motion) * 1.6) var(--ak-ease) forwards; }
+@keyframes ak-band-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+.ak-chart__funnellabel, .ak-chart__cellname, .ak-chart__flowlabel {
+  font-size: 13px; font-weight: 650; fill: var(--ak-ink);
+  paint-order: stroke; stroke: var(--ak-surface); stroke-width: 3.5px; stroke-linejoin: round;
+}
+.ak-chart__funnelvalue, .ak-chart__cellvalue {
+  font-size: 11.5px; font-weight: 500; fill: var(--ak-ink-dim);
+  paint-order: stroke; stroke: var(--ak-surface); stroke-width: 3px; stroke-linejoin: round;
+}
+.ak-chart__funnelpct { font-size: 13px; font-weight: 650; fill: var(--ak-ink-dim); }
+.ak-chart__cell { fill-opacity: 0.9; }
+.ak-chart__ribbon { fill: none; stroke-opacity: 0.42; }
+.ak-chart__flownode { stroke: var(--ak-surface); stroke-width: 1.5; }
+.ak-chart__flowlabel { font-size: 12px; }
 .ak-chart__legend {
   display: flex; flex-wrap: wrap; gap: 6px 14px;
   margin-top: 8px; font-size: var(--ak-text-fine); color: var(--ak-ink-dim);
@@ -447,7 +467,7 @@ button.ak-card:hover { box-shadow: var(--ak-elev-2); transform: translateY(-2px)
 @media (prefers-reduced-motion: reduce) {
   .ak-chart__bar--enter { animation: none; }
   .ak-chart__line--enter { transition: none; stroke-dashoffset: 0 !important; }
-  .ak-chart__slice--enter, .ak-chart__point--enter { animation: none; opacity: 1; }
+  .ak-chart__slice--enter, .ak-chart__point--enter, .ak-chart__band--enter { animation: none; opacity: 1; }
 }
 
 /* ── Matrix: labelled rows × labelled columns, every cell a toned word ────────────────────── */
