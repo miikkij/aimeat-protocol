@@ -5,6 +5,8 @@
  * @description Schedule, workflow, task lifecycle, and agent memory (read/write/list/search) tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.3.0 — 2026-08-30 — aimeat_workflow_run publishes `vars` and `target`, the two fields
+ *     POST /v1/workflows/:id/run has always read and no tool surface sent.
  *   v1.2.0 — 2026-08-30 — aimeat_workflow_run and _get say that a signals-only check is not a run:
  *     it costs nothing and is kept apart from the run history and the health.
  *   v1.1.0 — 2026-08-14 — aimeat_task_create gains `scope`: the named parameters a receiving
@@ -106,6 +108,8 @@ export const schedulesTasksMemoryTools: AimeatToolDefinition[] = [
         input: {
             id: { type: 'string', required: true, description: 'The workflow id.' },
             mode: { type: 'string', required: true, description: 'signals-only | full', enum: ['signals-only', 'full'] },
+            vars: { type: 'object', description: 'The run\'s input, as { varName: value } over the vars the workflow declares. A workflow that takes input is a constant without this. Anything it does not declare is ignored, and a declared var left out falls back to its default.' },
+            target: { type: 'string', description: 'With mode="full": "sandbox" writes every key behind a per-run prefix so a trial cannot touch what a live run produced. Default "live".', enum: ['live', 'sandbox'] },
         },
     },
     {

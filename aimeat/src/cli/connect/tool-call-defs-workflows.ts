@@ -7,6 +7,9 @@
  * @structure workflowTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { workflowTools } from './tool-call-defs-workflows.js';
  * @version-history
+ *   v1.1.0 -- 2026-08-30 -- aimeat_workflow_run forwards `vars` and `target`. This is the door a
+ *     fleet daemon calls, and it sent only { mode }: a workflow that declares input ran at its
+ *     defaults, every time, with nothing to say so.
  *   v1.0.0 -- 2026-08-16 -- Pure extraction from tool-call-defs-apps.ts (max-file-lines). Handlers
  *     unchanged; aimeat_workflow_answer had just been corrected to POST { picks, other } as the
  *     route reads, instead of { answer }, which it had never accepted.
@@ -49,8 +52,18 @@ export const workflowTools: ConnectCliToolDefinition[] = [
         input: {
             id: { type: 'string', required: true, description: 'The workflow id.' },
             mode: { type: 'string', required: true, description: 'signals-only | full' },
+            vars: { type: 'object', description: 'The run\'s input, as { varName: value } over the vars the workflow declares. A workflow that takes input is a constant without this.' },
+            target: { type: 'string', description: 'With mode="full": "sandbox" writes every key behind a per-run prefix. Default "live".' },
         },
-        handler: ({ client }, input) => client.post(`/v1/workflows/${encodeURIComponent(requiredString(input, 'id'))}/run`, { mode: requiredString(input, 'mode') }),
+        handler: ({ client }, input) => {
+            const vars = optionalRecord(input, 'vars');
+            const target = optionalString(input, 'target');
+            return client.post(`/v1/workflows/${encodeURIComponent(requiredString(input, 'id'))}/run`, {
+                mode: requiredString(input, 'mode'),
+                ...(vars ? { vars } : {}),
+                ...(target ? { target } : {}),
+            });
+        },
     },
     {
         // → POST /v1/workflows/:id/runs/:runId/steps/:stepId/answer — answer a paused human-input step.
