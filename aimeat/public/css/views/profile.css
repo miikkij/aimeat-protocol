@@ -1748,19 +1748,7 @@
 .pf .pn-padding-half { padding: .5rem 0; }
 .pf .pn-no-agents    { font-size: .8rem; color: var(--muted); margin-top: .3rem; }
 
-/* ── Email tab ── */
-.pf .email-desc      { color: var(--text-dim); font-size: .9rem; margin-bottom: 16px; }
-.pf .email-icon-row  { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.pf .email-verified-icon { color: var(--success, #22C55E); font-size: 20px; }
-.pf .email-verified-text { font-weight: 600; color: var(--success, #22C55E); }
-.pf .email-status-text   { font-size: .9rem; color: var(--text-dim); }
-.pf .email-address-display { font-size: .9rem; color: var(--text, #1a1a1a); font-family: var(--font-mono, monospace); padding: 4px 0; }
-.pf .email-sent-text     { font-size: .9rem; color: var(--success, #22C55E); margin-bottom: 12px; }
-.pf .email-form-label    { display: block; margin-bottom: 5px; font-size: 12px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; color: var(--text-dim); }
-.pf .email-form-group    { margin-bottom: 14px; }
-.pf .email-unverified-icon { color: var(--text-dim); font-size: 16px; }
-.pf .email-unverified-text { font-size: .9rem; color: var(--text-dim); }
-.pf .email-change-btn    { margin-top: 12px; }
+/* The Email tab lives in css/views/email-poster.css (the poster face, 2026-08-30). */
 
 /* ── Access tab ── */
 .pf .access-mono     { font-family: var(--font-mono); font-size: .75rem; word-break: break-all; color: var(--muted); }
