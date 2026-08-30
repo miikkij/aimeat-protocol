@@ -36,6 +36,10 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.38.0 — 2026-08-30 — THE COMMERCIAL SIDE: commercial.css joins the imports — the legal
+ *     pages list and its states, the readiness chip, the legal page frame, the audit trail,
+ *     the feedback honeypot, the reviewer line and the marks switches, all on --ak-ok/-warn
+ *     and color-mix grounds so every look and mode answers them.
  *   v0.37.0 — 2026-08-30 — Radar rings and shapes + the rating stars (content.css), the steps
  *     tracker (planner.css).
  *   v0.36.0 — 2026-08-30 — THE APPROVED EXPANSION: planner.css joins the imports (kanban,
@@ -200,6 +204,7 @@
 @import url('./aimeat-atelier/content.css');
 @import url('./aimeat-atelier/data.css');
 @import url('./aimeat-atelier/planner.css');
+@import url('./aimeat-atelier/commercial.css');
 @import url('./aimeat-atelier/scenics.css');
 @import url('./aimeat-atelier/patterns.css');
 @import url('./aimeat-atelier/mosaic.css');
