@@ -2,10 +2,17 @@
  * @file admin.css
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Admin dashboard (operator tooling) styles, .adm-* scoped. Keeps
- *   its distinct indigo accent and a permanently-dark sidebar, but all content
- *   surfaces map to global theme.css tokens so they flip with dark/light mode.
+ * @description Admin dashboard (operator tooling) styles, .adm-* scoped. The frame is the poster
+ *   face with the ground inverted: the settings side's sidebar is paper, this one is ink — fixed
+ *   in both themes, so you know which side you are on before reading a word. The sun marks the
+ *   selected item, group labels wear the sun, the node id sits on top in mono. Content surfaces
+ *   map to global theme.css tokens so they flip with dark/light mode.
  * @version-history
+ *   v2.0.0 — 2026-08-31 — The poster frame (design canvas "AIMEAT Hallinnan kehys", direction A):
+ *     sidebar to ink with the sun on the active item, the indigo accent removed (the global coral
+ *     flows in), cards become sections under a 3px ink rule, badges and chips go square and mono,
+ *     buttons lose their radius (the primary becomes the ink slab), the page title wears the
+ *     poster headline face, and the overview's poster pieces (.adm-ov-*, .adm-mrow) arrive.
  *   v1.13.0 — 2026-08-29 — The four monospace rules read var(--font-mono) instead of naming the family.
  *   v1.12.0 — 2026-08-24 — Organisation sign-in tab (BR-04): .adm-sso-* — the playbook steps,
  *     copy rows and the small layout utilities the tab needs instead of inline styles.
@@ -40,20 +47,20 @@
  *     in place (mono/bordered look differs from canonical .kv-row).
  */
 
-/* Admin-scoped variables: indigo accent identity + surfaces mapped to global
-   (flipping) tokens. Text tiers inherit the global tokens so they flip too. */
+/* Admin-scoped variables. The accent is the global coral (no override): which side you are on is
+   told by the GROUND, not by a foreign colour. The sidebar is the poster's ink, FIXED in both
+   themes on purpose — the settings side's sidebar is paper, this one is ink, and that inversion
+   is the whole identity (the literal values below are theme.css's light-mode ink/paper, pinned
+   here precisely so the theme cannot flip them). */
 .adm {
-  --accent: #6366F1;
-  --accent-light: rgba(99, 102, 241, 0.12);
   --glass-border: var(--border);
   --glass-bg: var(--bg-card);
   --bg-deep: var(--bg);
-  --sidebar-bg: #1E293B;            /* dark slate — sidebar stays dark in both themes (by design) */
-  --sidebar-text: #CBD5E1;
-  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-bg: #1A1A2E;            /* the poster ink, fixed in both themes (by design) */
+  --sidebar-text: #FAFAF8;          /* the poster paper, fixed with it */
+  --sidebar-dim: #9AA0B0;
+  --sidebar-border: rgba(250, 250, 248, 0.14);
 }
-/* Brighten the indigo accent for contrast on dark surfaces */
-[data-theme="dark"] .adm { --accent: #818CF8; }
 
 /* Layout */
 .adm { display: flex; min-height: 100vh; position: relative; z-index: 1; background: var(--bg-deep); color: var(--text); }
@@ -79,17 +86,18 @@
 .adm-sidebar .node-id {
   padding: 0 18px;
   padding-top: 4px;
-  color: #475569;
-  font-size: .69rem;
+  color: var(--sidebar-dim);
+  font-size: .66rem;
   font-family: var(--font-mono);
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   word-break: break-all;
 }
+/* The group label wears the sun on ink — the same pairing the poster rail uses. */
 .adm-nav-group {
-  font-size: .625rem;
+  font-size: .6rem;
   text-transform: uppercase;
-  letter-spacing: 1px;
-  color: #475569;
+  letter-spacing: .14em;
+  color: var(--sun);
   padding: 0 18px;
   margin-top: 16px;
   margin-bottom: 4px;
@@ -99,36 +107,36 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 7px 18px;
-  color: var(--sidebar-text, #CBD5E1);
-  font-size: .84rem;
+  padding: 6px 18px;
+  color: var(--sidebar-text);
+  font-size: .82rem;
   cursor: pointer;
   border: none;
   background: none;
   width: 100%;
   text-align: left;
   font-family: inherit;
-  font-weight: 400;
-  transition: all .1s;
-  border-left: 3px solid transparent;
+  font-weight: 600;
+  transition: background .1s, color .1s;
 }
-.adm-nav-item:hover { background: rgba(255,255,255,0.04); color: #F1F5F9; }
+.adm-nav-item:hover { background: rgba(250,250,248,0.08); }
+/* The selected item sits on the sun with ink words, exactly like the settings side. */
 .adm-nav-item.active {
-  color: #FFFFFF;
-  background: rgba(99,102,241,0.18);
-  border-left-color: var(--accent);
-  font-weight: 500;
+  background: var(--sun);
+  color: var(--on-sun);
+  font-weight: 800;
 }
 .adm-nav-item .label { flex: 1; }
 .adm-nav-item .cnt {
-  background: rgba(255,255,255,0.08);
-  color: #94A3B8;
-  font-size: .69rem;
-  padding: 1px 7px;
-  border-radius: 9999px;
-  font-weight: 600;
+  font-family: var(--font-mono);
+  background: none;
+  color: var(--sidebar-dim);
+  font-size: .66rem;
+  padding: 0;
+  font-weight: 500;
 }
-.adm-sep { height: 1px; background: rgba(255,255,255,0.08); margin: 8px 16px; }
+.adm-nav-item.active .cnt { color: var(--on-sun); }
+.adm-sep { height: 1px; background: var(--sidebar-border); margin: 8px 16px; }
 
 /* Main area */
 .adm-main { flex: 1; padding: 24px 32px; overflow-y: auto; background: var(--bg-deep); }
@@ -140,29 +148,44 @@
   flex-wrap: wrap;
   gap: 10px;
 }
-.adm-topbar-right { display: flex; align-items: center; gap: 12px; }
+.adm-topbar-right { display: flex; align-items: center; gap: 14px; }
 .adm-page-title {
-  font-size: 1.375rem;
+  font-size: 2.1rem;
   /* The one headline face of the site; it ships one cut, so a literal 800 would be a synthesised bold. */
   font-family: var(--font-headline);
   font-weight: var(--font-poster-weight, 800);
+  letter-spacing: var(--font-poster-tracking, .01em);
+  line-height: var(--font-poster-leading, 1);
+  text-transform: uppercase;
   color: var(--text);
   display: flex;
   align-items: center;
   gap: 10px;
 }
+/* The refresh is a quiet underlined word, and the clock beside it is a machine reading. */
+.adm-refresh {
+  background: none; border: 0; padding: 0 0 1px; cursor: pointer;
+  border-bottom: 2px solid var(--text);
+  font-family: inherit; font-weight: 800; font-size: .8rem;
+  text-transform: uppercase; letter-spacing: .04em; color: var(--text);
+}
+.adm-refresh:hover { color: var(--accent); border-bottom-color: var(--accent); }
+.adm-refresh:disabled { opacity: .5; cursor: default; }
+.adm-time { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
 
 /* Cards */
 .adm-grid { display: grid; gap: 16px; margin-bottom: 20px; }
 .adm-grid-4 { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
 .adm-grid-3 { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
 .adm-grid-2 { grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
+/* A card is a section under an ink rule now — no frame, no fill, no radius, no shadow. */
 .adm-card {
-  background: var(--glass-bg, #FFFFFF);
-  border: 1px solid var(--glass-border, #E5E7EB);
-  border-radius: 14px;
-  padding: 20px 24px;
-  box-shadow: var(--shadow-sm);
+  background: none;
+  border: 0;
+  border-top: 3px solid var(--text);
+  border-radius: 0;
+  padding: 14px 0 12px;
+  box-shadow: none;
 }
 .adm-card h2 {
   /* A card's small uppercase label is a label, not a headline: the body face, like every
@@ -170,8 +193,9 @@
   font-family: var(--font);
   font-size: .66rem;
   text-transform: uppercase;
-  letter-spacing: .5px;
-  color: var(--text-muted);
+  letter-spacing: .12em;
+  color: var(--accent);
+  font-weight: 700;
   margin-bottom: 6px;
   font-weight: 700;
 }
@@ -208,13 +232,14 @@
 .adm-db-bar { height: 6px; border-radius: 3px; background: var(--blue); min-width: 2px; }
 .adm-db-bar-track { background: var(--bg-dim); border-radius: 3px; width: 100%; }
 
-/* Badges */
+/* Badges: square and mono, the poster chip's shape; the semantic colours stay. */
 .adm-badge {
   display: inline-block;
-  padding: 2px 8px;
-  border-radius: 20px;
-  font-size: .7rem;
-  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 0;
+  font-family: var(--font-mono);
+  font-size: .66rem;
+  font-weight: 500;
   text-transform: uppercase;
 }
 /* Badge semantic colors */
@@ -264,7 +289,7 @@
 /* Error / success toast */
 .adm-toast {
   padding: 10px 16px;
-  border-radius: 8px;
+  border-radius: 0;
   font-size: .85rem;
   margin-bottom: 12px;
   display: flex;
@@ -319,43 +344,99 @@
 .adm .tag--status-queued  { color: var(--purple); }
 .adm .tag--status-draft   { color: var(--text-dim); }
 
-/* Buttons */
+/* Buttons: the primary is the poster's ink slab; the small ones are quiet squares. */
 .adm-btn {
-  background: var(--accent);
-  color: #fff;
+  background: var(--text);
+  color: var(--bg);
   border: none;
-  padding: 8px 18px;
-  border-radius: 10px;
+  padding: 9px 16px;
+  border-radius: 0;
+  box-shadow: 3px 3px 0 var(--sun);
   cursor: pointer;
-  font-size: .81rem;
+  font-size: .78rem;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
   font-family: inherit;
-  transition: all .15s;
+  transition: transform .1s, box-shadow .1s;
 }
-.adm-btn:hover { filter: brightness(0.92); }
+.adm-btn:hover { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--sun); }
 .adm-btn:disabled { opacity: .5; cursor: not-allowed; }
 .adm-btn-sm {
   background: none;
-  border: 1px solid var(--border);
-  color: var(--accent);
-  padding: 3px 10px;
-  border-radius: 6px;
+  border: 2px solid var(--border);
+  color: var(--text);
+  padding: 2px 9px;
+  border-radius: 0;
   cursor: pointer;
   font-size: .75rem;
+  font-weight: 600;
   font-family: inherit;
 }
-.adm-btn-sm:hover { background: var(--bg-surface); }
+.adm-btn-sm:hover { border-color: var(--text); }
 .adm-btn-action {
   background: none;
-  border: 1px solid var(--border);
-  color: var(--accent);
-  padding: 4px 12px;
-  border-radius: 6px;
+  border: 2px solid var(--border);
+  color: var(--text);
+  padding: 3px 11px;
+  border-radius: 0;
   cursor: pointer;
   font-size: .78rem;
+  font-weight: 600;
   font-family: inherit;
 }
-.adm-btn-action:hover { background: var(--bg-surface); }
+.adm-btn-action:hover { border-color: var(--text); }
+
+/* ── The overview in the poster face (design canvas "AIMEAT Hallinnan kehys", Main) ── */
+/* The section headline and its coral number: organism.css lays the header row out but the
+   heading's face lives in the profile sheets, which do not reach .adm — so it is said here. */
+.adm .og-sec-h h2 {
+  margin: 0;
+  font-family: var(--font-poster);
+  font-weight: var(--font-poster-weight, 400);
+  font-size: 1.5rem;
+  line-height: var(--font-poster-leading, 1);
+  letter-spacing: var(--font-poster-tracking, .01em);
+  text-transform: uppercase;
+  color: var(--text);
+}
+.adm .og-sec-h h2 small {
+  font-family: var(--font-mono);
+  font-size: .78rem;
+  font-weight: 400;
+  color: var(--accent);
+  text-transform: none;
+  letter-spacing: 0;
+  margin-left: .7rem;
+}
+.adm-ov-grid { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 0 44px; align-items: start; }
+.adm-ov-status {
+  font-family: var(--font-poster);
+  font-weight: var(--font-poster-weight, 400);
+  font-size: 3.4rem;
+  line-height: var(--font-poster-leading, 1);
+  letter-spacing: var(--font-poster-tracking, .01em);
+  text-transform: uppercase;
+  color: var(--text);
+}
+.adm-ov-status.danger { color: var(--accent); }
+.adm-ov-status.watch { color: var(--warn-fg); }
+.adm-ov-up { margin-top: .5rem; font-family: var(--font-mono); font-size: .75rem; color: var(--text-dim); }
+.adm-mrow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(10rem, auto);
+  gap: 0 1.2rem;
+  align-items: baseline;
+  padding: .55rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: .9rem;
+  color: var(--text);
+}
+.adm-mrow .adm-mval { font-family: var(--font-mono); font-size: .78rem; color: var(--text-dim); text-align: right; }
+.adm-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 0 44px; }
+@media (max-width: 860px) {
+  .adm-ov-grid { grid-template-columns: 1fr; gap: 14px 0; }
+}
 
 /* Sub-panels */
 .adm-sub-panel {
@@ -386,7 +467,7 @@
 .adm textarea:focus,
 .adm select:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+  box-shadow: none;
   outline: none;
 }
 
