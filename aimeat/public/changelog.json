@@ -5,6 +5,18 @@
       "date": "2026-08-30",
       "kind": "feature",
       "title": {
+        "en": "Email: what your address is for, your mailboxes, and the emails that are yours to switch off",
+        "fi": "Sähköposti: mihin osoitettasi käytetään, postilaatikkosi, ja kirjeet, jotka voit itse kytkeä pois"
+      },
+      "body": {
+        "en": "The Email page now says what your address unlocks (recovery, sign-in by link, invitations, being found as a contact, the emails from here) and warns before a change that the old address stops working. Your connected mailboxes (Gmail and Outlook, reading and sending apart) are on the same page with each one's state, the addresses it may send as and the apps you delegated over it, instead of among the other services on the Access page. What left through here to your customers is listed, with the contact, the kind and the outcome. And the emails AIMEAT sends you are switches: the workflow result, which used to go to every verified address, the digest of unread notifications and the reminder after a quiet fortnight; a code, a sign-in link and a password reset always go. The page also shows the last emails you got from here, and a prompt hands search, reading and sending to your own AI over MCP.",
+        "fi": "Sähköposti-sivu kertoo nyt, mitä osoitteesi avaa (palautus, kirjautuminen linkillä, kutsut, löytyminen kontaktina, kirjeet täältä) ja varoittaa ennen vaihtoa, että vanha osoite lakkaa toimimasta. Yhdistetyt postilaatikkosi (Gmail ja Outlook, luku ja lähetys erikseen) ovat samalla sivulla tiloineen, lähetysosoitteineen ja niiden yli valtuuttamiesi sovellusten kanssa, sen sijaan että ne olisivat muiden palvelujen seassa Pääsy-sivulla. Täältä asiakkaillesi lähtenyt posti näkyy listana kontaktin, lajin ja lopputuloksen kanssa. Ja kirjeet, joita AIMEAT lähettää sinulle, ovat kytkimiä: työnkulun tulos, joka lähti ennen jokaiseen vahvistettuun osoitteeseen, kooste lukemattomista ilmoituksista ja muistutus hiljaisen kahden viikon jälkeen; koodi, kirjautumislinkki ja salasanan palautus lähtevät aina. Sivu näyttää myös viimeisimmät täältä saamasi kirjeet, ja kehote antaa haun, lukemisen ja lähettämisen omalle tekoälyllesi MCP:n yli."
+      }
+    },
+    {
+      "date": "2026-08-30",
+      "kind": "feature",
+      "title": {
         "en": "Notifications show what happened, and you decide who may reach your devices",
         "fi": "Ilmoitukset näyttävät, mitä tapahtui, ja sinä päätät, kuka pääsee laitteillesi"
       },
