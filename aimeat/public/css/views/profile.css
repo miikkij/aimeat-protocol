@@ -3144,50 +3144,7 @@
 .pj-pinv-editor { margin: 0.3rem 0 0.5rem 1.2rem; }
 .pj-member-access { margin: 0.2rem 0 0.6rem 2.6rem; }
 
-/* ── Contacts tab (address book) ── */
-.pf-ct-addrow { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin: 0.7rem 0; }
-.pf-ct-filter { max-width: 180px; margin-left: auto; }
-.pf-ct-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.45rem 0; border-bottom: 1px solid var(--border); }
-.pf-ct-avatar { flex: 0 0 auto; width: 2rem; height: 2rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--bg-dim); color: var(--text); font-size: 0.78rem; font-weight: 600; }
-.pf-ct-main { min-width: 0; flex: 1; }
-.pf-ct-name { font-size: 0.88rem; font-weight: 500; color: var(--text); display: flex; align-items: center; gap: 0.35rem; }
-.pf-ct-id { font-size: 0.74rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pf-ct-count { color: var(--muted); font-weight: 400; }
-.pf-ct-miss { border: 1px dashed var(--border); border-radius: 8px; padding: 0.4rem 0.6rem; background: var(--bg-dim); }
-.pf-ct-blocked { margin-top: 0.8rem; }
-/* Each contact group (saved / messaged) is framed as a card; the last row drops its
-   divider so it doesn't leave a stray line above the card's bottom padding. */
-.pf-ct-group { margin-top: 0.85rem; }
-.pf-ct-group .pf-ct-row:last-child { border-bottom: none; padding-bottom: 0; }
-/* Saving a PERSON the node does not have (TARGET-063): the panel is folded away until asked for,
-   so the common case (pick an identity) keeps the one-line add row it always had. */
-.pf-ct-person { border: 1px solid var(--border); border-radius: 10px; background: var(--card); padding: 0.6rem 0.7rem; margin: 0 0 0.85rem; }
-.pf-ct-person-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-.pf-ct-person-grid .input-field { flex: 1 1 12rem; min-width: 0; }
-.pf-ct-person-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 0.5rem; }
-.pf-ct-person-hint { font-size: 0.74rem; color: var(--muted); flex: 1 1 100%; }
-/* The card under a contact's name: address, the owner's own word for the relationship, and where
-   else this person is. Wraps rather than pushing the row wide on a phone. */
-/* On a phone the name, its badges and the row's buttons were all competing for one line, so a
-   two-word name broke across three lines beside a badge doing the same. The name takes the line;
-   badges wrap under it; the buttons drop to their own row rather than squeezing the name column. */
-@media (max-width: 560px) {
-  .pf-ct-name { flex-wrap: wrap; }
-  .pf-ct-name > :first-child { flex: 1 0 100%; }
-  /* A badge sizes to its word. Without this it stretches to the line the name just claimed and
-     reads as a banner across the row rather than a label on a person. */
-  .pf-ct-name .badge { flex: 0 0 auto; }
-  .pf-ct-row { flex-wrap: wrap; }
-  .pf-ct-main { flex: 1 0 calc(100% - 2.6rem); }
-  .pf-ct-row > button { margin-left: auto; }
-}
-.pf-ct-card { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.6rem; margin-top: 0.15rem; }
-.pf-ct-card-note { font-size: 0.76rem; color: var(--text-dim); flex: 1 1 100%; }
-.pf-ct-links { display: flex; flex-wrap: wrap; gap: 0.4rem; }
-.pf-ct-links a { font-size: 0.74rem; color: var(--accent); text-decoration: none; }
-.pf-ct-links a:hover { text-decoration: underline; }
-.pf-ct-edit { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.4rem; }
-.pf-ct-edit .input-field { flex: 1 1 10rem; min-width: 0; }
+/* The Contacts tab lives in css/views/contacts-poster.css (the poster face, 2026-08-30). */
 .pj-orgsearch { margin: 0 0 0.6rem; }
 .pj-orgsearch-input { min-width: 220px; }
 .pj-board-post { border: 1px solid var(--border); border-radius: 10px; background: var(--card); padding: 0.5rem 0.7rem; margin-bottom: 0.5rem; }

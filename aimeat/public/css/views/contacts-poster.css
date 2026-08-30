@@ -1,0 +1,117 @@
+/**
+ * @file contacts-poster.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The Contacts page in the poster face (ct- prefix; design canvas "AIMEAT Kontaktien
+ *   sivu", direction A). The shared parts (crumb, masthead, strip, sections, folds, rail, fields,
+ *   choices) come from organism.css's og- rules; this file carries what contacts add: the three
+ *   tables (people, people without an account, agents and apps) with an initials mark, tags, the
+ *   last message; the three roads; the person form and the facts list; the together list; a
+ *   message; the organism chooser box. NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-08-30 — Initial.
+ */
+
+.og-ct .og-door.on { color: var(--accent); border-bottom-color: var(--accent); }
+.og-ct .og-choice-btn.on { background: var(--text); color: var(--card-bg); }
+.og-ct .og-empty { margin: 0; font-size: .9rem; color: var(--text-dim); }
+.og-ct .ct-hint { margin: .6rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--text-dim); display: block; }
+.og-ct .ct-kv .ct-hint, .og-ct .ct-form .ct-hint { margin-top: .2rem; }
+.og-ct .ct-prose { margin: 0 0 .6rem; font-size: .92rem; line-height: 1.55; color: var(--text); }
+.og-ct .ct-bad { color: var(--accent); }
+.og-ct .ct-dim { color: var(--text-dim); }
+.og-ct .ct-loading { display: inline-block; padding-left: 1.1rem; position: relative; }
+.og-ct .ct-loading::before { content: ''; position: absolute; left: 0; top: .35em; width: .55em; height: .55em; background: var(--accent); animation: ctBlink 1s steps(2, start) infinite; }
+@keyframes ctBlink { to { visibility: hidden; } }
+.og-title.ct-title--page { font-size: 2.1rem; overflow-wrap: anywhere; }
+.og-ct .og-label { display: block; }
+.og-ct .og-chip.ct-chip--case { text-transform: none; }
+.og-ct .og-fold > span:not(.og-fold-r):not(.og-fold-arrow) { white-space: nowrap; }
+.og-ct .og-fold-r { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.og-ct .ct-search { margin: 0 0 .8rem; max-width: 26rem; }
+.og-ct .ct-more { margin-top: .8rem; }
+
+/* ── The tables ─────────────────────────────────────────────────────────────────────────────── */
+.ct-rows { display: grid; grid-template-columns: 2.2rem minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.1fr) auto; gap: 0 .9rem; align-items: center; }
+.ct-rows--mail { grid-template-columns: 2.2rem minmax(0, 1.2fr) minmax(0, .9fr) minmax(0, 1.3fr) minmax(0, 8rem) auto; }
+.ct-rows--agents { grid-template-columns: 2.2rem minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1.1fr) auto; }
+.ct-rows > div { padding: .55rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
+.ct-rows--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.ct-av { width: 2.2rem; height: 2.2rem; display: flex; align-items: center; justify-content: center; border: 2px solid var(--text); font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: .95rem; color: var(--text); }
+.ct-av--agent { border-style: dashed; color: var(--text-dim); }
+.ct-nm { font-weight: 800; font-size: .95rem; color: var(--text); }
+.ct-nm .og-tbl-name { white-space: normal; overflow-wrap: anywhere; }
+.ct-nm .ct-nm-plain { font-weight: 800; }
+.ct-nm small { display: block; font-size: .74rem; font-weight: 400; color: var(--text-dim); margin-top: .1rem; font-family: var(--font-mono); overflow-wrap: anywhere; }
+.ct-rows--agents .ct-nm small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ct-w { font-size: .82rem; line-height: 1.45; color: var(--text); overflow-wrap: anywhere; }
+.ct-w .ct-kind { display: block; font-size: .72rem; color: var(--text-dim); }
+.ct-m { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
+.ct-note { font-size: .78rem; color: var(--text-dim); }
+.ct-last b { display: block; font-family: var(--font-mono); font-size: .72rem; font-weight: 500; color: var(--text); }
+.ct-last small { display: block; font-size: .76rem; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ct-doors { white-space: nowrap; }
+.ct-doors .og-door { margin-left: .8rem; }
+.ct-tags { display: inline-flex; flex-wrap: wrap; gap: .3rem; }
+.ct-tag { display: inline-block; padding: .1rem .45rem; border: 1px solid var(--text); font-size: .68rem; font-weight: 700; letter-spacing: .04em; color: var(--text); background: transparent; font-family: inherit; }
+.ct-tag--rel { background: var(--text); color: var(--card-bg); }
+.ct-tag--x { cursor: pointer; }
+.ct-tag--x:hover { color: var(--accent); border-color: var(--accent); }
+
+/* ── The roads and the form ─────────────────────────────────────────────────────────────────── */
+.ct-roads { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem; }
+.ct-road { display: flex; flex-direction: column; gap: .35rem; padding: .9rem 1rem; border: 2px solid var(--text); background: var(--card-bg); font-size: .85rem; line-height: 1.5; color: var(--text-dim); cursor: pointer; }
+.ct-road.on { border-color: var(--accent); }
+.ct-road b { font-weight: 800; font-size: .95rem; color: var(--text); }
+.ct-road p { margin: 0; }
+.ct-road-k { font-family: var(--font-mono); font-size: .7rem; color: var(--accent); }
+.ct-road .og-doors { margin-top: auto; padding-top: .4rem; }
+.ct-form-wrap { margin-top: 1.2rem; }
+.ct-addrow { display: flex; flex-wrap: wrap; align-items: flex-start; gap: .6rem; margin-top: .5rem; }
+.ct-addrow > :first-child { flex: 1 1 18rem; min-width: 0; }
+.ct-kv { display: grid; grid-template-columns: 9rem minmax(0, 1fr); gap: .55rem 1rem; align-items: start; margin-top: .6rem; }
+.ct-kv .k { font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); padding-top: .35rem; }
+.ct-kv .v { font-size: .92rem; line-height: 1.5; color: var(--text); min-width: 0; }
+.ct-kv .v .og-doors { margin-top: .3rem; }
+.ct-form .og-input, .ct-form .og-textarea { width: 100%; box-sizing: border-box; }
+.ct-form .ct-in--name { font-weight: 800; font-size: 1.05rem; }
+.ct-form .ct-in--short { max-width: 16rem; margin-top: .35rem; }
+.ct-form .ct-tags { margin-bottom: .2rem; }
+.ct-linkrow { display: grid; grid-template-columns: minmax(0, 10rem) minmax(0, 1fr) auto; gap: .5rem; align-items: center; margin-bottom: .4rem; }
+.ct-form-doors { margin-top: 1rem; }
+.ct-choice { margin-bottom: .2rem; }
+.ct-link { display: inline-block; margin-right: .8rem; color: var(--accent); text-decoration: none; border-bottom: 1px solid var(--accent); }
+.ct-link:hover { color: var(--text); border-bottom-color: var(--text); }
+
+/* ── Together, messages, the box ────────────────────────────────────────────────────────────── */
+.ct-where { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem 1.4rem; }
+.ct-where > div { padding: .5rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
+.ct-where b { display: block; font-weight: 800; font-size: .92rem; color: var(--text); }
+.ct-where small { display: block; font-size: .78rem; line-height: 1.45; color: var(--text-dim); }
+.ct-msg { padding: .6rem 0; border-bottom: 1px solid var(--border); font-size: .92rem; line-height: 1.5; color: var(--text); }
+.ct-msg small { display: block; margin-top: .15rem; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); }
+.ct-box { margin: 0 0 1.2rem; padding: .9rem 1rem; border: 2px solid var(--accent); }
+.ct-box .og-box-label { display: block; margin-bottom: .4rem; }
+.ct-box .og-doors { flex-wrap: wrap; }
+
+/* ── Phone ──────────────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 860px) {
+  /* Three columns and two rows per contact: the mark spans both rows, the name and the doors share
+     the first, the last message (or the invitation) takes the second. Every cell names its column
+     and the flow is dense, so the doors land beside the name rather than after the second row. */
+  .ct-rows, .ct-rows--mail, .ct-rows--agents { grid-template-columns: 2.2rem minmax(0, 1fr) auto; grid-auto-flow: dense; }
+  .ct-rows--head { display: none; }
+  .ct-rows > .ct-av { grid-column: 1; grid-row: span 2; align-self: start; margin-top: .55rem; }
+  .ct-rows > .ct-nm { grid-column: 2; border-bottom: 0; padding-bottom: 0; }
+  .ct-rows > .ct-doors { grid-column: 3; border-bottom: 0; padding-bottom: 0; }
+  .ct-rows > .ct-w:not(.ct-last) { display: none; }
+  .ct-rows > .ct-last { grid-column: 2 / 4; padding-top: .2rem; }
+  .ct-rows--mail > .ct-w.ct-m { display: block; grid-column: 2 / 4; padding-top: .2rem; }
+  .ct-nm small { white-space: normal; }
+  .ct-roads { grid-template-columns: 1fr; }
+  .ct-kv { grid-template-columns: 1fr; gap: .25rem 0; }
+  .ct-kv .k { padding-top: .5rem; }
+  .ct-where { grid-template-columns: 1fr; }
+  .ct-linkrow { grid-template-columns: 1fr; }
+  .ct-doors .og-door { margin-left: .5rem; }
+}
