@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Action, Work, Wallet, Board, OTK, Node-key, Dispute, Micro-memory methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.5.0 — 2026-08-30 — boards.rules round-trips; updateBoardRules, updatePostExpiry and
+ *     boardAuthorStanding (posts, thanks, first post per author in one grouped query); listReplies
+ *     and replyCounts, since listPosts leaves replies out and nothing listed them.
  *   v1.4.0 — 2026-08-30 — listPosts pages in SQL (expiry, cursor with an id tie-break, LIMIT) instead
  *     of loading the whole board and deleting expired rows as a side effect of a read; deleteBoard
  *     removes the board's subscriptions with its posts.
@@ -23,7 +26,7 @@
  */
 import type {
   ActionRecord, WorkRecord, WalletTransaction, BoardRecord, BoardPostRecord, OtkRecord,
-  DisputeRecord, DisputeAuditEntry, BoardSubscriptionRecord
+  DisputeRecord, DisputeAuditEntry, BoardSubscriptionRecord, BoardRules, BoardAuthorStanding,
 } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
 import { countActionsForProviders as countActionsForProvidersRepo } from '../repos/action.js';
@@ -314,14 +317,15 @@ export const workMethods = {
 
   async createBoard(this: SqliteStorage, board: BoardRecord): Promise<BoardRecord> {
     this.db.prepare(
-      `INSERT INTO boards (id, name, description, visibility, ownerGaii, allowedGaiis, createdAt, semantic, federate)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO boards (id, name, description, visibility, ownerGaii, allowedGaiis, createdAt, semantic, federate, rules)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       board.id, board.name, board.description ?? null,
       board.visibility, board.ownerGaii,
       JSON.stringify(board.allowedGaiis), board.createdAt,
       board.semantic ? JSON.stringify(board.semantic) : null,
       board.federate ? 1 : 0,
+      board.rules ? JSON.stringify(board.rules) : null,
     );
     return board;
   },
@@ -353,6 +357,12 @@ export const workMethods = {
 
   async updateBoardMembers(this: SqliteStorage, id: string, allowedGaiis: string[]): Promise<BoardRecord | null> {
     const result = this.db.prepare('UPDATE boards SET allowedGaiis = ? WHERE id = ?').run(JSON.stringify(allowedGaiis), id);
+    if (result.changes === 0) return null;
+    return this.getBoard(id);
+  },
+
+  async updateBoardRules(this: SqliteStorage, id: string, rules: BoardRules | null): Promise<BoardRecord | null> {
+    const result = this.db.prepare('UPDATE boards SET rules = ? WHERE id = ?').run(rules ? JSON.stringify(rules) : null, id);
     if (result.changes === 0) return null;
     return this.getBoard(id);
   },
@@ -419,6 +429,44 @@ export const workMethods = {
     return result.changes > 0;
   },
 
+  async listReplies(this: SqliteStorage, boardId: string, postId: string): Promise<BoardPostRecord[]> {
+    const rows = this.db.prepare('SELECT * FROM board_posts WHERE boardId = ? AND replyTo = ? ORDER BY createdAt ASC, id ASC').all(boardId, postId) as Record<string, unknown>[];
+    return rows.map(row => this.deserializePost(row));
+  },
+
+  async replyCounts(this: SqliteStorage, boardId: string, postIds: string[]): Promise<Record<string, number>> {
+    const out: Record<string, number> = {};
+    if (postIds.length === 0) return out;
+    const marks = postIds.map(() => '?').join(', ');
+    const rows = this.db.prepare(`SELECT replyTo, COUNT(*) AS n FROM board_posts WHERE boardId = ? AND replyTo IN (${marks}) GROUP BY replyTo`).all(boardId, ...postIds) as Array<{ replyTo: string; n: number }>;
+    for (const r of rows) out[r.replyTo] = Number(r.n);
+    return out;
+  },
+
+  async updatePostExpiry(this: SqliteStorage, boardId: string, postId: string, ttlExpiresAt: string): Promise<boolean> {
+    const result = this.db.prepare('UPDATE board_posts SET ttlExpiresAt = ? WHERE boardId = ? AND id = ?').run(ttlExpiresAt, boardId, postId);
+    return result.changes > 0;
+  },
+
+  async boardAuthorStanding(this: SqliteStorage, gaiis: string[]): Promise<Record<string, BoardAuthorStanding>> {
+    // One grouped query for the page's authors. json_array_length with a path answers NULL when the
+    // post has no 'thanks' reactions, which COALESCE turns into the zero it means.
+    const out: Record<string, BoardAuthorStanding> = {};
+    if (gaiis.length === 0) return out;
+    const marks = gaiis.map(() => '?').join(', ');
+    const rows = this.db.prepare(
+      `SELECT authorGaii,
+              SUM(CASE WHEN replyTo IS NULL THEN 1 ELSE 0 END) AS posts,
+              SUM(COALESCE(json_array_length(reactions, '$.thanks'), 0)) AS thanks,
+              MIN(createdAt) AS since
+       FROM board_posts WHERE authorGaii IN (${marks}) GROUP BY authorGaii`,
+    ).all(...gaiis) as Array<{ authorGaii: string; posts: number; thanks: number; since: string | null }>;
+    for (const r of rows) {
+      out[r.authorGaii] = { gaii: r.authorGaii, posts: Number(r.posts), thanks: Number(r.thanks), ...(r.since ? { since: r.since } : {}) };
+    }
+    return out;
+  },
+
   async pruneExpiredBoardPosts(this: SqliteStorage, nowIso: string): Promise<number> {
     // ISO-8601 strings compare correctly as text, so this is one indexed-scan DELETE with no
     // values loaded — the TTL sweep no longer pages 10,000 posts per board through listPosts.
@@ -450,6 +498,7 @@ export const workMethods = {
     if (row.description) record.description = row.description as string;
     if (row.semantic) record.semantic = JSON.parse(row.semantic as string);
     record.federate = row.federate === 1;
+    if (row.rules) record.rules = JSON.parse(row.rules as string) as BoardRules;
     return record;
   },
 

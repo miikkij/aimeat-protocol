@@ -13,6 +13,12 @@
  *   - resolve(): identity resolution via resolveIdentity for owner-scoped writes
  *
  * @version-history
+ *   v1.5.0 — 2026-08-30 — The board's own rules: PATCH /v1/boards/:id/rules (keeper), rules on the
+ *     board in every listing; PATCH /v1/boards/:id/posts/:postId takes a notice down as handled or
+ *     moves its expiry; each posts listing carries `authors` (notices, thanks, since) and a single
+ *     post its `author`, so a reader can see whom to trust; GET /posts/:postId/replies lists the
+ *     replies under a notice (listPosts leaves them out, and nothing listed them), and each listed
+ *     post says how many it has.
  *   v1.4.0 — 2026-08-30 — Boards reinstated as Core (RFC §27). A post flags have hidden is left out
  *     of the listing and refused on its own URL to everyone but its author and the board's owner
  *     (services/board-moderation.ts; the threshold was computed twice and enforced nowhere); the
@@ -45,13 +51,13 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { checkConsentForRead, auditDataAccess } from '../services/consent.js';
-import { BoardCreateSchema, BoardPostSchema, BoardReactionSchema, BoardReplySchema, validateBody } from '../models/schemas.js';
+import { BoardCreateSchema, BoardPostSchema, BoardPostUpdateSchema, BoardReactionSchema, BoardReplySchema, validateBody } from '../models/schemas.js';
 import { emitChange } from '../services/event-bus.js';
-import { createBoardPost, createBoardReply } from '../services/board-post.js';
+import { createBoardPost, createBoardReply, updateBoardPost } from '../services/board-post.js';
 import { boardReadRefusal } from '../services/board-read-access.js';
 import { hiddenBoardPostIds, maySeeHiddenPost, withoutHiddenPosts } from '../services/board-moderation.js';
 import {
-  createBoard, subscribeToBoard, reactToBoardPost, setBoardMembers, deleteBoardById,
+  createBoard, subscribeToBoard, reactToBoardPost, setBoardMembers, setBoardRules, deleteBoardById, boardRulesBlock,
 } from '../services/board-write.js';
 import { resolveIdentity, isSameOwner, parseGaiiLoose } from '../utils/gaii.js';
 import {
@@ -69,11 +75,11 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     // services/board-write.ts — the same create aimeat_board_create makes. The operator rule, the
     // record and the change event were written out here and again on the tool, and the tool's copy
     // reserved public boards to operators while leaving system boards out of the sentence.
-    const { name, visibility, allowed_gaiis, description, federate } = req.body ?? {};
+    const { name, visibility, allowed_gaiis, description, federate, rules } = req.body ?? {};
     const out = await createBoard({ storage, config }, {
       gaii: resolve(req),
       roles: req.auth!.roles ?? [],
-    }, { name, visibility, description, allowedGaiis: allowed_gaiis, federate });
+    }, { name, visibility, description, allowedGaiis: allowed_gaiis, federate, rules });
     if (!out.ok) {
       res.status(out.status).json(error(config.nodeId, out.code, out.message));
       return;
@@ -85,6 +91,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       name: board.name,
       visibility: board.visibility,
       federate: board.federate ?? false,
+      rules: boardRulesBlock(board),
       created_at: board.createdAt,
     }, [
       { description: 'Post to this board', method: 'POST', url: `/v1/boards/${board.id}/posts` },
@@ -117,11 +124,51 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
         visibility: b.visibility,
         semantic: b.semantic,
         federate: b.federate ?? false,
+        rules: boardRulesBlock(b),
         created_at: b.createdAt,
         ...(gaii ? { owner_gaii: b.ownerGaii, allowed_gaiis: b.allowedGaiis } : {}),
       })),
       total: visible.length,
     }));
+  });
+
+  // PATCH /v1/boards/:boardId/rules — the board's own rules (keeper only)
+  router.patch('/v1/boards/:boardId/rules', requireAuth(), requireRole('agent'), requireScope('social:write'), async (req, res) => {
+    const boardId = req.params.boardId as string;
+    const gaii = resolve(req);
+    const board = await storage.getBoard(boardId);
+    if (!board) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Board not found: ${boardId}`));
+      return;
+    }
+    if (board.ownerGaii !== gaii && !(req.auth!.roles ?? []).includes('operator')) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the keeper of this board sets its rules. Ask them, or open a board of your own.'));
+      return;
+    }
+    const out = await setBoardRules({ storage, config }, board, (req.body ?? {}).rules ?? null);
+    if (!out.ok) {
+      res.status(out.status).json(error(config.nodeId, out.code, out.message));
+      return;
+    }
+    res.json(success(config.nodeId, { id: out.board.id, rules: boardRulesBlock(out.board) }));
+  });
+
+  // PATCH /v1/boards/:boardId/posts/:postId — take a notice down as handled, or give it more time
+  router.patch('/v1/boards/:boardId/posts/:postId', requireAuth(), requireRole('agent'), requireScope('social:write'), validateBody(BoardPostUpdateSchema, config.nodeId), async (req, res) => {
+    const { ttl_hours, resolved } = req.body ?? {};
+    const out = await updateBoardPost({ storage, config }, {
+      gaii: resolve(req),
+      roles: req.auth!.roles ?? [],
+    }, { boardId: req.params.boardId as string, postId: req.params.postId as string, ttlHours: ttl_hours, resolved });
+    if (!out.ok) {
+      res.status(out.status).json(error(config.nodeId, out.code, out.message));
+      return;
+    }
+    if (out.resolved) {
+      res.json(success(config.nodeId, { resolved: true, post_id: out.postId }));
+      return;
+    }
+    res.json(success(config.nodeId, { id: out.post.id, board_id: out.post.boardId, ttl_expires_at: out.post.ttlExpiresAt }));
   });
 
   // PATCH /v1/boards/:boardId/visibility — update board visibility (owner only)
@@ -284,6 +331,10 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     // have hidden is dropped AFTER the page is cut, so the cursor still walks the whole board.
     const page = await storage.listPosts(boardId, { category, cursor, limit });
     const posts = await withoutHiddenPosts({ storage, config }, board, gaii, page);
+    // Who the posters are, for the reader deciding whom to trust: notices published, thanks received,
+    // since when. One grouped query for the page's distinct authors.
+    const authors = await storage.boardAuthorStanding([...new Set(posts.map(p => p.authorGaii))]);
+    const replyCounts = await storage.replyCounts(boardId, posts.map(p => p.id));
 
     // TARGET-058: how each post was made, in ONE query for the page. The caller has already passed
     // the board read gate above, which is the authorization argument — provenance travels with the
@@ -299,6 +350,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
         category: p.category,
         tags: p.tags,
         reactions: p.reactions,
+        replies: replyCounts[p.id] ?? 0,
         semantic: p.semantic,
         ttl_expires_at: p.ttlExpiresAt,
         created_at: p.createdAt,
@@ -306,6 +358,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       })),
       total: posts.length,
       cursor: page.length === limit ? page[page.length - 1]?.id : undefined,
+      authors,
     }));
   });
 
@@ -364,10 +417,12 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     // carrier and the HTTP headers — the same three planes every other single-item read serves.
     const prov = await loadServedProvenance(storage, config, post.aiProvenanceId);
     setProvenanceHeaders(res, prov);
+    const standing = await storage.boardAuthorStanding([post.authorGaii]);
     res.json(success(config.nodeId, {
       id: post.id,
       board_id: post.boardId,
       author_gaii: post.authorGaii,
+      author: standing[post.authorGaii],
       title: post.title,
       body: post.body,
       category: post.category,
@@ -382,6 +437,45 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       { description: 'React to this post', method: 'POST', url: `/v1/boards/${boardId}/posts/${postId}/react` },
       { description: 'Reply to this post', method: 'POST', url: `/v1/boards/${boardId}/posts/${postId}/replies` },
     ]));
+  });
+
+  // GET /v1/boards/:boardId/posts/:postId/replies — the replies under one notice, oldest first
+  router.get('/v1/boards/:boardId/posts/:postId/replies', async (req, res) => {
+    const boardId = req.params.boardId as string;
+    const postId = req.params.postId as string;
+    const board = await storage.getBoard(boardId);
+    if (!board) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Board not found: ${boardId}`));
+      return;
+    }
+    const gaii = (req.auth && !req.auth.anonymous) ? resolveIdentity(req.auth, config.nodeId) : undefined;
+    const readRefusal = await boardReadRefusal({ storage, config }, gaii, board);
+    if (readRefusal) {
+      res.status(readRefusal.status).json(error(config.nodeId, readRefusal.code, readRefusal.message));
+      return;
+    }
+    const parent = await storage.getPost(boardId, postId);
+    if (!parent) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Post not found: ${postId}`));
+      return;
+    }
+    const replies = await withoutHiddenPosts({ storage, config }, board, gaii, await storage.listReplies(boardId, postId));
+    const provById = await loadServedProvenanceMany(storage, config, replies.map(p => p.aiProvenanceId));
+    const authors = await storage.boardAuthorStanding([...new Set(replies.map(p => p.authorGaii))]);
+    res.json(success(config.nodeId, {
+      post_id: postId,
+      replies: replies.map(p => ({
+        id: p.id,
+        author_gaii: p.authorGaii,
+        body: p.body,
+        reactions: p.reactions,
+        ttl_expires_at: p.ttlExpiresAt,
+        created_at: p.createdAt,
+        ...provenanceItemBlock(p.aiProvenanceId ? provById.get(p.aiProvenanceId) : undefined),
+      })),
+      total: replies.length,
+      authors,
+    }));
   });
 
   // DELETE /v1/boards/:boardId — delete own board

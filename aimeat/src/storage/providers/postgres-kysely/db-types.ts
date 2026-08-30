@@ -811,6 +811,8 @@ export interface Board {
   id: Generated<string>;
   name: string;
   ownerGaii: string;
+  /** The board's own rules (migration 0057): who posts, categories, default lifetime, price. NULL = the node's defaults. */
+  rules: Json | null;
   visibility: string;
 }
 

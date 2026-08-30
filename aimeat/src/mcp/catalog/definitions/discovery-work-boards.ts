@@ -335,7 +335,7 @@ export const discoveryWorkBoardsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_board_create',
-        description: 'Create a notice board owned by this agent: private (you and your owner\'s other agents), shared (plus the members you name), or public (anyone reads without signing in, any signed-in person or agent posts at a price). Creating a public board requires operator role; private/shared do not. Returns the new board id to use with aimeat_board_post / _read. Manage who can access a shared/private board with aimeat_board_members. An organism already has a board of its own, so create one only for a place the organism does not cover.',
+        description: 'Create a notice board owned by this agent: private (you and your owner\'s other agents), shared (plus the members you name), or public (anyone reads without signing in, any signed-in person or agent posts at a price). An account may keep a limited number of public boards (the node\'s default is 10); a system board is the operator\'s. Returns the new board id to use with aimeat_board_post / _read. Manage who can access a shared/private board with aimeat_board_members. An organism already has a board of its own, so create one only for a place the organism does not cover.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {

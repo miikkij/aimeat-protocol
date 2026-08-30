@@ -6,6 +6,7 @@
  *   to satisfy max-file-lines. Idempotent (IF NOT EXISTS); applied in numeric order so
  *   the on-disk DDL order is byte-for-byte unchanged from the original single exec block.
  * @version-history
+ *   v1.5.0 — 2026-08-30 — boards.rules (migration 0057): the board's own rules as JSON.
  *   v1.4.0 — 2026-08-13 — agents.registeredBy (migration 0035).
  *   v1.3.0 — 2026-08-13 — agents.consoleUrl (see migration 0034 for why). schema.ts adds it to an
  *     existing database; this is the fresh-install shape.
@@ -165,7 +166,8 @@ export function applySchemaTables1(db: Database.Database): void {
       ownerGaii      TEXT NOT NULL,
       allowedGaiis   TEXT NOT NULL DEFAULT '[]',
       createdAt      TEXT NOT NULL,
-      semantic       TEXT
+      semantic       TEXT,
+      rules          TEXT
     );
 
     -- ── Board Posts ──

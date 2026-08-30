@@ -123,6 +123,31 @@
       if (!res.ok) throw new Error(res.error?.message || "Failed to reply");
       return res.data;
     },
+    // Take a notice down as handled (resolved: true) or move its expiry (ttl_hours). Author or board keeper.
+    async updatePost(boardId, postId, changes) {
+      const res = await authFetch2(
+        "/v1/boards/" + encodeURIComponent(boardId) + "/posts/" + encodeURIComponent(postId),
+        { method: "PATCH", body: JSON.stringify(changes) }
+      );
+      if (!res.ok) throw new Error(res.error?.message || "Failed to update post");
+      return res.data;
+    },
+    // ── Rules (board keeper only) ──
+    // Set the board's own rules: { posting, categories, default_ttl_hours, post_cost }. null resets them.
+    async setRules(boardId, rules) {
+      const res = await authFetch2("/v1/boards/" + encodeURIComponent(boardId) + "/rules", {
+        method: "PATCH",
+        body: JSON.stringify({ rules })
+      });
+      if (!res.ok) throw new Error(res.error?.message || "Failed to set board rules");
+      return res.data;
+    },
+    // True when a session is signed in, so a page can show the visitor a sign-in door instead of
+    // letting post()/react()/reply() throw.
+    signedIn() {
+      const auth = window.AIMEAT && window.AIMEAT.auth;
+      return !!(auth && auth.getSession && auth.getSession());
+    },
     // ── Subscriptions ──
     // Subscribe to a board
     async subscribe(boardId, opts) {

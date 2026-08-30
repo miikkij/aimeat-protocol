@@ -12,6 +12,8 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   v1.8.0 — 2026-08-30 — boards.public_per_owner_max (AIMEAT_BOARD_PUBLIC_PER_OWNER_MAX): how many
+ *     public notice boards one account may keep, now that opening one is no longer the operator's.
  *   v1.7.0 — 2026-08-29 — The ai.label_public row (AIMEAT_AI_LABEL_PUBLIC), out of the coverage
  *     backlog: the visible-label policy an operator has to be able to see and set, now that a named
  *     reviewer's effect on an app and its legal pages depends on it.
@@ -178,6 +180,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'maxOperatorMintPerDay', dotPath: 'morsel_policy.max_operator_mint_per_day', envVar: 'AIMEAT_MAX_OPERATOR_MINT_PER_DAY', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Max morsels operator can mint per day', range: '0-1000000' },
   { key: 'boardPostBaseCost', dotPath: 'morsel_policy.board_post_base_cost', envVar: 'AIMEAT_BOARD_POST_BASE_COST', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Base morsel cost for public board posts', range: '0-1000' },
   { key: 'boardPostCostPerKb', dotPath: 'morsel_policy.board_post_cost_per_kb', envVar: 'AIMEAT_BOARD_POST_COST_PER_KB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Additional morsel cost per KB of post body', range: '0-100' },
+  { key: 'boardPublicPerOwnerMax', dotPath: 'boards.public_per_owner_max', envVar: 'AIMEAT_BOARD_PUBLIC_PER_OWNER_MAX', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Public notice boards one account may keep (system boards stay operator-only)', range: '0-1000' },
 
   // ── Auth (mutable) ──
   { key: 'jwtTtlSeconds', dotPath: 'auth.jwt_ttl_seconds', envVar: 'AIMEAT_JWT_TTL', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 60, immutable: false, description: 'JWT token time-to-live in seconds', range: '60-86400' },

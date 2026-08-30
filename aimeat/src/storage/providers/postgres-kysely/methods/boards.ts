@@ -7,6 +7,9 @@
  *   and the boards API. Translated 1:1 from the Prisma implementation. The business key is `boardId`
  *   (record.id), `postId` for posts.
  * @version-history
+ *   v1.4.0 — 2026-08-30 — Board.rules round-trips (migration 0057); updateBoardRules, updatePostExpiry
+ *     and boardAuthorStanding (posts, thanks, first post per author in one grouped query);
+ *     listReplies and replyCounts, since listPosts leaves replies out and nothing listed them.
  *   v1.3.0 — 2026-08-30 — listPosts honours the cursor (it was accepted and ignored, so page two was
  *     page one) and filters expiry in SQL rather than after LIMIT; deleteBoard removes the board's
  *     subscriptions with its posts.
@@ -17,8 +20,8 @@
  *     ./ai-provenance.ts, so an anonymous reader of that board can resolve the record behind it.
  *   v1.0.0 — 2026-07-15 — Phase 5: boards on Postgres+Kysely.
  */
-import type { Selectable } from 'kysely';
-import type { BoardPostRecord, BoardRecord, BoardSubscriptionRecord } from '../../../interface.js';
+import { sql, type Selectable } from 'kysely';
+import type { BoardPostRecord, BoardRecord, BoardSubscriptionRecord, BoardRules, BoardAuthorStanding } from '../../../interface.js';
 import type { Board, BoardPost, BoardSubscription } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
 import { jsonb } from '../helpers.js';
@@ -26,7 +29,11 @@ import { jsonb } from '../helpers.js';
 const iso = (t: Date | string): string => (t instanceof Date ? t : new Date(t)).toISOString();
 
 function toBoard(r: Selectable<Board>): BoardRecord {
-  return { id: r.boardId, name: r.name, description: r.description ?? undefined, visibility: r.visibility as BoardRecord['visibility'], ownerGaii: r.ownerGaii, allowedGaiis: r.allowedGaiis ?? [], federate: r.federate ?? false, createdAt: iso(r.createdAt) };
+  return {
+    id: r.boardId, name: r.name, description: r.description ?? undefined, visibility: r.visibility as BoardRecord['visibility'], ownerGaii: r.ownerGaii,
+    allowedGaiis: r.allowedGaiis ?? [], federate: r.federate ?? false, createdAt: iso(r.createdAt),
+    ...(r.rules ? { rules: r.rules as BoardRules } : {}),
+  };
 }
 function toPost(r: Selectable<BoardPost>): BoardPostRecord {
   return { id: r.postId, boardId: r.boardId, authorGaii: r.authorGaii, title: r.title, body: r.body, category: r.category ?? undefined, tags: r.tags ?? [], ttlExpiresAt: r.ttlExpiresAt ? iso(r.ttlExpiresAt) : undefined, reactions: (r.reactions ?? {}) as BoardPostRecord['reactions'], replyTo: r.replyTo ?? undefined, createdAt: iso(r.createdAt), aiProvenanceId: r.aiProvenanceId ?? undefined };
@@ -37,8 +44,17 @@ function toSub(r: Selectable<BoardSubscription>): BoardSubscriptionRecord {
 
 export const boardMethods = {
   async createBoard(this: PostgresKyselyStorage, b: BoardRecord): Promise<BoardRecord> {
-    const [row] = await this.db.insertInto('Board').values({ boardId: b.id, name: b.name, description: b.description ?? null, visibility: b.visibility, ownerGaii: b.ownerGaii, allowedGaiis: b.allowedGaiis ?? null, federate: b.federate ?? false, createdAt: new Date(b.createdAt) }).returningAll().execute();
+    const [row] = await this.db.insertInto('Board').values({
+      boardId: b.id, name: b.name, description: b.description ?? null, visibility: b.visibility, ownerGaii: b.ownerGaii, allowedGaiis: b.allowedGaiis ?? null,
+      federate: b.federate ?? false, createdAt: new Date(b.createdAt), rules: b.rules ? jsonb(b.rules) : null,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any).returningAll().execute();
     return toBoard(row);
+  },
+  async updateBoardRules(this: PostgresKyselyStorage, id: string, rules: BoardRules | null): Promise<BoardRecord | null> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rows = await this.db.updateTable('Board').set({ rules: rules ? jsonb(rules) : null } as any).where('boardId', '=', id).returningAll().execute();
+    return rows[0] ? toBoard(rows[0]) : null;
   },
   async getBoard(this: PostgresKyselyStorage, id: string): Promise<BoardRecord | null> {
     const r = await this.db.selectFrom('Board').selectAll().where('boardId', '=', id).executeTakeFirst();
@@ -106,6 +122,39 @@ export const boardMethods = {
   async deletePost(this: PostgresKyselyStorage, boardId: string, postId: string): Promise<boolean> {
     const r = await this.db.deleteFrom('BoardPost').where('boardId', '=', boardId).where('postId', '=', postId).executeTakeFirst();
     return Number(r.numDeletedRows ?? 0) > 0;
+  },
+  async listReplies(this: PostgresKyselyStorage, boardId: string, postId: string): Promise<BoardPostRecord[]> {
+    const rows = await this.db.selectFrom('BoardPost').selectAll().where('boardId', '=', boardId).where('replyTo', '=', postId).orderBy('createdAt', 'asc').orderBy('postId', 'asc').execute();
+    return rows.map(toPost);
+  },
+  async replyCounts(this: PostgresKyselyStorage, boardId: string, postIds: string[]): Promise<Record<string, number>> {
+    const out: Record<string, number> = {};
+    if (postIds.length === 0) return out;
+    const rows = await this.db.selectFrom('BoardPost').select(['replyTo']).select(sql<number>`count(*)`.as('n'))
+      .where('boardId', '=', boardId).where('replyTo', 'in', postIds).groupBy('replyTo').execute();
+    for (const r of rows) if (r.replyTo) out[r.replyTo] = Number(r.n);
+    return out;
+  },
+  async updatePostExpiry(this: PostgresKyselyStorage, boardId: string, postId: string, ttlExpiresAt: string): Promise<boolean> {
+    const r = await this.db.updateTable('BoardPost').set({ ttlExpiresAt: new Date(ttlExpiresAt) }).where('boardId', '=', boardId).where('postId', '=', postId).executeTakeFirst();
+    return Number(r.numUpdatedRows ?? 0) > 0;
+  },
+  async boardAuthorStanding(this: PostgresKyselyStorage, gaiis: string[]): Promise<Record<string, BoardAuthorStanding>> {
+    // One grouped query for the page's authors; 'thanks' is the reaction the standing counts.
+    const out: Record<string, BoardAuthorStanding> = {};
+    if (gaiis.length === 0) return out;
+    const res = await sql<{ authorGaii: string; posts: string | number; thanks: string | number; since: Date | string | null }>`
+      SELECT "authorGaii",
+             COUNT(*) FILTER (WHERE "replyTo" IS NULL) AS posts,
+             COALESCE(SUM(jsonb_array_length(COALESCE("reactions"->'thanks', '[]'::jsonb))), 0) AS thanks,
+             MIN("createdAt") AS since
+      FROM "BoardPost"
+      WHERE "authorGaii" = ANY(${gaiis})
+      GROUP BY "authorGaii"`.execute(this.db);
+    for (const r of res.rows) {
+      out[r.authorGaii] = { gaii: r.authorGaii, posts: Number(r.posts), thanks: Number(r.thanks), ...(r.since ? { since: iso(r.since) } : {}) };
+    }
+    return out;
   },
   async pruneExpiredBoardPosts(this: PostgresKyselyStorage, nowIso: string): Promise<number> {
     // One cross-board DELETE. Until 2026-08-17 this backend never removed expired posts at all:
