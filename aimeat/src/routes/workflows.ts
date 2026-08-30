@@ -318,8 +318,12 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
   router.get('/v1/workflows/:id/runs', requireAuth(), requireScope('workflow:read'), async (req: Request, res: Response) => {
     const id = req.params.id as string;
     const checks = req.query.only === 'checks' ? 'only' : String(req.query.include ?? '').split(',').includes('checks') ? 'include' : 'exclude';
-    const runs = await listRuns(storage, ownerGhiiOf(req), id, { checks });
-    res.json(success(config.nodeId, { runs, count: runs.length, checks }));
+    const all = await listRuns(storage, ownerGhiiOf(req), id, { checks });
+    // ?limit=N: a run record carries the pinned definition and every step's observations, so a
+    // cover that wants each workflow's LAST run should not be handed a hundred of them.
+    const limit = Math.min(Math.max(0, parseInt(String(req.query.limit ?? '0'), 10) || 0), 200);
+    const runs = limit ? all.slice(0, limit) : all;
+    res.json(success(config.nodeId, { runs, count: all.length, checks }));
   });
 
   // GET /v1/workflows/:id/preflight — what a run would do now: the agents it dispatches, the steps
