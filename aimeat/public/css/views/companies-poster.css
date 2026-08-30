@@ -1,0 +1,92 @@
+/**
+ * @file companies-poster.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The Companies pages in the poster face (co- prefix; design canvas "AIMEAT
+ *   Yritysten sivu", direction A). The shared parts come from organism.css's og- rules and the
+ *   mark box follows the email page's pattern; this file carries what companies add: the company
+ *   rows on the cover, the facts grid with its consequences, the front-page choice row, the edit
+ *   and SMTP grids, the events rows and the chat roads. NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-08-31 — Initial.
+ */
+
+.og-co .og-chip--coral { border-color: var(--accent); color: var(--accent); }
+.og-co .og-strip b.og-coral { color: var(--accent); }
+.og-co .og-door.on { color: var(--accent); border-bottom-color: var(--accent); }
+.og-co .og-empty { margin: 0; font-size: .9rem; color: var(--text-dim); }
+.og-co .co-hint { margin: .6rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--text-dim); display: block; }
+.og-co .og-fold > span:not(.og-fold-r):not(.og-fold-arrow) { white-space: nowrap; }
+.og-co .og-fold-r { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.og-co .co-more { margin-top: .8rem; }
+
+/* ── The company rows on the cover ──────────────────────────────────────────────────────────── */
+.co-rows { display: grid; grid-template-columns: 2.2rem minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr) auto; gap: 0 1rem; align-items: center; }
+.co-rows > div { padding: .7rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
+.co-rows > .co-head { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+/* The mark is a whole box of its own: the row rule above would otherwise cut its bottom border. */
+.co-rows > .co-av { width: 2.2rem; height: 2.2rem; padding: 0; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border: 2px solid var(--text); font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: .85rem; color: var(--text); }
+.co-nm { font-weight: 800; font-size: .95rem; color: var(--text); }
+.co-nm small { display: block; font-family: var(--font-mono); font-size: .7rem; font-weight: 400; color: var(--text-dim); margin-top: .1rem; overflow-wrap: anywhere; }
+.co-w { font-size: .82rem; line-height: 1.45; color: var(--text-dim); }
+.co-w b { color: var(--text); font-weight: 800; }
+.co-w small { display: block; font-family: var(--font-mono); font-size: .7rem; }
+.co-w .co-warn { color: var(--accent); font-weight: 800; }
+.co-ctl { display: flex; gap: .9rem; align-items: center; justify-content: flex-end; white-space: nowrap; }
+
+/* ── Register a company ─────────────────────────────────────────────────────────────────────── */
+.co-create { display: flex; gap: 1rem; align-items: flex-end; }
+.co-create .co-field { flex: 1; min-width: 0; }
+.co-create .og-input { width: 100%; box-sizing: border-box; }
+.co-preview { margin: .5rem 0 0; font-family: var(--font-mono); font-size: .74rem; color: var(--text-dim); }
+.co-preview b { color: var(--accent); font-weight: 500; }
+.co-preview .taken { color: var(--danger-fg); font-weight: 700; }
+
+/* ── The facts grid (what is filled in, what a gap costs) ───────────────────────────────────── */
+.co-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 1.6rem; }
+.co-facts > div { padding: .5rem 0; border-bottom: 1px solid var(--border); min-width: 0; font-size: .88rem; line-height: 1.45; }
+.co-facts .k { display: block; font-size: .64rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+.co-facts .v { color: var(--text); font-weight: 600; overflow-wrap: anywhere; }
+.co-facts .v.miss { color: var(--text-dim); font-weight: 400; font-style: italic; }
+
+/* The edit form over the same grid: label over input, two columns. */
+.co-edit { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem 1.6rem; }
+.co-edit label { display: block; min-width: 0; }
+.co-edit label span { display: block; font-size: .64rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); margin-bottom: .25rem; }
+.co-edit .og-input { width: 100%; box-sizing: border-box; }
+.co-form-doors { margin-top: 1rem; }
+
+/* ── The front page choice ──────────────────────────────────────────────────────────────────── */
+.co-choice { display: flex; flex-wrap: wrap; }
+.co-choice button { border: 2px solid var(--text); border-right-width: 0; background: none; padding: .35rem .7rem; font: inherit; font-size: .78rem; font-weight: 700; color: var(--text-dim); cursor: pointer; }
+.co-choice button:last-child { border-right-width: 2px; }
+.co-choice button.on { background: var(--sun); color: var(--on-sun); }
+.co-front-ctl { margin-top: .8rem; display: flex; gap: .8rem; flex-wrap: wrap; align-items: center; }
+.co-front-ctl .og-input { min-width: 16rem; }
+.co-kv { display: grid; grid-template-columns: minmax(6rem, 10rem) minmax(0, 1fr); gap: .5rem 1.2rem; margin-top: .6rem; }
+.co-kv .k { font-size: .64rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); padding-top: .15rem; }
+.co-kv .v { font-size: .9rem; color: var(--text); overflow-wrap: anywhere; }
+.co-kv .v small { display: block; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); margin-top: .1rem; }
+.co-html { width: 100%; box-sizing: border-box; font-family: var(--font-mono); font-size: .74rem; }
+.co-file input[type='file'] { display: none; }
+
+/* ── The SMTP grid (in the fold) ────────────────────────────────────────────────────────────── */
+.co-smtp { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem 1.6rem; }
+.co-smtp label { display: block; min-width: 0; }
+.co-smtp label span { display: block; font-size: .64rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); margin-bottom: .25rem; }
+.co-smtp .og-input { width: 100%; box-sizing: border-box; }
+.co-smtp .co-check { display: flex; align-items: center; gap: .6rem; }
+.co-smtp .co-check span { margin-bottom: 0; }
+
+/* ── Phone ──────────────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 860px) {
+  .co-rows { grid-template-columns: 2.2rem minmax(0, 1fr); }
+  .co-rows > .co-head { display: none; }
+  .co-rows > .co-w { display: none; }
+  .co-rows > .co-nm { border-bottom: 0; padding-bottom: .2rem; }
+  .co-rows > .co-ctl { grid-column: 2; justify-content: flex-start; padding-top: 0; }
+  .co-facts, .co-edit, .co-smtp { grid-template-columns: 1fr; }
+  .co-create { flex-direction: column; align-items: stretch; }
+  .co-kv { grid-template-columns: 1fr; gap: .1rem 0; }
+  .co-kv .k { padding-top: .5rem; }
+}

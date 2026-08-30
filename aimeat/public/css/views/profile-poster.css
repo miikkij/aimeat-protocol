@@ -19,6 +19,8 @@
  *   renders in a sandboxed frame with its own stylesheet.
  * @usage Linked from public/spa.html after every other stylesheet.
  * @version-history
+ *   v1.3.2 — 2026-08-31 — The pf-co selectors leave: the Companies tab wears the poster face
+ *     (companies-poster.css, co- prefix), so there is no old-shape companies surface to skin.
  *   v1.3.1 — 2026-08-29 — Every headline reads --font-poster-tracking / --font-poster-leading (theme.css)
  *     instead of the -.035em / .9 measured for Archivo Black, which made Fjalla One's letters touch.
  *   v1.3.0 — 2026-08-29 — Section headlines (the title under a page title, the other tabs' own section
@@ -58,7 +60,7 @@
 .pf .section-desc, .portfolio-subtitle-text { font-weight: 600; color: var(--text-dim); font-size: 0.92rem; }
 .pf .card-h3, .pf .card-title, .pf .pf-agd-section-label, .pf .pf-agd-section-title, .pf .pj-section-title,
 .pf .form-row label, .pf .detail-label, .pf .tx-detail-label, .pf .pj-field > span, .pf .pj-rec-field-label,
-.pf .pf-co-field > span, .pf .pj-form-group, .portfolio-source-group summary {
+.pf .pj-form-group, .portfolio-source-group summary {
   font-family: var(--font-showroom-body);
   font-size: 0.72rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
   color: var(--accent); margin-bottom: 0.4rem;
@@ -132,7 +134,7 @@
 
 /* ── Badges and chips: square, ink-framed, the colour kept ──────────────────────────────── */
 .pf .badge, .pf .pill, .pf .vis-pill, .pf .pf-agd-badge, .pf .pf-agd-tag-chip, .pf .pf-agd-step-pill, .pf .pf-agd-cap-badge,
-.pf .pf-agd-change-badge, .pf .pf-agd-tab-badge, .kpkg-badge, .pf .pf-co-badge, .pj-doc-tag, .pj-tab-pill, .pj-org-tab-unseen,
+.pf .pf-agd-change-badge, .pf .pf-agd-tab-badge, .kpkg-badge, .pj-doc-tag, .pj-tab-pill, .pj-org-tab-unseen,
 .pf .pf-psp-chip, .pf .pf-federation-badge {
   border-radius: 0; font-family: var(--font-mono); font-weight: 500; letter-spacing: 0;
 }
@@ -241,9 +243,6 @@
 }
 .pf .stat-card { padding: 0.9rem 0 1rem; margin-bottom: 0; }
 .pf .stat-grid { gap: 0 2rem; }
-
-/* ── Companies ──────────────────────────────────────────────────────────────────────────── */
-.pf .pf-co-badge { border: 2px solid currentColor; padding: 0 6px; }
 
 /* ── Controls that keep a box: the segmented control and the collapsible ────────────────── */
 .pf .seg { border: 2px solid var(--text); border-radius: 0; background: none; }
