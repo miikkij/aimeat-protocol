@@ -8,6 +8,8 @@
  * @structure outboundMethods — contacts · send log
  * @usage merged onto SqliteStorage.prototype in ../index.ts
  * @version-history
+ *   v1.2.0 — 2026-08-30 — logWhere filters on organismId (the column has been written since
+ *     2026-08-23; this makes it readable per company).
  *   v1.1.0 — 2026-08-17 — TARGET-063: emailHash/links/relation (safeAddColumn in schema.ts) and
  *     the cross-owner promotion lookup findUnresolvedOutboundContactsByEmailHash.
  *   v1.0.0 — 2026-08-06 — Company-in-a-box phase 2.
@@ -80,6 +82,7 @@ function logWhere(query: OutboundLogQuery): { sql: string; params: unknown[] } {
   if (query.kind) { clauses.push('kind = ?'); params.push(query.kind); }
   if (query.status) { clauses.push('status = ?'); params.push(query.status); }
   if (query.sentBy) { clauses.push('sentBy = ?'); params.push(query.sentBy); }
+  if (query.organismId) { clauses.push('organismId = ?'); params.push(query.organismId); }
   return { sql: clauses.join(' AND '), params };
 }
 
