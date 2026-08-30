@@ -268,6 +268,7 @@ const GOOD_LAYOUT = {
                 { id: 'drop', component: 'chart', props: { source: 'sales.stages', kind: 'funnel' } },
                 { id: 'share', component: 'chart', props: { source: 'stock.byProduct', kind: 'treemap' } },
                 { id: 'went', component: 'chart', props: { source: 'money.paths', kind: 'flow' } },
+                { id: 'shape', component: 'chart', props: { source: 'skills.profile', kind: 'radar' } },
             ],
         });
         assert(good.status === 200 && good.body.data.ok === true,
@@ -318,6 +319,8 @@ const GOOD_LAYOUT = {
                 { id: 'board', component: 'kanban', props: { source: 'work.board', title: 'The board' } },
                 { id: 'phases', component: 'plan', props: { source: 'project.phases' } },
                 { id: 'week', component: 'schedule', props: { source: 'bookings.week' } },
+                { id: 'where', component: 'steps', props: { source: 'order.progress' } },
+                { id: 'score', component: 'rating', props: { source: 'reviews.score' } },
             ],
         });
         assert(good.status === 200 && good.body.data.ok === true,

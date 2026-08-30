@@ -15,10 +15,12 @@
  *   reason the publish gate refuses it — inlined image bytes are the documented way an app file
  *   bloats past its edit loop.
  * @structure hero(spec) → { el, set, destroy } · statRow(spec) → { el, set, destroy } ·
- *   figure(spec) → { el, set, destroy }
+ *   figure(spec) → { el, set, destroy } · rating(spec) → { el, set, destroy }
  * @usage  AIMEAT.atelier.hero({ target: a.main, title: 'Errands', sub: '3 open',
  *           actions: [{ id: 'add', label: 'Add', kind: 'primary', onClick }] });
  * @version-history
+ *   v0.37.0 — 2026-08-30 — rating(): a score as stars — inline SVG on the tokens, partial fill
+ *     by clipping, the number and the vote count in words beside it.
  *   v0.33.0 — 2026-08-29 — statRow tiles accept `trend: number[]`: a sparkline under the
  *     number, so a KPI carries its direction without a chart block.
  *   v0.10.0 — 2026-08-28 — A hero that repeats the app's title claims it: when the hero title
@@ -294,5 +296,69 @@ export function figure(spec) {
       }
     },
     destroy() { if (root.parentNode) root.parentNode.removeChild(root); },
+  };
+}
+
+const STAR_PATH = 'M8 1.3l2 4.1 4.6.7-3.3 3.2.8 4.5L8 11.7l-4.1 2.1.8-4.5L1.4 6.1 6 5.4z';
+
+/** A row of five star glyphs, drawn once; the caller clips a filled copy over a quiet one. */
+function starRow() {
+  const ns = 'http://www.w3.org/2000/svg';
+  const node = document.createElementNS(ns, 'svg');
+  node.setAttribute('viewBox', '0 0 84 16');
+  node.setAttribute('aria-hidden', 'true');
+  node.setAttribute('class', 'ak-rating__stars');
+  for (let i = 0; i < 5; i++) {
+    const star = document.createElementNS(ns, 'path');
+    star.setAttribute('d', STAR_PATH);
+    star.setAttribute('transform', `translate(${i * 17} 0)`);
+    node.appendChild(star);
+  }
+  return node;
+}
+
+/**
+ * A score as stars: the number, the five glyphs part-filled to it, and who said so.
+ * @param {{ target?: string|Element,
+ *   value: number, max?: number, count?: number, label?: string,
+ * }} spec
+ * @returns {{ el: HTMLElement, set: (patch: { value?: number, count?: number }) => void, destroy: () => void }}
+ */
+export function rating(spec) {
+  const state = { value: Number(spec.value) || 0, max: Number(spec.max) > 0 ? Number(spec.max) : 5, count: spec.count };
+  const root = el('div', { class: 'ak-root ak-rating', role: 'img' });
+  if (spec.target) resolve(spec.target).appendChild(root);
+
+  const number = el('b', { class: 'ak-rating__value' });
+  const track = el('span', { class: 'ak-rating__track' });
+  track.appendChild(starRow());
+  const fill = el('span', { class: 'ak-rating__fill' });
+  fill.appendChild(starRow());
+  track.appendChild(fill);
+  const words = el('span', { class: 'ak-rating__words' });
+  root.appendChild(number);
+  root.appendChild(track);
+  root.appendChild(words);
+
+  function paint() {
+    const frac = Math.min(Math.max(state.value / state.max, 0), 1);
+    number.textContent = (Math.round(state.value * 10) / 10).toLocaleString();
+    fill.style.width = (frac * 100).toFixed(1) + '%';
+    words.textContent = [
+      spec.label || '',
+      state.count != null ? '(' + Number(state.count).toLocaleString() + ')' : '',
+    ].filter(Boolean).join(' ');
+    root.setAttribute('aria-label', `${state.value} / ${state.max}` + (state.count != null ? ` · ${state.count}` : ''));
+  }
+  paint();
+
+  return {
+    el: root,
+    set(patch) {
+      if (patch && typeof patch.value === 'number') state.value = patch.value;
+      if (patch && 'count' in patch) state.count = patch.count;
+      paint();
+    },
+    destroy() { root.remove(); },
   };
 }

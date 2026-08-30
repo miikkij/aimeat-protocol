@@ -73,7 +73,7 @@
 import { el, clear, resolve, enter } from './dom.js';
 import { t } from './i18n.js';
 import { section, tabs } from './shell.js';
-import { hero, statRow, figure } from './hero.js';
+import { hero, statRow, figure, rating } from './hero.js';
 import { emptyState, skeleton } from './state.js';
 import { list } from './list.js';
 import { cardGrid, mediaCard } from './grid.js';
@@ -92,7 +92,7 @@ import { aide } from './aide.js';
 import { projectCanvas } from './mosaic-canvas.js';
 import { projectStack, projectOverlay, projectRail, projectPicker, projectDeck, projectFlow } from './mosaic-projections.js';
 import { health, queue, gauge } from './ops.js';
-import { kanban, plan, schedule } from './planner.js';
+import { kanban, plan, schedule, steps } from './planner.js';
 import { konsole } from './konsole.js';
 import { atlas } from './atlas.js';
 import { map } from './map.js';
@@ -188,6 +188,15 @@ export function mosaic(spec) {
         return bound('figure', function (data) {
           const d = patchFor('figure', data);
           return figure({ target: into, value: d.value, label: d.label || p.title || '', sub: d.sub, delta: d.delta });
+        });
+      case 'rating':
+        return bound('rating', function (data) {
+          const d = patchFor('rating', data).data || {};
+          return rating({ target: into, value: Number(d.value) || 0, max: d.max, count: d.count, label: d.label || p.title });
+        });
+      case 'steps':
+        return bound('steps', function (data) {
+          return steps({ target: into, data: patchFor('steps', data).data, empty: empty });
         });
       case 'list':
         return bound('list', function (data) {

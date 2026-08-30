@@ -1310,6 +1310,58 @@
       }
     };
   }
+  var STAR_PATH = "M8 1.3l2 4.1 4.6.7-3.3 3.2.8 4.5L8 11.7l-4.1 2.1.8-4.5L1.4 6.1 6 5.4z";
+  function starRow() {
+    const ns = "http://www.w3.org/2000/svg";
+    const node = document.createElementNS(ns, "svg");
+    node.setAttribute("viewBox", "0 0 84 16");
+    node.setAttribute("aria-hidden", "true");
+    node.setAttribute("class", "ak-rating__stars");
+    for (let i = 0; i < 5; i++) {
+      const star = document.createElementNS(ns, "path");
+      star.setAttribute("d", STAR_PATH);
+      star.setAttribute("transform", `translate(${i * 17} 0)`);
+      node.appendChild(star);
+    }
+    return node;
+  }
+  function rating(spec) {
+    const state = { value: Number(spec.value) || 0, max: Number(spec.max) > 0 ? Number(spec.max) : 5, count: spec.count };
+    const root = el("div", { class: "ak-root ak-rating", role: "img" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    const number = el("b", { class: "ak-rating__value" });
+    const track = el("span", { class: "ak-rating__track" });
+    track.appendChild(starRow());
+    const fill = el("span", { class: "ak-rating__fill" });
+    fill.appendChild(starRow());
+    track.appendChild(fill);
+    const words = el("span", { class: "ak-rating__words" });
+    root.appendChild(number);
+    root.appendChild(track);
+    root.appendChild(words);
+    function paint() {
+      const frac = Math.min(Math.max(state.value / state.max, 0), 1);
+      number.textContent = (Math.round(state.value * 10) / 10).toLocaleString();
+      fill.style.width = (frac * 100).toFixed(1) + "%";
+      words.textContent = [
+        spec.label || "",
+        state.count != null ? "(" + Number(state.count).toLocaleString() + ")" : ""
+      ].filter(Boolean).join(" ");
+      root.setAttribute("aria-label", `${state.value} / ${state.max}` + (state.count != null ? ` · ${state.count}` : ""));
+    }
+    paint();
+    return {
+      el: root,
+      set(patch) {
+        if (patch && typeof patch.value === "number") state.value = patch.value;
+        if (patch && "count" in patch) state.count = patch.count;
+        paint();
+      },
+      destroy() {
+        root.remove();
+      }
+    };
+  }
 
   // src/static/sdk-libs/atelier/aide.js
   var SOURCE_CHARS_MAX = 2e3;
@@ -2676,23 +2728,23 @@
     }
   }
   function renderFunnel(ctx, data) {
-    const steps = (data && Array.isArray(data.steps) ? data.steps : []).filter((s) => s && typeof s.value === "number" && s.value >= 0);
-    if (!steps.length || steps[0].value <= 0) return ctx.empty();
-    ctx.root.setAttribute("aria-label", (ctx.title ? ctx.title + " — " : "") + steps.map((s) => s.label + " " + s.value).join(", "));
+    const steps2 = (data && Array.isArray(data.steps) ? data.steps : []).filter((s) => s && typeof s.value === "number" && s.value >= 0);
+    if (!steps2.length || steps2[0].value <= 0) return ctx.empty();
+    ctx.root.setAttribute("aria-label", (ctx.title ? ctx.title + " — " : "") + steps2.map((s) => s.label + " " + s.value).join(", "));
     const W4 = 460;
     const STEP_H = 44;
     const GAP = 7;
     const BAND = 340;
     const CX = 195;
-    const H4 = steps.length * (STEP_H + GAP) - GAP + 8;
-    const first = steps[0].value;
+    const H4 = steps2.length * (STEP_H + GAP) - GAP + 8;
+    const first = steps2[0].value;
     const node = svg("svg", { viewBox: `0 0 ${W4} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
     const still = ctx.still();
     const half = (v) => Math.max(v / first * BAND, 18) / 2;
-    steps.forEach((s, i) => {
+    steps2.forEach((s, i) => {
       const y = 4 + i * (STEP_H + GAP);
       const topHalf = half(s.value);
-      const nxt = steps[i + 1];
+      const nxt = steps2[i + 1];
       const botHalf = nxt ? half(nxt.value) : topHalf;
       const band = svg("path", {
         d: `M${CX - topHalf} ${y} L${CX + topHalf} ${y} L${CX + botHalf} ${y + STEP_H} L${CX - botHalf} ${y + STEP_H} Z`,
@@ -2880,13 +2932,79 @@
     }
     ctx.root.appendChild(node);
   }
+  function renderRadar(ctx, data) {
+    const axes = (data && Array.isArray(data.axes) ? data.axes : []).slice(0, 10);
+    const series = (data && Array.isArray(data.series) ? data.series : []).filter((s) => s && Array.isArray(s.values) && s.values.length).slice(0, 4);
+    if (axes.length < 3 || !series.length) return ctx.empty();
+    const max = typeof data.max === "number" && data.max > 0 ? data.max : series.reduce((m, s) => s.values.reduce((m2, v) => Math.max(m2, Number(v) || 0), m), 0) || 1;
+    ctx.root.setAttribute("aria-label", (ctx.title ? ctx.title + " — " : "") + series.map((s) => s.label).join(", "));
+    const W4 = 460;
+    const H4 = 340;
+    const CX = W4 / 2;
+    const CY = H4 / 2 + 4;
+    const R = 118;
+    const angle = (i) => -Math.PI / 2 + 2 * Math.PI * i / axes.length;
+    const at = (i, r) => `${(CX + Math.cos(angle(i)) * r).toFixed(1)} ${(CY + Math.sin(angle(i)) * r).toFixed(1)}`;
+    const node = svg("svg", { viewBox: `0 0 ${W4} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
+    for (const frac of [0.25, 0.5, 0.75, 1]) {
+      node.appendChild(svg("polygon", {
+        points: axes.map((a, i) => at(i, R * frac)).join(" "),
+        class: "ak-chart__radarring"
+      }));
+    }
+    axes.forEach((label, i) => {
+      node.appendChild(svg("line", {
+        x1: CX,
+        y1: CY,
+        x2: CX + Math.cos(angle(i)) * R,
+        y2: CY + Math.sin(angle(i)) * R,
+        class: "ak-chart__radarspoke"
+      }));
+      const lx = CX + Math.cos(angle(i)) * (R + 16);
+      const ly = CY + Math.sin(angle(i)) * (R + 16);
+      const cap = svg("text", {
+        x: lx.toFixed(1),
+        y: (ly + 4).toFixed(1),
+        class: "ak-chart__tick",
+        "text-anchor": Math.abs(Math.cos(angle(i))) < 0.3 ? "middle" : Math.cos(angle(i)) > 0 ? "start" : "end"
+      });
+      cap.textContent = String(label);
+      node.appendChild(cap);
+    });
+    const still = ctx.still();
+    series.forEach((s, si) => {
+      const points = axes.map((a, i) => at(i, R * Math.min(Math.max((Number(s.values[i]) || 0) / max, 0), 1))).join(" ");
+      const shape = svg("polygon", { points, class: "ak-chart__radarshape" });
+      shape.style.fill = SERIES_VARS[si % SERIES_VARS.length];
+      shape.style.stroke = SERIES_VARS[si % SERIES_VARS.length];
+      if (!still) {
+        shape.classList.add("ak-chart__band--enter");
+        shape.style.animationDelay = `${si * 120}ms`;
+      }
+      node.appendChild(shape);
+    });
+    ctx.root.appendChild(node);
+    const legend = el(
+      "figcaption",
+      { class: "ak-chart__legend" },
+      series.map((s) => el("span", { class: "ak-chart__key" }, [
+        el("span", { class: "ak-chart__swatch" }),
+        el("span", { text: String(s.label) })
+      ]))
+    );
+    series.forEach((s, i) => {
+      const sw = legend.children[i] && legend.children[i].firstChild;
+      if (sw) sw.style.background = SERIES_VARS[i % SERIES_VARS.length];
+    });
+    ctx.root.appendChild(legend);
+  }
 
   // src/static/sdk-libs/atelier/chart.js
   var W = 560;
   var H = 300;
   var PAD = { top: 16, right: 14, bottom: 34, left: 46 };
   function chart(spec) {
-    const kind = ["donut", "calendar", "scatter", "funnel", "treemap", "flow"].indexOf(spec.kind) >= 0 ? spec.kind : "axes";
+    const kind = ["donut", "calendar", "scatter", "funnel", "treemap", "flow", "radar"].indexOf(spec.kind) >= 0 ? spec.kind : "axes";
     const root = el("figure", {
       class: "ak-root ak-chart" + (spec.presentation === "mural" ? " ak-chart--mural" : ""),
       role: "img"
@@ -2914,6 +3032,7 @@
       if (kind === "funnel") return renderFunnel(ctx, data);
       if (kind === "treemap") return renderTreemap(ctx, data);
       if (kind === "flow") return renderFlow(ctx, data);
+      if (kind === "radar") return renderRadar(ctx, data);
       renderAxes(data);
     }
     function renderAxes(data) {
@@ -4052,7 +4171,7 @@
     if (kind === "statRow") return { tiles: Array.isArray(data) ? data : [] };
     if (kind === "table") return { rows: Array.isArray(data) ? data : data && data.rows || [] };
     if (kind === "figure") return data && typeof data === "object" ? data : { value: 0 };
-    if (kind === "chart" || kind === "matrix" || kind === "graph" || kind === "waveform" || kind === "gauge" || kind === "console" || kind === "atlas" || kind === "map" || kind === "scene3d" || kind === "kanban" || kind === "plan" || kind === "schedule") {
+    if (kind === "chart" || kind === "matrix" || kind === "graph" || kind === "waveform" || kind === "gauge" || kind === "console" || kind === "atlas" || kind === "map" || kind === "scene3d" || kind === "kanban" || kind === "plan" || kind === "schedule" || kind === "steps" || kind === "rating") {
       return { data: data && typeof data === "object" && !Array.isArray(data) ? data : null };
     }
     if (kind === "health" || kind === "queue") {
@@ -5029,6 +5148,45 @@
       destroy: () => root.remove()
     };
   }
+  function steps(spec) {
+    const root = el("ol", { class: "ak-root ak-steps" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let emptyCard = null;
+    function render(data) {
+      if (emptyCard) {
+        emptyCard.destroy();
+        emptyCard = null;
+      }
+      clear(root);
+      const items = (data && Array.isArray(data.steps) ? data.steps : []).filter((s) => s && s.label);
+      if (!items.length) {
+        emptyCard = emptyInto(root, spec);
+        return;
+      }
+      const current2 = Math.min(Math.max(Number(data.current) || 0, 0), items.length - 1);
+      items.forEach((s, i) => {
+        const state = i < current2 ? "done" : i === current2 ? "now" : "ahead";
+        root.appendChild(el("li", {
+          class: "ak-steps__step ak-steps__step--" + state,
+          "aria-current": state === "now" ? "step" : void 0
+        }, [
+          el("span", { class: "ak-steps__dot", "aria-hidden": "true" }, state === "done" ? "✓" : String(i + 1)),
+          el("span", { class: "ak-steps__words" }, [
+            el("span", { class: "ak-steps__label", text: s.label }),
+            s.sub ? el("span", { class: "ak-steps__sub", text: s.sub }) : null
+          ])
+        ]));
+      });
+    }
+    render(spec.data || null);
+    return {
+      el: root,
+      set: (patch) => {
+        if (patch && "data" in patch) render(patch.data || null);
+      },
+      destroy: () => root.remove()
+    };
+  }
 
   // src/static/sdk-libs/atelier/konsole.js
   var CAP_DEFAULT = 400;
@@ -5431,6 +5589,15 @@
           return bound("figure", function(data) {
             const d = patchFor("figure", data);
             return figure({ target: into, value: d.value, label: d.label || p.title || "", sub: d.sub, delta: d.delta });
+          });
+        case "rating":
+          return bound("rating", function(data) {
+            const d = patchFor("rating", data).data || {};
+            return rating({ target: into, value: Number(d.value) || 0, max: d.max, count: d.count, label: d.label || p.title });
+          });
+        case "steps":
+          return bound("steps", function(data) {
+            return steps({ target: into, data: patchFor("steps", data).data, empty });
           });
         case "list":
           return bound("list", function(data) {
@@ -5985,7 +6152,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.36.0",
+    version: "0.37.0",
     // ── Shell and navigation ──
     app,
     section,
@@ -5998,6 +6165,7 @@
     hero,
     statRow,
     figure,
+    rating,
     aide,
     delegate,
     agentActivity,
@@ -6041,6 +6209,7 @@
     kanban,
     plan,
     schedule,
+    steps,
     // ── The things that open ──
     reveal,
     drawer,

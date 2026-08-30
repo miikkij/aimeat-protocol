@@ -14,7 +14,10 @@
  *   All three follow the family physics: data in, picture out, tones on --ak-ok/-warn/-err,
  *   set() repaints, nothing polls, nothing animates at idle. Dates are 'YYYY-MM-DD' strings
  *   and times 'HH:MM', because the record travels through memory as words.
- * @structure kanban(spec) · plan(spec) · schedule(spec) — each → { el, set, destroy }
+ *     steps     where a process stands: the stations in order, done behind, current lit,
+ *               the rest ahead — an order, an application, an onboarding at a glance.
+ *
+ * @structure kanban(spec) · plan(spec) · schedule(spec) · steps(spec) — each → { el, set, destroy }
  * @usage
  *   AIMEAT.atelier.kanban({ target: host, onMove: (id, col) => save(id, col), data: {
  *     columns: [{ id: 'todo', label: 'To do' }, { id: 'doing', label: 'Doing', tone: 'warn' }],
@@ -24,6 +27,7 @@
  *   AIMEAT.atelier.schedule({ target: host, data: { days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
  *     from: '08:00', to: '18:00', events: [{ day: 1, from: '09:00', to: '11:30', label: 'Baking class' }] } });
  * @version-history
+ *   v0.37.0 — 2026-08-30 — steps: the process tracker (done / current / ahead on one line).
  *   v0.36.0 — 2026-08-30 — Initial (basket two of the approved expansion).
  */
 import { el, clear, resolve, reducedMotion } from './dom.js';
@@ -292,6 +296,48 @@ export function schedule(spec) {
       grid.appendChild(col);
     });
     root.appendChild(grid);
+  }
+
+  render(spec.data || null);
+  return {
+    el: root,
+    set: (patch) => { if (patch && 'data' in patch) render(patch.data || null); },
+    destroy: () => root.remove(),
+  };
+}
+
+/**
+ * The process tracker: stations in order, done behind, current lit, the rest ahead.
+ * @param {{ target?: string|Element,
+ *   data?: { steps: Array<{ label: string, sub?: string }>, current?: number }|null,
+ *   empty?: { title?: string, hint?: string },
+ * }} spec
+ * @returns {{ el: HTMLElement, set: (patch: { data?: object|null }) => void, destroy: () => void }}
+ */
+export function steps(spec) {
+  const root = el('ol', { class: 'ak-root ak-steps' });
+  if (spec.target) resolve(spec.target).appendChild(root);
+  let emptyCard = null;
+
+  function render(data) {
+    if (emptyCard) { emptyCard.destroy(); emptyCard = null; }
+    clear(root);
+    const items = (data && Array.isArray(data.steps) ? data.steps : []).filter((s) => s && s.label);
+    if (!items.length) { emptyCard = emptyInto(root, spec); return; }
+    const current = Math.min(Math.max(Number(data.current) || 0, 0), items.length - 1);
+    items.forEach((s, i) => {
+      const state = i < current ? 'done' : i === current ? 'now' : 'ahead';
+      root.appendChild(el('li', {
+        class: 'ak-steps__step ak-steps__step--' + state,
+        'aria-current': state === 'now' ? 'step' : undefined,
+      }, [
+        el('span', { class: 'ak-steps__dot', 'aria-hidden': 'true' }, state === 'done' ? '✓' : String(i + 1)),
+        el('span', { class: 'ak-steps__words' }, [
+          el('span', { class: 'ak-steps__label', text: s.label }),
+          s.sub ? el('span', { class: 'ak-steps__sub', text: s.sub }) : null,
+        ]),
+      ]));
+    });
   }
 
   render(spec.data || null);

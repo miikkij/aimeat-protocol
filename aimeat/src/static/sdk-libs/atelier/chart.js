@@ -18,11 +18,13 @@
  *     funnel         { steps: [{ label, value }] }
  *     treemap        { items: [{ label, value }] }
  *     flow           { nodes: [{ id, label }], links: [{ from, to, value }] }
+ *     radar          { axes: string[], series: [{ label, values }], max? }
  * @structure chart(spec) → { el, set, destroy }
  * @usage  AIMEAT.atelier.chart({ target: host, data: { labels: ['Jan','Feb'], series: [
  *           { id: 'in', label: 'Income', kind: 'bar', values: [1200, 1400] },
  *           { id: 'cash', label: 'Cash', kind: 'line', values: [300, 900] } ] } });
  * @version-history
+ *   v0.37.0 — 2026-08-30 — kind radar (chart-shapes.js): profiles on spokes.
  *   v0.36.0 — 2026-08-30 — Basket one of the approved expansion: kinds funnel, treemap and
  *     flow join the dispatch (chart-shapes.js).
  *   v0.35.0 — 2026-08-29 — THE PROPER FAMILY (the developer's words: "kaikkea siistiä ja
@@ -35,7 +37,7 @@ import { el, clear, resolve, reducedMotion } from './dom.js';
 import { t } from './i18n.js';
 import { emptyState } from './state.js';
 import { svg, SERIES_VARS, tickStep, fmtTick, smoothPath, defsFor } from './chart-core.js';
-import { renderDonut, renderCalendar, renderScatter, renderFunnel, renderTreemap, renderFlow } from './chart-shapes.js';
+import { renderDonut, renderCalendar, renderScatter, renderFunnel, renderTreemap, renderFlow, renderRadar } from './chart-shapes.js';
 
 const W = 560;
 const H = 300;
@@ -47,12 +49,12 @@ const PAD = { top: 16, right: 14, bottom: 34, left: 46 };
  *   target?: string|Element, data?: object|null, title?: string,
  *   empty?: { title?: string, hint?: string },
  *   presentation?: 'tile'|'mural',
- *   kind?: 'axes'|'donut'|'calendar'|'scatter'|'funnel'|'treemap'|'flow',
+ *   kind?: 'axes'|'donut'|'calendar'|'scatter'|'funnel'|'treemap'|'flow'|'radar',
  * }} spec
  * @returns {{ el: HTMLElement, set: (patch: { data: object|null }) => void, destroy: () => void }}
  */
 export function chart(spec) {
-  const kind = ['donut', 'calendar', 'scatter', 'funnel', 'treemap', 'flow'].indexOf(spec.kind) >= 0 ? spec.kind : 'axes';
+  const kind = ['donut', 'calendar', 'scatter', 'funnel', 'treemap', 'flow', 'radar'].indexOf(spec.kind) >= 0 ? spec.kind : 'axes';
   const root = el('figure', {
     class: 'ak-root ak-chart' + (spec.presentation === 'mural' ? ' ak-chart--mural' : ''),
     role: 'img',
@@ -79,6 +81,7 @@ export function chart(spec) {
     if (kind === 'funnel') return renderFunnel(ctx, data);
     if (kind === 'treemap') return renderTreemap(ctx, data);
     if (kind === 'flow') return renderFlow(ctx, data);
+    if (kind === 'radar') return renderRadar(ctx, data);
     renderAxes(data);
   }
 

@@ -28,6 +28,7 @@
  * @version-history
  *   v1.16.0 — 2026-08-29 — "A map" means the REAL map: the `map` block (Leaflet + OSM) taught
  *     as the answer to the word, the atlas demoted to its narrow choropleth truth.
+ *   v1.18.0 — 2026-08-30 — Radar, steps and rating taught.
  *   v1.17.0 — 2026-08-30 — The approved expansion taught: chart kinds funnel/treemap/flow,
  *     the work-planning family (kanban/plan/schedule), scene3d kind "globe".
  *   v1.16.0 — 2026-08-30 — The grown chart family taught (stacked, horizontal, scatter, note
@@ -284,15 +285,18 @@ function composeBody(config: AimeatConfig): string {
     + 'its change there too), `"calendar"` (a stretch of days as a heat grid, months named) or '
     + '`"scatter"` (points on two measures with an honest trend line), `"funnel"` (stages '
     + 'losing people — the survival rate written at each step), `"treemap"` (shares as area '
-    + 'when the donut\'s slices would not fit) or `"flow"` (where the quantity went — ribbons '
-    + 'as wide as their sums). A statRow tile carrying '
+    + 'when the donut\'s slices would not fit), `"flow"` (where the quantity went — ribbons '
+    + 'as wide as their sums) or `"radar"` (profiles on spokes — one polygon per series, for '
+    + '"strong where, weak where"). A statRow tile carrying '
     + '`trend: [numbers]` draws its short history as a filled sparkline under the figure.\n\n'
     + 'WORK AGAINST PEOPLE AND TIME is its own family: `kanban` (work as columns by state — '
     + 'queue shows the same work as a list, this is the board, and with onMove wired the '
     + 'cards actually move), `plan` (stretches on a shared time axis with today drawn as a '
     + 'line — timeline tells what happened, this tells what is running) and `schedule` (a '
     + 'week as a grid, bookings as blocks — chart kind "calendar" is the year at a distance, '
-    + 'this is next week).\n\n'
+    + 'this is next week). And two small truth-tellers: `steps` (where a process stands — '
+    + 'done behind, current lit, the rest ahead) and `rating` (a score as stars, display '
+    + 'only — collecting one is a form\'s job).\n\n'
     + 'WHEN THE OWNER SAYS "A MAP", THEY MEAN THE REAL ONE: the `map` block is Leaflet over '
     + 'OpenStreetMap street tiles — pins with popups at real addresses, the view framing the '
     + 'markers on its own, the licence\'s attribution built in, dark mode re-toning the tiles. '

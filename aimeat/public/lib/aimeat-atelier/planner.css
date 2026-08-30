@@ -220,6 +220,46 @@ button.ak-schedule__event { cursor: pointer; }
 .ak-schedule__eventtime { font-size: 0.68rem; color: var(--ak-ink-dim); font-variant-numeric: tabular-nums; }
 .ak-schedule__event--enter { opacity: 0; animation: ak-band-in calc(var(--ak-motion) * 1.6) var(--ak-ease) forwards; }
 
+/* ── Steps: the process tracker ──────────────────────────────────────────────────────────── */
+.ak-steps { display: flex; flex-wrap: wrap; gap: 12px 0; list-style: none; margin: 0; padding: 0; }
+.ak-steps__step { display: flex; align-items: center; gap: 10px; flex: 1 1 0; min-width: 10rem; }
+.ak-steps__step + .ak-steps__step::before {
+  content: '';
+  flex: 1 0 14px;
+  height: 2px;
+  margin-inline-end: 10px;
+  background: var(--ak-line);
+}
+.ak-steps__step--done + .ak-steps__step::before { background: var(--ak-ok); }
+.ak-steps__dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: 999px;
+  border: 2px solid var(--ak-line);
+  font-size: var(--ak-text-fine);
+  font-weight: 700;
+  color: var(--ak-ink-dim);
+  background: var(--ak-surface);
+}
+.ak-steps__step--done .ak-steps__dot {
+  border-color: var(--ak-ok);
+  background: color-mix(in oklab, var(--ak-ok) 16%, var(--ak-surface));
+  color: var(--ak-ok-text);
+}
+.ak-steps__step--now .ak-steps__dot {
+  border-color: var(--ak-accent);
+  background: var(--ak-accent);
+  color: var(--ak-surface);
+}
+.ak-steps__words { display: flex; flex-direction: column; min-width: 0; }
+.ak-steps__label { font-size: var(--ak-text-fine); font-weight: 650; color: var(--ak-ink-dim); }
+.ak-steps__step--now .ak-steps__label { color: var(--ak-ink); }
+.ak-steps__sub { font-size: 0.72rem; color: var(--ak-ink-dim); }
+
 @media (prefers-reduced-motion: reduce) {
   .ak-kanban__card--enter, .ak-plan__span--enter, .ak-schedule__event--enter { animation: none; opacity: 1; }
 }

@@ -25,6 +25,8 @@
  * @usage
  *   import { UI_COMPONENTS, componentById, buildUiCatalogue } from './registry.js';
  * @version-history
+ *   v1.15.0 — 2026-08-30 — More of everything (append-only): chart kind radar, `steps` (the
+ *     process tracker) and `rating` (a score as stars, display only).
  *   v1.14.0 — 2026-08-30 — THE APPROVED EXPANSION (append-only): chart kinds funnel, treemap
  *     and flow; the work-planning family kanban, plan and schedule; scene3d kind "globe".
  *   v1.13.0 — 2026-08-29 — The chart family grown to the approved level (stacked, horizontal,
@@ -217,12 +219,12 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
   },
   {
     id: 'chart',
-    summary: 'The whole chart family in one block, chosen by `kind`, drawn to the approved level (rounded sheened bars, smooth curves, a touch tooltip on every axes chart). axes (default): grouped bars, lines and soft-filled areas over one label axis — { labels, series: [{ id, label, kind: "bar"|"line"|"area", values }], stacked?: true (bars pile into one column), horizontal?: true (ranked things read sideways), note?: { label, text } (a story bubble on the one point that matters) }. donut: parts of a whole — { slices: [{ label, value }], delta?: { text, tone } } with the total and its change in the middle. calendar: days as a heat grid — { days: [{ date: "YYYY-MM-DD", value }] }, months named, the ramp explained. scatter: { points: [{ x, y, label? }], xLabel?, yLabel? } with an honest least-squares trend. funnel: stages losing people — { steps: [{ label, value }] }, the survival rate written at each step. treemap: shares as area when the donut\'s slices would not fit — { items: [{ label, value }] }. flow: where the quantity went — { nodes: [{ id, label }], links: [{ from, to, value }] }, ribbons as wide as their sums. Colours come from the look\'s own accent spectrum. presentation "mural" makes the chart the room instead of a tile.',
+    summary: 'The whole chart family in one block, chosen by `kind`, drawn to the approved level (rounded sheened bars, smooth curves, a touch tooltip on every axes chart). axes (default): grouped bars, lines and soft-filled areas over one label axis — { labels, series: [{ id, label, kind: "bar"|"line"|"area", values }], stacked?: true (bars pile into one column), horizontal?: true (ranked things read sideways), note?: { label, text } (a story bubble on the one point that matters) }. donut: parts of a whole — { slices: [{ label, value }], delta?: { text, tone } } with the total and its change in the middle. calendar: days as a heat grid — { days: [{ date: "YYYY-MM-DD", value }] }, months named, the ramp explained. scatter: { points: [{ x, y, label? }], xLabel?, yLabel? } with an honest least-squares trend. funnel: stages losing people — { steps: [{ label, value }] }, the survival rate written at each step. treemap: shares as area when the donut\'s slices would not fit — { items: [{ label, value }] }. flow: where the quantity went — { nodes: [{ id, label }], links: [{ from, to, value }] }, ribbons as wide as their sums. radar: profiles on spokes — { axes: string[] (3–10), series: [{ label, values }], max? }, one polygon per series over a shared ring grid. Colours come from the look\'s own accent spectrum. presentation "mural" makes the chart the room instead of a tile.',
     props: {
       source: source(),
       title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
       kind: {
-        type: 'enum', values: ['axes', 'donut', 'calendar', 'scatter', 'funnel', 'treemap', 'flow'], default: 'axes',
+        type: 'enum', values: ['axes', 'donut', 'calendar', 'scatter', 'funnel', 'treemap', 'flow', 'radar'], default: 'axes',
         description: 'The chart\'s shape — and the record shape the source must resolve to (see the summary).',
       },
       emptyTitle: text('What the empty state says.', 80),
@@ -313,6 +315,24 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
       fit: { type: 'enum', values: ['auto', 'world'], default: 'auto', description: 'auto frames the matched regions and markers; world pins the whole map.' },
       emptyTitle: text('What the empty state says.', 80),
       emptyHint: text('The line under it.', 160),
+    },
+  },
+  {
+    id: 'steps',
+    summary: 'Where a process stands: the stations in order, done behind, current lit, the rest ahead — an order, an application, an onboarding at a glance. The source resolves to ONE record: { steps: [{ label, sub? }], current (index of the station under way) }.',
+    props: {
+      source: source(),
+      title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
+      emptyTitle: text('What the empty state says.', 80),
+      emptyHint: text('The line under it.', 160),
+    },
+  },
+  {
+    id: 'rating',
+    summary: 'A score as stars: the number leads, five glyphs part-fill to it, the vote count says who. The source resolves to ONE record: { value, max? (default 5), count?, label? }. Display only — collecting a rating is a form\'s job.',
+    props: {
+      source: source(),
+      title: text('The words beside the stars when the record carries no label.', 80),
     },
   },
   {
