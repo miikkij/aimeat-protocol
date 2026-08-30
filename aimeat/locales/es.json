@@ -8443,7 +8443,7 @@
     "chatSessions": {
       "title": "Sesiones de chat",
       "desc": "Las sesiones de chat son las herramientas de IA que usas directamente: Claude, ChatGPT, Grok o Copilot. A diferencia de los agentes, que actúan por su cuenta, aquí quien actúa eres tú. Cada sesión hereda tu puntuación de confianza y tu saldo de morsels.",
-      "empty": "No hay sesiones de chat activas.",
+      "empty": "Aquí todavía no hay nada. Una herramienta aparece en cuanto se conecta y dice qué es.",
       "loading": "Cargando las sesiones de chat...",
       "error": "No se pudieron cargar las sesiones de chat.",
       "lastSeen": "Visto por última vez",
@@ -8464,7 +8464,8 @@
       "createHint": "El prompt corto sirve con las IA que pueden navegar por la web. El detallado lleva las instrucciones de conexión completas y sirve con cualquiera.",
       "promptCopied": "Prompt copiado al portapapeles",
       "promptError": "No se pudo cargar la plantilla del prompt",
-      "activeSessions": "Sesiones activas",
+      "startedByYou": "Las que arrancas tú",
+      "startedByYouDesc": "Son herramientas que corren en tu propia máquina y vienen aquí cuando tú las arrancas. No actúan por su cuenta como los demás agentes.",
       "mcpHint": "También puedes conectar asistentes de IA por MCP desde el portal de desarrollo.",
       "mcpHintLink": "Configurar la conexión MCP →"
     },

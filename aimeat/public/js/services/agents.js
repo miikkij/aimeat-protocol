@@ -11,9 +11,14 @@
  *   - getAgentCors / setAgentCors: per-agent CORS origins
  *   - offersWorkspaceContract / contractNamesOf / adoptContractTask / getAgentEngagements: workspace-contract tags
  *   - getAgentGroups / saveAgentGroups: owner-scoped custom agent grouping (memory `agents.groups`)
- *   - listChatSessions / listChatInstances / deleteChatInstance: chat/MCP session management
+ *   - isOwnerStartedAgent / listChatSessions / listChatInstances / deleteChatInstance: chat/MCP session management
  *
  * @version-history
+ *   v1.1.0 — 2026-08-31 — listChatSessions selects on `mode === 'workstation'` (the field the node
+ *     already sets from the reported platform) instead of a `session-` name prefix that no MCP client
+ *     has ever used. The prefix stays as the legacy half of the test, because the prompt this tab
+ *     hands out still asks for that name. Selector exported as isOwnerStartedAgent so the tab and
+ *     this service cannot disagree about who belongs in the list.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { apiGet, apiPost, apiDelete, api } from '/js/api.js';
@@ -77,10 +82,27 @@ export async function getAgentEngagements(agentName) {
   } catch (err) { swallowed('agents: getAgentEngagements', err); return []; }
 }
 
-/** List chat session agents (name starts with 'session-'). */
+/**
+ * The agents the OWNER starts: tools that run in their own environment (Claude Code, Claude Desktop,
+ * VS Code, Cursor) and visit this node over MCP. The node already has a word for them and a field
+ * that carries it — `mode: 'workstation'`, inferred from the platform the agent reports
+ * (services/platform-detector.ts) — so this reads the field.
+ *
+ * It used to select on `name.startsWith('session-')`, and that is why the tab was empty: Claude Code
+ * registers as `claude-code`, Claude Desktop as `claude-desktop-home-mcp`, VS Code as
+ * `vscode-claude`, and not one of them begins with `session-`. They sat in the general agent list
+ * instead, which is exactly the complaint.
+ *
+ * The prefix survives as the second half of the test because it is the legacy marker: the
+ * connectivity-key prompt this tab still hands out asks the agent to name itself
+ * `session-<platform>-<timestamp>`, and an agent that followed those instructions must not vanish
+ * from the tab that gave them.
+ */
+export const isOwnerStartedAgent = (a) => a?.mode === 'workstation' || Boolean(a?.name?.startsWith('session-'));
+
 export async function listChatSessions(owner) {
   const agents = await listAgents(owner);
-  return agents.filter(a => a.name?.startsWith('session-'));
+  return agents.filter(isOwnerStartedAgent);
 }
 
 /** Delete an agent by name. */
