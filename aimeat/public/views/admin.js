@@ -15,6 +15,9 @@
  *   v1.4.0 — 2026-07-11 — Replace the "AI Apps Usage" nav entry with a unified "Usage" tab
  *     (agent LLM ledger + AI apps spend, two labeled never-summed sections).
  *   v1.6.0 — 2026-08-17 — Metrics tab: the /v1/metrics Prometheus exposition rendered as a page.
+ *   v1.7.0 — 2026-08-31 — The poster frame (design canvas "AIMEAT Hallinnan kehys"): the refresh
+ *     becomes the quiet underlined word (.adm-refresh), the clock a mono reading (.adm-time),
+ *     and the access-denied heading loses its emoji.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -388,7 +391,7 @@ export default function Admin({ navigate, locale }) {
     return html`<div class="adm">
       <div class="adm-login">
         <div class="adm-card" style="text-align:center">
-          <h2>\u{1F6AB} ${t('dashboard.accessDenied') || 'Access Denied'}</h2>
+          <h2>${t('dashboard.accessDenied') || 'Access Denied'}</h2>
           <p>${t('dashboard.operatorRequired') || 'You need the operator role to access the admin dashboard.'}</p>
         </div>
       </div>
@@ -432,10 +435,10 @@ export default function Admin({ navigate, locale }) {
             ${t(pageInfo.key)}
           </div>
           <div class="adm-topbar-right">
-            <button class="adm-btn" onClick=${loadAll} disabled=${loading}>
+            <button class="adm-refresh" onClick=${loadAll} disabled=${loading}>
               ${loading ? t('dashboard.loading') : t('dashboard.refresh')}
             </button>
-            ${lastUpdate && html`<span style="color:var(--text-dim);font-size:.7rem">${lastUpdate}</span>`}
+            ${lastUpdate && html`<span class="adm-time">${lastUpdate}</span>`}
           </div>
         </div>
 

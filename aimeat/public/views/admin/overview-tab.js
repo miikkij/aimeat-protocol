@@ -1,16 +1,17 @@
 /**
- * @file public/views/admin/overview-tab.js
+ * @file overview-tab.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Admin dashboard overview tab: node health card, headline counters
- *   (owners/agents/actions/boards/tasks/sharing-groups), today's economy figures,
- *   quick config, and a health-warnings table. Fetches live task and sharing-group
- *   counts on mount.
- *
- * @structure
- *   - OverviewTab({ data }): renders health/stats/economy/config/warnings from data.dash
- *
+ * @description Admin dashboard overview in the poster face (design canvas "AIMEAT Hallinnan
+ *   kehys", direction A): the node's status as one big word with the four health metrics as
+ *   rows beside it (each carrying its zone and threshold, so a separate warnings table has
+ *   nothing left to say), the headline counters as the poster's numeral strip, and today's
+ *   economy and the quick config as two sections side by side. Fetches live task and
+ *   sharing-group counts on mount.
+ * @structure OverviewTab({ data }) — status section · numeral strip · economy + config
  * @version-history
+ *   v2.0.0 — 2026-08-31 — The poster face: status word + metric rows (absorbing the warnings
+ *     table), og-strip numerals, sections under ink rules.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { h } from 'preact';
@@ -18,8 +19,7 @@ import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
-import { num, fmtUp, Badge, StatsGrid, EconRow, HealthRow } from './shared.js';
+import { num, fmtUp, Badge, EconRow } from './shared.js';
 import { apiGet } from '/js/api.js';
 
 export default function OverviewTab({ data }) {
@@ -32,14 +32,12 @@ export default function OverviewTab({ data }) {
     apiGet('/v1/admin/agent-tasks?status=active&per_page=1')
       .then(r => {
         const activeTotal = r.data?.total || 0;
-        // Also fetch queued
         return apiGet('/v1/admin/agent-tasks?status=queued&per_page=1').then(r2 => {
           setActiveTaskCount(activeTotal + (r2.data?.total || 0));
         });
       })
       .catch(() => setActiveTaskCount(0));
 
-    // Fetch sharing group count
     apiGet('/v1/admin/sharing-groups')
       .then(r => setSharingGroupCount(r.data?.total || 0))
       .catch(() => setSharingGroupCount(0));
@@ -52,80 +50,60 @@ export default function OverviewTab({ data }) {
   const c = d.counts;
   const e = d.economy;
   const w = d.warnings || [];
-  const hColor = h_.status === 'healthy' ? '#22c55e' : h_.status === 'watch' ? '#eab308' : '#ef4444';
+
+  // One row per health metric, carrying its zone and — when the metric is warning — the
+  // threshold it crossed. The old separate warnings table said nothing these rows do not.
+  const thresholdOf = (metric) => w.find(x => x.metric === metric)?.threshold || null;
+  const metricRow = (metric, labelKey, obj) => html`
+    <div class="adm-mrow" key=${metric}>
+      <span>${t('dashboard.' + labelKey)}</span>
+      <span><${Badge} type=${obj.zone} /></span>
+      <span class="adm-mval">${obj.value}${thresholdOf(metric) ? ' · ' + thresholdOf(metric) : ''}</span>
+    </div>`;
 
   return html`
-    <!-- Health card -->
-    <div class="adm-card" style="border-left:4px solid ${hColor};margin-bottom:20px">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <div>
-          <h2>${t('dashboard.nodeHealth')}</h2>
-          <div class="adm-stat" style="color:${hColor}">${h_.status.toUpperCase()}</div>
-          <div class="adm-stat-label">${t('dashboard.uptime')}: ${fmtUp(d.uptime_seconds)} \u00B7 ${t('dashboard.storage')}: ${escHtml(d.storage_type)}</div>
+    <div class="og">
+      <section class="og-sec">
+        <div class="og-sec-h"><h2>${t('dashboard.nodeHealth')}<small>01</small></h2></div>
+        <div class="adm-ov-grid">
+          <div>
+            <div class="adm-ov-status ${h_.status}">${h_.status}</div>
+            <div class="adm-ov-up">${t('dashboard.uptime')}: ${fmtUp(d.uptime_seconds)} · ${t('dashboard.storage')}: ${d.storage_type}</div>
+          </div>
+          <div>
+            ${metricRow('burn_mint_ratio', 'healthBurnMintRatio', h_.burn_mint_ratio)}
+            ${metricRow('agent_churn_rate_30d', 'healthAgentChurn', h_.agent_churn_rate_30d)}
+            ${metricRow('work_expiry_rate_30d', 'healthWorkExpiry', h_.work_expiry_rate_30d)}
+            ${metricRow('dispute_rate_30d', 'healthDisputeRate', h_.dispute_rate_30d)}
+          </div>
         </div>
-        <${Badge} type=${h_.status} />
+      </section>
+
+      <div class="og-strip">
+        <div><b>${num(c.owners)}</b><span>${t('dashboard.registeredOwners')}</span></div>
+        <div><b>${num(c.agents)}</b><span>${t('dashboard.registeredAgents')}</span><small>${c.active_agents_24h} ${t('dashboard.active24h')}</small></div>
+        <div><b>${num(c.boards)}</b><span>${t('dashboard.activeBoards')}</span><small>${t('dashboard.publishedActions')}: ${num(c.actions)}</small></div>
+        <div><b>${num(c.chat_instances || 0)}</b><span>${t('dashboard.activeChatSessions')}</span></div>
+        <div><b>${activeTaskCount != null ? num(activeTaskCount) : '–'}</b><span>${t('dashboard.agentTasksActiveTasks')}</span></div>
+        <div><b>${sharingGroupCount != null ? num(sharingGroupCount) : '–'}</b><span>${t('dashboard.sharingGroupsTotalCount')}</span></div>
       </div>
-      <div style="margin-top:14px">
-        <${HealthRow} label=${t('dashboard.healthBurnMintRatio')} obj=${h_.burn_mint_ratio} />
-        <${HealthRow} label=${t('dashboard.healthAgentChurn')} obj=${h_.agent_churn_rate_30d} />
-        <${HealthRow} label=${t('dashboard.healthWorkExpiry')} obj=${h_.work_expiry_rate_30d} />
-        <${HealthRow} label=${t('dashboard.healthDisputeRate')} obj=${h_.dispute_rate_30d} />
+
+      <div class="adm-two">
+        <section class="og-sec">
+          <div class="og-sec-h"><h2>${t('dashboard.economyToday')}<small>02</small></h2></div>
+          <${EconRow} label=${t('dashboard.transactionsToday')} value=${num(e.transactions_today)} />
+          <${EconRow} label=${t('dashboard.morselsMovedToday')} value=${num(e.morsels_transacted_today)} />
+          <${EconRow} label=${t('dashboard.inCirculation')} value=${num(e.total_morsels_in_circulation)} />
+          <${EconRow} label=${t('dashboard.burnedToday')} value=${num(e.burned_today)} />
+        <//>
+        <section class="og-sec">
+          <div class="og-sec-h"><h2>${t('dashboard.quickConfig')}<small>03</small></h2></div>
+          <${EconRow} label=${t('dashboard.port')} value=${d.config.port} />
+          <${EconRow} label=${t('dashboard.jwtTtl')} value=${d.config.jwt_ttl_seconds + 's'} />
+          <${EconRow} label=${t('dashboard.keyedBrowse')} value=${d.config.keyed_browse_enabled ? t('dashboard.enabled') : t('dashboard.disabled')} />
+          <${EconRow} label=${t('dashboard.welcomeBonus')} value=${num(e.welcome_bonus)} />
+        <//>
       </div>
     </div>
-
-    <!-- Stats -->
-    <${StatsGrid} items=${[
-      { label: t('dashboard.registeredOwners'), value: c.owners, tone: 'blue' },
-      { label: t('dashboard.registeredAgents'), value: c.agents, sub: '(' + c.active_agents_24h + ' ' + t('dashboard.active24h') + ')', tone: 'purple' },
-      { label: t('dashboard.publishedActions'), value: c.actions, tone: 'cyan' },
-      { label: t('dashboard.activeBoards'), value: c.boards, tone: 'green' },
-      { label: t('dashboard.activeChatSessions'), value: c.chat_instances || 0, tone: 'cyan' },
-      { label: t('dashboard.agentTasksActiveTasks'), value: activeTaskCount != null ? activeTaskCount : '--', tone: 'orange' },
-      { label: t('dashboard.sharingGroupsTotalCount'), value: sharingGroupCount != null ? sharingGroupCount : '--', tone: 'purple' },
-    ]} />
-
-    <!-- Economy & Config -->
-    <div class="adm-grid adm-grid-2">
-      <div class="adm-card">
-        <h2>${t('dashboard.economyToday')}</h2>
-        <${EconRow} label=${t('dashboard.transactionsToday')} value=${num(e.transactions_today)} />
-        <${EconRow} label=${t('dashboard.morselsMovedToday')} value=${num(e.morsels_transacted_today)} />
-        <${EconRow} label=${t('dashboard.inCirculation')} value=${num(e.total_morsels_in_circulation)} />
-        <${EconRow} label=${t('dashboard.burnedToday')} value=${num(e.burned_today)} />
-      </div>
-      <div class="adm-card">
-        <h2>${t('dashboard.quickConfig')}</h2>
-        <${EconRow} label=${t('dashboard.port')} value=${d.config.port} />
-        <${EconRow} label=${t('dashboard.jwtTtl')} value=${d.config.jwt_ttl_seconds + 's'} />
-        <${EconRow} label=${t('dashboard.keyedBrowse')} value=${d.config.keyed_browse_enabled ? t('dashboard.enabled') : t('dashboard.disabled')} />
-        <${EconRow} label=${t('dashboard.welcomeBonus')} value=${num(e.welcome_bonus)} />
-      </div>
-    </div>
-
-    <!-- Warnings -->
-    ${w.length > 0 && html`
-      <div class="adm-card" style="border-left:3px solid #eab308;margin-bottom:20px">
-        <h2>${t('dashboard.warnings')} (${w.length})</h2>
-        <table>
-          <thead><tr><th>${t('dashboard.metric')}</th><th>${t('dashboard.value')}</th><th>${t('dashboard.zone')}</th><th>${t('dashboard.threshold')}</th></tr></thead>
-          <tbody>
-            ${w.map(x => {
-              const metricKey = {
-                burn_mint_ratio: 'healthBurnMintRatio',
-                agent_churn_rate_30d: 'healthAgentChurn',
-                work_expiry_rate_30d: 'healthWorkExpiry',
-                dispute_rate_30d: 'healthDisputeRate',
-              }[x.metric];
-              return html`<tr>
-              <td>${metricKey ? t('dashboard.' + metricKey) : x.metric}</td>
-              <td>${x.value}</td>
-              <td><${Badge} type=${x.zone} /></td>
-              <td style="color:var(--text-dim)">${x.threshold}</td>
-            </tr>`;
-            })}
-          </tbody>
-        </table>
-      </div>
-    `}
   `;
 }
