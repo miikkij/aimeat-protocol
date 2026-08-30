@@ -127,7 +127,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_package_install',
         // The person's own welcome page, beside the company one: same act, different owner.
         'aimeat_portfolio_publish',
-        'aimeat_contact_list', 'aimeat_contact_add', 'aimeat_contact_remove', 'aimeat_contact_resolve_email',
+        'aimeat_contact_list', 'aimeat_contact_add', 'aimeat_contact_remove', 'aimeat_contact_resolve_email', 'aimeat_contact_invite',
         // Outbound connections and mail, beside the address book because that is where they meet:
         // a send takes a saved contact, and a mailbox is what it can leave through. Scopes still
         // decide who sees which of them — reading the list of accounts, spending one, and sending

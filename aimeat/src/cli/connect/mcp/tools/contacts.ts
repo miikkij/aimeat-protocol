@@ -7,6 +7,8 @@
  *   resolve_email locally. Thin proxies over the shared /v1/contacts routes (owner-role), so both
  *   surfaces behave identically.
  * @version-history
+ *   v1.2.0 -- 2026-08-30 -- aimeat_contact_list takes include; aimeat_contact_invite proxies
+ *     POST /v1/contacts/invite. Parameter for parameter with the server MCP.
  *   v1.1.0 -- 2026-08-17 -- TARGET-063: aimeat_contact_add takes name + email (a person with no
  *     account on this node) beside contact_id, matching the server MCP parameter for parameter.
  *     A parameter that exists on one surface and not the other is dropped in silence, which is
@@ -33,12 +35,21 @@ export function registerContactTools(mcp: McpServer, registry: AgentRegistry): v
   mcp.tool('aimeat_contact_list', descriptionFor('aimeat_contact_list'), {
     q: z.string().optional().describe('Filter by id, name or email (case-insensitive substring).'),
     state: z.enum(['pending', 'accepted', 'blocked']).optional().describe('Narrow to one consent state.'),
-  }, annotationsFor('aimeat_contact_list'), async ({ q, state }) => {
+    include: z.string().optional().describe('Comma-separated extras: "together" (shared organisms per person), "invites" (the owner\'s open invitation per person without an account).'),
+  }, annotationsFor('aimeat_contact_list'), async ({ q, state, include }) => {
     const params = new URLSearchParams();
     if (q) params.set('q', q);
     if (state) params.set('state', state);
+    if (include) params.set('include', include);
     const qs = params.toString();
     return out(await client.get(`/v1/contacts${qs ? '?' + qs : ''}`));
+  });
+
+  mcp.tool('aimeat_contact_invite', descriptionFor('aimeat_contact_invite'), {
+    email: z.string().max(200).describe('The address to invite; they get a link to open an account here.'),
+    message: z.string().max(1000).optional().describe('A short message from the owner, carried in the email.'),
+  }, annotationsFor('aimeat_contact_invite'), async ({ email, message }) => {
+    return out(await client.post('/v1/contacts/invite', { email, message }));
   });
 
   mcp.tool('aimeat_contact_add', descriptionFor('aimeat_contact_add'), {

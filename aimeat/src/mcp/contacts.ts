@@ -13,6 +13,9 @@
  *   aimeat_contact_list, aimeat_contact_add, aimeat_contact_remove, aimeat_contact_resolve_email.
  * @usage import { registerContactTools } from './contacts.js';
  * @version-history
+ *   v1.2.0 — 2026-08-30 — aimeat_contact_list takes include (together, invites); aimeat_contact_invite
+ *     sends a person an invitation to join this AIMEAT with no organism behind it. Same service
+ *     functions as the routes.
  *   v1.1.0 — 2026-08-17 — TARGET-063: aimeat_contact_add takes name + email (a person with no
  *     account here) beside contact_id. Same handler, same service call — the decision of what a
  *     contact IS stays in services/contacts.ts rather than being made once per surface.
@@ -26,9 +29,11 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import {
-    ContactsError, listContactsMerged, addContact, removeContact, resolveContactEmail,
+    ContactsError, listContactsMerged, addContact, removeContact, resolveContactEmail, parseContactInclude,
     type AddContactInput,
 } from '../services/contacts.js';
+import { createContactInvitation, ContactInvitationError } from '../services/contact-invitations.js';
+import { invitePublic } from '../services/invitations.js';
 
 /** The link shape both MCP surfaces accept, declared once so they cannot drift. */
 const LinkSchema = z.object({
@@ -57,11 +62,33 @@ export function registerContactTools(
         {
             q: z.string().optional().describe('Filter by id, name or email (case-insensitive substring)'),
             state: z.enum(['pending', 'accepted', 'blocked']).optional().describe('Narrow to one consent state (default hides blocked; only identities have one)'),
+            include: z.string().optional().describe('Comma-separated extras: "together" adds the organisms each person and the owner share; "invites" adds the owner\'s open invitation on each person without an account'),
         },
         annotationsFor('aimeat_contact_list'),
-        async ({ q, state }) => {
-            const { contacts, truncated } = await listContactsMerged(storage, ownerGhii(), { q, state });
+        async ({ q, state, include }) => {
+            const { contacts, truncated } = await listContactsMerged(storage, ownerGhii(), { q, state, include: parseContactInclude(include) });
             return { content: [{ type: 'text' as const, text: JSON.stringify({ contacts, total: contacts.length, truncated }, null, 2) }] };
+        },
+    );
+
+    // ── aimeat_contact_invite — invite a person to join this AIMEAT, no organism behind it ──
+    mcp.tool(
+        'aimeat_contact_invite',
+        descriptionFor('aimeat_contact_invite'),
+        {
+            email: z.string().max(200).describe('The address to invite; they get a link to open an account here'),
+            message: z.string().max(1000).optional().describe("A short message from the owner, carried in the email"),
+        },
+        annotationsFor('aimeat_contact_invite'),
+        async ({ email, message }) => {
+            try {
+                const inviterName = parseGaiiLoose(getAgentGaii()).owner || getAgentGaii().split('@')[0];
+                const { invitation, acceptUrl, emailSent } = await createContactInvitation(storage, config, { inviterName, email, message: message ?? null });
+                return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'invited', invitation: invitePublic(invitation), email_sent: emailSent, accept_url: acceptUrl }, null, 2) }] };
+            } catch (e) {
+                const text = e instanceof ContactInvitationError ? e.message : errText(e);
+                return { content: [{ type: 'text' as const, text }], isError: true };
+            }
         },
     );
 

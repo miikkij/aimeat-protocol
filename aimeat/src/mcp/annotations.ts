@@ -354,6 +354,7 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_contact_add: { title: 'Add Contact', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_contact_remove: { title: 'Remove Contact', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     aimeat_contact_resolve_email: { title: 'Resolve Email to Owner', readOnlyHint: true },
+    aimeat_contact_invite: { title: 'Invite a Person by Email', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
 
     // ── Consent ──
     aimeat_consent_list: { title: 'List Consents', readOnlyHint: true },

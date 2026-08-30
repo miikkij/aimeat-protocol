@@ -261,6 +261,17 @@ export const agentMessagingTools: AimeatToolDefinition[] = [
         input: {
             q: { type: 'string', description: 'Filter by id, name or email (case-insensitive substring).' },
             state: { type: 'string', enum: ['pending', 'accepted', 'blocked'], description: 'Narrow to one consent state (default hides blocked). Only identities have one, so this excludes saved people.' },
+            include: { type: 'string', description: 'Comma-separated extras. "together": the organisms each person and the owner share, on every ghii row. "invites": the owner\'s open invitation on every person without an account.' },
+        },
+    },
+    {
+        name: 'aimeat_contact_invite',
+        description: "Invite a person to join this AIMEAT with no organism behind it: they get an email in the owner's name with a link that opens an account here, and if the owner wrote them down as a contact, that entry becomes them when they arrive. Refused when the address already has an account (add them with aimeat_contact_add instead), when the owner's own invitation to it is still open, or when the owner has too many open. To invite someone INTO an organism, use aimeat_organism_invite_email. Send one only when the owner asks: it is an email in their name.",
+        caller: 'agent',
+        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        input: {
+            email: { type: 'string', required: true, description: 'The address to invite.' },
+            message: { type: 'string', description: 'A short message from the owner, carried in the email.' },
         },
     },
     {

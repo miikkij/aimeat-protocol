@@ -302,6 +302,12 @@ const AI_PROVENANCE_REVIEWED_WITHOUT = [
   // cannot be promised is stated in services/outbound/ai-disclosure.ts — a provider we do not own
   // decides which headers it signs, and nothing forbids an intermediary stripping an unknown one.
   'aimeat_mail_send',
+  // DECIDED, 2026-08-30, by the same paragraph. The free text here is the inviter's note in an
+  // invitation email to ONE person, sent because the owner asked for it: not published, not a matter
+  // of public interest, and the owner is the editorial control. The email itself is this node's own
+  // template; the note rides inside it labelled as a personal message. Nothing authored lands on
+  // the node for anyone to read, so there is no record to mint.
+  'aimeat_contact_invite',
   'aimeat_app_template_propose',
   'aimeat_appdev_pitfall_report',
   'aimeat_board_create',
