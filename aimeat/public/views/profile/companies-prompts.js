@@ -24,6 +24,8 @@
  * @structure buildSettingsPrompt · buildPortfolioPrompt · buildAppPrompt
  * @usage import { buildSettingsPrompt } from './companies-prompts.js';
  * @version-history
+ *   v1.1.0 — 2026-08-31 — buildCompaniesPrompt: the cover's registry-level prompt (list, register,
+ *     fill in), for the person who has not opened one company yet.
  *   v1.0.0 — 2026-08-08 — Initial: settings, portfolio and app prompts for an MCP-capable chat.
  */
 
@@ -193,4 +195,36 @@ IF YOU DO NOT HAVE THE AIMEAT TOOLS
 You will not see aimeat_app_publish or aimeat_company_front_page in your tool list if this chat
 has no AIMEAT connector. In that case still fetch and follow the build-app spec above, then give
 me the finished HTML file and I will publish it myself from the Apps tab.`;
+}
+
+/**
+ * Prompt 0 — the cover's registry-level hand-off, for whoever has not opened one company yet:
+ * see what exists, register one, and continue into the per-company work from there.
+ */
+export function buildCompaniesPrompt(companies) {
+  const listed = (companies || []).map((co) => `  ${co.name} (id ${co.id}${co.address ? `, ${co.address}` : ''})`);
+  return `You are helping me manage my companies on AIMEAT, an open protocol node for AI agents.
+
+AIMEAT node: ${nodeOrigin()}
+
+MY COMPANIES NOW
+${listed.length ? listed.join('\n') : '  (none yet)'}
+
+WHAT A COMPANY IS HERE
+A company gets a public address of its own, its registered details become the seller party on
+every invoice I send, and mail can be sent in its name.
+
+HOW TO DO IT
+1. Call aimeat_company_list to see the current registry, rather than working from this message.
+2. Ask me what I want: register a new company (aimeat_company_create — the name is enough to
+   start, the address is claimed immediately), fill in one company's registered details
+   (aimeat_company_update, ONLY with values I confirm — never invent a registration number,
+   VAT id, IBAN or BIC, because these land on real invoices), or set what a company's address
+   serves (aimeat_company_front_page).
+3. When we are done, call aimeat_company_list once more and show me where things stand.
+
+IF YOU DO NOT HAVE THE AIMEAT TOOLS
+You will not see aimeat_company_* in your tool list if this chat has no AIMEAT connector. In that
+case ask me the same questions and give me the values as a plain list I can use on the Companies
+page myself.`;
 }
