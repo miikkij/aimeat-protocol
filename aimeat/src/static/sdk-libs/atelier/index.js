@@ -28,6 +28,9 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.37.0 — 2026-08-30 — MORE OF EVERYTHING (the developer's ask): chart kind radar
+ *     (profiles on spokes), steps (the process tracker — done / current / ahead), rating
+ *     (a score as part-filled SVG stars).
  *   v0.36.0 — 2026-08-30 — THE APPROVED EXPANSION, all three baskets: chart kinds funnel,
  *     treemap and flow (own layouts, no library); the work-planning family kanban (cards
  *     move — drag or arrow keys — and the app is told), plan (stretches against months,
@@ -165,7 +168,7 @@ import { el, append, $, $$, clear, uid, busy, guardButtons, whileBusy, injectSty
 import { i18n } from './i18n.js';
 import { flapify, ransom, vu, typeout, dealIn } from './scenics.js';
 import { app, section, tabs, bottomNav } from './shell.js';
-import { hero, statRow, figure } from './hero.js';
+import { hero, statRow, figure, rating } from './hero.js';
 import { aide } from './aide.js';
 import { delegate, agentActivity } from './agentic.js';
 import { emptyState, skeleton } from './state.js';
@@ -182,7 +185,7 @@ import { graph } from './graph.js';
 import { waveform } from './waveform.js';
 import { scene3d } from './scene3d.js';
 import { health, queue, gauge } from './ops.js';
-import { kanban, plan, schedule } from './planner.js';
+import { kanban, plan, schedule, steps } from './planner.js';
 import { konsole } from './konsole.js';
 import { atlas } from './atlas.js';
 import { map } from './map.js';
@@ -194,7 +197,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.36.0',
+  version: '0.37.0',
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,
@@ -203,7 +206,7 @@ const atelier = {
   mosaic, appRef,
 
   // ── Focal content ──
-  hero, statRow, figure,
+  hero, statRow, figure, rating,
   aide, delegate, agentActivity,
 
   /**
@@ -229,7 +232,7 @@ const atelier = {
   health, queue, gauge, console: konsole, atlas, map,
 
   // ── The work-planning family (work against people and time) ──
-  kanban, plan, schedule,
+  kanban, plan, schedule, steps,
 
   // ── The things that open ──
   reveal, drawer, dialog, confirm, prompt, sheet,

@@ -457,6 +457,18 @@ button.ak-card:hover { box-shadow: var(--ak-elev-2); transform: translateY(-2px)
 .ak-chart__ribbon { fill: none; stroke-opacity: 0.42; }
 .ak-chart__flownode { stroke: var(--ak-surface); stroke-width: 1.5; }
 .ak-chart__flowlabel { font-size: 12px; }
+/* Radar: a quiet ring grid, one translucent polygon per series. */
+.ak-chart__radarring { fill: none; stroke: var(--ak-line); }
+.ak-chart__radarspoke { stroke: var(--ak-line); }
+.ak-chart__radarshape { fill-opacity: 0.16; stroke-width: 2.5; stroke-linejoin: round; }
+/* Rating: the number leads, the stars part-fill to it by clipping, the count says who. */
+.ak-rating { display: inline-flex; align-items: center; gap: 10px; }
+.ak-rating__value { font-size: 1.45rem; line-height: 1; color: var(--ak-ink); }
+.ak-rating__track { position: relative; display: inline-block; width: 116px; height: 22px; }
+.ak-rating__stars { display: block; width: 116px; height: 22px; fill: color-mix(in oklab, var(--ak-ink) 16%, var(--ak-surface)); }
+.ak-rating__fill { position: absolute; inset: 0 auto 0 0; overflow: hidden; }
+.ak-rating__fill .ak-rating__stars { fill: var(--ak-accent); }
+.ak-rating__words { font-size: var(--ak-text-fine); color: var(--ak-ink-dim); }
 .ak-chart__legend {
   display: flex; flex-wrap: wrap; gap: 6px 14px;
   margin-top: 8px; font-size: var(--ak-text-fine); color: var(--ak-ink-dim);

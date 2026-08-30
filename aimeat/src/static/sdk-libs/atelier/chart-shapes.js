@@ -7,10 +7,12 @@
  *   and the FLOW (where the quantity went — ribbons as wide as their sums). chart.js
  *   dispatches here; the visual bar is the approved Näyteikkuna board.
  * @structure renderDonut · renderCalendar · renderScatter · renderFunnel · renderTreemap ·
- *   renderFlow — each (ctx, data)
+ *   renderFlow · renderRadar — each (ctx, data)
  * @usage  import { renderDonut, renderCalendar, renderScatter, renderFunnel, renderTreemap,
- *   renderFlow } from './chart-shapes.js';
+ *   renderFlow, renderRadar } from './chart-shapes.js';
  * @version-history
+ *   v0.37.0 — 2026-08-30 — RADAR: several measures on spokes, one polygon per series — the
+ *     profile comparison (skills, products, plans) the axes chart cannot say.
  *   v0.36.0 — 2026-08-30 — Basket one of the approved expansion: funnel, treemap (own
  *     squarify, no library) and flow (own layered layout — ribbons cubic, node colour carries
  *     into its ribbons).
@@ -417,4 +419,72 @@ export function renderFlow(ctx, data) {
     node.appendChild(name);
   }
   ctx.root.appendChild(node);
+}
+
+/**
+ * Profiles on spokes: { axes: string[], series: [{ label, values }], max? } — one polygon per
+ * series over a shared ring grid, so two shapes answer "strong where, weak where" at a glance.
+ */
+export function renderRadar(ctx, data) {
+  const axes = (data && Array.isArray(data.axes) ? data.axes : []).slice(0, 10);
+  const series = (data && Array.isArray(data.series) ? data.series : [])
+    .filter((s) => s && Array.isArray(s.values) && s.values.length)
+    .slice(0, 4);
+  if (axes.length < 3 || !series.length) return ctx.empty();
+  const max = (typeof data.max === 'number' && data.max > 0)
+    ? data.max
+    : series.reduce((m, s) => s.values.reduce((m2, v) => Math.max(m2, Number(v) || 0), m), 0) || 1;
+  ctx.root.setAttribute('aria-label', (ctx.title ? ctx.title + ' — ' : '') + series.map((s) => s.label).join(', '));
+
+  const W = 460;
+  const H = 340;
+  const CX = W / 2;
+  const CY = H / 2 + 4;
+  const R = 118;
+  const angle = (i) => -Math.PI / 2 + (2 * Math.PI * i) / axes.length;
+  const at = (i, r) => `${(CX + Math.cos(angle(i)) * r).toFixed(1)} ${(CY + Math.sin(angle(i)) * r).toFixed(1)}`;
+  const node = svg('svg', { viewBox: `0 0 ${W} ${H}`, class: 'ak-chart__svg', 'aria-hidden': 'true' });
+
+  for (const frac of [0.25, 0.5, 0.75, 1]) {
+    node.appendChild(svg('polygon', {
+      points: axes.map((a, i) => at(i, R * frac)).join(' '),
+      class: 'ak-chart__radarring',
+    }));
+  }
+  axes.forEach((label, i) => {
+    node.appendChild(svg('line', {
+      x1: CX, y1: CY,
+      x2: CX + Math.cos(angle(i)) * R, y2: CY + Math.sin(angle(i)) * R,
+      class: 'ak-chart__radarspoke',
+    }));
+    const lx = CX + Math.cos(angle(i)) * (R + 16);
+    const ly = CY + Math.sin(angle(i)) * (R + 16);
+    const cap = svg('text', {
+      x: lx.toFixed(1), y: (ly + 4).toFixed(1), class: 'ak-chart__tick',
+      'text-anchor': Math.abs(Math.cos(angle(i))) < 0.3 ? 'middle' : (Math.cos(angle(i)) > 0 ? 'start' : 'end'),
+    });
+    cap.textContent = String(label);
+    node.appendChild(cap);
+  });
+  const still = ctx.still();
+  series.forEach((s, si) => {
+    const points = axes.map((a, i) => at(i, R * Math.min(Math.max((Number(s.values[i]) || 0) / max, 0), 1))).join(' ');
+    const shape = svg('polygon', { points, class: 'ak-chart__radarshape' });
+    shape.style.fill = SERIES_VARS[si % SERIES_VARS.length];
+    shape.style.stroke = SERIES_VARS[si % SERIES_VARS.length];
+    if (!still) { shape.classList.add('ak-chart__band--enter'); shape.style.animationDelay = `${si * 120}ms`; }
+    node.appendChild(shape);
+  });
+  ctx.root.appendChild(node);
+
+  const legend = el('figcaption', { class: 'ak-chart__legend' },
+    series.map((s) => el('span', { class: 'ak-chart__key' }, [
+      el('span', { class: 'ak-chart__swatch' }),
+      el('span', { text: String(s.label) }),
+    ])));
+  series.forEach((s, i) => {
+    const sw = legend.children[i] && legend.children[i].firstChild;
+    if (sw) /** @type {HTMLElement} */ (sw).style.background = SERIES_VARS[i % SERIES_VARS.length];
+  });
+  ctx.root.appendChild(legend);
 }
