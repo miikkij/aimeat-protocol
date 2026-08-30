@@ -28,6 +28,7 @@ import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
 import type { Scheduler } from '../services/scheduler.js';
 import type { WorkflowEngine } from '../services/workflow/engine.js';
+import type { AiJobService } from '../services/ai-jobs/index.js';
 import type { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
 import type { createPushService } from '../services/push.js';
 import type { createEmailService } from '../services/email.js';
@@ -48,6 +49,7 @@ export interface BackgroundJobDeps {
   peers: Map<string, PeerInfo>;
   scheduler: Scheduler;
   workflowEngine: WorkflowEngine;
+  aiJobService: AiJobService;
   webhookDispatcher: ReturnType<typeof createWebhookDispatcher>;
   pushService: ReturnType<typeof createPushService>;
   emailService: ReturnType<typeof createEmailService>;
@@ -56,7 +58,7 @@ export interface BackgroundJobDeps {
 /** Start the node's own recurring work. Called from mountRoutes() after the routers are up. */
 export function startBackgroundJobs(deps: BackgroundJobDeps): void {
   const {
-    config, storage, peers, scheduler, workflowEngine,
+    config, storage, peers, scheduler, workflowEngine, aiJobService,
     webhookDispatcher, pushService, emailService,
   } = deps;
 
@@ -73,6 +75,13 @@ export function startBackgroundJobs(deps: BackgroundJobDeps): void {
   workflowEngine.setPushService(pushService);
   workflowEngine.setEmailService(emailService);
   workflowEngine.start().catch(err => logger.error('WorkflowEngine start failed', { error: String(err) }));
+
+  // AI jobs outlive the process that started them. Anything left `running` has no worker any more
+  // and would sit "running" for ever in every view, so it is failed with a named reason; anything
+  // left `queued` never started and goes back into the pool. Same shape, same reason, as the
+  // workflow engine's resumeInflight() one line above.
+  aiJobService.reconcileAfterRestart()
+    .catch(err => logger.error('AI job restart reconciliation failed', { error: String(err) }));
 
   // Start the scheduler (loads enabled jobs from storage). The backfill runs FIRST and is awaited:
   // an extension job stored before its owner scope was stamped refuses at run time, and the first

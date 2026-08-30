@@ -130,6 +130,7 @@ import { registerSharingGroupTools } from './sharing-groups.js';
 import { registerAgentTaskTools } from './agent-tasks.js';
 import { registerAgentScheduleTools } from './agent-schedules.js';
 import { registerWorkflowTools } from './workflows.js';
+import { registerAiJobTools } from './ai-jobs.js';
 import { registerAgentCapabilityTools } from './agent-capabilities.js';
 import { registerAgentMessageTools } from './agent-messages.js';
 import { registerDmMessageTools } from './dm-messages.js';
@@ -324,6 +325,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         registerAgentTaskTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerAgentScheduleTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
         registerWorkflowTools(mcp, storage, config, () => agentGaii);
+        registerAiJobTools(mcp, storage, config, () => agentGaii);
         registerAgentCapabilityTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerAgentMessageTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerDmMessageTools(mcp, storage, config, () => agentGaii, peers);

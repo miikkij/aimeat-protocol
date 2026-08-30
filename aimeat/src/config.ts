@@ -311,6 +311,15 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     modelDefaultImage: process.env.AIMEAT_MODEL_DEFAULT_IMAGE ?? '',
     sttLanguageDefault: process.env.AIMEAT_STT_LANGUAGE_DEFAULT ?? '',
     screenshotOnDemandPerHour: parseInt(process.env.AIMEAT_SCREENSHOT_ONDEMAND_PER_HOUR ?? '20', 10),
+
+    // AI jobs — a model call with a handle. See config-types-ai.ts for what each number protects and
+    // why there is deliberately no per-owner or per-app CONCURRENCY cap among them.
+    aiJobSlots: parseInt(process.env.AIMEAT_AI_JOB_SLOTS ?? '80', 10),
+    aiJobMaxQueued: parseInt(process.env.AIMEAT_AI_JOB_MAX_QUEUED ?? '1000', 10),
+    aiJobMaxPromptBytes: parseInt(process.env.AIMEAT_AI_JOB_MAX_PROMPT_BYTES ?? '2097152', 10),
+    aiJobMaxQueuedPerOwner: parseInt(process.env.AIMEAT_AI_JOB_MAX_QUEUED_PER_OWNER ?? '200', 10),
+    aiJobMaxChain: parseInt(process.env.AIMEAT_AI_JOB_MAX_CHAIN ?? '8', 10),
+    aiJobLogRetentionDays: parseInt(process.env.AIMEAT_AI_JOB_LOG_RETENTION_DAYS ?? '30', 10),
     maxActionsPerAgent: parseInt(process.env.AIMEAT_MAX_ACTIONS_PER_AGENT ?? '20', 10),
     minTrustForPaidActions: parseInt(process.env.AIMEAT_MIN_TRUST_PAID_ACTIONS ?? '10', 10),
     appMaxSizeMb: parseInt(process.env.AIMEAT_APP_MAX_SIZE_MB ?? '5', 10),

@@ -50,6 +50,7 @@ import { INTERNAL_PASS_HEADER } from './internal-pass.js';
 import { enforcePaywall, APP_TOOL_HEADER } from './paywall.js';
 import { resolveGatedApp } from './permissions.js';
 import { buildExtensionCtx, buildExtensionWallet, buildExtensionNotify, buildExtensionEmail, sandboxLimits } from '../../services/extension-ctx.js';
+import { maybeExtensionAi, getActiveAiJobService } from '../../services/ai-jobs/index.js';
 import { takeDesignations } from '../../commerce/beneficiary-designation.js';
 import { recordCallDuration } from '../../services/call-timing.js';
 import { getEncryptionKey } from '../../services/encryption.js';
@@ -178,6 +179,12 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
           config, storage,
           ownerGhii: ownerGhiiOf(callerGaii),
           producedBy: { gaii: callerGaii, kind: producerKindOf(req.auth!.roles), ref: `${ext.name}/${action.id}` },
+        }),
+        // Background model calls, billed to the INSTALLER and not to whoever is calling — the same
+        // rule as buy() just below, and the reason both read `ext.installedBy` from the record.
+        ai: maybeExtensionAi({
+          service: getActiveAiJobService(), extName: ext.name, extOwner: ext.installedBy,
+          nodeId: config.nodeId, createdBy: callerGaii,
         }),
         buy: async (appRef: string, tool: string, buyInput?: Record<string, unknown>) => {
           const { buyForExtension } = await import('../../services/extension-purchase.js');
@@ -329,6 +336,12 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
           config, storage,
           ownerGhii: ownerGhiiOf(callerGaii),
           producedBy: { gaii: callerGaii, kind: producerKindOf(req.auth!.roles), ref: `${ext.name}/${action.id}` },
+        }),
+        // Background model calls, billed to the INSTALLER and not to whoever is calling — the same
+        // rule as buy() just below, and the reason both read `ext.installedBy` from the record.
+        ai: maybeExtensionAi({
+          service: getActiveAiJobService(), extName: ext.name, extOwner: ext.installedBy,
+          nodeId: config.nodeId, createdBy: callerGaii,
         }),
         buy: async (appRef: string, tool: string, buyInput?: Record<string, unknown>) => {
           const { buyForExtension } = await import('../../services/extension-purchase.js');

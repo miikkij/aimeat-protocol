@@ -10835,6 +10835,254 @@ paths:
         '403':
           $ref: '#/components/responses/AimeatError'
 
+  /v1/ai/jobs:
+    post:
+      operationId: startAiJob
+      summary: Start a background AI job and get a handle back
+      description: >
+        A model call can take twenty or thirty minutes, and nothing else on this node can wait that
+        long in the right way: the extension sandbox caps at 60 seconds and every other path holds an
+        HTTP request open. An AI job is that call with a handle. It queues for a slot, runs on this
+        node with the owner's own key, and writes its answer to the memory key you named.
+
+
+        **This answers 202 and returns before the work starts.** Poll `GET /v1/ai/jobs/{id}` or read
+        `result_key` when it is `done`. The response carries `queue_position` and never an ETA:
+        model latency is unknown, so a number of seconds would be invented.
+
+
+        `prompt` or `prompt_key` — one of them is required. `input_keys` names owner-namespace
+        records that are read and appended to the prompt, labelled by key; a record that does not
+        exist is stated in the prompt rather than left as a silence the model fills in. The assembled
+        prompt is capped (`AIMEAT_AI_JOB_MAX_PROMPT_BYTES`, 2 MB by default).
+
+
+        `on_done` calls one of the OWNER'S OWN extension actions with `{ job_id, state, result_key }`
+        once the answer has landed — checked at enqueue and again at fire time, because `installedBy`
+        is decided at install and a delete-and-reinstall by another owner outlives the first check.
+        If that callback cannot run, the job ends `failed` and not `done`: a half-finished chain
+        reporting success is the worst available outcome.
+
+
+        There is deliberately no `max_tokens`. A cap truncates a long generation in silence, and a
+        long generation is the point.
+
+
+        Requires an owner session or a token carrying `ai:use`.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [result_key]
+              properties:
+                prompt:
+                  type: string
+                  description: The prompt. Required unless `prompt_key` names a record holding it.
+                prompt_key:
+                  type: string
+                  description: >
+                    An owner-namespace key holding the prompt text (a string, or an object with a
+                    `prompt` field). Changing the prompt is then a memory write rather than a code
+                    change.
+                input_keys:
+                  type: array
+                  items: { type: string }
+                  description: >
+                    Owner-scope memory keys read and appended to the prompt, labelled by key. The
+                    model has no tools and cannot read anything itself; a missing record is stated
+                    as such in the prompt.
+                result_key:
+                  type: string
+                  description: >
+                    Where the answer is written, in the owner's own namespace. Refused when it names
+                    another namespace or falls under a prefix the server reads and trusts.
+                result_visibility:
+                  type: string
+                  enum: [private, owner, public]
+                  default: private
+                  description: Visibility of the record written at `result_key`.
+                model:
+                  type: string
+                  description: Optional explicit model id (overrides the owner's configured model).
+                system_prompt:
+                  type: string
+                json:
+                  type: boolean
+                  description: >
+                    Parse the answer as JSON before storing it, so a malformed answer fails the job
+                    rather than becoming a string every reader has to re-parse.
+                app_id:
+                  type: string
+                  description: App attribution — enables the per-app allowlist and the per-app quota.
+                on_done:
+                  type: object
+                  required: [extension, action]
+                  description: An extension action of the job's OWN owner, invoked when the job finishes.
+                  properties:
+                    extension: { type: string }
+                    action: { type: string }
+      responses:
+        '202':
+          description: Accepted. `data` is `{ job_id, state, queue_position }`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          description: >
+            `AI_JOB_CALLBACK_FORBIDDEN` — `on_done` names an extension action this account cannot
+            call. Same wording whichever way it fails: which extensions exist is not a stranger's
+            business.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '413':
+          description: '`AI_JOB_PROMPT_TOO_LARGE` — the prompt and its inputs came to more than the cap.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '422':
+          description: '`AI_JOB_CHAIN_TOO_DEEP` — a chain called itself too many times and was stopped.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '429':
+          description: >
+            `AI_JOB_LIMIT_REACHED` — this owner has too many jobs queued. Nothing is wrong with the
+            node; something of theirs is probably looping.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '503':
+          description: >
+            `AI_JOB_QUEUE_FULL` — the node's wait line is full. Carries `Retry-After`; this is the
+            one refusal of the four that means "come back shortly".
+          headers:
+            Retry-After:
+              schema: { type: integer }
+              description: Seconds to wait before trying again.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+
+    get:
+      operationId: listAiJobs
+      summary: List the caller's AI jobs
+      description: >
+        Defaults to the LIVE ones (queued and running), which is what "what am I waiting for" means.
+        A finished job has been folded into its day's log and is listed with `state=all` or by its
+        own state; the live record is deleted on the fold, because a key per run would fill the
+        node's per-principal key ceiling in weeks.
+
+
+        Requires an owner session or a token carrying `ai:use`.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: state
+          in: query
+          schema:
+            type: string
+            enum: [queued, running, done, failed, cancelled, live, all]
+            default: live
+          description: Which jobs to list. `live` is queued + running.
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 50
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/ai/jobs/{id}:
+    get:
+      operationId: getAiJob
+      summary: Read one AI job
+      description: >
+        The record, live or finished. Reachable only by its owner, resolved server-side and never
+        from anything the caller sends; another owner's id is a 404 rather than a 403, because whose
+        jobs exist is not a stranger's business.
+
+
+        Requires an owner session or a token carrying `ai:use`.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+        '404':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/ai/jobs/{id}/cancel:
+    post:
+      operationId: cancelAiJob
+      summary: Stop an AI job, queued or running
+      description: >
+        A queued job leaves the wait line and nothing is spent. A running job's provider call is torn
+        down through its abort signal, so a stuck long call can be cleared instead of waited out.
+        Whatever the provider had already billed is still recorded — a cancelled call is not a free
+        call, and the usage row must not silently disappear or the spend charts lie.
+
+
+        A job that has already finished answers 409: there is nothing left to stop. Another owner's
+        id is a 404.
+
+
+        Requires an owner session or a token carrying `ai:use`.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+        '404':
+          $ref: '#/components/responses/AimeatError'
+        '409':
+          description: '`AI_JOB_ALREADY_TERMINAL` — the job is already done, failed or cancelled.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+
   /v1/ai/image:
     post:
       operationId: generateImage

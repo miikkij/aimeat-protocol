@@ -249,6 +249,13 @@ export interface CompletionOptions {
   max_tokens?: number;
   frequency_penalty?: number;
   presence_penalty?: number;
+  /**
+   * An outside reason to stop waiting — a cancelled AI job, so far. It is COMBINED with this
+   * function's own timeout rather than replacing it: a caller that can cancel still gets the
+   * timeout, and a caller that cannot is unchanged. `chatCompletionRaw` below has taken a signal
+   * since it was written, so this is the pattern arriving on the other door rather than a new one.
+   */
+  signal?: AbortSignal;
 }
 
 /** A user-message content part for OpenAI-compatible multimodal (vision) requests. */
@@ -281,6 +288,12 @@ export async function complete(
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  // The timeout and the caller's own reason to stop, combined rather than chosen between. Without
+  // the composition a cancellable caller would silently lose the timeout, which is the guard that
+  // stops a hung provider holding a slot for ever.
+  const signal = options?.signal
+    ? AbortSignal.any([controller.signal, options.signal])
+    : controller.signal;
 
   const headers: Record<string, string> = { 'Content-Type': 'application/json', ...providerHeaders(apiKey, baseUrl) };
 
@@ -298,7 +311,7 @@ export async function complete(
       method: 'POST',
       headers,
       body: bodyStr,
-      signal: controller.signal,
+      signal,
     });
 
     if (!resp.ok) {

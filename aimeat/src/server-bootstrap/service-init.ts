@@ -46,6 +46,7 @@ import { RealtimeManager } from '../services/realtime-manager.js';
 import { MailboxNotificationService } from '../services/mailbox-notification.js';
 import { Scheduler, setActiveScheduler } from '../services/scheduler.js';
 import { WorkflowEngine, setActiveWorkflowEngine } from '../services/workflow/engine.js';
+import { AiJobService, setActiveAiJobService } from '../services/ai-jobs/index.js';
 import { createEmailService, setActiveEmailService } from '../services/email.js';
 import { enqueueCatalogueSync } from '../services/catalogue-sync.js';
 import { initializeNode } from '../auth/node-keys.js';
@@ -68,6 +69,7 @@ export interface ServiceInitResult {
   mailboxNotificationService: MailboxNotificationService | null;
   scheduler: Scheduler;
   workflowEngine: WorkflowEngine;
+  aiJobService: AiJobService;
 }
 
 /**
@@ -102,6 +104,12 @@ export async function initializeServices(
   // task-terminal events (agent-tasks route), and its own watchdog sweep.
   const workflowEngine = new WorkflowEngine(config, storage);
   setActiveWorkflowEngine(workflowEngine);
+
+  // AI jobs — a background model call with a handle. Constructed here rather than per request
+  // because the QUEUE is process-wide: the routes, the MCP tools and the sandbox's ctx.ai must all
+  // be talking to the same wait line, or each of them enforces its own idea of "full".
+  const aiJobService = new AiJobService(config, storage, emailService);
+  setActiveAiJobService(aiJobService);
 
   // Register core job handlers
   registerCoreHandlers(scheduler, config, storage);
@@ -396,6 +404,7 @@ export async function initializeServices(
     mailboxNotificationService,
     scheduler,
     workflowEngine,
+    aiJobService,
   };
 }
 

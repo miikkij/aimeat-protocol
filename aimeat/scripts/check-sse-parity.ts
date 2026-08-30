@@ -82,6 +82,12 @@ const EXEMPT: Record<string, string> = {
         + '\'apps\' frame belongs to the promotion (publishAppDraft) where the catalogue actually '
         + 'changes. Emitting per chunk would also mean a frame per append while a 400 kB app is being '
         + 'built. Silence here is parity with the REST twin, not a gap.',
+    'src/mcp/ai-jobs.ts':
+        'The four job tools call the same service functions POST /v1/ai/jobs and its siblings call, '
+        + 'and that route emits nothing either. There is no SSE-backed surface showing a job: the '
+        + 'design deliberately ships no profile tab, so `GET /v1/ai/jobs` and the handle a start '
+        + 'returns are the whole of how anyone watches one. Silence here is parity with the REST twin, and '
+        + 'the day a tab exists this entry is what has to be revisited.',
     'src/mcp/ai-image.ts':
         'The generated image is written to the caller\'s own storage, and POST /v1/ai/image emits '
         + 'nothing either. Storage has no SSE domain: a file appears in the owner\'s own list when '
