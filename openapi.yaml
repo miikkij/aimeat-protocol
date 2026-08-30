@@ -31534,6 +31534,22 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
 
+  /v1/templates/knowledge-packager-mcp:
+    get:
+      operationId: getKnowledgePackagerMcpTemplate
+      summary: Knowledge packager prompt for an agent connected over MCP
+      description: >
+        The prompt a person copies to an agent that reaches this node over MCP (Claude, Cursor, Codex,
+        VS Code). The agent writes the package manifest with `aimeat_memory_write` and each entry with
+        `aimeat_knowledge_contribute`; nothing is pasted back. Variables (owner, node URL, node id) are
+        filled in for the caller.
+      tags: [Knowledge]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+
   /v1/templates/chat-session-human:
     get:
       operationId: getChatSessionHumanTemplate

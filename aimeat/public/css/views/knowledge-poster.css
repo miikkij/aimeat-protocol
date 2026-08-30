@@ -1,0 +1,138 @@
+/**
+ * @file knowledge-poster.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The Knowledge page and the public knowledge library in the poster face (kp- prefix;
+ *   design canvas "AIMEAT Tietopankin sivu", direction A). The shared parts (crumb, masthead, strip,
+ *   sections, folds, rail) come from organism.css's og- rules; this file carries what knowledge adds:
+ *   the packages table, the three roads to a new package with the paste box and its preview, an
+ *   entry as text with its sources and relations, the sharing switches, and the library's desk and
+ *   list. The public page has no profile shell, so the heading rule the shell scopes is repeated
+ *   here for .og-kp--public. NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
+ * @version-history
+ *   v1.0.0 — 2026-08-30 — Initial.
+ */
+
+.og-kp .og-chip--coral { border-color: var(--accent); color: var(--accent); }
+.og-kp .kp-chip--case { text-transform: none; }
+.og-kp .kp-chip--btn { cursor: pointer; }
+.og-kp .kp-chip--btn:hover { border-color: var(--accent); color: var(--accent); }
+.og-kp .og-door.on { color: var(--accent); border-bottom-color: var(--accent); }
+.og-kp .og-empty { margin: 0; font-size: .9rem; color: var(--text-dim); }
+.og-kp .kp-hint { margin: .6rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--text-dim); }
+.og-kp .kp-inline { margin: 0; white-space: nowrap; }
+.og-kp .kp-warn { color: var(--accent); }
+.og-kp .kp-error { margin: .5rem 0 0; font-size: .85rem; color: var(--accent); }
+.og-kp .kp-mono { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
+.og-kp .kp-loading { display: inline-block; padding-left: 1.1rem; position: relative; }
+.og-kp .kp-loading::before { content: ''; position: absolute; left: 0; top: .35em; width: .55em; height: .55em; background: var(--accent); animation: kpBlink 1s steps(2, start) infinite; }
+@keyframes kpBlink { to { visibility: hidden; } }
+.og-title.kp-title--page { font-size: 2.1rem; overflow-wrap: anywhere; }
+.og-kp .og-strip b .kp-of { font-size: 1.1rem; color: var(--text-dim); }
+
+/* ── The packages table ─────────────────────────────────────────────────────────────────────── */
+.kp-rows { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 9rem) minmax(0, 12rem) 6rem 3.5rem; gap: 0 1rem; align-items: center; }
+.kp-rows > div { padding: .6rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
+.kp-rows--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.kp-rows--org { grid-template-columns: minmax(0, 1fr) minmax(0, 9rem) minmax(0, 12rem); }
+.kp-rows .kp-nm { font-weight: 800; font-size: .95rem; color: var(--text); }
+.kp-rows .kp-nm .og-tbl-name { white-space: normal; overflow-wrap: anywhere; }
+.kp-rows .kp-nm small { display: block; font-size: .78rem; font-weight: 400; color: var(--text-dim); margin-top: .1rem; }
+.kp-rows .kp-m, .kp-lib .kp-m { font-family: var(--font-mono); font-size: .72rem; line-height: 1.5; color: var(--text-dim); }
+.kp-rows .kp-m b, .kp-lib .kp-m b { color: var(--text); font-weight: 500; }
+.kp-rows .kp-w { font-size: .82rem; line-height: 1.4; color: var(--text); }
+.kp-group { display: contents; }
+.kp-lbl { display: flex; align-items: baseline; padding: .9rem 0 .25rem; border-bottom: 1px solid var(--text); font-family: var(--font-poster); font-weight: var(--font-poster-weight); text-transform: uppercase; font-size: .82rem; letter-spacing: .05em; color: var(--accent); }
+.kp-lbl em { margin-left: auto; font-family: var(--font-mono); font-size: .7rem; font-style: normal; color: var(--text-dim); }
+
+/* ── Three roads to a package ───────────────────────────────────────────────────────────────── */
+.kp-roads { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem; }
+.kp-road { display: flex; flex-direction: column; gap: .4rem; padding: .9rem 1rem; border: 2px solid var(--text); background: var(--card-bg); font-size: .85rem; line-height: 1.5; color: var(--text-dim); }
+.kp-road b { font-weight: 800; font-size: .95rem; color: var(--text); }
+.kp-road p { margin: 0; }
+.kp-road .kp-step { font-family: var(--font-mono); font-size: .7rem; color: var(--accent); }
+.kp-road .og-doors { margin-top: auto; padding-top: .4rem; }
+.kp-road .og-door { font-size: .72rem; }
+.kp-road.on { background: var(--sun); color: var(--on-sun); box-shadow: 4px 4px 0 var(--text); }
+.kp-road.on b, .kp-road.on .kp-step, .kp-road.on .og-door { color: var(--on-sun); border-bottom-color: var(--on-sun); }
+.kp-paste { width: 100%; box-sizing: border-box; margin-top: .9rem; border: 2px solid var(--text); background: var(--card-bg); padding: .6rem .8rem; font: inherit; font-size: .9rem; color: var(--text); resize: vertical; }
+.kp-paste:focus { outline: none; border-color: var(--accent); }
+.kp-preview { margin-top: .9rem; padding: .9rem 1.1rem; border: 2px solid var(--text); background: var(--card-bg); }
+.kp-preview-h { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; font-size: 1rem; }
+.kp-preview-h b { font-weight: 800; }
+.kp-preview-entries { display: flex; flex-direction: column; margin-top: .6rem; }
+.kp-preview-entry { display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; padding: .45rem 0; border-top: 1px solid var(--border); font-size: .9rem; }
+.kp-preview-entry b { font-weight: 800; }
+.kp-preview-entry small { flex-basis: 100%; font-size: .8rem; color: var(--text-dim); }
+.kp-check { display: flex; align-items: center; gap: .5rem; margin-top: .8rem; font-size: .88rem; }
+.kp-preview-actions { display: flex; align-items: center; gap: 1.2rem; margin-top: .9rem; }
+
+/* ── An entry ───────────────────────────────────────────────────────────────────────────────── */
+.kp-entry { padding: .7rem 0; border-bottom: 1px solid var(--border); }
+.kp-entry:last-child { border-bottom: 0; }
+.kp-entry-h { display: flex; align-items: center; gap: 1rem; }
+.kp-entry-title { background: none; border: 0; padding: 0; cursor: pointer; text-align: left; font-family: inherit; font-size: .97rem; font-weight: 800; color: var(--text); min-width: 0; overflow-wrap: anywhere; }
+.kp-entry-title:hover { color: var(--accent); }
+.kp-entry-r { margin-left: auto; display: flex; align-items: center; gap: .9rem; flex: none; }
+.kp-entry-r .og-door { font-size: .72rem; }
+.kp-entry-text { margin: .6rem 0 0; font-size: .95rem; line-height: 1.6; max-width: 72ch; white-space: pre-wrap; overflow-wrap: anywhere; }
+.kp-about { margin: 0; font-size: 1rem; line-height: 1.6; max-width: 72ch; }
+.kp-refs { display: flex; flex-direction: column; gap: .25rem; margin-top: .6rem; }
+.kp-ref { display: flex; gap: .7rem; align-items: baseline; font-size: .85rem; }
+.kp-ref i { flex: 0 0 6.5rem; font-family: var(--font-mono); font-size: .7rem; font-style: normal; color: var(--success, #10B981); }
+.kp-ref i.kp-ref--no { color: var(--accent); }
+.kp-ref a { color: var(--text); text-decoration: none; border-bottom: 1px solid var(--border); }
+.kp-ref a:hover { color: var(--accent); border-bottom-color: var(--accent); }
+.kp-rels { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .6rem; }
+.kp-rel { background: none; border: 1px solid var(--border); padding: .1rem .5rem; cursor: pointer; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); }
+.kp-rel b { color: var(--accent); font-weight: 500; margin-right: .35rem; }
+.kp-rel:hover { border-color: var(--accent); color: var(--text); }
+
+/* ── Sharing, details ───────────────────────────────────────────────────────────────────────── */
+.kp-kv { display: grid; grid-template-columns: minmax(8rem, 11rem) minmax(0, 1fr); gap: .7rem 1.2rem; align-items: center; font-size: .95rem; line-height: 1.5; }
+.kp-kv .k { font-size: .68rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.kp-toggle { display: inline-flex; align-items: center; gap: .6rem; background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit; font-size: .9rem; font-weight: 600; color: var(--text); text-align: left; }
+.kp-toggle i { display: inline-block; flex: none; width: 30px; height: 16px; border: 2px solid var(--text); position: relative; }
+.kp-toggle i::after { content: ''; position: absolute; top: 2px; left: 2px; width: 8px; height: 8px; background: var(--text); }
+.kp-toggle.on i { background: var(--sun); }
+.kp-toggle.on i::after { left: 16px; }
+.kp-toggle:disabled { opacity: .5; cursor: default; }
+.kp-orgshare { display: flex; align-items: center; gap: 1rem; }
+.kp-orgshare select { border: 0; border-bottom: 2px solid var(--text); background: transparent; font: inherit; font-size: .9rem; color: var(--text); padding: .2rem 0; }
+
+/* ── The library section on the cover, and the public library page ─────────────────────────── */
+.kp-lib { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 11rem) minmax(0, 9rem) 6rem 3.5rem; gap: 0 1rem; align-items: center; }
+.kp-lib > div { padding: .6rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
+.kp-lib--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.kp-lib .kp-nm { font-weight: 800; font-size: .95rem; color: var(--text); }
+.kp-lib .kp-nm .og-tbl-name { white-space: normal; overflow-wrap: anywhere; }
+.kp-lib .kp-nm small { display: block; font-size: .8rem; font-weight: 400; color: var(--text-dim); margin-top: .1rem; }
+.og-kp--public { max-width: 1150px; margin: 0 auto; padding: 1.6rem 1.5rem 3rem; background: var(--bg); }
+.og-kp--public .og-sec h2 { margin: 0; font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.6rem; line-height: 1.05; letter-spacing: var(--font-poster-tracking); text-transform: uppercase; color: var(--text); }
+.og-kp--public .og-sec h2 small { font-family: var(--font-mono); font-size: .8rem; letter-spacing: 0; text-transform: none; color: var(--accent); margin-left: .6rem; }
+.og-kp--public .og-title { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 2.6rem; line-height: 1; letter-spacing: var(--font-poster-tracking); text-transform: uppercase; margin: 0; }
+.kp-desk { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: .8rem 1.4rem; align-items: end; margin-top: 1.4rem; padding: 1rem 0; border-top: 3px solid var(--text); border-bottom: 3px solid var(--text); }
+.kp-field { width: 100%; min-width: 0; box-sizing: border-box; border: 0; border-bottom: 3px solid var(--text); background: transparent; padding: .45rem 0; font: inherit; font-size: 1.2rem; color: var(--text); }
+.kp-field:focus { outline: none; border-bottom-color: var(--accent); }
+.kp-desk .og-choice-btn { text-transform: uppercase; letter-spacing: .04em; font-size: .7rem; padding: .5rem .8rem; }
+.kp-more { margin: .9rem 0 0; }
+.kp-more button { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; font-size: .85rem; font-weight: 800; color: var(--text); border-bottom: 2px solid var(--text); }
+.kp-entry-sec p { margin: 0; font-size: .97rem; line-height: 1.65; max-width: 72ch; white-space: pre-wrap; overflow-wrap: anywhere; }
+.kp-prov { display: block; font-size: .8rem; font-weight: 400; line-height: 1.5; opacity: 1; }
+
+@media (max-width: 1100px) {
+  .kp-rows { grid-template-columns: minmax(0, 1fr) 3.5rem; }
+  .kp-rows > .kp-m, .kp-rows > .kp-w, .kp-rows--head > div:nth-child(2), .kp-rows--head > div:nth-child(3), .kp-rows--head > div:nth-child(4) { display: none; }
+  .kp-rows--org { grid-template-columns: minmax(0, 1fr); }
+  .kp-lib { grid-template-columns: minmax(0, 1fr) 4.5rem; }
+  .kp-lib > .kp-m, .kp-lib--head > div:nth-child(2), .kp-lib--head > div:nth-child(3), .kp-lib--head > div:nth-child(4) { display: none; }
+  .kp-roads { grid-template-columns: 1fr; }
+  .kp-kv { grid-template-columns: 1fr; }
+  .kp-desk { grid-template-columns: 1fr; }
+  .kp-entry-h { flex-wrap: wrap; }
+  .kp-entry-r { margin-left: 0; flex-basis: 100%; }
+  .og-kp .og-fold { flex-wrap: wrap; row-gap: .35rem; }
+  .og-kp .og-fold-r { white-space: normal; margin-left: 0; flex-basis: 100%; }
+  .og-kp .og-strip { flex-wrap: wrap; }
+  .og-kp .og-strip > div { flex: 1 1 45%; }
+}

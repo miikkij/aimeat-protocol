@@ -13,6 +13,7 @@
  *   - getPackageReputation / getPackageReviews / getHumanPrompt / getAgentPrompt: reputation + templates
  *
  * @version-history
+ *   v1.1.0 — 2026-08-30 — +getMcpPrompt(): the packager prompt for an agent connected over MCP.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { api, apiGet, apiPost, apiDelete } from '/js/api.js';
@@ -79,6 +80,11 @@ export async function getHumanPrompt() {
 
 export async function getAgentPrompt() {
   return apiGet('/v1/templates/knowledge-packager-agent');
+}
+
+/** The prompt for an agent connected over MCP: it writes the package with its AIMEAT tools. */
+export async function getMcpPrompt() {
+  return apiGet('/v1/templates/knowledge-packager-mcp');
 }
 
 /* ── Export ── */
