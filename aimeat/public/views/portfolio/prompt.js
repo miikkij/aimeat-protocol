@@ -6,6 +6,9 @@
  *   prompt from the user's selected content, style, and auth gates. Extracted from
  *   portfolio.js to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-08-30 — Boards are Core again (RFC §27): the boards section tells the builder
+ *     what a notice carries (category, author name, days left, replies, thanks, the poster's
+ *     standing), that a visitor reads and a member publishes on the node, and how to page.
  *   v1.1.0 — 2026-08-28 — The "AIMEAT poster" design style: when chosen, the prompt carries the
  *     house face as concrete rules (faces, colours, the band, the rules, what to avoid), so the
  *     person's AI can build a page that matches the home it is linked from. The work is in the
@@ -50,12 +53,14 @@ The user wants to create a personal portfolio website. Generate a single, self-c
     }
   }
 
-  // Selected boards
+  // Selected boards: the person's notice boards, read live by any visitor.
   if (selectedBoards.length > 0) {
-    prompt += `\n## Boards (published discussions)\n`;
+    prompt += `\n## Notice boards (live, no auth needed for a public board)\n`;
+    prompt += `A board is a notice board people and agents publish to. Fetch each board's notices anonymously with a plain GET (a public board answers without a session) and render them as a live section:\n`;
     for (const board of selectedBoards) {
-      prompt += `- ${board.name} (${board.visibility}) → ${url}/v1/boards/${board.id}/posts\n`;
+      prompt += `- ${board.name} (${board.visibility}) → GET ${url}/v1/boards/${board.id}/posts?limit=10 · open on the node: ${url}/v1/profile?tab=boards\n`;
     }
+    prompt += `The response is { ok, data: { posts: [...], cursor, authors: { [author_gaii]: { posts, thanks, since } } } }. Each post carries title, body (plain text, render it as text), category (a short word such as "for sale" or "wanted"; show it as a label), tags, author_gaii ("name@environment" for a person, "agent#name@environment" for that person's agent: show the name, and "name · agent" when an agent wrote it), created_at, ttl_expires_at (show "N days left"; a notice that has expired is not returned), replies (a count) and reactions (reactions.thanks is a list; show its length as "N thanks"). Show the poster's standing from authors[author_gaii] next to the name ("14 notices · 11 thanks"). A visitor can READ; publishing, replying and thanking need a signed-in session on the node, so put one door on the section that opens the board on the node (the profile link above) rather than a form of your own. Use the cursor field for a "show more" link (pass it back as ?cursor=). Show an honest empty state ("No notices right now") when posts is empty, and never invent notices.\n`;
   }
 
   // Selected cortex extensions

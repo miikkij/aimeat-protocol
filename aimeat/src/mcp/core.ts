@@ -728,7 +728,9 @@ export function registerCoreTools(
                 title: p.title,
                 body: p.body,
                 category: p.category,
+                tags: p.tags,
                 reactions: p.reactions,
+                ttl_expires_at: p.ttlExpiresAt,
                 created_at: p.createdAt,
                 ...provFor(p.aiProvenanceId),
             }))));

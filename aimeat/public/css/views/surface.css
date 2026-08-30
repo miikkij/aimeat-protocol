@@ -12,6 +12,7 @@
  * @structure .sf-band · .sf-free · .sf-portal-text · .sf-portal-board · .sf-settings-door
  * @usage Linked from public/spa.html beside the other view stylesheets.
  * @version-history
+ *   v1.2.0 — 2026-08-30 — A front-page notice shows its category and its poster's name (blocks-portal.js v1.2.0).
  *   v1.1.2 — 2026-08-29 — The band title reads --font-poster-tracking / --font-poster-leading (theme.css) instead
  *     of the -.03em / .95 measured for Archivo Black.
  *   v1.1.1 — 2026-08-29 — The band title reads --font-poster-weight (theme.css) instead of a literal 400.
@@ -80,6 +81,10 @@
 .sf-portal-board {
   margin: 1.5rem 0;
 }
+
+/* A notice on the front page: its category as a label, the poster's name beside the date. */
+.sf-portal-board .board-post-cat { display: inline-block; margin-bottom: .2rem; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.sf-portal-board .board-post-meta { display: flex; gap: .8rem; font-family: var(--font-mono); font-size: .75rem; color: var(--text-dim); }
 
 .sf-settings-door {
   margin: 1rem 0;

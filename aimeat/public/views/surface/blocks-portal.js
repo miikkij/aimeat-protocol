@@ -18,6 +18,8 @@
  *   StatsBlock · TransparencyBlock · PortalTextBlock · PortalBoardBlock
  * @usage Reached through views/surface/block-map.js, never imported directly by a view.
  * @version-history
+ *   v1.2.0 — 2026-08-30 — portal.board shows a notice's category and its poster's name beside the
+ *     date, now that a board is the notice board people and agents publish to (RFC §27).
  *   v1.1.0 — 2026-08-28 — The six showroom blocks (hero, wall intro, store, trust, rooms, close).
  *   v1.0.0 — 2026-08-26 — Initial.
  */
@@ -170,14 +172,20 @@ export function PortalBoardBlock(/** @type {{ ctx?: any, props?: Record<string, 
   const { data } = useShared(`portal-board:${slug}`, slug ? `/v1/boards/${encodeURIComponent(slug)}/posts?limit=${limit}` : '',
     ['boards'], (d) => (d?.posts ?? d?.items ?? []));
   if (!data?.length) return null;
+  // "alice" out of "alice@env", "scout · alice" out of "scout#alice@env": the name, never the identifier.
+  const who = (g) => { const s = String(g || ''); const hash = s.indexOf('#'); const at = s.indexOf('@'); if (hash >= 0 && at > hash) return `${s.slice(0, hash)} · ${s.slice(hash + 1, at)}`; return at >= 0 ? s.slice(0, at) : s; };
   return html`
     <section class="sf-portal-board">
       ${title ? html`<h2 class="sf-band-title">${title}</h2>` : ''}
       <div class="board-posts">
         ${data.slice(0, limit).map((p) => html`
           <article class="board-post" key=${p.id}>
+            ${p.category ? html`<span class="board-post-cat">${p.category}</span>` : ''}
             <h3>${p.title}</h3>
-            ${p.created_at ? html`<time datetime=${p.created_at}>${String(p.created_at).slice(0, 10)}</time>` : ''}
+            <div class="board-post-meta">
+              ${p.author_gaii ? html`<span>${who(p.author_gaii)}</span>` : ''}
+              ${p.created_at ? html`<time datetime=${p.created_at}>${String(p.created_at).slice(0, 10)}</time>` : ''}
+            </div>
             <p>${p.body}</p>
           </article>`)}
       </div>
