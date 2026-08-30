@@ -5,6 +5,18 @@
       "date": "2026-08-30",
       "kind": "feature",
       "title": {
+        "en": "Notifications show what happened, and you decide who may reach your devices",
+        "fi": "Ilmoitukset näyttävät, mitä tapahtui, ja sinä päätät, kuka pääsee laitteillesi"
+      },
+      "body": {
+        "en": "The Notifications page now shows the notifications themselves, each with who sent it: AIMEAT, an app you allowed, an extension, an agent. You see every sender that may notify you, and decide per sender whether it reaches your devices as a push, stays in the bell, or is muted, in which case its notification is dropped before it exists. Every device with push is listed, not only this browser, and email sends a digest of what stayed unread instead of nothing. Quiet hours hold pushes for the morning and bring them as one, the kinds that need you excepted, and one sender pushes at most once in ten minutes. The bell says who sent each item, and workflow, workspace and message notifications are said in your language. Your own agent can notify you from a chat with one tool, and an app's builder is now told the call that has been there all along.",
+        "fi": "Ilmoitukset-sivu näyttää nyt ilmoitukset itse, ja jokaisessa näkyy lähettäjä: AIMEAT, sallimasi sovellus, laajennus, agentti. Näet jokaisen lähettäjän, joka saa ilmoittaa sinulle, ja päätät lähettäjä kerrallaan, tuleeko ilmoitus laitteillesi push-ilmoituksena, jääkö se kelloon vai vaimennetaanko se, jolloin ilmoitus hylätään ennen kuin se syntyy. Jokainen push-laite on listalla, ei vain tämä selain, ja sähköposti lähettää koosteen lukematta jääneistä sen sijaan, ettei se lähetä mitään. Hiljaiset tunnit pidättävät pushit aamuun ja tuovat ne yhtenä, paitsi ne lajit, jotka vaativat sinua, ja samalta lähettäjältä tulee enintään yksi push kymmenessä minuutissa. Kello kertoo, kuka lähetti, ja työnkulkujen, työtilojen ja viestien ilmoitukset sanotaan omalla kielelläsi. Oma agenttisi voi ilmoittaa sinulle chatista yhdellä työkalulla, ja sovelluksen tekijälle kerrotaan nyt kutsu, joka on ollut olemassa koko ajan."
+      }
+    },
+    {
+      "date": "2026-08-30",
+      "kind": "feature",
+      "title": {
         "en": "Contacts are people again, with a page each and an invitation of their own",
         "fi": "Kontaktit ovat taas ihmisiä, jokaisella oma sivu ja oma kutsu"
       },
