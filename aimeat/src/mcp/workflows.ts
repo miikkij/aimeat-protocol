@@ -11,6 +11,11 @@
  * @usage import { registerWorkflowTools } from './workflows.js';
  *   registerWorkflowTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   v1.3.0 — 2026-08-30 — aimeat_workflow_run takes `vars` and `target`. POST /v1/workflows/:id/run
+ *     has read both since the CRUD phase; this tool was written against the body as it stood before
+ *     and never caught up, so a workflow that takes input could only be run at its defaults from a
+ *     chat session. A tool with no input is a constant. The same two fields were missing from the
+ *     connector MCP and the CLI dispatch, which is the three-surface rule in the flesh.
  *   v1.2.0 — 2026-07-16 — Human-in-the-loop: aimeat_workflow_pending_inputs (waiting-human roster) +
  *     aimeat_workflow_answer (relay the owner's decision to a parked step).
  *   v1.1.0 — 2026-07-06 — aimeat_workflow_save gains opt-in propose-then-confirm (propose:true →
@@ -134,12 +139,18 @@ export function registerWorkflowTools(
     {
       id: z.string().describe('The workflow id.'),
       mode: z.enum(['signals-only', 'full']).describe('signals-only = evaluate every step\'s signals against existing memory (no dispatch — an instant health check); full = execute the steps live.'),
+      vars: z.record(z.string(), z.string()).optional().describe('The run\'s input, as { varName: value } over the vars the workflow declares. A workflow that takes input is a constant without this. Anything it does not declare is ignored, and a declared var left out falls back to its default.'),
+      target: z.enum(['live', 'sandbox']).optional().describe('With mode="full": "sandbox" writes every key behind a per-run prefix so a trial cannot touch what a live run produced. Default "live".'),
     },
     annotationsFor('aimeat_workflow_run'),
     async (a) => {
       const engine = getActiveWorkflowEngine();
       if (!engine) return err('Workflow engine not started');
-      const result = await engine.startRun(ownerGhii, owner, a.id, { mode: a.mode === 'full' ? 'full-live' : 'signals-only' });
+      // Same mapping POST /v1/workflows/:id/run makes, because a chat session and an HTTP caller
+      // asking for the same trial must get the same run. `target` is meaningless without a full
+      // run, exactly as it is on the route.
+      const mode = a.mode === 'full' ? (a.target === 'sandbox' ? 'full-sandbox' : 'full-live') : 'signals-only';
+      const result = await engine.startRun(ownerGhii, owner, a.id, { mode, ...(a.vars ? { vars: a.vars } : {}) });
       if ('error' in result) return err(`Could not start run:\n- ${result.error.join('\n- ')}`);
       // For signals-only the run completes synchronously — return the per-step verdicts inline.
       if (a.mode === 'signals-only') {
@@ -148,7 +159,9 @@ export function registerWorkflowTools(
         const steps = run ? Object.fromEntries(Object.entries(run.steps).map(([k, s]) => [k, s.state])) : {};
         return text({ runId: result.runId, status: run?.status, steps });
       }
-      return text({ runId: result.runId, mode: 'full', note: 'Dispatched; poll aimeat_workflow_get for run status.' });
+      // The mode that actually ran, not the one asked for: a sandbox run writes to prefixed keys,
+      // and a caller told "full" would go looking for its output in the wrong place.
+      return text({ runId: result.runId, mode, note: 'Dispatched; poll aimeat_workflow_get for run status.' });
     },
   );
 

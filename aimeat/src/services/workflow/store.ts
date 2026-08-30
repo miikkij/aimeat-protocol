@@ -30,6 +30,10 @@
  *     deliverableKey = answer_to_key) so fresh/skip_done/signals-only/blueprint compose unchanged.
  *   v1.6.0 — 2026-08-30 — listRuns leaves the checks (signals-only) out by default; `checks:
  *     'include' | 'only'` for the callers that want them. A check is not a run.
+ *   v1.7.0 — 2026-08-30 — An ai step's `input_keys` joins the undeclared-var check its three
+ *     siblings were already in. It is templated at run time like the others, so an undeclared var
+ *     left a literal "{name}" in the key and the step reported the miss into its own prompt instead
+ *     of failing — correct at run time, and the wrong place to find out about a typo.
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
@@ -264,7 +268,11 @@ export async function validateWorkflow(
           errors.push(`step "${step.id}": an ai step needs result_to_key or an explicit success_signal — with neither, the step greens whenever the model answers, whatever it said`);
         }
         deliverableKey = a.result_to_key;
-        for (const v of collectVarRefs([a.prompt ?? '', a.prompt_key ?? '', a.result_to_key ?? ''])) {
+        // input_keys is checked with the rest: it is templated at run time exactly as the others
+        // are, so an undeclared var there leaves a literal "{name}" in the key, the record is not
+        // found, and the step reports the miss into the prompt rather than failing. That is the
+        // right run-time behaviour and the wrong place to learn about a typo.
+        for (const v of collectVarRefs([a.prompt ?? '', a.prompt_key ?? '', a.result_to_key ?? '', ...(a.input_keys ?? [])])) {
           if (!declaredVars.has(v)) errors.push(`step "${step.id}": references undeclared var "{${v}}"`);
         }
       }

@@ -18,6 +18,8 @@
  *     one output cleared, only that step re-runs (continue-from / re-run-one-step).
  *   v1.5.0 — 2026-08-30 — A check is not a run: the run list and the health leave signals-only out
  *     unless asked; GET /:id/preflight; the three workflow prompts for a person's own AI.
+ *   v1.6.0 — 2026-08-30 — An ai step's input_keys is held to the same undeclared-var check as its
+ *     three siblings, with the declared-var save as the positive control.
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -899,6 +901,38 @@ async function run() {
     // …and the scoped agent may remove it, so the refusal was the word and not the door.
     const delOk = await json('/v1/workflows/agent-denied-wf', { method: 'DELETE', headers: scoped });
     assert(delOk.status === 200, `DELETE with workflow:write: ${delOk.status} ${JSON.stringify(delOk.body.error)}`);
+  });
+
+  // ── an ai step's input_keys answers to the same undeclared-var check as its siblings ──
+  await test('save refuses an ai step whose input_keys names an undeclared var, and accepts a declared one', async () => {
+    const wf = (inputKey: string, vars: unknown[]) => ({
+      title: { en_US: 'Recipe' }, description: { en_US: 'fan out, then assemble' },
+      trigger: { kind: 'manual' }, vars, on_step_fail: 'inspect',
+      steps: [{
+        id: 'assemble', description: { en_US: 'Assemble' }, required_to_function: 'none',
+        action: { kind: 'ai', prompt: 'Combine them.', input_keys: [inputKey], result_to_key: 'recipe.result' },
+      }],
+    });
+
+    // `{topic}` is declared nowhere. Left unchecked this saves, and the run then templates nothing:
+    // the key keeps its literal braces, no record matches, and the step reports the miss INTO ITS OWN
+    // PROMPT and goes green. Correct behaviour at run time, and the wrong place to learn about a typo.
+    const bad = await json('/v1/workflows/recipe-wf', {
+      method: 'PUT', headers: auth, body: JSON.stringify(wf('perspectives.{topic}.a', [])),
+    });
+    assert(bad.status === 400, `undeclared var in input_keys: expected 400, got ${bad.status}: ${JSON.stringify(bad.body)}`);
+    const errs = JSON.stringify(bad.body.error ?? bad.body);
+    assert(errs.includes('topic'), `the refusal must name the var it could not resolve: ${errs}`);
+
+    // POSITIVE CONTROL: the same key, with the var declared. Anything else and this test would pass
+    // for a save path that refuses every input_keys it sees.
+    const good = await json('/v1/workflows/recipe-wf', {
+      method: 'PUT', headers: auth,
+      body: JSON.stringify(wf('perspectives.{topic}.a', [{ name: 'topic', type: 'string', description: { en_US: 'What to weigh up' } }])),
+    });
+    assert(good.status === 200, `declared var in input_keys: expected 200, got ${good.status}: ${JSON.stringify(good.body)}`);
+
+    await json('/v1/workflows/recipe-wf', { method: 'DELETE', headers: auth });
   });
 
   console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);

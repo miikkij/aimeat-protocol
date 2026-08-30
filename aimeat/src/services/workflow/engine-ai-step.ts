@@ -14,6 +14,12 @@
  *     three memory records, which it cannot do: it has no tools, only the string we send. It
  *     invented a whole product rather than reading the job, and every field was plausible. What an
  *     agent had for free, this step has to be handed.
+ *   v1.2.0 — 2026-08-30 — input_keys honours keyPrefix, which result_to_key here and from_key on the
+ *     datapackage step always did. Two fields with the same job disagreed, so a sandbox run read the
+ *     LIVE keys while writing prefixed ones: the fan-out steps greened (signal evaluation is
+ *     prefix-aware), and the step assembling their answers read the previous live run's data and
+ *     said nothing. Reachable only through POST /v1/workflows/:id/run with target=sandbox, which is
+ *     also the run a person makes when they are trying something out.
  */
 import type { StepDeps, OnPushTerminal } from './engine-steps.js';
 import type { WorkflowRun, WorkflowStep } from '../../models/workflow-schemas.js';
@@ -64,7 +70,12 @@ export function dispatchAiStep(
     if (action.input_keys?.length) {
       const parts: string[] = [];
       for (const raw of action.input_keys) {
-        const key = template(raw, run.vars);
+        // keyPrefix, for the same reason the datapackage step's from_key honours it: these name what
+        // an EARLIER STEP WROTE, and in a sandbox run that lives behind the run's prefix. Without it
+        // a trial read the live keys instead, the producing step still greened (signal evaluation
+        // has always been prefix-aware, eval-context.ts), and the assembling step answered
+        // confidently from the previous run's data. Green and wrong is the worst shape available.
+        const key = (run.keyPrefix ?? '') + template(raw, run.vars);
         const rec = await getOwnerScopeMemory(deps.storage, deps.config.nodeId, ownerGhii.split('@')[0], key);
         parts.push(rec
           ? `### ${key}\n${typeof rec.value === 'string' ? rec.value : JSON.stringify(rec.value, null, 2)}`
