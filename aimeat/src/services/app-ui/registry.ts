@@ -25,6 +25,11 @@
  * @usage
  *   import { UI_COMPONENTS, componentById, buildUiCatalogue } from './registry.js';
  * @version-history
+ *   v1.16.0 — 2026-08-30 — THE COMMERCIAL SIDE (append-only): `legalLinks`, `auditTrail`,
+ *     `feedbackForm` and `reviewerLine` join the components — self-sourced blocks carrying the
+ *     money-adjacent facts (the app's own legal pages with the reason each exists, the
+ *     organism-rows audit trail with the two-hand rule, the Public Intake feedback form, the
+ *     named reviewer with what a review lifts and what it never lifts).
  *   v1.15.0 — 2026-08-30 — More of everything (append-only): chart kind radar, `steps` (the
  *     process tracker) and `rating` (a score as stars, display only).
  *   v1.14.0 — 2026-08-30 — THE APPROVED EXPANSION (append-only): chart kinds funnel, treemap
@@ -410,6 +415,47 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
       title: text('The app name the aide speaks as.', 80),
       intro: text('The opening line the panel greets with.', 200),
     },
+  },
+  // ── The commercial side (2026-08-30, append-only): self-sourced blocks that carry the
+  //    money-adjacent facts by construction. No memory source — legalLinks reads the app's own
+  //    public legal surface, auditTrail the organism row space its props name, feedbackForm the
+  //    named Public Intake form, reviewerLine the reviewer meta the node stamps on a served app.
+  {
+    id: 'legalLinks',
+    summary: 'The app\'s own legal pages (terms, privacy, imprint, refunds, accessibility, cookies, support) as a list with state, links to the served pages, the reason each page exists and the readiness sentence — localised by the kit in its three languages. Reads the app\'s own public legal surface; nothing to bind.',
+    maxPerLayout: 1,
+    props: {
+      title: text('The section title, when the kit\'s own is not wanted.', 120),
+    },
+  },
+  {
+    id: 'auditTrail',
+    summary: 'The append-only trail from an organism row space, newest first: when, what, who. Needs the two-hand rule open (the organism names the app in the space; the person approves organism:rows), and shows the node\'s own refusal sentence with the rule beside it when it is not.',
+    props: {
+      org: requiredText('The organism id whose workspace holds the row space.', 80),
+      ws: requiredText('The workspace id.', 80),
+      space: requiredText('The row space name, e.g. "event".', 80),
+      title: text('The section title, when the kit\'s own is not wanted.', 120),
+      hint: text('The line under the title.', 200),
+    },
+  },
+  {
+    id: 'feedbackForm',
+    summary: 'The public feedback form (topic, message, optional contact, honeypot) bound to a Public Intake form — works signed in or not, and places the node\'s refusal sentence on the field it concerns.',
+    maxPerLayout: 1,
+    props: {
+      org: requiredText('The organism id the intake form belongs to.', 80),
+      ws: requiredText('The workspace id.', 80),
+      formId: requiredText('The intake form id, e.g. "palaute".', 80),
+      title: text('The section title, when the kit\'s own is not wanted.', 120),
+      hint: text('The line under the title.', 200),
+    },
+  },
+  {
+    id: 'reviewerLine',
+    summary: '"Reviewed by NAME, who answers for this app" — with what a named review lifts (the visible AI-content label) and what it never lifts (the you-are-talking-to-an-AI notice), law linked. Reads the reviewer meta the node stamps on a served app; renders nothing when no reviewer is declared.',
+    maxPerLayout: 1,
+    props: {},
   },
 ];
 
