@@ -2,328 +2,267 @@
  * @file workflows-tab.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Profile › Workflows — the owner-facing surface for Agent Workflows (declared, ordered
- *   agent pipelines with per-step input/output signals). Three views: a list of workflows with a
- *   health sparkline; a detail view showing the derived blueprint (the "whole workflow" graph) + the
- *   recent runs; and a single-run view with the per-step timeline (state + expected-vs-observed).
- *   Run-now offers a signals-only health check or a full live run. Reads the /v1/workflows API; the
- *   deterministic engine is node-owned. See docs/plans/2026-06-13-agent-workflows-node-plan.md §12.
- * @structure WorkflowsTab (default) — view state machine (list | detail | run)
+ * @description Profile › Workflows: the chains of agent jobs with a check on every step. Loads the
+ *   workflows with their health and each one's last run, and the questions waiting for the person;
+ *   holds the handlers the cover, a workflow's page, a run's page and the form call (check now,
+ *   the confirmation and the run, answer, cancel, save, delete, the prompts, a pasted definition);
+ *   renders the poster face (workflows/cover.js).
+ * @structure WorkflowsTab (default) — state, loads, handlers, the ctx bag, render
  * @usage Registered in profile.js TABS as { id:'workflows', component: WorkflowsTab }.
  * @version-history
- *   v1.4.0 -- 2026-07-06 -- statusClass maps the agent-offline step state to a distinct amber badge
- *     (wf-badge--offline) — a connectivity failure, not a productive-but-slow timed-out.
- *   v1.3.0 -- 2026-07-05 -- Run view shows per-step fill progress (ProgressChip: "leaves N/M" +
- *     still-filling / stalled while dispatched) from run.steps[].progress — so a slow step reads as
- *     in-progress, not a hard timed-out, while the crew is still filling keys (resume-on-retry).
- *   v1.2.0 -- 2026-06-22 -- List uses listWorkflows({include:'health'}) so health arrives inline in
- *     one request instead of a per-workflow getHealth fan-out.
+ *   v2.0.0 -- 2026-08-30 -- The poster face (design canvas "AIMEAT Työnkulkujen sivu", direction A).
+ *     Check now answers on the page and starts nothing; Run opens a confirmation that says what will
+ *     happen, how long, what it spends and where it starts, with a sandbox door; a question a run
+ *     puts to the person is answerable on the cover and on the run; every state is a word; the
+ *     form speaks; three prompts hand the work to the person's own AI. Every service call is the
+ *     same API as before, plus preflight, pending inputs, answer and the prompts.
+ *   v1.4.0 -- 2026-07-06 -- statusClass maps the agent-offline step state to a distinct amber badge.
+ *   v1.3.0 -- 2026-07-05 -- Run view shows per-step fill progress.
+ *   v1.2.0 -- 2026-06-22 -- List uses listWorkflows({include:'health'}).
  *   v1.0.0 -- 2026-06-13 -- Phase 9: list + blueprint + runs + run-now + health.
- *   v1.1.0 -- 2026-06-13 -- Run view renders image deliverables: a step whose observed output / writes
- *     hold an image (a /v1/pub URL or { url, mime } value) shows inline thumbnails via the shared
- *     ImageDeliverable renderer (collectImages + ImageStrip).
  */
-import { h } from 'preact';
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
-import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { t } from '/js/i18n.js';
-import { timeAgo } from '/js/utils.js';
-import { listWorkflows, getWorkflow, getBlueprint, listRuns, getRun, runWorkflow, cancelRun } from '/js/services/workflows.js';
-import { collectImages, ImageStrip } from '/components/ImageDeliverable.js';
-import WorkflowForm from './workflows-form.js';
-
-import { EmptyState } from '/components/EmptyState.js';
+import { copyToClipboard } from '/js/utils.js';
+import { useConfirm } from '/components/Modal.js';
+import { listAgents } from '/js/services/agents.js';
+import * as wf from '/js/services/workflows.js';
 import { swallowed } from '/js/swallowed.js';
-const html = htm.bind(h);
-
-/** Pick a display string from a localized value (string | { locale: text }). */
-function loc(s) {
-  if (!s) return '';
-  if (typeof s === 'string') return s;
-  return s.en_US || s.fi_FI || Object.values(s)[0] || '';
-}
-
-function triggerSummary(trigger) {
-  if (!trigger) return '';
-  if (trigger.kind === 'schedule') return `${t('profile.workflows.trigger.schedule')} · ${trigger.cron}${trigger.timezone ? ` (${trigger.timezone})` : ''}`;
-  if (trigger.kind === 'event') return `${t('profile.workflows.trigger.event')} · ${trigger.on}`;
-  return t('profile.workflows.trigger.manual');
-}
-
-/** Map a run/step status to a badge CSS modifier. */
-function statusClass(status) {
-  if (status === 'done' || status === 'green') return 'wf-badge--ok';
-  // agent-offline is a connectivity failure — its own amber badge, distinct from a productive-but-slow timed-out.
-  if (status === 'agent-offline') return 'wf-badge--offline';
-  if (status === 'partial' || status === 'red' || (typeof status === 'string' && status.endsWith('-red')) || status === 'timed-out') return 'wf-badge--err';
-  if (status === 'skipped' || status === 'cancelled') return 'wf-badge--muted';
-  return 'wf-badge--run';
-}
-
-function StatusBadge({ status }) {
-  if (!status) return html`<span class="wf-muted">—</span>`;
-  return html`<span class="wf-badge ${statusClass(status)}">${status}</span>`;
-}
-
-/**
- * Live fill progress for a step (from run.steps[id].progress, sampled by the engine watchdog from the
- * success signal's count_nonempty leaves). Shows "leaves N/M"; while the step is still dispatched it
- * also says whether the count is still rising (in-progress) or flat (stalled) — so a slow crew reads
- * as "in progress", not a hard failure. Absent for signals with no countable leaf.
- */
-function ProgressChip({ progress, dispatched }) {
-  const { count = 0, min = 0, increasing = false } = progress || {};
-  const live = dispatched && increasing;
-  const qualifier = dispatched
-    ? html` · ${increasing ? t('profile.workflows.progressIncreasing') : t('profile.workflows.progressStalled')}`
-    : '';
-  return html`<span class="wf-progress ${live ? 'wf-progress--live' : ''}"
-    title=${t('profile.workflows.progressTitle')}>${t('profile.workflows.progress', { count, min })}${qualifier}</span>`;
-}
-
-/** A tiny sparkline of the last-N run states for one step (green/red bars). */
-function Sparkline({ steps }) {
-  if (!steps || steps.length === 0) return html`<span class="wf-muted">—</span>`;
-  return html`<span class="wf-spark" title=${t('profile.workflows.health.title')}>
-    ${steps.map(s => {
-      const total = s.green + s.red;
-      const cls = total === 0 ? 'wf-spark-bar--none' : s.red > 0 ? 'wf-spark-bar--err' : 'wf-spark-bar--ok';
-      return html`<span class="wf-spark-bar ${cls}" title=${`${s.stepId}: ${s.green}✓ / ${s.red}✗`}></span>`;
-    })}
-  </span>`;
-}
+import { c, loc, observedWords } from './workflows/frame.js';
+import { renderWorkflowsView } from './workflows/cover.js';
+import { formOf, defOf, blankStep } from './workflows/form.js';
 
 export default function WorkflowsTab({ showToast }) {
-  // view: { name:'list' } | { name:'detail', id } | { name:'run', id, runId }
-  const [view, setView] = useState({ name: 'list' });
-  const [items, setItems] = useState([]); // [{ def, health }]
+  const { confirm, ConfirmUI } = useConfirm();
+  const [items, setItems] = useState([]);          // [{ def, health, lastRun, waiting }]
+  const [pending, setPending] = useState([]);      // questions waiting for the person
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [view, setView] = useState({ kind: 'cover' });
+  const [detail, setDetail] = useState(null);      // { id, runs, checks, runCount, checkCount, blueprint, blueprintResolved }
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [run, setRun] = useState(null);
+  const [folds, setFolds] = useState({ how: false, settings: false, prompt: false, raw: false, end: false, llm: false });
+  const [checks, setChecks] = useState({});        // id → { at, status, steps }
+  const [checking, setChecking] = useState(null);
+  const [checkNote, setCheckNote] = useState(null);
+  const [confirmState, setConfirmState] = useState(null);   // { id, preflight }
+  const [running, setRunning] = useState(false);
+  const [answers, setAnswers] = useState({});
+  const [answering, setAnswering] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [onlyProblems, setOnlyProblems] = useState(false);
+  const [runsTab, setRunsTab] = useState('runs');
+  const [showKeys, setShowKeys] = useState(false);
+  const [road, setRoad] = useState('mcp');
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [pasteText, setPasteText] = useState('');
+  const [pasteError, setPasteError] = useState('');
+  const [form, setForm] = useState(formOf(null));
+  const [openStep, setOpenStep] = useState(-1);
+  const [agents, setAgents] = useState([]);
+  const [offersByAgent, setOffersByAgent] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [saveErrors, setSaveErrors] = useState([]);
 
-  const loadList = useCallback(async () => {
+  const itemById = useCallback((id) => items.find(i => i.def.id === id), [items]);
+  const fail = (e, fallback) => showToast?.(e?.response?.error?.message || e?.error?.message || e?.message || fallback || t('profile.error'), true);
+
+  const loadAll = useCallback(async ({ showSpinner = true } = {}) => {
+    if (showSpinner) setLoading(true);
     try {
-      const res = await listWorkflows({ include: 'health' });
+      const [res, pend] = await Promise.all([wf.listWorkflows({ include: 'health' }), wf.pendingInputs().catch(err => { swallowed('workflows-tab: pending', err); return null; })]);
       const defs = res?.data?.workflows || [];
-      // Health arrives inline now (one request) — split it back out of each def.
-      const withHealth = defs.map((w) => { const { health = null, ...def } = w; return { def, health }; });
-      setItems(withHealth);
-      setError(null);
-    } catch (e) {
-      setError(e.message || 'Failed to load workflows');
-    } finally {
-      setLoading(false);
-    }
+      const inputs = pend?.data?.inputs || [];
+      setPending(inputs);
+      const withLast = await Promise.all(defs.map(async (w) => {
+        const { health = null, ...def } = w;
+        const last = await wf.listRuns(def.id, { limit: 1 }).catch(err => { swallowed('workflows-tab: last run', err); return null; });
+        return { def, health, lastRun: last?.data?.runs?.[0] || null, waiting: inputs.some(p => p.workflowId === def.id) };
+      }));
+      setItems(withLast);
+    } catch (err) { swallowed('workflows-tab', err); }
+    finally { setLoading(false); }
   }, []);
 
-  const loadRef = useRef(loadList);
-  loadRef.current = loadList;
-  useEffect(() => {
-    loadList();
-    return onLiveUpdate(['workflows'], () => { if (view.name === 'list') loadRef.current(); });
-  }, [loadList, view.name]);
-
-  const doRun = async (id, mode) => {
+  const loadDetail = useCallback(async (id) => {
+    setDetailLoading(true);
     try {
-      const res = await runWorkflow(id, mode);
-      const runId = res?.data?.runId;
-      showToast?.(t('profile.workflows.runStarted'), 'success');
-      if (runId) setView({ name: 'run', id, runId });
-      else loadList();
-    } catch (e) {
-      showToast?.(e.message || 'Run failed', 'error');
+      const [runsRes, checksRes, bp] = await Promise.all([
+        wf.listRuns(id, { limit: 20 }),
+        wf.listRuns(id, { checks: 'only', limit: 20 }).catch(err => { swallowed('workflows-tab: checks', err); return null; }),
+        wf.getBlueprint(id).catch(err => { swallowed('workflows-tab: blueprint', err); return null; }),
+      ]);
+      setDetail({ id, runs: runsRes?.data?.runs || [], runCount: runsRes?.data?.count ?? 0, checks: checksRes?.data?.runs || [], checkCount: checksRes?.data?.count ?? 0, blueprint: bp?.data || null });
+    } catch (err) { swallowed('workflows-tab: detail', err); }
+    finally { setDetailLoading(false); }
+  }, []);
+
+  const loadRun = useCallback(async (id, runId) => {
+    try { const r = await wf.getRun(id, runId); setRun(r?.data || null); }
+    catch (err) { swallowed('workflows-tab: run', err); fail(err); }
+  }, []);   // eslint-disable-line react-hooks/exhaustive-deps -- fail reads showToast, a stable prop
+
+  useEffect(() => { loadAll(); }, [loadAll]);
+  const liveRef = useRef(null);
+  liveRef.current = () => {
+    loadAll({ showSpinner: false });
+    if (view.kind === 'detail') loadDetail(view.id);
+    if (view.kind === 'run') loadRun(view.id, view.runId);
+  };
+  useEffect(() => onLiveUpdate(['workflows'], () => liveRef.current()), []);
+
+  const pickView = useCallback((v) => {
+    setView(v);
+    setFolds(f => ({ ...f, settings: false, prompt: false, raw: false }));
+    setConfirmState(null);
+    const box = document.querySelector('.page-content') || document.querySelector('.pf-content');
+    if (box) box.scrollTo({ top: 0 });
+    if (v.kind === 'detail') { setRunsTab('runs'); loadDetail(v.id); }
+    if (v.kind === 'run') { setRun(null); loadRun(v.id, v.runId); }
+    if (v.kind === 'edit' || v.kind === 'create') {
+      const def = v.kind === 'edit' ? itemById(v.id)?.def : null;
+      const f = v.prefill || formOf(def);
+      if (v.kind === 'create' && !v.prefill) f.steps = [blankStep()];
+      setForm(f); setSaveErrors([]); setOpenStep(f.steps.length === 1 && !f.steps[0].id ? 0 : -1);
+      if (!agents.length) listAgents().then(r => setAgents(Array.isArray(r) ? r : (r?.data?.agents ?? r?.data ?? []))).catch(err => swallowed('workflows-tab: agents', err));
+      f.steps.forEach(s => s.agent && loadOffers(s.agent));
     }
+  }, [itemById, loadDetail, loadRun, agents.length]);   // eslint-disable-line react-hooks/exhaustive-deps -- loadOffers is declared below and stable in effect
+
+  const setFold = (k, open) => setFolds(f => ({ ...f, [k]: open }));
+
+  /* ── check now: reads memory, starts nothing ── */
+  async function handleCheck(id) {
+    setChecking(id);
+    try {
+      const r = await wf.runWorkflow(id, 'signals-only');
+      if (r.ok === false) throw r;
+      const d = r.data || {};
+      setChecks(prev => ({ ...prev, [id]: { at: new Date().toISOString(), status: d.status, steps: d.steps || {} } }));
+      if (view.kind === 'cover') {
+        const def = itemById(id)?.def;
+        const words = (def?.steps || []).map(s => `${loc(s.description) || s.id}: ${c((d.steps?.[s.id]?.state === 'green') ? 'step.green' : d.steps?.[s.id]?.state === 'input-red' ? 'step.inputRed' : 'step.outputRed').toLowerCase()}`);
+        setCheckNote({ title: c('checkTitleFor', { name: loc(def?.title) || id }), text: words.join(' · ') });
+      }
+    } catch (e) { fail(e); }
+    finally { setChecking(null); }
+  }
+  const dismissCheck = (id) => setChecks(prev => { const n = { ...prev }; delete n[id]; return n; });
+
+  /* ── run: the confirmation first ── */
+  async function openConfirm(id) {
+    setConfirmState({ id, preflight: null });
+    try {
+      const r = await wf.preflight(id);
+      if (r.ok === false) throw r;
+      setConfirmState(s => (s?.id === id ? { id, preflight: r.data } : s));
+    } catch (e) { fail(e); setConfirmState(null); }
+  }
+  const closeConfirm = () => setConfirmState(null);
+  async function handleRun(id, sandbox) {
+    setRunning(true);
+    try {
+      const r = await wf.runWorkflow(id, 'full', undefined, { sandbox });
+      if (r.ok === false) throw r;
+      showToast?.(t('profile.workflows.runStarted'));
+      setConfirmState(null);
+      const runId = r.data?.runId;
+      if (runId) pickView({ kind: 'run', id, runId }); else loadDetail(id);
+    } catch (e) { fail(e); }
+    finally { setRunning(false); }
+  }
+
+  /* ── a question a run put to the person ── */
+  const setAnswer = (key, a) => setAnswers(prev => ({ ...prev, [key]: a }));
+  async function handleAnswer(p, a) {
+    setAnswering(true);
+    try {
+      const body = { picks: a.picks, ...(a.other?.trim() ? { other: a.other.trim() } : {}) };
+      const r = await wf.answerStep(p.workflowId, p.runId, p.stepId, body);
+      if (r.ok === false) throw r;
+      showToast?.(c('answered0'));
+      setAnswers(prev => { const n = { ...prev }; delete n[`${p.runId}:${p.stepId}`]; return n; });
+      await loadAll({ showSpinner: false });
+      if (view.kind === 'run') loadRun(p.workflowId, p.runId);
+    } catch (e) { fail(e); }
+    finally { setAnswering(false); }
+  }
+  function handleCancel(id, runId) {
+    confirm(c('cancelConfirm'), async () => {
+      setCancelling(true);
+      try { const r = await wf.cancelRun(id, runId); if (r.ok === false) throw r; showToast?.(t('profile.workflows.cancelled')); await loadAll({ showSpinner: false }); if (view.kind === 'run') loadRun(id, runId); if (view.kind === 'detail') loadDetail(id); }
+      catch (e) { fail(e); }
+      finally { setCancelling(false); }
+    }, { danger: true });
+  }
+
+  /* ── the form ── */
+  const loadOffers = useCallback((agentName) => {
+    if (!agentName) return;
+    setOffersByAgent(prev => {
+      if (prev[agentName]) return prev;
+      wf.getAgentOffers(agentName).then(r => {
+        const offers = (r?.data?.offers || []).filter(o => o.success_signal && o.required_to_function && o.deliverable?.location);
+        setOffersByAgent(p => ({ ...p, [agentName]: offers }));
+      }).catch(err => { swallowed('workflows-tab: offers', err); setOffersByAgent(p => ({ ...p, [agentName]: [] })); });
+      return prev;
+    });
+  }, []);
+  const addStep = () => { setForm(f => ({ ...f, steps: [...f.steps, blankStep()] })); setOpenStep(form.steps.length); };
+  const removeStep = (i) => { setForm(f => ({ ...f, steps: f.steps.filter((_, j) => j !== i) })); setOpenStep(-1); };
+  async function handleSave() {
+    setSaving(true); setSaveErrors([]);
+    try {
+      const id = form.id.trim();
+      if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(id)) { setSaveErrors([c('idHint')]); return; }
+      const r = await wf.putWorkflow(id, defOf(form));
+      if (r.ok === false) throw r;
+      showToast?.(t('profile.workflows.form.saved'));
+      await loadAll({ showSpinner: false });
+      pickView({ kind: 'detail', id });
+    } catch (e) {
+      const list = e?.response?.error?.details?.errors || e?.error?.details?.errors;
+      setSaveErrors(Array.isArray(list) && list.length ? list : [e?.response?.error?.message || e?.error?.message || e?.message || t('profile.error')]);
+    } finally { setSaving(false); }
+  }
+  function handleDelete(id) {
+    confirm(c('deleteConfirm'), async () => {
+      try { const r = await wf.deleteWorkflow(id); if (r.ok === false) throw r; showToast?.(c('deleted')); setView({ kind: 'cover' }); await loadAll({ showSpinner: false }); }
+      catch (e) { fail(e); }
+    }, { danger: true });
+  }
+
+  /* ── the prompts, and a definition pasted back ── */
+  async function copyPrompt(kind, id) {
+    try {
+      const r = await wf.getPrompt(kind, id);
+      if (r.ok === false) throw r;
+      await copyToClipboard(r.data.prompt);
+      showToast?.(c('promptCopied'));
+    } catch (e) { fail(e); }
+  }
+  function handlePaste() {
+    setPasteError('');
+    try {
+      const m = pasteText.match(/```(?:json)?\s*([\s\S]*?)```/);
+      const obj = JSON.parse((m ? m[1] : pasteText).trim());
+      const def = obj.definition || obj;
+      const id = obj.id || def.id || '';
+      if (!Array.isArray(def.steps) || !def.steps.length) throw new Error(c('pasteNoSteps'));
+      const f = formOf({ ...def, id });
+      setPasteOpen(false); setPasteText('');
+      pickView({ kind: 'create', prefill: f });
+    } catch (e) { setPasteError(c('pasteError', { why: e.message })); }
+  }
+
+  const ctx = {
+    items, pending, loading, view, pickView, itemById, detail, detailLoading, run, folds, setFold,
+    checks, checking, checkNote, setCheckNote, dismissCheck, handleCheck, confirm: confirmState, openConfirm, closeConfirm, handleRun, running,
+    answers, setAnswer, answering, handleAnswer, handleCancel, cancelling, onlyProblems, setOnlyProblems, runsTab, setRunsTab, showKeys, setShowKeys,
+    road, setRoad, pasteOpen, setPasteOpen, pasteText, setPasteText, pasteError, handlePaste, copyPrompt,
+    form, setForm, openStep, setOpenStep, agents, offersByAgent, loadOffers, addStep, removeStep, handleSave, saving, saveErrors, handleDelete,
+    observedWords, ConfirmUI,
   };
-
-  if (loading) return html`<div class="wf-loading">${t('profile.workflows.loading')}</div>`;
-  if (view.name === 'create') return html`<${WorkflowForm} existing=${null} showToast=${showToast}
-    onCancel=${() => setView({ name: 'list' })} onSaved=${(id) => { setView({ name: 'detail', id }); }} />`;
-  if (view.name === 'edit') return html`<${EditFormView} id=${view.id} showToast=${showToast}
-    onCancel=${() => setView({ name: 'detail', id: view.id })} onSaved=${(id) => setView({ name: 'detail', id })} />`;
-  if (view.name === 'detail') return html`<${DetailView} id=${view.id} onBack=${() => { setView({ name: 'list' }); loadList(); }} onOpenRun=${(runId) => setView({ name: 'run', id: view.id, runId })} onRun=${doRun} onEdit=${() => setView({ name: 'edit', id: view.id })} />`;
-  if (view.name === 'run') return html`<${RunView} id=${view.id} runId=${view.runId} showToast=${showToast} onBack=${() => setView({ name: 'detail', id: view.id })} />`;
-
-  // ── list ──
-  return html`
-    <div class="wf-tab">
-      <div class="wf-head">
-        <div>
-          <div class="section-title">${t('profile.workflows.title')}</div>
-          <div class="section-desc">${t('profile.workflows.desc')}</div>
-        </div>
-        <button class="btn-primary" onClick=${() => setView({ name: 'create' })}>+ ${t('profile.workflows.new')}</button>
-      </div>
-      ${error && html`<div class="wf-error">${error}</div>`}
-      ${items.length === 0
-        ? html`<${EmptyState} text=${t('profile.workflows.empty')} />`
-        : html`<div class="wf-card-list">
-            ${items.map(({ def, health }) => html`
-              <div class="wf-card" key=${def.id}>
-                <div class="wf-card-main" onClick=${() => setView({ name: 'detail', id: def.id })}>
-                  <div class="wf-card-title">
-                    ${loc(def.title) || def.id}
-                    <${StatusBadge} status=${health?.lastStatus} />
-                  </div>
-                  <div class="wf-card-meta">${triggerSummary(def.trigger)}</div>
-                  <div class="wf-card-meta">
-                    ${t('profile.workflows.stepCount', { count: def.steps?.length || 0 })}
-                    ${health?.lastRunAt ? html` · ${t('profile.workflows.lastRun')} ${timeAgo(health.lastRunAt)}` : ''}
-                  </div>
-                  <${Sparkline} steps=${health?.steps} />
-                </div>
-                <div class="wf-card-actions">
-                  <button class="btn-outline" onClick=${() => doRun(def.id, 'signals-only')}>${t('profile.workflows.check')}</button>
-                  <button class="btn-primary" onClick=${() => doRun(def.id, 'full')}>${t('profile.workflows.run')}</button>
-                </div>
-              </div>`)}
-          </div>`}
-    </div>`;
-}
-
-// ── Detail: blueprint + recent runs ─────────────────────────────────────────────
-function EditFormView({ id, onCancel, onSaved, showToast }) {
-  const [def, setDef] = useState(null);
-  const [err, setErr] = useState(null);
-  useEffect(() => { getWorkflow(id).then(r => setDef(r?.data || null)).catch(e => setErr(e.message)); }, [id]);
-  if (err) return html`<div class="wf-tab"><div class="wf-error">${err}</div></div>`;
-  if (!def) return html`<div class="wf-loading">${t('profile.workflows.loading')}</div>`;
-  return html`<${WorkflowForm} existing=${def} showToast=${showToast} onCancel=${onCancel} onSaved=${onSaved} />`;
-}
-
-function DetailView({ id, onBack, onOpenRun, onRun, onEdit }) {
-  const [def, setDef] = useState(null);
-  const [blueprint, setBlueprint] = useState(null);
-  const [runs, setRuns] = useState([]);
-  const [err, setErr] = useState(null);
-
-  const load = useCallback(async () => {
-    const [d, bp, rr] = await Promise.all([
-      getWorkflow(id).catch(err => { swallowed('workflows-tab: DetailView', err); return null; }),
-      getBlueprint(id).catch(e => ({ _err: e.message })),
-      listRuns(id).catch(err => { swallowed('workflows-tab: DetailView', err); return null; }),
-    ]);
-    setDef(d?.data || null);
-    if (bp?._err) setErr(bp._err); else setBlueprint(bp?.data || null);
-    setRuns(rr?.data?.runs || []);
-  }, [id]);
-  useEffect(() => { load(); }, [load]);
-  // Live updates: re-fetch the blueprint + recent runs as runs advance (engine emitChange → SSE).
-  const liveRef = useRef(load); liveRef.current = load;
-  useEffect(() => onLiveUpdate(['workflows'], () => liveRef.current()), []);
-
-  const stepDesc = (stepId) => loc((def?.steps || []).find(s => s.id === stepId)?.description);
-  const triggerLine = def ? triggerSummary(def.trigger) : '';
-
-  return html`
-    <div class="wf-tab">
-      <div class="wf-detail-head">
-        <button class="btn-ghost" onClick=${onBack}>← ${t('profile.workflows.back')}</button>
-        <div class="wf-detail-titlebox">
-          <div class="wf-detail-title">${def ? loc(def.title) || id : id}</div>
-          <div class="wf-detail-sub"><code>${id}</code>${triggerLine ? html` · ${triggerLine}` : ''}</div>
-        </div>
-        <div class="wf-detail-actions">
-          <button class="btn-ghost" onClick=${onEdit}>${t('profile.workflows.edit')}</button>
-          <button class="btn-outline" onClick=${() => onRun(id, 'signals-only')}>${t('profile.workflows.check')}</button>
-          <button class="btn-primary" onClick=${() => onRun(id, 'full')}>${t('profile.workflows.run')}</button>
-        </div>
-      </div>
-      ${def && loc(def.description) && html`<div class="wf-detail-desc">${loc(def.description)}</div>`}
-
-      ${err && html`<div class="wf-error">${err}</div>`}
-
-      <div class="wf-section-title">${t('profile.workflows.blueprint')}</div>
-      ${blueprint && html`<div class="wf-graph">
-        ${blueprint.nodes.map(n => html`<div class="wf-node" key=${n.stepId}>
-          <div class="wf-node-id">${n.stepId}${stepDesc(n.stepId) ? html` <span class="wf-node-desc">— ${stepDesc(n.stepId)}</span>` : ''}</div>
-          <div class="wf-node-agent">${(n.agents || []).join(', ')} · ${n.offerId}</div>
-          ${n.reads.length > 0 && html`<div class="wf-node-io">↘ ${n.reads.join(', ')}</div>`}
-          ${n.writes.length > 0 && html`<div class="wf-node-io">↗ ${n.writes.join(', ')}</div>`}
-          ${(() => {
-            const deps = (blueprint.edges || []).filter(e => e.to === n.stepId).map(e => e.from);
-            return deps.length > 0 ? html`<div class="wf-node-dep">${t('profile.workflows.after')}: ${deps.join(', ')}</div>` : '';
-          })()}
-        </div>`)}
-      </div>`}
-
-      <div class="wf-section-title">${t('profile.workflows.recentRuns')}</div>
-      ${runs.length === 0
-        ? html`<${EmptyState} text=${t('profile.workflows.noRuns')} />`
-        : html`<table class="wf-table"><tbody>
-            ${runs.map(r => html`<tr key=${r.runId} class="wf-run-row" onClick=${() => onOpenRun(r.runId)}>
-              <td>${timeAgo(r.startedAt)}</td>
-              <td><${StatusBadge} status=${r.status} /></td>
-              <td class="wf-muted">${r.mode}</td>
-            </tr>`)}
-          </tbody></table>`}
-    </div>`;
-}
-
-// ── Run: per-step timeline ──────────────────────────────────────────────────────
-function RunView({ id, runId, onBack, showToast }) {
-  const [run, setRun] = useState(null);
-  const [err, setErr] = useState(null);
-  const [cancelling, setCancelling] = useState(false);
-  const loadRun = useCallback(() => getRun(id, runId).then(r => setRun(r?.data || null)).catch(e => setErr(e.message)), [id, runId]);
-  useEffect(() => { loadRun(); }, [loadRun]);
-  // Live updates: the engine emits emitChange('workflows') as the run advances (dispatch → green →
-  // next step → done) → SSE → aimeat-live-update. Re-fetch so the timeline updates without a manual reload.
-  const liveRef = useRef(loadRun); liveRef.current = loadRun;
-  useEffect(() => onLiveUpdate(['workflows'], () => liveRef.current()), []);
-
-  const inFlight = run && (run.status === 'running' || run.status === 'waiting-step');
-  const doCancel = async () => {
-    setCancelling(true);
-    try { await cancelRun(id, runId); showToast?.(t('profile.workflows.cancelled'), false); await loadRun(); }
-    catch (e) { showToast?.(e?.message || 'Cancel failed', true); }
-    finally { setCancelling(false); }
-  };
-
-  // The run pins the full definition (defSnapshot), so we can name the workflow + each step
-  // without any extra fetch — and show exactly the def THIS run executed (even if it changed since).
-  const def = run?.defSnapshot;
-  const stepDef = (stepId) => (def?.steps || []).find(s => s.id === stepId);
-
-  return html`
-    <div class="wf-tab">
-      <div class="wf-detail-head">
-        <button class="btn-ghost" onClick=${onBack}>← ${t('profile.workflows.back')}</button>
-        <div class="wf-detail-titlebox">
-          <div class="wf-detail-title">${def ? loc(def.title) || run.workflowId : t('profile.workflows.run')}</div>
-          <div class="wf-detail-sub">
-            ${run ? html`<code>${run.workflowId}</code> · ${t('profile.workflows.run')} ${timeAgo(run.startedAt)} · ${run.mode}` : runId.slice(0, 8)}
-          </div>
-        </div>
-        ${inFlight && html`<button class="btn-danger-solid" disabled=${cancelling} onClick=${doCancel}>${cancelling ? '…' : t('profile.workflows.cancelRun')}</button>`}
-        ${run && html`<${StatusBadge} status=${run.status} />`}
-      </div>
-      ${run && def && loc(def.description) && html`<div class="wf-detail-desc">${loc(def.description)}</div>`}
-      ${err && html`<div class="wf-error">${err}</div>`}
-      ${run && html`<div class="wf-steps">
-        ${Object.entries(run.steps).map(([stepId, s]) => {
-          const sd = stepDef(stepId);
-          const agents = sd ? (Array.isArray(sd.agent) ? sd.agent.join(', ') : sd.agent) : null;
-          return html`<div class="wf-step" key=${stepId}>
-          <div class="wf-step-row">
-            <${StatusBadge} status=${s.state} />
-            <span class="wf-step-id">${stepId}</span>
-            ${sd && loc(sd.description) && html`<span class="wf-node-desc">— ${loc(sd.description)}</span>`}
-            ${s.reads?.length > 0 && html`<span class="wf-muted">↘ ${s.reads.length}</span>`}
-            ${s.writes?.length > 0 && html`<span class="wf-muted">↗ ${s.writes.length}</span>`}
-            ${s.attempt > 0 && html`<span class="wf-muted">${t('profile.workflows.attempt')} ${s.attempt + 1}</span>`}
-            ${s.progress && html`<${ProgressChip} progress=${s.progress} dispatched=${s.state === 'dispatched'} />`}
-          </div>
-          ${agents && html`<div class="wf-node-agent">${agents} · ${sd.offer}</div>`}
-          ${(() => {
-            // A step whose observed output / writes hold an image (a /v1/pub URL or { url, mime } value)
-            // renders thumbnails next to its observed state in the timeline.
-            const imgs = collectImages([s.outputObserved, s.inputObserved, s.writes], stepId);
-            return imgs.length ? html`<${ImageStrip} images=${imgs} />` : null;
-          })()}
-          ${(s.outputObserved || s.inputObserved) && html`<pre class="wf-observed">${JSON.stringify(s.outputObserved || s.inputObserved, null, 2)}</pre>`}
-        </div>`;
-        })}
-        ${(run.inspections || []).length > 0 && html`<div class="wf-inspections">${t('profile.workflows.inspectorDispatched', { count: run.inspections.length })}</div>`}
-      </div>`}
-    </div>`;
+  return renderWorkflowsView(ctx);
 }

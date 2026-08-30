@@ -1,0 +1,141 @@
+/**
+ * @file workflows-poster.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The Workflows page in the poster face (wp- prefix; design canvas "AIMEAT Työnkulkujen
+ *   sivu", direction A). The shared parts (crumb, masthead, strip, sections, folds, rail, fields,
+ *   choices) come from organism.css's og- rules; this file carries what workflows add: the
+ *   workflows table, a step as a row with its check in words and its state, the verdict band, the
+ *   confirmation panel, the question block, the check note, the runs table, the three roads and the
+ *   paste box, the words list, and the form's rows. NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-08-30 — Initial.
+ */
+
+.og-wp .og-chip--coral { border-color: var(--accent); color: var(--accent); }
+.og-wp .wp-chip--case { text-transform: none; }
+.og-wp .og-door.on { color: var(--accent); border-bottom-color: var(--accent); }
+.og-wp .og-choice-btn.on { background: var(--text); color: var(--card-bg); }
+.og-wp .og-empty { margin: 0; font-size: .9rem; color: var(--text-dim); }
+.og-wp .wp-hint { margin: .6rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--text-dim); display: block; }
+.og-wp .og-field .wp-hint { margin-top: .2rem; }
+.og-wp .wp-prose { margin: 0; font-size: .92rem; line-height: 1.55; color: var(--text); }
+.og-wp .wp-bad { color: var(--accent); }
+.og-wp .wp-error { margin: .5rem 0 0; font-size: .85rem; color: var(--accent); }
+.og-wp .wp-mono { font-family: var(--font-mono); font-size: .85rem; }
+.og-wp .wp-loading { display: inline-block; padding-left: 1.1rem; position: relative; }
+.og-wp .wp-loading::before { content: ''; position: absolute; left: 0; top: .35em; width: .55em; height: .55em; background: var(--accent); animation: wpBlink 1s steps(2, start) infinite; }
+@keyframes wpBlink { to { visibility: hidden; } }
+.og-title.wp-title--page { font-size: 2.1rem; overflow-wrap: anywhere; }
+.og-wp .og-rail-link.on { color: var(--accent); }
+.og-wp .wp-rail-static { cursor: default; }
+.og-wp .wp-rail-key { font-family: var(--font-mono); font-size: .72rem; text-transform: none; }
+.og-wp .og-label { display: block; }
+.og-wp .og-fold > span:not(.og-fold-r):not(.og-fold-arrow) { white-space: nowrap; }
+.og-wp .og-fold-r { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.og-wp .wp-danger-row { margin-top: .8rem; padding-top: .8rem; border-top: 1px solid var(--border); }
+
+/* tones */
+.wp-m--ok b, .wp-st--ok { color: var(--success-fg, #1f8f5a); }
+.wp-m--bad b, .wp-st--bad { color: var(--accent); }
+.wp-m--wait b, .wp-st--wait { color: var(--warning-fg, #b8860b); }
+.wp-st--none { color: var(--text-dim); font-weight: 500; }
+
+/* ── The workflows table ────────────────────────────────────────────────────────────────────── */
+.wp-rows { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 9rem) 7rem minmax(0, 14rem) 8.5rem; gap: 0 1rem; align-items: center; }
+.wp-rows > div { padding: .6rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
+.wp-rows--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.wp-rows .wp-nm { font-weight: 800; font-size: .95rem; color: var(--text); }
+.wp-rows .wp-nm .og-tbl-name { white-space: normal; overflow-wrap: anywhere; }
+.wp-rows .wp-nm small { display: block; font-size: .78rem; font-weight: 400; color: var(--text-dim); margin-top: .1rem; }
+.wp-m { font-family: var(--font-mono); font-size: .72rem; line-height: 1.5; color: var(--text-dim); }
+.wp-m b { color: var(--text); font-weight: 500; }
+.wp-m--sub { font-family: inherit; font-size: .8rem; line-height: 1.45; color: var(--text); overflow-wrap: anywhere; }
+.wp-doors2 { white-space: nowrap; }
+.wp-doors2 .og-door { margin-left: .8rem; }
+
+/* ── A step ─────────────────────────────────────────────────────────────────────────────────── */
+.wp-step { display: grid; grid-template-columns: 2.4rem minmax(0, 1fr) minmax(0, 11rem); gap: 0 1rem; padding: .8rem 0; border-bottom: 1px solid var(--border); align-items: start; }
+.wp-step-n { font-family: var(--font-mono); font-size: .8rem; line-height: 1.6; color: var(--accent); }
+.wp-step-body { min-width: 0; }
+.wp-step-body > b { display: block; font-size: 1rem; font-weight: 800; line-height: 1.3; color: var(--text); overflow-wrap: anywhere; }
+.wp-step-body > b small { display: block; font-family: var(--font-mono); font-size: .72rem; font-weight: 400; color: var(--text-dim); margin-top: .1rem; }
+.wp-sig { margin-top: .3rem; font-size: .84rem; line-height: 1.5; color: var(--text-dim); max-width: 70ch; overflow-wrap: anywhere; }
+.wp-sig--key { font-family: var(--font-mono); font-size: .72rem; }
+.wp-step-st { text-align: right; font-family: var(--font-mono); font-size: .72rem; line-height: 1.55; color: var(--text-dim); }
+.wp-step-st b { display: block; font-family: inherit; font-size: .84rem; font-weight: 800; }
+.wp-step-st span { display: block; }
+
+/* ── The verdict, the confirmation, the check note, the question ────────────────────────────── */
+.wp-verdict { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1.2rem; align-items: center; padding: 1rem 1.1rem; border: 3px solid var(--text); margin: 1.2rem 0 0; }
+.wp-verdict--bad { border-color: var(--accent); }
+.wp-verdict--wait { border-color: var(--sun); }
+.wp-verdict b { display: block; font-size: 1.05rem; font-weight: 800; line-height: 1.35; color: var(--text); }
+.wp-verdict span { display: block; margin-top: .25rem; font-size: .85rem; line-height: 1.5; color: var(--text-dim); }
+.wp-confirm { margin: 1.2rem 0 0; padding: 1.2rem 1.4rem; border: 3px solid var(--text); background: var(--card-bg); box-shadow: 8px 8px 0 var(--text); }
+.wp-confirm h3 { margin: 0; font-size: 1.3rem; font-weight: 800; line-height: 1.25; color: var(--text); }
+.wp-kv { display: grid; grid-template-columns: minmax(0, 10rem) minmax(0, 1fr); gap: .5rem 1rem; margin-top: 1rem; font-size: .9rem; line-height: 1.5; color: var(--text); }
+.wp-kv-k { font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); padding-top: .3rem; }
+.wp-kv-v { overflow-wrap: anywhere; }
+.wp-confirm .og-doors { margin-top: 1rem; }
+.wp-note { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .3rem 1rem; align-items: start; margin-top: .9rem; padding: .8rem 1rem; border: 2px solid var(--text); background: var(--card-bg); font-size: .85rem; line-height: 1.5; color: var(--text); }
+.wp-note b { grid-column: 1; font-weight: 800; }
+.wp-note > span { grid-column: 1; }
+.wp-note .og-door { grid-column: 2; grid-row: 1; }
+.wp-note--check { border-color: var(--accent); }
+.wp-ask { padding: 1rem 1.2rem; border: 3px solid var(--text); background: var(--sun); color: var(--on-sun); margin-top: .8rem; }
+.wp-ask b { display: block; font-size: 1rem; font-weight: 800; line-height: 1.35; }
+.wp-ask p { margin: .3rem 0 .7rem; font-size: .85rem; line-height: 1.5; }
+.wp-ask .og-choice { border-color: var(--on-sun); }
+.wp-ask .og-choice-btn { border-right-color: var(--on-sun); color: var(--on-sun); }
+.wp-ask .og-choice-btn.on { background: var(--on-sun); color: var(--sun); }
+.wp-ask-other { margin-top: .6rem; max-width: 30rem; border-bottom-color: var(--on-sun); color: var(--on-sun); }
+.wp-ask .og-doors { margin-top: .8rem; }
+.wp-ask .og-slab { background: var(--on-sun); color: var(--sun); box-shadow: 4px 4px 0 var(--text); }
+.wp-ask .og-door { color: var(--on-sun); border-bottom-color: var(--on-sun); }
+
+/* ── The runs table ─────────────────────────────────────────────────────────────────────────── */
+.wp-runs { display: grid; grid-template-columns: 7rem 7rem minmax(0, 1fr) 3.5rem; gap: 0 1rem; align-items: center; }
+.wp-runs > div { padding: .55rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
+
+/* ── The roads, the paste box, the words ────────────────────────────────────────────────────── */
+.wp-roads { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem; }
+.wp-road { display: flex; flex-direction: column; gap: .35rem; padding: .9rem 1rem; border: 2px solid var(--text); background: var(--card-bg); font-size: .85rem; line-height: 1.5; color: var(--text-dim); cursor: pointer; }
+.wp-road b { font-weight: 800; font-size: .95rem; color: var(--text); }
+.wp-road p { margin: 0; }
+.wp-road-k { font-family: var(--font-mono); font-size: .7rem; color: var(--accent); }
+.wp-road .og-doors { margin-top: auto; padding-top: .4rem; }
+.wp-road .og-door { font-size: .72rem; }
+.wp-road.on { background: var(--sun); color: var(--on-sun); box-shadow: 4px 4px 0 var(--text); }
+.wp-road.on b, .wp-road.on .wp-road-k, .wp-road.on .og-door { color: var(--on-sun); border-bottom-color: var(--on-sun); }
+.wp-paste { margin-top: .9rem; display: flex; flex-direction: column; gap: .5rem; }
+.wp-words { display: grid; grid-template-columns: minmax(0, 11rem) minmax(0, 1fr); gap: .35rem 1rem; font-size: .88rem; line-height: 1.5; color: var(--text); }
+.wp-words b { font-weight: 800; }
+.wp-words code { font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); margin-left: .3rem; }
+.wp-words--rail { grid-template-columns: minmax(0, 1fr); padding: .3rem 0 0 .4rem; font-size: .78rem; color: var(--text-dim); }
+.wp-code { margin: 0; padding: .7rem .9rem; border: 1px solid var(--border); background: var(--card-bg); font-family: var(--font-mono); font-size: .7rem; line-height: 1.5; color: var(--text); overflow-x: auto; white-space: pre; max-height: 32rem; }
+
+/* ── The form ───────────────────────────────────────────────────────────────────────────────── */
+.wp-form .og-fields--2 { gap: 1.1rem 1.6rem; }
+.wp-inline-fields { display: grid; grid-template-columns: 8rem minmax(0, 1fr) minmax(0, 1fr); gap: 1rem; margin-top: .6rem; }
+.wp-field--narrow .og-input { max-width: 8rem; }
+.wp-var-row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto; gap: .8rem; align-items: end; margin-top: .5rem; }
+.wp-check { display: flex; align-items: center; gap: .5rem; margin-top: .5rem; font-size: .85rem; color: var(--text); }
+.wp-choice--tight { margin-top: .5rem; align-items: center; }
+.wp-num { width: 5rem; margin-left: .6rem; }
+.og-wp select.og-input { appearance: auto; }
+
+@media (max-width: 900px) {
+  .wp-rows { grid-template-columns: minmax(0, 1fr) 7rem; }
+  .wp-rows--head { display: none; }
+  .wp-rows .wp-m:nth-child(5n + 2), .wp-rows .wp-m:nth-child(5n + 4) { display: none; }
+  .wp-doors2 .og-door { margin-left: .5rem; }
+  .wp-step { grid-template-columns: 2rem minmax(0, 1fr); }
+  .wp-step-st { grid-column: 2; text-align: left; }
+  .wp-step-st b, .wp-step-st span { display: inline; margin-right: .6rem; }
+  .wp-verdict, .wp-note, .wp-roads, .wp-inline-fields, .wp-var-row, .wp-form .og-fields--2 { grid-template-columns: minmax(0, 1fr); }
+  .wp-runs { grid-template-columns: 6rem minmax(0, 1fr); }
+  .wp-runs > div:nth-child(4n + 2), .wp-runs > div:nth-child(4n + 4) { display: none; }
+  .wp-kv { grid-template-columns: minmax(0, 1fr); }
+  .wp-confirm { box-shadow: none; }
+}
