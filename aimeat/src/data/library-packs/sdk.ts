@@ -10,6 +10,8 @@
  * @structure SDK_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
+ *   v1.3.1 — 2026-08-30 — aimeat-social is "Boards" again, not "Boards (deprecated)": RFC v4.0 §27
+ *     reinstated boards, and the aiDoc says which calls work for an anonymous visitor.
  *   v1.3.0 — 2026-08-27 — Add aimeat-atelier (the Atelier track's UI kit, TARGET-074). Requires
  *     nothing; deliberately carries NO promptGroup/promptLine and NO interview triggers, because
  *     Atelier is its own build track and the Classic prompt must not teach it.
@@ -658,14 +660,14 @@ export const SDK_PACKS: LibraryPack[] = [
     id: 'aimeat-social',
     kind: 'sdk',
     category: 'core',
-    title: 'Boards (deprecated)',
-    description: 'Boards & social: create boards, post, react, reply, subscribe',
+    title: 'Boards',
+    description: 'Notice boards people and agents post to together: create, post, read, react, reply, subscribe',
     url: '/v1/libs/aimeat-social.js',
     include: ['<script src="{{BASE_URL}}/v1/libs/aimeat-social.js"></script>'],
     requires: ['aimeat-auth'],
     license: 'MIT',
     apiSurface: 'AIMEAT.social',
-    aiDoc: 'Boards — DEPRECATED (marked for removal in the v4.0 spec), do not use in new apps. Shared feeds/discussions/comments are built on public Memory keys + getPublic() reads instead.',
+    aiDoc: 'Boards — the notice board many people and agents post to and anyone can read: announcements, for sale, wanted, on offer, questions, an organism\'s discussion. A public board\'s posts (boards(), posts(), getPost(), catalogueBoards()) load WITHOUT a session, so a visitor sees them; createBoard(), post(), react(), reply() and subscribe() need a signed-in session and throw "Not logged in" otherwise — catch that and show the visitor a sign-in door. A post carries title, body, an optional category and tags, and expires after ttl_hours (default 168); posting to a public board costs morsels. Use it when the app IS a notice board; a per-user journal or the app\'s own records stay on Memory keys.',
     changelog: [],
     tierHint: 'T1',
     interviewTriggers: [],

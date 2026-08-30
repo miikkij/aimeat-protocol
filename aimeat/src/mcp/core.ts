@@ -11,6 +11,8 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.18.0 — 2026-08-30 — aimeat_board_read leaves out a post flags have hidden, through the same
+ *     services/board-moderation.ts the HTTP listing uses.
  *   v1.17.0 — 2026-08-11 — aimeat_work_accept and aimeat_work_deliver call services/work-lifecycle.ts,
  *     the same functions POST /v1/work/:tc/accept and /deliver call. Accepting over MCP skipped the
  *     work→task bridge, so the agent had no task to work from; delivering over MCP skipped the
@@ -117,6 +119,7 @@ import { acceptWork, deliverWork } from '../services/work-lifecycle.js';
 import type { PeerInfo } from '../services/federation.js';
 import { createBoardPost } from '../services/board-post.js';
 import { boardReadRefusal } from '../services/board-read-access.js';
+import { withoutHiddenPosts } from '../services/board-moderation.js';
 
 
 // F3: bound aimeat_memory_list so a default (and especially owner_scope) call cannot return an
@@ -712,7 +715,10 @@ export function registerCoreTools(
             const refusal = await boardReadRefusal({ storage, config }, agentGaii, board);
             if (refusal) return { content: [{ type: 'text' as const, text: `${refusal.code}: ${refusal.message}` }], isError: true };
 
-            const posts = await storage.listPosts(board_id, { category, limit: limit ?? 20 });
+            // The same hiding rule GET /v1/boards/:id/posts applies: a post flags have hidden is
+            // left out for everyone but its author and the board's owner.
+            const posts = await withoutHiddenPosts({ storage, config }, board, agentGaii,
+                await storage.listPosts(board_id, { category, limit: limit ?? 20 }));
             // TARGET-058: an agent asked to summarise a board has to be able to say which posts a
             // model wrote. One query for the page — see readProvenanceMany's N+1 note.
             const provFor = await readProvenanceMany(storage, config, posts.map(p => p.aiProvenanceId));

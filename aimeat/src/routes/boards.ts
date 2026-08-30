@@ -13,6 +13,11 @@
  *   - resolve(): identity resolution via resolveIdentity for owner-scoped writes
  *
  * @version-history
+ *   v1.4.0 — 2026-08-30 — Boards reinstated as Core (RFC §27). A post flags have hidden is left out
+ *     of the listing and refused on its own URL to everyone but its author and the board's owner
+ *     (services/board-moderation.ts; the threshold was computed twice and enforced nowhere); the
+ *     page cursor is the last post of the page as fetched, not as filtered; the anonymous-mode
+ *     shared identity is not a principal on the post reads, as it already was not on GET /v1/boards.
  *   v1.3.0 — 2026-08-11 — GET /v1/boards/:boardId/posts/new?otk= is gone. RFC v4.0 deprecates
  *     one-time keys, and this door was a second implementation of posting that called
  *     storage.createPost directly: no board access check, so an OTK holder could post to a board
@@ -44,6 +49,7 @@ import { BoardCreateSchema, BoardPostSchema, BoardReactionSchema, BoardReplySche
 import { emitChange } from '../services/event-bus.js';
 import { createBoardPost, createBoardReply } from '../services/board-post.js';
 import { boardReadRefusal } from '../services/board-read-access.js';
+import { hiddenBoardPostIds, maySeeHiddenPost, withoutHiddenPosts } from '../services/board-moderation.js';
 import {
   createBoard, subscribeToBoard, reactToBoardPost, setBoardMembers, deleteBoardById,
 } from '../services/board-write.js';
@@ -260,7 +266,10 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     // Who may read this board is services/board-read-access.ts, the same rule aimeat_board_read
     // answers to. It used to live only here, and that tool listed the posts without ever loading the
     // board — so a private board was readable over MCP and there was no denial row to show it.
-    const gaii = req.auth ? resolveIdentity(req.auth, config.nodeId) : undefined;
+    // The anonymous-mode shared identity is not a principal here, the same rule GET /v1/boards
+    // applies: with it, a private board answered 403 instead of 401 and consent was consulted on
+    // behalf of a pseudo-identity.
+    const gaii = (req.auth && !req.auth.anonymous) ? resolveIdentity(req.auth, config.nodeId) : undefined;
     const readRefusal = await boardReadRefusal({ storage, config }, gaii, board);
     if (readRefusal) {
       res.status(readRefusal.status).json(error(config.nodeId, readRefusal.code, readRefusal.message));
@@ -271,7 +280,10 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     const cursor = req.query.cursor as string | undefined;
     const limit = Math.min(parseInt(req.query.limit as string ?? '20', 10), 100);
 
-    const posts = await storage.listPosts(boardId, { category, cursor, limit });
+    // A page is `limit` live posts; the cursor for the next page is the last of them. A post flags
+    // have hidden is dropped AFTER the page is cut, so the cursor still walks the whole board.
+    const page = await storage.listPosts(boardId, { category, cursor, limit });
+    const posts = await withoutHiddenPosts({ storage, config }, board, gaii, page);
 
     // TARGET-058: how each post was made, in ONE query for the page. The caller has already passed
     // the board read gate above, which is the authorization argument — provenance travels with the
@@ -293,7 +305,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
         ...provenanceItemBlock(p.aiProvenanceId ? provById.get(p.aiProvenanceId) : undefined),
       })),
       total: posts.length,
-      cursor: posts.length === limit ? posts[posts.length - 1]?.id : undefined,
+      cursor: page.length === limit ? page[page.length - 1]?.id : undefined,
     }));
   });
 
@@ -307,7 +319,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    const gaii = req.auth ? resolveIdentity(req.auth, config.nodeId) : undefined;
+    const gaii = (req.auth && !req.auth.anonymous) ? resolveIdentity(req.auth, config.nodeId) : undefined;
     if (board.visibility !== 'public' && board.visibility !== 'system') {
       if (!gaii) {
         res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Authentication required for non-public boards'));
@@ -338,6 +350,13 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     const post = await storage.getPost(boardId, postId);
     if (!post) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Post not found: ${postId}`));
+      return;
+    }
+
+    // A post flags have hidden is refused to everyone but its author and the board's owner, who
+    // are the two who can appeal or remove it.
+    if (!maySeeHiddenPost(post, board, gaii) && (await hiddenBoardPostIds({ storage, config }, [post.id])).has(post.id)) {
+      res.status(403).json(error(config.nodeId, 'HIDDEN', 'Readers reported this post, so it is hidden until its author or the board owner reviews it. You can still read the other posts on this board.'));
       return;
     }
 

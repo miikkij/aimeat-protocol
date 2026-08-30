@@ -15,6 +15,9 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   2026-08-30 — Boards reinstated (RFC v4.0 §27): the memory-key feed paragraph now names the ONE
+ *     shape a board serves better (a notice board many post to and a visitor reads) instead of
+ *     forbidding boards outright.
  *   2026-08-29 — ADDITIVE: "If the app sells something, or handles personal data" — the app's own
  *     legal pages (aimeat_app_legal_set), which of the seven a given app owes and why, minimisation
  *     written into the data map, and that money means a currency, never morsels.
@@ -240,7 +243,7 @@ function composeAppPrompt(
   body += '```\n';
   body += 'Works only when logged in. After a write, read it back to confirm it persisted.\n';
   body += 'A key is a plain string: `get(key)` / `getPublic(gaii, key)` always return the LATEST value — never append a version, index or `:0`/`:N` suffix to a key, and read back the SAME key you wrote (a store-as-`x` / read-as-`x:0` mismatch just 404s and your UI shows nothing). To page a large list, store it as ONE array under one key (or shard with your OWN explicit id scheme), not a magic version suffix.\n';
-  body += 'Shared feeds, journals, comments and discussions are ALL built this way — one public key per entry, `getPublic()` to read others\'. Never reach for Boards (deprecated, removal-bound) as an app\'s data layer, and do not use an organism workspace for a PERSONAL app\'s data. **A group application is the exception and the workspace is exactly where its data belongs — see the group section below before you choose.** When a rule must be enforced server-side (only-author-can-delete, one-vote-per-user), that logic goes into an extension — see the extension guide, not into boards/organisms.\n';
+  body += 'Shared feeds, journals, comments and discussions are ALL built this way — one public key per entry, `getPublic()` to read others\'. ONE shape is served better by a BOARD (`AIMEAT.social`, the aimeat-social lib): a notice board many people and agents post to and a visitor reads without signing in — announcements, for sale, wanted, on offer, questions. A board carries what keys cannot: a notice that expires on its own, priced public posting that keeps flood out, threaded replies, subscriptions with category filters, and flagging. Reach for it when the app IS such a board; keep a per-user journal or an app\'s own records on keys. Do not use an organism workspace for a PERSONAL app\'s data. **A group application is the exception and the workspace is exactly where its data belongs — see the group section below before you choose.** When a rule must be enforced server-side (only-author-can-delete, one-vote-per-user), that logic goes into an extension — see the extension guide, not into organisms.\n';
   body += 'If you RENDER content an agent wrote, read it with `getPublicEntry(gaii, key)` instead: it returns the same entry plus `provenance` — how that content was made, including the model and the `sources` the writer declared. `getPublic()` returns the bare value and cannot carry it. Showing agent-written text with no origin, when the node is holding the record that explains it, is the gap the label is meant to close.\n\n';
 
   // A GROUP app is a different shape and the rules above are not enough for it. Added 2026-08-24

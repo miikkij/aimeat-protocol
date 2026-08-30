@@ -3,13 +3,17 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Backend-agnostic storage interface for boards — the persistence contract implemented
- *   by each provider (SQLite/MongoDB/PostgreSQL) covering boards, posts, reactions, and subscriptions.
- *   (Boards are marked deprecated per RFC v4.0 but the contract remains.)
+ *   by each provider (SQLite/PostgreSQL) covering boards, posts, reactions, and subscriptions.
+ *   Boards are Core (RFC v4.0 §27, reinstated 2026-08-30): the notice board people and agents
+ *   publish to together.
  *
  * @structure
  *   - BoardRepository: interface for board CRUD + visibility/members, posts CRUD, reactions, and subscriptions
  *
  * @version-history
+ *   v1.2.0 — 2026-08-30 — listPosts contract: `cursor` is the id of the last post of the previous
+ *     page and the result is the live (unexpired) top-level posts older than it; deleteBoard removes
+ *     the board's subscriptions with its posts.
  *   v1.1.0 — 2026-08-17 — pruneExpiredBoardPosts: one cross-board DELETE for the TTL sweep. The
  *     cleanup job used to load up to 10,000 full posts per board and rely on listPosts's lazy
  *     side-effect delete — which only the SQLite provider had, so Postgres never pruned at all.

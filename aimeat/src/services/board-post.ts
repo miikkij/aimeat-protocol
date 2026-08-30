@@ -28,6 +28,8 @@
  *   const out = await createBoardPost({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.1.0 — 2026-08-30 — A reply inherits its parent's expiry; it used to carry none and outlived
+ *     the notice it answered.
  *   v1.0.0 — 2026-08-11 — Initial (August 2026 audit step 3, option B: shared service, gate inside).
  */
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -260,6 +262,8 @@ export async function createBoardReply(
         enabled: config.aiProvenance,
     });
 
+    // A reply lives as long as the notice it answers. Until 2026-08-30 it carried no expiry at all,
+    // so replies outlived their parents and the TTL sweep never reached them.
     const reply = await storage.createPost({
         id: `reply-${randomBytes(8).toString('hex')}`,
         boardId: input.boardId,
@@ -269,6 +273,7 @@ export async function createBoardReply(
         tags: [],
         reactions: {},
         replyTo: input.postId,
+        ...(parent.ttlExpiresAt ? { ttlExpiresAt: parent.ttlExpiresAt } : {}),
         createdAt: new Date().toISOString(),
         ...(aiProvenanceId ? { aiProvenanceId } : {}),
     });

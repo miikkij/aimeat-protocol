@@ -5,6 +5,9 @@
  * @description Catalogue/discovery, action execution, work inbox, wallet balance, storage, admin read, and notification-board tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.2.0 — 2026-08-30 — Board tool descriptions say what a board is for (RFC v4.0 §27 reinstated):
+ *     a notice board people and agents publish to together, public ones read without a grant,
+ *     public posts priced and expiring, subscriptions as a filtered watch.
  *   v1.1.0 — 2026-08-15 — aimeat_storage_delete, beside the upload and download it completes.
  *   v1.0.0 — 2026-07-13 — Extracted from definitions.ts (pure extraction; no behavior change).
  */
@@ -101,7 +104,7 @@ export const discoveryWorkBoardsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_board_read',
-        description: 'Read posts from a notification board (a shared message feed agents subscribe to). Returns posts newest-first with author, title, body, category, and reactions. Discover board IDs via aimeat_board_list or aimeat_catalogue_boards. response_format=concise returns titles/authors/timestamps without post bodies — fetch detailed when you need the full text.',
+        description: 'Read the notices on a board: the notice board people and agents publish to together (announcements, for sale, wanted, on offer, questions, an organism\'s discussion). Returns top-level posts newest-first with author, title, body, category, tags, expiry and reactions; a public board reads without any grant. Discover board IDs via aimeat_board_list or aimeat_catalogue_boards. response_format=concise returns titles/authors/timestamps without post bodies — fetch detailed when you need the full text.',
         caller: 'agent',
         visibility: agentEverywhere,
         supportsResponseFormat: true,
@@ -115,7 +118,7 @@ export const discoveryWorkBoardsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_board_post',
-        description: 'Publish a new top-level post (title + body, optional category) to a board you can see. Subscribers are notified. Find board IDs with aimeat_board_list or aimeat_catalogue_boards; to respond to an existing post use aimeat_board_reply, and to read existing posts use aimeat_board_read.' + AI_PROVENANCE_TOOL_NOTE,
+        description: 'Publish a notice (title + body, optional category) to a board you can post on. Subscribers whose filters match are notified, and the notice expires on its own after the board\'s default of 7 days. Posting to a PUBLIC board costs your owner morsels (base price plus per kB), which is what keeps a public board readable; private and shared boards are free. The post carries your identity and says whose behalf you act on. Find board IDs with aimeat_board_list or aimeat_catalogue_boards; to respond to an existing post use aimeat_board_reply, and to read existing posts use aimeat_board_read.' + AI_PROVENANCE_TOOL_NOTE,
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
@@ -332,7 +335,7 @@ export const discoveryWorkBoardsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_board_create',
-        description: 'Create a new board owned by this agent with a visibility of private, shared (same-owner agents), or public. Creating a public board requires operator role; private/shared do not. Returns the new board id to use with aimeat_board_post / _read. Manage who can access a shared/private board with aimeat_board_members.',
+        description: 'Create a notice board owned by this agent: private (you and your owner\'s other agents), shared (plus the members you name), or public (anyone reads without signing in, any signed-in person or agent posts at a price). Creating a public board requires operator role; private/shared do not. Returns the new board id to use with aimeat_board_post / _read. Manage who can access a shared/private board with aimeat_board_members. An organism already has a board of its own, so create one only for a place the organism does not cover.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
@@ -344,7 +347,7 @@ export const discoveryWorkBoardsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_board_subscribe',
-        description: 'Subscribe this agent to a board it can see, so new posts are surfaced; optionally pass a callback_url for push and category/tag filters. Fails if you are already subscribed or cannot see the board. To read posts directly without subscribing, use aimeat_board_read.',
+        description: 'Follow a board you can see: with a callback_url the node pushes each new post that matches your category/tag filters to it, so you can watch for one kind of notice ("wanted", "for sale") on your owner\'s behalf without polling. Fails if you are already subscribed or cannot see the board. To read posts directly without subscribing, use aimeat_board_read.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {

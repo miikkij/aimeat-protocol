@@ -7,6 +7,9 @@
  *   and the boards API. Translated 1:1 from the Prisma implementation. The business key is `boardId`
  *   (record.id), `postId` for posts.
  * @version-history
+ *   v1.3.0 — 2026-08-30 — listPosts honours the cursor (it was accepted and ignored, so page two was
+ *     page one) and filters expiry in SQL rather than after LIMIT; deleteBoard removes the board's
+ *     subscriptions with its posts.
  *   v1.2.0 — 2026-08-17 — pruneExpiredBoardPosts: this backend gains its first real TTL delete
  *     (listPosts only filtered, so expired posts accumulated forever).
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 9 step 0: `BoardPost.aiProvenanceId` round-trips
@@ -60,6 +63,9 @@ export const boardMethods = {
   async deleteBoard(this: PostgresKyselyStorage, id: string): Promise<boolean> {
     const r = await this.db.deleteFrom('Board').where('boardId', '=', id).executeTakeFirst();
     await this.db.deleteFrom('BoardPost').where('boardId', '=', id).execute();
+    // A subscription to a board that no longer exists is a phantom row on the subscriber's list,
+    // and until 2026-08-30 every deleted board left one behind per follower.
+    await this.db.deleteFrom('BoardSubscription').where('boardId', '=', id).execute();
     return Number(r.numDeletedRows ?? 0) > 0;
   },
 
@@ -77,10 +83,25 @@ export const boardMethods = {
     return r ? toPost(r) : null;
   },
   async listPosts(this: PostgresKyselyStorage, boardId: string, opts?: { category?: string; cursor?: string; limit?: number }): Promise<BoardPostRecord[]> {
-    let q = this.db.selectFrom('BoardPost').selectAll().where('boardId', '=', boardId).where('replyTo', 'is', null);
+    // Expiry is a WHERE clause, so a page of N is N live posts: filtering after LIMIT returned short
+    // pages a caller could not tell from the end of the board. The cursor is the last post of the
+    // previous page, and the next page is everything older than it (ties broken on postId, so two
+    // posts created in the same millisecond cannot be skipped). Until 2026-08-30 the cursor was
+    // accepted and never read, so page two was always page one.
+    const now = new Date();
+    let q = this.db.selectFrom('BoardPost').selectAll().where('boardId', '=', boardId).where('replyTo', 'is', null)
+      .where(eb => eb.or([eb('ttlExpiresAt', 'is', null), eb('ttlExpiresAt', '>', now)]));
     if (opts?.category) q = q.where('category', '=', opts.category);
-    const rows = await q.orderBy('createdAt', 'desc').limit(opts?.limit ?? 20).execute();
-    return rows.filter(r => !r.ttlExpiresAt || new Date(r.ttlExpiresAt).getTime() > Date.now()).map(toPost);
+    if (opts?.cursor) {
+      const at = await this.db.selectFrom('BoardPost').select('createdAt').where('boardId', '=', boardId).where('postId', '=', opts.cursor).executeTakeFirst();
+      if (at) {
+        const cursorAt = at.createdAt instanceof Date ? at.createdAt : new Date(at.createdAt);
+        const cursorId = opts.cursor;
+        q = q.where(eb => eb.or([eb('createdAt', '<', cursorAt), eb.and([eb('createdAt', '=', cursorAt), eb('postId', '<', cursorId)])]));
+      }
+    }
+    const rows = await q.orderBy('createdAt', 'desc').orderBy('postId', 'desc').limit(opts?.limit ?? 20).execute();
+    return rows.map(toPost);
   },
   async deletePost(this: PostgresKyselyStorage, boardId: string, postId: string): Promise<boolean> {
     const r = await this.db.deleteFrom('BoardPost').where('boardId', '=', boardId).where('postId', '=', postId).executeTakeFirst();
