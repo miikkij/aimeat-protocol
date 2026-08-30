@@ -1,0 +1,225 @@
+/*
+ * @file aimeat-atelier/planner.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The work-planning family's clothes — kanban (columns of cards, a lift while
+ *   dragging), plan (stretches on a shared month axis, today as a line through everything)
+ *   and schedule (a week grid, bookings as blocks). Tones ride --ak-ok/-warn/-err/-accent as
+ *   soft color-mix grounds with the -text variants for words, so every look and mode answers
+ *   them; entrances are finite and reduced-motion drops them, like the rest of the kit.
+ * @structure .ak-kanban · .ak-plan · .ak-schedule · reduced-motion
+ * @version-history
+ *   v0.36.0 — 2026-08-30 — Initial (basket two of the approved expansion).
+ */
+
+/* ── Kanban: columns of cards ────────────────────────────────────────────────────────────── */
+.ak-kanban {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(13rem, 1fr);
+  gap: calc(var(--ak-gap) * 0.75);
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.ak-kanban__col { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.ak-kanban__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--ak-radius-sm);
+  background: color-mix(in oklab, var(--ak-accent) 12%, var(--ak-surface));
+  font-size: var(--ak-text-fine);
+  font-weight: 700;
+  color: var(--ak-ink);
+}
+.ak-kanban__head--ok { background: color-mix(in oklab, var(--ak-ok) 16%, var(--ak-surface)); }
+.ak-kanban__head--warn { background: color-mix(in oklab, var(--ak-warn) 18%, var(--ak-surface)); }
+.ak-kanban__head--err { background: color-mix(in oklab, var(--ak-err) 16%, var(--ak-surface)); }
+.ak-kanban__count {
+  min-width: 1.6em;
+  text-align: center;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--ak-surface);
+  font-variant-numeric: tabular-nums;
+}
+.ak-kanban__well {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 3rem;
+  border-radius: var(--ak-radius-sm);
+  transition: background var(--ak-motion);
+}
+.ak-kanban__well--over { background: color-mix(in oklab, var(--ak-accent) 10%, transparent); }
+.ak-kanban__card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: relative;
+  padding: 10px 12px;
+  border-radius: var(--ak-radius-sm);
+  background: var(--ak-surface);
+  border: 1px solid var(--ak-line);
+  box-shadow: var(--ak-elev-1);
+  text-align: left;
+  font: inherit;
+  color: var(--ak-ink);
+  cursor: grab;
+  touch-action: none;
+}
+.ak-kanban__card:not([draggable]) { cursor: default; }
+.ak-kanban__card--lift { opacity: 0.45; cursor: grabbing; }
+.ak-kanban__card--ok { border-inline-start: 3px solid var(--ak-ok); }
+.ak-kanban__card--warn { border-inline-start: 3px solid var(--ak-warn); }
+.ak-kanban__card--err { border-inline-start: 3px solid var(--ak-err); }
+.ak-kanban__cardtitle { font-weight: 650; font-size: var(--ak-text-body); }
+.ak-kanban__cardsub { font-size: var(--ak-text-fine); color: var(--ak-ink-dim); }
+.ak-kanban__badge {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  font-size: var(--ak-text-fine);
+  font-weight: 700;
+  color: var(--ak-accent-text);
+}
+.ak-kanban__card--enter { opacity: 0; animation: ak-band-in calc(var(--ak-motion) * 1.6) var(--ak-ease) forwards; }
+
+/* ── Plan: stretches against months ──────────────────────────────────────────────────────── */
+.ak-plan { position: relative; }
+.ak-plan__months { position: relative; height: 1.4rem; margin-inline-start: 9.5rem; }
+.ak-plan__month {
+  position: absolute;
+  top: 0;
+  transform: translateX(2px);
+  font-size: var(--ak-text-fine);
+  font-weight: 600;
+  color: var(--ak-ink-dim);
+  border-inline-start: 1px solid var(--ak-line);
+  padding-inline-start: 5px;
+  height: 100%;
+}
+.ak-plan__rows { position: relative; display: flex; flex-direction: column; gap: 6px; }
+.ak-plan__row { display: grid; grid-template-columns: 9rem 1fr; gap: 0.5rem; align-items: center; min-height: 2.1rem; }
+.ak-plan__rowname {
+  font-size: var(--ak-text-fine);
+  font-weight: 650;
+  color: var(--ak-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ak-plan__track {
+  position: relative;
+  display: block;
+  height: 1.7rem;
+  border-radius: var(--ak-radius-sm);
+  background: color-mix(in oklab, var(--ak-ink) 4%, var(--ak-surface));
+}
+.ak-plan__span {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  display: inline-flex;
+  align-items: center;
+  padding-inline: 8px;
+  border-radius: calc(var(--ak-radius-sm) - 2px);
+  overflow: hidden;
+}
+/* The family's tone language (queue and schedule speak it too): a soft tone ground with a
+ * solid tone edge, ink words on top — readable in both modes with no halo tricks. */
+.ak-plan__span { border-inline-start: 3px solid var(--ak-accent); background: color-mix(in oklab, var(--ak-accent) 30%, var(--ak-surface)); }
+.ak-plan__span--ok { border-color: var(--ak-ok); background: color-mix(in oklab, var(--ak-ok) 30%, var(--ak-surface)); }
+.ak-plan__span--warn { border-color: var(--ak-warn); background: color-mix(in oklab, var(--ak-warn) 34%, var(--ak-surface)); }
+.ak-plan__span--err { border-color: var(--ak-err); background: color-mix(in oklab, var(--ak-err) 30%, var(--ak-surface)); }
+.ak-plan__spanlabel {
+  font-size: var(--ak-text-fine);
+  font-weight: 650;
+  color: var(--ak-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ak-plan__span--enter { opacity: 0; animation: ak-band-in calc(var(--ak-motion) * 1.6) var(--ak-ease) forwards; }
+.ak-plan__today {
+  position: absolute;
+  top: -1.4rem;
+  bottom: 0;
+  margin-inline-start: 9.5rem;
+  border-inline-start: 2px dashed var(--ak-accent);
+  z-index: 1;
+}
+
+/* ── Schedule: the week grid ─────────────────────────────────────────────────────────────── */
+.ak-schedule__grid {
+  display: grid;
+  grid-template-columns: 3.4rem repeat(auto-fit, minmax(0, 1fr));
+  gap: 6px;
+  min-height: 20rem;
+}
+.ak-schedule__hours { position: relative; margin-top: 1.9rem; }
+.ak-schedule__hour {
+  position: absolute;
+  right: 4px;
+  transform: translateY(-50%);
+  font-size: var(--ak-text-fine);
+  color: var(--ak-ink-dim);
+  font-variant-numeric: tabular-nums;
+}
+.ak-schedule__day { display: flex; flex-direction: column; min-width: 0; }
+.ak-schedule__dayname {
+  font-size: var(--ak-text-fine);
+  font-weight: 700;
+  color: var(--ak-ink);
+  text-align: center;
+  padding-bottom: 6px;
+}
+.ak-schedule__well {
+  position: relative;
+  flex: 1;
+  border-radius: var(--ak-radius-sm);
+  background:
+    repeating-linear-gradient(to bottom,
+      color-mix(in oklab, var(--ak-ink) 6%, transparent) 0,
+      color-mix(in oklab, var(--ak-ink) 6%, transparent) 1px,
+      transparent 1px,
+      transparent 10%),
+    color-mix(in oklab, var(--ak-ink) 3%, var(--ak-surface));
+}
+.ak-schedule__event {
+  position: absolute;
+  inset-inline: 3px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  padding: 4px 8px;
+  border: 0;
+  border-inline-start: 3px solid var(--ak-accent);
+  border-radius: calc(var(--ak-radius-sm) - 2px);
+  background: color-mix(in oklab, var(--ak-accent) 16%, var(--ak-surface));
+  text-align: left;
+  font: inherit;
+  overflow: hidden;
+  cursor: default;
+}
+button.ak-schedule__event { cursor: pointer; }
+.ak-schedule__event--ok { border-color: var(--ak-ok); background: color-mix(in oklab, var(--ak-ok) 16%, var(--ak-surface)); }
+.ak-schedule__event--warn { border-color: var(--ak-warn); background: color-mix(in oklab, var(--ak-warn) 18%, var(--ak-surface)); }
+.ak-schedule__event--err { border-color: var(--ak-err); background: color-mix(in oklab, var(--ak-err) 16%, var(--ak-surface)); }
+.ak-schedule__eventname {
+  font-size: var(--ak-text-fine);
+  font-weight: 650;
+  color: var(--ak-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ak-schedule__eventtime { font-size: 0.68rem; color: var(--ak-ink-dim); font-variant-numeric: tabular-nums; }
+.ak-schedule__event--enter { opacity: 0; animation: ak-band-in calc(var(--ak-motion) * 1.6) var(--ak-ease) forwards; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ak-kanban__card--enter, .ak-plan__span--enter, .ak-schedule__event--enter { animation: none; opacity: 1; }
+}

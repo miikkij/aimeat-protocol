@@ -6,7 +6,10 @@
  *
  *     orb    a signature object — the app's mark given mass, turning under the hand;
  *     sky    the procedural sky with a sun — an atmosphere band for a front or a story;
- *     bars   data as terrain — the bound rows stand up as a field of columns, the 3D chart.
+ *     bars   data as terrain — the bound rows stand up as a field of columns, the 3D chart;
+ *     model  any .glb/.gltf by URL — fitted, grounded and studio-lit like a product shot;
+ *     globe  the earth as a graticule sphere — points at real places, data travelling
+ *            between them as lifted arcs (federation, members, deliveries).
  *
  *   THE KIT'S PHYSICS HOLD IN 3D: every colour is read from the look's --ak-* tokens at mount
  *   (a palette or theme change re-reads on set()), the entrance is finite, and the render loop
@@ -17,6 +20,8 @@
  * @structure scene3d(spec) → { el, set, destroy }
  * @usage  AIMEAT.atelier.scene3d({ target: host, kind: 'bars', data: { items: rows } });
  * @version-history
+ *   v0.36.0 — 2026-08-30 — kind "globe": the abstract earth — a graticule sphere, points at
+ *     lat/lon, routes as lifted arcs — on the base bundle alone (no loaders, no new library).
  *   v0.35.0 — 2026-08-29 — kind "model": any .glb/.gltf by URL — fitted whole, grounded on a
  *     soft shadow disc, lit by a real studio environment (GLTFLoader + RoomEnvironment ride
  *     the companion bundle /lib/three-world-loaders@1.min.js), turning under the hand.
@@ -91,14 +96,16 @@ function easeOut(x) { return 1 - Math.pow(1 - x, 3); }
 /**
  * The 3D scene.
  * @param {{
- *   target?: string|Element, kind?: 'orb'|'sky'|'bars'|'model',
- *   data?: { items?: Array<{ label?: string, value: number }>, url?: string }|null,
+ *   target?: string|Element, kind?: 'orb'|'sky'|'bars'|'model'|'globe',
+ *   data?: { items?: Array<{ label?: string, value: number }>, url?: string,
+ *            points?: Array<{ lat: number, lon: number, label?: string }>,
+ *            routes?: Array<{ from: [number, number], to: [number, number] }> }|null,
  *   title?: string, empty?: { title?: string, hint?: string },
  * }} spec
  * @returns {{ el: HTMLElement, set: (patch: { data?: object|null }) => void, destroy: () => void }}
  */
 export function scene3d(spec) {
-  const kind = ['sky', 'bars', 'model'].indexOf(spec.kind) >= 0 ? spec.kind : 'orb';
+  const kind = ['sky', 'bars', 'model', 'globe'].indexOf(spec.kind) >= 0 ? spec.kind : 'orb';
   const root = el('figure', { class: 'ak-root ak-scene', 'data-ak-scene': kind });
   if (spec.target) resolve(spec.target).appendChild(root);
   if (spec.title) root.appendChild(el('figcaption', { class: 'ak-scene__title' }, spec.title));
@@ -150,7 +157,7 @@ function buildWorld(THREE, stage, kind, spec, root) {
   const controls = new THREE.Addons.OrbitControls(camera, renderer.domElement);
   controls.enableDamping = !reducedMotion();
   controls.enablePan = false;
-  controls.enableZoom = kind === 'bars' || kind === 'model';
+  controls.enableZoom = kind === 'bars' || kind === 'model' || kind === 'globe';
   if (kind === 'sky') { controls.enableZoom = false; controls.rotateSpeed = -0.35; }
   if (kind === 'model') {
     // The showcase spins like a product on a table: PBR needs a real environment, so the
@@ -227,7 +234,10 @@ function buildWorld(THREE, stage, kind, spec, root) {
       controls.update();
       return;
     }
-    if (kind === 'sky') {
+    if (kind === 'globe') {
+      camera.position.set(0, 2.4, 8.4);
+      controls.target.set(0, 0, 0);
+    } else if (kind === 'sky') {
       // A look-around: the target sits up and away, so the gaze rests on the sky, not the haze.
       camera.position.set(0, 2, 0.5);
       controls.target.set(0, 16, -22);
@@ -306,7 +316,79 @@ function buildWorld(THREE, stage, kind, spec, root) {
       return; // the loader's callback finishes the build
     }
 
-    if (kind === 'sky') {
+    if (kind === 'globe') {
+      // THE ABSTRACT EARTH: a graticule sphere in the theme's own colours, points at real
+      // places, routes as lifted arcs. Deliberately no landmass — this is the data's globe.
+      const R = 3;
+      const accentC = new THREE.Color(accent);
+      const inkC = new THREE.Color(ink);
+      const surfaceC = new THREE.Color(surface);
+      // The lights live in `group`, the earth in `ball`: the data-facing turn below rotates
+      // the BALL only, so the sun keeps shining from the front whatever the data's centre.
+      const ball = new THREE.Group();
+      group.add(ball);
+      ball.add(new THREE.Mesh(
+        new THREE.SphereGeometry(R - 0.02, 48, 32),
+        new THREE.MeshStandardMaterial({ color: surfaceC.clone().lerp(inkC, 0.05), roughness: 0.9, metalness: 0.02 })
+      ));
+      // The atmosphere: a back-face rim in the accent, so the ball sits in space instead of
+      // floating as a flat grey circle on the card.
+      ball.add(new THREE.Mesh(
+        new THREE.SphereGeometry(R * 1.045, 48, 32),
+        new THREE.MeshBasicMaterial({ color: accentC, transparent: true, opacity: 0.16, side: THREE.BackSide, depthWrite: false })
+      ));
+      const gratMat = new THREE.LineBasicMaterial({ color: inkC, transparent: true, opacity: 0.22 });
+      const toV = function (lat, lon, r) {
+        return new THREE.Vector3().setFromSphericalCoords(
+          r || R, THREE.MathUtils.degToRad(90 - lat), THREE.MathUtils.degToRad(lon + 180));
+      };
+      for (let lat = -60; lat <= 60; lat += 20) {
+        const pts = [];
+        for (let lon = 0; lon <= 360; lon += 6) pts.push(toV(lat, lon));
+        ball.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), gratMat));
+      }
+      for (let lon = 0; lon < 360; lon += 20) {
+        const pts = [];
+        for (let lat = -90; lat <= 90; lat += 6) pts.push(toV(lat, lon));
+        ball.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), gratMat));
+      }
+      const points = (data && Array.isArray(data.points) ? data.points : [])
+        .filter(function (p) { return p && typeof p.lat === 'number' && typeof p.lon === 'number'; });
+      const dotGeo = new THREE.SphereGeometry(0.085, 12, 8);
+      const dotMat = new THREE.MeshBasicMaterial({ color: accentC });
+      for (const p of points) {
+        const dot = new THREE.Mesh(dotGeo, dotMat);
+        dot.position.copy(toV(p.lat, p.lon, R + 0.02));
+        ball.add(dot);
+      }
+      const routes = (data && Array.isArray(data.routes) ? data.routes : [])
+        .filter(function (r2) { return r2 && Array.isArray(r2.from) && Array.isArray(r2.to); });
+      const arcMat = new THREE.MeshBasicMaterial({ color: accentC, transparent: true, opacity: 0.7 });
+      for (const r2 of routes) {
+        const a = toV(Number(r2.from[0]) || 0, Number(r2.from[1]) || 0, R + 0.02);
+        const b = toV(Number(r2.to[0]) || 0, Number(r2.to[1]) || 0, R + 0.02);
+        const sum = a.clone().add(b);
+        if (sum.lengthSq() < 1e-6) sum.set(0, R, 0); // antipodes: lift the arc over a pole
+        const lift = R + 0.25 + a.distanceTo(b) * 0.3;
+        const mid = sum.normalize().multiplyScalar(lift);
+        const curve = new THREE.QuadraticBezierCurve3(a, mid, b);
+        ball.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 40, 0.025, 6, false), arcMat));
+      }
+      // Face the data: turn the globe so the points' centre looks at the camera, instead of
+      // greeting the viewer with whichever hemisphere the maths happened to leave in front.
+      const centre = new THREE.Vector3();
+      for (const p of points) centre.add(toV(p.lat, p.lon, 1));
+      for (const r2 of routes) {
+        centre.add(toV(Number(r2.from[0]) || 0, Number(r2.from[1]) || 0, 1));
+        centre.add(toV(Number(r2.to[0]) || 0, Number(r2.to[1]) || 0, 1));
+      }
+      const baseY = centre.lengthSq() > 1e-6 ? -Math.atan2(centre.x, centre.z) : 0;
+      ball.rotation.y = baseY;
+      applyEntrance = function (p) {
+        ball.rotation.y = baseY + (1 - p) * 1.4;
+        ball.scale.setScalar(0.6 + 0.4 * p);
+      };
+    } else if (kind === 'sky') {
       const sky = new THREE.Addons.Sky();
       sky.scale.setScalar(300);
       group.add(sky);
