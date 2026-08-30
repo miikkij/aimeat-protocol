@@ -27,6 +27,9 @@
  *   import { workflowsRouter } from './routes/workflows.js';
  *   app.use(workflowsRouter(config, storage));
  * @version-history
+ *   v1.2.0 — 2026-08-30 — A signals-only check is not a run: the run list and the health leave it
+ *     out unless asked (?include=checks | ?only=checks); GET /:id/preflight answers the confirmation
+ *     before a run (agents, steps already satisfied, the longest timeout chain, the last run, vars).
  *   v1.1.0 — 2026-07-16 — Human-in-the-loop: GET /pending-inputs (registered BEFORE /:id — Express
  *     param order) + POST .../steps/:stepId/answer → engine.onHumanAnswer (409 when not parked).
  *   v1.0.1 — 2026-06-28 — Doc: the engine + runs have shipped (POST /:id/run + cancel + health); corrected
@@ -50,6 +53,7 @@ import {
   listRuns, getRun, validateWorkflow, buildBlueprint,
 } from '../services/workflow/store.js';
 import { syncWorkflowTriggers, removeWorkflowTriggers } from '../services/workflow/lifecycle.js';
+import { preflightWorkflow } from '../services/workflow/preflight.js';
 import { HUMAN_TIMEOUT_MIN_DEFAULT } from '../services/workflow/engine.js';
 import { WorkflowHumanAnswerSchema, type WorkflowDef, type WorkflowRun } from '../models/workflow-schemas.js';
 
@@ -222,7 +226,8 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
     // see: it is where `<run-date>` became a concrete date, and a wrong date there is the difference
     // between a run that publishes and one that greens every step against yesterday's output.
     if (mode === 'signals-only') {
-      const run = (await listRuns(storage, ownerGhiiOf(req), id)).find(r => r.runId === result.runId);
+      // By id: the run list leaves checks out, and this is a check.
+      const run = await getRun(storage, ownerGhiiOf(req), id, result.runId);
       if (run) {
         res.json(success(config.nodeId, {
           runId: result.runId, mode, status: run.status, vars: run.vars,
@@ -308,11 +313,28 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
     res.json(success(config.nodeId, buildBlueprint(def, v.resolved)));
   });
 
-  // GET /v1/workflows/:id/runs — list runs (empty until the engine writes them in Phase 4).
+  // GET /v1/workflows/:id/runs — the runs, newest first. A signals-only check is not a run and is
+  // left out; ?include=checks lists both (each record says its mode), ?only=checks the checks alone.
   router.get('/v1/workflows/:id/runs', requireAuth(), requireScope('workflow:read'), async (req: Request, res: Response) => {
     const id = req.params.id as string;
-    const runs = await listRuns(storage, ownerGhiiOf(req), id);
-    res.json(success(config.nodeId, { runs, count: runs.length }));
+    const checks = req.query.only === 'checks' ? 'only' : String(req.query.include ?? '').split(',').includes('checks') ? 'include' : 'exclude';
+    const runs = await listRuns(storage, ownerGhiiOf(req), id, { checks });
+    res.json(success(config.nodeId, { runs, count: runs.length, checks }));
+  });
+
+  // GET /v1/workflows/:id/preflight — what a run would do now: the agents it dispatches, the steps
+  // already satisfied in memory (skipped when skip_done is on), the longest timeout chain, the last
+  // run and the resolved variables. Reads memory the way a check does; persists nothing.
+  router.get('/v1/workflows/:id/preflight', requireAuth(), requireScope('workflow:read'), async (req: Request, res: Response) => {
+    const id = req.params.id as string;
+    const result = await preflightWorkflow({ storage, config, engine }, ownerGhiiOf(req), req.auth!.owner, id);
+    if (!result.ok) {
+      res.status(result.errors[0]?.endsWith('not found') ? 404 : 409).json(error(config.nodeId, 'WORKFLOW_STALE', 'This workflow cannot run as it is: one of its offers has changed or gone. Open it and pick a replacement.', undefined, { errors: result.errors }));
+      return;
+    }
+    res.json(success(config.nodeId, result.preflight, [
+      { description: 'Run it', method: 'POST', url: `/v1/workflows/${id}/run` },
+    ]));
   });
 
   // GET /v1/workflows/:id/runs/:runId — one run.

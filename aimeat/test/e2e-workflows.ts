@@ -16,6 +16,8 @@
  *     no-clobber guard: an earlier step's output survives a later step that shares its output glob.
  *   v1.4.0 — 2026-07-06 — skip_done: a fully-done re-run greens every step with no crew dispatch; with
  *     one output cleared, only that step re-runs (continue-from / re-run-one-step).
+ *   v1.5.0 — 2026-08-30 — A check is not a run: the run list and the health leave signals-only out
+ *     unless asked; GET /:id/preflight; the three workflow prompts for a person's own AI.
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -788,9 +790,62 @@ async function run() {
   await test('GET health reports per-step trend over runs', async () => {
     const { status, body } = await json('/v1/workflows/news/health', { headers: auth });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
-    assert(body.data.sample >= 3, `expected >=3 runs sampled, got ${body.data.sample}`);
+    assert(body.data.sample >= 1, `expected >=1 run sampled, got ${body.data.sample}`);
     const fetch = body.data.steps.find((s: any) => s.stepId === 'fetch');
     assert(fetch.green >= 1, 'fetch has at least one green run');
+  });
+
+  // ── a check is not a run (2026-08-30) ──
+  await test('a signals-only check is kept apart from the runs and the health', async () => {
+    // Before: the runs and the health as they stand.
+    const before = await json('/v1/workflows/news/runs', { headers: auth });
+    const healthBefore = await json('/v1/workflows/news/health', { headers: auth });
+    assert(before.status === 200 && before.body.data.checks === 'exclude', `runs default: ${before.status} ${JSON.stringify(before.body.data?.checks)}`);
+    assert(before.body.data.runs.every((r: any) => r.mode !== 'signals-only'), 'the default run list carries no check');
+    // A check.
+    const check = await json('/v1/workflows/news/run', { method: 'POST', headers: auth, body: JSON.stringify({ mode: 'signals-only' }) });
+    assert(check.status === 200, `check: ${check.status}`);
+    // After: the run list and the health did not move; the check is there when asked for.
+    const after = await json('/v1/workflows/news/runs', { headers: auth });
+    assert(after.body.data.count === before.body.data.count, `a check joined the run list: ${before.body.data.count} → ${after.body.data.count}`);
+    const healthAfter = await json('/v1/workflows/news/health', { headers: auth });
+    assert(healthAfter.body.data.sample === healthBefore.body.data.sample, `a check moved the health sample: ${healthBefore.body.data.sample} → ${healthAfter.body.data.sample}`);
+    const both = await json('/v1/workflows/news/runs?include=checks', { headers: auth });
+    assert(both.body.data.runs.some((r: any) => r.runId === check.body.data.runId), 'include=checks lists the check');
+    const only = await json('/v1/workflows/news/runs?only=checks', { headers: auth });
+    assert(only.body.data.runs.length > 0 && only.body.data.runs.every((r: any) => r.mode === 'signals-only'), 'only=checks lists checks alone');
+    // The check itself is still readable on its own address.
+    const one = await json(`/v1/workflows/news/runs/${check.body.data.runId}`, { headers: auth });
+    assert(one.status === 200 && one.body.data.mode === 'signals-only', 'a check reads back by id');
+  });
+
+  await test('GET preflight says what a run would do now, and persists nothing', async () => {
+    const before = await json('/v1/workflows/news/runs?include=checks', { headers: auth });
+    const { status, body } = await json('/v1/workflows/news/preflight', { headers: auth });
+    assert(status === 200, `preflight: ${status} ${JSON.stringify(body)}`);
+    const p = body.data;
+    assert(Array.isArray(p.steps) && p.steps.length === 2, `two steps, got ${JSON.stringify(p.steps)}`);
+    assert(p.steps.every((s: any) => ['green', 'input-red', 'output-red'].includes(s.now)), 'every step says what memory holds now');
+    assert(Array.isArray(p.agents) && p.agents.includes(agentName), `the agents a run dispatches: ${JSON.stringify(p.agents)}`);
+    assert(typeof p.maxMinutes === 'number' && p.maxMinutes >= 10, `the longest timeout chain: ${p.maxMinutes}`);
+    assert(typeof p.vars?.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(p.vars.date), `the resolved run date: ${JSON.stringify(p.vars)}`);
+    assert(p.lastRun && typeof p.lastRun.status === 'string', 'the last real run rides along');
+    const after = await json('/v1/workflows/news/runs?include=checks', { headers: auth });
+    assert(after.body.data.count === before.body.data.count, 'a preflight left no record behind');
+  });
+
+  await test('the three prompts for a person\'s own AI are served with the owner and the workflow filled in', async () => {
+    const improve = await json('/v1/templates/workflow-improve-mcp?id=news', { headers: auth });
+    assert(improve.status === 200, `improve: ${improve.status} ${JSON.stringify(improve.body)}`);
+    assert(improve.body.data.prompt.includes('news') && improve.body.data.prompt.includes(ownerName), 'the improve prompt names the workflow and the owner');
+    const missing = await json('/v1/templates/workflow-improve-mcp', { headers: auth });
+    assert(missing.status === 400, `improve without an id: expected 400, got ${missing.status}`);
+    const create = await json('/v1/templates/workflow-create-mcp', { headers: auth });
+    assert(create.status === 200 && create.body.data.prompt.includes('aimeat_workflow_save'), 'the create prompt names the save tool');
+    const chat = await json('/v1/templates/workflow-create-chat', { headers: auth });
+    assert(chat.status === 200, `chat: ${chat.status}`);
+    assert(chat.body.data.prompt.includes(`${agentName} · fetch`), `the chat prompt lists the owner's offers: ${chat.body.data.prompt.slice(0, 200)}`);
+    assert(!chat.body.data.prompt.includes('{{agents_and_offers}}'), 'no placeholder left in the chat prompt');
   });
 
   // ── the scope words on the workflow doors ──

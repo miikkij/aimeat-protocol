@@ -5,6 +5,8 @@
  * @description Schedule, workflow, task lifecycle, and agent memory (read/write/list/search) tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.2.0 — 2026-08-30 — aimeat_workflow_run and _get say that a signals-only check is not a run:
+ *     it costs nothing and is kept apart from the run history and the health.
  *   v1.1.0 — 2026-08-14 — aimeat_task_create gains `scope`: the named parameters a receiving
  *     runner dispatches on, which the tool had no way to send.
  *   v1.0.0 — 2026-07-13 — Extracted from definitions.ts (pure extraction; no behavior change).
@@ -91,14 +93,14 @@ export const schedulesTasksMemoryTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_workflow_get',
-        description: 'Inspect workflows. Omit id to list all your workflows; pass an id for its definition + the derived blueprint (the whole input→output flow + the memory keys each step touches) + recent runs. Use before editing or running, and to read a run\'s outcome.',
+        description: 'Inspect workflows. Omit id to list all your workflows; pass an id for its definition + the derived blueprint (the whole input→output flow + the memory keys each step touches) + recent runs. The recent runs are the ones that dispatched agents; a signals-only check is not a run and is not listed among them. Use before editing or running, and to read a run\'s outcome.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: { id: { type: 'string', description: 'Omit to list; pass for one workflow\'s detail.' } },
     },
     {
         name: 'aimeat_workflow_run',
-        description: 'Run a workflow. mode="signals-only" evaluates every step\'s signals against existing memory with NO dispatch (an instant health check — returns each step\'s verdict inline); mode="full" executes the steps live (dispatches the agent tasks; poll aimeat_workflow_get for progress). Use signals-only to validate a workflow or check a past run cheaply before a full run.',
+        description: 'Run a workflow. mode="signals-only" is a CHECK: it evaluates every step\'s signals against existing memory with NO dispatch, costs nothing, returns each step\'s verdict inline, and is kept apart from the runs (it does not appear in the run history or the health); mode="full" executes the steps live (dispatches the agent tasks, which takes time and spends their budget; poll aimeat_workflow_get for progress). Use signals-only to validate a workflow or to see what is already in memory before a full run.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {

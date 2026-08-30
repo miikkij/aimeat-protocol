@@ -625,7 +625,8 @@ export class WorkflowEngine {
 
   // ── helpers ──────────────────────────────────────────────────────────────────────
 
-  private resolveVars(def: WorkflowDef, overrides: Record<string, string> | undefined, runId: string): Record<string, string> {
+  /** Public since 2026-08-30: preflight.ts resolves the same vars a run would, without starting one. */
+  resolveVars(def: WorkflowDef, overrides: Record<string, string> | undefined, runId: string): Record<string, string> {
     // The run date belongs to the zone the SCHEDULE is in, not the server's — see runDateIn(), which
     // carries the why. Only a schedule trigger has a zone; manual/event runs stay on UTC as before.
     const today = runDateIn(def.trigger.kind === 'schedule' ? def.trigger.timezone : undefined);

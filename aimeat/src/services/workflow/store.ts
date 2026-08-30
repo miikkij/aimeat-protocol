@@ -28,6 +28,8 @@
  *   v1.5.0 — 2026-07-16 — human-input steps: validation (no retry, on_timeout='default' needs a valid
  *     default_option) + synthesized resolved entry (success_signal = nonempty(answer_to_key),
  *     deliverableKey = answer_to_key) so fresh/skip_done/signals-only/blueprint compose unchanged.
+ *   v1.6.0 — 2026-08-30 — listRuns leaves the checks (signals-only) out by default; `checks:
+ *     'include' | 'only'` for the callers that want them. A check is not a run.
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
@@ -110,15 +112,16 @@ export function detectCycle(steps: Pick<WorkflowStep, 'id' | 'after'>[]): string
 
 // ── offer resolution ───────────────────────────────────────────────────────────
 
-interface OfferLite {
+export interface OfferLite {
   id: string;
+  title?: unknown;
   success_signal?: Signal;
   required_to_function?: Signal;
   deliverable?: { location?: { key?: string; space?: string; url?: string } };
 }
 
 /** Read one agent's published offers (stored under the agent's GAII as `agents.<name>.offers`). */
-async function readAgentOffers(storage: Storage, config: AimeatConfig, ownerName: string, agentName: string): Promise<OfferLite[]> {
+export async function readAgentOffers(storage: Storage, config: AimeatConfig, ownerName: string, agentName: string): Promise<OfferLite[]> {
   const gaii = buildGAII(agentName, ownerName, config.nodeId);
   const rec = await storage.getMemory(gaii, `agents.${agentName}.offers`);
   const offers = (rec?.value as { offers?: OfferLite[] } | undefined)?.offers;
@@ -416,9 +419,23 @@ export async function deleteWorkflow(storage: Storage, ownerGhii: string, id: st
   return true;
 }
 
-export async function listRuns(storage: Storage, ownerGhii: string, id: string): Promise<WorkflowRun[]> {
+/** A signals-only run is a CHECK: it reads memory and dispatches nothing. It is kept, but it is not a run. */
+export const isCheckRun = (run: Pick<WorkflowRun, 'mode'>): boolean => run.mode === 'signals-only';
+
+/**
+ * The runs of one workflow, newest first. By default the checks (signals-only) are left out: a
+ * check reads what is in memory now and dispatches nothing, so it says nothing about whether the
+ * workflow produces, and until 2026-08-30 sixty-one of them sat in one production workflow's
+ * history and its health beside twenty real runs. `checks: 'include'` returns both, 'only' the checks.
+ */
+export async function listRuns(
+  storage: Storage, ownerGhii: string, id: string,
+  opts: { checks?: 'exclude' | 'include' | 'only' } = {},
+): Promise<WorkflowRun[]> {
   const recs = await storage.listMemory(ownerGhii, { prefix: runKeyPrefix(id) });
+  const checks = opts.checks ?? 'exclude';
   return recs.map(r => r.value as WorkflowRun)
+    .filter(r => checks === 'include' || (checks === 'only') === isCheckRun(r))
     .sort((a, b) => (b.startedAt ?? '').localeCompare(a.startedAt ?? ''));
 }
 
