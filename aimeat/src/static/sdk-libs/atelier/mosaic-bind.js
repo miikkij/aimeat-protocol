@@ -25,7 +25,8 @@ export function patchFor(kind, data) {
   if (kind === 'table') return { rows: Array.isArray(data) ? data : (data && data.rows) || [] };
   if (kind === 'figure') return data && typeof data === 'object' ? data : { value: 0 };
   if (kind === 'chart' || kind === 'matrix' || kind === 'graph' || kind === 'waveform'
-    || kind === 'gauge' || kind === 'console' || kind === 'atlas' || kind === 'map' || kind === 'scene3d') {
+    || kind === 'gauge' || kind === 'console' || kind === 'atlas' || kind === 'map' || kind === 'scene3d'
+    || kind === 'kanban' || kind === 'plan' || kind === 'schedule') {
     return { data: data && typeof data === 'object' && !Array.isArray(data) ? data : null };
   }
   if (kind === 'health' || kind === 'queue') {

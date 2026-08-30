@@ -25,6 +25,8 @@
  * @usage
  *   import { UI_COMPONENTS, componentById, buildUiCatalogue } from './registry.js';
  * @version-history
+ *   v1.14.0 — 2026-08-30 — THE APPROVED EXPANSION (append-only): chart kinds funnel, treemap
+ *     and flow; the work-planning family kanban, plan and schedule; scene3d kind "globe".
  *   v1.13.0 — 2026-08-29 — The chart family grown to the approved level (stacked, horizontal,
  *     scatter, the note bubble, tooltips) and scene3d kind "model" (a loaded .glb shown like
  *     a product) — the Näyteikkuna canvas round, accepted by the developer.
@@ -215,12 +217,12 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
   },
   {
     id: 'chart',
-    summary: 'The whole chart family in one block, chosen by `kind`, drawn to the approved level (rounded sheened bars, smooth curves, a touch tooltip on every axes chart). axes (default): grouped bars, lines and soft-filled areas over one label axis — { labels, series: [{ id, label, kind: "bar"|"line"|"area", values }], stacked?: true (bars pile into one column), horizontal?: true (ranked things read sideways), note?: { label, text } (a story bubble on the one point that matters) }. donut: parts of a whole — { slices: [{ label, value }], delta?: { text, tone } } with the total and its change in the middle. calendar: days as a heat grid — { days: [{ date: "YYYY-MM-DD", value }] }, months named, the ramp explained. scatter: { points: [{ x, y, label? }], xLabel?, yLabel? } with an honest least-squares trend. Colours come from the look\'s own accent spectrum. presentation "mural" makes the chart the room instead of a tile.',
+    summary: 'The whole chart family in one block, chosen by `kind`, drawn to the approved level (rounded sheened bars, smooth curves, a touch tooltip on every axes chart). axes (default): grouped bars, lines and soft-filled areas over one label axis — { labels, series: [{ id, label, kind: "bar"|"line"|"area", values }], stacked?: true (bars pile into one column), horizontal?: true (ranked things read sideways), note?: { label, text } (a story bubble on the one point that matters) }. donut: parts of a whole — { slices: [{ label, value }], delta?: { text, tone } } with the total and its change in the middle. calendar: days as a heat grid — { days: [{ date: "YYYY-MM-DD", value }] }, months named, the ramp explained. scatter: { points: [{ x, y, label? }], xLabel?, yLabel? } with an honest least-squares trend. funnel: stages losing people — { steps: [{ label, value }] }, the survival rate written at each step. treemap: shares as area when the donut\'s slices would not fit — { items: [{ label, value }] }. flow: where the quantity went — { nodes: [{ id, label }], links: [{ from, to, value }] }, ribbons as wide as their sums. Colours come from the look\'s own accent spectrum. presentation "mural" makes the chart the room instead of a tile.',
     props: {
       source: source(),
       title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
       kind: {
-        type: 'enum', values: ['axes', 'donut', 'calendar', 'scatter'], default: 'axes',
+        type: 'enum', values: ['axes', 'donut', 'calendar', 'scatter', 'funnel', 'treemap', 'flow'], default: 'axes',
         description: 'The chart\'s shape — and the record shape the source must resolve to (see the summary).',
       },
       emptyTitle: text('What the empty state says.', 80),
@@ -314,6 +316,36 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
     },
   },
   {
+    id: 'kanban',
+    summary: 'Work as columns by state, a card per piece — the board every team tool wants (queue shows the same work as a LIST; this is the same data as lanes). The source resolves to ONE record: { columns: [{ id, label, tone? }], cards: [{ id, column, title, sub?, badge?, tone? }] }. In an app the builder may wire onMove so cards move — drag between columns, or arrow keys on a focused card — and the app is told; bound read-only, it is the honest picture of the board.',
+    props: {
+      source: source(),
+      title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
+      emptyTitle: text('What the empty state says.', 80),
+      emptyHint: text('The line under it.', 160),
+    },
+  },
+  {
+    id: 'plan',
+    summary: 'Stretches on a shared time axis — project phases, campaigns, leases: what is under way and how long still, with today drawn as a line through everything (timeline tells what HAPPENED; this tells what is RUNNING). The source resolves to ONE record: { rows: [{ label, spans: [{ from: "YYYY-MM-DD", to, label?, tone? }] }], start?, end?, today? }. Months name themselves along the top.',
+    props: {
+      source: source(),
+      title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
+      emptyTitle: text('What the empty state says.', 80),
+      emptyHint: text('The line under it.', 160),
+    },
+  },
+  {
+    id: 'schedule',
+    summary: 'A week as a grid, bookings as blocks — appointments, rooms, shifts: next week at a glance, where chart kind "calendar" shows the year at a distance. The source resolves to ONE record: { days?: string[] (column names, up to 7), from?: "HH:MM", to?: "HH:MM", events: [{ day (column index), from, to, label, sub?, tone? }] }. The hour scale sizes itself to the events when from/to are omitted.',
+    props: {
+      source: source(),
+      title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
+      emptyTitle: text('What the empty state says.', 80),
+      emptyHint: text('The line under it.', 160),
+    },
+  },
+  {
     id: 'map',
     summary: 'The REAL map: Leaflet over OpenStreetMap street tiles (the node serves Leaflet; the tiles carry their required attribution). The source resolves to ONE record: { markers: [{ label?, lon, lat, tone? }], center?: { lon, lat }, zoom? }. Two or more markers frame themselves; one centres on itself. Pins and popups ride the look\'s tokens, dark mode re-tones the tiles. When the owner says "a map", this is the block — the atlas is the offline country choropleth for data-by-country.',
     props: {
@@ -326,9 +358,9 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
   },
   {
     id: 'scene3d',
-    summary: 'Real depth: a 3D band on the node\'s own three-world bundle (lazy-loaded, ~745 kB, so use it as the ONE showpiece a screen gets). kind "orb" is a signature object turning under the hand; "sky" is a procedural atmosphere band; "bars" stands the bound rows up as a field of columns — the 3D chart, source rows { label?, value }. Colours come from the look\'s tokens and the render loop stops at rest, so an idle scene costs nothing.',
+    summary: 'Real depth: a 3D band on the node\'s own three-world bundle (lazy-loaded, ~745 kB, so use it as the ONE showpiece a screen gets). kind "orb" is a signature object turning under the hand; "sky" is a procedural atmosphere band; "bars" stands the bound rows up as a field of columns — the 3D chart, source rows { label?, value }; "model" shows a loaded .glb/.gltf like a product shot; "globe" is the earth with places as dots and data travelling as lifted arcs. Colours come from the look\'s tokens and the render loop stops at rest, so an idle scene costs nothing.',
     props: {
-      kind: { type: 'enum', values: ['orb', 'sky', 'bars', 'model'], default: 'orb', description: 'What the scene is: a signature object, an atmosphere band, data as terrain, or a loaded 3D model shown like a product (kind "model": the source resolves to { url } — a .glb/.gltf address; it is fitted, grounded and studio-lit for you).' },
+      kind: { type: 'enum', values: ['orb', 'sky', 'bars', 'model', 'globe'], default: 'orb', description: 'What the scene is: a signature object, an atmosphere band, data as terrain, a loaded 3D model shown like a product (kind "model": the source resolves to { url } — a .glb/.gltf address; it is fitted, grounded and studio-lit for you), or the earth (kind "globe": the source resolves to { points: [{ lat, lon, label? }], routes: [{ from: [lat, lon], to: [lat, lon] }] } — places as dots, data travelling as lifted arcs).' },
       source: {
         type: 'string', maxLength: 120,
         description: 'For kind "bars": the data binding the app resolves to rows of { label?, value }. Omit for orb and sky.',
