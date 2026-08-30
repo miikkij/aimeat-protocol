@@ -73,6 +73,14 @@ export function registerCoreHandlers(
     await runComplianceMonthlyReport(config, storage);
   });
 
+  // The AI-job day logs. A finished job folds into ai.jobs.log.<day> and its live key is deleted;
+  // this is what stops the day records themselves accumulating for ever. Without it the fold would
+  // trade one ceiling problem for a slower one.
+  scheduler.registerCoreHandler('ai-job-log-prune', async () => {
+    const { runAiJobLogPrune } = await import('./ai-jobs/prune-job.js');
+    await runAiJobLogPrune(config, storage);
+  });
+
   scheduler.registerCoreHandler('capability-aggregation', async () => {
     const { runCapabilityAggregation } = await import('./capability-aggregator.js');
     await runCapabilityAggregation(config, storage);

@@ -33,6 +33,9 @@
  *     logLabel: 'scheduler',
  *   });
  * @version-history
+ *   v1.1.0 -- 2026-08-31 -- Optional `ai`, so a job's on_done callback can start the next job in its
+ *     chain. Handed in rather than built here: which job is being continued is knowable only to the
+ *     caller, and a continuation that did not know its parent could not report that the chain broke.
  *   v1.0.0 -- 2026-08-15 -- TARGET-063 A3: extracted from services/scheduler-extension-job.ts when
  *     the workflow engine gained an `extension` step and would otherwise have grown the second copy.
  */
@@ -87,6 +90,12 @@ export interface SystemRunArgs {
     producerSchedule?: string;
     /** Wrap the context in memory-access tracking and return the reads/writes (the scheduler logs them). */
     trackMemory?: boolean;
+    /**
+     * Background AI jobs, when this road can offer them. Passed in rather than built here because
+     * the CHAIN matters: an action fired as a job's `on_done` starts its next job as a continuation
+     * of that job, and only the caller knows which job it is continuing.
+     */
+    ai?: ExtensionCtx['ai'];
 }
 
 export interface SystemRunResult {
@@ -163,6 +172,7 @@ export async function runExtensionActionAsSystem(deps: SystemRunDeps, args: Syst
                 ...(args.producerSchedule ? { schedule: args.producerSchedule } : {}),
             },
         }),
+        ...(args.ai ? { ai: args.ai } : {}),
         notify: buildExtensionNotify({
             storage, config, extName: ext.name,
             recipientGaii: ownerName, recipientOwner: ownerName,

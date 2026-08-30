@@ -36,6 +36,8 @@ export async function seedCoreScheduledJobs(config: AimeatConfig, storage: Stora
     { id: 'core:board-post-ttl-cleanup', name: 'Board Post TTL Cleanup', coreHandler: 'board-post-ttl-cleanup', cron: '*/10 * * * *' },
     { id: 'core:dispute-timeout', name: 'Dispute Auto-Escalation', coreHandler: 'dispute-timeout', cron: '0 * * * *' },
     { id: 'core:execution-log-prune', name: 'Execution Log Prune', coreHandler: 'execution-log-prune', cron: '0 3 * * *' },
+    // The AI-job day logs, pruned to the retention window. 03:10, after the execution-log prune.
+    { id: 'core:ai-job-log-prune', name: 'AI Job Log Prune', coreHandler: 'ai-job-log-prune', cron: '10 3 * * *' },
     { id: 'core:designbook-aging', name: 'Design Book Aging', coreHandler: 'designbook-aging', cron: '0 5 * * *' },
     // Mark still-pending email invitations expired once their TTL passes (lazy checks also enforce this).
     { id: 'core:invitation-expiry', name: 'Invitation Expiry', coreHandler: 'invitation-expiry', cron: '*/10 * * * *' },

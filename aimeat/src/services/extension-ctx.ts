@@ -27,6 +27,10 @@
  *   const ctx = buildExtensionCtx({ config, storage, extMemoryOwner, caller, extConfig, log, files });
  *   await executeExtensionAction(script, ctx, …);
  * @version-history
+ *   v1.4.0 — 2026-08-31 — `ai` joins the optional capabilities, with one condition the others do not
+ *     have: it is attached ONLY alongside `extension`. A background job is billed to the installer,
+ *     and `deps.extension` is the only server-resolved answer to who that is, so a road that cannot
+ *     name the record gets no ctx.ai rather than one that guesses whose money to spend.
  *   v1.3.0 — 2026-08-23 — Carries `extension: { name, owner }` through to the sandbox so an
  *     owner-only action can exist. Every road that knows the record passes it; a road that does not
  *     leaves it absent, and a script must read that as "not the owner" rather than as permission.
@@ -78,6 +82,9 @@ export interface ExtensionCtxDeps {
     files?: ExtensionCtx['files'];
     datapackage?: ExtensionCtx['datapackage'];
     buy?: ExtensionCtx['buy'];
+    /** Background model calls. Offered only where `extension` is known, because the job is billed to
+     *  the INSTALLER and a road that cannot name the record cannot say who pays. */
+    ai?: ExtensionCtx['ai'];
     notify?: ExtensionCtx['notify'];
     email?: ExtensionCtx['email'];
 }
@@ -496,6 +503,10 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
     if (deps.files) ctx.files = deps.files;
     if (deps.datapackage) ctx.datapackage = deps.datapackage;
     if (deps.buy) ctx.buy = deps.buy;
+    // Never without `extension`: the job is billed to the installer, and `deps.extension` is the only
+    // server-resolved answer to who that is. A road that omits the record gets no ctx.ai rather than
+    // one that guesses.
+    if (deps.ai && deps.extension) ctx.ai = deps.ai;
     if (deps.notify) ctx.notify = deps.notify;
     if (deps.email) ctx.email = deps.email;
 

@@ -45,6 +45,7 @@ import { agentMessagingTools } from './definitions/agent-messaging.js';
 import { crewTools } from './definitions/crew.js';
 import { companyTools } from './definitions/companies.js';
 import { schedulesTasksMemoryTools } from './definitions/schedules-tasks-memory.js';
+import { aiJobTools } from './definitions/ai-jobs.js';
 import { discoveryWorkBoardsTools } from './definitions/discovery-work-boards.js';
 import { capabilitiesGroupsSkillsTools } from './definitions/capabilities-groups-skills.js';
 import { organismsWorkspacesAppsTools } from './definitions/organisms-workspaces-apps.js';
@@ -63,6 +64,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     ...agentMessagingTools,
     ...crewTools,
     ...schedulesTasksMemoryTools,
+    ...aiJobTools,
     ...discoveryWorkBoardsTools,
     ...capabilitiesGroupsSkillsTools,
     ...organismsWorkspacesAppsTools,
