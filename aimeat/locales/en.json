@@ -8832,7 +8832,7 @@
     "chatSessions": {
       "title": "Chat Sessions",
       "desc": "Chat sessions represent AI tools you use directly: like Claude, ChatGPT, Grok, or Copilot. Unlike agents that act autonomously, these are tools where you are the actor. Each session inherits your trust score and morsel balance.",
-      "empty": "No active chat sessions.",
+      "empty": "Nothing here yet. A tool appears once it has connected and said what it is.",
       "loading": "Loading chat sessions...",
       "error": "Could not load chat sessions.",
       "lastSeen": "Last Seen",
@@ -8853,7 +8853,8 @@
       "createHint": "Quick Prompt works with AIs that can browse the web. Detailed Prompt includes full connection instructions for any AI.",
       "promptCopied": "Prompt copied to clipboard",
       "promptError": "Could not load prompt template",
-      "activeSessions": "Active Sessions",
+      "startedByYou": "Started by you",
+      "startedByYouDesc": "These are tools that run on your own machine and come here when you start them. They do not act on their own the way your other agents do.",
       "mcpHint": "You can also connect AI assistants via MCP in the developer portal.",
       "mcpHintLink": "Set up MCP connection →"
     },

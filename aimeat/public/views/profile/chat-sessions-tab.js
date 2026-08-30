@@ -11,6 +11,10 @@
  *   v1.2.0 — 2026-06-02 — Component unification (#1): "Copy GAII" uses canonical
  *     <CopyButton> (toast preserved); prompt-copy routed through shared copyToClipboard
  *     (insecure-context fallback) instead of raw navigator.clipboard.
+ *   v1.3.0 — 2026-08-31 — The list is the owner's WORKSTATION agents, through the shared
+ *     listChatSessions selector. It filtered on a `session-` name prefix here, which no MCP client
+ *     uses, so the tab meant for Claude Code and Claude Desktop showed none of them and they read as
+ *     ordinary autonomous agents everywhere else. The group says what these are: you start them.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -22,7 +26,7 @@ import { escHtml, timeAgo, copyToClipboard } from '/js/utils.js';
 import { Spinner } from './shared.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { useConfirm } from '/components/Modal.js';
-import { listAgents, deleteAgent } from '/js/services/agents.js';
+import { listChatSessions, deleteAgent } from '/js/services/agents.js';
 import { apiGet } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -35,8 +39,7 @@ export default function ChatSessionsTab({ session, showToast, onStats }) {
 
   const loadData = useCallback(async () => {
     try {
-      const agents = await listAgents(session.owner);
-      const sessions = agents.filter(a => a.owner === session.owner && a.name?.startsWith('session-'));
+      const sessions = await listChatSessions(session.owner);
       setChatSessions(sessions);
       onStats?.({ chatSessions: sessions.length });
     } catch (err) { swallowed('chat-sessions-tab', err); setChatSessions([]); }
@@ -122,7 +125,8 @@ export default function ChatSessionsTab({ session, showToast, onStats }) {
     ${chatSessions.length === 0
       ? html`<div class="empty">${t('profile.chatSessions.empty')}</div>`
       : html`
-        <div class="section-title cs-section-sub">${t('profile.chatSessions.activeSessions')}</div>
+        <div class="section-title cs-section-sub">${t('profile.chatSessions.startedByYou')}</div>
+        <div class="section-desc">${t('profile.chatSessions.startedByYouDesc')}</div>
         ${chatSessions.map(s => {
           const isExpanded = expanded === s.name;
           return html`

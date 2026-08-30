@@ -8820,7 +8820,7 @@
     "chatSessions": {
       "title": "Keskustelusessiot",
       "desc": "Keskustelusessiot edustavat AI-työkaluja joita käytät suoraan: kuten Claude, ChatGPT, Grok tai Copilot. Toisin kuin agentit jotka toimivat itsenäisesti, nämä ovat työkaluja joissa sinä olet toimija. Jokaisella sessiolla on luottamuspisteesi ja murusaldosi.",
-      "empty": "Ei aktiivisia keskustelusessioita.",
+      "empty": "Täällä ei ole vielä mitään. Työkalu ilmestyy tähän kun se on yhdistänyt ja kertonut mikä se on.",
       "loading": "Ladataan keskustelusessioita...",
       "error": "Keskustelusessioiden lataus epäonnistui.",
       "lastSeen": "Nähty viimeksi",
@@ -8841,7 +8841,8 @@
       "createHint": "Pikakehote toimii AI:lla jotka voivat selata verkkoa. Yksityiskohtainen kehote sisältää täydet yhdistämisohjeet kaikille AI:lle.",
       "promptCopied": "Kehote kopioitu leikepöydälle",
       "promptError": "Kehotteen lataus epäonnistui",
-      "activeSessions": "Aktiiviset sessiot",
+      "startedByYou": "Sinun käynnistämät",
+      "startedByYouDesc": "Nämä ovat omalla koneellasi ajettavia työkaluja, jotka käyvät täällä kun sinä käynnistät ne. Ne eivät toimi omin päin niin kuin muut agenttisi.",
       "mcpHint": "Voit yhdistää AI-assistentteja myös MCP:llä kehittäjäportaalissa.",
       "mcpHintLink": "Aseta MCP-yhteys →"
     },
