@@ -8,6 +8,12 @@
  *   selected item, group labels wear the sun, the node id sits on top in mono. Content surfaces
  *   map to global theme.css tokens so they flip with dark/light mode.
  * @version-history
+ *   v2.1.0 — 2026-08-31 — The frame stops scrolling away: .adm-main gives up its inert
+ *     overflow:auto (it was the nearest scrollport and swallowed every position:sticky inside
+ *     it while .page-content did the actual scrolling), the topbar and the Config tab's
+ *     search-and-save row pin to the top, the left index really sticks, and the pending
+ *     changes move from a fixed bottom overlay that covered the content into the pinned row,
+ *     with the old→new list behind a word.
  *   v2.0.0 — 2026-08-31 — The poster frame (design canvas "AIMEAT Hallinnan kehys", direction A):
  *     sidebar to ink with the sun on the active item, the indigo accent removed (the global coral
  *     flows in), cards become sections under a 3px ink rule, badges and chips go square and mono,
@@ -138,13 +144,21 @@
 .adm-nav-item.active .cnt { color: var(--on-sun); }
 .adm-sep { height: 1px; background: var(--sidebar-border); margin: 8px 16px; }
 
-/* Main area */
-.adm-main { flex: 1; padding: 24px 32px; overflow-y: auto; background: var(--bg-deep); }
+/* Main area. NO overflow of its own: .page-content above is the one scroll region, and an
+   overflow:auto here — even one that never actually scrolls — becomes the nearest scrollport
+   and quietly breaks every position:sticky inside (the left index, the pinned rows below). */
+.adm-main { flex: 1; padding: 0 32px 24px; background: var(--bg-deep); min-width: 0; }
+/* The page title and its refresh stay in sight wherever you are on a long page. */
 .adm-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: var(--bg-deep);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  padding: 16px 0 12px;
+  margin-bottom: 8px;
   flex-wrap: wrap;
   gap: 10px;
 }
@@ -457,14 +471,21 @@
 .adm-mint-result.bad { color: var(--danger-fg); }
 
 /* ── The Config tab in the poster face: search, the left index, the field rows ── */
-.adm-cfg-tools { display: flex; gap: 18px; align-items: center; margin: 4px 0 14px; flex-wrap: wrap; }
+/* Pinned right under the sticky topbar, and the save controls live IN it when something is
+   unsaved — nothing overlays the content you are editing. */
+.adm-cfg-tools { position: sticky; top: 62px; z-index: 39; background: var(--bg-deep); display: flex; gap: 18px; align-items: center; margin: 0 0 14px; padding: 2px 0 10px; flex-wrap: wrap; }
+.adm-cfg-pending-mini { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.adm-cfg-pending-mini strong { color: var(--accent); font-size: .85rem; }
+.adm-cfg-listbox { border: 3px dashed var(--accent); background: var(--glass-bg); padding: 10px 14px; margin: 0 0 14px; }
+.adm-cfg-listbox ul { margin: 0; padding-left: 18px; font-size: .8rem; max-height: 40vh; overflow-y: auto; }
+.adm-cfg-listbox li { margin: 2px 0; display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
 .adm-cfg-searchwrap { flex: 1; min-width: 280px; display: flex; align-items: center; gap: 10px; border-bottom: 3px solid var(--text); padding: 2px 2px 4px; }
 .adm-cfg-searchwrap svg { width: 16px; height: 16px; stroke: var(--text); fill: none; stroke-width: 2.5; flex: none; }
 .adm-cfg-searchwrap input { border: 0; background: none; outline: none; width: 100%; font-family: inherit; font-size: .95rem; font-weight: 600; color: var(--text); padding: 4px 0; }
 .adm-cfg-filter { background: none; border: 0; padding: 0 0 1px; cursor: pointer; font-family: inherit; font-weight: 800; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text); border-bottom: 2px solid var(--text); }
 .adm-cfg-filter.on { color: var(--accent); border-bottom-color: var(--accent); }
 .adm-cfg-body { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 0 36px; align-items: start; }
-.adm-cfg-rail { position: sticky; top: 10px; border-top: 3px solid var(--text); padding-top: 8px; max-height: calc(100dvh - 90px); overflow-y: auto; }
+.adm-cfg-rail { position: sticky; top: 122px; border-top: 3px solid var(--text); padding-top: 8px; max-height: calc(100dvh - 190px); overflow-y: auto; }
 .adm-cfg-rail .d { font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: .82rem; letter-spacing: var(--font-poster-tracking, .01em); text-transform: uppercase; color: var(--text); margin: 12px 0 3px; }
 .adm-cfg-rail .g { display: flex; justify-content: space-between; gap: 8px; width: 100%; background: none; border: 0; padding: 3px 0; font-family: inherit; font-size: .8rem; font-weight: 600; color: var(--text-dim); cursor: pointer; text-align: left; }
 .adm-cfg-rail .g:hover { color: var(--text); }
@@ -559,39 +580,9 @@
   border: 1px solid var(--warn-border);
   border-radius: 8px;
 }
-/* The pending bar follows the viewport, because the thing it reports — work that is not saved yet —
-   happens wherever you are on a page that is many screens long.
-   FIXED rather than sticky, and that was measured: the admin content sits inside `.adm-main`, which
-   has `overflow: auto` and is as tall as its content, so it is the nearest scrollport while the
-   actual scrolling happens in `.page-content` above it. A sticky bar therefore sticks to the top of
-   a box that itself scrolls away — measured at top: -1274px after one screen of scrolling, which is
-   the exact failure this bar exists to prevent. */
-.adm-cfg-pending {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 30;
-  margin-bottom: 0;
-  border-radius: 8px 8px 0 0;
-  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.18);
-}
-.adm-cfg-pending-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-.adm-cfg-pending-hint { font-size: .8rem; opacity: .85; }
-.adm-cfg-pending-actions { margin-left: auto; }
-.adm-cfg-pending-list {
-  margin: 8px 0 0;
-  padding-left: 18px;
-  font-size: .8rem;
-  max-height: 30vh;
-  overflow-y: auto;
-}
-.adm-cfg-pending-list li { margin: 2px 0; display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+/* The unsaved-changes controls live in the pinned search row now (.adm-cfg-pending-mini) and
+   the old→new list opens as an in-flow box (.adm-cfg-listbox) — the fixed bottom overlay that
+   covered the content you were editing is gone. */
 .adm-cfg-pending-was { text-decoration: line-through; opacity: .7; margin: 0 4px; }
 
 /* An edited row stays findable after you have scrolled past it. */
