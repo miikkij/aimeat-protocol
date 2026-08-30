@@ -37,8 +37,10 @@
 .ct-rows--agents { grid-template-columns: 2.2rem minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1.1fr) auto; }
 .ct-rows > div { padding: .55rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
 .ct-rows--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
-.ct-av { width: 2.2rem; height: 2.2rem; display: flex; align-items: center; justify-content: center; border: 2px solid var(--text); font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: .95rem; color: var(--text); }
-.ct-av--agent { border-style: dashed; color: var(--text-dim); }
+/* The mark is a whole box: the row rule above would otherwise take its bottom edge (the row's 1px
+   line wins on specificity), which is how the boxes shipped open at the bottom on 2026-08-30. */
+.ct-rows > .ct-av { width: 2.2rem; height: 2.2rem; padding: 0; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border: 2px solid var(--text); font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: .95rem; color: var(--text); }
+.ct-rows > .ct-av--agent { border-style: dashed; color: var(--text-dim); }
 .ct-nm { font-weight: 800; font-size: .95rem; color: var(--text); }
 .ct-nm .og-tbl-name { white-space: normal; overflow-wrap: anywhere; }
 .ct-nm .ct-nm-plain { font-weight: 800; }
