@@ -13,6 +13,8 @@
  * @structure designbookRouter(config, storage): Router
  * @usage mounted by server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.3.0 — 2026-08-30 — GET /v1/designbook/:id/preview: the part rendered as the page the
+ *     bench measures, sessionless, for the browsable gallery (wish-designbook-graafinen-selailu).
  *   v1.2.0 — 2026-08-29 — DELETE /v1/designbook/:id: real cleanup for junk with zero
  *     adoptions (memory:delete; the service decides who and refuses adopted parts with
  *     PART_IN_USE → retire). A system that can be littered but never cleaned drifts to a
@@ -98,6 +100,33 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
       res.json(success(config.nodeId, out, [
         { description: 'Adopt into one of your apps', method: 'POST', url: `/v1/designbook/${encodeURIComponent(out.part.id)}/adopt` },
       ]));
+    } catch (err) { refuse(res, err); }
+  });
+
+  // The GRAPHICAL preview: one part rendered as the real page the bench measures — the kit, the
+  // part's body, demo rows — for the gallery's iframes and anyone who wants to SEE a part
+  // instead of reading its JSON. Sessionless for every part that exists, published or not: the
+  // part is a public-visibility record readable through the public memory door already, so this
+  // door shows nothing that address does not serve — it only renders it. Served HTML from a
+  // route is the bench-page exception, not a per-service UI: the builder lives in the service
+  // (preview.ts), the bench renders the identical page, and any client may embed it.
+  router.get('/v1/designbook/:id/preview', async (req: Request, res: Response) => {
+    try {
+      const { partPreviewHtml } = await import('../services/design-book/preview.js');
+      const { part } = await book.get(req.params.id as string);
+      const html = partPreviewHtml(part);
+      if (html === null) {
+        return res.status(404).json(error(config.nodeId, 'NOT_RENDERABLE',
+          `"${part.id}" points at a template this node no longer carries, so there is nothing to render.`));
+      }
+      // A preview is a rendering of the part's current version, not a page of its own: no store,
+      // no index — the gallery at /v1/design-book is the address a person keeps. The page's
+      // inline script needs the request's CSP nonce; the part's body cannot mint a script tag of
+      // its own (the builder escapes `</` and the genre pages are the node's own templates).
+      const { injectCspNonce } = await import('../utils/csp-nonce.js');
+      res.setHeader('Cache-Control', 'no-store');
+      res.setHeader('X-Robots-Tag', 'noindex');
+      res.type('html').send(injectCspNonce(html, res.locals.cspNonce as string | undefined));
     } catch (err) { refuse(res, err); }
   });
 
