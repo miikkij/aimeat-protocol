@@ -1079,17 +1079,24 @@ await test('GET /v1/libs/aimeat-atelier.js — the version an app prints moves w
 await test('GET /v1/libs/aimeat-atelier.js — one named network call, and no hardcoded colour', async () => {
     const res = await fetch(`${BASE}/v1/libs/aimeat-atelier.js`);
     const code = withoutComments(await res.text());
-    // THE BOUNDARY, narrowed on 2026-08-27 (TARGET-074 phase 2) from "no fetch at all", and
-    // widened once on 2026-08-29: the kit makes exactly TWO named calls, both to this node —
-    // the mosaic's sessionless GET of the app's OWN public layout record (as public as the app
-    // itself) and the atlas component's lazy GET of the node's own static geometry file
-    // (/lib/aimeat-atlas@1.json — vendored Natural Earth shapes, no external host). Everything
-    // else still renders what the host supplies, so the assertion stays "exactly these", never
-    // "some calls are fine now".
+    // THE BOUNDARY, narrowed on 2026-08-27 (TARGET-074 phase 2) from "no fetch at all",
+    // widened on 2026-08-29 and again on 2026-08-30 (the commercial side): the kit makes
+    // exactly FOUR matched calls, all to this node — the mosaic's sessionless GET of the app's
+    // OWN public layout record (as public as the app itself), the atlas component's lazy GET
+    // of the node's own static geometry file (/lib/aimeat-atlas@1.json — vendored Natural
+    // Earth shapes, no external host), the commercial module's sessionless GET of the app's
+    // OWN public legal surface (pre-contract information, served without the access code), and
+    // the marks switches' relay through the SESSION the shell handed the app (session.fetch —
+    // the credential lives in the auth library, never here). Everything else still renders
+    // what the host supplies, so the assertion stays "exactly these", never "some calls are
+    // fine now".
     const fetches = code.match(/\bfetch\s*\(/g) || [];
-    assert(fetches.length === 2,
-        `exactly two fetches — the layout read and the atlas geometry — found ${fetches.length}`);
-    assert(code.includes('/lib/aimeat-atlas@1.json'), 'the second call targets the vendored atlas geometry');
+    assert(fetches.length === 4,
+        `exactly four matched calls — layout, atlas geometry, legal surface, session relay — found ${fetches.length}`);
+    assert(code.includes('/lib/aimeat-atlas@1.json'), 'one call targets the vendored atlas geometry');
+    assert(code.includes('/legal'), 'one call targets the app\'s own public legal surface');
+    assert((code.match(/session\.fetch\s*\(/g) || []).length === 1,
+        'exactly one call is the session relay, and the kit itself holds no credential');
     assert(!/XMLHttpRequest|EventSource|WebSocket/.test(code), 'must not open any other transport');
     // Every API-path reference is the layout read and nothing else.
     const paths = code.match(/\/v1\/[a-z-]+/g) || [];

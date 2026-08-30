@@ -94,6 +94,7 @@ import { projectStack, projectOverlay, projectRail, projectPicker, projectDeck, 
 import { health, queue, gauge } from './ops.js';
 import { kanban, plan, schedule, steps } from './planner.js';
 import { konsole } from './konsole.js';
+import { legalLinks, auditTrail, feedbackForm, reviewerLine } from './commercial.js';
 import { atlas } from './atlas.js';
 import { map } from './map.js';
 
@@ -325,6 +326,28 @@ export function mosaic(spec) {
           item: { id: block.id, title: p.title, sub: p.sub, image: p.image },
           onPick: pick,
         }));
+        return;
+      }
+      // ── The commercial side: self-sourced blocks (the app's own public legal surface, the
+      //    organism row space and the intake form the props name), no memory source to bind.
+      case 'legalLinks': {
+        alive.handles.push(legalLinks({ target: into, title: p.title }));
+        return;
+      }
+      case 'auditTrail': {
+        alive.handles.push(auditTrail({
+          target: into, org: p.org, ws: p.ws, space: p.space, title: p.title, hint: p.hint,
+        }));
+        return;
+      }
+      case 'feedbackForm': {
+        alive.handles.push(feedbackForm({
+          target: into, org: p.org, ws: p.ws, formId: p.formId, title: p.title, hint: p.hint,
+        }));
+        return;
+      }
+      case 'reviewerLine': {
+        alive.handles.push(reviewerLine({ target: into }));
         return;
       }
       default:

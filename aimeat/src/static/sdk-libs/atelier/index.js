@@ -6,13 +6,16 @@
  *   i18n layers underneath. Load one script and an Atelier app has its frame, its states and its
  *   motion without writing any of it.
  *
- *   IT RENDERS; IT DOES NOT FETCH — WITH ONE NAMED EXCEPTION. The library imports no
+ *   IT RENDERS; IT DOES NOT FETCH — WITH TWO NAMED EXCEPTIONS. The library imports no
  *   `_core/session.js`, holds no credentials, no state beyond what it was last told, and reports
- *   events rather than acting on them. The mosaic module is the single exception: one sessionless
+ *   events rather than acting on them. The mosaic module is the first exception: one sessionless
  *   GET of the app's OWN public layout record (`/v1/apps/:owner/:filename/ui`), which is as
- *   public as the app itself and read the way the stylesheet is read. The other outward glance is
- *   feature-detecting window.AIMEAT.auth so the shell can mount the login pill the AUTH library
- *   owns; with no auth library on the page the shell still renders and boots sessionless.
+ *   public as the app itself and read the way the stylesheet is read. The commercial module is
+ *   the second, in the same class: one sessionless GET of the app's OWN public legal surface
+ *   (`/v1/apps/:owner/:filename/legal`) — pre-contract information, served without the access
+ *   code. The other outward glance is feature-detecting window.AIMEAT.auth (and, in the
+ *   commercial module, AIMEAT.rows / AIMEAT.intake) so components can ride the libraries the
+ *   app loaded; with none of them on the page everything still renders and degrades in words.
  *
  *   THE LOOK IS NOT BAKED IN. Every colour, radius, shadow, font, density and motion value is an
  *   `--ak-*` custom property declared in /lib/aimeat-atelier.css, which IS the theming contract,
@@ -28,6 +31,15 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.38.0 — 2026-08-30 — THE COMMERCIAL SIDE (the wish of 2026-08-29): eight components so a
+ *     builder never re-derives how the money-adjacent facts are shown — legalLinks (the app's
+ *     own pages with state, readiness and the reason each exists, localised in the kit's three
+ *     languages), readinessChip (the owner's nudge, never a block), legalPageFrame (the frame
+ *     with the who-answers footer), auditTrail + recordEvent (the append-only organism-rows
+ *     trail with the two-hand rule spoken on refusal), feedbackForm (Public Intake with the
+ *     honeypot built in), reviewerLine (what a named review lifts and what it never lifts,
+ *     law linked) and marksSwitches (the owner's badge and install switches). legalLinks,
+ *     auditTrail, feedbackForm and reviewerLine join the mosaic vocabulary.
  *   v0.37.0 — 2026-08-30 — MORE OF EVERYTHING (the developer's ask): chart kind radar
  *     (profiles on spokes), steps (the process tracker — done / current / ahead), rating
  *     (a score as part-filled SVG stars).
@@ -190,6 +202,10 @@ import { konsole } from './konsole.js';
 import { atlas } from './atlas.js';
 import { map } from './map.js';
 import { mosaic, appRef } from './mosaic.js';
+import {
+  legalLinks, readinessChip, legalPageFrame, auditTrail, recordEvent, feedbackForm,
+  reviewerLine, marksSwitches,
+} from './commercial.js';
 
 const atelier = {
   /**
@@ -197,7 +213,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.37.0',
+  version: '0.38.0',
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,
@@ -236,6 +252,10 @@ const atelier = {
 
   // ── The things that open ──
   reveal, drawer, dialog, confirm, prompt, sheet,
+
+  // ── The commercial side (legal pages, marks, reviewer, audit trail, feedback) ──
+  legalLinks, readinessChip, legalPageFrame, auditTrail, recordEvent, feedbackForm,
+  reviewerLine, marksSwitches,
 
   // ── Data ──
   form, table, searchBar,

@@ -1,0 +1,140 @@
+/*
+ * @file aimeat-atelier/commercial.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The commercial side's clothes — the legal-pages list with its states, the
+ *   readiness chip, the legal page frame with the who-answers footer, the audit trail, the
+ *   feedback form's honeypot (invisible to people, present for crawlers), the reviewer line
+ *   and the marks switches. Everything rides the --ak-* token contract: --ak-ok/-warn for the
+ *   states, color-mix grounds so every look and mode answers, no colour of its own.
+ * @structure .ak-com (shared) · .ak-com-legal · .ak-com-chip · .ak-com-frame · .ak-com-audit ·
+ *   .ak-com-hp · .ak-com-reviewer · .ak-com-marks
+ * @version-history
+ *   v0.38.0 — 2026-08-30 — Initial (the commercial side arrives in the kit).
+ */
+
+/* ── Shared bones ─────────────────────────────────────────────────────────────────────────── */
+.ak-com { display: block; }
+.ak-com__title { margin: 0 0 4px; font-size: 1.05rem; color: var(--ak-ink); }
+.ak-com__intro { margin: 0 0 10px; font-size: var(--ak-text-fine, 0.85rem); color: var(--ak-ink-dim); max-width: 70ch; }
+.ak-com__aside {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-radius: var(--ak-radius-sm);
+  background: color-mix(in oklab, var(--ak-accent) 10%, var(--ak-surface));
+  font-size: var(--ak-text-fine, 0.85rem);
+  color: var(--ak-ink);
+  max-width: 70ch;
+}
+
+/* ── The legal pages list ─────────────────────────────────────────────────────────────────── */
+.ak-com-legal__rows { display: flex; flex-direction: column; gap: 8px; }
+.ak-com-legal__row {
+  padding: 10px 12px;
+  border: 1px solid var(--ak-line);
+  border-radius: var(--ak-radius-sm);
+  background: var(--ak-surface);
+}
+.ak-com-legal__row.is-missing { border-color: color-mix(in oklab, var(--ak-warn) 45%, var(--ak-line)); }
+.ak-com-legal__head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.ak-com-legal__name { font-weight: 700; color: var(--ak-ink); }
+.ak-com-state { font-size: var(--ak-text-fine, 0.85rem); color: var(--ak-ink-dim); }
+.ak-com-state--on { color: color-mix(in oklab, var(--ak-ok) 60%, var(--ak-ink)); }
+.ak-com-state--missing { color: color-mix(in oklab, var(--ak-warn) 55%, var(--ak-ink)); font-weight: 700; }
+.ak-com-legal__open { margin-left: auto; font-size: var(--ak-text-fine, 0.85rem); color: var(--ak-ink); }
+.ak-com-legal__why { margin: 4px 0 0; font-size: var(--ak-text-fine, 0.85rem); color: var(--ak-ink-dim); max-width: 70ch; }
+
+/* ── The readiness chip: the owner's nudge, hot on purpose ────────────────────────────────── */
+.ak-com-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid color-mix(in oklab, var(--ak-warn) 55%, var(--ak-line));
+  border-radius: var(--ak-radius-pill, 999px);
+  background: color-mix(in oklab, var(--ak-warn) 16%, var(--ak-surface));
+  color: var(--ak-ink);
+  font-size: var(--ak-text-fine, 0.85rem);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* ── The legal page frame ─────────────────────────────────────────────────────────────────── */
+.ak-com-frame { max-width: 76ch; }
+.ak-com-frame__crumb {
+  margin: 0 0 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ak-accent);
+}
+.ak-com-frame__title { margin: 0 0 6px; font-size: 1.6rem; line-height: 1.1; color: var(--ak-ink); }
+.ak-com-frame__meta {
+  margin: 0 0 18px;
+  padding-bottom: 14px;
+  border-bottom: 2px solid var(--ak-ink);
+  font-size: var(--ak-text-fine, 0.85rem);
+  color: var(--ak-ink-dim);
+}
+.ak-com-frame__body { color: var(--ak-ink); }
+.ak-com-frame__body p { max-width: 70ch; }
+.ak-com-frame__footer {
+  margin-top: 28px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ak-line);
+  font-size: var(--ak-text-fine, 0.85rem);
+  color: var(--ak-ink-dim);
+  max-width: 70ch;
+}
+
+/* ── The audit trail ──────────────────────────────────────────────────────────────────────── */
+.ak-com-audit__rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.ak-com-audit__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: baseline;
+  padding: 6px 10px;
+  border-left: 3px solid color-mix(in oklab, var(--ak-accent) 50%, var(--ak-line));
+  background: color-mix(in oklab, var(--ak-ink) 3%, var(--ak-surface));
+  border-radius: 0 var(--ak-radius-sm) var(--ak-radius-sm) 0;
+  font-size: var(--ak-text-fine, 0.85rem);
+}
+.ak-com-audit__when { font-variant-numeric: tabular-nums; color: var(--ak-ink-dim); white-space: nowrap; }
+.ak-com-audit__what { color: var(--ak-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ak-com-audit__who { color: var(--ak-ink-dim); }
+
+/* ── The honeypot: absent for people, present for crawlers ────────────────────────────────── */
+.ak-com-hp {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ── The reviewer line ────────────────────────────────────────────────────────────────────── */
+.ak-com-reviewer {
+  padding: 10px 12px;
+  border-left: 3px solid var(--ak-ok);
+  background: color-mix(in oklab, var(--ak-ok) 8%, var(--ak-surface));
+  border-radius: 0 var(--ak-radius-sm) var(--ak-radius-sm) 0;
+}
+.ak-com-reviewer__line { margin: 0 0 4px; font-weight: 700; color: var(--ak-ink); }
+.ak-com-reviewer__lifts { margin: 0; font-size: var(--ak-text-fine, 0.85rem); color: var(--ak-ink-dim); max-width: 70ch; }
+.ak-com-reviewer__lifts a { color: var(--ak-ink); }
+
+/* ── The marks switches ───────────────────────────────────────────────────────────────────── */
+.ak-com-marks__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--ak-line);
+}
+.ak-com-marks__name { font-weight: 700; color: var(--ak-ink); }
+.ak-com-marks__meaning { grid-column: 1; font-size: var(--ak-text-fine, 0.85rem); color: var(--ak-ink-dim); }
+.ak-com-marks__row .ak-btn { grid-column: 2; grid-row: 1 / span 2; }
