@@ -16,6 +16,10 @@
  *   - toEntry() — classify + normalize → DiscoveryEntry
  * @usage registry.register(createMemorySource(storage, config));
  * @version-history
+ *   v0.5.0 — 2026-08-31 — apps.{appId}.tools is left to the `app-tools` source. It used to arrive
+ *     here as a plain `memory` record: one row for a manifest holding many tools, described by its
+ *     own JSON. The other apps.* records (ui, legal, cost) have no other home and still surface here,
+ *     which is why the exclusion is a pattern rather than a prefix.
  *   v0.4.0 — 2026-08-30 — Three things the Discover page needed and the API had wrong. (1) A workspace
  *     document listed once: its `.version.N` and `.history.` keys and the `meta` space are skipped in
  *     every scope, so 9 105 "documents" on aimeat.io stop being 4 500 documents twice. (2) A record
@@ -41,6 +45,7 @@ import { classifyMemoryKey } from '../classify.js';
 import { bestTitle, bestDescription, normalizeTags, normalizeVisibility, toFullOwner } from '../normalize.js';
 import { scopeIsCovered } from '../../../utils/scope-coverage.js';
 import { readWorkspaceManifest } from '../../workspace-meta.js';
+import { appIdFromToolsKey } from '../../../models/app-tool-schemas.js';
 import type { DiscoveryPlace } from '../types.js';
 
 export const MEMORY_SOURCE_ID = 'memory-fts';
@@ -50,7 +55,12 @@ const MAX_LIMIT = 100;
  *  record is surfaced once, with its canonical type, not also as a generic 'memory' hit. (Secretary P5 / S-D:
  *  published use-case templates live at template.catalog.* and are owned by the `templates` source.) */
 const OWNED_BY_OTHER_SOURCE = ['template.catalog.', 'atelier.book.'];
-const isOwnedElsewhere = (key: string) => OWNED_BY_OTHER_SOURCE.some(p => key.startsWith(p));
+/** An app's tool manifest is owned by the `app-tools` source, which lists one entry per TOOL rather
+ *  than one per manifest. A prefix cannot express this: `apps.` also covers the ui, legal and cost
+ *  records, which have no other home and must keep surfacing here — so the key is tested with the
+ *  shared grammar instead. */
+const isOwnedElsewhere = (key: string) =>
+  OWNED_BY_OTHER_SOURCE.some(p => key.startsWith(p)) || appIdFromToolsKey(key) !== null;
 
 /** The uniform internal row both paths (searchText / listing) produce before normalization. */
 interface MemHit {

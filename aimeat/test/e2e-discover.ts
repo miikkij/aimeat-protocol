@@ -175,6 +175,49 @@ const hasId = (entries: any[], id: string) => entries.some((e: any) => e.id === 
         assert(!q.body.data.entries.some((x: any) => x.type === 'designbook' || x.type === 'template'), 'a Book part or a template answers only when the words match');
     });
 
+    // An app's tool manifest is ONE record holding MANY tools. The directory lists the tools, because
+    // a person searching for one searches for its name, not for the file that lists it.
+    const TOOLS_KEY = `apps.${APP_FILE}.tools`;
+    await test('seed: publish a tool manifest with a priced and a free tool', async () => {
+        await putMem(a.token, TOOLS_KEY, {
+            tools: [
+                { name: 'probability', description: 'Rates how likely a thing is', price: { morsels: 5, unit: 'per-call' }, action_id: 'ext:demo:probability' },
+                { name: 'freebie', description: 'Costs nothing at all' },
+            ],
+        }, 'public');
+    });
+
+    await test('a published tool is its own entry, one per tool, not one per manifest', async () => {
+        const r = await discover(`scope=own&type=tool&per_page=100`, a.token);
+        assert(r.status === 200 && r.body.ok, `status ${r.status}`);
+        const e = r.body.data.entries;
+        const priced = byId(e, `${a.name}/${APP_FILE}#probability`);
+        const free = byId(e, `${a.name}/${APP_FILE}#freebie`);
+        assert(priced, `the priced tool is listed, got ids ${JSON.stringify(e.map((x: any) => x.id))}`);
+        assert(free, 'the FREE tool is listed too: the directory is about use, not sale');
+        assert(priced.title === 'probability', `title is the tool name, got ${priced.title}`);
+        assert(priced.description === 'Rates how likely a thing is', 'description comes from the manifest');
+        assert(priced.segment === `${a.name}/${APP_FILE}`, `segment is the app, got ${priced.segment}`);
+        assert(priced.tags.includes('priced') && free.tags.includes('free'), 'price is legible from the tags');
+    });
+
+    // The failure this replaces: `apps.` is not a bookkeeping prefix and had no classifier pattern,
+    // so the manifest did not fall out of the directory — it fell IN, raw, as type `memory`.
+    await test('the manifest itself is NOT listed as a raw memory record', async () => {
+        const r = await discover('scope=own&per_page=100', a.token);
+        const e = r.body.data.entries;
+        assert(!hasId(e, TOOLS_KEY), `the manifest key must not be an entry of its own, got ${JSON.stringify(byId(e, TOOLS_KEY))}`);
+        const mem = await discover('scope=own&type=memory&per_page=100', a.token);
+        assert(!hasId(mem.body.data.entries, TOOLS_KEY), 'and it is not a memory entry either');
+    });
+
+    await test('another owner sees a public tool, and a query narrows tools like anything else', async () => {
+        const pub = await discover('scope=public&type=tool&per_page=100');
+        assert(hasId(pub.body.data.entries, `${a.name}/${APP_FILE}#probability`), 'a public tool is public');
+        const q = await discover('scope=own&type=tool&q=zzqqxx-no-such-words&per_page=100', a.token);
+        assert(q.body.data.entries.length === 0, 'a tool answers only when the words match');
+    });
+
     await test('type filter narrows to one domain', async () => {
         const r = await discover('scope=own&type=knowledge&per_page=100', a.token);
         const e = r.body.data.entries;

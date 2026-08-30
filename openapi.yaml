@@ -13262,7 +13262,9 @@ paths:
           schema: { type: string }
           description: >
             CSV of types to include (capability, workflow, knowledge, decision, research, material,
-            company, offering, document, organism, app, template, skill, designbook, memory).
+            company, offering, document, organism, app, tool, template, skill, designbook, memory).
+            A `tool` entry is one published app tool, listed per tool rather than per app; its id is
+            `owner/appId#tool` and its href is that app's WebMCP listing.
         - name: segment
           in: query
           schema: { type: string }

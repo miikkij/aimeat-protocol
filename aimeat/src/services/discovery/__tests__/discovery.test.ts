@@ -113,6 +113,17 @@ describe('classifyMemoryKey', () => {
     expect(classifyMemoryKey('org.acme.offerings').type).toBe('offering');
     expect(classifyMemoryKey('agents.bot.offers').type).toBe('offering');
   });
+  it('classifies an app tool manifest, keeping the dotted appId as the segment', () => {
+    // The appId is a published filename, so it carries dots. A non-greedy middle would segment this
+    // as "probability" and leave ".html" in the suffix, which matches nothing.
+    expect(classifyMemoryKey('apps.probability.html.tools')).toEqual({
+      type: 'tool',
+      segment: 'probability.html',
+    });
+    // The app's OTHER records have no other home and must stay plain memory.
+    expect(classifyMemoryKey('apps.probability.html.ui').type).toBe('memory');
+    expect(classifyMemoryKey('apps.probability.html.legal').type).toBe('memory');
+  });
   it('falls back to the kind: tag, then to memory', () => {
     expect(classifyMemoryKey('notes.misc', { tags: ['kind:research'] }).type).toBe('research');
     expect(classifyMemoryKey('notes.misc', { tags: ['kind:deliverable'] }).type).toBe('material');
