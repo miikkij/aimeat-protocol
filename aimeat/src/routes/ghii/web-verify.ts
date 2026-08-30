@@ -31,6 +31,7 @@ import { generateKeyPair } from '../../auth/keypair.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
+import { appendMailLog } from '../../services/notification-settings.js';
 import { validateOwnerName, buildGAII } from '../../utils/gaii.js';
 import { issueJWT } from '../../auth/jwt.js';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
@@ -448,7 +449,8 @@ export function registerWebVerifyRoutes(
             });
 
             const loginUrl = `${config.baseUrl}/v1/ghii/magic-link/verify?token=${token}`;
-            await emailService.sendMagicLink(email, loginUrl, ghiiRecord.locale);
+            const sent = await emailService.sendMagicLink(email, loginUrl, ghiiRecord.locale);
+            if (sent) await appendMailLog(storage, ghiiRecord.ghii, { kind: 'magic_link', subject: 'login link' });
         }
 
         res.json(success(config.nodeId, {
