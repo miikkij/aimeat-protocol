@@ -434,8 +434,63 @@
 }
 .adm-mrow .adm-mval { font-family: var(--font-mono); font-size: .78rem; color: var(--text-dim); text-align: right; }
 .adm-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 0 44px; }
+.adm-half { max-width: 560px; }
+.adm-mrow--two { grid-template-columns: minmax(0, 1fr) auto; }
+.adm-why { display: block; font-size: .78rem; font-weight: 400; line-height: 1.45; color: var(--text-dim); margin-top: 2px; }
+.adm-intro { margin: 0 0 .8rem; font-size: .88rem; line-height: 1.55; color: var(--text-dim); max-width: 70ch; }
+.adm .og-strip b.og-coral-num { color: var(--accent); }
+/* A strip cell that is a button keeps the div cell's whole anatomy — flex, borders, gaps —
+   because organism.css lays out `.og-strip > div` and a button is not a div. */
+.adm .og-strip > button { flex: 1 1 0; box-sizing: border-box; display: flex; align-items: baseline; flex-wrap: wrap; gap: .6rem; min-width: 0; background: none; border: 0; border-right: 1px solid var(--border); border-radius: 0; padding: .9rem 1.1rem .9rem 0; margin: 0; font: inherit; text-align: left; cursor: pointer; }
+.adm .og-strip > button + button { padding-left: 1.1rem; }
+.adm .og-strip > button:last-child { border-right: 0; }
+.adm .og-strip > button:hover span { text-decoration: underline; text-decoration-thickness: 2px; }
+.adm-alert-line { margin: .6rem 0 0; font-size: .9rem; font-weight: 600; color: var(--text); }
+
+/* The grant form and other poster fields */
+.adm-mint { display: flex; gap: 18px; align-items: flex-end; max-width: 760px; flex-wrap: wrap; }
+.adm-fld { display: block; flex: 1; min-width: 140px; }
+.adm-fld--wide { flex: 2; min-width: 240px; }
+.adm-fld > span { display: block; font-size: .66rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: .3rem; }
+.adm-fld input { width: 100%; box-sizing: border-box; }
+.adm-mint-result { margin-top: .6rem; font-size: .85rem; color: var(--success-fg); }
+.adm-mint-result.bad { color: var(--danger-fg); }
+
+/* ── The Config tab in the poster face: search, the left index, the field rows ── */
+.adm-cfg-tools { display: flex; gap: 18px; align-items: center; margin: 4px 0 14px; flex-wrap: wrap; }
+.adm-cfg-searchwrap { flex: 1; min-width: 280px; display: flex; align-items: center; gap: 10px; border-bottom: 3px solid var(--text); padding: 2px 2px 4px; }
+.adm-cfg-searchwrap svg { width: 16px; height: 16px; stroke: var(--text); fill: none; stroke-width: 2.5; flex: none; }
+.adm-cfg-searchwrap input { border: 0; background: none; outline: none; width: 100%; font-family: inherit; font-size: .95rem; font-weight: 600; color: var(--text); padding: 4px 0; }
+.adm-cfg-filter { background: none; border: 0; padding: 0 0 1px; cursor: pointer; font-family: inherit; font-weight: 800; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text); border-bottom: 2px solid var(--text); }
+.adm-cfg-filter.on { color: var(--accent); border-bottom-color: var(--accent); }
+.adm-cfg-body { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 0 36px; align-items: start; }
+.adm-cfg-rail { position: sticky; top: 10px; border-top: 3px solid var(--text); padding-top: 8px; max-height: calc(100dvh - 90px); overflow-y: auto; }
+.adm-cfg-rail .d { font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: .82rem; letter-spacing: var(--font-poster-tracking, .01em); text-transform: uppercase; color: var(--text); margin: 12px 0 3px; }
+.adm-cfg-rail .g { display: flex; justify-content: space-between; gap: 8px; width: 100%; background: none; border: 0; padding: 3px 0; font-family: inherit; font-size: .8rem; font-weight: 600; color: var(--text-dim); cursor: pointer; text-align: left; }
+.adm-cfg-rail .g:hover { color: var(--text); }
+.adm-cfg-rail .g em { font-family: var(--font-mono); font-size: .66rem; font-style: normal; }
+.adm-cfg-rail .g .adm-cfg-edited-dot { font-size: .6rem; }
+.adm-cfg-sec { border-top: 3px solid var(--text); padding: 12px 0 8px; margin-bottom: 6px; scroll-margin-top: 10px; }
+.adm-cfg-sec-h { display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px; }
+.adm-cfg-sec-h h2 { margin: 0; font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: 1.3rem; line-height: var(--font-poster-leading, 1); letter-spacing: var(--font-poster-tracking, .01em); text-transform: uppercase; color: var(--text); }
+.adm-cfg-sec-h small { font-family: var(--font-mono); font-size: .72rem; color: var(--accent); }
+.adm-cfg-domain-head2 { margin: 18px 0 8px; font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: .95rem; letter-spacing: .06em; text-transform: uppercase; color: var(--text-dim); }
+.adm-cfg-frow { display: grid; grid-template-columns: minmax(0, 1.4fr) auto minmax(220px, 1fr) auto; gap: 0 18px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.adm-cfg-frow.adm-cfg-row-edited { background: none; }
+.adm-cfg-fname { min-width: 0; font-size: .88rem; font-weight: 600; color: var(--text); }
+.adm-cfg-fname code { display: block; font-family: var(--font-mono); font-size: .66rem; font-weight: 400; color: var(--accent); background: none; padding: 0; }
+.adm-cfg-fdesc { display: block; font-size: .78rem; font-weight: 400; line-height: 1.45; color: var(--text-dim); margin-top: 1px; }
+.adm-cfg-fsrc { white-space: nowrap; }
+.adm-cfg-fedit { display: flex; align-items: center; gap: 10px; justify-content: flex-end; min-width: 0; flex-wrap: wrap; }
+.adm-cfg-fedit input[type='number'] { width: 120px; }
+.adm-cfg-fedit input[type='text'] { width: 240px; }
+.adm-cfg-frange { font-family: var(--font-mono); font-size: .66rem; color: var(--text-dim); white-space: nowrap; }
+.adm-cfg-noresult { padding: 14px 0; color: var(--text-dim); font-size: .9rem; }
+@media (max-width: 1100px) { .adm-cfg-body { grid-template-columns: 1fr; } .adm-cfg-rail { position: static; max-height: none; } }
 @media (max-width: 860px) {
   .adm-ov-grid { grid-template-columns: 1fr; gap: 14px 0; }
+  .adm-cfg-frow { grid-template-columns: 1fr; gap: 4px 0; }
+  .adm-cfg-fedit { justify-content: flex-start; }
 }
 
 /* Sub-panels */
