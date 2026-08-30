@@ -27,7 +27,8 @@ export const firstLine = (s) => String(s || '').split(/\r?\n/).map(l => l.trim()
 
 /** The poster switch: a label and a two-state box. */
 export function Switch({ on, label, disabled, onToggle }) {
-  return html`<button type="button" class=${`nt-sw ${on ? 'on' : 'off'}`} disabled=${disabled} aria-pressed=${on ? 'true' : 'false'} onClick=${onToggle}><i></i>${label}</button>`;
+  // The word on the left, the box on the right, so a column of switches lines up on its boxes.
+  return html`<button type="button" class=${`nt-sw ${on ? 'on' : 'off'}`} disabled=${disabled} aria-pressed=${on ? 'true' : 'false'} onClick=${onToggle}>${label}<i></i></button>`;
 }
 
 const ACTION_WORD = { reply: 'action.reply', approve: 'action.approve', deny: 'action.deny', accept: 'action.accept', decline: 'action.decline', reject: 'action.reject' };
@@ -56,9 +57,9 @@ export function senderRows(ctx, rows) {
       <div class="nt-nm" key=${'n' + r.key}>${r.name}<small>${r.sub}</small></div>
       <div class="nt-w" key=${'w' + r.key}>${r.what}</div>
       <div class="nt-ctl" key=${'c' + r.key}>
-        ${p.muted ? html`<span class="nt-muted">${c('mutedWord')}</span>` : html`<${Switch} on=${p.push !== false} label=${c('push')} disabled=${ctx.busy} onToggle=${() => ctx.setPref(r, { push: p.push === false })} />`}
-        ${r.kind === 'aimeat' ? null : html`<button type="button" class="og-door og-door--quiet" disabled=${ctx.busy} onClick=${() => ctx.setPref(r, { muted: !p.muted })}>${p.muted ? c('unmute') : c('mute')}</button>`}
         ${r.door}
+        ${r.kind === 'aimeat' ? null : html`<button type="button" class="og-door og-door--quiet" disabled=${ctx.busy} onClick=${() => ctx.setPref(r, { muted: !p.muted })}>${p.muted ? c('unmute') : c('mute')}</button>`}
+        ${p.muted ? html`<span class="nt-muted">${c('mutedWord')}</span>` : html`<${Switch} on=${p.push !== false} label=${c('push')} disabled=${ctx.busy} onToggle=${() => ctx.setPref(r, { push: p.push === false })} />`}
       </div>`; })}
   </div>`;
 }

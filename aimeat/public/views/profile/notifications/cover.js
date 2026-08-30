@@ -143,8 +143,8 @@ function secDevices(ctx) {
         <div class=${`nt-dev-card ${digest.enabled ? '' : 'dim'}`}>
           <b>${c('emailDigest')}</b><small>${ctx.emailVerified === false ? c('emailNotVerified') : digest.enabled ? c('digestOn', { h: digest.afterHours }) : c('digestOff')}</small>
           <div class="og-doors nt-digest-doors">
-            <${Switch} on=${digest.enabled} label=${c('digestSwitch')} disabled=${ctx.busy || ctx.emailVerified === false} onToggle=${() => ctx.saveSettings({ ...s, emailDigest: { ...digest, enabled: !digest.enabled } })} />
             ${digest.enabled ? html`<select class="og-input nt-select" value=${String(digest.afterHours)} onChange=${e => ctx.saveSettings({ ...s, emailDigest: { ...digest, afterHours: Number(e.target.value) } })}>${[2, 4, 8, 24, 72].map(h => html`<option key=${h} value=${String(h)}>${c('afterHours', { h })}</option>`)}</select>` : null}
+            <${Switch} on=${digest.enabled} label=${c('digestSwitch')} disabled=${ctx.busy || ctx.emailVerified === false} onToggle=${() => ctx.saveSettings({ ...s, emailDigest: { ...digest, enabled: !digest.enabled } })} />
           </div>
         </div>
       </div>
