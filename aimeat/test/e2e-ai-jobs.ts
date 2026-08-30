@@ -20,6 +20,10 @@
  *   deterministically — otherwise every timing assertion here would be a race.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-jobs.ts
  * @version-history
+ *   v1.2.0 — 2026-08-31 — Cases 16/16b/16c compare THE GATE'S VERDICT rather than the raw status,
+ *     and 16c adds the negative point. Comparing statuses only worked while the shared answer was a
+ *     refusal: one door is synchronous and the other answers 202 and fails the job later, so with
+ *     both admitting `ai:*` (main 4fabbefcd) the numbers legitimately differ while the gates agree.
  *   v1.1.0 — 2026-08-31 — Case 16: the two AI doors are asked whether they ADMIT THE SAME PEOPLE.
  *     They did not — one stated its word as requireScope middleware, which accepts the domain
  *     wildcard, and the other asks assertAiUseAllowed, which does not — so an `ai:*` agent could
@@ -591,60 +595,79 @@ const SCRIPT_THROW = `export default async function(ctx, input) {
 
     // ── 16. The two AI doors admit the same principals ──
     // The money is the same money — the owner's own provider key, their daily budget, their per-app
-    // quota — so the word that opens one door has to be the word that opens the other. It was not:
-    // these routes stated `ai:use` as requireScope middleware, which asks scopeIsCovered and so
-    // accepts the DOMAIN wildcard `ai:*`, while /v1/ai/complete asks assertAiUseAllowed, which
-    // accepts the exact word or the global `*` and nothing else. An agent holding `ai:*` could spend
-    // through the new door and not the old one. This case does not name a status of its own on
-    // purpose: it asks the two doors whether they agree, so it keeps holding whichever way that
-    // shared answer is later decided to go.
-    await test('16. An `ai:*` agent gets the same answer from POST /v1/ai/jobs as from POST /v1/ai/complete', async () => {
-        const token = await connectAgent(a, `aijobwild${Date.now()}`, ['ai:*']);
+    // quota — so whoever gets through one door has to get through the other. They have already
+    // disagreed twice, once in each direction: these routes stated `ai:use` as requireScope
+    // middleware, which asks scopeIsCovered and honours the DOMAIN wildcard, while
+    // assertAiUseAllowed restated the test by hand as `includes('ai:use') || includes('*')` and did
+    // not. First the job routes were moved onto the shared gate; then the gate itself was fixed to
+    // ASK rather than restate (4fabbefcd), which is what made `ai:*` open both.
+    //
+    // These three cases compare THE GATE'S VERDICT and never the raw status. One door is
+    // synchronous and answers about the work; the other answers 202 and fails the job later, so
+    // "same status" was only ever true while the shared answer was a refusal. What must match is
+    // admitted-or-refused, on the same principal, and that stays true whichever way the answer is
+    // later decided to go: a change to either gate alone turns one of these red.
+    const gateRefused = (r: { status: number; body: any }): boolean =>
+        r.status === 403 && r.body?.error?.code === 'FORBIDDEN';
+
+    /** The same request at both doors, as one principal. */
+    async function probeBothDoors(token: string, label: string) {
         const complete = await json('/v1/ai/complete', {
             method: 'POST', headers: auth(token),
-            body: JSON.stringify({ prompt: 'wildcard probe', app_id: 'e2e-ai-jobs' }),
+            body: JSON.stringify({ prompt: `${label} probe`, app_id: 'e2e-ai-jobs' }),
         });
         const jobs = await json('/v1/ai/jobs', {
             method: 'POST', headers: auth(token),
-            body: JSON.stringify({ prompt: 'wildcard probe', result_key: 'aijob.wildcard' }),
+            body: JSON.stringify({ prompt: `${label} probe`, result_key: `aijob.${label}` }),
         });
-        assert(jobs.status === complete.status,
-            `the two doors disagree: /v1/ai/complete ${complete.status}, /v1/ai/jobs ${jobs.status}`);
-        assert(complete.status === 403, `and the shared answer is a refusal, got ${complete.status}`);
-        const wrote = await readMemory(a, 'aijob.wildcard');
-        assert(wrote.status === 404, 'a refused start writes nothing');
+        assert(gateRefused(jobs) === gateRefused(complete),
+            `the two gates disagree about ${label}: /v1/ai/complete ${complete.status} `
+            + `${complete.body?.error?.code ?? ''}, /v1/ai/jobs ${jobs.status} ${jobs.body?.error?.code ?? ''}`);
+        return { complete, jobs };
+    }
+
+    await test('16. An `ai:*` agent is admitted by both /v1/ai/complete and POST /v1/ai/jobs', async () => {
+        const token = await connectAgent(a, `aijobwild${Date.now()}`, ['ai:*']);
+        const { complete, jobs } = await probeBothDoors(token, 'wildcard');
+        // The domain wildcard is a grant of the whole AI area, and both doors honour it now. An
+        // owner who granted `ai:*` and got an agent that could start a job but not run a completion
+        // was being told to grant the permission they had just granted.
+        assert(!gateRefused(complete), `the gate must admit ai:*, got ${complete.status} ${JSON.stringify(complete.body?.error)}`);
+        assert(jobs.status === 202, `and the job door starts it, got ${jobs.status}: ${JSON.stringify(jobs.body?.error)}`);
     });
 
-    // The other half of the same question, so a fix cannot be "refuse everybody". An agent holding
-    // the exact word must still get IN at both doors, and then meet the same wall behind them: both
-    // resolve the identity that pays through resolveIdentity, so an agent with no provider settings
-    // of its own is refused for the key and not for the permission. The synchronous door says so in
-    // its response and the asynchronous one says so on the job, which is the whole difference
-    // between them — a start is accepted before the work begins.
+    // The other half, so a fix cannot be "refuse everybody". An agent holding the exact word must
+    // still get IN at both, and then meet the same wall behind them: both resolve the identity that
+    // pays through resolveIdentity, so an agent with no provider settings of its own is refused for
+    // the KEY and not for the permission. The synchronous door says so in its response and the
+    // asynchronous one says so on the job, which is the whole difference between them — a start is
+    // accepted before the work begins.
     await test('16b. An agent holding the exact `ai:use` gets IN at both, and hits the same wall behind them', async () => {
         const token = await connectAgent(a, `aijobexact${Date.now()}`, ['ai:use']);
-        const complete = await json('/v1/ai/complete', {
-            method: 'POST', headers: auth(token),
-            body: JSON.stringify({ prompt: 'exact probe', app_id: 'e2e-ai-jobs' }),
-        });
-        assert(complete.status !== 403, `the gate must admit an exact ai:use agent, got ${complete.status}`);
+        const { complete, jobs } = await probeBothDoors(token, 'exact');
+        assert(!gateRefused(complete), `the gate must admit an exact ai:use agent, got ${complete.status}`);
         assert(complete.body?.error?.code === 'NO_API_KEY', `refused for the key, not the permission: ${JSON.stringify(complete.body?.error)}`);
-
-        const jobs = await json('/v1/ai/jobs', {
-            method: 'POST', headers: auth(token),
-            body: JSON.stringify({ prompt: 'exact probe', result_key: 'aijob.exact' }),
-        });
         assert(jobs.status === 202, `the gate must admit it here too, got ${jobs.status}: ${JSON.stringify(jobs.body?.error)}`);
 
-        const end = await json(`/v1/ai/jobs/${jobs.body.data.job_id}`, { headers: auth(token) });
+        let end = await json(`/v1/ai/jobs/${jobs.body.data.job_id}`, { headers: auth(token) });
         assert(end.status === 200, `the agent can read its own job: ${end.status}`);
         for (let i = 0; i < 100 && end.body.data.state !== 'failed'; i++) {
             await sleep(120);
-            const again = await json(`/v1/ai/jobs/${jobs.body.data.job_id}`, { headers: auth(token) });
-            end.body = again.body;
+            end = await json(`/v1/ai/jobs/${jobs.body.data.job_id}`, { headers: auth(token) });
         }
         assert(end.body.data.state === 'failed', `the job ends failed, got ${end.body.data.state}`);
         assert(end.body.data.error?.code === 'NO_API_KEY', `for the same reason the other door gave: ${JSON.stringify(end.body.data.error)}`);
+    });
+
+    // The negative point, and the one that makes the pair above load-bearing: without it, "both
+    // gates agree" would still hold if somebody opened both to everybody.
+    await test('16c. An agent holding neither word is refused by both, and starts nothing', async () => {
+        const token = await connectAgent(a, `aijobnone${Date.now()}`, ['memory:read']);
+        const { complete, jobs } = await probeBothDoors(token, 'unscoped');
+        assert(gateRefused(complete), `/v1/ai/complete must refuse it: ${complete.status} ${JSON.stringify(complete.body?.error)}`);
+        assert(gateRefused(jobs), `/v1/ai/jobs must refuse it: ${jobs.status} ${JSON.stringify(jobs.body?.error)}`);
+        const wrote = await readMemory(a, 'aijob.unscoped');
+        assert(wrote.status === 404, 'a refused start writes nothing');
     });
 
     // ── cleanup ──
