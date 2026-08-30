@@ -1,0 +1,108 @@
+/**
+ * @file notifications-poster.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The Notifications page in the poster face (nt- prefix; design canvas "AIMEAT
+ *   Ilmoitusten sivu", direction A). The shared parts come from organism.css's og- rules and the
+ *   initials mark from contacts-poster.css; this file carries what notifications add: the inbox
+ *   table, the sender rows with the switch, the device cards, the quiet-hours form, the three
+ *   roads. NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-08-30 — Initial.
+ */
+
+.og-nt .og-door.on { color: var(--accent); border-bottom-color: var(--accent); }
+.og-nt .og-door--coral { color: var(--accent); border-bottom-color: var(--accent); }
+.og-nt .og-choice-btn.on { background: var(--text); color: var(--card-bg); }
+.og-nt .og-empty { margin: 0; font-size: .9rem; color: var(--text-dim); }
+.og-nt .nt-hint { margin: .6rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--text-dim); display: block; }
+.og-nt .nt-loading { display: inline-block; padding-left: 1.1rem; position: relative; }
+.og-nt .nt-loading::before { content: ''; position: absolute; left: 0; top: .35em; width: .55em; height: .55em; background: var(--accent); animation: ntBlink 1s steps(2, start) infinite; }
+@keyframes ntBlink { to { visibility: hidden; } }
+.og-nt .og-fold > span:not(.og-fold-r):not(.og-fold-arrow) { white-space: nowrap; }
+.og-nt .og-fold-r { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.og-nt .nt-more { margin-top: .8rem; }
+
+/* ── The switch ─────────────────────────────────────────────────────────────────────────────── */
+.nt-sw { display: inline-flex; align-items: center; gap: .5rem; background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit; font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--text); }
+.nt-sw i { width: 2.1rem; height: 1.1rem; border: 2px solid var(--text); position: relative; display: inline-block; box-sizing: border-box; }
+.nt-sw i::after { content: ''; position: absolute; top: 2px; left: 2px; width: .55rem; height: .55rem; background: var(--text); }
+.nt-sw.on i { background: var(--sun); }
+.nt-sw.on i::after { left: auto; right: 2px; }
+.nt-sw.off { color: var(--text-dim); }
+.nt-sw:disabled { opacity: .5; cursor: default; }
+.nt-muted { font-family: var(--font-mono); font-size: .72rem; color: var(--accent); }
+
+/* ── The inbox ──────────────────────────────────────────────────────────────────────────────── */
+.nt-rows { display: grid; grid-template-columns: 6.5rem minmax(0, 9rem) minmax(0, 1fr) auto; gap: 0 1rem; align-items: start; }
+.nt-rows > div { padding: .6rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
+.nt-rows--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.nt-when { font-family: var(--font-mono); font-size: .72rem; line-height: 1.5; color: var(--text-dim); }
+.nt-when b { display: block; color: var(--text); font-weight: 500; }
+.nt-src { font-weight: 800; font-size: .85rem; color: var(--text); overflow-wrap: anywhere; }
+.nt-src small { display: block; font-family: var(--font-mono); font-size: .68rem; font-weight: 400; color: var(--text-dim); }
+.nt-what { font-size: .92rem; line-height: 1.45; color: var(--text); overflow-wrap: anywhere; }
+.nt-what b { font-weight: 800; }
+.nt-what small { display: block; color: var(--text-dim); font-size: .82rem; }
+.nt-what em { display: block; font-style: normal; font-family: var(--font-mono); font-size: .72rem; margin-top: .2rem; }
+.nt-what em.ok { color: var(--success-fg, #1f8f5a); }
+.nt-what em.bad { color: var(--accent); }
+.nt-what.unread b::before { content: ''; display: inline-block; width: .5rem; height: .5rem; background: var(--accent); margin-right: .5rem; vertical-align: middle; }
+.nt-doors { white-space: nowrap; }
+.nt-doors .og-door { margin-left: .8rem; }
+
+/* ── Senders ────────────────────────────────────────────────────────────────────────────────── */
+.nt-src-rows { display: grid; grid-template-columns: 2.2rem minmax(0, 1.2fr) minmax(0, 1fr) auto; gap: 0 1rem; align-items: center; }
+.nt-src-rows > div { padding: .7rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
+/* The mark is a whole box of its own here: the contacts rule is scoped to its own rows. */
+.nt-src-rows > .nt-av { width: 2.2rem; height: 2.2rem; padding: 0; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border: 2px solid var(--text); font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: .95rem; color: var(--text); }
+.nt-src-rows > .nt-av.ct-av--agent { border-style: dashed; color: var(--text-dim); }
+.nt-nm { font-weight: 800; font-size: .95rem; color: var(--text); }
+.nt-nm small { display: block; font-family: var(--font-mono); font-size: .7rem; font-weight: 400; color: var(--text-dim); margin-top: .1rem; overflow-wrap: anywhere; }
+.nt-w { font-size: .82rem; line-height: 1.45; color: var(--text-dim); }
+.nt-ctl { display: flex; gap: .9rem; align-items: center; justify-content: flex-end; white-space: nowrap; }
+.nt-groups { margin: 0 0 .4rem 1.6rem; padding-left: 1rem; border-left: 3px solid var(--sun); }
+.nt-empty-senders { padding: .7rem 0; }
+
+/* ── Devices ────────────────────────────────────────────────────────────────────────────────── */
+.nt-dev { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem; }
+.nt-dev-card { border: 2px solid var(--text); background: var(--card-bg); padding: .8rem .9rem; font-size: .85rem; line-height: 1.5; display: flex; flex-direction: column; gap: .3rem; }
+.nt-dev-card.this { border-color: var(--accent); }
+.nt-dev-card.dim { border-style: dashed; color: var(--text-dim); }
+.nt-dev-card b { font-weight: 800; font-size: .95rem; color: var(--text); }
+.nt-dev-card.dim b { color: var(--text-dim); }
+.nt-dev-card small { font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); }
+.nt-dev-card .og-doors { margin-top: auto; padding-top: .4rem; flex-wrap: wrap; }
+.nt-select { max-width: 12rem; font-size: .8rem; }
+
+/* ── Quiet hours and the roads ──────────────────────────────────────────────────────────────── */
+.nt-kv { margin-top: .2rem; }
+.nt-quiet-row { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; }
+.nt-time { width: 7rem; }
+.nt-tz { width: 12rem; }
+.nt-dash { color: var(--text-dim); }
+.nt-choice { margin-bottom: .2rem; }
+.nt-form-doors { margin-top: 1rem; }
+.nt-roads { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem; }
+.nt-road { display: flex; flex-direction: column; gap: .35rem; padding: .9rem 1rem; border: 2px solid var(--text); background: var(--card-bg); font-size: .85rem; line-height: 1.5; color: var(--text-dim); }
+.nt-road b { font-weight: 800; font-size: .95rem; color: var(--text); }
+.nt-road p { margin: 0; }
+.nt-road-k { font-family: var(--font-mono); font-size: .7rem; color: var(--accent); }
+.nt-road code { font-family: var(--font-mono); font-size: .74rem; color: var(--text); background: var(--bg-dim); padding: .2rem .4rem; overflow-wrap: anywhere; margin-top: auto; }
+
+/* ── Phone ──────────────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 860px) {
+  .nt-rows { grid-template-columns: minmax(0, 1fr) auto; grid-auto-flow: dense; }
+  .nt-rows--head { display: none; }
+  .nt-rows > .nt-when { grid-column: 1; border-bottom: 0; padding-bottom: 0; }
+  .nt-rows > .nt-when b { display: inline; margin-right: .5rem; }
+  .nt-rows > .nt-src { display: none; }
+  .nt-rows > .nt-what { grid-column: 1; padding-top: .1rem; }
+  .nt-rows > .nt-doors { grid-column: 2; grid-row: span 2; align-self: center; }
+  .nt-src-rows { grid-template-columns: 2.2rem minmax(0, 1fr); }
+  .nt-src-rows > .nt-w { display: none; }
+  .nt-src-rows > .nt-ctl { grid-column: 2; justify-content: flex-start; border-top: 0; padding-top: 0; flex-wrap: wrap; white-space: normal; }
+  .nt-src-rows > .nt-nm { border-bottom: 0; padding-bottom: .2rem; }
+  .nt-dev, .nt-roads { grid-template-columns: 1fr; }
+  .nt-groups { margin-left: .4rem; }
+}

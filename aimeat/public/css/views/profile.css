@@ -1865,17 +1865,11 @@
 /* Memory tab: sharing rules row */
 .pf .pf-rule-row { display: flex; gap: .5rem; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--border); }
 
-/* A settings row: a label and its explanation on the left, the control on the right. The
-   pf-notif-* names came first and the notifications tab still uses them; pf-setting-* is the
-   same rule under a name that does not claim the row is about notifications. */
-.pf .pf-notif-heading,
+/* A settings row: a label and its explanation on the left, the control on the right. (The
+   notifications tab moved to css/views/notifications-poster.css on 2026-08-30; pf-setting-* stays
+   for the other tabs that use the row.) */
 .pf .pf-setting-heading { font-weight: 600; margin-bottom: 4px; }
-.pf .pf-notif-text,
 .pf .pf-setting-text    { flex: 1; }
-.pf .pf-notif-disabled { opacity: .7; }
-.pf .pf-notif-options  { padding-left: 8px; border-left: 2px solid var(--glass-border, #E5E7EB); }
-.pf .pf-notif-option   { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: .9rem; cursor: pointer; }
-.pf .pf-notif-option:last-child { margin-bottom: 0; }
 
 /* Apps tab: inline edit panel */
 .pf .pf-edit-panel { margin-top: .75rem; padding: .75rem; background: var(--bg2, #f5f5f5); border-radius: 8px; }
