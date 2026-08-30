@@ -25,6 +25,10 @@
  * @usage
  *   import { UI_COMPONENTS, componentById, buildUiCatalogue } from './registry.js';
  * @version-history
+ *   v1.17.0 — 2026-08-30 — THE BROADCAST FAMILY (append-only): `crt`, `countdown` and `crawl`
+ *     join the components — the Music Television genre's parts extracted as reusable blocks
+ *     (the set with the credits box, the ranked rows in channel colours, the star-separated
+ *     strip), asked for by name on the Design Book wall.
  *   v1.16.0 — 2026-08-30 — THE COMMERCIAL SIDE (append-only): `legalLinks`, `auditTrail`,
  *     `feedbackForm` and `reviewerLine` join the components — self-sourced blocks carrying the
  *     money-adjacent facts (the app's own legal pages with the reason each exists, the
@@ -456,6 +460,40 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
     summary: '"Reviewed by NAME, who answers for this app" — with what a named review lifts (the visible AI-content label) and what it never lifts (the you-are-talking-to-an-AI notice), law linked. Reads the reviewer meta the node stamps on a served app; renders nothing when no reviewer is declared.',
     maxPerLayout: 1,
     props: {},
+  },
+  // ── The broadcast family (2026-08-30, append-only): the Music Television genre's parts as
+  //    reusable components, so a builder takes the set, the countdown or the crawl without
+  //    forking the whole page. Static by the register's physics — entrances only, no idle
+  //    repaints; the waveform component is the standalone VU meter.
+  {
+    id: 'crt',
+    summary: 'The CRT television set: a status strip (channel, slot, LIVE), a dark screen with static level bars, the credits box naming what plays and who made it — the provenance line is the point — and a tracking footer with progress. Display only; the app wires any transport around it. The source resolves to one record: { channel?, status?, live?, title, artist?, meta?, note?, bars?, progress? { value, total } }.',
+    maxPerLayout: 1,
+    props: {
+      source: source(),
+      title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
+      emptyTitle: text('What the empty state says when nothing is on air.', 80),
+      emptyHint: text('The line under it.', 160),
+    },
+  },
+  {
+    id: 'countdown',
+    summary: 'The chart countdown: ranked rows with a big numeral, title and a sub line, votes when given, each row wearing the next channel colour. The source resolves to rows of { rank?, title, sub?, votes? } — omitted ranks count down from the top. For charts, standings with theatre, anything announced one at a time.',
+    props: {
+      source: source(),
+      title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
+      emptyTitle: text('What the empty state says.', 80),
+      emptyHint: text('The line under it.', 160),
+    },
+  },
+  {
+    id: 'crawl',
+    summary: 'The news crawl: one loud strip of short items separated by stars, uppercase, standing still — it enters once and holds, because a stored arrangement never repaints on idle. The source resolves to rows of { text }, or plain strings.',
+    maxPerLayout: 1,
+    props: {
+      source: source(),
+      tone: { type: 'enum', values: ['signal', 'ink'], default: 'signal', description: 'The strip\'s ground: the signal-yellow band with ink words, or ink with paper words.' },
+    },
   },
 ];
 
