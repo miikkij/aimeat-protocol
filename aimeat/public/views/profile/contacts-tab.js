@@ -2,235 +2,262 @@
  * @file contacts-tab.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Profile → Contacts tab — the owner's address book. Two groups: SAVED contacts
- *   (explicitly added; removable) and MESSAGED people (DM conversation peers / gate rows; one
- *   click saves them). An add box takes an owner name, a member-directory pick, or an email
- *   (exact-match resolve → add; miss → the person panel, so the answer to "they have no account"
- *   is writing them down rather than a dead end). Blocked contacts are managed in Messages — this
- *   tab only counts them and links over.
- * @structure ContactsTab (default export)
+ * @description Profile › Contacts: the owner's address book, read through people. Loads the
+ *   merged list with what each person and the owner share and which invitations are open; holds
+ *   the handlers the cover, a person's page and the add fold call (add by name or email, write a
+ *   person down and invite them in the same move, edit what is known, invite into an organism,
+ *   the message door, remove); renders the poster face (contacts/cover.js).
+ * @structure ContactsTab (default) — state, loads, handlers, the ctx bag, render
  * @usage Registered in views/profile.js TABS as id 'contacts'.
  * @version-history
+ *   v2.0.0 — 2026-08-30 — The poster face (design canvas "AIMEAT Kontaktien sivu", direction A).
+ *     People, people without an account and agents under their people are three sections instead
+ *     of two lists; a person has a page; tags, links and the name are editable; an invitation
+ *     goes out without an organism; the chat prompt is on the page.
+ *   v1.2.0 — 2026-08-17 — TARGET-063: save a PERSON who has no account here.
+ *   v1.1.0 — 2026-07-18 — Card-cohesion pass.
  *   v1.0.0 — 2026-07-16 — Initial.
- *   v1.1.0 — 2026-07-18 — Vaihe 3 card-cohesion: the two contact groups (saved / messaged) are now
- *     each framed in a `.pf-agd-card` with a canonical `.pf-agd-section-label` header (were bare
- *     `.detail-label` text over unframed border-bottom row lists). The loose rows now read as two
- *     cohesive cards instead of a ragged column.
- *   v1.2.0 — 2026-08-17 — TARGET-063: save a PERSON who has no account here (name, email, note,
- *     relation, one link), show their card on the row, and edit note/relation in place. An
- *     unresolved email now opens that panel prefilled instead of only hinting at an organism.
  */
-import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
-import htm from 'htm';
-const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
-import { ContactPicker } from '/components/ContactPicker.js';
-import { PresenceDot } from '/components/PresenceDot.js';
+import { copyToClipboard } from '/js/utils.js';
+import { useConfirm } from '/components/Modal.js';
 import * as contactsService from '/js/services/contacts.js';
+import * as messagesService from '/js/services/messages.js';
+import { listOrganisms, inviteMember } from '/js/services/organisms.js';
 import { swallowed } from '/js/swallowed.js';
+import { c, nameOf, parts } from './contacts/frame.js';
+import { renderContactsView } from './contacts/cover.js';
 
-const KIND_ICON = { ghii: '👤', gaii: '🤖', geai: '🧩', mail: '✉' };
-const bare = (id) => String(id || '').split('@')[0];
-const initials = (id) => bare(id).slice(0, 2).toUpperCase();
-const EMPTY_PERSON = { name: '', email: '', note: '', relation: '', link: '' };
+const EMPTY_FORM = { name: '', email: '', relation: '', relationOther: false, tags: [], tagInput: '', links: [], note: '', invite: false, inviteMessage: '' };
+const openTabEvent = (tabId) => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } }));
 
 export default function ContactsTab({ showToast }) {
-  const [contacts, setContacts] = useState(null);
+  const { confirm, ConfirmUI } = useConfirm();
+  const [contacts, setContacts] = useState([]);
+  const [truncated, setTruncated] = useState(false);
   const [blockedCount, setBlockedCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [view, setView] = useState({ kind: 'cover' });
+  const [folds, setFolds] = useState({ add: false, where: false, perm: false });
+  const [road, setRoad] = useState('name');
   const [who, setWho] = useState('');
   const [busy, setBusy] = useState(false);
   const [q, setQ] = useState('');
-  const [emailMiss, setEmailMiss] = useState(null);   // unresolved email → the person panel
-  const [person, setPerson] = useState(null);         // null = panel closed
-  const [editing, setEditing] = useState(null);       // contact_id whose card is open
-  const [edit, setEdit] = useState({ note: '', relation: '' });
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [peopleFilter, setPeopleFilter] = useState('all');
+  const [showAll, setShowAll] = useState(false);
+  const [agentsFilter, setAgentsFilter] = useState('others');
+  const [form, setForm] = useState({ ...EMPTY_FORM });
+  const [formResolve, setFormResolve] = useState(null);   // null = not asked; { found, ... }
+  const [editing, setEditing] = useState(false);
+  const [personData, setPersonData] = useState(null);    // { id, together, thread }
+  const [orgChooser, setOrgChooser] = useState(false);
+  const [myOrganisms, setMyOrganisms] = useState(null);
 
-  const load = useCallback(async () => {
+  const me = (() => { try { return JSON.parse(localStorage.getItem('aimeat_session') || '{}'); } catch (err) { swallowed('contacts-tab: session', err); return {}; } })();
+  const myGhii = me.owner && contacts.length ? (contacts.find(r => r.owner && parts(r.owner).owner === me.owner)?.owner || `${me.owner}@${parts(contacts[0].contact_id).node}`) : (me.owner || '');
+
+  const fail = (e, fallback) => showToast?.(e?.error?.message || e?.response?.error?.message || e?.message || fallback || t('contacts.addFailed'), true);
+
+  const load = useCallback(async ({ showSpinner = true } = {}) => {
+    if (showSpinner) setLoading(true);
     try {
       const [list, blocked] = await Promise.all([
-        contactsService.listContacts(),
-        contactsService.listContacts({ state: 'blocked' }),
+        contactsService.listContacts({ include: 'together,invites' }),
+        contactsService.listContacts({ state: 'blocked' }).catch(err => { swallowed('contacts-tab: blocked', err); return []; }),
       ]);
       setContacts(list);
+      setTruncated(false);
       setBlockedCount(blocked.length);
-    } catch (err) { swallowed('contacts-tab', err); setContacts([]); }
+    } catch (err) { swallowed('contacts-tab', err); }
+    finally { setLoading(false); }
   }, []);
+
+  const loadPerson = useCallback(async (id) => {
+    const row = contacts.find(r => r.contact_id === id);
+    setPersonData({ id, together: null, thread: null });
+    const [together, thread] = await Promise.all([
+      row?.kind === 'ghii' ? contactsService.together(id).catch(err => { swallowed('contacts-tab: together', err); return { organisms: [], workspaces: [], agents: [] }; }) : Promise.resolve(null),
+      row?.conversation_id ? messagesService.getConversation(row.conversation_id).catch(err => { swallowed('contacts-tab: thread', err); return []; }) : Promise.resolve([]),
+    ]);
+    setPersonData(d => (d?.id === id ? { id, together, thread } : d));
+  }, [contacts]);
+
   useEffect(() => { load(); }, [load]);
-  const liveRef = useRef(load); liveRef.current = load;
-  useEffect(() => onLiveUpdate(['messages'], () => liveRef.current()), []);
+  const liveRef = useRef(null);
+  liveRef.current = () => { load({ showSpinner: false }); };
+  useEffect(() => onLiveUpdate(['messages', 'organisms'], () => liveRef.current()), []);
+  useEffect(() => { if (view.kind === 'person' && contacts.length && personData?.id !== view.id) loadPerson(view.id); }, [view, contacts.length]);   // eslint-disable-line react-hooks/exhaustive-deps -- loadPerson changes with contacts; the id guard stops a loop
 
-  const fail = (e, key, fallback) => showToast((e && e.message) || (t(key) || fallback), true);
+  const rowOf = useCallback((id) => contacts.find(r => r.contact_id === id) || null, [contacts]);
+  const personOf = useCallback((ghii) => (ghii ? contacts.find(r => r.contact_id === ghii) || null : null), [contacts]);
+  const people = contacts.filter(r => r.kind === 'ghii');
+  const noAccount = contacts.filter(r => r.kind === 'mail');
+  const agents = contacts.filter(r => r.kind === 'gaii' || r.kind === 'geai');
 
-  const add = async (target) => {
+  const pickView = useCallback((v) => {
+    setView(v);
+    setEditing(false); setOrgChooser(false);
+    setFolds(f => ({ ...f, perm: false }));
+    const box = document.querySelector('.page-content') || document.querySelector('.pf-content');
+    if (box) box.scrollTo({ top: 0 });
+  }, []);
+  const openPerson = (id) => pickView({ kind: 'person', id });
+  const setFold = (k, open) => setFolds(f => ({ ...f, [k]: open }));
+  const openAdd = (which) => { setRoad(which); setFold('add', true); setTimeout(() => document.getElementById('ct-add')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 30); };
+  const resetForm = () => { setForm({ ...EMPTY_FORM }); setFormResolve(null); };
+
+  /* ── doors to other pages ── */
+  const openTab = (tabId) => openTabEvent(tabId);
+  const message = (id) => { window.location.assign(`/v1/profile?tab=messages&to=${encodeURIComponent(id)}`); };
+  // The inbox opens the thread named in this hint when the tab opens (the same road the bell uses).
+  const openConversation = (conversationId) => { try { sessionStorage.setItem('aimeat.inbox.open', conversationId); } catch (err) { swallowed('contacts-tab: inbox hint', err); } openTabEvent('messages'); };
+
+  /* ── add by name or email ── */
+  async function add(target) {
     const id = (target ?? who).trim();
     if (!id) return;
     setBusy(true);
     try {
       const r = await contactsService.addContact(id);
-      if (r?.ok === false) showToast(r?.error?.message || (t('contacts.addFailed') || 'Could not add the contact'), true);
-      else { showToast(t('contacts.added') || 'Contact saved'); setWho(''); setEmailMiss(null); }
-      await load();
-    } catch (e) { fail(e, 'contacts.addFailed', 'Could not add the contact'); }
+      if (r?.ok === false) throw r;
+      showToast?.(t('contacts.added'));
+      setWho('');
+      await load({ showSpinner: false });
+    } catch (e) { fail(e); }
     finally { setBusy(false); }
-  };
+  }
+  const emailUnresolved = (email) => { setForm({ ...EMPTY_FORM, email }); setFormResolve({ found: false }); setRoad('person'); setFold('add', true); };
 
-  // An email nobody here owns is not a dead end: it is a person worth writing down. The panel
-  // opens with the address already filled so the only thing left to type is who they are.
-  const openPersonFor = (email) => { setEmailMiss(email); setPerson({ ...EMPTY_PERSON, email }); };
-
-  const savePerson = async () => {
-    if (!person?.name.trim() || !person?.email.trim()) return;
+  /* ── the person form ── */
+  async function resolveForm() {
+    const email = form.email.trim();
+    if (!email || !email.includes('@')) { setFormResolve(null); return; }
+    try { setFormResolve(await contactsService.resolveEmail(email)); }
+    catch (err) { swallowed('contacts-tab: resolve', err); setFormResolve(null); }
+  }
+  const cardOf = (f) => ({
+    name: f.name.trim(), email: f.email.trim(), note: f.note.trim() || null, relation: f.relation.trim() || null,
+    tags: (f.tags || []).map(x => x.trim()).filter(Boolean),
+    links: (f.links || []).map(l => ({ label: (l.label || '').trim(), url: (l.url || '').trim() })).filter(l => l.url),
+  });
+  async function savePerson() {
     setBusy(true);
     try {
-      const r = await contactsService.savePerson({
-        name: person.name.trim(), email: person.email.trim(),
-        note: person.note.trim() || null,
-        relation: person.relation.trim() || null,
-        links: person.link.trim() ? [{ label: '', url: person.link.trim() }] : undefined,
-      });
-      if (r?.ok === false) showToast(r?.error?.message || (t('contacts.addFailed') || 'Could not add the contact'), true);
-      else { showToast(t('contacts.added') || 'Contact saved'); setPerson(null); setEmailMiss(null); setWho(''); }
-      await load();
-    } catch (e) { fail(e, 'contacts.addFailed', 'Could not add the contact'); }
+      const r = await contactsService.savePerson(cardOf(form));
+      if (r?.ok === false) throw r;
+      let note = t('contacts.added');
+      if (form.invite && r?.data?.kind === 'mail') {
+        const inv = await contactsService.invite(form.email.trim(), form.inviteMessage.trim());
+        if (inv?.ok === false) { fail(inv); note = t('contacts.added'); }
+        else note = inv?.data?.email_sent ? c('invitedSent', { email: form.email.trim() }) : c('invitedNoMail');
+      }
+      showToast?.(note);
+      resetForm();
+      await load({ showSpinner: false });
+    } catch (e) { fail(e); }
     finally { setBusy(false); }
+  }
+  const startEdit = (row) => {
+    setForm({ ...EMPTY_FORM, name: row.saved_name || row.display_name || '', email: row.email || '', relation: row.relation || '', tags: row.tags || [], links: (row.links || []).map(l => ({ ...l })), note: row.note || '' });
+    setFormResolve(null);
+    setEditing(true);
   };
-
-  const saveCard = async (id) => {
+  async function saveEdit() {
+    const row = rowOf(view.id);
+    if (!row) return;
     setBusy(true);
     try {
-      const r = await contactsService.updatePerson(id, { note: edit.note.trim() || null, relation: edit.relation.trim() || null });
-      if (r?.ok === false) showToast(r?.error?.message || (t('contacts.updateFailed') || 'Could not update the contact'), true);
-      else { showToast(t('contacts.updated') || 'Contact updated'); setEditing(null); }
-      await load();
-    } catch (e) { fail(e, 'contacts.updateFailed', 'Could not update the contact'); }
+      const card = cardOf(form);
+      // A person with an account keeps their own name and address; the owner edits the rest.
+      const patch = row.kind === 'mail' ? card : { note: card.note, tags: card.tags, links: card.links, relation: card.relation };
+      let r;
+      if (row.kind === 'ghii' && !row.email && !row.saved_name && !row.note && !(row.tags || []).length && !(row.links || []).length && !row.relation) {
+        // No card behind this identity yet: the first edit creates one with the address it needs.
+        r = card.email ? await contactsService.savePerson(card) : { ok: false, error: { message: c('needEmailForCard') } };
+      } else {
+        r = await contactsService.updatePerson(row.contact_id, patch);
+      }
+      if (r?.ok === false) throw r;
+      showToast?.(t('contacts.updated'));
+      setEditing(false);
+      await load({ showSpinner: false });
+    } catch (e) { fail(e); }
     finally { setBusy(false); }
-  };
+  }
 
-  const remove = async (id) => {
+  /* ── invitations ── */
+  async function invite(row) {
+    if (!row.email) return;
+    confirm(c('inviteConfirm', { email: row.email }), async () => {
+      setBusy(true);
+      try {
+        const r = await contactsService.invite(row.email);
+        if (r?.ok === false) throw r;
+        showToast?.(r?.data?.email_sent ? c('invitedSent', { email: row.email }) : c('invitedNoMail'));
+        if (!r?.data?.email_sent && r?.data?.accept_url) copyToClipboard(r.data.accept_url);
+        await load({ showSpinner: false });
+      } catch (e) { fail(e); }
+      finally { setBusy(false); }
+    });
+  }
+  async function toggleOrgChooser() {
+    const next = !orgChooser;
+    setOrgChooser(next);
+    if (next && !myOrganisms) {
+      try {
+        const r = await listOrganisms({ member: 'me' });
+        // Ownership is plural: `owners` is the truth, creatorGhii its older mirror, admins beside them.
+        const mine = me.owner;
+        const list = (r?.data?.organisms || r?.data || []).filter(o => o && ((o.owners || []).includes(mine) || o.creatorGhii === mine || (o.admins || []).includes(mine)));
+        setMyOrganisms(list);
+      } catch (err) { swallowed('contacts-tab: organisms', err); setMyOrganisms([]); }
+    }
+  }
+  async function inviteToOrganism(org, row) {
     setBusy(true);
     try {
-      const r = await contactsService.removeContact(id);
-      if (r?.ok === false) showToast(r?.error?.message || (t('contacts.removeFailed') || 'Could not remove the contact'), true);
-      else showToast(t('contacts.removed') || 'Contact removed');
-      await load();
-    } catch (e) { fail(e, 'contacts.removeFailed', 'Could not remove the contact'); }
+      const r = await inviteMember(org.id, parts(row.contact_id).owner);
+      if (r?.ok === false) throw r;
+      showToast?.(c('invitedToOrganism', { name: nameOf(row), org: org.name }));
+      setOrgChooser(false);
+    } catch (e) { fail(e); }
     finally { setBusy(false); }
+  }
+
+  /* ── remove ── */
+  function remove(row) {
+    confirm(row.has_messages ? c('removeConfirmHistory', { name: nameOf(row) }) : c('removeConfirm', { name: nameOf(row) }), async () => {
+      setBusy(true);
+      try {
+        const r = await contactsService.removeContact(row.contact_id);
+        if (r?.ok === false) throw r;
+        showToast?.(t('contacts.removed'));
+        pickView({ kind: 'cover' });
+        await load({ showSpinner: false });
+      } catch (e) { fail(e); }
+      finally { setBusy(false); }
+    }, { danger: true });
+  }
+
+  /* ── the prompt ── */
+  async function copyPrompt() {
+    try {
+      const text = await contactsService.getPrompt();
+      if (!text) throw new Error(c('promptUnavailable'));
+      copyToClipboard(text);
+      showToast?.(c('promptCopied'));
+    } catch (e) { fail(e, c('promptUnavailable')); }
+  }
+
+  const ctx = {
+    contacts, people, noAccount, agents, truncated, blockedCount, loading, view, folds, road, who, busy, q, searchOpen, peopleFilter, showAll, agentsFilter,
+    form, formResolve, editing, personData, orgChooser, myOrganisms, me: myGhii, ConfirmUI,
+    rowOf, personOf, pickView, openPerson, setFold, openAdd, setRoad, setWho, setQ, setSearchOpen, setPeopleFilter, setShowAll, setAgentsFilter,
+    setForm, resetForm, setEditing, openTab, message, openConversation,
+    add, emailUnresolved, resolveForm, savePerson, startEdit, saveEdit, invite, toggleOrgChooser, inviteToOrganism, remove, copyPrompt,
   };
-
-  const filter = (list) => {
-    const needle = q.trim().toLowerCase();
-    if (!needle) return list;
-    return list.filter(c => c.contact_id.toLowerCase().includes(needle)
-      || (c.display_name || '').toLowerCase().includes(needle)
-      || (c.email || '').toLowerCase().includes(needle));
-  };
-  const all = contacts || [];
-  const saved = filter(all.filter(c => c.origin === 'saved'));
-  const messaged = filter(all.filter(c => c.origin !== 'saved'));
-
-  const kindBadge = (kind) => kind === 'gaii' ? (t('contacts.kindAgent') || 'agent')
-    : kind === 'geai' ? (t('contacts.kindApp') || 'app')
-      : (t('contacts.kindPerson') || 'no account yet');
-
-  const row = (c, actions) => html`
-    <div class="pf-ct-row" key=${c.contact_id}>
-      <div class="pf-ct-avatar" aria-hidden="true">${c.kind === 'ghii' ? initials(c.contact_id) : (KIND_ICON[c.kind] || '👤')}</div>
-      <div class="pf-ct-main">
-        <div class="pf-ct-name">
-          ${c.display_name || bare(c.contact_id)}
-          ${c.kind === 'ghii' ? html` <${PresenceDot} ghii=${c.contact_id} />` : null}
-          ${c.kind !== 'ghii' ? html`<span class="badge badge-info">${kindBadge(c.kind)}</span>` : null}
-          ${c.relation ? html`<span class="badge">${c.relation}</span>` : null}
-        </div>
-        <div class="pf-ct-id">${c.kind === 'mail' ? c.email : c.contact_id}${c.has_messages ? ` · ${t('contacts.hasMessages') || 'messaged'}` : ''}</div>
-        ${(c.email && c.kind !== 'mail') || c.note || (c.links || []).length ? html`
-          <div class="pf-ct-card">
-            ${c.email && c.kind !== 'mail' ? html`<span class="pf-ct-id">${c.email}</span>` : null}
-            ${(c.links || []).length ? html`
-              <span class="pf-ct-links">
-                ${c.links.map(l => html`<a href=${l.url} target="_blank" rel="noopener noreferrer">${l.label || l.url}</a>`)}
-              </span>` : null}
-            ${c.note ? html`<span class="pf-ct-card-note">${c.note}</span>` : null}
-          </div>` : null}
-        ${editing === c.contact_id ? html`
-          <div class="pf-ct-edit">
-            <input class="input-field input-sm" placeholder=${t('contacts.notePlaceholder') || 'What should you remember about them?'}
-              value=${edit.note} onInput=${(e) => setEdit({ ...edit, note: e.target.value })} />
-            <input class="input-field input-sm" placeholder=${t('contacts.relationPlaceholder') || 'following, to invite, colleague…'}
-              value=${edit.relation} onInput=${(e) => setEdit({ ...edit, relation: e.target.value })} />
-            <button class="btn-primary btn-sm" disabled=${busy} onClick=${() => saveCard(c.contact_id)}>${t('contacts.saveCard') || 'Save'}</button>
-            <button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => setEditing(null)}>${t('common.cancel') || 'Cancel'}</button>
-          </div>` : null}
-      </div>
-      ${actions}
-    </div>`;
-
-  return html`
-    <div class="pf-ct">
-      <div class="section-title">${t('contacts.title') || 'Contacts'}</div>
-      <div class="section-desc">${t('contacts.desc') || 'Your address book: people you trust and people you have messaged. Contacts feed the identity pickers everywhere you grant access — organisms, workspaces, and apps.'}</div>
-
-      <div class="pf-ct-addrow">
-        <${ContactPicker} value=${who} onChange=${setWho} onSubmit=${() => add()} valueMode="full"
-          onEmailUnresolved=${openPersonFor}
-          placeholder=${t('contacts.addPlaceholder') || 'owner name or email'} disabled=${busy} />
-        <button class="btn-primary btn-sm" disabled=${busy || !who.trim()} onClick=${() => add()}>${'+ '}${t('contacts.add') || 'Add'}</button>
-        <button class="btn-outline btn-sm" disabled=${busy}
-          onClick=${() => setPerson(person ? null : { ...EMPTY_PERSON })}>${t('contacts.addPerson') || 'Add someone without an account'}</button>
-        <input class="input-field input-sm pf-ct-filter" placeholder=${t('contacts.filterPlaceholder') || 'Filter…'}
-          value=${q} onInput=${(e) => setQ(e.target.value)} />
-      </div>
-
-      ${person ? html`
-        <div class="pf-ct-person">
-          <div class="pf-ct-person-grid">
-            <input class="input-field input-sm" placeholder=${t('contacts.personName') || 'Name'}
-              value=${person.name} onInput=${(e) => setPerson({ ...person, name: e.target.value })} />
-            <input class="input-field input-sm" type="email" placeholder=${t('contacts.personEmail') || 'Email'}
-              value=${person.email} onInput=${(e) => setPerson({ ...person, email: e.target.value })} />
-            <input class="input-field input-sm" placeholder=${t('contacts.relationPlaceholder') || 'following, to invite, colleague…'}
-              value=${person.relation} onInput=${(e) => setPerson({ ...person, relation: e.target.value })} />
-            <input class="input-field input-sm" placeholder=${t('contacts.personLink') || 'Link (LinkedIn, site…)'}
-              value=${person.link} onInput=${(e) => setPerson({ ...person, link: e.target.value })} />
-            <input class="input-field input-sm" placeholder=${t('contacts.notePlaceholder') || 'What should you remember about them?'}
-              value=${person.note} onInput=${(e) => setPerson({ ...person, note: e.target.value })} />
-          </div>
-          <div class="pf-ct-person-actions">
-            <button class="btn-primary btn-sm" disabled=${busy || !person.name.trim() || !person.email.trim()}
-              onClick=${savePerson}>${t('contacts.savePerson') || 'Save person'}</button>
-            <button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => { setPerson(null); setEmailMiss(null); }}>${t('common.cancel') || 'Cancel'}</button>
-            <span class="pf-ct-person-hint">${t('contacts.personHint') || 'If they open an account with this address later, this entry becomes them and nothing you wrote is lost.'}</span>
-          </div>
-        </div>` : null}
-
-      ${emailMiss && !person ? html`
-        <div class="section-desc pf-ct-miss">
-          ${(t('contacts.inviteHint') || 'No account for {email} yet — invite them by email from an organism\'s Members tab (they get an account and the access you choose in one step).').replace('{email}', emailMiss)}
-        </div>` : null}
-
-      ${contacts === null ? html`<div class="section-desc">${t('contacts.loading') || 'Loading…'}</div>` : html`
-        <div class="pf-agd-card pf-ct-group">
-          <div class="pf-agd-section-label">${t('contacts.savedGroup') || 'Saved contacts'} <span class="pf-ct-count">${saved.length}</span></div>
-          ${saved.length ? saved.map(c => row(c, html`
-            ${c.email ? html`<button class="btn-ghost btn-sm" disabled=${busy}
-              onClick=${() => { setEditing(editing === c.contact_id ? null : c.contact_id); setEdit({ note: c.note || '', relation: c.relation || '' }); }}>${t('contacts.edit') || 'Edit'}</button>` : null}
-            <button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => remove(c.contact_id)}>${t('contacts.remove') || 'Remove'}</button>
-          `)) : html`<div class="section-desc">${t('contacts.savedEmpty') || 'Nobody saved yet — add someone above, or save a messaged person below.'}</div>`}
-        </div>
-
-        <div class="pf-agd-card pf-ct-group">
-          <div class="pf-agd-section-label">${t('contacts.messagedGroup') || 'People you\'ve messaged'} <span class="pf-ct-count">${messaged.length}</span></div>
-          ${messaged.length ? messaged.map(c => row(c, html`
-            <button class="btn-outline btn-sm" disabled=${busy} onClick=${() => add(c.contact_id)}>${t('contacts.save') || 'Save'}</button>
-          `)) : html`<div class="section-desc">${t('contacts.messagedEmpty') || 'Direct-message conversations show up here automatically.'}</div>`}
-        </div>
-
-        ${blockedCount > 0 ? html`
-          <div class="section-desc pf-ct-blocked">
-            ${(t('contacts.blockedNote') || '{n} blocked contact(s) — manage them in the Messages tab.').replace('{n}', String(blockedCount))}
-          </div>` : null}
-      `}
-    </div>`;
+  return renderContactsView(ctx);
 }
