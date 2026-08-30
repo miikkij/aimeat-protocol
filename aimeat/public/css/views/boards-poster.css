@@ -1,0 +1,100 @@
+/**
+ * @file boards-poster.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The Boards page in the poster face (bp- prefix; design canvas "AIMEAT Taulujen sivu",
+ *   direction A). The shared parts (crumb, masthead, strip, sections, folds, rail, fields, choices)
+ *   come from organism.css's og- rules; this file carries what boards add: the boards table, a
+ *   notice as a row, the composer with its side column, a reply in the thread, the own-board form,
+ *   the members block and the two columns of the app fold. NOTE: this file must be linked in
+ *   spa.html (useViewCSS is a no-op).
+ * @version-history
+ *   v1.0.0 — 2026-08-30 — Initial.
+ */
+
+.og-bp .og-chip--coral { border-color: var(--accent); color: var(--accent); }
+.og-bp .bp-chip--case { text-transform: none; }
+.og-bp .bp-door--case { text-transform: none; }
+.og-bp .og-door.on { color: var(--accent); border-bottom-color: var(--accent); }
+.og-bp .og-choice-btn.on { background: var(--text); color: var(--card-bg); }
+.og-bp .og-choice-btn:disabled { cursor: default; }
+.og-bp .og-empty { margin: 0; font-size: .9rem; color: var(--text-dim); }
+.og-bp .bp-hint { margin: .6rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--text-dim); }
+.og-bp .og-field .bp-hint { margin-top: .2rem; }
+.og-bp .bp-loading { display: inline-block; padding-left: 1.1rem; position: relative; }
+.og-bp .bp-loading::before { content: ''; position: absolute; left: 0; top: .35em; width: .55em; height: .55em; background: var(--accent); animation: bpBlink 1s steps(2, start) infinite; }
+@keyframes bpBlink { to { visibility: hidden; } }
+.og-title.bp-title--page { font-size: 2.1rem; overflow-wrap: anywhere; }
+.og-bp .bp-more { margin-top: .8rem; }
+.og-bp .og-rail-link.on { color: var(--accent); }
+.og-bp .bp-rail-static { cursor: default; }
+.og-bp .bp-rail-note { padding: .3rem 0 0 1.7rem; font-size: .78rem; line-height: 1.5; color: var(--text-dim); }
+.og-bp .og-label { display: block; }
+/* A fold's title stays on one line; its long sub-line gives way instead of squeezing the title. */
+.og-bp .og-fold > span:not(.og-fold-r):not(.og-fold-arrow) { white-space: nowrap; }
+.og-bp .og-fold-r { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── The boards table ───────────────────────────────────────────────────────────────────────── */
+.bp-rows { display: grid; grid-template-columns: minmax(0, 1fr) 6.5rem minmax(0, 8rem) minmax(0, 11rem) 3.5rem; gap: 0 1rem; align-items: center; }
+.bp-rows > div { padding: .6rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
+.bp-rows--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.bp-rows .bp-nm { font-weight: 800; font-size: .95rem; color: var(--text); }
+.bp-rows .bp-nm .og-tbl-name { white-space: normal; overflow-wrap: anywhere; }
+.bp-rows .bp-nm small { display: block; font-size: .78rem; font-weight: 400; color: var(--text-dim); margin-top: .1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bp-rows .bp-m { font-family: var(--font-mono); font-size: .72rem; line-height: 1.5; color: var(--text-dim); }
+.bp-rows .bp-m b { color: var(--text); font-weight: 500; }
+.bp-rows .bp-m--q { color: var(--border); }
+
+/* ── A notice as a row ──────────────────────────────────────────────────────────────────────── */
+.bp-notice { display: grid; grid-template-columns: 6rem minmax(0, 1fr) 9rem; gap: 0 1.1rem; padding: .85rem 0; border-bottom: 1px solid var(--border); align-items: start; }
+.bp-cat { font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); padding-top: .2rem; overflow-wrap: anywhere; }
+.bp-cat--q { color: var(--text-dim); }
+.bp-notice-body { min-width: 0; }
+.bp-notice-title { background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit; font-size: 1rem; font-weight: 800; line-height: 1.3; color: var(--text); text-align: left; display: block; overflow-wrap: anywhere; }
+.bp-notice-title:hover { color: var(--accent); }
+.bp-notice-body p { margin: .25rem 0 0; font-size: .88rem; line-height: 1.55; color: var(--text); max-width: 66ch; overflow-wrap: anywhere; }
+.bp-who { margin-top: .35rem; font-family: var(--font-mono); font-size: .72rem; line-height: 1.5; color: var(--text-dim); }
+.bp-who b { color: var(--text); font-weight: 500; }
+.bp-who-board { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; color: var(--accent); }
+.bp-r { text-align: right; font-family: var(--font-mono); font-size: .72rem; line-height: 1.6; color: var(--text-dim); }
+.bp-r b { display: block; color: var(--text); font-weight: 500; }
+.bp-notice-text { margin: 1.2rem 0 0; font-size: 1.05rem; line-height: 1.6; color: var(--text); max-width: 66ch; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* ── The composer, a reply, the poster's tools ──────────────────────────────────────────────── */
+.bp-composer { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 18rem); gap: 1.2rem 1.6rem; align-items: start; }
+.bp-composer--reply { grid-template-columns: minmax(0, 1fr) auto; align-items: end; margin-top: 1.2rem; padding-top: 1rem; border-top: 3px solid var(--text); }
+.bp-composer-main { gap: .6rem; }
+.bp-composer-side { display: flex; flex-direction: column; gap: 1rem; }
+.bp-composer-side .og-doors { margin-top: .2rem; }
+.bp-reply { padding: .7rem 0 .7rem 1.2rem; border-left: 3px solid var(--border); margin-top: .7rem; }
+.bp-reply p { margin: .25rem 0 0; font-size: .92rem; line-height: 1.55; color: var(--text); max-width: 66ch; white-space: pre-wrap; overflow-wrap: anywhere; }
+.bp-tools { flex-wrap: wrap; }
+
+/* ── The own-board form, the rules, the members ─────────────────────────────────────────────── */
+.bp-form .og-fields--2 { gap: 1.2rem 1.6rem; }
+.bp-field--narrow .og-input { max-width: 10rem; }
+.bp-danger-row { margin-top: .4rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+.bp-members { display: flex; flex-direction: column; gap: .5rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+.bp-members .bp-hint { margin: 0; }
+.bp-member-list { display: flex; flex-wrap: wrap; gap: .4rem; }
+.bp-member-x { background: none; border: 0; padding: 0 0 0 .3rem; cursor: pointer; font: inherit; color: var(--accent); }
+.bp-member-add { display: flex; gap: 1rem; align-items: flex-end; }
+.bp-member-add .og-input { max-width: 24rem; }
+
+/* ── The app fold ───────────────────────────────────────────────────────────────────────────── */
+.bp-app { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 1.6rem; }
+.bp-app-col { display: flex; flex-direction: column; gap: .7rem; font-size: .88rem; line-height: 1.55; color: var(--text-dim); }
+.bp-app-col p { margin: 0; }
+.bp-app-col b { font-weight: 800; font-size: .95rem; color: var(--text); }
+.bp-code { margin: 0; padding: .7rem .9rem; border: 1px solid var(--border); background: var(--card-bg); font-family: var(--font-mono); font-size: .72rem; line-height: 1.6; color: var(--text); overflow-x: auto; white-space: pre; }
+
+@media (max-width: 900px) {
+  .bp-rows { grid-template-columns: minmax(0, 1fr) 5rem 3.5rem; }
+  .bp-rows--head { display: none; }
+  .bp-rows .bp-m:nth-child(5n + 3), .bp-rows .bp-m:nth-child(5n + 4) { display: none; }
+  .bp-notice { grid-template-columns: minmax(0, 1fr); gap: .3rem 0; }
+  .bp-r { text-align: left; }
+  .bp-r b { display: inline; margin-right: .5rem; }
+  .bp-composer, .bp-composer--reply, .bp-app { grid-template-columns: minmax(0, 1fr); }
+  .bp-form .og-fields--2 { grid-template-columns: minmax(0, 1fr); }
+}

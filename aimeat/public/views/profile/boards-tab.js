@@ -2,334 +2,272 @@
  * @file boards-tab.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Profile tab for discussion boards — create, subscribe, browse, post, react, delete, member management.
+ * @description Profile › Boards: the notice boards people and agents publish to together. Loads the
+ *   boards this session can see, the subscriptions and a page of notices per followed board; holds
+ *   the handlers the cover, a board's page and a notice's page call (create, follow, publish, thank,
+ *   reply, resolve, extend, delete, report, the rules, the members); renders the poster face
+ *   (boards/cover.js).
+ * @structure BoardsTab (default) — state, loads, handlers, the ctx bag, render
+ * @usage
+ *   import BoardsTab from './boards-tab.js';
+ *   html`<${BoardsTab} session=${session} showToast=${showToast} />`
  * @version-history
- *   v1.0.0 — 2026-03-17 — Refactor: replace inline styles with CSS utility classes
+ *   v2.0.0 — 2026-08-30 — The poster face (design canvas "AIMEAT Taulujen sivu", direction A): the
+ *     cover with followed boards, the newest notices, public boards, a board of one's own and a
+ *     board for an app; a board's page with notices, the composer and the rules; a notice's page
+ *     with replies, thanks and the poster's tools. Replaces the subscriptions list, "browse all", the
+ *     create form on an empty page, the chat-shaped board view and the five emoji reactions.
  *   v1.1.0 — 2026-03-20 — Add board member management UI for shared boards
+ *   v1.0.0 — 2026-03-17 — Refactor: replace inline styles with CSS utility classes
  */
-import { h } from 'preact';
-import { useState, useEffect, useRef } from 'preact/hooks';
-import htm from 'htm';
+import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import { onLiveUpdate } from '/lib/live-updates.js';
-const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml, timeAgo } from '/js/utils.js';
-import { Spinner } from './shared.js';
+import { copyToClipboard } from '/js/utils.js';
 import { useConfirm } from '/components/Modal.js';
 import * as boardsService from '/js/services/boards.js';
 import { swallowed } from '/js/swallowed.js';
+import { bid, followedOf, c } from './boards/frame.js';
+import { renderBoardsView } from './boards/cover.js';
 
-/** Extract the owner name from a GAII or GHII string. */
-function extractOwner(gaii) {
-  if (!gaii) return '';
-  // agent#owner@node -> owner
-  const hashIdx = gaii.indexOf('#');
-  const atIdx = gaii.indexOf('@');
-  if (hashIdx >= 0 && atIdx > hashIdx) return gaii.slice(hashIdx + 1, atIdx);
-  // owner@node -> owner
-  if (atIdx >= 0) return gaii.slice(0, atIdx);
-  return gaii;
+const PAGE = 20;
+const EMPTY_FORM = { name: '', description: '', visibility: 'private', posting: 'anyone', categories: '', ttl: '168', price: '5' };
+const EMPTY_NOTICE = { title: '', body: '', category: '', ttl: '' };
+
+/** The rules form for a board, from what the board carries. */
+function rulesFormOf(b) {
+  return {
+    visibility: b?.visibility || 'private',
+    posting: b?.rules?.posting || (b?.visibility === 'public' ? 'anyone' : b?.visibility === 'shared' ? 'members' : 'owner'),
+    categories: (b?.rules?.categories || []).join(', '),
+    ttl: String(b?.rules?.default_ttl_hours ?? 168),
+    price: b?.rules?.post_cost !== undefined ? String(b.rules.post_cost) : '',
+    federate: b?.federate ? 'yes' : 'no',
+  };
+}
+/** The rules a form adds up to, in the wire shape; undefined fields mean the node's default. */
+function rulesOf(f) {
+  const cats = String(f.categories || '').split(',').map(s => s.trim()).filter(Boolean);
+  const out = {};
+  if (f.posting) out.posting = f.posting;
+  if (cats.length) out.categories = cats;
+  if (f.ttl) out.default_ttl_hours = Number(f.ttl);
+  if (f.visibility === 'public' && f.price !== '' && f.price !== undefined) out.post_cost = Math.max(0, Math.round(Number(f.price)));
+  return out;
 }
 
 export default function BoardsTab({ session, showToast }) {
   const { confirm, ConfirmUI } = useConfirm();
-  const [myBoards, setMyBoards] = useState(null);
-  const [allBoards, setAllBoards] = useState(null);
-  const [boardView, setBoardView] = useState(null);
-  const [brdSubTab, setBrdSubTab] = useState('mine');
-  const [showBrdForm, setShowBrdForm] = useState(false);
-  // Ref used by the board-detail view below — declared unconditionally (Rules of Hooks).
-  const postRef = useRef(null);
+  const [boards, setBoards] = useState([]);
+  const [subs, setSubs] = useState([]);
+  const [pages, setPages] = useState({});           // board id → { posts, cursor, authors }
+  const [pageLoading, setPageLoading] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [view, setView] = useState({ kind: 'cover' });
+  const [folds, setFolds] = useState({ own: false, app: false, rules: false, tools: false });
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [creating, setCreating] = useState(false);
+  const [notice, setNotice] = useState(EMPTY_NOTICE);
+  const [posting, setPosting] = useState(false);
+  const [rules, setRules] = useState(rulesFormOf(null));
+  const [savingRules, setSavingRules] = useState(false);
+  const [memberInput, setMemberInput] = useState('');
+  const [openNotice, setOpenNotice] = useState(null);   // { post, replies, authors }
+  const [replyText, setReplyText] = useState('');
+  const [replying, setReplying] = useState(false);
+  const [thanking, setThanking] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const [onlyNew, setOnlyNew] = useState(false);
+  const [recentFilter, setRecentFilter] = useState('all');
+  const [recentAll, setRecentAll] = useState(false);
+  const [publicAll, setPublicAll] = useState(false);
+  const [catFilter, setCatFilter] = useState('');
 
-  useEffect(() => {
-    if (session) loadMyData();
-  }, [session]);
+  const boardById = useCallback((id) => boards.find(b => bid(b) === id), [boards]);
+  const { followed, others, isMine, isSubscribed } = followedOf(boards, subs, session);
 
-  async function loadMyData() {
-    try { setMyBoards(await boardsService.listSubscriptions()); }
-    catch (err) { swallowed('boards-tab', err); setMyBoards([]); }
-  }
-
-  // Live update listener
-  const loadRef = useRef(loadMyData);
-  loadRef.current = loadMyData;
-  useEffect(() => onLiveUpdate(['boards'], () => loadRef.current()), []);
-
-  async function loadAllData() {
-    try { setAllBoards(await boardsService.listAllBoards()); }
-    catch (err) { swallowed('boards-tab', err); setAllBoards([]); }
-  }
-
-  async function handleCreate(name, desc, vis) {
-    const resp = await boardsService.createBoard(name, desc, vis);
-    if (resp.ok !== false) {
-      // Auto-subscribe owner to their own board so it appears in "my boards"
-      const boardId = resp.data?.id || resp.data?.board_id;
-      if (boardId) await boardsService.subscribe(boardId).catch(err => { swallowed('boards-tab: handleCreate', err); });
-      showToast(t('profile.boards.created'));
-      setShowBrdForm(false);
-      loadMyData();
-    } else showToast(t('profile.boards.createFailed'), true);
-  }
-
-  const cycleVis = ['private', 'shared', 'public'];
-  const visColor = { private: '#c084fc', shared: '#60a5fa', public: '#4ade80' };
-  const visBg = { private: 'rgba(150,100,200,.2)', shared: 'rgba(96,165,250,.2)', public: 'rgba(0,200,100,.2)' };
-
-  async function handleUpdateBoardVisibility(boardId, newVis) {
-    setMyBoards(prev => prev?.map(b => (b.board_id || b.id) === boardId ? { ...b, visibility: newVis } : b));
-    const resp = await boardsService.updateBoardVisibility(boardId, newVis);
-    if (resp.ok === false) {
-      showToast(resp.error?.message || t('profile.error'), true);
-      loadMyData();
-    }
-  }
-
-  async function handleSubscribe(boardId) {
+  /** @param {string} id @param {{ cursor?: string, keep?: boolean }} [opts] */
+  const loadPage = useCallback(async (id, opts = {}) => {
+    const { cursor, keep } = opts;
+    setPageLoading(id);
     try {
-      const resp = await boardsService.subscribe(boardId);
-      if (resp.ok === false) throw new Error(resp.error?.message || 'Subscribe failed');
-      showToast(t('profile.boards.subscribed'));
-      loadMyData();
-    } catch(e) { showToast(e.message || t('profile.boards.subscribeFailed'), true); }
-  }
+      const page = await boardsService.listPostsPage(id, { cursor, limit: PAGE });
+      setPages(prev => ({ ...prev, [id]: keep && prev[id] ? { posts: [...prev[id].posts, ...page.posts], cursor: page.cursor, authors: { ...prev[id].authors, ...page.authors } } : page }));
+    } catch (err) { swallowed('boards-tab: page', err); setPages(prev => ({ ...prev, [id]: prev[id] || { posts: [], authors: {}, cursor: undefined } })); }
+    finally { setPageLoading(null); }
+  }, []);
 
-  async function viewPosts(boardId, boardName) {
+  const loadAll = useCallback(async ({ showSpinner = true } = {}) => {
+    if (showSpinner) setLoading(true);
     try {
-      const posts = await boardsService.listPosts(boardId);
-      // Find the board data to get owner_gaii and allowed_gaiis
-      const boardData = myBoards?.find(b => (b.board_id || b.id) === boardId)
-        || allBoards?.find(b => (b.board_id || b.id) === boardId);
-      setBoardView({ id: boardId, name: boardName, posts, boardData });
-    } catch (err) { swallowed('boards-tab', err); setBoardView({ id: boardId, name: boardName, posts: [], boardData: null }); }
-  }
+      const [list, mine] = await Promise.all([
+        boardsService.listAllBoards(),
+        // An unreadable subscriptions list still leaves the boards readable; the failure is logged, not hidden.
+        boardsService.listSubscriptions().catch(err => { swallowed('boards-tab: subscriptions', err); return []; }),
+      ]);
+      setBoards(list);
+      setSubs(mine);
+      const f = followedOf(list, mine, session).followed.slice(0, 12);
+      await Promise.all(f.map(b => loadPage(bid(b))));
+    } catch (err) { swallowed('boards-tab', err); }
+    finally { setLoading(false); }
+  }, [session, loadPage]);
 
-  async function handlePost(boardId, content) {
-    if (!content?.trim()) { showToast(t('profile.boards.writeFirst'), true); return; }
+  useEffect(() => { if (session) loadAll(); }, [session, loadAll]);
+  const loadRef = useRef(loadAll);
+  loadRef.current = loadAll;
+  useEffect(() => onLiveUpdate(['boards'], () => loadRef.current({ showSpinner: false })), []);
+
+  const loadNotice = useCallback(async (boardId, postId) => {
     try {
-      await boardsService.createPost(boardId, content);
-      showToast(t('profile.boards.posted'));
-      viewPosts(boardId, boardView?.name);
-    } catch (e) { showToast(e.message || t('profile.error'), true); }
+      const [post, thread] = await Promise.all([boardsService.getPost(boardId, postId), boardsService.listReplies(boardId, postId)]);
+      setOpenNotice({ post, replies: thread.replies, authors: thread.authors });
+    } catch (err) { swallowed('boards-tab: notice', err); showToast(t('profile.boards.postsError'), true); setView({ kind: 'board', id: boardId }); }
+  }, [showToast]);
+
+  const pickView = useCallback((v) => {
+    setView(v);
+    setFolds(f => ({ ...f, rules: false, tools: false }));
+    setCatFilter('');
+    const box = document.querySelector('.page-content') || document.querySelector('.pf-content');
+    if (box) box.scrollTo({ top: 0 });
+    if (v.kind === 'board') { const b = boardById(v.id); setRules(rulesFormOf(b)); setNotice(EMPTY_NOTICE); loadPage(v.id); }
+    if (v.kind === 'notice') { setOpenNotice(null); setReplyText(''); loadNotice(v.boardId, v.postId); }
+  }, [boardById, loadPage, loadNotice]);
+
+  const setFold = (k, open) => setFolds(f => ({ ...f, [k]: open }));
+  const fail = (e, fallback) => showToast(e?.error?.message || e?.message || fallback || t('profile.error'), true);
+  const copy = async (text, done) => { try { await copyToClipboard(text); showToast(done); } catch (e) { fail(e); } };
+
+  /** The slab on the cover: open the freshest followed board at its composer, or the own-board fold. */
+  function startNotice() {
+    const target = followed.slice().sort((a, z) => new Date(pages[bid(z)]?.posts[0]?.created_at || 0).getTime() - new Date(pages[bid(a)]?.posts[0]?.created_at || 0).getTime())[0];
+    if (target) { pickView({ kind: 'board', id: bid(target) }); setTimeout(() => document.getElementById('bp-n-title')?.focus(), 250); }
+    else { setFold('own', true); setTimeout(() => document.getElementById('bp-f-name')?.focus(), 100); }
   }
 
-  async function handleReact(boardId, postId, emoji) {
+  async function handleCreate() {
+    setCreating(true);
     try {
-      await boardsService.reactToPost(boardId, postId, emoji);
-      viewPosts(boardId, boardView?.name);
-    } catch (e) { showToast(e.message || t('profile.error'), true); }
+      const resp = await boardsService.createBoard(form.name.trim(), form.description.trim() || undefined, form.visibility, { rules: rulesOf(form) });
+      if (resp.ok === false) { fail(resp, t('profile.boards.createFailed')); return; }
+      const id = resp.data?.id;
+      showToast(c('created'));
+      setForm(EMPTY_FORM);
+      setFold('own', false);
+      await loadAll({ showSpinner: false });
+      if (id) pickView({ kind: 'board', id });
+    } catch (e) { fail(e, t('profile.boards.createFailed')); }
+    finally { setCreating(false); }
   }
-
-  async function toggleBoardFederate(boardId, value) {
+  async function handleFollow(id) {
+    try { const r = await boardsService.subscribe(id); if (r.ok === false) throw r; showToast(t('profile.boards.subscribed')); await loadAll({ showSpinner: false }); }
+    catch (e) { fail(e, t('profile.boards.subscribeFailed')); }
+  }
+  async function handleUnfollow(id) {
+    try { const r = await boardsService.unsubscribe(id); if (r.ok === false) throw r; showToast(c('unfollowed')); await loadAll({ showSpinner: false }); }
+    catch (e) { fail(e); }
+  }
+  async function handlePost(boardId) {
+    setPosting(true);
     try {
-      await boardsService.updateBoardVisibility(boardId, undefined, value);
-      loadMyData();
-    } catch (e) { showToast(e.message || t('profile.error'), true); }
+      const b = boardById(boardId);
+      const body = { title: notice.title.trim(), body: notice.body.trim() };
+      if (notice.category.trim()) body.category = notice.category.trim();
+      body.ttl_hours = Number(notice.ttl || b?.rules?.default_ttl_hours || 168);
+      const r = await boardsService.createNotice(boardId, body);
+      if (r.ok === false) throw r;
+      showToast(c('posted'));
+      setNotice(EMPTY_NOTICE);
+      await loadPage(boardId);
+    } catch (e) { fail(e); }
+    finally { setPosting(false); }
   }
-
-  async function handleDeleteBoard(boardId) {
-    confirm(t('profile.boards.confirmDeleteBoard') || 'Delete this board and all its posts?', async () => {
-      try {
-        await boardsService.deleteBoard(boardId);
-        showToast(t('profile.boards.boardDeleted') || 'Board deleted');
-        loadMyData();
-      } catch (e) { showToast(e.message || t('profile.error'), true); }
+  async function handleThank(boardId, postId) {
+    setThanking(true);
+    try { const r = await boardsService.reactToPost(boardId, postId, 'thanks'); if (r.ok === false) throw r; await loadNotice(boardId, postId); loadPage(boardId); }
+    catch (e) { fail(e); }
+    finally { setThanking(false); }
+  }
+  async function handleReply(boardId, postId) {
+    setReplying(true);
+    try { const r = await boardsService.replyToPost(boardId, postId, replyText.trim()); if (r.ok === false) throw r; setReplyText(''); await loadNotice(boardId, postId); loadPage(boardId); }
+    catch (e) { fail(e); }
+    finally { setReplying(false); }
+  }
+  async function handleResolve(boardId, postId) {
+    setUpdating(true);
+    try { const r = await boardsService.updatePost(boardId, postId, { resolved: true }); if (r.ok === false) throw r; showToast(c('resolved')); await loadPage(boardId); pickView({ kind: 'board', id: boardId }); }
+    catch (e) { fail(e); }
+    finally { setUpdating(false); }
+  }
+  async function handleExtend(boardId, postId, hours) {
+    setUpdating(true);
+    try { const r = await boardsService.updatePost(boardId, postId, { ttl_hours: hours }); if (r.ok === false) throw r; showToast(c('extended')); await loadNotice(boardId, postId); loadPage(boardId); }
+    catch (e) { fail(e); }
+    finally { setUpdating(false); }
+  }
+  function handleDeletePost(boardId, postId) {
+    confirm(t('profile.boards.confirmDelete'), async () => {
+      try { const r = await boardsService.deletePost(boardId, postId); if (r.ok === false) throw r; showToast(t('profile.boards.postDeleted')); await loadPage(boardId); pickView({ kind: 'board', id: boardId }); }
+      catch (e) { fail(e); }
     }, { danger: true });
   }
-
-  async function handleDeletePost(boardId, postId) {
-    confirm(t('profile.boards.confirmDelete') || 'Delete this post?', async () => {
-      try {
-        await boardsService.deletePost(boardId, postId);
-        showToast(t('profile.boards.postDeleted') || 'Post deleted');
-        viewPosts(boardId, boardView?.name);
-      } catch (e) { showToast(e.message || t('profile.error'), true); }
+  function handleReport(postId) {
+    confirm(c('reportConfirm'), async () => {
+      try { const r = await boardsService.reportPost(postId); if (r.ok === false) throw r; showToast(c('reported')); }
+      catch (e) { fail(e); }
+    });
+  }
+  async function handleSaveRules(boardId) {
+    setSavingRules(true);
+    try {
+      const b = boardById(boardId);
+      if (b && (rules.visibility !== b.visibility || (rules.federate === 'yes') !== !!b.federate)) {
+        const r = await boardsService.updateBoardVisibility(boardId, rules.visibility !== b.visibility ? rules.visibility : undefined, rules.visibility === 'public' ? rules.federate === 'yes' : undefined);
+        if (r.ok === false) throw r;
+      }
+      const r2 = await boardsService.setRules(boardId, rulesOf(rules));
+      if (r2.ok === false) throw r2;
+      showToast(c('rulesSaved'));
+      await loadAll({ showSpinner: false });
+    } catch (e) { fail(e); }
+    finally { setSavingRules(false); }
+  }
+  async function handleAddMember(boardId) {
+    const g = memberInput.trim();
+    if (!g) return;
+    try { const r = await boardsService.updateBoardMembers(boardId, { add: [g] }); if (r.ok === false) throw r; setMemberInput(''); showToast(t('profile.boards.memberAdded')); await loadAll({ showSpinner: false }); }
+    catch (e) { fail(e, t('profile.boards.memberError')); }
+  }
+  async function handleRemoveMember(boardId, g) {
+    try { const r = await boardsService.updateBoardMembers(boardId, { remove: [g] }); if (r.ok === false) throw r; showToast(t('profile.boards.memberRemoved')); await loadAll({ showSpinner: false }); }
+    catch (e) { fail(e, t('profile.boards.memberError')); }
+  }
+  function handleDeleteBoard(boardId) {
+    confirm(c('deleteBoardConfirm'), async () => {
+      try { const r = await boardsService.deleteBoard(boardId); if (r.ok === false) throw r; showToast(t('profile.boards.boardDeleted')); setView({ kind: 'cover' }); await loadAll({ showSpinner: false }); }
+      catch (e) { fail(e); }
     }, { danger: true });
   }
+  async function loadMore(id) { await loadPage(id, { cursor: pages[id]?.cursor, keep: true }); }
 
-  async function handleAddMember(boardId, gaii) {
-    try {
-      await boardsService.updateBoardMembers(boardId, { add: [gaii] });
-      showToast(t('profile.boards.memberAdded'));
-      // Reload board list to get updated allowed_gaiis, then refresh the view
-      await loadMyData();
-      viewPosts(boardId, boardView?.name);
-    } catch (e) { showToast(e.message || t('profile.boards.memberError'), true); }
-  }
+  const agentPrompt = () => [
+    'You are connected to my AIMEAT over MCP. Boards are the notice boards people and agents publish to together.',
+    '1. aimeat_board_list shows the boards you can see; aimeat_catalogue_boards the public ones on this node.',
+    '2. aimeat_board_read reads a board\'s notices newest first, with each author, category and expiry.',
+    '3. aimeat_board_post publishes a notice on my behalf (title, body, category); a public board costs my morsels, so say the price before posting.',
+    '4. aimeat_board_reply answers a notice in its thread; aimeat_board_react with "thanks" thanks a poster.',
+    '5. aimeat_board_subscribe with a callback_url and category filters makes the node push matching new notices to you, so watch one topic for me without polling.',
+    'Show me the draft of any notice before you publish it.',
+  ].join('\n');
 
-  async function handleRemoveMember(boardId, gaii) {
-    try {
-      await boardsService.updateBoardMembers(boardId, { remove: [gaii] });
-      showToast(t('profile.boards.memberRemoved'));
-      await loadMyData();
-      viewPosts(boardId, boardView?.name);
-    } catch (e) { showToast(e.message || t('profile.boards.memberError'), true); }
-  }
-
-  function isMyPost(post) {
-    const author = post.author_gaii || post.author || '';
-    return author === session?.ghii || author === session?.owner || author === session?.gaii;
-  }
-
-  /** Check if current user owns the board. */
-  function isBoardOwner(boardData) {
-    if (!boardData?.owner_gaii || !session?.owner) return false;
-    return extractOwner(boardData.owner_gaii) === session.owner;
-  }
-
-  if (boardView) {
-    const bd = boardView.boardData;
-    const showMembers = bd && bd.visibility === 'shared' && isBoardOwner(bd);
-    return html`
-      <button class="btn-outline mb-1" onClick=${() => setBoardView(null)}>\u2190 ${t('profile.boards.backToBoards')}</button>
-      <div class="section-title">${escHtml(boardView.name)}</div>
-      ${showMembers && html`<${BoardMembers}
-        boardId=${boardView.id}
-        allowedGaiis=${bd.allowed_gaiis || []}
-        onAdd=${(gaii) => handleAddMember(boardView.id, gaii)}
-        onRemove=${(gaii) => handleRemoveMember(boardView.id, gaii)}
-      />`}
-      <div class="mb-1">
-        <textarea ref=${postRef} class="input-field" rows="2" placeholder=${t('profile.boards.postPlaceholder')}></textarea>
-        <button class="btn-primary mb-half" onClick=${() => { handlePost(boardView.id, postRef.current?.value); if (postRef.current) postRef.current.value = ''; }}>${t('profile.boards.postBtn')}</button>
-      </div>
-      ${boardView.posts.length === 0
-        ? html`<div class="empty">${t('profile.boards.postsEmpty')}</div>`
-        : boardView.posts.map(p => html`
-          <div class="post-card">
-            <div class="post-content">${escHtml(p.body || p.content || '')}</div>
-            <div class="post-meta">
-              <span>${escHtml(p.author_gaii || p.author || '-')}</span>
-              <span class="text-meta">\u00B7</span>
-              <span>${p.created_at ? timeAgo(p.created_at) : ''}</span>
-              ${isMyPost(p) ? html`<button class="btn-danger-solid btn-sm pf-ml-auto" onClick=${(e) => { e.stopPropagation(); handleDeletePost(boardView.id, p.id || p.post_id); }}>${t('profile.boards.deletePost') || 'Delete'}</button>` : null}
-            </div>
-            <div class="post-reactions">
-              ${['\u{1F44D}','\u2764\uFE0F','\u{1F525}','\u{1F4A1}','\u{1F602}'].map(emoji => html`
-                <button class="reaction-btn" onClick=${() => handleReact(boardView.id, p.id || p.post_id, emoji)}>${emoji} ${p.reactions?.[emoji] || ''}</button>
-              `)}
-            </div>
-          </div>
-        `)
-      }
-      <${ConfirmUI} />`;
-  }
-
-  return html`
-    <div class="section-title">${t('profile.boards.title')}</div>
-    <div class="section-desc">${t('profile.boards.desc')}</div>
-    <div class="sub-tabs">
-      <button class="sub-tab ${brdSubTab === 'mine' ? 'active' : ''}" onClick=${() => { setBrdSubTab('mine'); if (!myBoards) loadMyData(); }}>${t('profile.boards.mine')}</button>
-      <button class="sub-tab ${brdSubTab === 'browse' ? 'active' : ''}" onClick=${() => { setBrdSubTab('browse'); if (!allBoards) loadAllData(); }}>${t('profile.boards.browse')}</button>
-    </div>
-    ${brdSubTab === 'mine' ? html`
-      <button class="btn-primary mb-1" onClick=${() => setShowBrdForm(!showBrdForm)}>${t('profile.boards.createBtn')}</button>
-      ${showBrdForm && html`<${BoardForm} onCreate=${handleCreate} onCancel=${() => setShowBrdForm(false)} />`}
-      ${!myBoards ? html`<${Spinner} text=${t('profile.boards.loading')} />`
-        : myBoards.length === 0 ? html`<div class="empty">${t('profile.boards.empty')}</div>`
-        : myBoards.map(b => { const bid = b.board_id || b.id; const vis = b.visibility || 'private'; const nextVis = cycleVis[(cycleVis.indexOf(vis) + 1) % cycleVis.length]; return html`
-          <div class="card card-clickable" onClick=${() => viewPosts(bid, b.name)}>
-            <div class="card-header">
-              <div class="card-title">${escHtml(b.name)}</div>
-              <div class="flex-row">
-                <button class="kpkg-vis-pill"
-                  onClick=${(e) => { e.stopPropagation(); handleUpdateBoardVisibility(bid, nextVis); }}
-                  title="${t('knowledge.visibility.' + vis)} \u2192 ${t('knowledge.visibility.' + nextVis)}"
-                  style="background:${visBg[vis]};color:${visColor[vis]};border-color:${visColor[vis]}"
-                >${t('knowledge.visibility.' + vis)} \u25BE</button>
-                ${vis === 'public' && html`<span class="${b.federate ? 'badge badge-success' : 'badge badge-muted'}"
-                  onClick=${(e) => { e.stopPropagation(); toggleBoardFederate(bid, !b.federate); }}
-                  title=${t('profile.federateTooltip')}>
-                  ${b.federate ? t('profile.federated') : t('profile.notFederated')}
-                </span>`}
-                <button class="btn-danger-solid btn-sm" onClick=${(e) => { e.stopPropagation(); handleDeleteBoard(bid); }}>${t('profile.boards.deleteBoard')}</button>
-              </div>
-            </div>
-            ${b.description ? html`<div class="card-subtitle">${escHtml(b.description)}</div>` : null}
-            <div class="text-meta-sm">${b.created_at ? timeAgo(b.created_at) : ''}</div>
-          </div>
-        `; })
-      }
-    ` : html`
-      ${!allBoards ? html`<${Spinner} text=${t('profile.boards.browseLoading')} />`
-        : allBoards.length === 0 ? html`<div class="empty">${t('profile.boards.browseEmpty')}</div>`
-        : allBoards.map(b => html`
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title card-clickable" onClick=${() => viewPosts(b.id || b.board_id, b.name)}>${escHtml(b.name)}</div>
-              <button class="btn-sm" onClick=${() => handleSubscribe(b.id || b.board_id)}>${t('profile.boards.subscribe')}</button>
-            </div>
-            ${b.description ? html`<div class="card-subtitle">${escHtml(b.description)}</div>` : null}
-            <div class="text-meta-sm">${b.created_at ? timeAgo(b.created_at) : ''}</div>
-          </div>
-        `)
-      }
-    `}
-    <${ConfirmUI} />
-  `;
-}
-
-/** Board member management section for shared boards. */
-function BoardMembers({ allowedGaiis, onAdd, onRemove }) {
-  const inputRef = useRef(null);
-
-  function handleAdd() {
-    const val = inputRef.current?.value?.trim();
-    if (!val) return;
-    onAdd(val);
-    if (inputRef.current) inputRef.current.value = '';
-  }
-
-  function handleKeyDown(e) {
-    if (e.key === 'Enter') { e.preventDefault(); handleAdd(); }
-  }
-
-  /** Truncate long GAII for display. */
-  function truncGaii(gaii) {
-    if (!gaii || gaii.length <= 40) return gaii;
-    return gaii.slice(0, 18) + '\u2026' + gaii.slice(-18);
-  }
-
-  return html`
-    <div class="brd-members card mb-1">
-      <div class="card-title">${t('profile.boards.membersTitle')}</div>
-      <div class="text-meta-sm mb-half">${t('profile.boards.autoAccessInfo')}</div>
-      ${allowedGaiis.length > 0 && html`
-        <div class="brd-member-tags mb-half">
-          ${allowedGaiis.map(g => html`
-            <span class="brd-member-tag" title=${escHtml(g)}>
-              <span>${escHtml(truncGaii(g))}</span>
-              <button class="brd-member-remove" onClick=${() => onRemove(g)} aria-label="Remove">\u00D7</button>
-            </span>
-          `)}
-        </div>
-      `}
-      <div class="brd-member-add">
-        <input ref=${inputRef} class="input-field" placeholder=${t('profile.boards.addMemberPlaceholder')} onKeyDown=${handleKeyDown} />
-        <button class="btn-primary btn-sm" onClick=${handleAdd}>${t('profile.boards.addMember')}</button>
-      </div>
-    </div>
-  `;
-}
-
-function BoardForm({ onCreate, onCancel }) {
-  const [name, setName] = useState('');
-  const [desc, setDesc] = useState('');
-  const [vis, setVis] = useState('private');
-  return html`
-    <div class="create-form">
-      <div class="form-row"><label>${t('profile.boards.nameLabel')}</label><input class="input-field" placeholder=${t('profile.boards.namePlaceholder')} value=${name} onInput=${e => setName(e.target.value)} /></div>
-      <div class="form-row"><label>${t('profile.boards.descLabel')}</label><input class="input-field" placeholder=${t('profile.boards.descPlaceholder')} value=${desc} onInput=${e => setDesc(e.target.value)} /></div>
-      <div class="form-row"><label>${t('profile.boards.visLabel')}</label>
-        <select class="input-field" value=${vis} onChange=${e => setVis(e.target.value)}>
-          <option value="private">${t('profile.boards.visPrivate')}</option>
-          <option value="shared">${t('profile.boards.visShared')}</option>
-          <option value="public">${t('profile.boards.visPublic')}</option>
-        </select>
-      </div>
-      <div class="form-actions">
-        <button class="btn-primary" onClick=${() => onCreate(name, desc, vis)}>${t('profile.boards.createSaveBtn')}</button>
-        <button class="btn-outline" onClick=${onCancel}>${t('profile.cancel')}</button>
-      </div>
-    </div>`;
+  const ctx = {
+    session, boards, subs, pages, pageLoading, loading, view, pickView, boardById, followed, others, isMine, isSubscribed,
+    folds, setFold, form, setForm, creating, notice, setNotice, posting, rules, setRules, savingRules, memberInput, setMemberInput,
+    openNotice, replyText, setReplyText, replying, thanking, updating, onlyNew, setOnlyNew, recentFilter, setRecentFilter, recentAll, setRecentAll, publicAll, setPublicAll, catFilter, setCatFilter,
+    startNotice, handleCreate, handleFollow, handleUnfollow, handlePost, handleThank, handleReply, handleResolve, handleExtend, handleDeletePost, handleReport,
+    handleSaveRules, handleAddMember, handleRemoveMember, handleDeleteBoard, loadMore, copy, agentPrompt, ConfirmUI,
+  };
+  return renderBoardsView(ctx);
 }
