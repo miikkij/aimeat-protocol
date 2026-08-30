@@ -11,6 +11,9 @@
  *   v1.2.0 -- 2026-08-12 -- August 2026 audit H-2: the operator-gated public-board creation is
  *     driven by the OWNER session, because an agent JWT no longer carries its owner's roles.
  *     Test 35 proves the operator gate with a non-operator owner session as well as an agent one.
+ *   v1.3.0 -- 2026-08-30 -- Phase 9, with the RFC §27 reinstatement: the cursor page (37), a reply's
+ *     inherited expiry (38), subscriptions gone with their board (39), and auto-hide enforced on the
+ *     listing and the single-post read (40). All four failed on the source before the fix.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=board-ttl
 
@@ -702,6 +705,120 @@ await test('36. Unsubscribe when not subscribed → 404', async () => {
         headers: { Authorization: `Bearer ${agentToken}` },
     });
     assert(status === 404, `expected 404, got ${status}`);
+});
+
+// ─── Phase 9: Reinstated boards (2026-08-30) ───
+// Four defects the RFC §27 reinstatement found, none of which any test had asserted: the cursor
+// was accepted and ignored on Postgres (page two was page one), a reply carried no expiry, a
+// deleted board left its subscriptions behind, and a post past the auto-hide threshold stayed
+// visible to everyone. Each test here failed on the source before its fix.
+console.log('\nPhase 9 — Pages, reply expiry, deletion, hiding');
+
+let pageBoardId = '';
+const pageIds: string[] = [];
+
+await test('37. Three posts, a page of two, then the cursor page holds the third and nothing else', async () => {
+    const { status: bStatus, body: bBody } = await json('/v1/boards', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ name: 'Page Board', visibility: 'shared' }),
+    });
+    assert(bStatus === 201, `board: ${bStatus} ${JSON.stringify(bBody)}`);
+    pageBoardId = bBody.data.id;
+    for (const n of [1, 2, 3]) {
+        const { status, body } = await json(`/v1/boards/${pageBoardId}/posts`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${agentToken}` },
+            body: JSON.stringify({ title: `Page post ${n}`, body: `Body ${n}` }),
+        });
+        assert(status === 201, `post ${n}: ${status} ${JSON.stringify(body)}`);
+        pageIds.push(body.data.id);
+    }
+    const { body: p1 } = await json(`/v1/boards/${pageBoardId}/posts?limit=2`, {
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(p1.data.posts.length === 2, `page 1 holds ${p1.data.posts.length} posts`);
+    assert(p1.data.cursor === p1.data.posts[1].id, `cursor ${p1.data.cursor} is the last post of page 1`);
+    const { body: p2 } = await json(`/v1/boards/${pageBoardId}/posts?limit=2&cursor=${encodeURIComponent(p1.data.cursor)}`, {
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(p2.data.posts.length === 1, `page 2 holds ${p2.data.posts.length} posts (2 means the cursor was ignored)`);
+    const seen = new Set<string>([...p1.data.posts.map((p: any) => p.id), ...p2.data.posts.map((p: any) => p.id)]);
+    assert(seen.size === 3 && pageIds.every(id => seen.has(id)), 'the two pages cover all three posts once');
+    assert(p2.data.cursor === undefined, `no cursor after the last page, got ${p2.data.cursor}`);
+});
+
+await test('38. A reply expires with the notice it answers', async () => {
+    const { status: pStatus, body: post } = await json(`/v1/boards/${pageBoardId}/posts`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ title: 'Expiring notice', body: 'Gone in two hours', ttl_hours: 2 }),
+    });
+    assert(pStatus === 201, `post: ${pStatus}`);
+    const { status: rStatus, body: reply } = await json(`/v1/boards/${pageBoardId}/posts/${post.data.id}/replies`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ body: 'Still here?' }),
+    });
+    assert(rStatus === 201, `reply: ${rStatus} ${JSON.stringify(reply)}`);
+    const { body: read } = await json(`/v1/boards/${pageBoardId}/posts/${reply.data.id}`, {
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(typeof post.data.ttl_expires_at === 'string', 'the notice has an expiry');
+    assert(read.data.ttl_expires_at === post.data.ttl_expires_at,
+        `reply expires ${read.data.ttl_expires_at}, notice ${post.data.ttl_expires_at}`);
+});
+
+await test('39. Deleting a board removes its subscriptions with it', async () => {
+    const { status: sStatus } = await json(`/v1/boards/${pageBoardId}/subscribe`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agent2Token}` },
+        body: JSON.stringify({}),
+    });
+    assert(sStatus === 201, `subscribe: ${sStatus}`);
+    const { status: dStatus } = await json(`/v1/boards/${pageBoardId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(dStatus === 200, `delete: ${dStatus}`);
+    const { body } = await json('/v1/boards/subscriptions', {
+        headers: { Authorization: `Bearer ${agent2Token}` },
+    });
+    assert(!body.data.subscriptions.some((s: any) => s.board_id === pageBoardId),
+        'a subscription to the deleted board still lists');
+});
+
+await test('40. Five reports hide a public post from everyone but its author and the board owner', async () => {
+    // The poster is the non-operator owner's agent, whose owner still holds its welcome balance
+    // (test 23 drained the first owner's). The public board belongs to the operator owner.
+    const { status: pStatus, body: post } = await json(`/v1/boards/${publicBoardId}/posts`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${nonOpAgentToken}` },
+        body: JSON.stringify({ title: 'Reported notice', body: 'Five people will report this.' }),
+    });
+    assert(pStatus === 201, `post: ${pStatus} ${JSON.stringify(post)}`);
+    const hiddenId = post.data.id;
+    const reporters = [ownerToken, agentToken, agent2Token, nonOpOwnerToken, nonOpAgentToken];
+    for (const [i, token] of reporters.entries()) {
+        const { status, body } = await json('/v1/flags', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ targetType: 'board_post', targetId: hiddenId, reason: 'spam' }),
+        });
+        assert(status === 201, `report ${i + 1}: ${status} ${JSON.stringify(body)}`);
+    }
+    const { body: anonList } = await json(`/v1/boards/${publicBoardId}/posts?limit=100`);
+    assert(!anonList.data.posts.some((p: any) => p.id === hiddenId), 'a stranger still sees the hidden post in the listing');
+    const { status: anonOne } = await json(`/v1/boards/${publicBoardId}/posts/${hiddenId}`);
+    assert(anonOne === 403, `a stranger opening the hidden post: expected 403, got ${anonOne}`);
+    const { body: authorList } = await json(`/v1/boards/${publicBoardId}/posts?limit=100`, {
+        headers: { Authorization: `Bearer ${nonOpAgentToken}` },
+    });
+    assert(authorList.data.posts.some((p: any) => p.id === hiddenId), 'the author no longer sees their own hidden post');
+    const { status: ownerOne } = await json(`/v1/boards/${publicBoardId}/posts/${hiddenId}`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(ownerOne === 200, `the board owner opening the hidden post: expected 200, got ${ownerOne}`);
 });
 
 // ─── Cleanup ───

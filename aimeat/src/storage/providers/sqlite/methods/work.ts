@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Action, Work, Wallet, Board, OTK, Node-key, Dispute, Micro-memory methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.4.0 — 2026-08-30 — listPosts pages in SQL (expiry, cursor with an id tie-break, LIMIT) instead
+ *     of loading the whole board and deleting expired rows as a side effect of a read; deleteBoard
+ *     removes the board's subscriptions with its posts.
  *   v1.3.0 — 2026-08-17 — pruneExpiredBoardPosts: one cross-board TTL DELETE for the cleanup job
  *     (which used to page 10,000 posts per board through listPosts just for its side-effect delete).
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 9 step 0: board posts round-trip `aiProvenanceId`.
@@ -355,8 +358,10 @@ export const workMethods = {
   },
 
   async deleteBoard(this: SqliteStorage, id: string): Promise<boolean> {
-    // Delete all posts in the board
+    // Posts and subscriptions go with the board. A subscription to a board that no longer exists
+    // was a phantom row on the subscriber's list until 2026-08-30.
     this.db.prepare('DELETE FROM board_posts WHERE boardId = ?').run(id);
+    this.db.prepare('DELETE FROM board_subscriptions WHERE boardId = ?').run(id);
     const result = this.db.prepare('DELETE FROM boards WHERE id = ?').run(id);
     return result.changes > 0;
   },
@@ -384,30 +389,29 @@ export const workMethods = {
   },
 
   async listPosts(this: SqliteStorage, boardId: string, opts?: { category?: string; cursor?: string; limit?: number }): Promise<BoardPostRecord[]> {
+    // One indexed query with the page in SQL. Until 2026-08-30 this loaded and deserialised every
+    // post in the board to find the cursor in JS, and deleted expired rows as a side effect of a
+    // read; the TTL sweep (pruneExpiredBoardPosts) owns deletion now. ISO-8601 strings order as
+    // text, so expiry and the cursor are plain comparisons; ties on createdAt break on id so two
+    // posts from the same millisecond cannot be skipped between pages.
     const limit = opts?.limit ?? 20;
-    const now = Date.now();
+    const nowIso = new Date().toISOString();
 
-    let sql = 'SELECT * FROM board_posts WHERE boardId = ? AND replyTo IS NULL';
-    const params: unknown[] = [boardId];
+    let sql = 'SELECT * FROM board_posts WHERE boardId = ? AND replyTo IS NULL AND (ttlExpiresAt IS NULL OR ttlExpiresAt > ?)';
+    const params: unknown[] = [boardId, nowIso];
     if (opts?.category) { sql += ' AND category = ?'; params.push(opts.category); }
-    sql += ' ORDER BY createdAt DESC';
+    if (opts?.cursor) {
+      const at = this.db.prepare('SELECT createdAt FROM board_posts WHERE boardId = ? AND id = ?').get(boardId, opts.cursor) as { createdAt: string } | undefined;
+      if (at) {
+        sql += ' AND (createdAt < ? OR (createdAt = ? AND id < ?))';
+        params.push(at.createdAt, at.createdAt, opts.cursor);
+      }
+    }
+    sql += ' ORDER BY createdAt DESC, id DESC LIMIT ?';
+    params.push(limit);
 
     const rows = this.db.prepare(sql).all(...params) as Record<string, unknown>[];
-    let results: BoardPostRecord[] = [];
-    for (const row of rows) {
-      const post = this.deserializePost(row);
-      if (post.ttlExpiresAt && new Date(post.ttlExpiresAt).getTime() < now) {
-        this.db.prepare('DELETE FROM board_posts WHERE boardId = ? AND id = ?').run(post.boardId, post.id);
-        continue;
-      }
-      results.push(post);
-    }
-
-    if (opts?.cursor) {
-      const idx = results.findIndex(p => p.id === opts.cursor);
-      if (idx >= 0) results = results.slice(idx + 1);
-    }
-    return results.slice(0, limit);
+    return rows.map(row => this.deserializePost(row));
   },
 
   async deletePost(this: SqliteStorage, boardId: string, postId: string): Promise<boolean> {

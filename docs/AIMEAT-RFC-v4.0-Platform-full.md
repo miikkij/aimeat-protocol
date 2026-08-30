@@ -18,7 +18,7 @@ The split follows one test: *"would a second, different service also use this?"*
 
 ### 0.1 The Platform Thesis — Applications Almost Replace Everything
 
-The single most important observation about AIMEAT today: **once the Core makes generic APIs possible, generated applications supplant purpose-built protocol features.** A boards feature, a marketplace UI, a status page, a directory — each of these was once something the protocol had to provide. Now an AI writes an application in minutes that does the same job against generic memory + workspaces + live updates, better and specific to the need.
+The single most important observation about AIMEAT today: **once the Core makes generic APIs possible, generated applications supplant purpose-built protocol features.** A marketplace UI, a status page, a directory — each of these was once something the protocol had to provide. Now an AI writes an application in minutes that does the same job against generic memory + workspaces + live updates, better and specific to the need.
 
 So the Platform is not "some optional extras on top of the real protocol." **The Platform is where the product is.** Its center of gravity — by code mass, maturity, and where engineering energy goes — is four clusters:
 
@@ -415,7 +415,7 @@ v4.0 makes these explicit so they can be executed, not just noted:
 | **Micro-memory** (Core §13) | **Drop** — a flaky early workaround for AI↔system conversation, superseded by MCP. Nice idea, ultimately noise. |
 | **OTK / Tier 0.5** (Core §9) | **Drop** — same rationale; the whole ecosystem moved to device-auth + MCP. |
 | **Legacy Ed25519 challenge-response** (Core §9) | Keep mounted for now (federation/node signing leans on the keypair); off the mainline. |
-| **Boards** (Core §27) | Legacy; not recommended for new work — applications supplant them. |
+| **Boards** (Core §27) | Core, reinstated 2026-08-30. The Platform gives them a face: the Boards page, the `portal.board` front-page block, the portfolio catalog entry, `AIMEAT.social` for apps. |
 
 ---
 

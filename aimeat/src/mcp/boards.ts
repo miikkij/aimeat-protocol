@@ -24,6 +24,8 @@
  *     to build its own record and emit its own event here, and the copies had drifted: no bound on a
  *     board name or a reaction, the operator rule named public but not system, federate never set,
  *     and a roster call with neither add nor remove reported success while changing nothing.
+ *   v1.5.0 -- 2026-08-30 -- The board-posts resource leaves out a post flags have hidden
+ *     (services/board-moderation.ts), as the HTTP listing and aimeat_board_read do.
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -34,6 +36,7 @@ import { parseGAII, parseGaiiLoose } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { createBoardReply } from '../services/board-post.js';
+import { withoutHiddenPosts } from '../services/board-moderation.js';
 import {
     boardVisibleTo, createBoard, subscribeToBoard, reactToBoardPost, setBoardMembers, deleteBoardById,
     type BoardWriteCaller,
@@ -97,7 +100,7 @@ export function registerBoardsTools(
             const board = await storage.getBoard(boardId);
             if (!board) return { contents: [{ uri: uri.toString(), text: 'Board not found' }] };
             if (!canSeeBoard(board)) return { contents: [{ uri: uri.toString(), text: 'Access denied' }] };
-            const posts = await storage.listPosts(boardId, { limit: 50 });
+            const posts = await withoutHiddenPosts({ storage, config }, board, agentGaii, await storage.listPosts(boardId, { limit: 50 }));
             return {
                 contents: [{
                     uri: uri.toString(),
