@@ -8,12 +8,18 @@
  *   and let apps/agents post a notification to their OWN owner (bell + web push, deep-linked).
  *   Owner-scoped: a caller only ever sees their own owner's notifications.
  * @structure
- *   - GET    /v1/notifications      — list (newest first) + unread count
- *   - POST   /v1/notifications      — create a notification for the caller's own owner
- *   - POST   /v1/notifications/read — mark notifications read ({ ids } or { all: true })
- *   - DELETE /v1/notifications      — clear notifications (all, or a given { ids }) — the bell's "Clear all"
+ *   - GET    /v1/notifications          — list (newest first, ?limit= up to 200, ?unread=1) + unread and total; each row carries source and group
+ *   - GET    /v1/notifications/settings — what the owner decided (notification-settings.ts)
+ *   - PUT    /v1/notifications/settings — the whole record, owner only
+ *   - GET    /v1/notifications/senders  — who may notify this owner, with counts and the owner's decision per sender
+ *   - POST   /v1/notifications          — create a notification for the caller's own owner (notification-create.ts)
+ *   - POST   /v1/notifications/read     — mark notifications read ({ ids } or { all: true })
+ *   - DELETE /v1/notifications          — clear notifications (all, or a given { ids }) — the bell's "Clear all"
  * @usage app.use(notificationsRouter(config, storage));
  * @version-history
+ *   v1.4.0 -- 2026-08-30 -- The Notifications page in the poster face: rows carry their source and
+ *     group (derived for older rows), the list takes ?limit and ?unread, the owner's settings have
+ *     their own GET/PUT, and /senders says who may notify the owner. POST is the shared service call.
  *   Notification body limit 1 000 → 10 000 — 2026-07-30 — matched in openapi.yaml.
  *   v1.3.0 -- 2026-07-19 -- DELETE /v1/notifications: "Clear all" from the header bell removes the owner's
  *     notif rows (owner-scoped list → bulkDeleteMemory, per-key fallback); optional { ids } to clear a subset.
@@ -27,11 +33,17 @@ import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
-import { requireAuth, requireScope } from '../auth/middleware.js';
-import { NOTIF_PREFIX, notify, type NotifAction } from '../services/notify.js';
+import { requireAuth, requireScope, requireRole } from '../auth/middleware.js';
+import { NOTIF_PREFIX, type NotifAction } from '../services/notify.js';
 import { emitChange } from '../services/event-bus.js';
+import { createPrincipalNotification, NotificationCreateError } from '../services/notification-create.js';
+import {
+  readNotificationSettings, writeNotificationSettings, normalizeSettings, sourceOf, groupOfType, senderKey, prefsFor,
+  NOTIF_GROUPS, type NotifSource,
+} from '../services/notification-settings.js';
+import { listOwnerNotifications } from '../services/notification-sweeps.js';
 
-interface NotifValue { id: string; type: string; title: string; body: string; link: string; actions?: NotifAction[]; read: boolean; createdAt: string }
+interface NotifValue { id: string; type: string; title: string; body: string; link: string; actions?: NotifAction[]; read: boolean; createdAt: string; source?: NotifSource; i18n?: unknown; held?: boolean }
 
 export function notificationsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -54,9 +66,81 @@ export function notificationsRouter(config: AimeatConfig, storage: Storage): Rou
       .filter(r => r.ownerGaii === ghii)
       .map(r => r.value as NotifValue)
       .filter(v => v && typeof v === 'object' && v.id)
-      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+      // Who sent it and which group it belongs to travel with every row, derived for the rows
+      // written before the source did, so the page and the bell never have to guess.
+      .map(v => ({ ...v, source: sourceOf(v), group: groupOfType(v.type) }));
     const unread = mine.filter(n => !n.read).length;
-    res.json(success(config.nodeId, { notifications: mine.slice(0, 50), unread }));
+    const onlyUnread = req.query.unread === '1' || req.query.unread === 'true';
+    const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 50));
+    const list = (onlyUnread ? mine.filter(n => !n.read) : mine).slice(0, limit);
+    res.json(success(config.nodeId, { notifications: list, unread, total: mine.length }));
+  });
+
+  /* ── GET /v1/notifications/settings — what the owner decided (defaults when nothing was written) ── */
+  router.get('/v1/notifications/settings', requireAuth(), requireRole('owner'), async (req, res) => {
+    res.json(success(config.nodeId, { settings: await readNotificationSettings(storage, ownerGhii(req)), groups: NOTIF_GROUPS }));
+  });
+
+  /* ── PUT /v1/notifications/settings — the whole record; unknown fields dropped, bad values defaulted.
+   * Owner only: the key is under a reserved prefix (utils/reserved-keys.ts), so a granted app cannot write it
+   * through the memory door either, which is what keeps "mute" the owner's decision alone. ── */
+  router.put('/v1/notifications/settings', requireAuth(), requireRole('owner'), async (req, res) => {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const incoming = normalizeSettings(body.settings ?? body);
+    const current = await readNotificationSettings(storage, ownerGhii(req));
+    // The digest bookkeeping is the node's, not the client's: keep what the sweep wrote.
+    const saved = await writeNotificationSettings(storage, ownerGhii(req), { ...incoming, lastDigestAt: current.lastDigestAt });
+    emitChange('notifications', ownerGhii(req));
+    res.json(success(config.nodeId, { settings: saved }));
+  });
+
+  /* ── GET /v1/notifications/senders — who may notify this owner, with what each did in 30 days:
+   * the node's own groups, the apps whose grant carries notifications:send, the owner's agents
+   * with the scope, and the extensions that have notified. Each with the owner's decision. ── */
+  router.get('/v1/notifications/senders', requireAuth(), requireRole('owner'), async (req, res) => {
+    const ghii = ownerGhii(req);
+    const owner = req.auth!.owner as string;
+    const settings = await readNotificationSettings(storage, ghii);
+    const since = Date.now() - 30 * 864e5;
+    const rows = (await listOwnerNotifications(storage, ghii)).map(n => n.value);
+    const stat = new Map<string, { count: number; last_at: string | null }>();
+    const groupStat = new Map<string, { count: number; last_at: string | null }>();
+    for (const n of rows) {
+      const src = sourceOf(n);
+      const recent = new Date(n.createdAt).getTime() >= since;
+      const bump = (m: Map<string, { count: number; last_at: string | null }>, k: string) => {
+        const s = m.get(k) ?? { count: 0, last_at: null };
+        if (recent) s.count++;
+        if (!s.last_at || n.createdAt > s.last_at) s.last_at = n.createdAt;
+        m.set(k, s);
+      };
+      if (src.kind === 'aimeat' || src.kind === 'owner') bump(groupStat, groupOfType(n.type)); else bump(stat, senderKey(src));
+    }
+    const groups = NOTIF_GROUPS.map(g => ({ group: g, ...(groupStat.get(g) ?? { count: 0, last_at: null }), prefs: prefsFor(settings, { kind: 'aimeat', name: 'AIMEAT' }, g === 'organisms' ? 'workspace' : g === 'messages' ? 'direct_message' : g === 'workflows' ? 'workflow' : g === 'apps' ? 'app_member' : g === 'account' ? 'budget' : 'other') }));
+    const senders: Array<Record<string, unknown>> = [];
+    const add = (src: NotifSource, extra: Record<string, unknown>) => {
+      const key = senderKey(src);
+      senders.push({ kind: src.kind, id: src.id ?? src.name, name: src.name, key, ...(stat.get(key) ?? { count: 0, last_at: null }), prefs: prefsFor(settings, src, ''), ...extra });
+    };
+    for (const g of await storage.listAppGrantsByOwner(owner)) {
+      if (g.revoked || !(g.scopes ?? []).includes('notifications:send')) continue;
+      add({ kind: 'app', name: g.appName, id: g.app }, { grant_id: g.grantId, granted_at: g.createdAt });
+    }
+    for (const a of await storage.listAgents()) {
+      if (a.owner !== owner || !(a.defaultScopes ?? []).includes('notifications:send')) continue;
+      add({ kind: 'agent', name: a.displayName || a.name, id: a.gaii }, { last_seen: a.lastSeen ?? null });
+    }
+    const seen = new Set(senders.map(s => s.key as string));
+    for (const n of rows) {
+      const src = sourceOf(n);
+      if (src.kind !== 'extension' && src.kind !== 'app' && src.kind !== 'agent') continue;
+      const key = senderKey(src);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      add(src, { granted_at: null });
+    }
+    res.json(success(config.nodeId, { groups, senders, settings }));
   });
 
   /* ── POST /v1/notifications — notify the CALLER's OWN owner (bell + web push) ──
@@ -68,61 +152,12 @@ export function notificationsRouter(config: AimeatConfig, storage: Storage): Rou
   router.post('/v1/notifications', requireAuth(), requireScope('notifications:send'), async (req, res) => {
     try {
       const auth = req.auth!;
-      const { title, body, link, type } = (req.body ?? {}) as Record<string, unknown>;
-      if (typeof title !== 'string' || !title.trim() || title.length > 200) {
-        res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'title is required (string, max 200 chars)'));
-        return;
-      }
-      if (body !== undefined && (typeof body !== 'string' || body.length > 10_000)) {
-        res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'body must be a string (max 10000 chars)'));
-        return;
-      }
-      // Same-node paths only ('/...', not '//host' or absolute URLs) — a notification never
-      // deep-links off the node.
-      if (link !== undefined && (typeof link !== 'string' || !link.startsWith('/') || link.startsWith('//') || link.length > 500)) {
-        res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'link must be a same-node path starting with "/"'));
-        return;
-      }
-      if (type !== undefined && (typeof type !== 'string' || !/^[a-z0-9_:.-]{1,64}$/i.test(type))) {
-        res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'type must match [a-z0-9_:.-]{1,64}'));
-        return;
-      }
-      // SECURITY: inline reply/api actions execute with the RECIPIENT's authority when clicked, so
-      // they may only originate from trusted server-side emit code — never a principal (app/agent/
-      // owner) posting here. Reject any client-supplied actions outright; a caller wanting an
-      // extra button uses `link` (navigation carries no authority).
-      if ((req.body as Record<string, unknown>)?.actions !== undefined) {
-        res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'actions are set by the node, not by the notification creator; use link for navigation'));
-        return;
-      }
-
-      let finalTitle = title.trim();
-      let finalLink = link as string | undefined;
-      let finalType = type as string | undefined;
-      if (auth.roles.includes('app')) {
-        const grant = auth.app_grant ? await storage.getAppGrant(auth.app_grant) : null;
-        if (!finalLink && grant?.app) {
-          const [appOwner, filename] = grant.app.split('/');
-          finalLink = `/v1/apps/${encodeURIComponent(appOwner)}/${encodeURIComponent(filename)}?mode=inline`;
-        }
-        finalTitle = `${grant?.appName || 'App'}: ${finalTitle}`;
-        finalType = finalType ?? 'app';
-      } else if (auth.roles.includes('agent') && !auth.roles.includes('owner')) {
-        const agentName = auth.sub.includes('#') ? auth.sub.split('#')[0] : auth.sub;
-        finalTitle = `${agentName}: ${finalTitle}`;
-        finalLink = finalLink ?? '/v1/profile?tab=agents';
-        finalType = finalType ?? 'agent';
-      } else {
-        finalType = finalType ?? 'custom';
-      }
-
-      const ghii = ownerGhii(req);
-      await notify(storage, ghii, { type: finalType, title: finalTitle, body: body as string | undefined, link: finalLink });
-      emitChange('notifications', ghii);
-      res.status(201).json(success(config.nodeId, { created: true, link: finalLink ?? null }, [
+      const r = await createPrincipalNotification(storage, config, { owner: auth.owner as string, sub: auth.sub, roles: auth.roles, app_grant: auth.app_grant ?? null }, (req.body ?? {}) as Record<string, unknown>);
+      res.status(201).json(success(config.nodeId, r, [
         { description: 'List your notifications', method: 'GET', url: '/v1/notifications' },
       ]));
     } catch (err) {
+      if (err instanceof NotificationCreateError) { res.status(err.status).json(error(config.nodeId, err.code, err.message)); return; }
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', String(err)));
     }
   });

@@ -222,6 +222,7 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
         type: isRequest ? 'direct_message_request' : 'direct_message',
         title: isRequest ? `${senderGhii} wants to message you` : `New message from ${senderGhii}`,
         body: messagePreviewWithAttachments(body, attachments),
+        i18n: { key: isRequest ? 'direct_message_request' : 'direct_message', vars: { who: senderGhii, preview: messagePreviewWithAttachments(body, attachments) } },
         // Request → 'req:<conversationId>': while pending it lands on the inbox requests list, but once
         // the request is accepted the same notification opens the now-existing thread (see inbox-tab
         // consumeDeepLink). A delivered DM deep-links straight to its conversation.

@@ -308,6 +308,10 @@ const AI_PROVENANCE_REVIEWED_WITHOUT = [
   // template; the note rides inside it labelled as a personal message. Nothing authored lands on
   // the node for anyone to read, so there is no record to mint.
   'aimeat_contact_invite',
+  // DECIDED, 2026-08-30. A notification is a line in the owner's OWN bell, from their own agent,
+  // read by nobody else: not published, not public interest. The record carries the sender's
+  // name in front of the title, which is the attribution a reader needs, and the owner can mute it.
+  'aimeat_notify',
   'aimeat_app_template_propose',
   'aimeat_appdev_pitfall_report',
   'aimeat_board_create',

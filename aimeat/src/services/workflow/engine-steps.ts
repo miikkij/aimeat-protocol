@@ -566,7 +566,7 @@ export async function askHumanInput(
   const optionsSummary = question.options.map(o => o.label).join(' / ');
   const body = `${name}: step "${step.id}" — ${question.prompt} [${optionsSummary}]`;
   logger.info(`workflow ${run.workflowId} run ${run.runId}: step "${step.id}" waiting for human input`);
-  try { await notify(deps.storage, ownerGhii, { type: 'workflow_input_needed', title, body, link: '/v1/profile?tab=workflows' }); }
+  try { await notify(deps.storage, ownerGhii, { type: 'workflow_input_needed', title, body, link: '/v1/profile?tab=workflows', i18n: { key: 'workflow_input_needed', vars: { name, step: step.id, question: question.prompt, options: optionsSummary } } }); }
   catch (err) { logger.warn('askHumanInput: in-app notify best-effort', { error: String(err) }); }
   if (deps.pushService?.enabled) {
     deps.pushService.sendNotification(ownerGhii.split('@')[0], { title, body, url: '/v1/profile?tab=workflows', tag: `workflow:${run.workflowId}` })
@@ -657,7 +657,7 @@ export async function maybeAlertAgentOffline(deps: StepDeps, ownerGhii: string, 
   const title = 'Workflow agent offline';
   const body = `${name}: step "${step.id}" was dispatched but its agent (${agents}) looks offline — it will fail in ~${graceMin} min unless the agent connects.`;
   logger.warn(`workflow ${run.workflowId} run ${run.runId}: step "${step.id}" dispatched to offline agent(s) ${agents}`);
-  try { await notify(deps.storage, ownerGhii, { type: 'workflow_agent_offline', title, body, link: '/v1/profile?tab=workflows' }); }
+  try { await notify(deps.storage, ownerGhii, { type: 'workflow_agent_offline', title, body, link: '/v1/profile?tab=workflows', i18n: { key: 'workflow_agent_offline', vars: { name, step: step.id, agents, minutes: graceMin } } }); }
   catch (err) { logger.warn('agents: in-app notify best-effort', { error: String(err) }); }
   if (deps.pushService?.enabled) {
     deps.pushService.sendNotification(ownerName, { title, body, url: '/v1/profile?tab=workflows', tag: `workflow:${run.workflowId}` })
@@ -710,6 +710,10 @@ export async function onRunFinished(deps: StepDeps, ownerGhii: string, run: Work
   await notify(deps.storage, ownerGhii, {
     type: succeeded ? 'workflow_finished' : 'workflow_failed',
     title, body, link,
+    i18n: {
+      key: succeeded ? 'workflow_finished' : run.status === 'cancelled' ? 'workflow_cancelled' : 'workflow_failed',
+      vars: { name, minutes: durMin ?? 0, failed: failedSteps.join(', '), steps: run.defSnapshot.steps.map(s => `${s.id}: ${run.steps[s.id]?.state ?? 'unknown'}`).join(' · ') },
+    },
   });
 
   // 2. Email — only when configured AND the owner set a notification email.

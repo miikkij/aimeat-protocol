@@ -6,6 +6,9 @@
  *   without notifications:send gets 403), mark-read, the inline-actions security invariant (a
  *   client-supplied actions field is rejected), and the DM reply action end-to-end.
  * @version-history
+ *   v1.3.0 — 2026-08-30 — The Notifications page in the poster face: rows carry source and group,
+ *     the settings record (defaults, normalisation, owner only), a muted group drops before the
+ *     write, the senders read, localized words on a message, the devices list (tests 15–20).
  *   v1.0.0 — 2026-07-02 — Initial: self-notify create/validate/scope-gate/read flow.
  *   v1.1.0 — 2026-07-18 — Inline actions: reject client-supplied actions (403/400 invariant) +
  *     a delivered DM carries a reply action whose params drive a working POST /v1/messages reply.
@@ -206,6 +209,79 @@ await test('14. REGRESSION: the newest notification is returned even with >500 t
     assert(notifs.length > 0, 'list is non-empty');
     assert(notifs[0].title === marker, `newest-first ordering surfaces the marker; got top="${notifs[0]?.title}"`);
     assert(list.body.data.unread > 500, `unread reflects all of the owner's unread (>500), got ${list.body.data.unread}`);
+});
+
+
+// -- The Notifications page in the poster face (2026-08-30): sources, settings, mute, senders, devices --
+
+await test('15. Every row says who sent it and which group it is in; ?unread=1&limit=1 narrows', async () => {
+    const r = await json('/v1/notifications?unread=1&limit=1', { headers: auth(A.token) });
+    assert(r.status === 200, `list ${r.status}`);
+    const list = r.body.data.notifications || [];
+    assert(list.length === 1, `limit honoured, got ${list.length}`);
+    assert(typeof r.body.data.total === 'number', 'total reported');
+    assert(list[0].source && typeof list[0].source.kind === 'string' && typeof list[0].group === 'string', `source and group present: ${JSON.stringify(list[0].source)} ${list[0].group}`);
+    const all = (await json('/v1/notifications?limit=200', { headers: auth(A.token) })).body.data.notifications || [];
+    const mine = all.find((x: any) => x.title === 'Report ready');
+    assert(mine && mine.source.kind === 'owner' && mine.group === 'other', `an owner-created row is sourced to the owner: ${JSON.stringify([mine?.source, mine?.group])}`);
+});
+
+await test('16. Settings: defaults when nothing was written; PUT keeps what was sent and drops the rest; not for an agent', async () => {
+    const d = await json('/v1/notifications/settings', { headers: auth(A.token) });
+    assert(d.status === 200 && d.body.data.settings.throttleMinutes === 10 && d.body.data.settings.quiet === null, `defaults: ${JSON.stringify(d.body.data.settings)}`);
+    const put = await json('/v1/notifications/settings', {
+        method: 'PUT', headers: auth(A.token),
+        body: JSON.stringify({ settings: { groups: { workflows: { push: false } }, senders: { 'app:x/y.html': { muted: true } }, quiet: { start: '22:00', end: '07:00', tz: 'Europe/Helsinki', breakthrough: ['messages', 'bogus'] }, throttleMinutes: 999, emailDigest: { enabled: true, afterHours: 8 }, lastDigestAt: '2020-01-01T00:00:00Z', evil: 1 } }),
+    });
+    assert(put.status === 200, `put ${put.status}: ${JSON.stringify(put.body.error)}`);
+    const s = put.body.data.settings;
+    assert(s.groups.workflows.push === false && s.senders['app:x/y.html'].muted === true, 'decisions kept');
+    assert(s.quiet.tz === 'Europe/Helsinki' && s.quiet.breakthrough.length === 1 && s.quiet.breakthrough[0] === 'messages', `quiet normalised: ${JSON.stringify(s.quiet)}`);
+    assert(s.throttleMinutes === 120 && s.emailDigest.enabled === true && s.lastDigestAt === null && s.evil === undefined, `clamped and cleaned: ${JSON.stringify(s)}`);
+    const anon = await json('/v1/auth/anonymous', { method: 'POST', body: '{}' });
+    const denied = await json('/v1/notifications/settings', { method: 'PUT', headers: auth(anon.body.data.token), body: JSON.stringify({ settings: {} }) });
+    assert(denied.status === 403 || denied.status === 401, `an agent cannot write the owner's settings: ${denied.status}`);
+});
+
+await test('17. A muted group drops the notification before it is written', async () => {
+    const before = (await json('/v1/notifications', { headers: auth(A.token) })).body.data.total;
+    const mute = await json('/v1/notifications/settings', { method: 'PUT', headers: auth(A.token), body: JSON.stringify({ settings: { groups: { other: { muted: true } } } }) });
+    assert(mute.status === 200, `mute ${mute.status}`);
+    const r = await json('/v1/notifications', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ title: 'you will not see this' }) });
+    assert(r.status === 201 && r.body.data.muted === true, `created but muted: ${JSON.stringify(r.body.data)}`);
+    const after = (await json('/v1/notifications', { headers: auth(A.token) })).body.data.total;
+    assert(after === before, `nothing stored: ${before} → ${after}`);
+    const unmute = await json('/v1/notifications/settings', { method: 'PUT', headers: auth(A.token), body: JSON.stringify({ settings: {} }) });
+    assert(unmute.status === 200, 'unmute');
+    const r2 = await json('/v1/notifications', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ title: 'seen again' }) });
+    assert(r2.status === 201 && r2.body.data.muted === false, 'delivered again');
+});
+
+await test('18. Senders: the six groups with counts, and nobody else for an owner with no apps or agents', async () => {
+    const r = await json('/v1/notifications/senders', { headers: auth(A.token) });
+    assert(r.status === 200, `senders ${r.status}: ${JSON.stringify(r.body.error)}`);
+    const { groups, senders } = r.body.data;
+    assert(Array.isArray(groups) && groups.length === 6, `six groups: ${groups?.length}`);
+    const other = groups.find((g: any) => g.group === 'other');
+    assert(other && other.count >= 1 && other.prefs.push === true, `owner's own notifications counted under "other": ${JSON.stringify(other)}`);
+    assert(Array.isArray(senders) && senders.length === 0, `no app, agent or extension has notified A: ${JSON.stringify(senders)}`);
+});
+
+await test('19. A delivered message carries the words to say it in the reader\'s language, and is the node\'s own', async () => {
+    const r = await json('/v1/notifications', { headers: auth(B.token) });
+    assert(r.status === 200, `B list ${r.status}`);
+    const n = (r.body.data.notifications || []).find((x: any) => x.type === 'direct_message' || x.type === 'direct_message_request');
+    assert(!!n, 'B has a message notification');
+    assert(n.i18n && (n.i18n.key === 'direct_message' || n.i18n.key === 'direct_message_request') && n.i18n.vars.who, `i18n key and vars: ${JSON.stringify(n.i18n)}`);
+    assert(n.source.kind === 'aimeat' && n.group === 'messages', `source and group: ${JSON.stringify([n.source, n.group])}`);
+});
+
+await test('20. Devices: the owner\'s push subscriptions list is theirs and empty here', async () => {
+    const r = await json('/v1/push/subscriptions', { headers: auth(A.token) });
+    assert(r.status === 200 && r.body.data.total === 0 && Array.isArray(r.body.data.subscriptions), `devices: ${r.status} ${JSON.stringify(r.body.data)}`);
+    const anon = await json('/v1/auth/anonymous', { method: 'POST', body: '{}' });
+    const denied = await json('/v1/push/subscriptions', { headers: auth(anon.body.data.token) });
+    assert(denied.status === 403, `push:manage is needed: ${denied.status}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

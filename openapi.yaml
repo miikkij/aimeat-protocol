@@ -27510,10 +27510,23 @@ paths:
         `{ id, label, kind }` where kind is `reply` (opens a reply box → POST /v1/messages),
         `api` (calls `endpoint` with the caller's own session, e.g. approve/deny a request), or
         `navigate` (a deep link). Actions are set only by trusted node emit code — see the POST note.
+
+        Every row also carries `source` ({ kind: aimeat|app|extension|agent|owner, name, id? }, derived
+        from the title prefix for rows written before it travelled with them), `group` (organisms,
+        messages, workflows, apps, account, other) and, for the node's own kinds, `i18n` ({ key, vars })
+        so a client can say the title and body in the reader's language. `total` is the whole inbox.
       tags: [Notifications]
       security: [{ BearerAuth: [] }]
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+        - name: unread
+          in: query
+          schema: { type: string, enum: ['1', 'true'] }
+          description: Only the unread ones.
       responses:
-        '200': { description: Notifications + unread count }
+        '200': { description: "Notifications + unread count + total ({ notifications, unread, total })" }
         '401': { $ref: '#/components/responses/Unauthorized' }
     post:
       operationId: createNotification
@@ -27572,6 +27585,72 @@ paths:
       responses:
         '200': { description: "Count cleared ({ cleared })" }
         '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/notifications/settings:
+    get:
+      operationId: getNotificationSettings
+      summary: What the owner decided about their notifications
+      description: >-
+        The owner's settings record (defaults when nothing was written): per sender and, for the node's
+        own notifications, per group, whether it reaches their devices as a push or is muted; quiet
+        hours with the groups that break through; one push per sender per throttle window; the email
+        digest of what stayed unread. Owner only.
+      tags: [Notifications]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: "{ settings, groups }" }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: Not an owner session }
+    put:
+      operationId: putNotificationSettings
+      summary: Replace the owner's notification settings
+      description: >-
+        The whole record. Unknown fields are dropped and bad values replaced by defaults; the digest
+        bookkeeping (`lastDigestAt`) is the node's and is kept. Owner only: the memory key behind it
+        (`notifications.settings`) is under a reserved prefix, so a granted app cannot write it either.
+      tags: [Notifications]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                settings:
+                  type: object
+                  properties:
+                    groups: { type: object, additionalProperties: { type: object, properties: { push: { type: boolean }, muted: { type: boolean } } } }
+                    senders: { type: object, additionalProperties: { type: object, properties: { push: { type: boolean }, muted: { type: boolean } } } }
+                    quiet:
+                      type: object
+                      nullable: true
+                      properties:
+                        start: { type: string, example: '22:00' }
+                        end: { type: string, example: '07:00' }
+                        tz: { type: string, example: Europe/Helsinki }
+                        breakthrough: { type: array, items: { type: string, enum: [organisms, messages, workflows, apps, account, other] } }
+                    throttleMinutes: { type: integer, minimum: 0, maximum: 120 }
+                    emailDigest: { type: object, properties: { enabled: { type: boolean }, afterHours: { type: integer, minimum: 1, maximum: 168 } } }
+      responses:
+        '200': { description: "{ settings }" }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: Not an owner session }
+
+  /v1/notifications/senders:
+    get:
+      operationId: listNotificationSenders
+      summary: Who may notify this owner, and what each did in 30 days
+      description: >-
+        The node's own six groups with counts, the apps whose grant carries notifications:send, the
+        owner's agents with the scope, and the extensions that have notified, each with the count in
+        the last 30 days, the last time, and the owner's decision (push, muted). Owner only.
+      tags: [Notifications]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: "{ groups: [{ group, count, last_at, prefs }], senders: [{ kind, id, name, key, count, last_at, prefs, grant_id?, granted_at?, last_seen? }], settings }" }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: Not an owner session }
 
   /v1/notifications/read:
     post:
@@ -28575,6 +28654,21 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+
+  /v1/push/subscriptions:
+    get:
+      operationId: listPushSubscriptions
+      summary: The owner's push devices
+      description: >-
+        Every device subscribed for this owner: the endpoint (what DELETE /v1/push/subscribe takes to
+        name one), the browser family read off the push service's host, when it was added and last
+        used. Requires push:manage (an owner session has it by role).
+      tags: [Push]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: "{ subscriptions: [{ endpoint, family, created_at, last_used_at }], total }" }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: Missing push:manage scope }
 
   /v1/push/test:
     post:

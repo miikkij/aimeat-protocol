@@ -52,6 +52,8 @@ import { initializeNode } from '../auth/node-keys.js';
 import { logger } from '../utils/logger.js';
 import { sweepLapsedMemberships } from '../services/app-member-sweep.js';
 import { sweepUndisclosedPublicContent } from '../services/ai-disclosure-sweep.js';
+import { sweepHeldPushes, sweepNotificationDigests } from '../services/notification-sweeps.js';
+import { getNotifyPushService } from '../services/notify.js';
 import { registerCoreHandlers } from '../services/core-jobs.js';
 
 export interface ServiceInitResult {
@@ -299,6 +301,26 @@ export async function initializeServices(
     };
     setTimeout(disclosureSweep, 90_000);
     setInterval(disclosureSweep, DISCLOSURE_SWEEP_MS);
+  }
+
+  // Notifications the owner asked to be held or folded (services/notification-sweeps.ts): every
+  // five minutes, the pushes held during quiet hours go out as one when the window has just ended;
+  // every hour, an owner who asked for a digest gets one email for what stayed unread. Both read
+  // only owners who wrote a settings record, so a node where nobody did runs them for nothing.
+  {
+    const HELD_MS = 5 * 60_000;
+    const held = () => {
+      sweepHeldPushes(storage, config, getNotifyPushService(), 6)
+        .catch(err => logger.warn('notification held-push sweep failed', { error: String(err) }));
+    };
+    setTimeout(held, 60_000);
+    setInterval(held, HELD_MS);
+    const digest = () => {
+      sweepNotificationDigests(storage, config)
+        .catch(err => logger.warn('notification digest sweep failed', { error: String(err) }));
+    };
+    setTimeout(digest, 120_000);
+    setInterval(digest, 3_600_000);
   }
 
   // A.4: Wire peer recovery to key exchange + future full sync
