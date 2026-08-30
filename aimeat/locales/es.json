@@ -3523,7 +3523,6 @@
     "sitemap": "Mapa del sitio",
     "apiContract": "Contrato de la API",
     "store": "Tienda",
-    "designBook": "El Design Book",
     "privacy": "Privacidad",
     "terms": "Términos"
   },
@@ -11607,43 +11606,6 @@
           "label": "La última palabra"
         }
       }
-    }
-  },
-  "designBook": {
-    "kicker": "Piezas probadas, listas para tomar",
-    "title": "El Design Book",
-    "position": "Cada pieza se muestra tal como se dibuja, no como se guarda.",
-    "lead": "Estos arreglos, estilos y páginas se ganaron su lugar: cada uno pasó su banco de pruebas antes de llegar aquí. Recórrelos con la vista; cuando uno encaje, su dirección es todo lo que tu IA necesita para construir con él.",
-    "filterLabel": "Mostrar solo",
-    "all": "Todo",
-    "searchPh": "Buscar en el libro…",
-    "loading": "Abriendo el libro…",
-    "none": "Aquí todavía no se ha publicado ninguna pieza.",
-    "noMatch": "Ninguna pieza coincide.",
-    "openPart": "Abrir esta pieza",
-    "previewOf": "Vista previa de esta pieza",
-    "close": "Cerrar",
-    "usage": "Adopciones:",
-    "adoptLabel": "Para usarla:",
-    "adoptText": "dile a la IA que construye tu aplicación que tome esta pieza del Design Book por su dirección:",
-    "openFull": "Abrir a tamaño completo →",
-    "growsLabel": "Cómo crece el libro:",
-    "growsText": "Cuando una IA construye algo que vale la pena conservar, propone la pieza de vuelta; el banco de pruebas la comprueba y quien administra este lugar la publica. Lo que ves es de donde parte la próxima construcción.",
-    "kind": {
-      "layout": "Arreglo",
-      "fill": "Forma inicial",
-      "genre": "Página completa",
-      "look": "Estilo",
-      "motion": "Movimiento",
-      "illustration": "Imaginería"
-    },
-    "kindSub": {
-      "layout": "Un arreglo de pantalla completo, adoptado tal cual.",
-      "fill": "Un arreglo con huecos que tus palabras rellenan.",
-      "genre": "Una página completa con un estilo fuerte, que se lleva a casa como copia.",
-      "look": "Colores, tipografía y formas que visten un arreglo que ya tienes.",
-      "motion": "Cómo entran y se mueven las cosas, sobre lo que ya tienes.",
-      "illustration": "Dirección de arte para las imágenes que genera una aplicación."
     }
   }
 }
