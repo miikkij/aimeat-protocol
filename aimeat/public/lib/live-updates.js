@@ -22,6 +22,9 @@
  * retried 17 times at exactly that cadence. A 401 now gets ONE retry after 10 s (another call on
  * the same page may have just refreshed the session), then the connection stops and tries again
  * only when the tab next becomes visible. Network failures keep the existing backoff.
+ * Reconnect after a restart (2026-08-30): the backoff starts at 2 s and caps at 60 s (was 5 s to
+ * 120 s), and a tab that comes back into view while a reconnect is still waiting tries at once. A
+ * run page left open across a deploy sat still for over a minute while the run advanced.
  */
 
 let es = null;
@@ -30,11 +33,17 @@ let debounceTimer = null;
 let refCount = 0;
 let jwtGetter = null;
 let reconnectTimer = null;
-let reconnectDelay = 5000;
+// Reconnect backoff (2026-08-30): 2 s doubling to a 60 s cap, from 5 s doubling to 120 s. A node
+// restart (a deploy) is down for half a minute or so; with the old schedule a tab that lost its
+// connection at the start of one waited 5 + 10 + 20 + 40 s before its first try after the node was
+// back, and a run page open across the restart sat still for over a minute while the run advanced.
+// The cap stays: a node that is really gone is not knocked on every two seconds forever.
+const INITIAL_RECONNECT_DELAY = 2000;
+const MAX_RECONNECT_DELAY = 60000;
+let reconnectDelay = INITIAL_RECONNECT_DELAY;
 let everOpened = false;
 let authRetried = false;             // the one 10 s retry after a 401 has been spent
 let authDead = false;                // session known dead: no timers run until the tab is shown again
-const MAX_RECONNECT_DELAY = 120000;
 const AUTH_RETRY_DELAY = 10000;
 const DEBOUNCE_MS = 1000;             // match server COALESCE_MS
 
@@ -121,7 +130,7 @@ async function _open() {
     es = new EventSource(`/v1/events?ticket=${encodeURIComponent(ticket)}`);
 
     es.onopen = () => {
-      reconnectDelay = 5000;
+      reconnectDelay = INITIAL_RECONNECT_DELAY;
       authRetried = false;
       authDead = false;
       // Reconnect catch-up: after a gap we may have missed events, so force one "all domains"
@@ -131,7 +140,7 @@ async function _open() {
     };
 
     es.onmessage = (event) => {
-      reconnectDelay = 5000;
+      reconnectDelay = INITIAL_RECONNECT_DELAY;
       let domains = null;
       try {
         const p = JSON.parse(event.data);
@@ -198,6 +207,15 @@ if (typeof document !== 'undefined') {
       authDead = false;
       authRetried = false;
       _open();
+      return;
+    }
+    // A reconnect still waiting on its backoff does not make the person wait: coming back to the
+    // tab is the moment they want it live, so the attempt happens now and the backoff starts over.
+    if (!document.hidden && reconnectTimer && !es && refCount > 0 && isLeader) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+      reconnectDelay = INITIAL_RECONNECT_DELAY;
+      _open();
     }
   });
 }
@@ -213,7 +231,7 @@ export function disconnect() {
     if (bc) { try { bc.close(); } catch { /* already closed */ } bc = null; }
     clearTimeout(debounceTimer);
     clearTimeout(reconnectTimer);
-    reconnectDelay = 5000;
+    reconnectDelay = INITIAL_RECONNECT_DELAY;
     authRetried = false;
     authDead = false;
     jwtGetter = null;
