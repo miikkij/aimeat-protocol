@@ -5,7 +5,11 @@
 ### Before Adding Any Package
 
 1. **Check if it's actually needed.** Can Node.js built-ins or existing dependencies handle this?
-2. **Check the license.** Acceptable: MIT, Apache-2.0, ISC, BSD-2-Clause, BSD-3-Clause. Requires user approval: GPL, AGPL, LGPL, MPL, or any copyleft license.
+2. **Check the license.** Permissive and no decision needed: MIT, MIT-0, ISC, Apache-2.0,
+   BSD-2-Clause, BSD-3-Clause, 0BSD, BlueOak-1.0.0, Unlicense, CC0-1.0. Anything else — GPL, AGPL,
+   LGPL, MPL, SSPL, BUSL, a source-available licence — needs the developer's approval and an entry
+   in `EXCEPTIONS` in `aimeat/scripts/check-licenses.ts` saying what the obligation costs an
+   operator. `pnpm check:licenses` refuses the commit otherwise.
 3. **Evaluate the package:**
    - Active maintenance (commits in last 6 months)
    - Reasonable download count / community adoption
@@ -27,6 +31,10 @@ pnpm audit
 pnpm audit --fix
 
 # If auto-fix doesn't work, investigate and present options to user
+
+# Licences, and the notices that have to follow them
+pnpm check:licenses
+pnpm gen:notices
 ```
 
 **If `pnpm audit` reports high/critical vulnerabilities:**
@@ -37,56 +45,60 @@ pnpm audit --fix
 
 ---
 
-## Current Dependencies
+## Licensing
 
-### Production Dependencies
+AIMEAT is MIT and people run it commercially, so the question that has to keep being answerable is
+"can a company ship this without a lawyer stopping them". Three tools answer it, and none of them is
+a list anybody maintains by hand.
 
-| Package | Version | Purpose | License |
-|---------|---------|---------|---------|
-| `@clack/prompts` | ^1.0.1 | CLI wizard UI | MIT |
-| `@modelcontextprotocol/sdk` | ^1.27.1 | MCP protocol support | MIT |
-| `@node-saml/node-saml` | ^5.1.0 | SAML 2.0 SP: AuthnRequest, Response + XML-DSig validation (BR-04; >=5.1.0 pins the CVE-2025-54419 fix) | MIT |
-| `@xmldom/xmldom` | ^0.9.12 | Namespace-aware parsing of IdP metadata documents (BR-04) | MIT |
-| `scimmy` | ^1.3.5 | SCIM 2.0 protocol: schemas, filter grammar, PATCH semantics (BR-04) | MIT |
-| `scimmy-routers` | ^1.3.2 | Express routers over scimmy (BR-04) | MIT |
-| `@noble/ed25519` | ^3.0.0 | Ed25519 key generation/signing | MIT |
-| `@noble/hashes` | ^2.0.1 | Cryptographic hash functions | MIT |
-| `ajv` | ^8.18.0 | JSON Schema validation | MIT |
-| `ajv-formats` | ^3.0.1 | AJV format plugins | MIT |
-| `better-sqlite3` | ^12.6.2 | SQLite database driver | MIT |
-| `compression` | ^1.8.1 | HTTP compression middleware | MIT |
-| `consul` | ^2.0.1 | Consul config management client | MIT |
-| `croner` | ^10.0.1 | Cron job scheduler | MIT |
-| `express` | ^5.2.1 | HTTP framework | MIT |
-| `ini` | ^6.0.0 | INI file parser | ISC |
-| `isolated-vm` | ^6.0.2 | V8 isolate sandboxing for extensions | MIT |
-| `jose` | ^6.1.3 | JWT/JWS/JWE (EdDSA support) | MIT |
-| `nodemailer` | ^8.0.1 | Email sending (SMTP) | MIT |
-| `otpauth` | ^9.5.0 | TOTP/HOTP 2FA | MIT |
-| `prom-client` | ^15.1.3 | Prometheus metrics | Apache-2.0 |
-| `qrcode` | ^1.5.4 | QR code generation | MIT |
-| `unpdf` | ^1.8.1 | PDF text extraction (attached files) | MIT |
-| `uuid` | ^13.0.0 | UUID generation | MIT |
-| `vanilla-cookieconsent` | ^3.1.0 | Cookie consent banner | MIT |
-| `web-push` | ^3.6.7 | Web push notifications | MIT |
-| `winston` | ^3.19.0 | Structured logging | MIT |
-| `ws` | ^8.19.0 | WebSocket server | MIT |
-| `yaml` | ^2.8.2 | YAML parser | ISC |
-| `zod` | ^4.3.6 | Runtime type validation | MIT |
+| Command | What it does |
+|---|---|
+| `pnpm check:licenses` | Refuses a licence outside the allowlist, a served file with no licence entry, a copyleft component with no source offer, and a GPL asset that is tracked or unmarked. Pre-commit hook, CI and `prepublishOnly`. |
+| `pnpm gen:notices` | Regenerates `THIRD-PARTY-NOTICES.md` — every component, its copyright holder and its licence text in full. `pnpm check:notices` proves it is current. |
+| `pnpm sbom` | Writes `sbom.cdx.json`, a CycloneDX 1.6 bill of materials. This is what a company's security review asks for. Generated on demand, not committed. |
 
-### Dev Dependencies
+**This section used to be a table of every dependency and its licence, and that is why it is not
+one now.** By August 2026 it listed `isolated-vm` (replaced by `quickjs-emscripten`), `uuid ^13`
+(shipping `^14`) and `typescript ^5.9` (shipping `^6`), because 412 production packages cannot be
+tracked by a human. A stale table is worse than none: it reads as an assurance. The gate fails on
+the commit that introduces the problem, and the notices file is regenerated from the tree that is
+actually installed.
 
-| Package | Version | Purpose | License |
-|---------|---------|---------|---------|
-| `@eslint/js` | ^10.0.1 | ESLint built-in rules | MIT |
-| `@playwright/test` | ^1.58.2 | Browser E2E testing | Apache-2.0 |
-| `eslint` | ^10.0.2 | Code linting | MIT |
-| `xml-crypto` | ^6.1.2 | The fake IdP signs real SAML Responses in tests (BR-04); already transitive under node-saml | MIT |
-| `openapi-typescript` | ^7.8.0 | Generate types from OpenAPI spec | MIT |
-| `tsx` | ^4.21.0 | TypeScript execution (tests, scripts) | MIT |
-| `typescript` | ^5.9.3 | TypeScript compiler | Apache-2.0 |
-| `typescript-eslint` | ^8.56.1 | TypeScript ESLint integration | MIT |
-| `vitest` | ^4.0.18 | Unit test framework | MIT |
+### The two populations
+
+Every licence tool in the ecosystem walks the npm tree and stops. That describes about two thirds of
+what this node distributes:
+
+- **The npm tree**, 412 production packages, read by `pnpm licenses list`. Dev dependencies are
+  excluded on purpose: the toolchain does not ship, so it carries no obligation for anyone.
+- **`aimeat/public/lib/`**, twenty-odd browser libraries fetched from a CDN and committed by hand.
+  No npm tool has ever looked at them, and serving a file to a browser is distribution in the same
+  sense a tarball is. [`licenses.json`](../../aimeat/public/lib/licenses.json) is their manifest and
+  `LICENSES/` holds the texts. Six of them (p5, Phaser, PixiJS, Drawflow, Tailwind, daisyUI) are
+  minified builds with no copyright line anywhere in the file, so copying the file satisfies
+  nothing on its own.
+
+Adding a file under `public/lib/` without an entry in `licenses.json` fails the gate.
+
+### The three approved exceptions
+
+Each is a decision with a date, not a suppression. The full reasoning is in `EXCEPTIONS` in
+`aimeat/scripts/check-licenses.ts` and in the notices file.
+
+| Component | Licence | Why it is acceptable |
+|---|---|---|
+| `web-push` | MPL-2.0 | File-level copyleft, used unmodified. The obligation is the notice and a pointer to the source. Modifying a web-push file would put that file under the MPL. |
+| p5.js | LGPL-2.1-only | Served unmodified as its own file at a stable URL. Nothing links it statically, so an app that calls it keeps its own licence. Text, notice and the exact source tarball are all in `licenses.json`. Approved 2026-07-16. |
+| `@ffmpeg/core` | GPL-2.0-or-later | AIMEAT does not distribute it. Marked `"distribute": false`, untracked, skipped by the build's copy step, and installed on the operator's own machine by `pnpm vendor:libs`. Approved 2026-07-31. |
+
+### What the desktop build adds
+
+`aimeat-desktop` distributes two things the web node does not, and neither is a declared
+dependency: the Node runtime, staged as a Tauri sidecar from the build machine's own installation,
+whose 146 kB `LICENSE` carries the notices for OpenSSL, V8, ICU and the rest; and
+`WebView2Loader.dll`, a Microsoft redistributable under Microsoft's terms rather than the MIT of the
+crate it came from. `scripts/stage-licenses.mjs` stages both, plus AIMEAT's own licence and the
+generated notices, into the installer. It fails the build rather than shipping without them.
 
 ---
 
@@ -134,6 +146,11 @@ pnpm audit --fix
 
 # Check why a package is installed
 pnpm why <package>
+
+# Licences: the gate, the notices, the bill of materials
+pnpm check:licenses
+pnpm gen:notices
+pnpm sbom
 ```
 
 ---
@@ -144,9 +161,10 @@ When evaluating whether to add a package, go through this checklist:
 
 - [ ] Is there a Node.js built-in that does this? (`node:crypto`, `node:fs`, `node:url`, etc.)
 - [ ] Do existing dependencies already cover this? (e.g., `ajv` for validation, `zod` for schemas)
-- [ ] Is the license acceptable? (MIT/Apache-2.0/ISC/BSD)
+- [ ] Is the license permissive? If not, has the developer approved it, and is the obligation written down?
 - [ ] Is it actively maintained? (check GitHub activity)
 - [ ] Is the bundle size reasonable? (check bundlephobia.com)
 - [ ] Does `pnpm audit` pass after installation?
 - [ ] Are TypeScript types available?
 - [ ] Have I documented why this package is needed?
+- [ ] Does `pnpm check:licenses` still pass, and did I run `pnpm gen:notices`?

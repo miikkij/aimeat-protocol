@@ -38,6 +38,7 @@
     "resources": [
       "resources/server/**/*",
       "resources/agent-runtime/**/*",
+      "resources/licenses/**/*",
       "WebView2Loader.*"
     ],
     "createUpdaterArtifacts": true

@@ -21,6 +21,8 @@
 #  10. Cortex pack integrity (embed + versions) — pnpm check:viewport
 #  11. AI disclosure gates (TARGET-058)  — pnpm check:ai-disclosure
 #  11b. Language files agree with en.json  — pnpm check:locales
+#  11c. Licences allowed + every served file — pnpm check:licenses
+#  11d. THIRD-PARTY-NOTICES.md is current  — pnpm check:notices
 #  12. Route authorization gates        — pnpm check:route-scopes
 #  12b. E2E suites test a refusal       — pnpm check:denial-coverage
 #  13. Outbound fetch through safeFetch — pnpm check:outbound-fetch
@@ -119,6 +121,18 @@ pnpm -s check:ai-disclosure
 
 echo "[pre-commit] Language files agree with en.json (check:locales)…"
 pnpm -s check:locales
+
+# AIMEAT is MIT and people run it commercially, so "can a company ship this" has to keep being
+# answerable. check:licenses reads the production tree AND public/lib/, which no npm tool looks at
+# and which is where the problems were: a GPL ffmpeg build inside the MIT npm package for every
+# release up to 3.10.0, an LGPL p5 with no licence text beside it, and six minified libraries
+# carrying no copyright line at all. check:notices proves THIRD-PARTY-NOTICES.md followed the
+# dependency that changed. Together under two seconds.
+echo "[pre-commit] Licences allowed, every served file accounted for (check:licenses)…"
+pnpm -s check:licenses
+
+echo "[pre-commit] Third-party notices match the tree (check:notices)…"
+pnpm -s check:notices
 
 
 # ── August 2026 audit gates ──────────────────────────────────────────────────

@@ -7,10 +7,11 @@
     "dev": "pnpm stage && tauri dev",
     "build": "pnpm package",
     "package": "pnpm stage && tauri build && node scripts/report-bundles.mjs",
-    "stage": "node scripts/stage-node.mjs && node scripts/stage-webview2.mjs && node scripts/stage-server.mjs",
+    "stage": "node scripts/stage-node.mjs && node scripts/stage-webview2.mjs && node scripts/stage-server.mjs && node scripts/stage-licenses.mjs",
     "stage:node": "node scripts/stage-node.mjs",
     "stage:webview2": "node scripts/stage-webview2.mjs",
     "stage:server": "node scripts/stage-server.mjs",
+    "stage:licenses": "node scripts/stage-licenses.mjs",
     "tauri": "tauri"
   },
   "dependencies": {},
