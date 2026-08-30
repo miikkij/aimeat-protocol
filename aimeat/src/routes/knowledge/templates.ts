@@ -6,6 +6,7 @@
  *   knowledge-packager (human/agent) and chat-session (human/quick). Extracted from
  *   src/routes/knowledge.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-08-30 — +GET /v1/templates/knowledge-packager-mcp: the prompt for an agent connected over MCP.
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/knowledge.ts (max-file-lines)
  */
 import type { Router } from 'express';
@@ -63,6 +64,26 @@ export function registerTemplateRoutes(
     });
 
     res.json(success(config.nodeId, { prompt: text, ghii, gaii, node_url: nodeUrl, node_id: config.nodeId }));
+  });
+
+  /* ── GET /v1/templates/knowledge-packager-mcp — the prompt for an agent connected over MCP ── */
+  router.get('/v1/templates/knowledge-packager-mcp', requireAuth(), async (req, res) => {
+    const ghii = req.auth!.owner as string;
+    const nodeUrl = config.baseUrl || `http://localhost:${config.port}`;
+
+    const record = await storage.getSystemPrompt('knowledge-packager-mcp');
+    if (!record || !record.active) {
+      return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Prompt not available'));
+    }
+    const content = resolvePromptContent(record, req.headers['accept-language'] as string);
+    const text = substituteVariables(content, {
+      owner_name: ghii,
+      node_url: nodeUrl,
+      node_id: config.nodeId,
+      gaii: resolve(req),
+    });
+
+    res.json(success(config.nodeId, { prompt: text, ghii, node_url: nodeUrl, node_id: config.nodeId }));
   });
 
   /* ── GET /v1/templates/chat-session-human — Get chat session human prompt ── */
