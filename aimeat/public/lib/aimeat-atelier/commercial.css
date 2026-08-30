@@ -10,11 +10,26 @@
  * @structure .ak-com (shared) · .ak-com-legal · .ak-com-chip · .ak-com-frame · .ak-com-audit ·
  *   .ak-com-hp · .ak-com-reviewer · .ak-com-marks
  * @version-history
+ *   v0.39.0 — 2026-08-30 — The sample chip (.ak-com-sample): the dashed mark every sample
+ *     render carries, so gallery content is never mistaken for the real thing.
  *   v0.38.0 — 2026-08-30 — Initial (the commercial side arrives in the kit).
  */
 
 /* ── Shared bones ─────────────────────────────────────────────────────────────────────────── */
 .ak-com { display: block; }
+.ak-com-sample {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border: 1px dashed color-mix(in oklab, var(--ak-ink) 45%, var(--ak-line));
+  border-radius: var(--ak-radius-pill, 999px);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ak-ink-dim);
+  vertical-align: middle;
+}
 .ak-com__title { margin: 0 0 4px; font-size: 1.05rem; color: var(--ak-ink); }
 .ak-com__intro { margin: 0 0 10px; font-size: var(--ak-text-fine, 0.85rem); color: var(--ak-ink-dim); max-width: 70ch; }
 .ak-com__aside {

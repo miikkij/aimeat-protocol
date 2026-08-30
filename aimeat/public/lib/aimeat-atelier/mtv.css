@@ -1,0 +1,144 @@
+/*
+ * @file aimeat-atelier/mtv.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The broadcast family's clothes — the CRT set, the countdown rows and the news
+ *   crawl. The set is dark whatever the theme (a television is a television), and the four
+ *   channel colours are kit tokens with broadcast defaults, so a look may retune the whole
+ *   family by overriding --ak-crt-ch1..4. Everything else rides the --ak-* contract; nothing
+ *   here animates on idle.
+ * @structure .ak-crt · .ak-countdown · .ak-crawl
+ * @version-history
+ *   v0.39.0 — 2026-08-30 — Initial: the Music Television parts arrive as components.
+ */
+
+:root {
+  --ak-crt-ch1: #24e5ff;
+  --ak-crt-ch2: #ff2e9a;
+  --ak-crt-ch3: #ffe14d;
+  --ak-crt-ch4: #38f2a0;
+  --ak-crt-set: #14101f;
+}
+
+/* ── The CRT set: dark in every theme, framed like an object ─────────────────────────────── */
+.ak-crt {
+  margin: 0;
+  padding: 0;
+  border-radius: var(--ak-radius);
+  overflow: hidden;
+  background: var(--ak-crt-set);
+  color: #f4f2fa;
+  border: 1px solid color-mix(in oklab, var(--ak-crt-set) 60%, var(--ak-line));
+}
+.ak-crt__status {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 8px 14px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ak-crt-ch4);
+  border-bottom: 1px solid color-mix(in oklab, #ffffff 12%, transparent);
+}
+.ak-crt__status-mid { margin-left: auto; }
+.ak-crt__live { color: var(--ak-crt-ch2); }
+.ak-crt__screen {
+  height: 150px;
+  padding: 14px 18px;
+  display: flex;
+  align-items: flex-end;
+  background:
+    radial-gradient(120% 90% at 50% 10%, color-mix(in oklab, var(--ak-crt-ch2) 14%, transparent), transparent 60%),
+    color-mix(in oklab, var(--ak-crt-set) 82%, #000000);
+}
+.ak-crt__vu { display: flex; align-items: flex-end; gap: 7px; width: 100%; height: 100%; }
+.ak-crt__bar { flex: 1 1 0; border-radius: 2px 2px 0 0; min-height: 6px; }
+.ak-crt__bar--1 { background: var(--ak-crt-ch1); box-shadow: 0 0 10px color-mix(in oklab, var(--ak-crt-ch1) 55%, transparent); }
+.ak-crt__bar--2 { background: var(--ak-crt-ch2); box-shadow: 0 0 10px color-mix(in oklab, var(--ak-crt-ch2) 55%, transparent); }
+.ak-crt__bar--3 { background: var(--ak-crt-ch3); box-shadow: 0 0 10px color-mix(in oklab, var(--ak-crt-ch3) 55%, transparent); }
+.ak-crt__bar--4 { background: var(--ak-crt-ch4); box-shadow: 0 0 10px color-mix(in oklab, var(--ak-crt-ch4) 55%, transparent); }
+.ak-crt__credits {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px;
+  background: color-mix(in oklab, #000000 35%, var(--ak-crt-set));
+  border-top: 2px solid var(--ak-crt-ch2);
+}
+.ak-crt__artist { font-size: 1rem; letter-spacing: 0.02em; }
+.ak-crt__title { font-style: italic; opacity: 0.9; }
+.ak-crt__meta { font-size: 0.75rem; color: var(--ak-crt-ch1); }
+.ak-crt__foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, #ffffff 65%, var(--ak-crt-set));
+}
+.ak-crt__track {
+  flex: 1 1 60px;
+  max-width: 140px;
+  height: 6px;
+  border-radius: 3px;
+  background: color-mix(in oklab, #ffffff 14%, transparent);
+  overflow: hidden;
+  display: inline-block;
+}
+.ak-crt__track-fill { display: block; height: 100%; background: var(--ak-crt-ch4); }
+
+/* ── The countdown: ranked rows, each wearing the next channel colour ────────────────────── */
+.ak-countdown { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.ak-countdown__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 4px 14px;
+  align-items: center;
+  padding: 8px 14px;
+  border-radius: var(--ak-radius-sm);
+  background: var(--ak-surface);
+  border: 1px solid var(--ak-line);
+  border-left-width: 4px;
+}
+.ak-countdown__row--1 { border-left-color: var(--ak-crt-ch1); }
+.ak-countdown__row--2 { border-left-color: var(--ak-crt-ch2); }
+.ak-countdown__row--3 { border-left-color: var(--ak-crt-ch3); }
+.ak-countdown__row--4 { border-left-color: var(--ak-crt-ch4); }
+.ak-countdown__rank {
+  font-family: var(--ak-font-display);
+  font-weight: var(--ak-weight-display, 800);
+  font-size: 1.6rem;
+  line-height: 1;
+  min-width: 2ch;
+  text-align: right;
+  color: var(--ak-ink);
+}
+.ak-countdown__row--1 .ak-countdown__rank { color: color-mix(in oklab, var(--ak-crt-ch1) 60%, var(--ak-ink)); }
+.ak-countdown__row--2 .ak-countdown__rank { color: color-mix(in oklab, var(--ak-crt-ch2) 60%, var(--ak-ink)); }
+.ak-countdown__row--3 .ak-countdown__rank { color: color-mix(in oklab, var(--ak-crt-ch3) 60%, var(--ak-ink)); }
+.ak-countdown__row--4 .ak-countdown__rank { color: color-mix(in oklab, var(--ak-crt-ch4) 60%, var(--ak-ink)); }
+.ak-countdown__body { display: flex; flex-direction: column; min-width: 0; }
+.ak-countdown__title { font-weight: 700; color: var(--ak-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ak-countdown__sub { font-size: var(--ak-text-fine, 0.85rem); color: var(--ak-ink-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ak-countdown__votes { font-size: var(--ak-text-fine, 0.85rem); font-variant-numeric: tabular-nums; color: var(--ak-ink-dim); white-space: nowrap; }
+
+/* ── The crawl: one loud strip, standing still ───────────────────────────────────────────── */
+.ak-crawl {
+  margin: 0;
+  padding: 8px 14px;
+  border-radius: var(--ak-radius-sm);
+  background: var(--ak-crt-ch3);
+  color: #14101f;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ak-crawl--ink { background: var(--ak-ink); color: var(--ak-paper, var(--ak-surface)); }

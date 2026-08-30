@@ -13,6 +13,8 @@
  *   import { tc } from './commercial-i18n.js';
  *   tc('kind.privacy.title');
  * @version-history
+ *   v0.39.0 — 2026-08-30 — The sample words: the badge that marks sample content and the note
+ *     under a sample form, for the gallery states the Design Book wall shows.
  *   v0.38.0 — 2026-08-30 — Initial (the commercial side arrives in the kit).
  */
 import { i18n } from './i18n.js';
@@ -74,6 +76,8 @@ const STRINGS = {
     'marks.turnOff': 'Turn off',
     'marks.ownerOnly': 'These switches belong to the app’s owner.',
     'marks.saveFailed': 'The change did not go through.',
+    'sample.badge': 'Sample content',
+    'sample.formNote': 'A sample — nothing is sent from here.',
   },
   fi: {
     'legal.title': 'Sivut joilla tämä sovellus vastaa',
@@ -131,6 +135,8 @@ const STRINGS = {
     'marks.turnOff': 'Kytke pois',
     'marks.ownerOnly': 'Nämä kytkimet kuuluvat sovelluksen omistajalle.',
     'marks.saveFailed': 'Muutos ei mennyt läpi.',
+    'sample.badge': 'Näytesisältö',
+    'sample.formNote': 'Näyte — täältä ei lähetetä mitään.',
   },
   es: {
     'legal.title': 'Las páginas con las que responde esta app',
@@ -188,6 +194,8 @@ const STRINGS = {
     'marks.turnOff': 'Desactivar',
     'marks.ownerOnly': 'Estos interruptores pertenecen al dueño de la app.',
     'marks.saveFailed': 'El cambio no se aplicó.',
+    'sample.badge': 'Contenido de muestra',
+    'sample.formNote': 'Una muestra — desde aquí no se envía nada.',
   },
 };
 

@@ -36,6 +36,9 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.39.0 — 2026-08-30 — THE BROADCAST FAMILY: mtv.css joins the imports (the CRT set, the
+ *     countdown rows, the news crawl — the Music Television genre's parts as components), and
+ *     commercial.css gains the sample chip.
  *   v0.38.0 — 2026-08-30 — THE COMMERCIAL SIDE: commercial.css joins the imports — the legal
  *     pages list and its states, the readiness chip, the legal page frame, the audit trail,
  *     the feedback honeypot, the reviewer line and the marks switches, all on --ak-ok/-warn
@@ -205,6 +208,7 @@
 @import url('./aimeat-atelier/data.css');
 @import url('./aimeat-atelier/planner.css');
 @import url('./aimeat-atelier/commercial.css');
+@import url('./aimeat-atelier/mtv.css');
 @import url('./aimeat-atelier/scenics.css');
 @import url('./aimeat-atelier/patterns.css');
 @import url('./aimeat-atelier/mosaic.css');

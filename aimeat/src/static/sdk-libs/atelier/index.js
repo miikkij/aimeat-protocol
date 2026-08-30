@@ -31,6 +31,13 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.39.0 — 2026-08-30 — THE BROADCAST FAMILY AND THE SAMPLE STATES (the owner's ask, on the
+ *     Design Book wall): crt (the television set with the credits box — the provenance is the
+ *     point), countdown (ranked rows in channel colours) and crawl (the star-separated news
+ *     strip, standing still) extract the Music Television genre's parts as components and join
+ *     the mosaic vocabulary; the commercial components gain a marked sample state (`sample:
+ *     true`, or a fill's <angle-bracketed> placeholder in a prop) so a gallery shows what they
+ *     look like instead of the grey refusals that are only honest inside a running app.
  *   v0.38.0 — 2026-08-30 — THE COMMERCIAL SIDE (the wish of 2026-08-29): eight components so a
  *     builder never re-derives how the money-adjacent facts are shown — legalLinks (the app's
  *     own pages with state, readiness and the reason each exists, localised in the kit's three
@@ -206,6 +213,7 @@ import {
   legalLinks, readinessChip, legalPageFrame, auditTrail, recordEvent, feedbackForm,
   reviewerLine, marksSwitches,
 } from './commercial.js';
+import { crt, countdown, crawl } from './mtv.js';
 
 const atelier = {
   /**
@@ -213,7 +221,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.38.0',
+  version: '0.39.0',
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,
@@ -256,6 +264,9 @@ const atelier = {
   // ── The commercial side (legal pages, marks, reviewer, audit trail, feedback) ──
   legalLinks, readinessChip, legalPageFrame, auditTrail, recordEvent, feedbackForm,
   reviewerLine, marksSwitches,
+
+  // ── The broadcast family (the Music Television genre's parts as components) ──
+  crt, countdown, crawl,
 
   // ── Data ──
   form, table, searchBar,
