@@ -26,6 +26,8 @@
  *   - FieldRow — one field: name, key, description, source, editor
  *   - ConfigTab (default)
  * @version-history
+ *   v2.1.0 -- 2026-08-31 -- The save controls move into the pinned search row and the old→new
+ *     list opens from a word there; the fixed bottom overlay that covered the content is gone.
  *   v2.0.0 -- 2026-08-31 -- The poster face: search over name/key/description, the only-changed
  *     filter, the description visible under the name, the chip-cloud contents replaced by a
  *     sticky left index, sections under ink rules. The pending bar is unchanged by design.
@@ -111,26 +113,14 @@ function shown(v) {
 }
 
 /**
- * The unsaved-changes bar.
- *
- * Sticky on purpose: this is the answer to "I changed four things and nothing happened". It says
- * how many are pending, what each one would become, and carries the only two buttons that end the
- * state it describes.
+ * The old→new list of unsaved changes. It opens from a word in the pinned row rather than
+ * covering the page: the controls that matter (the count, Save, Cancel) are always in sight up
+ * there, and the details arrive only when asked for.
  */
-function PendingBar({ paths, pending, schema, onSave, onCancel, saving }) {
-  if (paths.length === 0) return null;
+function PendingList({ paths, pending, schema }) {
   return html`
-    <div class="adm-config-changes adm-cfg-pending" role="status">
-      <div class="adm-cfg-pending-head">
-        <strong>${tr('dashboard.cfgUnsaved', '{n} unsaved change(s)').replace('{n}', paths.length)}</strong>
-        <span class="adm-cfg-pending-hint">${tr('dashboard.cfgUnsavedHint', 'Nothing is stored until you save.')}</span>
-        <span class="adm-cfg-pending-actions">
-          <button class="adm-btn-action" onClick=${onSave} disabled=${saving}>${t('dashboard.saveChanges')}</button>
-          ${' '}
-          <button class="adm-btn-action" onClick=${onCancel} disabled=${saving}>${t('dashboard.cancelLabel')}</button>
-        </span>
-      </div>
-      <ul class="adm-cfg-pending-list">
+    <div class="adm-cfg-listbox" role="status">
+      <ul>
         ${paths.map(p => html`
           <li key=${p}>
             <code>${escHtml(p)}</code>
@@ -194,6 +184,7 @@ export default function ConfigTab({ data, reload }) {
   const [saving, setSaving] = useState(false);
   const [q, setQ] = useState('');
   const [onlyChanged, setOnlyChanged] = useState(false);
+  const [showChanges, setShowChanges] = useState(false);
 
   const s = data.configSchema;
   if (!s || !s.schema) return html`<${Empty} text=${t('dashboard.configNotAvailable')} />`;
@@ -299,7 +290,17 @@ export default function ConfigTab({ data, reload }) {
         <button type="button" class=${'adm-cfg-filter' + (onlyChanged ? '' : ' on')} onClick=${() => setOnlyChanged(false)}>
           ${tr('dashboard.cfgAll', 'All')}
         </button>
+        ${editable && pendingKeys.length > 0 && html`
+          <span class="adm-cfg-pending-mini" role="status">
+            <strong>${tr('dashboard.cfgUnsaved', '{n} unsaved change(s)').replace('{n}', pendingKeys.length)}</strong>
+            <button class="adm-btn" onClick=${save} disabled=${saving}>${t('dashboard.saveChanges')}</button>
+            <button class="adm-btn-action" onClick=${cancel} disabled=${saving}>${t('dashboard.cancelLabel')}</button>
+            <button type="button" class="adm-cfg-filter" onClick=${() => setShowChanges(!showChanges)}>
+              ${showChanges ? tr('dashboard.cfgHideChanges', 'Hide the changes') : tr('dashboard.cfgShowChanges', 'What changes?')}
+            </button>
+          </span>`}
       </div>
+      ${editable && showChanges && pendingKeys.length > 0 && html`<${PendingList} paths=${pendingKeys} pending=${pending} schema=${schema} />`}
 
       <!-- Read-only banner for in-memory storage -->
       ${!editable && html`
@@ -320,9 +321,6 @@ export default function ConfigTab({ data, reload }) {
       ${result && (result.ok
         ? html`<div class="adm-config-result-ok adm-mb-md adm-text-base">${escHtml(result.msg)}</div>`
         : html`<div class="adm-mb-md"><${ErrorBox} message=${result.msg} /></div>`)}
-
-      ${editable && html`<${PendingBar} paths=${pendingKeys} pending=${pending} schema=${schema}
-        onSave=${save} onCancel=${cancel} saving=${saving} />`}
 
       ${domainOrder.length === 0 && html`<div class="adm-cfg-noresult">${tr('dashboard.cfgNoMatches', 'No setting matches.')}</div>`}
 
