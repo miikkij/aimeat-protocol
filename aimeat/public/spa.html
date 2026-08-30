@@ -86,6 +86,7 @@
   <link rel="stylesheet" href="/css/views/landing.css">
   <link rel="stylesheet" href="/css/views/landing-showroom.css">
   <link rel="stylesheet" href="/css/views/changelog.css">
+  <link rel="stylesheet" href="/css/views/design-book.css">
   <link rel="stylesheet" href="/css/views/build-story.css">
   <link rel="stylesheet" href="/css/views/portal-classic.css">
   <link rel="stylesheet" href="/css/views/portal-dev.css">
@@ -470,6 +471,9 @@
       // Two showroom companions (2026-08-28): the whole change log, and the story of how an app
       // gets built here. Both are also spaRoutes in routes/portal.ts, or F5 is a 404.
       '/v1/changelog':   () => import('/views/changelog.js' + B),
+      // The Design Book, browsable (2026-08-30): every published part shown as it renders. A
+      // spaRoute in routes/portal.ts too, or F5 is a 404.
+      '/v1/design-book': () => import('/views/design-book.js' + B),
       '/v1/how-an-app-builds': () => import('/views/build-story.js' + B),
       // The connect story (2026-08-29): what "connect the AI you already use" means, told before
       // the account exists. A spaRoute in routes/portal.ts too, or F5 is a 404.
@@ -931,6 +935,7 @@
       // visitors leave from; without '/' here the footer was missing exactly there.
       '/', '/v1/portal', '/v1/how-it-works', '/v1/business', '/v1/changelog', '/v1/how-an-app-builds',
       '/v1/connect-your-ai', '/v1/members', '/v1/help', '/v1/glossary', '/v1/transparency',
+      '/v1/design-book',
     ]);
 
     function SiteFooter({ navigate }) {
@@ -957,6 +962,7 @@
             <a href="/v1/how-it-works" onClick=${(e) => go(e, '/v1/how-it-works')}>${tr('nav.howItWorks', 'How it works')}</a>
             <a href="/v1/how-an-app-builds" onClick=${(e) => go(e, '/v1/how-an-app-builds')}>${tr('footer.buildStory', 'How an app gets built')}</a>
             <a href="/v1/changelog" onClick=${(e) => go(e, '/v1/changelog')}>${tr('footer.changelog', 'What shipped')}</a>
+            <a href="/v1/design-book" onClick=${(e) => go(e, '/v1/design-book')}>${tr('footer.designBook', 'The Design Book')}</a>
             <a href="/v1/business" onClick=${(e) => go(e, '/v1/business')}>${tr('nav.business', 'For your business')}</a>
             <a href="/v1/members" onClick=${(e) => go(e, '/v1/members')}>${tr('nav.members', 'Members')}</a>
             <a href="/v1/portal?view=dev" onClick=${(e) => go(e, '/v1/portal?view=dev')}>${tr('nav.devView', 'For Developers')}</a>

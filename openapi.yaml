@@ -20874,6 +20874,29 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /v1/designbook/{id}/preview:
+    get:
+      operationId: previewDesignbookPart
+      summary: One part rendered as a page
+      description: >-
+        The part rendered as the real page the guarantee bench measures — the Atelier kit, the
+        part's body, demo rows shaped per component; a look or motion sheet is shown worn by the
+        demo arrangement, a genre as its template's own page, an illustration as its art
+        direction set in the kit's type. Sessionless for any part that exists (the part is a
+        public record already); the browsable gallery at /v1/design-book embeds this per card.
+        Answers text/html, not the JSON envelope.
+      tags: [Apps]
+      security: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The preview page
+          content:
+            text/html:
+              schema: { type: string }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /v1/designbook/{id}/adopt:
     post:
       operationId: adoptDesignbookPart
