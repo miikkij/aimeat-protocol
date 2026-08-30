@@ -36,6 +36,10 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.36.0 — 2026-08-30 — THE APPROVED EXPANSION: planner.css joins the imports (kanban,
+ *     plan, schedule — the work-planning family's clothes) and content.css learns the funnel,
+ *     treemap and flow shapes (label halos via paint-order, so ink reads on any series
+ *     colour in both modes).
  *   v0.35.0 — 2026-08-30 — THE APPROVED LEVEL (content.css + data.css): the chart family's
  *     visual language v2 — sheen gradients, per-series fades, the ink tooltip and note bubble,
  *     the donut centre, the calendar ramp, scatter points and trend; the gauge's half-dial;
@@ -193,6 +197,7 @@
 @import url('./aimeat-atelier/shell.css');
 @import url('./aimeat-atelier/content.css');
 @import url('./aimeat-atelier/data.css');
+@import url('./aimeat-atelier/planner.css');
 @import url('./aimeat-atelier/scenics.css');
 @import url('./aimeat-atelier/patterns.css');
 @import url('./aimeat-atelier/mosaic.css');

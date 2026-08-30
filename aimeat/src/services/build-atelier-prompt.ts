@@ -28,6 +28,8 @@
  * @version-history
  *   v1.16.0 — 2026-08-29 — "A map" means the REAL map: the `map` block (Leaflet + OSM) taught
  *     as the answer to the word, the atlas demoted to its narrow choropleth truth.
+ *   v1.17.0 — 2026-08-30 — The approved expansion taught: chart kinds funnel/treemap/flow,
+ *     the work-planning family (kanban/plan/schedule), scene3d kind "globe".
  *   v1.16.0 — 2026-08-30 — The grown chart family taught (stacked, horizontal, scatter, note
  *     bubble, tooltips, donut delta) and scene3d kind "model" (a .glb by URL as a product shot).
  *   v1.15.0 — 2026-08-29 — THE DEMO TRAP named in the genre section: a block stack wearing a
@@ -280,8 +282,17 @@ function composeBody(config: AimeatConfig): string {
     + 'story bubble on the point that matters — every axes chart answers touch with a tooltip '
     + 'on its own), `"donut"` (parts of a whole — the total in the middle, and a `delta` puts '
     + 'its change there too), `"calendar"` (a stretch of days as a heat grid, months named) or '
-    + '`"scatter"` (points on two measures with an honest trend line). A statRow tile carrying '
+    + '`"scatter"` (points on two measures with an honest trend line), `"funnel"` (stages '
+    + 'losing people — the survival rate written at each step), `"treemap"` (shares as area '
+    + 'when the donut\'s slices would not fit) or `"flow"` (where the quantity went — ribbons '
+    + 'as wide as their sums). A statRow tile carrying '
     + '`trend: [numbers]` draws its short history as a filled sparkline under the figure.\n\n'
+    + 'WORK AGAINST PEOPLE AND TIME is its own family: `kanban` (work as columns by state — '
+    + 'queue shows the same work as a list, this is the board, and with onMove wired the '
+    + 'cards actually move), `plan` (stretches on a shared time axis with today drawn as a '
+    + 'line — timeline tells what happened, this tells what is running) and `schedule` (a '
+    + 'week as a grid, bookings as blocks — chart kind "calendar" is the year at a distance, '
+    + 'this is next week).\n\n'
     + 'WHEN THE OWNER SAYS "A MAP", THEY MEAN THE REAL ONE: the `map` block is Leaflet over '
     + 'OpenStreetMap street tiles — pins with popups at real addresses, the view framing the '
     + 'markers on its own, the licence\'s attribution built in, dark mode re-toning the tiles. '
@@ -291,8 +302,9 @@ function composeBody(config: AimeatConfig): string {
     + 'And when a screen has earned a SHOWPIECE, the `scene3d` block gives it real depth: '
     + '`kind: "orb"` (a signature object turning under the hand), `"sky"` (a procedural '
     + 'atmosphere band), `"bars"` (the bound rows stand up as a field of columns — the 3D '
-    + 'chart) or `"model"` (a .glb/.gltf by URL, fitted, grounded and studio-lit like a '
-    + 'product shot). One per layout, loaded lazily, colours from the look\'s tokens, and the render '
+    + 'chart), `"model"` (a .glb/.gltf by URL, fitted, grounded and studio-lit like a '
+    + 'product shot) or `"globe"` (the earth — places as dots, data travelling between them '
+    + 'as lifted arcs). One per layout, loaded lazily, colours from the look\'s tokens, and the render '
     + 'loop stops at rest so an idle scene costs nothing. It is a statement, not a default: '
     + 'most screens want a chart, not a scene.\n\n'
     + 'COMPOSE, do not pile: a block may carry `span` — `full` (default), `main` + `side` for the '

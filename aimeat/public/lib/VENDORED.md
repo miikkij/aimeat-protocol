@@ -14,6 +14,7 @@ with per-lib AI docs + changelogs) — keep this table and the registry in sync.
 | `aimeat-theme.css` | AIMEAT-local (the theme SYSTEM: 5 palettes × light+dark on the `data-theme` × `data-palette` axes, self-hosted faces, elevation/motion/type tokens; verified by `pnpm check:theme`) | 2.0.0 | `styling` | this repo | MIT |
 | `aimeat-daisyui-bridge.css` | AIMEAT-local (theme bridge; `@import`s the theme) | — | `styling` | this repo | MIT |
 | `chartjs@4.js` | `chart.js` (UMD) | 4.5.1 | `chartjs` | `https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js` | MIT |
+| `d3@7.min.js` | `d3` (UMD — `window.d3`; the full v7 bundle: selection, scales, shapes, hierarchy, force, geo) | 7.9.0 | `d3` | `https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js` | ISC |
 | `mermaid/mermaid.min.js` | `mermaid` (UMD) | 11.15.0 | `mermaid` | `node_modules/mermaid/dist` (see mermaid/README.md) | MIT |
 | `three.min.js` | `three` (r128 UMD) | r128 | `three` | `https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js` | MIT |
 | `three-world@1.min.js` | `three` + addons OrbitControls, Sky, RGBELoader (esbuild IIFE — `window.THREE`, addons on `THREE.Addons`; never load together with `three.min.js`) | 0.185.1 (r185), bundle v1 | `three-world` | built by `aimeat/scripts/vendor-three-world.mjs` from `registry.npmjs.org/three/-/three-0.185.1.tgz` | MIT |

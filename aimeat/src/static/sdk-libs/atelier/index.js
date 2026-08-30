@@ -28,6 +28,11 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.36.0 — 2026-08-30 — THE APPROVED EXPANSION, all three baskets: chart kinds funnel,
+ *     treemap and flow (own layouts, no library); the work-planning family kanban (cards
+ *     move — drag or arrow keys — and the app is told), plan (stretches against months,
+ *     today as a line) and schedule (the week grid); and scene3d kind `globe` — the earth
+ *     with data travelling as arcs, on the three-world bundle already vendored.
  *   v0.35.0 — 2026-08-30 — THE APPROVED LEVEL: the chart family grown whole (stacked and
  *     horizontal bars, scatter with an honest trend, the note bubble, a touch tooltip on every
  *     axes chart, sheened rounded bars, the donut's total-and-delta centre, named calendar
@@ -177,6 +182,7 @@ import { graph } from './graph.js';
 import { waveform } from './waveform.js';
 import { scene3d } from './scene3d.js';
 import { health, queue, gauge } from './ops.js';
+import { kanban, plan, schedule } from './planner.js';
 import { konsole } from './konsole.js';
 import { atlas } from './atlas.js';
 import { map } from './map.js';
@@ -188,7 +194,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.35.0',
+  version: '0.36.0',
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,
@@ -221,6 +227,9 @@ const atelier = {
 
   // ── The ops family and the maps (an admin panel is an arrangement, not app code) ──
   health, queue, gauge, console: konsole, atlas, map,
+
+  // ── The work-planning family (work against people and time) ──
+  kanban, plan, schedule,
 
   // ── The things that open ──
   reveal, drawer, dialog, confirm, prompt, sheet,
