@@ -19,7 +19,7 @@
  *     side-effect delete — which only the SQLite provider had, so Postgres never pruned at all.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
-import type { BoardRecord, BoardPostRecord, BoardSubscriptionRecord } from '../interface.js';
+import type { BoardRecord, BoardPostRecord, BoardSubscriptionRecord, BoardRules, BoardAuthorStanding } from '../interface.js';
 
 export interface BoardRepository {
   createBoard(board: BoardRecord): Promise<BoardRecord>;
@@ -27,10 +27,20 @@ export interface BoardRepository {
   listBoards(opts?: { visibility?: string; ownerGaii?: string }): Promise<BoardRecord[]>;
   updateBoardVisibility(id: string, visibility: string, federate?: boolean): Promise<BoardRecord | null>;
   updateBoardMembers(id: string, allowedGaiis: string[]): Promise<BoardRecord | null>;
+  /** Replace the board's own rules; null returns the board to the node's defaults. */
+  updateBoardRules(id: string, rules: BoardRules | null): Promise<BoardRecord | null>;
   deleteBoard(id: string): Promise<boolean>;
   createPost(post: BoardPostRecord): Promise<BoardPostRecord>;
   getPost(boardId: string, postId: string): Promise<BoardPostRecord | null>;
   listPosts(boardId: string, opts?: { category?: string; cursor?: string; limit?: number }): Promise<BoardPostRecord[]>;
+  /** Move a post's expiry; the author extending a notice, or the sweep's clock being reset. */
+  updatePostExpiry(boardId: string, postId: string, ttlExpiresAt: string): Promise<boolean>;
+  /** The replies under one notice, oldest first. listPosts leaves replies out; this is the only way to read them together. */
+  listReplies(boardId: string, postId: string): Promise<BoardPostRecord[]>;
+  /** How many replies each of `postIds` has, for a listing that says "5 replies" without loading them. */
+  replyCounts(boardId: string, postIds: string[]): Promise<Record<string, number>>;
+  /** Posts published, thanks received and first-post date for each of `gaiis`, one grouped query. */
+  boardAuthorStanding(gaiis: string[]): Promise<Record<string, BoardAuthorStanding>>;
   deletePost(boardId: string, postId: string): Promise<boolean>;
   /**
    * Delete EVERY post (across all boards) whose ttlExpiresAt has passed `nowIso` — one SQL DELETE,

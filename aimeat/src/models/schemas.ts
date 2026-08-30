@@ -15,6 +15,8 @@
  *   - validateBody(schema, nodeId): Express middleware wiring a schema to the request pipeline
  *
  * @version-history
+ *   Board rules — 2026-08-30 — BoardRulesSchema (posting, categories, default_ttl_hours, post_cost)
+ *     on BoardCreateSchema, and BoardPostUpdateSchema (ttl_hours or resolved: true), RFC §27.
  *   Password floor unsplit — 2026-08-12 — GhiiRegistrationSchema drops password.min(8). The rule was
  *     duplicated in validatePasswordStrength, and the schema copy answered first, so a short password
  *     came back VALIDATION_ERROR instead of the WEAK_PASSWORD the route documents and clients branch on.
@@ -215,12 +217,28 @@ export const OperatorRulingSchema = z.object({
 
 // ── Boards ──────────────────────────────────────────────────
 
+/** A board's own rules (RFC §27). Every field optional; a missing one means the node's default. */
+export const BoardRulesSchema = z.object({
+    posting: z.enum(['owner', 'members', 'anyone']).optional(),
+    categories: z.array(z.string().min(1).max(64)).max(20).optional(),
+    default_ttl_hours: z.number().positive().max(8760).optional(),
+    post_cost: z.number().int().min(0).max(100_000).optional(),
+});
+
 export const BoardCreateSchema = z.object({
     name: z.string().min(1).max(128),
     visibility: z.enum(['private', 'shared', 'public', 'system']),
     description: z.string().max(10_000).optional(),
     allowed_gaiis: z.array(z.string()).optional(),
+    federate: z.boolean().optional(),
+    rules: BoardRulesSchema.optional(),
 });
+
+/** What a notice's author (or the board's keeper) may change after publishing. */
+export const BoardPostUpdateSchema = z.object({
+    ttl_hours: z.number().positive().max(8760).optional(),
+    resolved: z.literal(true).optional(),
+}).refine(v => v.ttl_hours !== undefined || v.resolved === true, { message: 'Provide ttl_hours to extend the notice, or resolved: true to take it down' });
 
 export const BoardPostSchema = z.object({
     title: z.string().min(1).max(256),

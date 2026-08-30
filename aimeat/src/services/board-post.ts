@@ -24,10 +24,15 @@
  *   - BOARD_POST_LIMITS — the shape bounds, shared with the REST validator
  *   - createBoardPost() — access, hook, price, provenance, record; a refusal or the post
  *   - createBoardReply() — the same access rule, which neither door applied to a reply
+ *   - boardPostPrice() — the board's own price or the node's, plus the per-kB flood price
+ *   - updateBoardPost() — a notice taken down as handled, or given more time
  * @usage
  *   const out = await createBoardPost({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.2.0 — 2026-08-30 — The board's own rules (RFC §27) decide who posts, which categories a
+ *     notice may carry, how long it lives by default and what it costs; updateBoardPost() takes a
+ *     notice down as handled or moves its expiry.
  *   v1.1.0 — 2026-08-30 — A reply inherits its parent's expiry; it used to carry none and outlived
  *     the notice it answered.
  *   v1.0.0 — 2026-08-11 — Initial (August 2026 audit step 3, option B: shared service, gate inside).
@@ -77,9 +82,16 @@ export type BoardPostResult =
 const DEFAULT_TTL_HOURS = 168;
 
 
-/** May this caller put text on this board? A post and a reply ask the same question. */
+/**
+ * May this caller put text on this board? A post and a reply ask the same question.
+ *
+ * A private board is its owner's alone. On a shared or public board the board's own posting rule
+ * decides, and its default is what the visibility always meant: a shared board takes posts from its
+ * keeper, the keeper's other principals and the roster; a public one from anyone signed in. A
+ * keeper may narrow either to 'owner' (an announcements board) or a public one to 'members'.
+ */
 function boardPostAccessRefusal(
-    board: Pick<BoardRecord, 'visibility' | 'ownerGaii' | 'allowedGaiis'>,
+    board: Pick<BoardRecord, 'visibility' | 'ownerGaii' | 'allowedGaiis' | 'rules'>,
     caller: BoardPostCaller,
 ): { ok: false; status: number; code: string; message: string } | null {
     if (board.visibility === 'system' && !caller.roles.includes('operator')) {
@@ -88,13 +100,25 @@ function boardPostAccessRefusal(
     if (board.visibility === 'private' && board.ownerGaii !== caller.gaii) {
         return { ok: false, status: 403, code: 'ACCESS_DENIED', message: 'Cannot post to this private board' };
     }
-    if (board.visibility === 'shared'
-        && board.ownerGaii !== caller.gaii
-        && !isSameOwner(board.ownerGaii, caller.gaii)
-        && !board.allowedGaiis.includes(caller.gaii)) {
-        return { ok: false, status: 403, code: 'ACCESS_DENIED', message: 'You are not invited to this board' };
+    if (board.visibility === 'shared' || board.visibility === 'public') {
+        const posting = board.rules?.posting ?? (board.visibility === 'public' ? 'anyone' : 'members');
+        const own = board.ownerGaii === caller.gaii || isSameOwner(board.ownerGaii, caller.gaii);
+        if (posting === 'owner' && !own) {
+            return { ok: false, status: 403, code: 'ACCESS_DENIED', message: 'Only the keeper of this board publishes on it. You can read it, reply is closed too; ask the keeper if you have something for the board.' };
+        }
+        if (posting === 'members' && !own && !board.allowedGaiis.includes(caller.gaii)) {
+            return { ok: false, status: 403, code: 'ACCESS_DENIED', message: 'You are not invited to this board' };
+        }
     }
     return null;
+}
+
+/** What one post on this board costs its author: the board's own price, or the node's, plus the per-kB flood price. A board priced at 0 is free. */
+export function boardPostPrice(board: Pick<BoardRecord, 'visibility' | 'rules'>, config: Pick<AimeatConfig, 'boardPostBaseCost' | 'boardPostCostPerKb'>, bodyLength: number): number {
+    if (board.visibility !== 'public') return 0;
+    const base = board.rules?.postCost ?? config.boardPostBaseCost;
+    if (base === 0) return 0;
+    return base + Math.ceil((bodyLength / 1000) * config.boardPostCostPerKb);
 }
 
 /**
@@ -129,6 +153,11 @@ export async function createBoardPost(
     if (tags.length > BOARD_POST_LIMITS.tagsMax || tags.some(t => String(t).length > BOARD_POST_LIMITS.tagMax)) {
         return { ok: false, status: 400, code: 'VALIDATION_ERROR', message: `at most ${BOARD_POST_LIMITS.tagsMax} tags of ${BOARD_POST_LIMITS.tagMax} characters` };
     }
+    // A board that names its categories takes a notice under one of them or under none.
+    const allowedCategories = board.rules?.categories;
+    if (input.category && allowedCategories?.length && !allowedCategories.includes(input.category)) {
+        return { ok: false, status: 400, code: 'VALIDATION_ERROR', message: `This board files notices under ${allowedCategories.join(', ')}. Pick one of those as the category, or leave it out.` };
+    }
 
     // An installed extension may refuse the post. Advisory on one surface is not a moderation rule.
     const hook = await executeHooks(config, storage, 'pre_board_post', { board_id: input.boardId, author_gaii: caller.gaii });
@@ -141,10 +170,10 @@ export async function createBoardPost(
     if (denied) return denied;
 
     // A public board costs, scaled by length. This is the anti-flood price on the one surface
-    // everybody reads, and it applied only to the HTTP door.
-    let charged = 0;
-    if (board.visibility === 'public') {
-        charged = config.boardPostBaseCost + Math.ceil((body.length / 1000) * config.boardPostCostPerKb);
+    // everybody reads, and it applied only to the HTTP door. The board's own price, when its keeper
+    // set one, replaces the node's base price; a board priced at 0 is free.
+    const charged = boardPostPrice(board, config, body.length);
+    if (charged > 0) {
         const debited = await storage.debitBalance(caller.gaii, charged);
         if (!debited) {
             return { ok: false, status: 402, code: 'INSUFFICIENT_MORSELS', message: `Posting costs ${charged} morsels` };
@@ -172,7 +201,7 @@ export async function createBoardPost(
         enabled: config.aiProvenance,
     });
 
-    const hours = input.ttlHours ?? DEFAULT_TTL_HOURS;
+    const hours = input.ttlHours ?? board.rules?.defaultTtlHours ?? DEFAULT_TTL_HOURS;
     const post = await storage.createPost({
         id: `post-${randomBytes(8).toString('hex')}`,
         boardId: input.boardId,
@@ -202,6 +231,47 @@ export async function createBoardPost(
     });
 
     return { ok: true, post, charged };
+}
+
+export type BoardPostUpdateResult =
+    | { ok: true; resolved: true; postId: string }
+    | { ok: true; resolved: false; post: BoardPostRecord }
+    | { ok: false; status: number; code: string; message: string };
+
+/**
+ * What happens to a notice after it is up: its author, or the board's keeper, takes it down as
+ * handled (the bike is sold, the cat is home) or gives it more time. Taking it down is a delete:
+ * a handled notice has nothing left to say, and the board does not keep an archive of it.
+ */
+export async function updateBoardPost(
+    deps: { storage: Storage; config: AimeatConfig },
+    caller: BoardPostCaller,
+    input: { boardId: string; postId: string; ttlHours?: number; resolved?: boolean },
+): Promise<BoardPostUpdateResult> {
+    const { storage } = deps;
+    const post = await storage.getPost(input.boardId, input.postId);
+    if (!post) return { ok: false, status: 404, code: 'NOT_FOUND', message: `Post not found: ${input.postId}` };
+    const board = await storage.getBoard(input.boardId);
+    if (!board) return { ok: false, status: 404, code: 'NOT_FOUND', message: `Board not found: ${input.boardId}` };
+
+    const own = post.authorGaii === caller.gaii || board.ownerGaii === caller.gaii || caller.roles.includes('operator');
+    if (!own) {
+        return { ok: false, status: 403, code: 'ACCESS_DENIED', message: 'Only the author or the board keeper can change this notice. To answer it, reply instead.' };
+    }
+
+    if (input.resolved === true) {
+        await storage.deletePost(input.boardId, input.postId);
+        emitChange('boards');
+        return { ok: true, resolved: true, postId: input.postId };
+    }
+    const hours = Number(input.ttlHours);
+    if (!Number.isFinite(hours) || hours <= 0) {
+        return { ok: false, status: 400, code: 'VALIDATION_ERROR', message: 'Provide ttl_hours to extend the notice, or resolved: true to take it down' };
+    }
+    const ttlExpiresAt = new Date(Date.now() + hours * 3600_000).toISOString();
+    await storage.updatePostExpiry(input.boardId, input.postId, ttlExpiresAt);
+    emitChange('boards');
+    return { ok: true, resolved: false, post: { ...post, ttlExpiresAt } };
 }
 
 export type BoardReplyResult =

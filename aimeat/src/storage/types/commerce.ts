@@ -127,6 +127,34 @@ export interface WalletTransaction {
   timestamp: string;
 }
 
+/**
+ * A board's own rules (RFC v4.0 §27, 2026-08-30). Every field is optional and the node's defaults
+ * apply where one is missing: who may post follows the visibility (a public board takes posts from
+ * anyone signed in, a shared one from its members, a private one from its owner), the categories
+ * are free text, a notice lives 168 hours, and a public post costs the node's base price.
+ */
+export interface BoardRules {
+  /** Who may publish. 'owner' = the owner and the owner's own agents; 'members' = plus the roster; 'anyone' = any signed-in principal who may read. */
+  posting?: 'owner' | 'members' | 'anyone';
+  /** When set, a post's category must be one of these. */
+  categories?: string[];
+  /** Lifetime of a post whose author names none, in hours. */
+  defaultTtlHours?: number;
+  /** Base price of a post on this board in morsels (public boards only; the per-kB part stays the node's). */
+  postCost?: number;
+}
+
+/** A poster's standing on the boards: what a reader sees next to the name. */
+export interface BoardAuthorStanding {
+  gaii: string;
+  /** Top-level notices this principal has published (live ones; expired are gone). */
+  posts: number;
+  /** 'thanks' reactions received across their posts and replies. */
+  thanks: number;
+  /** When their first post was made. */
+  since?: string;
+}
+
 export interface BoardRecord {
   id: string;
   name: string;
@@ -137,6 +165,7 @@ export interface BoardRecord {
   createdAt: string;
   semantic?: SemanticAnnotation;
   federate?: boolean;
+  rules?: BoardRules;
 }
 
 export interface BoardPostRecord {

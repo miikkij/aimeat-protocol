@@ -12,6 +12,7 @@
  *   block 1), or upgrades crash with "no such column" before the ALTER runs.
  * @usage initializeSchema(db) from sqlite/index.ts constructor.
  * @version-history
+ *   2026-08-30 — boards.rules (migration 0057): the board's own rules as JSON.
  *   v1.12.0 — 2026-08-22 — direct_messages.ownerReadAt plus its backfill: inbound copies inherit
  *     readAt so today's badge is unchanged, everything else is stamped seen so the whole history
  *     does not light up at once.
@@ -232,6 +233,7 @@ export function initializeSchema(db: Database.Database): void {
   safeAddColumn('actions', 'federate', 'INTEGER NOT NULL DEFAULT 0');
   safeAddColumn('agents', 'federate', 'INTEGER NOT NULL DEFAULT 0');
   safeAddColumn('boards', 'federate', 'INTEGER NOT NULL DEFAULT 0');
+  safeAddColumn('boards', 'rules', 'TEXT');   // migration 0057: the board's own rules, JSON
   safeAddColumn('storage_files', 'federate', 'INTEGER NOT NULL DEFAULT 0');
 
   // Security audit — per-account password brute-force protection

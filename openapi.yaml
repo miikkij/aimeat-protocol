@@ -1655,8 +1655,54 @@ components:
           type: boolean
           default: false
           description: Whether this board is visible to federated peer nodes
+        rules:
+          $ref: '#/components/schemas/BoardRules'
         semantic:
           $ref: '#/components/schemas/SemanticAnnotation'
+
+    BoardRules:
+      type: object
+      description: >-
+        The board's own rules (RFC v4.0 §27). Every field is optional; a missing one means the
+        node's default. `posting` narrows who may publish: 'owner' is the keeper and their own agents
+        (an announcements board), 'members' adds the roster, 'anyone' is any signed-in principal who
+        can read the board (the default on a public board). `categories` names the categories a
+        notice may carry; `default_ttl_hours` is a notice's lifetime when its author names none;
+        `post_cost` replaces the node's base price on a public board, and 0 makes the board free.
+      properties:
+        posting:
+          type: string
+          enum: [owner, members, anyone]
+        categories:
+          type: array
+          maxItems: 20
+          items:
+            type: string
+            maxLength: 64
+        default_ttl_hours:
+          type: number
+          minimum: 0
+          maximum: 8760
+          exclusiveMinimum: true
+        post_cost:
+          type: integer
+          minimum: 0
+          maximum: 100000
+
+    BoardAuthorStanding:
+      type: object
+      description: What a reader sees next to a poster's name — notices published, thanks received, since when.
+      properties:
+        gaii:
+          type: string
+        posts:
+          type: integer
+        thanks:
+          type: integer
+          description: "'thanks' reactions received across the poster's notices and replies."
+        since:
+          type: string
+          format: date-time
 
     BoardPost:
       type: object
@@ -15853,6 +15899,48 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+    patch:
+      operationId: updateBoardPost
+      summary: Take a notice down as handled, or give it more time
+      description: >-
+        The author or the board's keeper. `resolved: true` removes the notice (the bike is sold,
+        the cat is home); `ttl_hours` sets a new expiry counted from now. One of the two is required.
+      tags: [Boards]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: boardId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ttl_hours:
+                  type: number
+                  minimum: 0
+                  maximum: 8760
+                  exclusiveMinimum: true
+                resolved:
+                  type: boolean
+                  enum: [true]
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   /v1/boards/{boardId}/posts/{postId}/react:
     post:
@@ -15886,6 +15974,30 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
 
   /v1/boards/{boardId}/posts/{postId}/replies:
+    get:
+      operationId: listBoardPostReplies
+      summary: The replies under one notice
+      description: >-
+        Oldest first, with each reply's author, body, reactions and expiry, and an `authors` block
+        with every replier's standing. Reads under the board's read rule, so a public board needs no
+        auth. A reply flags have hidden is left out for everyone but its author and the board's keeper.
+      tags: [Boards]
+      parameters:
+        - name: boardId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '404':
+          $ref: '#/components/responses/NotFound'
     post:
       operationId: replyToPost
       summary: Reply to post
@@ -45218,6 +45330,41 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+  /v1/boards/{boardId}/rules:
+    patch:
+      operationId: patchBoardRules
+      tags: [Boards]
+      summary: Set the board's own rules
+      description: |
+        The board's keeper (or an operator). Replaces the rules wholesale: who may post, the
+        categories a notice may carry, the default lifetime, the price of a public post. `rules: null`
+        returns the board to the node's defaults.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: boardId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rules:
+                  oneOf:
+                    - $ref: '#/components/schemas/BoardRules'
+                    - type: 'null'
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /v1/boards/{boardId}/visibility:
     patch:
       operationId: patchBoardVisibility

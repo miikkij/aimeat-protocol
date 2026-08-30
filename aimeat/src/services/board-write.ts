@@ -40,18 +40,87 @@
  *   - reactToBoardPost() — the reaction bound, the write, the event
  *   - setBoardMembers() — the roster arithmetic and the write, on an already-authorized board
  *   - deleteBoardById() — owner or operator, the delete, the event
+ *   - normalizeBoardRules() / boardRulesBlock() / setBoardRules() — the board's own rules (RFC §27)
  * @usage
  *   const out = await createBoard({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.1.0 — 2026-08-30 — Boards are Core again (RFC §27). A board carries its own rules (who
+ *     posts, categories, default lifetime, price), checked here for both doors. Any account may open
+ *     a public board, up to config.boardPublicPerOwnerMax; a system board stays the operator's.
  *   v1.0.0 — 2026-08-11 — Initial (August 2026 audit step 8, the boards unit): the five board writes
  *     the MCP tools were performing against storage directly.
  */
 import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, BoardRecord, BoardSubscriptionRecord } from '../storage/interface.js';
+import type { Storage, BoardRecord, BoardRules, BoardSubscriptionRecord } from '../storage/interface.js';
 import { isSameOwner } from '../utils/gaii.js';
 import { emitChange } from './event-bus.js';
+
+/** The bounds BoardRulesSchema applies on the HTTP door. */
+export const BOARD_RULE_LIMITS = {
+    categoriesMax: 20,
+    categoryMax: 64,
+    ttlHoursMax: 8760,
+    postCostMax: 100_000,
+} as const;
+
+const POSTING_RULES = ['owner', 'members', 'anyone'] as const;
+
+/**
+ * A board's rules as the keeper sent them (snake_case on the wire), checked and in record shape.
+ * An empty object, or nothing, means the node's defaults; null on an update means the same.
+ */
+export function normalizeBoardRules(raw: unknown): { ok: true; rules?: BoardRules } | BoardWriteRefusal {
+    if (raw === undefined || raw === null) return { ok: true };
+    if (typeof raw !== 'object' || Array.isArray(raw)) {
+        return { ok: false, status: 400, code: 'VALIDATION_ERROR', message: 'rules must be an object' };
+    }
+    const r = raw as Record<string, unknown>;
+    const rules: BoardRules = {};
+    if (r.posting !== undefined) {
+        if (!(POSTING_RULES as readonly unknown[]).includes(r.posting)) {
+            return { ok: false, status: 400, code: 'VALIDATION_ERROR', message: 'rules.posting must be "owner", "members" or "anyone"' };
+        }
+        rules.posting = r.posting as BoardRules['posting'];
+    }
+    if (r.categories !== undefined) {
+        const cats = Array.isArray(r.categories) ? r.categories.map(c => String(c).trim()).filter(Boolean) : null;
+        if (!cats || cats.length > BOARD_RULE_LIMITS.categoriesMax || cats.some(c => c.length > BOARD_RULE_LIMITS.categoryMax)) {
+            return { ok: false, status: 400, code: 'VALIDATION_ERROR', message: `rules.categories must be at most ${BOARD_RULE_LIMITS.categoriesMax} names of ${BOARD_RULE_LIMITS.categoryMax} characters` };
+        }
+        if (cats.length) rules.categories = [...new Set(cats)];
+    }
+    const ttl = r.default_ttl_hours ?? r.defaultTtlHours;
+    if (ttl !== undefined) {
+        const n = Number(ttl);
+        if (!Number.isFinite(n) || n <= 0 || n > BOARD_RULE_LIMITS.ttlHoursMax) {
+            return { ok: false, status: 400, code: 'VALIDATION_ERROR', message: `rules.default_ttl_hours must be between 0 and ${BOARD_RULE_LIMITS.ttlHoursMax}` };
+        }
+        rules.defaultTtlHours = n;
+    }
+    const cost = r.post_cost ?? r.postCost;
+    if (cost !== undefined) {
+        const n = Number(cost);
+        if (!Number.isInteger(n) || n < 0 || n > BOARD_RULE_LIMITS.postCostMax) {
+            return { ok: false, status: 400, code: 'VALIDATION_ERROR', message: `rules.post_cost must be a whole number of morsels from 0 to ${BOARD_RULE_LIMITS.postCostMax}` };
+        }
+        rules.postCost = n;
+    }
+    return Object.keys(rules).length ? { ok: true, rules } : { ok: true };
+}
+
+/** The rules on the wire: snake_case, and absent when the board runs on the node's defaults. */
+export function boardRulesBlock(board: Pick<BoardRecord, 'rules'>): Record<string, unknown> | undefined {
+    const r = board.rules;
+    if (!r) return undefined;
+    return {
+        ...(r.posting ? { posting: r.posting } : {}),
+        ...(r.categories ? { categories: r.categories } : {}),
+        ...(r.defaultTtlHours !== undefined ? { default_ttl_hours: r.defaultTtlHours } : {}),
+        ...(r.postCost !== undefined ? { post_cost: r.postCost } : {}),
+    };
+}
 
 /** The bounds BoardCreateSchema and BoardReactionSchema apply on the HTTP door. */
 export const BOARD_LIMITS = {
@@ -106,15 +175,17 @@ export interface BoardCreateInput {
     description?: string;
     allowedGaiis?: string[];
     federate?: boolean;
+    /** The board's own rules, as sent (see normalizeBoardRules). */
+    rules?: unknown;
 }
 
-/** Create one board. The order is the HTTP route's order: shape, then the operator rule, then write. */
+/** Create one board. The order is the HTTP route's order: shape, then who may open one, then write. */
 export async function createBoard(
     deps: BoardWriteDeps,
     caller: BoardWriteCaller,
     input: BoardCreateInput,
 ): Promise<BoardCreateResult> {
-    const { storage } = deps;
+    const { storage, config } = deps;
 
     const name = String(input.name ?? '').trim();
     if (!name || name.length > BOARD_LIMITS.nameMax) {
@@ -126,11 +197,26 @@ export async function createBoard(
     if (!VISIBILITIES.includes(input.visibility)) {
         return { ok: false, status: 400, code: 'VALIDATION_ERROR', message: 'visibility must be "private", "shared", "public" or "system"' };
     }
+    const rules = normalizeBoardRules(input.rules);
+    if (!rules.ok) return rules;
 
-    // A board everyone can read, and a board the node itself speaks through, are the operator's to
-    // create. The tool copy of this rule named only the first of the two.
-    if ((input.visibility === 'system' || input.visibility === 'public') && !caller.roles.includes('operator')) {
-        return { ok: false, status: 403, code: 'ACCESS_DENIED', message: 'Only operators can create public or system boards' };
+    // A board the node itself speaks through is the operator's to create. A board everyone can read
+    // was too, until 2026-08-30: a notice board a person keeps for their street or their club is the
+    // shape RFC §27 exists for, so any account may open one, up to a count. The price on a public
+    // post keeps the flood out of the board; this keeps the flood out of the catalogue.
+    const operator = caller.roles.includes('operator');
+    if (input.visibility === 'system' && !operator) {
+        return { ok: false, status: 403, code: 'ACCESS_DENIED', message: 'Only operators can create system boards' };
+    }
+    if (input.visibility === 'public' && !operator) {
+        const mine = (await storage.listBoards({ visibility: 'public' }))
+            .filter(b => b.ownerGaii === caller.gaii || isSameOwner(b.ownerGaii, caller.gaii)).length;
+        if (mine >= config.boardPublicPerOwnerMax) {
+            return {
+                ok: false, status: 403, code: 'BOARD_QUOTA',
+                message: `You already keep ${mine} public boards, the most one account may here. Delete one to open another.`,
+            };
+        }
     }
 
     const board = await storage.createBoard({
@@ -142,6 +228,7 @@ export async function createBoard(
         allowedGaiis: input.allowedGaiis ?? [],
         federate: input.federate === true,
         createdAt: new Date().toISOString(),
+        ...(rules.rules ? { rules: rules.rules } : {}),
     });
 
     // A board list open in a browser listens on the 'boards' domain. Without this the new board
@@ -273,6 +360,28 @@ export async function setBoardMembers(
     }
 
     // Who may read a shared board is what this changes, so the members list on screen must hear it.
+    emitChange('boards');
+    return { ok: true, board: updated };
+}
+
+export type BoardRulesResult = { ok: true; board: BoardRecord } | BoardWriteRefusal;
+
+/**
+ * Replace a board's own rules. The caller has already established that `caller` keeps the board;
+ * this checks the shape and writes. `raw` null returns the board to the node's defaults.
+ */
+export async function setBoardRules(
+    deps: BoardWriteDeps,
+    board: BoardRecord,
+    raw: unknown,
+): Promise<BoardRulesResult> {
+    const { storage } = deps;
+    const rules = normalizeBoardRules(raw);
+    if (!rules.ok) return rules;
+    const updated = await storage.updateBoardRules(board.id, rules.rules ?? null);
+    if (!updated) {
+        return { ok: false, status: 500, code: 'INTERNAL', message: 'Failed to update board rules' };
+    }
     emitChange('boards');
     return { ok: true, board: updated };
 }

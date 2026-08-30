@@ -333,6 +333,8 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   maxOperatorMintPerDay: number;
   boardPostBaseCost: number;
   boardPostCostPerKb: number;
+  /** Public boards one account may keep (RFC §27). A system board stays the operator's. */
+  boardPublicPerOwnerMax: number;
   appAnnouncementBoardId: string;
   webhookMaxRetries: number;
   workQueueMaxPending: number;

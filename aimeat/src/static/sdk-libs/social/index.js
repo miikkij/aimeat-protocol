@@ -11,6 +11,9 @@
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-social.js"></script>
  *   await AIMEAT.social.post('general', { title: 'Hi', body: 'Hello!' });
  * @version-history
+ *   v1.1.0 — 2026-08-30 — Boards are Core again (RFC §27): updatePost (resolve a notice or move its
+ *     expiry), setRules (the board's own rules), and signedIn() so a page can offer a visitor a
+ *     sign-in door instead of letting a write throw.
  *   v1.0.0 — 2026-07-19 — Migrated from src/routes/lib-social.ts (SDK-libs migration Phase 2).
  */
 import { NODE_URL } from '../_core/config.js';
@@ -96,6 +99,34 @@ const social = {
     );
     if (!res.ok) throw new Error(res.error?.message || 'Failed to reply');
     return res.data;
+  },
+
+  // Take a notice down as handled (resolved: true) or move its expiry (ttl_hours). Author or board keeper.
+  async updatePost(boardId, postId, changes) {
+    const res = await authFetch(
+      '/v1/boards/' + encodeURIComponent(boardId) + '/posts/' + encodeURIComponent(postId),
+      { method: 'PATCH', body: JSON.stringify(changes) },
+    );
+    if (!res.ok) throw new Error(res.error?.message || 'Failed to update post');
+    return res.data;
+  },
+
+  // ── Rules (board keeper only) ──
+
+  // Set the board's own rules: { posting, categories, default_ttl_hours, post_cost }. null resets them.
+  async setRules(boardId, rules) {
+    const res = await authFetch('/v1/boards/' + encodeURIComponent(boardId) + '/rules', {
+      method: 'PATCH', body: JSON.stringify({ rules }),
+    });
+    if (!res.ok) throw new Error(res.error?.message || 'Failed to set board rules');
+    return res.data;
+  },
+
+  // True when a session is signed in, so a page can show the visitor a sign-in door instead of
+  // letting post()/react()/reply() throw.
+  signedIn() {
+    const auth = window.AIMEAT && window.AIMEAT.auth;
+    return !!(auth && auth.getSession && auth.getSession());
   },
 
   // ── Subscriptions ──

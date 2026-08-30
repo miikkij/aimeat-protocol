@@ -14,6 +14,9 @@
  *   v1.3.0 -- 2026-08-30 -- Phase 9, with the RFC §27 reinstatement: the cursor page (37), a reply's
  *     inherited expiry (38), subscriptions gone with their board (39), and auto-hide enforced on the
  *     listing and the single-post read (40). All four failed on the source before the fix.
+ *   v1.4.0 -- 2026-08-30 -- Test 35 turned around: any account opens a public board (35), up to the
+ *     node's count (35b); system boards stay the operator's. Phase 10: the board's own rules (41),
+ *     a notice extended and taken down (42), the poster's standing on the listing (43).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=board-ttl
 
@@ -618,6 +621,7 @@ await test('30. Public board posts readable without auth', async () => {
 let nonOpOwnerName = '';
 let nonOpOwnerToken = '';
 let nonOpAgentToken = '';
+let nonOpAgentGaii = '';
 
 await test('31-pre. Create non-operator owner+agent', async () => {
     nonOpOwnerName = `bd-noop-${Date.now()}`;
@@ -631,7 +635,8 @@ await test('31-pre. Create non-operator owner+agent', async () => {
         headers: { Authorization: `Bearer ${nonOpOwnerToken}` },
         body: JSON.stringify({ name: 'noop-agent', owner: nonOpOwnerName, capabilities: ['boards'], model: 'gpt-4o' }),
     });
-    nonOpAgentToken = await getToken(aBody.data.agent.gaii, aBody.data.private_key, true);
+    nonOpAgentGaii = aBody.data.agent.gaii;
+    nonOpAgentToken = await getToken(nonOpAgentGaii, aBody.data.private_key, true);
 });
 
 await test('31. Non-operator, non-owner cannot list subscribers → 403', async () => {
@@ -671,32 +676,62 @@ await test('34. Reply to non-existent post → 404', async () => {
     assert(status === 404, `expected 404, got ${status}`);
 });
 
-await test('35. Non-operator create public board → 403', async () => {
-    const { status } = await json('/v1/boards', {
+let nonOpPublicBoardId = '';
+
+await test('35. Any account opens a public board; a system board stays the operator\'s', async () => {
+    // Until 2026-08-30 this test asserted the opposite: public boards were the operator's to create.
+    // RFC §27 reinstated boards as the notice board a person keeps for their street or their club,
+    // so a non-operator owner, and that owner's agent, both open one. The system board is the
+    // control: same credential, same route, 403, so the 201s are about `public` alone.
+    const { status: agentStatus, body: agentBody } = await json('/v1/boards', {
         method: 'POST',
         headers: { Authorization: `Bearer ${nonOpAgentToken}` },
-        body: JSON.stringify({ name: 'Should Fail', visibility: 'public' }),
+        body: JSON.stringify({ name: 'Espoo notices (agent)', visibility: 'public' }),
     });
-    assert(status === 403, `expected 403 for agent, got ${status}`);
+    assert(agentStatus === 201, `expected 201 for a non-operator agent, got ${agentStatus}: ${JSON.stringify(agentBody)}`);
 
-    // The probe above no longer says much: since H-2 no agent session carries 'operator' at all, so
-    // it would refuse whoever the agent's owner is. The distinction it used to draw needs a
-    // principal that CAN hold 'operator' and does not, which is the second owner (only the first
-    // registered owner is promoted). The private board is the control: same credential, same route,
-    // 201, so the 403 that follows it is about `public` alone.
-    const { status: controlStatus } = await json('/v1/boards', {
+    const { status: ownerStatus, body: ownerBody } = await json('/v1/boards', {
         method: 'POST',
         headers: { Authorization: `Bearer ${nonOpOwnerToken}` },
-        body: JSON.stringify({ name: 'Control Private Board', visibility: 'private' }),
+        body: JSON.stringify({ name: 'Espoo notices', visibility: 'public' }),
     });
-    assert(controlStatus === 201, `control private board should succeed, got ${controlStatus}`);
+    assert(ownerStatus === 201, `expected 201 for a non-operator owner session, got ${ownerStatus}: ${JSON.stringify(ownerBody)}`);
+    nonOpPublicBoardId = ownerBody.data.id;
 
-    const { status: ownerStatus } = await json('/v1/boards', {
+    const { status: systemStatus } = await json('/v1/boards', {
         method: 'POST',
         headers: { Authorization: `Bearer ${nonOpOwnerToken}` },
-        body: JSON.stringify({ name: 'Should Fail Too', visibility: 'public' }),
+        body: JSON.stringify({ name: 'Not the node', visibility: 'system' }),
     });
-    assert(ownerStatus === 403, `expected 403 for non-operator owner session, got ${ownerStatus}`);
+    assert(systemStatus === 403, `expected 403 for a system board from a non-operator, got ${systemStatus}`);
+});
+
+await test('35b. The eleventh public board of one account is refused', async () => {
+    // A fresh owner, so the count starts at zero and the two boards of test 35 do not skew it.
+    const name = `bd-quota-${Date.now()}`;
+    const { body: oBody } = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
+    const token = await getToken(name, oBody.data.private_key, false);
+    for (let i = 1; i <= 10; i++) {
+        const { status } = await json('/v1/boards', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ name: `Quota board ${i}`, visibility: 'public' }),
+        });
+        assert(status === 201, `board ${i} of 10: expected 201, got ${status}`);
+    }
+    const { status, body } = await json('/v1/boards', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name: 'Quota board 11', visibility: 'public' }),
+    });
+    assert(status === 403 && body.error?.code === 'BOARD_QUOTA', `board 11: expected 403 BOARD_QUOTA, got ${status} ${body.error?.code}`);
+    const { status: privStatus } = await json('/v1/boards', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name: 'Still a private one', visibility: 'private' }),
+    });
+    assert(privStatus === 201, `a private board is not counted: expected 201, got ${privStatus}`);
+    await json(`/v1/owners/${encodeURIComponent(name)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
 });
 
 await test('36. Unsubscribe when not subscribed → 404', async () => {
@@ -767,6 +802,14 @@ await test('38. A reply expires with the notice it answers', async () => {
     assert(typeof post.data.ttl_expires_at === 'string', 'the notice has an expiry');
     assert(read.data.ttl_expires_at === post.data.ttl_expires_at,
         `reply expires ${read.data.ttl_expires_at}, notice ${post.data.ttl_expires_at}`);
+    // The replies under the notice can be read together, and the listing counts them.
+    const { status: lStatus, body: list } = await json(`/v1/boards/${pageBoardId}/posts/${post.data.id}/replies`, {
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(lStatus === 200 && list.data.replies.length === 1 && list.data.replies[0].id === reply.data.id, `replies list: ${lStatus} ${JSON.stringify(list.data)}`);
+    const { body: page } = await json(`/v1/boards/${pageBoardId}/posts?limit=10`, { headers: { Authorization: `Bearer ${agentToken}` } });
+    const listed = page.data.posts.find((p: any) => p.id === post.data.id);
+    assert(listed?.replies === 1, `the listing says ${listed?.replies} replies`);
 });
 
 await test('39. Deleting a board removes its subscriptions with it', async () => {
@@ -819,6 +862,101 @@ await test('40. Five reports hide a public post from everyone but its author and
         headers: { Authorization: `Bearer ${ownerToken}` },
     });
     assert(ownerOne === 200, `the board owner opening the hidden post: expected 200, got ${ownerOne}`);
+});
+
+// ─── Phase 10: The board's own rules, a notice after publishing, the poster's standing ───
+console.log('\nPhase 10 — Rules, resolving and extending, standing');
+
+await test('41. The keeper sets the rules: who posts, the categories, the lifetime, the price', async () => {
+    const rules = { posting: 'owner', categories: ['for-sale', 'wanted'], default_ttl_hours: 720, post_cost: 0 };
+    const { status: rStatus, body: rBody } = await json(`/v1/boards/${nonOpPublicBoardId}/rules`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${nonOpOwnerToken}` },
+        body: JSON.stringify({ rules }),
+    });
+    assert(rStatus === 200, `rules: ${rStatus} ${JSON.stringify(rBody)}`);
+    assert(rBody.data.rules.posting === 'owner' && rBody.data.rules.post_cost === 0, `rules echoed: ${JSON.stringify(rBody.data.rules)}`);
+
+    // A stranger may not set them, and a stranger may not post on an owner-only board.
+    const { status: strangerRules } = await json(`/v1/boards/${nonOpPublicBoardId}/rules`, {
+        method: 'PATCH', headers: { Authorization: `Bearer ${agentToken}` }, body: JSON.stringify({ rules: null }),
+    });
+    assert(strangerRules === 403, `a stranger setting rules: expected 403, got ${strangerRules}`);
+    const { status: strangerPost } = await json(`/v1/boards/${nonOpPublicBoardId}/posts`, {
+        method: 'POST', headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ title: 'Not mine to post', body: 'x', category: 'for-sale' }),
+    });
+    assert(strangerPost === 403, `a stranger posting on an owner-only board: expected 403, got ${strangerPost}`);
+
+    // The keeper's own agent posts; a category outside the list is refused, one inside lands with
+    // the board's default lifetime and at the board's price, which is nothing.
+    const { status: badCat } = await json(`/v1/boards/${nonOpPublicBoardId}/posts`, {
+        method: 'POST', headers: { Authorization: `Bearer ${nonOpAgentToken}` },
+        body: JSON.stringify({ title: 'Wrong shelf', body: 'x', category: 'gossip' }),
+    });
+    assert(badCat === 400, `a category the board does not file: expected 400, got ${badCat}`);
+    const { body: before } = await json('/v1/wallet', { headers: { Authorization: `Bearer ${nonOpAgentToken}` } });
+    const { status: okStatus, body: okBody } = await json(`/v1/boards/${nonOpPublicBoardId}/posts`, {
+        method: 'POST', headers: { Authorization: `Bearer ${nonOpAgentToken}` },
+        body: JSON.stringify({ title: 'Bike for sale', body: 'Red, 16 inch, 60 euros.', category: 'for-sale' }),
+    });
+    assert(okStatus === 201, `post under a listed category: ${okStatus} ${JSON.stringify(okBody)}`);
+    const hoursLeft = (new Date(okBody.data.ttl_expires_at).getTime() - Date.now()) / 3600_000;
+    assert(hoursLeft > 719 && hoursLeft <= 720, `default lifetime 720 h, got ${hoursLeft.toFixed(1)} h`);
+    const { body: after } = await json('/v1/wallet', { headers: { Authorization: `Bearer ${nonOpAgentToken}` } });
+    assert(after.data.balance === before.data.balance, `a board priced at 0 charged ${before.data.balance - after.data.balance}`);
+
+    // Back to the node's defaults.
+    const { status: resetStatus, body: resetBody } = await json(`/v1/boards/${nonOpPublicBoardId}/rules`, {
+        method: 'PATCH', headers: { Authorization: `Bearer ${nonOpOwnerToken}` }, body: JSON.stringify({ rules: null }),
+    });
+    assert(resetStatus === 200 && resetBody.data.rules === undefined, `reset: ${resetStatus} ${JSON.stringify(resetBody.data)}`);
+});
+
+await test('42. A notice is given more time, then taken down as handled', async () => {
+    const { status: pStatus, body: post } = await json(`/v1/boards/${nonOpPublicBoardId}/posts`, {
+        method: 'POST', headers: { Authorization: `Bearer ${nonOpAgentToken}` },
+        body: JSON.stringify({ title: 'Cat missing', body: 'Grey, red collar, Tapiola.', ttl_hours: 24 }),
+    });
+    assert(pStatus === 201, `post: ${pStatus} ${JSON.stringify(post)}`);
+    const id = post.data.id;
+    const { status: strangerStatus } = await json(`/v1/boards/${nonOpPublicBoardId}/posts/${id}`, {
+        method: 'PATCH', headers: { Authorization: `Bearer ${agentToken}` }, body: JSON.stringify({ ttl_hours: 48 }),
+    });
+    assert(strangerStatus === 403, `a stranger extending: expected 403, got ${strangerStatus}`);
+    const { status: extStatus, body: ext } = await json(`/v1/boards/${nonOpPublicBoardId}/posts/${id}`, {
+        method: 'PATCH', headers: { Authorization: `Bearer ${nonOpAgentToken}` }, body: JSON.stringify({ ttl_hours: 48 }),
+    });
+    assert(extStatus === 200, `extend: ${extStatus} ${JSON.stringify(ext)}`);
+    assert(new Date(ext.data.ttl_expires_at).getTime() > new Date(post.data.ttl_expires_at).getTime(), 'the expiry moved later');
+    const { status: emptyStatus } = await json(`/v1/boards/${nonOpPublicBoardId}/posts/${id}`, {
+        method: 'PATCH', headers: { Authorization: `Bearer ${nonOpAgentToken}` }, body: JSON.stringify({}),
+    });
+    assert(emptyStatus === 400, `neither ttl_hours nor resolved: expected 400, got ${emptyStatus}`);
+    const { status: doneStatus, body: done } = await json(`/v1/boards/${nonOpPublicBoardId}/posts/${id}`, {
+        method: 'PATCH', headers: { Authorization: `Bearer ${nonOpOwnerToken}` }, body: JSON.stringify({ resolved: true }),
+    });
+    assert(doneStatus === 200 && done.data.resolved === true, `the keeper resolves: ${doneStatus} ${JSON.stringify(done)}`);
+    const { status: goneStatus } = await json(`/v1/boards/${nonOpPublicBoardId}/posts/${id}`);
+    assert(goneStatus === 404, `a handled notice is gone: expected 404, got ${goneStatus}`);
+});
+
+await test('43. A reader sees the poster\'s standing: notices, thanks, since when', async () => {
+    const { body: list } = await json(`/v1/boards/${nonOpPublicBoardId}/posts`);
+    const mine = list.data.posts.find((p: any) => p.author_gaii === nonOpAgentGaii);
+    assert(mine, 'the agent\'s bike notice is on the board');
+    const { status: thanksStatus } = await json(`/v1/boards/${nonOpPublicBoardId}/posts/${mine.id}/react`, {
+        method: 'POST', headers: { Authorization: `Bearer ${agentToken}` }, body: JSON.stringify({ reaction: 'thanks' }),
+    });
+    assert(thanksStatus === 200 || thanksStatus === 201, `thanks: ${thanksStatus}`);
+    const { body: again } = await json(`/v1/boards/${nonOpPublicBoardId}/posts`);
+    const standing = again.data.authors?.[nonOpAgentGaii];
+    assert(standing, `authors block carries ${nonOpAgentGaii}: ${JSON.stringify(again.data.authors)}`);
+    assert(standing.posts >= 1, `posts ${standing.posts}`);
+    assert(standing.thanks >= 1, `thanks ${standing.thanks}`);
+    assert(typeof standing.since === 'string', `since ${standing.since}`);
+    const { body: one } = await json(`/v1/boards/${nonOpPublicBoardId}/posts/${mine.id}`);
+    assert(one.data.author?.thanks >= 1, `single post carries the author's standing: ${JSON.stringify(one.data.author)}`);
 });
 
 // ─── Cleanup ───
