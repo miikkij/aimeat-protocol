@@ -6,6 +6,8 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v3.2.2 — 2026-08-31 — The Companies tab's pf-co rules leave for companies-poster.css (co-
+ *     prefix): the tab wears the poster face now.
  *   v3.2.1 — 2026-08-29 — The sidebar nameplate rules (.pf-side-identity, -avatar, -id-name) go with the
  *     nameplate: the pill and the masthead already carry the name.
  *   v3.2.0 — 2026-08-29 — The agent permission dialog in the poster face: presets as one segmented row with
@@ -3733,40 +3735,8 @@
 .pf-acc-who { font-family: var(--font-mono, monospace); font-size: 0.9rem; word-break: break-all; }
 .pf-acc-field { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: var(--text-dim); flex: 1; min-width: 200px; }
 
-/* ── Companies tab (pf-co) — the company registry + co addresses ─────────── */
-.pf-co-row { display: flex; gap: var(--space-3, 0.75rem); align-items: flex-end; flex-wrap: wrap; margin: var(--space-3, 0.75rem) 0; }
-.pf-co-field { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: var(--text-dim); flex: 1; min-width: 180px; }
-.pf-co-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-3, 0.75rem); }
-.pf-co-preview { font-size: 0.9rem; color: var(--text-dim); margin: 0; }
-.pf-co-preview code { background: var(--bg-dim); padding: 2px 6px; border-radius: 4px; }
-/* The card body stacks three titled sections; without this the headings sit flush against the
-   button row above them and the sections read as one undivided wall of fields. */
-.pf-co-body > .pf-co-row { margin-top: var(--space-3, 0.75rem); }
-/* Deleting a company frees its public address, so it is fenced off from the save buttons above
-   rather than sitting one gap below them where a mis-aimed click lands. */
-.pf-co-portfolio { margin-top: var(--space-3, 0.75rem); }
-.pf-co-html { font-family: var(--font-mono, monospace); font-size: 0.8rem; line-height: 1.45; width: 100%; resize: vertical; }
-/* A file input styled as a button: the native control is hidden, the label IS the button. */
-.pf-co-file { position: relative; overflow: hidden; display: inline-flex; align-items: center; cursor: pointer; }
-.pf-co-file input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
-.pf-co-danger-row { border-top: 1px solid var(--border); padding-top: var(--space-4, 1rem); margin-top: var(--space-5, 1.25rem) !important; }
-/* The checkbox has no input box of its own, so it is pinned to the bottom of its grid cell to
-   land on the same line as the text inputs beside it instead of floating mid-cell. */
-.pf-co-check { flex-direction: row; align-items: center; gap: var(--space-2, 0.5rem); align-self: end; padding-bottom: 6px; }
-.pf-co-check input { width: auto; }
-.pf-co-badge { display: inline-block; margin-left: var(--space-2, 0.5rem); padding: 1px 8px; border-radius: 99px; font-size: 0.75rem; border: 1px solid var(--border); }
-.pf-co-badge.free { border-color: var(--success, #1e7d45); color: var(--success, #1e7d45); }
-.pf-co-badge.taken { border-color: var(--danger, #b3372c); color: var(--danger, #b3372c); }
-.pf-co-card { margin-bottom: var(--space-3, 0.75rem); }
-.pf-co-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3, 0.75rem); cursor: pointer; flex-wrap: wrap; }
-.pf-co-address { font-size: 0.88rem; margin-top: 2px; }
-.pf-co-address a { color: var(--accent, #E8564A); }
-.pf-co-serving { font-size: 0.82rem; color: var(--text-dim); }
-.pf-co-body { border-top: 1px solid var(--border); margin-top: var(--space-3, 0.75rem); padding-top: var(--space-3, 0.75rem); }
-.pf-co-body h4 { margin: var(--space-5, 1.25rem) 0 2px; font-size: 0.95rem; }
-.pf-co-body h4:first-child { margin-top: 0; }
-.pf-co-hint, .pf-co-muted { color: var(--text-dim); font-size: 0.85rem; }
-.pf-co-error { color: var(--danger, #b3372c); }
+/* The Companies tab's pf-co rules left for css/views/companies-poster.css (co- prefix) when the
+   tab moved to the poster face. */
 
 /* The start-page setting, at the foot of the overview. Separated by a rule so it reads as a footer
    preference rather than another card in the grid. */
