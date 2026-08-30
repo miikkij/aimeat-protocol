@@ -22,6 +22,8 @@
  *   v1.3.0 — 2026-07-19 — "Clear all" in the dropdown head (DELETE /v1/notifications) — deletes every
  *     notification for the owner (not just mark-read), optimistic empty + reconcile.
  *   v1.3.1 — 2026-08-07 — Reads the JWT via /js/services/auth.js (single session source).
+ *   v1.5.0 — 2026-08-30 — Each item says who sent it, and a title or body the record knows how to
+ *     say in the reader's language (an i18n key) is said that way (js/services/notifications.js).
  *   v1.4.0 — 2026-08-16 — The unread count also lands on the installed app's icon (Badging API):
  *     set wherever this component learns the count, cleared when it reaches zero. The service
  *     worker's push handler sets a plain dot; this is what turns it into the exact number.
@@ -32,6 +34,7 @@ import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { swallowed } from '/js/swallowed.js';
 import { getJwt } from '/js/services/auth.js';
+import { titleOf, bodyOf, sourceName } from '/js/services/notifications.js';
 const html = htm.bind(h);
 
 async function api(path, opts = {}) {
@@ -227,9 +230,9 @@ export function NotificationBell({ t, onNavigate }) {
     return html`
       <div class="notif-item ${n.read ? '' : 'unread'}" key=${n.id}>
         <button class="notif-item-main" onClick=${() => clickNotif(n)}>
-          <div class="notif-item-title">${n.title}</div>
-          ${n.body ? html`<div class="notif-item-body">${n.body}</div>` : null}
-          <div class="notif-item-time">${relTime(n.createdAt)}</div>
+          <div class="notif-item-title">${titleOf(n)}</div>
+          ${bodyOf(n) ? html`<div class="notif-item-body">${bodyOf(n)}</div>` : null}
+          <div class="notif-item-time">${sourceName(n)} · ${relTime(n.createdAt)}</div>
         </button>
         ${actions.length ? html`<div class="notif-actions">${actions.map(a => renderAction(n, a))}</div>` : null}
         ${replyFor === n.id && replyAction ? html`
