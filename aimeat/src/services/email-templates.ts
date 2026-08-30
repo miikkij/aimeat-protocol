@@ -8,6 +8,8 @@
  * @structure i18n string table + wrapHtml() layout + per-template builder functions.
  * @usage import { inviteEmailHtml, inviteEmailSubject } from './email-templates.js';
  * @version-history
+ *   v1.5.0 — 2026-08-30 — Add contactInviteEmail: a person inviting a person to join this AIMEAT,
+ *     no organism behind it (the Contacts page's invitation), in the organism invitation's layout.
  *   v1.0.0 — 2026-04-10 — Initial (verification, magic link, notification, match).
  *   v1.1.0 — 2026-07-04 — Add inviteEmailHtml/inviteEmailSubject + esc() for user-controlled fields.
  *   v1.2.0 — 2026-07-05 — Add keyInviteEmailHtml/keyInviteEmailSubject (provisioned-code access keys).
@@ -78,6 +80,8 @@ const i18n: Record<string, Record<string, string>> = {
     inviteFallback: 'Or copy and paste this URL into your browser:',
     inviteIgnore: "If you weren't expecting this invitation, you can safely ignore this email.",
     inviteMessageLabel: 'Personal message:',
+    contactInviteSubject: '{inviter} invited you to AIMEAT',
+    contactInviteSentence: '{inviter} would like you to join them on AIMEAT. With an account you can message each other and work in the same organisms and workspaces.',
     keySubject: 'Your access key to {org} on AIMEAT',
     keyHeading: "You've received an access key",
     keyCodeLabel: 'Your access code:',
@@ -150,6 +154,8 @@ const i18n: Record<string, Record<string, string>> = {
     inviteFallback: 'Tai kopioi ja liitä tämä osoite selaimeesi:',
     inviteIgnore: 'Jos et odottanut tätä kutsua, voit ohittaa tämän viestin.',
     inviteMessageLabel: 'Henkilökohtainen viesti:',
+    contactInviteSubject: '{inviter} kutsui sinut AIMEATiin',
+    contactInviteSentence: '{inviter} kutsui sinut mukaan AIMEATiin. Tilin kanssa voitte viestitellä keskenänne ja tehdä töitä samoissa organismeissa ja työtiloissa.',
     keySubject: 'Pääsyavaimesi: {org} — AIMEAT',
     keyHeading: 'Sait pääsyavaimen',
     keyCodeLabel: 'Pääsykoodisi:',
@@ -222,6 +228,8 @@ const i18n: Record<string, Record<string, string>> = {
     inviteFallback: 'O copia esta dirección en tu navegador:',
     inviteIgnore: 'Si no esperabas esta invitación, puedes ignorar este correo sin problema.',
     inviteMessageLabel: 'Mensaje personal:',
+    contactInviteSubject: '{inviter} te invitó a AIMEAT',
+    contactInviteSentence: '{inviter} quiere que te unas a AIMEAT. Con una cuenta pueden enviarse mensajes y trabajar en los mismos organismos y espacios de trabajo.',
     keySubject: 'Tu clave de acceso a {org} en AIMEAT',
     keyHeading: 'Recibiste una clave de acceso',
     keyCodeLabel: 'Tu código de acceso:',
@@ -443,6 +451,57 @@ export function inviteEmailHtml(args: InviteEmailArgs, locale?: string): { html:
   ].join('\n');
 
   return { html, text };
+}
+
+export interface ContactInviteEmailArgs {
+  inviterName: string;
+  acceptUrl: string;
+  message?: string | null;
+  expiresLabel?: string;
+}
+
+/**
+ * A person inviting another person to join this AIMEAT, with no organism behind it (the Contacts
+ * page's invitation). The same layout and the same strings as the organism invitation except the
+ * sentence, which names the inviter and nothing else, because there is nothing else.
+ */
+export function contactInviteEmail(args: ContactInviteEmailArgs, locale?: string): { subject: string; html: string; text: string } {
+  const subject = t(locale, 'contactInviteSubject').replace('{inviter}', args.inviterName);
+  const sentence = t(locale, 'contactInviteSentence').replace('{inviter}', `<strong>${esc(args.inviterName)}</strong>`);
+  const messageHtml = args.message
+    ? `<p style="background:#f0f0f5;border-radius:6px;padding:12px;color:#444;"><em>${t(locale, 'inviteMessageLabel')}</em><br>${esc(args.message)}</p>`
+    : '';
+  const expiryHtml = args.expiresLabel
+    ? `<p style="font-size:13px;color:#999;">${t(locale, 'inviteExpiryPrefix')} ${esc(args.expiresLabel)}.</p>`
+    : '';
+  const html = wrapHtml(t(locale, 'inviteHeading'), `
+    <p>${sentence}</p>
+    <p>${t(locale, 'inviteNewAccount')}</p>
+    ${messageHtml}
+    <p style="text-align: center;">
+      <a href="${args.acceptUrl}" class="btn">${t(locale, 'inviteButton')}</a>
+    </p>
+    ${expiryHtml}
+    <p style="font-size: 13px; color: #999;">${t(locale, 'inviteFallback')}</p>
+    <p class="url-fallback">${args.acceptUrl}</p>
+    <p style="color: #999; font-size: 13px;">${t(locale, 'inviteIgnore')}</p>
+  `, locale);
+  const text = [
+    t(locale, 'inviteHeading'),
+    '',
+    t(locale, 'contactInviteSentence').replace('{inviter}', args.inviterName),
+    '',
+    t(locale, 'inviteNewAccount'),
+    '',
+    ...(args.message ? [`${t(locale, 'inviteMessageLabel')} ${args.message}`, ''] : []),
+    args.acceptUrl,
+    '',
+    ...(args.expiresLabel ? [`${t(locale, 'inviteExpiryPrefix')} ${args.expiresLabel}.`, ''] : []),
+    t(locale, 'inviteIgnore'),
+    '',
+    `-- ${t(locale, 'footer')}`,
+  ].join('\n');
+  return { subject, html, text };
 }
 
 export interface RegistrationInviteEmailArgs {

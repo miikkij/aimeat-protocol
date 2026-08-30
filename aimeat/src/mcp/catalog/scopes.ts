@@ -451,6 +451,7 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_contact_resolve_email: 'messages:read',
     aimeat_contact_add: 'messages:send',
     aimeat_contact_remove: 'messages:send',
+    aimeat_contact_invite: 'messages:send',
 
     // Outbound connections, read side. `connections:read` is knowing WHAT you attached;
     // `connections:use` is spending it, which is what reaching into a mailbox actually is. An app

@@ -25,6 +25,10 @@
  *   resolveContactEmail; resolveOwnerByVerifiedEmail; promoteContactsForVerifiedEmail.
  * @usage const { contacts } = await listContactsMerged(storage, config, ownerGhii, { q });
  * @version-history
+ *   v2.1.0 — 2026-08-30 — The Contacts page in the poster face. Every row carries the last message
+ *     (when, first line, who wrote it, how many), an agent's or an app's owner, and on request the
+ *     organisms shared with the person (include 'together') and the owner's open invitation to a
+ *     person with no account (include 'invites'). The owner is no longer listed in their own book.
  *   v2.0.0 — 2026-08-17 — TARGET-063. Third source (people the node does not have, kind 'mail'),
  *     display names for agents and ecosystem apps (nine agent rows read back `null` before this),
  *     existence checks for GAII/GEAI on save (a contact naming a nonexistent app was accepted),
@@ -46,6 +50,9 @@ import { revokeContactHandles } from './contact-handles.js';
 import { parseGaiiLoose, isValidGAII, isValidGEAI, isValidGHII } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { isValidEmail } from '../utils/email-validator.js';
+import type { ConversationSummary } from '../storage/repositories/direct-message.repository.js';
+import { sharedOrganisms, SHARED_LOOKUP_CAP, type SharedOrganism } from './contacts-together.js';
+import { pendingContactInvitation } from './contact-invitations.js';
 
 /**
  * How many contact RECORDS the projection folds in. The consent sources are naturally bounded by
@@ -114,6 +121,55 @@ export interface ContactRow {
   has_messages: boolean;
   created_at: string | null;
   updated_at: string | null;
+  /** The person an agent or an app belongs to (their GHII). Null for a person. */
+  owner: string | null;
+  last_message_at: string | null;
+  /** The first line of the last message exchanged, trimmed. */
+  last_message: string | null;
+  /** Who wrote the last message. */
+  last_sender: string | null;
+  message_count: number;
+  conversation_id: string | null;
+  /** Organisms both are active members of. Present only with include 'together'. */
+  shared_organisms?: SharedOrganism[];
+  /** The owner's open invitation to this person, who has no account here. Present only with
+   *  include 'invites', and only on `mail` rows. */
+  invitation?: { created_at: string; expires_at: string } | null;
+}
+
+/** What a listing may add beyond the rows: `together` (shared organisms per person, one query
+ *  each, capped) and `invites` (the owner's open invitation per person without an account). */
+export type ContactInclude = 'together' | 'invites';
+export function parseContactInclude(raw: unknown): Set<ContactInclude> {
+  const out = new Set<ContactInclude>();
+  for (const part of String(raw ?? '').split(',')) {
+    const p = part.trim();
+    if (p === 'together' || p === 'invites') out.add(p);
+  }
+  return out;
+}
+
+/** Fields every row carries about its conversation with the owner, from the summary the
+ *  conversations list already holds. Rows without a thread carry the empty shape. */
+function messageOf(conv: ConversationSummary | undefined): Pick<ContactRow, 'has_messages' | 'last_message_at' | 'last_message' | 'last_sender' | 'message_count' | 'conversation_id'> {
+  if (!conv) return { has_messages: false, last_message_at: null, last_message: null, last_sender: null, message_count: 0, conversation_id: null };
+  const first = String(conv.lastMessage ?? '').split(/\r?\n/).map(l => l.trim()).find(Boolean) ?? '';
+  return {
+    has_messages: true,
+    last_message_at: conv.updatedAt,
+    last_message: first.length > 160 ? `${first.slice(0, 159)}…` : first || null,
+    last_sender: conv.lastSenderGhii || null,
+    message_count: conv.messageCount,
+    conversation_id: conv.conversationId,
+  };
+}
+
+/** The person behind an agent or an app id, as a GHII; null for anything else. */
+function ownerOf(id: string): string | null {
+  const kind = contactKind(id);
+  if (kind !== 'gaii' && kind !== 'geai') return null;
+  const p = parseGaiiLoose(id);
+  return p.owner && p.node ? `${p.owner}@${p.node}` : null;
 }
 
 /**
@@ -220,8 +276,9 @@ export interface MergedContacts {
  */
 export async function listContactsMerged(
   storage: Storage, ownerGhii: string,
-  opts?: { state?: ContactConsentRecord['state']; q?: string },
+  opts?: { state?: ContactConsentRecord['state']; q?: string; include?: Iterable<ContactInclude> },
 ): Promise<MergedContacts> {
+  const include = new Set(opts?.include ?? []);
   const [rows, conversations, people] = await Promise.all([
     storage.listContacts(ownerGhii, opts?.state ? { state: opts.state } : undefined),
     storage.listConversations(ownerGhii).catch(err => { logger.warn('listContactsMerged: continuing after a suppressed failure', { error: String(err) }); return []; }),
@@ -233,7 +290,8 @@ export async function listContactsMerged(
           .catch(err => { logger.warn('listContactsMerged: continuing after a suppressed failure', { error: String(err) }); return []; }),
   ]);
   const byId = new Map(rows.map(c => [c.contactId, c]));
-  const messaged = new Set(conversations.map(c => c.peerGhii).filter(Boolean));
+  const convByPeer = new Map(conversations.filter(c => c.peerGhii).map(c => [c.peerGhii, c]));
+  const messaged = new Set(convByPeer.keys());
 
   const truncated = people.length > MAX_PERSON_ROWS;
   const personRows = truncated ? people.slice(0, MAX_PERSON_ROWS) : people;
@@ -245,16 +303,20 @@ export async function listContactsMerged(
   for (const p of personRows) if (p.ghii) cardByIdentity.set(p.ghii, p);
 
   const out: ContactRow[] = [];
-  const emit = (id: string, base: Omit<ContactRow, keyof ReturnType<typeof blankCard> | 'display_name'>) => {
+  type Base = Pick<ContactRow, 'contact_id' | 'kind' | 'state' | 'origin' | 'created_at' | 'updated_at'>;
+  const emit = (id: string, base: Base) => {
     const card = cardByIdentity.get(id);
-    out.push({ ...base, ...(card ? cardOf(card) : blankCard()), display_name: null } as ContactRow);
+    out.push({ ...base, ...(card ? cardOf(card) : blankCard()), ...messageOf(convByPeer.get(id)), owner: ownerOf(id), display_name: null });
   };
 
   for (const c of rows) {
     if (!opts?.state && c.state === 'blocked') continue;   // hidden unless explicitly requested
+    // The operator's welcome message once gave an owner a consent row with themselves; a person
+    // is not a contact of their own.
+    if (c.contactId === ownerGhii) continue;
     emit(c.contactId, {
       contact_id: c.contactId, kind: contactKind(c.contactId),
-      state: c.state, origin: c.origin ?? 'message', has_messages: messaged.has(c.contactId),
+      state: c.state, origin: c.origin ?? 'message',
       created_at: c.createdAt, updated_at: c.updatedAt,
     });
   }
@@ -264,7 +326,7 @@ export async function listContactsMerged(
       if (byId.has(peer) || peer === ownerGhii) continue;
       emit(peer, {
         contact_id: peer, kind: contactKind(peer), state: null, origin: 'message',
-        has_messages: true, created_at: null, updated_at: null,
+        created_at: null, updated_at: null,
       });
     }
     // Contact records: a person with no identity here gets their own row; one who HAS an identity
@@ -282,7 +344,7 @@ export async function listContactsMerged(
       out.push({
         contact_id: id, kind: contactKind(id), display_name: null,
         ...cardOf(p),
-        state: null, origin: 'saved', has_messages: false,
+        state: null, origin: 'saved', ...messageOf(convByPeer.get(id)), owner: null,
         created_at: p.createdAt, updated_at: p.updatedAt,
       });
     }
@@ -290,6 +352,24 @@ export async function listContactsMerged(
   const names = await resolveDisplayNames(storage, out.map(r => r.contact_id));
   // The identity's own name wins where there is one; the owner's note is what is left.
   for (const r of out) r.display_name = names.get(r.contact_id) ?? r.saved_name ?? null;
+
+  if (include.has('together')) {
+    const shared = await sharedOrganisms(storage, ownerGhii, out.filter(r => r.kind === 'ghii').map(r => r.contact_id));
+    for (const r of out) if (r.kind === 'ghii') r.shared_organisms = shared.get(r.contact_id) ?? [];
+  }
+  if (include.has('invites')) {
+    // One query per person without an account, under the same cap the shared-organisms column has.
+    const inviter = ownerGhii.split('@')[0];
+    let looked = 0;
+    for (const r of out) {
+      if (r.kind !== 'mail') continue;
+      if (!r.email || looked >= SHARED_LOOKUP_CAP) { r.invitation = null; continue; }
+      looked++;
+      const inv = await pendingContactInvitation(storage, inviter, r.email)
+        .catch(err => { logger.warn('listContactsMerged: invitations are best-effort', { error: String(err) }); return null; });
+      r.invitation = inv ? { created_at: inv.createdAt, expires_at: inv.expiresAt } : null;
+    }
+  }
 
   const q = (opts?.q ?? '').trim().toLowerCase();
   const contacts = q

@@ -31694,6 +31694,20 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /v1/templates/contacts-mcp:
+    get:
+      operationId: getContactsMcpPrompt
+      summary: The prompt for keeping the address book from a chat connected over MCP
+      description: Find, add, write down, check an address, invite and remove, with the same rules as the Contacts page; the caller's name and node are substituted in.
+      tags: [Contacts]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /v1/templates/knowledge-packager-mcp:
     get:
       operationId: getKnowledgePackagerMcpTemplate
@@ -38179,6 +38193,14 @@ paths:
           description: >-
             Narrow to one consent state (default hides blocked). Only identities have one, so
             passing it excludes saved people.
+        - name: include
+          in: query
+          schema: { type: string }
+          description: >-
+            Comma-separated extras. `together` adds `shared_organisms` (the organisms the owner and
+            that person are both active members of) on every ghii row, one membership query each,
+            for the first 200 people. `invites` adds `invitation` (the owner's own open invitation
+            to join here, or null) on every `mail` row.
       responses:
         '200':
           description: Contacts
@@ -38230,6 +38252,34 @@ paths:
                                 has_messages: { type: boolean }
                                 created_at: { type: string, nullable: true }
                                 updated_at: { type: string, nullable: true }
+                                owner:
+                                  type: string
+                                  nullable: true
+                                  description: The person an agent or an app belongs to (their GHII). Null for a person.
+                                last_message_at: { type: string, nullable: true }
+                                last_message:
+                                  type: string
+                                  nullable: true
+                                  description: The first line of the last message exchanged with this contact, trimmed to 160 characters.
+                                last_sender: { type: string, nullable: true, description: Who wrote the last message. }
+                                message_count: { type: integer }
+                                conversation_id: { type: string, nullable: true }
+                                shared_organisms:
+                                  type: array
+                                  description: Only with `include=together`, on ghii rows.
+                                  items:
+                                    type: object
+                                    properties:
+                                      id: { type: string }
+                                      name: { type: string }
+                                      role: { type: string, enum: [creator, admin, member], description: The contact's role in it. }
+                                invitation:
+                                  type: object
+                                  nullable: true
+                                  description: Only with `include=invites`, on mail rows. The owner's open invitation to this person, or null.
+                                  properties:
+                                    created_at: { type: string }
+                                    expires_at: { type: string }
                           total: { type: integer }
                           truncated:
                             type: boolean
@@ -38529,6 +38579,116 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '429': { $ref: '#/components/responses/BadRequest' }
+
+  /v1/contacts/{contactId}/together:
+    get:
+      operationId: contactTogether
+      summary: What the owner and one person have in common
+      description: >-
+        The organisms both are active members of (with the contact's role), the workspaces in those
+        organisms both may read (by the same gate the workspace routes use), and the person's agents
+        on this node with the last message each exchanged with the owner. Read from the memberships,
+        the workspace registries and the agent table; nothing is stored. A person with an account
+        only (a ghii id): an agent's or an app's "together" is its owner's.
+      tags: [Contacts]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: contactId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Shared organisms, workspaces and the person's agents
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          contact_id: { type: string }
+                          organisms:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: string }
+                                name: { type: string }
+                                role: { type: string, enum: [creator, admin, member] }
+                          workspaces:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                organism_id: { type: string }
+                                organism_name: { type: string }
+                                ws: { type: string }
+                                name: { type: string }
+                          agents:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                gaii: { type: string }
+                                display_name: { type: string, nullable: true }
+                                last_seen: { type: string, nullable: true }
+                                last_message_at: { type: string, nullable: true }
+                                message_count: { type: integer }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/contacts/invite:
+    post:
+      operationId: inviteContact
+      summary: Invite a person to join this AIMEAT, no organism behind it
+      description: >-
+        Mints a single-use invitation (the same record and accept flow as an organism's email
+        invitation, with no organism) and emails it in the owner's name with their message. The
+        accept link comes back so the owner can hand it over when mail is off. Refused before
+        anything is written: a malformed address (400), an address that already has a verified
+        account here (409 ALREADY_HERE: add them as a contact instead), the owner's own invitation
+        to that address still open (409 ALREADY_INVITED), too many open invitations (429). Rate
+        limited per owner like the organism email invite.
+      tags: [Contacts]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+                message: { type: string, maxLength: 1000, description: A short message from the owner, carried in the email. }
+      responses:
+        '201':
+          description: Invited
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          invitation: { type: object }
+                          email_sent: { type: boolean }
+                          accept_url: { type: string }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409': { $ref: '#/components/responses/Conflict' }
         '429': { $ref: '#/components/responses/BadRequest' }
 
   /v1/federation/message:

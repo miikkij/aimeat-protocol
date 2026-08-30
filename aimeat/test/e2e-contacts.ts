@@ -5,6 +5,9 @@
  *   contact never resets the DM first-contact gate), blocked-row handling, the q filter,
  *   cross-owner isolation, and exact-match email resolve (found / not-found / invalid / unauth).
  * @version-history
+ *   v1.2.0 — 2026-08-30 — The Contacts page in the poster face: the last message on a row, nobody
+ *     their own contact, ?include=together and GET /:id/together, POST /invite with its refusals
+ *     and its public read, ?include=invites scoped to the inviter, the chat prompt (tests 22–27).
  *   v1.1.0 — 2026-08-17 — TARGET-063: saved PEOPLE (name + email, no account here), the
  *     shape and existence checks that close "any string with an @ is a contact", promotion on
  *     a verified email, card edits, and the cross-owner refusals for both new verbs.
@@ -389,6 +392,114 @@ await test('21. A person blocked AFTER being saved stays hidden (the card cannot
     assert(!def.some(c => c.email === email), `and does not come back as a mail row: ${JSON.stringify(def.filter(c => c.email === email))}`);
     const blocked = await contactsOf(A.token, '?state=blocked');
     assert(blocked.some(c => c.contact_id === ghii), 'still visible under ?state=blocked');
+});
+
+
+// -- The Contacts page in the poster face (2026-08-30): the last message on the row, what two
+//    people have in common, an invitation with no organism behind it, the chat prompt --
+
+await test('22. A row carries its last message (when, first line, who wrote it, how many); nobody is their own contact', async () => {
+    // C blocked B in test 8, so the thread is read from B's side: B's row for C.
+    const bList = await contactsOf(B.token);
+    const cRow = bList.find(c => c.contact_id === C.ghii);
+    assert(!!cRow, 'B still lists C');
+    assert(cRow.last_message === 'hello from B', `first line: ${JSON.stringify(cRow.last_message)}`);
+    assert(cRow.last_sender === B.ghii, `sender: ${cRow.last_sender}`);
+    assert(cRow.message_count >= 1 && typeof cRow.conversation_id === 'string' && !!cRow.last_message_at, `thread facts: ${JSON.stringify({ n: cRow.message_count, id: cRow.conversation_id, at: cRow.last_message_at })}`);
+    assert(cRow.owner === null, `a person has no owner: ${cRow.owner}`);
+    for (const who of [A, B, C]) {
+        assert(!(await contactsOf(who.token)).some(c => c.contact_id === who.ghii), `${who.name} is not in their own address book`);
+    }
+});
+
+let sharedOrgId = '';
+await test('23. ?include=together says which organisms A and B share; absent without it', async () => {
+    const org = await json('/v1/organisms', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ name: 'Together Org', type: 'project', join_policy: 'invite_only', visibility: 'public' }) });
+    assert(org.status === 201, `org ${org.status}`);
+    sharedOrgId = org.body.data.organism.id;
+    const add = await json(`/v1/organisms/${sharedOrgId}/members`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ ghii: B.name, role: 'member' }) });
+    assert(add.status === 201, `direct add ${add.status}: ${JSON.stringify(add.body.error)}`);
+    // Test 6 removed B from A's book; save B again so there is a row to read the column on.
+    const resave = await json('/v1/contacts', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ contact_id: B.name }) });
+    assert(resave.status === 201, `resave B ${resave.status}`);
+
+    const plain = (await contactsOf(A.token)).find(c => c.contact_id === B.ghii);
+    assert(plain && !('shared_organisms' in plain), `no column without include: ${JSON.stringify(plain?.shared_organisms)}`);
+    const withIt = (await contactsOf(A.token, '?include=together')).find(c => c.contact_id === B.ghii);
+    assert(Array.isArray(withIt?.shared_organisms), `column present with include: ${JSON.stringify(withIt)}`);
+    const hit = withIt.shared_organisms.find((o: any) => o.id === sharedOrgId);
+    assert(hit && hit.name === 'Together Org' && hit.role === 'member', `Together Org shared, B a member: ${JSON.stringify(withIt.shared_organisms)}`);
+    // C is in no organism with A: the column is there and empty, which is not the same as absent.
+    const cSeenByB = (await contactsOf(B.token, '?include=together')).find(c => c.contact_id === C.ghii);
+    assert(cSeenByB && Array.isArray(cSeenByB.shared_organisms) && cSeenByB.shared_organisms.length === 0, `B and C share nothing: ${JSON.stringify(cSeenByB?.shared_organisms)}`);
+});
+
+await test('24. GET /:id/together reads organisms, workspaces and agents for a person; refuses a mail id and yourself', async () => {
+    const r = await json(`/v1/contacts/${encodeURIComponent(B.ghii)}/together`, { headers: auth(A.token) });
+    assert(r.status === 200, `together ${r.status}: ${JSON.stringify(r.body.error)}`);
+    const d = r.body.data;
+    assert(d.contact_id === B.ghii && d.organisms.some((o: any) => o.id === sharedOrgId), `organisms: ${JSON.stringify(d.organisms)}`);
+    assert(Array.isArray(d.workspaces) && Array.isArray(d.agents) && d.agents.length === 0, `shape: ${JSON.stringify({ ws: d.workspaces, agents: d.agents })}`);
+    const mail = await json('/v1/contacts/mail%3Anobody/together', { headers: auth(A.token) });
+    assert(mail.status === 400, `mail id → 400, got ${mail.status}`);
+    const self = await json(`/v1/contacts/${encodeURIComponent(A.ghii)}/together`, { headers: auth(A.token) });
+    assert(self.status === 400, `yourself → 400, got ${self.status}`);
+});
+
+let inviteEmail = '';
+let acceptToken = '';
+await test('25. POST /invite: a bad address 400; a person gets a link (no organism); the same address again 409; an address with an account 409', async () => {
+    const bad = await json('/v1/contacts/invite', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ email: 'not-an-address' }) });
+    assert(bad.status === 400, `bad email → 400, got ${bad.status}`);
+
+    inviteEmail = `invitee-${Date.now()}@example.com`;
+    const ok = await json('/v1/contacts/invite', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ email: inviteEmail, message: 'Come and see what I keep here' }) });
+    assert(ok.status === 201, `invite ${ok.status}: ${JSON.stringify(ok.body.error)}`);
+    const inv = ok.body.data.invitation;
+    assert(inv.type === 'link' && inv.organism_id === null && inv.invited_by === A.name && inv.status === 'pending', `record: ${JSON.stringify(inv)}`);
+    assert(typeof ok.body.data.accept_url === 'string' && ok.body.data.accept_url.includes('token='), `accept_url: ${ok.body.data.accept_url}`);
+    acceptToken = ok.body.data.accept_url.split('token=')[1];
+
+    const again = await json('/v1/contacts/invite', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ email: inviteEmail }) });
+    assert(again.status === 409 && again.body.error.code === 'ALREADY_INVITED', `again → 409 ALREADY_INVITED, got ${again.status} ${again.body.error?.code}`);
+
+    // An address that already has a verified account here is added, not invited.
+    const org = await json('/v1/organisms', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ name: 'Here Org', type: 'project', join_policy: 'invite_only', visibility: 'public' }) });
+    const here = `already-${Date.now()}@example.com`;
+    const mint = await json(`/v1/organisms/${org.body.data.organism.id}/invitations/code`, {
+        method: 'POST', headers: auth(A.token), body: JSON.stringify({ email: here, username: `contxh${Date.now()}`, code: 'SuperSecret99', display_name: 'Already Here' }),
+    });
+    assert(mint.status === 201, `code mint ${mint.status}`);
+    const taken = await json('/v1/contacts/invite', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ email: here }) });
+    assert(taken.status === 409 && taken.body.error.code === 'ALREADY_HERE', `has an account → 409 ALREADY_HERE, got ${taken.status} ${taken.body.error?.code}`);
+});
+
+await test('26. The invitation is readable by its link as a node-level one, in the inviter\'s name; the list says it is open (include=invites), and only to the inviter', async () => {
+    const page = await json(`/v1/invitations/${acceptToken}`);
+    assert(page.status === 200, `public read ${page.status}: ${JSON.stringify(page.body.error)}`);
+    const inv = page.body.data.invitation;
+    assert(inv.kind === 'node' && inv.invited_by === A.name && inv.organism === null && inv.email === inviteEmail, `page: ${JSON.stringify(inv)}`);
+
+    const saved = await json('/v1/contacts', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ name: 'Invited Ines', email: inviteEmail, relation: 'to invite' }) });
+    assert(saved.status === 201 && saved.body.data.kind === 'mail', `person saved: ${JSON.stringify(saved.body.data)}`);
+    const row = (await contactsOf(A.token, '?include=invites')).find(c => c.email === inviteEmail);
+    assert(row && row.invitation && typeof row.invitation.expires_at === 'string', `open invitation on the row: ${JSON.stringify(row?.invitation)}`);
+    const bare = (await contactsOf(A.token)).find(c => c.email === inviteEmail);
+    assert(bare && !('invitation' in bare), 'absent without include');
+
+    // B writes the same address down: A's invitation is A's, and B's row says none.
+    const bSaved = await json('/v1/contacts', { method: 'POST', headers: auth(B.token), body: JSON.stringify({ name: 'Ines Too', email: inviteEmail }) });
+    assert(bSaved.status === 201, `B saves ${bSaved.status}`);
+    const bRow = (await contactsOf(B.token, '?include=invites')).find(c => c.email === inviteEmail);
+    assert(bRow && bRow.invitation === null, `B sees no invitation of A's: ${JSON.stringify(bRow?.invitation)}`);
+});
+
+await test('27. The chat prompt is served with the owner\'s name; unauthenticated → 401', async () => {
+    const r = await json('/v1/templates/contacts-mcp', { headers: auth(A.token) });
+    assert(r.status === 200, `template ${r.status}: ${JSON.stringify(r.body.error)}`);
+    assert(typeof r.body.data.prompt === 'string' && r.body.data.prompt.includes(A.name) && r.body.data.prompt.includes('aimeat_contact_invite'), 'prompt carries the owner and the tools');
+    const anon = await json('/v1/templates/contacts-mcp');
+    assert(anon.status === 401, `anon → 401, got ${anon.status}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);

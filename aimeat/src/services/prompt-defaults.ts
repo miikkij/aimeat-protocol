@@ -63,9 +63,11 @@ import { MANIFEST_ARCHITECT_SEEDS } from './prompt-defaults/manifest-architect.j
 import { PLAYBOOK_SEEDS } from './prompt-defaults/playbooks.js';
 import { PROACTIVE_SEEDS } from './prompt-defaults/proactive.js';
 import { WORKFLOW_SEEDS } from './prompt-defaults/workflows.js';
+import { CONTACT_SEEDS } from './prompt-defaults/contacts.js';
 
 export const PROMPT_SEEDS: PromptSeedEntry[] = [
   ...WORKFLOW_SEEDS,
+  ...CONTACT_SEEDS,
   ...NOTEBOOK_BUILDER_SEEDS,
   ...TIER_CORE_SEEDS,
   ...TIER_EXTENDED_SEEDS,

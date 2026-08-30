@@ -15,12 +15,19 @@
  *   gate); POST /v1/contacts/resolve (email → GHII exact match, or invite fallback signal).
  * @usage app.use(contactsRouter(config, storage))
  * @version-history
+ *   v1.2.0 — 2026-08-30 — The Contacts page in the poster face: GET takes ?include=together,invites
+ *     (shared organisms per person; the owner's open invitation per person without an account);
+ *     GET /:contactId/together reads what the owner and one person have in common; POST /invite
+ *     sends a person an invitation to join this AIMEAT with no organism behind it; saving a
+ *     person by email now sits behind the same rate limit as the email lookup, since the saved
+ *     record says whether the address has an account here.
  *   v1.1.0 — 2026-08-17 — TARGET-063: POST accepts { name, email, … } for a person the node does
  *     not have, PATCH edits that card, and the list reports `truncated` rather than stopping
  *     silently. No new authorization word: this is the owner's own address book, as before.
  *   v1.0.0 — 2026-07-16 — Initial: merged list, proactive save, gate-safe delete, email resolve.
  */
 import { Router } from 'express';
+import type { RequestHandler } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, ContactConsentRecord } from '../storage/interface.js';
 import type { OutboundContactLink } from '../models/outbound-schemas.js';
@@ -30,8 +37,11 @@ import { rateLimit } from '../middleware/rate-limit.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import {
   ContactsError, listContactsMerged, addContact, updatePersonContact, removeContact, resolveContactEmail,
-  sendToContact, type AddContactInput,
+  sendToContact, contactKind, parseContactInclude, type AddContactInput,
 } from '../services/contacts.js';
+import { contactTogether } from '../services/contacts-together.js';
+import { createContactInvitation, ContactInvitationError } from '../services/contact-invitations.js';
+import { invitePublic } from '../services/invitations.js';
 import { mintContactHandle, resolveContactHandle } from '../services/contact-handles.js';
 import { resolveAppOriginTarget } from '../services/app-origin-target.js';
 
@@ -80,15 +90,61 @@ export function contactsRouter(config: AimeatConfig, storage: Storage): Router {
     const { contacts, truncated } = await listContactsMerged(storage, resolve(req), {
       state: typeof req.query.state === 'string' ? req.query.state as ContactConsentRecord['state'] : undefined,
       q: typeof req.query.q === 'string' ? req.query.q : undefined,
+      include: parseContactInclude(req.query.include),
     });
     res.json(success(config.nodeId, { contacts, total: contacts.length, truncated }));
   });
+
+  /* ── GET /v1/contacts/:contactId/together — what the owner and ONE person have in common: the
+   * organisms both are active members of, the workspaces in them both may read, and the person's
+   * agents here with the last message each exchanged with the owner. A person with an account
+   * only; an agent's or an app's "together" is its owner's. ── */
+  router.get('/v1/contacts/:contactId/together', requireAuth(), requireRole('owner'), async (req, res) => {
+    const contactId = decodeURIComponent(req.params.contactId as string);
+    if (contactKind(contactId) !== 'ghii') {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Together is read for a person with an account here: pass their owner@node id, or the owner of the agent or app'));
+      return;
+    }
+    const ownerGhii = resolve(req);
+    if (contactId === ownerGhii) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'That is your own account: pick a contact')); return; }
+    const together = await contactTogether(storage, config, ownerGhii, contactId);
+    res.json(success(config.nodeId, { contact_id: contactId, ...together }));
+  });
+
+  /* ── POST /v1/contacts/invite — invite a person to join this AIMEAT, no organism behind it. The
+   * email goes out in the owner's name with their message; the accept link comes back so it can
+   * be handed over when mail is off. Same throttle as the organism email invite. ── */
+  router.post('/v1/contacts/invite', requireAuth(), requireRole('owner'), rateLimit({ max: 20, windowMs: 10 * 60 * 1000 }), async (req, res) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    try {
+      const { invitation, acceptUrl, emailSent } = await createContactInvitation(storage, config, {
+        inviterName: req.auth!.owner as string,
+        email: typeof b.email === 'string' ? b.email : '',
+        message: typeof b.message === 'string' ? b.message : null,
+        locale: typeof req.headers['accept-language'] === 'string' ? req.headers['accept-language'] : undefined,
+      });
+      res.status(201).json(success(config.nodeId, { invitation: invitePublic(invitation), email_sent: emailSent, accept_url: acceptUrl }));
+    } catch (e) {
+      if (e instanceof ContactInvitationError) { res.status(e.status).json(error(config.nodeId, e.code, e.message)); return; }
+      throw e;
+    }
+  });
+
+  /* Saving a person by email resolves the address to an account here and says so on the record,
+   * which is the same answer the email lookup gives; it stands behind the same limit. A save by id
+   * is not an address question and passes straight through. */
+  const personSaveLimit = rateLimit({ max: 20, windowMs: 10 * 60 * 1000 });
+  const limitPersonSaves: RequestHandler = (req, res, next) => {
+    const email = (req.body as Record<string, unknown> | undefined)?.email;
+    if (typeof email === 'string' && email.trim()) return personSaveLimit(req, res, next);
+    next();
+  };
 
   /* ── POST /v1/contacts — save a contact, in either shape:
    *   { contact_id }              a bare local owner name, GHII, GAII or GEAI
    *   { name, email, … }          a person, who may have no identity on this node
    * A blocked contact stays blocked (409) — lift the block via Messages first. ── */
-  router.post('/v1/contacts', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.post('/v1/contacts', requireAuth(), requireRole('owner'), limitPersonSaves, async (req, res) => {
     const input = parseAddInput((req.body ?? {}) as Record<string, unknown>);
     if (!input) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
