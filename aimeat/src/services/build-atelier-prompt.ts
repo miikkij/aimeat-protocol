@@ -28,6 +28,8 @@
  * @version-history
  *   v1.16.0 — 2026-08-29 — "A map" means the REAL map: the `map` block (Leaflet + OSM) taught
  *     as the answer to the word, the atlas demoted to its narrow choropleth truth.
+ *   v1.16.0 — 2026-08-30 — The grown chart family taught (stacked, horizontal, scatter, note
+ *     bubble, tooltips, donut delta) and scene3d kind "model" (a .glb by URL as a product shot).
  *   v1.15.0 — 2026-08-29 — THE DEMO TRAP named in the genre section: a block stack wearing a
  *     look is never a statement — subject first, genre fork, components serving the page
  *     (docs/pitfalls.md §34, learned the hard way twice in one day).
@@ -273,9 +275,13 @@ function composeBody(config: AimeatConfig): string {
     + 'tail only while the reader is at the tail). Their tones ride the theme\'s ok/warn/err '
     + 'colours, so a status screen reads at a glance in every look and mode.\n\n'
     + 'CHARTS ARE A FAMILY on one block: `chart` with `kind: "axes"` (bars, lines and filled '
-    + 'areas — a series may be kind "area"), `"donut"` (parts of a whole, the total in the '
-    + 'middle) or `"calendar"` (a stretch of days as a heat grid). A statRow tile carrying '
-    + '`trend: [numbers]` draws its short history as a sparkline under the figure.\n\n'
+    + 'areas — a series may be kind "area"; `stacked: true` piles the bars into one column per '
+    + 'label, `horizontal: true` turns ranked things sideways, and a `note` puts a one-line '
+    + 'story bubble on the point that matters — every axes chart answers touch with a tooltip '
+    + 'on its own), `"donut"` (parts of a whole — the total in the middle, and a `delta` puts '
+    + 'its change there too), `"calendar"` (a stretch of days as a heat grid, months named) or '
+    + '`"scatter"` (points on two measures with an honest trend line). A statRow tile carrying '
+    + '`trend: [numbers]` draws its short history as a filled sparkline under the figure.\n\n'
     + 'WHEN THE OWNER SAYS "A MAP", THEY MEAN THE REAL ONE: the `map` block is Leaflet over '
     + 'OpenStreetMap street tiles — pins with popups at real addresses, the view framing the '
     + 'markers on its own, the licence\'s attribution built in, dark mode re-toning the tiles. '
@@ -284,8 +290,9 @@ function composeBody(config: AimeatConfig): string {
     + 'map is a wrong answer with a confident face.\n\n'
     + 'And when a screen has earned a SHOWPIECE, the `scene3d` block gives it real depth: '
     + '`kind: "orb"` (a signature object turning under the hand), `"sky"` (a procedural '
-    + 'atmosphere band) or `"bars"` (the bound rows stand up as a field of columns — the 3D '
-    + 'chart). One per layout, loaded lazily, colours from the look\'s tokens, and the render '
+    + 'atmosphere band), `"bars"` (the bound rows stand up as a field of columns — the 3D '
+    + 'chart) or `"model"` (a .glb/.gltf by URL, fitted, grounded and studio-lit like a '
+    + 'product shot). One per layout, loaded lazily, colours from the look\'s tokens, and the render '
     + 'loop stops at rest so an idle scene costs nothing. It is a statement, not a default: '
     + 'most screens want a chart, not a scene.\n\n'
     + 'COMPOSE, do not pile: a block may carry `span` — `full` (default), `main` + `side` for the '

@@ -163,20 +163,19 @@ export function gauge(spec) {
   if (spec.target) resolve(spec.target).appendChild(root);
   let emptyCard = null;
 
-  const R = 84;
-  const CX = 100;
-  const CY = 104;
-  const SWEEP = 240; // degrees, opening downward
-  function angleAt(frac) { return (-SWEEP / 2 - 90) + SWEEP * frac; }
-  function pointAt(deg, radius) {
-    const rad = (deg * Math.PI) / 180;
+  // A half-circle dial (the target board's shape): a quiet track, the value drawn on it in
+  // its band's tone, the band BOUNDARIES as small ticks, and a marker dot at the value's end.
+  const R = 96;
+  const CX = 120;
+  const CY = 118;
+  function pointAt(frac, radius) {
+    const rad = Math.PI + Math.PI * Math.max(0, Math.min(1, frac));
     return [CX + radius * Math.cos(rad), CY + radius * Math.sin(rad)];
   }
   function arcPath(fromFrac, toFrac, radius) {
-    const [x1, y1] = pointAt(angleAt(fromFrac), radius);
-    const [x2, y2] = pointAt(angleAt(toFrac), radius);
-    const large = (toFrac - fromFrac) * SWEEP > 180 ? 1 : 0;
-    return 'M ' + x1 + ' ' + y1 + ' A ' + radius + ' ' + radius + ' 0 ' + large + ' 1 ' + x2 + ' ' + y2;
+    const [x1, y1] = pointAt(fromFrac, radius);
+    const [x2, y2] = pointAt(toFrac, radius);
+    return 'M ' + x1.toFixed(1) + ' ' + y1.toFixed(1) + ' A ' + radius + ' ' + radius + ' 0 0 1 ' + x2.toFixed(1) + ' ' + y2.toFixed(1);
   }
 
   function render(data) {
@@ -190,26 +189,25 @@ export function gauge(spec) {
     const min = typeof data.min === 'number' ? data.min : 0;
     const max = typeof data.max === 'number' && data.max > min ? data.max : min + 100;
     const frac = Math.max(0, Math.min(1, (data.value - min) / (max - min)));
-    const bands = Array.isArray(data.bands) && data.bands.length
-      ? data.bands
-      : [{ upTo: max, tone: 'plain' }];
+    const bands = Array.isArray(data.bands) && data.bands.length ? data.bands : [];
     let tone = 'plain';
     for (const band of bands) { if (data.value <= band.upTo) { tone = toneOf(band.tone); break; } }
-    if (data.value > bands[bands.length - 1].upTo) tone = toneOf(bands[bands.length - 1].tone);
+    if (bands.length && data.value > bands[bands.length - 1].upTo) tone = toneOf(bands[bands.length - 1].tone);
 
     root.setAttribute('aria-label', (data.label ? data.label + ': ' : '') + data.value + (data.unit || ''));
-    const node = svg('svg', { viewBox: '0 0 200 160', class: 'ak-gauge__svg', 'aria-hidden': 'true' });
-    // The track, then each declared band on it, then the needle arc for the value itself.
+    const node = svg('svg', { viewBox: '0 0 240 132', class: 'ak-gauge__svg', 'aria-hidden': 'true' });
     node.appendChild(svg('path', { d: arcPath(0, 1, R), class: 'ak-gauge__track' }));
-    let from = min;
-    for (const band of bands) {
-      const f0 = Math.max(0, Math.min(1, (from - min) / (max - min)));
-      const f1 = Math.max(0, Math.min(1, (band.upTo - min) / (max - min)));
-      if (f1 > f0) node.appendChild(svg('path', { d: arcPath(f0, f1, R), class: 'ak-gauge__band ak-gauge__band--' + toneOf(band.tone) }));
-      from = band.upTo;
-    }
-    const value = svg('path', { d: arcPath(0, Math.max(frac, 0.004), R - 14), class: 'ak-gauge__value ak-gauge__value--' + tone });
+    const value = svg('path', { d: arcPath(0, Math.max(frac, 0.005), R), class: 'ak-gauge__value ak-gauge__value--' + tone });
     node.appendChild(value);
+    // Band boundaries as ticks — the scale's story without painting the whole rainbow.
+    for (const band of bands.slice(0, -1)) {
+      const f = Math.max(0, Math.min(1, (band.upTo - min) / (max - min)));
+      const [x1, y1] = pointAt(f, R - 12);
+      const [x2, y2] = pointAt(f, R + 12);
+      node.appendChild(svg('line', { x1: x1, y1: y1, x2: x2, y2: y2, class: 'ak-gauge__tickmark' }));
+    }
+    const [dx, dy] = pointAt(frac, R);
+    node.appendChild(svg('circle', { cx: dx, cy: dy, r: 8, class: 'ak-gauge__marker ak-gauge__marker--' + tone }));
     root.appendChild(node);
     if (!reducedMotion()) {
       const len = /** @type {SVGPathElement} */ (value).getTotalLength();
@@ -222,6 +220,7 @@ export function gauge(spec) {
       el('span', { class: 'ak-gauge__reading ak-gauge__reading--' + tone },
         [el('strong', { text: String(data.value) }), data.unit ? el('span', { text: data.unit }) : null]),
       data.label ? el('span', { class: 'ak-gauge__label', text: data.label }) : null,
+      data.sub ? el('span', { class: 'ak-gauge__label', text: data.sub }) : null,
     ]));
   }
 
