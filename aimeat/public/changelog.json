@@ -5,6 +5,18 @@
       "date": "2026-08-30",
       "kind": "feature",
       "title": {
+        "en": "Workflows say what happened, ask before they run, and speak your language",
+        "fi": "Työnkulut kertovat mitä kävi, kysyvät ennen ajoa ja puhuvat sinun kieltäsi"
+      },
+      "body": {
+        "en": "The Workflows page now tells you, in one sentence per workflow, what its last run did and why it stopped short if it did. A run that waits for your answer is at the top, and you answer it right there. \"Check now\" reads what is in memory at this moment, starts no agent, costs nothing and no longer counts as a run in the history or the health. \"Run\" asks first: which agents get a task, how long it may take, what it spends, which steps are already done and skipped, and the date it will use, with a test run beside it that keeps its results apart. Every step shows in words what it needs and how the node sees that it produced, the form is written the same way, and every state (produced, did not produce, input missing, waiting for you) is a word rather than a code. Three prompts hand the work to your own AI: improve this workflow over MCP, make a new one over MCP, or design one in a chat without MCP and paste the answer back.",
+        "fi": "Työnkulut-sivu kertoo nyt jokaisesta työnkulusta yhdellä lauseella, mitä viime ajossa kävi ja miksi se jäi kesken, jos jäi. Ajo, joka odottaa vastaustasi, on ylimpänä, ja vastaat siihen siinä. \"Tarkista nyt\" katsoo, mitä muistissa on tällä hetkellä, ei käynnistä yhtään agenttia, ei maksa mitään eikä enää kirjaudu ajoksi historiaan tai terveyteen. \"Aja\" kysyy ensin: mitkä agentit saavat tehtävän, kauanko siinä voi mennä, mitä se kuluttaa, mitkä askeleet on jo tehty ja ohitetaan sekä mitä päivää se käyttää; vieressä on koeajo, joka pitää tuloksensa erillään. Jokainen askel kertoo sanoin, mitä se tarvitsee ja mistä nähdään, että se tuotti; lomake on kirjoitettu samalla tavalla, ja jokainen tila (tuotti, ei tuottanut, syöte puuttui, odottaa sinua) on sana eikä koodi. Kolme kehotetta antavat työn omalle tekoälyllesi: paranna tätä työnkulkua MCP:llä, tee uusi MCP:llä, tai suunnittele chatissa ilman MCP:tä ja liitä vastaus takaisin."
+      }
+    },
+    {
+      "date": "2026-08-30",
+      "kind": "feature",
+      "title": {
         "en": "Boards are notice boards again: for sale, wanted, on offer, a question",
         "fi": "Taulut ovat taas ilmoitustauluja: myydään, etsitään, tarjolla, kysymys"
       },
