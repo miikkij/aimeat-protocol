@@ -34,6 +34,9 @@
  *   });
  *   // later, when the app's data changed:  m.refresh('errands.');
  * @version-history
+ *   v0.39.0 — 2026-08-30 — The broadcast family joins the block vocabulary: `crt` (binds its
+ *     record whole), `countdown` (rows) and `crawl` (lines) — the Music Television genre's
+ *     parts as components.
  *   v0.36.0 — 2026-08-30 — The work-planning family (`kanban` with onMove wiring, `plan`,
  *     `schedule`); scene3d binds model/globe record shapes; the six flat projections extracted
  *     whole to mosaic-projections.js under the 800-line rule (pure move).
@@ -95,6 +98,7 @@ import { health, queue, gauge } from './ops.js';
 import { kanban, plan, schedule, steps } from './planner.js';
 import { konsole } from './konsole.js';
 import { legalLinks, auditTrail, feedbackForm, reviewerLine } from './commercial.js';
+import { crt, countdown, crawl } from './mtv.js';
 import { atlas } from './atlas.js';
 import { map } from './map.js';
 
@@ -265,6 +269,20 @@ export function mosaic(spec) {
       case 'waveform':
         return bound('waveform', function (data) {
           return waveform({ target: into, data: patchFor('waveform', data).data, title: p.title, empty: empty });
+        });
+      // ── The broadcast family: the CRT binds its record whole, the countdown its rows, the
+      //    crawl its lines — the Music Television genre's parts in the block vocabulary.
+      case 'crt':
+        return bound('crt', function (data) {
+          return crt({ target: into, data: patchFor('crt', data).data, title: p.title, empty: empty });
+        });
+      case 'countdown':
+        return bound('countdown', function (data) {
+          return countdown({ target: into, data: patchFor('countdown', data).items, title: p.title, empty: empty, onPick: pick });
+        });
+      case 'crawl':
+        return bound('crawl', function (data) {
+          return crawl({ target: into, data: patchFor('crawl', data).items, tone: p.tone });
         });
       case 'scene3d': {
         // bars binds a source (rows stand up as columns); model and globe bind their own

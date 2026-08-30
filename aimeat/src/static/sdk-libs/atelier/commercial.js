@@ -35,6 +35,12 @@
  *   AIMEAT.atelier.legalLinks({ target: host });
  *   AIMEAT.atelier.auditTrail({ target: host, org, ws, space: 'event' });
  * @version-history
+ *   v0.39.0 — 2026-08-30 — THE SAMPLE STATES: `sample: true`, or any prop still carrying a
+ *     fill's <angle-bracketed> placeholder, renders built-in sample content marked with the
+ *     sample chip — a legal surface with five pages written and two to write, three trail rows,
+ *     a named reviewer, a form that sends nothing and says so, both switches. Before this, a
+ *     gallery render fell to the grey refusal states that are only honest inside a running app
+ *     ("kovin on köyhä backroom" — the owner, on the Design Book wall).
  *   v0.38.0 — 2026-08-30 — Initial (the commercial side arrives in the kit).
  */
 import { APEX_URL } from '../_core/config.js';
@@ -46,6 +52,54 @@ import { tc } from './commercial-i18n.js';
 
 const LAW_URL = 'https://eur-lex.europa.eu/eli/reg/2024/1689/oj#art_50';
 const KINDS = ['terms', 'privacy', 'imprint', 'refunds', 'accessibility', 'cookies', 'support'];
+
+// ── The sample states ────────────────────────────────────────────────────────────────────────
+// A gallery (the Design Book wall, a fill's demo render) shows these components without a real
+// app, a session or a row space behind them. `sample: true` — or any prop still carrying a
+// fill's <angle-bracketed> placeholder — renders built-in sample content, marked as such, so a
+// browsing person sees what the component looks LIKE instead of a grey refusal that is only
+// honest in a running app.
+
+/** A fill's unreplaced placeholder: "<the organism id>" and friends. */
+function isPlaceholder(v) {
+  return /^\s*</.test(String(v == null ? '' : v));
+}
+
+/** Whether this spec asks for the sample state, by flag or by placeholder-shaped props. */
+function wantsSample(spec, keys) {
+  if (spec && spec.sample === true) return true;
+  for (const k of keys || []) if (spec && isPlaceholder(spec[k])) return true;
+  return false;
+}
+
+/** The chip that marks sample content — every sample render carries it. */
+function sampleBadge() {
+  return el('span', { class: 'ak-com-sample' }, tc('sample.badge'));
+}
+
+/** What a healthy legal surface answers, shaped like the real endpoint: five pages written,
+ *  two still to write, so both states are seen. */
+const SAMPLE_LEGAL = {
+  legal: {
+    terms: { format: 'markdown', updatedAt: '2026-08-29T16:12:00Z' },
+    privacy: { format: 'markdown', updatedAt: '2026-08-29T16:12:00Z' },
+    imprint: { format: 'markdown', updatedAt: '2026-08-29T16:12:00Z' },
+    cookies: { format: 'markdown', updatedAt: '2026-08-29T16:12:00Z' },
+    support: { format: 'markdown', updatedAt: '2026-08-29T16:12:00Z' },
+  },
+  links: [],
+  readiness: {
+    recommended: KINDS.slice(),
+    missing: ['refunds', 'accessibility'],
+  },
+};
+
+/** Three rows the way a real trail holds them — data stays data, so these are not localised. */
+const SAMPLE_AUDIT_ROWS = [
+  { occurredAt: '2026-08-30T19:12:00Z', body: { kind: 'order', detail: 'forty loaves for Harvest Fest', actor: 'kim@node' } },
+  { occurredAt: '2026-08-29T17:38:00Z', body: { kind: 'legal.set', detail: 'privacy · markdown', actor: 'kim@node' } },
+  { occurredAt: '2026-08-29T16:12:00Z', body: { kind: 'other', detail: 'published v1 (ai-generated, declared)', actor: 'kim@node' } },
+];
 
 /** The apex the legal surface lives on: the auth library's node when present, else the baked apex. */
 function apiBase() {
@@ -104,9 +158,11 @@ export function legalLinks(spec) {
   if (s.target) resolve(s.target).appendChild(root);
   const ref = selfRef(s);
 
-  function render(data) {
+  function render(data, sample) {
     clear(root);
-    root.appendChild(el('h3', { class: 'ak-com__title' }, s.title || tc('legal.title')));
+    root.appendChild(el('h3', { class: 'ak-com__title' }, [
+      s.title || tc('legal.title'), sample ? sampleBadge() : null,
+    ].filter(Boolean)));
     root.appendChild(el('p', { class: 'ak-com__intro' }, tc('legal.intro')));
     if (!data) {
       emptyState({ target: root, tone: 'quiet', title: tc('legal.loadFailed') });
@@ -145,6 +201,7 @@ export function legalLinks(spec) {
 
   function reload() {
     clear(root);
+    if (wantsSample(s, ['owner', 'filename'])) { render(SAMPLE_LEGAL, true); return; }
     if (!ref) { render(null); return; }
     const wait = skeleton({ target: root, rows: 3 });
     fetchLegal(ref).then(function (data) { wait.destroy(); render(data); },
@@ -168,6 +225,13 @@ export function readinessChip(spec) {
     click: function () { if (s.onPick) s.onPick(); },
   } });
   if (s.target) resolve(s.target).appendChild(root);
+  if (wantsSample(s, ['owner', 'filename'])) {
+    root.textContent = '■ ' + tc('chip.pages', { n: 2 });
+    root.setAttribute('disabled', '');
+    root.hidden = false;
+    enter(root);
+    return { el: root, destroy() { if (root.parentNode) root.parentNode.removeChild(root); } };
+  }
   const ref = selfRef(s);
   const who = s.session ? ownerPart(s.session.ghii || s.session.gaii) : '';
   if (ref && who && who === ownerPart(ref.owner)) {
@@ -234,8 +298,12 @@ export function auditTrail(spec) {
     root.appendChild(el('p', { class: 'ak-com__intro' }, spec.hint || tc('audit.intro')));
   }
 
-  function renderRows(rows) {
+  function renderRows(rows, sample) {
     head();
+    if (sample) {
+      const h = root.querySelector('.ak-com__title');
+      if (h) h.appendChild(sampleBadge());
+    }
     if (!rows.length) {
       emptyState({ target: root, tone: 'quiet', title: tc('audit.empty') });
       return;
@@ -265,6 +333,7 @@ export function auditTrail(spec) {
   }
 
   function reload() {
+    if (wantsSample(spec, ['org', 'ws', 'space'])) { renderRows(SAMPLE_AUDIT_ROWS, true); return; }
     const ns = /** @type {any} */ (window).AIMEAT;
     if (!ns || !ns.rows) {
       head();
@@ -308,10 +377,14 @@ export function recordEvent(ev) {
  */
 export function feedbackForm(spec) {
   const names = { topic: 'topic', message: 'message', contact: 'contact', ...(spec.fields || {}) };
+  const sample = wantsSample(spec, ['org', 'ws', 'formId']);
   const root = el('section', { class: 'ak-root ak-com ak-com-feedback' });
   if (spec.target) resolve(spec.target).appendChild(root);
-  root.appendChild(el('h3', { class: 'ak-com__title' }, spec.title || tc('feedback.title')));
+  root.appendChild(el('h3', { class: 'ak-com__title' }, [
+    spec.title || tc('feedback.title'), sample ? sampleBadge() : null,
+  ].filter(Boolean)));
   if (spec.hint) root.appendChild(el('p', { class: 'ak-com__intro' }, spec.hint));
+  if (sample) root.appendChild(el('p', { class: 'ak-com__intro' }, tc('sample.formNote')));
   const done = el('p', { class: 'ak-com__aside', hidden: true }, tc('feedback.sent'));
 
   const f = form({
@@ -323,6 +396,8 @@ export function feedbackForm(spec) {
       { name: names.contact, label: tc('feedback.contact'), type: 'text', maxLength: 200 },
     ],
     onSubmit(values) {
+      // A sample form sends nothing and says so on the field — the note above said it first.
+      if (sample) throw { field: names.message, message: tc('sample.formNote') };
       const ns = /** @type {any} */ (window).AIMEAT;
       if (!ns || !ns.intake) throw { field: names.message, message: tc('feedback.failed') };
       if (!String(values[names.message] || '').trim()) throw { field: names.message, message: tc('feedback.messageRequired') };
@@ -357,10 +432,12 @@ export function feedbackForm(spec) {
  */
 export function reviewerLine(spec) {
   const s = spec || {};
+  const sample = wantsSample(s, ['name']);
   const meta = document.querySelector('meta[name="aimeat-reviewed-by"]');
-  const name = s.name || (meta && meta.getAttribute('content')) || '';
+  const name = sample ? 'Kim Virtanen' : (s.name || (meta && meta.getAttribute('content')) || '');
   const root = el('aside', { class: 'ak-root ak-com ak-com-reviewer', hidden: !name });
   if (name) {
+    if (sample) root.appendChild(sampleBadge());
     root.appendChild(el('p', { class: 'ak-com-reviewer__line' }, tc('reviewer.line', { name })));
     root.appendChild(el('p', { class: 'ak-com-reviewer__lifts' }, [
       el('span', {}, tc('reviewer.lifts') + ' '),
@@ -384,6 +461,7 @@ export function reviewerLine(spec) {
  */
 export function marksSwitches(spec) {
   const s = spec || {};
+  const sample = wantsSample(s, ['filename']);
   const root = el('section', { class: 'ak-root ak-com ak-com-marks', hidden: true });
   if (s.target) resolve(s.target).appendChild(root);
   const ref = selfRef(s);
@@ -403,9 +481,9 @@ export function marksSwitches(spec) {
     return el('div', { class: 'ak-com-marks__row' }, [
       el('span', { class: 'ak-com-marks__name' }, tc('marks.' + key)),
       el('span', { class: 'ak-com-marks__meaning' }, tc('marks.' + key + (on ? 'On' : 'Off'))),
-      el('button', { type: 'button', class: 'ak-btn ak-btn--ghost', disabled: busyNow ? true : null, on: {
+      el('button', { type: 'button', class: 'ak-btn ak-btn--ghost', disabled: (busyNow || sample) ? true : null, on: {
         click: function () {
-          if (busyNow) return;
+          if (busyNow || sample) return;
           busyNow = true; render();
           const next = {}; next[key] = !on;
           sessionFetch('/v1/apps/' + encodeURIComponent(ref.filename), {
@@ -426,12 +504,21 @@ export function marksSwitches(spec) {
 
   function render() {
     clear(root);
-    root.appendChild(el('h3', { class: 'ak-com__title' }, s.title || tc('marks.title')));
+    root.appendChild(el('h3', { class: 'ak-com__title' }, [
+      s.title || tc('marks.title'), sample ? sampleBadge() : null,
+    ].filter(Boolean)));
     root.appendChild(el('div', {}, [switchRow('badge'), switchRow('install')]));
     root.appendChild(el('p', { class: 'ak-com__intro' }, tc('marks.ownerOnly')));
   }
 
   function reload() {
+    if (sample) {
+      marks = { badge: true, install: false };
+      root.hidden = false;
+      render();
+      enter(root);
+      return;
+    }
     if (!ref || !session) return;
     const who = ownerPart(session.ghii || session.gaii);
     if (!who || who !== ownerPart(ref.owner)) return;

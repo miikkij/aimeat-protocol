@@ -4171,7 +4171,7 @@
     if (kind === "statRow") return { tiles: Array.isArray(data) ? data : [] };
     if (kind === "table") return { rows: Array.isArray(data) ? data : data && data.rows || [] };
     if (kind === "figure") return data && typeof data === "object" ? data : { value: 0 };
-    if (kind === "chart" || kind === "matrix" || kind === "graph" || kind === "waveform" || kind === "gauge" || kind === "console" || kind === "atlas" || kind === "map" || kind === "scene3d" || kind === "kanban" || kind === "plan" || kind === "schedule" || kind === "steps" || kind === "rating") {
+    if (kind === "chart" || kind === "matrix" || kind === "graph" || kind === "waveform" || kind === "gauge" || kind === "console" || kind === "atlas" || kind === "map" || kind === "scene3d" || kind === "kanban" || kind === "plan" || kind === "schedule" || kind === "steps" || kind === "rating" || kind === "crt") {
       return { data: data && typeof data === "object" && !Array.isArray(data) ? data : null };
     }
     if (kind === "health" || kind === "queue") {
@@ -5316,7 +5316,9 @@
       "marks.turnOn": "Turn on",
       "marks.turnOff": "Turn off",
       "marks.ownerOnly": "These switches belong to the app’s owner.",
-      "marks.saveFailed": "The change did not go through."
+      "marks.saveFailed": "The change did not go through.",
+      "sample.badge": "Sample content",
+      "sample.formNote": "A sample — nothing is sent from here."
     },
     fi: {
       "legal.title": "Sivut joilla tämä sovellus vastaa",
@@ -5373,7 +5375,9 @@
       "marks.turnOn": "Kytke päälle",
       "marks.turnOff": "Kytke pois",
       "marks.ownerOnly": "Nämä kytkimet kuuluvat sovelluksen omistajalle.",
-      "marks.saveFailed": "Muutos ei mennyt läpi."
+      "marks.saveFailed": "Muutos ei mennyt läpi.",
+      "sample.badge": "Näytesisältö",
+      "sample.formNote": "Näyte — täältä ei lähetetä mitään."
     },
     es: {
       "legal.title": "Las páginas con las que responde esta app",
@@ -5430,7 +5434,9 @@
       "marks.turnOn": "Activar",
       "marks.turnOff": "Desactivar",
       "marks.ownerOnly": "Estos interruptores pertenecen al dueño de la app.",
-      "marks.saveFailed": "El cambio no se aplicó."
+      "marks.saveFailed": "El cambio no se aplicó.",
+      "sample.badge": "Contenido de muestra",
+      "sample.formNote": "Una muestra — desde aquí no se envía nada."
     }
   };
   function tc(key, vars) {
@@ -5454,6 +5460,36 @@
   // src/static/sdk-libs/atelier/commercial.js
   var LAW_URL = "https://eur-lex.europa.eu/eli/reg/2024/1689/oj#art_50";
   var KINDS = ["terms", "privacy", "imprint", "refunds", "accessibility", "cookies", "support"];
+  function isPlaceholder(v) {
+    return /^\s*</.test(String(v == null ? "" : v));
+  }
+  function wantsSample(spec, keys) {
+    if (spec && spec.sample === true) return true;
+    for (const k of keys || []) if (spec && isPlaceholder(spec[k])) return true;
+    return false;
+  }
+  function sampleBadge() {
+    return el("span", { class: "ak-com-sample" }, tc("sample.badge"));
+  }
+  var SAMPLE_LEGAL = {
+    legal: {
+      terms: { format: "markdown", updatedAt: "2026-08-29T16:12:00Z" },
+      privacy: { format: "markdown", updatedAt: "2026-08-29T16:12:00Z" },
+      imprint: { format: "markdown", updatedAt: "2026-08-29T16:12:00Z" },
+      cookies: { format: "markdown", updatedAt: "2026-08-29T16:12:00Z" },
+      support: { format: "markdown", updatedAt: "2026-08-29T16:12:00Z" }
+    },
+    links: [],
+    readiness: {
+      recommended: KINDS.slice(),
+      missing: ["refunds", "accessibility"]
+    }
+  };
+  var SAMPLE_AUDIT_ROWS = [
+    { occurredAt: "2026-08-30T19:12:00Z", body: { kind: "order", detail: "forty loaves for Harvest Fest", actor: "kim@node" } },
+    { occurredAt: "2026-08-29T17:38:00Z", body: { kind: "legal.set", detail: "privacy · markdown", actor: "kim@node" } },
+    { occurredAt: "2026-08-29T16:12:00Z", body: { kind: "other", detail: "published v1 (ai-generated, declared)", actor: "kim@node" } }
+  ];
   function apiBase() {
     const ns = (
       /** @type {any} */
@@ -5497,9 +5533,12 @@
     const root = el("section", { class: "ak-root ak-com ak-com-legal" });
     if (s.target) resolve(s.target).appendChild(root);
     const ref = selfRef(s);
-    function render(data) {
+    function render(data, sample) {
       clear(root);
-      root.appendChild(el("h3", { class: "ak-com__title" }, s.title || tc("legal.title")));
+      root.appendChild(el("h3", { class: "ak-com__title" }, [
+        s.title || tc("legal.title"),
+        sample ? sampleBadge() : null
+      ].filter(Boolean)));
       root.appendChild(el("p", { class: "ak-com__intro" }, tc("legal.intro")));
       if (!data) {
         emptyState({ target: root, tone: "quiet", title: tc("legal.loadFailed") });
@@ -5546,6 +5585,10 @@
     }
     function reload() {
       clear(root);
+      if (wantsSample(s, ["owner", "filename"])) {
+        render(SAMPLE_LEGAL, true);
+        return;
+      }
       if (!ref) {
         render(null);
         return;
@@ -5575,6 +5618,15 @@
       }
     } });
     if (s.target) resolve(s.target).appendChild(root);
+    if (wantsSample(s, ["owner", "filename"])) {
+      root.textContent = "■ " + tc("chip.pages", { n: 2 });
+      root.setAttribute("disabled", "");
+      root.hidden = false;
+      enter(root);
+      return { el: root, destroy() {
+        if (root.parentNode) root.parentNode.removeChild(root);
+      } };
+    }
     const ref = selfRef(s);
     const who = s.session ? ownerPart(s.session.ghii || s.session.gaii) : "";
     if (ref && who && who === ownerPart(ref.owner)) {
@@ -5624,8 +5676,12 @@
       root.appendChild(el("h3", { class: "ak-com__title" }, spec.title || tc("audit.title")));
       root.appendChild(el("p", { class: "ak-com__intro" }, spec.hint || tc("audit.intro")));
     }
-    function renderRows(rows) {
+    function renderRows(rows, sample) {
       head();
+      if (sample) {
+        const h = root.querySelector(".ak-com__title");
+        if (h) h.appendChild(sampleBadge());
+      }
       if (!rows.length) {
         emptyState({ target: root, tone: "quiet", title: tc("audit.empty") });
         return;
@@ -5659,6 +5715,10 @@
       emptyState({ target: root, tone: "quiet", title: String(err && err.message || tc("audit.loadFailed")), hint: tc("audit.twoHands") });
     }
     function reload() {
+      if (wantsSample(spec, ["org", "ws", "space"])) {
+        renderRows(SAMPLE_AUDIT_ROWS, true);
+        return;
+      }
       const ns = (
         /** @type {any} */
         window.AIMEAT
@@ -5703,10 +5763,15 @@
   }
   function feedbackForm(spec) {
     const names = { topic: "topic", message: "message", contact: "contact", ...spec.fields || {} };
+    const sample = wantsSample(spec, ["org", "ws", "formId"]);
     const root = el("section", { class: "ak-root ak-com ak-com-feedback" });
     if (spec.target) resolve(spec.target).appendChild(root);
-    root.appendChild(el("h3", { class: "ak-com__title" }, spec.title || tc("feedback.title")));
+    root.appendChild(el("h3", { class: "ak-com__title" }, [
+      spec.title || tc("feedback.title"),
+      sample ? sampleBadge() : null
+    ].filter(Boolean)));
     if (spec.hint) root.appendChild(el("p", { class: "ak-com__intro" }, spec.hint));
+    if (sample) root.appendChild(el("p", { class: "ak-com__intro" }, tc("sample.formNote")));
     const done = el("p", { class: "ak-com__aside", hidden: true }, tc("feedback.sent"));
     const f = form({
       target: root,
@@ -5717,6 +5782,7 @@
         { name: names.contact, label: tc("feedback.contact"), type: "text", maxLength: 200 }
       ],
       onSubmit(values) {
+        if (sample) throw { field: names.message, message: tc("sample.formNote") };
         const ns = (
           /** @type {any} */
           window.AIMEAT
@@ -5748,10 +5814,12 @@
   }
   function reviewerLine(spec) {
     const s = spec || {};
+    const sample = wantsSample(s, ["name"]);
     const meta = document.querySelector('meta[name="aimeat-reviewed-by"]');
-    const name = s.name || meta && meta.getAttribute("content") || "";
+    const name = sample ? "Kim Virtanen" : s.name || meta && meta.getAttribute("content") || "";
     const root = el("aside", { class: "ak-root ak-com ak-com-reviewer", hidden: !name });
     if (name) {
+      if (sample) root.appendChild(sampleBadge());
       root.appendChild(el("p", { class: "ak-com-reviewer__line" }, tc("reviewer.line", { name })));
       root.appendChild(el("p", { class: "ak-com-reviewer__lifts" }, [
         el("span", {}, tc("reviewer.lifts") + " "),
@@ -5766,6 +5834,7 @@
   }
   function marksSwitches(spec) {
     const s = spec || {};
+    const sample = wantsSample(s, ["filename"]);
     const root = el("section", { class: "ak-root ak-com ak-com-marks", hidden: true });
     if (s.target) resolve(s.target).appendChild(root);
     const ref = selfRef(s);
@@ -5783,9 +5852,9 @@
       return el("div", { class: "ak-com-marks__row" }, [
         el("span", { class: "ak-com-marks__name" }, tc("marks." + key)),
         el("span", { class: "ak-com-marks__meaning" }, tc("marks." + key + (on ? "On" : "Off"))),
-        el("button", { type: "button", class: "ak-btn ak-btn--ghost", disabled: busyNow ? true : null, on: {
+        el("button", { type: "button", class: "ak-btn ak-btn--ghost", disabled: busyNow || sample ? true : null, on: {
           click: function() {
-            if (busyNow) return;
+            if (busyNow || sample) return;
             busyNow = true;
             render();
             const next = {};
@@ -5812,11 +5881,21 @@
     }
     function render() {
       clear(root);
-      root.appendChild(el("h3", { class: "ak-com__title" }, s.title || tc("marks.title")));
+      root.appendChild(el("h3", { class: "ak-com__title" }, [
+        s.title || tc("marks.title"),
+        sample ? sampleBadge() : null
+      ].filter(Boolean)));
       root.appendChild(el("div", {}, [switchRow("badge"), switchRow("install")]));
       root.appendChild(el("p", { class: "ak-com__intro" }, tc("marks.ownerOnly")));
     }
     function reload() {
+      if (sample) {
+        marks = { badge: true, install: false };
+        root.hidden = false;
+        render();
+        enter(root);
+        return;
+      }
       if (!ref || !session) return;
       const who = ownerPart(session.ghii || session.gaii);
       if (!who || who !== ownerPart(ref.owner)) return;
@@ -5837,6 +5916,115 @@
     }
     reload();
     return { el: root, reload, destroy() {
+      if (root.parentNode) root.parentNode.removeChild(root);
+    } };
+  }
+
+  // src/static/sdk-libs/atelier/mtv.js
+  function rowsOf(data) {
+    if (Array.isArray(data)) return data;
+    if (data && Array.isArray(data.items)) return data.items;
+    return [];
+  }
+  function crt(spec) {
+    const s = spec || {};
+    const root = el("figure", { class: "ak-root ak-crt" });
+    if (s.target) resolve(s.target).appendChild(root);
+    const d = s.data || null;
+    if (!d || !d.title && !d.artist) {
+      const e = s.empty || {};
+      emptyState({ target: root, tone: "quiet", title: e.title || s.title || "CRT", hint: e.hint });
+      return { el: root, destroy() {
+        if (root.parentNode) root.parentNode.removeChild(root);
+      } };
+    }
+    root.appendChild(el("div", { class: "ak-crt__status" }, [
+      el("span", {}, d.channel || ""),
+      el("span", { class: "ak-crt__status-mid" }, d.status || ""),
+      d.live ? el("span", { class: "ak-crt__live" }, "● LIVE") : null
+    ].filter(Boolean)));
+    const bars = Array.isArray(d.bars) && d.bars.length ? d.bars : [0.35, 0.7, 0.5, 0.9, 0.6, 0.8, 0.45, 0.65];
+    const screen = el("div", { class: "ak-crt__screen", "aria-hidden": "true" });
+    const vu2 = el("div", { class: "ak-crt__vu" });
+    bars.slice(0, 16).forEach(function(v, i) {
+      const h = Math.round(Math.max(0.06, Math.min(Number(v) || 0, 1)) * 100);
+      vu2.appendChild(el("span", {
+        class: "ak-crt__bar ak-crt__bar--" + (i % 4 + 1),
+        style: "height:" + h + "%"
+      }));
+    });
+    screen.appendChild(vu2);
+    root.appendChild(screen);
+    root.appendChild(el("figcaption", { class: "ak-crt__credits" }, [
+      d.artist ? el("strong", { class: "ak-crt__artist" }, d.artist) : null,
+      d.title ? el("em", { class: "ak-crt__title" }, "“" + d.title + "”") : null,
+      d.meta ? el("span", { class: "ak-crt__meta" }, d.meta) : null
+    ].filter(Boolean)));
+    const p = d.progress;
+    if (p && p.total > 0) {
+      const pct = Math.round(Math.max(0, Math.min(p.value / p.total, 1)) * 100);
+      root.appendChild(el("div", { class: "ak-crt__foot" }, [
+        el("span", {}, "TRACKING " + p.value + " / " + p.total),
+        el(
+          "span",
+          { class: "ak-crt__track", "aria-hidden": "true" },
+          [el("span", { class: "ak-crt__track-fill", style: "width:" + pct + "%" })]
+        ),
+        d.note ? el("span", {}, d.note) : null
+      ].filter(Boolean)));
+    } else if (d.note) {
+      root.appendChild(el("div", { class: "ak-crt__foot" }, [el("span", {}, d.note)]));
+    }
+    enter(root);
+    return { el: root, destroy() {
+      if (root.parentNode) root.parentNode.removeChild(root);
+    } };
+  }
+  function countdown(spec) {
+    const s = spec || {};
+    const root = el("ol", { class: "ak-root ak-countdown" });
+    if (s.target) resolve(s.target).appendChild(root);
+    const rows = rowsOf(s.data);
+    if (!rows.length) {
+      const e = s.empty || {};
+      emptyState({ target: root, tone: "quiet", title: e.title || s.title || "—", hint: e.hint });
+      return { el: root, destroy() {
+        if (root.parentNode) root.parentNode.removeChild(root);
+      } };
+    }
+    rows.forEach(function(row, i) {
+      const rank = row.rank != null ? row.rank : rows.length - i;
+      const li = el("li", { class: "ak-countdown__row ak-countdown__row--" + (i % 4 + 1), on: s.onPick ? {
+        click: function() {
+          s.onPick(row);
+        }
+      } : void 0 }, [
+        el("span", { class: "ak-countdown__rank" }, String(rank)),
+        el("span", { class: "ak-countdown__body" }, [
+          el("span", { class: "ak-countdown__title" }, String(row.title || "")),
+          row.sub ? el("span", { class: "ak-countdown__sub" }, String(row.sub)) : null
+        ].filter(Boolean)),
+        row.votes != null ? el("span", { class: "ak-countdown__votes" }, "♥ " + row.votes) : null
+      ].filter(Boolean));
+      root.appendChild(li);
+    });
+    enter(root);
+    return { el: root, destroy() {
+      if (root.parentNode) root.parentNode.removeChild(root);
+    } };
+  }
+  function crawl(spec) {
+    const s = spec || {};
+    const root = el("p", {
+      class: "ak-root ak-crawl" + (s.tone === "ink" ? " ak-crawl--ink" : "")
+    });
+    if (s.target) resolve(s.target).appendChild(root);
+    const items = rowsOf(s.data).map(function(x) {
+      return typeof x === "string" ? x : String(x && x.text || "");
+    }).filter(Boolean);
+    root.textContent = items.length ? "★ " + items.join("  ★  ") : "★";
+    enter(root);
+    return { el: root, destroy() {
       if (root.parentNode) root.parentNode.removeChild(root);
     } };
   }
@@ -6254,6 +6442,20 @@
         case "waveform":
           return bound("waveform", function(data) {
             return waveform({ target: into, data: patchFor("waveform", data).data, title: p.title, empty });
+          });
+        // ── The broadcast family: the CRT binds its record whole, the countdown its rows, the
+        //    crawl its lines — the Music Television genre's parts in the block vocabulary.
+        case "crt":
+          return bound("crt", function(data) {
+            return crt({ target: into, data: patchFor("crt", data).data, title: p.title, empty });
+          });
+        case "countdown":
+          return bound("countdown", function(data) {
+            return countdown({ target: into, data: patchFor("countdown", data).items, title: p.title, empty, onPick: pick });
+          });
+        case "crawl":
+          return bound("crawl", function(data) {
+            return crawl({ target: into, data: patchFor("crawl", data).items, tone: p.tone });
           });
         case "scene3d": {
           if (p.source) {
@@ -6766,7 +6968,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.38.0",
+    version: "0.39.0",
     // ── Shell and navigation ──
     app,
     section,
@@ -6840,6 +7042,10 @@
     feedbackForm,
     reviewerLine,
     marksSwitches,
+    // ── The broadcast family (the Music Television genre's parts as components) ──
+    crt,
+    countdown,
+    crawl,
     // ── Data ──
     form,
     table,
