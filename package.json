@@ -96,6 +96,7 @@
     "check:copied-logic": "cd aimeat && pnpm check:copied-logic",
     "check:liaison-surface": "cd aimeat && pnpm check:liaison-surface",
     "check:storage-parity": "cd aimeat && pnpm check:storage-parity",
-    "check:audit-gates": "cd aimeat && pnpm check:audit-gates"
+    "check:audit-gates": "cd aimeat && pnpm check:audit-gates",
+    "audit:security": "cd aimeat && pnpm audit:security"
   }
 }

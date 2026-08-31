@@ -3,14 +3,14 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description SD-JWT decode and cryptographic signature verification for EUDIW VP tokens.
- *   Uses @sd-jwt/decode for token parsing and jose for signature validation.
+ *   Uses @sd-jwt/core for token parsing and jose for signature validation.
  * @version-history
+ *   v1.1.0 — 2026-08-31 — @sd-jwt/decode, /types and /utils were deprecated upstream and merged
+ *     into @sd-jwt/core 0.20. Same three names, one import; nothing about the decoding changed.
  *   v1.0.0 — 2026-05-02 — Initial implementation
  */
 
-import { decodeSdJwt } from '@sd-jwt/decode';
-import type { Hasher } from '@sd-jwt/types';
-import { Disclosure } from '@sd-jwt/utils';
+import { decodeSdJwt, Disclosure, type Hasher } from '@sd-jwt/core';
 import * as jose from 'jose';
 import type { JWK } from 'jose';
 import { createHash } from 'node:crypto';

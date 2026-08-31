@@ -76,7 +76,7 @@ Components AIMEAT changed rather than copied verbatim: **world-atlas (Natural Ea
 
 ## Production dependencies
 
-The 412 npm packages that travel inside the `aimeat` package. Build and test
+The 407 npm packages that travel inside the `aimeat` package. Build and test
 tools are not listed: they do not ship, so they carry no obligation for you.
 
 | Package | Version | Licence |
@@ -102,31 +102,29 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [@modelcontextprotocol/ext-apps](https://github.com/modelcontextprotocol/ext-apps) | 1.7.5 | MIT |
 | [@modelcontextprotocol/sdk](https://modelcontextprotocol.io) | 1.30.0 | MIT |
 | [@noble/ciphers](https://paulmillr.com/noble/) | 1.3.0 | MIT |
-| [@noble/ed25519](https://paulmillr.com/noble/) | 3.1.0 | MIT |
-| [@noble/hashes](https://paulmillr.com/noble/) | 1.8.0, 2.2.0, 2.3.0 | MIT |
+| [@noble/ed25519](https://paulmillr.com/noble/) | 3.2.0 | MIT |
+| [@noble/hashes](https://paulmillr.com/noble/) | 1.8.0, 2.2.0, 2.4.0 | MIT |
 | [@node-saml/node-saml](https://github.com/node-saml/node-saml#readme) | 5.1.0 | MIT |
-| [@opentelemetry/api](https://github.com/open-telemetry/opentelemetry-js/tree/main/api) | 1.9.0 | Apache-2.0 |
-| [@sd-jwt/core](https://github.com/openwallet-foundation/sd-jwt-js/wiki) | 0.19.0 | Apache-2.0 |
-| [@sd-jwt/decode](https://github.com/openwallet-foundation/sd-jwt-js/wiki) | 0.19.0 | Apache-2.0 |
-| [@sd-jwt/present](https://github.com/openwallet-foundation/sd-jwt-js/wiki) | 0.19.0 | Apache-2.0 |
-| [@sd-jwt/types](https://github.com/openwallet-foundation/sd-jwt-js/wiki) | 0.19.0 | Apache-2.0 |
-| [@sd-jwt/utils](https://github.com/openwallet-foundation/sd-jwt-js/wiki) | 0.19.0 | Apache-2.0 |
+| [@opentelemetry/api](https://github.com/open-telemetry/opentelemetry-js/tree/main/api) | 1.9.1 | Apache-2.0 |
+| [@owf/identity-common](https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/identity-common) | 0.3.2 | Apache-2.0 |
+| [@prometheus-io/client](https://github.com/prometheus/client_js) | 0.16.1 | Apache-2.0 |
+| [@sd-jwt/core](https://github.com/openwallet-foundation/sd-jwt-js/wiki) | 0.20.1 | Apache-2.0 |
 | [@so-ric/colorspace](https://github.com/so-ric/colorspace) | 1.1.6 | MIT |
 | [@standard-schema/spec](https://standardschema.dev) | 1.1.0 | MIT |
 | [@swc/helpers](https://swc.rs) | 0.5.23 | Apache-2.0 |
 | [@types/debug](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/debug) | 4.1.13 | MIT |
 | [@types/minimatch](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/minimatch) | 3.0.5 | MIT |
 | [@types/ms](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/ms) | 2.1.0 | MIT |
-| [@types/node](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/node) | 25.9.3 | MIT |
-| [@types/qs](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/qs) | 6.14.0 | MIT |
+| [@types/node](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/node) | 25.9.5 | MIT |
+| [@types/qs](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/qs) | 6.15.1 | MIT |
 | [@types/triple-beam](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/triple-beam) | 1.3.5 | MIT |
 | [@types/validator](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/validator) | 13.15.10 | MIT |
 | [@types/xml-encryption](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/xml-encryption) | 1.2.4 | MIT |
 | [@types/xml2js](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/xml2js) | 0.4.14 | MIT |
-| [@vercel/blob](https://vercel.com/storage/blob) | 2.5.0 | Apache-2.0 |
-| [@vercel/cli-config](https://vercel.com/docs/projects/project-configuration/global-configuration) | 0.2.0 | Apache-2.0 |
-| [@vercel/cli-exec](https://vercel.com) | 1.0.0 | Apache-2.0 |
-| [@vercel/oidc](https://vercel.com) | 3.8.0 | Apache-2.0 |
+| [@vercel/blob](https://vercel.com/storage/blob) | 2.8.0 | Apache-2.0 |
+| [@vercel/cli-config](https://vercel.com/docs/projects/project-configuration/global-configuration) | 0.2.4 | Apache-2.0 |
+| [@vercel/cli-exec](https://vercel.com) | 1.0.1 | Apache-2.0 |
+| [@vercel/oidc](https://vercel.com) | 3.8.5 | Apache-2.0 |
 | [@xmldom/is-dom-node](https://github.com/xmldom/is-dom-node#readme) | 1.0.1 | MIT |
 | [@xmldom/xmldom](https://github.com/xmldom/xmldom) | 0.8.15, 0.9.12 | MIT |
 | [abort-controller](https://github.com/mysticatea/abort-controller#readme) | 3.0.0 | MIT |
@@ -149,18 +147,17 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [available-typed-arrays](https://github.com/inspect-js/available-typed-arrays#readme) | 1.0.7 | MIT |
 | [b4a](https://github.com/holepunchto/b4a#readme) | 1.8.1 | Apache-2.0 |
 | [balanced-match](https://github.com/juliangruber/balanced-match#readme) | 4.0.4 | MIT |
-| [bare-events](https://github.com/holepunchto/bare-events#readme) | 2.9.1 | Apache-2.0 |
-| [bare-fs](https://github.com/holepunchto/bare-fs#readme) | 4.7.2 | Apache-2.0 |
-| [bare-os](https://github.com/holepunchto/bare-os#readme) | 3.9.1 | Apache-2.0 |
-| [bare-path](https://github.com/holepunchto/bare-path#readme) | 3.0.1 | Apache-2.0 |
-| [bare-stream](https://github.com/holepunchto/bare-stream#readme) | 2.13.3 | Apache-2.0 |
-| [bare-url](https://github.com/holepunchto/bare-url) | 2.4.5 | Apache-2.0 |
+| [bare-events](https://github.com/holepunchto/bare-events#readme) | 2.9.2 | Apache-2.0 |
+| [bare-fs](https://github.com/holepunchto/bare-fs#readme) | 4.8.1 | Apache-2.0 |
+| [bare-path](https://github.com/holepunchto/bare-path#readme) | 3.1.1 | Apache-2.0 |
+| [bare-stream](https://github.com/holepunchto/bare-stream#readme) | 2.13.4 | Apache-2.0 |
+| [bare-url](https://github.com/holepunchto/bare-url) | 2.5.2 | Apache-2.0 |
 | [base64-js](https://github.com/beatgammit/base64-js) | 0.0.8, 1.5.1 | MIT |
-| [better-sqlite3](http://github.com/WiseLibs/better-sqlite3) | 12.10.0 | MIT |
+| [better-sqlite3](http://github.com/WiseLibs/better-sqlite3) | 12.11.1 | MIT |
 | [bindings](https://github.com/TooTallNate/node-bindings) | 1.5.0 | MIT |
 | [bintrees](https://github.com/vadimg/js_bintrees#readme) | 1.0.2 | MIT |
 | [bl](https://github.com/rvagg/bl) | 4.1.0 | MIT |
-| [bn.js](https://github.com/indutny/bn.js) | 4.12.3 | MIT |
+| [bn.js](https://github.com/indutny/bn.js) | 4.12.5 | MIT |
 | [body-parser](https://github.com/expressjs/body-parser#readme) | 2.3.0 | MIT |
 | [brace-expansion](https://github.com/juliangruber/brace-expansion#readme) | 5.0.9 | MIT |
 | [brotli](https://github.com/devongovett/brotli.js) | 1.3.3 | MIT |
@@ -184,14 +181,14 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [clone](https://github.com/pvorb/node-clone#readme) | 2.1.2 | MIT |
 | [color](https://github.com/Qix-/color#readme) | 5.0.3 | MIT |
 | [color-convert](https://github.com/Qix-/color-convert#readme) | 2.0.1, 3.1.3 | MIT |
-| [color-name](https://github.com/colorjs/color-name) | 1.1.4, 2.1.0 | MIT |
+| [color-name](https://github.com/colorjs/color-name) | 1.1.4, 2.1.1 | MIT |
 | [color-string](https://github.com/Qix-/color-string#readme) | 2.1.4 | MIT |
 | [commander](https://github.com/tj/commander.js#readme) | 12.1.0 | MIT |
 | [compress-commons](https://github.com/archiverjs/node-compress-commons) | 7.0.1 | MIT |
 | [compressible](https://github.com/jshttp/compressible#readme) | 2.0.18 | MIT |
 | [compression](https://github.com/expressjs/compression#readme) | 1.8.1 | MIT |
 | [consul](https://github.com/silas/node-consul#readme) | 2.0.1 | MIT |
-| [content-disposition](https://github.com/jshttp/content-disposition#readme) | 1.0.1 | MIT |
+| [content-disposition](https://github.com/jshttp/content-disposition#readme) | 1.1.0 | MIT |
 | [content-type](https://github.com/jshttp/content-type#readme) | 1.0.5, 2.1.0 | MIT |
 | [cookie](https://github.com/jshttp/cookie#readme) | 0.7.2 | MIT |
 | [cookie-signature](https://github.com/visionmedia/node-cookie-signature#readme) | 1.2.2 | MIT |
@@ -223,7 +220,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [env-paths](https://github.com/sindresorhus/env-paths#readme) | 4.0.0 | MIT |
 | [es-define-property](https://github.com/ljharb/es-define-property#readme) | 1.0.1 | MIT |
 | [es-errors](https://github.com/ljharb/es-errors#readme) | 1.3.0 | MIT |
-| [es-object-atoms](https://github.com/ljharb/es-object-atoms#readme) | 1.1.1 | MIT |
+| [es-object-atoms](https://github.com/ljharb/es-object-atoms#readme) | 1.1.2 | MIT |
 | [escape-html](https://github.com/component/escape-html#readme) | 1.0.3 | MIT |
 | [eslint-scope](https://github.com/eslint/js/blob/main/packages/eslint-scope/README.md) | 8.4.0 | BSD-2-Clause |
 | [eslint-visitor-keys](https://github.com/eslint/js/blob/main/packages/eslint-visitor-keys/README.md) | 4.2.1 | Apache-2.0 |
@@ -236,17 +233,17 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [events](https://github.com/Gozala/events#readme) | 3.3.0 | MIT |
 | [events-universal](https://github.com/holepunchto/events-universal#readme) | 1.0.1 | Apache-2.0 |
 | [eventsource](https://github.com/EventSource/eventsource#readme) | 3.0.7 | MIT |
-| [eventsource-parser](https://github.com/rexxars/eventsource-parser#readme) | 3.1.0 | MIT |
+| [eventsource-parser](https://github.com/rexxars/eventsource-parser#readme) | 3.1.1 | MIT |
 | [execa](https://github.com/sindresorhus/execa#readme) | 5.1.1 | MIT |
 | [expand-template](https://github.com/ralphtheninja/expand-template) | 2.0.3 | (MIT OR WTFPL) |
 | [express](https://expressjs.com/) | 5.2.1 | MIT |
-| [express-rate-limit](https://github.com/express-rate-limit/express-rate-limit) | 8.5.2 | MIT |
+| [express-rate-limit](https://github.com/express-rate-limit/express-rate-limit) | 8.7.0 | MIT |
 | [fast-deep-equal](https://github.com/epoberezkin/fast-deep-equal#readme) | 3.1.3 | MIT |
 | [fast-fifo](https://github.com/mafintosh/fast-fifo) | 1.3.2 | MIT |
 | [fast-levenshtein](https://github.com/hiddentao/fast-levenshtein#readme) | 2.0.6 | MIT |
 | [fast-string-truncated-width](https://github.com/fabiospampinato/fast-string-truncated-width#readme) | 3.0.3 | MIT |
 | [fast-string-width](https://github.com/fabiospampinato/fast-string-width#readme) | 3.0.2 | MIT |
-| [fast-uri](https://github.com/fastify/fast-uri) | 4.1.2 | BSD-3-Clause |
+| [fast-uri](https://github.com/fastify/fast-uri) | 4.1.3 | BSD-3-Clause |
 | [fast-wrap-ansi](https://github.com/43081j/fast-wrap-ansi#readme) | 0.2.2 | MIT |
 | [fecha](https://github.com/taylorhakes/fecha) | 4.2.3 | MIT |
 | [file-uri-to-path](https://github.com/TooTallNate/file-uri-to-path) | 1.0.0 | MIT |
@@ -270,18 +267,18 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [has-property-descriptors](https://github.com/inspect-js/has-property-descriptors#readme) | 1.0.2 | MIT |
 | [has-symbols](https://github.com/ljharb/has-symbols#readme) | 1.1.0 | MIT |
 | [has-tostringtag](https://github.com/inspect-js/has-tostringtag#readme) | 1.0.2 | MIT |
-| [hasown](https://github.com/inspect-js/hasOwn#readme) | 2.0.2 | MIT |
-| [hono](https://hono.dev) | 4.13.3 | MIT |
+| [hasown](https://github.com/inspect-js/hasOwn#readme) | 2.0.4 | MIT |
+| [hono](https://hono.dev) | 4.13.5 | MIT |
 | [http_ece](https://github.com/martinthomson/encrypted-content-encoding) | 1.2.0 | MIT |
 | [http-errors](https://github.com/jshttp/http-errors#readme) | 2.0.1 | MIT |
 | [https-proxy-agent](https://github.com/TooTallNate/proxy-agents#readme) | 7.0.6 | MIT |
 | [human-signals](https://git.io/JeluP) | 2.1.0 | Apache-2.0 |
-| [iconv-lite](https://github.com/pillarjs/iconv-lite) | 0.7.2 | MIT |
+| [iconv-lite](https://github.com/pillarjs/iconv-lite) | 0.7.3 | MIT |
 | [ieee754](https://github.com/feross/ieee754#readme) | 1.2.1 | BSD-3-Clause |
 | [inherits](https://github.com/isaacs/inherits#readme) | 2.0.4 | ISC |
 | [ini](https://github.com/npm/ini#readme) | 1.3.8, 7.0.0 | ISC |
 | [inversify](https://inversify.io) | 7.11.0 | MIT |
-| [ip-address](https://github.com/beaugunderson/ip-address#readme) | 10.5.0 | MIT |
+| [ip-address](https://github.com/beaugunderson/ip-address#readme) | 10.7.0 | MIT |
 | [ipaddr.js](https://github.com/whitequark/ipaddr.js#readme) | 1.9.1 | MIT |
 | [is-arguments](https://github.com/inspect-js/is-arguments) | 1.2.0 | MIT |
 | [is-buffer](https://github.com/feross/is-buffer#readme) | 1.1.6, 2.0.5 | MIT |
@@ -297,9 +294,8 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [is-typed-array](https://github.com/inspect-js/is-typed-array#readme) | 1.1.15 | MIT |
 | [isarray](https://github.com/juliangruber/isarray) | 1.0.0 | MIT |
 | [isexe](https://github.com/isaacs/isexe#readme) | 2.0.0 | ISC |
-| [javascript-obfuscator](https://obfuscator.io/) | 5.5.0 | BSD-2-Clause |
-| [jose](https://github.com/panva/jose) | 5.10.0, 6.2.9 | MIT |
-| [js-base64](https://github.com/dankogai/js-base64#readme) | 3.7.8 | BSD-3-Clause |
+| [javascript-obfuscator](https://obfuscator.io/) | 5.6.0 | BSD-2-Clause |
+| [jose](https://github.com/panva/jose) | 5.10.0, 6.2.10 | MIT |
 | [js-md5](https://github.com/emn178/js-md5) | 0.8.3 | MIT |
 | [js-string-escape](https://github.com/joliss/js-string-escape#readme) | 1.0.1 | MIT |
 | [json-schema-traverse](https://github.com/epoberezkin/json-schema-traverse#readme) | 1.0.0 | MIT |
@@ -310,13 +306,13 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [kysely](https://kysely.dev) | 0.29.5 | MIT |
 | [lazystream](https://github.com/jpommerening/node-lazystream) | 1.0.1 | MIT |
 | [levn](https://github.com/gkz/levn) | 0.3.0 | MIT |
-| [libphonenumber-js](https://gitlab.com/catamphetamine/libphonenumber-js#readme) | 1.13.8 | MIT |
+| [libphonenumber-js](https://gitlab.com/catamphetamine/libphonenumber-js#readme) | 1.13.12 | MIT |
 | [linebreak](https://github.com/devongovett/linebreaker) | 1.1.0 | MIT |
 | [locate-path](https://github.com/sindresorhus/locate-path#readme) | 5.0.0 | MIT |
 | [logform](https://github.com/winstonjs/logform#readme) | 2.7.0 | MIT |
 | [math-intrinsics](https://github.com/es-shims/math-intrinsics#readme) | 1.1.0 | MIT |
 | [md5](https://github.com/pvorb/node-md5#readme) | 2.3.0 | BSD-3-Clause |
-| [media-typer](https://github.com/jshttp/media-typer#readme) | 1.1.0 | MIT |
+| [media-typer](https://github.com/jshttp/media-typer#readme) | 1.1.1 | MIT |
 | [merge-descriptors](https://github.com/sindresorhus/merge-descriptors#readme) | 2.0.0 | MIT |
 | [merge-stream](https://github.com/grncdr/merge-stream#readme) | 2.0.0 | MIT |
 | [mime-db](https://github.com/jshttp/mime-db#readme) | 1.54.0 | MIT |
@@ -332,9 +328,9 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [ms](https://github.com/vercel/ms#readme) | 2.0.0, 2.1.3 | MIT |
 | [multimatch](https://github.com/sindresorhus/multimatch#readme) | 5.0.0 | MIT |
 | [napi-build-utils](https://github.com/inspiredware/napi-build-utils#readme) | 2.0.0 | MIT |
-| [negotiator](https://github.com/jshttp/negotiator#readme) | 0.6.4, 1.0.0 | MIT |
-| [node-abi](https://github.com/electron/node-abi#readme) | 3.92.0 | MIT |
-| [nodemailer](https://nodemailer.com/) | 9.0.5 | MIT-0 |
+| [negotiator](https://github.com/jshttp/negotiator#readme) | 0.6.4, 1.1.0 | MIT |
+| [node-abi](https://github.com/electron/node-abi#readme) | 3.96.0 | MIT |
+| [nodemailer](https://nodemailer.com/) | 9.0.6 | MIT-0 |
 | [normalize-path](https://github.com/jonschlinkert/normalize-path) | 3.0.0 | MIT |
 | [npm-run-path](https://github.com/sindresorhus/npm-run-path#readme) | 4.0.1 | MIT |
 | [oauth4webapi](https://github.com/panva/oauth4webapi) | 3.8.7 | MIT |
@@ -348,7 +344,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [once](https://github.com/isaacs/once#readme) | 1.4.0 | ISC |
 | [one-time](https://github.com/3rd-Eden/one-time#readme) | 1.0.0 | MIT |
 | [onetime](https://github.com/sindresorhus/onetime#readme) | 5.1.2 | MIT |
-| [openid-client](https://github.com/panva/openid-client) | 6.8.6 | MIT |
+| [openid-client](https://github.com/panva/openid-client) | 6.8.7 | MIT |
 | [optionator](https://github.com/gkz/optionator) | 0.8.3 | MIT |
 | [os-paths](https://github.com/rivy/js.os-paths#readme) | 4.4.0 | MIT |
 | [otpauth](https://github.com/hectorm/otpauth) | 9.5.1 | MIT |
@@ -385,14 +381,13 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [prelude-ls](http://preludels.com) | 1.1.2 | MIT |
 | [process](https://github.com/shtylman/node-process#readme) | 0.11.10 | MIT |
 | [process-nextick-args](https://github.com/calvinmetcalf/process-nextick-args) | 2.0.1 | MIT |
-| [prom-client](https://github.com/siimon/prom-client) | 15.1.3 | Apache-2.0 |
 | [proxy-addr](https://github.com/jshttp/proxy-addr#readme) | 2.0.7 | MIT |
 | [pump](https://github.com/mafintosh/pump#readme) | 3.0.4 | MIT |
 | [qrcode](http://github.com/soldair/node-qrcode) | 1.5.4 | MIT |
-| [qs](https://github.com/ljharb/qs) | 6.15.2 | BSD-3-Clause |
+| [qs](https://github.com/ljharb/qs) | 6.16.0 | BSD-3-Clause |
 | [quickjs-emscripten](https://github.com/justjake/quickjs-emscripten#readme) | 0.32.0 | MIT |
 | [quickjs-emscripten-core](https://github.com/justjake/quickjs-emscripten#readme) | 0.32.0 | MIT |
-| [range-parser](https://github.com/jshttp/range-parser#readme) | 1.2.1 | MIT |
+| [range-parser](https://github.com/jshttp/range-parser#readme) | 1.3.0 | MIT |
 | [raw-body](https://github.com/stream-utils/raw-body#readme) | 3.0.2 | MIT |
 | [rc](https://github.com/dominictarr/rc#readme) | 1.2.8 | (BSD-2-Clause OR MIT OR Apache-2.0) |
 | [readable-stream](https://github.com/nodejs/readable-stream) | 2.3.8, 3.6.2, 4.7.0 | MIT |
@@ -411,7 +406,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [sax](https://github.com/isaacs/sax-js#readme) | 1.6.1 | BlueOak-1.0.0 |
 | [scimmy](https://scimmyjs.github.io) | 1.3.5 | MIT |
 | [scimmy-routers](https://github.com/scimmyjs/scimmy-routers#readme) | 1.3.2 | MIT |
-| [semver](https://github.com/npm/node-semver#readme) | 7.8.4 | ISC |
+| [semver](https://github.com/npm/node-semver#readme) | 7.8.5 | ISC |
 | [send](https://github.com/pillarjs/send#readme) | 1.2.1 | MIT |
 | [serve-static](https://github.com/expressjs/serve-static#readme) | 2.2.1 | MIT |
 | [set-blocking](https://github.com/yargs/set-blocking#readme) | 2.0.0 | ISC |
@@ -419,8 +414,8 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [setprototypeof](https://github.com/wesleytodd/setprototypeof) | 1.2.0 | ISC |
 | [shebang-command](https://github.com/kevva/shebang-command#readme) | 2.0.0 | MIT |
 | [shebang-regex](https://github.com/sindresorhus/shebang-regex#readme) | 3.0.0 | MIT |
-| [side-channel](https://github.com/ljharb/side-channel#readme) | 1.1.0 | MIT |
-| [side-channel-list](https://github.com/ljharb/side-channel-list#readme) | 1.0.0 | MIT |
+| [side-channel](https://github.com/ljharb/side-channel#readme) | 1.1.1 | MIT |
+| [side-channel-list](https://github.com/ljharb/side-channel-list#readme) | 1.0.1 | MIT |
 | [side-channel-map](https://github.com/ljharb/side-channel-map#readme) | 1.0.1 | MIT |
 | [side-channel-weakmap](https://github.com/ljharb/side-channel-weakmap#readme) | 1.0.2 | MIT |
 | [signal-exit](https://github.com/tapjs/signal-exit) | 3.0.7 | ISC |
@@ -432,7 +427,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [stack-trace](https://github.com/felixge/node-stack-trace) | 0.0.10 | MIT |
 | [statuses](https://github.com/jshttp/statuses#readme) | 2.0.2 | MIT |
 | [streamsearch](https://github.com/mscdex/streamsearch#readme) | 1.1.0 | MIT |
-| [streamx](https://github.com/mafintosh/streamx) | 2.28.0 | MIT |
+| [streamx](https://github.com/mafintosh/streamx) | 2.28.1 | MIT |
 | [string_decoder](https://github.com/nodejs/string_decoder) | 1.1.1, 1.3.0 | MIT |
 | [string-template](https://github.com/Matt-Esch/string-template) | 1.0.0 | MIT |
 | [string-width](https://github.com/sindresorhus/string-width#readme) | 4.2.3 | MIT |
@@ -441,9 +436,9 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [strip-final-newline](https://github.com/sindresorhus/strip-final-newline#readme) | 2.0.0 | MIT |
 | [strip-json-comments](https://github.com/sindresorhus/strip-json-comments#readme) | 2.0.1 | MIT |
 | [supports-color](https://github.com/chalk/supports-color#readme) | 7.2.0, 10.2.2 | MIT |
-| [tar-fs](https://github.com/mafintosh/tar-fs) | 2.1.4 | MIT |
-| [tar-stream](https://github.com/mafintosh/tar-stream) | 2.2.0, 3.2.0 | MIT |
-| [tdigest](https://github.com/welch/tdigest) | 0.1.2 | MIT |
+| [tar-fs](https://github.com/mafintosh/tar-fs) | 2.1.5 | MIT |
+| [tar-stream](https://github.com/mafintosh/tar-stream) | 2.2.0, 3.2.1 | MIT |
+| [tdigest](https://github.com/welch/tdigest) | 0.1.3 | MIT |
 | [teex](https://github.com/mafintosh/teex) | 1.0.1 | MIT |
 | [text-decoder](https://github.com/holepunchto/text-decoder#readme) | 1.2.7 | Apache-2.0 |
 | [text-hex](https://github.com/3rd-Eden/text-hex) | 1.0.0 | MIT |
@@ -454,7 +449,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [tslib](https://www.typescriptlang.org/) | 2.8.1 | 0BSD |
 | [tunnel-agent](https://github.com/mikeal/tunnel-agent#readme) | 0.6.0 | Apache-2.0 |
 | [type-check](https://github.com/gkz/type-check) | 0.3.2 | MIT |
-| [type-is](https://github.com/jshttp/type-is#readme) | 2.0.1, 2.1.0 | MIT |
+| [type-is](https://github.com/jshttp/type-is#readme) | 2.1.0 | MIT |
 | [undici](https://undici.nodejs.org) | 8.10.0 | MIT |
 | [undici-types](https://undici.nodejs.org) | 7.24.6 | MIT |
 | [unicode-properties](https://github.com/devongovett/unicode-properties) | 1.4.1 | MIT |
@@ -491,7 +486,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [yargs-parser](https://github.com/yargs/yargs-parser#readme) | 18.1.3 | ISC |
 | [yauzl](https://github.com/thejoshwolfe/yauzl) | 3.4.0 | MIT |
 | [zip-stream](https://github.com/archiverjs/node-zip-stream) | 7.0.5 | MIT |
-| [zod](https://zod.dev) | 4.1.11, 4.4.3 | MIT |
+| [zod](https://zod.dev) | 4.1.11, 4.5.4 | MIT |
 | [zod-to-json-schema](https://github.com/StefanTerdell/zod-to-json-schema#readme) | 3.25.2 | ISC |
 
 ## Licence texts
@@ -990,7 +985,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-### @javascript-obfuscator/estraverse 5.4.0, estraverse 5.3.0, esutils 2.0.3, javascript-obfuscator 5.5.0
+### @javascript-obfuscator/estraverse 5.4.0, estraverse 5.3.0, esutils 2.0.3, javascript-obfuscator 5.6.0
 
 ```text
 Redistribution and use in source and binary forms, with or without
@@ -1366,7 +1361,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### @noble/ed25519 3.1.0
+### @noble/ed25519 3.2.0
 
 ```text
 The MIT License (MIT)
@@ -1392,7 +1387,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### @noble/hashes 1.8.0, 2.2.0, 2.3.0
+### @noble/hashes 1.8.0, 2.2.0, 2.4.0
 
 ```text
 The MIT License (MIT)
@@ -1729,7 +1724,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @types/debug 4.1.13, @types/minimatch 3.0.5, @types/ms 2.1.0, @types/node 25.9.3, @types/qs 6.14.0, @types/triple-beam 1.3.5, @types/validator 13.15.10, @types/xml-encryption 1.2.4, @types/xml2js 0.4.14
+### @types/debug 4.1.13, @types/minimatch 3.0.5, @types/ms 2.1.0, @types/node 25.9.5, @types/qs 6.15.1, @types/triple-beam 1.3.5, @types/validator 13.15.10, @types/xml-encryption 1.2.4, @types/xml2js 0.4.14
 
 ```text
 MIT License
@@ -1755,7 +1750,7 @@ MIT License
     SOFTWARE
 ```
 
-### @vercel/blob 2.5.0
+### @vercel/blob 2.8.0
 
 ```text
 Apache License
@@ -1961,7 +1956,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ```
 
-### @vercel/cli-config 0.2.0, @vercel/cli-exec 1.0.0, @vercel/oidc 3.8.0
+### @vercel/cli-config 0.2.4, @vercel/cli-exec 1.0.1, @vercel/oidc 3.8.5
 
 ```text
 Apache License
@@ -2431,7 +2426,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### Apache Arrow (JS) 17.0.0, @opentelemetry/api 1.9.0, @sd-jwt/core 0.19.0, @sd-jwt/decode 0.19.0, @sd-jwt/present 0.19.0, @sd-jwt/types 0.19.0, @sd-jwt/utils 0.19.0, b4a 1.8.1, bare-events 2.9.1, bare-fs 4.7.2, bare-os 3.9.1, bare-path 3.0.1, bare-stream 2.13.3, bare-url 2.4.5, events-universal 1.0.1, text-decoder 1.2.7
+### Apache Arrow (JS) 17.0.0, @opentelemetry/api 1.9.1, @owf/identity-common 0.3.2, @prometheus-io/client 0.16.1, @sd-jwt/core 0.20.1, b4a 1.8.1, bare-events 2.9.2, bare-fs 4.8.1, bare-path 3.1.1, bare-stream 2.13.4, bare-url 2.5.2, events-universal 1.0.1, text-decoder 1.2.7
 
 ```text
 Apache License
@@ -2945,7 +2940,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### better-sqlite3 12.10.0
+### better-sqlite3 12.11.1
 
 ```text
 The MIT License (MIT)
@@ -3040,7 +3035,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### bn.js 4.12.3
+### bn.js 4.12.5
 
 ```text
 Copyright Fedor Indutny, 2015.
@@ -3064,7 +3059,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### body-parser 2.3.0, compression 1.8.1, type-is 2.0.1, 2.1.0
+### body-parser 2.3.0, compression 1.8.1, type-is 2.1.0
 
 ```text
 (The MIT License)
@@ -3340,7 +3335,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### call-bind-apply-helpers 1.0.2, call-bound 1.0.4, es-define-property 1.0.1, es-errors 1.3.0, es-object-atoms 1.1.1, possible-typed-array-names 1.1.0, side-channel-list 1.0.0, side-channel-map 1.0.1
+### call-bind-apply-helpers 1.0.2, call-bound 1.0.4, es-define-property 1.0.1, es-errors 1.3.0, es-object-atoms 1.1.2, possible-typed-array-names 1.1.0, side-channel-list 1.0.1, side-channel-map 1.0.1
 
 ```text
 MIT License
@@ -3464,7 +3459,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### chownr 1.1.4, ini 1.3.8, 7.0.0, isexe 2.0.0, minimatch 3.1.5, once 1.4.0, semver 7.8.4, which 2.0.2, wrappy 1.0.2
+### chownr 1.1.4, ini 1.3.8, 7.0.0, isexe 2.0.0, minimatch 3.1.5, once 1.4.0, semver 7.8.5, which 2.0.2, wrappy 1.0.2
 
 ```text
 The ISC License
@@ -3602,7 +3597,7 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### color-name 1.1.4, 2.1.0
+### color-name 1.1.4, 2.1.1
 
 ```text
 The MIT License (MIT)
@@ -3747,7 +3742,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### content-disposition 1.0.1, forwarded 0.2.0, media-typer 1.1.0, vary 1.1.2
+### content-disposition 1.1.0, forwarded 0.2.0, media-typer 1.1.1, vary 1.1.2
 
 ```text
 (The MIT License)
@@ -4956,7 +4951,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### end-of-stream 1.4.5, pump 3.0.4, tar-fs 2.1.4, tar-stream 2.2.0, 3.2.0
+### end-of-stream 1.4.5, pump 3.0.4, tar-fs 2.1.5, tar-stream 2.2.0, 3.2.1
 
 ```text
 The MIT License (MIT)
@@ -5377,7 +5372,7 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### eventsource-parser 3.1.0
+### eventsource-parser 3.1.1
 
 ```text
 MIT License
@@ -5458,10 +5453,10 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### express-rate-limit 8.5.2
+### express-rate-limit 8.7.0
 
 ```text
-# MIT License
+MIT License
 
 Copyright 2023 Nathan Friedly, Vedant K
 
@@ -5476,11 +5471,12 @@ The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
-FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
-COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 ```
 
 ### fast-deep-equal 3.1.3, json-schema-traverse 1.0.0
@@ -5509,7 +5505,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### fast-fifo 1.3.2, streamx 2.28.0
+### fast-fifo 1.3.2, streamx 2.28.1
 
 ```text
 The MIT License (MIT)
@@ -5590,7 +5586,7 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-### fast-uri 4.1.2
+### fast-uri 4.1.3
 
 ```text
 Copyright (c) 2011-2021, Gary Court until https://github.com/garycourt/uri-js/commit/a1acf730b4bba3f1097c9f52e7d9d3aba8cdcaae
@@ -6037,7 +6033,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### hasown 2.0.2, set-function-length 1.2.2
+### hasown 2.0.4, set-function-length 1.2.2
 
 ```text
 MIT License
@@ -6063,7 +6059,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### hono 4.13.3
+### hono 4.13.5
 
 ```text
 MIT License
@@ -6528,7 +6524,7 @@ Apache License
    limitations under the License.
 ```
 
-### iconv-lite 0.7.2
+### iconv-lite 0.7.3
 
 ```text
 Copyright (c) 2011 Alexander Shtuchkin
@@ -6615,7 +6611,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### ip-address 10.5.0
+### ip-address 10.7.0
 
 ```text
 Copyright (C) 2011 by Beau Gunderson
@@ -6764,7 +6760,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### jose 5.10.0, 6.2.9
+### jose 5.10.0, 6.2.10
 
 ```text
 The MIT License (MIT)
@@ -6788,38 +6784,6 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-```
-
-### js-base64 3.7.8
-
-```text
-Copyright (c) 2014, Dan Kogai
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-* Redistributions of source code must retain the above copyright notice, this
-  list of conditions and the following disclaimer.
-
-* Redistributions in binary form must reproduce the above copyright notice,
-  this list of conditions and the following disclaimer in the documentation
-  and/or other materials provided with the distribution.
-
-* Neither the name of {{{project}}} nor the names of its
-  contributors may be used to endorse or promote products derived from
-  this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
 ### js-md5 0.8.3
@@ -7080,7 +7044,7 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### libphonenumber-js 1.13.8
+### libphonenumber-js 1.13.12
 
 ```text
 (The MIT License)
@@ -7469,7 +7433,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### negotiator 0.6.4, 1.0.0
+### negotiator 0.6.4, 1.1.0
 
 ```text
 (The MIT License)
@@ -7498,7 +7462,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### node-abi 3.92.0
+### node-abi 3.96.0
 
 ```text
 MIT License
@@ -7524,7 +7488,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### nodemailer 9.0.5
+### nodemailer 9.0.6
 
 ```text
 Copyright (c) 2011-2023 Andris Reinman
@@ -7756,7 +7720,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### openid-client 6.8.6
+### openid-client 6.8.7
 
 ```text
 The MIT License (MIT)
@@ -9174,212 +9138,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.**
 ```
 
-### prom-client 15.1.3
-
-```text
-Apache License
-                           Version 2.0, January 2004
-                        http://www.apache.org/licenses/
-
-   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
-
-   1. Definitions.
-
-      "License" shall mean the terms and conditions for use, reproduction,
-      and distribution as defined by Sections 1 through 9 of this document.
-
-      "Licensor" shall mean the copyright owner or entity authorized by
-      the copyright owner that is granting the License.
-
-      "Legal Entity" shall mean the union of the acting entity and all
-      other entities that control, are controlled by, or are under common
-      control with that entity. For the purposes of this definition,
-      "control" means (i) the power, direct or indirect, to cause the
-      direction or management of such entity, whether by contract or
-      otherwise, or (ii) ownership of fifty percent (50%) or more of the
-      outstanding shares, or (iii) beneficial ownership of such entity.
-
-      "You" (or "Your") shall mean an individual or Legal Entity
-      exercising permissions granted by this License.
-
-      "Source" form shall mean the preferred form for making modifications,
-      including but not limited to software source code, documentation
-      source, and configuration files.
-
-      "Object" form shall mean any form resulting from mechanical
-      transformation or translation of a Source form, including but
-      not limited to compiled object code, generated documentation,
-      and conversions to other media types.
-
-      "Work" shall mean the work of authorship, whether in Source or
-      Object form, made available under the License, as indicated by a
-      copyright notice that is included in or attached to the work
-      (an example is provided in the Appendix below).
-
-      "Derivative Works" shall mean any work, whether in Source or Object
-      form, that is based on (or derived from) the Work and for which the
-      editorial revisions, annotations, elaborations, or other modifications
-      represent, as a whole, an original work of authorship. For the purposes
-      of this License, Derivative Works shall not include works that remain
-      separable from, or merely link (or bind by name) to the interfaces of,
-      the Work and Derivative Works thereof.
-
-      "Contribution" shall mean any work of authorship, including
-      the original version of the Work and any modifications or additions
-      to that Work or Derivative Works thereof, that is intentionally
-      submitted to Licensor for inclusion in the Work by the copyright owner
-      or by an individual or Legal Entity authorized to submit on behalf of
-      the copyright owner. For the purposes of this definition, "submitted"
-      means any form of electronic, verbal, or written communication sent
-      to the Licensor or its representatives, including but not limited to
-      communication on electronic mailing lists, source code control systems,
-      and issue tracking systems that are managed by, or on behalf of, the
-      Licensor for the purpose of discussing and improving the Work, but
-      excluding communication that is conspicuously marked or otherwise
-      designated in writing by the copyright owner as "Not a Contribution."
-
-      "Contributor" shall mean Licensor and any individual or Legal Entity
-      on behalf of whom a Contribution has been received by Licensor and
-      subsequently incorporated within the Work.
-
-   2. Grant of Copyright License. Subject to the terms and conditions of
-      this License, each Contributor hereby grants to You a perpetual,
-      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
-      copyright license to reproduce, prepare Derivative Works of,
-      publicly display, publicly perform, sublicense, and distribute the
-      Work and such Derivative Works in Source or Object form.
-
-   3. Grant of Patent License. Subject to the terms and conditions of
-      this License, each Contributor hereby grants to You a perpetual,
-      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
-      (except as stated in this section) patent license to make, have made,
-      use, offer to sell, sell, import, and otherwise transfer the Work,
-      where such license applies only to those patent claims licensable
-      by such Contributor that are necessarily infringed by their
-      Contribution(s) alone or by combination of their Contribution(s)
-      with the Work to which such Contribution(s) was submitted. If You
-      institute patent litigation against any entity (including a
-      cross-claim or counterclaim in a lawsuit) alleging that the Work
-      or a Contribution incorporated within the Work constitutes direct
-      or contributory patent infringement, then any patent licenses
-      granted to You under this License for that Work shall terminate
-      as of the date such litigation is filed.
-
-   4. Redistribution. You may reproduce and distribute copies of the
-      Work or Derivative Works thereof in any medium, with or without
-      modifications, and in Source or Object form, provided that You
-      meet the following conditions:
-
-      (a) You must give any other recipients of the Work or
-          Derivative Works a copy of this License; and
-
-      (b) You must cause any modified files to carry prominent notices
-          stating that You changed the files; and
-
-      (c) You must retain, in the Source form of any Derivative Works
-          that You distribute, all copyright, patent, trademark, and
-          attribution notices from the Source form of the Work,
-          excluding those notices that do not pertain to any part of
-          the Derivative Works; and
-
-      (d) If the Work includes a "NOTICE" text file as part of its
-          distribution, then any Derivative Works that You distribute must
-          include a readable copy of the attribution notices contained
-          within such NOTICE file, excluding those notices that do not
-          pertain to any part of the Derivative Works, in at least one
-          of the following places: within a NOTICE text file distributed
-          as part of the Derivative Works; within the Source form or
-          documentation, if provided along with the Derivative Works; or,
-          within a display generated by the Derivative Works, if and
-          wherever such third-party notices normally appear. The contents
-          of the NOTICE file are for informational purposes only and
-          do not modify the License. You may add Your own attribution
-          notices within Derivative Works that You distribute, alongside
-          or as an addendum to the NOTICE text from the Work, provided
-          that such additional attribution notices cannot be construed
-          as modifying the License.
-
-      You may add Your own copyright statement to Your modifications and
-      may provide additional or different license terms and conditions
-      for use, reproduction, or distribution of Your modifications, or
-      for any such Derivative Works as a whole, provided Your use,
-      reproduction, and distribution of the Work otherwise complies with
-      the conditions stated in this License.
-
-   5. Submission of Contributions. Unless You explicitly state otherwise,
-      any Contribution intentionally submitted for inclusion in the Work
-      by You to the Licensor shall be under the terms and conditions of
-      this License, without any additional terms or conditions.
-      Notwithstanding the above, nothing herein shall supersede or modify
-      the terms of any separate license agreement you may have executed
-      with Licensor regarding such Contributions.
-
-   6. Trademarks. This License does not grant permission to use the trade
-      names, trademarks, service marks, or product names of the Licensor,
-      except as required for reasonable and customary use in describing the
-      origin of the Work and reproducing the content of the NOTICE file.
-
-   7. Disclaimer of Warranty. Unless required by applicable law or
-      agreed to in writing, Licensor provides the Work (and each
-      Contributor provides its Contributions) on an "AS IS" BASIS,
-      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
-      implied, including, without limitation, any warranties or conditions
-      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
-      PARTICULAR PURPOSE. You are solely responsible for determining the
-      appropriateness of using or redistributing the Work and assume any
-      risks associated with Your exercise of permissions under this License.
-
-   8. Limitation of Liability. In no event and under no legal theory,
-      whether in tort (including negligence), contract, or otherwise,
-      unless required by applicable law (such as deliberate and grossly
-      negligent acts) or agreed to in writing, shall any Contributor be
-      liable to You for damages, including any direct, indirect, special,
-      incidental, or consequential damages of any character arising as a
-      result of this License or out of the use or inability to use the
-      Work (including but not limited to damages for loss of goodwill,
-      work stoppage, computer failure or malfunction, or any and all
-      other commercial damages or losses), even if such Contributor
-      has been advised of the possibility of such damages.
-
-   9. Accepting Warranty or Additional Liability. While redistributing
-      the Work or Derivative Works thereof, You may choose to offer,
-      and charge a fee for, acceptance of support, warranty, indemnity,
-      or other liability obligations and/or rights consistent with this
-      License. However, in accepting such obligations, You may act only
-      on Your own behalf and on Your sole responsibility, not on behalf
-      of any other Contributor, and only if You agree to indemnify,
-      defend, and hold each Contributor harmless for any liability
-      incurred by, or claims asserted against, such Contributor by reason
-      of your accepting any such warranty or additional liability.
-
-   END OF TERMS AND CONDITIONS
-
-   APPENDIX: How to apply the Apache License to your work.
-
-      To apply the Apache License to your work, attach the following
-      boilerplate notice, with the fields enclosed by brackets "{}"
-      replaced with your own identifying information. (Don't include
-      the brackets!)  The text should be enclosed in the appropriate
-      comment syntax for the file format. We also recommend that a
-      file or class name and description of purpose be included on the
-      same "printed page" as the copyright notice for easier
-      identification within third-party archives.
-
-   Copyright 2015 Simon Nyberg
-
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
-
-       http://www.apache.org/licenses/LICENSE-2.0
-
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
-```
-
 ### qrcode 1.5.4
 
 ```text
@@ -9394,7 +9152,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### qs 6.15.2
+### qs 6.16.0
 
 ```text
 BSD 3-Clause License
@@ -9428,7 +9186,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-### range-parser 1.2.1
+### range-parser 1.3.0
 
 ```text
 (The MIT License)
@@ -10201,7 +9959,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### side-channel 1.1.0, side-channel-weakmap 1.0.2
+### side-channel 1.1.1, side-channel-weakmap 1.0.2
 
 ```text
 MIT License
@@ -10474,7 +10232,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### tdigest 0.1.2
+### tdigest 0.1.3
 
 ```text
 The MIT License (MIT)
@@ -11323,7 +11081,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### zod 4.1.11, 4.4.3
+### zod 4.1.11, 4.5.4
 
 ```text
 MIT License
@@ -11493,7 +11251,7 @@ an external CDN and the CSP no longer allows one. All subsets are latin + latin-
 Finnish ä/ö render.
 ```
 
-### bare-path 3.0.1
+### bare-path 3.1.1
 
 ```text
 Copyright 2023 Holepunch Inc

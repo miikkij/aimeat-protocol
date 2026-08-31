@@ -16,7 +16,7 @@
  */
 
 import { Router } from 'express';
-import type { Registry } from 'prom-client';
+import type { Registry } from '@prometheus-io/client';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { StatsCollector } from '../services/stats.js';
