@@ -15,19 +15,26 @@
  *   implementation, and the same defect has already been fixed three separate times inside one MCP
  *   tool because two surfaces each had their own.
  *
- *   ALL FOUR ASK `assertAiUseAllowed`, WHICH IS THE SAME GATE `/v1/ai/complete` ASKS. It is the same
- *   money — the owner's own provider key, their daily budget, their per-app quota — so it has to be
- *   the same door, and "the same word" is not enough: these four stated `ai:use` as `requireScope`
- *   middleware for one commit, and that admits MORE people. `requireScope` asks
- *   `scopeIsCovered` (utils/scope-coverage.ts:185), which honours the domain wildcard, so an agent
- *   holding `ai:*` walked through here; `assertAiUseAllowed` (auth/ai-gate.ts:31-32) reads the exact
- *   string or the global `*` and nothing else, so the same agent is refused at /v1/ai/complete. One
- *   spend gate admitting two different sets is invariant 15 in the flesh, and the fix is to ask the
- *   one function rather than to restate its rule.
+ *   ALL FOUR ASK `assertAiUseAllowed` (auth/ai-gate.ts:35-52), WHICH IS THE GATE `/v1/ai/complete`
+ *   ASKS. It is the same money — the owner's own provider key, their daily budget, their per-app
+ *   quota — so it has to be the same door, and naming the same WORD is not enough to make it one:
+ *   these four stated `ai:use` as `requireScope` middleware for one commit, which is a second way of
+ *   asking the same question, and the two ways disagreed about `ai:*`.
+ *
+ *   ASKING, RATHER THAN RESTATING, IS WHY THESE ROUTES ARE STILL RIGHT. The rule they depend on
+ *   CHANGED underneath them: `assertAiUseAllowed` used to spell the scope test out by hand and now
+ *   asks `scopeIsCovered` (utils/scope-coverage.ts:185), so `ai:use` covers the domain wildcard
+ *   where it did not before. Not a line here moved, and every door that spends AI money moved
+ *   together. That is the whole property — what `ai:use` covers is ONE rule in ONE place, and the
+ *   next change to it (making AI spend wildcard-proof is one line in SCOPES_OUTSIDE_WILDCARD,
+ *   utils/scope-coverage.ts:169) reaches these four without anybody walking the doors one by one and
+ *   getting three of the four.
  *
  *   `check:route-scopes` cannot see a call inside a handler, so the four routes carry an entry in
  *   security/route-scope-exemptions.json naming this gate — exactly as /v1/ai/complete,
- *   /v1/ai/transcribe and /v1/ai/available already do.
+ *   /v1/ai/transcribe and /v1/ai/available already do. Cases 16, 16b and 16c of
+ *   test/e2e-ai-jobs.ts hold these doors level with /v1/ai/complete from the outside, because an
+ *   exemption entry is a claim and a route can quietly stop asking.
  *
  *   WHOSE JOB IS WHOSE. Every read resolves under `resolveIdentity(req.auth!, config.nodeId)` and
  *   never a client-supplied id, so a stranger asking after somebody else's job simply finds nothing.
@@ -37,10 +44,10 @@
  * @usage app.use(aiJobsRouter(config, storage, aiJobService));
  * @version-history
  *   v1.1.0 — 2026-08-31 — The four doors ask assertAiUseAllowed instead of stating `ai:use` as
- *     requireScope middleware. The two are NOT the same test: requireScope honours the domain
- *     wildcard, so an `ai:*` agent could spend the owner's provider key here and not at
- *     /v1/ai/complete. Same money, same gate — and the gate is the shared function, not a second
- *     statement of its rule.
+ *     requireScope middleware. Two ways of asking one question is one way too many: they disagreed
+ *     about `ai:*` on the same key and the same budget. Asking the shared function is what has since
+ *     kept these routes correct without being edited — the gate was changed to consult
+ *     scope-coverage.ts and `ai:use` widened underneath them, and they inherited it.
  *   v1.0.0 — 2026-08-31 — Initial.
  */
 import { Router } from 'express';
