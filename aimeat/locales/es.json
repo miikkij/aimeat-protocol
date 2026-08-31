@@ -4245,6 +4245,52 @@
       "memory": "Memoria"
     }
   },
+  "fleet": {
+    "navLabel": "Agentes",
+    "title": "Tus agentes",
+    "desc": "Todos en un mismo sitio, y si cada uno puede seguir entrando. Abre uno para ver qué ha estado haciendo.",
+    "loading": "Leyendo tus agentes…",
+    "signedOut": "Inicia sesión para ver tus agentes",
+    "signedOutText": "Esta página muestra los agentes de tu propia cuenta.",
+    "emptyTitle": "Todavía no hay agentes",
+    "emptyText": "Cuando tengas uno, esta página te dirá de un vistazo si sigue funcionando.",
+    "countAgents": "{n} agentes",
+    "countAgentsOne": "1 agente",
+    "needAttention": "{n} necesitan atención",
+    "needAttentionOne": "1 necesita atención",
+    "allFine": "Todos dentro",
+    "showAll": "Ver todos",
+    "connectedNow": "Conectado ahora mismo",
+    "notConnected": "No conectado ahora mismo",
+    "kindKey": "Clave propia",
+    "kindToken": "Acceso guardado",
+    "openWork": "{n} trabajando",
+    "messages": "{n} mensajes",
+    "messagesOne": "1 mensaje",
+    "note": {
+      "never": "Nunca se ha conectado. Ejecuta el paso de conexión para que entre.",
+      "dead": "Su acceso ha caducado y ya no puede entrar. Vuelve a conectarlo.",
+      "expiringToday": "Su acceso caduca hoy. Vuelve a conectarlo ahora.",
+      "expiring": "Su acceso caduca dentro de unos {n} días. Vuelve a conectarlo antes.",
+      "expiringOne": "Su acceso caduca dentro de un día. Vuelve a conectarlo antes.",
+      "okToday": "Dentro, y caduca hoy.",
+      "ok": "Dentro, le quedan unos {n} días.",
+      "okOne": "Dentro, le queda un día.",
+      "keyNever": "Creado, y su conector todavía no lo ha recogido.",
+      "keyDead": "Le falta la clave, así que no puede entrar. Vuelve a crearlo.",
+      "keyUnreadable": "No se puede leer su tarjeta. Pide ayuda a quien lo lleva.",
+      "keyConnected": "Entra solo con su propia clave, y está conectado ahora.",
+      "keyOk": "Entra solo con su propia clave siempre que lo necesita."
+    },
+    "state": {
+      "ok": "Bien",
+      "expiring": "A punto de caducar",
+      "dead": "No puede entrar",
+      "never": "Nunca se ha conectado",
+      "unreadable": "Hay que mirarlo",
+      "unknown": "Se desconoce"
+    }
+  },
   "footer": {
     "ownNode": "Monta tu propio nodo",
     "transparency": "Transparencia sobre la IA",

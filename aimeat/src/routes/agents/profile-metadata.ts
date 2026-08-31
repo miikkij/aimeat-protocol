@@ -39,6 +39,7 @@ import { logger } from '../../utils/logger.js';
 import { computeAgentHealthMany } from '../../services/agent-health.js';
 import type { AgentOnboardingRecord } from '../../storage/types/agents-messaging.js';
 import { isRunMode, RUN_MODES } from '../../models/agent-card.js';
+import { credentialHealthForOwner, summariseCredentialHealth } from '../../services/agent-credential-health.js';
 
 /** HTTP status for a refusal from services/agent-profile-write.ts. */
 function agentWriteStatus(code: AgentWriteRefusal['code']): number {
@@ -131,6 +132,10 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
 
     const include = String(req.query.include ?? '').split(',').map(s => s.trim());
     const wantStats = include.includes('stats');
+    // ?include=credentials — can each of these agents still authenticate. Computed, never stored:
+    // a stored verdict goes stale in exactly the way the thing it describes does. One extra query
+    // for the whole fleet (services/agent-credential-health.ts), and only when asked for.
+    const wantCredentials = include.includes('credentials');
 
     let taskCounts: Record<string, { queued: number; active: number; done: number; failed: number; doneToday: number; lastTaskUpdateAt: string | null; lastFailedAt: string | null }> = {};
     let msgCounts: Record<string, { total: number; lastMessageAt: string | null }> = {};
@@ -150,6 +155,13 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
     // One clock for the whole page: two cards in one response must not straddle a threshold and
     // then disagree about what time it is.
     const health = computeAgentHealthMany(agents, onboardingByGaii, Date.now());
+
+    // Whether the credential still works is a different question from whether the agent is healthy:
+    // the first is about signing in at all, the second about webhooks and onboarding. Kept apart on
+    // purpose, and opt-in because it costs a query the fleet list did not make.
+    const credentialHealth = wantCredentials
+        ? await credentialHealthForOwner(storage, config, agents)
+        : {};
 
     if (wantStats && agents.length > 0) {
       const ownerGhii = `${req.auth!.owner}@${config.nodeId}`;
@@ -212,6 +224,7 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
         // Credential health at a glance: a v2 agent with no card is created and unconnected.
         card_enrolled: !!a.enrolledAt,
         enrolled_at: a.enrolledAt ?? null,
+        ...(wantCredentials ? { credential: credentialHealth[a.gaii] } : {}),
         schedule_constraint_defaults: a.scheduleConstraintDefaults ?? [],
         ...(wantStats ? {
           stats: {
@@ -222,6 +235,9 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
           },
         } : {}),
       })),
+      // How many are in each state, so a heading can say "3 need attention" without the reader
+      // scanning sixty-eight rows to find out. Only when credentials were asked for.
+      ...(wantCredentials ? { credential_summary: summariseCredentialHealth(credentialHealth) } : {}),
     }, [
       { description: 'Register a new agent', method: 'POST', url: '/v1/agents' },
     ]));

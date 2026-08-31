@@ -1,0 +1,178 @@
+/**
+ * @file fleet.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The Agents section (/v1/fleet): one row per agent, with the credential state as the
+ *   thing the eye lands on. Prefix `flt-`.
+ * @version-history
+ *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V3).
+ */
+
+.flt {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 2rem 1rem 4rem;
+}
+
+.flt-title {
+  font-size: 1.6rem;
+  margin: 0 0 0.25rem;
+}
+
+.flt-desc {
+  color: var(--text-muted);
+  margin: 0 0 1.5rem;
+  font-size: 0.9rem;
+}
+
+.flt-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.flt-count {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.flt-chip {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--text);
+  padding: 0.25rem 0.6rem;
+  font-size: 0.8rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.flt-chip--warn {
+  border-color: var(--warn, #F59E0B);
+  color: var(--warn, #F59E0B);
+}
+
+.flt-chip--warn.is-on {
+  background: var(--warn, #F59E0B);
+  color: var(--bg);
+}
+
+.flt-chip--ok {
+  border-color: var(--success, #10b981);
+  color: var(--success, #10b981);
+  cursor: default;
+}
+
+.flt-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.flt-row {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  padding: 0.75rem 0.9rem;
+}
+
+.flt-row-main {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  /* A flex item's automatic min-width is its content, which is what holds a page open on a phone.
+     docs/pitfalls.md §30. */
+  min-width: 0;
+}
+
+.flt-name {
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.flt-name:hover {
+  text-decoration: underline;
+}
+
+.flt-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border);
+  flex: 0 0 auto;
+}
+
+.flt-dot--on {
+  background: var(--success, #10b981);
+}
+
+.flt-badge {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  padding: 0.1rem 0.4rem;
+  border-radius: var(--radius-sm, 4px);
+  background: var(--bg-dim);
+  color: var(--text-muted);
+}
+
+.flt-badge--run,
+.flt-badge--kind {
+  background: transparent;
+  border: 1px solid var(--border);
+}
+
+/* The state is the thing the eye should land on, so it is the only coloured word in the row. */
+.flt-state {
+  margin-left: auto;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+}
+
+.flt-state--ok { color: var(--success, #10b981); }
+.flt-state--expiring { color: var(--warn, #F59E0B); }
+.flt-state--dead { color: var(--danger, #E8564A); }
+.flt-state--never { color: var(--text-muted); }
+.flt-state--unreadable { color: var(--danger, #E8564A); }
+.flt-state--unknown { color: var(--text-muted); }
+
+.flt-row-note {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-top: 0.3rem;
+}
+
+.flt-row-meta {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.flt-gaii {
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+@media (max-width: 600px) {
+  /* On a phone the state belongs under the name rather than pushed to a right edge that is not
+     there: `margin-left: auto` on a wrapped row leaves it stranded on a line of its own. */
+  .flt-state {
+    margin-left: 0;
+  }
+}

@@ -7787,6 +7787,12 @@ paths:
         per-agent `stats` projection (task/message counts, latest-activity timestamps, the
         active-task list, and onboarding) computed in a few grouped queries — so a fleet
         dashboard gets everything in ONE request instead of N+1 per-agent round trips.
+
+        Pass `include=credentials` to attach a per-agent `credential` reading and a
+        `credential_summary` count over the whole list: whether each agent can still authenticate,
+        and when that stops being true. It is computed on read rather than stored, because a stored
+        verdict goes stale in exactly the way the thing it describes does. One session query serves
+        the whole fleet.
       tags: [Identity]
       security:
         - BearerAuth: []
@@ -7795,7 +7801,7 @@ paths:
           in: query
           schema:
             type: string
-          description: 'Comma-separated optional projections. Currently supported: `stats`.'
+          description: 'Comma-separated optional projections. Supported: `stats`, `credentials`.'
         - name: run_mode
           in: query
           schema:
@@ -7862,6 +7868,58 @@ paths:
                                               updatedAt: { type: string, format: date-time }
                                               createdAt: { type: string, format: date-time }
                                               agentGaii: { type: string }
+                                    credential:
+                                      type: object
+                                      description: Present only when `include=credentials` was requested.
+                                      properties:
+                                        kind:
+                                          type: string
+                                          enum: [device-token, key-and-card]
+                                          description: |
+                                            Which credential family the agent belongs to. A device-token agent
+                                            holds a long-lived session; a key-and-card agent holds a pinned key
+                                            and mints a credential per use.
+                                        state:
+                                          type: string
+                                          enum: [ok, expiring, dead, never, unreadable]
+                                          description: |
+                                            `ok` it can authenticate · `expiring` it can, and not for much
+                                            longer · `dead` it cannot, the session ran out or was revoked ·
+                                            `never` it has not connected yet, so nothing expired · `unreadable`
+                                            a key-and-card agent whose stored card will not parse.
+                                        expires_at:
+                                          type: string
+                                          format: date-time
+                                          nullable: true
+                                          description: When the longest-lived session ends. Null for a key-and-card agent.
+                                        days_left:
+                                          type: integer
+                                          nullable: true
+                                          description: Whole days until `expires_at`, floored, so 0 means today. Null when there is nothing to count down.
+                                        live_sessions: { type: integer }
+                                        key_pinned:
+                                          type: boolean
+                                          description: 'key-and-card only: the node holds a pinned verification key.'
+                                        card_valid:
+                                          type: boolean
+                                          description: 'key-and-card only: the stored card parses and names this agent.'
+                                        connected:
+                                          type: boolean
+                                          description: Holding a tunnel socket right now. Not part of the verdict; offline is not unhealthy.
+                                        summary:
+                                          type: string
+                                          description: |
+                                            One English sentence, for a reader with no locale file. A browser
+                                            composes its own from `state`, `kind` and `days_left`.
+                          credential_summary:
+                            type: object
+                            description: Present only when `include=credentials` was requested. How many agents are in each state.
+                            properties:
+                              ok: { type: integer }
+                              expiring: { type: integer }
+                              dead: { type: integer }
+                              never: { type: integer }
+                              unreadable: { type: integer }
         '401':
           $ref: '#/components/responses/Unauthorized'
     post:

@@ -8,13 +8,22 @@
  *   ?v=BUILD_ID — without an entry the module still loads but is NOT cache-busted, so browsers
  *   serve a stale copy after a deploy. tsc (checkJs) does NOT catch this: it resolves the path to
  *   the real file regardless of the importmap. This check closes that gap.
+ *
+ *   IT ALSO CHECKS VIEW CSS, for the same reason and against the same file. `useViewCSS()` has been
+ *   a no-op since 2026-07-13: view stylesheets are preloaded as <link> in spa.html. A new view that
+ *   calls it and adds no link renders completely unstyled, and nothing errors — the page is there,
+ *   the console is clean, and the CSS file returns 200 to anyone who asks for it. Cost one round of
+ *   browser verification on 2026-09-01.
  * @structure
  *   - parses the importmap JSON out of public/spa.html
  *   - scans every public JS source for static + dynamic absolute imports
- *   - reports: (a) imported-but-unmapped specifiers, (b) mapped-but-missing target files
+ *   - scans the same sources for useViewCSS('/css/…') calls
+ *   - reports: (a) imported-but-unmapped specifiers, (b) mapped-but-missing target files,
+ *     (c) a view stylesheet with no <link> in spa.html
  * @usage  pnpm check:importmap   (exits non-zero if any problem is found)
  * @version-history
  *   v1.0.0 — 2026-06-19 — Initial importmap ↔ import consistency check
+ *   v1.1.0 — 2026-09-01 — Also checks useViewCSS paths against spa.html's <link> tags.
  */
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -61,7 +70,14 @@ const files = globSync('**/*.js', { cwd: publicDir }).filter(
   (f) => !IGNORE.some((p) => f.replace(/\\/g, '/').startsWith(p)),
 );
 
+/** Every stylesheet spa.html preloads, path only, so the ?v= stamp does not matter here. */
+const linkedCss = new Set(
+  [...html.matchAll(/<link[^>]+rel=["']stylesheet["'][^>]*href=["']([^"']+)["']/gi)]
+    .map((m) => m[1].split('?')[0]),
+);
+
 const unmapped = new Map<string, string[]>(); // specifier -> files that import it
+const unlinkedCss = new Map<string, string[]>(); // stylesheet -> views that ask for it
 for (const rel of files) {
   const src = readFileSync(join(publicDir, rel), 'utf-8');
   for (const spec of absoluteImports(src)) {
@@ -71,6 +87,11 @@ for (const rel of files) {
       if (!unmapped.has(spec)) unmapped.set(spec, []);
       unmapped.get(spec)!.push(rel.replace(/\\/g, '/'));
     }
+  }
+  for (const m of src.matchAll(/useViewCSS\(\s*['"](\/[^'"]+\.css)['"]\s*\)/g)) {
+    if (linkedCss.has(m[1])) continue;
+    if (!unlinkedCss.has(m[1])) unlinkedCss.set(m[1], []);
+    unlinkedCss.get(m[1])!.push(rel.replace(/\\/g, '/'));
   }
 }
 
@@ -102,7 +123,19 @@ if (orphans.length > 0) {
   console.error('\n  Fix: remove the dead entries from the importmap in public/spa.html.\n');
 }
 
+if (unlinkedCss.size > 0) {
+  failed = true;
+  console.error(`\n✖ ${unlinkedCss.size} view stylesheet(s) asked for by useViewCSS with no <link> in spa.html`);
+  console.error('  (useViewCSS is a no-op — the view renders completely unstyled, and nothing errors)\n');
+  for (const [css, views] of unlinkedCss) {
+    console.error(`  <link rel="stylesheet" href="${css}">`);
+    console.error(`      wanted by: ${views.join(', ')}`);
+  }
+  console.error('\n  Fix: add the link tag(s) above to public/spa.html, next to the other view stylesheets.\n');
+}
+
 if (failed) {
   process.exit(1);
 }
 console.log(`✓ importmap in sync — ${mapped.size} entries, all absolute /js|/components|/views imports mapped.`);
+console.log(`✓ view CSS in sync — every useViewCSS path is preloaded in spa.html (${linkedCss.size} stylesheets).`);

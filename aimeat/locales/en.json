@@ -4386,6 +4386,52 @@
       "memory": "Memory"
     }
   },
+  "fleet": {
+    "navLabel": "Agents",
+    "title": "Your agents",
+    "desc": "All of them in one place, and whether each one can still sign in. Open one to see what it has been doing.",
+    "loading": "Reading your agents…",
+    "signedOut": "Sign in to see your agents",
+    "signedOutText": "This page shows the agents on your own account.",
+    "emptyTitle": "No agents yet",
+    "emptyText": "Once you have one, this page tells you at a glance whether it is still working.",
+    "countAgents": "{n} agents",
+    "countAgentsOne": "1 agent",
+    "needAttention": "{n} need attention",
+    "needAttentionOne": "1 needs attention",
+    "allFine": "All signed in",
+    "showAll": "Show all",
+    "connectedNow": "Connected right now",
+    "notConnected": "Not connected right now",
+    "kindKey": "Own key",
+    "kindToken": "Stored sign-in",
+    "openWork": "{n} working",
+    "messages": "{n} messages",
+    "messagesOne": "1 message",
+    "note": {
+      "never": "Never connected. Run the connect step to bring it in.",
+      "dead": "Its sign-in has run out, so it cannot get in any more. Connect it again.",
+      "expiringToday": "Its sign-in runs out today. Connect it again now.",
+      "expiring": "Its sign-in runs out in about {n} days. Connect it again before then.",
+      "expiringOne": "Its sign-in runs out in about a day. Connect it again before then.",
+      "okToday": "Signed in, and it runs out today.",
+      "ok": "Signed in, good for about {n} more days.",
+      "okOne": "Signed in, good for about one more day.",
+      "keyNever": "Created, and its connector has not taken it on yet.",
+      "keyDead": "Its key is missing, so it cannot sign in. Create it again.",
+      "keyUnreadable": "Its card cannot be read. Ask whoever runs this for help.",
+      "keyConnected": "Signs itself in with its own key, and is connected now.",
+      "keyOk": "Signs itself in with its own key whenever it needs to."
+    },
+    "state": {
+      "ok": "Fine",
+      "expiring": "Running out",
+      "dead": "Cannot sign in",
+      "never": "Never connected",
+      "unreadable": "Needs a look",
+      "unknown": "Unknown"
+    }
+  },
   "footer": {
     "ownNode": "Run your own node",
     "transparency": "AI transparency",

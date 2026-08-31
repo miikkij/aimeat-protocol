@@ -519,6 +519,8 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     '/v1/app-store',
     '/v1/classic',
     '/v1/portfolio',
+    // The Agents section (Agent v2 V3). Registered here AND in spa.html's ROUTES.
+    '/v1/fleet',
     '/v1/members',
     '/v1/admin',
     '/v1/help',

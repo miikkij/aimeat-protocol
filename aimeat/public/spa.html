@@ -113,6 +113,7 @@
   <link rel="stylesheet" href="/css/views/capabilities.css">
   <link rel="stylesheet" href="/css/views/agents-detail.css">
   <link rel="stylesheet" href="/css/views/agents-crew.css">
+  <link rel="stylesheet" href="/css/views/fleet.css">
   <link rel="stylesheet" href="/css/views/scheduler.css">
   <link rel="stylesheet" href="/css/views/scheduler-poster.css">
   <link rel="stylesheet" href="/css/views/offers-poster.css">
@@ -487,6 +488,10 @@
       '/v1/aimeat-os':   () => import('/views/aimeat-os.js' + B),
       '/v1/classic':     () => import('/views/portal-classic.js' + B),
       '/v1/portfolio':   () => import('/views/portfolio.js' + B),
+      // The Agents section (2026-09-01, Agent v2 V3). Addressed /v1/fleet because /v1/agents
+      // is the API; the menu and the page call it Agents. A spaRoute in routes/portal.ts
+      // too, or F5 is a 404.
+      '/v1/fleet':       () => import('/views/fleet.js' + B),
       '/v1/members':     () => import('/views/members.js' + B),
       '/v1/admin':       () => import('/views/admin.js' + B),
       '/v1/help':        () => import('/views/help.js' + B),

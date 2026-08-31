@@ -364,6 +364,12 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
         <a class="pf-side-item pf-side-home" href="/v1/home">
           <span class="pf-side-label">← ${t('nav.home')}</span>
         </a>
+        ${/* The Agents section (Agent v2 V3): the fleet and whether each agent can still sign in.
+              A LINK, not a tab: it is its own page, and the Agents tab below stays exactly where it
+              is and shows exactly what it always did. */''}
+        <a class="pf-side-item pf-side-fleet" href="/v1/fleet">
+          <span class="pf-side-label">${t('fleet.navLabel')}</span>
+        </a>
         ${/* No nameplate here: the pill in the top bar already says who is signed in and the
               overview's masthead is the name at full size, so a third copy in the index was the
               one Jouni counted out loud (2026-08-29). */''}

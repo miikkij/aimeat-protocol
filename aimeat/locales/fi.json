@@ -4374,6 +4374,52 @@
       "memory": "Muisti"
     }
   },
+  "fleet": {
+    "navLabel": "Agentit",
+    "title": "Sinun agenttisi",
+    "desc": "Kaikki yhdessä paikassa, ja se pääseekö kukin vielä sisään. Avaa yksi niin näet mitä se on tehnyt.",
+    "loading": "Luetaan agenttejasi…",
+    "signedOut": "Kirjaudu sisään nähdäksesi agenttisi",
+    "signedOutText": "Tämä sivu näyttää oman tilisi agentit.",
+    "emptyTitle": "Ei vielä agentteja",
+    "emptyText": "Kun sinulla on yksi, tämä sivu kertoo yhdellä silmäyksellä toimiiko se yhä.",
+    "countAgents": "{n} agenttia",
+    "countAgentsOne": "1 agentti",
+    "needAttention": "{n} kaipaa huomiota",
+    "needAttentionOne": "1 kaipaa huomiota",
+    "allFine": "Kaikki sisällä",
+    "showAll": "Näytä kaikki",
+    "connectedNow": "Kiinni juuri nyt",
+    "notConnected": "Ei kiinni juuri nyt",
+    "kindKey": "Oma avain",
+    "kindToken": "Tallennettu kirjautuminen",
+    "openWork": "{n} työn alla",
+    "messages": "{n} viestiä",
+    "messagesOne": "1 viesti",
+    "note": {
+      "never": "Ei ole koskaan yhdistänyt. Aja yhdistäminen niin se pääsee sisään.",
+      "dead": "Kirjautuminen on umpeutunut, eikä se pääse enää sisään. Yhdistä se uudelleen.",
+      "expiringToday": "Kirjautuminen umpeutuu tänään. Yhdistä se uudelleen nyt.",
+      "expiring": "Kirjautuminen umpeutuu noin {n} päivän päästä. Yhdistä se uudelleen ennen sitä.",
+      "expiringOne": "Kirjautuminen umpeutuu noin päivän päästä. Yhdistä se uudelleen ennen sitä.",
+      "okToday": "Sisällä, ja umpeutuu tänään.",
+      "ok": "Sisällä, riittää vielä noin {n} päiväksi.",
+      "okOne": "Sisällä, riittää vielä noin päivän.",
+      "keyNever": "Luotu, eikä sen konnektori ole vielä ottanut sitä käyttöön.",
+      "keyDead": "Avain puuttuu, joten se ei pääse sisään. Luo se uudelleen.",
+      "keyUnreadable": "Sen korttia ei saa luettua. Pyydä apua ylläpidolta.",
+      "keyConnected": "Kirjaa itsensä sisään omalla avaimellaan, ja on nyt kiinni.",
+      "keyOk": "Kirjaa itsensä sisään omalla avaimellaan aina kun tarvitsee."
+    },
+    "state": {
+      "ok": "Kunnossa",
+      "expiring": "Loppumassa",
+      "dead": "Ei pääse sisään",
+      "never": "Ei ole koskaan yhdistänyt",
+      "unreadable": "Vaatii katsomista",
+      "unknown": "Ei tiedossa"
+    }
+  },
   "footer": {
     "ownNode": "Aja oma node",
     "transparency": "Tekoälyn läpinäkyvyys",
