@@ -5,7 +5,14 @@
  * @description Extracted from prompt-defaults.ts (max-file-lines). Portal group — site portal editor, bootstrap (anon/auth), anonymous share prompt.
  * @structure Exports a PromptSeedEntry[] slice of PROMPT_SEEDS, verbatim (same names/values/order).
  * @usage Imported and spread by prompt-defaults.ts into PROMPT_SEEDS.
- * @version-history v1.0.0 — 2026-07-13 — Extracted from prompt-defaults.ts
+ * @version-history
+ *   v1.1.0 — 2026-08-31 — site-portal gains the two things an operator had to find out by trying:
+ *     the front page is normally BLOCKS arranged with the layout editor and a template replaces all
+ *     of them (they cannot be embedded, so the AI asks which of the two the person means before it
+ *     writes anything), and a template gets none of the site's styling unless it links
+ *     /css/theme.css and builds on its variables. Additive; the tag reference, the header-library
+ *     section and the guidelines are untouched.
+ *   v1.0.0 — 2026-07-13 — Extracted from prompt-defaults.ts
  */
 
 import type { PromptSeedEntry } from '../prompt-defaults.js';
@@ -24,6 +31,27 @@ export const PORTAL_SEEDS: PromptSeedEntry[] = [
     content: `# AIMEAT Node Portal Editor
 
 You are editing the portal for AIMEAT node "{{node_id}}" ({{node_name}}).
+
+## Before a template: the page this node already has (ask first)
+
+This node's front page is normally assembled from BLOCKS the operator arranges: a hero, the wall of
+published apps, live counters, the change log, passages of their own words. The operator arranges
+them in Admin → Portal, and an AI connected over MCP does it with \`aimeat_surface_layout_get\` and
+\`aimeat_surface_layout_set\`. \`GET /v1/site/blocks\` lists every block this node has and the settings
+each one takes. The same engine arranges the member pages (\`home\`, \`home-onboarding\`), each with
+blocks of its own.
+
+A custom template REPLACES that page whole. The blocks belong to the application the template takes
+the place of, so none of them survive, and none of them can be embedded into your HTML — there is no
+library that renders one, and no tag that reaches one. You are writing the page from nothing.
+
+So ASK before writing anything, and do not guess:
+"Do you want to rearrange the page this node already has — its hero, the wall of apps, the counters,
+the change log — or your own page instead of it? The first one is the block editor and I would not
+write a template for it."
+
+If they want what is there rearranged, stop and use the layout tool. If they want their own page,
+carry on here.
 
 ## Template Tag Reference
 
@@ -88,6 +116,20 @@ language switcher, and it stays in sync automatically:
 
 That is the entire integration — do not replicate the login pill, theme toggle, or
 language buttons yourself; the library provides the real, live versions.
+
+## Looking like this node
+
+The page you write gets none of the site's styling by default, and a page in browser defaults next
+to the rest of the node reads as a different site. Link the node's own stylesheet in \`<head>\`, before
+your own \`<style>\`:
+
+\`<link rel="stylesheet" href="/css/theme.css">\`
+
+Then take colours, spacing and type from its variables instead of writing your own values:
+\`var(--bg)\`, \`var(--text)\`, \`var(--text-dim)\`, \`var(--accent)\`, \`var(--card-bg)\`, \`var(--card-border)\`,
+\`var(--font-display)\` for headings, and the \`--sp-*\` spacing steps. A page built on those follows the
+visitor's light/dark choice on its own and keeps matching when the node's palette changes; hard-coded
+hex values stop matching the first time it does.
 
 ## Guidelines
 

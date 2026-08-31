@@ -3001,6 +3001,8 @@
     "portalNavSave": "Guardar la navegación",
     "portalNavSaved": "Navegación de la cabecera guardada",
     "portalPreview": "Vista previa del portal",
+    "portalPreviewNote": "Has entrado con tu cuenta, así que la cabecera muestra aquí tu propia sesión. Quien llega de fuera ve la misma página, y en su lugar un enlace para entrar. Ábrela en una ventana privada y verás lo que ve esa persona.",
+    "portalPreviewOpen": "Abrir la página de inicio en otra pestaña",
     "portalMemoryKeys": "Claves de memoria del portal",
     "portalKvPairs": "Pares clave-valor (del entorno)",
     "portalChangelog": "Registro de cambios",
