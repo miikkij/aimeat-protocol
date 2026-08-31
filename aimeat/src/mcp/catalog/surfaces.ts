@@ -229,7 +229,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         // Read-only: what the one-press basic agents would give this account, and whether the
         // owner's connector is up. On 'agent' beside the three above because its caller is one of
         // the owner's own agents, telling the person where to press.
-        'aimeat_agent_basics_get',
+        'aimeat_agent_basics_get', 'aimeat_agent_basics_request',
         'aimeat_crew_get', 'aimeat_crew_validate', 'aimeat_crew_try', 'aimeat_crew_draft', 'aimeat_crew_publish', 'aimeat_crew_seed',
         'aimeat_operator_agent_configure', 'aimeat_operator_ai_config',
     ],

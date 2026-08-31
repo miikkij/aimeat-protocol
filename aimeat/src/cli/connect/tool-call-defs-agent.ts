@@ -158,6 +158,14 @@ export const agentTools: ConnectCliToolDefinition[] = [
         handler: ({ client }) => client.get('/v1/agents/v2/basic-agents'),
     },
     {
+        name: 'aimeat_agent_basics_request',
+        description: "Ask your owner to set up the basic agents. Puts one line on their open-items list; it retires itself once they press. Creates nothing.",
+        input: {
+            note: { type: 'string', description: 'One short phrase on why you are asking, shown to the person with the request.' },
+        },
+        handler: ({ client }, input) => client.post('/v1/agents/v2/basic-agents/request', { note: optionalString(input, 'note') }),
+    },
+    {
         name: 'aimeat_agent_console_set',
         description: "Record where an agent is managed by whatever HOSTS it (its settings or brain page in the fleet runtime it runs in), so the owner's profile can link straight to it. Absolute http(s) URL; '' clears it.",
         input: {

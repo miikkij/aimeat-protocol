@@ -47,6 +47,7 @@ import { getOwnerScopeMemory } from './owner-memory.js';
 import { portfolioReadGaiis, PORTFOLIO_HTML_KEY } from '../routes/portfolio.js';
 import { HELLO_MCP_KEY } from './hello-mcp.js';
 import { loadOwnerAgents } from './db/owner-identity.js';
+import { BASIC_AGENTS } from '../data/basic-agents.js';
 
 /** The one key. Named for what a person calls it, because their AI reads this name aloud. */
 export const OPEN_ITEMS_KEY = 'open-items.list';
@@ -74,7 +75,7 @@ export type ItemStatus = 'open' | 'working';
 export type FlippedBy = 'person' | 'ai';
 
 /** The conditions a system-suggested item can close itself on. Evaluated on read. */
-export const CLOSES_CHECKS = ['hello_mcp', 'welcome_mat', 'first_agent'] as const;
+export const CLOSES_CHECKS = ['hello_mcp', 'welcome_mat', 'first_agent', 'basic_agents'] as const;
 export type ClosesCheck = typeof CLOSES_CHECKS[number];
 
 export interface OpenItem {
@@ -272,6 +273,14 @@ export async function evaluateCloses(
         }
         case 'first_agent':
             return (await loadOwnerAgents(storage, owner)).length > 0;
+        case 'basic_agents': {
+            // An agent asked for the basic set and the person has since pressed the button, so the
+            // request has answered itself and should not still be on their list. Enrolled, not
+            // merely created: an agent with no card is not yet a working agent.
+            const have = await loadOwnerAgents(storage, owner);
+            const enrolled = new Set(have.filter(a => a.enrolledAt).map(a => a.name));
+            return BASIC_AGENTS.every(t => enrolled.has(t.name));
+        }
         default:
             return false;
     }

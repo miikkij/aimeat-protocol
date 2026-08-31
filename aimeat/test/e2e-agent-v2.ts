@@ -120,6 +120,28 @@ function openDaemon(token: string): Promise<FakeDaemon> {
     });
 }
 
+/**
+ * A GEAI token for this owner: the cheapest real principal of a class that is NOT an agent, and it
+ * takes the same handler branch an app grant does. Three calls and no app to publish.
+ */
+async function mintEcoToken(owner: string, ownerAuth: Record<string, string>, app: string): Promise<string> {
+    const hello = await json('/v1/ecosystem-apps/hello', {
+        method: 'POST',
+        body: JSON.stringify({ owner, app, public_key: Buffer.from(`key-${app}`).toString('base64') }),
+    });
+    assert(hello.status === 200, `hello ${hello.status}`);
+    const approve = await json(`/v1/ecosystem-apps/${hello.body.data.user_code}/approve`, {
+        method: 'POST', headers: ownerAuth, body: JSON.stringify({ action: 'approve', scopes: ['memory:read', 'memory:write'] }),
+    });
+    assert(approve.status === 200, `approve ${approve.status}: ${JSON.stringify(approve.body?.error)}`);
+    const tok = await json('/v1/ecosystem-apps/token', {
+        method: 'POST',
+        body: JSON.stringify({ device_code: hello.body.data.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }),
+    });
+    assert(!!tok.body.access_token, `eco token ${tok.status}: ${JSON.stringify(tok.body)}`);
+    return tok.body.access_token as string;
+}
+
 // ── Keys and cards ───────────────────────────────────────────────────────────
 
 interface TestKey { privateKey: string; publicKey: string; kid: string }
@@ -247,25 +269,47 @@ async function run() {
     });
 
     await test('an outside app of the same owner cannot read how their agents are set up', async () => {
-        // The read is open to the owner and their own agents, and to nothing else. An ecosystem app
-        // is the cheapest real principal of the other class to obtain, and it takes the same branch
-        // an app grant does: the handler refuses both by name.
-        const hello = await json('/v1/ecosystem-apps/hello', {
-            method: 'POST',
-            body: JSON.stringify({ owner: a.owner, app: 'nosy-app', public_key: Buffer.from('not-a-real-key').toString('base64') }),
-        });
-        assert(hello.status === 200, `hello ${hello.status}`);
-        const approve = await json(`/v1/ecosystem-apps/${hello.body.data.user_code}/approve`, {
-            method: 'POST', headers: authA, body: JSON.stringify({ action: 'approve', scopes: ['memory:read'] }),
-        });
-        assert(approve.status === 200, `approve ${approve.status}: ${JSON.stringify(approve.body?.error)}`);
-        const tok = await json('/v1/ecosystem-apps/token', {
-            method: 'POST',
-            body: JSON.stringify({ device_code: hello.body.data.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }),
-        });
-        assert(!!tok.body.access_token, `eco token ${tok.status}: ${JSON.stringify(tok.body)}`);
+        // The read is open to the owner and their own agents, and to nothing else.
+        const tok = await mintEcoToken(a.owner, authA, 'nosy-app');
+        const r = await json('/v1/agents/v2/basic-agents', { headers: { Authorization: `Bearer ${tok}` } });
+        assert(r.status === 403, `expected 403, got ${r.status}`);
+    });
 
-        const r = await json('/v1/agents/v2/basic-agents', { headers: { Authorization: `Bearer ${tok.body.access_token}` } });
+    // ── 3b. The agent asks, and the ask lands where the person looks ──────────
+    let askedItemId = '';
+    await test('an agent asks its owner for the basic agents, and it lands on their open items', async () => {
+        const r = await json('/v1/agents/v2/basic-agents/request', {
+            method: 'POST', headers: { Authorization: `Bearer ${daemonA.token}` },
+            body: JSON.stringify({ note: 'you asked me to route things' }),
+        });
+        assert(r.status === 200, `expected 200, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        assert(r.body.data.requested === true, 'the first ask should be recorded');
+        askedItemId = r.body.data.item_id;
+        assert(!!askedItemId, 'and it should name the item');
+
+        const items = await json('/v1/open-items', { headers: authA });
+        const mine = (items.body.data.items as any[]).find(i => i.id === askedItemId);
+        assert(!!mine, 'the owner should see it on their own list');
+        assert(mine.by === 'ai', 'and see that their AI put it there, not them');
+        assert(mine.title.includes('you asked me to route things'), 'the note reaches the person');
+        assert(mine.satisfied === false, 'it is still open, because nothing has been pressed');
+    });
+
+    await test('asking twice does not print a second line', async () => {
+        const r = await json('/v1/agents/v2/basic-agents/request', {
+            method: 'POST', headers: { Authorization: `Bearer ${daemonA.token}` }, body: JSON.stringify({}),
+        });
+        assert(r.status === 200, `expected 200, got ${r.status}`);
+        assert(r.body.data.requested === false, 'the second ask writes nothing');
+        assert(r.body.data.reason === 'already_asked', `expected already_asked, got ${r.body.data.reason}`);
+        assert(r.body.data.item_id === askedItemId, 'and points at the standing one');
+    });
+
+    await test('an outside app cannot ask for agents in your name', async () => {
+        const tok = await mintEcoToken(a.owner, authA, 'nosy-asker');
+        const r = await json('/v1/agents/v2/basic-agents/request', {
+            method: 'POST', headers: { Authorization: `Bearer ${tok}` }, body: JSON.stringify({}),
+        });
         assert(r.status === 403, `expected 403, got ${r.status}`);
     });
 
@@ -292,6 +336,24 @@ async function run() {
         assert(r.status === 200, `expected 200, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
         assert((r.body.data.created as string[]).length === 3, `expected 3 created, got ${JSON.stringify(r.body.data.created)}`);
         assert((r.body.data.enrolled as any[]).length === 3, `expected 3 enrolled, got ${JSON.stringify(r.body.data.enrolled)}`);
+    });
+
+    await test('the ask retires itself once the person has pressed, with nobody ticking it off', async () => {
+        const items = await json('/v1/open-items', { headers: authA });
+        const mine = (items.body.data.items as any[]).find(i => i.id === askedItemId);
+        // Either the list no longer offers it, or it is there marked satisfied. Both mean the same
+        // thing to the person: it is not something waiting for them any more.
+        assert(!mine || mine.satisfied === true,
+            `the request should have answered itself, got ${JSON.stringify(mine)}`);
+    });
+
+    await test('and asking again now says they are already there, without writing anything', async () => {
+        const r = await json('/v1/agents/v2/basic-agents/request', {
+            method: 'POST', headers: { Authorization: `Bearer ${daemonA.token}` }, body: JSON.stringify({}),
+        });
+        assert(r.status === 200, `expected 200, got ${r.status}`);
+        assert(r.body.data.requested === false && r.body.data.reason === 'already_there',
+            `expected already_there, got ${JSON.stringify(r.body.data.reason)}`);
     });
 
     await test('the other agent on that daemon never lost its connection', async () => {

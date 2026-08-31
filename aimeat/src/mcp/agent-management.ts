@@ -41,7 +41,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { setAgentTags, setAgentMode, setAgentConsoleUrl } from '../services/agent-profile-write.js';
-import { describeBasicAgents } from '../services/basic-agents.js';
+import { describeBasicAgents, requestBasicAgents } from '../services/basic-agents.js';
 import { VALID_MODES } from '../routes/agents/constants.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
@@ -144,6 +144,27 @@ export function registerAgentManagementTools(
             // Same function the HTTP route calls, so the two surfaces cannot answer differently.
             const view = await describeBasicAgents(config, storage, callerParsed.owner);
             return { content: [{ type: 'text' as const, text: JSON.stringify(view, null, 2) }] };
+        },
+    );
+
+    // ── Tool: aimeat_agent_basics_request ──
+    // The other half of the chat path, and it still creates nothing: it puts one line on the
+    // owner's open-items list, and that line retires itself once they press.
+    mcp.tool(
+        'aimeat_agent_basics_request',
+        descriptionFor('aimeat_agent_basics_request'),
+        { note: z.string().max(300).optional().describe('One short phrase on why you are asking, shown to the person with the request.') },
+        annotationsFor('aimeat_agent_basics_request'),
+        async ({ note }) => {
+            const callerParsed = parseGAII(agentGaii);
+            if (!callerParsed) {
+                return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
+            }
+            const out = await requestBasicAgents(config, storage, callerParsed.owner, agentGaii, note);
+            if (!out.ok) return { content: [{ type: 'text' as const, text: out.message }], isError: true };
+            const data: Record<string, unknown> = { ...out };
+            delete data.ok;
+            return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
         },
     );
 
