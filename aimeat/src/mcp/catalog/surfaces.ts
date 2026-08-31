@@ -148,7 +148,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_catalogue_agents', 'aimeat_catalogue_directory', 'aimeat_catalogue_boards',
         'aimeat_board_read',
         'aimeat_agent_profile', 'aimeat_agent_activity', 'aimeat_agent_capabilities_report', 'aimeat_agent_tags_set', 'aimeat_agent_telemetry_report', 'aimeat_agents_list',
-        'aimeat_crew_get', 'aimeat_crew_validate', 'aimeat_crew_try', 'aimeat_crew_draft', 'aimeat_crew_publish',
+        'aimeat_crew_get', 'aimeat_crew_validate', 'aimeat_crew_try', 'aimeat_crew_draft', 'aimeat_crew_publish', 'aimeat_crew_seed',
         'aimeat_usage_report',
         'aimeat_onboarding_status', 'aimeat_onboarding_identify_platform', 'aimeat_onboarding_confirm_skill_installed',
         'aimeat_onboarding_confirm_directives_read', 'aimeat_onboarding_declare_services',
@@ -182,7 +182,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_workspace_create', 'aimeat_workspace_list', 'aimeat_workspace_read', 'aimeat_workspace_overview', 'aimeat_organism_overview', 'aimeat_workspace_write', 'aimeat_workspace_publish', 'aimeat_workspace_revert_to_draft', 'aimeat_workspace_object_delete', 'aimeat_workspace_update', 'aimeat_workspace_access', 'aimeat_workspace_member_grant', 'aimeat_workspace_member_revoke', 'aimeat_workspace_members', 'aimeat_workspace_transfer', 'aimeat_workspace_comment', 'aimeat_workspace_comments',
         'aimeat_workspace_rows_append', 'aimeat_workspace_rows_read', 'aimeat_workspace_rows_stats', 'aimeat_workspace_rows_delete',
         'aimeat_agent_profile', 'aimeat_agent_activity', 'aimeat_agent_capabilities_report', 'aimeat_agent_tags_set', 'aimeat_agent_telemetry_report', 'aimeat_agents_list',
-        'aimeat_crew_get', 'aimeat_crew_validate', 'aimeat_crew_try', 'aimeat_crew_draft', 'aimeat_crew_publish',
+        'aimeat_crew_get', 'aimeat_crew_validate', 'aimeat_crew_try', 'aimeat_crew_draft', 'aimeat_crew_publish', 'aimeat_crew_seed',
         'aimeat_usage_report',
         'aimeat_onboarding_status', 'aimeat_onboarding_identify_platform', 'aimeat_onboarding_confirm_skill_installed',
         'aimeat_onboarding_confirm_directives_read', 'aimeat_onboarding_declare_services',
@@ -230,7 +230,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         // owner's connector is up. On 'agent' beside the three above because its caller is one of
         // the owner's own agents, telling the person where to press.
         'aimeat_agent_basics_get',
-        'aimeat_crew_get', 'aimeat_crew_validate', 'aimeat_crew_try', 'aimeat_crew_draft', 'aimeat_crew_publish',
+        'aimeat_crew_get', 'aimeat_crew_validate', 'aimeat_crew_try', 'aimeat_crew_draft', 'aimeat_crew_publish', 'aimeat_crew_seed',
         'aimeat_operator_agent_configure', 'aimeat_operator_ai_config',
     ],
     // The selling surface (/v2/mcp/commerce): everything an agent needs to price something, take

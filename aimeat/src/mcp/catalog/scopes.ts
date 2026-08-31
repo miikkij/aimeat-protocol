@@ -158,6 +158,7 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_crew_try:                          'memory:write',
     aimeat_crew_draft:                        'memory:write',
     aimeat_crew_publish:                      'memory:write',
+    aimeat_crew_seed:                         'memory:write',
     // Rewriting an agent's PERMISSIONS is its own word, and no wildcard carries it. PATCH
     // /v1/agents/:name/scopes is owner-only, and the propose-then-confirm dance here binds the
     // token to the CALLER — so the same agent mints and redeems it in two consecutive calls, and

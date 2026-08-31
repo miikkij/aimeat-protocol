@@ -23,7 +23,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import {
-    crewState, crewValidate, crewTryStart, crewTryWait, crewDraftSave, crewDraftDiscard, crewPublish, crewRestore, crewData,
+    crewState, crewValidate, crewTryStart, crewTryWait, crewDraftSave, crewDraftDiscard, crewPublish, crewRestore, crewSeed, crewData,
     type CrewCaller, type CrewRefusal,
 } from '../services/crew-ops.js';
 import { annotationsFor } from './annotations.js';
@@ -167,6 +167,22 @@ export function registerAgentCrewTools(
                 : await crewRestore(deps, caller, target_agent_name, revision as number);
             if (!out.ok) return refused(out);
             return ok({ published: true, revision: out.revision, publishedAt: out.publishedAt, key: out.key });
+        },
+    );
+
+    mcp.tool(
+        'aimeat_crew_seed',
+        descriptionFor('aimeat_crew_seed'),
+        {
+            target_agent_name: agentNameSchema,
+            doc: DocSchema.describe('The FIRST definition for this agent. Refused if it already has one.'),
+            validate_with: z.string().optional().describe('Which connected same-owner agent should check it. Omit and any connected one is used.'),
+        },
+        annotationsFor('aimeat_crew_seed'),
+        async ({ target_agent_name, doc, validate_with }) => {
+            const out = await crewSeed(deps, callerOf('mcp.crew_seed'), target_agent_name, doc, validate_with);
+            if (!out.ok) return refused(out);
+            return ok({ seeded: true, revision: out.revision, publishedAt: out.publishedAt, key: out.key, validated_by: out.validatedBy });
         },
     );
 }
