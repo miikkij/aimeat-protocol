@@ -33,6 +33,7 @@ import { join } from 'node:path';
 import { AIMEAT_ROOT, REPO_ROOT, npmComponents, vendoredComponents } from './lib/license-inventory.js';
 import { scanComponents, type Finding } from './lib/osv-scan.js';
 import { libFreshness } from './check-lib-freshness.js';
+import { cell } from './lib/md-table.js';
 
 const SEVERITY_ORDER = ['CRITICAL', 'HIGH', 'MODERATE', 'MEDIUM', 'LOW'];
 
@@ -335,7 +336,7 @@ function main(): void {
       md.push('| Package | Version | What upstream says |');
       md.push('|---|---|---|');
       for (const [name, v] of deprecated) {
-        md.push(`| \`${name}\` | ${v.current ?? '?'} | ${deprecationReason(name, v.current ?? '').replace(/\|/g, '\\|')} |`);
+        md.push(`| \`${name}\` | ${v.current ?? '?'} | ${cell(deprecationReason(name, v.current ?? ''))} |`);
       }
       md.push('');
     }
