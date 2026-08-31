@@ -9,6 +9,9 @@
  *   an "ID card" face (renderIdCard): full GAII with its expansion, issued date, last seen,
  *   task/message tallies, trust + morsels — teaching display-name-vs-GAII at a glance.
  * @version-history
+ *   v3.3.0 -- 2026-08-31 -- A sixth pill, `connection`, in teal: the MCP connections the owner's own
+ *     tools use. They were being counted as issues on the surface written to make an issue
+ *     unmissable, purely for not having been opened today.
  *   v3.2.1 -- 2026-08-29 -- The board card name takes its colour from --agd-state in the stylesheet
  *     instead of an inline style, so a skin can decide (the poster skin keeps names in ink).
  *   v3.2.0 -- 2026-08-09 -- Buckets and sort order come from the server verdict. The local
@@ -45,6 +48,9 @@ const BUCKETS = [
   { id: 'quiet', color: 'var(--text-muted)', key: 'profile.agents.board.quiet' },
   { id: 'onboarding', color: 'var(--warning)', key: 'profile.agents.board.onboarding' },
   { id: 'issue', color: 'var(--danger)', key: 'profile.agents.board.issue' },
+  // The tools the owner opens themselves. Teal rather than a status colour: the pill filters by
+  // WHAT these are, where its neighbours filter by how things are going.
+  { id: 'connection', color: 'var(--teal)', key: 'profile.agents.board.connection' },
   { id: 'internal', color: 'var(--text-muted)', key: 'profile.agents.board.internal' },
 ];
 
@@ -65,7 +71,7 @@ export default function SharedBoard({ agents, onboardings, onAgentClick }) {
   }, [agents, onboardings]);
 
   const counts = useMemo(() => {
-    const c = { online: 0, quiet: 0, onboarding: 0, issue: 0, internal: 0 };
+    const c = { online: 0, quiet: 0, onboarding: 0, issue: 0, connection: 0, internal: 0 };
     for (const r of agentStates) c[r.bucket] = (c[r.bucket] ?? 0) + 1;
     return c;
   }, [agentStates]);

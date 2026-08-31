@@ -202,5 +202,60 @@ await test('a user_code from another account is ignored, not honoured', async ()
     assert(r.status === 200, `first-agent with an unknown code ${r.status}`);
 });
 
+// A workstation is the MCP connection a tool uses, given a GAII for traceability. It is online only
+// while a person is using it, so the working/broken axis does not apply and the route must project
+// that rather than scoring it. Before this it read as `new` (orange, "finish your onboarding") the
+// moment it connected, and as `problem` (red, "something is wrong") a day after anyone last opened
+// the tool — two colours making claims about an agent that was working exactly as intended.
+await test('a workstation connection is its own state, not an unfinished agent', async () => {
+    await connectAgent('ws-tool');
+    const m = await json(`/v1/agents/ws-tool/mode`, auth(ownerToken, {
+        method: 'PATCH', body: JSON.stringify({ mode: 'workstation' }),
+    }));
+    assert(m.status === 200, `set mode ${m.status}: ${JSON.stringify(m.body.error)}`);
+
+    const ws = (await listAgents()).find(a => a.name === 'ws-tool');
+    assert(!!ws, 'the connection is in the list');
+    assert(ws.health.state === 'workstation', `state should be workstation, got ${ws.health.state}`);
+    assert(ws.health.bucket === 'connection', `bucket should be connection, got ${ws.health.bucket}`);
+    assert(ws.health.reasons.length === 0, `a connection never carries faults, got ${JSON.stringify(ws.health.reasons)}`);
+    // The one thing worth knowing about it survives the new branch.
+    assert('last_seen' in ws.health, 'the row still says when something last came through');
+});
+
+await test('a connection counts as a live agent, so the home does not call the account empty', async () => {
+    const state = await homeState();
+    assert(state.agent.total >= 3, `the connection is counted, got ${state.agent.total}`);
+    assert((state.agent.problems ?? 0) === 0, `a connection is not a problem, got ${state.agent.problems}`);
+});
+
+// The refusal this surface owes. Mode is same-owner gated rather than owner-role gated, so that an
+// agent can set its own and a sibling's — which makes the cross-owner case the one worth proving,
+// and it has to be asked with a FULL GAII: a bare name resolves into the CALLER's own namespace, so
+// a stranger naming "ws-tool" gets a 404 about an agent of their own that does not exist, never a
+// look at anybody else's. Naming the real one must be refused rather than obeyed: the mode decides
+// which Hello Integration flow an agent is measured against, so setting it is not a cosmetic write.
+await test('another owner cannot set the mode of an agent that is not theirs', async () => {
+    const stranger = `${owner}x`;
+    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: stranger, public_key: 'placeholder' }) });
+    assert(reg.status === 201, `register stranger ${reg.status}: ${JSON.stringify(reg.body)}`);
+    const ts = new Date().toISOString();
+    const tok = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ owner: stranger, timestamp: ts, signature: await signMsg(reg.body.data.private_key, stranger + NODE_ID + ts) }),
+    });
+    assert(tok.body.ok === true, `stranger token: ${JSON.stringify(tok.body.error)}`);
+
+    const target = encodeURIComponent(`ws-tool#${owner}@${NODE_ID}`);
+    const r = await json(`/v1/agents/${target}/mode`, auth(tok.body.data.token, {
+        method: 'PATCH', body: JSON.stringify({ mode: 'task-runner' }),
+    }));
+    assert(r.status === 403, `a stranger setting someone else's mode must be 403, got ${r.status}`);
+
+    // And the refusal has to have refused: a 403 that wrote first would be the worse bug.
+    const mine = (await listAgents()).find(a => a.name === 'ws-tool');
+    assert(mine.mode === 'workstation', `the mode survived the attempt, got ${mine.mode}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);
 if (failed > 0) process.exit(1);

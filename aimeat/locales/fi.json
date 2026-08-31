@@ -7996,6 +7996,7 @@
         "saveError": "Ryhmien tallennus epäonnistui."
       },
       "reorderHint": "Raahaa järjestääksesi",
+      "startedByYou": "Sinun käynnistämät",
       "solo": {
         "notFound": "Agenttia ei löytynyt.",
         "loginRequired": "Kirjaudu sisään nähdäksesi tämän agentin."
@@ -8792,6 +8793,7 @@
         "issue": "ongelma",
         "newShort": "uusi",
         "issueShort": "ongelma",
+        "connection": "yhteydet",
         "internal": "Sisäinen"
       },
       "idcard": {

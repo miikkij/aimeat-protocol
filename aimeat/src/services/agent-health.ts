@@ -27,6 +27,12 @@
  *   import { computeAgentHealthMany } from '../services/agent-health.js';
  *   const health = computeAgentHealthMany(agents, onboardingByGaii);
  * @version-history
+ *   v1.1.0 — 2026-08-31 — A `workstation` agent gets its own state and its own bucket
+ *     (`connection`), decided before staleness or onboarding are read. It is the MCP connection a
+ *     tool uses rather than something that acts on its own, so the working/broken axis said things
+ *     about it that were not true: a month unopened read as a fault, and a flow it does not owe read
+ *     as unfinished business. It counts as live — the person working through a chat tool every day
+ *     has a working home.
  *   v1.0.0 — 2026-08-09 — Initial (V1: one status vocabulary, both surfaces project it).
  */
 import type { AgentRecord } from '../storage/types/identity.js';
@@ -55,14 +61,14 @@ export const AGENT_STALE_MS = 24 * 60 * 60 * 1000;
  */
 export const AGENT_WEBHOOK_DOWN_THRESHOLD = 10;
 
-export type AgentHealthState = 'system' | 'new' | 'onboarding' | 'problem' | 'idle' | 'production';
-export type AgentHealthBucket = 'issue' | 'onboarding' | 'online' | 'quiet' | 'internal';
+export type AgentHealthState = 'system' | 'workstation' | 'new' | 'onboarding' | 'problem' | 'idle' | 'production';
+export type AgentHealthBucket = 'issue' | 'onboarding' | 'online' | 'quiet' | 'internal' | 'connection';
 export type AgentHealthReason = 'onboarding-failed' | 'never-seen' | 'stale-24h' | 'webhook-down';
 export type AgentDeliveryChannel = 'webhook' | 'webhook-failing' | 'polling' | 'none';
 
 /** Sort order for a fleet view: an issue must never drown in a long list. */
 export const BUCKET_RANK: Record<AgentHealthBucket, number> =
-    { issue: 0, onboarding: 1, online: 2, quiet: 3, internal: 4 };
+    { issue: 0, onboarding: 1, online: 2, quiet: 3, connection: 4, internal: 5 };
 
 const BUCKET_OF: Record<AgentHealthState, AgentHealthBucket> = {
     problem: 'issue',
@@ -70,6 +76,7 @@ const BUCKET_OF: Record<AgentHealthState, AgentHealthBucket> = {
     onboarding: 'onboarding',
     production: 'online',
     idle: 'quiet',
+    workstation: 'connection',
     system: 'internal',
 };
 
@@ -97,7 +104,7 @@ export interface AgentHealth {
 }
 
 type HealthAgent = Pick<AgentRecord,
-    'lastSeen' | 'tags' | 'webhookUrl' | 'webhookEnabled' | 'webhookFailCount'
+    'lastSeen' | 'tags' | 'mode' | 'webhookUrl' | 'webhookEnabled' | 'webhookFailCount'
     | 'webhookLastSuccess' | 'webhookLastFailure'>;
 
 /**
@@ -163,6 +170,24 @@ export function computeAgentHealth(
         ({ ...base, state, bucket: BUCKET_OF[state], rank: BUCKET_RANK[BUCKET_OF[state]], reasons });
 
     if (isSystemAgent(agent.tags)) return verdict('system');
+
+    // A WORKSTATION LEAVES THE AXIS HERE, before anything reads lastSeen or onboarding.
+    //
+    // It is not an agent in the sense the rest of this function means. It is the MCP connection a
+    // tool uses — Claude Code, Claude Desktop, VS Code, Cursor — given a GAII so its work can be
+    // traced to a principal. It is online exactly while a person is using it, which makes every
+    // verdict below a false claim about it: "not seen in 24 h" means the person did not open the
+    // tool, not that anything failed, and Hello Integration is not owed by something that reaches
+    // this node over MCP whether it onboards or not. Both used to show as a colour that said
+    // otherwise, red and orange respectively, on agents that were working perfectly.
+    //
+    // `system` is checked first on purpose: an owner who marked something node machinery has said
+    // something more specific than its mode has.
+    //
+    // The row still carries `last_seen` and `seconds_since_seen`, because when something last came
+    // through the connection is the one thing worth knowing about it.
+    if (agent.mode === 'workstation') return verdict('workstation');
+
     if (!onboarding || onboarding.status === 'pending') return verdict('new');
     if (onboarding.status === 'in_progress') return verdict('onboarding');
 
@@ -192,7 +217,11 @@ export function computeAgentHealth(
  * ready — a home is not ready on the strength of a row.
  */
 export function isLiveState(state: AgentHealthState): boolean {
-    return state === 'production' || state === 'idle' || state === 'onboarding' || state === 'new';
+    return state === 'production' || state === 'idle' || state === 'onboarding' || state === 'new'
+        // A connection counts. Somebody whose only agent is the chat tool they work in every day is
+        // using this node, and telling them their home is not ready would be the reading that is
+        // wrong — they are the person this is built for.
+        || state === 'workstation';
 }
 
 /**

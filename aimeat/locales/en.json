@@ -8008,6 +8008,7 @@
         "saveError": "Failed to save groups."
       },
       "reorderHint": "Drag to reorder",
+      "startedByYou": "Started by you",
       "solo": {
         "notFound": "Agent not found.",
         "loginRequired": "Please log in to view this agent."
@@ -8804,6 +8805,7 @@
         "issue": "issue",
         "newShort": "new",
         "issueShort": "issue",
+        "connection": "connections",
         "internal": "Internal"
       },
       "idcard": {

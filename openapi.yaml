@@ -1113,15 +1113,19 @@ components:
       properties:
         state:
           type: string
-          enum: [system, new, onboarding, problem, idle, production]
+          enum: [system, workstation, new, onboarding, problem, idle, production]
           description: >
-            First match wins, in this order. `system` = owner-tagged node machinery. `new` = no
-            onboarding record, or pending. `onboarding` = in progress. `problem` = onboarding is
-            behind it and something is wrong (see `reasons`). `production` = seen within 10 minutes,
-            or reached by a healthy webhook. `idle` = alive but quiet.
+            First match wins, in this order. `system` = owner-tagged node machinery.
+            `workstation` = the MCP connection a tool uses (Claude Code, Claude Desktop, VS Code),
+            which is online only while a person is using it, so staleness and onboarding are not
+            faults for it and it never carries `reasons`; `last_seen` still says when something last
+            came through. `new` = no onboarding record, or pending. `onboarding` = in progress.
+            `problem` = onboarding is behind it and something is wrong (see `reasons`).
+            `production` = seen within 10 minutes, or reached by a healthy webhook. `idle` = alive
+            but quiet.
         bucket:
           type: string
-          enum: [issue, onboarding, online, quiet, internal]
+          enum: [issue, onboarding, online, quiet, connection, internal]
           description: The glanceable grouping used by the fleet board.
         rank:
           type: integer

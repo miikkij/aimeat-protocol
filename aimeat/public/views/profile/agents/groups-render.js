@@ -6,6 +6,10 @@
  *   grouped agent-card renderer (none / custom groups / mode / tag). Extracted from
  *   ../agents-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-08-31 — In the DEFAULT view the owner's own tool connections (mode `workstation`)
+ *     fall under a standing heading at the end instead of being mixed into the list. Grouping by
+ *     mode already existed, but behind a dropdown nobody opens, and mixing them is what made an MCP
+ *     connection read as an agent that runs on its own.
  *   v1.0.0 — 2026-07-13 — Extracted from views/profile/agents-tab.js (max-file-lines)
  */
 import { h } from 'preact';
@@ -159,8 +163,7 @@ export function renderAgentGroups({ agents, tagFilter, groupBy, onboardings, tas
     const orderedNames = effectiveOrderedNames(agents, agentOrder || []);
     const idx = new Map(orderedNames.map((n, i) => [n, i]));
     const ordered = [...filtered].sort((a, b) => (idx.get(a.name) ?? 1e9) - (idx.get(b.name) ?? 1e9));
-    if (!dnd?.reorderable) return ordered.map(renderCard);
-    return ordered.map(a => html`
+    const row = (a) => (!dnd?.reorderable ? renderCard(a) : html`
       <div data-agent-name=${a.name} key=${a.name}
            class="pf-agd-dnd-row ${dnd.draggingName === a.name ? 'pf-agd-dnd-dragging' : ''}"
            draggable=${expandedAgent !== a.name}
@@ -172,6 +175,27 @@ export function renderAgentGroups({ agents, tagFilter, groupBy, onboardings, tas
         ${card(a)}
       </div>
     `);
+
+    // The connections the owner opens themselves sit under their own heading at the end, rather
+    // than mixed into a list of things that run on their own. This is the default view, so it is
+    // not behind the group-by control: mixing them there is what made them read as agents.
+    //
+    // Keyed on `mode`, which is what the health state is derived from — the two cannot disagree.
+    // The Chat Sessions tab casts a wider net (it also honours the legacy `session-` naming), and
+    // that is deliberate: this grouping has to line up with the teal dot beside each card.
+    const tools = ordered.filter(a => a.mode === 'workstation');
+    if (tools.length === 0) return ordered.map(row);
+    const rest = ordered.filter(a => a.mode !== 'workstation');
+    return [
+      ...rest.map(row),
+      html`
+        <div class="pf-agd-group-header" key="ws-header">
+          <span class="pf-agd-badge pf-agd-badge--mode pf-agd-badge--mode-workstation">${t('profile.agents.startedByYou')}</span>
+          <span class="pf-agd-group-count">${tools.length}</span>
+        </div>
+      `,
+      ...tools.map(row),
+    ];
   }
 
   if (groupBy === 'custom') {
