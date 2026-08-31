@@ -144,6 +144,7 @@ import { registerDesignbookTools } from './designbook.js';
 import { registerAgentOnboardingTools } from './agent-onboarding.js';
 import { registerAgentTelemetryTools } from './agent-telemetry.js';
 import { registerAgentManagementTools } from './agent-management.js';
+import { registerInvokeTool } from './invoke.js';
 import { registerAgentCrewTools } from './agent-crew.js';
 import { scopeAllowsTool } from './catalog/scopes.js';
 import { registerConnectionTools } from './connections.js';
@@ -312,6 +313,9 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         registerFlagsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerPromptsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerCapabilitiesTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, getToken);
+        // The second primitive, beside aimeat_discover: run what you found. Needs the session's
+        // raw bearer, because the call is dispatched as the caller through the node's own routes.
+        registerInvokeTool(mcp, config, getToken, () => agentGaii);
         registerCortexTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerAppsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerAppDraftEditTools(mcp, storage, config, () => agentGaii);

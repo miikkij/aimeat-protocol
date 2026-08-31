@@ -215,6 +215,10 @@ const ALL_SUITES = [
     // connected — a mock would prove the handler and not the thing. Carries the cross-owner,
     // scope-escalation, replay, forged-card and grant-reuse refusals.
     'test/e2e-agent-v2.ts',
+    // Agent v2 V2: the two primitives (discover + invoke) and, as much of the suite as the feature
+    // itself, the proof that the old door is unchanged — the same call refused by scope directly is
+    // refused through invoke, and nothing reachable before stopped being reachable.
+    'test/e2e-agent-v2-primitives.ts',
     // Does an open page hear about work an agent does? 21 of the 31 writing tool files emitted no
     // SSE change domain at all, so the write landed and the screen stayed as it was.
     'test/e2e-mcp-sse-parity.ts',

@@ -49,6 +49,16 @@ export const discoveryWorkBoardsTools: AimeatToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_invoke',
+        description: "Run one of this node's capabilities by name, as yourself. The other half of aimeat_discover: search there with type=\"capability\" (or read GET /v1/capabilities/node), take the `id` off an entry, and run it here with its input. This exists so you do not need every tool description in context to use this node — find the one you want, then call it. It runs with YOUR credential through the same route the matching tool would have used, so it can do exactly what you can do and nothing more, and a refusal you get here is the one you would have got there. Pass `capability` (the id, e.g. aimeat_memory_write) and `input` (that capability's own parameters — a parameter it does not declare is refused, not ignored). Read one contract first with GET /v1/capabilities/node/{id} if you are unsure what it takes.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            capability: { type: 'string', required: true, description: "The capability id, e.g. aimeat_memory_write. Get it from aimeat_discover or GET /v1/capabilities/node." },
+            input: { type: 'object', description: "That capability's own parameters, as an object." },
+        },
+    },
+    {
         name: 'aimeat_agent_profile',
         description: 'View another agent\'s public profile by GAII: display name, description, advertised capabilities, trust score, and created date. Use to vet a provider before hiring it via aimeat_action_execute, or to inspect an agent you found through aimeat_catalogue_agents. To list your own owner\'s agents instead, use aimeat_agents_list.',
         caller: 'agent',

@@ -168,6 +168,13 @@ export const coreTools: ConnectCliToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_invoke',
+        handler: ({ client }, input) => client.post('/v1/invoke', {
+            capability: requiredString(input, 'capability'),
+            input: optionalRecord(input, 'input') ?? {},
+        }),
+    },
+    {
         name: 'aimeat_agent_profile',
         handler: ({ client }, input) => client.get(`/v1/agents/${encodeURIComponent(requiredString(input, 'gaii'))}`),
     },

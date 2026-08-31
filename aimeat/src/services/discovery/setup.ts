@@ -9,6 +9,9 @@
  * @structure buildDiscoveryRegistry(storage, config) → DiscoveryRegistry (memory + capabilities + apps + agent-tasks)
  * @usage const registry = buildDiscoveryRegistry(storage, config);
  * @version-history
+ *   v0.5.0 — 2026-09-01 — Register the `node-capabilities` source: what THIS NODE can do, so an
+ *     agent can find `aimeat_memory_write` in the directory instead of needing all 297 tool
+ *     descriptions in its context to know it exists. Agent v2 V2.
  *   v0.4.0 — 2026-08-31 — Register the `app-tools` source: an app's published tools, one entry per
  *     tool. Their manifests were already reaching the directory through the memory source as
  *     untyped records, so this is a correction as much as an addition.
@@ -26,6 +29,7 @@ import { createCapabilitiesSource, createAppsSource, createAgentTasksSource } fr
 import { createTemplatesSource } from './sources/templates-source.js';
 import { createDesignbookSource } from './sources/designbook-source.js';
 import { createAppToolsSource } from './sources/app-tools-source.js';
+import { createNodeCapabilitiesSource } from './sources/node-capabilities-source.js';
 
 export function buildDiscoveryRegistry(storage: Storage, config: AimeatConfig): DiscoveryRegistry {
   const registry = createRegistry();
@@ -36,5 +40,6 @@ export function buildDiscoveryRegistry(storage: Storage, config: AimeatConfig): 
   registry.register(createTemplatesSource(storage, config));     // agent-proposed app templates (template.catalog.*)
   registry.register(createDesignbookSource(storage, config));    // Design Book parts (atelier.book.part.*)
   registry.register(createAppToolsSource(storage, config));      // published app tools (apps.*.tools), one entry per TOOL
+  registry.register(createNodeCapabilitiesSource());              // the node's OWN capabilities — what `invoke` can run
   return registry;
 }
