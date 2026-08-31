@@ -84,6 +84,16 @@ export interface CrewDefEnvelope {
   publishedBy: string;
   agent_name: string;
   doc: Record<string, unknown>;
+  /**
+   * WHOSE runtime said this definition is valid, when that was not the agent's own.
+   *
+   * Absent on every ordinary publish, and absent means the usual thing happened: the agent
+   * validated its own definition. It is written only by the seed path, where a brand-new agent has
+   * no runtime to ask and a sibling answered instead — and then it has to be recorded, because
+   * "this was checked" and "this was checked by something else" are different claims and the second
+   * one should not quietly read as the first.
+   */
+  validatedBy?: string;
 }
 
 export interface CrewDraft { doc: Record<string, unknown>; savedAt: string }
@@ -124,6 +134,10 @@ function unwrapEnvelope(value: unknown, fallbackName: string): CrewDefEnvelope |
     publishedBy: typeof obj.publishedBy === 'string' ? obj.publishedBy : '',
     agent_name: typeof obj.agent_name === 'string' ? obj.agent_name : (typeof doc.agent_name === 'string' ? doc.agent_name : fallbackName),
     doc,
+    // Only a seed writes this. Projected back out so the Crew tab and a reading agent can see that
+    // a sibling checked the definition rather than the agent itself; a field that is written and
+    // never read back is the same as not recording it.
+    ...(typeof obj.validatedBy === 'string' ? { validatedBy: obj.validatedBy } : {}),
   };
 }
 
@@ -212,6 +226,8 @@ export type CrewPublishResult =
  */
 export async function publishCrewDef(
   deps: CrewWriteDeps, caller: CrewWriteCaller, agent: AgentRecord, doc: Record<string, unknown>,
+  /** Only the seed path passes this: the sibling whose runtime validated, when the agent had none. */
+  validatedBy?: string,
 ): Promise<CrewPublishResult> {
   const { storage } = deps;
   const keys = crewKeysFor(agent.name);
@@ -227,6 +243,9 @@ export async function publishCrewDef(
     publishedBy: caller.principal,
     agent_name: agent.name,
     doc: { ...doc, agent_name: agent.name },
+    // Written only when a sibling validated. Omitted otherwise, so an ordinary publish produces
+    // exactly the envelope it always did.
+    ...(validatedBy ? { validatedBy } : {}),
   };
 
   const snapshot = await writeInto(deps, caller, agent, `${keys.base}.version.${revision}`, envelope, ['crew-def', 'version']);

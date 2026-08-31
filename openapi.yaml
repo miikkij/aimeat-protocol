@@ -40120,6 +40120,82 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
+  /v1/agents/{name}/crew/seed:
+    post:
+      operationId: seedAgentCrew
+      summary: Give an agent its FIRST crew definition, when it has no runtime to check one
+      description: |
+        The chicken and egg this answers: `publish` asks the TARGET agent's own runtime to validate,
+        which is the right validator because it is the thing that will run the definition. But an
+        agent the basic-agents button just created has no runtime, and what it would load is the
+        definition being published, so `publish` answers `409 AGENT_OFFLINE` forever and the agent
+        can never be given anything to be.
+
+        REFUSED with `409 ALREADY_DEFINED` if the agent already has a published definition. This
+        door only ever adds a first one; changing an existing definition goes through `publish`,
+        where the agent's own runtime has the say. That is what makes a weaker validator acceptable
+        here.
+
+        Validation still happens on a REAL runtime, in this order: the agent itself if it is
+        connected; otherwise the same-owner agent named in `validate_with`; otherwise any connected
+        agent of the owner, chosen deterministically so a retry asks the same one. Whoever it was is
+        recorded on the published envelope as `validatedBy` and returned as `validated_by`, so a
+        sibling's verdict is never read later as the agent's own.
+
+        Needs `memory:write` and the target must belong to the caller's account. An app grant is
+        refused. `409 NO_VALIDATOR` when nothing of the owner's is connected at all.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+          description: The agent's bare name, or its full identity url-encoded.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [doc]
+              properties:
+                doc:
+                  type: object
+                  description: The first crew definition for this agent.
+                validate_with:
+                  type: string
+                  description: Which connected same-owner agent should check it. Omit and any connected one is used.
+      responses:
+        '200':
+          description: Seeded as revision 1
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          seeded: { type: boolean }
+                          revision: { type: integer }
+                          publishedAt: { type: string, format: date-time }
+                          key: { type: string }
+                          validated_by:
+                            type: string
+                            description: The agent whose runtime checked it.
+        '403':
+          description: Not your agent, or an app grant
+        '404':
+          description: No such agent on this account
+        '409':
+          description: ALREADY_DEFINED, AGENT_OFFLINE (a named validator that is not connected), or NO_VALIDATOR
+        '422':
+          description: CREW_INVALID — the validator's messages verbatim, and nothing was written
+
   /v1/agents/{name}/crew/publish:
     post:
       operationId: publishAgentCrew

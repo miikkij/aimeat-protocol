@@ -565,4 +565,17 @@ export const agentTools: ConnectCliToolDefinition[] = [
             return client.post(`${base}/restore`, { revision });
         },
     },
+    {
+        name: 'aimeat_crew_seed',
+        description: "Give an agent its FIRST crew definition when it has no runtime yet to check one. Refused if it already has a definition.",
+        input: {
+            target_agent_name: { type: 'string', description: "The agent to give a first definition to." },
+            doc: { type: 'object', description: 'The definition.' },
+            validate_with: { type: 'string', description: 'Which connected same-owner agent should check it. Omit and any connected one is used.' },
+        },
+        handler: ({ client }, input) => client.post(
+            `/v1/agents/${encodeURIComponent(requiredString(input, 'target_agent_name'))}/crew/seed`,
+            { doc: requiredRecord(input, 'doc'), validate_with: optionalString(input, 'validate_with') },
+        ),
+    },
 ];

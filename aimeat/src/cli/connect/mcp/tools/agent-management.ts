@@ -183,4 +183,19 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
       return { content: [{ type: 'text' as const, text: 'Pass doc to publish a definition, or revision to restore a kept one.' }], isError: true };
     },
   );
+
+  mcp.tool(
+    'aimeat_crew_seed',
+    descriptionFor('aimeat_crew_seed'),
+    {
+      agent_name: agentNameSchema,
+      target_agent_name: crewAgentSchema,
+      doc: docSchema.describe('The FIRST definition for this agent. Refused if it already has one.'),
+      validate_with: z.string().optional().describe('Which connected same-owner agent should check it. Omit and any connected one is used.'),
+    },
+    async ({ agent_name, target_agent_name, doc, validate_with }) => {
+      const { client } = pickAgent(registry, agent_name);
+      return text(await client.post(`/v1/agents/${encodeURIComponent(target_agent_name)}/crew/seed`, { doc, validate_with }));
+    },
+  );
 }

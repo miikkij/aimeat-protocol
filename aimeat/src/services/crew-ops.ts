@@ -311,6 +311,101 @@ export async function crewPublish(deps: CrewDeps, caller: CrewCaller, identifier
   return validateThenPublish(deps, caller, target.agent, doc);
 }
 
+/**
+ * The FIRST definition for an agent that has none, validated by a sibling when the agent itself
+ * cannot answer.
+ *
+ * THE CHICKEN AND EGG THIS EXISTS FOR. `crewPublish` asks the TARGET's own runtime to validate, and
+ * that is the right validator: it is the thing that will run the definition. But an agent the
+ * basic-agents button just created has no runtime and nothing to load, because what it would load
+ * is the definition being published. So the ordinary path answers AGENT_OFFLINE forever, and
+ * crew-forge cannot give an agent it just made anything to be.
+ *
+ * WHY IT IS A SEPARATE DOOR AND NOT A FLAG ON PUBLISH. It refuses an agent that already has a
+ * published definition, so it can only ever ADD a first one and never replace one. That is what
+ * makes a weaker validator acceptable here: the worst case is a brand-new agent whose first
+ * definition a sibling approved, and the owner can see who that was.
+ *
+ * WHO VALIDATES, in order: the agent itself when it is connected (unchanged from publish, and the
+ * best answer); otherwise the sibling named in `validateWith`; otherwise any connected same-owner
+ * agent, chosen deterministically so a retry asks the same one. Whoever it was is recorded on the
+ * envelope as `validatedBy`, because "checked" and "checked by something else" are different
+ * claims. With nothing of this owner's connected at all, the refusal stands as before.
+ */
+export async function crewSeed(
+  deps: CrewDeps, caller: CrewCaller, identifier: string, doc: Doc, validateWith?: string,
+): Promise<{ ok: true; seeded: true; revision: number; publishedAt: string; key: string; validatedBy: string } | CrewRefusal> {
+  const target = await resolveCrewAgent(deps, caller, identifier);
+  if (!target.ok) return target;
+  const app = refuseAppGrant(caller);
+  if (app) return app;
+  const agent = target.agent;
+
+  // Seed means FIRST. An agent that already has one goes through publish, where its own runtime
+  // has the say — refusing here is what keeps this door from becoming a way around that.
+  const state = await readCrewState(deps.storage, agent);
+  if (state.published) {
+    return {
+      ok: false, status: 409, code: 'ALREADY_DEFINED',
+      message: `${agent.name} already has a definition, so this is not a first one. Change it with publish, which asks ${agent.name}'s own runtime first.`,
+    };
+  }
+
+  const chosen = await chooseSeedValidator(deps, caller, agent, validateWith);
+  if (!chosen.ok) return chosen;
+
+  const asked = await askCrew(deps.config, chosen.validator, 'crew.validate', { doc }, caller.principal, deps.config.connectTunnelRequestTimeoutMs);
+  if (!asked.ok) return asked;
+  const errors = errorsOf(asked.result);
+  if (!errors) return unreadableVerdict(chosen.validator, asked.result);
+  if (errors.length > 0) {
+    return {
+      ok: false, status: 422, code: 'CREW_INVALID',
+      message: `${chosen.validator.name}'s validator found ${errors.length} problem${errors.length === 1 ? '' : 's'} in this definition, so nothing was written. Fix them and seed again.`,
+      details: { errors, validated_by: chosen.validator.gaii },
+    };
+  }
+
+  const validatedBy = chosen.validator.gaii === agent.gaii ? undefined : chosen.validator.gaii;
+  const out = await publishCrewDef(deps, caller, agent, doc, validatedBy);
+  if (!out.ok) return out;
+  return { ok: true, seeded: true, revision: out.revision, publishedAt: out.publishedAt, key: out.key, validatedBy: chosen.validator.gaii };
+}
+
+/** The agent itself when it can answer, else a named sibling, else any connected one. */
+async function chooseSeedValidator(
+  deps: CrewDeps, caller: CrewCaller, agent: AgentRecord, validateWith?: string,
+): Promise<{ ok: true; validator: AgentRecord } | CrewRefusal> {
+  const mgr = getActiveConnectTunnelManager();
+  if (mgr?.isConnected(agent.gaii)) return { ok: true, validator: agent };
+
+  if (validateWith) {
+    const named = await resolveCrewAgent(deps, caller, validateWith);
+    if (!named.ok) return named;
+    if (!mgr?.isConnected(named.agent.gaii)) {
+      return {
+        ok: false, status: 409, code: 'AGENT_OFFLINE',
+        message: `${named.agent.name} is not connected, so it cannot check this definition. Start its runtime, or leave the validator unset and any connected agent of yours will do it.`,
+      };
+    }
+    return { ok: true, validator: named.agent };
+  }
+
+  // Sorted, so a retry asks the same runtime and two attempts cannot disagree for a reason nobody
+  // can see. The target is excluded: it was already tried above and is not connected.
+  const siblings = (await deps.storage.getAgentsByOwner(caller.owner))
+    .filter(a => a.gaii !== agent.gaii && !!mgr?.isConnected(a.gaii))
+    .sort((x, y) => x.gaii.localeCompare(y.gaii));
+  const validator = siblings[0];
+  if (!validator) {
+    return {
+      ok: false, status: 409, code: 'NO_VALIDATOR',
+      message: `${agent.name} has no runtime yet and none of your other agents is connected to check its first definition. Start your connector (aimeat connect serve) and try again.`,
+    };
+  }
+  return { ok: true, validator };
+}
+
 /** A kept revision goes back through the same gate and becomes a new revision. */
 export async function crewRestore(deps: CrewDeps, caller: CrewCaller, identifier: string, revision: number) {
   const target = await resolveCrewAgent(deps, caller, identifier);

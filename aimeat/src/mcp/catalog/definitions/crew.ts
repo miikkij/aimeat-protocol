@@ -62,4 +62,15 @@ export const crewTools: AimeatToolDefinition[] = [
             revision: { type: 'number', description: 'Instead of doc: the kept revision to republish (it becomes a new revision).' },
         },
     },
+    {
+        name: 'aimeat_crew_seed',
+        description: "Give an agent its FIRST crew definition when it has no runtime yet to check one. Use this after creating an agent (the basic-agents button, or your own device-authorized registration): the agent has nothing to load, so aimeat_crew_publish would answer AGENT_OFFLINE forever and the agent could never be given anything to be. REFUSED if the agent already has a definition — change that one with aimeat_crew_publish, where the agent's own runtime has the say. Validation still happens on a REAL runtime: the agent itself if it is connected, otherwise the same-owner agent you name in validate_with, otherwise any connected agent of the owner. Whoever it was is recorded on the published definition as validatedBy, so nobody later reads a sibling's verdict as the agent's own. Needs memory:write. Refused with NO_VALIDATOR when nothing of the owner's is connected at all.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            target_agent_name: AGENT_NAME,
+            doc: { ...DOC, required: true, description: `${DOC.description} The FIRST definition for this agent.` },
+            validate_with: { type: 'string', description: 'Which connected same-owner agent should check it. Omit and any connected one is used.' },
+        },
+    },
 ];

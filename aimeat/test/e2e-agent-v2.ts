@@ -91,6 +91,8 @@ interface FakeDaemon {
     ws: WebSocket;
     /** Called with the enrolment offer; whatever it returns is sent back as the invoke_result. */
     onEnrol: ((offer: any) => Promise<{ ok: boolean; result: unknown }>) | null;
+    /** Any other capability the node invokes on this principal (crew.validate and friends). */
+    onInvoke: ((capability: string, input: any) => Promise<{ ok: boolean; result: unknown }>) | null;
     close(): void;
 }
 
@@ -98,19 +100,21 @@ function openDaemon(token: string): Promise<FakeDaemon> {
     return new Promise((resolve, reject) => {
         const wsUrl = BASE.replace(/^http/, 'ws') + '/v1/connect/tunnel';
         const ws = new WebSocket(wsUrl, { headers: { Authorization: `Bearer ${token}` } });
-        const daemon: FakeDaemon = { ws, onEnrol: null, close: () => { try { ws.close(); } catch { /* already gone */ } } };
+        const daemon: FakeDaemon = { ws, onEnrol: null, onInvoke: null, close: () => { try { ws.close(); } catch { /* already gone */ } } };
         const timer = setTimeout(() => reject(new Error('tunnel did not welcome in time')), 10_000);
         ws.on('message', (data) => {
             let frame: any;
             try { frame = JSON.parse(data.toString()); } catch { return; }
             if (frame.type === 'welcome') { clearTimeout(timer); resolve(daemon); return; }
-            if (frame.type === 'invoke' && frame.capability === ENROL_CAPABILITY) {
-                const handler = daemon.onEnrol;
-                const answer = handler
-                    ? handler(frame.input)
-                    : Promise.resolve({ ok: false, result: { code: 'NO_HANDLER', message: 'nothing listening' } });
-                void answer.then(r => ws.send(JSON.stringify({ type: 'invoke_result', id: frame.id, ok: r.ok, result: r.result })));
-            }
+            if (frame.type !== 'invoke') return;
+            const answer = frame.capability === ENROL_CAPABILITY
+                ? (daemon.onEnrol
+                    ? daemon.onEnrol(frame.input)
+                    : Promise.resolve({ ok: false, result: { code: 'NO_HANDLER', message: 'nothing listening' } }))
+                : (daemon.onInvoke
+                    ? daemon.onInvoke(frame.capability, frame.input)
+                    : Promise.resolve({ ok: false, result: { code: 'NO_HANDLER', message: 'nothing listening' } }));
+            void answer.then(r => ws.send(JSON.stringify({ type: 'invoke_result', id: frame.id, ok: r.ok, result: r.result })));
         });
         ws.on('error', (e) => { clearTimeout(timer); reject(e); });
     });
@@ -673,6 +677,89 @@ async function run() {
             body: JSON.stringify({ agent_name: 'over-reacher', owner: a.owner, scopes: ['account:security'] }),
         });
         assert(r.body?.data?.auto_approved !== true, 'an escalating registration must wait for the owner');
+    });
+
+    // ── 8b. A first crew definition for an agent that has no runtime ─────────
+    // The chicken and egg: publish asks the TARGET's runtime to validate, and a brand-new agent
+    // has none, because what it would load is the definition being published.
+    const DOC = { agents: [{ name: 'writer', role: 'writes' }], tasks: [{ id: 'go', agent: 'writer', description: 'do {{ctx.prompt}}' }] };
+
+    await test('the old path is unchanged: publishing to an agent with no runtime still refuses', async () => {
+        const r = await json(`/v1/agents/${offlineA.name}/crew/publish`, {
+            method: 'POST', headers: authA, body: JSON.stringify({ doc: DOC }),
+        });
+        assert(r.status === 409, `expected 409, got ${r.status}`);
+        assert(r.body?.error?.code === 'AGENT_OFFLINE', `expected AGENT_OFFLINE, got ${r.body?.error?.code}`);
+    });
+
+    await test('seed gives that agent a first definition, checked by a connected sibling', async () => {
+        dA.onInvoke = async (capability, input) => capability === 'crew.validate'
+            ? { ok: true, result: { valid: true, errors: [], doc_seen: !!(input as any)?.doc } }
+            : { ok: false, result: { code: 'NO_HANDLER' } };
+        const r = await json(`/v1/agents/${offlineA.name}/crew/seed`, {
+            method: 'POST', headers: authA, body: JSON.stringify({ doc: DOC }),
+        });
+        assert(r.status === 200, `expected 200, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        assert(r.body.data.revision === 1, `a seed is revision 1, got ${r.body.data.revision}`);
+        assert(r.body.data.validated_by === daemonA.gaii, `the sibling that checked it should be named, got ${r.body.data.validated_by}`);
+    });
+
+    await test('who validated is recorded, so a sibling\'s verdict never reads as the agent\'s own', async () => {
+        const r = await json(`/v1/agents/${offlineA.name}/crew`, { headers: authA });
+        assert(r.status === 200, `crew read ${r.status}`);
+        assert(r.body.data.published?.validatedBy === daemonA.gaii,
+            `the envelope should carry validatedBy, got ${JSON.stringify(r.body.data.published?.validatedBy)}`);
+        assert(r.body.data.published?.revision === 1, 'and revision 1');
+    });
+
+    await test('seeding twice is refused: this door only ever adds a first definition', async () => {
+        const r = await json(`/v1/agents/${offlineA.name}/crew/seed`, {
+            method: 'POST', headers: authA, body: JSON.stringify({ doc: DOC }),
+        });
+        assert(r.status === 409, `expected 409, got ${r.status}`);
+        assert(r.body?.error?.code === 'ALREADY_DEFINED', `expected ALREADY_DEFINED, got ${r.body?.error?.code}`);
+    });
+
+    await test('the validator\'s errors come back verbatim and nothing is written', async () => {
+        const fresh = await addV1Agent(a.owner, a.ownerToken, 'needs-a-def');
+        dA.onInvoke = async () => ({ ok: true, result: { valid: false, errors: ["agents[0]: unknown tool 'nope'"] } });
+        const r = await json(`/v1/agents/${fresh.name}/crew/seed`, {
+            method: 'POST', headers: authA, body: JSON.stringify({ doc: DOC }),
+        });
+        assert(r.status === 422, `expected 422, got ${r.status}`);
+        assert(JSON.stringify(r.body?.error?.details?.errors ?? []).includes('unknown tool'), 'the runtime\'s own message, verbatim');
+        const after = await json(`/v1/agents/${fresh.name}/crew`, { headers: authA });
+        assert(after.body.data.published === null, 'a refused seed writes nothing');
+        dA.onInvoke = async () => ({ ok: true, result: { valid: true, errors: [] } });
+    });
+
+    await test('a named validator that is not connected is refused by name', async () => {
+        const fresh = await addV1Agent(a.owner, a.ownerToken, 'needs-a-def-two');
+        const r = await json(`/v1/agents/${fresh.name}/crew/seed`, {
+            method: 'POST', headers: authA,
+            body: JSON.stringify({ doc: DOC, validate_with: offlineA.name }),
+        });
+        assert(r.status === 409, `expected 409, got ${r.status}`);
+        assert(r.body?.error?.code === 'AGENT_OFFLINE', `expected AGENT_OFFLINE, got ${r.body?.error?.code}`);
+    });
+
+    await test('another owner cannot seed your agent', async () => {
+        const gaii = `${offlineA.name}#${a.owner}@${NODE_ID}`;
+        const r = await json(`/v1/agents/${encodeURIComponent(gaii)}/crew/seed`, {
+            method: 'POST', headers: authB, body: JSON.stringify({ doc: DOC }),
+        });
+        assert(r.status === 403, `expected 403, got ${r.status}`);
+    });
+
+    await test('with nothing of the owner\'s connected, seed says so plainly', async () => {
+        const d = await setupOwner('d');
+        const lonely = await addV1Agent(d.owner, d.ownerToken, 'all-alone');
+        const r = await json(`/v1/agents/${lonely.name}/crew/seed`, {
+            method: 'POST', headers: { Authorization: `Bearer ${d.ownerToken}` },
+            body: JSON.stringify({ doc: DOC }),
+        });
+        assert(r.status === 409, `expected 409, got ${r.status}`);
+        assert(r.body?.error?.code === 'NO_VALIDATOR', `expected NO_VALIDATOR, got ${r.body?.error?.code}`);
     });
 
     // ── 9. Run mode is readable and settable, and fenced ─────────────────────

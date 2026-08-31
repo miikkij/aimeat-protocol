@@ -20,9 +20,15 @@
  *   - POST   /v1/agents/:name/crew/validate   ask the runtime; returns its error list verbatim
  *   - POST   /v1/agents/:name/crew/try        start one trial run (202 + id); GET .../try/:id polls it
  *   - POST   /v1/agents/:name/crew/publish    validate on the runtime, then write revision N+1
+ *   - POST   /v1/agents/:name/crew/seed       a FIRST definition, validated by a sibling if needed
  *   - POST   /v1/agents/:name/crew/restore    republish a kept revision through the same gate
  * @usage app.use(agentCrewRouter(config, storage));
  * @version-history
+ *   v1.2.0 — 2026-09-01 — POST .../crew/seed. An agent the basic-agents button just created has no
+ *     runtime, and what it would load is the definition being published, so publish answers
+ *     AGENT_OFFLINE forever and crew-forge cannot give it anything to be. Seed refuses an agent
+ *     that already has a definition, so it can only ever add a first one; that is what makes a
+ *     sibling's verdict acceptable, and the sibling is recorded on the envelope.
  *   v1.1.0 — 2026-08-28 — The logic moved to services/crew-ops.ts so the MCP tools share it. Agents of
  *     the same owner may now read, validate, try and (with memory:write) draft, publish and restore,
  *     the way tags and mode already work: a chat session is an agent principal, and building an
@@ -39,7 +45,7 @@ import { requireAuth, requireScope } from '../auth/middleware.js';
 import { validateBody } from '../models/schemas.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import {
-  crewState, crewValidate, crewTryStart, crewTryPoll, crewDraftSave, crewDraftDiscard, crewPublish, crewRestore, crewData,
+  crewState, crewValidate, crewTryStart, crewTryPoll, crewDraftSave, crewDraftDiscard, crewPublish, crewRestore, crewSeed, crewData,
   type CrewCaller, type CrewRefusal,
 } from '../services/crew-ops.js';
 
@@ -49,6 +55,7 @@ const DraftBody = z.object({ doc: DocSchema });
 const ValidateBody = z.object({ doc: DocSchema });
 const TryBody = z.object({ doc: DocSchema, prompt: z.string().min(1).max(20_000) });
 const PublishBody = z.object({ doc: DocSchema });
+const SeedBody = z.object({ doc: DocSchema, validate_with: z.string().min(1).max(200).optional() });
 const RestoreBody = z.object({ revision: z.number().int().positive() });
 
 export function agentCrewRouter(config: AimeatConfig, storage: Storage): Router {
@@ -116,6 +123,15 @@ export function agentCrewRouter(config: AimeatConfig, storage: Storage): Router 
     const out = await crewPublish(deps, callerOf(req, 'rest.agent-crew.publish'), name(req), req.body.doc);
     if (!out.ok) return refuse(res, out);
     res.json(success(config.nodeId, { published: true, revision: out.revision, publishedAt: out.publishedAt, key: out.key }));
+  });
+
+  // POST /v1/agents/:name/crew/seed — the FIRST definition for an agent that has none, validated
+  // by a sibling when the agent itself has no runtime yet. Refuses an agent that already has one,
+  // so it can only ever add a first definition and never replace one. See crewSeed().
+  router.post('/v1/agents/:name/crew/seed', requireAuth(), requireScope('memory:write'), validateBody(SeedBody, config.nodeId), async (req, res) => {
+    const out = await crewSeed(deps, callerOf(req, 'rest.agent-crew.seed'), name(req), req.body.doc, req.body.validate_with);
+    if (!out.ok) return refuse(res, out);
+    res.json(success(config.nodeId, { seeded: true, revision: out.revision, publishedAt: out.publishedAt, key: out.key, validated_by: out.validatedBy }));
   });
 
   // POST /v1/agents/:name/crew/restore — a kept revision goes back through the same gate.
