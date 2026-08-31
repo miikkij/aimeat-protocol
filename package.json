@@ -97,6 +97,7 @@
     "check:liaison-surface": "cd aimeat && pnpm check:liaison-surface",
     "check:storage-parity": "cd aimeat && pnpm check:storage-parity",
     "check:audit-gates": "cd aimeat && pnpm check:audit-gates",
-    "audit:security": "cd aimeat && pnpm audit:security"
+    "audit:security": "cd aimeat && pnpm audit:security",
+    "outdated:libs": "cd aimeat && pnpm outdated:libs"
   }
 }

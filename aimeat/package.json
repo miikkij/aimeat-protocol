@@ -165,7 +165,8 @@
     "audit:report": "node ../security/semantic-audit/generate-report.mjs",
     "audit:triage": "node ../security/semantic-audit/ai-triage.mjs",
     "audit:full": "pnpm audit:triage && pnpm audit:report",
-    "audit:security": "tsx scripts/security-report.ts"
+    "audit:security": "tsx scripts/security-report.ts",
+    "outdated:libs": "tsx scripts/check-lib-freshness.ts"
   },
   "keywords": [
     "aimeat",

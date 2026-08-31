@@ -32,6 +32,7 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { AIMEAT_ROOT, REPO_ROOT, npmComponents, vendoredComponents } from './lib/license-inventory.js';
 import { scanComponents, type Finding } from './lib/osv-scan.js';
+import { libFreshness } from './check-lib-freshness.js';
 
 const SEVERITY_ORDER = ['CRITICAL', 'HIGH', 'MODERATE', 'MEDIUM', 'LOW'];
 
@@ -164,6 +165,14 @@ function externalScanners(sbomFile: string): ScannerResult[] {
   });
 }
 
+/** Days as something a person reads at a glance: 45d, 9mo, 5.4y. */
+function ageOf(days: number | null): string {
+  if (days === null) return '?';
+  if (days < 90) return `${days}d`;
+  if (days < 730) return `${Math.round(days / 30)}mo`;
+  return `${(days / 365).toFixed(1)}y`;
+}
+
 function bySeverity(a: Finding, b: Finding): number {
   const rank = (s: string) => {
     const at = SEVERITY_ORDER.indexOf(s.toUpperCase());
@@ -189,6 +198,9 @@ function main(): void {
   console.log('Running the OSV scan (npm tree + served browser libraries)…');
   void (async () => {
     const scan = await scanComponents([...npm, ...served]);
+
+    console.log('Reading how old the served browser libraries are…');
+    const libs = await libFreshness(served);
 
     console.log('Reading the outdated and deprecated list…');
     const stale = outdated();
@@ -293,7 +305,29 @@ function main(): void {
     md.push('The full inventory with every copyright holder and licence text is `THIRD-PARTY-NOTICES.md`.');
     md.push('');
 
-    md.push('## Freshness');
+    md.push('## Freshness — the browser libraries');
+    md.push('');
+    md.push('`pnpm outdated` cannot see these; `pnpm outdated:libs` is what produced this. A major');
+    md.push('behind is a decision rather than a defect — the major-pinned filename is the');
+    md.push('compatibility contract for every published app — but the age of the bytes is worth');
+    md.push('knowing, and nothing else here was telling anyone.');
+    md.push('');
+    md.push('| Library | We serve | Latest | Behind | Our version | Upstream |');
+    md.push('|---|---|---|---|---|---|');
+    for (const r of libs) {
+      const upstream = (r.upstreamAgeDays ?? 0) > 540
+        ? `quiet ${ageOf(r.upstreamAgeDays)}`
+        : `active (${ageOf(r.upstreamAgeDays)} ago)`;
+      md.push(`| \`${r.name}\` | ${r.ours} | ${r.latest} | ${r.behind === 'major' ? '**major**' : r.behind} | ${ageOf(r.ourAgeDays)} old | ${upstream} |`);
+    }
+    md.push('');
+    md.push(`${libs.filter(r => r.behind === 'current').length} current, `
+      + `${libs.filter(r => r.behind === 'minor' || r.behind === 'patch').length} a minor or patch behind, `
+      + `${libs.filter(r => r.behind === 'major').length} a major behind. `
+      + `${libs.filter(r => (r.ourAgeDays ?? 0) > 730).length} serve bytes more than two years old.`);
+    md.push('');
+
+    md.push('## Freshness — the npm tree');
     md.push('');
     if (deprecated.length > 0) {
       md.push('### Deprecated upstream');
@@ -327,6 +361,7 @@ function main(): void {
       deprecated: deprecated.map(([name, v]) => ({ name, version: v.current })),
       major: majors.map(([name, v]) => ({ name, current: v.current, latest: v.latest })),
       minor: minors.map(([name, v]) => ({ name, current: v.current, latest: v.latest })),
+      browserLibraries: libs,
     }, null, 2) + '\n', 'utf-8');
 
     console.log(`\n✓ ${mdFile}`);
