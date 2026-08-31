@@ -40,9 +40,15 @@ const OUTPUTS = [
   join(AIMEAT_ROOT, 'public', 'THIRD-PARTY-NOTICES.md'),
 ];
 
-/** Markdown table cells cannot carry a pipe or a newline. */
+/**
+ * Markdown table cells cannot carry a pipe or a newline.
+ *
+ * The backslash is escaped FIRST and that order is the whole point: escaping the pipe first turns
+ * an input `\|` into `\\|`, where the reader sees an escaped backslash followed by a live column
+ * separator, and the row breaks. CodeQL flagged it as js/incomplete-sanitization on 2026-08-31.
+ */
 function cell(text: string): string {
-  return text.replace(/\|/g, '\\|').replace(/\s*\n\s*/g, ' ').trim();
+  return text.replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\s*\n\s*/g, ' ').trim();
 }
 
 function link(name: string, url: string): string {
@@ -76,7 +82,13 @@ function licenceSections(components: Component[]): TextGroup[] {
     if (existing === undefined) groups.set(key, { text: c.licenseText, components: [c] });
     else existing.components.push(c);
   }
-  return [...groups.values()].sort((a, b) => a.components[0].name.localeCompare(b.components[0].name));
+  // Code-unit order, not localeCompare: collation differs between hosts, and a notices file that
+  // orders its sections differently on Linux than on Windows makes the --check gate disagree with
+  // itself for the same commit. That happened, and it turned main red with no explanation.
+  return [...groups.values()].sort((a, b) => {
+    const x = a.components[0].id, y = b.components[0].id;
+    return x < y ? -1 : x > y ? 1 : 0;
+  });
 }
 
 function render(served: Component[], npm: Component[]): string {
@@ -198,7 +210,21 @@ function main(): void {
     if (stale.length > 0) {
       console.error('✗ THIRD-PARTY-NOTICES.md is out of date:');
       for (const f of stale) console.error(`    ${f}`);
-      console.error('  A dependency changed and the notices did not follow. Run: pnpm gen:notices');
+      // SAY WHAT DIFFERS. Until 2026-08-31 this printed only "out of date", and when the gate went
+      // red in CI while passing on the developer's machine for the same commit, there was nothing
+      // to go on: the cause (a localeCompare sort that follows the host's collation) took a
+      // separate investigation to find. A gate that cannot say what it saw is not a gate.
+      const first = stale[0];
+      if (existsSync(first)) {
+        const have = readFileSync(first, 'utf-8').split('\n');
+        const want = content.split('\n');
+        const at = have.findIndex((line, i) => line !== want[i]);
+        console.error(`\n  First difference at line ${at + 1} of ${first}:`);
+        console.error(`    committed: ${JSON.stringify(have[at] ?? '(file ends here)')}`);
+        console.error(`    generated: ${JSON.stringify(want[at] ?? '(file ends here)')}`);
+        console.error(`  ${have.length} lines committed, ${want.length} generated.`);
+      }
+      console.error('\n  A dependency changed and the notices did not follow. Run: pnpm gen:notices');
       process.exit(1);
     }
     console.log(`✓ notices current: ${served.length} served components + ${npm.length} dependencies.`);

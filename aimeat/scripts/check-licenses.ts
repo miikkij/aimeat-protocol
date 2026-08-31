@@ -84,8 +84,15 @@ function evaluate(expression: string): boolean {
   return allowed.has(expr);
 }
 
+/**
+ * An exception is keyed by package NAME, not by the inventory id. An npm component's id carries its
+ * version (`web-push@3.6.7`) since 2026-08-31, when one component per version replaced one per
+ * package; matching on the id alone silently stopped recognising every npm exception the moment
+ * that changed, and the gate failed on an approval it already had.
+ */
 function exceptionFor(component: Component): { reason: string; approved: string } | undefined {
-  const hit = EXCEPTIONS.find(e => e.id === component.id && e.spdx === component.spdx);
+  const hit = EXCEPTIONS.find(e =>
+    (e.id === component.id || e.id === component.name) && e.spdx === component.spdx);
   return hit === undefined ? undefined : { reason: hit.reason, approved: hit.approved };
 }
 

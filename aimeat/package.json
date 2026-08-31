@@ -202,7 +202,6 @@
     "better-sqlite3": "^12.11.1",
     "busboy": "^1.6.0",
     "compression": "^1.8.1",
-    "consul": "^2.0.1",
     "croner": "^10.0.1",
     "express": "^5.2.1",
     "ini": "^7.0.0",

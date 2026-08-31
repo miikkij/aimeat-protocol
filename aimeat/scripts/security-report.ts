@@ -87,6 +87,83 @@ function deprecationReason(name: string, version: string): string {
   return ok && out.trim() ? out.trim() : '(deprecated, reason could not be read)';
 }
 
+interface ScannerResult {
+  name: string;
+  version: string;
+  /** clean | findings | not-installed | error — and `not-installed` is never rendered as a pass. */
+  status: 'clean' | 'findings' | 'not-installed' | 'error';
+  count: number;
+  detail: string;
+}
+
+/**
+ * Where an external scanner binary lives. PATH first; `AIMEAT_SCANNER_DIR` is the escape hatch for
+ * a machine where they are downloaded rather than installed, which is how they were first run here.
+ */
+function scannerPath(binary: string): string | null {
+  const dir = process.env.AIMEAT_SCANNER_DIR;
+  const candidates = [binary];
+  if (dir) candidates.unshift(`${dir}/${binary}`, `${dir}/${binary}/${binary}`);
+  for (const candidate of candidates) {
+    const probe = run(`"${candidate}" --version`);
+    if (probe.ok) return candidate;
+    const probe2 = run(`"${candidate}" version`);
+    if (probe2.ok) return candidate;
+  }
+  return null;
+}
+
+/** Count findings in whatever shape each scanner returns. */
+function countIn(name: string, json: string): number {
+  try {
+    const j = JSON.parse(json) as Record<string, unknown>;
+    if (name === 'trivy') {
+      const results = (j.Results ?? []) as Array<{ Vulnerabilities?: unknown[] }>;
+      return results.reduce((n, r) => n + (r.Vulnerabilities?.length ?? 0), 0);
+    }
+    if (name === 'grype') return ((j.matches ?? []) as unknown[]).length;
+    const results = (j.results ?? []) as Array<{ packages?: Array<{ vulnerabilities?: unknown[] }> }>;
+    return results.reduce((n, r) => n + (r.packages ?? []).reduce((m, p) => m + (p.vulnerabilities?.length ?? 0), 0), 0);
+  } catch {
+    return -1;
+  }
+}
+
+/**
+ * Run every third-party SBOM scanner that is present, against the SBOM this repo generates.
+ *
+ * A scanner that is NOT INSTALLED is reported as not installed, in the same table, in the same
+ * report. Silence must never read as a pass — that is the whole reason this section exists, and it
+ * is the failure mode of every "all green" summary that was never actually run.
+ */
+function externalScanners(sbomFile: string): ScannerResult[] {
+  const specs = [
+    { name: 'trivy', binary: 'trivy', args: `sbom "${sbomFile}" --scanners vuln --format json --quiet` },
+    { name: 'grype', binary: 'grype', args: `sbom:"${sbomFile}" -o json -q` },
+    { name: 'osv-scanner', binary: 'osv-scanner', args: `scan -L "${sbomFile}" --format json` },
+  ];
+
+  return specs.map(spec => {
+    const bin = scannerPath(spec.binary);
+    if (bin === null) {
+      return {
+        name: spec.name, version: '—', status: 'not-installed' as const, count: 0,
+        detail: 'not installed on this machine — this check did NOT run, which is not the same as passing',
+      };
+    }
+    const version = (run(`"${bin}" --version`).out || run(`"${bin}" version`).out).split('\n')[0].trim();
+    const { out } = run(`"${bin}" ${spec.args}`);
+    const count = countIn(spec.name, out.slice(out.indexOf('{')));
+    if (count < 0) return { name: spec.name, version, status: 'error' as const, count: 0, detail: 'ran, but its output could not be parsed' };
+    return {
+      name: spec.name, version,
+      status: count === 0 ? 'clean' as const : 'findings' as const,
+      count,
+      detail: count === 0 ? 'ran, no findings' : `ran, ${count} finding(s)`,
+    };
+  });
+}
+
 function bySeverity(a: Finding, b: Finding): number {
   const rank = (s: string) => {
     const at = SEVERITY_ORDER.indexOf(s.toUpperCase());
@@ -125,6 +202,10 @@ function main(): void {
     console.log('Writing the SBOM…');
     run('pnpm -s sbom');
 
+    console.log('Running the third-party SBOM scanners…');
+    const external = externalScanners(join(REPO_ROOT, 'sbom.cdx.json'));
+    for (const s of external) console.log(`  ${s.name}: ${s.detail}`);
+
     const auditTotal = Object.values(audit.counts).reduce((a, b) => a + b, 0);
     const md: string[] = [];
     md.push(`# AIMEAT security report`);
@@ -137,18 +218,41 @@ function main(): void {
 
     md.push('## Verdict');
     md.push('');
-    const needsPerson = scan.findings.length > 0 || auditTotal > 0 || !licences.ok;
-    md.push(needsPerson
-      ? '**Something needs a person.** See the sections below.'
-      : '**Nothing outstanding.** No known vulnerability in either database, licences accounted for.');
+    const externalFindings = external.filter(s => s.status === 'findings');
+    const externalBroken = external.filter(s => s.status === 'error');
+    const externalMissing = external.filter(s => s.status === 'not-installed');
+    const needsPerson = scan.findings.length > 0 || auditTotal > 0 || !licences.ok
+      || externalFindings.length > 0 || externalBroken.length > 0;
+
+    if (needsPerson) {
+      md.push('**Something needs a person.** See the sections below.');
+    } else if (externalMissing.length > 0) {
+      md.push(`**Clean on everything that ran, and ${externalMissing.length} scanner(s) did not run.**`);
+      md.push(`Not installed here: ${externalMissing.map(s => s.name).join(', ')}. Those checks are`);
+      md.push('unanswered rather than passed. Install them, or read this report knowing what it does');
+      md.push('not cover.');
+    } else {
+      md.push('**Everything ran and everything is clean.** Five independent checks: two vulnerability');
+      md.push('databases queried directly, three third-party scanners over the SBOM, and the licence');
+      md.push('gate. Every one of them ran on this tree, at this version, on the date above.');
+    }
     md.push('');
-    md.push(`| Check | Result |`);
-    md.push('|---|---|');
-    md.push(`| OSV.dev — npm tree **and** browser libraries | ${scan.findings.length === 0 ? `clean, ${scan.scanned} component versions` : `**${scan.findings.length} finding(s)**`} |`);
-    md.push(`| pnpm audit — npm advisory database | ${auditTotal === 0 ? `clean, ${audit.total} packages` : `**${auditTotal} advisory(ies)**`} |`);
-    md.push(`| Licences allowed, every served file claimed | ${licences.ok ? 'pass' : '**fail**'} |`);
-    md.push(`| Deprecated upstream | ${deprecated.length} |`);
-    md.push(`| Behind latest (major / minor-patch) | ${majors.length} / ${minors.length} |`);
+    md.push(`| Check | Ran | Result |`);
+    md.push('|---|---|---|');
+    md.push(`| OSV.dev API — npm tree **and** browser libraries | yes | ${scan.findings.length === 0 ? `clean, ${scan.scanned} component versions` : `**${scan.findings.length} finding(s)**`} |`);
+    md.push(`| \`pnpm audit\` — npm advisory database | yes | ${auditTotal === 0 ? `clean, ${audit.total} packages` : `**${auditTotal} advisory(ies)**`} |`);
+    for (const s of external) {
+      const ran = s.status === 'not-installed' ? '**NO**' : 'yes';
+      const result = s.status === 'not-installed'
+        ? '**not installed — this check is unanswered, not passed**'
+        : s.status === 'error' ? '**ran, output unreadable**'
+          : s.status === 'clean' ? `clean (${s.version})`
+            : `**${s.count} finding(s)** (${s.version})`;
+      md.push(`| \`${s.name}\` over the SBOM | ${ran} | ${result} |`);
+    }
+    md.push(`| Licences allowed, every served file claimed | yes | ${licences.ok ? 'pass' : '**fail**'} |`);
+    md.push(`| Deprecated upstream | yes | ${deprecated.length} |`);
+    md.push(`| Behind latest (major / minor-patch) | yes | ${majors.length} / ${minors.length} |`);
     md.push('');
 
     md.push('## What was scanned');
@@ -219,7 +323,7 @@ function main(): void {
     writeFileSync(mdFile, md.join('\n') + '\n', 'utf-8');
     writeFileSync(jsonFile, JSON.stringify({
       version, date: stamp, scanned: scan.scanned, osv: scan.findings,
-      pnpmAudit: audit.counts, licencesPass: licences.ok,
+      pnpmAudit: audit.counts, licencesPass: licences.ok, externalScanners: external,
       deprecated: deprecated.map(([name, v]) => ({ name, version: v.current })),
       major: majors.map(([name, v]) => ({ name, current: v.current, latest: v.latest })),
       minor: minors.map(([name, v]) => ({ name, current: v.current, latest: v.latest })),

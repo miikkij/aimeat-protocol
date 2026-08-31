@@ -102,12 +102,18 @@ function componentOf(c: Component, assets: VendoredAsset[]): CycloneComponent {
     properties.push({ name: `aimeat:sha256:${h.path}`, value: h.content });
   }
 
+  // The version a scanner reads comes from the purl whenever there is an npm purl, so the two can
+  // never disagree and the string is always a version rather than a description. Trivy skips a
+  // component whose version it cannot parse — it printed "invalid semantic version" twice and
+  // scanned 453 of 455 components without saying which two it had dropped.
+  const purl = purlOf(c);
+  const fromPurl = /^pkg:npm\/.+@([^@]+)$/.exec(purl);
   return {
     type: 'library',
     'bom-ref': `${c.origin}:${c.id}@${c.version}`,
     name: c.name,
-    version: c.version,
-    purl: purlOf(c),
+    version: fromPurl === null ? c.version : decodeURIComponent(fromPurl[1]),
+    purl,
     licenses: licencesOf(c.spdx),
     ...(refs.length > 0 ? { externalReferences: refs } : {}),
     ...(hashes.length === 1 ? { hashes: [{ alg: hashes[0].alg, content: hashes[0].content }] } : {}),

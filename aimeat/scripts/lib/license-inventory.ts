@@ -98,12 +98,19 @@ interface PnpmLicenseEntry {
   homepage?: string;
 }
 
-/** LICENSE / LICENCE / COPYING, whichever spelling the package chose, at the package root. */
+/**
+ * LICENSE / LICENCE / COPYING, whichever spelling the package chose, at the package root.
+ *
+ * The sort is not cosmetic. `readdirSync` returns entries in filesystem order, which is alphabetical
+ * on NTFS and hash order on ext4, so a package shipping both `LICENSE` and `LICENSE.md` gave one
+ * text on Windows and possibly the other on Linux — a second way for the same commit to generate
+ * two different notices files on two machines.
+ */
 function readLicenseFileIn(dir: string, pattern: RegExp): string | null {
   if (!dir || !existsSync(dir)) return null;
   let names: string[];
   try {
-    names = readdirSync(dir);
+    names = readdirSync(dir).sort();
   } catch {
     return null;
   }
@@ -147,26 +154,34 @@ export function npmComponents(options: { dev?: boolean } = {}): Component[] {
   const out: Component[] = [];
   for (const [spdx, entries] of Object.entries(byLicense)) {
     for (const entry of entries) {
-      const version = (entry.versions ?? []).join(', ') || 'unknown';
-      const dir = (entry.paths ?? [])[0] ?? '';
-      const licenseText = readLicenseFileIn(dir, /^(licen[cs]e|copying)(\.|$)/i);
-      const noticeText = readLicenseFileIn(dir, /^notice(\.|$)/i);
-      out.push({
-        id: entry.name,
-        name: entry.name,
-        version,
-        spdx,
-        copyright: entry.author ? `© ${entry.author}` : '',
-        homepage: entry.homepage ?? '',
-        source: `npm: ${entry.name}@${(entry.versions ?? [])[0] ?? ''}`,
-        licenseText,
-        noticeText,
-        modified: false,
-        origin: 'npm',
+      // ONE COMPONENT PER VERSION. pnpm groups a package's versions into one row, and joining them
+      // into "2.6.9, 4.4.3" produced a component whose `version` was not a version and whose purl
+      // named only the first — so a scanner checked one of the two and said nothing about the
+      // other. Found 2026-08-31 by running osv-scanner against the SBOM this file feeds.
+      const versions = (entry.versions ?? []).length > 0 ? (entry.versions as string[]) : ['unknown'];
+      versions.forEach((version, at) => {
+        const dir = (entry.paths ?? [])[at] ?? (entry.paths ?? [])[0] ?? '';
+        out.push({
+          id: `${entry.name}@${version}`,
+          name: entry.name,
+          version,
+          spdx,
+          copyright: entry.author ? `© ${entry.author}` : '',
+          homepage: entry.homepage ?? '',
+          source: `npm: ${entry.name}@${version}`,
+          licenseText: readLicenseFileIn(dir, /^(licen[cs]e|copying)(\.|$)/i),
+          noticeText: readLicenseFileIn(dir, /^notice(\.|$)/i),
+          modified: false,
+          origin: 'npm',
+        });
       });
     }
   }
-  out.sort((a, b) => a.name.localeCompare(b.name));
+  // NOT localeCompare. It sorts by the host's collation, so `@types/node` and `@noble/hashes` can
+  // land in a different order on Linux than on Windows — which is exactly how `pnpm check:notices`
+  // came to be red in CI and green on the developer's machine for the same commit, with the gate
+  // unable to say what differed. Code-unit order is the same everywhere.
+  out.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   return out;
 }
 

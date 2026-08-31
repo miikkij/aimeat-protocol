@@ -144,17 +144,22 @@ what a vulnerability feed matches on, so the licence work is what made the scan 
 - **After any of them:** `pnpm check:licenses && pnpm gen:notices`, then the guard tier on both
   backends. A dependency bump is a change to what users run.
 
-### `consul` is deprecated and staying, for now
+### The one outbound call that must not use safeFetch
 
-npm marks it "no longer supported" and names no successor. It is used for exactly three calls in
-`src/services/consul-config.ts` — read the KV prefix, write a key, ping the agent — so replacing the
-client with plain HTTP is about forty lines. Two things stop that being an obvious win. It cannot go
-through `safeFetch`, which blocks private and loopback addresses unless
-`AIMEAT_ALLOW_PRIVATE_EGRESS` is set, and a Consul agent is on a private address in every real
-deployment; and it cannot be verified here, because proving a Consul client needs a Consul, and this
-project does not stand up containers to test with. An unmaintained package is not a vulnerability —
-both scanners are clean on it — so the honest state is: known, parked, and worth doing the day
-there is an instance to test against. Do not rewrite it blind.
+`src/services/consul-config.ts` talks to the Consul agent with plain `fetch`, and that is deliberate:
+`safeFetch` refuses private and loopback addresses unless `AIMEAT_ALLOW_PRIVATE_EGRESS` is set, and a
+Consul agent is on one in every real deployment, so routing it through there would break the feature
+for everyone who uses it. The URL is `AIMEAT_CONSUL_URL` read from config at boot — no request,
+principal or stored record can influence it — which is the carve-out
+`security/outbound-fetch-exemptions.json` exists for, and the entry there says so.
+
+This came up when the deprecated `consul` package was removed (npm: "no longer supported", no
+successor named). Three calls were all it was used for. **The way to verify a rewrite like this
+without a container is a fake server that speaks the real protocol**, the way the SAML code is driven
+against a fake IdP that signs real responses: `test/unit/consul-config.test.ts` stands up an HTTP
+server answering as a Consul agent and proves the base64 decode, the ACL token header, the
+datacenter parameter, 404-means-no-keys, a null value being skipped rather than applied as empty,
+and Consul's `false` answer to a write being treated as the refusal it is.
 
 ### Updating a browser library under public/lib/
 
