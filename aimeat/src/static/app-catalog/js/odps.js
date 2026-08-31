@@ -19,6 +19,9 @@
  *   readOdpsToolFields · readOdpsAppDefaults · odpsSuggestForTool · odpsToggleDefaults · odpsToggleTool
  * @usage import { odpsStatusInner, odpsToolFieldsHtml, readOdpsToolFields } from './odps.js'
  * @version-history
+ *   v1.0.1 — 2026-08-31 — The odps.yaml link escapes the node address before it goes in the href.
+ *     It comes from the Settings field, so it was DOM text reinterpreted as markup, and it reached
+ *     the page through the Monetize editor and the whole detail view (CodeQL js/xss-through-dom).
  *   v1.0.0 — 2026-07-25 — Initial ODPS authoring surface (app-level defaults + per-tool block + AI draft).
  */
 import { escapeHtml } from './util.js';
@@ -259,7 +262,10 @@ export function odpsToolFieldsHtml(tool, offeringId, ctx) {
   var head = '<div class="od-tool-head">' +
     dtlBtn((odToolOpen ? '▾ ' : '▸ ') + t('odps.toolTitle'), 'window._launcher.odpsToggleTool()') +
     (offeringId
-      ? '<a class="od-link" href="' + apiBase() + '/v1/exchange/offerings/' + encodeURIComponent(offeringId) +
+      // The node address is whatever the person typed in Settings, so it is escaped like any other
+      // value on its way into an attribute: unescaped, a `"` in it closed the href and the rest of
+      // the string became markup (CodeQL js/xss-through-dom 1577/1578).
+      ? '<a class="od-link" href="' + escapeHtml(apiBase()) + '/v1/exchange/offerings/' + encodeURIComponent(offeringId) +
         '/odps.yaml" target="_blank" rel="noopener">' + escapeHtml(t('odps.viewYaml')) + '</a>'
       : '') +
   '</div>';

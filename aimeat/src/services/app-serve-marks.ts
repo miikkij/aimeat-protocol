@@ -39,6 +39,9 @@
  *   const body = applyServeMarks(app.data, {
  *     badge: true, provenance: prov, visibleLabel: { config, locale }, discovery, headMeta });
  * @version-history
+ *   v1.2.1 — 2026-08-31 — The head injection finds `<body …>` with utils/html-inject's findOpenTag
+ *     instead of `/<body[^>]*>/i`, which cost quadratic time on a document made of `<body` repeats
+ *     (CodeQL js/polynomial-redos 1579/1580). Same insertion point, so the goldens are unchanged.
  *   v1.2.0 — 2026-08-29 — `reviewedBy`: the named reviewer goes into the head as two meta tags
  *     and re-decides the visible label with editorial responsibility declared; `badge` is now
  *     the owner's switch at every call site (services/app-marks.ts). Existing goldens unchanged:
@@ -51,7 +54,7 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Locale } from '../i18n.js';
-import { injectBeforeClosingTag } from '../utils/html-inject.js';
+import { findOpenTag, injectBeforeClosingTag } from '../utils/html-inject.js';
 import { BADGE_MARK, badgeSnippet } from '../utils/app-badge.js';
 import { RESERVE_MARK, reserveSnippet } from '../utils/app-chrome-reserve.js';
 import { DISCOVERY_MARK, agentDiscoverySnippet, type AppDiscoverySpec } from '../utils/app-agent-discovery.js';
@@ -70,7 +73,8 @@ function escAttr(s: string): string {
 /** Before `</head>` when there is one; else before the body opens; else at the front. */
 function injectIntoHead(html: string, snippet: string): string {
   if (/<\/head\s*>/i.test(html)) return html.replace(/<\/head\s*>/i, (m) => snippet + m);
-  if (/<body[^>]*>/i.test(html)) return html.replace(/<body[^>]*>/i, (m) => m + snippet);
+  const body = findOpenTag(html, 'body');
+  if (body) return html.slice(0, body.end) + snippet + html.slice(body.end);
   return snippet + html;
 }
 

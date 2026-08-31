@@ -17,6 +17,10 @@
  *   the MCP tool, both through services/app-legal.ts.
  * @structure registerLegalRoutes(router, config, storage, canonicalOwner)
  * @version-history
+ *   v1.1.1 — 2026-08-31 — Ownership is claimed by an authenticated principal, not by `req.auth`
+ *     being set: in anonymous mode optionalAuth injects the node's anonymous owner, so an
+ *     unauthenticated caller was answered as the owner of that owner's apps and given the legal
+ *     drafts and the hidden-app existence check (invariant 6, audit gate 1576).
  *   v1.1.0 — 2026-08-29 — The served page carries the page's provenance record (headers, marks,
  *     label, lifted by the app's reviewer); readiness answers on money, never morsels; the `me`
  *     forms keep the query; app:write on the three authenticated routes.
@@ -45,6 +49,15 @@ export function registerLegalRoutes(
   storage: Storage,
   canonicalOwner: CanonicalOwner,
 ): void {
+  /**
+   * A principal that actually authenticated. `req.auth` being set is not that test: optionalAuth
+   * hands an anonymous caller an identity too, and that identity carries a REAL owner name — the
+   * node's anonymous owner. On a node whose anonymous owner had published the app, `if (!req.auth)`
+   * therefore answered "yes, this is the owner" to somebody who had presented nothing, and handed
+   * them the owner's own unpublished legal drafts (security invariant 6).
+   */
+  const authenticated = (req: Request): boolean => !!req.auth && req.auth.anonymous !== true;
+
   /** The app, or null; false when the viewer may not know it exists. */
   async function visibleApp(req: Request, owner: string, filename: string): Promise<AppRecord | null | 'hidden'> {
     let app = await storage.getAppByOwnerName(owner, filename);
@@ -52,14 +65,14 @@ export function registerLegalRoutes(
     if (!app) return null;
     if (app.operatorHidden) {
       const isOperator = !!req.auth?.roles?.includes('operator');
-      const isOwner = req.auth ? (await canonicalOwner(req)).owner === app.ownerName : false;
+      const isOwner = authenticated(req) ? (await canonicalOwner(req)).owner === app.ownerName : false;
       if (!isOperator && !isOwner) return 'hidden';
     }
     return app;
   }
 
   async function isOwnerOf(req: Request, app: AppRecord): Promise<boolean> {
-    if (!req.auth) return false;
+    if (!authenticated(req)) return false;
     return (await canonicalOwner(req)).owner === app.ownerName;
   }
 
