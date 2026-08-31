@@ -30,6 +30,11 @@
  * @usage
  *   text = applyAppHeadMeta(text, { owner, filename, appName, description, origin, baseUrl, tools });
  * @version-history
+ *   v1.4.1 — 2026-08-31 — The three places that located a tag in the author's document by regex
+ *     (`<meta name="robots">`, `<title>`, `<html>`) do it by index instead. Each of those patterns
+ *     rescanned forward from every occurrence of its own prefix, so a document made of repeated
+ *     `<title>` or `<html` cost quadratic time on a serving thread (CodeQL js/polynomial-redos,
+ *     alerts 1581 to 1584). Same tags found, same bytes written.
  *   v1.4.0 — 2026-08-29 — `installChip: false` leaves the install-chip script out (the owner's switch);
  *     `author` (the declared reviewer) becomes the JSON-LD author and editor; `legal` writes the
  *     app's own legal pages as <link rel="terms-of-service" | "privacy-policy" | "help">.
@@ -47,6 +52,8 @@
  *     for exactly the apps that needed it. Heading injection dropped, see rule 2 (phase 12b)
  *   v1.0.0 — 2026-07-28 — Initial (agent-readability phase 12)
  */
+
+import { findOpenTag } from './html-inject.js';
 
 export interface AppPricedTool {
   name: string;
@@ -122,6 +129,27 @@ function esc(t: string): string {
 
 const has = (html: string, re: RegExp) => re.test(html);
 
+/**
+ * Where the first tag opening with this exact literal starts and ends. An index scan, because
+ * `/<meta name="robots"[^>]*>/i` restarts its forward scan at every occurrence of the prefix, and
+ * the document is a file somebody uploaded (CodeQL js/polynomial-redos 1581/1582).
+ */
+function findLiteralTag(doc: string, opening: string): { start: number; end: number } | null {
+  const at = doc.toLowerCase().indexOf(opening.toLowerCase());
+  if (at < 0) return null;
+  const gt = doc.indexOf('>', at);
+  return gt < 0 ? null : { start: at, end: gt + 1 };
+}
+
+/** The `<title>…</title>` span, by index. Same reason: `[\s\S]*?` rescans from every `<title>`. */
+function findTitleSpan(doc: string): { start: number; end: number } | null {
+  const lower = doc.toLowerCase();
+  const open = lower.indexOf('<title>');
+  if (open < 0) return null;
+  const close = lower.indexOf('</title>', open + 7);
+  return close < 0 ? null : { start: open, end: close + 8 };
+}
+
 /** Add the tags the document does not already carry. Returns the input unchanged if it is not a document. */
 export function applyAppHeadMeta(text: string, spec: AppHeadSpec): string {
   // A single-file app is frequently a bare fragment. The one measured here opens with
@@ -149,10 +177,9 @@ export function applyAppHeadMeta(text: string, spec: AppHeadSpec): string {
   // to make through the switch, not the document's.
   if (!spec.indexable) {
     const noindex = `<meta name="robots" content="noindex, nofollow">`;
-    text = has(text, /<meta name="robots"[^>]*>/i)
-      ? text.replace(/<meta name="robots"[^>]*>/i, noindex)
-      : text;
-    if (!has(text, /<meta name="robots"/i)) add.push(noindex);
+    const own = findLiteralTag(text, '<meta name="robots"');
+    if (own) text = text.slice(0, own.start) + noindex + text.slice(own.end);
+    else add.push(noindex);
   }
 
   if (!has(text, /<meta name="description"/i)) {
@@ -170,8 +197,9 @@ export function applyAppHeadMeta(text: string, spec: AppHeadSpec): string {
   // and an owner who had followed advice to lengthen a short title saw no change at all.
   //
   // Only when they typed something. Left empty, the app's own title stands untouched.
-  if (spec.seoTitle && has(text, /<title>[\s\S]*?<\/title>/i)) {
-    text = text.replace(/<title>[\s\S]*?<\/title>/i, `<title>${esc(spec.seoTitle)}</title>`);
+  if (spec.seoTitle) {
+    const own = findTitleSpan(text);
+    if (own) text = text.slice(0, own.start) + `<title>${esc(spec.seoTitle)}</title>` + text.slice(own.end);
   }
   if (spec.seoDescription && has(text, /<meta name="description" content="[^"]*"\s*\/?>/i)) {
     text = text.replace(/<meta name="description" content="[^"]*"\s*\/?>/i,
@@ -303,9 +331,13 @@ export function applyAppHeadMeta(text: string, spec: AppHeadSpec): string {
   // asserting something plainly false to every search engine and screen reader that read it.
   // `spec.lang` carries what the app declares about ITSELF — its own `aimeat-locales` meta, or the
   // owner's override. 'en' is the last resort it always was, not the first answer.
-  if (hasHtmlEl && !/<html[^>]*\slang=/i.test(out)) {
+  const htmlTag = hasHtmlEl ? findOpenTag(out, 'html') : null;
+  if (htmlTag && !/\slang\s*=/i.test(out.slice(htmlTag.start, htmlTag.end))) {
     const lang = esc(spec.lang?.trim() || 'en');
-    out = out.replace(/<html(\s|>)/i, (m, tail: string) => `<html lang="${lang}"${tail === '>' ? '>' : ' '}`);
+    // Straight after `<html`, which is where the old replace put it: `<html lang="fi">` for a bare
+    // tag, `<html lang="fi" data-x>` for one that carries attributes.
+    const afterName = htmlTag.start + 5;
+    out = `${out.slice(0, afterName)} lang="${lang}"${out.slice(afterName)}`;
   }
 
   return out;

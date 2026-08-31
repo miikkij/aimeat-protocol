@@ -11,8 +11,13 @@
  *   the last occurrence in any well-formed document, since scripts live inside <body>.
  * @structure injectBeforeClosingTag(text, snippet) — pure string transform; last </body>,
  *   fallback last </html>, else append.
+ *   findOpenTag(text, name) — where an opening tag starts and ends, by index scan.
  * @usage import { injectBeforeClosingTag } from './html-inject.js';
  * @version-history
+ *   v1.1.0 — 2026-08-31 — findOpenTag(): locating `<body …>` or `<html …>` in an uploaded document
+ *     is an index scan now, not `/<body[^>]*>/`. That regex restarts its `[^>]*` at every `<body`
+ *     in the text, so a document written to contain a hundred thousand of them costs quadratic time
+ *     on a serving thread (CodeQL js/polynomial-redos, alerts 1579/1580/1584).
  *   v1.0.0 — 2026-07-16 — Initial: last-match injection extracted from app-badge/app-protect
  *     first-match replaces that broke apps whose JS contains '</body>'.
  */
@@ -39,4 +44,29 @@ export function injectBeforeClosingTag(text: string, snippet: string): string {
     const htmlIdx = lastMatchIndex(text, /<\/html\s*>/gi);
     if (htmlIdx >= 0) return text.slice(0, htmlIdx) + snippet + text.slice(htmlIdx);
     return text + snippet;
+}
+
+/**
+ * Where the first `<name …>` opening tag starts, and where it ends (one past its `>`). Null when
+ * the document has no such tag, or when the tag never closes.
+ *
+ * An index scan rather than `/<name[^>]*>/i`, and the difference is not style. That regex has no
+ * anchor, so the engine retries it at every position, and at each `<name` it finds it scans forward
+ * with `[^>]*` looking for a `>` — quadratic on a document built out of `<body<body<body…`. Every
+ * document these injectors touch is a file somebody uploaded, and a serving thread is the wrong
+ * place to spend that.
+ *
+ * The name must end where a tag name ends: whitespace, `/` or `>`. `<bodyguard>` is not a body.
+ */
+export function findOpenTag(text: string, name: string): { start: number; end: number } | null {
+    const lower = text.toLowerCase();
+    const needle = `<${name.toLowerCase()}`;
+    for (let at = lower.indexOf(needle); at >= 0; at = lower.indexOf(needle, at + needle.length)) {
+        const after = lower[at + needle.length];
+        if (after === undefined || (after !== '>' && after !== '/' && !/\s/.test(after))) continue;
+        const gt = lower.indexOf('>', at);
+        if (gt < 0) return null;
+        return { start: at, end: gt + 1 };
+    }
+    return null;
 }
