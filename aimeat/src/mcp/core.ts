@@ -361,6 +361,11 @@ export function registerCoreTools(
                     federate: a.federate ?? false,
                     tags: a.tags ?? [],
                     mode: a.mode ?? 'interactive',
+                    // How the agent is meant to be RUN, for a runtime assembling its roster:
+                    // 'spawn' (data here until work arrives) or 'resident'. Null means nobody has
+                    // said, which is NOT the same as 'spawn' — a runtime filtering for what it
+                    // should serve has to be able to tell those apart.
+                    run_mode: a.runMode ?? null,
                 })),
             });
         },

@@ -7597,6 +7597,18 @@ paths:
           schema:
             type: string
           description: 'Comma-separated optional projections. Currently supported: `stats`.'
+        - name: run_mode
+          in: query
+          schema:
+            type: string
+            enum: [spawn, resident]
+          description: |
+            Return only agents whose run mode is this. The roster read a fleet runtime does on a
+            timer: without it, it fetches every agent the account has and filters client-side.
+
+            An agent nobody has decided about reports `run_mode: null` and matches no filter value,
+            because absence is not `spawn`. An unrecognised value returns an empty list rather than
+            everything, so a filter that does not filter cannot go unnoticed.
       responses:
         '200':
           description: List of agents
