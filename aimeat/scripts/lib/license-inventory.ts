@@ -122,11 +122,15 @@ function readLicenseFileIn(dir: string, pattern: RegExp): string | null {
  * The production dependency tree as pnpm sees it. `--prod` matters: dev dependencies are the
  * toolchain and do not travel in the tarball, so listing them in a notices file would tell a
  * commercial reader they carry obligations they do not have.
+ *
+ * `{ dev: true }` includes them anyway, for the one question where they do count: a vulnerability
+ * in a build tool runs on the machine that builds a release, which is a supply-chain problem even
+ * though nothing ships.
  */
-export function npmComponents(): Component[] {
+export function npmComponents(options: { dev?: boolean } = {}): Component[] {
   let raw: string;
   try {
-    raw = execSync('pnpm licenses list --prod --json', {
+    raw = execSync(`pnpm licenses list ${options.dev === true ? '' : '--prod '}--json`, {
       cwd: AIMEAT_ROOT,
       encoding: 'utf-8',
       maxBuffer: 64 * 1024 * 1024,
