@@ -30,6 +30,9 @@
  * @structure registerBasicAgentsRoutes(router, config, storage)
  * @usage registerBasicAgentsRoutes(router, config, storage);
  * @version-history
+ *   v1.1.0 — 2026-08-31 — The GET moves to services/basic-agents.ts and drops to requireAuth(), so a
+ *     chat can ask what this account would get and hand the person the page to press it on. The POST
+ *     is untouched: creating agents stays with the account holder in person.
  *   v1.0.0 — 2026-08-31 — Initial (Agent v2, V1).
  */
 import type { Router } from 'express';
@@ -40,6 +43,7 @@ import { requireAuth, requireOwnerPrincipal } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { buildGAII } from '../../utils/gaii.js';
 import { BASIC_AGENTS } from '../../data/basic-agents.js';
+import { describeBasicAgents, daemonPrincipals } from '../../services/basic-agents.js';
 import { getActiveConnectTunnelManager } from '../../services/connect-tunnel.js';
 import { emitChange } from '../../services/event-bus.js';
 import { recordAccountEvent } from '../../services/account-events.js';
@@ -56,42 +60,31 @@ export const ENROL_CAPABILITY = 'aimeat.agents.enrol';
  */
 const ENROL_INVOKE_TIMEOUT_MS = 45_000;
 
-/**
- * A daemon principal is an AGENT principal. An owner's ecosystem apps hold tunnels too, and one of
- * those answering "create this person's agents" would be an app populating an account.
- */
-function daemonPrincipals(owner: string): string[] {
-  const tunnels = getActiveConnectTunnelManager();
-  if (!tunnels) return [];
-  return tunnels.principalsForOwner(owner).filter(p => !p.startsWith('eco:'));
-}
-
 export function registerBasicAgentsRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   // ── GET — what the set is, and whether it can be created right now ──
-  router.get('/v1/agents/v2/basic-agents', requireAuth(), requireOwnerPrincipal(), async (req, res) => {
-    const owner = req.auth!.owner;
-    const connected = daemonPrincipals(owner);
-    const existing = await storage.getAgentsByOwner(owner);
-    const byName = new Map(existing.map(a => [a.name, a]));
-
-    res.json(success(config.nodeId, {
-      daemon_connected: connected.length > 0,
-      connected_principals: connected,
-      agents: BASIC_AGENTS.map(t => {
-        const have = byName.get(t.name);
-        return {
-          name: t.name,
-          display_name: t.displayName,
-          description: t.description,
-          scopes: t.scopes,
-          mode: t.mode,
-          run_mode: t.runMode,
-          exists: !!have,
-          enrolled: !!have?.enrolledAt,
-        };
-      }),
-    }, [
-      { description: 'Create the ones that are missing', method: 'POST', url: '/v1/agents/v2/basic-agents' },
+  //
+  // requireAuth() and nothing more, deliberately, where the POST below is requireOwnerPrincipal().
+  // READING is not the act this feature guards: everything in the answer is already visible to a
+  // principal acting for this owner — the template is static, and which of the owner's agents exist
+  // and hold a tunnel comes back from GET /v1/agents. What an agent must not do is PRESS the button,
+  // and that gate is untouched. The relaxation is what lets a chat say "open this page and press
+  // it", which is the whole point of the tool surface over this.
+  //
+  // Scoped to req.auth.owner throughout, so no principal can read another account's state.
+  router.get('/v1/agents/v2/basic-agents', requireAuth(), async (req, res) => {
+    // An app grant is consent to USE this account, and an ecosystem app is a different principal
+    // class with its own onboarding. Neither has any business reading how this account's own agents
+    // are set up, and refusing them here is what keeps this door narrower than the fleet listing.
+    const roles = req.auth!.roles ?? [];
+    if (roles.includes('app') || roles.includes('ecosystem')) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED',
+        'This is for the account holder and their own agents. An app cannot read how your agents are set up.'));
+      return;
+    }
+    const view = await describeBasicAgents(config, storage, req.auth!.owner);
+    res.json(success(config.nodeId, view, [
+      { description: 'The owner presses this on their Agents page', method: 'GET', url: '/v1/profile?tab=agents' },
+      { description: 'Create the ones that are missing (owner in person)', method: 'POST', url: '/v1/agents/v2/basic-agents' },
     ]));
   });
 
