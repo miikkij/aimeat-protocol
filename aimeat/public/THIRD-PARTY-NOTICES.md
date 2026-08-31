@@ -85,7 +85,7 @@ tarball is. "Installed by the operator" means AIMEAT does not ship the file at a
 | [@ffmpeg/core (ffmpeg 5.1.4 compiled to WebAssembly)](https://ffmpeg.org) | 0.12.10 | GPL-2.0-or-later | Copyright (c) 2000-2022 the FFmpeg developers | installed by the operator | **see below** |
 | [world-atlas (Natural Earth 110m country shapes)](https://github.com/topojson/world-atlas) | 2.0.2 | ISC | Copyright 2013-2019 Michael Bostock; the underlying Natural Earth data is in the public domain | served by the node | notice only |
 | [yaml](https://eemeli.org/yaml/) | 2.9.0 | ISC | Copyright Eemeli Aro <eemeli@gmail.com> | served by the node | notice only |
-| [Preact](https://preactjs.com) | 10.25.4 | MIT | Copyright (c) 2015-present Jason Miller | served by the node | notice only |
+| [Preact](https://preactjs.com) | 10.29.8 | MIT | Copyright (c) 2015-present Jason Miller | served by the node | notice only |
 | [htm](https://github.com/developit/htm) | 3.1.1 | Apache-2.0 | Copyright (c) Jason Miller and the htm contributors | served by the node | notice only |
 | [minidenticons](https://github.com/laurentpayot/minidenticons) | 4.2.1 | MIT | Copyright (c) 2021 Laurent Payot | served by the node | notice only |
 | [Baloo 2, Bangers, Inter, Archivo, Archivo Black, Space Grotesk, Fraunces, JetBrains Mono, Fjalla One, DM Sans, VT323](https://fonts.google.com) | see fonts/LICENSE.md | OFL-1.1 | see fonts/LICENSE.md for the copyright holder of each family | served by the node | notice only |
@@ -9142,7 +9142,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### Preact 10.25.4
+### Preact 10.29.8
 
 ```text
 The MIT License (MIT)

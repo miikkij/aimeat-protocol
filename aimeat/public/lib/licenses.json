@@ -356,19 +356,19 @@
     {
       "id": "preact",
       "name": "Preact",
-      "version": "10.25.4",
+      "version": "10.29.8",
       "spdx": "MIT",
       "copyright": "Copyright (c) 2015-present Jason Miller",
       "homepage": "https://preactjs.com",
-      "source": "https://esm.sh/preact@10.25.4 (esbuild bundle; the version is in each file own banner)",
+      "source": "https://cdn.jsdelivr.net/npm/preact@10.29.8/dist/preact.mjs and hooks/dist/hooks.mjs — the package own ESM builds",
       "licenseFile": "LICENSES/preact.txt",
       "files": [
         "preact.mjs",
         "preact-hooks.mjs"
       ],
       "modified": false,
-      "purl": "pkg:npm/preact@10.25.4",
-      "note": "Held at 10.25.4 on purpose. 10.29.8 was tried on 2026-08-31 and broke the SPA outright: the whole app died with AIMEAT failed to start, because the esm.sh hooks build for that version does not share a preact instance with the one the importmap serves. Verified in a real browser, then reverted. No known vulnerability in 10.25.4; the upgrade needs a hooks build that works, not another attempt at the same one."
+      "purl": "pkg:npm/preact@10.29.8",
+      "note": "Both files come from the SAME upstream dist. That is the whole requirement, and getting it wrong killed the app once: on 2026-08-31 preact was taken from one esm.sh build variant and hooks from another, the two ended up with different options objects, and the SPA died with AIMEAT failed to start. hooks/dist/hooks.mjs imports the bare specifier preact, which the importmap resolves to the same module the page uses; a build that imports ./preact.mjs relatively does NOT work here, because the importmap stamps a ?v= cache-busting query and the relative path does not carry it."
     },
     {
       "id": "htm",
