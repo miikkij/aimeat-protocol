@@ -34,6 +34,13 @@
  *     discovery-file lifecycle, signal handling.
  * @usage Called by mcp/server.ts `runServe()` when `--http`/`--daemon` is set.
  * @version-history
+ *   v1.8.0 — 2026-08-31 — An agent can join a RUNNING daemon. The startup loop's body is
+ *     `attachRegistered()`, and the tunnel's `invoke` frame carries one capability the daemon
+ *     answers itself — `aimeat.agents.enrol` — which generates a key per agent, submits signed
+ *     cards over the socket it already holds, and calls `attachNewAgent()`. Adding an agent used to
+ *     mean a restart, and a restart drops every other agent's socket: 49 of them, measured on
+ *     production 2026-08-31. Credentials now come from `resolveToken()`, which mints for a v2 agent
+ *     and reads the stored bearer for a v1 one, so neither call site has to know which it holds.
  *   v1.0.0 — 2026-06-10 — Phase 4: initial loopback daemon (local MCP + REST
  *     proxy + long-poll push surface + discovery file + degraded fallback).
  *   v1.1.0 — 2026-06-10 — Add `POST /local/call/:tool` — deterministic
@@ -76,8 +83,10 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { ConnectTunnelClient } from '../tunnel-client.js';
-import { getToken } from '../keychain.js';
-import { getConfigDir } from '../config.js';
+import { resolveToken } from '../agent-key.js';
+import { getConfigDir, type AimeatPerAgentConfig } from '../config.js';
+import { AimeatClient } from '../api-client.js';
+import { handleEnrolOffer, ENROL_CAPABILITY } from '../enrolment.js';
 import type { AgentRegistry, RegisteredAgent } from '../agent-registry.js';
 import { startPollerForAgent } from './poller.js';
 import { AgentChannel, type SpaceRef } from './local-channel.js';
@@ -167,8 +176,13 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
   const channels = new Map<string, AgentChannel>();
   const invokeChannels = new Map<string, InvokeChannel>();
 
-  // ── One tunnel client per agent, with graceful degradation ──
-  for (const entry of registry.list()) {
+  /**
+   * Give ONE agent its channel and its tunnel. Extracted from the startup loop so the same code
+   * path serves an agent that arrives later: enrolment calls this on a running daemon, and nothing
+   * else has to be restarted or rebuilt. That is the whole point of the extraction — adding an
+   * agent used to mean a restart, and a restart drops every other agent's socket.
+   */
+  async function attachRegistered(entry: RegisteredAgent): Promise<void> {
     const ch = new AgentChannel(entry);
     channels.set(entry.agent, ch);
     // Server-initiated invokes (Crew tab validate/try) queue here and are answered back over the
@@ -178,9 +192,25 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
 
     const tunnel = new ConnectTunnelClient({
       nodeUrl: entry.config.node_url,
-      getToken: () => getToken(entry.agent, entry.owner),
+      // Not getToken(): a v2 agent has no stored bearer, it has a key and mints a credential per
+      // use. resolveToken answers for both kinds, so this line does not have to know which it is.
+      getToken: () => resolveToken(entry.agent, entry.owner, entry.config.node_url),
       label: `tunnel:${entry.agent}`,
-      onInvoke: (frame) => inv.handleInvoke(frame),
+      onInvoke: (frame) => {
+        // The one capability the DAEMON answers itself rather than offering to a crew runtime:
+        // taking on new agents. A crew cannot do it — it has no access to the keychain and no way
+        // to add a tunnel — and queueing it would answer NO_HANDLER to an owner pressing a button.
+        if (frame.capability === ENROL_CAPABILITY) {
+          const id = frame.id;
+          void handleEnrolOffer(frame.input, {
+            forward: (m, p, o) => tunnel.forward(m, p, o),
+            attach: (a) => attachNewAgent(a),
+            version: freshness.stamp?.version ?? undefined,
+          }).then(r => { if (id) tunnel.replyInvoke(id, r.ok, r.result); });
+          return;
+        }
+        inv.handleInvoke(frame);
+      },
       onDeliver: (kind, payload) => {
         if (kind === 'task_assigned') ch.handleTask(payload, 'deliver');
         else if (kind === 'workspace.record') ch.handleRecord(payload);
@@ -223,6 +253,32 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
       console.error(`[serve] ${entry.agent}@${entry.owner}: tunnel ${outcome} — degraded to direct HTTP + poll loop`);
       startPollerForAgent(entry);
     }
+  }
+
+  /**
+   * An agent the owner has just created and the node has just credentialled. Registered and attached
+   * on the running daemon: no restart, and nobody else's socket is touched.
+   *
+   * Its client is built with NO baked token on purpose. A v2 agent's credential is short-lived and
+   * comes from resolveToken(); a token frozen into the client at construction would be the exact
+   * thing this identity model removes, and it would go stale in an hour.
+   */
+  async function attachNewAgent(a: { agent: string; owner: string; config: AimeatPerAgentConfig }): Promise<void> {
+    if (registry.get(a.agent)) {
+      console.error(`[serve] ${a.agent}@${a.owner}: already served, leaving it alone`);
+      return;
+    }
+    const client = new AimeatClient(a.config.node_url);
+    const entry: RegisteredAgent = { agent: a.agent, owner: a.owner, client, config: a.config };
+    registry.add(entry);
+    await attachRegistered(entry);
+    writeDiscovery();
+    console.error(`[serve] ${a.agent}@${a.owner}: attached without a restart (${registry.size()} agents served)`);
+  }
+
+  // ── One tunnel client per agent, with graceful degradation ──
+  for (const entry of registry.list()) {
+    await attachRegistered(entry);
   }
 
   // ── Loopback HTTP server ──
@@ -530,7 +586,7 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
       // Degraded (or tunnel mid-reconnect): direct HTTP with the stored token.
       const url = new URL(entry.config.node_url.replace(/\/+$/, '') + req.path);
       for (const [k, v] of Object.entries(query)) url.searchParams.set(k, v);
-      const token = await getToken(entry.agent, entry.owner);
+      const token = await resolveToken(entry.agent, entry.owner, entry.config.node_url);
       const headers: Record<string, string> = { 'Content-Type': 'application/json', Connection: 'close' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
       const r = await fetch(url, { method: req.method, headers, body: body !== undefined ? JSON.stringify(body) : undefined });

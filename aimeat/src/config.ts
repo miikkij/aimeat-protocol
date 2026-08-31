@@ -267,6 +267,8 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     jwtTtlSeconds: parseInt(process.env.AIMEAT_JWT_TTL ?? '3600', 10),
     agentJwtTtlSeconds: parseInt(process.env.AIMEAT_AGENT_JWT_TTL ?? '7776000', 10), // 90 days
     ecoJwtTtlSeconds: parseInt(process.env.AIMEAT_ECO_JWT_TTL ?? '7776000', 10),     // 90 days
+    agentV2TokenTtlSeconds: parseInt(process.env.AIMEAT_AGENT_V2_TOKEN_TTL ?? '3600', 10),      // 1 hour
+    agentEnrolmentGrantTtlSeconds: parseInt(process.env.AIMEAT_AGENT_ENROLMENT_TTL ?? '600', 10), // 10 min
     accessTtlSeconds: parseInt(process.env.AIMEAT_ACCESS_TTL ?? '900', 10),          // 15 min
     refreshIdleDays: parseInt(process.env.AIMEAT_REFRESH_IDLE_DAYS ?? '30', 10),
     refreshAbsoluteDays: parseInt(process.env.AIMEAT_REFRESH_ABSOLUTE_DAYS ?? '90', 10),

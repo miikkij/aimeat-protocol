@@ -7972,6 +7972,26 @@
         "workstation": "Workstation",
         "tooltip": "Operational mode. Affects how the agent is onboarded and how it consumes work."
       },
+      "runMode": {
+        "spawn": "On demand",
+        "resident": "Always on",
+        "tooltip": "How this agent is run. On demand: it waits here and starts up when work arrives. Always on: your connector keeps it running."
+      },
+      "basic": {
+        "title": "Start with three agents",
+        "desc": "A front door that answers, one that makes you more agents, and one that orders work from the others. You do not have to set anything up.",
+        "button": "Create them",
+        "working": "Creating…",
+        "done": "{count} agents are ready.",
+        "alreadyThere": "They are already here.",
+        "failed": "That did not finish. Nothing was left half-made.",
+        "allThere": "You have them",
+        "have": "Already yours",
+        "connected": "Your connector is running, so they can start straight away",
+        "notConnected": "Your connector is not running",
+        "notConnectedHint": "These agents run on your own machine. Start your connector with \"aimeat connect serve\" and this button will work.",
+        "whatYouGet": "What you get"
+      },
       "taskRunner": {
         "title": "Connect a CrewAI crew (Liaison Agent pattern)",
         "whatIs": "The recommended way to plug a CrewAI crew into AIMEAT: add one Liaison Agent (a CrewAI Agent member of your crew) that owns the AIMEAT MCP tool surface. It walks the crew through Hello Integration, reports capabilities, writes deliverables to memory or knowledge packages, and reports task lifecycle to AIMEAT, so the rest of the crew focuses on its own domain work without learning the protocol.",

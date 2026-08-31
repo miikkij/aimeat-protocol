@@ -184,6 +184,15 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
 
   // ── Auth (mutable) ──
   { key: 'jwtTtlSeconds', dotPath: 'auth.jwt_ttl_seconds', envVar: 'AIMEAT_JWT_TTL', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 60, immutable: false, description: 'JWT token time-to-live in seconds', range: '60-86400' },
+  // Agent v2. Short on purpose: a key-holding agent mints a credential whenever it needs one, so a
+  // long life buys nothing and costs an attacker's replay window. The upper bound is a day rather
+  // than the ninety the v1 agent gets, because a node that sets this to ninety days has quietly
+  // rebuilt the credential model this one replaces.
+  { key: 'agentV2TokenTtlSeconds', dotPath: 'auth.agent_v2_token_ttl_seconds', envVar: 'AIMEAT_AGENT_V2_TOKEN_TTL', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 300 && (v as number) <= 86400, immutable: false, description: 'How long a key-and-card agent\'s credential lives, in seconds', range: '300-86400' },
+  // How long an unspent basic-agents enrolment grant stays usable. The daemon that will spend it is
+  // connected at the moment the button is pressed, so a longer window only lengthens the time a
+  // stolen grant id is worth something.
+  { key: 'agentEnrolmentGrantTtlSeconds', dotPath: 'auth.agent_enrolment_grant_ttl_seconds', envVar: 'AIMEAT_AGENT_ENROLMENT_TTL', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 60 && (v as number) <= 3600, immutable: false, description: 'How long an unspent agent-enrolment grant stays usable, in seconds', range: '60-3600' },
   // Immutable on purpose, and not only because the loader would hand this string-typed door a
   // string where the node reads a list: which organisations may sign in is a decision that belongs
   // to whoever runs the node, not to an operator session that could widen it in one PUT.

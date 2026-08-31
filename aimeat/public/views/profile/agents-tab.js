@@ -91,6 +91,7 @@ import { buildAgentPrompt, buildTaskRunnerPrompt, buildMcpOnboardingPrompt, PLAT
 import { loadAgentOrder, saveAgentOrder, UNGROUPED_ID, loadCollapsedGroups, saveCollapsedGroups, loadSeen, saveSeen, markTabSeen, effectiveOrderedNames, popOutAgent } from './agents/tab-helpers.js';
 import { renderFilterBar, ActiveTasksPanel, renderAgentGroups } from './agents/groups-render.js';
 import ScopesModal from './agents/scopes-modal.js';
+import BasicAgentsPanel from './agents/basic-agents-panel.js';
 import { swallowed } from '/js/swallowed.js';
 
 // The familiar GitHub "Octocat" mark. fill=currentColor so it inherits the link's themed color.
@@ -490,6 +491,10 @@ export default function AgentsTab({ session, showToast, onStats }) {
           shows the same panel for the person's FIRST agent, and a copy here would drift from it.
           Behaviour is unchanged — same requests, same scope presets, same verify calls. */''}
     <${AgentConsent} requests=${pendingRequests} onApprove=${handleApprove} onDeny=${handleDeny} />
+
+    ${/* The one-press road in. Above the connect panel on purpose: for somebody whose connector is
+          already running, this is the whole job, and the panel below is the long way round. */''}
+    <${BasicAgentsPanel} session=${session} showToast=${showToast} onCreated=${loadData} />
 
     ${connectExpanded && html`
       <div class="pf-agd-connect-content">

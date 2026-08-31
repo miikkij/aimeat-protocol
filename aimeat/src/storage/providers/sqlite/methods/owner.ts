@@ -174,8 +174,9 @@ export const ownerMethods = {
     try {
       this.db.prepare(
         `INSERT INTO agents (gaii, name, owner, displayName, description, capabilities, publicKey, trustScore, morselBalance, createdAt, lastSeen, semantic, allowedOrigins, defaultScopes, federate,
-         webhookUrl, webhookSecret, webhookEnabled, webhookLastSuccess, webhookLastFailure, webhookFailCount, platform, platformVersion, platformDetectedBy, model, modelDetectedBy, tags, mode, maxConcurrentTasks, consoleUrl, registeredBy)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         webhookUrl, webhookSecret, webhookEnabled, webhookLastSuccess, webhookLastFailure, webhookFailCount, platform, platformVersion, platformDetectedBy, model, modelDetectedBy, tags, mode, maxConcurrentTasks, consoleUrl, registeredBy,
+         runMode, identityVersion, cardJws, cardIssuedAt, enrolledAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         agent.gaii, agent.name, agent.owner,
         agent.displayName ?? null, agent.description ?? null,
@@ -195,6 +196,11 @@ export const ownerMethods = {
         agent.maxConcurrentTasks ?? 1,
         agent.consoleUrl ?? null,
         agent.registeredBy ?? null,
+        agent.runMode ?? null,
+        agent.identityVersion ?? null,
+        agent.cardJws ?? null,
+        agent.cardIssuedAt ?? null,
+        agent.enrolledAt ?? null,
       );
       return agent;
     } catch (err: unknown) {
@@ -242,7 +248,8 @@ export const ownerMethods = {
        modulesLoaded = ?, agentLimitations = ?, languages = ?,
        webhookUrl = ?, webhookSecret = ?, webhookEnabled = ?, webhookLastSuccess = ?, webhookLastFailure = ?, webhookFailCount = ?,
        platform = ?, platformVersion = ?, platformDetectedBy = ?, model = ?, modelDetectedBy = ?, tags = ?, mode = ?, maxConcurrentTasks = ?,
-       dailySpendLimit = ?, scheduleConstraintDefaults = ?, consoleUrl = ?, registeredBy = ?
+       dailySpendLimit = ?, scheduleConstraintDefaults = ?, consoleUrl = ?, registeredBy = ?,
+       runMode = ?, identityVersion = ?, cardJws = ?, cardIssuedAt = ?, enrolledAt = ?
        WHERE gaii = ?`
     ).run(
       updated.name, updated.owner,
@@ -275,6 +282,11 @@ export const ownerMethods = {
       // key through generically, and a column one backend silently refuses is a worse trap than a
       // rule stated in one place.
       updated.registeredBy ?? null,
+      updated.runMode ?? null,
+      updated.identityVersion ?? null,
+      updated.cardJws ?? null,
+      updated.cardIssuedAt ?? null,
+      updated.enrolledAt ?? null,
       gaii,
     );
     return updated;
@@ -422,6 +434,11 @@ export const ownerMethods = {
     if (row.scheduleConstraintDefaults) record.scheduleConstraintDefaults = JSON.parse(row.scheduleConstraintDefaults as string);
     if (row.consoleUrl) record.consoleUrl = row.consoleUrl as string;
     if (row.registeredBy) record.registeredBy = row.registeredBy as string;
+    if (row.runMode) record.runMode = row.runMode as AgentRecord['runMode'];
+    if (row.identityVersion != null) record.identityVersion = row.identityVersion as 1 | 2;
+    if (row.cardJws) record.cardJws = row.cardJws as string;
+    if (row.cardIssuedAt) record.cardIssuedAt = row.cardIssuedAt as string;
+    if (row.enrolledAt) record.enrolledAt = row.enrolledAt as string;
     return record;
   },
 

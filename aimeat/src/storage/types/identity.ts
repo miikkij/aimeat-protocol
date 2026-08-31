@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Identity + principal record types (owners, agents, ecosystem apps, GHII, sessions, personal nodes, agent activity). Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 — 2026-08-31 — Agent v2 identity: AgentRecord.runMode (spawn/resident, stored and shown,
+ *     never enforced), identityVersion, cardJws/cardIssuedAt/enrolledAt, and the
+ *     AgentEnrolmentGrantRecord one button press produces.
  *   v1.3.0 — 2026-08-23 — OwnerRecord.disabledAt/disabledBy/managedBy: the first "account exists
  *     but cannot act" state (BR-04 deactivation), and the SSO-connection fence for SCIM-managed
  *     accounts. Until now the only off switch an account had was erasure.
@@ -135,6 +138,65 @@ export interface AgentRecord {
    * it is the one that asked for it.
    */
   registeredBy?: string | null;
+  /**
+   * How this agent is meant to be RUN. `spawn` (the default for anything created the v2 way) means
+   * the agent is data here until work arrives and its runtime starts a worker for the job, which
+   * then unwinds; `resident` means the runtime has to keep it up.
+   *
+   * The node stores this and shows it. It does not enforce it, exactly as it does not enforce
+   * `maxConcurrentTasks`: the runtime is the only party that can honour either, and a server-side
+   * check would be a second opinion about a process the server does not run. Absent = the agent
+   * predates the field and nobody has said, which is not the same as `spawn`.
+   */
+  runMode?: 'spawn' | 'resident';
+  /**
+   * Which identity mechanics this agent's credential uses. 1 (or absent) is the device-authorization
+   * agent whose proof is a long-lived JWT in a keychain; 2 brings its own Ed25519 key, pinned here at
+   * enrolment, and exchanges a signed assertion for a short-lived token per use.
+   *
+   * The two paths run side by side. Nothing in the v1 path reads this field, which is the point: an
+   * existing agent is untouched, and a v2 door refuses anything that is not marked 2.
+   */
+  identityVersion?: 1 | 2;
+  /**
+   * The agent's card as a compact JWS (RFC 7515), signed by the agent's own key — what it is, what it
+   * can do, and the verification key, in a document anyone can check against the published JWKS
+   * without asking this node whether to believe it. Null until the agent enrols.
+   */
+  cardJws?: string | null;
+  /** When the card in `cardJws` says it was issued (the card's own claim, re-read on every submit). */
+  cardIssuedAt?: string | null;
+  /** When this agent's key was pinned and its card accepted. Null for an agent that never enrolled. */
+  enrolledAt?: string | null;
+}
+
+/**
+ * AgentEnrolmentGrantRecord — the short-lived permission one button press creates, and nothing else.
+ *
+ * The owner pressing "create my basic agents" IS the human approval in this flow, and this record is
+ * what that press produces: a named list of agents, for one owner, that a daemon may enrol ONCE
+ * within a few minutes. It is deliberately not a standing power — a daemon holding a grant cannot
+ * mint a sibling that is not on the list, cannot spend it twice, and cannot spend it for another
+ * owner.
+ *
+ * `createdBy` is the principal the press came from (the owner), `usedBy` the daemon principal that
+ * spent it. Both are recorded because "who asked" and "who carried it out" are different questions,
+ * and here the second one is a machine.
+ */
+export interface AgentEnrolmentGrantRecord {
+  id: string;
+  /** Bare owner name. Every check in the enrolment path compares against THIS, never the request. */
+  owner: string;
+  /** The exact agent names this grant covers. A card for anything else is refused. */
+  agents: string[];
+  /** The principal that pressed the button (the owner's bare name). */
+  createdBy: string;
+  createdAt: string;
+  expiresAt: string;
+  /** Set the moment the grant is spent. A second submit finds it here and is refused. */
+  usedAt?: string | null;
+  /** The daemon principal (GAII) that spent it. */
+  usedBy?: string | null;
 }
 
 /**

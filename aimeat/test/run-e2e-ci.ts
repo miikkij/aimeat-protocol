@@ -210,6 +210,11 @@ const ALL_SUITES = [
     // A fleet concierge ending the agents it created, and the three conditions that let it — each
     // one proven load-bearing on its own, because two of them are individually far too wide.
     'test/e2e-agent-delete-by-sibling.ts',
+    // Agent v2: the key-and-card identity and the one button it exists to make work. Opens a REAL
+    // tunnel socket, because the whole point of the enrolment path is that the daemon is ALREADY
+    // connected — a mock would prove the handler and not the thing. Carries the cross-owner,
+    // scope-escalation, replay, forged-card and grant-reuse refusals.
+    'test/e2e-agent-v2.ts',
     // Does an open page hear about work an agent does? 21 of the 31 writing tool files emitted no
     // SSE change domain at all, so the write landed and the screen stayed as it was.
     'test/e2e-mcp-sse-parity.ts',

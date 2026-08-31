@@ -7739,6 +7739,26 @@
         "workstation": "Puesto de trabajo",
         "tooltip": "Modo de funcionamiento. Cambia cómo se da de alta el agente y cómo consume trabajo."
       },
+      "runMode": {
+        "spawn": "Bajo demanda",
+        "resident": "Siempre activo",
+        "tooltip": "Cómo se ejecuta este agente. Bajo demanda: espera aquí y arranca cuando llega trabajo. Siempre activo: tu conector lo mantiene en marcha."
+      },
+      "basic": {
+        "title": "Empieza con tres agentes",
+        "desc": "Una puerta de entrada que responde, uno que te crea más agentes y otro que encarga trabajo a los demás. No tienes que configurar nada.",
+        "button": "Créalos",
+        "working": "Creando…",
+        "done": "Ya tienes {count} agentes listos.",
+        "alreadyThere": "Ya están aquí.",
+        "failed": "Esto no llegó a terminar. No quedó nada a medias.",
+        "allThere": "Ya los tienes",
+        "have": "Ya es tuyo",
+        "connected": "Tu conector está en marcha, así que pueden ponerse a trabajar enseguida",
+        "notConnected": "Tu conector no está en marcha",
+        "notConnectedHint": "Estos agentes se ejecutan en tu propio ordenador. Arranca el conector con \"aimeat connect serve\" y este botón funcionará.",
+        "whatYouGet": "Lo que recibes"
+      },
       "taskRunner": {
         "title": "Conectar un equipo de CrewAI (patrón del agente enlace)",
         "whatIs": "La forma recomendada de enchufar un equipo de CrewAI a AIMEAT: añade un agente enlace (un Agent de CrewAI que es miembro de tu equipo) que se queda con la superficie de herramientas MCP de AIMEAT. Lleva al equipo por Hello Integration, declara sus capacidades, escribe las entregas en memoria o en paquetes de conocimiento, y le informa a AIMEAT del ciclo de vida de las tareas, para que el resto del equipo se ocupe de lo suyo sin aprenderse el protocolo.",

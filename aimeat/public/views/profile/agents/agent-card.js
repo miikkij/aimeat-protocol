@@ -5,6 +5,9 @@
  * @description Agent card component with collapsed/expanded states,
  *   Two-Zone Header (identity + state-dependent status), and tab bar.
  * @version-history
+ *   v1.24.0 -- 2026-08-31 -- Run-mode badge beside the mode badge: spawn (data on the node until
+ *     work arrives) or resident (the runtime keeps it up). Shown only when the field is set, because
+ *     an agent nobody has decided about must not be displayed as though somebody had.
  *   v1.23.0 -- 2026-08-28 -- Crew tab (tab-crew.js): a JSON crew definition for the agent, validated
  *     and tried by the agent's own runtime over the tunnel, published to crews.registry.<agent>.
  *   v1.22.0 -- 2026-08-13 -- Footer link through to wherever the agent actually runs, when its host
@@ -270,6 +273,7 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
           </div>
           <div class="pf-agd-zone1-badges">
             ${renderModeBadge(agent)}
+            ${renderRunModeBadge(agent)}
             ${renderPlatformBadge(onboarding)}
             ${renderModelBadge(agent)}
             ${renderReadinessBadge(state, onboarding)}
@@ -588,6 +592,17 @@ function renderModeBadge(agent) {
   const mode = agent.mode || 'interactive';
   const label = t(`profile.agents.mode.${mode}`) || mode;
   return html`<span class="pf-agd-badge pf-agd-badge--mode pf-agd-badge--mode-${mode}" title=${t('profile.agents.mode.tooltip') || ''}>${label}</span>`;
+}
+
+/**
+ * How the agent is meant to be RUN, when anyone has said. Absent on every agent that predates the
+ * field, and absence is not 'spawn' — an agent nobody has decided about should not be shown as
+ * though somebody had, so there is no badge at all rather than a guessed one.
+ */
+function renderRunModeBadge(agent) {
+  const runMode = agent.run_mode;
+  if (!runMode) return '';
+  return html`<span class="pf-agd-badge pf-agd-badge--run pf-agd-badge--run-${runMode}" title=${t('profile.agents.runMode.tooltip') || ''}>${t(`profile.agents.runMode.${runMode}`) || runMode}</span>`;
 }
 
 // Editable tag strip shown in the expanded card header. The same owner-managed

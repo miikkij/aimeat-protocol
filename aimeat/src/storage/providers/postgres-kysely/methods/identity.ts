@@ -7,6 +7,9 @@
  *   RevokedToken tables. These are the methods the server's anonymous-identity bootstrap and the
  *   register→token→request path exercise. Mappers are module-local (row → *Record).
  * @version-history
+ *   2026-08-31 — Agent v2 identity on create and read: runMode, identityVersion, cardJws,
+ *     cardIssuedAt, enrolledAt (migration 0058). updateAgent needs nothing — it passes unknown keys
+ *     through generically.
  *   2026-08-23 — Owner lifecycle: disabledAt/disabledBy/managedBy on read and update (migration
  *     0047). Null is a meaningful update value here — reactivation clears the flag.
  *   2026-08-13 — registeredBy on create and on read (migration 0035).
@@ -57,6 +60,9 @@ function toAgentRecord(r: Selectable<Agent>): AgentRecord {
     tags: arr(r.tags), mode: (r.mode ?? 'interactive') as AgentRecord['mode'], maxConcurrentTasks: r.maxConcurrentTasks ?? 1,
     dailySpendLimit: r.dailySpendLimit ?? undefined,
     consoleUrl: r.consoleUrl ?? undefined, registeredBy: r.registeredBy ?? undefined,
+    runMode: (r.runMode ?? undefined) as AgentRecord['runMode'],
+    identityVersion: (r.identityVersion ?? undefined) as AgentRecord['identityVersion'],
+    cardJws: r.cardJws ?? null, cardIssuedAt: r.cardIssuedAt ?? null, enrolledAt: r.enrolledAt ?? null,
     scheduleConstraintDefaults: (r.scheduleConstraintDefaults ?? undefined) as AgentRecord['scheduleConstraintDefaults'],
     createdAt: iso(r.createdAt), lastSeen: iso(r.lastSeen),
   };
@@ -142,6 +148,8 @@ export const identityMethods = {
       webhookLastFailure: a.webhookLastFailure ? new Date(a.webhookLastFailure) : null, webhookFailCount: a.webhookFailCount ?? 0,
       platform: a.platform ?? null, platformVersion: a.platformVersion ?? null, platformDetectedBy: a.platformDetectedBy ?? null,
       model: a.model ?? null, modelDetectedBy: a.modelDetectedBy ?? null, consoleUrl: a.consoleUrl ?? null, registeredBy: a.registeredBy ?? null,
+      runMode: a.runMode ?? null, identityVersion: a.identityVersion ?? null,
+      cardJws: a.cardJws ?? null, cardIssuedAt: a.cardIssuedAt ?? null, enrolledAt: a.enrolledAt ?? null,
       tags: a.tags ?? [], createdAt: new Date(a.createdAt), lastSeen: new Date(a.lastSeen),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any).returningAll().execute();
