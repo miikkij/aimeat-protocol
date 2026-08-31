@@ -79,6 +79,8 @@ export interface LibRow {
   ourAgeDays: number | null;
   /** Days since ANY release — whether upstream is still alive. */
   upstreamAgeDays: number | null;
+  /** The component that replaces this one, when this file is frozen on purpose. */
+  supersededBy?: string;
   note: string;
 }
 
@@ -107,7 +109,10 @@ export async function libFreshness(components: Component[]): Promise<LibRow[]> {
       name: parsed.name,
       ours: parsed.version,
       latest: info.latest,
-      behind: behindBy(parsed.version, info.latest),
+      // A file kept only so already-published apps keep working is behind ON PURPOSE. Printing it
+      // as 'major' forever would train everyone to ignore the column that matters.
+      behind: c.supersededBy ? 'frozen' : behindBy(parsed.version, info.latest),
+      supersededBy: c.supersededBy,
       ourAgeDays: daysSince(info.time[parsed.version], now),
       upstreamAgeDays: daysSince(info.time[info.latest], now),
       note: c.fetched === true ? 'installed by the operator, not shipped by AIMEAT' : '',
@@ -133,7 +138,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const order = { major: 0, minor: 1, patch: 2, unknown: 3, current: 4 } as Record<string, number>;
+  const order = { major: 0, minor: 1, patch: 2, unknown: 3, current: 4, frozen: 5 } as Record<string, number>;
   rows.sort((a, b) => (order[a.behind] ?? 9) - (order[b.behind] ?? 9) || (b.ourAgeDays ?? 0) - (a.ourAgeDays ?? 0));
 
   console.log('\nBrowser libraries served from /lib/ — nothing else looks at these\n');
@@ -146,9 +151,10 @@ async function main(): Promise<void> {
       + r.latest.padEnd(14) + ' '
       + r.behind.padEnd(8) + ' '
       + years(r.ourAgeDays).padEnd(13) + ' '
-      + (r.upstreamAgeDays !== null && r.upstreamAgeDays > STALE_DAYS
-        ? `last release ${years(r.upstreamAgeDays)} ago`
-        : `active (${years(r.upstreamAgeDays)} ago)`),
+      + (r.behind === 'frozen' ? 'kept for published apps -> ' + r.supersededBy
+        : r.upstreamAgeDays !== null && r.upstreamAgeDays > STALE_DAYS
+          ? `last release ${years(r.upstreamAgeDays)} ago`
+          : `active (${years(r.upstreamAgeDays)} ago)`),
     );
   }
 
@@ -156,10 +162,11 @@ async function main(): Promise<void> {
   const small = rows.filter(r => r.behind === 'minor' || r.behind === 'patch');
   const current = rows.filter(r => r.behind === 'current');
   const stale = rows.filter(r => (r.upstreamAgeDays ?? 0) > STALE_DAYS);
-  const ancient = rows.filter(r => (r.ourAgeDays ?? 0) > 365 * 2);
+  const frozen = rows.filter(r => r.behind === 'frozen');
+  const ancient = rows.filter(r => (r.ourAgeDays ?? 0) > 365 * 2 && r.behind !== 'frozen');
 
   console.log('\n  ' + '-'.repeat(88));
-  console.log(`  ${current.length} current · ${small.length} a minor or patch behind · ${majors.length} a major behind`);
+  console.log(`  ${current.length} current · ${small.length} a minor or patch behind · ${majors.length} a major behind · ${frozen.length} frozen for published apps`);
   console.log(`  ${ancient.length} serving bytes more than two years old · ${stale.length} with no upstream release in ${Math.round(STALE_DAYS / 30)} months`);
   console.log('\n  A major behind is a DECISION, not a defect: the major-pinned filename is the');
   console.log('  compatibility contract for every published app (public/lib/VENDORED.md). A minor or');

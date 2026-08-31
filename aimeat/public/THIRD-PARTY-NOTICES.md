@@ -31,11 +31,27 @@ WEAK COPYLEFT, and the one place on this node where that matters. p5 is served u
 
 **Complete source of the exact version:** https://registry.npmjs.org/p5/-/p5-1.11.13.tgz
 
+### p5.js — LGPL-2.1-only
+
+Weak copyleft: your own code stays yours, but the library must remain replaceable and its complete source must be available. Modifying the library itself puts the changes under the LGPL.
+
+p5 2.x, served beside p5@1.min.js rather than over it. Still LGPL-2.1: the same three obligations as the v1 entry, and the source offer above is the exact 2.3.2 tarball.
+
+**Complete source of the exact version:** https://registry.npmjs.org/p5/-/p5-2.3.2.tgz
+
 ### @ffmpeg/core (ffmpeg 5.1.4 compiled to WebAssembly) — GPL-2.0-or-later
 
 Strong copyleft: distributing this binary means distributing it under the GPL, with its source. AIMEAT does not distribute it — the operator installs it.
 
 STRONG COPYLEFT, and the reason none of these three files is in git or in any AIMEAT package. The build enables libx264 and libx265, which makes the compiled result GPL-2.0-or-later; npm's `license: MIT` field describes the packaging and not the binary. All three files (the wasm and both emscripten loaders) are installed on the operator's own machine by `pnpm vendor:libs`, byte-identical to upstream and hash-pinned, so AIMEAT never distributes them and stays MIT. An operator who serves them is distributing GPL work under the GPL, and the source offer above is what that requires.
+
+**Complete source of the exact version:** https://github.com/ffmpegwasm/ffmpeg.wasm (build scripts) and https://ffmpeg.org/releases/ffmpeg-5.1.4.tar.xz (the ffmpeg sources it was built from)
+
+### @ffmpeg/core (ffmpeg 5.1.4 compiled to WebAssembly) — GPL-2.0-or-later
+
+Strong copyleft: distributing this binary means distributing it under the GPL, with its source. AIMEAT does not distribute it — the operator installs it.
+
+Same GPL build, one patch newer, in its own directory because the full version is in the path. AIMEAT distributes neither: both directories are installed by pnpm vendor:libs on the operator's own machine.
 
 **Complete source of the exact version:** https://github.com/ffmpegwasm/ffmpeg.wasm (build scripts) and https://ffmpeg.org/releases/ffmpeg-5.1.4.tar.xz (the ffmpeg sources it was built from)
 
@@ -47,23 +63,26 @@ tarball is. "Installed by the operator" means AIMEAT does not ship the file at a
 
 | Component | Version | Licence | Copyright | How it gets there | Obligation |
 |---|---|---|---|---|---|
-| [@tailwindcss/browser](https://tailwindcss.com) | 4.3.1 | MIT | Copyright (c) Tailwind Labs, Inc. | served by the node | notice only |
-| [daisyUI](https://daisyui.com) | 5.5.23 | MIT | Copyright (c) 2020 Pouya Saadeghi | served by the node | notice only |
+| [@tailwindcss/browser](https://tailwindcss.com) | 4.3.3 | MIT | Copyright (c) Tailwind Labs, Inc. | served by the node | notice only |
+| [daisyUI](https://daisyui.com) | 5.7.22 | MIT | Copyright (c) 2020 Pouya Saadeghi | served by the node | notice only |
 | [Chart.js](https://www.chartjs.org) | 4.5.1 | MIT | Copyright (c) 2014-2024 Chart.js Contributors | served by the node | notice only |
 | [D3](https://d3js.org) | 7.9.0 | ISC | Copyright 2010-2023 Mike Bostock | served by the node | notice only |
-| [Mermaid](https://mermaid.js.org) | 11.16.1 | MIT | Copyright (c) 2014 - 2022 Knut Sveidqvist | served by the node | notice only |
+| [Mermaid](https://mermaid.js.org) | 11.17.2 | MIT | Copyright (c) 2014 - 2022 Knut Sveidqvist | served by the node | notice only |
 | [three.js](https://threejs.org) | 0.128.0 (r128) | MIT | Copyright © 2010-2026 three.js authors | served by the node | notice only |
 | [three.js + example addons (OrbitControls, Sky, RGBELoader, GLTFLoader, RoomEnvironment, BufferGeometryUtils, SkeletonUtils)](https://threejs.org) | 0.185.1 (r185) | MIT | Copyright © 2010-2026 three.js authors | served by the node | notice only |
 | [Leaflet](https://leafletjs.com) | 1.9.4 | BSD-2-Clause | Copyright (c) 2010-2023, Volodymyr Agafonkin; Copyright (c) 2010-2011, CloudMade | served by the node | notice only |
 | [p5.js](https://p5js.org) | 1.11.13 | LGPL-2.1-only | Copyright (c) The Processing Foundation and the p5.js contributors | served by the node | **see below** |
-| [PixiJS](https://pixijs.com) | 8.19.0 | MIT | Copyright (c) 2013-2023 Mathew Groves, Chad Engler | served by the node | notice only |
+| [p5.js](https://p5js.org) | 2.3.2 | LGPL-2.1-only | Copyright (c) The Processing Foundation and the p5.js contributors | served by the node | **see below** |
+| [PixiJS](https://pixijs.com) | 8.20.1 | MIT | Copyright (c) 2013-2023 Mathew Groves, Chad Engler | served by the node | notice only |
 | [Phaser](https://phaser.io) | 3.90.0 | MIT | Copyright (c) 2024 Richard Davey, Phaser Studio Inc. | served by the node | notice only |
+| [Phaser](https://phaser.io) | 4.2.1 | MIT | Copyright (c) 2024 Richard Davey, Phaser Studio Inc. | served by the node | notice only |
 | [Drawflow](https://github.com/jerosoler/Drawflow) | 0.0.60 | MIT | Copyright (c) 2020 Jero Soler | served by the node | notice only |
-| [PDF.js (pdfjs-dist)](https://mozilla.github.io/pdf.js/) | 6.2.108 | Apache-2.0 | Copyright 2024 Mozilla Foundation | served by the node | notice only |
+| [PDF.js (pdfjs-dist)](https://mozilla.github.io/pdf.js/) | 6.3.289 | Apache-2.0 | Copyright 2024 Mozilla Foundation | served by the node | notice only |
 | [DuckDB-Wasm](https://duckdb.org) | 1.32.0 | MIT | Copyright 2018-2025 Stichting DuckDB Foundation | served by the node | notice only |
 | [Apache Arrow (JS)](https://arrow.apache.org) | 17.0.0 | Apache-2.0 | Copyright 2016-2026 The Apache Software Foundation | served by the node | notice only |
 | [TOAST UI Editor](https://ui.toast.com/tui-editor) | 3.2.2 | MIT | Copyright (c) 2020 NHN Cloud Corp. | served by the node | notice only |
 | [@ffmpeg/core (ffmpeg 5.1.4 compiled to WebAssembly)](https://ffmpeg.org) | 0.12.6 | GPL-2.0-or-later | Copyright (c) 2000-2022 the FFmpeg developers | installed by the operator | **see below** |
+| [@ffmpeg/core (ffmpeg 5.1.4 compiled to WebAssembly)](https://ffmpeg.org) | 0.12.10 | GPL-2.0-or-later | Copyright (c) 2000-2022 the FFmpeg developers | installed by the operator | **see below** |
 | [world-atlas (Natural Earth 110m country shapes)](https://github.com/topojson/world-atlas) | 2.0.2 | ISC | Copyright 2013-2019 Michael Bostock; the underlying Natural Earth data is in the public domain | served by the node | notice only |
 | [yaml](https://eemeli.org/yaml/) | 2.9.0 | ISC | Copyright Eemeli Aro <eemeli@gmail.com> | served by the node | notice only |
 | [Preact](https://preactjs.com) | 10.25.4 | MIT | Copyright (c) 2015-present Jason Miller | served by the node | notice only |
@@ -3771,7 +3790,7 @@ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
 THIS SOFTWARE.
 ```
 
-### daisyUI 5.5.23
+### daisyUI 5.7.22
 
 ```text
 MIT License
@@ -5292,7 +5311,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @ffmpeg/core (ffmpeg 5.1.4 compiled to WebAssembly) 0.12.6
+### @ffmpeg/core (ffmpeg 5.1.4 compiled to WebAssembly) 0.12.6, @ffmpeg/core (ffmpeg 5.1.4 compiled to WebAssembly) 0.12.10
 
 ```text
 GNU GENERAL PUBLIC LICENSE
@@ -7259,7 +7278,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### Mermaid 11.16.1
+### Mermaid 11.17.2
 
 ```text
 The MIT License (MIT)
@@ -7875,7 +7894,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### p5.js 1.11.13
+### p5.js 1.11.13, p5.js 2.3.2
 
 ```text
 GNU LESSER GENERAL PUBLIC LICENSE
@@ -8444,7 +8463,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### PDF.js (pdfjs-dist) 6.2.108
+### PDF.js (pdfjs-dist) 6.3.289
 
 ```text
 Apache License
@@ -8762,7 +8781,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### Phaser 3.90.0
+### Phaser 3.90.0, Phaser 4.2.1
 
 ```text
 The MIT License (MIT)
@@ -8787,7 +8806,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### PixiJS 8.19.0
+### PixiJS 8.20.1
 
 ```text
 The MIT License
@@ -10320,7 +10339,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @tailwindcss/browser 4.3.1
+### @tailwindcss/browser 4.3.3
 
 ```text
 MIT License

@@ -65,6 +65,22 @@ const EXCEPTIONS: Array<{ id: string; spdx: string; reason: string; approved: st
       + 'operator\'s own machine by pnpm vendor:libs. An operator who serves them distributes GPL '
       + 'work under the GPL, and the source offer in licenses.json is what that requires.',
   },
+  {
+    id: 'p5v2',
+    spdx: 'LGPL-2.1-only',
+    approved: '2026-08-31',
+    reason: 'p5 2.x, served beside p5@1.min.js rather than over it so no published sketch breaks. '
+      + 'Same library, same licence and same three obligations as the p5 entry above; the source '
+      + 'offer in licenses.json is the exact 2.3.2 tarball.',
+  },
+  {
+    id: 'ffmpeg-core-0-12-10',
+    spdx: 'GPL-2.0-or-later',
+    approved: '2026-08-31',
+    reason: 'ffmpeg 0.12.10, in its own directory beside 0.12.6 because the full version is in the '
+      + 'path. Both are marked "distribute": false and installed by the operator; AIMEAT ships '
+      + 'neither. Same reasoning as the ffmpeg-core entry above.',
+  },
 ];
 
 /** Licence ids that appear inside dual expressions in the tree and are permissive on their own. */

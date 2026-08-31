@@ -18,31 +18,34 @@ compatibility contract; the licence half lives in the JSON so tools can read it.
 
 | File | Package | Version | Pack id | Source | License |
 |------|---------|---------|---------|--------|---------|
-| `tailwindcss@4.js` | `@tailwindcss/browser` | 4.3.1 | `styling` | `https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4` | MIT |
-| `daisyui@5.css` | `daisyui` | 5.5.23 | `styling` | `https://cdn.jsdelivr.net/npm/daisyui@5` | MIT |
+| `tailwindcss@4.js` | `@tailwindcss/browser` | 4.3.3 | `styling` | `https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4` | MIT |
+| `daisyui@5.css` | `daisyui` | 5.7.22 | `styling` | `https://cdn.jsdelivr.net/npm/daisyui@5` | MIT |
 | `aimeat-theme.css` | AIMEAT-local (the theme SYSTEM: 5 palettes × light+dark on the `data-theme` × `data-palette` axes, self-hosted faces, elevation/motion/type tokens; verified by `pnpm check:theme`) | 2.0.0 | `styling` | this repo | MIT |
 | `aimeat-daisyui-bridge.css` | AIMEAT-local (theme bridge; `@import`s the theme) | — | `styling` | this repo | MIT |
 | `chartjs@4.js` | `chart.js` (UMD) | 4.5.1 | `chartjs` | `https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js` | MIT |
 | `d3@7.min.js` | `d3` (UMD — `window.d3`; the full v7 bundle: selection, scales, shapes, hierarchy, force, geo) | 7.9.0 | `d3` | `https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js` | ISC |
-| `mermaid/mermaid.min.js` | `mermaid` (UMD) | 11.16.1 | `mermaid` | `node_modules/mermaid/dist` (see mermaid/README.md) | MIT |
-| `three.min.js` | `three` (r128 UMD) | r128 | `three` | `https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js` | MIT |
+| `mermaid/mermaid.min.js` | `mermaid` (UMD) | 11.17.2 | `mermaid` | `node_modules/mermaid/dist` (see mermaid/README.md) | MIT |
+| `three.min.js` | `three` (r128 UMD; SUPERSEDED by `three-world@1.min.js`, which is r185 with the same `window.THREE` — three ships no UMD build any more, so there is no newer file to put here) | r128 | `three` (deprecated) | `https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js` | MIT |
 | `three-world@1.min.js` | `three` + addons OrbitControls, Sky, RGBELoader (esbuild IIFE — `window.THREE`, addons on `THREE.Addons`; never load together with `three.min.js`) | 0.185.1 (r185), bundle v1 | `three-world` | built by `aimeat/scripts/vendor-three-world.mjs` from `registry.npmjs.org/three/-/three-0.185.1.tgz` | MIT |
 | `three-world-loaders@1.min.js` | three.js example addons GLTFLoader, RoomEnvironment, BufferGeometryUtils, SkeletonUtils (esbuild IIFE that binds to the already-loaded `window.THREE` and attaches to `THREE.Addons`; loaded lazily by the Atelier kit's scene3d kind `model` AFTER three-world@1) | 0.185.1 (r185), bundle v1 | — (kit-internal) | built by `aimeat/scripts/vendor-three-loaders.mjs` from `cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/` | MIT |
 | `aimeat-atlas@1.json` | Natural Earth 110m country shapes pre-projected to SVG paths (geometry DATA for the Atelier kit's `atlas` component — not a script; loaded lazily by the kit itself) | world-atlas 2.0.2 | — (kit-internal) | built by `aimeat/scripts/vendor-atlas-data.mjs` from `cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json` | data: public domain (Natural Earth); packaging: ISC |
 | `leaflet@1/` | Leaflet (leaflet.js + leaflet.css + images/) — the real interactive map; tiles come from OpenStreetMap at runtime with the licence-required attribution | 1.9.4 | `leaflet` | `https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/` | BSD-2-Clause |
-| `p5@1.min.js` | `p5` | 1.11.13 | `p5` | `https://cdn.jsdelivr.net/npm/p5@1/lib/p5.min.js` | LGPL-2.1 (owner-approved 2026-07-16) |
-| `pixi@8.min.js` | `pixi.js` | 8.19.0 | `pixi` | `https://cdn.jsdelivr.net/npm/pixi.js@8/dist/pixi.min.js` | MIT |
-| `pixi-unsafe-eval@8.min.js` | `pixi.js` (unsafe-eval companion — REQUIRED after pixi under the app CSP) | 8.19.0 | `pixi` | `https://cdn.jsdelivr.net/npm/pixi.js@8/dist/packages/unsafe-eval.min.js` | MIT |
-| `phaser@3.min.js` | `phaser` | 3.90.0 | `phaser` | `https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js` | MIT |
+| `p5@1.min.js` | `p5` (SUPERSEDED by `p5@2.min.js`; kept forever for the sketches that name it) | 1.11.13 | `p5` (deprecated) | `https://cdn.jsdelivr.net/npm/p5@1/lib/p5.min.js` | LGPL-2.1 (owner-approved 2026-07-16) |
+| `p5@2.min.js` | `p5` | 2.3.2 | `p5v2` | `https://cdn.jsdelivr.net/npm/p5@2.3.2/lib/p5.min.js` | LGPL-2.1 (owner-approved 2026-08-31) |
+| `pixi@8.min.js` | `pixi.js` | 8.20.1 | `pixi` | `https://cdn.jsdelivr.net/npm/pixi.js@8/dist/pixi.min.js` | MIT |
+| `pixi-unsafe-eval@8.min.js` | `pixi.js` (unsafe-eval companion — REQUIRED after pixi under the app CSP) | 8.20.1 | `pixi` | `https://cdn.jsdelivr.net/npm/pixi.js@8/dist/packages/unsafe-eval.min.js` | MIT |
+| `phaser@3.min.js` | `phaser` (SUPERSEDED by `phaser@4.min.js`; kept forever for the games that name it) | 3.90.0 | `phaser` (deprecated) | `https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js` | MIT |
+| `phaser@4.min.js` | `phaser` | 4.2.1 | `phaser4` | `https://cdn.jsdelivr.net/npm/phaser@4.2.1/dist/phaser.min.js` | MIT |
 | `drawflow@0.min.js` + `.min.css` | `drawflow` (engine INSIDE the aimeat-flow cortex — apps use AIMEAT.flow, never Drawflow directly) | 0.0.60 | `aimeat-flow` | `https://cdn.jsdelivr.net/npm/drawflow@0.0.60/dist/` | MIT |
 | `fonts.css` + `fonts/*.woff2` | Baloo 2 + Bangers display fonts (the `fonts` pack, via `fonts.css`) AND the theme-system faces Inter, Space Grotesk, Fraunces, JetBrains Mono (declared by `aimeat-theme.css`, lazy-loaded per family). All latin + latin-ext (ä/ö); see `fonts/LICENSE.md` | Baloo 2 v23 · Bangers v25 · Inter v20 · Space Grotesk v22 · Fraunces v38 · JetBrains Mono v24 | `fonts` / `styling` | Google Fonts CDN (see `fonts/LICENSE.md`) | OFL-1.1 |
 | `realtime.js` | AIMEAT-local (WS/WebRTC/Yjs client + `SharedClock` synced timeline) | 1 | `realtime` | this repo | MIT |
 | `toastui/toastui-editor-all.min.js` + `.min.css` | TOAST UI Editor | (SPA-internal) | — | `https://uicdn.toast.com` | MIT |
-| `pdfjs@6/pdf.min.mjs` + `pdf.worker.min.mjs` | `pdfjs-dist` (ESM + worker) | 6.2.108 | `pdfjs` | `https://cdn.jsdelivr.net/npm/pdfjs-dist@6.2.108/build/` | Apache-2.0 |
-| `ffmpeg-core@0.12.6/ffmpeg-core.js` + `.umd.js` + `ffmpeg-core.wasm` | `@ffmpeg/core` (ffmpeg 5.1.4, single-threaded) | 0.12.6 | `ffmpeg-core` | `https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm/` (UMD loader from `dist/umd/`) | GPL-2.0-or-later (the compiled ffmpeg: `--enable-gpl --enable-libx264 --enable-libx265`; the npm `license: MIT` covers only the packaging) |
+| `pdfjs@6/pdf.min.mjs` + `pdf.worker.min.mjs` | `pdfjs-dist` (ESM + worker) | 6.3.289 | `pdfjs` | `https://cdn.jsdelivr.net/npm/pdfjs-dist@6.3.289/build/` | Apache-2.0 |
+| `ffmpeg-core@0.12.6/ffmpeg-core.js` + `.umd.js` + `ffmpeg-core.wasm` | `@ffmpeg/core` (SUPERSEDED by `ffmpeg-core@0.12.10/`; kept forever for the apps that name this path) | 0.12.6 | `ffmpeg-core` | `https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm/` (UMD loader from `dist/umd/`) | GPL-2.0-or-later (the compiled ffmpeg: `--enable-gpl --enable-libx264 --enable-libx265`; the npm `license: MIT` covers only the packaging) |
+| `ffmpeg-core@0.12.10/ffmpeg-core.js` + `.umd.js` + `ffmpeg-core.wasm` | `@ffmpeg/core` (ffmpeg 5.1.4, single-threaded) | 0.12.10 | `ffmpeg-core` | `https://unpkg.com/@ffmpeg/core@0.12.10/dist/esm/` (UMD loader from `dist/umd/`) | GPL-2.0-or-later, same build flags as 0.12.6 |
 | `duckdb-wasm@1.32.0/duckdb-browser.js` + `duckdb-browser-eh.worker.js` + `duckdb-eh.wasm` + `extensions/v1.4.3/wasm_eh/parquet.duckdb_extension.wasm` | `@duckdb/duckdb-wasm` (eh = single-threaded) + `apache-arrow` bundled in | 1.32.0 (arrow 17.0.0) | `duckdb-wasm` | built by `aimeat/scripts/vendor-duckdb-wasm.mjs`; the two .wasm files fetched by `pnpm vendor:libs` | MIT (arrow: Apache-2.0) |
 | `yaml.mjs` | `yaml` (ESM) | 2.x | `yaml` | jsdelivr | ISC |
-| `preact.mjs`, `preact-hooks.mjs`, `htm.mjs`, `minidenticons.min.js` | preact / htm / minidenticons (ESM) | (SPA-internal, importmap) | — | jsdelivr | MIT |
+| `preact.mjs`, `preact-hooks.mjs`, `htm.mjs`, `minidenticons.min.js` | preact / htm / minidenticons (ESM). The exact version is in each file's own banner — read it there before guessing, which is how these three sat at "10" and "3" in the inventory and were skipped by every scanner. | preact 10.25.4 · htm 3.1.1 · minidenticons 4.2.1 | — (SPA-internal, importmap) | `https://esm.sh/preact@10.25.4` · jsdelivr | MIT (htm: Apache-2.0) |
 | `live-updates.js` | AIMEAT-local (SSE ESM wrapper) | (SPA-internal) | — | this repo | MIT |
 | `samples/` | audio samples for aimeat-audio | — | — | CC | CC |
 
