@@ -102,6 +102,53 @@ generated notices, into the installer. It fails the build rather than shipping w
 
 ---
 
+## Vulnerabilities, and keeping things current
+
+Two scanners, because one of them cannot see a third of what this node ships.
+
+| Command | Reads | Covers |
+|---|---|---|
+| `pnpm audit` | GitHub's npm advisory database | the npm tree |
+| `pnpm scan:vulns` | OSV.dev, which aggregates about twenty sources | the npm tree **and** the browser libraries under `public/lib/` |
+
+`pnpm scan:vulns -- --dev` adds the build toolchain, which does not ship but runs on the machine
+that cuts a release. `-- --json` is the CI shape.
+
+**The gap is not theoretical.** On 2026-08-31, `pnpm audit` reported zero vulnerabilities across
+730 packages while the served libraries carried six: a HIGH-severity arbitrary JavaScript execution
+in PDF.js 6.1.200 (opening a malicious PDF), and five in Mermaid 11.15.0 — prototype pollution twice,
+CSS injection reaching outside the diagram, and two denial-of-service paths. Nothing had ever
+scanned them, because they are committed files with no manifest above them and every dependency
+tool in the ecosystem reads manifests. `licenses.json` gives each one a real package URL, which is
+what a vulnerability feed matches on, so the licence work is what made the scan possible.
+
+### The routine
+
+- **Weekly, automatic.** `.github/dependabot.yml` opens grouped update PRs: production and toolchain
+  apart, minor and patch grouped, a major on its own because it is a decision rather than a bump.
+  `.github/workflows/vulnerability-scan.yml` runs both scanners on Mondays and fails on a finding.
+- **A security advisory does not wait for Monday.** GitHub opens those as soon as they land.
+- **By hand, when you want to look:** `pnpm outdated` for the list, `pnpm update` for everything the
+  ranges already allow, `pnpm add <pkg>@latest` for a deliberate major.
+- **After any of them:** `pnpm check:licenses && pnpm gen:notices`, then the guard tier on both
+  backends. A dependency bump is a change to what users run.
+
+### Updating a browser library under public/lib/
+
+Dependabot cannot do this one; it is four steps and they must all happen together.
+
+1. Fetch the new build to the same path. The major-pinned filename is the compatibility contract:
+   a minor or patch update lands **in place**, a major ships as a new file or directory beside the
+   old one, which is never changed.
+2. Update the version in `public/lib/VENDORED.md`, in `public/lib/licenses.json` (version **and**
+   `purl`, or the scan keeps checking the old version) and in
+   `src/data/library-packs/vendored.ts`.
+3. Append a `changelog` entry to that pack. It is written **for an AI**: what changed and what it
+   means for apps already published.
+4. Verify in a real browser that the library still does its job, then `pnpm gen:notices`.
+
+---
+
 ## Security Overrides
 
 The `package.json` contains `pnpm.overrides` to patch known vulnerabilities in transitive dependencies:

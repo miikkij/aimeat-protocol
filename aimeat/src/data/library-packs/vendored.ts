@@ -161,7 +161,7 @@ export const VENDORED_PACKS: LibraryPack[] = [
       '<script type="module">import * as pdfjsLib from "{{BASE_URL}}/lib/pdfjs@6/pdf.min.mjs"; pdfjsLib.GlobalWorkerOptions.workerSrc = "/lib/pdfjs@6/pdf.worker.min.mjs"; window.pdfjsLib = pdfjsLib;</script>',
     ],
     requires: [],
-    version: '6.1.200',
+    version: '6.2.108',
     majorPin: 'pdfjs@6',
     license: 'Apache-2.0',
     sourceUrl: 'https://mozilla.github.io/pdf.js/',
@@ -229,6 +229,12 @@ export const VENDORED_PACKS: LibraryPack[] = [
         date: '2026-07-27',
         summary:
           'Initial vendoring of pdf.js 6.1.200 (ESM build + worker) at /lib/pdfjs@6/. The @6 directory name is the compatibility contract — minor/patch updates land in place, a future v7 ships as a NEW pdfjs@7/ directory. Added so apps can quote a document with a page number instead of paraphrasing it.',
+      },
+      {
+        version: '6.2.108',
+        date: '2026-08-31',
+        summary:
+          'SECURITY: 6.1.200 was vulnerable to arbitrary JavaScript execution when opening a malicious PDF (GHSA-hq66-cqwq-w95j, HIGH). Updated in place at the same /lib/pdfjs@6/ paths — no API change, nothing for an app to edit. An app that reads PDFs a stranger supplied should be on this build.',
       },
     ],
     demoTemplateId: 'shell-extension',
@@ -484,7 +490,7 @@ export const VENDORED_PACKS: LibraryPack[] = [
     url: '/lib/mermaid/mermaid.min.js',
     include: ['<script src="{{BASE_URL}}/lib/mermaid/mermaid.min.js"></script>'],
     requires: [],
-    version: '11.15.0',
+    version: '11.16.1',
     majorPin: 'mermaid (v11 line)',
     license: 'MIT',
     sourceUrl: 'https://mermaid.js.org',
@@ -504,6 +510,7 @@ export const VENDORED_PACKS: LibraryPack[] = [
     changelog: [
       { version: '11.15.0', date: '2026-06-08', summary: 'Initial vendoring of mermaid 11.15.0 UMD at /lib/mermaid/mermaid.min.js (previously lazy-loaded only by aimeat-markdown renderRich). Promoted to a first-class pack 2026-07-16 — no API change, apps may now load it directly.' },
       { version: '11.15.0', date: '2026-07-17', summary: 'Promoted to stable: AEB-3 run aeb3-mermaid-001 (diagram notebook task) — treatment passed 5/5 vs control 4/5 (control missed theme-following) at flat token cost, using the documented initialize/render idioms.' },
+    { version: '11.16.1', date: '2026-08-31', summary: 'SECURITY: 11.15.0 carried five advisories — prototype pollution through the configuration API and through architecture diagrams, CSS injection reaching elements beside the diagram, and denial of service in XY and radar charts (GHSA-3rrr-jr9j-h3q3, GHSA-c4c3-pg64-4m4v, GHSA-6x64-9x62-f2gx, GHSA-2v8p-3f2j-5mp7, GHSA-rhh3-jpg6-66xh). Updated in place at the same /lib/mermaid/mermaid.min.js path; window.mermaid and the initialize/render idioms are unchanged. It matters most when the diagram text comes from somewhere other than the app author.' },
     ],
     demoTemplateId: 'comp-mermaid-diagram',
     tierHint: 'T1',

@@ -2,6 +2,32 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does.",
   "entries": [
     {
+      "date": "2026-08-31",
+      "version": "3.11.0",
+      "kind": "security",
+      "title": {
+        "en": "The PDF reader and the diagram library, patched",
+        "fi": "PDF-lukija ja kaaviokirjasto päivitetty"
+      },
+      "body": {
+        "en": "The PDF reader that apps on this node use could be made to run JavaScript hidden inside a PDF somebody sent you. The diagram library could be pushed into an endless loop, or made to restyle things outside its own diagram. Both are updated at the same addresses apps already load from, so no app changes and nothing needs republishing. Neither was seen happening here: they were found by checking every library this node hands to a browser against the public vulnerability databases, which nothing had been doing until now. That check is now a command anyone running a node can run.",
+        "fi": "PDF-lukija, jota tämän noden sovellukset käyttävät, saatiin ajamaan JavaScriptiä, joka oli piilotettu jonkun lähettämään PDF-tiedostoon. Kaaviokirjasto voitiin jumittaa loputtomaan silmukkaan tai saada muotoilemaan oman kaavionsa ulkopuolisia asioita. Molemmat päivitettiin samoihin osoitteisiin, joista sovellukset ne jo lataavat, joten yksikään sovellus ei muutu eikä mitään tarvitse julkaista uudelleen. Kumpaakaan ei ollut täällä käytetty hyväksi: ne löytyivät, kun jokainen selaimelle annettava kirjasto tarkistettiin julkisia haavoittuvuustietokantoja vasten, mitä ei ollut tehnyt aiemmin mikään. Tarkistus on nyt komento, jonka jokainen nodea ylläpitävä voi ajaa."
+      }
+    },
+    {
+      "date": "2026-08-31",
+      "version": "3.11.0",
+      "kind": "notice",
+      "title": {
+        "en": "What you may do with AIMEAT, written down",
+        "fi": "Mitä AIMEATilla saa tehdä, kirjoitettuna auki"
+      },
+      "body": {
+        "en": "AIMEAT is MIT-licensed and you may sell what you build on it, closed-source included. Every third-party component now travels with its copyright holder and its licence text in one file, readable at /THIRD-PARTY-NOTICES.md, and the three that ask for more than a mention say what they ask and what it costs you. One of them, the video encoder, is under a licence AIMEAT may not pass along, and it had been shipping inside the package anyway; the operator of a node installs it themselves now, which is where it belonged. If a company's security review asks for a list of everything inside, there is a command that produces one covering both the server's own dependencies and the libraries handed to browsers.",
+        "fi": "AIMEAT on MIT-lisensoitu, ja sillä rakennetun saa myydä, myös suljettuna. Jokaisen kolmannen osapuolen komponentin tekijänoikeuden haltija ja lisenssiteksti kulkevat nyt mukana yhdessä tiedostossa, joka on luettavissa osoitteessa /THIRD-PARTY-NOTICES.md, ja ne kolme, jotka vaativat mainintaa enemmän, kertovat mitä vaativat ja mitä se sinulta edellyttää. Yksi niistä, videon pakkaaja, on lisenssillä jota AIMEAT ei saa välittää eteenpäin, ja se oli silti kulkenut paketin mukana; nyt sen asentaa noden ylläpitäjä itse, mihin se kuuluikin. Jos yrityksen tietoturva-arvio pyytää luettelon kaikesta mitä sisällä on, sellaisen tuottaa yksi komento, ja se kattaa sekä palvelimen omat riippuvuudet että selaimelle annettavat kirjastot."
+      }
+    },
+    {
       "date": "2026-08-30",
       "kind": "feature",
       "title": {
