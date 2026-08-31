@@ -6837,6 +6837,66 @@ paths:
             error details carry `grant_id` so the press can be retried. `CONNECTOR_TOO_OLD` means the
             connector is connected but does not know how to take on new agents yet.
 
+  /v1/agents/v2/basic-agents/request:
+    post:
+      operationId: requestBasicAgents
+      summary: An agent asks its owner to set up the basic agents
+      description: |
+        The half of the chat path that creates nothing. It puts ONE line on the owner's open-items
+        list — the list they already read — naming the agents that are missing, and that line
+        retires itself the moment they press the button, so nobody has to tick it off.
+
+        Not a second approval system: an open item is a record the owner already has, and the
+        `basic_agents` closes-check is evaluated on read, so the request answers itself.
+
+        Answers `requested: false` with `reason: already_there` when the agents are already set up,
+        and with `reason: already_asked` plus the standing item's id when one of the owner's agents
+        has already asked. Neither writes anything.
+
+        Needs `memory:write`, because an open item is a record in the owner's own namespace. App and
+        ecosystem principals are refused: an app may use the account, not ask for agents in the
+        person's name.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note:
+                  type: string
+                  maxLength: 300
+                  description: One short phrase on why you are asking, shown to the person with the request.
+      responses:
+        '200':
+          description: The ask, or why nothing was written
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          requested: { type: boolean }
+                          item_id:
+                            type: string
+                            nullable: true
+                            description: The open item, whether this call created it or found it standing.
+                          reason:
+                            type: string
+                            enum: [already_there, already_asked]
+                            description: Present only when nothing was written.
+        '403':
+          description: An app or ecosystem principal, or missing memory:write
+        '409':
+          description: LIST_FULL — the owner's open-items list is at its cap
+
   /v1/agents/v2/enrol:
     post:
       operationId: enrolAgentsV2

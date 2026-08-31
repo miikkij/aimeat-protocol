@@ -1,19 +1,22 @@
 /**
  * @file test/unit/open-items-closes-when.test.ts
- * @description The three conditions a system-suggested open item can close itself on, each asserted
- *   in BOTH directions.
+ * @description The conditions a system-suggested open item can close itself on, each asserted in
+ *   BOTH directions.
  *
  *   These are evaluated on read and never stored, which is the whole point: a suggestion whose
  *   situation unwinds — the agent is deleted, the portfolio page is removed — has to come back.
  *   A stored "done" could not do that, and would quietly leave the person believing a step was
  *   handled when it no longer is. So the false direction matters as much as the true one, and both
- *   are here for all three.
+ *   are here for every one of them.
  * @usage pnpm test -- open-items-closes-when
  * @version-history
  *   v1.0.0 — 2026-08-09 — Initial (intent pool, checklist 1.7).
  *   v1.1.0 — 2026-08-10 — Follow the code: the intent pool became open items and `intents.ts` was
  *     deleted, but this file kept importing it, so vitest could not even load it and the whole file
  *     ran nowhere while reporting nothing. Renamed with the concept and pointed at open-items.ts.
+ *   v1.2.0 — 2026-09-01 — basic_agents, the fourth check: an agent asked its owner for the basic
+ *     agents, and the ask retires itself when they press. ENROLLED, not merely created — an agent
+ *     with no card is not a working agent, and the third case here is what says so.
  */
 import { describe, it, expect } from 'vitest';
 import { evaluateCloses, CLOSES_CHECKS } from '../../src/services/open-items.js';
@@ -95,9 +98,29 @@ describe('first_agent — is anyone connected?', () => {
     });
 });
 
+describe('basic_agents — did the person actually press the button?', () => {
+    const three = ['concierge', 'crew-forge', 'workflow-manager'];
+    const enrolled = (names: string[]) => names.map(name => ({ gaii: `${name}#o@n`, name, enrolledAt: '2026-09-01T00:00:00.000Z' }));
+
+    it('true once all three are ENROLLED', async () => {
+        const storage = stubStorage({ getAgentsByOwner: async () => enrolled(three) });
+        expect(await evaluateCloses(storage, config, OWNER, 'basic_agents')).toBe(true);
+    });
+
+    it('false while one is still missing', async () => {
+        const storage = stubStorage({ getAgentsByOwner: async () => enrolled(three.slice(0, 2)) });
+        expect(await evaluateCloses(storage, config, OWNER, 'basic_agents')).toBe(false);
+    });
+
+    it('false when they exist but none is enrolled — a card-less agent is not a working agent', async () => {
+        const storage = stubStorage({ getAgentsByOwner: async () => three.map(name => ({ gaii: `${name}#o@n`, name })) });
+        expect(await evaluateCloses(storage, config, OWNER, 'basic_agents')).toBe(false);
+    });
+});
+
 describe('the vocabulary is closed', () => {
-    it('names exactly the three checks the route validates against', () => {
-        expect([...CLOSES_CHECKS].sort()).toEqual(['first_agent', 'hello_mcp', 'welcome_mat']);
+    it('names exactly the checks the route validates against', () => {
+        expect([...CLOSES_CHECKS].sort()).toEqual(['basic_agents', 'first_agent', 'hello_mcp', 'welcome_mat']);
     });
 
     it('an unknown check is false rather than throwing', async () => {

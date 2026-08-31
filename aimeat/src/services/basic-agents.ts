@@ -29,6 +29,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { BASIC_AGENTS } from '../data/basic-agents.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
+import { addItem, listItems } from './open-items.js';
 
 /** Where the owner presses. A deep link into their own profile, not an API address. */
 export function basicAgentsApprovalUrl(baseUrl: string): string {
@@ -63,6 +64,62 @@ export function daemonPrincipals(owner: string): string[] {
   const tunnels = getActiveConnectTunnelManager();
   if (!tunnels) return [];
   return tunnels.principalsForOwner(owner).filter(p => !p.startsWith('eco:'));
+}
+
+/**
+ * An agent asks its owner for the basic agents. The ask lands on the owner's open-items list, and
+ * the owner presses the button that was already there.
+ *
+ * WHY THIS IS NOT A NEW APPROVAL SYSTEM. Device authorization already has one, and a second one
+ * beside it would mean a record type in both providers, a listing route, an approve route and a
+ * surface to approve on. Open items is a list the person already reads, already a single memory
+ * record, and already carries an item that can close itself when its condition holds. So the
+ * request is one item with `closes_when: basic_agents`: the person presses, the agents enrol, and
+ * the item leaves the list on its own without anybody marking it done.
+ *
+ * WHAT IT CANNOT DO, on purpose: create anything. The button is still `requireOwnerPrincipal()`,
+ * and an agent asking in the owner's name is not the owner. This writes a line on a list.
+ */
+export async function requestBasicAgents(
+  config: AimeatConfig, storage: Storage, owner: string, askedBy: string, note?: string,
+): Promise<{ ok: true; requested: boolean; item_id: string | null; reason?: string } & BasicAgentsView | { ok: false; status: number; code: string; message: string }> {
+  const view = await describeBasicAgents(config, storage, owner);
+
+  // Nothing to ask for. Not an error: an agent that checks first and finds them there should be
+  // able to say so, rather than putting a dead line on the person's list.
+  if (view.agents.every(a => a.enrolled)) {
+    return { ok: true, requested: false, item_id: null, reason: 'already_there', ...view };
+  }
+
+  const ownerGhii = `${owner}@${config.nodeId}`;
+  const existing = await listItems(storage, config, ownerGhii, owner);
+  // One ask, not one per conversation. An agent that asks twice should not print two lines on a
+  // person's list, and the id of the standing one is a more useful answer than a duplicate.
+  const already = existing.find(i => i.closes_when?.check === 'basic_agents' && !i.satisfied);
+  if (already) {
+    return { ok: true, requested: false, item_id: already.id, reason: 'already_asked', ...view };
+  }
+
+  const missing = view.agents.filter(a => !a.enrolled).map(a => a.display_name);
+  const title = note?.trim()
+    ? `Set up your first agents: ${missing.join(', ')} (${note.trim().slice(0, 120)})`
+    : `Set up your first agents: ${missing.join(', ')}`;
+
+  const item = await addItem(storage, ownerGhii, {
+    title,
+    kind: 'decision',
+    origin: askedBy,
+    by: 'ai',
+    // It answers itself the moment the person presses, so nobody has to tick it off.
+    closes_when: { check: 'basic_agents' },
+  });
+  if (!item) {
+    return {
+      ok: false, status: 409, code: 'LIST_FULL',
+      message: 'Your list of open items is full, so this could not be added to it. Close a few and ask again.',
+    };
+  }
+  return { ok: true, requested: true, item_id: item.id, ...view };
 }
 
 export async function describeBasicAgents(

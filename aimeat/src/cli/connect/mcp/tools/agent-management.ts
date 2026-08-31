@@ -52,6 +52,15 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
   });
 
+  mcp.tool('aimeat_agent_basics_request', descriptionFor('aimeat_agent_basics_request'), {
+    agent_name: agentNameSchema,
+    note: z.string().max(300).optional().describe('One short phrase on why you are asking, shown to the person with the request.'),
+  }, annotationsFor('aimeat_agent_basics_request'), async ({ agent_name, note }) => {
+    const { client } = pickAgent(registry, agent_name);
+    const resp = await client.post('/v1/agents/v2/basic-agents/request', { note });
+    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
+  });
+
   mcp.tool(
     'aimeat_agent_tags_set',
     descriptionFor('aimeat_agent_tags_set'),

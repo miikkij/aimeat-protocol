@@ -39,11 +39,11 @@ import type { Router } from 'express';
 import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { requireAuth, requireOwnerPrincipal } from '../../auth/middleware.js';
+import { requireAuth, requireOwnerPrincipal, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { buildGAII } from '../../utils/gaii.js';
 import { BASIC_AGENTS } from '../../data/basic-agents.js';
-import { describeBasicAgents, daemonPrincipals } from '../../services/basic-agents.js';
+import { describeBasicAgents, requestBasicAgents, daemonPrincipals } from '../../services/basic-agents.js';
 import { getActiveConnectTunnelManager } from '../../services/connect-tunnel.js';
 import { emitChange } from '../../services/event-bus.js';
 import { recordAccountEvent } from '../../services/account-events.js';
@@ -86,6 +86,33 @@ export function registerBasicAgentsRoutes(router: Router, config: AimeatConfig, 
       { description: 'The owner presses this on their Agents page', method: 'GET', url: '/v1/profile?tab=agents' },
       { description: 'Create the ones that are missing (owner in person)', method: 'POST', url: '/v1/agents/v2/basic-agents' },
     ]));
+  });
+
+  // ── POST /request — an agent asks its owner for them ──
+  //
+  // The half of the chat path that does not create anything. It puts one line on the owner's open
+  // items, where they already look, and that line retires itself once they press. `memory:write`
+  // because an open item IS a memory record in the owner's namespace, which is the same permission
+  // an agent needs to write one directly.
+  router.post('/v1/agents/v2/basic-agents/request', requireAuth(), requireScope('memory:write'), async (req, res) => {
+    const roles = req.auth!.roles ?? [];
+    if (roles.includes('app') || roles.includes('ecosystem')) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED',
+        'This is for the account holder and their own agents. An app cannot ask for agents on your behalf.'));
+      return;
+    }
+    const note = typeof req.body?.note === 'string' ? req.body.note.slice(0, 300) : undefined;
+    const out = await requestBasicAgents(config, storage, req.auth!.owner, req.auth!.sub, note);
+    if (!out.ok) {
+      res.status(out.status).json(error(config.nodeId, out.code, out.message, out.status));
+      return;
+    }
+    const data: Record<string, unknown> = { ...out };
+    delete data.ok;
+    res.json(success(config.nodeId, data, [
+      { description: 'The owner presses this on their Agents page', method: 'GET', url: '/v1/profile?tab=agents' },
+    ]));
+    emitChange('open-items');
   });
 
   // ── POST — the button ──

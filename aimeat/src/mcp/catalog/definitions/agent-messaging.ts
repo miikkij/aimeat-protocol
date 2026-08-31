@@ -165,6 +165,15 @@ export const agentMessagingTools: AimeatToolDefinition[] = [
         input: {},
     },
     {
+        name: 'aimeat_agent_basics_request',
+        description: "Ask your owner to set up the basic agents. Puts ONE line on their open-items list — the list they already read — saying which agents are missing, and that line retires itself the moment they press the button, so nobody has to tick it off. Call aimeat_agent_basics_get first: if they are already there this answers requested:false with reason 'already_there' and writes nothing, and if you (or another of the owner's agents) already asked, it answers 'already_asked' with the standing item's id rather than printing a second line. This does NOT create the agents; creating them changes the account and the person does that themselves on the page in approval_url. Needs memory:write, because an open item is a record in the owner's own namespace.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            note: { type: 'string', description: 'Optional: one short phrase on why you are asking, shown to the person with the request.' },
+        },
+    },
+    {
         name: 'aimeat_message_inbox',
         description: 'Fetch this agent\'s pending inbound messages from its owner (each with id, thread_id, sender, content, timestamp). Poll this to pick up new instructions or replies from the human; reply with aimeat_message_send (pass the same thread_id to stay in the conversation). For delegated work use the aimeat_task_* tools instead.',
         caller: 'agent',
