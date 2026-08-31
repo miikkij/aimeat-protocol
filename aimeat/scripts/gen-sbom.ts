@@ -53,7 +53,10 @@ function licencesOf(spdx: string): CycloneLicence[] {
 function purlOf(c: Component): string {
   if (c.purl) return c.purl;
   const version = c.version.split(',')[0].trim();
-  if (c.origin === 'npm') return `pkg:npm/${c.name.replace('@', '%40')}@${version}`;
+  // replaceAll, not replace: a one-argument replace takes the FIRST `@` only, so the escaping is
+  // right for `@scope/name` by luck and wrong for anything else (CodeQL js/incomplete-sanitization
+  // 1585). The `@` that separates the version is appended after this, so it stays a separator.
+  if (c.origin === 'npm') return `pkg:npm/${c.name.replaceAll('@', '%40')}@${version}`;
   return `pkg:generic/${c.id}@${encodeURIComponent(version)}`;
 }
 

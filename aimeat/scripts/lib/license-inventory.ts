@@ -24,6 +24,9 @@
  *   - PERMISSIVE / SPDX_OF_NOTE — the allowlist, and the ids that carry an obligation
  * @usage  imported by check-licenses.ts, gen-third-party-notices.ts and gen-sbom.ts
  * @version-history
+ *   v1.0.1 — 2026-08-31 — Licence and notice texts are read with LF line endings whatever the
+ *     package shipped. One CRLF licence (`@so-ric/colorspace`) was the third and last reason the
+ *     notices gate answered differently on Linux and on Windows for the same commit.
  *   v1.0.0 — 2026-08-31 — Initial: npm tree + vendored manifest behind one reader.
  */
 import { execSync } from 'node:child_process';
@@ -99,6 +102,18 @@ interface PnpmLicenseEntry {
 }
 
 /**
+ * A licence or notice text as its author shipped it, with exactly one thing normalised: the line
+ * endings. Registry tarballs carry whatever the author's editor wrote, and `@so-ric/colorspace`
+ * ships its MIT text with CRLF. THIRD-PARTY-NOTICES.md is stored LF, because `.gitattributes`
+ * normalises it on `git add` — so a CR that survives into the generated text can never appear in
+ * the committed file, and `check:notices` then fails forever on CI while passing on the machine
+ * that last ran the generator. The reproduction of that is one `npm install` away at any time.
+ */
+function readText(file: string): string {
+  return readFileSync(file, 'utf-8').replace(/\r\n?/g, '\n').trim();
+}
+
+/**
  * LICENSE / LICENCE / COPYING, whichever spelling the package chose, at the package root.
  *
  * The sort is not cosmetic. `readdirSync` returns entries in filesystem order, which is alphabetical
@@ -119,7 +134,7 @@ function readLicenseFileIn(dir: string, pattern: RegExp): string | null {
   const file = join(dir, hit);
   try {
     if (!statSync(file).isFile()) return null;
-    return readFileSync(file, 'utf-8').trim();
+    return readText(file);
   } catch {
     return null;
   }
@@ -208,7 +223,7 @@ function readRelative(rel: string | undefined): string | null {
   if (rel === undefined) return null;
   const file = resolve(LIB_DIR, rel);
   if (!existsSync(file)) return null;
-  return readFileSync(file, 'utf-8').trim();
+  return readText(file);
 }
 
 /** public/lib/licenses.json — the manifest for everything this node serves to a browser. */
