@@ -267,11 +267,12 @@ async function run() {
     });
 
     // ── 5. The card verifies from outside, using only the published JWKS ──────
-    await test('each card verifies against its own published key set', async () => {
+    await test('each agent\'s own card verifies against its own published key set', async () => {
         for (const n of BASIC_NAMES) {
             const gaii = `${n}#${a.owner}@${NODE_ID}`;
-            const cardRes = await fetch(`${BASE}/v1/agents/${encodeURIComponent(gaii)}/card`);
-            assert(cardRes.status === 200, `${n} card ${cardRes.status}`);
+            // The EXTENDED card is the agent's own bytes; it is what the agent's JWKS verifies.
+            const cardRes = await fetch(`${BASE}/v1/agents/${encodeURIComponent(gaii)}/card/extended`, { headers: authA });
+            assert(cardRes.status === 200, `${n} extended card ${cardRes.status}`);
             const jws = (await cardRes.text()).trim();
 
             const jwksRes = await fetch(`${BASE}/v1/agents/${encodeURIComponent(gaii)}/jwks.json`);
@@ -279,24 +280,98 @@ async function run() {
             const jwks = await jwksRes.json() as { keys: any[] };
             assert(jwks.keys.length === 1, `${n} should publish exactly one key`);
 
-            // Nothing but these two documents. No token, no lookup, no asking the node.
+            // Nothing but these two documents. No lookup, no asking the node what to believe.
             const key = await importJWK(jwks.keys[0], 'EdDSA');
             const { payload } = await compactVerify(jws, key, { algorithms: ['EdDSA'] });
             const card = JSON.parse(new TextDecoder().decode(payload));
             assert(card.gaii === gaii, `${n} card identity mismatch`);
             assert(card.runMode === 'spawn', `${n} card run mode`);
+            assert(Array.isArray(card.requestedScopes), `${n} extended card should carry requestedScopes`);
         }
     });
 
-    await test('both public documents are readable with no credential at all', async () => {
+    // ── 5b. The public / extended split ───────────────────────────────────────
+    await test('an anonymous reader gets the public card and cannot see what the agent asked for', async () => {
         const gaii = `concierge#${a.owner}@${NODE_ID}`;
         const r = await fetch(`${BASE}/v1/agents/${encodeURIComponent(gaii)}/card`);
         assert(r.status === 200, `unauthenticated card read ${r.status}`);
+        const body = (await r.text()).trim();
+        assert(!body.includes('requestedScopes'), 'the raw response must not carry the field at all');
+
+        const parts = body.split('.');
+        assert(parts.length === 3, 'the public card should be a compact JWS');
+        const card = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf-8'));
+        assert(card.spec === 'aimeat.agent-card-public/v1', `expected the public spec, got ${card.spec}`);
+        assert(card.requestedScopes === undefined, 'requestedScopes must not reach an anonymous reader');
+        assert(card.webhookUrl === undefined, 'webhookUrl must not reach an anonymous reader');
+        assert(card.description === undefined, 'description must not reach an anonymous reader');
+        assert(card.gaii === gaii && card.runMode === 'spawn', 'the public card should still identify the agent');
+        assert(typeof card.nodeKeyUri === 'string', 'the public card should say where its signing key is published');
     });
 
-    await test('an agent that never enrolled has no card and no key set', async () => {
+    await test('the public card is signed by the NODE, and the node key is the one already published', async () => {
+        const gaii = `concierge#${a.owner}@${NODE_ID}`;
+        const jws = (await (await fetch(`${BASE}/v1/agents/${encodeURIComponent(gaii)}/card`)).text()).trim();
+
+        const wk = await (await fetch(`${BASE}/.well-known/aimeat`)).json() as any;
+        const nodeKeyB64 = wk.data.public_key as string;
+        assert(!!nodeKeyB64, 'the node should publish its public key at /.well-known/aimeat');
+        const x = Buffer.from(nodeKeyB64, 'base64').toString('base64url');
+        const nodeKey = await importJWK({ kty: 'OKP', crv: 'Ed25519', x }, 'EdDSA');
+        const { payload } = await compactVerify(jws, nodeKey, { algorithms: ['EdDSA'] });
+        assert(JSON.parse(new TextDecoder().decode(payload)).gaii === gaii, 'the node-signed projection should name the agent');
+
+        // And it is NOT the agent's key: the two signatures say different things.
+        const jwks = await (await fetch(`${BASE}/v1/agents/${encodeURIComponent(gaii)}/jwks.json`)).json() as { keys: any[] };
+        assert(jwks.keys[0].x !== x, 'the agent key and the node key must be different keys');
+    });
+
+    await test('the owner in person gets the extended card', async () => {
+        const gaii = `concierge#${a.owner}@${NODE_ID}`;
+        const r = await fetch(`${BASE}/v1/agents/${encodeURIComponent(gaii)}/card/extended`, { headers: authA });
+        assert(r.status === 200, `expected 200, got ${r.status}`);
+        const card = JSON.parse(Buffer.from((await r.text()).trim().split('.')[1], 'base64url').toString('utf-8'));
+        assert(card.spec === 'aimeat.agent-card/v1', 'the extended card is the agent\'s own card');
+        assert(Array.isArray(card.requestedScopes), 'the owner may see what the agent asked for');
+    });
+
+    await test('a same-owner agent principal gets the extended card', async () => {
+        const gaii = `concierge#${a.owner}@${NODE_ID}`;
+        const r = await fetch(`${BASE}/v1/agents/${encodeURIComponent(gaii)}/card/extended`,
+            { headers: { Authorization: `Bearer ${daemonA.token}` } });
+        assert(r.status === 200, `expected 200, got ${r.status}`);
+    });
+
+    await test('another owner gets the public card only', async () => {
+        const gaii = `concierge#${a.owner}@${NODE_ID}`;
+        const pub = await fetch(`${BASE}/v1/agents/${encodeURIComponent(gaii)}/card`, { headers: authB });
+        assert(pub.status === 200, `the public card should still be readable, got ${pub.status}`);
+        const ext = await fetch(`${BASE}/v1/agents/${encodeURIComponent(gaii)}/card/extended`, { headers: authB });
+        assert(ext.status === 403, `expected 403 on the extended card, got ${ext.status}`);
+        const extAgent = await fetch(`${BASE}/v1/agents/${encodeURIComponent(gaii)}/card/extended`,
+            { headers: { Authorization: `Bearer ${daemonB.token}` } });
+        assert(extAgent.status === 403, `another owner's agent should be refused too, got ${extAgent.status}`);
+    });
+
+    await test('card/info says which half it gave you, and withholds accordingly', async () => {
+        const gaii = `concierge#${a.owner}@${NODE_ID}`;
+        const anon = await json(`/v1/agents/${encodeURIComponent(gaii)}/card/info`);
+        assert(anon.status === 200, `anonymous info ${anon.status}`);
+        assert(anon.body.data.extended === false, 'an anonymous reader is not extended');
+        assert(anon.body.data.card.requestedScopes === undefined, 'requestedScopes must not leak through info');
+
+        const owner = await json(`/v1/agents/${encodeURIComponent(gaii)}/card/info`, { headers: authA });
+        assert(owner.body.data.extended === true, 'the owner is extended');
+        assert(Array.isArray(owner.body.data.card.requestedScopes), 'the owner sees the full card');
+    });
+
+    await test('an agent that never enrolled has no card, and neither half says which', async () => {
         const r = await fetch(`${BASE}/v1/agents/${encodeURIComponent(daemonA.gaii)}/card`);
         assert(r.status === 404, `expected 404, got ${r.status}`);
+        const ext = await fetch(`${BASE}/v1/agents/${encodeURIComponent(daemonA.gaii)}/card/extended`, { headers: authA });
+        assert(ext.status === 404, `expected 404 on the extended card too, got ${ext.status}`);
+        const nobody = await fetch(`${BASE}/v1/agents/${encodeURIComponent(`ghost#${a.owner}@${NODE_ID}`)}/card`);
+        assert(nobody.status === 404, `a name that does not exist answers the same 404, got ${nobody.status}`);
     });
 
     // ── 6. The credential: minted per use, spent once ─────────────────────────
