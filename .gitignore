@@ -217,3 +217,5 @@ secaudit/
 # snapshot that stops being true on the next dependency bump, and THIRD-PARTY-NOTICES.md is the
 # copy that IS committed and does travel with releases.
 sbom.cdx.json
+security-report.md
+security-report.json

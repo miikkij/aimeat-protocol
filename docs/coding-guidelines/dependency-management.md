@@ -124,18 +124,48 @@ what a vulnerability feed matches on, so the licence work is what made the scan 
 
 ### The routine
 
-- **Weekly, automatic.** `.github/dependabot.yml` opens grouped update PRs: production and toolchain
-  apart, minor and patch grouped, a major on its own because it is a decision rather than a bump.
-  `.github/workflows/vulnerability-scan.yml` runs both scanners on Mondays and fails on a finding.
-- **A security advisory does not wait for Monday.** GitHub opens those as soon as they land.
+- **`pnpm audit:security`** runs everything at once and writes a dated report: both scanners, the
+  licence gate, the outdated list with the deprecated packages called out, and a fresh SBOM. This
+  is the one to run before a release and the one to hand to a security review.
+- **Weekly, automatic.** `.github/workflows/vulnerability-scan.yml` runs both scanners on Mondays
+  and fails on a finding.
+- **GitHub watches the npm tree and says so on the Security tab.** Dependabot ALERTS are on;
+  dependency review fails a PR that introduces a vulnerable or copyleft dependency; CodeQL,
+  Scorecard and secret scanning with push protection all run.
+- **There is deliberately no `.github/dependabot.yml`, and no automatic security-update PRs.**
+  This is a decision, not an omission, and it has been re-made by mistake once: a solo maintainer
+  does not want a queue of bot pull requests, and alerts on the Security tab carry the same
+  information without the noise. The cost is that nothing opens a fix PR for you, so the Security
+  tab is a place you go and look. If you ever want the PRs, the switch is
+  `dependabot_security_updates` in the repository settings, and a version-update config file after
+  that; do not add either on a whim.
 - **By hand, when you want to look:** `pnpm outdated` for the list, `pnpm update` for everything the
   ranges already allow, `pnpm add <pkg>@latest` for a deliberate major.
 - **After any of them:** `pnpm check:licenses && pnpm gen:notices`, then the guard tier on both
   backends. A dependency bump is a change to what users run.
 
+### `consul` is deprecated and staying, for now
+
+npm marks it "no longer supported" and names no successor. It is used for exactly three calls in
+`src/services/consul-config.ts` — read the KV prefix, write a key, ping the agent — so replacing the
+client with plain HTTP is about forty lines. Two things stop that being an obvious win. It cannot go
+through `safeFetch`, which blocks private and loopback addresses unless
+`AIMEAT_ALLOW_PRIVATE_EGRESS` is set, and a Consul agent is on a private address in every real
+deployment; and it cannot be verified here, because proving a Consul client needs a Consul, and this
+project does not stand up containers to test with. An unmaintained package is not a vulnerability —
+both scanners are clean on it — so the honest state is: known, parked, and worth doing the day
+there is an instance to test against. Do not rewrite it blind.
+
 ### Updating a browser library under public/lib/
 
-Dependabot cannot do this one; it is four steps and they must all happen together.
+No dependency tool does this one — not Dependabot, not `pnpm update`, not `pnpm audit`. The reason
+is not that these files are fetched at install time; almost all of them are committed to the
+repository like any other source file. It is that **they have no manifest above them.** Every
+dependency tool in the ecosystem starts from a package.json or a lockfile and walks down;
+`public/lib/phaser@3.min.js` is a file in a directory, so there is nothing for such a tool to walk.
+That is what `licenses.json` fixes: it gives each file a real package URL, which is what
+`pnpm scan:vulns` matches against a vulnerability feed. An update is four steps, and they must all
+happen together.
 
 1. Fetch the new build to the same path. The major-pinned filename is the compatibility contract:
    a minor or patch update lands **in place**, a major ships as a new file or directory beside the
