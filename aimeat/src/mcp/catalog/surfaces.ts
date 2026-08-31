@@ -21,6 +21,9 @@
  *   import { toolsForSurface } from '../catalog/surfaces.js';
  *   const allowed = toolsForSurface('agent'); // register only these on /v2/mcp/agent
  * @version-history
+ *   2026-09-01 — A sixth surface, `primitives` (Agent v2 V2): twelve tools, and everything else
+ *     reached through aimeat_discover + aimeat_invoke. The other five are unchanged, and so is
+ *     /v1/mcp — this is one more door, not a replacement for any of them.
  *   2026-08-29 — aimeat_app_marks_set, aimeat_app_legal_set and aimeat_app_audit beside aimeat_app_seo_set.
  *   2026-08-28 — The five aimeat_crew_* tools on `appdev`, `agent` and `admin`: the chat path to
  *     building a JSON agent, beside the other owner-managed agent tools.
@@ -52,8 +55,8 @@
  */
 import { CLI_FALLBACK_TOOL_DEFINITIONS } from './definitions.js';
 
-export type SurfaceRole = 'appdev' | 'agent' | 'service' | 'admin' | 'commerce';
-export const V2_ROLES: readonly SurfaceRole[] = ['appdev', 'agent', 'service', 'admin', 'commerce'];
+export type SurfaceRole = 'appdev' | 'agent' | 'service' | 'admin' | 'commerce' | 'primitives';
+export const V2_ROLES: readonly SurfaceRole[] = ['appdev', 'agent', 'service', 'admin', 'commerce', 'primitives'];
 
 /**
  * Catalog tools intentionally NOT exposed on any v2 server surface:
@@ -74,6 +77,37 @@ export const V2_EXCLUDED: readonly string[] = [
 
 /** role -> allowlist of tool names. Derived from docs/mcp_audit/11-v2-mcp-design.md §2/§3. */
 export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
+    /**
+     * The PRIMITIVES surface (/v2/mcp/primitives) — Agent v2, V2.
+     *
+     * Twelve tools instead of several hundred. Not a smaller version of `agent`: a different
+     * proposition. The other surfaces answer "here is everything of this kind"; this one answers
+     * "here is how to hold this node in your head". Everything else on the node is reachable
+     * through `aimeat_discover` (find a capability) and `aimeat_invoke` (run it as yourself), so
+     * the catalogue is data the agent reads when it needs it rather than context it carries always.
+     *
+     * The other five surfaces and /v1/mcp are untouched and still register their full sets. Nothing
+     * here removes a tool from anywhere; this is one more door.
+     *
+     * WHY THESE TWELVE. They are the ones an agent cannot discover its way to, because they are what
+     * it uses to work at all: read and write what it knows, read and write what a group knows, take
+     * work and hand it back, speak to its person, put a file somewhere and fetch it. Everything past
+     * that is a capability, and capabilities are found rather than carried.
+     */
+    primitives: [
+        // Know things.
+        'aimeat_memory_read', 'aimeat_memory_write', 'aimeat_memory_search',
+        // Know things together.
+        'aimeat_workspace_read', 'aimeat_workspace_write',
+        // Take work, hand it back.
+        'aimeat_task_list', 'aimeat_task_complete',
+        // Talk to the person.
+        'aimeat_message_inbox', 'aimeat_message_send',
+        // Carry bytes.
+        'aimeat_storage_upload', 'aimeat_storage_download',
+        // And the pair that reaches everything else.
+        'aimeat_discover', 'aimeat_invoke',
+    ],
     appdev: [
         'aimeat_storage_upload', 'aimeat_storage_download', 'aimeat_storage_delete',
         'aimeat_datapackage_publish', 'aimeat_datapackage_export',
@@ -255,6 +289,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
 };
 
 const _surfaceSets: Record<SurfaceRole, Set<string>> = {
+    primitives: new Set(MCP_SURFACES.primitives),
     appdev: new Set(MCP_SURFACES.appdev),
     agent: new Set(MCP_SURFACES.agent),
     service: new Set(MCP_SURFACES.service),

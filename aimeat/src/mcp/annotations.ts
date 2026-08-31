@@ -65,6 +65,9 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_catalogue_boards: { title: 'Browse Public Boards', readOnlyHint: true },
     aimeat_catalogue_directory: { title: 'Search People Directory', readOnlyHint: true },
     aimeat_discover: { title: 'Discover (Master Directory)', readOnlyHint: true, openWorldHint: true },
+    // NOT read-only and NOT idempotent: it runs whatever it was pointed at, and what that does is
+    // the target capability's business. openWorld, because the set of what it can reach is data.
+    aimeat_invoke: { title: 'Run a Node Capability', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     aimeat_agent_profile: { title: 'View Agent Profile', readOnlyHint: true },
 
     // ── Onboarding ──

@@ -93,6 +93,12 @@ import { logger } from '../../utils/logger.js';
  * come back to it: the set may shrink, and every removal is either a real scope or a real refusal.
  */
 export const SCOPE_EXEMPT_TOOLS = new Set<string>([
+    // The dispatcher. It carries the CALLER'S OWN bearer back through the node's real route, so the
+    // scope that matters is the target capability's and it is checked there, on the same code path a
+    // direct call would take. A word here would be a second, weaker opinion in front of the real
+    // one, and it would have to guess which scope the target wants. `aimeat_invoke` can do exactly
+    // what its caller can already do and nothing more; see services/node-invoke.ts.
+    'aimeat_invoke',
     'aimeat_admin_mint',                             // gated in the handler on the operator role, not by a scope
     // BR-04 SSO administration: all seven mutate node-level connection records or account
     // lifecycle, and every one is gated in the handler on the operator role — the same decision

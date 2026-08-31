@@ -17,6 +17,7 @@ import { APPDEV_HANDBOOK } from './appdev.js';
 import { SERVICE_HANDBOOK } from './service.js';
 import { ADMIN_HANDBOOK } from './admin.js';
 import { COMMERCE_HANDBOOK } from './commerce.js';
+import { PRIMITIVES_HANDBOOK } from './primitives.js';
 
 export const SURFACE_HANDBOOKS: Record<SurfaceRole, string> = {
     agent: AGENT_HANDBOOK,
@@ -24,6 +25,7 @@ export const SURFACE_HANDBOOKS: Record<SurfaceRole, string> = {
     service: SERVICE_HANDBOOK,
     admin: ADMIN_HANDBOOK,
     commerce: COMMERCE_HANDBOOK,
+    primitives: PRIMITIVES_HANDBOOK,
 };
 
 /** The operating handbook markdown for a v2 surface role. */

@@ -112,6 +112,13 @@ const EXEMPT: Record<string, string> = {
  * entry says which function carries it.
  */
 const DELEGATES: Record<string, string> = {
+    'src/mcp/invoke.ts': 'services/node-invoke.ts, which does not write anything itself: it '
+        + 'dispatches over loopback to the node\'s OWN route for the named capability, carrying the '
+        + 'caller\'s bearer, so the write happens in that route and whatever it emits is emitted '
+        + 'there, unchanged. Naming one domain here would be wrong in every case but one \u2014 the '
+        + 'capability being run decides which view goes stale, and it is a different capability '
+        + 'every call. Verified by reading the dispatch: the only fetch in node-invoke.ts targets '
+        + '127.0.0.1 and the real Express stack.',
     'src/mcp/agent-crew.ts': "services/crew-ops.ts → services/crew-def-store.ts, which emits 'agents' "
         + 'after a publish (publishCrewDef, the same call the Crew tab\'s route makes) and writes the '
         + 'draft and every version copy through services/memory-write.ts, whose afterMemoryWrite fires '

@@ -187,6 +187,18 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     return jsonContent(shapeResponse('aimeat_discover', response_format, resp.data ?? resp));
   });
 
+  // ── Invoke: the other half of discover ───────────────────────
+
+  mcp.tool('aimeat_invoke', descriptionFor('aimeat_invoke'), {
+    agent_name: agentNameSchema,
+    capability: z.string().describe('The capability id, e.g. aimeat_memory_write.'),
+    input: z.record(z.string(), z.unknown()).optional().describe("That capability's own parameters, as an object."),
+  }, annotationsFor('aimeat_invoke'), async ({ agent_name, capability, input }) => {
+    const { client } = pickAgent(registry, agent_name);
+    const resp = await client.post('/v1/invoke', { capability, input: input ?? {} });
+    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
+  });
+
   // ── Agent profile ──────────────────────────────────────────────────
 
   mcp.tool(

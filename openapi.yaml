@@ -6700,6 +6700,145 @@ paths:
           $ref: '#/components/responses/NotFound'
 
   # ── Device Authorization Flow (RFC 8628) ──────────────────
+  /v1/capabilities/node:
+    get:
+      operationId: listNodeCapabilities
+      summary: What this node can do, as data
+      description: |
+        The catalogue behind `aimeat_discover` and `POST /v1/invoke`: every capability this node can
+        run by name, with the input each one takes.
+
+        WHY IT EXISTS. Several hundred tool descriptions do not fit in a model's context. This turns
+        them into something to look things up in, so an agent can work here holding a dozen tools
+        and finding the rest when it needs them. It is a door beside the existing tool surfaces and
+        replaces none of them: every tool and every route answers exactly as before.
+
+        A PROJECTION, not a second list: the entries are derived from the same transport-neutral
+        catalog the three MCP surfaces share. A capability appears here only if `invoke` can
+        actually run it, so the catalogue cannot list something that does not work.
+
+        Unauthenticated, because it describes the NODE and not any account. Knowing that a
+        capability exists gives nobody access to it; the gate is on the call.
+      tags: [Discovery]
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string }
+          description: Free text. An id match outranks a description match.
+        - name: segment
+          in: query
+          schema: { type: string }
+          description: 'One family, e.g. `memory`, `task`, `workspace`. The response lists them all.'
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20, maximum: 100 }
+      responses:
+        '200':
+          description: The catalogue, or a slice of it
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          total: { type: integer }
+                          returned: { type: integer }
+                          segments:
+                            type: array
+                            items: { type: string }
+                          capabilities:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: string }
+                                title: { type: string }
+                                segment: { type: string }
+                                description: { type: string }
+                                required:
+                                  type: array
+                                  items: { type: string }
+
+  /v1/capabilities/node/{id}:
+    get:
+      operationId: getNodeCapability
+      summary: One capability's contract
+      description: What it takes, what is required, and who it is for. Read this before invoking one you have not called before.
+      tags: [Discovery]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+          description: 'The capability id, e.g. `aimeat_memory_write`.'
+      responses:
+        '200':
+          description: The contract
+        '404':
+          description: This node has nothing by that name
+
+  /v1/invoke:
+    post:
+      operationId: invokeNodeCapability
+      summary: Run a capability by name, as yourself
+      description: |
+        The other half of discover. Name a capability from the catalogue and give it its own input.
+
+        IT RUNS AS THE CALLER. The dispatch goes over loopback with your bearer, through the node's
+        real route for that capability, so `requireAuth`, `requireScope` and every ownership check
+        apply exactly as they would if you had called that route directly. `invoke` can do what you
+        can do and nothing more: a call your scopes refuse is refused here identically, and for the
+        same reason. That is why this route carries no scope of its own — one here would be a
+        second, weaker opinion in front of the real one.
+
+        A parameter the capability does not declare is REFUSED, not dropped, so a call that answers
+        ok did everything you asked. `aimeat_invoke` cannot be invoked.
+      tags: [Discovery]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [capability]
+              properties:
+                capability:
+                  type: string
+                  description: 'The id from the catalogue, e.g. `aimeat_memory_write`.'
+                input:
+                  type: object
+                  description: That capability's own parameters.
+      responses:
+        '200':
+          description: What the capability answered
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          capability: { type: string }
+                          result: {}
+                          duration_ms: { type: integer }
+        '400':
+          description: |
+            No capability named, `NOT_INVOKABLE`, or the capability itself refused — its own error
+            code and message come back whole, with the full envelope in `details`.
+        '401':
+          description: Not authenticated
+        '404':
+          description: NO_SUCH_CAPABILITY, with near misses in `details.did_you_mean` when there are any
+
   /v1/agents/v2/basic-agents:
     get:
       operationId: basicAgentsPreview

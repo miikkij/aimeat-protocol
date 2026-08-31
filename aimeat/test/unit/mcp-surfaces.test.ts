@@ -24,6 +24,38 @@ describe('v2 MCP surfaces', () => {
         }
     });
 
+    /**
+     * The `primitives` surface has ONE number in its acceptance criterion: an agent does its work
+     * with under fifteen tools in context. A surface that quietly grows past that has stopped being
+     * the thing it was built to be, so the number is asserted rather than described.
+     */
+    it('primitives is under fifteen tools, and carries the pair that reaches the rest', () => {
+        const s = toolsForSurface('primitives');
+        expect(MCP_SURFACES.primitives.length).toBeLessThan(15);
+        expect(s.has('aimeat_discover')).toBe(true);
+        expect(s.has('aimeat_invoke')).toBe(true);
+        // The five families an agent works WITH rather than looks up.
+        expect(s.has('aimeat_memory_write')).toBe(true);
+        expect(s.has('aimeat_workspace_read')).toBe(true);
+        expect(s.has('aimeat_task_complete')).toBe(true);
+        expect(s.has('aimeat_message_send')).toBe(true);
+        expect(s.has('aimeat_storage_upload')).toBe(true);
+        // And nothing that should be discovered instead of carried.
+        expect(s.has('aimeat_app_publish')).toBe(false);
+        expect(s.has('aimeat_organism_create')).toBe(false);
+        expect(s.has('aimeat_checkout_open')).toBe(false);
+    });
+
+    it('adding the primitives surface took no tool away from any other surface', () => {
+        // The whole promise of V2 is that it is one more door. If `primitives` had been carved out
+        // of `agent` rather than added beside it, this is where that would show.
+        for (const name of ['aimeat_memory_write', 'aimeat_task_create', 'aimeat_message_send', 'aimeat_discover']) {
+            expect(toolsForSurface('agent').has(name)).toBe(true);
+        }
+        expect(toolsForSurface('appdev').has('aimeat_app_publish')).toBe(true);
+        expect(toolsForSurface('service').has('aimeat_board_post')).toBe(true);
+    });
+
     it('appdev is build-focused: has component tools, no memory/task/board', () => {
         const s = toolsForSurface('appdev');
         expect(s.has('aimeat_app_publish')).toBe(true);
