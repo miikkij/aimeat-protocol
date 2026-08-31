@@ -6709,6 +6709,15 @@ paths:
         whatever it says, plus whether the caller's `aimeat connect serve` is holding a tunnel right
         now. A surface that wants to know what the button will do asks here rather than carrying its
         own copy of the list.
+
+        READ ONLY, and readable by ANY principal of the account, not only the account holder: an
+        agent acting for this owner can already see which of the owner's agents exist and which hold
+        a tunnel, and the template is static. What an agent cannot do is press the button; POST below
+        stays with the account holder in person. This is what lets a chat say "open this page and
+        press it" — the answer carries `approval_url` and a `next_step` sentence written for the
+        person to hear, already true for this account's current state.
+
+        Everything is scoped to the caller's own account. There is no way to ask about another.
       tags: [Identity]
       security:
         - BearerAuth: []
@@ -6747,8 +6756,14 @@ paths:
                                   enum: [spawn, resident]
                                 exists: { type: boolean }
                                 enrolled: { type: boolean }
-        '403':
-          description: Not the account holder (requireOwnerPrincipal)
+                          approval_url:
+                            type: string
+                            description: The page the owner opens to press the button.
+                          next_step:
+                            type: string
+                            description: One sentence to say to the person, true for this account right now.
+        '401':
+          description: Not authenticated
     post:
       operationId: createBasicAgents
       summary: Create the basic agents and hand them to the connector already running

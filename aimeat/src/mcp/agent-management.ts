@@ -17,6 +17,9 @@
  *   import { registerAgentManagementTools } from './agent-management.js';
  *   registerAgentManagementTools(mcp, storage, config, getAgentGaii);
  * @version-history
+ *   v1.5.0 -- 2026-08-31 -- aimeat_agent_basics_get: the chat road to the one-press basic agents.
+ *     Read-only on purpose. The creating door is requireOwnerPrincipal() and stays there, so the
+ *     tool tells the agent what to say and where to send the person, and the person presses.
  *   v1.0.0 -- 2026-05-29 -- Initial creation. Closes public/connector parity drift
  *     for mode_set + tags_set (connector-only since 1.12.1).
  *   v1.1.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
@@ -38,6 +41,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { setAgentTags, setAgentMode, setAgentConsoleUrl } from '../services/agent-profile-write.js';
+import { describeBasicAgents } from '../services/basic-agents.js';
 import { VALID_MODES } from '../routes/agents/constants.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
@@ -119,6 +123,27 @@ export function registerAgentManagementTools(
                     }, null, 2),
                 }],
             };
+        },
+    );
+
+    // ── Tool: aimeat_agent_basics_get ──
+    // The chat road to the basic agents. It reads and it does not create: the creating door is
+    // requireOwnerPrincipal() and stays that way, because an agent calling in the owner's NAME is
+    // not the owner, and creating agents is the account changing. So this hands the agent what to
+    // say and where to send the person, and the person presses.
+    mcp.tool(
+        'aimeat_agent_basics_get',
+        descriptionFor('aimeat_agent_basics_get'),
+        {},
+        annotationsFor('aimeat_agent_basics_get'),
+        async () => {
+            const callerParsed = parseGAII(agentGaii);
+            if (!callerParsed) {
+                return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
+            }
+            // Same function the HTTP route calls, so the two surfaces cannot answer differently.
+            const view = await describeBasicAgents(config, storage, callerParsed.owner);
+            return { content: [{ type: 'text' as const, text: JSON.stringify(view, null, 2) }] };
         },
     );
 

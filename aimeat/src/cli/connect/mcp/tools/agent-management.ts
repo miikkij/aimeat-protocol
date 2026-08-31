@@ -11,6 +11,8 @@
  *     a same-owner sibling's mode, so a device-authed crew self-sets task-runner at startup.
  *
  * @version-history
+ *   v1.6.0 -- 2026-08-31 -- aimeat_agent_basics_get, parity with the server MCP surface: a thin
+ *     proxy onto GET /v1/agents/v2/basic-agents. Read-only; the creating press stays the owner's.
  *   v1.5.0 -- 2026-08-28 -- The five aimeat_crew_* tools, parity with the server MCP surface: thin
  *     proxies onto /v1/agents/:name/crew*, with try polling locally up to wait_seconds.
  *   v1.4.0 -- 2026-08-13 -- Add aimeat_agent_console_set, parity with the server MCP surface.
@@ -37,6 +39,16 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
   }, annotationsFor('aimeat_agent_statistics'), async ({ agent_name }) => {
     const { client, agent } = pickAgent(registry, agent_name);
     const resp = await client.get(`/v1/agents/${encodeURIComponent(agent)}/statistics`);
+    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
+  });
+
+  // Read-only: what the one-press basic agents would give this account, and whether the owner's
+  // connector is up. Creating them is the owner's own press, so there is no write half here.
+  mcp.tool('aimeat_agent_basics_get', descriptionFor('aimeat_agent_basics_get'), {
+    agent_name: agentNameSchema,
+  }, annotationsFor('aimeat_agent_basics_get'), async ({ agent_name }) => {
+    const { client } = pickAgent(registry, agent_name);
+    const resp = await client.get('/v1/agents/v2/basic-agents');
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
   });
 

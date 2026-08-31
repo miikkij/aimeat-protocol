@@ -210,9 +210,58 @@ async function run() {
         assert((r.body.data.connected_principals as string[]).includes(daemonA.gaii), 'the connected principal should be named');
     });
 
-    // ── 3. An agent of the owner cannot press the button ──────────────────────
+    // ── 3. An agent of the owner may READ, and may not press ──────────────────
     await test('an agent acting in the owner\'s name cannot press the button', async () => {
         const r = await json('/v1/agents/v2/basic-agents', { method: 'POST', headers: { Authorization: `Bearer ${daemonA.token}` } });
+        assert(r.status === 403, `expected 403, got ${r.status}`);
+    });
+
+    await test('an agent of the owner CAN read what the button would do, and where to send the person', async () => {
+        const r = await json('/v1/agents/v2/basic-agents', { headers: { Authorization: `Bearer ${daemonA.token}` } });
+        assert(r.status === 200, `expected 200, got ${r.status}`);
+        assert((r.body.data.agents as any[]).length === BASIC_NAMES.length, 'the agent should see the whole set');
+        assert(r.body.data.daemon_connected === true, 'and the state of its own connector');
+        assert(typeof r.body.data.approval_url === 'string' && r.body.data.approval_url.includes('tab=agents'),
+            'the answer should carry the page the owner opens');
+        assert(typeof r.body.data.next_step === 'string' && r.body.data.next_step.length > 0,
+            'and a sentence the agent can say to the person');
+    });
+
+    await test('an agent reading this sees its OWN account and no other', async () => {
+        const mine = await json('/v1/agents/v2/basic-agents', { headers: { Authorization: `Bearer ${daemonB.token}` } });
+        assert(mine.status === 200, `expected 200, got ${mine.status}`);
+        // Owner B has no basic agents; owner A's state must not leak into the answer.
+        assert((mine.body.data.agents as any[]).every(x => x.exists === false),
+            'another owner\'s agents must not appear here');
+        assert((mine.body.data.connected_principals as string[]).every(p => p.includes(`#${b.owner}@`)),
+            'only this account\'s own connected principals');
+    });
+
+    await test('an unauthenticated caller cannot read it at all', async () => {
+        const r = await json('/v1/agents/v2/basic-agents');
+        assert(r.status === 401, `expected 401, got ${r.status}`);
+    });
+
+    await test('an outside app of the same owner cannot read how their agents are set up', async () => {
+        // The read is open to the owner and their own agents, and to nothing else. An ecosystem app
+        // is the cheapest real principal of the other class to obtain, and it takes the same branch
+        // an app grant does: the handler refuses both by name.
+        const hello = await json('/v1/ecosystem-apps/hello', {
+            method: 'POST',
+            body: JSON.stringify({ owner: a.owner, app: 'nosy-app', public_key: Buffer.from('not-a-real-key').toString('base64') }),
+        });
+        assert(hello.status === 200, `hello ${hello.status}`);
+        const approve = await json(`/v1/ecosystem-apps/${hello.body.data.user_code}/approve`, {
+            method: 'POST', headers: authA, body: JSON.stringify({ action: 'approve', scopes: ['memory:read'] }),
+        });
+        assert(approve.status === 200, `approve ${approve.status}: ${JSON.stringify(approve.body?.error)}`);
+        const tok = await json('/v1/ecosystem-apps/token', {
+            method: 'POST',
+            body: JSON.stringify({ device_code: hello.body.data.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }),
+        });
+        assert(!!tok.body.access_token, `eco token ${tok.status}: ${JSON.stringify(tok.body)}`);
+
+        const r = await json('/v1/agents/v2/basic-agents', { headers: { Authorization: `Bearer ${tok.body.access_token}` } });
         assert(r.status === 403, `expected 403, got ${r.status}`);
     });
 
