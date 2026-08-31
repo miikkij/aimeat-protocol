@@ -6957,12 +6957,24 @@ paths:
   /v1/agents/{gaii}/card:
     get:
       operationId: getAgentCard
-      summary: An agent's signed card
+      summary: An agent's public card, signed by this node
       description: |
-        Public and unauthenticated, which is the feature: fetching this and the matching JWKS is the
-        whole authenticity check, so another owner's node can verify the card without a bilateral
-        arrangement with us. Returned as the exact compact JWS that was verified at enrolment — a
-        signature is over bytes, so a re-serialisation would be a different document.
+        Public and unauthenticated, which is the feature: fetching this and the node's published key
+        is the whole authenticity check, so another owner's node can verify that this agent exists
+        here without a bilateral arrangement with us.
+
+        WHAT IT CARRIES: identity, display name, runtime, run mode, modalities, skills, and the
+        agent's verification key. What the agent ASKED to be allowed to do, its description and its
+        webhook are NOT here; those are on the extended card.
+
+        WHO SIGNED IT: this node, with the key `/.well-known/aimeat` publishes as `public_key`
+        (base64; a JWK `x` is the same bytes as base64url). The agent cannot sign a subset it never
+        saw, so the projection carries the node's word rather than the agent's. `spec` is
+        `aimeat.agent-card-public/v1`, deliberately not the agent card's own spec, and the document
+        names its own signing key at `nodeKeyUri`.
+
+        If this node's signing key is unavailable the projection is served as plain JSON instead of a
+        JWS. A caller can tell the two apart by content type.
 
         The path segment is a full agent identity (`agent#owner@node`), url-encoded. A bare name is
         ambiguous across owners on a shared node.
@@ -6975,12 +6987,49 @@ paths:
           description: The agent's full identity, url-encoded.
       responses:
         '200':
-          description: The card, as a compact JWS
+          description: The public card, as a compact JWS (or plain JSON if this node could not sign it)
           content:
             application/jose:
               schema: { type: string }
         '400':
           description: The path is not a full agent identity
+        '404':
+          description: No published card for that agent
+
+  /v1/agents/{gaii}/card/extended:
+    get:
+      operationId: getAgentCardExtended
+      summary: The agent's own signed card, in full
+      description: |
+        The exact compact JWS the agent signed and this node verified at enrolment, served verbatim:
+        a signature is over bytes, so a re-serialisation would be a different document. This is what
+        `/v1/agents/{gaii}/jwks.json` verifies.
+
+        Readable by the account this agent belongs to: the owner in person, and any principal acting
+        in that owner's name. Anybody else reads the public card at the address without `/extended`.
+        Federated sessions are refused, because their owner claim names a remote node's account.
+
+        A separate address rather than a richer response on the public one, so nothing in front of
+        this node can cache an owner's answer and hand it to a stranger.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: gaii
+          in: path
+          required: true
+          schema: { type: string }
+          description: The agent's full identity, url-encoded.
+      responses:
+        '200':
+          description: The agent's own card, as a compact JWS
+          content:
+            application/jose:
+              schema: { type: string }
+        '400':
+          description: The path is not a full agent identity
+        '403':
+          description: Not this agent's account
         '404':
           description: No published card for that agent
 
@@ -7025,8 +7074,12 @@ paths:
       operationId: getAgentCardInfo
       summary: An agent's card as JSON, for a surface that will not verify it
       description: |
-        A convenience for rendering. Anything DECIDING whether to trust the agent reads the JWS and
-        the JWKS instead.
+        A convenience for rendering. Anything DECIDING whether to trust the agent reads a JWS and a
+        key set instead.
+
+        The same split as the two card addresses: this owner's principals get the full card, everyone
+        else gets the public projection. `extended` says which half you were given, so a surface
+        never has to guess whether a missing field is absent or withheld.
       tags: [Identity]
       parameters:
         - name: gaii
@@ -7035,7 +7088,31 @@ paths:
           schema: { type: string }
       responses:
         '200':
-          description: The card's contents, with the addresses of the two documents that prove it
+          description: The card's contents, with the addresses of the documents that prove it
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          extended:
+                            type: boolean
+                            description: True when the caller was given the agent's full card.
+                          card:
+                            type: object
+                            description: The agent card, or its public projection.
+                          card_url: { type: string }
+                          extended_card_url: { type: string }
+                          jwks_url: { type: string }
+                          node_key_url: { type: string }
+                          enrolled_at:
+                            type: string
+                            nullable: true
+                            description: Present only on the extended answer.
         '404':
           description: No published card for that agent
 

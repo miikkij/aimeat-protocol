@@ -21,18 +21,22 @@
  *   and a signature is over bytes.
  *
  * @structure
- *   - jwkThumbprint / ed25519Jwk / jwkFromBase64Key — key shapes
+ *   - jwkThumbprint / ed25519Jwk / base64KeyToJwkX — key shapes
  *   - readCardJws — parse a compact JWS without trusting it
  *   - verifyCardJws — verify against a NAMED key
  *   - buildJwks — the published key set
+ *   - publicCardProjection / signWithNodeKey — the public half, and who signs it
  * @usage
  *   const read = readCardJws(jws);
  *   const ok = await verifyCardJws(jws, read.card.publicKey);
  * @version-history
+ *   v1.1.0 — 2026-08-31 — The public projection and its signer. Two documents, two authors: the
+ *     agent signs the full card, the node signs the public subset, and the two `kid`s are different
+ *     keys saying different things on purpose.
  *   v1.0.0 — 2026-08-31 — Initial (Agent v2, V1).
  */
-import { compactVerify, importJWK, calculateJwkThumbprint, decodeProtectedHeader, type JWK } from 'jose';
-import { validateAgentCard, type AgentCard, type AgentCardKey, type CardDefect } from '../models/agent-card.js';
+import { CompactSign, compactVerify, importJWK, calculateJwkThumbprint, decodeProtectedHeader, type JWK } from 'jose';
+import { validateAgentCard, type AgentCard, type AgentCardKey, type CardDefect, type RunMode } from '../models/agent-card.js';
 
 /** The RFC 7638 thumbprint of an Ed25519 public key given as raw base64url. */
 export async function jwkThumbprint(xBase64Url: string): Promise<string> {
@@ -123,4 +127,85 @@ export async function verifyCardJws(jws: string, key: Pick<AgentCardKey, 'x'>): 
 /** The published key set for one agent: exactly the key its card is signed with. */
 export function buildJwks(xBase64Url: string, kid: string): { keys: JWK[] } {
   return { keys: [ed25519Jwk(xBase64Url, kid)] };
+}
+
+// ── The public projection ────────────────────────────────────────────────────
+
+/**
+ * The `spec` of a public card. DELIBERATELY not `aimeat.agent-card/v1`.
+ *
+ * A public card is a different document with a different author. The agent's card is signed by the
+ * agent and says "I am this, and I hold this key"; the public card is a subset signed by the NODE
+ * and says "this agent exists here, with this key". Giving both the same `spec` would invite a
+ * reader to validate one against the other's schema and to mistake the node's word for the agent's.
+ */
+export const AGENT_CARD_PUBLIC_SPEC = 'aimeat.agent-card-public/v1';
+
+/**
+ * What anyone may read about an agent without being its owner: enough to find it, address it and
+ * verify anything it later signs. Everything an owner would not publish about their own agent —
+ * what it ASKED to be allowed to do, its description, its webhook — is absent, and absent by
+ * construction rather than by a caller remembering to strip it.
+ */
+export interface PublicAgentCard {
+  spec: typeof AGENT_CARD_PUBLIC_SPEC;
+  gaii: string;
+  name: string;
+  owner: string;
+  node: string;
+  displayName?: string;
+  runtime: { platform: string; version?: string };
+  runMode: RunMode;
+  skills: string[];
+  modalities: string[];
+  publicKey: AgentCardKey;
+  jwksUri: string;
+  cardUri: string;
+  /** Where the key that signed THIS document is published, so the projection verifies on its own. */
+  nodeKeyUri: string;
+  issuedAt: string;
+}
+
+/**
+ * The public half of a card. A pure function of the agent's own card, so the same projection serves
+ * the public endpoint here and the A2A card an exporter will need later — one decision about what is
+ * public, in one place, rather than one per surface.
+ *
+ * `skills` passes through whole. There is no mechanism today for an owner to mark one skill private,
+ * so every skill an agent declares is public; when that mechanism exists, this is the line it
+ * changes and nothing else has to move.
+ */
+export function publicCardProjection(card: AgentCard, nodeKeyUri: string): PublicAgentCard {
+  return {
+    spec: AGENT_CARD_PUBLIC_SPEC,
+    gaii: card.gaii,
+    name: card.name,
+    owner: card.owner,
+    node: card.node,
+    ...(card.displayName ? { displayName: card.displayName } : {}),
+    runtime: card.runtime,
+    runMode: card.runMode,
+    skills: card.skills,
+    modalities: card.modalities,
+    publicKey: card.publicKey,
+    jwksUri: card.jwksUri,
+    cardUri: card.cardUri,
+    nodeKeyUri,
+    issuedAt: card.issuedAt,
+  };
+}
+
+/**
+ * Sign a projection with the NODE's own key — the one `/.well-known/aimeat` publishes and federation
+ * already verifies with. Not a new key and not a hierarchy: the node has exactly one signing
+ * identity, and this is it saying "this agent exists here".
+ *
+ * The agent cannot sign this. Its signature is over the full card's bytes and the agent is not
+ * present when somebody reads the public one, so a subset it never signed can only carry the
+ * signature of whoever produced the subset.
+ */
+export async function signWithNodeKey(payload: unknown, privateKey: CryptoKey, kid: string): Promise<string> {
+  return new CompactSign(new TextEncoder().encode(JSON.stringify(payload)))
+    .setProtectedHeader({ alg: 'EdDSA', typ: 'aimeat-agent-card-public+jws', kid })
+    .sign(privateKey);
 }
