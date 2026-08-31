@@ -32,8 +32,21 @@ const STALE_DAYS = 540;
 
 interface Registry { time: Record<string, string>; latest: string }
 
+/**
+ * npm names the package in the path, and a scoped name has to survive that intact.
+ *
+ * This used to be `encodeURIComponent(name).replace('%40', '@')` — encode everything, then undo the
+ * one bit the registry will not accept. CodeQL called it what it is (js/incomplete-sanitization,
+ * alert 1594): a non-global `.replace` puts back only the FIRST `%40`, so the round trip is not a
+ * round trip. Checking the name against what an npm name may contain is both stricter and simpler
+ * than encoding and partially decoding it, and these names come from our own licenses.json rather
+ * than from anywhere a stranger can reach.
+ */
+const NPM_NAME = /^@?[a-z0-9][a-z0-9._-]*(\/[a-z0-9][a-z0-9._-]*)?$/i;
+
 async function registryInfo(name: string): Promise<Registry | null> {
-  const res = await fetch(`https://registry.npmjs.org/${encodeURIComponent(name).replace('%40', '@')}`);
+  if (!NPM_NAME.test(name)) return null;
+  const res = await fetch(`https://registry.npmjs.org/${name}`);
   if (!res.ok) return null;
   const body = await res.json() as { time?: Record<string, string>; 'dist-tags'?: { latest?: string } };
   const latest = body['dist-tags']?.latest;
