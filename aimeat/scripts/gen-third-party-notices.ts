@@ -34,22 +34,12 @@ import {
   AIMEAT_ROOT, REPO_ROOT, SPDX_OF_NOTE, npmComponents, vendoredComponents,
   type Component,
 } from './lib/license-inventory.js';
+import { cell } from './lib/md-table.js';
 
 const OUTPUTS = [
   join(REPO_ROOT, 'THIRD-PARTY-NOTICES.md'),
   join(AIMEAT_ROOT, 'public', 'THIRD-PARTY-NOTICES.md'),
 ];
-
-/**
- * Markdown table cells cannot carry a pipe or a newline.
- *
- * The backslash is escaped FIRST and that order is the whole point: escaping the pipe first turns
- * an input `\|` into `\\|`, where the reader sees an escaped backslash followed by a live column
- * separator, and the row breaks. CodeQL flagged it as js/incomplete-sanitization on 2026-08-31.
- */
-function cell(text: string): string {
-  return text.replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\s*\n\s*/g, ' ').trim();
-}
 
 function link(name: string, url: string): string {
   return url ? `[${cell(name)}](${url})` : cell(name);
