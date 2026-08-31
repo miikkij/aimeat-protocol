@@ -52,6 +52,39 @@
       "package": "duckdb parquet extension (duckdb 1.4.3, wasm_eh)",
       "license": "MIT",
       "why": "MEASURED, not anticipated: reading a Parquet file makes duckdb-wasm fetch this extension from extensions.duckdb.org AT RUNTIME. The app CSP happens to allow it (connect-src https:), so it works and would have gone unnoticed — but it is exactly the CDN dependency self-hosting exists to remove, and it puts Parquet reading at the mercy of somebody else's uptime. Mirrored here under the upstream's own directory layout, because that is what duckdb appends to the repository it is given: SET custom_extension_repository = '<base>/extensions'."
+    },
+    {
+      "path": "lib/ffmpeg-core@0.12.10/ffmpeg-core.wasm",
+      "url": "https://unpkg.com/@ffmpeg/core@0.12.10/dist/esm/ffmpeg-core.wasm",
+      "sha256": "9f57947a5bd530d8f00c5b3f2cb2a3492faa7e5d823315342d6a8656d0a6b7b7",
+      "bytes": 32232419,
+      "package": "@ffmpeg/core@0.12.10",
+      "license": "GPL-2.0-or-later",
+      "distribute": false,
+      "licenseNote": "Same GPL ffmpeg build as 0.12.6, one patch newer. AIMEAT distributes neither version.",
+      "why": "32 MB, AND GPL. The 0.12.6 directory stays beside it: an app that names that path keeps working, which is the whole point of putting the full version in the directory name."
+    },
+    {
+      "path": "lib/ffmpeg-core@0.12.10/ffmpeg-core.js",
+      "url": "https://unpkg.com/@ffmpeg/core@0.12.10/dist/esm/ffmpeg-core.js",
+      "sha256": "67a48f11645f85439f3fde4f2119042c16b374b910206b7a7a24f342e28dcae3",
+      "bytes": 111804,
+      "package": "@ffmpeg/core@0.12.10",
+      "license": "GPL-2.0-or-later",
+      "distribute": false,
+      "licenseNote": "Same GPL ffmpeg build as 0.12.6, one patch newer. AIMEAT distributes neither version.",
+      "why": "LICENCE, not size. Emscripten output of the same GPL build."
+    },
+    {
+      "path": "lib/ffmpeg-core@0.12.10/ffmpeg-core.umd.js",
+      "url": "https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd/ffmpeg-core.js",
+      "sha256": "b266ab5b952555881dd6310663986994a182acb2b7ff25cf10a25f7a37ac2b21",
+      "bytes": 112059,
+      "package": "@ffmpeg/core@0.12.10",
+      "license": "GPL-2.0-or-later",
+      "distribute": false,
+      "licenseNote": "Same GPL ffmpeg build as 0.12.6, one patch newer. AIMEAT distributes neither version.",
+      "why": "LICENCE, not size. The UMD loader for the same GPL build."
     }
   ]
 }

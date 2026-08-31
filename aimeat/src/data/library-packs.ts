@@ -99,6 +99,15 @@ export interface LibraryPack {
   /** stable REQUIRES a demo template + a recorded AEB acceleration result. */
   status: 'preview' | 'stable' | 'deprecated';
   /**
+   * The pack id that replaces this one, on a deprecated pack. `phaser` → `phaser4`.
+   *
+   * WITHOUT IT, DEPRECATION ONLY SAYS STOP. That is half an instruction: a model told not to use
+   * phaser 3 has no way to learn that phaser 4 sits on the same node under a different id, so it
+   * either uses the deprecated pack anyway or writes the game without one. The deprecation is also
+   * the ONLY moment this can be said, because the old pack is what an existing app still names.
+   */
+  supersededBy?: string;
+  /**
    * The strongest model-strength this pack is reliably-and-accelerated on — a WARNING label, not a
    * gate (an unlabelled pack still ships). Driven by API-version drift from training data:
    *   'any'       — pin == the API models know; a mid-tier model codes it correctly from memory.
@@ -199,7 +208,10 @@ export function buildLibsCatalogue(baseUrl: string): Array<Record<string, unknow
       include: renderPackText(p.include.join('\n'), baseUrl),
     };
     if (p.requires.length > 0) entry.requires = p.requires.join(', ');
-    if (p.status === 'deprecated') entry.deprecated = true;
+    if (p.status === 'deprecated') {
+      entry.deprecated = true;
+      if (p.supersededBy) entry.superseded_by = p.supersededBy;
+    }
     return entry;
   });
 }
@@ -271,9 +283,16 @@ export function buildLlmsPacksTable(): string {
   for (const p of PACKS) {
     const tier = p.modelTier ? `[${p.modelTier}] ` : '';
     const caveat = p.apiCaveat ? ` ⚠ ${p.apiCaveat}` : '';
-    const doc = p.kind === 'sdk'
-      ? (p.status === 'deprecated' ? p.description + ' (DEPRECATED — do not use in new apps)' : p.aiDoc)
-      : tier + p.description + caveat + ' Full usage doc: GET /v1/library-packs/' + p.id;
+    // The deprecation label used to be printed for sdk packs only, so a deprecated VENDORED pack
+    // appeared here with its ordinary description and nothing else — and the vendored packs are
+    // exactly the ones that get replaced, since a new major of a browser library ships as a new
+    // file beside the old one. A model reading this table would have picked the dead one.
+    const doc = p.status === 'deprecated'
+      ? p.description + ' (DEPRECATED — do not use in new apps'
+        + (p.supersededBy ? `; use ${p.supersededBy} instead)` : ')')
+      : p.kind === 'sdk'
+        ? p.aiDoc
+        : tier + p.description + caveat + ' Full usage doc: GET /v1/library-packs/' + p.id;
     rows.push(`| ${p.id} | \`${p.url}\` | ${cell(doc)} |`);
   }
   return rows.join('\n');

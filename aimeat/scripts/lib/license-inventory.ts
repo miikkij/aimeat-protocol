@@ -81,6 +81,11 @@ export interface Component {
   /** Vendored only: true when vendor-libs.mjs installs it rather than AIMEAT shipping it. */
   fetched?: boolean;
   /**
+   * The component id that replaces this one, when this file is kept only so that already-published
+   * apps that name it keep working. It is deliberately behind and must not be read as neglect.
+   */
+  supersededBy?: string;
+  /**
    * Package URL. Stated rather than derived for the served libraries: most came off a CDN URL that
    * a regex could parse and a few (the re-bundled three.js) did not, and a scanner matching an
    * SBOM against a vulnerability feed matches on exactly this string. A wrong one is worse than a
@@ -201,6 +206,7 @@ interface VendoredEntry {
   modified?: boolean;
   note?: string;
   purl?: string;
+  supersededBy?: string;
 }
 
 /** Read a path that licenses.json gave, relative to public/lib/. */
@@ -233,6 +239,7 @@ export function vendoredComponents(): Component[] {
     files: e.files ?? [],
     fetched: e.fetched === true,
     purl: e.purl,
+    supersededBy: e.supersededBy,
   }));
 }
 

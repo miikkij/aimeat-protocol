@@ -4,32 +4,32 @@
     {
       "id": "tailwindcss",
       "name": "@tailwindcss/browser",
-      "version": "4.3.1",
+      "version": "4.3.3",
       "spdx": "MIT",
       "copyright": "Copyright (c) Tailwind Labs, Inc.",
       "homepage": "https://tailwindcss.com",
-      "source": "https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4",
+      "source": "https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.3",
       "licenseFile": "LICENSES/tailwindcss.txt",
       "files": [
         "tailwindcss@4.js"
       ],
       "modified": false,
-      "purl": "pkg:npm/%40tailwindcss/browser@4.3.1"
+      "purl": "pkg:npm/%40tailwindcss/browser@4.3.3"
     },
     {
       "id": "daisyui",
       "name": "daisyUI",
-      "version": "5.5.23",
+      "version": "5.7.22",
       "spdx": "MIT",
       "copyright": "Copyright (c) 2020 Pouya Saadeghi",
       "homepage": "https://daisyui.com",
-      "source": "https://cdn.jsdelivr.net/npm/daisyui@5",
+      "source": "https://cdn.jsdelivr.net/npm/daisyui@5.7.22/daisyui.css",
       "licenseFile": "LICENSES/daisyui.txt",
       "files": [
         "daisyui@5.css"
       ],
       "modified": false,
-      "purl": "pkg:npm/daisyui@5.5.23"
+      "purl": "pkg:npm/daisyui@5.7.22"
     },
     {
       "id": "chartjs",
@@ -64,17 +64,17 @@
     {
       "id": "mermaid",
       "name": "Mermaid",
-      "version": "11.16.1",
+      "version": "11.17.2",
       "spdx": "MIT",
       "copyright": "Copyright (c) 2014 - 2022 Knut Sveidqvist",
       "homepage": "https://mermaid.js.org",
-      "source": "npm mermaid@11.16.1 (dist/mermaid.min.js)",
+      "source": "npm mermaid@11.17.2 (dist/mermaid.min.js)",
       "licenseFile": "LICENSES/mermaid.txt",
       "files": [
         "mermaid/mermaid.min.js"
       ],
       "modified": false,
-      "purl": "pkg:npm/mermaid@11.16.1"
+      "purl": "pkg:npm/mermaid@11.17.2"
     },
     {
       "id": "three",
@@ -89,7 +89,8 @@
         "three.min.js"
       ],
       "modified": false,
-      "purl": "pkg:npm/three@0.128.0"
+      "purl": "pkg:npm/three@0.128.0",
+      "supersededBy": "three-world"
     },
     {
       "id": "three-world",
@@ -139,23 +140,41 @@
       ],
       "modified": false,
       "note": "WEAK COPYLEFT, and the one place on this node where that matters. p5 is served unmodified as its own file at a stable URL; nothing links it statically and nothing derives from it, so an app that calls p5 stays under its own licence. The LGPL asks for three things and all three are here: the licence text (LICENSES/p5.txt), the notice that the library is used and can be replaced, and the complete source of the exact version, which is the tarball in `sourceOffer`. Anyone may substitute their own p5 build by pointing their app at a different URL. Owner-approved 2026-07-16.",
-      "purl": "pkg:npm/p5@1.11.13"
+      "purl": "pkg:npm/p5@1.11.13",
+      "supersededBy": "p5v2"
+    },
+    {
+      "id": "p5v2",
+      "name": "p5.js",
+      "version": "2.3.2",
+      "spdx": "LGPL-2.1-only",
+      "copyright": "Copyright (c) The Processing Foundation and the p5.js contributors",
+      "homepage": "https://p5js.org",
+      "source": "https://cdn.jsdelivr.net/npm/p5@2.3.2/lib/p5.min.js",
+      "sourceOffer": "https://registry.npmjs.org/p5/-/p5-2.3.2.tgz",
+      "licenseFile": "LICENSES/p5.txt",
+      "files": [
+        "p5@2.min.js"
+      ],
+      "modified": false,
+      "note": "p5 2.x, served beside p5@1.min.js rather than over it. Still LGPL-2.1: the same three obligations as the v1 entry, and the source offer above is the exact 2.3.2 tarball.",
+      "purl": "pkg:npm/p5@2.3.2"
     },
     {
       "id": "pixijs",
       "name": "PixiJS",
-      "version": "8.19.0",
+      "version": "8.20.1",
       "spdx": "MIT",
       "copyright": "Copyright (c) 2013-2023 Mathew Groves, Chad Engler",
       "homepage": "https://pixijs.com",
-      "source": "https://cdn.jsdelivr.net/npm/pixi.js@8/dist/",
+      "source": "https://cdn.jsdelivr.net/npm/pixi.js@8.20.1/dist/",
       "licenseFile": "LICENSES/pixijs.txt",
       "files": [
         "pixi@8.min.js",
         "pixi-unsafe-eval@8.min.js"
       ],
       "modified": false,
-      "purl": "pkg:npm/pixi.js@8.19.0"
+      "purl": "pkg:npm/pixi.js@8.20.1"
     },
     {
       "id": "phaser",
@@ -170,7 +189,24 @@
         "phaser@3.min.js"
       ],
       "modified": false,
-      "purl": "pkg:npm/phaser@3.90.0"
+      "purl": "pkg:npm/phaser@3.90.0",
+      "supersededBy": "phaser4"
+    },
+    {
+      "id": "phaser4",
+      "name": "Phaser",
+      "version": "4.2.1",
+      "spdx": "MIT",
+      "copyright": "Copyright (c) 2024 Richard Davey, Phaser Studio Inc.",
+      "homepage": "https://phaser.io",
+      "source": "https://cdn.jsdelivr.net/npm/phaser@4.2.1/dist/phaser.min.js",
+      "licenseFile": "LICENSES/phaser.txt",
+      "files": [
+        "phaser@4.min.js"
+      ],
+      "modified": false,
+      "purl": "pkg:npm/phaser@4.2.1",
+      "note": "Phaser 4, served beside phaser@3.min.js rather than over it. Every published game keeps loading the file it was written against; the v3 file is never touched again."
     },
     {
       "id": "drawflow",
@@ -191,17 +227,17 @@
     {
       "id": "pdfjs",
       "name": "PDF.js (pdfjs-dist)",
-      "version": "6.2.108",
+      "version": "6.3.289",
       "spdx": "Apache-2.0",
       "copyright": "Copyright 2024 Mozilla Foundation",
       "homepage": "https://mozilla.github.io/pdf.js/",
-      "source": "https://cdn.jsdelivr.net/npm/pdfjs-dist@6.2.108/build/",
+      "source": "https://cdn.jsdelivr.net/npm/pdfjs-dist@6.3.289/build/",
       "licenseFile": "LICENSES/pdfjs.txt",
       "files": [
         "pdfjs@6/**"
       ],
       "modified": false,
-      "purl": "pkg:npm/pdfjs-dist@6.2.108"
+      "purl": "pkg:npm/pdfjs-dist@6.3.289"
     },
     {
       "id": "duckdb-wasm",
@@ -265,7 +301,26 @@
       "fetched": true,
       "modified": false,
       "note": "STRONG COPYLEFT, and the reason none of these three files is in git or in any AIMEAT package. The build enables libx264 and libx265, which makes the compiled result GPL-2.0-or-later; npm's `license: MIT` field describes the packaging and not the binary. All three files (the wasm and both emscripten loaders) are installed on the operator's own machine by `pnpm vendor:libs`, byte-identical to upstream and hash-pinned, so AIMEAT never distributes them and stays MIT. An operator who serves them is distributing GPL work under the GPL, and the source offer above is what that requires.",
-      "purl": "pkg:npm/%40ffmpeg/core@0.12.6"
+      "purl": "pkg:npm/%40ffmpeg/core@0.12.6",
+      "supersededBy": "ffmpeg-core-0-12-10"
+    },
+    {
+      "id": "ffmpeg-core-0-12-10",
+      "name": "@ffmpeg/core (ffmpeg 5.1.4 compiled to WebAssembly)",
+      "version": "0.12.10",
+      "spdx": "GPL-2.0-or-later",
+      "copyright": "Copyright (c) 2000-2022 the FFmpeg developers",
+      "homepage": "https://ffmpeg.org",
+      "source": "https://unpkg.com/@ffmpeg/core@0.12.10/dist/",
+      "sourceOffer": "https://github.com/ffmpegwasm/ffmpeg.wasm (build scripts) and https://ffmpeg.org/releases/ffmpeg-5.1.4.tar.xz (the ffmpeg sources it was built from)",
+      "licenseFile": "LICENSES/GPL-2.0.txt",
+      "files": [
+        "ffmpeg-core@0.12.10/**"
+      ],
+      "fetched": true,
+      "modified": false,
+      "note": "Same GPL build, one patch newer, in its own directory because the full version is in the path. AIMEAT distributes neither: both directories are installed by pnpm vendor:libs on the operator's own machine.",
+      "purl": "pkg:npm/%40ffmpeg/core@0.12.10"
     },
     {
       "id": "world-atlas",
@@ -305,14 +360,15 @@
       "spdx": "MIT",
       "copyright": "Copyright (c) 2015-present Jason Miller",
       "homepage": "https://preactjs.com",
-      "source": "https://esm.sh/preact@10.25.4 (esbuild bundle; the version is in each file's own banner)",
+      "source": "https://esm.sh/preact@10.25.4 (esbuild bundle; the version is in each file own banner)",
       "licenseFile": "LICENSES/preact.txt",
       "files": [
         "preact.mjs",
         "preact-hooks.mjs"
       ],
       "modified": false,
-      "purl": "pkg:npm/preact@10.25.4"
+      "purl": "pkg:npm/preact@10.25.4",
+      "note": "Held at 10.25.4 on purpose. 10.29.8 was tried on 2026-08-31 and broke the SPA outright: the whole app died with AIMEAT failed to start, because the esm.sh hooks build for that version does not share a preact instance with the one the importmap serves. Verified in a real browser, then reverted. No known vulnerability in 10.25.4; the upgrade needs a hooks build that works, not another attempt at the same one."
     },
     {
       "id": "htm",
