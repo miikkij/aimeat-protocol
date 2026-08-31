@@ -13,13 +13,16 @@
  *   named a level the node never produces (`advanced`) and omitted the one it does (`expert`),
  *   which inverted the comparison at the top. None of that was visible from this file.
  *
- *   States: 'system' | 'new' | 'onboarding' | 'problem' | 'idle' | 'production' — unchanged, which
- *   is why every locale key and colour below still applies.
+ *   States: 'system' | 'workstation' | 'new' | 'onboarding' | 'problem' | 'idle' | 'production'.
  * @structure agentState(agent) · getDefaultTab(state) · getStateColor(state)
  * @usage
  *   import { agentState, getDefaultTab } from './state-detector.js';
  *   const state = agentState(agent);
  * @version-history
+ *   v2.1.0 -- 2026-08-31 -- 'workstation' is teal and opens on activity. It is an MCP connection a
+ *     tool uses, not something that acts on its own, so it leaves the red/orange/green axis rather
+ *     than being scored on it: unopened for a month used to be red, and a Hello Integration it does
+ *     not owe used to be orange.
  *   v2.0.0 -- 2026-08-09 -- Renders the server's verdict instead of computing its own (V1). Removed
  *     detectAgentState(), READINESS_RANKS, readinessRank() and isStale(); the three dead conditions
  *     went with them.
@@ -57,18 +60,31 @@ export function getDefaultTab(state) {
     case 'onboarding': return 'integration';
     case 'problem': return 'integration';
     case 'system': return 'directives'; // internal agents: brain, not onboarding
+    // A connection has no queue and owes no onboarding, so neither of those tabs has anything to
+    // say about it. What came through it does.
+    case 'workstation': return 'activity';
     case 'idle': return 'tasks';
     case 'production': return 'tasks';
     default: return 'tasks';
   }
 }
 
+/**
+ * The dot beside an agent.
+ *
+ * Red, orange and green answer ONE question — is something wrong, pending, or fine — and grey is
+ * its quiet fourth. `workstation` is deliberately none of them: it is teal, the colour its mode
+ * badge already carries, because the question that axis asks does not apply to an MCP connection a
+ * person opens and closes. Teal says WHAT it is where the others say HOW IT IS GOING, and that is
+ * the point rather than an inconsistency.
+ */
 export function getStateColor(state) {
   switch (state) {
     case 'new': return 'var(--warning)';
     case 'onboarding': return 'var(--warning)';
     case 'problem': return 'var(--danger)';
     case 'system': return 'var(--success)';
+    case 'workstation': return 'var(--teal)';
     case 'idle': return 'var(--text-muted)';
     case 'production': return 'var(--success)';
     default: return 'var(--text-muted)';

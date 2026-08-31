@@ -7775,6 +7775,7 @@
         "saveError": "No se pudieron guardar los grupos."
       },
       "reorderHint": "Arrastra para reordenar",
+      "startedByYou": "Las que arrancas tú",
       "solo": {
         "notFound": "No se encontró el agente.",
         "loginRequired": "Inicia sesión para ver este agente."
@@ -8415,6 +8416,7 @@
         "issue": "problema",
         "newShort": "nuevo",
         "issueShort": "problema",
+        "connection": "conexiones",
         "internal": "Interno"
       },
       "idcard": {

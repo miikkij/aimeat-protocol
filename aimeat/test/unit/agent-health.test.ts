@@ -55,6 +55,55 @@ describe('the states, in priority order', () => {
     });
 });
 
+/**
+ * A workstation is an MCP connection a TOOL uses, given a GAII so its work can be traced. It is
+ * online exactly while somebody is using it, so the working/broken axis does not apply: not seen
+ * today means the person did not open the tool, and Hello Integration is not owed by something that
+ * reaches the node over MCP anyway. Every one of these cases returned a colour that made a claim.
+ */
+describe('a workstation is not judged on the axis the other agents are', () => {
+    const ws = (over: Record<string, unknown> = {}) => agent({ mode: 'workstation', ...over });
+
+    it('a month unseen is NOT a problem — it is a tool nobody opened', () => {
+        const h = computeAgentHealth(ws({ lastSeen: ago(30 * 24 * HOUR) }), done, NOW);
+        expect(h.state).toBe('workstation');
+        expect(h.bucket).toBe('connection');
+        expect(h.reasons).toEqual([]);
+    });
+
+    it('never seen at all is not a problem either', () => {
+        expect(computeAgentHealth(ws({ lastSeen: undefined }), done, NOW).state).toBe('workstation');
+    });
+
+    it('no onboarding record does not park it in the orange forever', () => {
+        expect(computeAgentHealth(ws(), null, NOW).state).toBe('workstation');
+        expect(computeAgentHealth(ws(), { ...done, status: 'in_progress' as const }, NOW).state).toBe('workstation');
+        expect(computeAgentHealth(ws(), { ...done, status: 'failed' as const }, NOW).state).toBe('workstation');
+    });
+
+    it('being used right now does not make it a production agent either', () => {
+        expect(computeAgentHealth(ws({ lastSeen: ago(MIN) }), done, NOW).state).toBe('workstation');
+    });
+
+    it('it still says when something last came from it, which is the whole point of the row', () => {
+        const h = computeAgentHealth(ws({ lastSeen: ago(3 * HOUR) }), done, NOW);
+        expect(h.last_seen).toBe(ago(3 * HOUR));
+        expect(h.seconds_since_seen).toBe(3 * 60 * 60);
+    });
+
+    it('the owner calling it node machinery still wins: system is checked first', () => {
+        expect(computeAgentHealth(ws({ tags: ['system'] }), done, NOW).state).toBe('system');
+    });
+
+    it('counts as live, so a person whose only connection is a chat tool has a working home', () => {
+        expect(isLiveState('workstation')).toBe(true);
+    });
+
+    it('sorts below the agents that do something on their own', () => {
+        expect(BUCKET_RANK.connection).toBeGreaterThan(BUCKET_RANK.online);
+    });
+});
+
 describe('problem — the three conditions, one of which used to be the only one', () => {
     it('seen 25 hours ago with onboarding done is a problem (this one always worked)', () => {
         const h = computeAgentHealth(agent({ lastSeen: ago(25 * HOUR) }), done, NOW);
