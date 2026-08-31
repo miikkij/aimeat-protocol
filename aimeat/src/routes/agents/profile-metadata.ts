@@ -118,7 +118,16 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
   // timestamps + active-task list + onboarding) computed in a few grouped queries, so a
   // fleet dashboard gets everything in ONE request instead of N+1 per-agent round trips.
   router.get('/v1/agents', requireAuth(), async (req, res) => {
-    const agents = await storage.getAgentsByOwner(req.auth!.owner);
+    const all = await storage.getAgentsByOwner(req.auth!.owner);
+
+    // ?run_mode=spawn — the roster read a runtime does on a timer. Without it a fleet runtime
+    // fetches every agent the account has and filters client-side: measured 68 on one account, on
+    // a 30-second loop. Filtered in memory rather than in SQL on purpose — the query is already
+    // one indexed read per owner, and a second storage method would have to be written twice.
+    // An unknown value returns nothing rather than everything: a filter that silently does not
+    // filter is how a runtime ends up serving agents it was never meant to.
+    const wantRunMode = typeof req.query.run_mode === 'string' ? req.query.run_mode : undefined;
+    const agents = wantRunMode ? all.filter(a => (a.runMode ?? '') === wantRunMode) : all;
 
     const include = String(req.query.include ?? '').split(',').map(s => s.trim());
     const wantStats = include.includes('stats');

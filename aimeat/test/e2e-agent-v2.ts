@@ -307,6 +307,21 @@ async function run() {
         }
     });
 
+    // The question crewaimeat asked back: is run_mode there for a v2 agent the moment it enrols?
+    await test('run_mode is on a v2 agent the moment it is enrolled, and a roster read can filter on it', async () => {
+        const all = await json('/v1/agents?owner=' + a.owner, { headers: authA });
+        const spawn = await json('/v1/agents?run_mode=spawn', { headers: authA });
+        const names = (spawn.body.data.agents as any[]).map(x => x.name).sort();
+        assert(JSON.stringify(names) === JSON.stringify([...BASIC_NAMES].sort()),
+            `the filter should return exactly the spawn agents, got ${JSON.stringify(names)}`);
+        assert((all.body.data.agents as any[]).length > names.length, 'and the unfiltered list is bigger');
+        // A v1 agent has no run mode, and absence is not 'spawn'.
+        const v1 = (all.body.data.agents as any[]).find(x => x.name === daemonA.name);
+        assert(v1.run_mode === null, `a v1 agent should report null, got ${v1.run_mode}`);
+        const none = await json('/v1/agents?run_mode=nonsense', { headers: authA });
+        assert((none.body.data.agents as any[]).length === 0, 'an unknown run mode returns nothing, never everything');
+    });
+
     await test('the card asked for the wildcard and was granted the template instead', async () => {
         const list = await json('/v1/agents?owner=' + a.owner, { headers: authA });
         const forge = (list.body.data.agents as any[]).find(x => x.name === 'crew-forge');
