@@ -76,9 +76,6 @@ importers:
       compression:
         specifier: ^1.8.1
         version: 1.8.1
-      consul:
-        specifier: ^2.0.1
-        version: 2.0.1
       croner:
         specifier: ^10.0.1
         version: 10.0.1
@@ -1431,10 +1428,6 @@ packages:
     resolution: {integrity: sha512-9mAqGPHLakhCLeNyxPkK4xVo746zQ/czLH1Ky+vkitMnWfWZps8r0qXuwhwizagCRttsL4lfG4pIOvaWLpAP0w==}
     engines: {node: '>= 0.8.0'}
 
-  consul@2.0.1:
-    resolution: {integrity: sha512-91ExUUelOJ1yyB0etYAR0w1p6Ues1VosEyBVxPcWJdnQDTKqAEFzL0MHfOqZWYI2d4HZ4FgotHZkAPW2A/xahA==}
-    deprecated: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
-
   content-disposition@1.1.0:
     resolution: {integrity: sha512-5jRCH9Z/+DRP7rkvY83B+yGIGX96OYdJmzngqnw2SBSxqCFPd0w2km3s5iawpGX8krnwSGmF0FW5Nhr0Hfai3g==}
     engines: {node: '>=18'}
@@ -2448,11 +2441,6 @@ packages:
 
   pako@1.0.11:
     resolution: {integrity: sha512-4hLB8Py4zZce5s4yd9XzopqwVv/yGNhV1Bl8NTmCq1763HeK2+EwVTv+leGeL13Dnh2wfbqowVPXCIO0z4taYw==}
-
-  papi@1.1.2:
-    resolution: {integrity: sha512-cwM6pPpfAYgPe3EQi23SmB5J5s4XFS9lou9z63I5BbnMGmFaR8LAKvKboW7n1IUAKj76OtnyK0YU16JjnZrqVg==}
-    engines: {node: '>=10.0.0'}
-    deprecated: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
 
   parent-module@1.0.1:
     resolution: {integrity: sha512-GQ2EWRpQV8/o+Aw8YqtfZZPfNRWZYkbidE9k5rpl/hC3vtHHBfGm2Ifi6qWV+coDGkrUKZAxE3Lot5kcsRlh+g==}
@@ -4458,11 +4446,6 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  consul@2.0.1:
-    dependencies:
-      papi: 1.1.2
-      uuid: 14.0.2
-
   content-disposition@1.1.0: {}
 
   content-type@1.0.5: {}
@@ -5464,8 +5447,6 @@ snapshots:
   pako@0.2.9: {}
 
   pako@1.0.11: {}
-
-  papi@1.1.2: {}
 
   parent-module@1.0.1:
     dependencies:

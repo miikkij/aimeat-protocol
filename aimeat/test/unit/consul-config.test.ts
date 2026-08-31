@@ -1,142 +1,189 @@
 /**
- * @file consul-config.test.ts
- * @description The Consul config service's pure logic — no live Consul needed.
- * @usage pnpm test -- consul-config
+ * @file test/unit/consul-config.test.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Drives the Consul KV config service against a FAKE CONSUL AGENT — a real HTTP server
+ *   speaking Consul's actual wire protocol — the same way e2e-saml-login drives the SAML code
+ *   against a fake IdP that signs real responses.
+ *
+ *   WHY IT EXISTS. On 2026-08-31 the `consul` npm package was replaced with three direct calls to
+ *   the agent's HTTP API, because npm marks that package "no longer supported" and names no
+ *   successor. Rewriting a working integration against an API you cannot exercise is how a feature
+ *   breaks for whoever turns it on months later — and Consul is off by default here, so nobody
+ *   would notice. A fake agent needs no container and proves the parts a person cannot see by
+ *   reading: that the base64 KV body is decoded, that the token and datacenter reach the request,
+ *   that a 404 means "no keys" rather than a failure, and that Consul's `false` answer to a write
+ *   is treated as the refusal it is.
+ * @structure fakeConsul() → an http server recording every request; one test per behaviour
+ * @usage  cd aimeat && pnpm exec vitest run test/unit/consul-config.test.ts
  * @version-history
- *   v1.1.0 — 2026-08-10 — Moved from test/ to test/unit/ and put on vitest, same reason as
- *     config-loader.test.ts next door: vitest's include covers test/unit/** only, so a file
- *     named `.test.ts` anywhere else runs in no runner and says nothing about it.
- *   v1.0.0 — 2026-xx-xx — Initial (standalone script).
+ *   v1.0.0 — 2026-08-31 — Initial, with the move off the deprecated `consul` package.
  */
-
-import { it as test } from 'vitest';
-import assert from 'node:assert/strict';
-import { createConsulConfigService, applyConsulValues } from '../../src/services/consul-config.js';
+import { createServer, type Server } from 'node:http';
+import { afterEach, describe, expect, it } from 'vitest';
 import type { AimeatConfig } from '../../src/config.js';
+import { createConsulConfigService } from '../../src/services/consul-config.js';
 
-// Mock config factory
-function mockConfig(overrides: Partial<AimeatConfig> = {}): AimeatConfig {
-  return {
-    nodeId: 'test-node',
-    port: 40050,
-    nodeType: 'full',
-    storageProvider: 'memory',
-    sqlitePath: ':memory:',
-    dbUrl: null,
-    adminPassword: 'test123',
-    baseUrl: '',
-    devMode: true,
-    anonymousMode: false,
-    jwtTtlSeconds: 3600,
-    welcomeBonus: 100,
-    dailyAllowance: 50,
-    dailyAllowanceCap: 500,
-    burnRate: 0.1,
-    extendedFeaturesEnabled: true,
-    consulEnabled: false,
-    consulUrl: 'http://localhost:8500',
-    consulPrefix: 'aimeat/config',
-    consulToken: '',
-    consulWatchIntervalSeconds: 30,
-    consulDatacenter: '',
-    // Every real node has this list, empty on the self-hosted ones. The fixture omitted it and
-    // applyConsulValues now reads it, deliberately without an optional chain: a config that
-    // silently has no seal list is the failure the whole mechanism exists to prevent, so it
-    // should throw here rather than quietly disable sealing everywhere.
-    sealedConfigKeys: [],
-    ...overrides,
-  } as AimeatConfig;
+interface Recorded { method: string; url: string; token: string | undefined; body: string }
+
+interface Fake { url: string; server: Server; seen: Recorded[] }
+
+/** A real HTTP server that answers like a Consul agent. `routes` maps `METHOD /path` to a handler. */
+async function fakeConsul(
+  routes: Record<string, (req: Recorded) => { status?: number; body?: string }>,
+): Promise<Fake> {
+  const seen: Recorded[] = [];
+  const server = createServer((req, res) => {
+    const chunks: Buffer[] = [];
+    req.on('data', c => chunks.push(c as Buffer));
+    req.on('end', () => {
+      const record: Recorded = {
+        method: req.method ?? 'GET',
+        url: req.url ?? '',
+        token: req.headers['x-consul-token'] as string | undefined,
+        body: Buffer.concat(chunks).toString('utf8'),
+      };
+      seen.push(record);
+      const path = (req.url ?? '').split('?')[0];
+      const handler = routes[`${record.method} ${path}`];
+      if (!handler) { res.statusCode = 404; res.end('not found'); return; }
+      const out = handler(record);
+      res.statusCode = out.status ?? 200;
+      res.end(out.body ?? '');
+    });
+  });
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+  const port = (server.address() as { port: number }).port;
+  return { url: `http://127.0.0.1:${port}`, server, seen };
 }
 
+function configFor(fake: Fake, over: Partial<AimeatConfig> = {}): AimeatConfig {
+  return {
+    consulEnabled: true,
+    consulUrl: fake.url,
+    consulPrefix: 'aimeat/config',
+    consulToken: 'test-token',
+    consulDatacenter: 'dc1',
+    consulWatchIntervalSeconds: 60,
+    ...over,
+  } as unknown as AimeatConfig;
+}
 
-test('createConsulConfigService returns null when disabled', () => {
-  const config = mockConfig({ consulEnabled: false });
-  const service = createConsulConfigService(config);
-  assert.equal(service, null);
-});
+const b64 = (s: string) => Buffer.from(s, 'utf8').toString('base64');
 
-test('createConsulConfigService returns service when enabled', () => {
-  const config = mockConfig({ consulEnabled: true, consulUrl: 'http://localhost:8500' });
-  const service = createConsulConfigService(config);
-  assert.ok(service !== null, 'Service should be created');
-  assert.ok(typeof service!.loadAll === 'function', 'has loadAll');
-  assert.ok(typeof service!.startWatching === 'function', 'has startWatching');
-  assert.ok(typeof service!.stopWatching === 'function', 'has stopWatching');
-  assert.ok(typeof service!.set === 'function', 'has set');
-  assert.ok(typeof service!.health === 'function', 'has health');
-});
+let open: Server | null = null;
+afterEach(() => { open?.close(); open = null; });
 
+describe('consul config service, against a fake agent', () => {
+  it('decodes the base64 KV body and turns key paths back into dot paths', async () => {
+    const fake = await fakeConsul({
+      'GET /v1/kv/aimeat/config/': () => ({
+        body: JSON.stringify([
+          { Key: 'aimeat/config/operator/name', Value: b64('Overscale Solutions Oy') },
+          { Key: 'aimeat/config/operator/email', Value: b64('ops@example.test') },
+        ]),
+      }),
+    });
+    open = fake.server;
 
-test('applyConsulValues applies mutable fields', () => {
-  const config = mockConfig({ welcomeBonus: 100 });
-  const { applied, skipped } = applyConsulValues(config, {
-    'morsel_policy.welcome_bonus': '200',
+    const svc = createConsulConfigService(configFor(fake));
+    const values = await svc!.loadAll();
+
+    expect(values['operator.name']).toBe('Overscale Solutions Oy');
+    expect(values['operator.email']).toBe('ops@example.test');
   });
-  assert.deepEqual(applied, ['morsel_policy.welcome_bonus']);
-  assert.deepEqual(skipped, []);
-  assert.equal(config.welcomeBonus, 200);
-});
 
-test('applyConsulValues skips immutable fields', () => {
-  const config = mockConfig();
-  const { applied, skipped } = applyConsulValues(config, {
-    'node.id': 'hacked',
+  it('drops an immutable path before it can reach the running config', async () => {
+    // The KV store is edited by whoever can reach Consul, and some settings must not be changeable
+    // from there at all. The filter is in loadAll, so nothing downstream has to remember.
+    const fake = await fakeConsul({
+      'GET /v1/kv/aimeat/config/': () => ({
+        body: JSON.stringify([
+          { Key: 'aimeat/config/branding/siteName', Value: b64('Somebody Else') },
+          { Key: 'aimeat/config/operator/name', Value: b64('kept') },
+        ]),
+      }),
+    });
+    open = fake.server;
+
+    const values = await createConsulConfigService(configFor(fake))!.loadAll();
+
+    expect(values).not.toHaveProperty('branding.siteName');
+    expect(values['operator.name']).toBe('kept');
   });
-  // node.id is immutable — it should NOT be in MUTABLE_CONFIG_MAP,
-  // so it will be skipped (no matching field)
-  assert.deepEqual(applied, []);
-  assert.deepEqual(skipped, ['node.id']);
-  assert.equal(config.nodeId, 'test-node'); // unchanged
-});
 
-test('applyConsulValues skips unknown fields', () => {
-  const config = mockConfig();
-  const { applied, skipped } = applyConsulValues(config, {
-    'unknown.field': 'value',
+  it('sends the ACL token as a header and the datacenter as a query parameter', async () => {
+    const fake = await fakeConsul({ 'GET /v1/kv/aimeat/config/': () => ({ body: '[]' }) });
+    open = fake.server;
+
+    await createConsulConfigService(configFor(fake))!.loadAll();
+
+    expect(fake.seen[0].token).toBe('test-token');
+    expect(fake.seen[0].url).toContain('dc=dc1');
+    expect(fake.seen[0].url).toContain('recurse=true');
   });
-  assert.deepEqual(applied, []);
-  assert.deepEqual(skipped, ['unknown.field']);
-});
 
-test('applyConsulValues applies multiple fields', () => {
-  const config = mockConfig({ welcomeBonus: 100, dailyAllowance: 50, burnRate: 0.1 });
-  const { applied } = applyConsulValues(config, {
-    'morsel_policy.welcome_bonus': '300',
-    'morsel_policy.daily_allowance': '75',
-    'morsel_policy.burn_rate': '0.25',
+  it('reads a 404 as "no keys under the prefix", not as a failure', async () => {
+    const fake = await fakeConsul({});
+    open = fake.server;
+
+    await expect(createConsulConfigService(configFor(fake))!.loadAll()).resolves.toEqual({});
   });
-  assert.equal(applied.length, 3);
-  assert.equal(config.welcomeBonus, 300);
-  assert.equal(config.dailyAllowance, 75);
-  assert.equal(config.burnRate, 0.25);
-});
 
-test('applyConsulValues skips invalid values', () => {
-  const config = mockConfig({ welcomeBonus: 100 });
-  const { applied, skipped } = applyConsulValues(config, {
-    'morsel_policy.welcome_bonus': 'not-a-number',
+  it('skips a key that has no value rather than applying an empty setting', async () => {
+    const fake = await fakeConsul({
+      'GET /v1/kv/aimeat/config/': () => ({
+        body: JSON.stringify([
+          { Key: 'aimeat/config/operator/email', Value: null },
+          { Key: 'aimeat/config/operator/name', Value: b64('kept') },
+        ]),
+      }),
+    });
+    open = fake.server;
+
+    const values = await createConsulConfigService(configFor(fake))!.loadAll();
+
+    expect(values).not.toHaveProperty('operator.email');
+    expect(values['operator.name']).toBe('kept');
   });
-  // parseConfigValue should throw for 'not-a-number' on a number field
-  assert.deepEqual(applied, []);
-  assert.deepEqual(skipped, ['morsel_policy.welcome_bonus']);
-  assert.equal(config.welcomeBonus, 100); // unchanged
-});
 
-test('applyConsulValues handles boolean fields', () => {
-  const config = mockConfig({ extendedFeaturesEnabled: true });
-  const { applied } = applyConsulValues(config, {
-    'features.extended_features_enabled': 'false',
+  it('writes a dot path as a slash path, with the value as the request body', async () => {
+    const fake = await fakeConsul({
+      'PUT /v1/kv/aimeat/config/operator/name': () => ({ body: 'true' }),
+    });
+    open = fake.server;
+
+    await createConsulConfigService(configFor(fake))!.set('operator.name', 'New Name');
+
+    expect(fake.seen[0].method).toBe('PUT');
+    expect(fake.seen[0].url).toContain('/v1/kv/aimeat/config/operator/name');
+    expect(fake.seen[0].body).toBe('New Name');
   });
-  assert.deepEqual(applied, ['features.extended_features_enabled']);
-  assert.equal(config.extendedFeaturesEnabled, false);
-});
 
-test('applyConsulValues type-parses float correctly', () => {
-  const config = mockConfig({ burnRate: 0.1 });
-  const { applied } = applyConsulValues(config, {
-    'morsel_policy.burn_rate': '0.50',
+  it('treats Consul answering `false` to a write as the refusal it is', async () => {
+    // A 200 carrying `false` is how Consul refuses a write — a failed check-and-set, or an ACL that
+    // may read but not write. Reporting that as success loses the operator's edit in silence.
+    const fake = await fakeConsul({
+      'PUT /v1/kv/aimeat/config/operator/name': () => ({ body: 'false' }),
+    });
+    open = fake.server;
+
+    await expect(createConsulConfigService(configFor(fake))!.set('operator.name', 'x'))
+      .rejects.toThrow(/refused/i);
   });
-  assert.deepEqual(applied, ['morsel_policy.burn_rate']);
-  assert.equal(config.burnRate, 0.5);
-});
 
+  it('reports health from the agent endpoint, and reports false when it is not there', async () => {
+    const up = await fakeConsul({ 'GET /v1/agent/self': () => ({ body: '{"Config":{}}' }) });
+    open = up.server;
+    await expect(createConsulConfigService(configFor(up))!.health()).resolves.toBe(true);
+    up.server.close();
+
+    const down = await fakeConsul({});
+    open = down.server;
+    await expect(createConsulConfigService(configFor(down))!.health()).resolves.toBe(false);
+  });
+
+  it('returns null instead of a service when Consul is switched off', () => {
+    expect(createConsulConfigService({ consulEnabled: false } as unknown as AimeatConfig)).toBeNull();
+  });
+});

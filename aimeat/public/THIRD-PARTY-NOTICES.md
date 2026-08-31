@@ -52,7 +52,7 @@ tarball is. "Installed by the operator" means AIMEAT does not ship the file at a
 | [Chart.js](https://www.chartjs.org) | 4.5.1 | MIT | Copyright (c) 2014-2024 Chart.js Contributors | served by the node | notice only |
 | [D3](https://d3js.org) | 7.9.0 | ISC | Copyright 2010-2023 Mike Bostock | served by the node | notice only |
 | [Mermaid](https://mermaid.js.org) | 11.16.1 | MIT | Copyright (c) 2014 - 2022 Knut Sveidqvist | served by the node | notice only |
-| [three.js](https://threejs.org) | r128 | MIT | Copyright © 2010-2026 three.js authors | served by the node | notice only |
+| [three.js](https://threejs.org) | 0.128.0 (r128) | MIT | Copyright © 2010-2026 three.js authors | served by the node | notice only |
 | [three.js + example addons (OrbitControls, Sky, RGBELoader, GLTFLoader, RoomEnvironment, BufferGeometryUtils, SkeletonUtils)](https://threejs.org) | 0.185.1 (r185) | MIT | Copyright © 2010-2026 three.js authors | served by the node | notice only |
 | [Leaflet](https://leafletjs.com) | 1.9.4 | BSD-2-Clause | Copyright (c) 2010-2023, Volodymyr Agafonkin; Copyright (c) 2010-2011, CloudMade | served by the node | notice only |
 | [p5.js](https://p5js.org) | 1.11.13 | LGPL-2.1-only | Copyright (c) The Processing Foundation and the p5.js contributors | served by the node | **see below** |
@@ -66,8 +66,8 @@ tarball is. "Installed by the operator" means AIMEAT does not ship the file at a
 | [@ffmpeg/core (ffmpeg 5.1.4 compiled to WebAssembly)](https://ffmpeg.org) | 0.12.6 | GPL-2.0-or-later | Copyright (c) 2000-2022 the FFmpeg developers | installed by the operator | **see below** |
 | [world-atlas (Natural Earth 110m country shapes)](https://github.com/topojson/world-atlas) | 2.0.2 | ISC | Copyright 2013-2019 Michael Bostock; the underlying Natural Earth data is in the public domain | served by the node | notice only |
 | [yaml](https://eemeli.org/yaml/) | 2.9.0 | ISC | Copyright Eemeli Aro <eemeli@gmail.com> | served by the node | notice only |
-| [Preact](https://preactjs.com) | 10 | MIT | Copyright (c) 2015-present Jason Miller | served by the node | notice only |
-| [htm](https://github.com/developit/htm) | 3 | Apache-2.0 | Copyright (c) Jason Miller and the htm contributors | served by the node | notice only |
+| [Preact](https://preactjs.com) | 10.25.4 | MIT | Copyright (c) 2015-present Jason Miller | served by the node | notice only |
+| [htm](https://github.com/developit/htm) | 3.1.1 | Apache-2.0 | Copyright (c) Jason Miller and the htm contributors | served by the node | notice only |
 | [minidenticons](https://github.com/laurentpayot/minidenticons) | 4.2.1 | MIT | Copyright (c) 2021 Laurent Payot | served by the node | notice only |
 | [Baloo 2, Bangers, Inter, Archivo, Archivo Black, Space Grotesk, Fraunces, JetBrains Mono, Fjalla One, DM Sans, VT323](https://fonts.google.com) | see fonts/LICENSE.md | OFL-1.1 | see fonts/LICENSE.md for the copyright holder of each family | served by the node | notice only |
 | [AIMEAT (this project's own served libraries)](https://github.com/miikkij/aimeat-protocol) | see each file's @version-history header | MIT | Copyright (c) 2026 Jouni Miikki | served by the node | notice only |
@@ -76,7 +76,7 @@ Components AIMEAT changed rather than copied verbatim: **world-atlas (Natural Ea
 
 ## Production dependencies
 
-The 407 npm packages that travel inside the `aimeat` package. Build and test
+The 430 npm packages that travel inside the `aimeat` package. Build and test
 tools are not listed: they do not ship, so they carry no obligation for you.
 
 | Package | Version | Licence |
@@ -103,7 +103,9 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [@modelcontextprotocol/sdk](https://modelcontextprotocol.io) | 1.30.0 | MIT |
 | [@noble/ciphers](https://paulmillr.com/noble/) | 1.3.0 | MIT |
 | [@noble/ed25519](https://paulmillr.com/noble/) | 3.2.0 | MIT |
-| [@noble/hashes](https://paulmillr.com/noble/) | 1.8.0, 2.2.0, 2.4.0 | MIT |
+| [@noble/hashes](https://paulmillr.com/noble/) | 1.8.0 | MIT |
+| [@noble/hashes](https://paulmillr.com/noble/) | 2.2.0 | MIT |
+| [@noble/hashes](https://paulmillr.com/noble/) | 2.4.0 | MIT |
 | [@node-saml/node-saml](https://github.com/node-saml/node-saml#readme) | 5.1.0 | MIT |
 | [@opentelemetry/api](https://github.com/open-telemetry/opentelemetry-js/tree/main/api) | 1.9.1 | Apache-2.0 |
 | [@owf/identity-common](https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/identity-common) | 0.3.2 | Apache-2.0 |
@@ -126,14 +128,15 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [@vercel/cli-exec](https://vercel.com) | 1.0.1 | Apache-2.0 |
 | [@vercel/oidc](https://vercel.com) | 3.8.5 | Apache-2.0 |
 | [@xmldom/is-dom-node](https://github.com/xmldom/is-dom-node#readme) | 1.0.1 | MIT |
-| [@xmldom/xmldom](https://github.com/xmldom/xmldom) | 0.8.15, 0.9.12 | MIT |
+| [@xmldom/xmldom](https://github.com/xmldom/xmldom) | 0.8.15 | MIT |
+| [@xmldom/xmldom](https://github.com/xmldom/xmldom) | 0.9.12 | MIT |
 | [abort-controller](https://github.com/mysticatea/abort-controller#readme) | 3.0.0 | MIT |
 | [accepts](https://github.com/jshttp/accepts#readme) | 2.0.0 | MIT |
-| [acorn](https://github.com/acornjs/acorn) | 8.15.0 | MIT |
 | [acorn-import-attributes](https://github.com/xtuc/acorn-import-attributes#readme) | 1.9.5 | MIT |
+| [acorn](https://github.com/acornjs/acorn) | 8.15.0 | MIT |
 | [agent-base](https://github.com/TooTallNate/proxy-agents#readme) | 7.1.4 | MIT |
-| [ajv](https://ajv.js.org) | 8.20.0 | MIT |
 | [ajv-formats](https://github.com/ajv-validator/ajv-formats#readme) | 3.0.1 | MIT |
+| [ajv](https://ajv.js.org) | 8.20.0 | MIT |
 | [ansi-regex](https://github.com/chalk/ansi-regex#readme) | 5.0.1 | MIT |
 | [ansi-styles](https://github.com/chalk/ansi-styles#readme) | 4.3.0 | MIT |
 | [archiver](https://github.com/archiverjs/node-archiver) | 8.0.0 | MIT |
@@ -142,8 +145,8 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [arrify](https://github.com/sindresorhus/arrify#readme) | 2.0.1 | MIT |
 | [asn1.js](https://github.com/indutny/asn1.js) | 5.4.1 | MIT |
 | [assert](https://github.com/browserify/commonjs-assert) | 2.1.0 | MIT |
-| [async](https://caolan.github.io/async/) | 3.2.6 | MIT |
 | [async-retry](https://github.com/vercel/async-retry#readme) | 1.3.3 | MIT |
+| [async](https://caolan.github.io/async/) | 3.2.6 | MIT |
 | [available-typed-arrays](https://github.com/inspect-js/available-typed-arrays#readme) | 1.0.7 | MIT |
 | [b4a](https://github.com/holepunchto/b4a#readme) | 1.8.1 | Apache-2.0 |
 | [balanced-match](https://github.com/juliangruber/balanced-match#readme) | 4.0.4 | MIT |
@@ -152,7 +155,8 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [bare-path](https://github.com/holepunchto/bare-path#readme) | 3.1.1 | Apache-2.0 |
 | [bare-stream](https://github.com/holepunchto/bare-stream#readme) | 2.13.4 | Apache-2.0 |
 | [bare-url](https://github.com/holepunchto/bare-url) | 2.5.2 | Apache-2.0 |
-| [base64-js](https://github.com/beatgammit/base64-js) | 0.0.8, 1.5.1 | MIT |
+| [base64-js](https://github.com/beatgammit/base64-js) | 0.0.8 | MIT |
+| [base64-js](https://github.com/beatgammit/base64-js) | 1.5.1 | MIT |
 | [better-sqlite3](http://github.com/WiseLibs/better-sqlite3) | 12.11.1 | MIT |
 | [bindings](https://github.com/TooTallNate/node-bindings) | 1.5.0 | MIT |
 | [bintrees](https://github.com/vadimg/js_bintrees#readme) | 1.0.2 | MIT |
@@ -162,13 +166,14 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [brace-expansion](https://github.com/juliangruber/brace-expansion#readme) | 5.0.9 | MIT |
 | [brotli](https://github.com/devongovett/brotli.js) | 1.3.3 | MIT |
 | [browserify-zlib](https://github.com/devongovett/browserify-zlib) | 0.2.0 | MIT |
-| [buffer](https://github.com/feross/buffer) | 5.7.1, 6.0.3 | MIT |
 | [buffer-crc32](https://github.com/brianloveswords/buffer-crc32) | 1.0.0 | MIT |
 | [buffer-equal-constant-time](https://github.com/goinstant/buffer-equal-constant-time#readme) | 1.0.1 | BSD-3-Clause |
+| [buffer](https://github.com/feross/buffer) | 5.7.1 | MIT |
+| [buffer](https://github.com/feross/buffer) | 6.0.3 | MIT |
 | [busboy](https://github.com/mscdex/busboy#readme) | 1.6.0 | MIT |
 | [bytes](https://github.com/visionmedia/bytes.js#readme) | 3.1.2 | MIT |
-| [call-bind](https://github.com/ljharb/call-bind#readme) | 1.0.9 | MIT |
 | [call-bind-apply-helpers](https://github.com/ljharb/call-bind-apply-helpers#readme) | 1.0.2 | MIT |
+| [call-bind](https://github.com/ljharb/call-bind#readme) | 1.0.9 | MIT |
 | [call-bound](https://github.com/ljharb/call-bound#readme) | 1.0.4 | MIT |
 | [camelcase](https://github.com/sindresorhus/camelcase#readme) | 5.3.1 | MIT |
 | [chalk](https://github.com/chalk/chalk#readme) | 4.1.2 | MIT |
@@ -179,19 +184,21 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [class-validator](https://github.com/typestack/class-validator#readme) | 0.14.3 | MIT |
 | [cliui](https://github.com/yargs/cliui#readme) | 6.0.0 | ISC |
 | [clone](https://github.com/pvorb/node-clone#readme) | 2.1.2 | MIT |
-| [color](https://github.com/Qix-/color#readme) | 5.0.3 | MIT |
-| [color-convert](https://github.com/Qix-/color-convert#readme) | 2.0.1, 3.1.3 | MIT |
-| [color-name](https://github.com/colorjs/color-name) | 1.1.4, 2.1.1 | MIT |
+| [color-convert](https://github.com/Qix-/color-convert#readme) | 2.0.1 | MIT |
+| [color-convert](https://github.com/Qix-/color-convert#readme) | 3.1.3 | MIT |
+| [color-name](https://github.com/colorjs/color-name) | 1.1.4 | MIT |
+| [color-name](https://github.com/colorjs/color-name) | 2.1.1 | MIT |
 | [color-string](https://github.com/Qix-/color-string#readme) | 2.1.4 | MIT |
+| [color](https://github.com/Qix-/color#readme) | 5.0.3 | MIT |
 | [commander](https://github.com/tj/commander.js#readme) | 12.1.0 | MIT |
 | [compress-commons](https://github.com/archiverjs/node-compress-commons) | 7.0.1 | MIT |
 | [compressible](https://github.com/jshttp/compressible#readme) | 2.0.18 | MIT |
 | [compression](https://github.com/expressjs/compression#readme) | 1.8.1 | MIT |
-| [consul](https://github.com/silas/node-consul#readme) | 2.0.1 | MIT |
 | [content-disposition](https://github.com/jshttp/content-disposition#readme) | 1.1.0 | MIT |
-| [content-type](https://github.com/jshttp/content-type#readme) | 1.0.5, 2.1.0 | MIT |
-| [cookie](https://github.com/jshttp/cookie#readme) | 0.7.2 | MIT |
+| [content-type](https://github.com/jshttp/content-type#readme) | 1.0.5 | MIT |
+| [content-type](https://github.com/jshttp/content-type#readme) | 2.1.0 | MIT |
 | [cookie-signature](https://github.com/visionmedia/node-cookie-signature#readme) | 1.2.2 | MIT |
+| [cookie](https://github.com/jshttp/cookie#readme) | 0.7.2 | MIT |
 | [core-util-is](https://github.com/isaacs/core-util-is#readme) | 1.0.3 | MIT |
 | [cors](https://github.com/expressjs/cors#readme) | 2.8.6 | MIT |
 | [crc-32](https://sheetjs.com/) | 1.2.2 | Apache-2.0 |
@@ -199,7 +206,8 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [croner](https://croner.56k.guru) | 10.0.1 | MIT |
 | [cross-spawn](https://github.com/moxystudio/node-cross-spawn) | 7.0.6 | MIT |
 | [crypt](https://github.com/pvorb/node-crypt#readme) | 0.0.2 | BSD-3-Clause |
-| [debug](https://github.com/debug-js/debug#readme) | 2.6.9, 4.4.3 | MIT |
+| [debug](https://github.com/debug-js/debug#readme) | 2.6.9 | MIT |
+| [debug](https://github.com/debug-js/debug#readme) | 4.4.3 | MIT |
 | [decamelize](https://github.com/sindresorhus/decamelize#readme) | 1.2.0 | MIT |
 | [decompress-response](https://github.com/sindresorhus/decompress-response#readme) | 6.0.0 | MIT |
 | [deep-extend](https://github.com/unclechu/node-deep-extend) | 0.6.0 | MIT |
@@ -230,14 +238,14 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [esutils](https://github.com/estools/esutils) | 2.0.3 | BSD-2-Clause |
 | [etag](https://github.com/jshttp/etag#readme) | 1.8.1 | MIT |
 | [event-target-shim](https://github.com/mysticatea/event-target-shim) | 5.0.1 | MIT |
-| [events](https://github.com/Gozala/events#readme) | 3.3.0 | MIT |
 | [events-universal](https://github.com/holepunchto/events-universal#readme) | 1.0.1 | Apache-2.0 |
-| [eventsource](https://github.com/EventSource/eventsource#readme) | 3.0.7 | MIT |
+| [events](https://github.com/Gozala/events#readme) | 3.3.0 | MIT |
 | [eventsource-parser](https://github.com/rexxars/eventsource-parser#readme) | 3.1.1 | MIT |
+| [eventsource](https://github.com/EventSource/eventsource#readme) | 3.0.7 | MIT |
 | [execa](https://github.com/sindresorhus/execa#readme) | 5.1.1 | MIT |
 | [expand-template](https://github.com/ralphtheninja/expand-template) | 2.0.3 | (MIT OR WTFPL) |
-| [express](https://expressjs.com/) | 5.2.1 | MIT |
 | [express-rate-limit](https://github.com/express-rate-limit/express-rate-limit) | 8.7.0 | MIT |
+| [express](https://expressjs.com/) | 5.2.1 | MIT |
 | [fast-deep-equal](https://github.com/epoberezkin/fast-deep-equal#readme) | 3.1.3 | MIT |
 | [fast-fifo](https://github.com/mafintosh/fast-fifo) | 1.3.2 | MIT |
 | [fast-levenshtein](https://github.com/hiddentao/fast-levenshtein#readme) | 2.0.6 | MIT |
@@ -269,19 +277,21 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [has-tostringtag](https://github.com/inspect-js/has-tostringtag#readme) | 1.0.2 | MIT |
 | [hasown](https://github.com/inspect-js/hasOwn#readme) | 2.0.4 | MIT |
 | [hono](https://hono.dev) | 4.13.5 | MIT |
-| [http_ece](https://github.com/martinthomson/encrypted-content-encoding) | 1.2.0 | MIT |
 | [http-errors](https://github.com/jshttp/http-errors#readme) | 2.0.1 | MIT |
+| [http_ece](https://github.com/martinthomson/encrypted-content-encoding) | 1.2.0 | MIT |
 | [https-proxy-agent](https://github.com/TooTallNate/proxy-agents#readme) | 7.0.6 | MIT |
 | [human-signals](https://git.io/JeluP) | 2.1.0 | Apache-2.0 |
 | [iconv-lite](https://github.com/pillarjs/iconv-lite) | 0.7.3 | MIT |
 | [ieee754](https://github.com/feross/ieee754#readme) | 1.2.1 | BSD-3-Clause |
 | [inherits](https://github.com/isaacs/inherits#readme) | 2.0.4 | ISC |
-| [ini](https://github.com/npm/ini#readme) | 1.3.8, 7.0.0 | ISC |
+| [ini](https://github.com/npm/ini#readme) | 1.3.8 | ISC |
+| [ini](https://github.com/npm/ini#readme) | 7.0.0 | ISC |
 | [inversify](https://inversify.io) | 7.11.0 | MIT |
 | [ip-address](https://github.com/beaugunderson/ip-address#readme) | 10.7.0 | MIT |
 | [ipaddr.js](https://github.com/whitequark/ipaddr.js#readme) | 1.9.1 | MIT |
 | [is-arguments](https://github.com/inspect-js/is-arguments) | 1.2.0 | MIT |
-| [is-buffer](https://github.com/feross/is-buffer#readme) | 1.1.6, 2.0.5 | MIT |
+| [is-buffer](https://github.com/feross/is-buffer#readme) | 1.1.6 | MIT |
+| [is-buffer](https://github.com/feross/is-buffer#readme) | 2.0.5 | MIT |
 | [is-callable](https://github.com/inspect-js/is-callable#readme) | 1.2.7 | MIT |
 | [is-fullwidth-code-point](https://github.com/sindresorhus/is-fullwidth-code-point#readme) | 3.0.0 | MIT |
 | [is-generator-function](https://github.com/inspect-js/is-generator-function#readme) | 1.1.2 | MIT |
@@ -290,12 +300,14 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [is-promise](https://github.com/then/is-promise#readme) | 4.0.0 | MIT |
 | [is-regex](https://github.com/inspect-js/is-regex) | 1.2.1 | MIT |
 | [is-safe-filename](https://github.com/sindresorhus/is-safe-filename#readme) | 0.1.1 | MIT |
-| [is-stream](https://github.com/sindresorhus/is-stream#readme) | 2.0.1, 4.0.1 | MIT |
+| [is-stream](https://github.com/sindresorhus/is-stream#readme) | 2.0.1 | MIT |
+| [is-stream](https://github.com/sindresorhus/is-stream#readme) | 4.0.1 | MIT |
 | [is-typed-array](https://github.com/inspect-js/is-typed-array#readme) | 1.1.15 | MIT |
 | [isarray](https://github.com/juliangruber/isarray) | 1.0.0 | MIT |
 | [isexe](https://github.com/isaacs/isexe#readme) | 2.0.0 | ISC |
 | [javascript-obfuscator](https://obfuscator.io/) | 5.6.0 | BSD-2-Clause |
-| [jose](https://github.com/panva/jose) | 5.10.0, 6.2.10 | MIT |
+| [jose](https://github.com/panva/jose) | 5.10.0 | MIT |
+| [jose](https://github.com/panva/jose) | 6.2.10 | MIT |
 | [js-md5](https://github.com/emn178/js-md5) | 0.8.3 | MIT |
 | [js-string-escape](https://github.com/joliss/js-string-escape#readme) | 1.0.1 | MIT |
 | [json-schema-traverse](https://github.com/epoberezkin/json-schema-traverse#readme) | 1.0.0 | MIT |
@@ -321,14 +333,16 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [mimic-response](https://github.com/sindresorhus/mimic-response#readme) | 3.1.0 | MIT |
 | [minidenticons](https://laurentpayot.github.io/minidenticons) | 4.2.1 | MIT |
 | [minimalistic-assert](https://github.com/calvinmetcalf/minimalistic-assert) | 1.0.1 | ISC |
-| [minimatch](https://github.com/isaacs/minimatch#readme) | 3.1.5 | ISC |
 | [minimatch](https://github.com/isaacs/minimatch#readme) | 10.2.5 | BlueOak-1.0.0 |
+| [minimatch](https://github.com/isaacs/minimatch#readme) | 3.1.5 | ISC |
 | [minimist](https://github.com/minimistjs/minimist) | 1.2.8 | MIT |
 | [mkdirp-classic](https://github.com/mafintosh/mkdirp-classic) | 0.5.3 | MIT |
-| [ms](https://github.com/vercel/ms#readme) | 2.0.0, 2.1.3 | MIT |
+| [ms](https://github.com/vercel/ms#readme) | 2.0.0 | MIT |
+| [ms](https://github.com/vercel/ms#readme) | 2.1.3 | MIT |
 | [multimatch](https://github.com/sindresorhus/multimatch#readme) | 5.0.0 | MIT |
 | [napi-build-utils](https://github.com/inspiredware/napi-build-utils#readme) | 2.0.0 | MIT |
-| [negotiator](https://github.com/jshttp/negotiator#readme) | 0.6.4, 1.1.0 | MIT |
+| [negotiator](https://github.com/jshttp/negotiator#readme) | 0.6.4 | MIT |
+| [negotiator](https://github.com/jshttp/negotiator#readme) | 1.1.0 | MIT |
 | [node-abi](https://github.com/electron/node-abi#readme) | 3.96.0 | MIT |
 | [nodemailer](https://nodemailer.com/) | 9.0.6 | MIT-0 |
 | [normalize-path](https://github.com/jonschlinkert/normalize-path) | 3.0.0 | MIT |
@@ -353,20 +367,19 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [p-try](https://github.com/sindresorhus/p-try#readme) | 2.2.0 | MIT |
 | [pako](https://github.com/nodeca/pako) | 0.2.9 | MIT |
 | [pako](https://github.com/nodeca/pako) | 1.0.11 | (MIT AND Zlib) |
-| [papi](https://github.com/silas/node-papi) | 1.1.2 | MIT |
 | [parseurl](https://github.com/pillarjs/parseurl#readme) | 1.3.3 | MIT |
 | [path-exists](https://github.com/sindresorhus/path-exists#readme) | 4.0.0 | MIT |
 | [path-key](https://github.com/sindresorhus/path-key#readme) | 3.1.1 | MIT |
 | [path-to-regexp](https://github.com/pillarjs/path-to-regexp#readme) | 8.4.0 | MIT |
 | [pdfkit](http://pdfkit.org/) | 0.19.1 | MIT |
 | [pend](https://github.com/andrewrk/node-pend#readme) | 1.2.0 | MIT |
-| [pg](https://github.com/brianc/node-postgres) | 8.23.0 | MIT |
 | [pg-cloudflare](https://github.com/brianc/node-postgres#readme) | 1.4.0 | MIT |
 | [pg-connection-string](https://github.com/brianc/node-postgres/tree/master/packages/pg-connection-string) | 2.14.0 | MIT |
 | [pg-int8](https://github.com/charmander/pg-int8#readme) | 1.0.1 | ISC |
 | [pg-pool](https://github.com/brianc/node-postgres/tree/master/packages/pg-pool#readme) | 3.14.0 | MIT |
 | [pg-protocol](https://github.com/brianc/node-postgres#readme) | 1.16.0 | MIT |
 | [pg-types](https://github.com/brianc/node-pg-types) | 2.2.0 | MIT |
+| [pg](https://github.com/brianc/node-postgres) | 8.23.0 | MIT |
 | [pgpass](https://github.com/hoegaarden/pgpass#readme) | 1.0.5 | MIT |
 | [pkce-challenge](https://github.com/crouchcd/pkce-challenge#readme) | 5.0.1 | MIT |
 | [playwright-core](https://playwright.dev) | 1.62.1 | Apache-2.0 |
@@ -379,18 +392,20 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [postgres-interval](https://github.com/bendrucker/postgres-interval#readme) | 1.2.0 | MIT |
 | [prebuild-install](https://github.com/prebuild/prebuild-install) | 7.1.3 | MIT |
 | [prelude-ls](http://preludels.com) | 1.1.2 | MIT |
-| [process](https://github.com/shtylman/node-process#readme) | 0.11.10 | MIT |
 | [process-nextick-args](https://github.com/calvinmetcalf/process-nextick-args) | 2.0.1 | MIT |
+| [process](https://github.com/shtylman/node-process#readme) | 0.11.10 | MIT |
 | [proxy-addr](https://github.com/jshttp/proxy-addr#readme) | 2.0.7 | MIT |
 | [pump](https://github.com/mafintosh/pump#readme) | 3.0.4 | MIT |
 | [qrcode](http://github.com/soldair/node-qrcode) | 1.5.4 | MIT |
 | [qs](https://github.com/ljharb/qs) | 6.16.0 | BSD-3-Clause |
-| [quickjs-emscripten](https://github.com/justjake/quickjs-emscripten#readme) | 0.32.0 | MIT |
 | [quickjs-emscripten-core](https://github.com/justjake/quickjs-emscripten#readme) | 0.32.0 | MIT |
+| [quickjs-emscripten](https://github.com/justjake/quickjs-emscripten#readme) | 0.32.0 | MIT |
 | [range-parser](https://github.com/jshttp/range-parser#readme) | 1.3.0 | MIT |
 | [raw-body](https://github.com/stream-utils/raw-body#readme) | 3.0.2 | MIT |
 | [rc](https://github.com/dominictarr/rc#readme) | 1.2.8 | (BSD-2-Clause OR MIT OR Apache-2.0) |
-| [readable-stream](https://github.com/nodejs/readable-stream) | 2.3.8, 3.6.2, 4.7.0 | MIT |
+| [readable-stream](https://github.com/nodejs/readable-stream) | 2.3.8 | MIT |
+| [readable-stream](https://github.com/nodejs/readable-stream) | 3.6.2 | MIT |
+| [readable-stream](https://github.com/nodejs/readable-stream) | 4.7.0 | MIT |
 | [readdir-glob](https://github.com/Yqnn/node-readdir-glob) | 3.0.0 | Apache-2.0 |
 | [reflect-metadata](http://rbuckton.github.io/reflect-metadata) | 0.2.2 | Apache-2.0 |
 | [require-directory](https://github.com/troygoode/node-require-directory/) | 2.1.1 | MIT |
@@ -399,13 +414,14 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [restructure](https://github.com/devongovett/restructure) | 3.0.2 | MIT |
 | [retry](https://github.com/tim-kos/node-retry) | 0.13.1 | MIT |
 | [router](https://github.com/pillarjs/router#readme) | 2.2.0 | MIT |
-| [safe-buffer](https://github.com/feross/safe-buffer) | 5.1.2, 5.2.1 | MIT |
+| [safe-buffer](https://github.com/feross/safe-buffer) | 5.1.2 | MIT |
+| [safe-buffer](https://github.com/feross/safe-buffer) | 5.2.1 | MIT |
 | [safe-regex-test](https://github.com/ljharb/safe-regex-test#readme) | 1.1.0 | MIT |
 | [safe-stable-stringify](https://github.com/BridgeAR/safe-stable-stringify#readme) | 2.5.0 | MIT |
 | [safer-buffer](https://github.com/ChALkeR/safer-buffer#readme) | 2.1.2 | MIT |
 | [sax](https://github.com/isaacs/sax-js#readme) | 1.6.1 | BlueOak-1.0.0 |
-| [scimmy](https://scimmyjs.github.io) | 1.3.5 | MIT |
 | [scimmy-routers](https://github.com/scimmyjs/scimmy-routers#readme) | 1.3.2 | MIT |
+| [scimmy](https://scimmyjs.github.io) | 1.3.5 | MIT |
 | [semver](https://github.com/npm/node-semver#readme) | 7.8.5 | ISC |
 | [send](https://github.com/pillarjs/send#readme) | 1.2.1 | MIT |
 | [serve-static](https://github.com/expressjs/serve-static#readme) | 2.2.1 | MIT |
@@ -414,10 +430,10 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [setprototypeof](https://github.com/wesleytodd/setprototypeof) | 1.2.0 | ISC |
 | [shebang-command](https://github.com/kevva/shebang-command#readme) | 2.0.0 | MIT |
 | [shebang-regex](https://github.com/sindresorhus/shebang-regex#readme) | 3.0.0 | MIT |
-| [side-channel](https://github.com/ljharb/side-channel#readme) | 1.1.1 | MIT |
 | [side-channel-list](https://github.com/ljharb/side-channel-list#readme) | 1.0.1 | MIT |
 | [side-channel-map](https://github.com/ljharb/side-channel-map#readme) | 1.0.1 | MIT |
 | [side-channel-weakmap](https://github.com/ljharb/side-channel-weakmap#readme) | 1.0.2 | MIT |
+| [side-channel](https://github.com/ljharb/side-channel#readme) | 1.1.1 | MIT |
 | [signal-exit](https://github.com/tapjs/signal-exit) | 3.0.7 | ISC |
 | [simple-concat](https://github.com/feross/simple-concat) | 1.0.1 | MIT |
 | [simple-get](https://github.com/feross/simple-get) | 4.0.1 | MIT |
@@ -428,16 +444,19 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [statuses](https://github.com/jshttp/statuses#readme) | 2.0.2 | MIT |
 | [streamsearch](https://github.com/mscdex/streamsearch#readme) | 1.1.0 | MIT |
 | [streamx](https://github.com/mafintosh/streamx) | 2.28.1 | MIT |
-| [string_decoder](https://github.com/nodejs/string_decoder) | 1.1.1, 1.3.0 | MIT |
 | [string-template](https://github.com/Matt-Esch/string-template) | 1.0.0 | MIT |
 | [string-width](https://github.com/sindresorhus/string-width#readme) | 4.2.3 | MIT |
+| [string_decoder](https://github.com/nodejs/string_decoder) | 1.1.1 | MIT |
+| [string_decoder](https://github.com/nodejs/string_decoder) | 1.3.0 | MIT |
 | [stringz](https://github.com/sallar/stringz#readme) | 2.1.0 | MIT |
 | [strip-ansi](https://github.com/chalk/strip-ansi#readme) | 6.0.1 | MIT |
 | [strip-final-newline](https://github.com/sindresorhus/strip-final-newline#readme) | 2.0.0 | MIT |
 | [strip-json-comments](https://github.com/sindresorhus/strip-json-comments#readme) | 2.0.1 | MIT |
-| [supports-color](https://github.com/chalk/supports-color#readme) | 7.2.0, 10.2.2 | MIT |
+| [supports-color](https://github.com/chalk/supports-color#readme) | 10.2.2 | MIT |
+| [supports-color](https://github.com/chalk/supports-color#readme) | 7.2.0 | MIT |
 | [tar-fs](https://github.com/mafintosh/tar-fs) | 2.1.5 | MIT |
-| [tar-stream](https://github.com/mafintosh/tar-stream) | 2.2.0, 3.2.1 | MIT |
+| [tar-stream](https://github.com/mafintosh/tar-stream) | 2.2.0 | MIT |
+| [tar-stream](https://github.com/mafintosh/tar-stream) | 3.2.1 | MIT |
 | [tdigest](https://github.com/welch/tdigest) | 0.1.3 | MIT |
 | [teex](https://github.com/mafintosh/teex) | 1.0.1 | MIT |
 | [text-decoder](https://github.com/holepunchto/text-decoder#readme) | 1.2.7 | Apache-2.0 |
@@ -450,24 +469,24 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [tunnel-agent](https://github.com/mikeal/tunnel-agent#readme) | 0.6.0 | Apache-2.0 |
 | [type-check](https://github.com/gkz/type-check) | 0.3.2 | MIT |
 | [type-is](https://github.com/jshttp/type-is#readme) | 2.1.0 | MIT |
-| [undici](https://undici.nodejs.org) | 8.10.0 | MIT |
 | [undici-types](https://undici.nodejs.org) | 7.24.6 | MIT |
+| [undici](https://undici.nodejs.org) | 8.10.0 | MIT |
 | [unicode-properties](https://github.com/devongovett/unicode-properties) | 1.4.1 | MIT |
 | [unicode-trie](https://github.com/devongovett/unicode-trie) | 2.0.0 | MIT |
 | [unpdf](https://github.com/unjs/unpdf#readme) | 1.8.1 | MIT |
 | [unpipe](https://github.com/stream-utils/unpipe#readme) | 1.0.0 | MIT |
-| [util](https://github.com/browserify/node-util) | 0.12.5 | MIT |
 | [util-deprecate](https://github.com/TooTallNate/util-deprecate) | 1.0.2 | MIT |
+| [util](https://github.com/browserify/node-util) | 0.12.5 | MIT |
 | [uuid](https://github.com/uuidjs/uuid#readme) | 14.0.2 | MIT |
 | [validator](https://github.com/validatorjs/validator.js) | 13.15.35 | MIT |
 | [vanilla-cookieconsent](https://cookieconsent.orestbida.com) | 3.1.0 | MIT |
 | [vary](https://github.com/jshttp/vary#readme) | 1.1.2 | MIT |
 | [web-push](https://github.com/web-push-libs/web-push#readme) | 3.6.7 | MPL-2.0 |
-| [which](https://github.com/isaacs/node-which#readme) | 2.0.2 | ISC |
 | [which-module](https://github.com/nexdrew/which-module#readme) | 2.0.1 | ISC |
 | [which-typed-array](https://github.com/inspect-js/which-typed-array#readme) | 1.1.22 | MIT |
-| [winston](https://github.com/winstonjs/winston#readme) | 3.19.0 | MIT |
+| [which](https://github.com/isaacs/node-which#readme) | 2.0.2 | ISC |
 | [winston-transport](https://github.com/winstonjs/winston-transport#readme) | 4.9.0 | MIT |
+| [winston](https://github.com/winstonjs/winston#readme) | 3.19.0 | MIT |
 | [word-wrap](https://github.com/jonschlinkert/word-wrap) | 1.2.5 | MIT |
 | [wrap-ansi](https://github.com/chalk/wrap-ansi#readme) | 6.2.0 | MIT |
 | [wrappy](https://github.com/npm/wrappy) | 1.0.2 | ISC |
@@ -477,17 +496,21 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [xml-crypto](https://github.com/node-saml/xml-crypto#readme) | 6.1.2 | MIT |
 | [xml-encryption](https://github.com/auth0/node-xml-encryption#readme) | 3.1.0 | MIT |
 | [xml2js](https://github.com/Leonidas-from-XIV/node-xml2js) | 0.6.2 | MIT |
-| [xmlbuilder](http://github.com/oozcitak/xmlbuilder-js) | 11.0.1, 15.1.1 | MIT |
-| [xpath](https://github.com/goto100/xpath#readme) | 0.0.32, 0.0.33, 0.0.34 | MIT |
+| [xmlbuilder](http://github.com/oozcitak/xmlbuilder-js) | 11.0.1 | MIT |
+| [xmlbuilder](http://github.com/oozcitak/xmlbuilder-js) | 15.1.1 | MIT |
+| [xpath](https://github.com/goto100/xpath#readme) | 0.0.32 | MIT |
+| [xpath](https://github.com/goto100/xpath#readme) | 0.0.33 | MIT |
+| [xpath](https://github.com/goto100/xpath#readme) | 0.0.34 | MIT |
 | [xtend](https://github.com/Raynos/xtend) | 4.0.2 | MIT |
 | [y18n](https://github.com/yargs/y18n) | 4.0.3 | ISC |
 | [yaml](https://eemeli.org/yaml/) | 2.9.0 | ISC |
-| [yargs](https://yargs.js.org/) | 15.4.1 | MIT |
 | [yargs-parser](https://github.com/yargs/yargs-parser#readme) | 18.1.3 | ISC |
+| [yargs](https://yargs.js.org/) | 15.4.1 | MIT |
 | [yauzl](https://github.com/thejoshwolfe/yauzl) | 3.4.0 | MIT |
 | [zip-stream](https://github.com/archiverjs/node-zip-stream) | 7.0.5 | MIT |
-| [zod](https://zod.dev) | 4.1.11, 4.5.4 | MIT |
 | [zod-to-json-schema](https://github.com/StefanTerdell/zod-to-json-schema#readme) | 3.25.2 | ISC |
+| [zod](https://zod.dev) | 4.1.11 | MIT |
+| [zod](https://zod.dev) | 4.5.4 | MIT |
 
 ## Licence texts
 
@@ -562,349 +585,6 @@ FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
 COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-```
-
-### @ffmpeg/core (ffmpeg 5.1.4 compiled to WebAssembly) 0.12.6
-
-```text
-GNU GENERAL PUBLIC LICENSE
-                       Version 2, June 1991
-
- Copyright (C) 1989, 1991 Free Software Foundation, Inc.,
- <https://fsf.org/>
- Everyone is permitted to copy and distribute verbatim copies
- of this license document, but changing it is not allowed.
-
-                            Preamble
-
-  The licenses for most software are designed to take away your
-freedom to share and change it.  By contrast, the GNU General Public
-License is intended to guarantee your freedom to share and change free
-software--to make sure the software is free for all its users.  This
-General Public License applies to most of the Free Software
-Foundation's software and to any other program whose authors commit to
-using it.  (Some other Free Software Foundation software is covered by
-the GNU Lesser General Public License instead.)  You can apply it to
-your programs, too.
-
-  When we speak of free software, we are referring to freedom, not
-price.  Our General Public Licenses are designed to make sure that you
-have the freedom to distribute copies of free software (and charge for
-this service if you wish), that you receive source code or can get it
-if you want it, that you can change the software or use pieces of it
-in new free programs; and that you know you can do these things.
-
-  To protect your rights, we need to make restrictions that forbid
-anyone to deny you these rights or to ask you to surrender the rights.
-These restrictions translate to certain responsibilities for you if you
-distribute copies of the software, or if you modify it.
-
-  For example, if you distribute copies of such a program, whether
-gratis or for a fee, you must give the recipients all the rights that
-you have.  You must make sure that they, too, receive or can get the
-source code.  And you must show them these terms so they know their
-rights.
-
-  We protect your rights with two steps: (1) copyright the software, and
-(2) offer you this license which gives you legal permission to copy,
-distribute and/or modify the software.
-
-  Also, for each author's protection and ours, we want to make certain
-that everyone understands that there is no warranty for this free
-software.  If the software is modified by someone else and passed on, we
-want its recipients to know that what they have is not the original, so
-that any problems introduced by others will not reflect on the original
-authors' reputations.
-
-  Finally, any free program is threatened constantly by software
-patents.  We wish to avoid the danger that redistributors of a free
-program will individually obtain patent licenses, in effect making the
-program proprietary.  To prevent this, we have made it clear that any
-patent must be licensed for everyone's free use or not licensed at all.
-
-  The precise terms and conditions for copying, distribution and
-modification follow.
-
-                    GNU GENERAL PUBLIC LICENSE
-   TERMS AND CONDITIONS FOR COPYING, DISTRIBUTION AND MODIFICATION
-
-  0. This License applies to any program or other work which contains
-a notice placed by the copyright holder saying it may be distributed
-under the terms of this General Public License.  The "Program", below,
-refers to any such program or work, and a "work based on the Program"
-means either the Program or any derivative work under copyright law:
-that is to say, a work containing the Program or a portion of it,
-either verbatim or with modifications and/or translated into another
-language.  (Hereinafter, translation is included without limitation in
-the term "modification".)  Each licensee is addressed as "you".
-
-Activities other than copying, distribution and modification are not
-covered by this License; they are outside its scope.  The act of
-running the Program is not restricted, and the output from the Program
-is covered only if its contents constitute a work based on the
-Program (independent of having been made by running the Program).
-Whether that is true depends on what the Program does.
-
-  1. You may copy and distribute verbatim copies of the Program's
-source code as you receive it, in any medium, provided that you
-conspicuously and appropriately publish on each copy an appropriate
-copyright notice and disclaimer of warranty; keep intact all the
-notices that refer to this License and to the absence of any warranty;
-and give any other recipients of the Program a copy of this License
-along with the Program.
-
-You may charge a fee for the physical act of transferring a copy, and
-you may at your option offer warranty protection in exchange for a fee.
-
-  2. You may modify your copy or copies of the Program or any portion
-of it, thus forming a work based on the Program, and copy and
-distribute such modifications or work under the terms of Section 1
-above, provided that you also meet all of these conditions:
-
-    a) You must cause the modified files to carry prominent notices
-    stating that you changed the files and the date of any change.
-
-    b) You must cause any work that you distribute or publish, that in
-    whole or in part contains or is derived from the Program or any
-    part thereof, to be licensed as a whole at no charge to all third
-    parties under the terms of this License.
-
-    c) If the modified program normally reads commands interactively
-    when run, you must cause it, when started running for such
-    interactive use in the most ordinary way, to print or display an
-    announcement including an appropriate copyright notice and a
-    notice that there is no warranty (or else, saying that you provide
-    a warranty) and that users may redistribute the program under
-    these conditions, and telling the user how to view a copy of this
-    License.  (Exception: if the Program itself is interactive but
-    does not normally print such an announcement, your work based on
-    the Program is not required to print an announcement.)
-
-These requirements apply to the modified work as a whole.  If
-identifiable sections of that work are not derived from the Program,
-and can be reasonably considered independent and separate works in
-themselves, then this License, and its terms, do not apply to those
-sections when you distribute them as separate works.  But when you
-distribute the same sections as part of a whole which is a work based
-on the Program, the distribution of the whole must be on the terms of
-this License, whose permissions for other licensees extend to the
-entire whole, and thus to each and every part regardless of who wrote it.
-
-Thus, it is not the intent of this section to claim rights or contest
-your rights to work written entirely by you; rather, the intent is to
-exercise the right to control the distribution of derivative or
-collective works based on the Program.
-
-In addition, mere aggregation of another work not based on the Program
-with the Program (or with a work based on the Program) on a volume of
-a storage or distribution medium does not bring the other work under
-the scope of this License.
-
-  3. You may copy and distribute the Program (or a work based on it,
-under Section 2) in object code or executable form under the terms of
-Sections 1 and 2 above provided that you also do one of the following:
-
-    a) Accompany it with the complete corresponding machine-readable
-    source code, which must be distributed under the terms of Sections
-    1 and 2 above on a medium customarily used for software interchange; or,
-
-    b) Accompany it with a written offer, valid for at least three
-    years, to give any third party, for a charge no more than your
-    cost of physically performing source distribution, a complete
-    machine-readable copy of the corresponding source code, to be
-    distributed under the terms of Sections 1 and 2 above on a medium
-    customarily used for software interchange; or,
-
-    c) Accompany it with the information you received as to the offer
-    to distribute corresponding source code.  (This alternative is
-    allowed only for noncommercial distribution and only if you
-    received the program in object code or executable form with such
-    an offer, in accord with Subsection b above.)
-
-The source code for a work means the preferred form of the work for
-making modifications to it.  For an executable work, complete source
-code means all the source code for all modules it contains, plus any
-associated interface definition files, plus the scripts used to
-control compilation and installation of the executable.  However, as a
-special exception, the source code distributed need not include
-anything that is normally distributed (in either source or binary
-form) with the major components (compiler, kernel, and so on) of the
-operating system on which the executable runs, unless that component
-itself accompanies the executable.
-
-If distribution of executable or object code is made by offering
-access to copy from a designated place, then offering equivalent
-access to copy the source code from the same place counts as
-distribution of the source code, even though third parties are not
-compelled to copy the source along with the object code.
-
-  4. You may not copy, modify, sublicense, or distribute the Program
-except as expressly provided under this License.  Any attempt
-otherwise to copy, modify, sublicense or distribute the Program is
-void, and will automatically terminate your rights under this License.
-However, parties who have received copies, or rights, from you under
-this License will not have their licenses terminated so long as such
-parties remain in full compliance.
-
-  5. You are not required to accept this License, since you have not
-signed it.  However, nothing else grants you permission to modify or
-distribute the Program or its derivative works.  These actions are
-prohibited by law if you do not accept this License.  Therefore, by
-modifying or distributing the Program (or any work based on the
-Program), you indicate your acceptance of this License to do so, and
-all its terms and conditions for copying, distributing or modifying
-the Program or works based on it.
-
-  6. Each time you redistribute the Program (or any work based on the
-Program), the recipient automatically receives a license from the
-original licensor to copy, distribute or modify the Program subject to
-these terms and conditions.  You may not impose any further
-restrictions on the recipients' exercise of the rights granted herein.
-You are not responsible for enforcing compliance by third parties to
-this License.
-
-  7. If, as a consequence of a court judgment or allegation of patent
-infringement or for any other reason (not limited to patent issues),
-conditions are imposed on you (whether by court order, agreement or
-otherwise) that contradict the conditions of this License, they do not
-excuse you from the conditions of this License.  If you cannot
-distribute so as to satisfy simultaneously your obligations under this
-License and any other pertinent obligations, then as a consequence you
-may not distribute the Program at all.  For example, if a patent
-license would not permit royalty-free redistribution of the Program by
-all those who receive copies directly or indirectly through you, then
-the only way you could satisfy both it and this License would be to
-refrain entirely from distribution of the Program.
-
-If any portion of this section is held invalid or unenforceable under
-any particular circumstance, the balance of the section is intended to
-apply and the section as a whole is intended to apply in other
-circumstances.
-
-It is not the purpose of this section to induce you to infringe any
-patents or other property right claims or to contest validity of any
-such claims; this section has the sole purpose of protecting the
-integrity of the free software distribution system, which is
-implemented by public license practices.  Many people have made
-generous contributions to the wide range of software distributed
-through that system in reliance on consistent application of that
-system; it is up to the author/donor to decide if he or she is willing
-to distribute software through any other system and a licensee cannot
-impose that choice.
-
-This section is intended to make thoroughly clear what is believed to
-be a consequence of the rest of this License.
-
-  8. If the distribution and/or use of the Program is restricted in
-certain countries either by patents or by copyrighted interfaces, the
-original copyright holder who places the Program under this License
-may add an explicit geographical distribution limitation excluding
-those countries, so that distribution is permitted only in or among
-countries not thus excluded.  In such case, this License incorporates
-the limitation as if written in the body of this License.
-
-  9. The Free Software Foundation may publish revised and/or new versions
-of the General Public License from time to time.  Such new versions will
-be similar in spirit to the present version, but may differ in detail to
-address new problems or concerns.
-
-Each version is given a distinguishing version number.  If the Program
-specifies a version number of this License which applies to it and "any
-later version", you have the option of following the terms and conditions
-either of that version or of any later version published by the Free
-Software Foundation.  If the Program does not specify a version number of
-this License, you may choose any version ever published by the Free Software
-Foundation.
-
-  10. If you wish to incorporate parts of the Program into other free
-programs whose distribution conditions are different, write to the author
-to ask for permission.  For software which is copyrighted by the Free
-Software Foundation, write to the Free Software Foundation; we sometimes
-make exceptions for this.  Our decision will be guided by the two goals
-of preserving the free status of all derivatives of our free software and
-of promoting the sharing and reuse of software generally.
-
-                            NO WARRANTY
-
-  11. BECAUSE THE PROGRAM IS LICENSED FREE OF CHARGE, THERE IS NO WARRANTY
-FOR THE PROGRAM, TO THE EXTENT PERMITTED BY APPLICABLE LAW.  EXCEPT WHEN
-OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR OTHER PARTIES
-PROVIDE THE PROGRAM "AS IS" WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESSED
-OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
-MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.  THE ENTIRE RISK AS
-TO THE QUALITY AND PERFORMANCE OF THE PROGRAM IS WITH YOU.  SHOULD THE
-PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF ALL NECESSARY SERVICING,
-REPAIR OR CORRECTION.
-
-  12. IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW OR AGREED TO IN WRITING
-WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MAY MODIFY AND/OR
-REDISTRIBUTE THE PROGRAM AS PERMITTED ABOVE, BE LIABLE TO YOU FOR DAMAGES,
-INCLUDING ANY GENERAL, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES ARISING
-OUT OF THE USE OR INABILITY TO USE THE PROGRAM (INCLUDING BUT NOT LIMITED
-TO LOSS OF DATA OR DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY
-YOU OR THIRD PARTIES OR A FAILURE OF THE PROGRAM TO OPERATE WITH ANY OTHER
-PROGRAMS), EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE
-POSSIBILITY OF SUCH DAMAGES.
-
-                     END OF TERMS AND CONDITIONS
-
-            How to Apply These Terms to Your New Programs
-
-  If you develop a new program, and you want it to be of the greatest
-possible use to the public, the best way to achieve this is to make it
-free software which everyone can redistribute and change under these terms.
-
-  To do so, attach the following notices to the program.  It is safest
-to attach them to the start of each source file to most effectively
-convey the exclusion of warranty; and each file should have at least
-the "copyright" line and a pointer to where the full notice is found.
-
-    <one line to give the program's name and a brief idea of what it does.>
-    Copyright (C) <year>  <name of author>
-
-    This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License along
-    with this program; if not, see <https://www.gnu.org/licenses/>.
-
-Also add information on how to contact you by electronic and paper mail.
-
-If the program is interactive, make it output a short notice like this
-when it starts in an interactive mode:
-
-    Gnomovision version 69, Copyright (C) year name of author
-    Gnomovision comes with ABSOLUTELY NO WARRANTY; for details type `show w'.
-    This is free software, and you are welcome to redistribute it
-    under certain conditions; type `show c' for details.
-
-The hypothetical commands `show w' and `show c' should show the appropriate
-parts of the General Public License.  Of course, the commands you use may
-be called something other than `show w' and `show c'; they could even be
-mouse-clicks or menu items--whatever suits your program.
-
-You should also get your employer (if you work as a programmer) or your
-school, if any, to sign a "copyright disclaimer" for the program, if
-necessary.  Here is a sample; alter the names:
-
-  Yoyodyne, Inc., hereby disclaims all copyright interest in the program
-  `Gnomovision' (which makes passes at compilers) written by James Hacker.
-
-  <signature of Moe Ghoul>, 1 April 1989
-  Moe Ghoul, President of Vice
-
-This General Public License does not permit incorporating your program into
-proprietary programs.  If your program is a subroutine library, you may
-consider it more useful to permit linking proprietary applications with the
-library.  If this is what you want to do, use the GNU Lesser General
-Public License instead of this License.
 ```
 
 ### @hono/node-server 2.1.1
@@ -1009,7 +689,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-### @jitl/quickjs-ffi-types 0.32.0, quickjs-emscripten 0.32.0, quickjs-emscripten-core 0.32.0
+### @jitl/quickjs-ffi-types 0.32.0, quickjs-emscripten-core 0.32.0, quickjs-emscripten 0.32.0
 
 ```text
 The MIT License
@@ -1387,7 +1067,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### @noble/hashes 1.8.0, 2.2.0, 2.4.0
+### @noble/hashes 1.8.0, @noble/hashes 2.2.0, @noble/hashes 2.4.0
 
 ```text
 The MIT License (MIT)
@@ -1696,32 +1376,6 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-```
-
-### @tailwindcss/browser 4.3.1
-
-```text
-MIT License
-
-Copyright (c) Tailwind Labs, Inc.
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
 ```
 
 ### @types/debug 4.1.13, @types/minimatch 3.0.5, @types/ms 2.1.0, @types/node 25.9.5, @types/qs 6.15.1, @types/triple-beam 1.3.5, @types/validator 13.15.10, @types/xml-encryption 1.2.4, @types/xml2js 0.4.14
@@ -2188,7 +1842,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @xmldom/xmldom 0.8.15, 0.9.12
+### @xmldom/xmldom 0.8.15, @xmldom/xmldom 0.9.12
 
 ```text
 Copyright 2019 - present Christopher J. Brody and other contributors, as listed in: https://github.com/xmldom/xmldom/graphs/contributors
@@ -2255,32 +1909,6 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### acorn 8.15.0
-
-```text
-MIT License
-
-Copyright (C) 2012-2022 by various contributors (see AUTHORS)
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-```
-
 ### acorn-import-attributes 1.9.5
 
 ```text
@@ -2305,6 +1933,32 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+```
+
+### acorn 8.15.0
+
+```text
+MIT License
+
+Copyright (C) 2012-2022 by various contributors (see AUTHORS)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
 ```
 
 ### agent-base 7.1.4, https-proxy-agent 7.0.6
@@ -2360,32 +2014,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### ajv 8.20.0
-
-```text
-The MIT License (MIT)
-
-Copyright (c) 2015-2021 Evgeny Poberezkin
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
 ### ajv-formats 3.0.1
 
 ```text
@@ -2412,7 +2040,33 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### ansi-regex 5.0.1, ansi-styles 4.3.0, array-differ 3.0.0, array-union 2.1.0, arrify 2.0.1, camelcase 5.3.1, chalk 4.1.2, find-up 4.1.0, has-flag 4.0.0, is-fullwidth-code-point 3.0.0, locate-path 5.0.0, mimic-fn 2.1.0, npm-run-path 4.0.1, p-limit 2.3.0, p-locate 4.1.0, p-try 2.2.0, path-exists 4.0.0, path-key 3.1.1, shebang-regex 3.0.0, string-width 4.2.3, strip-ansi 6.0.1, strip-final-newline 2.0.0, supports-color 7.2.0, 10.2.2, wrap-ansi 6.2.0
+### ajv 8.20.0
+
+```text
+The MIT License (MIT)
+
+Copyright (c) 2015-2021 Evgeny Poberezkin
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+### ansi-regex 5.0.1, ansi-styles 4.3.0, array-differ 3.0.0, array-union 2.1.0, arrify 2.0.1, camelcase 5.3.1, chalk 4.1.2, find-up 4.1.0, has-flag 4.0.0, is-fullwidth-code-point 3.0.0, locate-path 5.0.0, mimic-fn 2.1.0, npm-run-path 4.0.1, p-limit 2.3.0, p-locate 4.1.0, p-try 2.2.0, path-exists 4.0.0, path-key 3.1.1, shebang-regex 3.0.0, string-width 4.2.3, strip-ansi 6.0.1, strip-final-newline 2.0.0, supports-color 7.2.0, wrap-ansi 6.2.0
 
 ```text
 MIT License
@@ -2708,30 +2362,6 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 IN THE SOFTWARE.
 ```
 
-### async 3.2.6
-
-```text
-Copyright (c) 2010-2018 Caolan McMahon
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-```
-
 ### async-retry 1.3.3
 
 ```text
@@ -2756,6 +2386,30 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+```
+
+### async 3.2.6
+
+```text
+Copyright (c) 2010-2018 Caolan McMahon
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
 ```
 
 ### available-typed-arrays 1.0.7
@@ -2812,114 +2466,38 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### Baloo 2, Bangers, Inter, Archivo, Archivo Black, Space Grotesk, Fraunces, JetBrains Mono, Fjalla One, DM Sans, VT323 see fonts/LICENSE.md
-
-```text
-Copyright (c) <dates>, <Copyright Holder> (<URL|email>),
-with Reserved Font Name <Reserved Font Name>.
-Copyright (c) <dates>, <additional Copyright Holder> (<URL|email>),
-with Reserved Font Name <additional Reserved Font Name>.
-Copyright (c) <dates>, <additional Copyright Holder> (<URL|email>).
-
-This Font Software is licensed under the SIL Open Font License, Version 1.1.
-This license is copied below, and is also available with a FAQ at:
-https://openfontlicense.org
-
-
------------------------------------------------------------
-SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
------------------------------------------------------------
-
-PREAMBLE
-The goals of the Open Font License (OFL) are to stimulate worldwide
-development of collaborative font projects, to support the font creation
-efforts of academic and linguistic communities, and to provide a free and
-open framework in which fonts may be shared and improved in partnership
-with others.
-
-The OFL allows the licensed fonts to be used, studied, modified and
-redistributed freely as long as they are not sold by themselves. The
-fonts, including any derivative works, can be bundled, embedded,
-redistributed and/or sold with any software provided that any reserved
-names are not used by derivative works. The fonts and derivatives,
-however, cannot be released under any other type of license. The
-requirement for fonts to remain under this license does not apply
-to any document created using the fonts or their derivatives.
-
-DEFINITIONS
-"Font Software" refers to the set of files released by the Copyright
-Holder(s) under this license and clearly marked as such. This may
-include source files, build scripts and documentation.
-
-"Reserved Font Name" refers to any names specified as such after the
-copyright statement(s).
-
-"Original Version" refers to the collection of Font Software components as
-distributed by the Copyright Holder(s).
-
-"Modified Version" refers to any derivative made by adding to, deleting,
-or substituting -- in part or in whole -- any of the components of the
-Original Version, by changing formats or by porting the Font Software to a
-new environment.
-
-"Author" refers to any designer, engineer, programmer, technical
-writer or other person who contributed to the Font Software.
-
-PERMISSION & CONDITIONS
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of the Font Software, to use, study, copy, merge, embed, modify,
-redistribute, and sell modified and unmodified copies of the Font
-Software, subject to the following conditions:
-
-1) Neither the Font Software nor any of its individual components,
-in Original or Modified Versions, may be sold by itself.
-
-2) Original or Modified Versions of the Font Software may be bundled,
-redistributed and/or sold with any software, provided that each copy
-contains the above copyright notice and this license. These can be
-included either as stand-alone text files, human-readable headers or
-in the appropriate machine-readable metadata fields within text or
-binary files as long as those fields can be easily viewed by the user.
-
-3) No Modified Version of the Font Software may use the Reserved Font
-Name(s) unless explicit written permission is granted by the corresponding
-Copyright Holder. This restriction only applies to the primary font name as
-presented to the users.
-
-4) The name(s) of the Copyright Holder(s) or the Author(s) of the Font
-Software shall not be used to promote, endorse or advertise any
-Modified Version, except to acknowledge the contribution(s) of the
-Copyright Holder(s) and the Author(s) or with their explicit written
-permission.
-
-5) The Font Software, modified or unmodified, in part or in whole,
-must be distributed entirely under this license, and must not be
-distributed under any other license. The requirement for fonts to
-remain under this license does not apply to any document created
-using the Font Software.
-
-TERMINATION
-This license becomes null and void if any of the above conditions are
-not met.
-
-DISCLAIMER
-THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
-OF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL THE
-COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-INCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL
-DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
-OTHER DEALINGS IN THE FONT SOFTWARE.
-```
-
-### base64-js 0.0.8, 1.5.1
+### base64-js 0.0.8
 
 ```text
 The MIT License (MIT)
 
 Copyright (c) 2014
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+```
+
+### base64-js 1.5.1
+
+```text
+The MIT License (MIT)
+
+Copyright (c) 2014 Jameson Little
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -3190,32 +2768,6 @@ IN THE SOFTWARE.
 """
 ```
 
-### buffer 5.7.1, 6.0.3
-
-```text
-The MIT License (MIT)
-
-Copyright (c) Feross Aboukhadijeh, and other contributors.
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-```
-
 ### buffer-crc32 1.0.0
 
 ```text
@@ -3255,6 +2807,32 @@ Redistribution and use in source and binary forms, with or without modification,
 * Neither the name of salesforce.com, nor GoInstant, nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
+
+### buffer 5.7.1, buffer 6.0.3
+
+```text
+The MIT License (MIT)
+
+Copyright (c) Feross Aboukhadijeh, and other contributors.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
 ```
 
 ### busboy 1.6.0
@@ -3309,12 +2887,12 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### call-bind 1.0.9, get-intrinsic 1.3.0
+### call-bind-apply-helpers 1.0.2, call-bound 1.0.4, es-define-property 1.0.1, es-errors 1.3.0, es-object-atoms 1.1.2, possible-typed-array-names 1.1.0, side-channel-list 1.0.1, side-channel-map 1.0.1
 
 ```text
 MIT License
 
-Copyright (c) 2020 Jordan Harband
+Copyright (c) 2024 Jordan Harband
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -3335,12 +2913,12 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### call-bind-apply-helpers 1.0.2, call-bound 1.0.4, es-define-property 1.0.1, es-errors 1.3.0, es-object-atoms 1.1.2, possible-typed-array-names 1.1.0, side-channel-list 1.0.1, side-channel-map 1.0.1
+### call-bind 1.0.9, get-intrinsic 1.3.0
 
 ```text
 MIT License
 
-Copyright (c) 2024 Jordan Harband
+Copyright (c) 2020 Jordan Harband
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -3459,7 +3037,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### chownr 1.1.4, ini 1.3.8, 7.0.0, isexe 2.0.0, minimatch 3.1.5, once 1.4.0, semver 7.8.5, which 2.0.2, wrappy 1.0.2
+### chownr 1.1.4, ini 1.3.8, ini 7.0.0, isexe 2.0.0, minimatch 3.1.5, once 1.4.0, semver 7.8.5, which 2.0.2, wrappy 1.0.2
 
 ```text
 The ISC License
@@ -3547,32 +3125,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### color 5.0.3
-
-```text
-Copyright (c) 2012 Heather Arthur
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-"Software"), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
-LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
-WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-```
-
-### color-convert 2.0.1, 3.1.3
+### color-convert 2.0.1
 
 ```text
 Copyright (c) 2011-2016 Heather Arthur <fayearthur@gmail.com>
@@ -3597,7 +3150,46 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### color-name 1.1.4, 2.1.1
+### color-convert 3.1.3
+
+```text
+Copyright (c) 2011-2016 Heather Arthur <fayearthur@gmail.com>.
+Copyright (c) 2016-2021 Josh Junon <josh@junon.me>.
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
+### color-name 1.1.4
+
+```text
+The MIT License (MIT)
+Copyright (c) 2015 Dmitry Ivanov
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
+### color-name 2.1.1
 
 ```text
 The MIT License (MIT)
@@ -3614,6 +3206,31 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ```text
 Copyright (c) 2011 Heather Arthur <fayearthur@gmail.com>
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
+### color 5.0.3
+
+```text
+Copyright (c) 2012 Heather Arthur
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -3718,30 +3335,6 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### consul 2.0.1, papi 1.1.2
-
-```text
-Copyright (c) 2014 Silas Sewell
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-```
-
 ### content-disposition 1.1.0, forwarded 0.2.0, media-typer 1.1.1, vary 1.1.2
 
 ```text
@@ -3769,12 +3362,39 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### content-type 1.0.5, 2.1.0
+### content-type 1.0.5, content-type 2.1.0
 
 ```text
 (The MIT License)
 
 Copyright (c) 2015 Douglas Christopher Wilson
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+'Software'), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
+### cookie-signature 1.2.2
+
+```text
+(The MIT License)
+
+Copyright (c) 2012–2024 LearnBoost <tj@learnboost.com> and other contributors;
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -3803,33 +3423,6 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 Copyright (c) 2012-2014 Roman Shtylman <shtylman@gmail.com>
 Copyright (c) 2015 Douglas Christopher Wilson <doug@somethingdoug.com>
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-'Software'), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-```
-
-### cookie-signature 1.2.2
-
-```text
-(The MIT License)
-
-Copyright (c) 2012–2024 LearnBoost <tj@learnboost.com> and other contributors;
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -4204,7 +3797,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### debug 2.6.9, 4.4.3
+### debug 2.6.9
 
 ```text
 (The MIT License)
@@ -4224,6 +3817,30 @@ THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. 
 IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
 WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE 
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
+### debug 4.4.3
+
+```text
+(The MIT License)
+
+Copyright (c) 2014-2017 TJ Holowaychuk <tj@vision-media.ca>
+Copyright (c) 2018-2021 Josh Junon
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+and associated documentation files (the 'Software'), to deal in the Software without restriction,
+including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial
+portions of the Software.
+
+THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT
+LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
@@ -4253,7 +3870,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### decompress-response 6.0.0, env-paths 4.0.0, execa 5.1.1, get-stream 6.0.1, is-safe-filename 0.1.1, is-stream 2.0.1, 4.0.1, mimic-response 3.1.0, multimatch 5.0.0, onetime 5.1.2
+### decompress-response 6.0.0, env-paths 4.0.0, execa 5.1.1, get-stream 6.0.1, is-safe-filename 0.1.1, is-stream 2.0.1, is-stream 4.0.1, mimic-response 3.1.0, multimatch 5.0.0, onetime 5.1.2, supports-color 10.2.2
 
 ```text
 MIT License
@@ -4951,7 +4568,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### end-of-stream 1.4.5, pump 3.0.4, tar-fs 2.1.5, tar-stream 2.2.0, 3.2.1
+### end-of-stream 1.4.5, pump 3.0.4, tar-fs 2.1.5, tar-stream 2.2.0, tar-stream 3.2.1
 
 ```text
 The MIT License (MIT)
@@ -5345,6 +4962,32 @@ OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
 USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
+### eventsource-parser 3.1.1
+
+```text
+MIT License
+
+Copyright (c) 2026 Espen Hovlandsdal <espen@hovlandsdal.com>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
 ### eventsource 3.0.7
 
 ```text
@@ -5372,32 +5015,6 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### eventsource-parser 3.1.1
-
-```text
-MIT License
-
-Copyright (c) 2026 Espen Hovlandsdal <espen@hovlandsdal.com>
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
 ### expand-template 2.0.3
 
 ```text
@@ -5422,6 +5039,32 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
+```
+
+### express-rate-limit 8.7.0
+
+```text
+MIT License
+
+Copyright 2023 Nathan Friedly, Vedant K
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 ```
 
 ### express 5.2.1
@@ -5451,32 +5094,6 @@ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
 CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-```
-
-### express-rate-limit 8.7.0
-
-```text
-MIT License
-
-Copyright 2023 Nathan Friedly, Vedant K
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the "Software"), to deal in
-the Software without restriction, including without limitation the rights to
-use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
-the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
 ```
 
 ### fast-deep-equal 3.1.3, json-schema-traverse 1.0.0
@@ -5675,6 +5292,349 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+### @ffmpeg/core (ffmpeg 5.1.4 compiled to WebAssembly) 0.12.6
+
+```text
+GNU GENERAL PUBLIC LICENSE
+                       Version 2, June 1991
+
+ Copyright (C) 1989, 1991 Free Software Foundation, Inc.,
+ <https://fsf.org/>
+ Everyone is permitted to copy and distribute verbatim copies
+ of this license document, but changing it is not allowed.
+
+                            Preamble
+
+  The licenses for most software are designed to take away your
+freedom to share and change it.  By contrast, the GNU General Public
+License is intended to guarantee your freedom to share and change free
+software--to make sure the software is free for all its users.  This
+General Public License applies to most of the Free Software
+Foundation's software and to any other program whose authors commit to
+using it.  (Some other Free Software Foundation software is covered by
+the GNU Lesser General Public License instead.)  You can apply it to
+your programs, too.
+
+  When we speak of free software, we are referring to freedom, not
+price.  Our General Public Licenses are designed to make sure that you
+have the freedom to distribute copies of free software (and charge for
+this service if you wish), that you receive source code or can get it
+if you want it, that you can change the software or use pieces of it
+in new free programs; and that you know you can do these things.
+
+  To protect your rights, we need to make restrictions that forbid
+anyone to deny you these rights or to ask you to surrender the rights.
+These restrictions translate to certain responsibilities for you if you
+distribute copies of the software, or if you modify it.
+
+  For example, if you distribute copies of such a program, whether
+gratis or for a fee, you must give the recipients all the rights that
+you have.  You must make sure that they, too, receive or can get the
+source code.  And you must show them these terms so they know their
+rights.
+
+  We protect your rights with two steps: (1) copyright the software, and
+(2) offer you this license which gives you legal permission to copy,
+distribute and/or modify the software.
+
+  Also, for each author's protection and ours, we want to make certain
+that everyone understands that there is no warranty for this free
+software.  If the software is modified by someone else and passed on, we
+want its recipients to know that what they have is not the original, so
+that any problems introduced by others will not reflect on the original
+authors' reputations.
+
+  Finally, any free program is threatened constantly by software
+patents.  We wish to avoid the danger that redistributors of a free
+program will individually obtain patent licenses, in effect making the
+program proprietary.  To prevent this, we have made it clear that any
+patent must be licensed for everyone's free use or not licensed at all.
+
+  The precise terms and conditions for copying, distribution and
+modification follow.
+
+                    GNU GENERAL PUBLIC LICENSE
+   TERMS AND CONDITIONS FOR COPYING, DISTRIBUTION AND MODIFICATION
+
+  0. This License applies to any program or other work which contains
+a notice placed by the copyright holder saying it may be distributed
+under the terms of this General Public License.  The "Program", below,
+refers to any such program or work, and a "work based on the Program"
+means either the Program or any derivative work under copyright law:
+that is to say, a work containing the Program or a portion of it,
+either verbatim or with modifications and/or translated into another
+language.  (Hereinafter, translation is included without limitation in
+the term "modification".)  Each licensee is addressed as "you".
+
+Activities other than copying, distribution and modification are not
+covered by this License; they are outside its scope.  The act of
+running the Program is not restricted, and the output from the Program
+is covered only if its contents constitute a work based on the
+Program (independent of having been made by running the Program).
+Whether that is true depends on what the Program does.
+
+  1. You may copy and distribute verbatim copies of the Program's
+source code as you receive it, in any medium, provided that you
+conspicuously and appropriately publish on each copy an appropriate
+copyright notice and disclaimer of warranty; keep intact all the
+notices that refer to this License and to the absence of any warranty;
+and give any other recipients of the Program a copy of this License
+along with the Program.
+
+You may charge a fee for the physical act of transferring a copy, and
+you may at your option offer warranty protection in exchange for a fee.
+
+  2. You may modify your copy or copies of the Program or any portion
+of it, thus forming a work based on the Program, and copy and
+distribute such modifications or work under the terms of Section 1
+above, provided that you also meet all of these conditions:
+
+    a) You must cause the modified files to carry prominent notices
+    stating that you changed the files and the date of any change.
+
+    b) You must cause any work that you distribute or publish, that in
+    whole or in part contains or is derived from the Program or any
+    part thereof, to be licensed as a whole at no charge to all third
+    parties under the terms of this License.
+
+    c) If the modified program normally reads commands interactively
+    when run, you must cause it, when started running for such
+    interactive use in the most ordinary way, to print or display an
+    announcement including an appropriate copyright notice and a
+    notice that there is no warranty (or else, saying that you provide
+    a warranty) and that users may redistribute the program under
+    these conditions, and telling the user how to view a copy of this
+    License.  (Exception: if the Program itself is interactive but
+    does not normally print such an announcement, your work based on
+    the Program is not required to print an announcement.)
+
+These requirements apply to the modified work as a whole.  If
+identifiable sections of that work are not derived from the Program,
+and can be reasonably considered independent and separate works in
+themselves, then this License, and its terms, do not apply to those
+sections when you distribute them as separate works.  But when you
+distribute the same sections as part of a whole which is a work based
+on the Program, the distribution of the whole must be on the terms of
+this License, whose permissions for other licensees extend to the
+entire whole, and thus to each and every part regardless of who wrote it.
+
+Thus, it is not the intent of this section to claim rights or contest
+your rights to work written entirely by you; rather, the intent is to
+exercise the right to control the distribution of derivative or
+collective works based on the Program.
+
+In addition, mere aggregation of another work not based on the Program
+with the Program (or with a work based on the Program) on a volume of
+a storage or distribution medium does not bring the other work under
+the scope of this License.
+
+  3. You may copy and distribute the Program (or a work based on it,
+under Section 2) in object code or executable form under the terms of
+Sections 1 and 2 above provided that you also do one of the following:
+
+    a) Accompany it with the complete corresponding machine-readable
+    source code, which must be distributed under the terms of Sections
+    1 and 2 above on a medium customarily used for software interchange; or,
+
+    b) Accompany it with a written offer, valid for at least three
+    years, to give any third party, for a charge no more than your
+    cost of physically performing source distribution, a complete
+    machine-readable copy of the corresponding source code, to be
+    distributed under the terms of Sections 1 and 2 above on a medium
+    customarily used for software interchange; or,
+
+    c) Accompany it with the information you received as to the offer
+    to distribute corresponding source code.  (This alternative is
+    allowed only for noncommercial distribution and only if you
+    received the program in object code or executable form with such
+    an offer, in accord with Subsection b above.)
+
+The source code for a work means the preferred form of the work for
+making modifications to it.  For an executable work, complete source
+code means all the source code for all modules it contains, plus any
+associated interface definition files, plus the scripts used to
+control compilation and installation of the executable.  However, as a
+special exception, the source code distributed need not include
+anything that is normally distributed (in either source or binary
+form) with the major components (compiler, kernel, and so on) of the
+operating system on which the executable runs, unless that component
+itself accompanies the executable.
+
+If distribution of executable or object code is made by offering
+access to copy from a designated place, then offering equivalent
+access to copy the source code from the same place counts as
+distribution of the source code, even though third parties are not
+compelled to copy the source along with the object code.
+
+  4. You may not copy, modify, sublicense, or distribute the Program
+except as expressly provided under this License.  Any attempt
+otherwise to copy, modify, sublicense or distribute the Program is
+void, and will automatically terminate your rights under this License.
+However, parties who have received copies, or rights, from you under
+this License will not have their licenses terminated so long as such
+parties remain in full compliance.
+
+  5. You are not required to accept this License, since you have not
+signed it.  However, nothing else grants you permission to modify or
+distribute the Program or its derivative works.  These actions are
+prohibited by law if you do not accept this License.  Therefore, by
+modifying or distributing the Program (or any work based on the
+Program), you indicate your acceptance of this License to do so, and
+all its terms and conditions for copying, distributing or modifying
+the Program or works based on it.
+
+  6. Each time you redistribute the Program (or any work based on the
+Program), the recipient automatically receives a license from the
+original licensor to copy, distribute or modify the Program subject to
+these terms and conditions.  You may not impose any further
+restrictions on the recipients' exercise of the rights granted herein.
+You are not responsible for enforcing compliance by third parties to
+this License.
+
+  7. If, as a consequence of a court judgment or allegation of patent
+infringement or for any other reason (not limited to patent issues),
+conditions are imposed on you (whether by court order, agreement or
+otherwise) that contradict the conditions of this License, they do not
+excuse you from the conditions of this License.  If you cannot
+distribute so as to satisfy simultaneously your obligations under this
+License and any other pertinent obligations, then as a consequence you
+may not distribute the Program at all.  For example, if a patent
+license would not permit royalty-free redistribution of the Program by
+all those who receive copies directly or indirectly through you, then
+the only way you could satisfy both it and this License would be to
+refrain entirely from distribution of the Program.
+
+If any portion of this section is held invalid or unenforceable under
+any particular circumstance, the balance of the section is intended to
+apply and the section as a whole is intended to apply in other
+circumstances.
+
+It is not the purpose of this section to induce you to infringe any
+patents or other property right claims or to contest validity of any
+such claims; this section has the sole purpose of protecting the
+integrity of the free software distribution system, which is
+implemented by public license practices.  Many people have made
+generous contributions to the wide range of software distributed
+through that system in reliance on consistent application of that
+system; it is up to the author/donor to decide if he or she is willing
+to distribute software through any other system and a licensee cannot
+impose that choice.
+
+This section is intended to make thoroughly clear what is believed to
+be a consequence of the rest of this License.
+
+  8. If the distribution and/or use of the Program is restricted in
+certain countries either by patents or by copyrighted interfaces, the
+original copyright holder who places the Program under this License
+may add an explicit geographical distribution limitation excluding
+those countries, so that distribution is permitted only in or among
+countries not thus excluded.  In such case, this License incorporates
+the limitation as if written in the body of this License.
+
+  9. The Free Software Foundation may publish revised and/or new versions
+of the General Public License from time to time.  Such new versions will
+be similar in spirit to the present version, but may differ in detail to
+address new problems or concerns.
+
+Each version is given a distinguishing version number.  If the Program
+specifies a version number of this License which applies to it and "any
+later version", you have the option of following the terms and conditions
+either of that version or of any later version published by the Free
+Software Foundation.  If the Program does not specify a version number of
+this License, you may choose any version ever published by the Free Software
+Foundation.
+
+  10. If you wish to incorporate parts of the Program into other free
+programs whose distribution conditions are different, write to the author
+to ask for permission.  For software which is copyrighted by the Free
+Software Foundation, write to the Free Software Foundation; we sometimes
+make exceptions for this.  Our decision will be guided by the two goals
+of preserving the free status of all derivatives of our free software and
+of promoting the sharing and reuse of software generally.
+
+                            NO WARRANTY
+
+  11. BECAUSE THE PROGRAM IS LICENSED FREE OF CHARGE, THERE IS NO WARRANTY
+FOR THE PROGRAM, TO THE EXTENT PERMITTED BY APPLICABLE LAW.  EXCEPT WHEN
+OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR OTHER PARTIES
+PROVIDE THE PROGRAM "AS IS" WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESSED
+OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.  THE ENTIRE RISK AS
+TO THE QUALITY AND PERFORMANCE OF THE PROGRAM IS WITH YOU.  SHOULD THE
+PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF ALL NECESSARY SERVICING,
+REPAIR OR CORRECTION.
+
+  12. IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW OR AGREED TO IN WRITING
+WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MAY MODIFY AND/OR
+REDISTRIBUTE THE PROGRAM AS PERMITTED ABOVE, BE LIABLE TO YOU FOR DAMAGES,
+INCLUDING ANY GENERAL, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES ARISING
+OUT OF THE USE OR INABILITY TO USE THE PROGRAM (INCLUDING BUT NOT LIMITED
+TO LOSS OF DATA OR DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY
+YOU OR THIRD PARTIES OR A FAILURE OF THE PROGRAM TO OPERATE WITH ANY OTHER
+PROGRAMS), EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGES.
+
+                     END OF TERMS AND CONDITIONS
+
+            How to Apply These Terms to Your New Programs
+
+  If you develop a new program, and you want it to be of the greatest
+possible use to the public, the best way to achieve this is to make it
+free software which everyone can redistribute and change under these terms.
+
+  To do so, attach the following notices to the program.  It is safest
+to attach them to the start of each source file to most effectively
+convey the exclusion of warranty; and each file should have at least
+the "copyright" line and a pointer to where the full notice is found.
+
+    <one line to give the program's name and a brief idea of what it does.>
+    Copyright (C) <year>  <name of author>
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License along
+    with this program; if not, see <https://www.gnu.org/licenses/>.
+
+Also add information on how to contact you by electronic and paper mail.
+
+If the program is interactive, make it output a short notice like this
+when it starts in an interactive mode:
+
+    Gnomovision version 69, Copyright (C) year name of author
+    Gnomovision comes with ABSOLUTELY NO WARRANTY; for details type `show w'.
+    This is free software, and you are welcome to redistribute it
+    under certain conditions; type `show c' for details.
+
+The hypothetical commands `show w' and `show c' should show the appropriate
+parts of the General Public License.  Of course, the commands you use may
+be called something other than `show w' and `show c'; they could even be
+mouse-clicks or menu items--whatever suits your program.
+
+You should also get your employer (if you work as a programmer) or your
+school, if any, to sign a "copyright disclaimer" for the program, if
+necessary.  Here is a sample; alter the names:
+
+  Yoyodyne, Inc., hereby disclaims all copyright interest in the program
+  `Gnomovision' (which makes passes at compilers) written by James Hacker.
+
+  <signature of Moe Ghoul>, 1 April 1989
+  Moe Ghoul, President of Vice
+
+This General Public License does not permit incorporating your program into
+proprietary programs.  If your program is a subroutine library, you may
+consider it more useful to permit linking proprietary applications with the
+library.  If this is what you want to do, use the GNU Lesser General
+Public License instead of this License.
+```
+
 ### file-uri-to-path 1.0.0
 
 ```text
@@ -5751,6 +5711,108 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+```
+
+### Baloo 2, Bangers, Inter, Archivo, Archivo Black, Space Grotesk, Fraunces, JetBrains Mono, Fjalla One, DM Sans, VT323 see fonts/LICENSE.md
+
+```text
+Copyright (c) <dates>, <Copyright Holder> (<URL|email>),
+with Reserved Font Name <Reserved Font Name>.
+Copyright (c) <dates>, <additional Copyright Holder> (<URL|email>),
+with Reserved Font Name <additional Reserved Font Name>.
+Copyright (c) <dates>, <additional Copyright Holder> (<URL|email>).
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+This license is copied below, and is also available with a FAQ at:
+https://openfontlicense.org
+
+
+-----------------------------------------------------------
+SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
+-----------------------------------------------------------
+
+PREAMBLE
+The goals of the Open Font License (OFL) are to stimulate worldwide
+development of collaborative font projects, to support the font creation
+efforts of academic and linguistic communities, and to provide a free and
+open framework in which fonts may be shared and improved in partnership
+with others.
+
+The OFL allows the licensed fonts to be used, studied, modified and
+redistributed freely as long as they are not sold by themselves. The
+fonts, including any derivative works, can be bundled, embedded,
+redistributed and/or sold with any software provided that any reserved
+names are not used by derivative works. The fonts and derivatives,
+however, cannot be released under any other type of license. The
+requirement for fonts to remain under this license does not apply
+to any document created using the fonts or their derivatives.
+
+DEFINITIONS
+"Font Software" refers to the set of files released by the Copyright
+Holder(s) under this license and clearly marked as such. This may
+include source files, build scripts and documentation.
+
+"Reserved Font Name" refers to any names specified as such after the
+copyright statement(s).
+
+"Original Version" refers to the collection of Font Software components as
+distributed by the Copyright Holder(s).
+
+"Modified Version" refers to any derivative made by adding to, deleting,
+or substituting -- in part or in whole -- any of the components of the
+Original Version, by changing formats or by porting the Font Software to a
+new environment.
+
+"Author" refers to any designer, engineer, programmer, technical
+writer or other person who contributed to the Font Software.
+
+PERMISSION & CONDITIONS
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of the Font Software, to use, study, copy, merge, embed, modify,
+redistribute, and sell modified and unmodified copies of the Font
+Software, subject to the following conditions:
+
+1) Neither the Font Software nor any of its individual components,
+in Original or Modified Versions, may be sold by itself.
+
+2) Original or Modified Versions of the Font Software may be bundled,
+redistributed and/or sold with any software, provided that each copy
+contains the above copyright notice and this license. These can be
+included either as stand-alone text files, human-readable headers or
+in the appropriate machine-readable metadata fields within text or
+binary files as long as those fields can be easily viewed by the user.
+
+3) No Modified Version of the Font Software may use the Reserved Font
+Name(s) unless explicit written permission is granted by the corresponding
+Copyright Holder. This restriction only applies to the primary font name as
+presented to the users.
+
+4) The name(s) of the Copyright Holder(s) or the Author(s) of the Font
+Software shall not be used to promote, endorse or advertise any
+Modified Version, except to acknowledge the contribution(s) of the
+Copyright Holder(s) and the Author(s) or with their explicit written
+permission.
+
+5) The Font Software, modified or unmodified, in part or in whole,
+must be distributed entirely under this license, and must not be
+distributed under any other license. The requirement for fonts to
+remain under this license does not apply to any document created
+using the Font Software.
+
+TERMINATION
+This license becomes null and void if any of the above conditions are
+not met.
+
+DISCLAIMER
+THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
+OF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+INCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL
+DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
+OTHER DEALINGS IN THE FONT SOFTWARE.
 ```
 
 ### for-each 0.3.5
@@ -6085,7 +6147,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### htm 3
+### htm 3.1.1
 
 ```text
 Apache License
@@ -6684,7 +6746,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### is-buffer 1.1.6, 2.0.5, safe-buffer 5.1.2, 5.2.1
+### is-buffer 1.1.6, is-buffer 2.0.5, safe-buffer 5.1.2, safe-buffer 5.2.1
 
 ```text
 The MIT License (MIT)
@@ -6760,7 +6822,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### jose 5.10.0, 6.2.10
+### jose 5.10.0, jose 6.2.10
 
 ```text
 The MIT License (MIT)
@@ -7381,12 +7443,38 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### ms 2.0.0, 2.1.3
+### ms 2.0.0
 
 ```text
 The MIT License (MIT)
 
 Copyright (c) 2016 Zeit, Inc.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+### ms 2.1.3
+
+```text
+The MIT License (MIT)
+
+Copyright (c) 2020 Vercel, Inc.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -7433,7 +7521,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### negotiator 0.6.4, 1.1.0
+### negotiator 0.6.4, negotiator 1.1.0
 
 ```text
 (The MIT License)
@@ -8578,7 +8666,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### pg 8.23.0, pg-cloudflare 1.4.0, pg-protocol 1.16.0
+### pg-cloudflare 1.4.0, pg-protocol 1.16.0, pg 8.23.0
 
 ```text
 MIT License
@@ -9035,7 +9123,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### Preact 10
+### Preact 10.25.4
 
 ```text
 The MIT License (MIT)
@@ -9087,6 +9175,30 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
+### process-nextick-args 2.0.1
+
+```text
+# Copyright (c) 2015 Calvin Metcalf
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+**THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.**
+```
+
 ### process 0.11.10
 
 ```text
@@ -9112,30 +9224,6 @@ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
 CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-```
-
-### process-nextick-args 2.0.1
-
-```text
-# Copyright (c) 2015 Calvin Metcalf
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-**THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.**
 ```
 
 ### qrcode 1.5.4
@@ -9261,7 +9349,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ```
 
-### readable-stream 2.3.8, 3.6.2, 4.7.0, string_decoder 1.1.1, 1.3.0
+### readable-stream 2.3.8, readable-stream 3.6.2, readable-stream 4.7.0, string_decoder 1.1.1, string_decoder 1.3.0
 
 ```text
 Node.js is licensed for use as follows:
@@ -9843,7 +9931,7 @@ will be liable to anyone for any damages related to this
 software or this license, under any kind of legal claim.***
 ```
 
-### scimmy 1.3.5, scimmy-routers 1.3.2
+### scimmy-routers 1.3.2, scimmy 1.3.5
 
 ```text
 MIT License
@@ -9959,7 +10047,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### side-channel 1.1.1, side-channel-weakmap 1.0.2
+### side-channel-weakmap 1.0.2, side-channel 1.1.1
 
 ```text
 MIT License
@@ -10232,6 +10320,32 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+### @tailwindcss/browser 4.3.1
+
+```text
+MIT License
+
+Copyright (c) Tailwind Labs, Inc.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
 ### tdigest 0.1.3
 
 ```text
@@ -10310,7 +10424,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### three.js r128, three.js + example addons (OrbitControls, Sky, RGBELoader, GLTFLoader, RoomEnvironment, BufferGeometryUtils, SkeletonUtils) 0.185.1 (r185)
+### three.js 0.128.0 (r128), three.js + example addons (OrbitControls, Sky, RGBELoader, GLTFLoader, RoomEnvironment, BufferGeometryUtils, SkeletonUtils) 0.185.1 (r185)
 
 ```text
 The MIT License
@@ -10506,7 +10620,7 @@ If the Work includes a "NOTICE" text file as part of its distribution, then any 
 END OF TERMS AND CONDITIONS
 ```
 
-### undici 8.10.0, undici-types 7.24.6
+### undici-types 7.24.6, undici 8.10.0
 
 ```text
 MIT License
@@ -10719,30 +10833,6 @@ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
 THIS SOFTWARE.
 ```
 
-### winston 3.19.0
-
-```text
-Copyright (c) 2010 Charlie Robbins
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-```
-
 ### winston-transport 4.9.0
 
 ```text
@@ -10767,6 +10857,30 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+```
+
+### winston 3.19.0
+
+```text
+Copyright (c) 2010 Charlie Robbins
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
 ```
 
 ### word-wrap 1.2.5
@@ -10915,7 +11029,7 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 IN THE SOFTWARE.
 ```
 
-### xmlbuilder 11.0.1, 15.1.1
+### xmlbuilder 11.0.1, xmlbuilder 15.1.1
 
 ```text
 The MIT License (MIT)
@@ -10941,7 +11055,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### xpath 0.0.32, 0.0.33, 0.0.34
+### xpath 0.0.32, xpath 0.0.33, xpath 0.0.34
 
 ```text
 MIT License 
@@ -11081,7 +11195,27 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### zod 4.1.11, 4.5.4
+### zod-to-json-schema 3.25.2
+
+```text
+ISC License
+
+Copyright (c) 2020, Stefan Terdell
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+```
+
+### zod 4.1.11, zod 4.5.4
 
 ```text
 MIT License
@@ -11105,26 +11239,6 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-```
-
-### zod-to-json-schema 3.25.2
-
-```text
-ISC License
-
-Copyright (c) 2020, Stefan Terdell
-
-Permission to use, copy, modify, and/or distribute this software for any
-purpose with or without fee is hereby granted, provided that the above
-copyright notice and this permission notice appear in all copies.
-
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
-ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
-ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
-OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ```
 
 ## NOTICE files

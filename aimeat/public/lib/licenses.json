@@ -79,7 +79,7 @@
     {
       "id": "three",
       "name": "three.js",
-      "version": "r128",
+      "version": "0.128.0 (r128)",
       "spdx": "MIT",
       "copyright": "Copyright © 2010-2026 three.js authors",
       "homepage": "https://threejs.org",
@@ -301,33 +301,33 @@
     {
       "id": "preact",
       "name": "Preact",
-      "version": "10",
+      "version": "10.25.4",
       "spdx": "MIT",
       "copyright": "Copyright (c) 2015-present Jason Miller",
       "homepage": "https://preactjs.com",
-      "source": "https://cdn.jsdelivr.net/npm/preact@10",
+      "source": "https://esm.sh/preact@10.25.4 (esbuild bundle; the version is in each file's own banner)",
       "licenseFile": "LICENSES/preact.txt",
       "files": [
         "preact.mjs",
         "preact-hooks.mjs"
       ],
       "modified": false,
-      "purl": "pkg:npm/preact@10"
+      "purl": "pkg:npm/preact@10.25.4"
     },
     {
       "id": "htm",
       "name": "htm",
-      "version": "3",
+      "version": "3.1.1",
       "spdx": "Apache-2.0",
       "copyright": "Copyright (c) Jason Miller and the htm contributors",
       "homepage": "https://github.com/developit/htm",
-      "source": "https://cdn.jsdelivr.net/npm/htm@3",
+      "source": "https://esm.sh/htm@3.1.1 (esbuild bundle; the version is in the file's own banner)",
       "licenseFile": "LICENSES/htm.txt",
       "files": [
         "htm.mjs"
       ],
       "modified": false,
-      "purl": "pkg:npm/htm@3"
+      "purl": "pkg:npm/htm@3.1.1"
     },
     {
       "id": "minidenticons",
