@@ -161,6 +161,30 @@ server answering as a Consul agent and proves the base64 decode, the ACL token h
 datacenter parameter, 404-means-no-keys, a null value being skipped rather than applied as empty,
 and Consul's `false` answer to a write being treated as the refusal it is.
 
+### The monthly cycle for the browser libraries
+
+Three commands, and none of them opens a pull request:
+
+| Command | Answers |
+|---|---|
+| `pnpm outdated:libs` | What moved upstream: our version, the newest one, how old the bytes we serve are, whether anybody still releases it. |
+| `pnpm libs:usage -- --node https://aimeat.io` | Which published apps load which FILE. Reads public endpoints only, so it needs no token. |
+| `pnpm audit:security` | Both of the above plus the vulnerability scanners and the licence gate, as one dated report. |
+
+`.github/workflows/library-freshness.yml` runs the first two on the first of the month and keeps the
+output as an artifact for 180 days. It does not fail on a version behind, because four files are
+behind on purpose and a job that is always red says nothing.
+
+**`libs:usage` is the one that turns a guess into a decision.** The major-pin policy keeps an old
+file forever so apps naming it keep working, and "forever" is only correct while somebody is still
+using it. The first run against production, on 2026-08-31, found 146 apps and said: three.min.js
+(r128) is loaded by 5, p5@1 by 2, phaser@3 by 1, ffmpeg-core@0.12.6 by 1. So none of the four frozen
+files can be retired, and that is now a fact rather than an assumption. It also showed what the
+platform really rests on: daisyUI in 58 apps and Tailwind in 56, against 8 for Chart.js.
+
+The scan cannot see an app published on another node or a draft that is not published yet, so zero
+apps means "retiring this is a decision rather than a risk", never "delete it".
+
 ### Updating a browser library under public/lib/
 
 No dependency tool does this one — not Dependabot, not `pnpm update`, not `pnpm audit`. The reason
@@ -172,15 +196,43 @@ That is what `licenses.json` fixes: it gives each file a real package URL, which
 `pnpm scan:vulns` matches against a vulnerability feed. An update is four steps, and they must all
 happen together.
 
-1. Fetch the new build to the same path. The major-pinned filename is the compatibility contract:
-   a minor or patch update lands **in place**, a major ships as a new file or directory beside the
-   old one, which is never changed.
+**A minor or patch — it lands in place, same filename, no app changes:**
+
+1. Fetch the new build over the old path.
 2. Update the version in `public/lib/VENDORED.md`, in `public/lib/licenses.json` (version **and**
-   `purl`, or the scan keeps checking the old version) and in
-   `src/data/library-packs/vendored.ts`.
+   `purl`, or the scan keeps checking the old version) and in `src/data/library-packs/vendored.ts`.
 3. Append a `changelog` entry to that pack. It is written **for an AI**: what changed and what it
    means for apps already published.
-4. Verify in a real browser that the library still does its job, then `pnpm gen:notices`.
+4. Verify in a real browser that the library still does its job, then `pnpm gen:notices` and
+   `pnpm check:licenses`.
+
+**A major — it ships beside the old file, which is never touched again.** This is the path that
+keeps published apps alive, and it was first walked on 2026-08-31 for p5 2, Phaser 4 and ffmpeg
+0.12.10. Steps 1 to 4 as above, writing to a NEW path (`p5@2.min.js`, `ffmpeg-core@0.12.10/`), then:
+
+5. Add a NEW component in `licenses.json` for the new file. The old entry stays, and gets
+   `supersededBy: '<new component id>'` — that is what makes `pnpm outdated:libs` print it as
+   `frozen` with its successor named, instead of nagging as "a major behind" forever.
+6. Add a NEW pack in `src/data/library-packs/`, and set the old pack to `status: 'deprecated'` with
+   `supersededBy: '<new pack id>'`. The old pack then disappears from the build-app prompt while
+   the old FILE keeps being served, and a model told not to use the old one is told what to use.
+   A new pack is `status: 'preview'` until it has a demo template and an AEB run.
+7. If the new major breaks code written from memory, set `modelTier: 'frontier'` and write the one
+   load-bearing gotcha into `apiCaveat`. p5 2 removing `preload()` is the example: a model will
+   emit it from memory and the sketch silently never draws.
+8. `pnpm libs:usage` before ever considering removing the old file. While one app loads it, it stays.
+
+**Two traps that cost a broken app each, both now written into `licenses.json`:**
+
+- **Take every file of a library from the SAME upstream build.** preact from one esm.sh variant and
+  hooks from another gave two different `options` objects, every hook ran outside a render, and the
+  SPA died with "AIMEAT failed to start". The library was fine; the fetch was wrong.
+- **A file that imports a sibling relatively cannot work here.** `portal.ts` stamps `?v=<build>` on
+  every importmap entry, and a relative `./preact.mjs` does not carry that query — the same file
+  arrives twice under two URLs, as two modules. The vendored build must import the bare specifier.
+
+And the reason step 4 says a real browser: every one of those failures compiles, typechecks and
+passes the unit suite.
 
 ---
 

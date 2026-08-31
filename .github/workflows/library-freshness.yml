@@ -1,0 +1,72 @@
+# Monthly: is there anything new upstream for the browser libraries this node serves.
+#
+# WHY IT IS SEPARATE FROM THE WEEKLY VULNERABILITY SCAN. That one asks "is anything we serve known to
+# be broken", and it has to be weekly because an advisory lands on somebody else's schedule. This one
+# asks "has anything moved on", which changes slowly and is a planning question rather than an alarm.
+# Weekly would make it noise, and noise is how a report stops being read.
+#
+# WHY IT DOES NOT OPEN A PULL REQUEST. There is deliberately no Dependabot config in this repository
+# (see docs/coding-guidelines/dependency-management.md): a solo maintainer does not want a queue of
+# bot branches. This job writes a report and keeps it as an artifact. Someone goes and looks, the way
+# they already go and look at the Security tab.
+#
+# WHY IT DOES NOT FAIL. Being a version behind is a decision here, not a defect — the major-pinned
+# filename is the compatibility contract for every published app, so four files are deliberately
+# frozen and would fail this job every month forever. A job that is always red says nothing.
+
+name: Library freshness
+
+on:
+  schedule:
+    - cron: '0 7 1 * *' # 07:00 on the first of the month
+  workflow_dispatch:
+    inputs:
+      node_url:
+        description: 'Node to count app usage against (blank = skip the usage report)'
+        required: false
+        default: 'https://aimeat.io'
+
+permissions:
+  contents: read
+
+jobs:
+  freshness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      # The vendored binaries are identified by the manifest, not by their bytes being present, so
+      # the 70 MB of wasm this job never looks at can stay unfetched.
+      - name: Install
+        run: pnpm install --frozen-lockfile
+        env:
+          AIMEAT_SKIP_VENDOR: '1'
+
+      # What moved upstream: our version, the newest one, how old the bytes we serve are, and whether
+      # anybody still releases the library at all.
+      - name: What is new upstream (outdated:libs)
+        working-directory: aimeat
+        run: pnpm outdated:libs | tee ../library-freshness.txt
+
+      # Which apps load which file. This is the number that decides whether a frozen old file can
+      # ever be retired: while even one app loads it, the file stays and there is nothing to discuss.
+      # It reads only public endpoints, so it needs no token.
+      - name: Who still loads what (libs:usage)
+        if: ${{ github.event_name == 'schedule' || inputs.node_url != '' }}
+        working-directory: aimeat
+        run: pnpm libs:usage -- --node "${NODE_URL}" | tee -a ../library-freshness.txt
+        env:
+          NODE_URL: ${{ inputs.node_url || 'https://aimeat.io' }}
+
+      - name: Keep the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: library-freshness
+          path: library-freshness.txt
+          retention-days: 180

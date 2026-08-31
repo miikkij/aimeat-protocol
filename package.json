@@ -98,6 +98,7 @@
     "check:storage-parity": "cd aimeat && pnpm check:storage-parity",
     "check:audit-gates": "cd aimeat && pnpm check:audit-gates",
     "audit:security": "cd aimeat && pnpm audit:security",
-    "outdated:libs": "cd aimeat && pnpm outdated:libs"
+    "outdated:libs": "cd aimeat && pnpm outdated:libs",
+    "libs:usage": "cd aimeat && pnpm libs:usage"
   }
 }
