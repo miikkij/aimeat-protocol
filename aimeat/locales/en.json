@@ -3001,6 +3001,8 @@
     "portalNavSave": "Save Navigation",
     "portalNavSaved": "Header navigation saved",
     "portalPreview": "Portal Preview",
+    "portalPreviewNote": "You are signed in, so the header here shows your own session. A visitor sees the same page with a sign-in link in its place. Open it in a private window to see theirs.",
+    "portalPreviewOpen": "Open the front page in its own tab",
     "portalMemoryKeys": "Portal Memory Keys",
     "portalKvPairs": "KV Pairs (Environment)",
     "portalChangelog": "Change Log",

@@ -19,6 +19,12 @@
  *     of the public header links (persisted via /v1/site/header-nav).
  *   v1.5.0 — 2026-08-29 — `exchange` leaves the configurable header links: the EXCHANGE app is a
  *     site-footer link now, like the store.
+ *   v1.6.0 — 2026-08-31 — The preview shows the page being edited. It pointed at `/`, which
+ *     forwards a signed-in person to their own home, so an operator looking at this tab saw their
+ *     home and concluded the front page was something else entirely. Without a custom template it
+ *     points at /v1/portal (the front page itself, which forwards nobody); with one it goes back to
+ *     `/`, because a template IS what the root sends everyone. A line under it says why the header
+ *     shows a signed-in session, and links the page out to a tab of its own.
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -286,10 +292,20 @@ export default function PortalTab({ data, reload }) {
          pairs. A member's home has none of those, so the switch hides them rather than showing an
          operator controls that would do nothing where they are standing. -->
     ${surface === 'portal' && html`
-    <!-- Preview -->
+    <!-- Preview. WHICH page this shows is not obvious and got it wrong for months: the site's root
+         forwards a signed-in person to their own home (views/landing.js), so an operator standing
+         here saw their home in the frame and had no way to tell it was not the page they were about
+         to edit. /v1/portal is the front page itself and forwards nobody. A custom template has no
+         such forward: it IS what the root hands every visitor, so once one is saved the frame goes
+         back to the root, which is then the only place the template can be seen. -->
     <div class="adm-card">
       <h3>${t('dashboard.portalPreview')}</h3>
-      <iframe src=${'/?_preview=' + previewNonce} style="width:100%;height:400px;border:1px solid var(--glass-border);border-radius:8px;background:#fff" sandbox="allow-same-origin allow-scripts"></iframe>
+      <iframe src=${(hasCustom ? '/?_preview=' : '/v1/portal?_preview=') + previewNonce} style="width:100%;height:400px;border:1px solid var(--glass-border);border-radius:8px;background:#fff" sandbox="allow-same-origin allow-scripts"></iframe>
+      <p class="adm-text-dim adm-text-base adm-mt-sm">
+        ${t('dashboard.portalPreviewNote')}
+        ${' '}
+        <a href=${hasCustom ? '/' : '/v1/portal'} target="_blank" rel="noopener">${t('dashboard.portalPreviewOpen')}</a>
+      </p>
       <div class="adm-flex adm-mt-sm">
         <button class="adm-btn-action" onClick=${doClearCache}>\u{1F6AB} ${t('dashboard.portalClearCache')}</button>
       </div>

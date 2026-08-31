@@ -327,13 +327,14 @@ nothing on the way to the person carried it.
 - **The tell is a test that keeps passing through a change that should have touched it.** After changing a signature, grep `test/` for the name rather than trusting the typecheck; `pnpm lint:tests` reads that directory but does not typecheck it either.
 - **When a test compares two things the same bug can empty, assert the thing is non-empty as well.** `expect(a).toEqual(b)` is satisfied by `[] === []`, and that is exactly what a shared failure produces.
 
-## 27. A backtick inside SQL that lives in a template literal
+## 27. A backtick inside a template literal: SQL, and an htm view
 
-*Symptoms: a `.ts` file holding DDL suddenly fails to parse, and the error points at a line of SQL that reads perfectly well.*
+*Symptoms: a `.ts` file holding DDL suddenly fails to parse, and the error points at a line of SQL that reads perfectly well. Or `pnpm lint` reports `no-useless-escape` on a `.js` view, on lines nobody touched.*
 
 - **The SQLite schema is SQL inside `db.exec(\`…\`)`, so a backtick anywhere in it ends the template literal.** A comment written the way this project writes comments everywhere else — naming a field as `` `indexOn` `` or `` `instance` `` — closes the string, and everything after it is parsed as TypeScript. On 2026-08-26 this happened twice inside one change, in `schema-tables-4.ts` and then in `schema-tables-3.ts`, both times in a prose comment explaining a column.
 - **`tsc` catches it, but the message names the symptom rather than the cause**: `TS1005: ',' expected` on the first line that stops looking like an expression, which can be dozens of lines below the backtick. Search the block for a backtick before reading the reported line.
 - **The rule inside a SQL template literal: quote a field name by not quoting it.** Write `the indexOn fields`, not `` the `indexOn` fields ``. The Postgres migrations are plain `.sql` files and have no such constraint, so the same sentence is fine there — which is exactly why it is easy to write once in each and only notice in one.
+- **The same rule holds inside every view's `html\`…\`` block, and there the file still parses.** An HTML comment written between two elements is inside the template literal like everything else, so a backtick in its prose ends it early and the rest of the view is parsed as ordinary JavaScript that happens to be valid. On 2026-08-31 one comment in `portal-tab.js` quoting a route as `` `/` `` did exactly this. Nothing failed: `tsc` was clean, the view rendered, and the only trace was `pnpm lint` reporting twenty `no-useless-escape` errors eighty lines below, on a `\{\{config:node_id\}\}` table that had been there for months. **ESLint exempts escapes in a TAGGED template literal, so the errors appear the moment the text stops being tagged** — the rule is reporting the terminated template, not the escapes. Read the lint output as "where did this template end", not as a complaint about the lines it names, and write the comment without backticks.
 
 ## 28. A nested object in a locale merge file replaces the branch instead of adding to it
 
