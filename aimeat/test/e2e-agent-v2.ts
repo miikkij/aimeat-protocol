@@ -824,6 +824,80 @@ async function run() {
         assert(r.body?.error?.code === 'NO_VALIDATOR', `expected NO_VALIDATOR, got ${r.body?.error?.code}`);
     });
 
+    // ── 8c. Credential health: the reading the Agents section is built around ─
+    await test('the fleet says which agents can still sign in, and which cannot', async () => {
+        const r = await json('/v1/agents?include=credentials', { headers: authA });
+        assert(r.status === 200, `expected 200, got ${r.status}`);
+        const list = r.body.data.agents as any[];
+
+        const concierge = list.find(x => x.name === 'concierge');
+        assert(concierge.credential.kind === 'key-and-card', `a v2 agent is key-and-card, got ${concierge.credential.kind}`);
+        assert(concierge.credential.state === 'ok', `and fine, got ${concierge.credential.state}`);
+        assert(concierge.credential.key_pinned === true, 'with a pinned key');
+        assert(concierge.credential.card_valid === true, 'and a card that reads');
+        assert(concierge.credential.expires_at === null, 'and no expiry to report: it mints per use');
+
+        const v1 = list.find(x => x.name === daemonA.name);
+        assert(v1.credential.kind === 'device-token', `a v1 agent is device-token, got ${v1.credential.kind}`);
+        // These test tokens are one-hour /v1/auth/token sessions, so `expiring` is the RIGHT answer
+        // for them and a real ninety-day device credential reads `ok`. Both mean it can sign in.
+        assert(['ok', 'expiring'].includes(v1.credential.state), `it can sign in, got ${v1.credential.state}`);
+        assert(typeof v1.credential.expires_at === 'string', 'with a date, because that is what runs out');
+        assert(v1.credential.summary.length > 0, 'and a sentence a person can act on');
+    });
+
+    await test('a revoked sign-in shows as dead, which is the state nothing used to report', async () => {
+        const victim = await addV1Agent(a.owner, a.ownerToken, 'about-to-die');
+        const before = await json('/v1/agents?include=credentials', { headers: authA });
+        const was = (before.body.data.agents as any[]).find(x => x.name === victim.name).credential.state;
+        assert(['ok', 'expiring'].includes(was), `it starts out able to sign in, got ${was}`);
+
+        // Sign that one agent out. The others must be untouched: revoked by session, not by owner.
+        const out = await json('/v1/auth/revoke', { method: 'POST', headers: { Authorization: `Bearer ${victim.token}` } });
+        assert(out.status === 200 || out.status === 204, `revoke ${out.status}: ${JSON.stringify(out.body?.error)}`);
+
+        const after = await json('/v1/agents?include=credentials', { headers: authA });
+        const dead = (after.body.data.agents as any[]).find(x => x.name === victim.name);
+        assert(dead.credential.state === 'dead', `expected dead, got ${dead.credential.state}`);
+        assert(dead.credential.summary.toLowerCase().includes('connect'), 'and it should say what to do');
+        const sibling = (after.body.data.agents as any[]).find(x => x.name === daemonA.name);
+        assert(['ok', 'expiring'].includes(sibling.credential.state), 'and no sibling was taken down with it');
+    });
+
+    await test('an agent that never connected says so, rather than claiming its sign-in ran out', async () => {
+        // Registration stamps `lastSeen` alongside `createdAt`, so "has a lastSeen" is true of an
+        // agent created a second ago. Reading it as evidence of a connection told every unconnected
+        // agent to reconnect something it had never connected. Create one and do not sign it in.
+        const born = await json('/v1/agents', {
+            method: 'POST', headers: authA,
+            body: JSON.stringify({ name: 'never-ran', owner: a.owner, capabilities: [], mode: 'interactive', scopes: ['memory:read'] }),
+        });
+        assert(born.status === 201, `agent ${born.status}`);
+
+        const r = await json('/v1/agents?include=credentials', { headers: authA });
+        const fresh = (r.body.data.agents as any[]).find(x => x.name === 'never-ran');
+        assert(fresh.credential.state === 'never', `expected never, got ${fresh.credential.state}`);
+        assert(fresh.credential.expires_at === null, 'and nothing to expire');
+        assert(fresh.credential.days_left === null, 'and no countdown');
+    });
+
+    await test('the fleet counts what needs attention without the reader scanning rows', async () => {
+        const r = await json('/v1/agents?include=credentials', { headers: authA });
+        const s = r.body.data.credential_summary;
+        assert(!!s, 'the summary should be there when credentials were asked for');
+        assert(s.dead >= 1, `at least the one we just killed, got ${s.dead}`);
+        assert(s.never >= 1, `and the one that never connected, got ${s.never}`);
+        assert(s.ok + s.expiring >= 1, 'and the ones that can still sign in counted separately');
+    });
+
+    await test('credential health is opt-in: the old listing is byte-for-byte what it was', async () => {
+        const plain = await json('/v1/agents', { headers: authA });
+        assert(plain.status === 200, `expected 200, got ${plain.status}`);
+        assert((plain.body.data.agents as any[]).every(x => x.credential === undefined),
+            'nothing extra without the include');
+        assert(plain.body.data.credential_summary === undefined, 'and no summary either');
+    });
+
     // ── 9. Run mode is readable and settable, and fenced ─────────────────────
     await test('the owner can set an agent resident, and read it back', async () => {
         const r = await json(`/v1/agents/concierge/run-mode`, {
