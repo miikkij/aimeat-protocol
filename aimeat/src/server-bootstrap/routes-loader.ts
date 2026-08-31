@@ -78,6 +78,7 @@ import { accessTokensRouter } from '../routes/access-tokens.js';
 import { appGrantsRouter } from '../routes/app-grants.js';
 import { ownersRouter } from '../routes/owners.js';
 import { agentsRouter } from '../routes/agents.js';
+import { agentsV2Router } from '../routes/agents-v2.js';
 import { ecosystemAppsRouter } from '../routes/ecosystem-apps.js';
 import { ecosystemEventsRouter } from '../routes/ecosystem-events.js';
 import { schemaRouter } from '../routes/schemas.js';
@@ -470,6 +471,9 @@ export async function mountRoutes(
   app.use(webmcpRouter(config, storage));  // WebMCP bridge (TARGET-034 phase C) — before appsRouter (shares /v1/apps/:owner/:filename/*)
   app.use(agentOnboardingRouter(config, storage, webhookDispatcher));
   app.use(agentIntegrationRouter(config, storage));
+  // Agent v2 (key + card) BEFORE agentsRouter for the same reason as everything above it: its
+  // /v1/agents/v2/... paths would otherwise be matched by /v1/agents/:name with name = 'v2'.
+  app.use(agentsV2Router(config, storage));
   app.use(agentsRouter(config, storage));
   app.use(ecosystemAppsRouter(config, storage, scheduler));
   app.use(ecosystemEventsRouter(config, storage));

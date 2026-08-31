@@ -6,6 +6,8 @@
  *   Uses agd- prefix to avoid collisions with other profile styles.
  *   All colors use CSS variables from theme.css.
  * @version-history
+ *   v1.24.0 -- 2026-08-31 -- The run-mode badge (outlined, so it does not compete with the filled
+ *     mode badge beside it) and the basic-agents panel.
  *   v1.23.0 -- 2026-08-29 -- Every monospace rule reads var(--font-mono) instead of a hand-typed stack (14 of them),
  *     so the mono face changes in theme.css alone.
  *   v1.22.1 -- 2026-08-29 -- .pf-agd-board-card-name reads --agd-state (set on the card) for its colour;
@@ -1828,6 +1830,100 @@
 .pf .pf-agd-badge--mode-workstation {
   background: var(--accent-subtle, rgba(20, 184, 166, 0.1));
   color: var(--teal, #14b8a6);
+}
+
+/* Run mode: how the agent is RUN, beside the mode badge that says what it is FOR. Outlined rather
+   than filled, so a row of agents does not read as two competing filled chips per line. */
+.pf .pf-agd-badge--run {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+.pf .pf-agd-badge--run-resident {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ── The basic-agents panel: one press, three agents ── */
+.pf .pf-agd-basic {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+.pf .pf-agd-basic-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.pf .pf-agd-basic-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+.pf .pf-agd-basic-desc {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
+  /* A flex item's automatic min-width is its content, which holds the whole page open on a phone.
+     docs/pitfalls.md §30. */
+  min-width: 0;
+}
+.pf .pf-agd-basic-state {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.pf .pf-agd-basic-status {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+.pf .pf-agd-basic-status.is-connected {
+  color: var(--success, #10b981);
+}
+.pf .pf-agd-basic-icon {
+  flex: 0 0 auto;
+}
+.pf .pf-agd-basic-hint {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+}
+.pf .pf-agd-basic-list {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.pf .pf-agd-basic-item-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.pf .pf-agd-basic-name {
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+.pf .pf-agd-basic-have {
+  font-size: 0.75rem;
+  color: var(--success, #10b981);
+}
+.pf .pf-agd-basic-item-desc {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
 }
 
 /* Tag chip strip on expanded card */

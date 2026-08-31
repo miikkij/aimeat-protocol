@@ -265,6 +265,20 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   jwtTtlSeconds: number;
   agentJwtTtlSeconds: number;
   ecoJwtTtlSeconds: number; // GEAI (ecosystem app) credential lifetime
+  /**
+   * How long an Agent v2 credential lives. Deliberately an HOUR against the v1 agent's ninety days:
+   * a v2 agent holds an Ed25519 key rather than a bearer, and mints a fresh token from it whenever
+   * it needs one, so a short life costs the agent one signature and costs an attacker the whole
+   * replay window. The tunnel client already re-reads its token before the server-advertised expiry,
+   * which is what makes an hour a working number rather than an hourly outage.
+   */
+  agentV2TokenTtlSeconds: number;
+  /**
+   * How long an unspent basic-agents enrolment grant stays usable. Minutes, not hours: the daemon
+   * that will spend it is connected at the moment the button is pressed, so the only thing a longer
+   * window buys is a longer time in which a stolen grant id is worth something.
+   */
+  agentEnrolmentGrantTtlSeconds: number;
   // Owner session refresh tokens (plan 2026-06-03-owner-session-refresh-tokens)
   accessTtlSeconds: number;     // owner access-token (JWT) lifetime — short
   refreshIdleDays: number;      // sliding idle window for the refresh cookie

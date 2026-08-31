@@ -74,6 +74,11 @@ export interface Agent {
   model: string | null;
   modelDetectedBy: string | null;
   publicKey: string;
+  runMode: string | null;
+  identityVersion: number | null;
+  cardJws: string | null;
+  cardIssuedAt: string | null;
+  enrolledAt: string | null;
   scheduleConstraintDefaults: Json | null;
   tags: string[] | null;
   technicalCapabilities: Json | null;
@@ -84,6 +89,17 @@ export interface Agent {
   webhookLastSuccess: Timestamp | null;
   webhookSecret: string | null;
   webhookUrl: string | null;
+}
+
+export interface AgentEnrolmentGrant {
+  id: string;
+  owner: string;
+  agents: Generated<string[]>;
+  createdBy: string;
+  createdAt: string;
+  expiresAt: string;
+  usedAt: string | null;
+  usedBy: string | null;
 }
 
 export interface AgentActivity {
@@ -2062,6 +2078,7 @@ export interface DB {
   Agent: Agent;
   AgentActivity: AgentActivity;
   AgentDirective: AgentDirective;
+  AgentEnrolmentGrant: AgentEnrolmentGrant;
   AgentMessage: AgentMessage;
   AgentOnboarding: AgentOnboarding;
   AgentTask: AgentTask;

@@ -6,6 +6,8 @@
  *   to satisfy max-file-lines. Idempotent (IF NOT EXISTS); applied in numeric order so
  *   the on-disk DDL order is byte-for-byte unchanged from the original single exec block.
  * @version-history
+ *   v1.4.0 — 2026-08-31 — agent_enrolment_grants: the single-use grant one basic-agents button
+ *     press produces (Agent v2 V1).
  *   v1.3.0 — 2026-08-13 — idx_ghii_emailHash moves to schema.ts, after safeAddColumn('ghiis',
  *     'emailHash'). Same shape as the provider_clients crash reported the same day: a block-1 index
  *     on a column that only an ALTER further down adds.
@@ -516,6 +518,23 @@ export function applySchemaTables2(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_device_auth_userCode ON device_auth(userCode);
     CREATE INDEX IF NOT EXISTS idx_device_auth_ownerName ON device_auth(ownerName);
     CREATE INDEX IF NOT EXISTS idx_device_auth_status ON device_auth(status);
+
+    -- ── Agent v2 enrolment grants ──
+    -- What one press of "create my basic agents" produces: a named list of agents, for one owner,
+    -- that the owner's already-connected daemon may enrol ONCE inside a few minutes. Not a standing
+    -- power to mint siblings — see the record's own documentation in types/identity.ts.
+    CREATE TABLE IF NOT EXISTS agent_enrolment_grants (
+      id            TEXT PRIMARY KEY,
+      owner         TEXT NOT NULL,
+      agents        TEXT NOT NULL DEFAULT '[]',
+      createdBy     TEXT NOT NULL,
+      createdAt     TEXT NOT NULL,
+      expiresAt     TEXT NOT NULL,
+      usedAt        TEXT,
+      usedBy        TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_agent_enrolment_owner ON agent_enrolment_grants(owner);
+    CREATE INDEX IF NOT EXISTS idx_agent_enrolment_expiresAt ON agent_enrolment_grants(expiresAt);
 
     -- ── Ecosystem Applications (GEAI principal) ──
     -- Mirror of the agents table, minus task/agent-only fields, plus the ecosystem binding fields.

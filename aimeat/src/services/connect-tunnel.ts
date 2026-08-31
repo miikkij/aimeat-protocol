@@ -25,6 +25,10 @@
  *   mgr.startHeartbeatMonitor();
  *   mgr.handleConnection(ws, verifiedToken, rawToken);
  * @version-history
+ *   v1.13.0 -- 2026-08-31 -- principalsForOwner(): which of an owner's principals hold a live socket
+ *     right now. The Agent v2 basic-agents button needs it twice — as the precondition that refuses
+ *     with "no daemon connected" before creating anything, and to pick the socket the enrolment
+ *     offer goes out on.
  *   v1.12.0 -- 2026-08-28 -- `invoke` carries `timeout_ms` so the connector daemon can drop a call the
  *     server has stopped waiting for. invokeOnPrincipal now also serves GAII targets (the Crew tab
  *     asks a running crew to validate or try a definition); the method was principal-agnostic
@@ -669,6 +673,30 @@ export class ConnectTunnelManager {
     } catch (err) {
       logger.warn('Connect tunnel cancel push failed', { event: 'connect_tunnel.error', key, error: err instanceof Error ? err.message : String(err) });
     }
+  }
+
+  /**
+   * Every principal of this OWNER holding a live socket right now, sorted so two calls a moment
+   * apart pick the same one.
+   *
+   * The basic-agents button asks this twice and for two different reasons. First as a precondition:
+   * pressing it with no daemon connected has to say so and create nothing, and this is the only
+   * place that knows. Then to choose whom to offer the enrolment to — any of these sockets reaches
+   * the daemon, because one `connect serve` process holds all of an owner's tunnels.
+   *
+   * The limit worth knowing: two daemons on two machines, both connected for one owner, are
+   * indistinguishable from one daemon here, so the offer goes to whichever machine sorts first.
+   * Matched on the verified token's `owner` claim, which is the bare owner name on every principal
+   * family this tunnel accepts.
+   */
+  principalsForOwner(owner: string): string[] {
+    const out: string[] = [];
+    for (const conn of this.connections.values()) {
+      if (conn.identity.owner !== owner) continue;
+      if (conn.ws.readyState !== WebSocket.OPEN) continue;
+      out.push(conn.principal);
+    }
+    return out.sort();
   }
 
   /** True if the agent currently holds an open tunnel socket. */

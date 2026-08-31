@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Agent read + owner-managed metadata routes (public profile, list, tags, engagements, mode, concurrency, schedule constraints, heartbeat). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 — 2026-08-31 — Agent v2 on the read side: `run_mode`, `identity_version`, `card_enrolled`
+ *     and `enrolled_at` on the agent list, plus PATCH /v1/agents/:name/run-mode. Stored and shown,
+ *     never enforced — the runtime is what honours a run mode, as it is for max-concurrent-tasks.
  *   v1.5.0 — 2026-08-13 — `registered_by` joins the agent list: who asked for each agent.
  *   v1.4.0 — 2026-08-13 — PATCH /v1/agents/:name/console-url, and `console_url` on the agent list.
  *     Same-owner gated like /tags and /mode: the party that knows where an agent is hosted is
@@ -35,6 +38,7 @@ import { setAgentTags, setAgentMode, setAgentConsoleUrl, type AgentWriteRefusal 
 import { logger } from '../../utils/logger.js';
 import { computeAgentHealthMany } from '../../services/agent-health.js';
 import type { AgentOnboardingRecord } from '../../storage/types/agents-messaging.js';
+import { isRunMode, RUN_MODES } from '../../models/agent-card.js';
 
 /** HTTP status for a refusal from services/agent-profile-write.ts. */
 function agentWriteStatus(code: AgentWriteRefusal['code']): number {
@@ -191,6 +195,14 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
         // every agent that predates the field. The owner's own answer to "where did these come
         // from", and the fence on which agents a sibling may delete.
         registered_by: a.registeredBy ?? null,
+        // How the agent is meant to be RUN, and which credential mechanics it uses. Both are
+        // recorded here and honoured by the runtime; the node never enforces either. `run_mode` is
+        // null on an agent nobody has said anything about, which is not the same as 'spawn'.
+        run_mode: a.runMode ?? null,
+        identity_version: a.identityVersion ?? 1,
+        // Credential health at a glance: a v2 agent with no card is created and unconnected.
+        card_enrolled: !!a.enrolledAt,
+        enrolled_at: a.enrolledAt ?? null,
         schedule_constraint_defaults: a.scheduleConstraintDefaults ?? [],
         ...(wantStats ? {
           stats: {
@@ -317,6 +329,49 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
       name: outcome.agent.name,
       console_url: outcome.agent.consoleUrl ?? null,
     }));
+  });
+
+  // PATCH /v1/agents/:name/run-mode — how this agent is meant to be RUN: 'spawn' (data on the node
+  // until work arrives, a worker starts for the job and unwinds) or 'resident' (the runtime keeps it
+  // up). Same rule as max-concurrent-tasks directly below: the node STORES and SHOWS it, the runtime
+  // is what honours it. A server-side check here would be a second opinion about a process this
+  // server does not run.
+  //
+  // `agent:write` is the word that names this — reconfiguring one of the owner's agents — and it is
+  // what /console-url beside it already asks for. An owner session bypasses scopes, so the person
+  // is unaffected; a fleet runtime that has worked out an agent must stay up is the other caller
+  // this exists for, and the same-owner check below is its second fence.
+  router.patch('/v1/agents/:name/run-mode', requireAuth(), requireScope('agent:write'), async (req, res) => {
+    const identifier = decodeURIComponent(req.params.name as string);
+    const gaii = identifier.includes('#') ? identifier : buildGAII(identifier, req.auth!.owner, config.nodeId);
+    const agent = await storage.getAgent(gaii);
+    if (!agent) {
+      res.status(404).json(error(config.nodeId, 'AGENT_NOT_FOUND', `Agent not found: ${identifier}`));
+      return;
+    }
+    if (agent.owner !== req.auth!.owner) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only update your own agents'));
+      return;
+    }
+
+    const value = req.body?.run_mode;
+    if (!isRunMode(value)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `run_mode must be one of: ${RUN_MODES.join(', ')}`));
+      return;
+    }
+
+    const updated = await storage.updateAgent(gaii, { runMode: value });
+    if (!updated) {
+      res.status(404).json(error(config.nodeId, 'AGENT_NOT_FOUND', `Agent not found: ${identifier}`));
+      return;
+    }
+
+    res.json(success(config.nodeId, {
+      gaii: updated.gaii,
+      name: updated.name,
+      run_mode: updated.runMode ?? null,
+    }));
+    emitChange('agents');
   });
 
   // PATCH /v1/agents/:name/max-concurrent-tasks — owner sets how many tasks the

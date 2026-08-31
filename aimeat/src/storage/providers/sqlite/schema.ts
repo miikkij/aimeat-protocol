@@ -420,6 +420,19 @@ export function initializeSchema(db: Database.Database): void {
   // The creation ledger, and the fence on agent-initiated deletion. See migration 0035.
   safeAddColumn('agents', 'registeredBy', 'TEXT');
 
+  // ── Agent v2 identity (migration 0058) ──
+  // How the agent is meant to be run: 'spawn' (data here until work arrives) or 'resident'. Stored
+  // and shown, never enforced — the runtime is the only party that can honour it, same rule as
+  // maxConcurrentTasks. NULL = nobody has said, which is not the same as 'spawn'.
+  safeAddColumn('agents', 'runMode', 'TEXT');
+  // 1 (or NULL) = device-authorization agent with a long-lived JWT; 2 = brings its own Ed25519 key,
+  // pinned at enrolment, and exchanges a signed assertion for a short-lived token per use.
+  safeAddColumn('agents', 'identityVersion', 'INTEGER');
+  // The agent's own JWS-signed card, verifiable against the published JWKS without asking this node.
+  safeAddColumn('agents', 'cardJws', 'TEXT');
+  safeAddColumn('agents', 'cardIssuedAt', 'TEXT');
+  safeAddColumn('agents', 'enrolledAt', 'TEXT');
+
   // device_auth.mode -- mode the CLI passed to /v1/agents/device-authorize.
   // verify-route reads this when the owner approves, and propagates it to
   // storage.createAgent so the new agent ends up with the right server-side

@@ -113,6 +113,13 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
 
     await step('device_auth', async () => { await storage.deleteDeviceAuthByOwner(name); return 'device_auth'; }, deletionLog);
 
+    // Agent v2 enrolment grants: an unspent grant names agents under a username that is released for
+    // reuse, so a surviving row would let a daemon enrol into the NEXT person to register that name.
+    await step('agent_enrolment_grants', async () => {
+      const n = await storage.deleteAgentEnrolmentGrantsByOwner(name);
+      return n ? `agent_enrolment_grants:${n}` : null;
+    }, deletionLog);
+
     // Outside accounts. Each row holds a SEALED credential to somebody's own Gmail, Outlook or
     // publishing account, addressed by the GHII string, and a deleted username is released for
     // reuse — so a surviving row would hand the next person to register that name the previous

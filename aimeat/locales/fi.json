@@ -7960,6 +7960,26 @@
         "workstation": "Työasema",
         "tooltip": "Toimintatila: vaikuttaa siihen, miten agentti läpäisee Hello Integrationin ja kuluttaa työtä."
       },
+      "runMode": {
+        "spawn": "Tarvittaessa",
+        "resident": "Aina päällä",
+        "tooltip": "Miten tätä agenttia ajetaan. Tarvittaessa: se odottaa täällä ja käynnistyy kun töitä tulee. Aina päällä: yhdistimesi pitää sen käynnissä."
+      },
+      "basic": {
+        "title": "Aloita kolmella agentilla",
+        "desc": "Etuovi joka vastaa, tekijä joka tekee sinulle lisää agentteja, ja työnjohtaja joka tilaa muilta töitä. Sinun ei tarvitse asentaa mitään.",
+        "button": "Tee ne",
+        "working": "Tehdään…",
+        "done": "{count} agenttia on valmiina.",
+        "alreadyThere": "Ne ovat jo täällä.",
+        "failed": "Tämä ei mennyt loppuun. Mitään ei jäänyt puolitiehen.",
+        "allThere": "Sinulla on ne",
+        "have": "Jo sinun",
+        "connected": "Yhdistimesi on käynnissä, joten ne pääsevät heti töihin",
+        "notConnected": "Yhdistimesi ei ole käynnissä",
+        "notConnectedHint": "Nämä agentit pyörivät omalla koneellasi. Käynnistä yhdistin komennolla \"aimeat connect serve\", niin tämä nappi toimii.",
+        "whatYouGet": "Mitä saat"
+      },
       "taskRunner": {
         "title": "Yhdistä CrewAI-crew (Liaison Agent -patterni)",
         "whatIs": "Suositeltu tapa kytkeä CrewAI-crew AIMEATiin: lisää crew:hun yksi Liaison Agent -niminen jäsen (CrewAI Agent), joka omistaa AIMEATin MCP-tooli-pinnan. Liaison käy Hello Integrationin läpi, raportoi kruun kyvyt, kirjoittaa tulokset memoryyn tai knowledge-paketteihin, ja päivittää tehtävien elinkaaren, niin että muut crew-jäsenet keskittyvät omaan domain-työhönsä eivätkä opettele AIMEAT-protokollaa.",

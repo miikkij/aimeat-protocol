@@ -101,6 +101,10 @@ export async function deactivateOwner(storage: Storage, name: string, by: string
     //    for a deactivated account.
     await step('device_auth', async () => { await storage.deleteDeviceAuthByOwner(name); }, incomplete);
 
+    //    Same reasoning for an unspent Agent v2 enrolment grant: it is a live permission to hand a
+    //    daemon credentials in this account's name, and deactivation has to end it too.
+    await step('agent_enrolment_grants', async () => { await storage.deleteAgentEnrolmentGrantsByOwner(name); }, incomplete);
+
     // 6. MCP OAuth refresh tokens are keyed by agent GAII and have no by-owner delete.
     await step('mcp_oauth_refresh', async () => {
       for (const agent of await storage.getAgentsByOwner(name)) {

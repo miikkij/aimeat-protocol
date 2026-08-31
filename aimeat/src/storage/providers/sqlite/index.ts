@@ -67,6 +67,7 @@ import { accountEventMethods } from './methods/account-events.js';
 import { workspaceRowMethods } from './methods/workspace-rows.js';
 import { memoryTallyMethods } from './methods/memory-tally.js';
 import { ssoConnectionMethods } from './methods/sso-connections.js';
+import { agentEnrolmentMethods } from './methods/agent-enrolment.js';
 
 /**
  * Marks the async context of an open transaction, so a write can tell whether it is a step OF the
@@ -212,6 +213,7 @@ Object.assign(
   workspaceRowMethods,
   memoryTallyMethods,
   ssoConnectionMethods,
+  agentEnrolmentMethods,
 );
 
 // Applied after the merge so it wraps every method group, including any added later.

@@ -72,6 +72,7 @@ import type { SchedulerRepository } from './repositories/scheduler.repository.js
 import type { ExtensionInstanceRepository } from './repositories/extension-instance.repository.js';
 import type { ReplicationQueueRepository } from './repositories/replication-queue.repository.js';
 import type { DeviceAuthRepository } from './repositories/device-auth.repository.js';
+import type { AgentEnrolmentRepository } from './repositories/agent-enrolment.repository.js';
 import type { OAuthRepository } from './repositories/oauth.repository.js';
 import type { SystemPromptRepository } from './repositories/system-prompt.repository.js';
 import type { PackageRepository } from './repositories/package.repository.js';
@@ -115,6 +116,7 @@ export interface Storage extends
   KnowledgeRepository, SchedulerRepository,
   ExtensionInstanceRepository, ReplicationQueueRepository,
   DeviceAuthRepository,
+  AgentEnrolmentRepository,
   EcosystemAppRepository,
   OAuthRepository, SystemPromptRepository,
   PackageRepository, TemplateListingRepository, PackageInstanceRepository,

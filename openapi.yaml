@@ -6700,6 +6700,387 @@ paths:
           $ref: '#/components/responses/NotFound'
 
   # ── Device Authorization Flow (RFC 8628) ──────────────────
+  /v1/agents/v2/basic-agents:
+    get:
+      operationId: basicAgentsPreview
+      summary: What the basic agents are, and whether a connector is there to run them
+      description: |
+        The set is defined in ONE place on the node (src/data/basic-agents.ts) and this returns
+        whatever it says, plus whether the caller's `aimeat connect serve` is holding a tunnel right
+        now. A surface that wants to know what the button will do asks here rather than carrying its
+        own copy of the list.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The set, and the state of the caller's connector
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          daemon_connected:
+                            type: boolean
+                          connected_principals:
+                            type: array
+                            items: { type: string }
+                          agents:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                name: { type: string }
+                                display_name: { type: string }
+                                description: { type: string }
+                                scopes:
+                                  type: array
+                                  items: { type: string }
+                                mode: { type: string }
+                                run_mode:
+                                  type: string
+                                  enum: [spawn, resident]
+                                exists: { type: boolean }
+                                enrolled: { type: boolean }
+        '403':
+          description: Not the account holder (requireOwnerPrincipal)
+    post:
+      operationId: createBasicAgents
+      summary: Create the basic agents and hand them to the connector already running
+      description: |
+        One press, three working agents, with nothing pasted and nothing restarted.
+
+        THE PRESS IS THE APPROVAL. This is gated on `requireOwnerPrincipal()` rather than
+        `requireRole('owner')`: the owner role does not say which principal is calling, and an agent
+        JWT carries the human's account name. This changes the account, so it is reserved to the
+        account holder in person.
+
+        PRECONDITION. The owner's `aimeat connect serve` must already be connected to this node. With
+        no connector there is nobody to run the agents, so the call answers 409 `NO_DAEMON` and
+        creates nothing.
+
+        WHAT HAPPENS. The agents are created from the node's own template, a single-use enrolment
+        grant naming exactly them is written, and the grant is offered to the connected daemon over a
+        socket it is already holding. The daemon generates one Ed25519 key per agent, signs a card
+        with it, submits the cards to `/v1/agents/v2/enrol`, and attaches the agents to its live
+        registry. No restart, so no other agent loses its connection.
+
+        Safe to press twice: an agent that already exists and is enrolled is reported under `skipped`.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Created and enrolled
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          created:
+                            type: array
+                            items: { type: string }
+                          reused:
+                            type: array
+                            items: { type: string }
+                          skipped:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                name: { type: string }
+                                reason: { type: string }
+                          enrolled:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                name: { type: string }
+                                gaii: { type: string }
+                                run_mode: { type: string }
+                                card_url: { type: string }
+                          served_by:
+                            type: string
+                            description: The daemon principal the enrolment was offered to.
+        '403':
+          description: Not the account holder (requireOwnerPrincipal)
+        '409':
+          description: NO_DAEMON — no connector is connected, and nothing was created
+        '502':
+          description: |
+            The connector was reached and did not finish. The agents exist and are unconnected; the
+            error details carry `grant_id` so the press can be retried. `CONNECTOR_TOO_OLD` means the
+            connector is connected but does not know how to take on new agents yet.
+
+  /v1/agents/v2/enrol:
+    post:
+      operationId: enrolAgentsV2
+      summary: A connected daemon turns an enrolment grant plus signed cards into credentials
+      description: |
+        The daemon's door, not the owner's. The caller must be an AGENT principal of the grant's
+        owner and must be holding a live tunnel at this moment; an app or ecosystem principal is
+        refused outright, and so is the owner in person.
+
+        Every card is read, matched against the grant and verified against the key INSIDE it before
+        anything is written. A card's `gaii` is a claim: the node recomputes it from the grant's
+        owner and the agent's name and refuses a card that disagrees. Scopes come from the stored
+        agent record — what the owner's template granted — and never from the card, which may ask
+        for more.
+
+        The submission must cover EVERY agent the grant names. A partial submit would spend the
+        grant and leave the rest permanently unenrolled with nothing saying why.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [grant_id, cards]
+              properties:
+                grant_id:
+                  type: string
+                cards:
+                  type: array
+                  description: One agent card per agent, each a compact JWS signed with that agent's own key.
+                  items: { type: string }
+      responses:
+        '200':
+          description: Enrolled — one short-lived credential per agent
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          grant_id: { type: string }
+                          token_endpoint: { type: string }
+                          enrolled:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                name: { type: string }
+                                gaii: { type: string }
+                                access_token: { type: string }
+                                token_type: { type: string }
+                                expires_in: { type: integer }
+                                expires_at: { type: string, format: date-time }
+                                scopes:
+                                  type: array
+                                  items: { type: string }
+                                run_mode: { type: string }
+                                card_url: { type: string }
+                                jwks_url: { type: string }
+        '403':
+          description: Not an agent principal of this account, or the grant belongs to another owner
+        '404':
+          description: No such enrolment grant
+        '409':
+          description: ALREADY_USED (the grant is spent) or NOT_CONNECTED (the caller holds no tunnel)
+        '410':
+          description: The grant has expired
+        '422':
+          description: |
+            CARD_REJECTED or INCOMPLETE_SUBMISSION. Nothing was enrolled. `error.details.rejected`
+            lists each refused card with a machine-readable `defects` array of `{ field, reason }`.
+
+  /v1/agents/v2/token:
+    post:
+      operationId: agentV2Token
+      summary: Exchange an agent key for a short-lived credential
+      description: |
+        Unauthenticated by design: the signed assertion IS the credential. A v2 agent holds an
+        Ed25519 key rather than a bearer, and mints a token whenever it needs one, so nothing
+        long-lived sits on disk.
+
+        The assertion is a compact JWS signed with the agent's pinned key, carrying `sub` (the
+        agent's GAII), `aud` (this node's id), `iat`, `exp` (at most 300 seconds out) and `jti`. It
+        is spent once: a replay is refused with 401 `ASSERTION_REPLAYED`.
+
+        The minted token's roles are always `["agent"]` and its scopes are the agent's stored
+        `defaultScopes` — what the owner granted. Neither is taken from the assertion.
+      tags: [Identity]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [grant_type, assertion]
+              properties:
+                grant_type:
+                  type: string
+                  enum: ['urn:aimeat:params:oauth:grant-type:agent-key']
+                assertion:
+                  type: string
+      responses:
+        '200':
+          description: A short-lived credential (flat OAuth-style JSON, not the AIMEAT envelope)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token: { type: string }
+                  token_type: { type: string }
+                  expires_in: { type: integer }
+                  expires_at: { type: string, format: date-time }
+                  gaii: { type: string }
+                  owner: { type: string }
+                  scopes:
+                    type: array
+                    items: { type: string }
+        '400':
+          description: The assertion is malformed, for another node, expired, or claims too long a life
+        '401':
+          description: No key is pinned for that agent, the signature does not verify, or the assertion was already spent
+        '403':
+          description: The account is deactivated
+
+  /v1/agents/{gaii}/card:
+    get:
+      operationId: getAgentCard
+      summary: An agent's signed card
+      description: |
+        Public and unauthenticated, which is the feature: fetching this and the matching JWKS is the
+        whole authenticity check, so another owner's node can verify the card without a bilateral
+        arrangement with us. Returned as the exact compact JWS that was verified at enrolment — a
+        signature is over bytes, so a re-serialisation would be a different document.
+
+        The path segment is a full agent identity (`agent#owner@node`), url-encoded. A bare name is
+        ambiguous across owners on a shared node.
+      tags: [Identity]
+      parameters:
+        - name: gaii
+          in: path
+          required: true
+          schema: { type: string }
+          description: The agent's full identity, url-encoded.
+      responses:
+        '200':
+          description: The card, as a compact JWS
+          content:
+            application/jose:
+              schema: { type: string }
+        '400':
+          description: The path is not a full agent identity
+        '404':
+          description: No published card for that agent
+
+  /v1/agents/{gaii}/jwks.json:
+    get:
+      operationId: getAgentJwks
+      summary: The key that verifies an agent's card
+      description: |
+        Public and unauthenticated, for the same reason as the card. Exactly one Ed25519 key, taken
+        from the pinned card itself so the key set and the document it verifies cannot drift apart.
+      tags: [Identity]
+      parameters:
+        - name: gaii
+          in: path
+          required: true
+          schema: { type: string }
+          description: The agent's full identity, url-encoded.
+      responses:
+        '200':
+          description: A JWKS with one Ed25519 verification key
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  keys:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        kty: { type: string }
+                        crv: { type: string }
+                        x: { type: string }
+                        kid: { type: string }
+                        use: { type: string }
+                        alg: { type: string }
+        '404':
+          description: No published key set for that agent
+
+  /v1/agents/{gaii}/card/info:
+    get:
+      operationId: getAgentCardInfo
+      summary: An agent's card as JSON, for a surface that will not verify it
+      description: |
+        A convenience for rendering. Anything DECIDING whether to trust the agent reads the JWS and
+        the JWKS instead.
+      tags: [Identity]
+      parameters:
+        - name: gaii
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: The card's contents, with the addresses of the two documents that prove it
+        '404':
+          description: No published card for that agent
+
+  /v1/agents/{name}/run-mode:
+    patch:
+      operationId: setAgentRunMode
+      summary: How this agent is meant to be run
+      description: |
+        `spawn` (the agent is data on the node until work arrives; the runtime starts a worker for
+        the job and it unwinds) or `resident` (the runtime keeps it up).
+
+        The node STORES and SHOWS this and does not enforce it, exactly as with
+        `max_concurrent_tasks`: the runtime is the only party that can honour it. Same-owner gated
+        rather than owner-role-only, because a fleet runtime that has worked out an agent must stay
+        up is the caller this exists for.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+          description: The agent's name, or its full identity url-encoded.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [run_mode]
+              properties:
+                run_mode:
+                  type: string
+                  enum: [spawn, resident]
+      responses:
+        '200':
+          description: The new run mode
+        '400':
+          description: run_mode is not one of the two values
+        '403':
+          description: Not your agent
+        '404':
+          description: No such agent
+
   /v1/agents/device-authorize:
     post:
       operationId: deviceAuthorize

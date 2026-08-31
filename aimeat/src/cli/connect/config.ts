@@ -26,6 +26,11 @@
  *   v1.1.0 -- 2026-05-28 -- Security warning on wake.command (executes via exec)
  *   v2.0.0 -- 2026-05-29 -- Per-agent config layout + runner block + loadAllAgents
  *   v2.1.0 -- 2026-06-10 -- AIMEAT_HOME env override for the connector home dir
+ *   v2.3.0 -- 2026-08-31 -- loadAllAgents() also scans `keys/`: an Agent v2 principal holds an
+ *                           Ed25519 key and no bearer, so a restarting daemon that only read
+ *                           `tokens/` would silently stop serving every agent the basic-agents
+ *                           button created. `token` is empty for those; agent-key.ts resolveToken()
+ *                           mints one per use.
  *   v2.2.0 -- 2026-06-17 -- Default home is now <cwd>/.aimeat (directory-scoped)
  *                           instead of the global ~/.aimeat, so two projects on
  *                           one machine get independent daemons / tokens /
@@ -36,6 +41,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse, stringify } from 'yaml';
 import { listAllTokens } from './keychain.js';
+import { listAllAgentKeys } from './agent-key.js';
 import { logger } from '../../utils/logger.js';
 
 // Connector home resolution (directory-scoped):
@@ -192,18 +198,29 @@ export interface LoadedAgent {
 }
 
 /**
- * Scan stored tokens, load per-agent config for each (synthesizing one from the
+ * Scan stored credentials, load per-agent config for each (synthesizing one from the
  * global config for legacy single-agent installs that have no per-agent file).
- * Returns the full set the connector should serve. Empty array if no tokens.
+ * Returns the full set the connector should serve. Empty array if there are none.
+ *
+ * TWO KINDS OF CREDENTIAL, ONE LIST. A v1 agent has a long-lived bearer under `tokens/`; a v2 agent
+ * has an Ed25519 key under `keys/` and no bearer at all, and mints one per use. Both are scanned,
+ * and the union is what the daemon serves — an owner with one of each does not have to know which
+ * is which, and the v1 half is untouched by the existence of the other.
+ *
+ * `token` is empty for a v2 agent. Everything that needs a live credential goes through
+ * `resolveToken()` in agent-key.ts, which mints for a key-holder and reads the file for the other.
  */
 export async function loadAllAgents(): Promise<LoadedAgent[]> {
   const credentials = await listAllTokens();
-  if (credentials.length === 0) return [];
+  const keyed = await listAllAgentKeys();
+  if (credentials.length === 0 && keyed.length === 0) return [];
 
   const global = loadConfig();
   const out: LoadedAgent[] = [];
+  const seen = new Set<string>();
 
   for (const cred of credentials) {
+    seen.add(`${cred.agent}@${cred.owner}`);
     let perAgent = loadPerAgentConfig(cred.agent);
     if (!perAgent) {
       // Legacy install: synthesize per-agent config from the global config when
@@ -218,6 +235,22 @@ export async function loadAllAgents(): Promise<LoadedAgent[]> {
       };
     }
     out.push({ agent: cred.agent, owner: cred.owner, token: cred.token, config: perAgent });
+  }
+
+  for (const k of keyed) {
+    // A stray bearer alongside a key means this agent was migrated; the key wins, because it is the
+    // credential the node will honour and the bearer is the thing being retired.
+    if (seen.has(`${k.agent}@${k.owner}`)) continue;
+    const perAgent = loadPerAgentConfig(k.agent);
+    if (!perAgent) {
+      // Enrolment writes the key and the config together, so this only happens if one of the two
+      // was lost. There is no default node URL to guess for a v2 agent — it never went through
+      // `aimeat connect`, so the global config does not describe it — and serving it against the
+      // wrong node would fail in a way that reads like a broken credential.
+      logger.warn('loadAllAgents: an agent key has no per-agent config and cannot be served', { agent: k.agent, owner: k.owner });
+      continue;
+    }
+    out.push({ agent: k.agent, owner: k.owner, token: '', config: perAgent });
   }
 
   return out;
