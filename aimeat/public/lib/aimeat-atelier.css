@@ -36,6 +36,9 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.42.0 — 2026-09-01 — NINE PARTS: parts.css joins the imports — the toast stack, the
+ *     command palette, the compare slider, the progress ring, the crew stack, the drop zone,
+ *     the tour, the poll and the key hints, every value on the contract.
  *   v0.41.0 — 2026-09-01 — MATERIALS AND MOTION: materials.css joins the imports — seven
  *     surfaces (glass, aurora, grain, ink, signal, ring, spot) and six motion recipes (magnet,
  *     tilt, sheen, thumb, odometer, deal), every value a token, nothing looping on idle.
@@ -217,6 +220,7 @@
 @import url('./aimeat-atelier/commercial.css');
 @import url('./aimeat-atelier/mtv.css');
 @import url('./aimeat-atelier/materials.css');
+@import url('./aimeat-atelier/parts.css');
 @import url('./aimeat-atelier/scenics.css');
 @import url('./aimeat-atelier/patterns.css');
 @import url('./aimeat-atelier/mosaic.css');

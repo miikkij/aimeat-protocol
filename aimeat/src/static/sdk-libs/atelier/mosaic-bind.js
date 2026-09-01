@@ -12,6 +12,8 @@
  * @usage
  *   import { patchFor, derivedColumns, wireLive } from './mosaic-bind.js';
  * @version-history
+ *   v0.42.0 — 2026-09-01 — patchFor rides ring, crew and poll records whole; keys takes the
+ *     default items shape.
  *   v0.39.0 — 2026-08-30 — patchFor rides the crt's record whole (the broadcast family);
  *     countdown and crawl take the default items shape.
  *   v0.33.0 — 2026-08-29 — patchFor covers the ops family (health/queue as { data: { items } },
@@ -29,7 +31,8 @@ export function patchFor(kind, data) {
   if (kind === 'chart' || kind === 'matrix' || kind === 'graph' || kind === 'waveform'
     || kind === 'gauge' || kind === 'console' || kind === 'atlas' || kind === 'map' || kind === 'scene3d'
     || kind === 'kanban' || kind === 'plan' || kind === 'schedule'
-    || kind === 'steps' || kind === 'rating' || kind === 'crt') {
+    || kind === 'steps' || kind === 'rating' || kind === 'crt'
+    || kind === 'ring' || kind === 'crew' || kind === 'poll') {
     return { data: data && typeof data === 'object' && !Array.isArray(data) ? data : null };
   }
   if (kind === 'health' || kind === 'queue') {
