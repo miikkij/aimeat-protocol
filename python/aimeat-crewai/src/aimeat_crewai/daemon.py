@@ -14,6 +14,13 @@ This is the second half of the AIMEAT-CrewAI integration story:
     them up automatically.
 
 Changelog:
+  0.23.1 -- The per-agent config is read from the path the connector actually uses. It moved to
+    `agents/{owner}/{agent}/config.yaml` on 2026-09-01 (one shared file gave two owners with a
+    `concierge` a single node_url and a single runner command between them). This still read the old
+    shared path only, found nothing on any current install, and fell through to the default --
+    which is aimeat.io, so a LOCAL test agent reported PRODUCTION as its node. Nothing calls it,
+    because calls go through the loopback, but a runtime that trusted it would. New path first, old
+    path still read for an install that has not migrated.
   0.23.0 -- A v2 agent can start. `_read_token` looked only in `tokens/`, so every agent the
     basic-agents button creates -- all of them v2, holding a KEY rather than a bearer -- was refused
     before anything else ran: `No token file matching .../tokens/concierge@*.token`, for a
@@ -301,7 +308,6 @@ def _read_token(agent_name: str, owner: str | None = None) -> tuple[str, str]:
     home_dir = aimeat_home()
     tokens_dir = home_dir / "tokens"
     keys_dir = home_dir / "keys"
-    agent_config_path = home_dir / "agents" / agent_name / "config.yaml"
 
     # Locate a credential of EITHER family.
     if owner:
@@ -343,9 +349,22 @@ def _read_token(agent_name: str, owner: str | None = None) -> tuple[str, str]:
         else ""
     )
 
-    # Best-effort node_url extraction from per-agent config.yaml.
+    # Best-effort node_url from the per-agent config. TWO PATHS, new one first: the connector moved
+    # to `agents/{owner}/{agent}/config.yaml` on 2026-09-01, because one shared
+    # `agents/{agent}/config.yaml` gave two owners with a `concierge` a single file -- one node_url
+    # and one runner command between them. Reading only the old path found nothing on any current
+    # install and fell through to the default below, which is aimeat.io: a local test agent would
+    # have reported PRODUCTION as its node. Nothing calls it, but a runtime that trusted it would.
+    credential_owner = credential_file.stem.split("@", 1)[1]
+    config_paths = [
+        home_dir / "agents" / credential_owner / agent_name / "config.yaml",
+        home_dir / "agents" / agent_name / "config.yaml",   # pre-2026-09-01, still read
+    ]
+
     node_url = "https://aimeat.io"
-    if agent_config_path.is_file():
+    for agent_config_path in config_paths:
+        if not agent_config_path.is_file():
+            continue
         text = agent_config_path.read_text(encoding="utf-8")
         for line in text.splitlines():
             line = line.strip()
@@ -354,6 +373,7 @@ def _read_token(agent_name: str, owner: str | None = None) -> tuple[str, str]:
                 if raw:
                     node_url = raw
                 break
+        break
 
     return token, node_url
 

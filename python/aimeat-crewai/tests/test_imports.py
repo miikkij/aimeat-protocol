@@ -272,6 +272,39 @@ def test_read_token_one_owner_holding_both_is_not_ambiguous(tmp_path, monkeypatc
     _read_token("concierge")  # must not raise
 
 
+def test_read_token_reads_the_per_owner_config_path(tmp_path, monkeypatch) -> None:
+    """The connector moved to agents/{owner}/{agent}/config.yaml on 2026-09-01.
+
+    Reading only the old shared path found nothing on any current install and fell through to the
+    default, which is aimeat.io -- so a LOCAL test agent reported production as its node."""
+    from aimeat_crewai.daemon import _read_token
+
+    monkeypatch.setenv("AIMEAT_HOME", str(tmp_path))
+    (tmp_path / "keys").mkdir()
+    (tmp_path / "keys" / "concierge@isoalice.key").write_text("k")
+    cfg = tmp_path / "agents" / "isoalice" / "concierge"
+    cfg.mkdir(parents=True)
+    (cfg / "config.yaml").write_text("node_url: http://localhost:40310\n")
+
+    _token, node_url = _read_token("concierge", owner="isoalice")
+    assert node_url == "http://localhost:40310"
+
+
+def test_read_token_still_reads_the_old_shared_config_path(tmp_path, monkeypatch) -> None:
+    """An install that has not been migrated yet keeps working."""
+    from aimeat_crewai.daemon import _read_token
+
+    monkeypatch.setenv("AIMEAT_HOME", str(tmp_path))
+    (tmp_path / "tokens").mkdir()
+    (tmp_path / "tokens" / "oldbot@alice.token").write_text("t")
+    cfg = tmp_path / "agents" / "oldbot"
+    cfg.mkdir(parents=True)
+    (cfg / "config.yaml").write_text("node_url: http://old.example:1\n")
+
+    _token, node_url = _read_token("oldbot", owner="alice")
+    assert node_url == "http://old.example:1"
+
+
 def test_read_token_missing_names_both_places(tmp_path, monkeypatch) -> None:
     """The fast failure this function exists for is KEPT, and now says where it looked."""
     from aimeat_crewai.daemon import _read_token
