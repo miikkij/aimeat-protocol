@@ -1,7 +1,17 @@
 /**
  * @file test/e2e-agent-v2-a2a.ts
- * @description Agent v2 V6a and V6c: one of this node's agents, answering A2A, and the same agent
- *   as an OASF record.
+ * @description Agent v2 V6a and V6c: one of this node's agents, answering A2A, the same agent as an
+ *   OASF record, and a STRANGER hiring it.
+ *
+ *   THE FOREIGN HALF IS THE PHASE'S OWN CRITERION, and it is written as one story rather than as a
+ *   set of unit-ish probes: an agent that holds no account here reads the public card, proves it
+ *   holds the key its own card names, is quoted a price, pays it, and reads the answer — never
+ *   having learnt a GAII. Everything it must NOT reach is asserted with the same credential in the
+ *   same session, because a fence proven with a different caller is not the fence.
+ *
+ *   THE STRANGER'S JWKS IS A REAL HTTP SERVER on loopback, not a stub. The node fetches it through
+ *   safeFetch on first sight, and that fetch is the only part of the claim somebody other than the
+ *   claimant can check. Faking it would leave the one outward step untested.
  *
  *   THE SUITE SPEAKS JSON-RPC, not our REST. Every call here is a real `POST /v1/a2a/:owner/:agent`
  *   with `{"jsonrpc":"2.0","method":…}`, because the whole point of V6a is that a client which knows
@@ -20,9 +30,13 @@
  *
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-v2-a2a
  * @version-history
+ *   v1.1.0 — 2026-09-01 — The foreign caller: a stranger hires a published offering, pays for it,
+ *     and reaches nothing else (V6a, the phase criterion).
  *   v1.0.0 — 2026-09-01 — Initial, with the feature.
  */
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
+import { createServer, type Server } from 'node:http';
+import { CompactSign, importJWK, calculateJwkThumbprint } from 'jose';
 import * as ed from '@noble/ed25519';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -77,6 +91,135 @@ async function addAgent(owner: string, ownerToken: string, name: string, scopes:
         body: JSON.stringify({ gaii, timestamp: ts, signature: await sign(ag.body.data.private_key, gaii + ts) }),
     });
     return { name, gaii, token: tok.body.data.token as string };
+}
+
+// ── A stranger: an agent on another node, with its own key, card and JWKS ──────────────────
+//
+// Everything below is what a FOREIGN implementation has to produce, so it doubles as the shape of
+// the instruction we would give one. Nothing here reaches into the node's own key material.
+
+/** A foreign agent's keypair, its published JWKS, and the card + assertions it signs with it. */
+interface Stranger {
+    gaii: string;
+    kid: string;
+    x: string;
+    cardJws: string;
+    jwksUrl: string;
+    assertion(): Promise<string>;
+}
+
+/** The A2A refusals this node names that the protocol does not. Mirrors src/services/a2a-foreign-handler.ts. */
+const FOREIGN_CODE = {
+    NOTHING_FOR_SALE: -32040,
+    OFFERING_NOT_NAMED: -32041,
+    PAYMENT_UNAVAILABLE: -32042,
+    NOT_FOR_STRANGERS: -32043,
+};
+
+const jwksServers: Server[] = [];
+
+/** Serve one JWKS on loopback, the way a real node publishes a key. Torn down at the end. */
+async function serveJwks(keys: Record<string, unknown>[]): Promise<string> {
+    const server = createServer((_req, res) => {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ keys }));
+    });
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    jwksServers.push(server);
+    const port = (server.address() as { port: number }).port;
+    return `http://127.0.0.1:${port}/jwks.json`;
+}
+
+async function ed25519Pair() {
+    const priv = ed.utils.randomSecretKey();
+    const pub = await ed.getPublicKeyAsync(priv);
+    const x = Buffer.from(pub).toString('base64url');
+    const d = Buffer.from(priv).toString('base64url');
+    const kid = await calculateJwkThumbprint({ kty: 'OKP', crv: 'Ed25519', x }, 'sha256');
+    return { x, d, kid, jwk: { kty: 'OKP' as const, crv: 'Ed25519' as const, x, d } };
+}
+
+/**
+ * A whole foreign agent: keys, a self-signed card, a JWKS that actually serves the key, and a
+ * fresh assertion on demand. `publishKey: false` builds the same thing with a JWKS that does not
+ * carry the key, which is the refusal the first-sight fetch exists to produce.
+ */
+async function makeStranger(name: string, opts: { publishKey?: boolean; gaii?: string } = {}): Promise<Stranger> {
+    const pair = await ed25519Pair();
+    const gaii = opts.gaii ?? `${name}#remote@remote-node-999`;
+    const jwksUrl = await serveJwks(opts.publishKey === false
+        ? []
+        : [{ kty: 'OKP', crv: 'Ed25519', x: pair.x, kid: pair.kid, use: 'sig', alg: 'EdDSA' }]);
+    const card = {
+        spec: 'aimeat.agent-card/v1',
+        gaii, name, owner: 'remote', node: 'remote-node-999',
+        displayName: `${name} of remote`,
+        description: 'An agent on somebody else\'s node.',
+        runtime: { platform: 'test-harness' }, runMode: 'resident',
+        skills: ['summarize'], modalities: ['text'], requestedScopes: [],
+        publicKey: { kty: 'OKP', crv: 'Ed25519', x: pair.x, kid: pair.kid },
+        jwksUri: jwksUrl, cardUri: `http://127.0.0.1:1/agents/${name}/card`,
+        issuedAt: new Date().toISOString(),
+    };
+    const key = await importJWK(pair.jwk, 'EdDSA');
+
+    return {
+        gaii, kid: pair.kid, x: pair.x, jwksUrl,
+        cardJws: await new CompactSign(new TextEncoder().encode(JSON.stringify(card)))
+            .setProtectedHeader({ alg: 'EdDSA', kid: pair.kid }).sign(key),
+        async assertion() {
+            const now = Math.floor(Date.now() / 1000);
+            return new CompactSign(new TextEncoder().encode(JSON.stringify({
+                sub: gaii, aud: NODE_ID, iat: now, exp: now + 120, jti: randomBytes(8).toString('hex'),
+            }))).setProtectedHeader({ alg: 'EdDSA', kid: pair.kid }).sign(key);
+        },
+    };
+}
+
+/**
+ * The SAME agent, coherently re-keyed: new key, new card, new JWKS, new assertions, same GAII.
+ *
+ * This is the shape the pin exists to catch, and the shape a lazier fake would miss: a card signed
+ * by a key it does not carry is refused two checks earlier, so it never reaches the comparison.
+ */
+function rekeyed(who: Stranger): Promise<Stranger> {
+    return makeStranger(who.gaii.split('#')[0], { gaii: who.gaii });
+}
+
+/** One JSON-RPC call made the way a stranger makes it: a signed card and a fresh assertion. */
+async function foreignRpc(
+    owner: string, agentName: string, who: Stranger, method: string, params: unknown,
+    opts: { payment?: string; card?: string; assertion?: string } = {},
+) {
+    const headers: Record<string, string> = {
+        'Content-Type': 'application/json', 'A2A-Version': '1.0',
+        'X-A2A-Agent-Card': opts.card ?? who.cardJws,
+        'X-A2A-Assertion': opts.assertion ?? await who.assertion(),
+    };
+    if (opts.payment) headers['X-PAYMENT'] = opts.payment;
+    const res = await fetch(`${BASE}/v1/a2a/${encodeURIComponent(owner)}/${encodeURIComponent(agentName)}`, {
+        method: 'POST', headers,
+        body: JSON.stringify({ jsonrpc: '2.0', id: ++rpcId, method, params }),
+    });
+    const text = await res.text();
+    let body: any = null;
+    try { body = text ? JSON.parse(text) : null; } catch { body = { _raw: text }; }
+    return { status: res.status, body, result: body?.result, error: body?.error };
+}
+
+/** The buyer's signed authorization, the same shape e2e-x402 builds. */
+function buildXPayment(requirements: any, from: string) {
+    return Buffer.from(JSON.stringify({
+        x402Version: 1, scheme: 'exact', network: requirements.network,
+        payload: {
+            signature: `0x${'ab'.repeat(65)}`,
+            authorization: {
+                from, to: requirements.payTo, value: requirements.maxAmountRequired,
+                validAfter: '0', validBefore: String(Math.floor(Date.now() / 1000) + 3600),
+                nonce: `0x${randomBytes(32).toString('hex')}`,
+            },
+        },
+    })).toString('base64');
 }
 
 let rpcId = 0;
@@ -415,7 +558,226 @@ async function run(): Promise<void> {
         assert(r.status === 404, `expected 404, got ${r.status}`);
     });
 
-    // ── 7. Nothing existing moved ─────────────────────────────────────────────
+    // ── 7. A STRANGER HIRES THE AGENT: the phase's own criterion ──────────────
+    //
+    // A foreign agent finds the card, hires the agent, gets the result, and never learns a GAII.
+    // The consent is the OFFERING: its owner published it, so it is for sale, and nothing else is.
+
+    const SELLER_ADDR = `0x${'b'.repeat(40)}`;
+    const BUYER_WALLET = `0x${'c'.repeat(40)}`;
+    const PRICE_MICROS = 2_500_000;   // 2.50 USD, settled in USDC
+
+    const stranger = await makeStranger('scout');
+    let offeringId = '';
+    let foreignTaskId = '';
+    let quotedRequirements: any = null;
+
+    await test('a seller publishes agent work for money, and puts an address for it to be paid to', async () => {
+        const listed = await json('/v1/exchange/offerings', {
+            method: 'POST', headers: authA,
+            body: JSON.stringify({
+                kind: 'agent-work', agent_name: worker.name, task_type: 'summarize',
+                title: 'Summarise a document',
+                description: 'Send text, get a summary back.',
+                price_money: { amount: PRICE_MICROS, currency: 'USD' },
+                usage_terms: { derivatives: true, resale: false, attribution: true },
+                input_schema: { type: 'object', required: ['text'], properties: { text: { type: 'string' } } },
+                output_schema: { type: 'object', properties: { summary: { type: 'string' } } },
+            }),
+        });
+        assert(listed.status === 201, `list ${listed.status}: ${JSON.stringify(listed.body?.error)}`);
+        offeringId = listed.body.data.offering.offeringId;
+        assert(listed.body.data.offering.currency === 'USD', `priced in money, got ${listed.body.data.offering.currency}`);
+
+        const psp = await json('/v1/memory', {
+            method: 'POST', headers: authA,
+            body: JSON.stringify({ key: 'commerce.psp', value: { provider: 'x402', payTo: SELLER_ADDR }, visibility: 'private' }),
+        });
+        assert(psp.status === 200 || psp.status === 201, `psp ${psp.status}: ${JSON.stringify(psp.body?.error)}`);
+    });
+
+    await test('the public card now says what is for sale, at what price, and how it is paid for', async () => {
+        // A buyer decides whether to knock by reading the card. A price only discoverable by
+        // starting a task makes every client start a task to window-shop.
+        const card = (await json(`/v1/a2a/${a.owner}/${worker.name}/agent-card.json`)).body;
+        const forHire = (card.skills as any[]).find(s => s.id === offeringId);
+        assert(!!forHire, `the offering is a skill on the card, got ${JSON.stringify((card.skills as any[]).map(s => s.id))}`);
+        assert((forHire.tags as string[]).includes('for-hire'), 'tagged so a client can tell it from a declared capability');
+        assert(String(forHire.description).includes('2500000 USD'), `with the price on it, got ${forHire.description}`);
+        assert((card.capabilities.extensions as any[]).some(e => String(e.uri).includes('x402')),
+            'and the payment extension is declared');
+        assert(!!card.securitySchemes?.foreignCard, 'and the stranger\'s way in is a declared scheme');
+        assert(!!card.securitySchemes?.bearer, 'beside the account one, which has not moved');
+        // The whole point: nothing on the public card names the GAII.
+        assert(!JSON.stringify(card).includes(worker.gaii), 'and the card never names the agent\'s GAII');
+    });
+
+    await test('a stranger with a valid card is quoted a price rather than let straight in', async () => {
+        const r = await foreignRpc(a.owner, worker.name, stranger, 'SendMessage', {
+            message: {
+                messageId: 'foreign-1', role: 'ROLE_USER',
+                metadata: { offeringId },
+                parts: [{ text: 'Summarise this: the quick brown fox.' }],
+            },
+        });
+        assert(!r.error, `expected a task, got ${JSON.stringify(r.error)}`);
+        const task = r.result?.task;
+        assert(typeof task?.id === 'string', `with an id, got ${JSON.stringify(r.result).slice(0, 250)}`);
+        foreignTaskId = task.id;
+        assert(task.status.state === 'TASK_STATE_AUTH_REQUIRED',
+            `payment first, got ${task.status.state}`);
+        quotedRequirements = task.metadata?.accepts?.[0];
+        assert(!!quotedRequirements, `with x402 requirements on it, got ${JSON.stringify(task.metadata)}`);
+        assert(quotedRequirements.maxAmountRequired === String(PRICE_MICROS),
+            `the offering's own price, got ${quotedRequirements.maxAmountRequired}`);
+        assert(quotedRequirements.payTo === SELLER_ADDR, `paid to the seller, got ${quotedRequirements.payTo}`);
+        assert(String(quotedRequirements.resource).endsWith(`/v1/a2a/${a.owner}/${worker.name}`),
+            `signed against the address it is buying from, got ${quotedRequirements.resource}`);
+        assert(!JSON.stringify(task).includes(worker.gaii), 'and it still has not learnt the GAII');
+    });
+
+    await test('paying the quote starts the work, and the seller can see it', async () => {
+        const r = await foreignRpc(a.owner, worker.name, stranger, 'SendMessage', {
+            message: { messageId: 'foreign-2', role: 'ROLE_USER', taskId: foreignTaskId, parts: [{ text: 'paid' }] },
+        }, { payment: buildXPayment(quotedRequirements, BUYER_WALLET) });
+        assert(!r.error, `expected the work to start, got ${JSON.stringify(r.error)}`);
+        assert(r.result.task.status.state === 'TASK_STATE_WORKING',
+            `paid work is working, got ${r.result.task.status.state}`);
+
+        const mine = await json('/v1/exchange/work?role=provider', { headers: authA });
+        const w = (mine.body.data.work as any[]).find(x => x.work_id === foreignTaskId);
+        assert(!!w, `the seller sees it in their own work list, got ${JSON.stringify((mine.body.data.work as any[]).map(x => x.work_id))}`);
+        assert(w.charged_units === PRICE_MICROS, `already paid for, got ${w.charged_units}`);
+        assert(w.consumer === stranger.gaii, `by the stranger, under its own identity, got ${w.consumer}`);
+    });
+
+    await test('the seller delivers, and the stranger reads the result it paid for', async () => {
+        const delivered = await json(`/v1/exchange/work/${foreignTaskId}/deliver`, {
+            method: 'POST', headers: authA,
+            body: JSON.stringify({ output: { summary: 'A fox, moving quickly.' } }),
+        });
+        assert(delivered.status === 200, `deliver ${delivered.status}: ${JSON.stringify(delivered.body?.error)}`);
+
+        const r = await foreignRpc(a.owner, worker.name, stranger, 'GetTask', { id: foreignTaskId });
+        assert(!r.error, `expected the task, got ${JSON.stringify(r.error)}`);
+        assert(r.result.status.state === 'TASK_STATE_COMPLETED', `expected completed, got ${r.result.status.state}`);
+        const out = r.result.artifacts?.[0]?.parts?.[0]?.data;
+        assert(out?.summary === 'A fox, moving quickly.', `with the answer, got ${JSON.stringify(r.result.artifacts)}`);
+        // The criterion, stated as an assertion: it hired an agent and read the answer without ever
+        // being told the agent's identity on this node.
+        assert(!JSON.stringify(r.body).includes(worker.gaii), 'and it never learnt the GAII');
+        assert(!JSON.stringify(r.body).includes(a.owner), 'nor the owner\'s account name');
+    });
+
+    await test('a stranger is refused against an agent whose owner has published nothing', async () => {
+        // `caller` is a real agent of the same account with no offering of its own. Consent is the
+        // publishing act, so an agent nobody listed is not for hire at any price.
+        const r = await foreignRpc(a.owner, caller.name, stranger, 'SendMessage', {
+            message: { messageId: 'foreign-3', role: 'ROLE_USER', parts: [{ text: 'do my work' }] },
+        });
+        assert(!!r.error, `expected a refusal, got ${JSON.stringify(r.result ?? null).slice(0, 200)}`);
+        assert(r.error.code === FOREIGN_CODE.NOTHING_FOR_SALE,
+            `naming why in a code a machine can act on, got ${JSON.stringify(r.error).slice(0, 250)}`);
+        assert(String(r.error.message).includes('published nothing'), 'and in words a person can act on');
+    });
+
+    await test('a caller whose card does not verify is refused, five ways', async () => {
+        // 1. THE PINNED KEY CHANGED. A coherently re-keyed twin — new key, new card, new JWKS, new
+        //    assertions, same GAII — is the shape the pin exists to catch, and the one a lazier
+        //    fake would miss: a card signed by a key it does not carry is refused two checks
+        //    earlier and never reaches the comparison.
+        const twin = await rekeyed(stranger);
+        const changed = await foreignRpc(a.owner, worker.name, twin, 'GetTask', { id: foreignTaskId });
+        assert(changed.status === 401, `a new key is a new party, got ${changed.status}`);
+        assert(changed.body?.error?.code === 'A2A_KEY_CHANGED',
+            `refused rather than absorbed, got ${changed.body?.error?.code}`);
+
+        // 2. A card signed by a key it does not carry at all.
+        const other = await makeStranger('impostor');
+        const mismatched = await foreignRpc(a.owner, worker.name, stranger, 'GetTask', { id: foreignTaskId },
+            { card: other.cardJws });
+        assert(mismatched.status === 401, `the card and the assertion must be one party, got ${mismatched.status}`);
+
+        // 3. An assertion signed by somebody else's key.
+        const borrowed = await foreignRpc(a.owner, worker.name, stranger, 'GetTask', { id: foreignTaskId },
+            { assertion: await other.assertion() });
+        assert(borrowed.status === 401, `a borrowed assertion is refused, got ${borrowed.status}`);
+
+        // 4. A key its own node does not publish: nobody but the claimant could check the claim.
+        const unpublished = await makeStranger('ghost', { publishKey: false });
+        const notPublished = await foreignRpc(a.owner, worker.name, unpublished, 'SendMessage', {
+            message: { messageId: 'foreign-4', role: 'ROLE_USER', metadata: { offeringId }, parts: [{ text: 'hi' }] },
+        });
+        assert(notPublished.status === 401 && notPublished.body?.error?.code === 'A2A_KEY_NOT_PUBLISHED',
+            `expected the JWKS refusal, got ${notPublished.status}/${notPublished.body?.error?.code}`);
+
+        // 5. No card at all — and the message names both ways in rather than only the one it knows.
+        const bare = await fetch(`${BASE}/v1/a2a/${a.owner}/${worker.name}`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'GetTask', params: { id: foreignTaskId } }),
+        });
+        assert(bare.status === 401, `expected 401, got ${bare.status}`);
+
+        // And after all of that the real one still works: a refusal did not re-pin anything.
+        const still = await foreignRpc(a.owner, worker.name, stranger, 'GetTask', { id: foreignTaskId });
+        assert(!still.error, `the pinned caller still gets in, got ${JSON.stringify(still.error)}`);
+    });
+
+    await test('a stranger cannot reach anything the offering does not name', async () => {
+        // A capability the agent DECLARES but nobody listed. The card carries it as a skill and the
+        // door still refuses it: a declared capability is a description, a listing is an offer.
+        const notListed = await foreignRpc(a.owner, worker.name, stranger, 'SendMessage', {
+            message: { messageId: 'foreign-5', role: 'ROLE_USER', metadata: { offeringId: worker.name }, parts: [{ text: 'x' }] },
+        });
+        assert(!!notListed.error && notListed.error.code === FOREIGN_CODE.OFFERING_NOT_NAMED,
+            `expected the offering-not-named code, got ${JSON.stringify(notListed.error).slice(0, 250)}`);
+        assert(String(notListed.error.message).includes(offeringId),
+            'and the refusal says what IS published, so a client is not left guessing ids');
+
+        // Another principal's task, over the same credential. Not-yours and not-there answer alike,
+        // so the door is not an oracle for other people's work ids.
+        const someoneElses = await foreignRpc(a.owner, worker.name, stranger, 'GetTask', { id: taskId });
+        assert(!!someoneElses.error && someoneElses.error.code === -32001,
+            `expected task-not-found, got ${JSON.stringify(someoneElses.error)}`);
+
+        // The account road's own methods. A push target is a URL this node would call for a party
+        // with no account here, and a task roster is a list a stranger has no place on.
+        const push = await foreignRpc(a.owner, worker.name, stranger, 'CreateTaskPushNotificationConfig', {
+            taskId: foreignTaskId, url: 'https://stranger.example.test/hook',
+        });
+        assert(!!push.error, `a push target should be refused, got ${JSON.stringify(push.result)}`);
+
+        const roster = await foreignRpc(a.owner, worker.name, stranger, 'ListTasks', {});
+        assert(!roster.error && (roster.result?.tasks ?? []).length === 0,
+            `a stranger's roster is empty rather than somebody else's, got ${JSON.stringify(roster.result).slice(0, 200)}`);
+
+        // And nothing it did put a row in the ACCOUNT's task store: two stores, one door.
+        const v5 = await json('/v1/agents/v2/tasks?limit=200', { headers: authA });
+        assert(!(v5.body.data.tasks as any[]).some(t => t.id === foreignTaskId),
+            'foreign work is not an account task');
+    });
+
+    await test('the same-account road still answers exactly as it did', async () => {
+        // The alongside rule, measured rather than assumed: the caller that has been used all the
+        // way through this suite makes the same call it made in section 2 and gets the same answer.
+        const r = await rpc(a.owner, worker.name, caller.token, 'GetTask', { id: taskId });
+        assert(!r.error, `the account road should be untouched, got ${JSON.stringify(r.error)}`);
+        assert(r.result.id === taskId && r.result.status.state === 'TASK_STATE_COMPLETED',
+            `same task, same state, got ${r.result?.status?.state}`);
+
+        const made = await rpc(a.owner, worker.name, caller.token, 'SendMessage', {
+            message: { messageId: 'still-works-1', role: 'ROLE_USER', parts: [{ text: 'One more.' }] },
+        });
+        assert(!made.error, `and it can still create work, got ${JSON.stringify(made.error)}`);
+        assert(made.result.task.status.state === 'TASK_STATE_SUBMITTED',
+            `with no payment step in front of it, got ${made.result.task.status.state}`);
+
+        // A principal of ANOTHER account is still refused rather than quietly becoming a buyer.
+        const other = await rpc(a.owner, worker.name, outsider.token, 'GetTask', { id: taskId });
+        assert(other.status === 403, `expected 403, got ${other.status}`);
+    });
+
+    // ── 8. Nothing existing moved ─────────────────────────────────────────────
 
     await test('the REST and MCP doors onto the same work answer exactly what they did', async () => {
         const rest = await json('/v1/agents/v2/tasks?limit=200', { headers: authA });
@@ -436,9 +798,11 @@ async function run(): Promise<void> {
 }
 
 run().then(() => {
+    for (const s of jwksServers) s.close();
     console.log(`\n${passed} passed, ${failed} failed\n`);
     process.exit(failed > 0 ? 1 : 0);
 }).catch((err) => {
+    for (const s of jwksServers) s.close();
     console.error('Suite crashed:', err);
     process.exit(1);
 });
