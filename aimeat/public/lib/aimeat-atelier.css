@@ -36,6 +36,9 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.41.0 — 2026-09-01 — MATERIALS AND MOTION: materials.css joins the imports — seven
+ *     surfaces (glass, aurora, grain, ink, signal, ring, spot) and six motion recipes (magnet,
+ *     tilt, sheen, thumb, odometer, deal), every value a token, nothing looping on idle.
  *   v0.40.0 — 2026-09-01 — BROADCAST, the look (looks.css): the night-gallery world the
  *     developer accepted on the Atelier Next canvas, in light and dark. The channel colours
  *     (--ak-crt-ch1..4) and the set's ground (--ak-crt-set) join the contract here, so a look
@@ -213,6 +216,7 @@
 @import url('./aimeat-atelier/planner.css');
 @import url('./aimeat-atelier/commercial.css');
 @import url('./aimeat-atelier/mtv.css');
+@import url('./aimeat-atelier/materials.css');
 @import url('./aimeat-atelier/scenics.css');
 @import url('./aimeat-atelier/patterns.css');
 @import url('./aimeat-atelier/mosaic.css');
