@@ -1,0 +1,122 @@
+/*
+ * @file aimeat-atelier/materials.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description MATERIALS AND MOTION RECIPES — the surfaces and moves the Atelier Next canvas
+ *   proposed (accepted 2026-09-01): one class per material, one class per recipe, every value a
+ *   --ak-* token, so each answers every look, palette and mode. The register's physics hold
+ *   throughout: nothing here animates on idle — a recipe runs under the hand (hover, press,
+ *   pointer), once on a change, or a finite few times when a thing is marked live — and
+ *   reduced-motion collapses all of it.
+ *
+ *   Materials: glass · aurora · grain · ink · signal · ring · spot
+ *   Motion:    magnet · tilt (JS) · sheen · thumb (JS) · odometer (JS) · deal
+ * @structure .ak-mat--* · .ak-move--* · .ak-thumb · .ak-odo · reduced-motion
+ * @version-history
+ *   v0.41.0 — 2026-09-01 — Initial (wish-atelier-night-gallery, stage 2).
+ */
+
+/* ── Materials: a surface is one class, and the tokens do the rest ───────────────────────── */
+.ak-mat--glass {
+  background: var(--ak-glass);
+  backdrop-filter: blur(var(--ak-blur));
+  -webkit-backdrop-filter: blur(var(--ak-blur));
+  border: var(--ak-line-w) solid color-mix(in oklab, var(--ak-ink) 16%, transparent);
+}
+.ak-mat--aurora {
+  background:
+    radial-gradient(at 12% 20%, color-mix(in oklab, var(--ak-accent) 34%, var(--ak-surface)), transparent 52%),
+    radial-gradient(at 88% 30%, color-mix(in oklab, var(--ak-spectrum-2) 28%, var(--ak-surface)), transparent 52%),
+    radial-gradient(at 50% 95%, color-mix(in oklab, var(--ak-spectrum-3) 24%, var(--ak-surface)), transparent 58%),
+    var(--ak-surface);
+}
+.ak-mat--grain { background-color: var(--ak-surface); background-image: var(--ak-grain); }
+.ak-mat--ink { background: var(--ak-ink); color: var(--ak-bg); }
+/* The signal sheet: the crawl's ground promoted to a surface — one loud slab per screen. */
+.ak-mat--signal {
+  background: var(--ak-crt-ch3);
+  color: var(--ak-crt-set);
+  box-shadow: 5px 5px 0 color-mix(in oklab, var(--ak-accent) 85%, transparent);
+}
+/* The spotlight: a glow that follows the pointer (materials.js sets --ak-spot-x/y), and stands
+   perfectly still when nobody touches it. */
+.ak-mat--spot {
+  background:
+    radial-gradient(260px circle at var(--ak-spot-x, 50%) var(--ak-spot-y, 40%),
+      color-mix(in oklab, var(--ak-accent) 26%, transparent), transparent 62%),
+    var(--ak-surface);
+  transition: --ak-spot-x 400ms var(--ak-ease), --ak-spot-y 400ms var(--ak-ease);
+}
+/* The live ring: a spectrum border that flows a few turns under the hand, or when the element
+   is marked [data-live] (an aide thinking, a delegate at work), then rests. Never on idle. */
+@property --ak-ring-angle { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+@keyframes ak-ring-flow { to { --ak-ring-angle: 360deg; } }
+.ak-mat--ring { position: relative; isolation: isolate; }
+.ak-mat--ring::before {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  padding: 2px;
+  background: conic-gradient(from var(--ak-ring-angle),
+    var(--ak-crt-ch2), var(--ak-crt-ch1), var(--ak-crt-ch4), var(--ak-crt-ch3), var(--ak-crt-ch2));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+.ak-mat--ring:hover::before,
+.ak-mat--ring:focus-within::before { animation: ak-ring-flow 2.4s linear 3; }
+.ak-mat--ring[data-live]::before { animation: ak-ring-flow 2.4s linear 6; }
+
+/* ── Motion recipes: the hand asks, the surface answers, then it rests ───────────────────── */
+/* Magnetic press: rise on approach, squash on press. */
+.ak-move--magnet { transition: transform var(--ak-motion) var(--ak-ease), box-shadow var(--ak-motion) var(--ak-ease); }
+.ak-move--magnet:hover { transform: translateY(-4px) rotate(calc(var(--ak-tilt) * -0.6)) scale(1.03); box-shadow: var(--ak-elev-2); }
+.ak-move--magnet:active { transform: translateY(1px) scale(0.97); transition-duration: 80ms; }
+/* Parallax tilt: materials.js drives the transform from the pointer; this is the return. */
+.ak-move--tilt { transition: transform 240ms var(--ak-ease); transform-style: preserve-3d; }
+/* Sheen: one light pass over a surface that just changed — "this is new", said without a badge. */
+@keyframes ak-sheen { to { transform: skewX(-18deg) translateX(260%); } }
+.ak-move--sheen { position: relative; overflow: hidden; }
+.ak-move--sheen::after {
+  content: '';
+  position: absolute; top: 0; bottom: 0; left: -70%; width: 50%;
+  transform: skewX(-18deg);
+  background: linear-gradient(90deg, transparent, color-mix(in oklab, var(--ak-crt-ch3) 55%, transparent), transparent);
+  opacity: 0;
+  pointer-events: none;
+}
+.ak-move--sheen:hover::after,
+.ak-move--sheen.is-sheening::after { opacity: 1; animation: ak-sheen 650ms ease-out 1; }
+/* The sliding thumb: the selection glides between choices instead of teleporting. */
+.ak-thumb { position: relative; }
+.ak-thumb__pill {
+  position: absolute;
+  top: var(--ak-thumb-top, 0px); left: var(--ak-thumb-left, 0px);
+  width: var(--ak-thumb-w, 0px); height: var(--ak-thumb-h, 0px);
+  border-radius: var(--ak-radius-sm);
+  background: var(--ak-crt-ch3);
+  transition: left 260ms var(--ak-ease), top 260ms var(--ak-ease), width 260ms var(--ak-ease), height 260ms var(--ak-ease);
+  z-index: 0;
+  pointer-events: none;
+}
+.ak-thumb > :not(.ak-thumb__pill) { position: relative; z-index: 1; }
+/* The odometer: a figure rolls to its new value when the data moves. */
+.ak-odo { display: inline-block; overflow: hidden; line-height: 1; vertical-align: bottom; }
+.ak-odo__reel { display: flex; flex-direction: column; }
+/* Deal-in v2: the entrance with a real spring and a flick of rotation, once. */
+@keyframes ak-deal {
+  0% { opacity: 0; transform: translateY(22px) rotate(-4deg) scale(0.94); }
+  60% { transform: translateY(-4px) rotate(1deg) scale(1.02); }
+  100% { opacity: 1; transform: none; }
+}
+.ak-move--deal {
+  animation: ak-deal 500ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation-delay: calc(var(--ak-deal-i, 0) * var(--ak-enter-stagger));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ak-move--deal, .ak-mat--ring::before, .ak-move--sheen::after { animation: none; }
+  .ak-move--magnet, .ak-move--tilt, .ak-thumb__pill, .ak-mat--spot { transition: none; }
+  .ak-move--magnet:hover, .ak-move--tilt { transform: none; }
+}

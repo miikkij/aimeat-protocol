@@ -25,6 +25,9 @@
  * @usage
  *   import { UI_COMPONENTS, componentById, buildUiCatalogue } from './registry.js';
  * @version-history
+ *   v1.18.0 — 2026-09-01 — FOUR OF THE NINE (append-only): `ring`, `crew`, `poll` and `keys` —
+ *     the data-shaped parts the Atelier Next canvas found the kit lacked — join the
+ *     components; toast, palette, compare, tour and dropzone stay component-only.
  *   v1.17.0 — 2026-08-30 — THE BROADCAST FAMILY (append-only): `crt`, `countdown` and `crawl`
  *     join the components — the Music Television genre's parts extracted as reusable blocks
  *     (the set with the credits box, the ranked rows in channel colours, the star-separated
@@ -493,6 +496,47 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
     props: {
       source: source(),
       tone: { type: 'enum', values: ['signal', 'ink'], default: 'signal', description: 'The strip\'s ground: the signal-yellow band with ink words, or ink with paper words.' },
+    },
+  },
+  // ── The nine parts the Atelier Next canvas found missing (2026-09-01, append-only): the four
+  //    data-shaped ones join the vocabulary here — ring, crew, poll, keys. The behaviour-shaped
+  //    five (toast, palette, compare, tour, dropzone) stay component-only, like the dialog family.
+  {
+    id: 'ring',
+    summary: 'Progress toward a whole, as a ring: the value over the total in the centre, a label and a line beside it. The gauge is a dial that reads a level; the ring is a journey with an end (pages written, steps done). The source resolves to one record: { value, total, label?, sub? }.',
+    props: {
+      source: source(),
+      title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
+      emptyTitle: text('What the empty state says.', 80),
+      emptyHint: text('The line under it.', 160),
+    },
+  },
+  {
+    id: 'crew',
+    summary: 'Who is on this: people and agents as ONE stack of faces (a person round, an agent square), the overflow folded into "+N", and the live dot with how many are here now. The source resolves to one record: { people: [{ id, label, agent? }], live?, max? }.',
+    props: {
+      source: source(),
+      title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
+      emptyTitle: text('What the empty state says when nobody is on it.', 80),
+      emptyHint: text('The line under it.', 160),
+    },
+  },
+  {
+    id: 'poll',
+    summary: 'One question, live shares: each option a bar filled to its share, the picked one marked, a pick reported to the app which records the vote wherever votes live. The source resolves to one record: { question, options: [{ id, label, count? | share? }], picked? }.',
+    props: {
+      source: source(),
+      emptyTitle: text('What the empty state says.', 80),
+      emptyHint: text('The line under it.', 160),
+    },
+  },
+  {
+    id: 'keys',
+    summary: 'Declared shortcuts, rendered as key caps with their meaning — the app states them once and the sheet, the hints and the handlers agree. The source resolves to rows of { keys, label }.',
+    maxPerLayout: 1,
+    props: {
+      source: source(),
+      title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
     },
   },
 ];

@@ -31,6 +31,21 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.42.0 — 2026-09-01 — NINE PARTS the canvas found missing (stage 3): ring (progress toward
+ *     a whole), crew (people and agents as one stack, with the live dot), poll (one question,
+ *     live shares), keys (declared shortcuts, rendered), dropzone (bring-a-file; the app
+ *     uploads), toast (the stacked confirmation with an undo), palette (one keystroke to every
+ *     declared action), compare (two states under one handle) and tour (a few steps over the
+ *     real screen). ring, crew, poll and keys join the mosaic vocabulary; the behaviour-shaped
+ *     rest stay component-only, the dialog family's own rule.
+ *   v0.41.0 — 2026-09-01 — MATERIALS AND MOTION (the Atelier Next canvas, stage 2): materials.css
+ *     carries seven surfaces (glass, aurora, grain, ink, signal, ring, spot) and six recipes
+ *     (magnet, tilt, sheen, thumb, odometer, deal) as classes on the tokens; materials.js adds
+ *     the six helpers that need a hand on the wheel — spotlight, tilt, sheen, odometer, thumb,
+ *     deal. Nothing loops on idle; reduced motion collapses all of it.
+ *   v0.40.0 — 2026-09-01 — Kit release marker (the JS↔CSS pin): BROADCAST, the look — the
+ *     night-gallery world in light and dark, and the channel colours promoted to contract
+ *     tokens so a look retunes the broadcast family under the matrix's proof. Stylesheet-only.
  *   v0.39.0 — 2026-08-30 — THE BROADCAST FAMILY AND THE SAMPLE STATES (the owner's ask, on the
  *     Design Book wall): crt (the television set with the credits box — the provenance is the
  *     point), countdown (ranked rows in channel colours) and crawl (the star-separated news
@@ -214,6 +229,9 @@ import {
   reviewerLine, marksSwitches,
 } from './commercial.js';
 import { crt, countdown, crawl } from './mtv.js';
+import { spotlight, tilt, sheen, odometer, thumb, deal } from './materials.js';
+import { ring, crew, poll, keys, dropzone } from './parts.js';
+import { toast, palette, compare, tour } from './parts-ui.js';
 
 const atelier = {
   /**
@@ -221,7 +239,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.39.0',
+  version: '0.42.0',
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,
@@ -267,6 +285,12 @@ const atelier = {
 
   // ── The broadcast family (the Music Television genre's parts as components) ──
   crt, countdown, crawl,
+
+  // ── Materials and motion recipes that need a hand on the wheel (materials.css has the rest) ──
+  spotlight, tilt, sheen, odometer, thumb, deal,
+
+  // ── The nine parts the canvas found missing (ring, crew, poll, keys also mosaic blocks) ──
+  ring, crew, poll, keys, dropzone, toast, palette, compare, tour,
 
   // ── Data ──
   form, table, searchBar,

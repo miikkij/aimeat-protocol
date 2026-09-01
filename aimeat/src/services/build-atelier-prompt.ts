@@ -26,6 +26,8 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.17.0 — 2026-09-01 — The materials and the motion recipes named beside the scenic props,
+ *     with the physics they keep (kit v0.41.0).
  *   v1.16.0 — 2026-08-29 — "A map" means the REAL map: the `map` block (Leaflet + OSM) taught
  *     as the answer to the word, the atlas demoted to its narrow choropleth truth.
  *   v1.18.0 — 2026-08-30 — Radar, steps and rating taught.
@@ -330,8 +332,11 @@ function composeBody(config: AimeatConfig): string {
     + 'the words, sources and images for the app at hand, and KEEP THE PHYSICS (finite entrances, '
     + 'motion only under the hand or the scroll, zero idle repaints, reduced-motion honesty). '
     + 'The kit\'s scenic props (`flapify`, `ransom`, `vu`, `typeout`, `dealIn`, the `.ak-stamp` / '
-    + '`.ak-ticker` / `.ak-torn` / `.ak-polaroid` family) and the pattern shelf below '
-    + 'carry the shared stagecraft.\n\n';
+    + '`.ak-ticker` / `.ak-torn` / `.ak-polaroid` family), the MATERIALS (one class per surface: '
+    + '`.ak-mat--glass`, `--aurora`, `--grain`, `--ink`, `--signal`, `--ring`, `--spot`) and the '
+    + 'MOTION RECIPES (`.ak-move--magnet`, `--sheen`, `--deal` as classes; `spotlight`, `tilt`, '
+    + '`sheen`, `odometer`, `thumb`, `deal` as calls — every one answers the hand or a change and '
+    + 'rests, none loops) and the pattern shelf below carry the shared stagecraft.\n\n';
   for (const g of genres) {
     body += '- `' + g.id + '` — **' + g.title + '**: ' + g.description + '\n';
   }

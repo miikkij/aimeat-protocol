@@ -9,16 +9,15 @@
  *   here animates on idle.
  * @structure .ak-crt · .ak-countdown · .ak-crawl
  * @version-history
+ *   v0.40.0 — 2026-09-01 — The channel colours move into the contract (aimeat-atelier.css) so
+ *     the broadcast look can retune them from the palette's accent under the matrix's proof;
+ *     this sheet only reads --ak-crt-ch1..4 and --ak-crt-set now.
  *   v0.39.0 — 2026-08-30 — Initial: the Music Television parts arrive as components.
  */
 
-:root {
-  --ak-crt-ch1: #24e5ff;
-  --ak-crt-ch2: #ff2e9a;
-  --ak-crt-ch3: #ffe14d;
-  --ak-crt-ch4: #38f2a0;
-  --ak-crt-set: #14101f;
-}
+/* The four channel colours and the set's ground are CONTRACT tokens (declared in
+ * aimeat-atelier.css beside the other --ak-* values), so a look may retune them and the matrix
+ * proves the retuning; this sheet only reads them. */
 
 /* ── The CRT set: dark in every theme, framed like an object ─────────────────────────────── */
 .ak-crt {
