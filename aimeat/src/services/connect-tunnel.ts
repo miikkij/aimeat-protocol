@@ -25,6 +25,12 @@
  *   mgr.startHeartbeatMonitor();
  *   mgr.handleConnection(ws, verifiedToken, rawToken);
  * @version-history
+ *   v1.14.0 -- 2026-09-02 -- closeForGaii(): the node stopped honouring ONE principal's
+ *     credential, so its socket goes. Deleting an agent revoked its sessions and told the tunnel
+ *     nothing, leaving a live socket that read `online` for a dead credential until some call
+ *     forced a 401. onTokenRevoked matches the raw token an owner never sees, and closeForOwner
+ *     would drop every other agent on the same daemon; this is the same mechanism with the
+ *     predicate the case needs.
  *   v1.13.0 -- 2026-08-31 -- principalsForOwner(): which of an owner's principals hold a live socket
  *     right now. The Agent v2 basic-agents button needs it twice — as the precondition that refuses
  *     with "no daemon connected" before creating anything, and to pick the socket the enrolment
@@ -91,6 +97,7 @@ export const CONNECT_TUNNEL_PATH = '/v1/connect/tunnel';
 export type { ConnectFrame, WorkspaceSpaceRef, ConnectTunnelStats } from './connect-tunnel-wire.js';
 import type { ConnectFrame, WorkspaceSpaceRef, ConnectTunnelStats } from './connect-tunnel-wire.js';
 import { parseWorkspaceRecordKey, spaceKeyOf, coerceSpaceRef } from './connect-tunnel-wire.js';
+import { revokeByToken, revokeByGaii, revokeByOwner } from './connect-tunnel-revocation.js';
 
 
 interface ConnectConnection {
@@ -640,34 +647,17 @@ export class ConnectTunnelManager {
   }
 
   /**
-   * P2: a bearer was revoked — if its socket is live, tell the principal to stop + re-auth, then
-   * close. The forward bearer IS this token, so leaving the socket open would just 401 every forward
-   * call (silent breakage); pushing `auth_revoked` lets the client surface re-auth guidance at once
-   * and removes the client's periodic auth-liveness probe. Matched by the pinned rawToken.
+   * The three ways a socket is closed because the node stopped honouring what it holds. Bodies live
+   * in ./connect-tunnel-revocation.ts, where the three predicates sit side by side — the next time
+   * something needs a socket closed, the question is which of these already reaches it.
    */
-  onTokenRevoked(rawToken: string): void {
-    for (const conn of this.connections.values()) {
-      if (conn.rawToken !== rawToken) continue;
-      this.send(conn.ws, { type: 'auth_revoked', message: 'Token revoked', timestamp: new Date().toISOString() });
-      try { conn.ws.close(1000, 'auth_revoked'); } catch (err) { logger.warn('onTokenRevoked: ignore', { error: String(err) }); }
-      break;  // single-socket-per-principal — at most one match
-    }
-  }
+  onTokenRevoked(rawToken: string): void { revokeByToken(this.connections, (ws, f) => this.send(ws, f), rawToken); }
 
-  /**
-   * Close every live socket whose principal acts for this OWNER. Deactivating an account
-   * (owner-lifecycle.ts) revokes session rows, but a tunnel verified its bearer only at upgrade,
-   * so without this the deactivated owner's agents keep receiving pushes until their own exp.
-   * Matched on the verified token's `owner` claim, which is the bare owner name on every
-   * principal family this tunnel accepts (agents and ecosystem apps).
-   */
-  closeForOwner(owner: string): void {
-    for (const conn of this.connections.values()) {
-      if (conn.identity.owner !== owner) continue;
-      this.send(conn.ws, { type: 'auth_revoked', message: 'Account deactivated', timestamp: new Date().toISOString() });
-      try { conn.ws.close(1000, 'auth_revoked'); } catch (err) { logger.warn('closeForOwner: ignore', { error: String(err) }); }
-    }
-  }
+  /** Deleting ONE agent: its socket goes, and nothing else on that daemon is touched. */
+  closeForGaii(gaii: string): void { revokeByGaii(this.connections, (ws, f) => this.send(ws, f), gaii); }
+
+  /** Deactivating an account: every principal acting for that owner. */
+  closeForOwner(owner: string): void { revokeByOwner(this.connections, (ws, f) => this.send(ws, f), owner); }
 
   /**
    * P3: resolve a cancel marker (its value is a list of task ids) to the owning agents and push a

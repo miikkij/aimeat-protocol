@@ -24,6 +24,9 @@
  *   - `AgentRegistry` -- holds the entries by GAII, exposes resolve/get/list/size
  *
  * @version-history
+ *   v1.2.0 -- 2026-09-02 -- remove(gaii). The counterpart to add()'s refusal: an entry may not be
+ *     replaced silently, but it may be removed deliberately and added again, which is what a
+ *     deleted-and-recreated agent needs -- same identity, a different credential.
  *   v1.1.0 -- 2026-09-01 -- Keyed by GAII. The bare name resolves when unambiguous and refuses when
  *     it is not; a duplicate identity is refused instead of overwriting the one already there.
  *   v1.0.0 -- 2026-05-29 -- Initial multi-agent registry
@@ -62,6 +65,16 @@ export class AgentRegistry {
       throw new Error(`Agent ${entry.gaii} is already loaded. Two credentials claim one identity; remove one from the keychain.`);
     }
     this.agents.set(entry.gaii, entry);
+  }
+
+  /**
+   * Forget one identity, by GAII. The counterpart to `add()`'s refusal: an entry may not be
+   * replaced silently, but it may be removed deliberately and then added again — which is what a
+   * deleted-and-recreated agent needs, since its new credential is a different one for the same
+   * identity. Returns whether anything was there.
+   */
+  remove(gaii: string): boolean {
+    return this.agents.delete(gaii);
   }
 
   /** By GAII, or by bare name when exactly one loaded agent has it. Undefined when ambiguous. */
