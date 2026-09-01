@@ -1152,7 +1152,7 @@ await test('GET /lib/aimeat-atelier.css — serves the theming contract, light, 
     const looksCss = withoutComments(looksText);
     for (const preset of ['flat', 'calm-card', 'editorial', 'sticker', 'neon-dense', 'poster',
         'broadsheet', 'gallery', 'brutalist', 'terminal', 'aurora', 'carnival', 'billboard',
-        'riso', 'stage']) {
+        'riso', 'stage', 'broadcast']) {
         assert(looksCss.includes(`[data-ak-look='${preset}']`), `the ${preset} preset block must exist`);
         assert(looksText.includes(`@preset-block ${preset}`), `the ${preset} preset must carry its @preset-block tag`);
     }

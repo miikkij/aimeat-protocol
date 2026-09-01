@@ -29,6 +29,13 @@
  * @usage
  *   import { LOOKS, STRUCTURES } from '../data/atelier-looks.js';
  * @version-history
+ *   v1.6.0 — 2026-09-01 — BROADCAST: the night-gallery world the developer accepted on the
+ *     Atelier Next canvas — two proven grounds (violet night, pale violet paper), maximum
+ *     display weight with the accent landing a step off, printed offset depth in the spectrum
+ *     hues, sticker tilt; the broadcast family's channel colours stay the contract's neons (a
+ *     palette-derived retune muddied the signal yellow, so the look leaves them alone). The
+ *     STRUCTURES moved whole to atelier-structures.ts (pure extraction, the 800-line cap) and
+ *     are re-exported from here.
  *   v1.5.0 — 2026-08-29 — THE BONES FREED: two COMPOSITION structures. press-sheet (riso) — the
  *     masthead is giant display type ON the sheet, print-sticker KPI chips overlap its foot,
  *     unspanned units set themselves asymmetrically. marquee (stage) — the band fills three
@@ -55,14 +62,10 @@
  *     the three structures extracted from editorial/poster become shared vocabulary.
  */
 
-/** A named, reusable page-shape recipe. `css(sel)` emits its rules scoped to one look. */
-export interface AtelierStructure {
-  id: string;
-  /** One sentence for the catalogue and the data sheet. */
-  summary: string;
-  /** The rules, scoped to the given look selector (e.g. "[data-ak-look='editorial']"). */
-  css: (sel: string) => string;
-}
+// The structures live in atelier-structures.ts since 2026-09-01 (a pure move under the 800-line
+// cap); they are re-exported here so every importer keeps the address it always had.
+import { STRUCTURES, type AtelierStructure } from './atelier-structures.js';
+export { STRUCTURES, type AtelierStructure };
 
 export interface AtelierLook {
   id: string;
@@ -87,222 +90,6 @@ export interface AtelierLook {
   /** The comment above the generated block — why this look is what it is. */
   note: string;
 }
-
-// ── The structures: page shapes, written once, reused by any look ────────────────────────────
-
-export const STRUCTURES: readonly AtelierStructure[] = [
-  {
-    id: 'masthead',
-    summary: 'The hero is a front-page masthead: giant display type on rules, no card, no mesh — and the news under it separates with RULES, not boxes (a card widget inside a newspaper was the first design review\'s finding).',
-    css: (sel) => `
-${sel} .ak-hero:not(.ak-hero--image) {
-  min-height: unset;
-  border-radius: 0;
-  box-shadow: none;
-  background: transparent;
-  border-top: 3px solid var(--ak-ink);
-  border-bottom: var(--ak-line-w) solid var(--ak-line);
-  overflow: visible;
-}
-${sel} .ak-hero:not(.ak-hero--image)::before,
-${sel} .ak-hero:not(.ak-hero--image) .ak-hero__scrim { display: none; }
-${sel} .ak-hero:not(.ak-hero--image) .ak-hero__inner { padding: calc(var(--ak-pad) * 1.25) 0; }
-${sel} .ak-hero__title {
-  font-size: clamp(2.8rem, 9vw, 5.6rem);
-  line-height: 0.98;
-  letter-spacing: -0.02em;
-}
-${sel} .ak-hero__sub { font-size: var(--ak-text-title); }
-${sel} .ak-statrow { gap: 0; }
-${sel} .ak-statrow__tile {
-  border: 0;
-  border-right: var(--ak-line-w) solid var(--ak-line);
-  border-radius: 0;
-  box-shadow: none;
-  background: transparent;
-  padding: calc(var(--ak-pad) * 1.25) var(--ak-pad);
-  transform: none;
-}
-${sel} .ak-statrow__tile:last-child { border-right: 0; }
-${sel} .ak-statrow__value { font-size: clamp(2.4rem, 6vw, 4rem); line-height: 1; }
-${sel} .ak-statrow__label {
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-family: var(--ak-font-mono);
-}
-${sel} .ak-list__row {
-  border: 0;
-  border-bottom: var(--ak-line-w) solid var(--ak-line);
-  border-radius: 0;
-  box-shadow: none;
-  background: transparent;
-  padding-inline: 0;
-}
-${sel} .ak-list .ak-badge {
-  background: transparent;
-  border: 0;
-  padding: 0;
-  font-family: var(--ak-font-mono);
-  font-size: var(--ak-text-fine);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--ak-ink-dim);
-}`,
-  },
-  {
-    id: 'joined',
-    summary: 'Cells share hairlines inside one bordered frame — a laid-out page, not floating cards.',
-    css: (sel) => `
-${sel} .ak-mosaic__units--grid {
-  gap: 0;
-  border: var(--ak-line-w) solid var(--ak-line);
-}
-${sel} .ak-mosaic__units--grid .ak-mosaic__unit {
-  align-self: stretch;
-  border-right: var(--ak-line-w) solid var(--ak-line);
-  border-bottom: var(--ak-line-w) solid var(--ak-line);
-  padding: var(--ak-pad);
-  margin-right: calc(-1 * var(--ak-line-w));
-  margin-bottom: calc(-1 * var(--ak-line-w));
-}
-${sel} .ak-mosaic .ak-section {
-  border: 0;
-  box-shadow: none;
-  background: transparent;
-  padding: 0;
-}`,
-  },
-  {
-    id: 'press-sheet',
-    summary: 'The POSTER composition: the masthead is giant display type ON the sheet itself (no band), the KPI chips are print stickers overlapping its foot, and unspanned units set themselves asymmetrically — a composed page, not a pile.',
-    css: (sel) => `
-${sel} .ak-mosaic__band .ak-hero:not(.ak-hero--image) {
-  min-height: unset;
-  margin-inline: 0;
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
-  background: transparent;
-  overflow: visible;
-}
-${sel} .ak-mosaic__band .ak-hero:not(.ak-hero--image)::before,
-${sel} .ak-mosaic__band .ak-hero:not(.ak-hero--image) .ak-hero__scrim { display: none; }
-${sel} .ak-mosaic__band .ak-hero:not(.ak-hero--image) .ak-hero__inner {
-  display: flex;
-  flex-direction: column-reverse;
-  gap: 6px;
-  padding: clamp(8px, 3vh, 28px) 0 0;
-}
-${sel} .ak-mosaic__band .ak-hero:not(.ak-hero--image) .ak-hero__title {
-  font-size: clamp(3.4rem, 12.5vw, 10.5rem);
-  line-height: 0.88;
-  letter-spacing: -0.03em;
-  text-transform: uppercase;
-  color: var(--ak-accent-text);
-  text-shadow: 0.045em 0.035em 0 color-mix(in oklab, var(--ak-spectrum-2) 62%, transparent);
-  overflow-wrap: anywhere;
-}
-${sel} .ak-mosaic__band .ak-hero:not(.ak-hero--image) .ak-hero__sub {
-  font-family: var(--ak-font-mono);
-  font-size: var(--ak-text-fine);
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-  color: var(--ak-ink-dim);
-}
-${sel} .ak-statrow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: calc(-1 * clamp(0.6rem, 2.5vw, 2.4rem));
-  position: relative;
-  z-index: 2;
-}
-${sel} .ak-statrow__tile {
-  flex: 0 1 auto;
-  border: 2px solid var(--ak-accent-text);
-  border-radius: 4px;
-  background: var(--ak-surface);
-  box-shadow: none;
-  padding: 8px 18px;
-  transform: rotate(-1.2deg);
-}
-${sel} .ak-statrow__tile:nth-child(2n) {
-  transform: rotate(1deg);
-  border-color: color-mix(in oklab, var(--ak-spectrum-2) 62%, var(--ak-ink));
-}
-${sel} .ak-statrow__value { color: var(--ak-accent-text); }
-${sel} .ak-mosaic__units--grid > .ak-mosaic__unit:not([class*='ak-mosaic__unit--']) { grid-column: span 6; }
-${sel} .ak-mosaic__units--grid > .ak-mosaic__unit:not([class*='ak-mosaic__unit--']):nth-child(3n+2) { grid-column: span 4; }
-${sel} .ak-mosaic__units--grid > .ak-mosaic__unit:not([class*='ak-mosaic__unit--']):nth-child(3n) {
-  grid-column: span 2;
-  transform: translateY(clamp(6px, 1.8vw, 20px)) rotate(0.6deg);
-}
-@media (max-width: 760px) {
-  ${sel} .ak-mosaic__units--grid > .ak-mosaic__unit:not([class*='ak-mosaic__unit--']),
-  ${sel} .ak-mosaic__units--grid > .ak-mosaic__unit:not([class*='ak-mosaic__unit--']):nth-child(3n+2),
-  ${sel} .ak-mosaic__units--grid > .ak-mosaic__unit:not([class*='ak-mosaic__unit--']):nth-child(3n) {
-    grid-column: 1 / -1;
-    transform: none;
-  }
-}`,
-  },
-  {
-    id: 'marquee',
-    summary: 'The OPENING composition: the band fills three quarters of the window with the title at its foot, and the working surface RISES OVER its bottom edge — staggered, asymmetric, layered; the page opens like a curtain, not like a form.',
-    css: (sel) => `
-${sel} .ak-mosaic__band .ak-hero {
-  min-height: 74dvh;
-  border-radius: 0;
-  margin-left: calc(50% - 50vw);
-  margin-right: calc(50% - 50vw);
-}
-${sel} .ak-mosaic__band .ak-hero .ak-hero__inner {
-  margin-top: auto;
-  padding-inline: max(var(--ak-pad), calc((100vw - min(var(--ak-main-max), 100vw)) / 2 + var(--ak-pad)));
-  padding-bottom: clamp(3rem, 10vh, 6.5rem);
-}
-${sel} .ak-hero__title {
-  font-size: clamp(3.2rem, 11vw, 9.5rem);
-  line-height: 0.92;
-  letter-spacing: -0.025em;
-}
-${sel} .ak-mosaic__units--grid {
-  margin-top: calc(-1 * clamp(2rem, 7vh, 5rem));
-  position: relative;
-  z-index: 2;
-  align-items: start;
-}
-${sel} .ak-mosaic__units--grid > .ak-mosaic__unit:not([class*='ak-mosaic__unit--']):first-child { grid-column: span 6; }
-${sel} .ak-mosaic__units--grid > .ak-mosaic__unit:not([class*='ak-mosaic__unit--']):nth-child(2n) { grid-column: span 4; }
-${sel} .ak-mosaic__units--grid > .ak-mosaic__unit:not([class*='ak-mosaic__unit--']):nth-child(2n+3) {
-  grid-column: span 2;
-  transform: translateY(clamp(10px, 3vh, 30px));
-}
-@media (max-width: 760px) {
-  ${sel} .ak-mosaic__units--grid { margin-top: calc(-1 * clamp(1rem, 4vh, 2.4rem)); }
-  ${sel} .ak-mosaic__units--grid > .ak-mosaic__unit:not([class*='ak-mosaic__unit--']):nth-child(2n),
-  ${sel} .ak-mosaic__units--grid > .ak-mosaic__unit:not([class*='ak-mosaic__unit--']):nth-child(2n+3) {
-    grid-column: 1 / -1;
-    transform: none;
-  }
-}`,
-  },
-  {
-    id: 'full-bleed-hero',
-    summary: 'The focal band runs edge to edge, out of the measure column.',
-    css: (sel) => `
-${sel} .ak-mosaic__band .ak-hero {
-  border-radius: 0;
-  margin-left: calc(50% - 50vw);
-  margin-right: calc(50% - 50vw);
-}
-/* The band escapes the column; its TEXT stays aligned to it — found in the first
- * real-data experiment run, where the title clipped at the viewport edge. */
-${sel} .ak-mosaic__band .ak-hero .ak-hero__inner {
-  padding-inline: max(var(--ak-pad), calc((100vw - min(var(--ak-main-max), 100vw)) / 2 + var(--ak-pad)));
-}`,
-  },
-];
 
 // ── The looks ────────────────────────────────────────────────────────────────────────────────
 
@@ -756,6 +543,59 @@ export const LOOKS: readonly AtelierLook[] = [
       '--ak-weight-display': '800',
     },
     note: 'The spectrum spreads wider (+120/-90), the band grows, the glass deepens — the look for an app that wants to feel like weather.',
+  },
+  {
+    id: 'broadcast',
+    feel: 'the night gallery: display type that owns the room, exhibits under gallery light with hard offset shadows in the channel colours, one signal band for the loud action — a shelf staged as its own broadcast',
+    imagery: '80s music television at night, neon channel colours on a dark stage, CRT glow, block display type, sprayed tags',
+    structures: ['press-sheet'],
+    dusk: {
+      '--ak-accent-text': 'color-mix(in oklab, var(--ak-accent) 70%, var(--ak-ink))',
+    },
+    grounds: {
+      light: {
+        '--ak-bg': '#f4f1f9',
+        '--ak-surface': '#ffffff',
+        '--ak-surface-2': '#e9e4f2',
+        '--ak-ink': '#14101f',
+        '--ak-ink-dim': '#5a5468',
+      },
+      dark: {
+        '--ak-bg': '#0d0a16',
+        '--ak-surface': '#1c1728',
+        '--ak-surface-2': '#0b0813',
+        '--ak-ink': '#f4f2fa',
+        '--ak-ink-dim': '#a9a3b8',
+      },
+    },
+    tokens: {
+      '--ak-accent-text': 'color-mix(in oklab, var(--ak-accent) 62%, var(--ak-ink))',
+      '--ak-kinetic': 'letters',
+      '--ak-page-image': 'radial-gradient(at 78% -5%, color-mix(in oklab, var(--ak-accent) 14%, var(--ak-bg)), transparent 60%), radial-gradient(at 8% 30%, color-mix(in oklab, var(--ak-spectrum-2) 9%, var(--ak-bg)), transparent 60%)',
+      '--ak-surface-image': 'none',
+      '--ak-hero-image': 'none',
+      '--ak-line': 'color-mix(in oklab, var(--ak-ink) 28%, var(--ak-bg))',
+      '--ak-line-w': '1.5px',
+      '--ak-radius': '6px',
+      '--ak-radius-sm': '3px',
+      '--ak-radius-pill': '3px',
+      '--ak-elev-1': '8px 8px 0 color-mix(in oklab, var(--ak-crt-ch1) 42%, transparent)',
+      '--ak-elev-2': '12px 12px 0 color-mix(in oklab, var(--ak-crt-ch2) 60%, transparent)',
+      '--ak-grad': 'linear-gradient(150deg, color-mix(in oklab, var(--ak-accent) 84%, var(--ak-ink)), color-mix(in oklab, var(--ak-spectrum-2) 74%, var(--ak-ink)))',
+      '--ak-scrim': 'color-mix(in oklab, var(--ak-ink) 14%, transparent)',
+      '--ak-hero-ink': 'var(--ak-accent-ink)',
+      '--ak-hero-ink-dim': 'var(--ak-accent-ink)',
+      '--ak-display-shadow': '4px 4px 0 color-mix(in oklab, var(--ak-accent) 55%, transparent)',
+      '--ak-display-stroke': '0',
+      '--ak-text-hero': 'clamp(3.2rem, 11vw, 6.2rem)',
+      '--ak-weight-display': '900',
+      '--ak-tilt': '-1.2deg',
+      '--ak-enter-distance': '24px',
+      '--ak-enter-stagger': '60ms',
+      '--ak-ease': 'cubic-bezier(0.34, 1.3, 0.5, 1)',
+      '--ak-hero-min': '30dvh',
+    },
+    note: 'The night-gallery direction the developer accepted on the Atelier Next canvas (2026-09-01): a WORLD with two proven grounds — violet night by default, a pale violet paper in light — display type at maximum weight with the accent landing a step off, printed offset depth in the spectrum hues, sticker tilt. The channel colours stay the contract\'s television neons on purpose: retuning them from the palette accent was tried and muddied the signal yellow into olive, and the identity IS the neon.',
   },
 ];
 

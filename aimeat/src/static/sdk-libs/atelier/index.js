@@ -31,6 +31,9 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.40.0 — 2026-09-01 — Kit release marker (the JS↔CSS pin): BROADCAST, the look — the
+ *     night-gallery world in light and dark, and the channel colours promoted to contract
+ *     tokens so a look retunes the broadcast family under the matrix's proof. Stylesheet-only.
  *   v0.39.0 — 2026-08-30 — THE BROADCAST FAMILY AND THE SAMPLE STATES (the owner's ask, on the
  *     Design Book wall): crt (the television set with the credits box — the provenance is the
  *     point), countdown (ranked rows in channel colours) and crawl (the star-separated news
@@ -221,7 +224,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.39.0',
+  version: '0.40.0',
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,

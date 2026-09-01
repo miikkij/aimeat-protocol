@@ -36,6 +36,10 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.40.0 — 2026-09-01 — BROADCAST, the look (looks.css): the night-gallery world the
+ *     developer accepted on the Atelier Next canvas, in light and dark. The channel colours
+ *     (--ak-crt-ch1..4) and the set's ground (--ak-crt-set) join the contract here, so a look
+ *     may retune the CRT, the countdown and the crawl and the matrix proves it.
  *   v0.39.0 — 2026-08-30 — THE BROADCAST FAMILY: mtv.css joins the imports (the CRT set, the
  *     countdown rows, the news crawl — the Music Television genre's parts as components), and
  *     commercial.css gains the sample chip.
@@ -337,6 +341,13 @@
    * and one line ate a third of a laptop screen before anything was read; the poster looks
    * (poster, carnival, billboard, aurora) still declare their tall bands on purpose. */
   --ak-hero-min:      11rem;
+  /* The broadcast family's channel colours and the set's ground (mtv.css reads them): four
+     spectrum hues with television defaults, retuned by a look under the matrix's proof. */
+  --ak-crt-ch1:       #24e5ff;
+  --ak-crt-ch2:       #ff2e9a;
+  --ak-crt-ch3:       #ffe14d;
+  --ak-crt-ch4:       #38f2a0;
+  --ak-crt-set:       #14101f;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════════════════
@@ -363,6 +374,12 @@
   --ak-elev-1:      var(--elev-card, 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 18px rgba(0, 0, 0, 0.35));
   /* Raised things GLOW in the dark, faintly — depth reads as light, not as a grey blur. */
   --ak-elev-2:      0 10px 30px rgba(0, 0, 0, 0.5), 0 0 26px color-mix(in oklab, var(--ak-accent) 16%, transparent);
+  /* The channel colours are the same in the dark: a television glows the same at night. */
+  --ak-crt-ch1:     #24e5ff;
+  --ak-crt-ch2:     #ff2e9a;
+  --ak-crt-ch3:     #ffe14d;
+  --ak-crt-ch4:     #38f2a0;
+  --ak-crt-set:     #14101f;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════════════════
