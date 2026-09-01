@@ -356,6 +356,15 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_v2_push_list: { title: 'List Delivery Targets', readOnlyHint: true },
     aimeat_v2_push_delete: { title: 'Remove a Delivery Target', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
 
+    // -- Agent v2 tasks (the polling handle, not the dashboard work item) --
+    // Cancelling is destructive in the sense that matters here: it ends the work, and it cannot be
+    // undone because a terminal task never moves again.
+    aimeat_v2_task_create: { title: 'Ask For Work', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    aimeat_v2_task_list: { title: 'List Tasks', readOnlyHint: true },
+    aimeat_v2_task_get: { title: 'Read One Task', readOnlyHint: true },
+    aimeat_v2_task_status: { title: 'Report Task Status', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    aimeat_v2_task_cancel: { title: 'Cancel Work', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+
     // ── Companies (the registry + the co address family) ──
     aimeat_company_list: { title: 'List Companies', readOnlyHint: true },
     aimeat_company_create: { title: 'Register Company', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },

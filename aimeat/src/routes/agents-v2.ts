@@ -14,6 +14,7 @@
  *     POST /v1/agents/v2/token         an agent turns its key into a short-lived credential
  *     /v1/agents/v2/messages           a turn between two of this account's principals
  *     /v1/agents/v2/push-config        where to reach a principal that is not connected
+ *     /v1/agents/v2/tasks              the handle a caller holds while work runs
  *     GET  /v1/agents/:gaii/card       the agent's signed card (public)
  *     GET  /v1/agents/:gaii/jwks.json  the key that verifies it (public)
  *
@@ -24,6 +25,7 @@
  * @structure agentsV2Router(config, storage) — mounts basic-agents, enrolment, token and card routes
  * @usage app.use(agentsV2Router(config, storage));  // BEFORE agentsRouter
  * @version-history
+ *   v1.2.0 — 2026-09-01 — V5: the task doors, in MCP's task shape with the A2A state derived.
  *   v1.1.0 — 2026-09-01 — V4: the message doors and the delivery target, mounted before the card
  *     routes for the same reason everything literal is.
  *   v1.0.0 — 2026-08-31 — Initial (Agent v2, V1): key, card, JWKS, token exchange, the basic-agents
@@ -37,6 +39,7 @@ import { registerAgentV2EnrolRoute } from './agents-v2/enrolment.js';
 import { registerAgentV2TokenRoute } from './agents-v2/token.js';
 import { registerAgentCardRoutes } from './agents-v2/card.js';
 import { registerAgentV2MessagingRoutes } from './agents-v2/messaging.js';
+import { registerAgentV2TaskRoutes } from './agents-v2/tasks.js';
 
 export function agentsV2Router(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -46,6 +49,7 @@ export function agentsV2Router(config: AimeatConfig, storage: Storage): Router {
   registerAgentV2EnrolRoute(router, config, storage);
   registerAgentV2TokenRoute(router, config, storage);
   registerAgentV2MessagingRoutes(router, config, storage);
+  registerAgentV2TaskRoutes(router, config, storage);
   registerAgentCardRoutes(router, config, storage);
 
   return router;

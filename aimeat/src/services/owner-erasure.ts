@@ -131,6 +131,10 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
       const n = await storage.deleteAgentV2PushConfigsByOwner(name);
       return n ? `agent_v2_push_configs:${n}` : null;
     }, deletionLog);
+    await step('agent_v2_tasks', async () => {
+      const n = await storage.deleteAgentV2TasksByOwner(name);
+      return n ? `agent_v2_tasks:${n}` : null;
+    }, deletionLog);
 
     // Outside accounts. Each row holds a SEALED credential to somebody's own Gmail, Outlook or
     // publishing account, addressed by the GHII string, and a deleted username is released for

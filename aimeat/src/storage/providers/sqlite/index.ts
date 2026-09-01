@@ -69,6 +69,7 @@ import { memoryTallyMethods } from './methods/memory-tally.js';
 import { ssoConnectionMethods } from './methods/sso-connections.js';
 import { agentEnrolmentMethods } from './methods/agent-enrolment.js';
 import { agentV2MessagingMethods } from './methods/agent-v2-messaging.js';
+import { agentV2TasksMethods } from './methods/agent-v2-tasks.js';
 
 /**
  * Marks the async context of an open transaction, so a write can tell whether it is a step OF the
@@ -216,6 +217,7 @@ Object.assign(
   ssoConnectionMethods,
   agentEnrolmentMethods,
   agentV2MessagingMethods,
+  agentV2TasksMethods,
 );
 
 // Applied after the merge so it wraps every method group, including any added later.

@@ -455,6 +455,13 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_v2_push_list: 'messages:read',
     aimeat_v2_push_delete: 'agent:write',
 
+    // Agent v2 tasks ride task:write, the word the existing task routes take. Creating work,
+    // reporting on it and cancelling it are one authority over work on this account; the reads are
+    // ungated for the same reason the existing task reads are.
+    aimeat_v2_task_create: 'task:write',
+    aimeat_v2_task_status: 'task:write',
+    aimeat_v2_task_cancel: 'task:write',
+
     // Contacts (address book) — the owner's messaging graph, so the messaging scopes gate it:
     // reading the list / resolving an email rides messages:read; editing the book (save/remove)
     // rides messages:send (the same trust level as opening conversations on the owner's behalf).
