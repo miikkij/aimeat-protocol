@@ -14,6 +14,16 @@ This is the second half of the AIMEAT-CrewAI integration story:
     them up automatically.
 
 Changelog:
+  0.23.0 -- A v2 agent can start. `_read_token` looked only in `tokens/`, so every agent the
+    basic-agents button creates -- all of them v2, holding a KEY rather than a bearer -- was refused
+    before anything else ran: `No token file matching .../tokens/concierge@*.token`, for a
+    credential sitting on disk one directory across in `keys/`. Either family now satisfies the
+    check. Nothing else changes, because nothing consumed the token: this call is a FAST FAILURE so
+    that an agent this machine was never connected for says so at once, and the real credential is
+    held by the loopback serve daemon, which routes by `X-Aimeat-Agent`. That fast failure is kept
+    and now names both places it looked. Ambiguity is judged by OWNER rather than by file, so one
+    owner holding both a token and a key -- what a v1 agent that migrated to a key leaves behind --
+    is no longer a conflict.
   0.22.1 -- The onboarding driver reads the tool's answer (onboarding.py). A tool returns a failure
     as a VALUE, it does not raise, and the driver logged the attempt before the call and nothing
     after it: a new agent's accept_test_task failed 15 times in a row with the same call and no line
@@ -253,54 +263,85 @@ class _Api:
 
 def _read_token(agent_name: str, owner: str | None = None) -> tuple[str, str]:
     """
-    Locate the agent's stored token + node URL from the connector's layout.
+    Check this machine HAS a credential for the agent, and read its node URL.
 
-    The connector (`aimeat connect add`) writes:
-      ~/.aimeat/tokens/{agent}@{owner}.token      -- bearer token (mode 0600)
-      ~/.aimeat/agents/{agent}/config.yaml        -- per-agent config (incl. node_url)
+    The connector writes one of two credential families, and both are the agent's
+    identity on this machine:
+      ~/.aimeat/tokens/{agent}@{owner}.token     -- v1: a bearer token (mode 0600)
+      ~/.aimeat/keys/{agent}@{owner}.key         -- v2: a signing key
+      ~/.aimeat/agents/{agent}/config.yaml       -- per-agent config (incl. node_url)
 
-    Earlier versions of this helper looked at `~/.aimeat/<agent>/.token` which
-    is the SKILL-BUNDLE directory, not the keychain. That layout never matched
-    a real connector install, so the daemon could never start. This rewrite
-    uses the actual keychain + per-agent config paths.
+    THIS FUNCTION DOES NOT SUPPLY THE CREDENTIAL, and it never did. The caller
+    discards the first element: real calls go through the loopback serve daemon,
+    which holds the credential itself and routes by `X-Aimeat-Agent`. What this
+    is for is the FAST FAILURE -- an agent this machine was never connected for
+    should say so at once, in the connector's own words, instead of failing later
+    somewhere less obvious.
 
-    If `owner` is provided, looks for `tokens/{agent}@{owner}.token` directly.
-    Otherwise globs `tokens/{agent}@*.token` and uses the single match. Errors
-    if zero matches or more than one (the latter means the agent name is
-    ambiguous and the caller must pass `owner`).
+    Which is why looking only in `tokens/` was wrong. Every agent the
+    basic-agents button creates is v2 and has a key, not a token, so the liaison
+    refused all three of them before anything else ran -- `No token file matching
+    .../tokens/concierge@*.token` -- for a credential that was on disk the whole
+    time, one directory across. Either family satisfies the check.
 
-    Returns (token, node_url).
+    Earlier versions looked at `~/.aimeat/<agent>/.token`, which is the
+    SKILL-BUNDLE directory rather than the keychain, and matched no real install
+    at all.
+
+    With `owner`, looks for that owner's credential directly; without, globs both
+    families and requires exactly one match. Two owners sharing an agent name is
+    ambiguous and the caller must pass `owner` -- the same rule the connector's
+    own registry applies to a bare name.
+
+    Returns (token, node_url). The token is "" for a v2 agent, because there is
+    no bearer on disk to return and nothing consumes it.
     """
     import glob
 
     home_dir = aimeat_home()
     tokens_dir = home_dir / "tokens"
+    keys_dir = home_dir / "keys"
     agent_config_path = home_dir / "agents" / agent_name / "config.yaml"
 
-    # Locate the token file.
+    # Locate a credential of EITHER family.
     if owner:
         token_path = tokens_dir / f"{agent_name}@{owner}.token"
-        if not token_path.is_file():
+        key_path = keys_dir / f"{agent_name}@{owner}.key"
+        if token_path.is_file():
+            credential_file = token_path
+        elif key_path.is_file():
+            credential_file = key_path
+        else:
             raise AimeatLiaisonError(
-                f"No token at {token_path}. Run: aimeat connect add --agent {agent_name} --owner {owner} ..."
+                f"No credential for {agent_name}@{owner} on this machine "
+                f"(looked for {token_path} and {key_path}). "
+                f"Run: aimeat connect add --agent {agent_name} --owner {owner} ..."
             )
-        token_file = token_path
     else:
-        pattern = str(tokens_dir / f"{agent_name}@*.token")
-        matches = sorted(glob.glob(pattern))
+        matches = sorted(
+            glob.glob(str(tokens_dir / f"{agent_name}@*.token"))
+            + glob.glob(str(keys_dir / f"{agent_name}@*.key"))
+        )
         if not matches:
             raise AimeatLiaisonError(
-                f"No token file matching {pattern}. Run: aimeat connect add --agent {agent_name} --owner <owner> --url <node-url>"
+                f"No credential for '{agent_name}' on this machine (looked in {tokens_dir} and {keys_dir}). "
+                f"Run: aimeat connect add --agent {agent_name} --owner <owner> --url <node-url>"
             )
-        if len(matches) > 1:
-            owners = [Path(m).stem.split("@", 1)[1] for m in matches]
+        owners = sorted({Path(m).stem.split("@", 1)[1] for m in matches})
+        if len(owners) > 1:
             raise AimeatLiaisonError(
                 f"Multiple owners have an agent named '{agent_name}' ({', '.join(owners)}). "
                 f"Pass `owner=<name>` to disambiguate."
             )
-        token_file = Path(matches[0])
+        credential_file = Path(matches[0])
 
-    token = token_file.read_text(encoding="utf-8").strip()
+    # A key is the agent's private signing material and is not a bearer: read the file only when it
+    # IS one. The distinction is the suffix, and the caller wants neither.
+    token = (
+        credential_file.read_text(encoding="utf-8").strip()
+        if credential_file.suffix == ".token"
+        else ""
+    )
 
     # Best-effort node_url extraction from per-agent config.yaml.
     node_url = "https://aimeat.io"
