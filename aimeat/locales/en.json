@@ -7883,7 +7883,7 @@
             "read": "Read the published content of the shared spaces you belong to.",
             "write": "Create shared spaces, write and publish documents in them, and comment.",
             "invite": "Let other people in: invite members and hand out access to a shared space.",
-        "rows": "Add to, and read back, the event logs of a shared space that has been opened to this app or agent by name. Nothing else in the space opens."
+            "rows": "Add to, and read back, the event logs of a shared space that has been opened to this app or agent by name. Nothing else in the space opens."
           },
           "outbound": {
             "send": "Send email from your company address to your saved contacts."
@@ -8023,7 +8023,10 @@
       "runMode": {
         "spawn": "On demand",
         "resident": "Always on",
-        "tooltip": "How this agent is run. On demand: it waits here and starts up when work arrives. Always on: your connector keeps it running."
+        "tooltip": "How this agent is run. On demand: it waits here and starts up when work arrives. Always on: your connector keeps it running.",
+        "label": "How it runs",
+        "saved": "Set to {mode}.",
+        "failed": "That could not be saved. Try again."
       },
       "basic": {
         "title": "Start with three agents",

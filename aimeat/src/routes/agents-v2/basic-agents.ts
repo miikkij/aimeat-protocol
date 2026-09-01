@@ -43,7 +43,7 @@ import { requireAuth, requireOwnerPrincipal, requireScope } from '../../auth/mid
 import { success, error } from '../../middleware/envelope.js';
 import { buildGAII } from '../../utils/gaii.js';
 import { BASIC_AGENTS } from '../../data/basic-agents.js';
-import { describeBasicAgents, requestBasicAgents, daemonPrincipals } from '../../services/basic-agents.js';
+import { describeBasicAgents, requestBasicAgents, daemonPrincipals, connectedDaemons } from '../../services/basic-agents.js';
 import { getActiveConnectTunnelManager } from '../../services/connect-tunnel.js';
 import { emitChange } from '../../services/event-bus.js';
 import { recordAccountEvent } from '../../services/account-events.js';
@@ -209,10 +209,26 @@ export function registerBasicAgentsRoutes(router: Router, config: AimeatConfig, 
     });
     emitChange('agents');
 
-    // Offer it to the daemon over a socket it is already holding. One `connect serve` process holds
-    // every one of an owner's tunnels, so any of them reaches it; the first by sorted principal is
-    // chosen so a retry picks the same machine.
-    const target = connected[0];
+    // Offer it to the daemon over a socket it is already holding.
+    //
+    // WHICH daemon, when there are two. Each machine presents an install id, so two laptops are two
+    // entries here rather than one undifferentiated set of principals — the limitation the V1
+    // report recorded. The caller may name one with `install_id`; without that the first by sorted
+    // id is taken, which is stable across retries. A named id that is not connected is refused
+    // rather than quietly served by the other machine, because "run this on my laptop" answered by
+    // the server is not a smaller version of the request.
+    const daemons = connectedDaemons(owner);
+    const askedFor = typeof req.body?.install_id === 'string' ? req.body.install_id.trim() : '';
+    const chosen = askedFor ? daemons.find(d => d.installId === askedFor) : daemons[0];
+    if (!chosen) {
+      res.status(409).json(error(config.nodeId, 'DAEMON_NOT_CONNECTED',
+        askedFor
+          ? 'That connector is not connected right now. Start it, or leave install_id out to use whichever one is.'
+          : 'Your connector is not connected right now. Start it and press again.',
+        undefined, { connected: daemons.map(d => ({ install_id: d.installId, principals: d.principals.length })) }));
+      return;
+    }
+    const target = chosen.target;
     const offer = {
       grant_id: grantId,
       node_url: config.baseUrl,

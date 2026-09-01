@@ -46,6 +46,7 @@
 import { WebSocket } from 'ws';
 import { randomUUID } from 'node:crypto';
 import { logger } from '../../utils/logger.js';
+import { getInstallId } from './install-id.js';
 
 /** Result of a forwarded API call — HTTP status + parsed (envelope) body. */
 export interface ForwardResult {
@@ -348,7 +349,12 @@ export class ConnectTunnelClient {
 
       let ws: WebSocket;
       try {
-        ws = new WebSocket(this.opts.wsUrl ?? wsUrl(this.opts.nodeUrl), { headers: { Authorization: `Bearer ${token}` } });
+        // The install id says WHICH MACHINE this socket is on, so an owner running two daemons
+        // is two daemons to the node rather than one ambiguous answer. Not a credential: the
+        // token beside it is still what authenticates.
+        ws = new WebSocket(this.opts.wsUrl ?? wsUrl(this.opts.nodeUrl), {
+          headers: { Authorization: `Bearer ${token}`, 'X-AIMEAT-Install': getInstallId() },
+        });
       } catch {
         this.setStatus('offline');
         settle('unreachable');

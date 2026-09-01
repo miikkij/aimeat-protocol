@@ -287,8 +287,15 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
             return;
           }
 
+          // Which installation this socket belongs to. A header rather than a claim in the
+          // token, because it is a property of the MACHINE and the token is a property of the
+          // agent: one credential is used from a laptop and a server, and the point is telling
+          // those apart. Unsigned and untrusted by design — it decides which of an owner's OWN
+          // daemons an offer goes to, and nothing else.
+          const installHeader = request.headers['x-aimeat-install'];
+          const installId = Array.isArray(installHeader) ? installHeader[0] : installHeader;
           connectWss.handleUpgrade(request, socket, head, (ws) => {
-            connectTunnelManager.handleConnection(ws, payload, token);
+            connectTunnelManager.handleConnection(ws, payload, token, installId ?? null);
           });
         } catch (err) {
           logger.warn('index-start: suppressed failure, continuing', { error: String(err) });

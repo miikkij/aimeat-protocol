@@ -7037,9 +7037,26 @@ paths:
         registry. No restart, so no other agent loses its connection.
 
         Safe to press twice: an agent that already exists and is enrolled is reported under `skipped`.
+
+        WHICH MACHINE, when there are two. Each connector presents an install id when it connects, so
+        two `connect serve` processes on two machines are two daemons rather than one ambiguous set
+        of sockets. Name one with `install_id` to have the enrolment offered there; leave it out and
+        the first by sorted id is used, which is stable across retries. An `install_id` that is not
+        connected answers 409 `DAEMON_NOT_CONNECTED` rather than being served by the other machine —
+        "run this on my laptop" answered by the server is not a smaller version of the request. A
+        connector older than 2026-09-01 sends no id and is one unnamed daemon, exactly as before.
       tags: [Identity]
       security:
         - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                install_id:
+                  type: string
+                  description: Offer the enrolment to this connector installation. Omit for whichever is connected.
       responses:
         '200':
           description: Created and enrolled
