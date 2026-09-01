@@ -1,0 +1,204 @@
+/*
+ * @file aimeat-atelier/flow-parts.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The clothes for the four flow parts (flow-parts.js): the reorderable list, the
+ *   cart, the notification centre and the facet filters. Every value rides the --ak-* contract,
+ *   so each answers every look, palette and mode; no colour is written literally here.
+ *
+ *   NOTHING ANIMATES ON ITS OWN. The travel in these parts belongs to the JavaScript primitives
+ *   (spring, drag, stagger, odometer) and to the cart's own collapse, all finite. The rules below
+ *   carry two transitions only, both on a hover or a press, so an idle surface repaints zero
+ *   times and the finish gate can measure that.
+ * @structure .ak-sortable · .ak-cart · .ak-notices · .ak-facets
+ * @version-history
+ *   v0.43.0 — 2026-09-02 — Initial (wish-atelier-motion-libraries-and-parts, stage 3).
+ */
+
+/* ── The sortable list: rows a hand carries, each with its grip ──────────────────────────── */
+.ak-sortable { display: flex; flex-direction: column; gap: 10px; }
+.ak-sortable__title { font-weight: 700; color: var(--ak-ink); }
+.ak-sortable__rows { display: flex; flex-direction: column; gap: 8px; }
+.ak-sortable__row {
+  display: flex; align-items: center; gap: 10px;
+  min-height: var(--ak-touch); padding: 8px 12px;
+  border-radius: var(--ak-radius-sm);
+  border: var(--ak-line-w) solid var(--ak-line);
+  border-left: 4px solid var(--ak-accent);
+  background: var(--ak-surface); color: var(--ak-ink);
+  box-shadow: var(--ak-elev-1);
+}
+.ak-sortable__row--ok { border-left-color: var(--ak-ok); }
+.ak-sortable__row--warn { border-left-color: var(--ak-warn); }
+.ak-sortable__row--err { border-left-color: var(--ak-err); }
+.ak-sortable__row--accent { border-left-color: var(--ak-accent); }
+/* The row under the hand rides above its neighbours and wears the raised shadow. */
+.ak-sortable__row.is-carried { box-shadow: var(--ak-elev-2); border-color: var(--ak-accent); }
+
+.ak-sortable__grip {
+  flex: none; width: 28px; height: var(--ak-touch);
+  display: grid; place-items: center;
+  border: 0; padding: 0; background: transparent; color: var(--ak-ink-dim);
+  cursor: grab;
+}
+.ak-sortable__grip:focus-visible { outline: 2px solid var(--ak-focus); outline-offset: 2px; border-radius: var(--ak-radius-sm); }
+/* Six dots drawn from one gradient pair: the grip mark needs no image and no glyph. */
+.ak-sortable__gripmark {
+  width: 10px; height: 16px;
+  background-image:
+    radial-gradient(circle at 2px 2px, currentColor 1.6px, transparent 1.7px),
+    radial-gradient(circle at 8px 2px, currentColor 1.6px, transparent 1.7px);
+  background-size: 100% 6px;
+  background-repeat: repeat-y;
+}
+.ak-sortable__text { display: flex; flex-direction: column; min-width: 0; }
+.ak-sortable__label { font-weight: 600; color: var(--ak-ink); }
+.ak-sortable__sub { font-size: var(--ak-text-fine); color: var(--ak-ink-dim); }
+
+/* ── The cart: a line per item, a stepper, a total that rolls ────────────────────────────── */
+.ak-cart { display: flex; flex-direction: column; gap: 12px; }
+.ak-cart__title { font-weight: 700; color: var(--ak-ink); }
+.ak-cart__lines {
+  display: flex; flex-direction: column;
+  border: var(--ak-line-w) solid var(--ak-line);
+  border-radius: var(--ak-radius);
+  background: var(--ak-surface);
+  overflow: hidden;
+}
+/* No gap between lines: the removal folds a line's own height and padding away, and a flex gap
+   would stay behind for the length of the fold. A hairline does the separating instead. */
+.ak-cart__line {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px;
+  border-top: var(--ak-line-w) solid var(--ak-line);
+  color: var(--ak-ink);
+  overflow: hidden;
+}
+.ak-cart__line:first-child { border-top: 0; }
+.ak-cart__art {
+  flex: none; width: 48px; height: 48px;
+  border-radius: var(--ak-radius-sm);
+  background: color-mix(in oklab, var(--ak-accent) 14%, var(--ak-surface-2));
+  display: grid; place-items: center;
+}
+.ak-cart__art--image { background-image: var(--ak-cart-image); background-size: cover; background-position: center; }
+.ak-cart__monogram {
+  font-family: var(--ak-font-display); font-weight: var(--ak-weight-display);
+  color: var(--ak-accent-text);
+}
+.ak-cart__body { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.ak-cart__linetitle { font-weight: 600; }
+.ak-cart__linesub { font-size: var(--ak-text-fine); color: var(--ak-ink-dim); }
+
+.ak-cart__qty {
+  flex: none; display: flex; align-items: center; gap: 2px;
+  border: var(--ak-line-w) solid var(--ak-line);
+  border-radius: var(--ak-radius-pill);
+  background: var(--ak-surface-2);
+}
+.ak-cart__step {
+  width: 32px; height: 32px;
+  border: 0; padding: 0; border-radius: var(--ak-radius-pill);
+  background: transparent; color: var(--ak-ink);
+  font: inherit; font-size: var(--ak-text-body); line-height: 1;
+  cursor: pointer;
+  transition: background var(--ak-motion) var(--ak-ease);
+}
+.ak-cart__step:hover { background: color-mix(in oklab, var(--ak-accent) 16%, transparent); }
+.ak-cart__count {
+  min-width: 2ch; text-align: center;
+  font-family: var(--ak-font-mono); font-variant-numeric: tabular-nums;
+}
+.ak-cart__price {
+  flex: none; min-width: 6ch; text-align: right;
+  font-family: var(--ak-font-mono); font-variant-numeric: tabular-nums;
+}
+.ak-cart__remove { flex: none; min-height: 32px; padding: 4px 10px; font-size: var(--ak-text-fine); }
+
+.ak-cart__foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+}
+.ak-cart__total { display: flex; align-items: baseline; gap: 10px; }
+.ak-cart__totallabel { font-size: var(--ak-text-fine); color: var(--ak-ink-dim); text-transform: uppercase; letter-spacing: 0.06em; }
+.ak-cart__totalvalue {
+  font-family: var(--ak-font-display); font-weight: var(--ak-weight-display);
+  font-size: var(--ak-text-title); color: var(--ak-ink);
+  font-variant-numeric: tabular-nums;
+}
+.ak-cart__checkout { min-height: var(--ak-touch); }
+.ak-cart__note { font-size: var(--ak-text-fine); color: var(--ak-ink-dim); }
+
+/* ── The notification centre: days, kinds, and the unread mark ───────────────────────────── */
+.ak-notices { display: flex; flex-direction: column; gap: 10px; }
+.ak-notices__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.ak-notices__title { font-weight: 700; color: var(--ak-ink); }
+.ak-notices__markall { min-height: 32px; padding: 4px 10px; font-size: var(--ak-text-fine); }
+.ak-notices__body { display: flex; flex-direction: column; gap: 6px; }
+.ak-notices__day {
+  margin-top: 6px;
+  font-family: var(--ak-font-mono); font-size: var(--ak-text-fine);
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--ak-ink-dim);
+}
+.ak-notices__day:first-child { margin-top: 0; }
+.ak-notices__item {
+  display: flex; align-items: flex-start; gap: 10px;
+  width: 100%; min-height: var(--ak-touch); padding: 10px 12px;
+  border: var(--ak-line-w) solid var(--ak-line);
+  border-radius: var(--ak-radius-sm);
+  background: var(--ak-surface); color: var(--ak-ink);
+  font: inherit; text-align: left; text-decoration: none;
+  cursor: pointer;
+  transition: border-color var(--ak-motion) var(--ak-ease);
+}
+.ak-notices__item:hover { border-color: var(--ak-accent); }
+/* The kind lives on the left edge: one bar, four tones, read before the words are. */
+.ak-notices__mark { flex: none; width: 4px; align-self: stretch; border-radius: var(--ak-radius-pill); background: var(--ak-ink-dim); }
+.ak-notices__item--info .ak-notices__mark { background: var(--ak-accent); }
+.ak-notices__item--ok .ak-notices__mark { background: var(--ak-ok); }
+.ak-notices__item--warn .ak-notices__mark { background: var(--ak-warn); }
+.ak-notices__item--err .ak-notices__mark { background: var(--ak-err); }
+.ak-notices__words { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.ak-notices__itemtitle { color: var(--ak-ink); }
+.ak-notices__text { font-size: var(--ak-text-fine); color: var(--ak-ink-dim); }
+.ak-notices__side { flex: none; display: flex; align-items: center; gap: 8px; }
+.ak-notices__time { font-family: var(--ak-font-mono); font-size: var(--ak-text-fine); color: var(--ak-ink-dim); }
+.ak-notices__dot { width: 8px; height: 8px; border-radius: var(--ak-radius-pill); background: var(--ak-accent); }
+/* Unread is a firmer face and a lit ground, so a read one does not have to be scanned twice. */
+.ak-notices__item.is-unread { background: color-mix(in oklab, var(--ak-accent) 7%, var(--ak-surface)); }
+.ak-notices__item.is-unread .ak-notices__itemtitle { font-weight: 700; }
+
+/* ── The facets: chips per filter, counts that roll, one summary line ────────────────────── */
+.ak-facets { display: flex; flex-direction: column; gap: 12px; }
+.ak-facets__title { font-weight: 700; color: var(--ak-ink); }
+.ak-facets__groups { display: flex; flex-direction: column; gap: 12px; }
+.ak-facets__group { display: flex; flex-direction: column; gap: 6px; }
+.ak-facets__label {
+  font-family: var(--ak-font-mono); font-size: var(--ak-text-fine);
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--ak-ink-dim);
+}
+.ak-facets__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ak-facets__chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 32px; padding: 4px 12px;
+  border: var(--ak-line-w) solid var(--ak-line);
+  border-radius: var(--ak-radius-pill);
+  background: var(--ak-surface); color: var(--ak-ink);
+  font: inherit; font-size: var(--ak-text-fine);
+  cursor: pointer;
+  transition: background var(--ak-motion) var(--ak-ease), border-color var(--ak-motion) var(--ak-ease);
+}
+.ak-facets__chip:hover { border-color: var(--ak-accent); }
+.ak-facets__chip[aria-pressed='true'] {
+  background: var(--ak-accent); color: var(--ak-accent-ink); border-color: var(--ak-accent);
+}
+.ak-facets__chipcount {
+  font-family: var(--ak-font-mono); font-variant-numeric: tabular-nums;
+  color: var(--ak-ink-dim);
+}
+.ak-facets__chip[aria-pressed='true'] .ak-facets__chipcount { color: var(--ak-accent-ink); }
+.ak-facets__summary { display: flex; align-items: center; gap: 8px; font-size: var(--ak-text-fine); color: var(--ak-ink-dim); }
+.ak-facets__tally { font-variant-numeric: tabular-nums; }
+.ak-facets__sep { color: var(--ak-line); }
+.ak-facets__clear { min-height: 30px; padding: 3px 10px; font-size: var(--ak-text-fine); }

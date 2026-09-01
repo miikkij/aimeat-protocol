@@ -26,6 +26,10 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.18.0 — 2026-09-02 — The kit's motion primitives (spring, stagger, inView, scrollLink,
+ *     drag) named beside the recipes, and the three vendored animation packs (motion, anime,
+ *     lenis) pointed at with the read-the-doc-first rule, because each changed its API after
+ *     the version a model knows (wish-atelier-motion-libraries-and-parts).
  *   v1.17.0 — 2026-09-01 — The materials and the motion recipes named beside the scenic props,
  *     with the physics they keep (kit v0.41.0).
  *   v1.16.0 — 2026-08-29 — "A map" means the REAL map: the `map` block (Leaflet + OSM) taught
@@ -336,7 +340,12 @@ function composeBody(config: AimeatConfig): string {
     + '`.ak-mat--glass`, `--aurora`, `--grain`, `--ink`, `--signal`, `--ring`, `--spot`) and the '
     + 'MOTION RECIPES (`.ak-move--magnet`, `--sheen`, `--deal` as classes; `spotlight`, `tilt`, '
     + '`sheen`, `odometer`, `thumb`, `deal` as calls — every one answers the hand or a change and '
-    + 'rests, none loops) and the pattern shelf below carry the shared stagecraft.\n\n';
+    + 'rests, none loops), the kit\'s own MOTION PRIMITIVES (`spring`, `stagger`, `inView`, '
+    + '`scrollLink`, `drag` — Web Animations API, no dependency, finite, a no-op under reduced '
+    + 'motion; reach for these before a library) and the pattern shelf below carry the shared '
+    + 'stagecraft. When an app needs a full animation library, the node serves three as packs — '
+    + 'Motion (`motion`), anime.js (`anime`) and Lenis (`lenis`) — read the pack\'s doc before '
+    + 'writing a line, because every one of them changed its API after the version you know.\n\n';
   for (const g of genres) {
     body += '- `' + g.id + '` — **' + g.title + '**: ' + g.description + '\n';
   }

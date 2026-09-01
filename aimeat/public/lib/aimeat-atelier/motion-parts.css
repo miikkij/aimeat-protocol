@@ -1,0 +1,234 @@
+/*
+ * @file aimeat-atelier/motion-parts.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The clothes for the two motion-shaped parts (motion-parts.js): the strip of media
+ *   cards you push along, and the picture that opens out of one of them. Every value rides the
+ *   --ak-* contract, so both answer every look, palette and mode.
+ *
+ *   THE SNAP IS THE FLOOR. The strip is a scroll-snap scroller before it is anything else: with no
+ *   script at all it still moves, still lands on a card, and still shows the one it landed on.
+ *   Motion, once it has loaded, springs the travel and lifts the current card on top of that; the
+ *   only rule here that the library replaces is the lift's transition.
+ *
+ *   NOTHING ANIMATES ON ITS OWN. The transitions below fire on a class change (a card becoming
+ *   current, a dot lighting) and settle; there is no keyframe animation in this file, so a
+ *   resting strip repaints zero times.
+ * @structure .ak-carousel (title · stage · nav · viewport · track · card · art · caption · dots) ·
+ *   .ak-lightbox (panel · figure · image · caption · nav · x) · body.ak-lightbox-open ·
+ *   reduced-motion
+ * @version-history
+ *   v0.44.0 — 2026-09-02 — Initial (wish-atelier-motion-libraries-and-parts, stage 3).
+ */
+
+/* ── The strip: media cards side by side, one of them current ────────────────────────────── */
+.ak-carousel { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.ak-carousel__title {
+  margin: 0;
+  font-family: var(--ak-font-display);
+  font-size: var(--ak-text-title);
+  font-weight: var(--ak-weight-display);
+  color: var(--ak-ink);
+}
+.ak-carousel__stage { display: flex; align-items: center; gap: 8px; min-width: 0; }
+
+/* The arrows: a real touch target, ghosted so the pictures stay the loud thing. Two classes, so
+   the shape wins over the base button whatever order the imports land in. */
+.ak-carousel .ak-carousel__nav {
+  flex: none;
+  width: var(--ak-touch); height: var(--ak-touch);
+  padding: 0;
+  border-radius: var(--ak-radius-pill);
+  display: grid; place-items: center;
+}
+.ak-carousel .ak-carousel__nav[disabled] { opacity: 0.35; cursor: default; }
+
+/* The scroller. `scroll-behavior` stays AUTO on purpose: the spring writes scrollLeft frame by
+   frame, and a smooth scroll on top of that would smooth an already-smoothed travel. The block
+   padding is the room the current card's lift grows into — one axis of overflow makes both
+   scrollable, so without it the lifted card would be clipped. */
+.ak-carousel__viewport {
+  flex: 1; min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: auto;
+  scrollbar-width: thin;
+  padding: 10px 0 12px;
+  border-radius: var(--ak-radius);
+}
+.ak-carousel__viewport:focus-visible { outline: 2px solid var(--ak-focus); outline-offset: 2px; }
+.ak-carousel__track { display: flex; gap: var(--ak-gap); min-width: 0; }
+
+.ak-carousel__card {
+  flex: 0 0 min(78%, 268px);
+  scroll-snap-align: center;
+  display: flex; flex-direction: column;
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  background: var(--ak-surface);
+  color: var(--ak-ink);
+  border: var(--ak-line-w) solid var(--ak-line);
+  border-radius: var(--ak-radius);
+  box-shadow: var(--ak-elev-1);
+  /* The floor for the lift: Motion writes its own transform once it lands, and this rule is
+     what stands in for it until then. */
+  transform: scale(var(--ak-lift, 1));
+  transform-origin: center;
+  transition: transform var(--ak-motion) var(--ak-ease),
+              border-color var(--ak-motion) var(--ak-ease),
+              box-shadow var(--ak-motion) var(--ak-ease);
+}
+.ak-carousel__card.is-current {
+  border-color: color-mix(in oklab, var(--ak-accent) 55%, var(--ak-line));
+  box-shadow: var(--ak-elev-2);
+}
+.ak-carousel__card:focus-visible { outline: 2px solid var(--ak-focus); outline-offset: 2px; }
+/* Without onPick a card is a div, not a control, and must not claim to be one. */
+.ak-carousel__card:not(button) { cursor: default; }
+
+.ak-carousel__art {
+  display: flex; align-items: center; justify-content: center;
+  aspect-ratio: 4 / 3;
+  background-size: cover;
+  background-position: center;
+}
+.ak-carousel__art--image { background-image: var(--ak-card-image); }
+/* The three deterministic washes — a card with no picture is designed, never grey. Same three
+   hue worlds the card grid uses, so a strip and a grid of the same items read as one set. */
+.ak-carousel__art--w1:not(.ak-carousel__art--image) {
+  background-image:
+    radial-gradient(at 28% 22%, color-mix(in oklab, var(--ak-bg) 46%, transparent), transparent 55%),
+    linear-gradient(135deg, color-mix(in oklab, var(--ak-accent) 62%, var(--ak-surface)), color-mix(in oklab, var(--ak-spectrum-2) 50%, var(--ak-surface)));
+}
+.ak-carousel__art--w2:not(.ak-carousel__art--image) {
+  background-image:
+    radial-gradient(at 72% 20%, color-mix(in oklab, var(--ak-bg) 46%, transparent), transparent 55%),
+    linear-gradient(160deg, color-mix(in oklab, var(--ak-spectrum-2) 58%, var(--ak-surface)), color-mix(in oklab, var(--ak-spectrum-3) 48%, var(--ak-surface)));
+}
+.ak-carousel__art--w3:not(.ak-carousel__art--image) {
+  background-image:
+    radial-gradient(at 50% 78%, color-mix(in oklab, var(--ak-bg) 42%, transparent), transparent 60%),
+    linear-gradient(115deg, color-mix(in oklab, var(--ak-spectrum-3) 56%, var(--ak-surface)), color-mix(in oklab, var(--ak-accent) 52%, var(--ak-surface)));
+}
+.ak-carousel__monogram {
+  font-family: var(--ak-font-display);
+  font-weight: 900;
+  font-size: calc(var(--ak-text-hero) * 0.9);
+  background-image: var(--ak-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 3px 0 color-mix(in oklab, var(--ak-ink) 30%, transparent));
+}
+
+/* The caption band under the picture. A tone paints its top edge and nothing else. */
+.ak-carousel__caption {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 10px var(--ak-pad) 12px;
+  border-top: var(--ak-line-w) solid var(--ak-line);
+}
+.ak-carousel__card--ok .ak-carousel__caption { border-top: 3px solid var(--ak-ok); }
+.ak-carousel__card--warn .ak-carousel__caption { border-top: 3px solid var(--ak-warn); }
+.ak-carousel__card--err .ak-carousel__caption { border-top: 3px solid var(--ak-err); }
+.ak-carousel__label { font-weight: 650; overflow-wrap: anywhere; }
+.ak-carousel__sub { font-size: var(--ak-text-fine); color: var(--ak-ink-dim); }
+
+/* The dots: a 24px target (WCAG 2.2's floor) with a small painted mark inside it. */
+.ak-carousel__dots { display: flex; justify-content: center; gap: 2px; }
+.ak-carousel .ak-carousel__dot {
+  width: 24px; height: 24px; min-height: 24px;
+  padding: 0; border: 0;
+  background: none;
+  display: grid; place-items: center;
+  cursor: pointer;
+}
+.ak-carousel__dot::after {
+  content: '';
+  width: 7px; height: 7px;
+  border-radius: var(--ak-radius-pill);
+  background: var(--ak-line);
+  transition: background var(--ak-motion) var(--ak-ease), width var(--ak-motion) var(--ak-ease);
+}
+.ak-carousel__dot.is-on::after { width: 18px; background: var(--ak-accent); }
+.ak-carousel__dot:focus-visible { outline: 2px solid var(--ak-focus); outline-offset: 1px; border-radius: var(--ak-radius-sm); }
+
+/* ── The picture, full size ──────────────────────────────────────────────────────────────── */
+/* The scrim is painted on the dialog itself rather than on ::backdrop, so the ground follows the
+   mode through one token that is certain to be in scope. */
+.ak-lightbox {
+  width: 100vw; height: 100dvh;
+  max-width: 100vw; max-height: 100dvh;
+  margin: 0; padding: var(--ak-pad);
+  border: 0;
+  box-sizing: border-box;
+  display: grid; place-items: center;
+  background: var(--ak-scrim);
+  backdrop-filter: blur(var(--ak-blur));
+  color: var(--ak-ink);
+  overflow: hidden;
+}
+.ak-lightbox::backdrop { background: transparent; }
+/* The panel is sized by the picture, so the room around it is the backdrop a press closes on. */
+.ak-lightbox__panel {
+  position: relative;
+  display: flex; align-items: center; gap: 8px;
+  max-width: 100%; max-height: 100%;
+  min-width: 0;
+}
+.ak-lightbox__figure {
+  margin: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  min-width: 0;
+}
+.ak-lightbox__image {
+  display: block;
+  max-width: min(84vw, 1000px);
+  max-height: 74dvh;
+  width: auto; height: auto;
+  border-radius: var(--ak-radius);
+  box-shadow: var(--ak-elev-2);
+  background: var(--ak-surface-2);
+}
+.ak-lightbox__caption {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  text-align: center;
+  max-width: min(84vw, 1000px);
+}
+.ak-lightbox__label { font-weight: 650; color: var(--ak-ink); overflow-wrap: anywhere; }
+.ak-lightbox__sub { font-size: var(--ak-text-fine); color: var(--ak-ink-dim); }
+.ak-lightbox__count { font-family: var(--ak-font-mono); font-size: var(--ak-text-fine); color: var(--ak-ink-dim); }
+
+/* The three controls float on the kit's own button surface so they read over any picture. */
+.ak-lightbox .ak-lightbox__nav,
+.ak-lightbox .ak-lightbox__x {
+  flex: none;
+  width: var(--ak-touch); height: var(--ak-touch);
+  padding: 0;
+  border-radius: var(--ak-radius-pill);
+  display: grid; place-items: center;
+  box-shadow: var(--ak-elev-1);
+}
+.ak-lightbox .ak-lightbox__nav[disabled] { opacity: 0.35; cursor: default; }
+.ak-lightbox .ak-lightbox__x { position: absolute; top: 0; right: 0; z-index: 1; }
+
+/* While a picture is open the page behind it holds still. */
+body.ak-lightbox-open { overflow: hidden; }
+
+/* On a phone the arrows sit over the picture's edges instead of stealing its width. */
+@media (max-width: 34rem) {
+  .ak-lightbox .ak-lightbox__nav { position: absolute; top: 50%; transform: translateY(-50%); z-index: 1; }
+  .ak-lightbox .ak-lightbox__nav--prev { left: 0; }
+  .ak-lightbox .ak-lightbox__nav--next { right: 0; }
+  .ak-carousel__card { flex-basis: 84%; }
+}
+
+/* ── Less motion: everything arrives, nothing travels ────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .ak-carousel__card,
+  .ak-carousel__dot::after { transition: none; }
+}

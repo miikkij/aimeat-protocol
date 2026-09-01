@@ -12,6 +12,8 @@
  * @usage
  *   import { patchFor, derivedColumns, wireLive } from './mosaic-bind.js';
  * @version-history
+ *   v0.44.0 — 2026-09-02 — patchFor rides thread, calendar, priceTable and facets records
+ *     whole; carousel, sortable and notices take the default items shape.
  *   v0.42.0 — 2026-09-01 — patchFor rides ring, crew and poll records whole; keys takes the
  *     default items shape.
  *   v0.39.0 — 2026-08-30 — patchFor rides the crt's record whole (the broadcast family);
@@ -32,7 +34,8 @@ export function patchFor(kind, data) {
     || kind === 'gauge' || kind === 'console' || kind === 'atlas' || kind === 'map' || kind === 'scene3d'
     || kind === 'kanban' || kind === 'plan' || kind === 'schedule'
     || kind === 'steps' || kind === 'rating' || kind === 'crt'
-    || kind === 'ring' || kind === 'crew' || kind === 'poll') {
+    || kind === 'ring' || kind === 'crew' || kind === 'poll'
+    || kind === 'thread' || kind === 'calendar' || kind === 'priceTable' || kind === 'facets') {
     return { data: data && typeof data === 'object' && !Array.isArray(data) ? data : null };
   }
   if (kind === 'health' || kind === 'queue') {
