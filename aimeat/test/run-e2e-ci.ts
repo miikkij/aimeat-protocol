@@ -238,6 +238,10 @@ const ALL_SUITES = [
     // expected of our side is decided by the protocol rather than by us; everything below
     // session/prompt is the real node and a real task settled by a real worker.
     'test/e2e-agent-v2-acp.ts',
+    // Agent v2 V6d: a front end watching an agent work, over AG-UI. Reads the event STREAM and
+    // drives the task from the other side while it is open, because a test that waited for the
+    // response to finish would pass on a door that sent everything at the end.
+    'test/e2e-agent-v2-agui.ts',
     // Does an open page hear about work an agent does? 21 of the 31 writing tool files emitted no
     // SSE change domain at all, so the write landed and the screen stayed as it was.
     'test/e2e-mcp-sse-parity.ts',

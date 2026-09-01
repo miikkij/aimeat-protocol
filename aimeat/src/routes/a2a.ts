@@ -6,6 +6,7 @@
  *
  *     GET  /v1/a2a/:owner/:agent/agent-card.json   what the agent is, in A2A's words
  *     POST /v1/a2a/:owner/:agent                   the JSON-RPC surface
+ *     GET  /v1/oasf/:owner/:agent                  the same agent, as an OASF record (V6c)
  *
  *   THE CARD IS PUBLIC AND THE DOOR IS NOT. Discovery has to be public or it is not discovery, and
  *   the card says nothing the AIMEAT card at /v1/agents/:gaii/card does not already say to anyone
@@ -27,6 +28,7 @@
  * @structure a2aRouter(config, storage)
  * @usage app.use(a2aRouter(config, storage));
  * @version-history
+ *   v1.1.0 — 2026-09-01 — The OASF record (V6c): the third projection of the same agent.
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V6a).
  */
 import { Router, type Request, type Response, type NextFunction } from 'express';
@@ -37,6 +39,7 @@ import { requireAuth } from '../auth/middleware.js';
 import { error } from '../middleware/envelope.js';
 import { buildGAII } from '../utils/gaii.js';
 import { a2aCardFor } from '../services/a2a-card.js';
+import { oasfRecordFor } from '../services/oasf-projection.js';
 import { AimeatA2ARequestHandler } from '../services/a2a-handler.js';
 import type { A2ACaller } from '../services/a2a-handler.js';
 
@@ -74,6 +77,26 @@ export function a2aRouter(config: AimeatConfig, storage: Storage): Router {
     // The SDK's handler owns the ETag, Cache-Control and 304, which is the part of serving a card
     // that is easy to get subtly wrong.
     return agentCardHandler({ agentCardProvider: async () => card })(req, res, next);
+  });
+
+  // ── The OASF record. The same agent again, for a directory that indexes agents rather than
+  //    talking to them. Public for the same reason the card is: this is discovery, and it says
+  //    nothing the two cards beside it do not. Not part of the A2A protocol — it lives here
+  //    because it is the third projection of one record, and keeping the three together is what
+  //    stops a fourth from being written somewhere else.
+  router.get('/v1/oasf/:owner/:agent', async (req, res) => {
+    const agent = await findAgent(req);
+    if (!agent) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No agent of that name on this node.'));
+      return;
+    }
+    const base = config.baseUrl.replace(/\/+$/, '');
+    const a2a = interfaceUrl(config, agent.owner, agent.name);
+    res.json(oasfRecordFor(config, agent, {
+      a2a,
+      a2aCard: `${a2a}/agent-card.json`,
+      card: `${base}/v1/agents/${encodeURIComponent(agent.gaii)}/card`,
+    }));
   });
 
   // ── The JSON-RPC surface. Authenticated, and fenced to the agent's own account. ──

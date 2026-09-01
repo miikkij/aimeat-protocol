@@ -7876,6 +7876,206 @@ paths:
         '409':
           description: Already settled
 
+  /v1/agui/{owner}/{agent}:
+    post:
+      operationId: aguiRun
+      summary: Ask an agent for something and watch it work, as AG-UI events
+      description: |
+        THE THIRD DOOR ONTO THE SAME WORK. A2A is another agent talking to ours, ACP is a code
+        editor, this is a browser. All three create the same V5 task through the same functions and
+        read the same row; none of them stores anything of its own.
+
+        The response is a server-sent event stream of AG-UI events, not a JSON body: `RUN_STARTED`,
+        then `TEXT_MESSAGE_START` / `TEXT_MESSAGE_CONTENT` / `TEXT_MESSAGE_END` for each thing the
+        agent says, then `RUN_FINISHED` or `RUN_ERROR`. The stream opens before the work is done,
+        which is the point of the protocol.
+
+        EVERY LINE IS ITS OWN MESSAGE. A status line and a result are different utterances at
+        different times; folding them into one would render them as one paragraph.
+
+        A CANCELLED RUN FINISHES, it does not error. Somebody meant to stop it, and a UI that shows
+        an error for a deliberate stop teaches people to distrust the errors that matter. A FAILED
+        task does send `RUN_ERROR`, carrying the worker's own code.
+
+        Only the USER turns in `messages` become the ask. An assistant turn is the front end
+        replaying its own history, and filing that as new work would ask the agent to redo it — a
+        run with no user text is refused before a stream is opened.
+
+        `threadId` is the conversation, which is the task's `contextId`: a front end that keeps one
+        gets one exchange rather than a pile of unrelated tasks.
+
+        The run is held open for at most ten minutes. When that passes the stream says the work
+        continues and names the task, because a UI that saw a run finish would otherwise report the
+        work as over.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: owner
+          in: path
+          required: true
+          schema: { type: string }
+        - name: agent
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: An AG-UI RunAgentInput. Only `threadId`, `runId` and `messages` are read.
+              properties:
+                threadId: { type: string }
+                runId: { type: string }
+                messages:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id: { type: string }
+                      role: { type: string, enum: [user, assistant, system, developer, tool] }
+                      content: { type: string }
+      responses:
+        '200':
+          description: An AG-UI event stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: 'SSE frames, each `data: {…}` carrying one AG-UI event.'
+        '400':
+          description: The run had no user message with text in it
+        '403':
+          description: The caller is a principal of another account, or lacks task:write
+        '404':
+          description: No agent of that name on this node
+
+  /v1/agui/{owner}/{agent}/{taskId}:
+    get:
+      operationId: aguiWatch
+      summary: Watch work that already exists, as AG-UI events
+      description: |
+        The same stream as the run above, for a task that is already going: a browser that reloaded,
+        or a second screen. A settled task streams its result and finishes immediately, which is
+        what a front end opening a finished conversation should see.
+
+        No scope: it is a read, and the task reads it mirrors on `/v1/agents/v2/tasks` are ungated
+        for the same reason — the owner is not a parameter. The POST beside it, which creates work,
+        takes `task:write`.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: owner
+          in: path
+          required: true
+          schema: { type: string }
+        - name: agent
+          in: path
+          required: true
+          schema: { type: string }
+        - name: taskId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: An AG-UI event stream
+          content:
+            text/event-stream:
+              schema: { type: string }
+        '403':
+          description: The caller is a principal of another account
+        '404':
+          description: No such agent or no such task on this account
+
+  /v1/oasf/{owner}/{agent}:
+    get:
+      operationId: getOasfRecord
+      summary: One agent, as an OASF record
+      description: |
+        THE SAME AGENT AGAIN, for a directory that indexes agents rather than talking to them. OASF
+        (the Open Agentic Schema Framework) is a JSON schema, not a protocol: there is nothing to
+        negotiate and no client to be compatible with, so this node writes the record itself rather
+        than taking a dependency to do it.
+
+        PUBLIC, like the two cards beside it, and generated from the agent record for the same
+        reason: a hand-written description of what an agent can do drifts from the first one, and
+        then two directories disagree about the same agent.
+
+        `skills` carry names and no taxonomy ids. OASF's skill list is a numbered taxonomy and this
+        node holds nothing that maps onto it — `capabilities` is what the owner typed — so an
+        invented id would file the agent under something it is not. The missing id is the honest
+        signal that this is not taxonomy data.
+
+        `locators` are the addresses a machine can act on: the A2A JSON-RPC door, the A2A agent
+        card, and the agent's own signed AIMEAT card. The AIMEAT-specific half — the GAII, the node,
+        the run mode — travels in an `aimeat.agent` extension, which is what OASF extensions are
+        for: a consumer either understands it or steps over it.
+
+        No signature block. An OASF signature covers a record as published to a registry, and this
+        node serves the record live. The AIMEAT card at the third locator IS signed, by the agent's
+        own key, and that is the claim this node can stand behind.
+      tags: [Identity]
+      parameters:
+        - name: owner
+          in: path
+          required: true
+          schema: { type: string }
+        - name: agent
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: The OASF record (the OASF shape, not the AIMEAT envelope)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    description: 'publisher/name — the owner and the agent.'
+                  version: { type: string }
+                  schema_version: { type: string }
+                  description: { type: string }
+                  authors:
+                    type: array
+                    items: { type: string }
+                  created_at: { type: string, format: date-time }
+                  skills:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name: { type: string }
+                        description: { type: string }
+                  locators:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type:
+                          type: string
+                          enum: [a2a-jsonrpc, a2a-agent-card, aimeat-agent-card]
+                        url: { type: string }
+                  extensions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name: { type: string }
+                        version: { type: string }
+                        data: { type: object }
+                  annotations:
+                    type: object
+                    additionalProperties: { type: string }
+        '404':
+          description: No agent of that name on this node
+
   /v1/a2a/{owner}/{agent}/agent-card.json:
     get:
       operationId: getA2AAgentCard
