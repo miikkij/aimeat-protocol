@@ -19795,6 +19795,15 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '404':
+          description: No peer with that node id
+        '409':
+          description: |
+            PEER_KEY_REQUIRED — `status: active` on a peer that would still have no `public_key`.
+            Nothing it sent could be checked, and `active` is what federated login, replication and
+            settlement read as "this link works". Send `public_key` in the SAME request to set a key
+            and activate at once, or use `POST /v1/federation/peer/activate`, which exchanges keys
+            with the node first. Also ONE_UPSTREAM_ONLY / MESSAGING_DISABLED for `support_upstream`.
 
     delete:
       operationId: depeer

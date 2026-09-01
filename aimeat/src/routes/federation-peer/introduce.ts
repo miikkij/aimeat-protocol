@@ -5,6 +5,9 @@
  * @description Federation peer directory + node-to-node introduction/handshake routes (directory,
  *   service-summary, signed introduce, peering-request CRUD, readiness test). Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-09-01 — The outbound peering request records NO publicKey field when it has no
+ *     key, instead of `publicKey: ''`. Absent and present-and-empty are different facts and only
+ *     one of them is true; the empty string is the shape the whole keyless-peer class is made of.
  *   v1.1.0 — 2026-08-23 — SECURITY (audit AI-triage, invariant 14): the outbound-URL check runs
  *     before consumeLinkInvite, so a 400 INVALID_URL no longer burns the one-time invite token.
  *   v1.0.0 — 2026-07-13 — Extracted from federation-peer.ts (max-file-lines)
@@ -311,13 +314,20 @@ export function registerIntroduceRoutes(router: Router, config: AimeatConfig, st
         const id = `peer-req-${randomBytes(8).toString('hex')}`;
         const now = new Date().toISOString();
 
+        // NO KEY MEANS THE FIELD IS ABSENT, not present and empty. This is the OUTBOUND direction —
+        // we are asking to peer with a node whose key we have usually not been told yet — so having
+        // nothing to record is normal here, and `publicKey: ''` said something different and false:
+        // that a key was recorded and it is the empty string. Every gate downstream then has to
+        // special-case the empty string, and the whole keyless-peer class is made of code that did
+        // not. `absent` and `present and empty` are different facts and only one of them is true.
+        const requestKey = typeof public_key === 'string' ? public_key.trim() : '';
         await storage.createPeeringRequest({
             id,
             fromNodeUrl: target_url,
             fromNodeId: config.nodeId,
             toNodeId: target_node_id ?? 'unknown',
             targetUrl: target_url,
-            publicKey: public_key ?? '',
+            ...(requestKey ? { publicKey: requestKey } : {}),
             message: message ?? '',
             status: 'pending',
             createdAt: now,

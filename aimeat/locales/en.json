@@ -3496,6 +3496,8 @@
     "fedDegradedPeers": "Degraded",
     "fedOfflinePeers": "Offline",
     "fedPendingRequests": "Pending Requests",
+    "fedKeylessPeers": "Without a key",
+    "fedKeylessPeersHint": "These peers have no verification key, so nothing they send can be checked and they cannot be switched on: {peers}. Use Activate on each one — that exchanges keys first.",
     "fedPendingRequestsTitle": "Pending Peering Requests",
     "fedPendingRequestsExplain": "These nodes want to join your federation. Review each request and approve or reject.",
     "fedPendingHelpTitle": "What should I check before approving?",
