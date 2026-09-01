@@ -21,6 +21,12 @@
  *   `X-PAYMENT`: the facilitator verifies and settles, and only then is the work created. No
  *   settlement is invented here — `x402PaymentHandler` is the same one the checkout path uses.
  *
+ *   AND THE OPERATOR TAKES THE SAME CUT it takes from a local sale. The fee is a property of the
+ *   transaction, not of the buyer's account; the checkout session is where the local path happens
+ *   to book it, not what makes it legitimate. Both roads read `commerceFeePercent(config)` and both
+ *   compute it with `percentFee`, because a lower rate here would make "have no account on this
+ *   node" the cheapest way to buy.
+ *
  *   IT NEVER LEARNS A GAII. The task it holds is its own work id; the provider is named by the
  *   offering, which is public. `contextId` is the work id, `status.message` is the state, and the
  *   agent behind it stays an address on a card.
@@ -28,6 +34,9 @@
  * @structure ForeignA2AHandler
  * @usage new ForeignA2AHandler(storage, config, agent, peer, card, payment)
  * @version-history
+ *   v1.1.0 — 2026-09-01 — The platform fee is a real number at the same rate as every other sale,
+ *     booked on the SELLER's side through `bookSessionlessSale`. v1.0.0 passed `fee: 0` and named
+ *     it a gap; leaving it would have made "have no account here" the cheapest way to buy.
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V6a foreign path).
  */
 import { TaskState, Role, type AgentCard, type Message, type Task,
@@ -51,6 +60,9 @@ import { newWorkId, putWork, getWork, type AgentWork } from './exchange-work.js'
 import { getPaymentHandler } from '../commerce/payment-handlers.js';
 import { X402_HANDLER_ID } from '../commerce/x402-handler.js';
 import { decodeXPayment } from '../commerce/x402-facilitator.js';
+import { bookSessionlessSale } from '../commerce/session-service.js';
+import { commerceFeePercent } from './marketplace-fee.js';
+import { percentFee } from '../commerce/money.js';
 import { notify } from './notify.js';
 import { logger } from '../utils/logger.js';
 
@@ -298,6 +310,11 @@ export class ForeignA2AHandler implements A2ARequestHandler {
     // handler charges onto the SELLER's rail; this node never holds the money.
     const psp = await this.storage.getMemory(work.providerGhii, 'commerce.psp');
 
+    // THE PLATFORM FEE, AT THE SAME RATE AS EVERY OTHER SALE. Computed before the collect because
+    // the handler contract takes it — it is booked separately rather than deducted at the rail, on
+    // this road exactly as on the checkout one, so what the buyer signs for is the gross either way.
+    const fee = percentFee(priced.price.amount, commerceFeePercent(this.config));
+
     try {
       // VERIFY AND SETTLE THROUGH THE EXISTING HANDLER. Nothing about the money is decided here:
       // the facilitator says whether the payment is real and moves it, exactly as it does for a
@@ -309,11 +326,7 @@ export class ForeignA2AHandler implements A2ARequestHandler {
           amount: priced.price.amount,
           currency: priced.price.currency,
           reference: work.workId,
-          // NO PLATFORM FEE ON THIS ROAD, and it is a gap rather than a choice: the fee leg is
-          // booked by the checkout session service, and a foreign buyer has no session here to
-          // book it against. Recorded in the spec as a question rather than answered by defaulting
-          // to a number nobody agreed.
-          fee: 0,
+          fee,
           instrument: proof,
           seller: { ghii: work.providerGhii, owner: work.providerOwner, psp: psp?.value },
           resource: priced.price.requirements.resource as string,
@@ -321,10 +334,25 @@ export class ForeignA2AHandler implements A2ARequestHandler {
         },
       );
 
+      const trackingCode = receipt?.trackingCode ?? `x402_${work.workId}`;
+
+      // THE SELLER'S SIDE OF THE SALE, through the same two calls the checkout path makes: the
+      // operator's fee as a receivable under the operator's own GHII, and then whoever the seller
+      // owes a share of what is left. Booked against the SELLER because that is where a fee on a
+      // transaction belongs; nothing here creates an account for the buyer, and nothing here is a
+      // second fee mechanism — it is `bookSessionlessSale`, which lives beside the checkout leg.
+      const booked = await bookSessionlessSale(this.storage, this.config, {
+        gross: priced.price.amount, currency: priced.price.currency,
+        sellerGhii: work.providerGhii, buyerRef: this.peer.gaii,
+        ext: work.ext, action: work.action,
+        trackingCode, handler: X402_HANDLER_ID,
+        reference: `a2a:${work.workId}:${work.ext}:${work.action}`,
+      });
+
       const paid: AgentWork = {
         ...work,
         chargedUnits: priced.price.amount,
-        note: `${work.note} · paid ${receipt?.trackingCode ?? 'x402'}`,
+        note: `${work.note} · paid ${trackingCode}`,
       };
       await putWork(this.storage, paid);
 
@@ -338,7 +366,8 @@ export class ForeignA2AHandler implements A2ARequestHandler {
       }).catch(err => logger.warn('a2a: could not notify the provider', { error: String(err) }));
 
       logger.info('a2a: foreign work paid and opened', {
-        workId: paid.workId, peer: this.peer.gaii, offering: paid.offeringId, amount: paid.chargedUnits,
+        workId: paid.workId, peer: this.peer.gaii, offering: paid.offeringId,
+        amount: paid.chargedUnits, fee: booked.fee, net: booked.net,
       });
       return workAsTask(paid);
     } catch (err) {

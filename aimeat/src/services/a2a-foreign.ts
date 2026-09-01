@@ -8,15 +8,26 @@
  *   the result without ever learning a GAII. It has no owner on this node, no bearer, and no
  *   session — so the only thing it can prove is that it holds the key its own published card names.
  *
- *   THREE THINGS ARE CHECKED, IN THIS ORDER, and each one is worth its cost:
- *     1. The ASSERTION verifies against the key in the card it presents. Proof of possession, and
- *        it is per-request with a one-minute life and a spent `jti`, so a captured one is worth one
- *        call. Exactly the shape /v1/agents/v2/token already uses for our own agents.
+ *   FOUR THINGS ARE CHECKED, IN THIS ORDER, and each one is worth its cost:
+ *     1. The ASSERTION verifies against the key in the card it presents. Proof of possession, per
+ *        request. Exactly the shape /v1/agents/v2/token already uses for our own agents.
  *     2. The CARD verifies against its OWN key and names the same identity the assertion claims.
  *        A card is a self-signed document; this says the document and the caller are one party.
- *     3. The key appears in the JWKS the card points at, fetched from the caller's own node. This
+ *     3. The ASSERTION IS SPENT. Its hash goes into the revoked-token table before the caller is
+ *        handed back, so the same one never authenticates twice. Without this step the other three
+ *        are worth nothing on a road where money moves: a captured assertion would be replayable
+ *        for the rest of its life, which is up to five minutes of free calls at somebody else's
+ *        expense. Written BEFORE the peer is returned, so a failure downstream burns the assertion
+ *        rather than leaving a replayable one in the caller's hands.
+ *     4. The key appears in the JWKS the card points at, fetched from the caller's own node. This
  *        is the only step that involves the outside world, and it is what makes the claim checkable
- *        by somebody other than the claimant.
+ *        by somebody other than the claimant. First sight only.
+ *
+ *   FIVE MINUTES, NOT ONE. `MAX_ASSERTION_LIFETIME_SECONDS` is 300 and that is deliberate: the
+ *   clocks on this road belong to strangers' machines, and a minute is not enough slack for one
+ *   that is a little wrong. The single-use spend is what makes the length safe to be generous
+ *   about — a five-minute window on a one-shot proof costs nothing, and the same five minutes on
+ *   a replayable one is the defect this paragraph used to describe as a feature.
  *
  *   THEN IT IS PINNED, TRUST ON FIRST USE, and every later call is compared against the pin. That
  *   last half is the part the ecosystem-app path does not have: `ecosystem-apps.ts` stores an app's
@@ -32,12 +43,16 @@
  * @structure ForeignPeer · identifyForeignCaller() · FOREIGN_HEADERS
  * @usage const who = await identifyForeignCaller(config, storage, req.headers);
  * @version-history
+ *   v1.1.0 — 2026-09-01 — The assertion is actually spent. v1.0.0's header claimed a spent `jti`
+ *     and the code never recorded one, so every assertion on the payment road was replayable for
+ *     its whole life. Found in review.
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V6a foreign path).
  */
 import { compactVerify, importJWK, decodeProtectedHeader } from 'jose';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { readCardJws, verifyCardJws } from './agent-card.js';
+import { spendAssertion } from './assertion-spend.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { logger } from '../utils/logger.js';
 
@@ -45,7 +60,7 @@ import { logger } from '../utils/logger.js';
 export const FOREIGN_HEADERS = {
   /** The caller's own signed agent card, as a compact JWS. */
   card: 'x-a2a-agent-card',
-  /** A one-minute assertion signed by the same key: proof it holds it right now. */
+  /** A short-lived single-use assertion signed by the same key: proof it holds it right now. */
   assertion: 'x-a2a-assertion',
 } as const;
 
@@ -60,8 +75,13 @@ export const FOREIGN_HEADERS = {
 const PEER_NS = '__a2a_peer__';
 const peerKey = (gaii: string) => `a2apeer.${Buffer.from(gaii).toString('base64url').slice(0, 100)}`;
 
-/** How far out an assertion may claim to live. One minute; the same reasoning as our own mint. */
+/**
+ * How far out an assertion may claim to live. FIVE MINUTES, the same number and the same reasoning
+ * as `/v1/agents/v2/token`: it covers a badly set clock, and the clocks here belong to machines
+ * nobody in this account administers. Longer than that is a bearer token with extra steps.
+ */
 const MAX_ASSERTION_LIFETIME_SECONDS = 300;
+/** How far AHEAD of us an `iat` may sit before we call it wrong rather than skewed. */
 const MAX_CLOCK_SKEW_SECONDS = 60;
 
 /** A foreign agent this node has seen and is willing to name. */
@@ -197,6 +217,19 @@ export async function identifyForeignCaller(
     // A signature that does not verify IS the answer, so the exception is the refusal rather than
     // something to report. jose throws for a bad key, a bad signature and a malformed token alike.
     return refuse(401, 'A2A_ASSERTION_UNSIGNED', 'The assertion is not signed by the card\'s key.');
+  }
+
+  // ── Spend it, before anything else happens ──
+  //
+  // HERE, not after the pin comparison and not after the JWKS fetch. Everything below this line can
+  // fail, and every one of those failures must cost the caller its assertion: an unreachable JWKS or
+  // a changed key that handed back a still-usable proof would be a retry budget, and a captured
+  // proof with a retry budget is a bearer token. The signature has verified by this point, so what
+  // is being spent is known to belong to the party presenting it.
+  const spend = await spendAssertion(storage, assertion, exp);
+  if (!spend.ok) {
+    logger.warn('a2a: a foreign assertion was presented twice', { gaii: card.gaii, jti: claims.jti });
+    return refuse(401, 'A2A_ASSERTION_REPLAYED', spend.message);
   }
 
   // ── Trust on first use, and compared on every use after it ──

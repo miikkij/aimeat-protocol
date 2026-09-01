@@ -105,7 +105,8 @@ interface Stranger {
     x: string;
     cardJws: string;
     jwksUrl: string;
-    assertion(): Promise<string>;
+    /** A fresh single-use assertion. `lifetimeSeconds` shortens it, for the expiry-beats-reuse test. */
+    assertion(lifetimeSeconds?: number): Promise<string>;
 }
 
 /** The A2A refusals this node names that the protocol does not. Mirrors src/services/a2a-foreign-handler.ts. */
@@ -167,10 +168,11 @@ async function makeStranger(name: string, opts: { publishKey?: boolean; gaii?: s
         gaii, kid: pair.kid, x: pair.x, jwksUrl,
         cardJws: await new CompactSign(new TextEncoder().encode(JSON.stringify(card)))
             .setProtectedHeader({ alg: 'EdDSA', kid: pair.kid }).sign(key),
-        async assertion() {
+        async assertion(lifetimeSeconds = 120) {
             const now = Math.floor(Date.now() / 1000);
             return new CompactSign(new TextEncoder().encode(JSON.stringify({
-                sub: gaii, aud: NODE_ID, iat: now, exp: now + 120, jti: randomBytes(8).toString('hex'),
+                sub: gaii, aud: NODE_ID, iat: now, exp: now + lifetimeSeconds,
+                jti: randomBytes(8).toString('hex'),
             }))).setProtectedHeader({ alg: 'EdDSA', kid: pair.kid }).sign(key);
         },
     };
@@ -651,6 +653,28 @@ async function run(): Promise<void> {
         assert(w.consumer === stranger.gaii, `by the stranger, under its own identity, got ${w.consumer}`);
     });
 
+    await test('the operator takes the same cut it takes from a local sale', async () => {
+        // A fee of zero on this road would make "have no account here" the cheapest way to buy. The
+        // rate itself is the operator's setting and is not asserted; that it was BOOKED, at the
+        // configured rate, against the seller, is.
+        const feePct = (await json('/v1/exchange/info')).body.data.rake_percent;
+        assert(typeof feePct === 'number' && feePct > 0,
+            `this run needs a live fee rate to prove anything, got ${feePct}`);
+
+        // No owner holds the operator role in the suite, so the entry lands under the seller's own
+        // GHII — which is the documented fallback and the only side a test can read.
+        const booked = await json('/v1/memory?prefix=commerce.platform-fee.&limit=50', { headers: authA });
+        assert(booked.status === 200, `memory list ${booked.status}: ${JSON.stringify(booked.body?.error)}`);
+        const entries = (booked.body.data.memories ?? booked.body.data.items ?? []) as any[];
+        const entry = entries.map(m => m.value).find(v => v?.buyerGhii === stranger.gaii);
+        assert(!!entry, `a platform-fee entry for this sale, got ${JSON.stringify(entries.map(m => m.key))}`);
+        assert(entry.currency === 'USD', `in the sale's own currency, got ${entry.currency}`);
+        assert(entry.mode === 'receivable', `owed rather than collected, got ${entry.mode}`);
+        assert(entry.sellerGhii === `${a.owner}@${NODE_ID}`, `against the seller, got ${entry.sellerGhii}`);
+        assert(entry.fee === Math.floor((PRICE_MICROS * feePct) / 100),
+            `at the node's own rate, expected ${Math.floor((PRICE_MICROS * feePct) / 100)}, got ${entry.fee}`);
+    });
+
     await test('the seller delivers, and the stranger reads the result it paid for', async () => {
         const delivered = await json(`/v1/exchange/work/${foreignTaskId}/deliver`, {
             method: 'POST', headers: authA,
@@ -721,6 +745,42 @@ async function run(): Promise<void> {
         // And after all of that the real one still works: a refusal did not re-pin anything.
         const still = await foreignRpc(a.owner, worker.name, stranger, 'GetTask', { id: foreignTaskId });
         assert(!still.error, `the pinned caller still gets in, got ${JSON.stringify(still.error)}`);
+    });
+
+    await test('an assertion is worth ONE call, and a fresh one still works', async () => {
+        // THE DEFECT THIS PINS: the file claimed a spent `jti` and spent nothing, so a captured
+        // assertion was replayable for its whole life — on the road where money moves.
+        const once = await stranger.assertion();
+        const first = await foreignRpc(a.owner, worker.name, stranger, 'GetTask', { id: foreignTaskId },
+            { assertion: once });
+        assert(!first.error, `the first use works, got ${JSON.stringify(first.error)}`);
+
+        const replay = await foreignRpc(a.owner, worker.name, stranger, 'GetTask', { id: foreignTaskId },
+            { assertion: once });
+        assert(replay.status === 401, `the same one again is refused, got ${replay.status}`);
+        assert(replay.body?.error?.code === 'A2A_ASSERTION_REPLAYED',
+            `for reuse, by name, got ${replay.body?.error?.code}`);
+
+        // Spending one must not lock the peer out: the pin is the identity, the assertion is one call.
+        const fresh = await foreignRpc(a.owner, worker.name, stranger, 'GetTask', { id: foreignTaskId });
+        assert(!fresh.error, `a fresh assertion from the same peer still works, got ${JSON.stringify(fresh.error)}`);
+    });
+
+    await test('an expired assertion is refused for expiry, not for reuse', async () => {
+        // ORDER, not presence: expiry is checked before the spend, so a caller whose clock ran out
+        // is told the true thing rather than "already used" — which would send them looking for a
+        // replay they did not make.
+        const shortLived = await stranger.assertion(2);
+        const used = await foreignRpc(a.owner, worker.name, stranger, 'GetTask', { id: foreignTaskId },
+            { assertion: shortLived });
+        assert(!used.error, `it works while it lives, got ${JSON.stringify(used.error)}`);
+
+        await new Promise(r => setTimeout(r, 2600));
+        const late = await foreignRpc(a.owner, worker.name, stranger, 'GetTask', { id: foreignTaskId },
+            { assertion: shortLived });
+        assert(late.status === 401, `expected 401, got ${late.status}`);
+        assert(late.body?.error?.code === 'A2A_ASSERTION_EXPIRED',
+            `expiry beats reuse in the ordering, got ${late.body?.error?.code}`);
     });
 
     await test('a stranger cannot reach anything the offering does not name', async () => {
