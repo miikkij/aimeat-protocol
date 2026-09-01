@@ -34,6 +34,8 @@
  *   });
  *   // later, when the app's data changed:  m.refresh('errands.');
  * @version-history
+ *   v0.42.0 — 2026-09-01 — Four of the nine new parts join the block vocabulary: `ring`, `crew`
+ *     and `poll` bind their record whole, `keys` its rows.
  *   v0.39.0 — 2026-08-30 — The broadcast family joins the block vocabulary: `crt` (binds its
  *     record whole), `countdown` (rows) and `crawl` (lines) — the Music Television genre's
  *     parts as components.
@@ -99,6 +101,7 @@ import { kanban, plan, schedule, steps } from './planner.js';
 import { konsole } from './konsole.js';
 import { legalLinks, auditTrail, feedbackForm, reviewerLine } from './commercial.js';
 import { crt, countdown, crawl } from './mtv.js';
+import { ring, crew, poll, keys } from './parts.js';
 import { atlas } from './atlas.js';
 import { map } from './map.js';
 
@@ -283,6 +286,25 @@ export function mosaic(spec) {
       case 'crawl':
         return bound('crawl', function (data) {
           return crawl({ target: into, data: patchFor('crawl', data).items, tone: p.tone });
+        });
+      // ── The data-shaped four of the nine new parts: ring, crew and poll bind their record
+      //    whole, keys its rows. The behaviour-shaped rest (toast, palette, compare, tour) are
+      //    component-only, like the dialog family.
+      case 'ring':
+        return bound('ring', function (data) {
+          return ring({ target: into, data: patchFor('ring', data).data, title: p.title, empty: empty });
+        });
+      case 'crew':
+        return bound('crew', function (data) {
+          return crew({ target: into, data: patchFor('crew', data).data, title: p.title, empty: empty });
+        });
+      case 'poll':
+        return bound('poll', function (data) {
+          return poll({ target: into, data: patchFor('poll', data).data, empty: empty, onPick: pick });
+        });
+      case 'keys':
+        return bound('keys', function (data) {
+          return keys({ target: into, data: patchFor('keys', data).items });
         });
       case 'scene3d': {
         // bars binds a source (rows stand up as columns); model and globe bind their own
