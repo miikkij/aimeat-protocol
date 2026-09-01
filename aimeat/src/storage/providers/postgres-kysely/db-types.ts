@@ -95,6 +95,7 @@ export interface AgentEnrolmentGrant {
   id: string;
   owner: string;
   agents: Generated<string[]>;
+  kind: string | null;
   createdBy: string;
   createdAt: string;
   expiresAt: string;

@@ -30,7 +30,7 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { apiGet } from '/js/api.js';
+import { apiGet, apiPost } from '/js/api.js';
 import { hasSession, getSession, onAuthChange } from '/js/services/auth.js';
 import { connect, disconnect, onUpdate, offUpdate } from '/lib/live-updates.js';
 import { useViewCSS } from '/components/useViewCSS.js';
@@ -78,6 +78,9 @@ export default function FleetView() {
   const [agents, setAgents] = useState(null);
   const [signedIn, setSignedIn] = useState(hasSession());
   const [onlyProblems, setOnlyProblems] = useState(false);
+  const [migration, setMigration] = useState(null);
+  const [migrating, setMigrating] = useState(false);
+  const [outcome, setOutcome] = useState(null);
 
   // The response also carries `credential_summary`, the same counts as one object. This page has the
   // rows in hand and has to filter them anyway, so it counts them itself; the summary is for a
@@ -87,6 +90,43 @@ export default function FleetView() {
       const resp = await apiGet('/v1/agents?include=stats,credentials');
       setAgents(resp?.data?.agents ?? []);
     } catch (err) { swallowed('fleet: load', err); setAgents([]); }
+    // What could be done about the ones that cannot sign in. Read separately because it is a
+    // DECISION rather than a listing: the node answers which agents would move, whether a
+    // connector is there to move them, and the sentence to show if it is not.
+    try {
+      const resp = await apiGet('/v1/agents/v2/migrate');
+      setMigration(resp?.data ?? null);
+    } catch (err) { swallowed('fleet: migration preview', err); setMigration(null); }
+  }
+
+  /**
+   * One press for the whole stuck fleet.
+   *
+   * No confirmation dialog: the agents keep their name, their identity and everything filed against
+   * them, and a failure leaves each one exactly as it was. A dialog in front of a reversible,
+   * non-destructive action is a step that teaches people to click through steps.
+   *
+   * THE OUTCOME STAYS ON THE PAGE rather than in a toast. This is a standalone view with no toast
+   * host of its own, and more to the point the answer is a state — which agents moved, which did
+   * not — and a state belongs where the person is already looking rather than in something that
+   * disappears while they read the list it changed.
+   */
+  async function migrate() {
+    if (migrating) return;
+    setMigrating(true);
+    setOutcome(null);
+    try {
+      const resp = await apiPost('/v1/agents/v2/migrate', {});
+      setOutcome({ ok: true, text: resp?.data?.next_step || t('fleet.migrate.done') });
+    } catch (err) {
+      swallowed('fleet: migrate', err);
+      // The node's own sentence: it already says whether anything changed, and it does that better
+      // than a generic line here could.
+      setOutcome({ ok: false, text: err?.message || t('fleet.migrate.failed') });
+    } finally {
+      setMigrating(false);
+      await loadRef.current();
+    }
   }
 
   // load() is redeclared every render; the ref is what the mounted-once effects below call.
@@ -150,6 +190,20 @@ export default function FleetView() {
       ${agents.length === 0
         ? html`<${EmptyState} title=${t('fleet.emptyTitle')} text=${t('fleet.emptyText')} />`
         : html`
+          ${migration && (migration.would_move ?? []).length > 0 && html`
+            <div class="flt-migrate">
+              <p class="flt-migrate-line">${migration.next_step}</p>
+              <button class="btn-primary btn-sm" disabled=${migrating || (migration.daemons ?? []).length === 0}
+                      onClick=${migrate}>
+                ${migrating ? t('fleet.migrate.working') : t('fleet.migrate.action').replace('{n}', String(migration.would_move.length))}
+              </button>
+              ${outcome && html`<p class="flt-migrate-outcome ${outcome.ok ? '' : 'is-bad'}">${outcome.text}</p>`}
+            </div>
+          `}
+          ${!(migration && (migration.would_move ?? []).length > 0) && outcome && html`
+            <p class="flt-migrate-outcome ${outcome.ok ? '' : 'is-bad'}">${outcome.text}</p>
+          `}
+
           <div class="flt-summary">
             <span class="flt-count">${agents.length === 1
               ? t('fleet.countAgentsOne')

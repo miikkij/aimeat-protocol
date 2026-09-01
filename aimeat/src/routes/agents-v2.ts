@@ -15,6 +15,7 @@
  *     /v1/agents/v2/messages           a turn between two of this account's principals
  *     /v1/agents/v2/push-config        where to reach a principal that is not connected
  *     /v1/agents/v2/tasks              the handle a caller holds while work runs
+ *     /v1/agents/v2/migrate            move existing v1 agents onto a key and a card
  *     GET  /v1/agents/:gaii/card       the agent's signed card (public)
  *     GET  /v1/agents/:gaii/jwks.json  the key that verifies it (public)
  *
@@ -40,6 +41,7 @@ import { registerAgentV2TokenRoute } from './agents-v2/token.js';
 import { registerAgentCardRoutes } from './agents-v2/card.js';
 import { registerAgentV2MessagingRoutes } from './agents-v2/messaging.js';
 import { registerAgentV2TaskRoutes } from './agents-v2/tasks.js';
+import { registerAgentV2MigrateRoutes } from './agents-v2/migrate.js';
 
 export function agentsV2Router(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -50,6 +52,7 @@ export function agentsV2Router(config: AimeatConfig, storage: Storage): Router {
   registerAgentV2TokenRoute(router, config, storage);
   registerAgentV2MessagingRoutes(router, config, storage);
   registerAgentV2TaskRoutes(router, config, storage);
+  registerAgentV2MigrateRoutes(router, config, storage);
   registerAgentCardRoutes(router, config, storage);
 
   return router;

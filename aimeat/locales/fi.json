@@ -4418,6 +4418,12 @@
       "never": "Ei ole koskaan yhdistänyt",
       "unreadable": "Vaatii katsomista",
       "unknown": "Ei tiedossa"
+    },
+    "migrate": {
+      "action": "Siirrä {n} omalle avaimelle",
+      "working": "Siirretään…",
+      "done": "Valmis.",
+      "failed": "Ei onnistunut. Mikään ei muuttunut."
     }
   },
   "footer": {

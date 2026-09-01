@@ -154,8 +154,17 @@ export function registerAgentV2EnrolRoute(router: Router, config: AimeatConfig, 
       const record = defects.length === 0 ? await storage.getAgent(expectedGaii) : null;
       if (defects.length === 0) {
         if (!record) defects.push({ field: 'name', reason: 'That agent does not exist on this node.' });
-        else if (record.identityVersion !== 2) defects.push({ field: 'name', reason: 'That agent is not a key-and-card agent.' });
-        else if (record.owner !== grant.owner) defects.push({ field: 'owner', reason: 'That agent belongs to another account.' });
+        // A MIGRATION grant is the one case where a v1 record is the point: the agents named in it
+        // are existing v1 agents, and `identityVersion: 2` is written below in the same update that
+        // pins the key, so nothing is half-changed if this submission is rejected. Every other
+        // grant still requires a record that is already 2.
+        else if (grant.kind !== 'migrate' && record.identityVersion !== 2) {
+          defects.push({ field: 'name', reason: 'That agent is not a key-and-card agent.' });
+        } else if (grant.kind === 'migrate' && record.identityVersion === 2 && record.enrolledAt) {
+          defects.push({ field: 'name', reason: 'That agent has already moved to a key and card.' });
+        } else if (record.owner !== grant.owner) {
+          defects.push({ field: 'owner', reason: 'That agent belongs to another account.' });
+        }
       }
 
       // Proof of possession: the card verifies against the key it carries. This says "whoever wrote
@@ -206,12 +215,19 @@ export function registerAgentV2EnrolRoute(router: Router, config: AimeatConfig, 
     const enrolled: Array<Record<string, unknown>> = [];
     for (const item of accepted) {
       const gaii = item.record.gaii;
+      // ONE WRITE PER AGENT, and it is the only write this whole path makes. Every card was
+      // verified before the loop started, so a rejected submission changes nothing at all and a
+      // migrated agent is either fully moved or exactly what it was.
+      //
+      // `identityVersion` is included only for a migration: the create path's agents are already 2,
+      // and writing it there would be a second place deciding what they are.
       await storage.updateAgent(gaii, {
         publicKey: item.publicKeyBase64,
         cardJws: item.jws,
         cardIssuedAt: item.issuedAt,
         enrolledAt: now,
         lastSeen: now,
+        ...(grant.kind === 'migrate' ? { identityVersion: 2 } : {}),
       });
 
       const sessionId = generateSessionId();

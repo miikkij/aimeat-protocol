@@ -4289,6 +4289,12 @@
       "never": "Nunca se ha conectado",
       "unreadable": "Hay que mirarlo",
       "unknown": "Se desconoce"
+    },
+    "migrate": {
+      "action": "Pasar {n} a su propia clave",
+      "working": "Pasándolos…",
+      "done": "Listo.",
+      "failed": "No ha funcionado. No ha cambiado nada."
     }
   },
   "footer": {

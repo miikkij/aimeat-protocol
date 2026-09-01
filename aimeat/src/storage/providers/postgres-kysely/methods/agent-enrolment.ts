@@ -17,7 +17,9 @@ import { dbError } from '../helpers.js';
 
 function toRecord(r: Selectable<AgentEnrolmentGrant>): AgentEnrolmentGrantRecord {
   return {
-    id: r.id, owner: r.owner, agents: r.agents ?? [], createdBy: r.createdBy,
+    id: r.id, owner: r.owner, agents: r.agents ?? [],
+    kind: ((r.kind ?? 'create') as 'create' | 'migrate'),
+    createdBy: r.createdBy,
     createdAt: r.createdAt, expiresAt: r.expiresAt,
     usedAt: r.usedAt ?? null, usedBy: r.usedBy ?? null,
   };
@@ -27,7 +29,7 @@ export const agentEnrolmentMethods = {
   async createAgentEnrolmentGrant(this: PostgresKyselyStorage, grant: AgentEnrolmentGrantRecord): Promise<void> {
     try {
       await this.db.insertInto('AgentEnrolmentGrant').values({
-        id: grant.id, owner: grant.owner, agents: grant.agents,
+        id: grant.id, owner: grant.owner, agents: grant.agents, kind: grant.kind ?? 'create',
         createdBy: grant.createdBy, createdAt: grant.createdAt, expiresAt: grant.expiresAt,
         usedAt: grant.usedAt ?? null, usedBy: grant.usedBy ?? null,
       }).execute();

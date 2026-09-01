@@ -7244,6 +7244,138 @@ paths:
             CARD_REJECTED or INCOMPLETE_SUBMISSION. Nothing was enrolled. `error.details.rejected`
             lists each refused card with a machine-readable `defects` array of `{ field, reason }`.
 
+  /v1/agents/v2/migrate:
+    get:
+      operationId: previewAgentMigration
+      summary: Which existing agents would move to a key and a card
+      description: |
+        Reads which of this account's agents cannot sign in — `dead`, `never` or `unreadable`,
+        through the same function the Agents section shows, so the page that says twelve agents are
+        stuck and the button that fixes them cannot disagree about which twelve.
+
+        An agent that is merely `expiring` is NOT included: it still works, and moving it is the
+        owner's call rather than something a button decides for them. Naming it in the POST moves it.
+
+        `next_step` is the sentence a person reads, and it says which of the three situations they
+        are in: nothing to move, something to move but no connector running, or ready.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: What would move
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          would_move:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                name: { type: string }
+                                gaii: { type: string }
+                                identity_version: { type: integer }
+                          skipped:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                name: { type: string }
+                                reason: { type: string }
+                          daemons:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                install_id: { type: string, nullable: true }
+                                principals: { type: integer }
+                          next_step: { type: string }
+        '403':
+          description: An app grant or an ecosystem app asked
+    post:
+      operationId: migrateAgentsToV2
+      summary: Move existing v1 agents onto their own key and card
+      description: |
+        ONE PRESS. The agents keep their name, their GAII, their tags, their trust score, their
+        scopes and every task filed against them; what changes is how they prove who they are.
+
+        THE CASE IT EXISTS FOR. A v1 agent holds a device credential that runs out, and until the
+        Agents section started reading that, nothing said so. The only previous remedy was deleting
+        the agent and connecting a new one, which loses everything above.
+
+        IT IS THE ENROLMENT PATH, pointed at rows that already exist: the same single-use grant, the
+        same offer over the socket the connector is already holding, the same cards, the same
+        `/v1/agents/v2/enrol` answering them. The connector needs no new code. The grant carries
+        `kind: 'migrate'`, which is what lets the enrol route accept a v1 record and write
+        `identityVersion: 2` in the same update that pins the key.
+
+        A FAILED MIGRATION LEAVES THE AGENT EXACTLY AS IT WAS. Nothing is written before the
+        connector answers — no pre-marking, no placeholder, no half-migrated row. With no connector
+        the call answers 409 `NO_DAEMON` before writing the grant; if the connector refuses or times
+        out it answers 502 and the agents are untouched. Pressing again makes a fresh grant.
+
+        `requireOwnerPrincipal()`, not `requireRole('owner')`: this replaces a credential, and
+        `req.auth.owner` carries the human's name on an agent token too.
+
+        Omit `agents` to move everything that cannot sign in. Name them to move a subset, including
+        one that is merely expiring. At most 50 per press.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                agents:
+                  type: array
+                  items: { type: string }
+                  description: Which to move. Omit for everything that cannot sign in.
+                install_id:
+                  type: string
+                  description: Which connector installation to hand the work to. Omit for whichever is connected.
+      responses:
+        '200':
+          description: What moved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          moved:
+                            type: array
+                            items: { type: string }
+                          still_stuck:
+                            type: array
+                            items: { type: string }
+                            description: Named rather than counted, and each is exactly as it was.
+                          skipped:
+                            type: array
+                            items: { type: object }
+                          install_id: { type: string, nullable: true }
+                          next_step: { type: string }
+        '400':
+          description: More than 50 named in one press
+        '403':
+          description: Not the account holder in person, or the scope is missing
+        '409':
+          description: Nothing needs moving, or no connector is running — and nothing was written
+        '502':
+          description: The connector refused or did not finish. Nothing changed.
+
   /v1/agents/v2/token:
     post:
       operationId: agentV2Token
