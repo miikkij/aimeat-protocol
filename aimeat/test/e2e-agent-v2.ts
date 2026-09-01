@@ -850,6 +850,79 @@ async function run() {
         assert(r.body?.data?.auto_approved !== true, 'an escalating registration must wait for the owner');
     });
 
+    // ── 8a. Making an agent needs agent:write ─────────────────────────────────
+    //
+    // This route's same-owner branch is the ONLY way an agent creates an agent, and until
+    // 2026-09-01 it read no scope at all: every same-owner agent qualified. The owner's three
+    // basic agents are granted different permissions on purpose — only crew-forge is given
+    // agent:write — and that distinction was not kept. These four tests are that distinction.
+    const mintFor = async (name: string, owner: string) => {
+        const assertion = await signAssertion(`${name}#${owner}@${NODE_ID}`, keysByAgent.get(name)!);
+        const mint = await json('/v1/agents/v2/token', { method: 'POST', body: JSON.stringify({ grant_type: KEY_GRANT, assertion }) });
+        assert(mint.status === 200, `${name} mint ${mint.status}`);
+        return mint.body.access_token as string;
+    };
+
+    await test('crew-forge holds agent:write, so its registration is settled on the spot', async () => {
+        const r = await json('/v1/agents/device-authorize', {
+            method: 'POST', headers: { Authorization: `Bearer ${await mintFor('crew-forge', a.owner)}` },
+            body: JSON.stringify({ agent_name: 'forged-by-forge', owner: a.owner, scopes: ['memory:read'] }),
+        });
+        assert(r.status === 200, `expected 200, got ${r.status}`);
+        assert(r.body?.data?.auto_approved === true, 'crew-forge is the one that may do this');
+        const list = await json('/v1/agents?owner=' + a.owner, { headers: authA });
+        assert((list.body.data.agents as any[]).some(x => x.name === 'forged-by-forge'), 'the agent should exist');
+
+        // And `registeredBy` named the forge — proven through the gate that reads it rather than
+        // through a listing field, because that is where the value has to be right. The forge may
+        // end what it made; a sibling of the same owner, holding the same delete word, may not.
+        const sibling = await addV1Agent(a.owner, a.ownerToken, 'not-the-registrar', ['agent:delete']);
+        const bySibling = await json('/v1/agents/forged-by-forge', {
+            method: 'DELETE', headers: { Authorization: `Bearer ${sibling.token}` },
+        });
+        assert(bySibling.status === 403, `a sibling that did not register it must be refused, got ${bySibling.status}`);
+        const byForge = await json('/v1/agents/forged-by-forge', {
+            method: 'DELETE', headers: { Authorization: `Bearer ${await mintFor('crew-forge', a.owner)}` },
+        });
+        assert(byForge.status === 200, `the forge that made it may end it, got ${byForge.status}`);
+    });
+
+    for (const name of ['concierge', 'workflow-manager']) {
+        await test(`${name} does not, and is told which permission is missing`, async () => {
+            const r = await json('/v1/agents/device-authorize', {
+                method: 'POST', headers: { Authorization: `Bearer ${await mintFor(name, a.owner)}` },
+                body: JSON.stringify({ agent_name: `forged-by-${name}`, owner: a.owner, scopes: ['memory:read'] }),
+            });
+            assert(r.status === 200, `expected 200, got ${r.status}`);
+            assert(r.body?.data?.auto_approved !== true, `${name} must not settle this itself`);
+
+            // Refusing is a fall-through, not a failure: the request is still there for the owner.
+            assert(r.body?.data?.status === 'pending', `expected pending, got ${r.body?.data?.status}`);
+            assert(typeof r.body?.data?.user_code === 'string' && r.body.data.user_code.length > 0,
+                'a code the owner can approve must still come back');
+
+            const said = String(r.body?.data?.user_instructions ?? '');
+            assert(said.includes('agent:write'), `the refusal must name the scope: ${said}`);
+            assert(/profile/i.test(said), `and where the owner approves it: ${said}`);
+
+            // Nothing was created, and no credential is waiting for anyone to collect.
+            const list = await json('/v1/agents?owner=' + a.owner, { headers: authA });
+            assert(!(list.body.data.agents as any[]).some(x => x.name === `forged-by-${name}`),
+                'no agent may exist before the owner approves');
+        });
+    }
+
+    await test('the owner\'s own session is unaffected by any of this', async () => {
+        // The owner holds no scopes at all — their session IS the permission — so a rule about
+        // scopes must not reach them.
+        const r = await json('/v1/agents/device-authorize', {
+            method: 'POST', headers: authA,
+            body: JSON.stringify({ agent_name: 'made-by-the-owner', owner: a.owner, scopes: ['memory:read'] }),
+        });
+        assert(r.status === 200, `expected 200, got ${r.status}`);
+        assert(r.body?.data?.auto_approved === true, 'an owner registering their own agent is still immediate');
+    });
+
     // ── 8b. A first crew definition for an agent that has no runtime ─────────
     // The chicken and egg: publish asks the TARGET's runtime to validate, and a brand-new agent
     // has none, because what it would load is the definition being published.
