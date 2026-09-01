@@ -6968,7 +6968,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.39.0",
+    version: "0.40.0",
     // ── Shell and navigation ──
     app,
     section,

@@ -23,6 +23,8 @@
  *   import { runMatrix } from './atelier-contrast.js';
  *   const failures = runMatrix({ '--ak-accent': '#b3261e' }).filter((r) => !r.ok);
  * @version-history
+ *   v1.1.0 — 2026-09-01 — REQUIRED_BASE grows by the broadcast family's five tokens
+ *     (--ak-crt-ch1..4, --ak-crt-set), declared in the contract for the broadcast look.
  *   v1.0.0 — 2026-08-28 — Extracted from tools/atelier-check.ts (TARGET-074: colour reaches the
  *     signature). The checks and thresholds are byte-for-byte the tool's; new here are only
  *     loadAtelierSheets' cache and runMatrix's `overrides` parameter.
@@ -381,6 +383,9 @@ export const REQUIRED_BASE = [
   '--ak-display-shadow', '--ak-display-stroke', '--ak-tilt', '--ak-kinetic', '--ak-page-grain',
   '--ak-gap', '--ak-pad', '--ak-touch', '--ak-motion', '--ak-ease',
   '--ak-enter-distance', '--ak-enter-stagger', '--ak-chrome-bottom', '--ak-main-max', '--ak-hero-min',
+  // The broadcast family's channel colours and the set's ground (2026-09-01): contract tokens
+  // so a look may retune the CRT, the countdown and the crawl under this matrix's proof.
+  '--ak-crt-ch1', '--ak-crt-ch2', '--ak-crt-ch3', '--ak-crt-ch4', '--ak-crt-set',
 ];
 /** The dark block must re-declare at least the surfaces and inks it exists for. */
 export const REQUIRED_DARK = ['--ak-bg', '--ak-surface', '--ak-surface-2', '--ak-ink', '--ak-line', '--ak-scrim'];
