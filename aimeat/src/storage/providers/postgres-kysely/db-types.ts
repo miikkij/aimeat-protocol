@@ -131,6 +131,26 @@ export interface AgentV2PushConfig {
   disabledAt: string | null;
 }
 
+export interface AgentV2Task {
+  taskId: string;
+  status: string;
+  statusMessage: string | null;
+  contextId: string;
+  owner: string;
+  createdBy: string;
+  assignedTo: string;
+  input: Generated<Json>;
+  result: Json | null;
+  error: Json | null;
+  createdAt: string;
+  lastUpdatedAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  ttlMs: number | null;
+  pollIntervalMs: number | null;
+  metadata: Json | null;
+}
+
 export interface AgentActivity {
   agentGaii: string;
   date: string;
@@ -2117,6 +2137,7 @@ export interface DB {
   AgentUsageEventArchive: AgentUsageEventArchive;
   AgentV2Message: AgentV2Message;
   AgentV2PushConfig: AgentV2PushConfig;
+  AgentV2Task: AgentV2Task;
   UsageCall: UsageCall;
   UsageCallArchive: UsageCallArchive;
   UsageRollup: UsageRollup;

@@ -60,8 +60,8 @@ function isHttpUrl(v: unknown): boolean {
   } catch { return false; }
 }
 
-function validatePart(p: unknown, i: number, defects: MessageDefect[]): MessagePart | null {
-  const at = `parts[${i}]`;
+function validatePart(p: unknown, i: number, defects: MessageDefect[], field = 'parts'): MessagePart | null {
+  const at = `${field}[${i}]`;
   if (!p || typeof p !== 'object' || Array.isArray(p)) {
     defects.push({ field: at, reason: 'Each part must be an object.' });
     return null;
@@ -111,6 +111,31 @@ function validatePart(p: unknown, i: number, defects: MessageDefect[]): MessageP
   return null;
 }
 
+/**
+ * An array of parts, under whatever name the caller's field has. Exported because a TASK carries
+ * the same shape for its input and its result: one definition of what a payload looks like, so a
+ * task and the conversation around it cannot disagree about it.
+ *
+ * Appends to `defects` and returns whatever parsed; the caller decides whether an empty result with
+ * defects recorded is a refusal.
+ */
+export function validatePartsArray(value: unknown, field: string, defects: MessageDefect[]): MessagePart[] {
+  const parts: MessagePart[] = [];
+  if (!Array.isArray(value) || value.length === 0) {
+    defects.push({ field, reason: 'Required: a non-empty array of parts.' });
+    return parts;
+  }
+  if (value.length > MESSAGE_LIMITS.maxParts) {
+    defects.push({ field, reason: `At most ${MESSAGE_LIMITS.maxParts} parts.` });
+    return parts;
+  }
+  value.forEach((p, i) => {
+    const part = validatePart(p, i, defects, field);
+    if (part) parts.push(part);
+  });
+  return parts;
+}
+
 export interface ValidatedMessageInput {
   role: MessageRole;
   parts: MessagePart[];
@@ -140,17 +165,7 @@ export function validateMessageInput(value: unknown): { ok: boolean; defects: Me
   const to = str(b.to);
   if (!to) defects.push({ field: 'to', reason: 'Required: the principal this turn is addressed to.' });
 
-  const parts: MessagePart[] = [];
-  if (!Array.isArray(b.parts) || b.parts.length === 0) {
-    defects.push({ field: 'parts', reason: 'Required: a non-empty array of parts.' });
-  } else if (b.parts.length > MESSAGE_LIMITS.maxParts) {
-    defects.push({ field: 'parts', reason: `At most ${MESSAGE_LIMITS.maxParts} parts in one turn.` });
-  } else {
-    b.parts.forEach((p, i) => {
-      const part = validatePart(p, i, defects);
-      if (part) parts.push(part);
-    });
-  }
+  const parts = validatePartsArray(b.parts, 'parts', defects);
 
   for (const field of ['contextId', 'taskId'] as const) {
     const v = b[field];

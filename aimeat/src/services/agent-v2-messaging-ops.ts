@@ -98,6 +98,15 @@ export async function sendTurn(
   const recipient = await resolveRecipient(storage, config.nodeId, auth.owner, input.to);
   if (!recipient.ok) return recipient;
 
+  // A taskId is an ADDRESS, so it is checked the same way a recipient is: a turn filed against a
+  // task that does not exist is a turn nobody reading that task will ever find, reported as sent.
+  if (input.taskId) {
+    const task = await storage.getAgentV2Task(auth.owner, input.taskId);
+    if (!task) {
+      return { ok: false, status: 404, code: 'NOT_FOUND', message: `No task ${input.taskId} on this account.` };
+    }
+  }
+
   const message = await sendAgentV2Message(storage, {
     owner: auth.owner,
     from: resolveIdentity(auth, config.nodeId),

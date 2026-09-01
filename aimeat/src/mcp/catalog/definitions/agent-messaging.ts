@@ -5,6 +5,7 @@
  * @description Handbook/onboarding, agent self-management (capabilities, activity, telemetry, tags, mode), owner-agent messaging, and federated direct-message (DM) tool definitions, plus aimeat_agents_list.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.3.0 — 2026-09-01 — The five Agent v2 task tools (V5), in MCP's task shape.
  *   v1.2.0 — 2026-09-01 — The five Agent v2 messaging tools (V4): a turn between two
  *     principals of one account, and the delivery target that reaches an absent one.
  *   v1.1.0 — 2026-08-13 — aimeat_agent_console_set: an agent that creates a sibling in a fleet
@@ -412,6 +413,78 @@ export const agentMessagingTools: AimeatToolDefinition[] = [
         visibility: agentEverywhere,
         input: {
             id: { type: 'string', required: true, description: 'The target id, from aimeat_v2_push_list.' },
+        },
+    },
+
+    // -- Agent v2 tasks: the handle a caller holds while work runs --
+    //
+    // Not the dashboard work item above (aimeat_task_*), which has a title, todos, an approval step
+    // and an SLA and is not going anywhere. This is MCP's task shape, which A2A also reads: a
+    // taskId, five statuses, a poll interval. The status word stored is always the MCP one and the
+    // A2A state is derived beside it, because `cancelled` and `canceled` differ by one letter.
+    {
+        name: 'aimeat_v2_task_create',
+        description: 'Ask another principal on this account to do something, and get back a handle you poll. This is the MCP task shape: a taskId, a status that is one of working / input_required / completed / failed / cancelled, and a poll interval. Distinct from aimeat_task_create, which makes the owner an item in their dashboard with a title, todos and an approval step; this one is the handle a long call runs behind. Group it with a conversation by passing the same context_id you use for turns.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            assigned_to: { type: 'string', required: true, description: 'The principal that is to do this: an agent GAII, an ecosystem app, or the owner GHII.' },
+            input: { type: 'array', required: true, description: 'What is being asked, as parts: {kind:"text",text} or {kind:"file",file:{uri}} or {kind:"data",data:{...}}. The same shape a turn carries.' },
+            context_id: { type: 'string', description: 'The exchange this work belongs to. Omit and the task names itself.' },
+            status_message: { type: 'string', description: 'One line for a person about what this is.' },
+            ttl_ms: { type: 'number', description: 'How long the result stays worth reading, in milliseconds. Advice, not a deletion.' },
+            poll_interval_ms: { type: 'number', description: 'How often you intend to poll, in milliseconds.' },
+            metadata: { type: 'object', description: 'Carried along, never read by the node.' },
+        },
+    },
+    {
+        name: 'aimeat_v2_task_list',
+        description: 'The task roster, newest first. Narrow by assigned_to for what a worker has been given, created_by for what you asked for, context_id for one conversation, or status for what is still open. An unrecognised status is refused rather than ignored, because a filter that does not filter returns everything and reads as a working query.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        supportsResponseFormat: true,
+        conciseFields: ['taskId', 'status', 'assignedTo', 'createdBy', 'lastUpdatedAt'],
+        concisePath: 'tasks',
+        input: {
+            assigned_to: { type: 'string', description: 'Tasks given to this principal.' },
+            created_by: { type: 'string', description: 'Tasks this principal asked for.' },
+            context_id: { type: 'string', description: 'Tasks in one exchange.' },
+            status: { type: 'string', description: 'One status or a comma-separated list: working, input_required, completed, failed, cancelled.' },
+            limit: { type: 'number', description: 'Max tasks to return (default 50, max 200).' },
+        },
+    },
+    {
+        name: 'aimeat_v2_task_get',
+        description: 'One task, with everything a poll needs: its MCP status, whether that status is terminal, the A2A state the same task reports on that protocol, the result if it completed and the error if it did not. A terminal task never changes again, so the first settled read you see is the last one you need.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            task_id: { type: 'string', required: true, description: 'The task id.' },
+        },
+    },
+    {
+        name: 'aimeat_v2_task_status',
+        description: 'Report where you have got to with work you were given. Only the assignee and the account holder may: a task\'s status is the worker\'s testimony about the work, so whoever asked for it cannot write it. Completing requires a result, failing requires a code and a message, and a task that has already settled refuses to move. To stop work you asked for, cancel it instead.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            task_id: { type: 'string', required: true, description: 'The task id.' },
+            status: { type: 'string', enum: ['working', 'input_required', 'completed', 'failed'], required: true, description: 'Where it has got to.' },
+            status_message: { type: 'string', description: 'One line for a person.' },
+            result: { type: 'array', description: 'What came back, as parts. Required when completing.' },
+            error: { type: 'object', description: '{ code, message }. Required when failing.' },
+            ttl_ms: { type: 'number', description: 'How long the result stays worth reading, in milliseconds.' },
+            poll_interval_ms: { type: 'number', description: 'How often the caller should poll from here, in milliseconds.' },
+        },
+    },
+    {
+        name: 'aimeat_v2_task_cancel',
+        description: 'Stop work you asked for. Only whoever created the task and the account holder may: a worker that will not do the work reports it failed with a reason, which is a different thing and is recorded as one. A task that has already settled refuses to move.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            task_id: { type: 'string', required: true, description: 'The task id.' },
+            reason: { type: 'string', description: 'Why, in one line.' },
         },
     },
 ];

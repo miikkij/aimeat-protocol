@@ -575,6 +575,33 @@ export function applySchemaTables2(db: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_agent_v2_push_owner_principal ON agent_v2_push_configs(owner, principal);
 
+    -- ── Agent v2 tasks ──
+    -- The handle a caller holds while work runs, in MCP's task shape. The dashboard work item
+    -- (agent_tasks) is a different thing and is untouched; see migration 0060 for why both exist.
+    -- The status is always the MCP word; the A2A state is derived, never stored.
+    CREATE TABLE IF NOT EXISTS agent_v2_tasks (
+      taskId         TEXT PRIMARY KEY,
+      status         TEXT NOT NULL,
+      statusMessage  TEXT,
+      contextId      TEXT NOT NULL,
+      owner          TEXT NOT NULL,
+      createdBy      TEXT NOT NULL,
+      assignedTo     TEXT NOT NULL,
+      input          TEXT NOT NULL DEFAULT '[]',
+      result         TEXT,
+      error          TEXT,
+      createdAt      TEXT NOT NULL,
+      lastUpdatedAt  TEXT NOT NULL,
+      startedAt      TEXT,
+      completedAt    TEXT,
+      ttlMs          INTEGER,
+      pollIntervalMs INTEGER,
+      metadata       TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_agent_v2_task_owner_assigned ON agent_v2_tasks(owner, assignedTo, status);
+    CREATE INDEX IF NOT EXISTS idx_agent_v2_task_owner_creator ON agent_v2_tasks(owner, createdBy, createdAt);
+    CREATE INDEX IF NOT EXISTS idx_agent_v2_task_context ON agent_v2_tasks(contextId);
+
     -- ── Ecosystem Applications (GEAI principal) ──
     -- Mirror of the agents table, minus task/agent-only fields, plus the ecosystem binding fields.
     CREATE TABLE IF NOT EXISTS ecosystem_apps (

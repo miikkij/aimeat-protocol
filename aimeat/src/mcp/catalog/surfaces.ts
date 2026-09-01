@@ -156,6 +156,8 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         // no messaging at all, and the primitives surface reaches these through aimeat_invoke.
         'aimeat_v2_message_send', 'aimeat_v2_message_list',
         'aimeat_v2_push_set', 'aimeat_v2_push_list', 'aimeat_v2_push_delete',
+        'aimeat_v2_task_create', 'aimeat_v2_task_list', 'aimeat_v2_task_get',
+        'aimeat_v2_task_status', 'aimeat_v2_task_cancel',
         'aimeat_company_list', 'aimeat_company_create', 'aimeat_company_update',
         'aimeat_company_front_page', 'aimeat_company_portfolio_publish',
         // Taking a shipped package into use, beside the company tools rather than with the four

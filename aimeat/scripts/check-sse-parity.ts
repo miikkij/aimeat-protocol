@@ -112,6 +112,14 @@ const EXEMPT: Record<string, string> = {
  * entry says which function carries it.
  */
 const DELEGATES: Record<string, string> = {
+    'src/mcp/agent-v2-tasks.ts': 'services/agent-v2-tasks-ops.ts, and for the same reason as '
+        + 'the v2 messaging tools beside it: a v2 task is addressed to a PRINCIPAL rather than to '
+        + 'a view. Whoever needs to know is told on the tunnel socket it is holding (emitDelivery, '
+        + 'kinds v2.task.assigned and v2.task.updated) and polls the task back with the same call '
+        + 'either way. No browser surface lists these — the profile Tasks tab reads AgentTask, '
+        + 'which is a different store and is untouched — so an emitChange here would wake every '
+        + 'open page for something none of them shows. Verified by reading notify() out of '
+        + 'agent-v2-tasks-ops.ts. When a view for them is built, this entry becomes an emit.',
     'src/mcp/agent-v2-messaging.ts': 'services/agent-v2-messaging-ops.ts, then '
         + 'services/agent-v2-messaging.ts, and the announcement it makes is deliberately NOT a '
         + 'change domain. A v2 turn is addressed to a PRINCIPAL, not to a view: the recipient is '

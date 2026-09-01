@@ -224,6 +224,10 @@ const ALL_SUITES = [
     // node: the envelope, the echoed token, the Authorization header. Half the suite asserts
     // that the five message kinds which already existed answer exactly what they answered.
     'test/e2e-agent-v2-messaging.ts',
+    // Agent v2 V5: the task handle, in MCP's task shape. Reads every A2A state off a real task,
+    // including the three recovered from what sits beside the status, and RUNS the race the
+    // conditional update exists for: a worker completing while the caller cancels.
+    'test/e2e-agent-v2-tasks.ts',
     // Does an open page hear about work an agent does? 21 of the 31 writing tool files emitted no
     // SSE change domain at all, so the write landed and the screen stayed as it was.
     'test/e2e-mcp-sse-parity.ts',

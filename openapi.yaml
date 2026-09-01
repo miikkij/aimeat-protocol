@@ -1060,6 +1060,59 @@ components:
           type: object
           nullable: true
 
+    AgentV2Task:
+      type: object
+      description: |
+        The handle a caller holds while work runs, in MCP's task shape, with the A2A state derived
+        beside the MCP status.
+      properties:
+        spec: { type: string, enum: ['aimeat.task/v1'] }
+        taskId: { type: string }
+        status:
+          type: string
+          enum: [working, input_required, completed, failed, cancelled]
+          description: The MCP word. Always this vocabulary in storage and in every write.
+        a2a_state:
+          type: string
+          enum: [submitted, working, input-required, auth-required, completed, failed, rejected, canceled]
+          description: |
+            What A2A calls the same state. Derived, never stored, never accepted as input.
+            `submitted` is a task nobody has started; `rejected` and `auth-required` are recovered
+            from `error.code`.
+        terminal:
+          type: boolean
+          description: True for completed, failed and cancelled. A terminal task never moves again.
+        statusMessage:
+          type: string
+          nullable: true
+        contextId: { type: string }
+        createdBy: { type: string }
+        assignedTo: { type: string }
+        input:
+          type: array
+          items: { type: object }
+        result:
+          type: array
+          nullable: true
+          items: { type: object }
+        error:
+          type: object
+          nullable: true
+          properties:
+            code: { type: string }
+            message: { type: string }
+        createdAt: { type: string, format: date-time }
+        lastUpdatedAt: { type: string, format: date-time }
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: When somebody picked it up. Null is what A2A reads as `submitted`.
+        completedAt: { type: string, format: date-time, nullable: true }
+        ttlMs: { type: integer, nullable: true }
+        pollIntervalMs: { type: integer, nullable: true }
+        metadata: { type: object, nullable: true }
+
     AgentV2PushConfig:
       type: object
       description: |
@@ -7552,6 +7605,276 @@ paths:
           description: That target belongs to another principal on this account
         '404':
           description: No such target on this account
+
+  /v1/agents/v2/tasks:
+    post:
+      operationId: createAgentV2Task
+      summary: Ask a principal on this account to do something
+      description: |
+        THE HANDLE, NOT THE DASHBOARD ITEM. `/v1/agents/:name/tasks` is the owner's work item — a
+        title, todos, an approval step, an SLA, a rating, and a whole profile tab built on it. It is
+        untouched. This is the other thing: the handle a caller holds while a long call runs, polls
+        until it settles, and cancels if it changes its mind. It is MCP's task shape, which A2A also
+        reads.
+
+        THE STORED STATUS IS ALWAYS THE MCP WORD: `working`, `input_required`, `completed`,
+        `failed`, `cancelled`. Every response also carries `a2a_state`, the same state as A2A names
+        it — `canceled` with one L, `input-required` with a hyphen — derived rather than stored,
+        because two vocabularies for one state is where a silent mismatch lives. A2A's four extra
+        states are recovered from what is stored beside the status: `submitted` is a task nobody has
+        picked up (`startedAt` still null), `rejected` is failed with `error.code = REJECTED`,
+        `auth-required` is input_required with `error.code = AUTH_REQUIRED`, and `unknown` is never
+        produced.
+
+        `contextId` ties the work to a conversation: a v2 message carrying the same one is part of
+        the same exchange.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [assignedTo, input]
+              properties:
+                assignedTo:
+                  type: string
+                  description: The principal that is to do this — an agent GAII, an ecosystem app, or the owner GHII.
+                input:
+                  type: array
+                  description: What is being asked, as message parts. The same shape a turn carries.
+                  items: { type: object }
+                contextId:
+                  type: string
+                  description: The exchange this work belongs to. Omitted and the task names itself.
+                statusMessage: { type: string }
+                ttlMs:
+                  type: integer
+                  description: How long the result stays worth reading. Advice — this node does not delete on it.
+                pollIntervalMs: { type: integer }
+                metadata: { type: object }
+      responses:
+        '201':
+          description: Created, and the assignee told if it is connected
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          task: { $ref: '#/components/schemas/AgentV2Task' }
+        '400':
+          description: Malformed. `details.defects` lists every defect.
+        '403':
+          description: The assignee belongs to another account
+        '404':
+          description: No principal of that name on this account
+    get:
+      operationId: listAgentV2Tasks
+      summary: The task roster, newest first
+      description: |
+        Narrow by `assigned_to` for what a worker has been given, `created_by` for what a caller
+        asked for, `context_id` for one conversation, or `status` for what is still open.
+
+        An unrecognised status is REFUSED, not dropped: a filter that does not filter returns
+        everything and reads as a working query, which is how a roster loop silently starts picking
+        up finished work.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: assigned_to
+          in: query
+          schema: { type: string }
+        - name: created_by
+          in: query
+          schema: { type: string }
+        - name: context_id
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { type: string }
+          description: 'One status or a comma-separated list: working, input_required, completed, failed, cancelled.'
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50, maximum: 200 }
+      responses:
+        '200':
+          description: The tasks
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          tasks:
+                            type: array
+                            items: { $ref: '#/components/schemas/AgentV2Task' }
+                          count: { type: integer }
+        '400':
+          description: A status filter naming something that is not a status
+
+  /v1/agents/v2/tasks/{taskId}:
+    get:
+      operationId: getAgentV2Task
+      summary: One task
+      description: |
+        Everything a poll needs: the MCP status, whether it is terminal, the A2A state, the result if
+        it completed and the error if it did not. A terminal task never changes again, so the first
+        settled read is the last one needed.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: The task
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          task: { $ref: '#/components/schemas/AgentV2Task' }
+        '404':
+          description: No such task on this account
+
+  /v1/agents/v2/tasks/{taskId}/status:
+    post:
+      operationId: setAgentV2TaskStatus
+      summary: The assignee reports where it has got to
+      description: |
+        ONLY THE ASSIGNEE AND THE ACCOUNT HOLDER. A task's status is the worker's testimony about the
+        work; a caller able to write it could report work that was never done.
+
+        Completing requires a `result`; failing requires an `error` with a code and a message. The
+        first status change also sets `startedAt`, which is what turns A2A's `submitted` into
+        `working`.
+
+        `cancelled` is not accepted here — it is its own door, because the party allowed to do it is
+        a different one.
+
+        A task that has already settled answers 409. So does one that settles while this change is
+        in flight: the write is conditional on the current status, so a worker completing while the
+        caller cancels produces one winner and one 409 rather than two silent successes.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [working, input_required, completed, failed]
+                statusMessage: { type: string }
+                result:
+                  type: array
+                  items: { type: object }
+                  description: What came back, as parts. Required when completing.
+                error:
+                  type: object
+                  required: [code, message]
+                  properties:
+                    code: { type: string }
+                    message: { type: string }
+                  description: Required when failing.
+                ttlMs: { type: integer }
+                pollIntervalMs: { type: integer }
+      responses:
+        '200':
+          description: Moved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          task: { $ref: '#/components/schemas/AgentV2Task' }
+        '400':
+          description: Malformed, or completing with no result, or failing with no error
+        '403':
+          description: Not the assignee
+        '404':
+          description: No such task on this account
+        '409':
+          description: Already settled, or settled while this change was in flight
+
+  /v1/agents/v2/tasks/{taskId}/cancel:
+    post:
+      operationId: cancelAgentV2Task
+      summary: The caller changes its mind
+      description: |
+        ONLY WHOEVER ASKED FOR THE WORK, AND THE ACCOUNT HOLDER. A worker that will not do what it
+        was given reports it `failed` with a reason, which is recorded; refusing through a door meant
+        for changing one's mind would leave no reason behind.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string }
+      responses:
+        '200':
+          description: Cancelled
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          task: { $ref: '#/components/schemas/AgentV2Task' }
+        '403':
+          description: Not the caller
+        '404':
+          description: No such task on this account
+        '409':
+          description: Already settled
 
   /v1/agents/{gaii}/card:
     get:

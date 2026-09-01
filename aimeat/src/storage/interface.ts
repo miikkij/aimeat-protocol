@@ -30,6 +30,7 @@ export * from './types/apps.js';
 export * from './types/organisms-federation.js';
 export * from './types/agents-messaging.js';
 export * from './types/agent-v2-messaging.js';
+export * from './types/agent-v2-tasks.js';
 export * from './types/ai-provenance.js';
 export * from './types/usage.js';
 export * from './types/account-events.js';
@@ -75,6 +76,7 @@ import type { ReplicationQueueRepository } from './repositories/replication-queu
 import type { DeviceAuthRepository } from './repositories/device-auth.repository.js';
 import type { AgentEnrolmentRepository } from './repositories/agent-enrolment.repository.js';
 import type { AgentV2MessagingRepository } from './repositories/agent-v2-messaging.repository.js';
+import type { AgentV2TasksRepository } from './repositories/agent-v2-tasks.repository.js';
 import type { OAuthRepository } from './repositories/oauth.repository.js';
 import type { SystemPromptRepository } from './repositories/system-prompt.repository.js';
 import type { PackageRepository } from './repositories/package.repository.js';
@@ -120,6 +122,7 @@ export interface Storage extends
   DeviceAuthRepository,
   AgentEnrolmentRepository,
   AgentV2MessagingRepository,
+  AgentV2TasksRepository,
   EcosystemAppRepository,
   OAuthRepository, SystemPromptRepository,
   PackageRepository, TemplateListingRepository, PackageInstanceRepository,

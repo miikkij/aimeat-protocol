@@ -133,6 +133,7 @@ import { registerWorkflowTools } from './workflows.js';
 import { registerAgentCapabilityTools } from './agent-capabilities.js';
 import { registerAgentMessageTools } from './agent-messages.js';
 import { registerAgentV2MessagingTools } from './agent-v2-messaging.js';
+import { registerAgentV2TaskTools } from './agent-v2-tasks.js';
 import { registerDmMessageTools } from './dm-messages.js';
 import { registerNotifyTools } from './notify.js';
 import { registerContactTools } from './contacts.js';
@@ -334,6 +335,8 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         // The v2 turn, beside the dashboard thread above it and the federated DM below. A session
         // here authenticates against an agent record, so the ops see roles: ['agent'].
         registerAgentV2MessagingTools(mcp, storage, config, () => agentGaii, () => owner ?? '');
+        // The v2 task handle, beside the dashboard work item registered above. Both stay.
+        registerAgentV2TaskTools(mcp, storage, config, () => agentGaii, () => owner ?? '');
         registerDmMessageTools(mcp, storage, config, () => agentGaii, peers);
         registerNotifyTools(mcp, storage, config, () => agentGaii);
         registerContactTools(mcp, storage, config, () => agentGaii);
