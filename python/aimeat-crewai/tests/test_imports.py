@@ -209,6 +209,81 @@ def test_read_token_missing_raises(tmp_path, monkeypatch) -> None:
         _read_token("nonexistent-agent")
 
 
+def test_read_key_v2_agent_is_accepted(tmp_path, monkeypatch) -> None:
+    """A v2 agent has a KEY, not a token, and the liaison must start for it.
+
+    Every agent the basic-agents button creates is v2. Looking only in tokens/ made the liaison
+    refuse all three of them -- "No token file matching .../tokens/concierge@*.token" -- for a
+    credential that was on disk the whole time, one directory across."""
+    from aimeat_crewai.daemon import _read_token
+
+    monkeypatch.setenv("AIMEAT_HOME", str(tmp_path))
+    (tmp_path / "keys").mkdir()
+    (tmp_path / "keys" / "concierge@happyowner.key").write_text("PRIVATE-KEY-MATERIAL")
+    agent_cfg_dir = tmp_path / "agents" / "concierge"
+    agent_cfg_dir.mkdir(parents=True)
+    (agent_cfg_dir / "config.yaml").write_text("node_url: https://node.example\n")
+
+    token, node_url = _read_token("concierge", owner="happyowner")
+    # Empty, deliberately: there is no bearer on disk, and the key material must never be
+    # handed out as one. The loopback holds the real credential.
+    assert token == ""
+    assert node_url == "https://node.example"
+
+
+def test_read_key_v2_agent_owner_auto_detect(tmp_path, monkeypatch) -> None:
+    """The same auto-detection a v1 agent gets, for a key."""
+    from aimeat_crewai.daemon import _read_token
+
+    monkeypatch.setenv("AIMEAT_HOME", str(tmp_path))
+    (tmp_path / "keys").mkdir()
+    (tmp_path / "keys" / "crew-forge@happyowner.key").write_text("k")
+
+    token, _ = _read_token("crew-forge")
+    assert token == ""
+
+
+def test_read_token_ambiguous_across_both_families(tmp_path, monkeypatch) -> None:
+    """Two OWNERS is ambiguous whichever family each of them uses."""
+    from aimeat_crewai.daemon import _read_token
+    from aimeat_crewai import AimeatLiaisonError
+    import pytest
+
+    monkeypatch.setenv("AIMEAT_HOME", str(tmp_path))
+    (tmp_path / "tokens").mkdir()
+    (tmp_path / "keys").mkdir()
+    (tmp_path / "tokens" / "concierge@alice.token").write_text("a")
+    (tmp_path / "keys" / "concierge@bob.key").write_text("b")
+
+    with pytest.raises(AimeatLiaisonError, match="Multiple owners"):
+        _read_token("concierge")
+
+
+def test_read_token_one_owner_holding_both_is_not_ambiguous(tmp_path, monkeypatch) -> None:
+    """A v1 agent that migrated to a key leaves both files. That is ONE owner, not a conflict."""
+    from aimeat_crewai.daemon import _read_token
+
+    monkeypatch.setenv("AIMEAT_HOME", str(tmp_path))
+    (tmp_path / "tokens").mkdir()
+    (tmp_path / "keys").mkdir()
+    (tmp_path / "tokens" / "concierge@happyowner.token").write_text("old-bearer")
+    (tmp_path / "keys" / "concierge@happyowner.key").write_text("new-key")
+
+    _read_token("concierge")  # must not raise
+
+
+def test_read_token_missing_names_both_places(tmp_path, monkeypatch) -> None:
+    """The fast failure this function exists for is KEPT, and now says where it looked."""
+    from aimeat_crewai.daemon import _read_token
+    from aimeat_crewai import AimeatLiaisonError
+    import pytest
+
+    monkeypatch.setenv("AIMEAT_HOME", str(tmp_path))
+
+    with pytest.raises(AimeatLiaisonError, match="No credential"):
+        _read_token("nonexistent-agent")
+
+
 def test_daemon_default_tool_filter_exported_and_curated() -> None:
     """0.3.2 ships a curated default tool list for daemon liaisons so the LLM
     schema package stays small enough for litellm / smaller models."""
