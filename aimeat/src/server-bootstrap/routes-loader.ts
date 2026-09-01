@@ -80,6 +80,7 @@ import { ownersRouter } from '../routes/owners.js';
 import { agentsRouter } from '../routes/agents.js';
 import { agentsV2Router } from '../routes/agents-v2.js';
 import { a2aRouter } from '../routes/a2a.js';
+import { aguiRouter } from '../routes/agui.js';
 import { invokeRouter } from '../routes/invoke.js';
 import { ecosystemAppsRouter } from '../routes/ecosystem-apps.js';
 import { ecosystemEventsRouter } from '../routes/ecosystem-events.js';
@@ -455,6 +456,8 @@ export async function mountRoutes(
   // The A2A door (Agent v2 V6a). Its own path prefix, so it collides with nothing, and it stores
   // nothing of its own: every method projects the V4 turns and the V5 tasks.
   app.use(a2aRouter(config, storage));
+  // The AG-UI door (Agent v2 V6d): a browser watching the same work, as an event stream.
+  app.use(aguiRouter(config, storage));
   app.use(agentTasksRouter(config, storage, webhookDispatcher));
   app.use(schedulesRouter(config, storage, scheduler));
   app.use(workflowsRouter(config, storage, scheduler, workflowEngine));

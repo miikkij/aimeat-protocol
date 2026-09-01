@@ -34,6 +34,9 @@ importers:
       '@a2a-js/sdk':
         specifier: ^1.1.0
         version: 1.1.0(express@5.2.1)
+      '@ag-ui/core':
+        specifier: ^0.0.59
+        version: 0.0.59
       '@agentclientprotocol/sdk':
         specifier: ^1.4.0
         version: 1.4.0(zod@4.5.4)
@@ -274,6 +277,9 @@ packages:
 
   '@adraffy/ens-normalize@1.11.1':
     resolution: {integrity: sha512-nhCBV3quEgesuf7c7KYfperqSS14T8bYuvJ8PcLJp6znkZpFc0AuW4qBtr8eKVyPPe/8RSr7sglCWPU5eaxwKQ==}
+
+  '@ag-ui/core@0.0.59':
+    resolution: {integrity: sha512-hDgy4ipTqXieT8YG8Mr917Y+FD/f11VK1GefZ5CwTDCuNqS/oTwjJ5l/DZkicThgS8hQW/Y7wPylPBMBJ8BkUg==}
 
   '@agentclientprotocol/sdk@1.4.0':
     resolution: {integrity: sha512-/eufudw+aFY1LKLolT6yFE6UMmYRl7fMJ/DEONSIyR6wI3slHWITBsANRGqXEY8FRzqUxwh7QEaGiZHcJPVThg==}
@@ -3285,6 +3291,9 @@ packages:
     peerDependencies:
       zod: ^3.25.0 || ^4.0.0
 
+  zod@3.25.76:
+    resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
+
   zod@4.1.11:
     resolution: {integrity: sha512-WPsqwxITS2tzx1bzhIKsEs19ABD5vmCVa4xBo2tq/SrV4RNZtfws1EnCWQXM6yh8bD08a1idvkB5MZSBiZsjwg==}
 
@@ -3300,6 +3309,10 @@ snapshots:
       express: 5.2.1
 
   '@adraffy/ens-normalize@1.11.1': {}
+
+  '@ag-ui/core@0.0.59':
+    dependencies:
+      zod: 3.25.76
 
   '@agentclientprotocol/sdk@1.4.0(zod@4.5.4)':
     dependencies:
@@ -6307,6 +6320,8 @@ snapshots:
   zod-validation-error@4.0.2(zod@4.5.4):
     dependencies:
       zod: 4.5.4
+
+  zod@3.25.76: {}
 
   zod@4.1.11: {}
 

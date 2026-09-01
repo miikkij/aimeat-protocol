@@ -1,6 +1,7 @@
 /**
  * @file test/e2e-agent-v2-a2a.ts
- * @description Agent v2 V6a: one of this node's agents, answering A2A.
+ * @description Agent v2 V6a and V6c: one of this node's agents, answering A2A, and the same agent
+ *   as an OASF record.
  *
  *   THE SUITE SPEAKS JSON-RPC, not our REST. Every call here is a real `POST /v1/a2a/:owner/:agent`
  *   with `{"jsonrpc":"2.0","method":…}`, because the whole point of V6a is that a client which knows
@@ -371,7 +372,50 @@ async function run(): Promise<void> {
         assert(r.result.id === taskId, 'and it is the task');
     });
 
-    // ── 6. Nothing existing moved ─────────────────────────────────────────────
+    // ── 6. The OASF record: the same agent, for a directory rather than a caller (V6c) ──
+
+    await test('the OASF record is public and is generated from the agent, not written by hand', async () => {
+        const r = await json(`/v1/oasf/${a.owner}/${worker.name}`);
+        assert(r.status === 200, `expected 200 with no credential, got ${r.status}`);
+        const rec = r.body;
+        assert(rec.name === `${a.owner}/${worker.name}`, `OASF names an agent publisher/name, got ${rec.name}`);
+        assert(typeof rec.schema_version === 'string' && rec.schema_version.length > 0, 'and says which schema it is written against');
+        assert(rec.description === 'Handles work sent over A2A.', 'the description is the one the owner gave the agent');
+        assert(rec.authors[0] === a.owner, 'the author is whose agent it is');
+        assert(typeof rec.created_at === 'string', 'with the date the agent was created');
+        assert(Array.isArray(rec.skills) && rec.skills.length >= 1, 'a record with no skills is invisible to a directory');
+        // No invented taxonomy id: emitting one would file the agent under something it is not.
+        assert(rec.skills.every((s: any) => s.id === undefined), 'and no invented taxonomy id');
+    });
+
+    await test('the record carries the addresses a machine can act on, and the AIMEAT half in an extension', async () => {
+        const rec = (await json(`/v1/oasf/${a.owner}/${worker.name}`)).body;
+        const byType = Object.fromEntries((rec.locators as any[]).map(l => [l.type, l.url]));
+        assert(String(byType['a2a-jsonrpc']).endsWith(`/v1/a2a/${a.owner}/${worker.name}`),
+            `the A2A door is locatable, got ${byType['a2a-jsonrpc']}`);
+        assert(String(byType['a2a-agent-card']).endsWith('/agent-card.json'), 'and the A2A card');
+        assert(String(byType['aimeat-agent-card']).includes('/v1/agents/'), 'and the signed AIMEAT card');
+
+        // The AIMEAT-specific half travels in an extension a consumer can step over, rather than
+        // being smuggled into a field OASF defined for something else.
+        const ext = (rec.extensions as any[]).find(e => e.name === 'aimeat.agent');
+        assert(!!ext, 'there is an aimeat.agent extension');
+        assert(ext.data.gaii === worker.gaii, `carrying the GAII, got ${ext.data.gaii}`);
+        assert(ext.data.node === NODE_ID, 'and the node');
+        assert(ext.data.owner === a.owner, 'and the owner');
+        assert('run_mode' in ext.data, 'and the run mode, even when nobody has said');
+
+        // The locator actually resolves: a directory that followed it would reach the card.
+        const card = await json(`/v1/a2a/${a.owner}/${worker.name}/agent-card.json`);
+        assert(card.status === 200, 'and following the A2A card locator works');
+    });
+
+    await test('there is no OASF record for an agent nobody created', async () => {
+        const r = await json(`/v1/oasf/${a.owner}/nobody`);
+        assert(r.status === 404, `expected 404, got ${r.status}`);
+    });
+
+    // ── 7. Nothing existing moved ─────────────────────────────────────────────
 
     await test('the REST and MCP doors onto the same work answer exactly what they did', async () => {
         const rest = await json('/v1/agents/v2/tasks?limit=200', { headers: authA });
