@@ -58,7 +58,9 @@ function asString(v: unknown): string | undefined {
 export function startPollerForAgent(agent: RegisteredAgent): void {
   const interval = (agent.config.poll_interval ?? 30) * 1000;
   const enc = encodeURIComponent(agent.agent);
-  const tag = `poller:${agent.agent}`;
+  // Owner-qualified: two owners on one daemon both have `concierge`, and two identical log tags
+  // in one stream is the same confusion the maps had, in the place a person reads.
+  const tag = `poller:${agent.agent}@${agent.owner}`;
   const runnerEnabled = isRunner(agent);
 
   let seenTaskIds = new Set<string>();

@@ -88,6 +88,7 @@ import { getConfigDir, type AimeatPerAgentConfig } from '../config.js';
 import { AimeatClient } from '../api-client.js';
 import { handleEnrolOffer, ENROL_CAPABILITY } from '../enrolment.js';
 import type { AgentRegistry, RegisteredAgent } from '../agent-registry.js';
+import { displayName } from '../agent-registry.js';
 import { startPollerForAgent } from './poller.js';
 import { AgentChannel, type SpaceRef } from './local-channel.js';
 import { InvokeChannel, registerLocalInvokeRoutes } from './local-invoke.js';
@@ -99,10 +100,19 @@ export { AgentChannel } from './local-channel.js';
 import { logger } from '../../../utils/logger.js';
 import { checkBuildFreshness, announceBuild, buildIdentity } from '../../../utils/build-stamp.js';
 
-export const SERVE_DISCOVERY_SCHEMA_VERSION = 1;
+/**
+ * 2 since 2026-09-01: `principals[].id` is the GAII it was always documented to be (it carried the
+ * bare agent name instead), and every `agents[]` row gained a `gaii`. Two owners with one agent
+ * name were one indistinguishable row before that, so the file described a daemon that does not
+ * exist.
+ */
+export const SERVE_DISCOVERY_SCHEMA_VERSION = 2;
 
 export interface ServeDiscoveryAgent {
+  /** The bare name, kept for sidecars that read it. Not unique across owners — use `gaii`. */
   agent: string;
+  /** `agent#owner@node`. The identity, and what tells two owners' `concierge` apart. */
+  gaii: string;
   owner: string;
   node_url: string;
   /** How this agent's API calls reach the node right now. */
@@ -173,6 +183,9 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
   }
 
   const startedAt = new Date().toISOString();
+  // Keyed by GAII, not by name: two owners on one daemon both have `concierge`, and a name-keyed
+  // map gave the second one the first one's channel. A task for alice's concierge reaching bob's
+  // runtime is the failure that keying prevents.
   const channels = new Map<string, AgentChannel>();
   const invokeChannels = new Map<string, InvokeChannel>();
 
@@ -184,18 +197,18 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
    */
   async function attachRegistered(entry: RegisteredAgent): Promise<void> {
     const ch = new AgentChannel(entry);
-    channels.set(entry.agent, ch);
+    channels.set(entry.gaii, ch);
     // Server-initiated invokes (Crew tab validate/try) queue here and are answered back over the
     // same socket. `tunnel` is assigned just below; the reply closure only runs after it exists.
     const inv = new InvokeChannel((id, ok, result) => tunnel.replyInvoke(id, ok, result));
-    invokeChannels.set(entry.agent, inv);
+    invokeChannels.set(entry.gaii, inv);
 
     const tunnel = new ConnectTunnelClient({
       nodeUrl: entry.config.node_url,
       // Not getToken(): a v2 agent has no stored bearer, it has a key and mints a credential per
       // use. resolveToken answers for both kinds, so this line does not have to know which it is.
       getToken: () => resolveToken(entry.agent, entry.owner, entry.config.node_url),
-      label: `tunnel:${entry.agent}`,
+      label: `tunnel:${displayName(entry)}`,
       onInvoke: (frame) => {
         // The one capability the DAEMON answers itself rather than offering to a crew runtime:
         // taking on new agents. A crew cannot do it — it has no access to the keychain and no way
@@ -263,13 +276,14 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
    * comes from resolveToken(); a token frozen into the client at construction would be the exact
    * thing this identity model removes, and it would go stale in an hour.
    */
-  async function attachNewAgent(a: { agent: string; owner: string; config: AimeatPerAgentConfig }): Promise<void> {
-    if (registry.get(a.agent)) {
+  async function attachNewAgent(a: { agent: string; owner: string; gaii: string; config: AimeatPerAgentConfig }): Promise<void> {
+    // By GAII: another owner's agent of the same name is a different identity and must still attach.
+    if (registry.get(a.gaii)) {
       console.error(`[serve] ${a.agent}@${a.owner}: already served, leaving it alone`);
       return;
     }
     const client = new AimeatClient(a.config.node_url);
-    const entry: RegisteredAgent = { agent: a.agent, owner: a.owner, client, config: a.config };
+    const entry: RegisteredAgent = { gaii: a.gaii, agent: a.agent, owner: a.owner, client, config: a.config };
     registry.add(entry);
     await attachRegistered(entry);
     writeDiscovery();
@@ -285,13 +299,22 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
   const app = express();
   app.use(express.json({ limit: '25mb' }));
 
+  /**
+   * Which identity this loopback call is for.
+   *
+   * `X-Aimeat-Agent` (or `?agent=`) may carry a BARE NAME, because that is what every existing
+   * caller sends and nothing about them should have to change. The registry resolves it to one
+   * identity when exactly one loaded agent has that name — every single-owner daemon, unchanged —
+   * and REFUSES, naming both GAIIs, when two owners on this daemon share it. A caller that knows
+   * exactly which it means may send the full GAII in the same header instead.
+   */
   const resolveAgent = (req: Request): RegisteredAgent => {
     const header = req.headers['x-aimeat-agent'];
     const q = req.query.agent;
-    const name = (typeof header === 'string' && header)
+    const identifier = (typeof header === 'string' && header)
       || (typeof q === 'string' && q)
       || undefined;
-    return registry.resolve(name || undefined);
+    return registry.resolve(identifier || undefined);
   };
 
   // GET /local/invoke/next + POST /local/invoke/:id/result — the invoke surface (./local-invoke.ts).
@@ -360,7 +383,7 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
     }
     const rawWait = typeof req.query.wait === 'string' ? parseInt(req.query.wait, 10) : NaN;
     const waitMs = Math.min(Math.max(Number.isFinite(rawWait) ? rawWait : 25_000, 0), 120_000);
-    const item = await channels.get(entry.agent)!.nextTask(waitMs);
+    const item = await channels.get(entry.gaii)!.nextTask(waitMs);
     if (!item) { res.status(204).end(); return; }
     res.json({
       ok: true,
@@ -380,7 +403,7 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
     }
     const rawWait = typeof req.query.wait === 'string' ? parseInt(req.query.wait, 10) : NaN;
     const waitMs = Math.min(Math.max(Number.isFinite(rawWait) ? rawWait : 25_000, 0), 120_000);
-    const item = await channels.get(entry.agent)!.nextTask(waitMs);
+    const item = await channels.get(entry.gaii)!.nextTask(waitMs);
     if (!item) { res.status(204).end(); return; }
     const payload = item.task as Record<string, unknown> | undefined;
     res.json({
@@ -408,7 +431,7 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
         spaces.push({ organism_id: r.organism_id, ws: r.ws, space: r.space });
       }
     }
-    const ch = channels.get(entry.agent)!;
+    const ch = channels.get(entry.gaii)!;
     ch.setSubscriptions(spaces);
     ch.tunnel?.subscribe(spaces);
     res.json({ ok: true, data: { agent: entry.agent, subscribed: spaces.length, online: ch.transportMode === 'tunnel' } });
@@ -425,11 +448,11 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
     }
     const rawWait = typeof req.query.wait === 'string' ? parseInt(req.query.wait, 10) : NaN;
     const waitMs = Math.min(Math.max(Number.isFinite(rawWait) ? rawWait : 25_000, 0), 120_000);
-    const item = await channels.get(entry.agent)!.nextRecord(waitMs);
+    const item = await channels.get(entry.gaii)!.nextRecord(waitMs);
     if (!item) { res.status(204).end(); return; }
     res.json({
       ok: true,
-      data: { agent: entry.agent, owner: entry.owner, received_at: item.receivedAt, reconnects: channels.get(entry.agent)!.reconnects, event: item.event },
+      data: { agent: entry.agent, owner: entry.owner, received_at: item.receivedAt, reconnects: channels.get(entry.gaii)!.reconnects, event: item.event },
     });
   });
 
@@ -445,11 +468,11 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
     }
     const rawWait = typeof req.query.wait === 'string' ? parseInt(req.query.wait, 10) : NaN;
     const waitMs = Math.min(Math.max(Number.isFinite(rawWait) ? rawWait : 25_000, 0), 120_000);
-    const item = await channels.get(entry.agent)!.nextDm(waitMs);
+    const item = await channels.get(entry.gaii)!.nextDm(waitMs);
     if (!item) { res.status(204).end(); return; }
     res.json({
       ok: true,
-      data: { agent: entry.agent, owner: entry.owner, received_at: item.receivedAt, reconnects: channels.get(entry.agent)!.reconnects, event: item.event },
+      data: { agent: entry.agent, owner: entry.owner, received_at: item.receivedAt, reconnects: channels.get(entry.gaii)!.reconnects, event: item.event },
     });
   });
 
@@ -468,7 +491,7 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
     }
     const rawWait = typeof req.query.wait === 'string' ? parseInt(req.query.wait, 10) : NaN;
     const waitMs = Math.min(Math.max(Number.isFinite(rawWait) ? rawWait : 25_000, 0), 120_000);
-    const woke = await channels.get(entry.agent)!.nextWake(waitMs);
+    const woke = await channels.get(entry.gaii)!.nextWake(waitMs);
     if (!woke) { res.status(204).end(); return; }
     res.json({ ok: true, data: { agent: entry.agent, owner: entry.owner, woke: true } });
   });
@@ -482,7 +505,7 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
       res.status(400).json({ ok: false, error: { code: 'UNKNOWN_AGENT', message: (err as Error).message } });
       return;
     }
-    res.json({ ok: true, data: { agent: entry.agent, cancelled: channels.get(entry.agent)!.getCancelledIds() } });
+    res.json({ ok: true, data: { agent: entry.agent, cancelled: channels.get(entry.gaii)!.getCancelledIds() } });
   });
 
   // ── Tool-call surface: deterministic shell-callable tool dispatch over the
@@ -531,22 +554,22 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
           id: e.agent,
           owner: e.owner,
           node_url: e.config.node_url,
-          transport: channels.get(e.agent)!.transportMode,
-          tunnel_status: channels.get(e.agent)!.tunnel?.getStatus() ?? null,
+          transport: channels.get(e.gaii)!.transportMode,
+          tunnel_status: channels.get(e.gaii)!.tunnel?.getStatus() ?? null,
         })),
         agents: registry.list().map(e => ({
           agent: e.agent,
           owner: e.owner,
           node_url: e.config.node_url,
-          transport: channels.get(e.agent)!.transportMode,
-          tunnel_status: channels.get(e.agent)!.tunnel?.getStatus() ?? null,
+          transport: channels.get(e.gaii)!.transportMode,
+          tunnel_status: channels.get(e.gaii)!.tunnel?.getStatus() ?? null,
           // Record-push: how many spaces the agent subscribed to, and the (re)connect count. A consumer
           // that sees `reconnects` increase between cycles does its one catch-up read (per-socket subs).
-          subscriptions: channels.get(e.agent)!.getSubscriptions().length,
-          reconnects: channels.get(e.agent)!.reconnects,
+          subscriptions: channels.get(e.gaii)!.getSubscriptions().length,
+          reconnects: channels.get(e.gaii)!.reconnects,
           // Server-initiated invokes queued or being worked on, and whether a runtime is collecting them.
-          invokes_pending: invokeChannels.get(e.agent)?.pendingCount() ?? 0,
-          invoke_handler: invokeChannels.get(e.agent)?.hasHandler() ?? false,
+          invokes_pending: invokeChannels.get(e.gaii)?.pendingCount() ?? 0,
+          invoke_handler: invokeChannels.get(e.gaii)?.hasHandler() ?? false,
         })),
       },
     });
@@ -565,7 +588,7 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
       res.status(400).json({ ok: false, error: { code: 'UNKNOWN_AGENT', message: (err as Error).message } });
       return;
     }
-    const ch = channels.get(entry.agent)!;
+    const ch = channels.get(entry.gaii)!;
 
     const query: Record<string, string> = {};
     for (const [k, v] of Object.entries(req.query)) {
@@ -616,17 +639,21 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
       // Neutral principal list — an `eco:`-prefixed id is type 'ecosystem', else 'agent'.
       principals: entries.map(e => ({
         type: e.agent.startsWith('eco:') ? 'ecosystem' as const : 'agent' as const,
-        id: e.agent,
+        // The FULL identity, which is what this field has always said it was. It carried the bare
+        // name, so two owners' `concierge` were one row and the file described a daemon that does
+        // not exist.
+        id: e.gaii,
         owner: e.owner,
         node_url: e.config.node_url,
-        transport: channels.get(e.agent)!.transportMode,
+        transport: channels.get(e.gaii)!.transportMode,
       })),
       // Transitional alias (agent-typed only) for sidecars that still read `agents`.
       agents: entries.filter(e => !e.agent.startsWith('eco:')).map(e => ({
         agent: e.agent,
+        gaii: e.gaii,
         owner: e.owner,
         node_url: e.config.node_url,
-        transport: channels.get(e.agent)!.transportMode,
+        transport: channels.get(e.gaii)!.transportMode,
       })),
     };
     mkdirSync(getConfigDir(), { recursive: true });
@@ -643,7 +670,7 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
     try { if (existsSync(discoveryFile)) unlinkSync(discoveryFile); } catch (err) { logger.warn('shutdown: best effort', { error: String(err) }); }
     for (const ch of channels.values()) {
       ch.drainWaiters();
-      invokeChannels.get(ch.entry.agent)?.drainWaiters();
+      invokeChannels.get(ch.entry.gaii)?.drainWaiters();
       try { await ch.tunnel?.close(); } catch (err) { logger.warn('shutdown: ignore', { error: String(err) }); }
     }
     await new Promise<void>((resolve) => {
@@ -657,7 +684,7 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
 
   const tunnelCount = [...channels.values()].filter(c => c.transportMode === 'tunnel').length;
   const summary = registry.list()
-    .map(e => `${e.agent}@${e.owner} [${channels.get(e.agent)!.transportMode}]`)
+    .map(e => `${e.agent}@${e.owner} [${channels.get(e.gaii)!.transportMode}]`)
     .join(', ');
   console.error(`AIMEAT serve daemon listening on http://127.0.0.1:${port} (MCP: /v1/mcp, proxy: /v1/*, tool-call: /local/call/:tool, push: /local/tasks/next, wake: /local/wake/next)`);
   console.error(`[serve] discovery: ${discoveryFile}`);

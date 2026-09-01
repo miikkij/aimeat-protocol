@@ -42,6 +42,7 @@ import { join } from 'node:path';
 import { parse, stringify } from 'yaml';
 import { listAllTokens } from './keychain.js';
 import { listAllAgentKeys } from './agent-key.js';
+import { gaiiFromToken, isGaii } from './agent-gaii.js';
 import { logger } from '../../utils/logger.js';
 
 // Connector home resolution (directory-scoped):
@@ -193,6 +194,13 @@ export function savePerAgentConfig(agent: string, config: AimeatPerAgentConfig):
 export interface LoadedAgent {
   agent: string;
   owner: string;
+  /**
+   * `agent#owner@node`. THE identity, and what every map that can hold more than one of these is
+   * keyed by. Resolved from the credential itself — the key file for a v2 agent, the bearer's `sub`
+   * for a v1 one — never assembled from the filename, because a filename is a naming convention and
+   * this is an identity.
+   */
+  gaii: string;
   token: string;
   config: AimeatPerAgentConfig;
 }
@@ -234,7 +242,18 @@ export async function loadAllAgents(): Promise<LoadedAgent[]> {
         poll_interval: isPrimary ? global?.poll_interval : undefined,
       };
     }
-    out.push({ agent: cred.agent, owner: cred.owner, token: cred.token, config: perAgent });
+    // The identity, from the credential. A v1 bearer carries it as `sub`; a token that does not is
+    // one this daemon cannot place, and serving it under a bare name is exactly the defect this
+    // resolves — so it is reported and skipped rather than guessed at.
+    const gaii = gaiiFromToken(cred.token);
+    if (!gaii) {
+      logger.warn('loadAllAgents: a stored token carries no usable identity and will not be served', {
+        agent: cred.agent, owner: cred.owner,
+        hint: 'Re-run `aimeat connect` for this agent; the token predates identities or is not this node\'s.',
+      });
+      continue;
+    }
+    out.push({ agent: cred.agent, owner: cred.owner, gaii, token: cred.token, config: perAgent });
   }
 
   for (const k of keyed) {
@@ -250,7 +269,14 @@ export async function loadAllAgents(): Promise<LoadedAgent[]> {
       logger.warn('loadAllAgents: an agent key has no per-agent config and cannot be served', { agent: k.agent, owner: k.owner });
       continue;
     }
-    out.push({ agent: k.agent, owner: k.owner, token: '', config: perAgent });
+    // Written beside the key at enrolment, so this is read rather than derived.
+    if (!isGaii(k.key.gaii)) {
+      logger.warn('loadAllAgents: an agent key carries no usable identity and will not be served', {
+        agent: k.agent, owner: k.owner,
+      });
+      continue;
+    }
+    out.push({ agent: k.agent, owner: k.owner, gaii: k.key.gaii, token: '', config: perAgent });
   }
 
   return out;

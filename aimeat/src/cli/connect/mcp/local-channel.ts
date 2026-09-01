@@ -169,7 +169,7 @@ export class AgentChannel {
         title: typeof task.title === 'string' ? task.title : undefined,
         description: typeof task.description === 'string' ? task.description : undefined,
       }).catch(err => {
-        console.error(`[serve:${this.entry.agent}] runner launch failed for ${id}: ${(err as Error).message}`);
+        console.error(`[serve:${this.entry.agent}@${this.entry.owner}] runner launch failed for ${id}: ${(err as Error).message}`);
       });
     }
 
