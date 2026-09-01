@@ -88,6 +88,14 @@ export interface AgentV2PushConfigRecord {
   id: string;
   /** The principal these deliveries are FOR. Its messages go to this URL. */
   principal: string;
+  /**
+   * One task's deliveries only, or null for every one of that principal's.
+   *
+   * A2A binds a push config to a TASK; V4 bound it to a principal, which is the more useful default
+   * and stays the default. Both fit here: a config with a task is used only for turns filed against
+   * that task, and one without is used for all of them.
+   */
+  taskId: string | null;
   /** The account it belongs to, bare name. The fence on every read, write and delete. */
   owner: string;
   /** The webhook. http(s) only, and every delivery goes through safeFetch. */

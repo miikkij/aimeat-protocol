@@ -118,6 +118,7 @@ export interface AgentV2Message {
 export interface AgentV2PushConfig {
   id: string;
   principal: string;
+  taskId: string | null;
   owner: string;
   url: string;
   token: string | null;

@@ -33,6 +33,7 @@ function toConfig(row: Record<string, unknown>): AgentV2PushConfigRecord {
   return {
     id: row.id as string,
     principal: row.principal as string,
+    taskId: (row.taskId as string) ?? null,
     owner: row.owner as string,
     url: row.url as string,
     token: (row.token as string) ?? null,
@@ -87,16 +88,17 @@ export const agentV2MessagingMethods = {
   async upsertAgentV2PushConfig(this: SqliteStorage, c: AgentV2PushConfigRecord): Promise<void> {
     this.db.prepare(
       `INSERT INTO agent_v2_push_configs
-         (id, principal, owner, url, token, authSchemes, authCredentials, createdAt, updatedAt,
+         (id, principal, taskId, owner, url, token, authSchemes, authCredentials, createdAt, updatedAt,
           lastSuccessAt, lastFailureAt, failCount, disabledAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
-         principal = excluded.principal, url = excluded.url, token = excluded.token,
+         principal = excluded.principal, taskId = excluded.taskId, url = excluded.url,
+         token = excluded.token,
          authSchemes = excluded.authSchemes, authCredentials = excluded.authCredentials,
          updatedAt = excluded.updatedAt,
          lastFailureAt = NULL, failCount = 0, disabledAt = NULL`
     ).run(
-      c.id, c.principal, c.owner, c.url, c.token ?? null, JSON.stringify(c.authSchemes),
+      c.id, c.principal, c.taskId ?? null, c.owner, c.url, c.token ?? null, JSON.stringify(c.authSchemes),
       c.authCredentials ?? null, c.createdAt, c.updatedAt,
       c.lastSuccessAt ?? null, c.lastFailureAt ?? null, c.failCount, c.disabledAt ?? null,
     );

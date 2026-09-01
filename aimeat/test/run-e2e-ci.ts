@@ -228,6 +228,11 @@ const ALL_SUITES = [
     // including the three recovered from what sits beside the status, and RUNS the race the
     // conditional update exists for: a worker completing while the caller cancels.
     'test/e2e-agent-v2-tasks.ts',
+    // Agent v2 V6a: this node's agents answering A2A. Speaks real JSON-RPC at the real door,
+    // and asserts the crossings rather than the round trips — work made over A2A is in the V5
+    // roster, work made over REST reads over A2A. Also measures the per-method scope gate the
+    // route-scope exemption for this door promises.
+    'test/e2e-agent-v2-a2a.ts',
     // Does an open page hear about work an agent does? 21 of the 31 writing tool files emitted no
     // SSE change domain at all, so the write landed and the screen stayed as it was.
     'test/e2e-mcp-sse-parity.ts',
