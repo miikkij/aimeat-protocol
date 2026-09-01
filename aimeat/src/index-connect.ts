@@ -42,6 +42,12 @@ export async function runConnectCli(positionals: string[]): Promise<void> {
     const { runServe } = await import('./cli/connect/mcp/server.js');
     await runServe(connectFlags);
     shouldExitAfterConnect = false;
+  } else if (connectAction === 'acp') {
+    // An editor spawns this and speaks the Agent Client Protocol to it over stdio. Like `serve`, it
+    // runs until the other side closes the pipe, so it must not be exited after dispatch.
+    const { runAcp } = await import('./cli/connect/acp/index.js');
+    await runAcp(connectFlags);
+    shouldExitAfterConnect = false;
   } else if (connectAction === 'inbox') {
     const { runInbox } = await import('./cli/connect/inbox.js');
     await runInbox();
