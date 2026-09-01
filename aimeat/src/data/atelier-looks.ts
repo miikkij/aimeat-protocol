@@ -588,7 +588,12 @@ export const LOOKS: readonly AtelierLook[] = [
       '--ak-display-shadow': '4px 4px 0 color-mix(in oklab, var(--ak-accent) 55%, transparent)',
       '--ak-display-stroke': '0',
       '--ak-text-hero': 'clamp(3.2rem, 11vw, 6.2rem)',
-      '--ak-weight-display': '900',
+      // The faces are the look's own: Archivo Black (one cut, so the weight is 400) for display,
+      // Archivo for reading, JetBrains Mono for the machine lines — all self-hosted by the node.
+      '--ak-font-display': "'Archivo Black', Archivo, system-ui, sans-serif",
+      '--ak-font': 'Archivo, system-ui, sans-serif',
+      '--ak-font-mono': "'JetBrains Mono', ui-monospace, monospace",
+      '--ak-weight-display': '400',
       '--ak-tilt': '-1.2deg',
       '--ak-enter-distance': '24px',
       '--ak-enter-stagger': '60ms',
