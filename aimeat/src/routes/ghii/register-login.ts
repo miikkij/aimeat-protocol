@@ -6,6 +6,11 @@
  *   POST /v1/ghii/login (password + federated + TOTP), POST /v1/ghii/login/attach-email. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 — 2026-09-01 — Federated login verifies the home node's attestation UNCONDITIONALLY. It
+ *     read `if (homePeer.publicKey && attestation.signature)`, so the two ways of having nothing to
+ *     check were the two ways of skipping it: a peer with no pinned key, or a reply with no
+ *     signature, signed the caller in on the strength of an HTTP 200. Refuses with PEER_KEY_MISSING
+ *     or ATTESTATION_UNSIGNED, because the two need different operators to act.
  *   v1.5.0 — 2026-08-23 — Password login answers 403 ACCOUNT_DISABLED for a deactivated account
  *     (BR-04) — after the password check (no state disclosure), before the login-count write.
  *   v1.4.0 — 2026-08-18 — Registration-mode gate (open|invite|closed): POST /v1/ghii is a direct door, 403 REGISTRATION_CLOSED when the node is invite-only or closed.
@@ -434,19 +439,49 @@ export function registerRegisterLoginRoutes(
                     return;
                 }
 
-                // Verify attestation signature against peer's known public key
-                if (homePeer.publicKey && attestation.signature) {
-                    const { verify: verifySignature } = await import('../../auth/keypair.js');
-                    const attestationPayload = Object.fromEntries(
-                        Object.entries(attestation).filter(([k]) => k !== 'signature'),
-                    );
-                    const payloadJson = JSON.stringify(attestationPayload);
-                    const sigValid = await verifySignature(homePeer.publicKey, payloadJson, attestation.signature);
-                    if (!sigValid) {
-                        logger.warn(`Federation attestation signature verification failed for ${attestation.ghii} from ${homePeer.nodeId}`);
-                        res.status(401).json(error(config.nodeId, 'INVALID_ATTESTATION', 'Attestation signature verification failed'));
-                        return;
-                    }
+                // ── The attestation's signature, verified UNCONDITIONALLY ──
+                //
+                // This used to read `if (homePeer.publicKey && attestation.signature)`, so the two
+                // ways of having nothing to check were the two ways of skipping the check: a peer
+                // with no stored key, or a reply with no signature field, signed the caller in on
+                // the strength of an HTTP 200 from a URL. On the LOGIN path. Rule 10's federation
+                // invariant says these are verified unconditionally, and a conditional verification
+                // is not a weaker version of that — it is its absence, arranged so that the party
+                // who benefits picks which one applies.
+                //
+                // FAIL CLOSED, AND SAY WHICH. The two causes need different people to act: a
+                // missing pinned key is this node's operator running key exchange with that peer, a
+                // missing signature is the other node's operator upgrading. Answering "invalid"
+                // for both would send each of them looking at the wrong end.
+                const { verify: verifySignature } = await import('../../auth/keypair.js');
+                if (!homePeer.publicKey) {
+                    logger.warn('Federated login refused: no key is pinned for the home node', {
+                        peer: homePeer.nodeId, peerUrl: homePeer.url, ghii: attestation.ghii,
+                    });
+                    res.status(401).json(error(config.nodeId, 'PEER_KEY_MISSING',
+                        'This node holds no verification key for your home node, so it cannot check that the reply came from it. Your operator can run key exchange with that node.'));
+                    return;
+                }
+                if (!attestation.signature) {
+                    logger.warn('Federated login refused: the home node sent an unsigned attestation', {
+                        peer: homePeer.nodeId, peerUrl: homePeer.url, ghii: attestation.ghii,
+                    });
+                    res.status(401).json(error(config.nodeId, 'ATTESTATION_UNSIGNED',
+                        'Your home node did not sign its reply, so this node cannot tell it is really from them. Sign in on your home node instead.'));
+                    return;
+                }
+                const attestationPayload = Object.fromEntries(
+                    Object.entries(attestation).filter(([k]) => k !== 'signature'),
+                );
+                const payloadJson = JSON.stringify(attestationPayload);
+                const sigValid = await verifySignature(homePeer.publicKey, payloadJson, attestation.signature);
+                if (!sigValid) {
+                    logger.warn('Federated login refused: the attestation signature did not verify', {
+                        peer: homePeer.nodeId, peerUrl: homePeer.url, ghii: attestation.ghii,
+                    });
+                    res.status(401).json(error(config.nodeId, 'INVALID_ATTESTATION',
+                        'The reply from your home node is not signed by the key this node holds for it.'));
+                    return;
                 }
 
                 // Determine scopes from RECEIVING node policy (not home node attestation)
