@@ -372,6 +372,45 @@ export async function crewSeed(
   return { ok: true, seeded: true, revision: out.revision, publishedAt: out.publishedAt, key: out.key, validatedBy: chosen.validator.gaii };
 }
 
+/**
+ * The FIRST definition for an agent the NODE ITSELF just created, written without asking any
+ * runtime, because at that moment there is none to ask.
+ *
+ * THIS IS NOT A WEAKER `crewPublish` AND MUST NOT BE MERGED WITH ONE. Publish validates a
+ * definition against the runtime that will run it, and that is the whole value of the gate —
+ * crewaimeat named the alternative of relaxing it and rejected it for that reason. Three things
+ * make this a different door with a different justification, and all three have to hold:
+ *
+ *   1. THE NODE AUTHORED THE DOCUMENT. It is `data/basic-agents.ts`, compiled into this binary,
+ *      not input from a caller. There is no user text in it to validate.
+ *   2. THERE IS NO RUNTIME, BY DEFINITION. `run_json_agent` refuses to start without a definition,
+ *      so the agent whose definition this is cannot be up to check it. Measured by crewaimeat on
+ *      2026-09-01: publish answered AGENT_OFFLINE, and the start refused with "an agent with no
+ *      definition has nothing to be".
+ *   3. IT CAN ONLY EVER ADD A FIRST ONE. An agent that already has a published definition is
+ *      refused here, so nothing an owner has since edited can be reached from this path.
+ *
+ *   `crewSeed` above is the sibling-validated door for a definition somebody ELSE wrote; it keeps a
+ *   validator because its document did not come from us. This one has no caller to distrust.
+ *
+ * NOT EXPOSED ON ANY ROUTE. Server-side only, called by the basic-agents button. A door with no
+ * validator that anything could reach would be the weakening this comment exists to prevent.
+ */
+export async function crewSeedAuthored(
+  deps: CrewDeps, caller: CrewCaller, agent: AgentRecord, doc: Doc,
+): Promise<{ ok: true; seeded: true; revision: number; key: string } | CrewRefusal> {
+  const state = await readCrewState(deps.storage, agent);
+  if (state.published) {
+    return {
+      ok: false, status: 409, code: 'ALREADY_DEFINED',
+      message: `${agent.name} already has a definition, so this is not a first one.`,
+    };
+  }
+  const out = await publishCrewDef(deps, caller, agent, doc);
+  if (!out.ok) return out;
+  return { ok: true, seeded: true, revision: out.revision, key: out.key };
+}
+
 /** The agent itself when it can answer, else a named sibling, else any connected one. */
 async function chooseSeedValidator(
   deps: CrewDeps, caller: CrewCaller, agent: AgentRecord, validateWith?: string,
