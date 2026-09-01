@@ -31,6 +31,13 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.42.0 — 2026-09-01 — NINE PARTS the canvas found missing (stage 3): ring (progress toward
+ *     a whole), crew (people and agents as one stack, with the live dot), poll (one question,
+ *     live shares), keys (declared shortcuts, rendered), dropzone (bring-a-file; the app
+ *     uploads), toast (the stacked confirmation with an undo), palette (one keystroke to every
+ *     declared action), compare (two states under one handle) and tour (a few steps over the
+ *     real screen). ring, crew, poll and keys join the mosaic vocabulary; the behaviour-shaped
+ *     rest stay component-only, the dialog family's own rule.
  *   v0.41.0 — 2026-09-01 — MATERIALS AND MOTION (the Atelier Next canvas, stage 2): materials.css
  *     carries seven surfaces (glass, aurora, grain, ink, signal, ring, spot) and six recipes
  *     (magnet, tilt, sheen, thumb, odometer, deal) as classes on the tokens; materials.js adds
@@ -223,6 +230,8 @@ import {
 } from './commercial.js';
 import { crt, countdown, crawl } from './mtv.js';
 import { spotlight, tilt, sheen, odometer, thumb, deal } from './materials.js';
+import { ring, crew, poll, keys, dropzone } from './parts.js';
+import { toast, palette, compare, tour } from './parts-ui.js';
 
 const atelier = {
   /**
@@ -230,7 +239,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.41.0',
+  version: '0.42.0',
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,
@@ -279,6 +288,9 @@ const atelier = {
 
   // ── Materials and motion recipes that need a hand on the wheel (materials.css has the rest) ──
   spotlight, tilt, sheen, odometer, thumb, deal,
+
+  // ── The nine parts the canvas found missing (ring, crew, poll, keys also mosaic blocks) ──
+  ring, crew, poll, keys, dropzone, toast, palette, compare, tour,
 
   // ── Data ──
   form, table, searchBar,

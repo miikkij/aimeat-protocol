@@ -2551,7 +2551,7 @@
     let offset = 0;
     slices.forEach((s, i) => {
       const frac = s.value / total;
-      const ring = svg("circle", {
+      const ring2 = svg("circle", {
         cx: 115,
         cy: 115,
         r: R,
@@ -2564,10 +2564,10 @@
         transform: "rotate(-90 115 115)"
       });
       if (!ctx.still()) {
-        ring.classList.add("ak-chart__slice--enter");
-        ring.style.animationDelay = `${i * 70}ms`;
+        ring2.classList.add("ak-chart__slice--enter");
+        ring2.style.animationDelay = `${i * 70}ms`;
       }
-      node.appendChild(ring);
+      node.appendChild(ring2);
       offset += frac;
     });
     wrap.appendChild(node);
@@ -4171,7 +4171,7 @@
     if (kind === "statRow") return { tiles: Array.isArray(data) ? data : [] };
     if (kind === "table") return { rows: Array.isArray(data) ? data : data && data.rows || [] };
     if (kind === "figure") return data && typeof data === "object" ? data : { value: 0 };
-    if (kind === "chart" || kind === "matrix" || kind === "graph" || kind === "waveform" || kind === "gauge" || kind === "console" || kind === "atlas" || kind === "map" || kind === "scene3d" || kind === "kanban" || kind === "plan" || kind === "schedule" || kind === "steps" || kind === "rating" || kind === "crt") {
+    if (kind === "chart" || kind === "matrix" || kind === "graph" || kind === "waveform" || kind === "gauge" || kind === "console" || kind === "atlas" || kind === "map" || kind === "scene3d" || kind === "kanban" || kind === "plan" || kind === "schedule" || kind === "steps" || kind === "rating" || kind === "crt" || kind === "ring" || kind === "crew" || kind === "poll") {
       return { data: data && typeof data === "object" && !Array.isArray(data) ? data : null };
     }
     if (kind === "health" || kind === "queue") {
@@ -5463,9 +5463,9 @@
   function isPlaceholder(v) {
     return /^\s*</.test(String(v == null ? "" : v));
   }
-  function wantsSample(spec, keys) {
+  function wantsSample(spec, keys2) {
     if (spec && spec.sample === true) return true;
-    for (const k of keys || []) if (spec && isPlaceholder(spec[k])) return true;
+    for (const k of keys2 || []) if (spec && isPlaceholder(spec[k])) return true;
     return false;
   }
   function sampleBadge() {
@@ -6029,6 +6029,224 @@
     } };
   }
 
+  // src/static/sdk-libs/atelier/parts.js
+  function rowsOf2(data) {
+    if (Array.isArray(data)) return data;
+    if (data && Array.isArray(data.items)) return data.items;
+    return [];
+  }
+  function ring(spec) {
+    const s = spec || {};
+    const root = el("div", { class: "ak-root ak-ring" });
+    if (s.target) resolve(s.target).appendChild(root);
+    const size = s.size || 96;
+    const r = (size - 12) / 2;
+    const circ = 2 * Math.PI * r;
+    function render(d) {
+      clear(root);
+      if (!d || typeof d.value !== "number" || !(d.total > 0)) {
+        const e = s.empty || {};
+        emptyState({ target: root, tone: "quiet", title: e.title || s.title || "—", hint: e.hint });
+        return;
+      }
+      const share = Math.max(0, Math.min(d.value / d.total, 1));
+      const node = svg("svg", {
+        class: "ak-ring__svg",
+        width: size,
+        height: size,
+        viewBox: "0 0 " + size + " " + size,
+        role: "img",
+        "aria-label": (d.label ? d.label + ": " : "") + d.value + " / " + d.total
+      });
+      node.appendChild(svg("circle", { class: "ak-ring__track", cx: size / 2, cy: size / 2, r, "stroke-width": 10 }));
+      node.appendChild(svg("circle", {
+        class: "ak-ring__fill",
+        cx: size / 2,
+        cy: size / 2,
+        r,
+        "stroke-width": 10,
+        "stroke-dasharray": circ.toFixed(1),
+        "stroke-dashoffset": (circ * (1 - share)).toFixed(1),
+        transform: "rotate(-90 " + size / 2 + " " + size / 2 + ")"
+      }));
+      const t2 = svg("text", { class: "ak-ring__value", x: size / 2, y: size / 2 + 6, "text-anchor": "middle", "font-size": Math.round(size / 5) });
+      t2.textContent = d.value + "/" + d.total;
+      node.appendChild(t2);
+      root.appendChild(node);
+      root.appendChild(el("div", {}, [
+        d.label ? el("div", { class: "ak-ring__label" }, String(d.label)) : null,
+        d.sub ? el("div", { class: "ak-ring__sub" }, String(d.sub)) : null
+      ].filter(Boolean)));
+      enter(root);
+    }
+    render(s.data);
+    return { el: root, set(patch) {
+      if (patch && "data" in patch) render(patch.data);
+    }, destroy() {
+      if (root.parentNode) root.parentNode.removeChild(root);
+    } };
+  }
+  function crew(spec) {
+    const s = spec || {};
+    const root = el("div", { class: "ak-root ak-crew" });
+    if (s.target) resolve(s.target).appendChild(root);
+    function render(d) {
+      clear(root);
+      const people = d && Array.isArray(d.people) ? d.people : rowsOf2(d);
+      if (!people.length) {
+        const e = s.empty || {};
+        emptyState({ target: root, tone: "quiet", title: e.title || s.title || "—", hint: e.hint });
+        return;
+      }
+      const max = d && d.max || 4;
+      const stack = el("div", { class: "ak-crew__stack" });
+      people.slice(0, max).forEach(function(p, i) {
+        const initials = String(p.label || p.id || "?").trim().split(/\s+/).map(function(w) {
+          return w[0];
+        }).join("").slice(0, 2).toUpperCase();
+        stack.appendChild(el("span", {
+          class: "ak-crew__face ak-crew__face--" + (i % 3 + 1) + (p.agent ? " ak-crew__face--agent" : ""),
+          title: String(p.label || p.id || "")
+        }, initials));
+      });
+      if (people.length > max) stack.appendChild(el("span", { class: "ak-crew__face ak-crew__more" }, "+" + (people.length - max)));
+      root.appendChild(stack);
+      if (d && typeof d.live === "number" && d.live > 0) {
+        root.appendChild(el("span", { class: "ak-crew__live" }, [el("span", { class: "ak-crew__dot" }), String(d.live) + " " + (d.liveLabel || "here now")]));
+      }
+      enter(root);
+    }
+    render(s.data);
+    return { el: root, set(patch) {
+      if (patch && "data" in patch) render(patch.data);
+    }, destroy() {
+      if (root.parentNode) root.parentNode.removeChild(root);
+    } };
+  }
+  function poll(spec) {
+    const s = spec || {};
+    const root = el("div", { class: "ak-root ak-poll" });
+    if (s.target) resolve(s.target).appendChild(root);
+    function render(d) {
+      clear(root);
+      const opts = d && Array.isArray(d.options) ? d.options : rowsOf2(d);
+      if (!opts.length) {
+        const e = s.empty || {};
+        emptyState({ target: root, tone: "quiet", title: e.title || "—", hint: e.hint });
+        return;
+      }
+      if (d && d.question) root.appendChild(el("div", { class: "ak-poll__q" }, String(d.question)));
+      const total = opts.reduce(function(n, o) {
+        return n + (typeof o.count === "number" ? o.count : 0);
+      }, 0);
+      opts.forEach(function(o) {
+        const share = typeof o.share === "number" ? o.share : total > 0 ? (o.count || 0) / total : 0;
+        const pct = Math.round(Math.max(0, Math.min(share, 1)) * 100);
+        root.appendChild(el("button", {
+          type: "button",
+          class: "ak-poll__opt",
+          "aria-pressed": d && d.picked === o.id ? "true" : "false",
+          on: s.onPick ? { click: function() {
+            s.onPick(o);
+          } } : void 0
+        }, [
+          el("span", { class: "ak-poll__fill", style: "--ak-share:" + pct + "%" }),
+          el("span", { class: "ak-poll__row" }, [el("span", {}, String(o.label || o.id)), el("span", { class: "ak-poll__share" }, pct + "%")])
+        ]));
+      });
+      enter(root);
+    }
+    render(s.data);
+    return { el: root, set(patch) {
+      if (patch && "data" in patch) render(patch.data);
+    }, destroy() {
+      if (root.parentNode) root.parentNode.removeChild(root);
+    } };
+  }
+  function keys(spec) {
+    const s = spec || {};
+    const root = el("ul", { class: "ak-root ak-keys" });
+    if (s.target) resolve(s.target).appendChild(root);
+    function render(d) {
+      clear(root);
+      rowsOf2(d).forEach(function(row) {
+        const ks = Array.isArray(row.keys) ? row.keys : [String(row.keys || "")];
+        root.appendChild(el("li", { class: "ak-keys__row" }, ks.map(function(k) {
+          return el("kbd", { class: "ak-kbd" }, k);
+        }).concat([el("span", {}, String(row.label || ""))])));
+      });
+    }
+    render(s.data);
+    return { el: root, set(patch) {
+      if (patch && "data" in patch) render(patch.data);
+    }, destroy() {
+      if (root.parentNode) root.parentNode.removeChild(root);
+    } };
+  }
+  function dropzone(spec) {
+    const s = spec || /** @type {any} */
+    {};
+    const accept = (s.accept || []).map(function(a) {
+      return String(a).toLowerCase();
+    });
+    const input = (
+      /** @type {HTMLInputElement} */
+      el("input", { type: "file", multiple: s.multiple ? true : null, accept: accept.length ? accept.join(",") : null })
+    );
+    const err = el("div", { class: "ak-dropzone__err", hidden: true });
+    const root = el("div", { class: "ak-root ak-dropzone", role: "button", tabindex: "0" }, [
+      el("div", { class: "ak-dropzone__label" }, s.label || "Drop the file, or press to pick"),
+      s.hint ? el("div", { class: "ak-dropzone__hint" }, s.hint) : null,
+      err,
+      input
+    ].filter(Boolean));
+    if (s.target) resolve(s.target).appendChild(root);
+    function take(list2) {
+      const files = Array.prototype.slice.call(list2 || []);
+      const bad = files.find(function(f) {
+        const ext = "." + String(f.name).split(".").pop().toLowerCase();
+        if (accept.length && accept.indexOf(ext) < 0 && accept.indexOf(f.type) < 0) return true;
+        return s.maxBytes ? f.size > s.maxBytes : false;
+      });
+      if (bad) {
+        err.textContent = s.maxBytes && bad.size > s.maxBytes ? bad.name + " is over " + Math.round(s.maxBytes / 1e6) + " MB." : bad.name + " is not a kind this takes.";
+        err.hidden = false;
+        return;
+      }
+      err.hidden = true;
+      if (files.length && s.onFiles) s.onFiles(s.multiple ? files : files.slice(0, 1));
+    }
+    root.addEventListener("click", function(e) {
+      if (e.target !== input) input.click();
+    });
+    root.addEventListener("keydown", function(e) {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        input.click();
+      }
+    });
+    input.addEventListener("change", function() {
+      take(input.files);
+      input.value = "";
+    });
+    root.addEventListener("dragover", function(e) {
+      e.preventDefault();
+      root.classList.add("is-over");
+    });
+    root.addEventListener("dragleave", function() {
+      root.classList.remove("is-over");
+    });
+    root.addEventListener("drop", function(e) {
+      e.preventDefault();
+      root.classList.remove("is-over");
+      take(e.dataTransfer ? e.dataTransfer.files : null);
+    });
+    enter(root);
+    return { el: root, destroy() {
+      if (root.parentNode) root.parentNode.removeChild(root);
+    } };
+  }
+
   // src/static/sdk-libs/atelier/atlas.js
   var SVG_NS5 = "http://www.w3.org/2000/svg";
   function svg5(name, attrs) {
@@ -6456,6 +6674,25 @@
         case "crawl":
           return bound("crawl", function(data) {
             return crawl({ target: into, data: patchFor("crawl", data).items, tone: p.tone });
+          });
+        // ── The data-shaped four of the nine new parts: ring, crew and poll bind their record
+        //    whole, keys its rows. The behaviour-shaped rest (toast, palette, compare, tour) are
+        //    component-only, like the dialog family.
+        case "ring":
+          return bound("ring", function(data) {
+            return ring({ target: into, data: patchFor("ring", data).data, title: p.title, empty });
+          });
+        case "crew":
+          return bound("crew", function(data) {
+            return crew({ target: into, data: patchFor("crew", data).data, title: p.title, empty });
+          });
+        case "poll":
+          return bound("poll", function(data) {
+            return poll({ target: into, data: patchFor("poll", data).data, empty, onPick: pick });
+          });
+        case "keys":
+          return bound("keys", function(data) {
+            return keys({ target: into, data: patchFor("keys", data).items });
           });
         case "scene3d": {
           if (p.source) {
@@ -7126,6 +7363,256 @@
     return list2.length;
   }
 
+  // src/static/sdk-libs/atelier/parts-ui.js
+  var toastHost = null;
+  function toast(spec) {
+    if (!toastHost || !toastHost.isConnected) {
+      toastHost = el("div", { class: "ak-root ak-toasts", role: "status", "aria-live": "polite" });
+      document.body.appendChild(toastHost);
+    }
+    let timer = null;
+    const node = el("div", { class: "ak-toast" + (spec.tone ? " ak-toast--" + spec.tone : "") }, [
+      el("div", { class: "ak-toast__body" }, [
+        el("div", { class: "ak-toast__title" }, spec.title),
+        spec.sub ? el("div", { class: "ak-toast__sub" }, spec.sub) : null
+      ].filter(Boolean)),
+      spec.action ? el("button", { type: "button", class: "ak-btn ak-btn--ghost", on: {
+        click: function() {
+          spec.action.onPick();
+          close();
+        }
+      } }, spec.action.label) : null
+    ].filter(Boolean));
+    function close() {
+      if (timer) clearTimeout(timer);
+      if (node.parentNode) node.parentNode.removeChild(node);
+    }
+    toastHost.appendChild(node);
+    enter(node);
+    const ttl = spec.ttl == null ? 6e3 : spec.ttl;
+    if (ttl > 0) timer = setTimeout(close, ttl);
+    return { el: node, close };
+  }
+  function palette(spec) {
+    const s = spec || { items: [] };
+    let root = null;
+    let cursor = 0;
+    let shown = [];
+    function close() {
+      if (root && root.parentNode) root.parentNode.removeChild(root);
+      root = null;
+    }
+    function paintList(list2) {
+      clear(list2);
+      if (!shown.length) {
+        list2.appendChild(el("li", { class: "ak-palette__empty" }, s.empty || "Nothing matches."));
+        return;
+      }
+      shown.forEach(function(it, i) {
+        list2.appendChild(el("li", { class: "ak-palette__item", role: "option", "aria-selected": i === cursor ? "true" : "false", on: {
+          click: function() {
+            close();
+            it.run();
+          },
+          mousemove: function() {
+            if (cursor !== i) {
+              cursor = i;
+              paintList(list2);
+            }
+          }
+        } }, [el("span", {}, it.label), it.hint ? el("span", { class: "ak-palette__hint" }, it.hint) : null].filter(Boolean)));
+      });
+    }
+    function open() {
+      if (root) return;
+      cursor = 0;
+      shown = s.items.slice();
+      const list2 = el("ul", { class: "ak-palette__list", role: "listbox" });
+      const input = el("input", { class: "ak-palette__input", type: "text", placeholder: s.placeholder || "go to, run, adopt…", autocomplete: "off", on: {
+        input: function() {
+          const q = (
+            /** @type {HTMLInputElement} */
+            input.value.trim().toLowerCase()
+          );
+          shown = s.items.filter(function(it) {
+            return !q || (it.label + " " + (it.hint || "")).toLowerCase().indexOf(q) >= 0;
+          });
+          cursor = 0;
+          paintList(list2);
+        },
+        keydown: function(e) {
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            cursor = Math.min(cursor + 1, shown.length - 1);
+            paintList(list2);
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            cursor = Math.max(cursor - 1, 0);
+            paintList(list2);
+          } else if (e.key === "Enter") {
+            e.preventDefault();
+            const it = shown[cursor];
+            if (it) {
+              close();
+              it.run();
+            }
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            close();
+          }
+        }
+      } });
+      root = el("div", { class: "ak-root ak-palette", on: { click: function(e) {
+        if (e.target === root) close();
+      } } }, [
+        el("div", { class: "ak-palette__box", role: "dialog", "aria-modal": "true", "aria-label": s.placeholder || "Commands" }, [input, list2])
+      ]);
+      paintList(list2);
+      document.body.appendChild(root);
+      input.focus();
+    }
+    const key = s.hotkey === void 0 ? "k" : s.hotkey;
+    const onKey = function(e) {
+      if (!key) return;
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === key) {
+        e.preventDefault();
+        if (root) close();
+        else open();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return { open, close, destroy() {
+      close();
+      window.removeEventListener("keydown", onKey);
+    } };
+  }
+  function compare(spec) {
+    const s = spec || { before: {}, after: {} };
+    function layer(side, cls) {
+      const body = side.el ? side.el : side.image ? el("img", { src: side.image, alt: side.label || "" }) : el("span", {}, side.label || "");
+      return el("div", { class: "ak-compare__layer " + cls }, [body]);
+    }
+    const handle2 = el("button", { type: "button", class: "ak-compare__handle", "aria-label": "Compare", role: "slider", "aria-valuemin": "0", "aria-valuemax": "100" }, "⇄");
+    const root = el("div", { class: "ak-root ak-compare" }, [
+      layer(s.before || {}, "ak-compare__before"),
+      layer(s.after || {}, "ak-compare__after"),
+      s.before && s.before.label ? el("span", { class: "ak-compare__label ak-compare__label--before" }, s.before.label) : null,
+      s.after && s.after.label ? el("span", { class: "ak-compare__label ak-compare__label--after" }, s.after.label) : null,
+      el("div", { class: "ak-compare__bar" }),
+      handle2
+    ].filter(Boolean));
+    if (s.target) resolve(s.target).appendChild(root);
+    let pct = typeof s.value === "number" ? s.value : 50;
+    function set(v) {
+      pct = Math.max(0, Math.min(Number(v) || 0, 100));
+      root.style.setProperty("--ak-compare", pct + "%");
+      handle2.setAttribute("aria-valuenow", String(Math.round(pct)));
+      if (s.onChange) s.onChange(pct);
+    }
+    let dragging = false;
+    function at(e) {
+      const r = root.getBoundingClientRect();
+      set((e.clientX - r.left) / Math.max(r.width, 1) * 100);
+    }
+    root.addEventListener("pointerdown", function(e) {
+      dragging = true;
+      root.setPointerCapture(e.pointerId);
+      at(e);
+    });
+    root.addEventListener("pointermove", function(e) {
+      if (dragging) at(e);
+    });
+    root.addEventListener("pointerup", function() {
+      dragging = false;
+    });
+    root.addEventListener("pointercancel", function() {
+      dragging = false;
+    });
+    handle2.addEventListener("keydown", function(e) {
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        set(pct - 5);
+      }
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        set(pct + 5);
+      }
+    });
+    set(pct);
+    return { el: root, set, destroy() {
+      if (root.parentNode) root.parentNode.removeChild(root);
+    } };
+  }
+  function tour(spec) {
+    const s = spec || { steps: [] };
+    const L = Object.assign({ next: "Next", done: "Done", skip: "Skip" }, s.labels || {});
+    let i = -1;
+    let note = null;
+    let marked = null;
+    function place2() {
+      if (!note || !marked) return;
+      const r = marked.getBoundingClientRect();
+      const w = note.offsetWidth || 260;
+      const top = r.bottom + 12;
+      const left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8));
+      note.style.top = (top + (note.offsetHeight || 0) > window.innerHeight ? Math.max(8, r.top - (note.offsetHeight || 0) - 12) : top) + "px";
+      note.style.left = left + "px";
+    }
+    function show(n) {
+      clearStep();
+      const step = s.steps[n];
+      if (!step) {
+        end();
+        return;
+      }
+      i = n;
+      const target = typeof step.target === "string" ? document.querySelector(step.target) : step.target;
+      if (!target) {
+        show(n + 1);
+        return;
+      }
+      marked = /** @type {HTMLElement} */
+      target;
+      marked.classList.add("ak-tour__mark");
+      if (!reducedMotion()) marked.scrollIntoView({ block: "center", behavior: "smooth" });
+      const last = n === s.steps.length - 1;
+      note = el("div", { class: "ak-root ak-tour__note", role: "dialog", "aria-live": "polite" }, [
+        el("div", {}, [el("span", { class: "ak-tour__step" }, n + 1 + "/" + s.steps.length), el("span", {}, step.text)]),
+        el("div", { class: "ak-tour__nav" }, [
+          el("button", { type: "button", class: "ak-btn ak-btn--ghost", on: { click: function() {
+            if (last) end();
+            else show(n + 1);
+          } } }, last ? L.done : L.next),
+          last ? null : el("button", { type: "button", class: "ak-btn ak-btn--ghost", on: { click: end } }, L.skip)
+        ].filter(Boolean))
+      ]);
+      document.body.appendChild(note);
+      place2();
+    }
+    function clearStep() {
+      if (marked) marked.classList.remove("ak-tour__mark");
+      if (note && note.parentNode) note.parentNode.removeChild(note);
+      marked = null;
+      note = null;
+    }
+    function onKey(e) {
+      if (e.key === "Escape") end();
+    }
+    function end() {
+      clearStep();
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", place2);
+      if (i >= 0 && s.onDone) s.onDone();
+      i = -1;
+    }
+    function start() {
+      window.addEventListener("keydown", onKey);
+      window.addEventListener("resize", place2);
+      show(0);
+    }
+    return { start, end };
+  }
+
   // src/static/sdk-libs/atelier/index.js
   var atelier = {
     /**
@@ -7133,7 +7620,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.41.0",
+    version: "0.42.0",
     // ── Shell and navigation ──
     app,
     section,
@@ -7218,6 +7705,16 @@
     odometer,
     thumb,
     deal,
+    // ── The nine parts the canvas found missing (ring, crew, poll, keys also mosaic blocks) ──
+    ring,
+    crew,
+    poll,
+    keys,
+    dropzone,
+    toast,
+    palette,
+    compare,
+    tour,
     // ── Data ──
     form,
     table,
