@@ -37,6 +37,11 @@ USAGE
                                  exposes only that purpose-scoped tool set (see "aimeat connect").
                                  --http runs a long-lived loopback daemon instead (one WS per agent
                                  + local /v1/mcp, REST proxy, push) -- for crews / many calls.
+  aimeat connect acp [--agent <name>]
+                                 Present this agent to a code editor over the Agent Client
+                                 Protocol (stdio). The editor spawns it; a prompt there becomes
+                                 a task on the node, and what the agent reports comes back into
+                                 the editor's chat.
   aimeat connect status          Show agent connection status
   aimeat connect inbox           Check message inbox
   aimeat connect tasks           List assigned tasks

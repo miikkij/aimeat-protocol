@@ -233,6 +233,11 @@ const ALL_SUITES = [
     // roster, work made over REST reads over A2A. Also measures the per-method scope gate the
     // route-scope exemption for this door promises.
     'test/e2e-agent-v2-a2a.ts',
+    // Agent v2 V6b: an AIMEAT agent presented to a code editor over ACP. The editor in the
+    // suite is the SDK's own client on the other end of an in-memory stream pair, so what is
+    // expected of our side is decided by the protocol rather than by us; everything below
+    // session/prompt is the real node and a real task settled by a real worker.
+    'test/e2e-agent-v2-acp.ts',
     // Does an open page hear about work an agent does? 21 of the 31 writing tool files emitted no
     // SSE change domain at all, so the write landed and the screen stayed as it was.
     'test/e2e-mcp-sse-parity.ts',
