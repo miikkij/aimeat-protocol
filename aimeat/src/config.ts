@@ -101,6 +101,7 @@ function isPrivateHost(baseUrl: string): boolean {
 // Moved to config-posture.ts when this file hit the line limit. Re-exported so the dozen
 // modules that import it from here keep working; the move was not meant to be visible.
 export { securityPostureWarnings } from './config-posture.js';
+import { assertEudiwNotHalfBuilt } from './config-eudiw-guard.js';
 
 export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
   const { configPath, cliOverrides } = options ?? {};
@@ -146,6 +147,9 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
   if (!['full', 'relay', 'mirror', 'personal'].includes(nodeType)) {
     throw new Error(`Invalid AIMEAT_NODE_TYPE: ${nodeType}. Must be 'full', 'relay', 'mirror', or 'personal'.`);
   }
+  // A flag whose feature is half built refuses rather than warns. The message is the specification
+  // of what has to be true before the guard is deleted — see src/config-eudiw-guard.ts.
+  assertEudiwNotHalfBuilt();
 
   const port = parseInt(process.env.AIMEAT_PORT ?? '40050', 10);
 
