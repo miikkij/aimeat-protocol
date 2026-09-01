@@ -2654,7 +2654,7 @@
     const points = (data && Array.isArray(data.points) ? data.points : []).filter((p) => p && typeof p.x === "number" && typeof p.y === "number");
     if (!points.length) return ctx.empty();
     ctx.root.setAttribute("aria-label", (ctx.title ? ctx.title + " — " : "") + points.length + " pts");
-    const W5 = 560;
+    const W6 = 560;
     const H4 = 300;
     const PAD3 = { top: 16, right: 16, bottom: 36, left: 50 };
     let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
@@ -2672,11 +2672,11 @@
     xMax = Math.ceil(xMax / xStep) * xStep;
     yMin = Math.floor(yMin / yStep) * yStep;
     yMax = Math.ceil(yMax / yStep) * yStep;
-    const X = (v) => PAD3.left + (W5 - PAD3.left - PAD3.right) * ((v - xMin) / (xMax - xMin));
+    const X = (v) => PAD3.left + (W6 - PAD3.left - PAD3.right) * ((v - xMin) / (xMax - xMin));
     const Y = (v) => PAD3.top + (H4 - PAD3.top - PAD3.bottom) * (1 - (v - yMin) / (yMax - yMin));
-    const node = svg("svg", { viewBox: `0 0 ${W5} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
+    const node = svg("svg", { viewBox: `0 0 ${W6} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
     for (let v = yMin; v <= yMax + yStep / 2; v += yStep) {
-      node.appendChild(svg("line", { x1: PAD3.left, x2: W5 - PAD3.right, y1: Y(v), y2: Y(v), class: "ak-chart__grid" }));
+      node.appendChild(svg("line", { x1: PAD3.left, x2: W6 - PAD3.right, y1: Y(v), y2: Y(v), class: "ak-chart__grid" }));
       const tk = svg("text", { x: PAD3.left - 8, y: Y(v) + 4, class: "ak-chart__tick", "text-anchor": "end" });
       tk.textContent = fmtTick(v);
       node.appendChild(tk);
@@ -2731,14 +2731,14 @@
     const steps2 = (data && Array.isArray(data.steps) ? data.steps : []).filter((s) => s && typeof s.value === "number" && s.value >= 0);
     if (!steps2.length || steps2[0].value <= 0) return ctx.empty();
     ctx.root.setAttribute("aria-label", (ctx.title ? ctx.title + " — " : "") + steps2.map((s) => s.label + " " + s.value).join(", "));
-    const W5 = 460;
+    const W6 = 460;
     const STEP_H = 44;
     const GAP = 7;
     const BAND = 340;
     const CX = 195;
     const H4 = steps2.length * (STEP_H + GAP) - GAP + 8;
     const first = steps2[0].value;
-    const node = svg("svg", { viewBox: `0 0 ${W5} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
+    const node = svg("svg", { viewBox: `0 0 ${W6} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
     const still = ctx.still();
     const half = (v) => Math.max(v / first * BAND, 18) / 2;
     steps2.forEach((s, i) => {
@@ -2759,7 +2759,7 @@
       const name = svg("text", { x: CX, y: y + STEP_H / 2 + 5, class: "ak-chart__funnellabel", "text-anchor": "middle" });
       name.textContent = `${s.label} · ${fmtTick(s.value)}`;
       node.appendChild(name);
-      const pct = svg("text", { x: W5 - 10, y: y + STEP_H / 2 + 5, class: "ak-chart__funnelpct", "text-anchor": "end" });
+      const pct = svg("text", { x: W6 - 10, y: y + STEP_H / 2 + 5, class: "ak-chart__funnelpct", "text-anchor": "end" });
       pct.textContent = Math.round(s.value / first * 100) + " %";
       node.appendChild(pct);
     });
@@ -2811,10 +2811,10 @@
     const items = (data && Array.isArray(data.items) ? data.items : []).filter((s) => s && typeof s.value === "number" && s.value > 0).sort((a, b) => b.value - a.value);
     if (!items.length) return ctx.empty();
     ctx.root.setAttribute("aria-label", (ctx.title ? ctx.title + " — " : "") + items.map((s) => s.label + " " + s.value).join(", "));
-    const W5 = 560;
+    const W6 = 560;
     const H4 = 320;
-    const node = svg("svg", { viewBox: `0 0 ${W5} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
-    const cells = squarify(items.map((s, i) => ({ v: s.value, s, i })), 2, 2, W5 - 4, H4 - 4);
+    const node = svg("svg", { viewBox: `0 0 ${W6} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
+    const cells = squarify(items.map((s, i) => ({ v: s.value, s, i })), 2, 2, W6 - 4, H4 - 4);
     const still = ctx.still();
     cells.forEach((c, n) => {
       const G = 2.5;
@@ -2872,15 +2872,15 @@
     }
     const maxDepth = Math.max(...[...byId.values()].map((m) => m.depth));
     ctx.root.setAttribute("aria-label", (ctx.title ? ctx.title + " — " : "") + nodes.map((n) => n.label || n.id).join(", "));
-    const W5 = 560;
+    const W6 = 560;
     const H4 = 320;
     const NODE_W = 12;
     const PAD_Y = 10;
     const cols = [];
     for (const m of byId.values()) (cols[m.depth] = cols[m.depth] || []).push(m);
     const scale = (H4 - PAD_Y * 2 - 8 * Math.max(...cols.map((c) => (c || []).length - 1), 0)) / Math.max(...cols.map((c) => (c || []).reduce((a, m) => a + Math.max(m.in, m.out), 0)), 1e-9);
-    const colX = (d) => 8 + (maxDepth ? (W5 - NODE_W - 16) * (d / maxDepth) : 0);
-    const node = svg("svg", { viewBox: `0 0 ${W5} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
+    const colX = (d) => 8 + (maxDepth ? (W6 - NODE_W - 16) * (d / maxDepth) : 0);
+    const node = svg("svg", { viewBox: `0 0 ${W6} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
     let colourIdx = 0;
     for (const col of cols) {
       if (!col) continue;
@@ -2938,14 +2938,14 @@
     if (axes.length < 3 || !series.length) return ctx.empty();
     const max = typeof data.max === "number" && data.max > 0 ? data.max : series.reduce((m, s) => s.values.reduce((m2, v) => Math.max(m2, Number(v) || 0), m), 0) || 1;
     ctx.root.setAttribute("aria-label", (ctx.title ? ctx.title + " — " : "") + series.map((s) => s.label).join(", "));
-    const W5 = 460;
+    const W6 = 460;
     const H4 = 340;
-    const CX = W5 / 2;
+    const CX = W6 / 2;
     const CY = H4 / 2 + 4;
     const R = 118;
     const angle = (i) => -Math.PI / 2 + 2 * Math.PI * i / axes.length;
     const at = (i, r) => `${(CX + Math.cos(angle(i)) * r).toFixed(1)} ${(CY + Math.sin(angle(i)) * r).toFixed(1)}`;
-    const node = svg("svg", { viewBox: `0 0 ${W5} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
+    const node = svg("svg", { viewBox: `0 0 ${W6} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
     for (const frac of [0.25, 0.5, 0.75, 1]) {
       node.appendChild(svg("polygon", {
         points: axes.map((a, i) => at(i, R * frac)).join(" "),
@@ -3974,11 +3974,11 @@
       [{ height: from + "px", opacity: opening ? 0.4 : 1 }, { height: to + "px", opacity: opening ? 1 : 0.4 }],
       { duration: span, easing: ease }
     );
-    const settle = function() {
+    const settle2 = function() {
       panel.style.height = opening ? "auto" : "0px";
     };
-    anim.onfinish = settle;
-    anim.oncancel = settle;
+    anim.onfinish = settle2;
+    anim.oncancel = settle2;
   }
   function reveal(spec) {
     const root = el("div", { class: "ak-root ak-reveal" });
@@ -5315,11 +5315,11 @@
       easing: "cubic-bezier(0.2, 0.7, 0.3, 1)",
       fill: "forwards"
     });
-    const settle = () => {
+    const settle2 = () => {
       node.textContent = next;
     };
-    anim.addEventListener("finish", settle);
-    anim.addEventListener("cancel", settle);
+    anim.addEventListener("finish", settle2);
+    anim.addEventListener("cancel", settle2);
     return true;
   }
   function thumb(target) {
@@ -5822,7 +5822,7 @@
     function kindOf(kind) {
       return KINDS.indexOf(kind) >= 0 ? kind : "info";
     }
-    function settle(dot) {
+    function settle2(dot) {
       if (!dot || dot.hidden) return;
       const done = function() {
         dot.hidden = true;
@@ -5850,7 +5850,7 @@
         if (!rec) return;
         rec.item.read = true;
         rec.node.classList.remove("is-unread");
-        settle(rec.dot);
+        settle2(rec.dot);
       });
       if (markAll.parentNode) markAll.parentNode.removeChild(markAll);
       if (s.onRead) s.onRead(ids);
@@ -8575,7 +8575,7 @@
     let index = 0;
     let flight = null;
     let driving = false;
-    let settle = 0;
+    let settle2 = 0;
     let swiped = false;
     let emptyCard = null;
     let dead = false;
@@ -8696,9 +8696,9 @@
       next.disabled = index >= items.length - 1;
     }
     function release(ms) {
-      if (settle) clearTimeout(settle);
-      settle = window.setTimeout(function() {
-        settle = 0;
+      if (settle2) clearTimeout(settle2);
+      settle2 = window.setTimeout(function() {
+        settle2 = 0;
         driving = false;
         syncFromScroll();
       }, ms);
@@ -8816,7 +8816,7 @@
       destroy: function() {
         dead = true;
         if (flight && typeof flight.stop === "function") flight.stop();
-        if (settle) clearTimeout(settle);
+        if (settle2) clearTimeout(settle2);
         if (resizing) cancelAnimationFrame(resizing);
         swipe.destroy();
         viewport.removeEventListener("scroll", onScroll);
@@ -9237,12 +9237,12 @@
         return typeof m.lon === "number" && typeof m.lat === "number";
       }) : [];
       for (const m of markers) {
-        const pin = L.marker([m.lat, m.lon], { icon: pinIcon(L, m.tone) });
-        if (m.label) pin.bindPopup(String(m.label));
-        if (spec.onPick) pin.on("click", function() {
+        const pin2 = L.marker([m.lat, m.lon], { icon: pinIcon(L, m.tone) });
+        if (m.label) pin2.bindPopup(String(m.label));
+        if (spec.onPick) pin2.on("click", function() {
           spec.onPick(m);
         });
-        pin.addTo(world.layer);
+        pin2.addTo(world.layer);
       }
       if (markers.length > 1) {
         world.leaflet.fitBounds(L.latLngBounds(markers.map(function(m) {
@@ -10280,6 +10280,1332 @@
     return { start, end };
   }
 
+  // src/static/sdk-libs/atelier/lenis-director.js
+  var lenisPromise2 = null;
+  function ensureLenis2() {
+    const w = (
+      /** @type {any} */
+      window
+    );
+    if (w.Lenis) return Promise.resolve(w.Lenis);
+    if (lenisPromise2) return lenisPromise2;
+    lenisPromise2 = new Promise(function(ok, fail) {
+      const css = document.createElement("link");
+      css.rel = "stylesheet";
+      css.href = NODE_URL + "/lib/lenis@1.css";
+      document.head.appendChild(css);
+      const s = document.createElement("script");
+      s.src = NODE_URL + "/lib/lenis@1.min.js";
+      s.onload = function() {
+        ok(w.Lenis);
+      };
+      s.onerror = function() {
+        lenisPromise2 = null;
+        fail(new Error("lenis failed to load"));
+      };
+      document.head.appendChild(s);
+    });
+    return lenisPromise2;
+  }
+  var JUMP = 0.9;
+  var LERP = 0.09;
+  function pin(node, holds) {
+    const outer = el("div", { class: "ak-scene__hold", vars: { "--ak-hold": String(1 + holds) } });
+    const stick = el("div", { class: "ak-scene__stick" });
+    const parent = node.parentNode;
+    if (parent) parent.insertBefore(outer, node);
+    stick.appendChild(node);
+    outer.appendChild(stick);
+    return outer;
+  }
+  function unpin(sc) {
+    const outer = sc.outer;
+    if (!outer || !outer.parentNode) return;
+    outer.parentNode.insertBefore(sc.el, outer);
+    outer.parentNode.removeChild(outer);
+  }
+  function playEnter(node, kind) {
+    if (typeof kind === "function") {
+      kind(node);
+      return;
+    }
+    if (kind === "stagger") {
+      stagger(node.children, { from: "up" });
+      return;
+    }
+    if (reducedMotion() || typeof node.animate !== "function") return;
+    const cs = getComputedStyle(node);
+    const dist = (parseFloat(cs.getPropertyValue("--ak-enter-distance")) || 14) * 2.5;
+    const span = (parseFloat(cs.getPropertyValue("--ak-motion")) || 200) * 3;
+    const ease = (cs.getPropertyValue("--ak-ease") || "").trim() || "cubic-bezier(0.2, 0.7, 0.3, 1)";
+    const frames = kind === "fade" ? [{ opacity: 0 }, { opacity: 1 }] : kind === "wipe" ? [{ clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0 0 0)" }] : kind === "scale" ? [{ opacity: 0, transform: "scale(0.94)" }, { opacity: 1, transform: "scale(1)" }] : [{ opacity: 0, transform: "translateY(" + dist + "px)" }, { opacity: 1, transform: "translateY(0)" }];
+    node.animate(frames, { duration: span, easing: ease, fill: "backwards" });
+  }
+  function railOf(items, onPick, inset) {
+    const dots = items.map(function(it, i) {
+      return el("button", {
+        type: "button",
+        class: "ak-rail__dot",
+        "aria-label": it.label,
+        on: { click: function() {
+          onPick(it.id, i);
+        } }
+      }, [
+        el("span", { class: "ak-rail__label", "aria-hidden": "true" }, it.label),
+        el("span", { class: "ak-rail__mark", "aria-hidden": "true" })
+      ]);
+    });
+    const nav = el("nav", {
+      class: "ak-rail" + (inset ? " ak-rail--inset" : ""),
+      "aria-label": "Story"
+    }, dots);
+    return {
+      nav,
+      dots,
+      mark(index) {
+        dots.forEach(function(d, n) {
+          if (n === index) d.setAttribute("aria-current", "true");
+          else d.removeAttribute("aria-current");
+          d.classList.toggle("is-current", n === index);
+        });
+      }
+    };
+  }
+  function editing() {
+    const a = (
+      /** @type {any} */
+      document.activeElement
+    );
+    if (!a) return false;
+    const tag = String(a.tagName || "");
+    return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || a.isContentEditable === true;
+  }
+  function clamp01(n) {
+    return n < 0 ? 0 : n > 1 ? 1 : n;
+  }
+  function director(spec) {
+    const s = spec || /** @type {any} */
+    {};
+    const scroller = (
+      /** @type {any} */
+      s.scroller || window
+    );
+    const isPage = scroller === window;
+    const scenes = [];
+    (s.scenes || []).forEach(function(raw) {
+      if (!raw) return;
+      const node = (
+        /** @type {HTMLElement|null} */
+        typeof raw.el === "string" ? document.querySelector(raw.el) : raw.el || null
+      );
+      if (!node) {
+        console.warn('aimeat-atelier: story scene "' + raw.id + '" has no element on the page, skipped');
+        return;
+      }
+      node.classList.add("ak-scene");
+      node.setAttribute("data-ak-scene", String(raw.id));
+      const holds = Math.max(0, Number(raw.hold) || 0);
+      scenes.push({
+        id: String(raw.id),
+        el: node,
+        outer: holds > 0 ? pin(node, holds) : null,
+        hold: holds,
+        label: String(raw.label || raw.id),
+        spec: raw,
+        entered: false,
+        inside: false
+      });
+    });
+    function sizeHolds() {
+      if (isPage) return;
+      const h = scroller.clientHeight;
+      scenes.forEach(function(sc) {
+        if (sc.outer) sc.outer.style.setProperty("--ak-story-vh", h + "px");
+      });
+    }
+    sizeHolds();
+    let lenis = null;
+    let dead = false;
+    if (!reducedMotion()) {
+      ensureLenis2().then(function(Lenis) {
+        if (dead) return;
+        const opts = (
+          /** @type {any} */
+          { autoRaf: true }
+        );
+        if (s.duration !== void 0) opts.duration = s.duration;
+        else opts.lerp = s.lerp !== void 0 ? s.lerp : LERP;
+        if (!isPage) {
+          opts.wrapper = scroller;
+          opts.content = scroller.firstElementChild || scroller;
+        }
+        lenis = new Lenis(opts);
+      }, function(err) {
+        console.warn("aimeat-atelier: lenis did not load, the browser scrolls this story", err);
+      });
+    }
+    const rail = s.rail === false || !scenes.length ? null : railOf(scenes, function(id) {
+      go(id);
+    }, !isPage);
+    let host = null;
+    let hostMarked = false;
+    if (rail) {
+      if (isPage) {
+        document.body.appendChild(rail.nav);
+      } else {
+        host = scroller.parentElement || document.body;
+        if (!host.classList.contains("ak-story")) {
+          host.classList.add("ak-story");
+          hostMarked = true;
+        }
+        host.appendChild(rail.nav);
+      }
+    }
+    let curIdx = -1;
+    let storyP = 0;
+    function progressOf(sc, r, vTop, vH) {
+      if (sc.hold > 0) return clamp01((vTop - r.top) / Math.max(1, r.height - vH));
+      return clamp01((vTop + vH - r.top) / Math.max(1, vH + r.height));
+    }
+    function tick() {
+      if (!scenes.length) return;
+      const vH = isPage ? window.innerHeight : scroller.clientHeight;
+      const vTop = isPage ? 0 : scroller.getBoundingClientRect().top;
+      const mid = vTop + vH / 2;
+      let best = -1;
+      let bestGap = Infinity;
+      let first = null;
+      let last = null;
+      scenes.forEach(function(sc, i) {
+        const r = (sc.outer || sc.el).getBoundingClientRect();
+        if (i === 0) first = r;
+        last = r;
+        if (sc.spec.onProgress) sc.spec.onProgress(progressOf(sc, r, vTop, vH), sc.el);
+        const gap = r.top <= mid && r.bottom >= mid ? 0 : Math.min(Math.abs(r.top - mid), Math.abs(r.bottom - mid));
+        if (gap < bestGap) {
+          bestGap = gap;
+          best = i;
+        }
+      });
+      if (first && last) {
+        const span = last.bottom - first.top - vH;
+        storyP = span > 0 ? clamp01((vTop - first.top) / span) : 1;
+      }
+      if (best !== curIdx) {
+        curIdx = best;
+        if (rail) rail.mark(best);
+        if (s.onScene && scenes[best]) s.onScene(scenes[best].id);
+      }
+    }
+    let rafId = 0;
+    const onScroll = function() {
+      if (rafId) return;
+      rafId = requestAnimationFrame(function() {
+        rafId = 0;
+        tick();
+      });
+    };
+    const onResize = function() {
+      sizeHolds();
+      onScroll();
+    };
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onResize);
+    let io = null;
+    if (typeof IntersectionObserver === "function") {
+      io = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+          const sc = scenes.find(function(c) {
+            return c.el === entry.target;
+          });
+          if (!sc) return;
+          if (entry.isIntersecting) {
+            if (!sc.entered) {
+              sc.entered = true;
+              playEnter(sc.el, sc.spec.enter || "rise");
+            }
+            if (!sc.inside) {
+              sc.inside = true;
+              if (sc.spec.onEnter) sc.spec.onEnter(sc.el);
+            }
+          } else if (sc.inside) {
+            sc.inside = false;
+            if (sc.spec.onLeave) sc.spec.onLeave(sc.el);
+          }
+        });
+      }, { root: isPage ? null : scroller, threshold: 0.25 });
+      scenes.forEach(function(sc) {
+        io.observe(sc.el);
+      });
+    } else {
+      scenes.forEach(function(sc) {
+        sc.entered = true;
+        if (sc.spec.onEnter) sc.spec.onEnter(sc.el);
+      });
+    }
+    function go(id, opts) {
+      const i = scenes.findIndex(function(sc) {
+        return sc.id === id;
+      });
+      if (i < 0) return;
+      const target = scenes[i].outer || scenes[i].el;
+      const o = opts || {};
+      if (lenis) {
+        lenis.scrollTo(target, { offset: o.offset || 0, duration: o.duration || JUMP });
+      } else {
+        target.scrollIntoView({ block: "start", behavior: reducedMotion() ? "auto" : "smooth" });
+      }
+      curIdx = i;
+      if (rail) rail.mark(i);
+      if (s.onScene) s.onScene(scenes[i].id);
+    }
+    function step(by) {
+      if (!scenes.length) return;
+      const from = curIdx < 0 ? 0 : curIdx;
+      const to = Math.max(0, Math.min(scenes.length - 1, from + by));
+      if (to !== from || curIdx < 0) go(scenes[to].id);
+    }
+    const onKey = function(ev) {
+      if (editing() || ev.metaKey || ev.ctrlKey || ev.altKey) return;
+      const k = ev.key;
+      if (k === "ArrowDown" || k === "PageDown") {
+        ev.preventDefault();
+        step(1);
+        return;
+      }
+      if (k === "ArrowUp" || k === "PageUp") {
+        ev.preventDefault();
+        step(-1);
+        return;
+      }
+      if (k === "Home" && scenes.length) {
+        ev.preventDefault();
+        go(scenes[0].id);
+        return;
+      }
+      if (k === "End" && scenes.length) {
+        ev.preventDefault();
+        go(scenes[scenes.length - 1].id);
+      }
+    };
+    const wantKeys = s.keys !== false;
+    if (wantKeys) window.addEventListener("keydown", onKey);
+    tick();
+    return {
+      el: rail ? rail.nav : null,
+      get lenis() {
+        return lenis;
+      },
+      go,
+      next() {
+        step(1);
+      },
+      prev() {
+        step(-1);
+      },
+      current() {
+        return curIdx >= 0 && scenes[curIdx] ? scenes[curIdx].id : null;
+      },
+      progress() {
+        return storyP;
+      },
+      destroy() {
+        dead = true;
+        if (rafId) {
+          cancelAnimationFrame(rafId);
+          rafId = 0;
+        }
+        if (io) {
+          io.disconnect();
+          io = null;
+        }
+        scroller.removeEventListener("scroll", onScroll);
+        window.removeEventListener("resize", onResize);
+        if (wantKeys) window.removeEventListener("keydown", onKey);
+        if (lenis) {
+          lenis.destroy();
+          lenis = null;
+        }
+        if (rail && rail.nav.parentNode) rail.nav.parentNode.removeChild(rail.nav);
+        if (host && hostMarked) host.classList.remove("ak-story");
+        scenes.forEach(function(sc) {
+          unpin(sc);
+          sc.el.classList.remove("ak-scene");
+          sc.el.removeAttribute("data-ak-scene");
+        });
+      }
+    };
+  }
+  function storyRail(spec) {
+    const s = spec || /** @type {any} */
+    {};
+    const items = (s.scenes || []).map(function(sc) {
+      return { id: String(sc.id), label: String(sc.label || sc.id) };
+    });
+    const built = railOf(items, function(id) {
+      if (s.onPick) s.onPick(id);
+    }, !!s.target);
+    const parent = s.target ? resolve(s.target) : document.body;
+    let marked = false;
+    if (s.target && !parent.classList.contains("ak-story")) {
+      parent.classList.add("ak-story");
+      marked = true;
+    }
+    parent.appendChild(built.nav);
+    return {
+      el: built.nav,
+      set(patch) {
+        if (!patch || patch.current == null) return;
+        const i = typeof patch.current === "number" ? patch.current : items.findIndex(function(it) {
+          return it.id === String(patch.current);
+        });
+        built.mark(i);
+      },
+      destroy() {
+        if (built.nav.parentNode) built.nav.parentNode.removeChild(built.nav);
+        if (marked) parent.classList.remove("ak-story");
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/anime-show.js
+  var W5 = (
+    /** @type {any} */
+    window
+  );
+  var animePromise2 = null;
+  var animeOff2 = false;
+  var LATE = 400;
+  var SVG_NS6 = "http://www.w3.org/2000/svg";
+  function ensureAnime2() {
+    if (W5.anime && W5.anime.animate) return Promise.resolve(W5.anime);
+    if (animePromise2) return animePromise2;
+    animePromise2 = new Promise(function(ok, fail) {
+      const s = document.createElement("script");
+      s.src = NODE_URL + "/lib/anime@4.min.js";
+      s.onload = function() {
+        ok(W5.anime);
+      };
+      s.onerror = function() {
+        animePromise2 = null;
+        fail(new Error("anime failed to load"));
+      };
+      document.head.appendChild(s);
+    });
+    return animePromise2;
+  }
+  function withAnime2(run) {
+    if (animeOff2 || reducedMotion()) return;
+    ensureAnime2().then(run, function() {
+      animeOff2 = true;
+    });
+  }
+  function warmAnime2() {
+    if (animeOff2 || reducedMotion()) return;
+    ensureAnime2().then(null, function() {
+      animeOff2 = true;
+    });
+  }
+  function onCue(run) {
+    const asked = Date.now();
+    withAnime2(function(a) {
+      if (Date.now() - asked > LATE) return;
+      run(a);
+    });
+  }
+  function cue(node, when, play, once) {
+    if (when === "now") {
+      play();
+      return null;
+    }
+    warmAnime2();
+    return inView(node, play, { once: once !== false });
+  }
+  function toElements(targets) {
+    if (!targets) return [];
+    if (typeof targets === "string") return Array.prototype.slice.call(document.querySelectorAll(targets));
+    if (targets instanceof Element) return [
+      /** @type {HTMLElement} */
+      targets
+    ];
+    if (typeof targets.length === "number") return Array.prototype.slice.call(targets);
+    return [];
+  }
+  function kidsOf(node) {
+    return Array.prototype.slice.call(node.children);
+  }
+  var REVEAL_EACH = { words: 34, chars: 16, lines: 70 };
+  var REVEAL_FROM = {
+    rise: { opacity: [0, 1], y: [18, 0] },
+    blur: { opacity: [0, 1], filter: ["blur(9px)", "blur(0px)"] },
+    flip: { opacity: [0, 1], perspective: ["720px", "720px"], rotateX: [-86, 0], y: [10, 0] },
+    drop: { opacity: [0, 1], y: [-24, 0], scale: [0.86, 1] }
+  };
+  function textReveal(target, opts) {
+    const o = opts || {};
+    const node = (
+      /** @type {HTMLElement} */
+      resolve(target)
+    );
+    const by = o.by === "chars" || o.by === "lines" ? o.by : "words";
+    const from = REVEAL_FROM[o.from] ? o.from : "rise";
+    const each = typeof o.each === "number" ? o.each : REVEAL_EACH[by];
+    const duration = o.duration || (by === "chars" ? 560 : 700);
+    const html = node.innerHTML;
+    const hasText = !!(node.textContent || "").trim();
+    node.classList.add("ak-textreveal", "ak-textreveal--" + from);
+    let splitter = null;
+    let ownSplit = false;
+    let watcher = null;
+    function fallback() {
+      const text = node.textContent || "";
+      node.setAttribute("aria-label", text.trim());
+      node.textContent = "";
+      const made = [];
+      text.split(/(\s+)/).forEach(function(part) {
+        if (!part) return;
+        const piece = el("span", { class: "ak-textreveal__piece", "aria-hidden": "true" }, part);
+        node.appendChild(piece);
+        if (part.trim()) made.push(piece);
+      });
+      ownSplit = true;
+      return made;
+    }
+    function piecesOf(sp) {
+      if (by === "chars") return sp.chars;
+      if (by === "lines") return sp.lines;
+      return sp.words;
+    }
+    function travel2(a, list2) {
+      if (!list2 || !list2.length) return;
+      a.animate(list2, Object.assign({}, REVEAL_FROM[from], {
+        duration,
+        delay: a.stagger(each),
+        ease: from === "flip" ? "outBack" : "outExpo"
+      }));
+    }
+    function reset() {
+      if (splitter) {
+        try {
+          splitter.revert();
+        } catch {
+        }
+        splitter = null;
+      }
+      if (ownSplit) {
+        node.innerHTML = html;
+        node.removeAttribute("aria-label");
+        ownSplit = false;
+      }
+    }
+    function play() {
+      if (!hasText || reducedMotion()) return;
+      onCue(function(a) {
+        reset();
+        const api = a.text || {};
+        const make = typeof api.splitText === "function" ? api.splitText : typeof api.split === "function" ? api.split : null;
+        if (!make) {
+          travel2(a, fallback());
+          return;
+        }
+        const cfg2 = (
+          /** @type {any} */
+          { accessible: true, lines: false, words: { class: "ak-textreveal__piece" } }
+        );
+        if (by === "chars") cfg2.chars = { class: "ak-textreveal__piece" };
+        if (by === "lines") cfg2.lines = { class: "ak-textreveal__piece" };
+        let played = false;
+        splitter = make(node, cfg2);
+        splitter.addEffect(function(sp) {
+          if (!played) {
+            played = true;
+            travel2(a, piecesOf(sp));
+          }
+          return function() {
+          };
+        });
+      });
+    }
+    watcher = cue(node, o.when === "now" ? "now" : "inView", play, o.once);
+    return {
+      el: node,
+      play,
+      reset,
+      /** Unwire and hand the element back as plain text. The element itself stays on the page. */
+      destroy: function() {
+        if (watcher) {
+          watcher.destroy();
+          watcher = null;
+        }
+        reset();
+        node.classList.remove("ak-textreveal", "ak-textreveal--" + from);
+      }
+    };
+  }
+  var DRAWABLE = "path, line, polyline, circle, rect";
+  function nearestScroller2(node) {
+    let p = node.parentElement;
+    while (p && p !== document.body) {
+      const oy = getComputedStyle(p).overflowY;
+      if ((oy === "auto" || oy === "scroll") && p.scrollHeight > p.clientHeight) return p;
+      p = p.parentElement;
+    }
+    return window;
+  }
+  function drawPath(target, opts) {
+    const o = opts || {};
+    const node = resolve(target);
+    const when = o.when === "now" || o.when === "scroll" ? o.when : "inView";
+    const duration = o.duration || 1100;
+    const each = typeof o.each === "number" ? o.each : 140;
+    node.classList.add("ak-draw");
+    const shapes = node.tagName && node.tagName.toLowerCase() === "svg" ? Array.prototype.slice.call(node.querySelectorAll(DRAWABLE)) : [node];
+    shapes.forEach(function(s) {
+      s.classList.add("ak-draw__shape");
+    });
+    let drawables = null;
+    let watcher = null;
+    let bound = null;
+    function drawablesOf(a) {
+      if (!drawables) drawables = a.svg.createDrawable(shapes, 0, 0);
+      return drawables;
+    }
+    function setDraw(value) {
+      if (!drawables) return;
+      drawables.forEach(function(d) {
+        d.setAttribute("draw", value);
+      });
+    }
+    function play() {
+      if (reducedMotion() || !shapes.length) return;
+      onCue(function(a) {
+        a.animate(drawablesOf(a), {
+          draw: ["0 0", "0 1"],
+          duration,
+          delay: a.stagger(each),
+          ease: o.ease || "inOutQuad"
+        });
+      });
+    }
+    function progress(p) {
+      const at = Math.max(0, Math.min(1, Number(p) || 0));
+      setDraw("0 " + at);
+    }
+    function reset() {
+      setDraw("0 0");
+    }
+    function bindScroll() {
+      if (reducedMotion()) return;
+      withAnime2(function(a) {
+        drawablesOf(a);
+        reset();
+        const scroller = o.scroller || nearestScroller2(node);
+        let rafId = 0;
+        const tick = function() {
+          const r = node.getBoundingClientRect();
+          const h = scroller === window ? window.innerHeight : (
+            /** @type {Element} */
+            scroller.clientHeight
+          );
+          const top = scroller === window ? 0 : (
+            /** @type {Element} */
+            scroller.getBoundingClientRect().top
+          );
+          progress((top + h - r.top) / Math.max(h + r.height, 1));
+        };
+        const onScroll = function() {
+          if (!rafId) rafId = requestAnimationFrame(function() {
+            rafId = 0;
+            tick();
+          });
+        };
+        scroller.addEventListener("scroll", onScroll, { passive: true });
+        window.addEventListener("resize", onScroll);
+        tick();
+        bound = function() {
+          scroller.removeEventListener("scroll", onScroll);
+          window.removeEventListener("resize", onScroll);
+          if (rafId) cancelAnimationFrame(rafId);
+        };
+      });
+    }
+    if (when === "scroll") bindScroll();
+    else watcher = cue(node, when, play, o.once);
+    return {
+      el: node,
+      play,
+      reset,
+      progress,
+      destroy: function() {
+        if (watcher) {
+          watcher.destroy();
+          watcher = null;
+        }
+        if (bound) {
+          bound();
+          bound = null;
+        }
+        progress(1);
+        drawables = null;
+        shapes.forEach(function(s) {
+          s.classList.remove("ak-draw__shape");
+        });
+        node.classList.remove("ak-draw");
+      }
+    };
+  }
+  var WAVE_BEATS = {
+    scale: [{ scale: 1.22 }, { scale: 1 }],
+    rise: [{ y: -16 }, { y: 0 }],
+    flip: [{ rotateY: 180 }, { rotateY: 360 }],
+    tint: [{ "--ak-wave-t": 1 }, { "--ak-wave-t": 0 }]
+  };
+  function gridWave(target, opts) {
+    const o = opts || {};
+    const root = (
+      /** @type {HTMLElement} */
+      resolve(target)
+    );
+    const cols = Math.max(1, Math.round(o.cols || 8));
+    const rows = Math.max(1, Math.round(o.rows || 4));
+    const kind = WAVE_BEATS[o.kind] ? o.kind : "scale";
+    const each = typeof o.each === "number" ? o.each : 34;
+    const duration = o.duration || 640;
+    root.classList.add("ak-wave", "ak-wave--" + kind);
+    root.style.setProperty("--ak-wave-cols", String(cols));
+    let tiles = kidsOf(root);
+    const built = !tiles.length;
+    if (built) {
+      const count = Math.max(1, Math.round(o.cells || cols * rows));
+      for (let i = 0; i < count; i++) {
+        root.appendChild(el("div", { class: "ak-wave__tile", "aria-hidden": "true" }));
+      }
+      tiles = kidsOf(root);
+    } else {
+      tiles.forEach(function(tile) {
+        tile.classList.add("ak-wave__tile");
+      });
+    }
+    function pointOf(value) {
+      if (Array.isArray(value) && value.length >= 2) {
+        const x = Math.max(0, Math.min(cols - 1, Math.round(Number(value[0]) || 0)));
+        const y = Math.max(0, Math.min(rows - 1, Math.round(Number(value[1]) || 0)));
+        return y * cols + x;
+      }
+      if (typeof value === "number") return Math.max(0, Math.round(value));
+      if (value === "first" || value === "last" || value === "random" || value === "center") return value;
+      return "center";
+    }
+    function play(fromAt) {
+      if (reducedMotion() || !tiles.length) return;
+      onCue(function(a) {
+        a.animate(tiles, {
+          keyframes: WAVE_BEATS[kind],
+          duration,
+          delay: a.stagger(each, { grid: [cols, rows], from: pointOf(fromAt === void 0 ? o.from : fromAt) }),
+          ease: "inOutQuad"
+        });
+      });
+    }
+    const onClick = function(ev) {
+      const start = (
+        /** @type {Element|null} */
+        ev.target
+      );
+      if (!start || !start.closest) return;
+      const tile = start.closest(".ak-wave__tile");
+      if (!tile || tile.parentElement !== root) return;
+      play(tiles.indexOf(
+        /** @type {any} */
+        tile
+      ));
+    };
+    root.addEventListener("click", onClick);
+    const watcher = cue(root, o.when === "now" ? "now" : "inView", function() {
+      play();
+    }, o.once);
+    return {
+      el: root,
+      play,
+      destroy: function() {
+        if (watcher) watcher.destroy();
+        root.removeEventListener("click", onClick);
+        if (built) tiles.forEach(function(tile) {
+          tile.remove();
+        });
+        else tiles.forEach(function(tile) {
+          tile.classList.remove("ak-wave__tile");
+        });
+        root.classList.remove("ak-wave", "ak-wave--" + kind);
+        root.style.removeProperty("--ak-wave-cols");
+      }
+    };
+  }
+  var END_KEYS = ["x", "y", "scale", "rotate", "opacity"];
+  function endOf(value) {
+    if (Array.isArray(value)) return value.length ? value[value.length - 1] : null;
+    if (value && typeof value === "object" && "to" in value) return (
+      /** @type {any} */
+      value.to
+    );
+    return value;
+  }
+  function settle(node, props) {
+    let moved = false;
+    const at = { x: 0, y: 0, scale: 1, rotate: 0 };
+    END_KEYS.forEach(function(key) {
+      const end = endOf(props[key]);
+      if (end == null) return;
+      moved = true;
+      if (key === "opacity") node.style.opacity = String(end);
+      else at[key] = parseFloat(String(end)) || 0;
+    });
+    if (!moved) return;
+    if (props.x !== void 0 || props.y !== void 0 || props.scale !== void 0 || props.rotate !== void 0) {
+      node.style.transform = "translate(" + at.x + "px, " + at.y + "px) scale(" + (props.scale === void 0 ? 1 : at.scale) + ") rotate(" + at.rotate + "deg)";
+    }
+  }
+  function sequence(steps2, opts) {
+    const o = opts || {};
+    const list2 = (Array.isArray(steps2) ? steps2 : []).filter(function(s) {
+      return s && s.targets && s.props;
+    });
+    let tl = null;
+    const queued = [];
+    const asked = Date.now();
+    function drive(name, arg) {
+      if (tl) {
+        tl[name](arg);
+        return;
+      }
+      queued.push([name, arg]);
+    }
+    if (reducedMotion()) {
+      list2.forEach(function(step) {
+        toElements(step.targets).forEach(function(node) {
+          settle(node, step.props);
+        });
+      });
+    } else {
+      withAnime2(function(a) {
+        tl = a.createTimeline({ autoplay: false, loop: o.loop || false });
+        list2.forEach(function(step) {
+          tl.add(step.targets, step.props, step.at);
+        });
+        queued.forEach(function(want) {
+          tl[want[0]](want[1]);
+        });
+        if (o.autoplay !== false && !queued.length && Date.now() - asked <= LATE) tl.play();
+      });
+    }
+    return {
+      /** The anime timeline itself, once the library has landed. Null until then. */
+      get timeline() {
+        return tl;
+      },
+      play: function() {
+        drive("play");
+      },
+      pause: function() {
+        drive("pause");
+      },
+      restart: function() {
+        drive("restart");
+      },
+      seek: function(ms) {
+        drive("seek", Number(ms) || 0);
+      },
+      reverse: function() {
+        drive("reverse");
+      },
+      /** How long the whole piece runs, in milliseconds. 0 until the timeline exists. */
+      duration: function() {
+        return tl ? tl.duration : 0;
+      },
+      destroy: function() {
+        queued.length = 0;
+        if (tl) {
+          tl.revert();
+          tl = null;
+        }
+      }
+    };
+  }
+  function orbit(target, opts) {
+    const o = opts || /** @type {any} */
+    {};
+    const root = (
+      /** @type {HTMLElement} */
+      resolve(target)
+    );
+    const duration = o.duration || 6e3;
+    const spread = typeof o.spread === "number" ? Math.max(0, Math.min(1, o.spread)) : 1;
+    root.classList.add("ak-orbit");
+    let stage = null;
+    let path = null;
+    if (o.path && typeof o.path !== "string") {
+      path = o.path;
+    } else if (typeof o.path === "string" && o.path.trim()) {
+      stage = document.createElementNS(SVG_NS6, "svg");
+      stage.setAttribute("class", "ak-orbit__stage");
+      stage.setAttribute("viewBox", o.viewBox || "0 0 100 100");
+      stage.setAttribute("aria-hidden", "true");
+      path = document.createElementNS(SVG_NS6, "path");
+      path.setAttribute("class", "ak-orbit__path");
+      path.setAttribute("d", o.path);
+      path.setAttribute("fill", "none");
+      stage.appendChild(path);
+      root.insertBefore(stage, root.firstChild);
+    }
+    const madeItems = typeof o.items === "number";
+    let items;
+    if (madeItems) {
+      items = [];
+      for (let i = 0; i < Math.max(1, Math.round(o.items)); i++) {
+        const dot = el("span", { class: "ak-orbit__dot", "aria-hidden": "true" });
+        root.appendChild(dot);
+        items.push(dot);
+      }
+    } else {
+      items = toElements(o.items);
+    }
+    items.forEach(function(item) {
+      item.classList.add("ak-orbit__item");
+    });
+    function offsetOf(i) {
+      return items.length ? spread * i / items.length : 0;
+    }
+    let runs = [];
+    let watcher = null;
+    function place2() {
+      if (!path || typeof path.getTotalLength !== "function") return false;
+      const len = path.getTotalLength();
+      if (!len) return false;
+      const m = path.getCTM();
+      items.forEach(function(item, i) {
+        const p = path.getPointAtLength(offsetOf(i) * len % len);
+        const x = m ? p.x * m.a + p.y * m.c + m.e : p.x;
+        const y = m ? p.x * m.b + p.y * m.d + m.f : p.y;
+        item.style.transform = "translate(" + x + "px, " + y + "px)";
+      });
+      return true;
+    }
+    function stop() {
+      runs.forEach(function(run) {
+        run.pause();
+      });
+      runs = [];
+    }
+    function play() {
+      if (reducedMotion()) {
+        place2();
+        return;
+      }
+      onCue(function(a) {
+        stop();
+        items.forEach(function(item, i) {
+          const along = a.svg.createMotionPath(path, offsetOf(i));
+          if (!along) return;
+          runs.push(a.animate(item, Object.assign({}, along, {
+            duration,
+            ease: o.ease || "linear",
+            loop: o.loop === true
+          })));
+        });
+      });
+    }
+    if (!place2()) requestAnimationFrame(function() {
+      place2();
+    });
+    watcher = cue(root, o.when === "now" ? "now" : "inView", play, o.once);
+    return {
+      el: root,
+      play,
+      pause: function() {
+        runs.forEach(function(run) {
+          run.pause();
+        });
+      },
+      /**
+       * Move the whole ride to a fraction of one lap, 0 to 1. A no-op until the ride has been built.
+       * @param {number} p
+       */
+      seek: function(p) {
+        const at = Math.max(0, Math.min(1, Number(p) || 0));
+        runs.forEach(function(run) {
+          run.seek(at * duration);
+        });
+      },
+      destroy: function() {
+        if (watcher) {
+          watcher.destroy();
+          watcher = null;
+        }
+        runs.forEach(function(run) {
+          run.revert();
+        });
+        runs = [];
+        if (madeItems) items.forEach(function(item) {
+          item.remove();
+        });
+        else items.forEach(function(item) {
+          item.classList.remove("ak-orbit__item");
+          item.style.transform = "";
+        });
+        if (stage) stage.remove();
+        root.classList.remove("ak-orbit");
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/transitions.js
+  var SCREEN_KINDS = ["fade", "wipe", "curtain", "zoom", "iris", "slide"];
+  var PANEL_KINDS = ["crossfade", "slide", "flip", "morph", "push"];
+  var CURTAIN_KINDS = ["band", "halves", "iris"];
+  var TINTS = ["accent", "ink", "surface"];
+  var DIRECTIONS = ["left", "right", "up", "down"];
+  var AWAY = { left: "translateX(-100%)", right: "translateX(100%)", up: "translateY(-100%)", down: "translateY(100%)" };
+  var TOWARD = { left: "translateX(100%)", right: "translateX(-100%)", up: "translateY(100%)", down: "translateY(-100%)" };
+  var STAND_IN = { fade: "band", wipe: "band", slide: "band", zoom: "halves", curtain: "halves", iris: "iris" };
+  var lastPoint = null;
+  if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+    window.addEventListener("pointerdown", function(ev) {
+      lastPoint = { x: ev.clientX, y: ev.clientY };
+    }, { capture: true, passive: true });
+  }
+  function originOf(from) {
+    if (from && typeof from.x === "number" && typeof from.y === "number") return { x: from.x, y: from.y };
+    if (lastPoint) return { x: lastPoint.x, y: lastPoint.y };
+    const w = typeof window !== "undefined" ? window.innerWidth : 0;
+    const h = typeof window !== "undefined" ? window.innerHeight : 0;
+    return { x: w / 2, y: h / 2 };
+  }
+  function spanOf(node, ms) {
+    if (ms) return ms;
+    const cs = getComputedStyle(node);
+    return (parseFloat(cs.getPropertyValue("--ak-motion")) || 200) * 2;
+  }
+  function easeOf2(node) {
+    const cs = getComputedStyle(node);
+    return (cs.getPropertyValue("--ak-ease") || "").trim() || "cubic-bezier(0.2, 0.7, 0.3, 1)";
+  }
+  function oneOf(set, value) {
+    return set.indexOf(value) >= 0 ? String(value) : set[0];
+  }
+  function playAll(runs) {
+    const settled = runs.map(function(r) {
+      if (typeof r.node.animate !== "function") return Promise.resolve();
+      const anim = r.node.animate(r.frames, r.timing);
+      return anim.finished.then(function() {
+        anim.cancel();
+      }, function() {
+      });
+    });
+    return Promise.all(settled).then(function() {
+    });
+  }
+  function reachOf(point) {
+    const w = typeof window !== "undefined" ? window.innerWidth : 0;
+    const h = typeof window !== "undefined" ? window.innerHeight : 0;
+    const dx = Math.max(point.x, w - point.x);
+    const dy = Math.max(point.y, h - point.y);
+    return Math.ceil(Math.sqrt(dx * dx + dy * dy));
+  }
+  function originIn(host, from) {
+    const r = host.getBoundingClientRect();
+    const src = from && typeof from.x === "number" ? from : lastPoint;
+    if (src) {
+      const x = src.x - r.left;
+      const y = src.y - r.top;
+      if (x >= 0 && y >= 0 && x <= r.width && y <= r.height) return { x, y };
+    }
+    return { x: r.width / 2, y: r.height / 2 };
+  }
+  function curtain(opts) {
+    const o = opts || {};
+    const kind = oneOf(CURTAIN_KINDS, o.kind);
+    const tint = o.colour && TINTS.indexOf(o.colour) >= 0 ? o.colour : "ink";
+    const dir = oneOf(DIRECTIONS, o.direction);
+    const axis = dir === "up" || dir === "down" ? "y" : "x";
+    const host = o.host ? (
+      /** @type {HTMLElement} */
+      resolve(o.host)
+    ) : null;
+    const point = host ? originIn(host, o.from) : originOf(o.from);
+    const reach = host ? Math.ceil(Math.hypot(host.clientWidth, host.clientHeight)) : reachOf(point);
+    const layer = el("div", {
+      class: "ak-root ak-curtain ak-curtain--" + kind + " ak-curtain--" + tint + " ak-curtain--axis-" + axis,
+      "aria-hidden": "true"
+    });
+    const leaves = [];
+    if (kind === "halves") {
+      leaves.push(el("div", { class: "ak-curtain__half ak-curtain__half--a" }));
+      leaves.push(el("div", { class: "ak-curtain__half ak-curtain__half--b" }));
+    } else {
+      leaves.push(el("div", { class: kind === "iris" ? "ak-curtain__iris" : "ak-curtain__band" }));
+    }
+    const open = kind === "iris" ? ["circle(0px at " + point.x + "px " + point.y + "px)"] : kind === "halves" ? [AWAY[axis === "y" ? "up" : "left"], AWAY[axis === "y" ? "down" : "right"]] : [TOWARD[dir]];
+    const shut = kind === "iris" ? ["circle(" + reach + "px at " + point.x + "px " + point.y + "px)"] : ["none", "none"];
+    const past = kind === "band" ? [AWAY[dir]] : open;
+    let parked = open;
+    leaves.forEach(function(leaf, i) {
+      if (kind === "iris") leaf.style.clipPath = open[i];
+      else leaf.style.transform = open[i];
+      layer.appendChild(leaf);
+    });
+    if (host) {
+      host.classList.add("ak-curtain-host");
+      layer.classList.add("ak-curtain--inset");
+      host.appendChild(layer);
+    } else {
+      document.body.appendChild(layer);
+    }
+    const ms = spanOf(layer, o.duration);
+    const ease = easeOf2(layer);
+    let covered = false;
+    let gone = false;
+    function travel2(from, to) {
+      if (gone) return Promise.resolve();
+      const land = function() {
+        leaves.forEach(function(leaf, i) {
+          if (kind === "iris") leaf.style.clipPath = to[i];
+          else leaf.style.transform = to[i];
+        });
+      };
+      if (reducedMotion() || typeof leaves[0].animate !== "function") {
+        land();
+        return Promise.resolve();
+      }
+      const runs = leaves.map(function(leaf, i) {
+        return {
+          node: leaf,
+          frames: kind === "iris" ? [{ clipPath: from[i] }, { clipPath: to[i] }] : [{ transform: from[i] }, { transform: to[i] }],
+          timing: { duration: ms, easing: ease, fill: (
+            /** @type {FillMode} */
+            "both"
+          ) }
+        };
+      });
+      return playAll(runs).then(land);
+    }
+    return {
+      cover() {
+        if (covered) return Promise.resolve();
+        covered = true;
+        layer.classList.add("ak-curtain--on");
+        const was = parked;
+        parked = shut;
+        return travel2(was, shut);
+      },
+      uncover() {
+        if (!covered) return Promise.resolve();
+        covered = false;
+        parked = past;
+        return travel2(shut, past).then(function() {
+          layer.classList.remove("ak-curtain--on");
+        });
+      },
+      destroy() {
+        gone = true;
+        if (layer.parentNode) layer.parentNode.removeChild(layer);
+        if (host && !host.querySelector(".ak-curtain")) host.classList.remove("ak-curtain-host");
+      }
+    };
+  }
+  function screenTransition(kind, run, opts) {
+    const o = opts || {};
+    const move = oneOf(SCREEN_KINDS, kind);
+    const root = document.documentElement;
+    if (reducedMotion()) return Promise.resolve(run()).then(function() {
+    });
+    if (typeof document.startViewTransition !== "function") {
+      const cover = curtain({
+        kind: (
+          /** @type {'band'|'halves'|'iris'} */
+          STAND_IN[move]
+        ),
+        colour: o.colour,
+        from: o.from,
+        direction: o.direction,
+        duration: o.duration
+      });
+      return cover.cover().then(function() {
+        return run();
+      }).then(function() {
+        return cover.uncover();
+      }).then(function() {
+        cover.destroy();
+      }, function(err) {
+        cover.destroy();
+        throw err;
+      });
+    }
+    const point = originOf(o.from);
+    root.setAttribute("data-ak-transition", move);
+    if (o.direction && DIRECTIONS.indexOf(o.direction) >= 0) root.setAttribute("data-ak-transition-dir", o.direction);
+    if (o.colour && TINTS.indexOf(o.colour) >= 0) root.setAttribute("data-ak-transition-colour", o.colour);
+    root.style.setProperty("--ak-iris-x", point.x + "px");
+    root.style.setProperty("--ak-iris-y", point.y + "px");
+    if (o.duration) root.style.setProperty("--ak-transition-span", o.duration + "ms");
+    const clear2 = function() {
+      root.removeAttribute("data-ak-transition");
+      root.removeAttribute("data-ak-transition-dir");
+      root.removeAttribute("data-ak-transition-colour");
+      root.style.removeProperty("--ak-iris-x");
+      root.style.removeProperty("--ak-iris-y");
+      root.style.removeProperty("--ak-transition-span");
+    };
+    return document.startViewTransition(run).finished.then(clear2, clear2);
+  }
+  function heightOf(node) {
+    const cs = getComputedStyle(node);
+    const box = node.getBoundingClientRect().height;
+    if (cs.boxSizing === "border-box") return box;
+    const pad = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+    const edge = (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
+    return Math.max(0, box - pad - edge);
+  }
+  function whenMorphDone(moving, cap) {
+    return new Promise(function(settle2) {
+      let done = false;
+      const finish = function() {
+        if (done) return;
+        done = true;
+        if (obs) obs.disconnect();
+        clearTimeout(timer);
+        settle2();
+      };
+      const obs = typeof MutationObserver === "function" ? new MutationObserver(function() {
+        if (!moving.style.viewTransitionName) finish();
+      }) : null;
+      if (obs) obs.observe(moving, { attributes: true, attributeFilter: ["style"] });
+      const timer = setTimeout(finish, cap);
+    });
+  }
+  function panelTransition(from, to, kind, opts) {
+    const o = opts || {};
+    const move = oneOf(PANEL_KINDS, kind);
+    const parent = (
+      /** @type {HTMLElement|null} */
+      from && from.parentElement
+    );
+    if (!parent || !to || from === to) return Promise.resolve();
+    const swap = function() {
+      parent.insertBefore(to, from);
+      if (from.parentNode) from.parentNode.removeChild(from);
+    };
+    if (reducedMotion() || typeof from.animate !== "function") {
+      swap();
+      return Promise.resolve();
+    }
+    const ms = spanOf(from, o.duration);
+    const ease = easeOf2(from);
+    const dir = oneOf(DIRECTIONS, o.direction);
+    const moving = (
+      /** @type {HTMLElement|null} */
+      o.moving || null
+    );
+    if (move === "morph") {
+      if (!moving || typeof document.startViewTransition !== "function") {
+        return panelTransition(from, to, "crossfade", o);
+      }
+      const done = whenMorphDone(moving, ms * 6);
+      morph(moving, swap);
+      return done;
+    }
+    const outgoing = (
+      /** @type {HTMLElement} */
+      from
+    );
+    const incoming = (
+      /** @type {HTMLElement} */
+      to
+    );
+    const box = outgoing.getBoundingClientRect();
+    const seat = parent.getBoundingClientRect();
+    const pcs = getComputedStyle(parent);
+    const startH = heightOf(parent);
+    const kept = { position: parent.style.position, overflow: parent.style.overflow };
+    if (pcs.position === "static") parent.style.position = "relative";
+    parent.style.overflow = "hidden";
+    if (move === "flip") parent.classList.add("ak-swap--flip");
+    parent.insertBefore(incoming, outgoing);
+    outgoing.style.position = "absolute";
+    outgoing.style.boxSizing = "border-box";
+    outgoing.style.margin = "0";
+    outgoing.style.top = box.top - seat.top - (parseFloat(pcs.borderTopWidth) || 0) + parent.scrollTop + "px";
+    outgoing.style.left = box.left - seat.left - (parseFloat(pcs.borderLeftWidth) || 0) + parent.scrollLeft + "px";
+    outgoing.style.width = box.width + "px";
+    outgoing.style.height = box.height + "px";
+    const endH = heightOf(parent);
+    const runs = [];
+    if (Math.abs(endH - startH) > 1) {
+      runs.push({
+        node: parent,
+        frames: [{ height: startH + "px" }, { height: endH + "px" }],
+        timing: { duration: ms, easing: ease, fill: (
+          /** @type {FillMode} */
+          "backwards"
+        ) }
+      });
+    }
+    if (move === "flip") {
+      const half = Math.round(ms / 2);
+      runs.push({
+        node: outgoing,
+        frames: [{ transform: "rotateY(0deg)", opacity: 1 }, { transform: "rotateY(-90deg)", opacity: 0 }],
+        timing: { duration: half, easing: "ease-in", fill: (
+          /** @type {FillMode} */
+          "forwards"
+        ) }
+      });
+      runs.push({
+        node: incoming,
+        frames: [{ transform: "rotateY(90deg)", opacity: 0 }, { transform: "rotateY(0deg)", opacity: 1 }],
+        timing: { duration: half, delay: half, easing: "ease-out", fill: (
+          /** @type {FillMode} */
+          "backwards"
+        ) }
+      });
+    } else if (move === "crossfade") {
+      runs.push({ node: outgoing, frames: [{ opacity: 1 }, { opacity: 0 }], timing: { duration: ms, easing: ease, fill: (
+        /** @type {FillMode} */
+        "forwards"
+      ) } });
+      runs.push({ node: incoming, frames: [{ opacity: 0 }, { opacity: 1 }], timing: { duration: ms, easing: ease, fill: (
+        /** @type {FillMode} */
+        "backwards"
+      ) } });
+    } else {
+      const fade = move === "slide";
+      runs.push({
+        node: outgoing,
+        frames: [{ transform: "none", opacity: 1 }, { transform: AWAY[dir], opacity: fade ? 0 : 1 }],
+        timing: { duration: ms, easing: ease, fill: (
+          /** @type {FillMode} */
+          "forwards"
+        ) }
+      });
+      runs.push({
+        node: incoming,
+        frames: [{ transform: TOWARD[dir], opacity: fade ? 0 : 1 }, { transform: "none", opacity: 1 }],
+        timing: { duration: ms, easing: ease, fill: (
+          /** @type {FillMode} */
+          "backwards"
+        ) }
+      });
+    }
+    return playAll(runs).then(function() {
+      if (outgoing.parentNode) outgoing.parentNode.removeChild(outgoing);
+      incoming.style.removeProperty("transform");
+      incoming.style.removeProperty("opacity");
+      parent.classList.remove("ak-swap--flip");
+      parent.style.position = kept.position;
+      parent.style.overflow = kept.overflow;
+      parent.style.removeProperty("height");
+    });
+  }
+
   // src/static/sdk-libs/atelier/index.js
   var atelier = {
     /**
@@ -10287,7 +11613,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.44.0",
+    version: "0.45.0",
     // ── Shell and navigation ──
     app,
     section,
@@ -10403,6 +11729,18 @@
     cart,
     notices,
     facets,
+    // ── The show: the Lenis director (scenes in order, each with its motion), the anime.js show
+    //    pieces, and the transitions between screens and between panels ──
+    director,
+    storyRail,
+    textReveal,
+    drawPath,
+    gridWave,
+    sequence,
+    orbit,
+    screenTransition,
+    panelTransition,
+    curtain,
     // ── Data ──
     form,
     table,

@@ -1,0 +1,170 @@
+/*
+ * @file aimeat-atelier/anime-show.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The clothes for the anime.js SHOW module: the headline that arrives piece by
+ *   piece, the SVG that draws itself on, the grid that ripples from where it was touched, and
+ *   the items that ride a path. Every value rides the --ak-* contract, so all four answer every
+ *   look, palette and mode; no colour is written here that is not a token or a color-mix over one.
+ *
+ *   `sequence` has no clothes: it choreographs the app's OWN elements and never introduces one
+ *   of its own, which is why there is no .ak-sequence class to find here.
+ *
+ *   NOTHING IN THIS FILE ANIMATES. Every piece of travel is written in JavaScript, runs once per
+ *   cue and is skipped under reduced motion. What lives here is the geometry the travel needs
+ *   (an inline-block piece a transform can reach, a stage a path can be measured in, a tile the
+ *   accent can be mixed into) plus a hover tint and a focus ring on the one thing that is
+ *   pressable — which is all an idle surface should ever repaint for.
+ * @structure .ak-textreveal (pieces, the four entrances) · .ak-draw (shapes, ink) · .ak-wave (grid,
+ *   tiles, the tint mix) · .ak-orbit (stage, path, dots) · reduced-motion
+ * @usage  Imported by aimeat-atelier.css; the components are AIMEAT.atelier.textReveal,
+ *   drawPath, gridWave, sequence and orbit.
+ * @version-history
+ *   v0.45.0 — 2026-09-02 — Initial: the anime.js show module (textReveal, drawPath, gridWave,
+ *     sequence, orbit).
+ */
+
+/* ── The headline that arrives ───────────────────────────────────────────────────────────── */
+/* The element keeps whatever type it already had; this only makes its pieces reachable by a
+ * transform. An inline span cannot be translated, rotated or scaled at all, so every piece the
+ * splitter makes becomes inline-block, and a LINE becomes a block because that is what it is. */
+.ak-textreveal {
+  color: inherit;
+}
+.ak-textreveal__piece,
+.ak-textreveal [data-word],
+.ak-textreveal [data-char] {
+  display: inline-block;
+  white-space: pre-wrap;
+  will-change: transform, opacity;
+}
+.ak-textreveal [data-line]:not([data-word]):not([data-char]) {
+  display: block;
+}
+/* The flip arrives edge-on, so the pieces need depth of their own. The JavaScript carries the
+ * perspective in the transform it writes; this is the fallback for the split the library did not
+ * make, where the piece wears the class instead. */
+.ak-textreveal--flip .ak-textreveal__piece {
+  transform-origin: 50% 100%;
+  backface-visibility: hidden;
+}
+/* The blur entrance ends at zero blur. Nothing is declared here that would fight the JS: the
+ * resting state IS the plain headline, and that is the whole contract. */
+
+/* ── The drawing that draws itself ───────────────────────────────────────────────────────── */
+/* The ink is the element's OWN colour: give the shapes stroke="currentColor" and this carries
+ * --ak-ink into them, or --ak-accent with the modifier. A shape that wants its own stroke keeps
+ * it — nothing here overrides a stroke or a fill the author drew. */
+.ak-draw {
+  display: block;
+  max-width: 100%;
+  color: var(--ak-ink);
+}
+.ak-draw--accent {
+  color: var(--ak-accent);
+}
+.ak-draw--quiet {
+  color: var(--ak-ink-dim);
+}
+.ak-draw__shape {
+  /* The stroke keeps its weight when the SVG is scaled by its box, which is what makes one
+   * drawing work at a card's width and at a hero's. */
+  vector-effect: non-scaling-stroke;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ── The grid that ripples ───────────────────────────────────────────────────────────────── */
+.ak-wave {
+  display: grid;
+  grid-template-columns: repeat(var(--ak-wave-cols, 8), minmax(0, 1fr));
+  gap: 4px;
+  /* The flip ripple turns each tile on its own axis; the depth belongs to the grid. */
+  perspective: 900px;
+}
+.ak-wave__tile {
+  --ak-wave-t: 0;
+  aspect-ratio: 1;
+  min-width: 0;
+  min-height: 12px;
+  border: var(--ak-line-w) solid var(--ak-line);
+  border-radius: var(--ak-radius-sm);
+  /* The tint ripple lives here: --ak-wave-t is a number the JavaScript moves from 0 to 1 and
+   * back, and the ground is mixed from it, so the accent travels through the grid without a
+   * single colour being written outside the contract. */
+  background: color-mix(in oklab, var(--ak-accent) calc(var(--ak-wave-t) * 100%), var(--ak-surface-2));
+  cursor: pointer;
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+}
+.ak-wave__tile:hover {
+  border-color: color-mix(in oklab, var(--ak-accent) 55%, var(--ak-line));
+}
+.ak-wave__tile:focus-visible {
+  outline: 2px solid var(--ak-focus);
+  outline-offset: 2px;
+}
+/* The three moving ripples leave the ground alone, so their tiles read as one material. */
+.ak-wave--scale .ak-wave__tile,
+.ak-wave--rise .ak-wave__tile,
+.ak-wave--flip .ak-wave__tile {
+  background: var(--ak-surface-2);
+}
+
+/* ── The path ride ───────────────────────────────────────────────────────────────────────── */
+.ak-orbit {
+  position: relative;
+  /* Square by default so a figure-eight drawn in a 100 x 100 viewBox is the shape the author
+   * drew. An app that wants another proportion sets its own height on the element. */
+  aspect-ratio: 1;
+  min-height: 8rem;
+}
+.ak-orbit__stage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+/* The path is the track, drawn faintly: the eye should follow the riders, not the rail. */
+.ak-orbit__path {
+  fill: none;
+  stroke: color-mix(in oklab, var(--ak-ink) 22%, transparent);
+  stroke-width: 1;
+  stroke-dasharray: 3 5;
+  vector-effect: non-scaling-stroke;
+}
+/* A rider is placed by a transform from the container's top-left corner, so it is pulled back by
+ * half its own size to sit ON the path rather than beside it. */
+.ak-orbit__item {
+  position: absolute;
+  top: 0;
+  left: 0;
+  will-change: transform;
+}
+.ak-orbit__dot {
+  width: var(--ak-orbit-dot, 14px);
+  height: var(--ak-orbit-dot, 14px);
+  margin: calc(var(--ak-orbit-dot, 14px) / -2);
+  border-radius: var(--ak-radius-pill);
+  background: var(--ak-accent);
+  box-shadow: var(--ak-elev-1);
+}
+.ak-orbit__dot:nth-child(even) {
+  background: var(--ak-spectrum-2, var(--ak-accent));
+}
+
+/* ── Less motion asked for: every part stands at its end state and the hovers stop ───────── */
+@media (prefers-reduced-motion: reduce) {
+  .ak-textreveal__piece,
+  .ak-textreveal [data-word],
+  .ak-textreveal [data-char],
+  .ak-orbit__item,
+  .ak-wave__tile {
+    will-change: auto;
+  }
+  .ak-wave__tile {
+    transition: none;
+  }
+}
