@@ -34,6 +34,11 @@
  *     discovery-file lifecycle, signal handling.
  * @usage Called by mcp/server.ts `runServe()` when `--http`/`--daemon` is set.
  * @version-history
+ *   v1.8.1 — 2026-09-01 — `/local/status` carries the SAME projection as serve.json. It holds a
+ *     second copy of that shape, and when serve.json's `principals[].id` became the GAII the field
+ *     was documented to be, this copy kept the bare agent name and its `agents[]` rows gained no
+ *     `gaii`. Two owners each with a `concierge` were one indistinguishable row on the surface an
+ *     operator reads. Found by running the two-owner daemon rather than by reading the diff.
  *   v1.8.0 — 2026-08-31 — An agent can join a RUNNING daemon. The startup loop's body is
  *     `attachRegistered()`, and the tunnel's `invoke` frame carries one capability the daemon
  *     answers itself — `aimeat.agents.enrol` — which generates a key per agent, submits signed
@@ -549,9 +554,12 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
         pid: process.pid,
         started_at: startedAt,
         build: buildIdentity(freshness),   // which artifact is answering — see utils/build-stamp.ts
+        // The SAME projection serve.json carries, and it has to stay the same: this is a second
+        // copy of one shape, and when serve.json's `id` became the GAII it was documented to be,
+        // this copy was missed and kept the bare name. Two owners' `concierge` were one id here.
         principals: registry.list().map(e => ({
           type: e.agent.startsWith('eco:') ? 'ecosystem' : 'agent',
-          id: e.agent,
+          id: e.gaii,
           owner: e.owner,
           node_url: e.config.node_url,
           transport: channels.get(e.gaii)!.transportMode,
@@ -559,6 +567,7 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
         })),
         agents: registry.list().map(e => ({
           agent: e.agent,
+          gaii: e.gaii,
           owner: e.owner,
           node_url: e.config.node_url,
           transport: channels.get(e.gaii)!.transportMode,

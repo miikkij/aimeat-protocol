@@ -1252,6 +1252,143 @@ async function run() {
         }
     });
 
+    // ── Two owners on one connector home ─────────────────────────────────────
+    //
+    // Stage A of the isolation test, pinned. The connector holds both owners' agents in one
+    // process and one directory; the node is what has to keep them apart, and these are the
+    // doors that were actually walked with a live daemon on 2026-09-01.
+    //
+    // Both owners press the button, so both have a `concierge`, a `crew-forge` and a
+    // `workflow-manager` — the same three NAMES under two accounts, which is the shape that
+    // makes a bare-name assumption anywhere in the stack visible.
+    console.log('\n=== Agent v2: two owners, the same three names ===\n');
+    {
+        const one = await setupOwner('iso1');
+        const two = await setupOwner('iso2');
+        const auth1 = { Authorization: `Bearer ${one.ownerToken}` };
+        const auth2 = { Authorization: `Bearer ${two.ownerToken}` };
+        const d1 = await openDaemon((await addV1Agent(one.owner, one.ownerToken, 'iso-daemon-1')).token, 'install-iso-1');
+        const d2 = await openDaemon((await addV1Agent(two.owner, two.ownerToken, 'iso-daemon-2')).token, 'install-iso-2');
+        // Neither daemon has a crew runtime attached, and the button does not need one: the node
+        // seeds the definitions itself and the offer is what the daemon would answer.
+        d1.onEnrol = async () => ({ ok: false, result: { code: 'NO_RUNTIME', message: 'node-side test' } });
+        d2.onEnrol = async () => ({ ok: false, result: { code: 'NO_RUNTIME', message: 'node-side test' } });
+
+        try {
+            await json('/v1/agents/v2/basic-agents', { method: 'POST', headers: auth1 });
+            await json('/v1/agents/v2/basic-agents', { method: 'POST', headers: auth2 });
+
+            await test('each owner gets their own three, and neither roster shows the other\'s', async () => {
+                for (const [who, auth, other] of [[one, auth1, two], [two, auth2, one]] as const) {
+                    const r = await json(`/v1/agents?owner=${who.owner}`, { headers: auth });
+                    const names = (r.body.data.agents as any[]).map(x => x.name);
+                    for (const n of BASIC_NAMES) assert(names.includes(n), `${who.owner} is missing ${n}`);
+                    // Every row is this owner's. A name appearing twice would mean the listing had
+                    // merged two accounts that happen to share it.
+                    const gaiis = (r.body.data.agents as any[]).map(x => x.gaii as string);
+                    assert(gaiis.every(g => g.endsWith(`#${who.owner}@${NODE_ID}`)),
+                        `${who.owner}'s roster carries a foreign identity: ${JSON.stringify(gaiis)}`);
+                    assert(!gaiis.some(g => g.includes(`#${other.owner}@`)), `${other.owner} appears on ${who.owner}'s roster`);
+                }
+            });
+
+            await test('and their own three crew definitions, under their own agent\'s identity', async () => {
+                for (const [who, auth] of [[one, auth1], [two, auth2]] as const) {
+                    for (const n of BASIC_NAMES) {
+                        const gaii = `${n}#${who.owner}@${NODE_ID}`;
+                        const r = await json(`/v1/memory/${encodeURIComponent(gaii)}/crews.registry.${n}`, { headers: auth });
+                        assert(r.status === 200, `${who.owner}/${n}: no definition (${r.status})`);
+                    }
+                }
+            });
+
+            await test('one owner cannot read the other\'s identical definition', async () => {
+                // Same key, same agent name, different owner: the only thing separating them is
+                // the identity in the address, so this is the test that a shared NAME shares nothing.
+                const theirs = `concierge#${two.owner}@${NODE_ID}`;
+                const r = await json(`/v1/memory/${encodeURIComponent(theirs)}/crews.registry.concierge`, { headers: auth1 });
+                assert(r.status === 403 || r.status === 404, `expected a refusal, got ${r.status}`);
+            });
+
+            await test('naming the other owner on a listing is ignored, not honoured', async () => {
+                // These answer 200. What matters is WHOSE rows come back: a query parameter is not
+                // a principal, and the resolved identity is what the store is read with.
+                const r = await json(`/v1/agents?owner=${two.owner}`, { headers: auth1 });
+                assert(r.status === 200, `expected the caller's own listing, got ${r.status}`);
+                const gaiis = (r.body.data.agents as any[]).map(x => x.gaii as string);
+                assert(gaiis.every(g => g.endsWith(`#${one.owner}@${NODE_ID}`)),
+                    `?owner= reached another account: ${JSON.stringify(gaiis)}`);
+            });
+
+            await test('the only door that answers across owners is the public card, and it stays public', async () => {
+                // This one is 200 BY DESIGN — it is the directory entry, the same view the
+                // catalogue serves, and it needs the full GAII (a bare name is 404). It is here so
+                // that a field which is not directory material cannot be added to it unnoticed.
+                const theirs = `concierge#${two.owner}@${NODE_ID}`;
+                const r = await json(`/v1/agents/${encodeURIComponent(theirs)}`, { headers: auth1 });
+                assert(r.status === 200, `the public card should be readable, got ${r.status}`);
+                const allowed = new Set(['gaii', 'display_name', 'description', 'capabilities', 'trust',
+                    'actions_published', 'tags', 'federate', 'home_node', 'created_at', 'last_seen']);
+                const extra = Object.keys(r.body.data).filter(k => !allowed.has(k));
+                assert(extra.length === 0, `the public card grew a field: ${JSON.stringify(extra)}`);
+                // Named explicitly, because these are the ones that would matter if they appeared.
+                for (const secret of ['scopes', 'registeredBy', 'run_mode', 'console_url', 'token', 'publicKey']) {
+                    assert(!(secret in r.body.data), `the public card exposes ${secret}`);
+                }
+            });
+
+            await test('an agent of one owner is refused at every door that changes it', async () => {
+                const theirs = `concierge#${two.owner}@${NODE_ID}`;
+                const doors: Array<[string, string, RequestInit]> = [
+                    ['change its run mode', `/v1/agents/${encodeURIComponent(theirs)}/run-mode`,
+                        { method: 'PATCH', headers: auth1, body: JSON.stringify({ run_mode: 'resident' }) }],
+                    ['change its console url', `/v1/agents/${encodeURIComponent(theirs)}/console-url`,
+                        { method: 'PATCH', headers: auth1, body: JSON.stringify({ console_url: 'http://x' }) }],
+                    ['end it', `/v1/agents/${encodeURIComponent(theirs)}`, { method: 'DELETE', headers: auth1 }],
+                ];
+                for (const [what, path, opts] of doors) {
+                    const r = await json(path, opts);
+                    assert(r.status === 403 || r.status === 404, `${what}: expected a refusal, got ${r.status}`);
+                }
+                // And it is still there afterwards, which is what makes the DELETE refusal mean
+                // something rather than merely answering with an error code.
+                const still = await json(`/v1/agents/${encodeURIComponent(theirs)}`, { headers: auth2 });
+                assert(still.status === 200, `the other owner's concierge should be untouched, got ${still.status}`);
+            });
+
+            await test('an agent holding agent:delete may end only what it registered', async () => {
+                // The scope word alone is not the permission: `registeredBy` is the second half,
+                // and without it one owner's forge could clear away that owner's whole roster.
+                // The OWNER creates the target, because there is no agent-callable creation door
+                // at all — POST /v1/agents reads no scope. That gap is the Stage A finding.
+                const made = await json('/v1/agents', {
+                    method: 'POST', headers: auth1,
+                    body: JSON.stringify({ name: 'iso-extra', owner: one.owner, capabilities: [] }),
+                });
+                assert(made.status === 201, `create ${made.status}`);
+
+                const deleter1 = await addV1Agent(one.owner, one.ownerToken, 'iso-deleter-1', ['agent:delete']);
+                const deleter2 = await addV1Agent(two.owner, two.ownerToken, 'iso-deleter-2', ['agent:delete']);
+
+                // Its own owner's agent, and it still may not: it did not register this one.
+                const mine = await json('/v1/agents/iso-extra', { method: 'DELETE', headers: { Authorization: `Bearer ${deleter1.token}` } });
+                assert(mine.status === 403, `expected the registeredBy fence, got ${mine.status}`);
+
+                // The other owner's deleter does not get a different error that would tell it the
+                // agent exists. It is not an oracle.
+                const theirs = await json('/v1/agents/iso-extra', { method: 'DELETE', headers: { Authorization: `Bearer ${deleter2.token}` } });
+                assert(theirs.status === 404, `expected 404 across owners, got ${theirs.status}`);
+
+                // Still there, and the owner who made it can end it.
+                const gone = await json('/v1/agents/iso-extra', { method: 'DELETE', headers: auth1 });
+                assert(gone.status === 200, `the owner may end their own agent, got ${gone.status}`);
+            });
+        } finally {
+            d1.close();
+            d2.close();
+        }
+    }
+
 }
 
 run().then(() => {

@@ -583,6 +583,17 @@ await test('/local/status shows both owners distinctly', async () => {
   assert(rows.length === 2, `expected two rows, got ${JSON.stringify(rows.map(r => r.agent ?? r.gaii))}`);
   const owners = rows.map(r => r.owner).sort();
   assert(owners[0] !== owners[1], `two rows should be two owners, got ${JSON.stringify(owners)}`);
+
+  // The same projection serve.json carries, and it has to be identifying in the same way. This
+  // surface held a SECOND copy of that shape and kept the bare agent name after serve.json's `id`
+  // became the GAII, so an operator reading /local/status saw two owners' `concierge` as one
+  // indistinguishable row while the discovery file next to it named them apart.
+  const gaiis = rows.map(r => r.gaii).sort();
+  assert(gaiis.every(Boolean) && gaiis[0] !== gaiis[1], `agents[] rows must carry distinct gaii: ${JSON.stringify(gaiis)}`);
+  const ids = ((st.body.data?.principals ?? []) as any[]).map(p => p.id).sort();
+  assert(ids.length === 2 && ids[0] !== ids[1], `principals[].id must be identifying: ${JSON.stringify(ids)}`);
+  assert(ids.every((i: string) => i.includes('#') && i.includes('@')), `principals[].id must be the GAII: ${JSON.stringify(ids)}`);
+  assert(JSON.stringify(ids) === JSON.stringify(gaiis), `the two lists describe the same daemon: ${JSON.stringify([ids, gaiis])}`);
 });
 
 await test('A task for one owner\'s concierge reaches that owner and never the other', async () => {
