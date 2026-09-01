@@ -527,6 +527,8 @@ export function applySchemaTables2(db: Database.Database): void {
       id            TEXT PRIMARY KEY,
       owner         TEXT NOT NULL,
       agents        TEXT NOT NULL DEFAULT '[]',
+      -- 'create' (the basic-agents button) or 'migrate' (existing v1 agents). See migration 0062.
+      kind          TEXT NOT NULL DEFAULT 'create',
       createdBy     TEXT NOT NULL,
       createdAt     TEXT NOT NULL,
       expiresAt     TEXT NOT NULL,

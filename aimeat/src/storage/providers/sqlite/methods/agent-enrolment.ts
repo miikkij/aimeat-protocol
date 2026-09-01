@@ -17,6 +17,7 @@ function toRecord(row: Record<string, unknown>): AgentEnrolmentGrantRecord {
     id: row.id as string,
     owner: row.owner as string,
     agents: JSON.parse((row.agents as string) || '[]') as string[],
+    kind: ((row.kind as string) ?? 'create') as 'create' | 'migrate',
     createdBy: row.createdBy as string,
     createdAt: row.createdAt as string,
     expiresAt: row.expiresAt as string,
@@ -28,10 +29,10 @@ function toRecord(row: Record<string, unknown>): AgentEnrolmentGrantRecord {
 export const agentEnrolmentMethods = {
   async createAgentEnrolmentGrant(this: SqliteStorage, grant: AgentEnrolmentGrantRecord): Promise<void> {
     this.db.prepare(
-      `INSERT INTO agent_enrolment_grants (id, owner, agents, createdBy, createdAt, expiresAt, usedAt, usedBy)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO agent_enrolment_grants (id, owner, agents, kind, createdBy, createdAt, expiresAt, usedAt, usedBy)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
-      grant.id, grant.owner, JSON.stringify(grant.agents), grant.createdBy,
+      grant.id, grant.owner, JSON.stringify(grant.agents), grant.kind ?? 'create', grant.createdBy,
       grant.createdAt, grant.expiresAt, grant.usedAt ?? null, grant.usedBy ?? null,
     );
   },

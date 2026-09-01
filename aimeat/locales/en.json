@@ -4430,6 +4430,12 @@
       "never": "Never connected",
       "unreadable": "Needs a look",
       "unknown": "Unknown"
+    },
+    "migrate": {
+      "action": "Move {n} to their own key",
+      "working": "Moving them…",
+      "done": "Done.",
+      "failed": "That did not work. Nothing changed."
     }
   },
   "footer": {

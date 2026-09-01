@@ -189,6 +189,19 @@ export interface AgentEnrolmentGrantRecord {
   owner: string;
   /** The exact agent names this grant covers. A card for anything else is refused. */
   agents: string[];
+  /**
+   * What this grant is for, and it decides ONE thing in the enrolment route.
+   *
+   *   'create'  the agents were made v2 a moment ago by the basic-agents button, so the route
+   *             requires `identityVersion === 2` and refuses anything else.
+   *   'migrate' the agents are EXISTING v1 agents, so the route accepts a v1 record and writes
+   *             `identityVersion: 2` in the same update that pins the key.
+   *
+   * The distinction is here rather than inferred from the record because inferring it would mean
+   * the create path silently accepting a v1 agent whose name happened to collide. Null or absent is
+   * 'create': every grant written before 2026-09-01 is one.
+   */
+  kind?: 'create' | 'migrate' | null;
   /** The principal that pressed the button (the owner's bare name). */
   createdBy: string;
   createdAt: string;

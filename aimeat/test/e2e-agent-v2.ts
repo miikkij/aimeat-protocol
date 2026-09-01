@@ -951,6 +951,163 @@ async function run() {
 
     dA.close(); dB.close(); dC.close();
     void pressBody;
+    // ── The migration: the twelve dead-token agents, rehearsed on throwaways ──
+    //
+    // Proven LOCALLY ONLY, against agents put into the same state as the real ones: registered,
+    // v1, a session that no longer signs in, no live tunnel of their own. Nothing on aimeat.io is
+    // touched by anything here.
+    await test('a stuck v1 agent moves to a key and a card, and keeps everything else', async () => {
+        const mig = await setupOwner('mig');
+        const authMig = { Authorization: `Bearer ${mig.ownerToken}` };
+
+        // The daemon that will hold the new keys. Its own credential stays a v1 one: the machine is
+        // not what is being migrated.
+        const daemon = await addV1Agent(mig.owner, mig.ownerToken, 'mig-daemon');
+        const dMig = await openDaemon(daemon.token, 'install-mig');
+
+        try {
+            // Two agents in the state the real twelve are in: they signed in once, and cannot now.
+            const stuck = await addV1Agent(mig.owner, mig.ownerToken, 'stuck-one', ['memory:read']);
+            const alsoStuck = await addV1Agent(mig.owner, mig.ownerToken, 'stuck-two', ['memory:read', 'memory:write']);
+            for (const victim of [stuck, alsoStuck]) {
+                const out = await json('/v1/auth/revoke', { method: 'POST', headers: { Authorization: `Bearer ${victim.token}` } });
+                assert(out.status === 200 || out.status === 204, `revoke ${out.status}`);
+            }
+
+            // Give one of them a tag, so "it keeps everything else" is measured rather than hoped.
+            await json(`/v1/agents/${stuck.name}/tags`, {
+                method: 'PATCH', headers: authMig, body: JSON.stringify({ tags: ['keep-me'] }),
+            });
+
+            const before = await json('/v1/agents?include=credentials', { headers: authMig });
+            const beforeStuck = (before.body.data.agents as any[]).find(x => x.name === 'stuck-one');
+            assert(beforeStuck.credential.state === 'dead', `it starts stuck, got ${beforeStuck.credential.state}`);
+
+            // What WOULD move, before anything does. The daemon's own agent is not stuck, so it is
+            // not in the list: the button does not sweep up whatever it can reach.
+            const preview = await json('/v1/agents/v2/migrate', { headers: authMig });
+            assert(preview.status === 200, `preview ${preview.status}`);
+            const names = (preview.body.data.would_move as any[]).map(x => x.name).sort();
+            assert(JSON.stringify(names) === JSON.stringify(['stuck-one', 'stuck-two']),
+                `exactly the stuck ones, got ${JSON.stringify(names)}`);
+            assert(preview.body.data.next_step.includes('connector is running'), 'and the sentence says it can go ahead');
+
+            // The daemon answers the offer exactly as it answers the basic-agents one: same
+            // capability, same cards, no new connector code.
+            let offered: string[] = [];
+            dMig.onEnrol = async (offer) => {
+                offered = (offer.agents as any[]).map(x => x.name);
+                const cards: string[] = [];
+                for (const one of offer.agents) {
+                    const key = await makeKey();
+                    cards.push(await signWith(cardFor(one, mig.owner, key), key));
+                }
+                const res = await json('/v1/agents/v2/enrol', {
+                    method: 'POST', headers: { Authorization: `Bearer ${daemon.token}` },
+                    body: JSON.stringify({ grant_id: offer.grant_id, cards }),
+                });
+                if (res.status !== 200) return { ok: false, result: res.body?.error ?? null };
+                return { ok: true, result: { attached: (res.body.data.enrolled as any[]).map(e => e.name) } };
+            };
+
+            const r = await json('/v1/agents/v2/migrate', { method: 'POST', headers: authMig });
+            assert(r.status === 200, `migrate ${r.status}: ${JSON.stringify(r.body?.error)}`);
+            assert(JSON.stringify((r.body.data.moved as string[]).sort()) === JSON.stringify(['stuck-one', 'stuck-two']),
+                `both moved, got ${JSON.stringify(r.body.data.moved)}`);
+            assert((r.body.data.still_stuck as string[]).length === 0, 'and none left behind');
+            assert(offered.length === 2, 'the daemon was offered exactly those two');
+
+            // What they became, and what they kept.
+            const after = await json('/v1/agents?include=credentials', { headers: authMig });
+            const one = (after.body.data.agents as any[]).find(x => x.name === 'stuck-one');
+            assert(one.identity_version === 2, `now a key-and-card agent, got ${one.identity_version}`);
+            assert(one.credential.kind === 'key-and-card', `and the fleet reads it as one, got ${one.credential.kind}`);
+            assert(one.credential.state === 'ok', `and it can sign in, got ${one.credential.state}`);
+            assert(one.gaii === stuck.gaii, 'the identity is the same identity');
+            assert((one.tags ?? []).includes('keep-me'), `and the tags survived, got ${JSON.stringify(one.tags)}`);
+            const two = (after.body.data.agents as any[]).find(x => x.name === 'stuck-two');
+            assert(JSON.stringify(two.scopes ?? two.default_scopes ?? []) !== '["*"]',
+                'a migration changes how an agent proves who it is, not what it may do');
+
+            // It really can sign in now: a fresh assertion against the pinned key mints a token.
+            // (The daemon holds those keys; here the proof is that the node reports it can.)
+            const settled = await json('/v1/agents/v2/migrate', { headers: authMig });
+            assert((settled.body.data.would_move as any[]).length === 0, 'and there is nothing left to move');
+            assert(settled.body.data.next_step.includes('nothing to move'), 'which the sentence says');
+        } finally {
+            dMig.close();
+        }
+    });
+
+    await test('a migration that fails leaves the agent exactly as it was', async () => {
+        const mig = await setupOwner('migfail');
+        const authMig = { Authorization: `Bearer ${mig.ownerToken}` };
+        const daemon = await addV1Agent(mig.owner, mig.ownerToken, 'failing-daemon');
+        const dFail = await openDaemon(daemon.token, 'install-fail');
+        try {
+            const victim = await addV1Agent(mig.owner, mig.ownerToken, 'stays-put', ['memory:read']);
+            await json('/v1/auth/revoke', { method: 'POST', headers: { Authorization: `Bearer ${victim.token}` } });
+
+            const before = (await json(`/v1/agents/${encodeURIComponent(victim.gaii)}`, { headers: authMig })).body;
+
+            // The connector refuses. This is the case that must not leave a half-migrated row.
+            dFail.onEnrol = async () => ({ ok: false, result: { code: 'NOPE', message: 'not signing that' } });
+            const r = await json('/v1/agents/v2/migrate', { method: 'POST', headers: authMig });
+            assert(r.status === 502, `expected 502, got ${r.status}`);
+            assert(String(r.body?.error?.message).includes('Nothing changed'), 'and it says so plainly');
+
+            const after = await json('/v1/agents?include=credentials', { headers: authMig });
+            const still = (after.body.data.agents as any[]).find(x => x.name === 'stays-put');
+            assert((still.identity_version ?? 1) !== 2, `still v1, got ${still.identity_version}`);
+            assert(!still.enrolled_at, 'with nothing pinned');
+            assert(still.credential.kind === 'device-token', `and read as what it is, got ${still.credential.kind}`);
+            assert(still.credential.state === 'dead', 'still stuck, which is honest');
+            void before;
+
+            // And pressing again is allowed: the spent grant does not lock the owner out.
+            dFail.onEnrol = async () => ({ ok: false, result: { code: 'NOPE', message: 'again' } });
+            const twice = await json('/v1/agents/v2/migrate', { method: 'POST', headers: authMig });
+            assert(twice.status === 502, `a second press is a fresh grant, got ${twice.status}`);
+        } finally {
+            dFail.close();
+        }
+    });
+
+    await test('with no connector running, the move refuses and writes nothing', async () => {
+        const mig = await setupOwner('migoff');
+        const authMig = { Authorization: `Bearer ${mig.ownerToken}` };
+        const victim = await addV1Agent(mig.owner, mig.ownerToken, 'no-daemon-here', ['memory:read']);
+        await json('/v1/auth/revoke', { method: 'POST', headers: { Authorization: `Bearer ${victim.token}` } });
+
+        const preview = await json('/v1/agents/v2/migrate', { headers: authMig });
+        assert((preview.body.data.would_move as any[]).length === 1, 'the preview still says what would move');
+        assert(preview.body.data.next_step.includes('aimeat connect serve'),
+            `and tells the person what to start, got ${preview.body.data.next_step}`);
+
+        const r = await json('/v1/agents/v2/migrate', { method: 'POST', headers: authMig });
+        assert(r.status === 409, `expected 409, got ${r.status}`);
+        assert(r.body?.error?.code === 'NO_DAEMON', `with a code that says which, got ${r.body?.error?.code}`);
+
+        const after = await json('/v1/agents?include=credentials', { headers: authMig });
+        const still = (after.body.data.agents as any[]).find(x => x.name === 'no-daemon-here');
+        assert((still.identity_version ?? 1) !== 2, 'and the agent is untouched');
+    });
+
+    await test('an agent acting in the owner\'s name cannot move the fleet', async () => {
+        // The same gate the basic-agents button takes: this replaces a credential, and
+        // req.auth.owner carries the human's name on an agent token too.
+        const r = await json('/v1/agents/v2/migrate', {
+            method: 'POST', headers: { Authorization: `Bearer ${daemonA.token}` },
+        });
+        assert(r.status === 403, `expected 403, got ${r.status}`);
+    });
+
+    await test('another account cannot move this one\'s agents', async () => {
+        const r = await json('/v1/agents/v2/migrate', { method: 'POST', headers: authB });
+        // B has agents of its own; what matters is that nothing of A's is in the answer.
+        assert(!JSON.stringify(r.body ?? {}).includes('stuck-one'), 'no sight of another account\'s agents');
+    });
+
     await test('two machines are two daemons, and the press can name which one', async () => {
         // The V1 report carried this as a stated limitation: one `connect serve` holds one socket
         // per agent, so two laptops looked like one set of principals and the offer went to
