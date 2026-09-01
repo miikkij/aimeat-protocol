@@ -97,7 +97,9 @@ export async function runServe(flags: Record<string, string>): Promise<void> {
   // stdio spawns (the default below) never collide with it.
   if (flags.http === 'true' || flags.daemon === 'true') {
     const { runServeDaemon } = await import('./local-server.js');
-    await runServeDaemon({ registry, buildMcp: () => buildMcpServer(role, registry) });
+    // The session's own registry, not the daemon's: it holds the one identity that session speaks
+    // as, so every tool module's `registry.resolve()` has a single unambiguous answer.
+    await runServeDaemon({ registry, buildMcp: (sessionRegistry) => buildMcpServer(role, sessionRegistry) });
     if (registry.list().some(isRunner)) {
       console.error('SECURITY: runner.command in per-agent config is exec\'d on task arrival. Trust your ~/.aimeat/ contents.');
     }

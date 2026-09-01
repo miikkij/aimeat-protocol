@@ -649,6 +649,51 @@ await test('A full identity routes a /local/call to that owner and no other', as
   }
 });
 
+// ─── An MCP session on a two-owner daemon says who it is ───
+//
+// The 28 tool modules resolve an agent ONCE, at registration time, with no identifier. Harmless
+// while a daemon served one owner; with two owners each holding a default agent, resolve() refuses
+// — correctly — and that refusal used to arrive as an exception from inside a tool module's
+// constructor and take the whole daemon with it. So the wish told the runtime side to attach, and
+// attaching is what killed the thing they were attaching to.
+await test('An MCP session that names its agent works on a two-owner daemon', async () => {
+  const gaiiA = `concierge#${acc3a!.ownerName}@${NODE_ID}`;
+  const client = new Client({ name: 'two-owner-e2e', version: '1.0.0' });
+  const transport = new StreamableHTTPClientTransport(new URL(`${lb3}/v1/mcp`), {
+    requestInit: { headers: { 'X-Aimeat-Agent': gaiiA } },
+  });
+  await client.connect(transport);
+  try {
+    const tools = await client.listTools();
+    assert(tools.tools.length > 0, 'a named session should get the full tool surface');
+    assert(tools.tools.map(t => t.name).includes('aimeat_memory_read'), 'core tool missing');
+  } finally {
+    await client.close();
+  }
+});
+
+await test('naming none is refused cleanly, and the daemon is still there afterwards', async () => {
+  const client = new Client({ name: 'two-owner-e2e-anon', version: '1.0.0' });
+  const transport = new StreamableHTTPClientTransport(new URL(`${lb3}/v1/mcp`));
+  let refused = false;
+  try {
+    await client.connect(transport);
+    await client.close();
+  } catch (err) {
+    refused = true;
+    // The registry's own words, so the caller learns WHICH identities it could have named.
+    const msg = (err as Error).message;
+    assert(/more than one account/i.test(msg) || /400/.test(msg), `expected the registry's refusal, got: ${msg}`);
+  }
+  assert(refused, 'a session naming no agent on a two-owner daemon must be refused');
+
+  // The point of the whole item: refusing is not dying.
+  const st = await json(lb3, '/local/status');
+  assert(st.status === 200, `the daemon must still be serving, got ${st.status}`);
+  const rows = (st.body.data?.agents ?? []) as any[];
+  assert(rows.length === 2, `and still holding both agents, got ${rows.length}`);
+});
+
 // ─── Deleting an agent reaches the daemon holding its socket ───
 //
 // A tunnel verifies its bearer ONCE, at upgrade. Deleting an agent revoked its sessions, so the
