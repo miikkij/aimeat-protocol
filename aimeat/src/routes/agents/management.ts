@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: MIT
  * @description Agent lifecycle management routes (export, import, rekey, port, scopes, federate, delete, CORS). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-09-02 — Deleting an agent closes its connector socket. Revoking its sessions
+ *     already made the node refuse it correctly; nothing told the connector, so a deleted agent
+ *     went on reading `online` on `/local/status` until some call forced a 401. `closeForGaii()`
+ *     now runs beside the revoke, the way deactivating an account already closes an owner's sockets.
  *   v1.2.0 — 2026-08-13 — DELETE /v1/agents/:name accepts an AGENT caller under three conditions:
  *     same owner, `agent:delete`, and `registeredBy` naming the caller. A fleet concierge has to be
  *     able to clear away what it built when its container goes; same-owner alone would let every
@@ -25,6 +29,7 @@ import { calculateTrustScore } from '../../services/trust.js';
 import { fireHook } from '../../utils/fire-hook.js';
 import { emitChange } from '../../services/event-bus.js';
 import { evictAgentTelemetry } from '../../services/telemetry-buffer.js';
+import { getActiveConnectTunnelManager } from '../../services/connect-tunnel.js';
 import { logger } from '../../utils/logger.js';
 
 export function registerManagementRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
@@ -466,6 +471,17 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
       return;
     }
     evictAgentTelemetry(agent.gaii);
+
+    // Revoking the sessions made the node refuse this agent; it did not tell the connector holding
+    // its socket. A tunnel verifies its bearer once, at upgrade, so without this the deleted agent
+    // kept a live socket reading `online` on `/local/status` until something happened to make a
+    // call. Same shape as deactivating an account (owner-lifecycle.ts §7), and outside any
+    // transaction for the same reason: closing a socket is not a storage write and cannot roll back.
+    try {
+      getActiveConnectTunnelManager()?.closeForGaii(agent.gaii);
+    } catch (err) {
+      logger.warn('deleteAgent: tunnel close failed', { gaii: agent.gaii, error: String(err) });
+    }
 
     res.json(success(config.nodeId, {
       deleted: true, name: agentName, gaii: agent.gaii,

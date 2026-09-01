@@ -649,6 +649,62 @@ await test('A full identity routes a /local/call to that owner and no other', as
   }
 });
 
+// ─── Deleting an agent reaches the daemon holding its socket ───
+//
+// A tunnel verifies its bearer ONCE, at upgrade. Deleting an agent revoked its sessions, so the
+// node refused every later call correctly — but nothing told the connector, and the socket stayed
+// up reading `online` for a credential that was already dead. That is not a hole; it is a surface
+// claiming something works when it does not, which is the `lastSeen`-as-liveness mistake again.
+// It surfaced during a re-seed, and crew-forge exists to create agents and clear away the ones it
+// made, so deleting and recreating a name is ordinary here rather than exotic.
+console.log('\nDeleting an agent under a running daemon');
+
+const statusRow = async (gaii: string) => {
+  const st = await json(lb3, '/local/status');
+  return ((st.body.data?.agents ?? []) as any[]).find(a => a.gaii === gaii);
+};
+
+await test('An idle agent is untouched — this must never become a liveness check', async () => {
+  // Sat here doing nothing for the whole suite. Nothing may have closed it.
+  const idle = await statusRow(`concierge#${acc3a!.ownerName}@${NODE_ID}`);
+  assert(!!idle, 'alice\'s concierge should still be listed');
+  assert(idle.tunnel_status === 'online', `an idle agent must stay online, got ${idle.tunnel_status}`);
+});
+
+await test('Deleting an agent closes its socket: it stops saying online, with no call made', async () => {
+  const gaiiB = `concierge#${acc3b!.ownerName}@${NODE_ID}`;
+  const before = await statusRow(gaiiB);
+  assert(before?.tunnel_status === 'online', `precondition: bob's concierge online, got ${before?.tunnel_status}`);
+
+  const del = await json(BASE, '/v1/agents/concierge', {
+    method: 'DELETE', headers: { Authorization: `Bearer ${acc3b!.ownerToken}` },
+  });
+  assert(del.status === 200, `delete ${del.status}: ${JSON.stringify(del.body?.error)}`);
+
+  // NO call is made through the daemon here, deliberately. Before the fix the socket only fell
+  // over once something forced a 401, which is why the surface could lie for as long as it did.
+  let row: any;
+  for (let i = 0; i < 40; i++) {
+    row = await statusRow(gaiiB);
+    if (row && row.tunnel_status !== 'online') break;
+    await sleep(100);
+  }
+  assert(row?.tunnel_status !== 'online',
+    `a deleted agent must stop reading online, got ${row?.tunnel_status}`);
+});
+
+await test('and nothing else on that daemon lost its connection', async () => {
+  const gaiiA = `concierge#${acc3a!.ownerName}@${NODE_ID}`;
+  const neighbour = await statusRow(gaiiA);
+  assert(neighbour?.tunnel_status === 'online',
+    `the other owner's agent must be untouched, got ${neighbour?.tunnel_status}`);
+  // And still working, not merely listed as online.
+  const r = await json(lb3, '/v1/agents?owner=' + encodeURIComponent(acc3a!.ownerName), {
+    headers: { 'X-Aimeat-Agent': gaiiA },
+  });
+  assert(r.status === 200, `the neighbour's calls must still work, got ${r.status}`);
+});
+
 await test('Stop the two-owner daemon', async () => {
   const sd = await json(lb3, '/local/shutdown', { method: 'POST' });
   assert(sd.status === 200, `shutdown ${sd.status}`);

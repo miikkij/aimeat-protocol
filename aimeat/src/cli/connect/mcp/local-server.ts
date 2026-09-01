@@ -34,6 +34,12 @@
  *     discovery-file lifecycle, signal handling.
  * @usage Called by mcp/server.ts `runServe()` when `--http`/`--daemon` is set.
  * @version-history
+ *   v1.9.0 — 2026-09-02 — A deleted-and-recreated agent re-attaches without a daemon restart.
+ *     `attachNewAgent` treated any registered GAII as "already served" and declined, so after a
+ *     delete the daemon kept the dead credential and the new one had nowhere to go — a restart was
+ *     the only way out, and a restart drops every other agent's socket. It now replaces an entry
+ *     the NODE has refused (transportMode 'auth_failed', arrived at through auth_revoked — a
+ *     verdict, not a liveness guess), via detachAgent() + AgentRegistry.remove().
  *   v1.8.2 — 2026-09-02 — A long-poll that cannot name its agent is refused after a pause, not
  *     instantly. All four polls here began with a resolve whose failure answered 400 in under a
  *     millisecond, and every one of those failures is PERSISTENT (unknown agent, a bare name two
@@ -289,11 +295,35 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
    * comes from resolveToken(); a token frozen into the client at construction would be the exact
    * thing this identity model removes, and it would go stale in an hour.
    */
+  /**
+   * Forget one identity: stop its tunnel and drop every per-agent map keyed by its GAII. Used when
+   * the node has refused the credential we hold, so that the identity can be attached again with a
+   * new one. Deliberately narrow — it touches nothing belonging to any other agent on this daemon.
+   */
+  function detachAgent(gaii: string): void {
+    void channels.get(gaii)?.tunnel?.close().catch((err: unknown) => logger.warn('detachAgent: close — ignore', { error: String(err) }));
+    channels.delete(gaii);
+    invokeChannels.delete(gaii);
+    registry.remove(gaii);
+  }
+
   async function attachNewAgent(a: { agent: string; owner: string; gaii: string; config: AimeatPerAgentConfig }): Promise<void> {
     // By GAII: another owner's agent of the same name is a different identity and must still attach.
-    if (registry.get(a.gaii)) {
-      console.error(`[serve] ${a.agent}@${a.owner}: already served, leaving it alone`);
-      return;
+    const already = registry.get(a.gaii);
+    if (already) {
+      // A LIVE entry is left alone, as before. A DEAD one is not the same thing, and treating the
+      // two alike is what forced a daemon restart: delete an agent and recreate it under the same
+      // name, and this guard saw the GAII, said "already served" and declined — so the daemon went
+      // on holding the deleted agent's credential while the new one had nowhere to attach.
+      // `auth_failed` is the node's own verdict, arrived at through the tunnel's auth_revoked; it
+      // is not a liveness guess, so an idle or briefly disconnected agent never takes this branch.
+      const dead = channels.get(a.gaii)?.transportMode === 'auth_failed';
+      if (!dead) {
+        console.error(`[serve] ${a.agent}@${a.owner}: already served, leaving it alone`);
+        return;
+      }
+      console.error(`[serve] ${a.agent}@${a.owner}: replacing a credential the node has refused`);
+      detachAgent(a.gaii);
     }
     const client = new AimeatClient(a.config.node_url);
     const entry: RegisteredAgent = { gaii: a.gaii, agent: a.agent, owner: a.owner, client, config: a.config };
