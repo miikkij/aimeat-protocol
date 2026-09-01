@@ -34,6 +34,14 @@
  *     discovery-file lifecycle, signal handling.
  * @usage Called by mcp/server.ts `runServe()` when `--http`/`--daemon` is set.
  * @version-history
+ *   v1.10.0 — 2026-09-02 — An MCP session carries an IDENTITY. The 28 tool modules resolve an agent
+ *     once, at registration time, with no identifier; with two owners each holding a default agent
+ *     that resolve refuses, and the refusal arrived as an unhandled throw inside a tool module's
+ *     constructor — so opening a session killed the daemon, and the wish was telling the runtime
+ *     side to attach. `buildMcp` now takes a registry holding the ONE identity the session speaks
+ *     as, resolved from the same `X-Aimeat-Agent` header every other loopback route reads. A
+ *     session that names none while several are loaded is refused at connect time in the registry's
+ *     own words. No tool module changes: the scoping is itself an AgentRegistry.
  *   v1.9.0 — 2026-09-02 — A deleted-and-recreated agent re-attaches without a daemon restart.
  *     `attachNewAgent` treated any registered GAII as "already served" and declined, so after a
  *     delete the daemon kept the dead credential and the new one had nowhere to go — a restart was
@@ -105,7 +113,7 @@ import { resolveToken } from '../agent-key.js';
 import { getConfigDir, type AimeatPerAgentConfig } from '../config.js';
 import { AimeatClient } from '../api-client.js';
 import { handleEnrolOffer, ENROL_CAPABILITY } from '../enrolment.js';
-import type { AgentRegistry, RegisteredAgent } from '../agent-registry.js';
+import { AgentRegistry, type RegisteredAgent } from '../agent-registry.js';
 import { displayName } from '../agent-registry.js';
 import { startPollerForAgent } from './poller.js';
 import { AgentChannel, type SpaceRef } from './local-channel.js';
@@ -167,8 +175,20 @@ export function serveDiscoveryPath(): string {
 
 export interface ServeDaemonOptions {
   registry: AgentRegistry;
-  /** Fresh, fully tool-registered MCP server (one per Streamable-HTTP session). */
-  buildMcp: () => McpServer;
+  /**
+   * Fresh, fully tool-registered MCP server (one per Streamable-HTTP session), built against the
+   * registry the SESSION is scoped to — which holds exactly the one identity the session speaks as.
+   *
+   * The 28 tool modules call `registry.resolve()` once, at registration time, with no identifier.
+   * That was harmless while a daemon served one owner. With two owners each holding a default
+   * agent, resolve() refuses — correctly — and the refusal became an unhandled throw inside a tool
+   * module's constructor, which killed the daemon the moment anyone opened a session.
+   *
+   * A session talking to a daemon that holds two owners is principal-shaped and has to say who it
+   * is. That is the registry's own lesson one level up, and binding it here answers it once instead
+   * of asking 28 modules to answer "as whom" on every call.
+   */
+  buildMcp: (sessionRegistry: AgentRegistry) => McpServer;
 }
 
 /** Is the pid recorded in an existing discovery file still alive? */
@@ -384,10 +404,29 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
         return;
       }
     }
+    // WHO this session speaks as, decided here and refused here. The identifier comes from the
+    // same header every other loopback route reads, so a client that already names its agent needs
+    // no change; one that names none while several agents are loaded is told so at connect time,
+    // in the registry's own words, naming the candidates. Before this the same refusal arrived as
+    // an exception thrown inside a tool module's constructor and took the daemon with it.
+    let sessionAgent: RegisteredAgent;
+    try { sessionAgent = resolveAgent(req); }
+    catch (err) {
+      res.status(400).json({
+        jsonrpc: '2.0',
+        error: { code: -32001, message: `${(err as Error).message} Send it as X-Aimeat-Agent on this MCP session.` },
+        id: (Array.isArray(req.body) ? req.body[0]?.id : req.body?.id) ?? null,
+      });
+      return;
+    }
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => `local-${randomBytes(16).toString('hex')}`,
     });
-    const mcp = buildMcp();
+    // One identity, so `resolve()` inside every tool module has exactly one answer and cannot
+    // refuse. The scoping IS an AgentRegistry, which is why no tool module changes.
+    const sessionRegistry = new AgentRegistry();
+    sessionRegistry.add(sessionAgent);
+    const mcp = buildMcp(sessionRegistry);
     transport.onclose = () => {
       if (transport.sessionId) transports.delete(transport.sessionId);
     };
