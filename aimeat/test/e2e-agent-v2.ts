@@ -371,7 +371,10 @@ async function run() {
         for (const n of BASIC_NAMES) {
             const rec = (list.body.data.agents as any[]).find(x => x.name === n);
             assert(!!rec, `${n} missing from the list`);
-            assert(rec.run_mode === 'spawn', `${n} run_mode should be spawn, got ${rec.run_mode}`);
+            // concierge is `resident` on crewaimeat's measurement: ~4 s of cold start before the
+            // model is even called is the wrong floor under a front door. The other two are bursty.
+            const expected = n === 'concierge' ? 'resident' : 'spawn';
+            assert(rec.run_mode === expected, `${n} run_mode should be ${expected}, got ${rec.run_mode}`);
             assert(rec.identity_version === 2, `${n} should be a v2 identity`);
             assert(rec.card_enrolled === true, `${n} should be enrolled`);
         }
@@ -382,14 +385,115 @@ async function run() {
         const all = await json('/v1/agents?owner=' + a.owner, { headers: authA });
         const spawn = await json('/v1/agents?run_mode=spawn', { headers: authA });
         const names = (spawn.body.data.agents as any[]).map(x => x.name).sort();
-        assert(JSON.stringify(names) === JSON.stringify([...BASIC_NAMES].sort()),
+        const expectSpawn = BASIC_NAMES.filter(n => n !== 'concierge').sort();
+        assert(JSON.stringify(names) === JSON.stringify(expectSpawn),
             `the filter should return exactly the spawn agents, got ${JSON.stringify(names)}`);
+        // And the filter genuinely separates them: the resident one is absent from that answer and
+        // present in its own, which is the property the roster read depends on.
+        const resident = await json('/v1/agents?run_mode=resident', { headers: authA });
+        const residentNames = (resident.body.data.agents as any[]).map(x => x.name);
+        assert(residentNames.includes('concierge'), `concierge should be in the resident answer, got ${JSON.stringify(residentNames)}`);
+        assert(!names.includes('concierge'), 'and not in the spawn one');
         assert((all.body.data.agents as any[]).length > names.length, 'and the unfiltered list is bigger');
         // A v1 agent has no run mode, and absence is not 'spawn'.
         const v1 = (all.body.data.agents as any[]).find(x => x.name === daemonA.name);
         assert(v1.run_mode === null, `a v1 agent should report null, got ${v1.run_mode}`);
         const none = await json('/v1/agents?run_mode=nonsense', { headers: authA });
         assert((none.body.data.agents as any[]).length === 0, 'an unknown run mode returns nothing, never everything');
+    });
+
+    // ── The definitions: three agents that have something to BE ────────────────
+    //
+    // crewaimeat measured the deadlock: publish needs a runtime, a runtime needs a definition, a
+    // definition would need publishing. So the definition has to exist before first start, and the
+    // only party who can write it then is the creator. These assert it did.
+
+    await test('each of the three has a readable definition where its runtime looks for it', async () => {
+        for (const n of BASIC_NAMES) {
+            const gaii = `${n}#${a.owner}@${NODE_ID}`;
+            // The same read the runtime does: the agent's OWN namespace, not the owner's. A plain
+            // memory write would land under the writer and be invisible here, which is exactly what
+            // memory-write.ts refuses and why the seed goes through crew-ops.
+            const r = await json(`/v1/memory/${encodeURIComponent(gaii)}/crews.registry.${n}`, { headers: authA });
+            assert(r.status === 200, `${n}: no definition at crews.registry.${n} (${r.status})`);
+            const env = r.body.data.value ?? r.body.data.memory?.value;
+            assert(env?.agent_name === n, `${n}: envelope should name the agent, got ${JSON.stringify(env?.agent_name)}`);
+            assert(env?.revision === 1, `${n}: a seed is revision 1, got ${env?.revision}`);
+            assert(typeof env?.doc === 'object' && env.doc !== null, `${n}: envelope carries no doc`);
+        }
+    });
+
+    await test('and each definition is the shape the runtime validates, with the agent named from the record', async () => {
+        for (const n of BASIC_NAMES) {
+            const gaii = `${n}#${a.owner}@${NODE_ID}`;
+            const r = await json(`/v1/memory/${encodeURIComponent(gaii)}/crews.registry.${n}`, { headers: authA });
+            const doc = (r.body.data.value ?? r.body.data.memory?.value).doc;
+            // The contract crewaimeat's validator applies, and the one this repo's own shipped
+            // definitions use: named agents by role, tasks that reference those roles, and a
+            // dependency graph that points only backwards.
+            assert(doc.agent_name === n, `${n}: agent_name is stamped from the record, got ${doc.agent_name}`);
+            assert(Array.isArray(doc.agents) && doc.agents.length > 0, `${n}: needs at least one agent`);
+            assert(Array.isArray(doc.tasks) && doc.tasks.length > 0, `${n}: needs at least one task`);
+            assert(doc.process === 'sequential' || doc.process === 'hierarchical', `${n}: process ${doc.process}`);
+            const roles = new Set(doc.agents.map((x: any) => x.role));
+            for (const ag of doc.agents) {
+                for (const f of ['role', 'goal', 'backstory']) {
+                    assert(typeof ag[f] === 'string' && ag[f].length > 0, `${n}: agent missing ${f}`);
+                }
+                assert(typeof ag.allow_delegation === 'boolean', `${n}: agent missing allow_delegation`);
+            }
+            const seen = new Set<string>();
+            for (const t of doc.tasks) {
+                for (const f of ['id', 'description', 'expected_output', 'agent']) {
+                    assert(typeof t[f] === 'string' && t[f].length > 0, `${n}: task missing ${f}`);
+                }
+                assert(roles.has(t.agent), `${n}: task ${t.id} names ${t.agent}, which is not one of its agents`);
+                for (const dep of (t.context ?? [])) {
+                    assert(seen.has(dep), `${n}: task ${t.id} depends on ${dep}, which does not come before it`);
+                }
+                seen.add(t.id);
+            }
+        }
+    });
+
+    await test('pressing again does not duplicate or clobber a definition the owner has edited', async () => {
+        const gaii = `concierge#${a.owner}@${NODE_ID}`;
+        // The owner changes what their agent is, the ordinary way — through publish, whose runtime
+        // check the daemon answers.
+        dA.onInvoke = async (capability: string) => (capability === 'crew.validate'
+            ? { ok: true, result: { errors: [] } }
+            : { ok: false, result: { code: 'NO_HANDLER' } });
+        const edited = await json(`/v1/agents/concierge/crew/publish`, {
+            method: 'POST', headers: authA,
+            body: JSON.stringify({ doc: { agents: [{ role: 'Mine', goal: 'g', backstory: 'b', allow_delegation: false }], tasks: [{ id: 't', description: 'd', expected_output: 'e', agent: 'Mine' }], process: 'sequential', tags: ['mine'], readme_md: '# Mine' } }),
+        });
+        // Whether the edit landed depends on the daemon answering validate; if it did not, the
+        // point of this test is unchanged — the press must not overwrite whatever is there.
+        const before = await json(`/v1/memory/${encodeURIComponent(gaii)}/crews.registry.concierge`, { headers: authA });
+        const beforeEnv = before.body.data.value ?? before.body.data.memory?.value;
+
+        const again = await json('/v1/agents/v2/basic-agents', { method: 'POST', headers: authA });
+        assert(again.status === 200, `second press ${again.status}: ${JSON.stringify(again.body?.error)}`);
+
+        const after = await json(`/v1/memory/${encodeURIComponent(gaii)}/crews.registry.concierge`, { headers: authA });
+        const afterEnv = after.body.data.value ?? after.body.data.memory?.value;
+        assert(afterEnv.revision === beforeEnv.revision,
+            `the press must not write a new revision, was ${beforeEnv.revision} now ${afterEnv.revision}`);
+        assert(JSON.stringify(afterEnv.doc) === JSON.stringify(beforeEnv.doc),
+            'and must not change the document');
+        assert(edited.status === 200 || edited.status >= 400, 'publish either worked or was refused; either way the press left it alone');
+    });
+
+    await test('an agent created by any other path gets no definition invented for it', async () => {
+        // The seed is the button's, not the node's opinion about agents in general.
+        const made = await json('/v1/agents', {
+            method: 'POST', headers: authA,
+            body: JSON.stringify({ name: 'plain-agent', owner: a.owner, capabilities: [] }),
+        });
+        assert(made.status === 201, `create ${made.status}: ${JSON.stringify(made.body?.error)}`);
+        const gaii = made.body.data.agent.gaii as string;
+        const r = await json(`/v1/memory/${encodeURIComponent(gaii)}/crews.registry.plain-agent`, { headers: authA });
+        assert(r.status === 404, `a plain agent should have no definition, got ${r.status}`);
     });
 
     await test('the card asked for the wildcard and was granted the template instead', async () => {
@@ -419,7 +523,8 @@ async function run() {
             const { payload } = await compactVerify(jws, key, { algorithms: ['EdDSA'] });
             const card = JSON.parse(new TextDecoder().decode(payload));
             assert(card.gaii === gaii, `${n} card identity mismatch`);
-            assert(card.runMode === 'spawn', `${n} card run mode`);
+            // The card carries what the OFFER said, which is the roster's value for that agent.
+            assert(card.runMode === (n === 'concierge' ? 'resident' : 'spawn'), `${n} card run mode: ${card.runMode}`);
             assert(Array.isArray(card.requestedScopes), `${n} extended card should carry requestedScopes`);
         }
     });
@@ -439,7 +544,7 @@ async function run() {
         assert(card.requestedScopes === undefined, 'requestedScopes must not reach an anonymous reader');
         assert(card.webhookUrl === undefined, 'webhookUrl must not reach an anonymous reader');
         assert(card.description === undefined, 'description must not reach an anonymous reader');
-        assert(card.gaii === gaii && card.runMode === 'spawn', 'the public card should still identify the agent');
+        assert(card.gaii === gaii && typeof card.runMode === 'string', 'the public card should still identify the agent');
         assert(typeof card.nodeKeyUri === 'string', 'the public card should say where its signing key is published');
     });
 

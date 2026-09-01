@@ -25,11 +25,19 @@
  *   daemon is already holding, and the daemon attaches the new agents live.
  *
  *   WHAT IS NOT DECIDED HERE. What the agents ARE: that is data/basic-agents.ts, and this route
- *   creates whatever it says. And what they DO: that is their runtime's half.
+ *   creates whatever it says — the records, the scopes, the run modes AND the crew definitions.
+ *
+ *   WHY THE DEFINITION IS SEEDED BEFORE THE OFFER. crewaimeat's runtime refuses to start an agent
+ *   with no definition, and publishing one needs a running runtime, so nobody downstream can break
+ *   that circle: the definition has to be on the node before the daemon attaches the agent. Seed,
+ *   then offer. And it is all or nothing — a seed failure deletes what this press created, because
+ *   an agent with nothing to be is the state the seed exists to remove.
  *
  * @structure registerBasicAgentsRoutes(router, config, storage)
  * @usage registerBasicAgentsRoutes(router, config, storage);
  * @version-history
+ *   v1.2.0 — 2026-09-01 — The button seeds each agent's crew definition at creation, before the
+ *     enrolment offer, and rolls back everything it created if any seed fails.
  *   v1.1.0 — 2026-08-31 — The GET moves to services/basic-agents.ts and drops to requireAuth(), so a
  *     chat can ask what this account would get and hand the person the page to press it on. The POST
  *     is untouched: creating agents stays with the account holder in person.
@@ -44,6 +52,7 @@ import { success, error } from '../../middleware/envelope.js';
 import { buildGAII } from '../../utils/gaii.js';
 import { BASIC_AGENTS } from '../../data/basic-agents.js';
 import { describeBasicAgents, requestBasicAgents, daemonPrincipals, connectedDaemons } from '../../services/basic-agents.js';
+import { crewSeedAuthored, type CrewCaller } from '../../services/crew-ops.js';
 import { getActiveConnectTunnelManager } from '../../services/connect-tunnel.js';
 import { emitChange } from '../../services/event-bus.js';
 import { recordAccountEvent } from '../../services/account-events.js';
@@ -195,6 +204,64 @@ export function registerBasicAgentsRoutes(router: Router, config: AimeatConfig, 
       return;
     }
 
+    // ── Give each of them something to BE, before anything tries to start them ──
+    //
+    // BEFORE THE OFFER, not after, and that ordering is the feature. crewaimeat's runtime refuses
+    // to start an agent with no definition ("an agent with no definition has nothing to be"), so
+    // the definition has to be on the node before the daemon attaches the agent and wakes it. Seed
+    // then offer means the first start finds it; offer then seed would be a race against the very
+    // thing that cannot happen without it.
+    //
+    // AND IT IS ALL OR NOTHING. An agent that exists with no definition is the state this whole
+    // step removes; leaving one behind because the seed failed halfway would recreate it under a
+    // different name. A failure here deletes what THIS press created — never a `reused` agent,
+    // which the owner already had — and the answer says which ones could not be made.
+    const seedCaller: CrewCaller = {
+      principal: `${owner}@${config.nodeId}`,
+      owner,
+      scopes: ['memory:write'],
+      roles: ['owner'],
+      pipeline: 'rest.basic-agents.seed',
+    };
+    const seeded: string[] = [];
+    const seedFailed: Array<{ name: string; reason: string }> = [];
+    for (const name of toEnrol) {
+      const template = BASIC_AGENTS.find(t => t.name === name)!;
+      const record = (await storage.getAgentsByOwner(owner)).find(a => a.name === name);
+      if (!record) { seedFailed.push({ name, reason: 'record_missing' }); continue; }
+      const out = await crewSeedAuthored({ storage, config }, seedCaller, record, template.crewDef as unknown as Record<string, unknown>);
+      if (out.ok) { seeded.push(name); continue; }
+      // A reused agent that already carries a definition is not a failure: the owner has one, and
+      // this path never replaces one. Anything else is.
+      if (out.code === 'ALREADY_DEFINED') { seeded.push(name); continue; }
+      seedFailed.push({ name, reason: out.code });
+    }
+
+    if (seedFailed.length > 0) {
+      // Roll back only what this press made. A reused agent predates the press and is left alone.
+      const rolledBack: string[] = [];
+      for (const name of created) {
+        try {
+          await storage.deleteAgent(buildGAII(name, owner, config.nodeId));
+          rolledBack.push(name);
+        } catch (err) {
+          logger.error('Basic-agents rollback failed; an agent may be left without a definition', {
+            event: 'agent_v2.seed_rollback_failed', owner, name, error: String(err),
+          });
+        }
+      }
+      // No grant to clean up: it is minted below, after this gate, precisely so a seed failure has
+      // nothing to undo but the records this press wrote.
+      logger.warn('Basic-agents seed failed; nothing was created', {
+        event: 'agent_v2.seed_failed', owner, failed: seedFailed.map(f => f.name).join(','),
+      });
+      res.status(502).json(error(config.nodeId, 'CREW_SEED_FAILED',
+        'These agents could not be given anything to run, so none of them were made. Nothing changed.',
+        undefined, { could_not_make: seedFailed, rolled_back: rolledBack, reused_left_alone: reused }));
+      emitChange('agents');
+      return;
+    }
+
     // The grant: exactly these agents, for this owner, for a few minutes, once.
     const grantId = `aeg-${randomBytes(16).toString('hex')}`;
     await storage.createAgentEnrolmentGrant({
@@ -307,7 +374,7 @@ export function registerBasicAgentsRoutes(router: Router, config: AimeatConfig, 
     logger.info('Basic agents created and enrolled', { event: 'agent_v2.basic_agents', owner, created: created.length, enrolled: enrolled.length });
     emitChange('agents');
     res.json(success(config.nodeId, {
-      created, reused, skipped, enrolled,
+      created, reused, skipped, enrolled, seeded,
       served_by: target,
     }, [
       { description: 'See them in your agents list', method: 'GET', url: '/v1/agents' },

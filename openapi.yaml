@@ -7030,11 +7030,26 @@ paths:
         no connector there is nobody to run the agents, so the call answers 409 `NO_DAEMON` and
         creates nothing.
 
-        WHAT HAPPENS. The agents are created from the node's own template, a single-use enrolment
-        grant naming exactly them is written, and the grant is offered to the connected daemon over a
-        socket it is already holding. The daemon generates one Ed25519 key per agent, signs a card
+        WHAT HAPPENS. The agents are created from the node's own template; each one is SEEDED with
+        the crew definition that template carries, at `crews.registry.<name>` in the agent's own
+        namespace; then a single-use enrolment grant naming exactly them is written and offered to
+        the connected daemon over a socket it is already holding. The daemon generates one Ed25519
+        key per agent, signs a card
         with it, submits the cards to `/v1/agents/v2/enrol`, and attaches the agents to its live
         registry. No restart, so no other agent loses its connection.
+
+        WHY THE DEFINITION IS SEEDED HERE, and not published later. A crew runtime refuses to start
+        an agent with no definition, and `aimeat_crew_publish` validates against the runtime that
+        will run it — so publishing needs a runtime, a runtime needs a definition, and a definition
+        would need publishing. The definition must therefore exist before first start, and the only
+        party who can write it then is whoever created the agent. `aimeat_crew_publish` is NOT
+        relaxed: the seed can only ever ADD a first definition, never replace one, and a definition
+        an owner has since edited is left exactly as it is when the button is pressed again.
+
+        ALL OR NOTHING. If a definition cannot be written, every agent this press created is deleted
+        and the call answers 502 `CREW_SEED_FAILED` naming which ones — an agent that exists with
+        nothing to run is the state the seed removes, not one it should leave behind. Agents that
+        already existed (`reused`) are never deleted.
 
         Safe to press twice: an agent that already exists and is enrolled is reported under `skipped`.
 
@@ -7092,6 +7107,12 @@ paths:
                                 gaii: { type: string }
                                 run_mode: { type: string }
                                 card_url: { type: string }
+                          seeded:
+                            type: array
+                            items: { type: string }
+                            description: >-
+                              The agents whose crew definition is in place. An agent already carrying
+                              one is listed here too: it has what it needs, and nothing was replaced.
                           served_by:
                             type: string
                             description: The daemon principal the enrolment was offered to.
@@ -7101,8 +7122,15 @@ paths:
           description: NO_DAEMON — no connector is connected, and nothing was created
         '502':
           description: |
-            The connector was reached and did not finish. The agents exist and are unconnected; the
-            error details carry `grant_id` so the press can be retried. `CONNECTOR_TOO_OLD` means the
+            Two shapes, and they differ in what is left behind.
+
+            `CREW_SEED_FAILED` — a crew definition could not be written. Every agent this press
+            created was deleted and nothing changed; `details.could_not_make` names them. This is
+            checked before the enrolment grant exists, so there is nothing else to clean up.
+
+            `ENROL_FAILED` / `ENROL_TIMEOUT` / `CONNECTOR_TOO_OLD` — the connector was reached and
+            did not finish. The agents exist, carry their definitions, and are unconnected; the error
+            details carry `grant_id` so the press can be retried. `CONNECTOR_TOO_OLD` means the
             connector is connected but does not know how to take on new agents yet.
 
   /v1/agents/v2/basic-agents/request:
