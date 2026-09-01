@@ -7876,6 +7876,138 @@ paths:
         '409':
           description: Already settled
 
+  /v1/a2a/{owner}/{agent}/agent-card.json:
+    get:
+      operationId: getA2AAgentCard
+      summary: One agent, as an A2A AgentCard
+      description: |
+        PUBLIC, like the AIMEAT card at /v1/agents/{gaii}/card that it is a second view of. Discovery
+        has to be public or it is not discovery, and this says nothing that one does not.
+
+        Everything the card points at takes a credential, and the card declares that
+        (`securitySchemes.bearer`) so a client knows before it tries.
+
+        It declares TWO interfaces at one address: A2A 1.0, and the 0.3 nearly every client speaks
+        today. The version header on a request decides which shape it is read as, and one
+        implementation answers both.
+
+        `capabilities.streaming` is false and the streaming methods refuse, deliberately: a card that
+        promised a stream this node does not send would leave a client holding a connection open for
+        updates that never arrive. `pushNotifications` is true, and the config it means is the one
+        `PUT /v1/agents/v2/push-config` stores.
+
+        The card is generated from the agent record and cannot be hand-written — a hand-written card
+        is a second source of truth about what an agent can do, and the first thing it does is drift.
+      tags: [Identity]
+      parameters:
+        - name: owner
+          in: path
+          required: true
+          schema: { type: string }
+        - name: agent
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: The A2A AgentCard (the A2A shape, not the AIMEAT envelope)
+          content:
+            application/json:
+              schema:
+                type: object
+                description: An A2A v1.0 AgentCard as the @a2a-js/sdk serialises it.
+        '304':
+          description: Not modified — the handler serves ETag and Cache-Control
+        '404':
+          description: No agent of that name on this node
+
+  /v1/a2a/{owner}/{agent}:
+    post:
+      operationId: a2aJsonRpc
+      summary: The A2A JSON-RPC surface for one agent
+      description: |
+        AN AGENT2AGENT CLIENT TALKING TO ONE OF THIS NODE'S AGENTS. The body is JSON-RPC 2.0, not the
+        AIMEAT envelope, and so is the answer: a client that knows nothing about this node can use it
+        with an off-the-shelf A2A library.
+
+        Methods (A2A 1.0 names; the 0.3 names work too, chosen by the `A2A-Version` header):
+        `SendMessage`, `GetTask`, `ListTasks`, `CancelTask`,
+        `CreateTaskPushNotificationConfig`, `GetTaskPushNotificationConfig`,
+        `ListTaskPushNotificationConfigs`, `DeleteTaskPushNotificationConfig`.
+        `SendMessage` with no task creates one and answers with it; with a task it adds a turn to the
+        same exchange. The streaming methods refuse, as the card says they will.
+
+        IT STORES NOTHING OF ITS OWN. Every method projects the same records the V4 message doors and
+        the V5 task doors read and write: work created here is in `GET /v1/agents/v2/tasks`, and a
+        task moved there reads moved here. `a2a_state` on the REST answer and the state on this one
+        come from the same row.
+
+        ONE ACCOUNT, IN V6a. The caller must be authenticated as a principal of the agent's own
+        owner; anyone else is refused with 403 before the JSON-RPC layer sees the request. Opening
+        this to callers from other accounts or other nodes is a trust boundary with its own consent
+        story and is not decided here.
+
+        THE SCOPE IS PER METHOD, not per door: one HTTP door with a dozen methods behind it cannot be
+        gated by one middleware without being wrong for eleven of them. `SendMessage` needs
+        `messages:send` (and `task:write` when it creates work), `CancelTask` needs `task:write`, the
+        push-config writes need `agent:write`, the push-config reads need `messages:read`, and the
+        task reads need none — the same words the REST twins take, asked the same way, with the same
+        owner-session bypass.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: owner
+          in: path
+          required: true
+          schema: { type: string }
+        - name: agent
+          in: path
+          required: true
+          schema: { type: string }
+        - name: A2A-Version
+          in: header
+          schema: { type: string, enum: ['1.0', '0.3'] }
+          description: Absent is read as 0.3, which is the compatibility path.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [jsonrpc, method]
+              properties:
+                jsonrpc: { type: string, enum: ['2.0'] }
+                id: { description: Any JSON-RPC id. }
+                method: { type: string }
+                params: { type: object }
+      responses:
+        '200':
+          description: |
+            A JSON-RPC response. A refusal is a JSON-RPC error with the code the A2A spec names —
+            -32001 for a task that is not there, -32002 for one that will not cancel, -32602 for a
+            malformed request — and `error.data.aimeatCode` carries this node's own code beside it.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jsonrpc: { type: string, enum: ['2.0'] }
+                  id: {}
+                  result: { type: object }
+                  error:
+                    type: object
+                    properties:
+                      code: { type: integer }
+                      message: { type: string }
+                      data: { type: object }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: The caller is a principal of another account
+        '404':
+          description: No agent of that name on this node
+
   /v1/agents/{gaii}/card:
     get:
       operationId: getAgentCard

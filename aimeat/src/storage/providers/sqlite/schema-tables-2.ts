@@ -561,6 +561,9 @@ export function applySchemaTables2(db: Database.Database): void {
     CREATE TABLE IF NOT EXISTS agent_v2_push_configs (
       id              TEXT PRIMARY KEY,
       principal       TEXT NOT NULL,
+      -- One task's deliveries only, or NULL for every one of that principal's. A2A binds a push
+      -- config to a task; V4 bound it to a principal, and both fit.
+      taskId          TEXT,
       owner           TEXT NOT NULL,
       url             TEXT NOT NULL,
       token           TEXT,

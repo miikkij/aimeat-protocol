@@ -201,6 +201,8 @@ export async function setPushTarget(
   const record: AgentV2PushConfigRecord = {
     id: existing?.id ?? randomUUID(),
     principal: target,
+    // V4's doors never bind a target to a task; the A2A door does, through setPushTargetForTask.
+    taskId: existing?.taskId ?? null,
     owner: auth.owner,
     url: input.url,
     token: input.token,

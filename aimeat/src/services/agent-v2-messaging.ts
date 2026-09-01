@@ -141,6 +141,10 @@ export async function deliverToPushTargets(storage: Storage, message: AgentV2Mes
 
   for (const target of targets) {
     if (target.disabledAt) continue;
+    // A target bound to ONE task hears only about that task. A target with no task hears about
+    // everything, which is what every V4 target is and stays. Skipping the mismatch here rather
+    // than filtering in the query keeps the one read per message that this path is built on.
+    if (target.taskId && target.taskId !== message.taskId) continue;
     const at = new Date().toISOString();
     try {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };

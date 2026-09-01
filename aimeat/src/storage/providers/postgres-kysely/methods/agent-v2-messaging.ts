@@ -34,7 +34,7 @@ function toMessage(r: Selectable<AgentV2Message>): AgentV2MessageRecord {
 
 function toConfig(r: Selectable<AgentV2PushConfig>): AgentV2PushConfigRecord {
   return {
-    id: r.id, principal: r.principal, owner: r.owner, url: r.url,
+    id: r.id, principal: r.principal, taskId: r.taskId ?? null, owner: r.owner, url: r.url,
     token: r.token ?? null,
     authSchemes: r.authSchemes ?? [],
     authCredentials: r.authCredentials ?? null,
@@ -84,14 +84,14 @@ export const agentV2MessagingMethods = {
   async upsertAgentV2PushConfig(this: PostgresKyselyStorage, c: AgentV2PushConfigRecord): Promise<void> {
     try {
       await this.db.insertInto('AgentV2PushConfig').values({
-        id: c.id, principal: c.principal, owner: c.owner, url: c.url,
+        id: c.id, principal: c.principal, taskId: c.taskId ?? null, owner: c.owner, url: c.url,
         token: c.token ?? null, authSchemes: c.authSchemes,
         authCredentials: c.authCredentials ?? null,
         createdAt: c.createdAt, updatedAt: c.updatedAt,
         lastSuccessAt: c.lastSuccessAt ?? null, lastFailureAt: c.lastFailureAt ?? null,
         failCount: c.failCount, disabledAt: c.disabledAt ?? null,
       }).onConflict((oc) => oc.column('id').doUpdateSet({
-        principal: c.principal, url: c.url, token: c.token ?? null,
+        principal: c.principal, taskId: c.taskId ?? null, url: c.url, token: c.token ?? null,
         authSchemes: c.authSchemes, authCredentials: c.authCredentials ?? null,
         updatedAt: c.updatedAt,
         // Re-registering is how a person clears a target the node gave up on.
