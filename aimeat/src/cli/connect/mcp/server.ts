@@ -115,12 +115,12 @@ export async function runServe(flags: Record<string, string>): Promise<void> {
   await mcp.connect(transport);
 
   const summary = registry.list().map(a => {
-    // Prefer the explicit per-agent mode (autonomous | interactive | task-runner |
-    // coordinator | workstation); fall back to runner detection for legacy configs
-    // that predate the mode field. The node record is authoritative -- this is only
-    // a local display label.
-    const mode = a.config.mode ?? (isRunner(a) ? 'task-runner' : 'interactive');
-    return `${a.agent}@${a.owner} [${mode}]`;
+    // A LOCAL label, derived locally on purpose. The node holds AgentRecord.mode and is
+    // authoritative; this line prints at startup before anything has talked to it, and a startup
+    // banner is not worth a REST call per agent. What it can say for certain is whether THIS
+    // connector will spawn a subprocess for the agent, which is a fact about this machine.
+    // `aimeat connect list` is where the node's own answer is shown.
+    return `${a.agent}@${a.owner} [${isRunner(a) ? 'task-runner' : 'interactive'}]`;
   }).join(', ');
   const surfaceNote = role === 'all' ? 'full surface' : `surface '${role}' (${toolsForSurface(role).size} tools)`;
   console.error(`AIMEAT MCP server running [${surfaceNote}]. ${registry.size()} agent(s): ${summary}`);

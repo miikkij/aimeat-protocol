@@ -177,13 +177,11 @@ export async function handleEnrolOffer(offer: unknown, deps: EnrolDeps): Promise
     try {
       await storeAgentKey(e.name, offer.owner, { ...prep.key, gaii: e.gaii, nodeId: offer.node_id });
       if (e.access_token) cacheToken(e.name, offer.owner, e.access_token, e.expires_in ?? 3600);
-      const perAgent: AimeatPerAgentConfig = {
-        agent: e.name,
-        owner: offer.owner,
-        node_url: offer.node_url,
-        mode: (prep.offered.mode as AimeatPerAgentConfig['mode']) ?? 'interactive',
-      };
-      savePerAgentConfig(e.name, perAgent);
+      // Only what the connector needs to reach the node. The agent, the owner and the mode are the
+      // NODE's: identity comes from the credential written just above, and the mode is served by
+      // GET /v1/agents.
+      const perAgent: AimeatPerAgentConfig = { node_url: offer.node_url };
+      savePerAgentConfig(e.name, offer.owner, perAgent);
       // The identity the node just confirmed, carried straight through: the registry keys by it
       // and must never have to assemble one from a name.
       await deps.attach({ agent: e.name, owner: offer.owner, gaii: e.gaii, config: perAgent });
