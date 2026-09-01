@@ -27,14 +27,22 @@
  *   AIMEAT.atelier.schedule({ target: host, data: { days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
  *     from: '08:00', to: '18:00', events: [{ day: 1, from: '09:00', to: '11:30', label: 'Baking class' }] } });
  * @version-history
+ *   v0.43.0 — 2026-09-02 — A moved kanban card TRAVELS to its new column on the kit's spring
+ *     (FLIP through flipFrom: its rect is read before the board rebuilds, the inverse becomes the
+ *     spring's starting state, and it springs to identity). The HTML5 drag, the keyboard move and
+ *     the onMove contract are untouched; under reduced motion the card lands with no travel.
  *   v0.37.0 — 2026-08-30 — steps: the process tracker (done / current / ahead on one line).
  *   v0.36.0 — 2026-08-30 — Initial (basket two of the approved expansion).
  */
 import { el, clear, resolve, reducedMotion } from './dom.js';
 import { t } from './i18n.js';
 import { emptyState } from './state.js';
+import { flipFrom } from './flow-parts.js';
 
 const TONES = ['ok', 'warn', 'err', 'accent'];
+
+/** The carried card's spring: it lands quickly and settles without a wobble. */
+const CARD_SPRING = { stiffness: 300, damping: 26 };
 function toneOf(value, fallback) { return TONES.indexOf(value) >= 0 ? value : (fallback || 'accent'); }
 
 function emptyInto(root, spec) {
@@ -62,11 +70,25 @@ export function kanban(spec) {
     if (!current) return;
     const card = (current.cards || []).find((c) => c && c.id === cardId);
     if (!card || card.column === toColumn) return;
+    // FLIP: where the card stands before the board is rebuilt, so it can TRAVEL to its new
+    // column instead of appearing there. Measured before the move, inverted after it.
+    const was = root.querySelector(`[data-card="${cardId}"]`);
+    const from = was ? was.getBoundingClientRect() : null;
     card.column = toColumn;
     render(current);
     // The focused card keeps the keyboard: after the repaint, focus follows it.
-    const again = root.querySelector(`[data-card="${cardId}"]`);
-    if (again) /** @type {HTMLElement} */ (again).focus();
+    const again = /** @type {HTMLElement} */ (root.querySelector(`[data-card="${cardId}"]`));
+    if (again) {
+      if (from) {
+        // The entrance belongs to a card that just appeared; this one is being carried, so it
+        // stands down and the spring owns the travel.
+        again.classList.remove('ak-kanban__card--enter');
+        again.style.animationDelay = '';
+        const to = again.getBoundingClientRect();
+        flipFrom(again, from.left - to.left, from.top - to.top, CARD_SPRING);
+      }
+      again.focus();
+    }
     if (spec.onMove) spec.onMove(cardId, toColumn);
   }
 

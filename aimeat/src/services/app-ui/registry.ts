@@ -25,6 +25,11 @@
  * @usage
  *   import { UI_COMPONENTS, componentById, buildUiCatalogue } from './registry.js';
  * @version-history
+ *   v1.19.0 — 2026-09-02 — THE MOTION PARTS (append-only, wish-atelier-motion-libraries-and-
+ *     parts): `thread`, `calendar`, `priceTable`, `carousel`, `sortable`, `notices` and `facets`
+ *     join the components — the parts that ride the vendored Motion, anime.js and Lenis packs
+ *     and the kit's own primitives. lightbox, cart and checkout stay component-only, the
+ *     dialog family's rule.
  *   v1.18.0 — 2026-09-01 — FOUR OF THE NINE (append-only): `ring`, `crew`, `poll` and `keys` —
  *     the data-shaped parts the Atelier Next canvas found the kit lacked — join the
  *     components; toast, palette, compare, tour and dropzone stay component-only.
@@ -537,6 +542,79 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
     props: {
       source: source(),
       title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
+    },
+  },
+  // ── v1.19.0: the parts that ride the motion libraries and the kit's own primitives ──
+  {
+    id: 'thread',
+    summary: 'A discussion: bubbles grouped by day in a well that scrolls smoothly to the newest, what this person said on the right in the accent tint, an agent squared the way the crew stack squares an agent, and a composer where Enter sends. The source resolves to one record: { messages: [{ id, who, label?, text, at, mine?, agent?, status? }] } (a bare array of messages works too). status is sent | read | failed.',
+    props: {
+      source: source(),
+      title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
+      placeholder: text('What the composer says before anything is typed.', 80),
+      emptyTitle: text('What the empty state says before the first message.', 80),
+      emptyHint: text('The line under it.', 160),
+    },
+  },
+  {
+    id: 'calendar',
+    summary: 'A month a hand turns: ISO weeks (Monday first), today outlined, days outside the month dimmed, and each day\'s events as tinted pips (three, then "+N"). Prev and next month sit under two buttons, and turning the month staggers the day cells in. The source resolves to one record: { month: \'YYYY-MM\', events: [{ id, date: \'YYYY-MM-DD\', title, tone? }] }.',
+    props: {
+      source: source(),
+      title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
+      weekStart: { type: 'number', min: 0, max: 1, default: 1, description: 'Which day a week opens on: 1 for Monday (the ISO week), 0 for Sunday.' },
+      emptyTitle: text('What the empty state says.', 80),
+      emptyHint: text('The line under it.', 160),
+    },
+  },
+  {
+    id: 'carousel',
+    summary: 'A strip of media cards you push along: each one a picture with a caption band (or a tinted card carrying the title when there is no picture), one of them current and standing a touch taller, moved by the arrows, the dots, the arrow keys or a swipe. For a set you look THROUGH rather than at — photos, covers, rooms, a week of shots. The source resolves to rows of { id, title?, sub?, image?, tone? }; tone is ok, warn or err and paints the caption edge.',
+    props: {
+      source: source(),
+      title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
+      emptyTitle: text('What the empty state says when there are no pictures.', 80),
+      emptyHint: text('The line under it.', 160),
+    },
+  },
+  {
+    id: 'sortable',
+    summary: 'A list whose order is the point, and a hand can change it: each row carries a grip, the carried row rides the pointer while the rows it crosses spring out of its way, and the new order reaches the app on release (Alt+ArrowUp / Alt+ArrowDown on a focused grip does the same without a mouse). The source resolves to rows of { id, label, sub?, tone? }. For a priority list, a running order, a queue somebody decides.',
+    props: {
+      source: source(),
+      title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
+      emptyTitle: text('What the empty state says.', 80),
+      emptyHint: text('The line under it.', 160),
+    },
+  },
+  {
+    id: 'notices',
+    summary: 'The notification centre: items under day headings (Today, Yesterday, then the date), the unread ones wearing an accent dot and a firmer face, the kind (info / ok / warn / err) as a bar on the left edge, the time on the right, and one "Mark all read" control. A tap opens the item. The source resolves to rows of { id, title, text?, at ("YYYY-MM-DDTHH:MM:SSZ"), kind?, read?, href? }. Items that arrive on a repaint stagger in; the ones already there stand still, which is what says something is new.',
+    props: {
+      source: source(),
+      title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
+      emptyTitle: text('What the empty state says when there is nothing new.', 80),
+      emptyHint: text('The line under it.', 160),
+    },
+  },
+  {
+    id: 'facets',
+    summary: 'Filters over a list: one labelled group of chips per facet, the count on each chip, the picked ones in the accent, and a summary line saying how many filters stand with a Clear beside it. A multi facet toggles; a single one holds the last pick. The source resolves to ONE record: { facets: [{ id, label, multi?, options: [{ id, label, count? }] }] }. A count that moves on a repaint rolls to its new figure instead of blinking.',
+    props: {
+      source: source(),
+      title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
+      emptyTitle: text('What the empty state says when there is nothing to filter by.', 80),
+      emptyHint: text('The line under it.', 160),
+    },
+  },
+  {
+    id: 'priceTable',
+    summary: 'What each plan costs, side by side: one plan lifted with the accent edge and a "Most chosen" chip, the features as a check list, one call to action each. Where the data carries yearly prices a month/year control appears and the figures ROLL to their new value without the cards remounting. The source resolves to one record: { plans: [{ id, name, price, priceYearly?, features: [], highlight?, cta?, note? }], currency?, periods? }.',
+    props: {
+      source: source(),
+      title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
+      emptyTitle: text('What the empty state says when no plan is offered.', 80),
+      emptyHint: text('The line under it.', 160),
     },
   },
 ];

@@ -34,6 +34,9 @@
  *   });
  *   // later, when the app's data changed:  m.refresh('errands.');
  * @version-history
+ *   v0.44.0 — 2026-09-02 — The motion parts join the block vocabulary: `thread` (binds its
+ *     record whole, reports onSend), `calendar` and `priceTable` (record whole, two-argument
+ *     picks folded into one item), `carousel`, `sortable`, `notices` and `facets`.
  *   v0.42.0 — 2026-09-01 — Four of the nine new parts join the block vocabulary: `ring`, `crew`
  *     and `poll` bind their record whole, `keys` its rows.
  *   v0.39.0 — 2026-08-30 — The broadcast family joins the block vocabulary: `crt` (binds its
@@ -102,6 +105,10 @@ import { konsole } from './konsole.js';
 import { legalLinks, auditTrail, feedbackForm, reviewerLine } from './commercial.js';
 import { crt, countdown, crawl } from './mtv.js';
 import { ring, crew, poll, keys } from './parts.js';
+import { thread } from './lenis-parts.js';
+import { calendar, priceTable } from './anime-parts.js';
+import { carousel } from './motion-parts.js';
+import { sortable, notices, facets } from './flow-parts.js';
 import { atlas } from './atlas.js';
 import { map } from './map.js';
 
@@ -123,6 +130,10 @@ export { appRef };
  *   onPick?: (blockId: string, item: any) => void,
  *   onSearch?: (bind: string, query: string) => void,
  *   onMove?: (blockId: string, cardId: string, toColumnId: string) => void,
+ *   onSend?: (blockId: string, text: string) => void,
+ *   onReorder?: (blockId: string, ids: string[]) => void,
+ *   onRead?: (blockId: string, ids: string[]) => void,
+ *   onFilter?: (blockId: string, selection: Record<string, string[]>) => void,
  *   layout?: object|null, fallback?: object|null,
  *   owner?: string, filename?: string,
  * }} spec
@@ -305,6 +316,56 @@ export function mosaic(spec) {
       case 'keys':
         return bound('keys', function (data) {
           return keys({ target: into, data: patchFor('keys', data).items });
+        });
+      case 'thread':
+        return bound('thread', function (data) {
+          return thread({
+            target: into, data: patchFor('thread', data).data, title: p.title,
+            placeholder: p.placeholder, empty: empty,
+            onSend: spec.onSend ? function (text) { spec.onSend(block.id, text); } : undefined,
+          });
+        });
+      case 'calendar':
+        return bound('calendar', function (data) {
+          return calendar({
+            target: into, data: patchFor('calendar', data).data, title: p.title,
+            weekStart: p.weekStart, empty: empty,
+            onPick: spec.onPick ? function (day, events) { spec.onPick(block.id, { day: day, events: events }); } : undefined,
+            onMonth: spec.onPick ? function (month) { spec.onPick(block.id, { month: month }); } : undefined,
+          });
+        });
+      case 'sortable':
+        return bound('sortable', function (data) {
+          return sortable({
+            target: into, data: patchFor('sortable', data).items, title: p.title, empty: empty,
+            onReorder: spec.onReorder ? function (ids) { spec.onReorder(block.id, ids); } : undefined,
+          });
+        });
+      case 'notices':
+        return bound('notices', function (data) {
+          return notices({
+            target: into, data: patchFor('notices', data).items, title: p.title, empty: empty,
+            onOpen: pick,
+            onRead: spec.onRead ? function (ids) { spec.onRead(block.id, ids); } : undefined,
+          });
+        });
+      case 'facets':
+        return bound('facets', function (data) {
+          return facets({
+            target: into, data: patchFor('facets', data).data, title: p.title, empty: empty,
+            onChange: spec.onFilter ? function (selection) { spec.onFilter(block.id, selection); } : undefined,
+          });
+        });
+      case 'carousel':
+        return bound('carousel', function (data) {
+          return carousel({ target: into, data: patchFor('carousel', data).items, title: p.title, empty: empty, onPick: pick });
+        });
+      case 'priceTable':
+        return bound('priceTable', function (data) {
+          return priceTable({
+            target: into, data: patchFor('priceTable', data).data, title: p.title, empty: empty,
+            onPick: spec.onPick ? function (plan, period) { spec.onPick(block.id, { plan: plan, period: period }); } : undefined,
+          });
         });
       case 'scene3d': {
         // bars binds a source (rows stand up as columns); model and globe bind their own

@@ -5,6 +5,9 @@
  *   plus the /v1/libs catalogue and the generated JS sources themselves.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=libs
  * @version-history
+ *   v1.6.0 — 2026-09-02 — The kit's motion primitives (springFrames, spring, stagger, inView,
+ *     scrollLink, drag, flipFrom) and the eleven parts that ride the motion libraries join the
+ *     export assertions (kit v0.44.0).
  *   v1.5.0 — 2026-08-27 — aimeat-atelier.js coverage (TARGET-074 phase 1): every component
  *     exported, the NO-NETWORK and NO-HARDCODED-COLOUR boundary guards, the EN+FI+ES strings and
  *     platform-language wiring, the --ak-* theming contract (dark re-declaration, the flat
@@ -1053,6 +1056,9 @@ await test('GET /v1/libs/aimeat-atelier.js — serves the Atelier kit with every
         'flapify', 'ransom', 'vu', 'typeout', 'dealIn',
         'spotlight', 'tilt', 'sheen', 'odometer', 'thumb', 'deal',
         'ring', 'crew', 'poll', 'keys', 'dropzone', 'toast', 'palette', 'compare', 'tour',
+        'springFrames', 'spring', 'stagger', 'inView', 'scrollLink', 'drag', 'flipFrom',
+        'carousel', 'lightbox', 'calendar', 'priceTable', 'thread', 'checkout',
+        'sortable', 'cart', 'notices', 'facets',
     ]) {
         assert(text.includes(part), `should export ${part}`);
     }

@@ -1,0 +1,262 @@
+/*
+ * @file aimeat-atelier/anime-parts.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The clothes for the two anime.js parts: the month grid a hand turns, and the
+ *   price table whose figures roll when the billing period changes. Every value rides the
+ *   --ak-* contract, so both answer every look, palette and mode; no colour is written here
+ *   that is not a token or a color-mix over one.
+ *
+ *   The day cells and the price figures carry NO resting animation. Their travel is written in
+ *   JavaScript, runs once per change, and is skipped under reduced motion — what is left in this
+ *   file is a hover tint and a focus ring, which is all an idle surface should ever repaint for.
+ * @structure .ak-calendar (head, grid, rows, day cells, pips) · .ak-price (periods, cards,
+ *   figure, features, cta) · reduced-motion
+ * @usage  Imported by aimeat-atelier.css; the components are AIMEAT.atelier.calendar and
+ *   AIMEAT.atelier.priceTable.
+ * @version-history
+ *   v0.44.0 — 2026-09-02 — Initial: the anime.js pair (calendar, priceTable).
+ */
+
+/* ── The month: ISO weeks, today outlined, events as tinted pips ─────────────────────────── */
+.ak-calendar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ak-calendar__name {
+  font-family: var(--ak-font-display);
+  font-weight: var(--ak-weight-display);
+  font-size: var(--ak-text-title);
+  color: var(--ak-ink);
+}
+.ak-calendar__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ak-calendar__title {
+  flex: 1;
+  text-align: center;
+  font-family: var(--ak-font-display);
+  font-weight: var(--ak-weight-display);
+  letter-spacing: 0.04em;
+  color: var(--ak-ink);
+}
+.ak-calendar__nav {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  padding: 0;
+  border: var(--ak-line-w) solid var(--ak-line);
+  border-radius: var(--ak-radius-sm);
+  background: var(--ak-surface);
+  color: var(--ak-ink);
+  cursor: pointer;
+  transition: background var(--ak-motion) var(--ak-ease);
+}
+.ak-calendar__nav:hover { background: color-mix(in oklab, var(--ak-accent) 14%, var(--ak-surface)); }
+.ak-calendar__nav:focus-visible { outline: 2px solid var(--ak-focus); outline-offset: 2px; }
+.ak-calendar__chev { display: block; }
+
+.ak-calendar__grid { display: flex; flex-direction: column; gap: 4px; }
+.ak-calendar__row {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+.ak-calendar__wd {
+  text-align: center;
+  padding-bottom: 2px;
+  font-family: var(--ak-font-mono);
+  font-size: var(--ak-text-fine);
+  color: var(--ak-ink-dim);
+}
+.ak-calendar__cell { display: block; min-width: 0; }
+.ak-calendar__day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 100%;
+  min-height: 2.5rem;
+  padding: 5px 2px;
+  border: var(--ak-line-w) solid transparent;
+  border-radius: var(--ak-radius-sm);
+  background: var(--ak-surface-2);
+  color: var(--ak-ink);
+  font: inherit;
+  font-size: var(--ak-text-fine);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background var(--ak-motion) var(--ak-ease);
+}
+.ak-calendar__day:hover { background: color-mix(in oklab, var(--ak-accent) 12%, var(--ak-surface-2)); }
+.ak-calendar__day:focus-visible { outline: 2px solid var(--ak-focus); outline-offset: 2px; }
+/* Outside the month: present, reachable, and clearly not this month's business. */
+.ak-calendar__day--out { background: transparent; color: var(--ak-ink-dim); }
+/* Today is OUTLINED rather than filled: a fill would compete with the tones the events carry. */
+.ak-calendar__day--today { border-color: var(--ak-accent); font-weight: 700; }
+.ak-calendar__num { line-height: 1.1; }
+
+.ak-calendar__pips { display: flex; align-items: center; gap: 3px; min-height: 6px; }
+.ak-calendar__pip {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--ak-radius-pill);
+  background: var(--ak-accent);
+}
+.ak-calendar__pip--ok { background: var(--ak-ok); }
+.ak-calendar__pip--warn { background: var(--ak-warn); }
+.ak-calendar__pip--err { background: var(--ak-err); }
+.ak-calendar__more {
+  font-family: var(--ak-font-mono);
+  font-size: 0.75em;
+  color: var(--ak-ink-dim);
+}
+
+/* ── The price table: plans side by side, one lifted, the figures rolling on a period change ─ */
+.ak-price {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ak-gap);
+}
+.ak-price__title {
+  font-family: var(--ak-font-display);
+  font-weight: var(--ak-weight-display);
+  font-size: var(--ak-text-title);
+  color: var(--ak-ink);
+}
+
+/* The segmented control: one ground, the pressed half wearing the accent. */
+.ak-price__periods {
+  display: inline-flex;
+  align-self: center;
+  gap: 2px;
+  padding: 3px;
+  border: var(--ak-line-w) solid var(--ak-line);
+  border-radius: var(--ak-radius-pill);
+  background: var(--ak-surface-2);
+}
+.ak-price__period {
+  min-height: 34px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: var(--ak-radius-pill);
+  background: transparent;
+  color: var(--ak-ink-dim);
+  font: inherit;
+  font-size: var(--ak-text-fine);
+  font-weight: 650;
+  cursor: pointer;
+  transition: background var(--ak-motion) var(--ak-ease), color var(--ak-motion) var(--ak-ease);
+}
+.ak-price__period:hover { color: var(--ak-ink); }
+.ak-price__period:focus-visible { outline: 2px solid var(--ak-focus); outline-offset: 2px; }
+.ak-price__period[aria-pressed='true'] {
+  background: var(--ak-accent);
+  color: var(--ak-accent-ink);
+}
+
+.ak-price__cards {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: var(--ak-gap);
+}
+.ak-price__card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1 1 15rem;
+  min-width: 0;
+  padding: var(--ak-pad);
+  border: var(--ak-line-w) solid var(--ak-line);
+  border-radius: var(--ak-radius);
+  background: var(--ak-surface);
+  color: var(--ak-ink);
+  box-shadow: var(--ak-elev-1);
+}
+/* The chosen plan stands a little proud of the row and wears the accent edge. A static offset,
+ * not a motion: nothing here moves at rest. */
+.ak-price__card--lift {
+  transform: translateY(-6px);
+  border-width: 2px;
+  border-color: var(--ak-accent);
+  box-shadow: var(--ak-elev-2);
+  z-index: 1;
+}
+.ak-price__chip {
+  position: absolute;
+  top: -11px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 3px 12px;
+  border-radius: var(--ak-radius-pill);
+  background: var(--ak-accent);
+  color: var(--ak-accent-ink);
+  font-size: var(--ak-text-fine);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.ak-price__name {
+  margin: 0;
+  font-family: var(--ak-font-display);
+  font-weight: var(--ak-weight-display);
+  font-size: var(--ak-text-title);
+  color: var(--ak-ink);
+}
+.ak-price__figure {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.ak-price__amount {
+  font-family: var(--ak-font-display);
+  font-weight: var(--ak-weight-display);
+  font-size: clamp(1.9rem, 5vw, 2.6rem);
+  line-height: 1;
+  color: var(--ak-accent-text);
+  font-variant-numeric: tabular-nums;
+}
+.ak-price__per {
+  font-size: var(--ak-text-fine);
+  color: var(--ak-ink-dim);
+}
+.ak-price__features {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+.ak-price__feature {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: var(--ak-text-fine);
+  color: var(--ak-ink);
+}
+.ak-price__check { color: var(--ak-ok-text); font-weight: 700; line-height: 1.4; }
+.ak-price__note {
+  margin: 0;
+  font-size: var(--ak-text-fine);
+  color: var(--ak-ink-dim);
+}
+.ak-price__cta { width: 100%; }
+
+/* ── Less motion asked for: the tints and the rolls stand still ──────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .ak-calendar__nav,
+  .ak-calendar__day,
+  .ak-price__period {
+    transition: none;
+  }
+}
