@@ -194,24 +194,64 @@ async function run() {
             method: 'POST', headers: authR,
             body: JSON.stringify({ capability: 'aimeat_memory_write', input: { key: 'prim.denied', value: { a: 1 } } }),
         });
-        assert(viaInvoke.status >= 400, `the invoked write must be refused too, got ${viaInvoke.status}`);
-        assert(JSON.stringify(viaInvoke.body?.error ?? {}).includes('SCOPE_DENIED')
-            || JSON.stringify(viaInvoke.body?.error ?? {}).toLowerCase().includes('scope'),
-            `and for the same reason, got ${JSON.stringify(viaInvoke.body?.error)}`);
+        // Not merely "also refused" — the SAME refusal, because the same gate ran. "Both failed"
+        // would pass on an invoke that refused for its own unrelated reason, which is exactly the
+        // drift this door has to be pinned against: it is requireAuth() and no scope, and the whole
+        // claim is that the target route decides.
+        assert(viaInvoke.status === direct.status,
+            `same status as the direct call: expected ${direct.status}, got ${viaInvoke.status}`);
+        assert(viaInvoke.body?.error?.code === direct.body?.error?.code,
+            `and the same code: expected ${direct.body?.error?.code}, got ${viaInvoke.body?.error?.code}`);
+        assert(direct.body?.error?.code === 'SCOPE_DENIED',
+            `and that code is the scope gate's, got ${direct.body?.error?.code}`);
 
         // And nothing was written by either attempt.
         const back = await json('/v1/memory/prim.denied', { headers: authW });
         assert(back.status === 404, `nothing should exist at that key, got ${back.status}`);
     });
 
-    await test('invoke cannot reach another owner\'s data', async () => {
-        const r = await json('/v1/invoke', {
+    await test('a role that refuses the route refuses the invoke, with the same code', async () => {
+        // A second shape, because a scope and a ROLE are different gates, and a door honouring one
+        // could still be walking past the other.
+        const direct = await json('/v1/agents/nobody-here/mode', {
+            method: 'PATCH', headers: authR, body: JSON.stringify({ mode: 'autonomous' }),
+        });
+        const viaInvoke = await json('/v1/invoke', {
+            method: 'POST', headers: authR,
+            body: JSON.stringify({ capability: 'aimeat_agent_mode_set', input: { target_agent_name: 'nobody-here', mode: 'autonomous' } }),
+        });
+        assert(direct.status >= 400, `the direct call is refused, got ${direct.status}`);
+        assert(viaInvoke.status === direct.status,
+            `and invoke gives the same status: expected ${direct.status}, got ${viaInvoke.status}`);
+        assert(viaInvoke.body?.error?.code === direct.body?.error?.code,
+            `and the same code: expected ${direct.body?.error?.code}, got ${viaInvoke.body?.error?.code}`);
+    });
+
+    await test('invoke cannot reach another owner\'s data, and answers as that owner would be answered', async () => {
+        // Owner A wrote prim.note. Owner B asks for the same key, both ways.
+        const direct = await json('/v1/memory/prim.note', { headers: authB });
+        const viaInvoke = await json('/v1/invoke', {
             method: 'POST', headers: authB,
             body: JSON.stringify({ capability: 'aimeat_memory_read', input: { key: 'prim.note' } }),
         });
-        // Owner B holds no such record: the read is answered in B's own namespace, not A's.
-        const text = JSON.stringify(r.body ?? {});
-        assert(!text.includes('from invoke'), `another owner must not see it, got ${text.slice(0, 200)}`);
+        assert(!JSON.stringify(direct.body ?? {}).includes('from invoke'),
+            'the direct read must not see another owner\'s value');
+        assert(!JSON.stringify(viaInvoke.body ?? {}).includes('from invoke'),
+            'and neither must the invoked one');
+
+        // The equivalence, not just the absence: B is answered the same way through both doors, so
+        // invoke is not a second namespace resolution that happens to agree today.
+        assert(direct.status === 404, `B has no such record directly, got ${direct.status}`);
+        assert(viaInvoke.status >= 400 || !JSON.stringify(viaInvoke.body ?? {}).includes('prim.note'),
+            `and invoke answers the same emptiness, got ${viaInvoke.status}`);
+
+        // And A still reads their own, so the fence is a fence rather than an outage.
+        const mine = await json('/v1/invoke', {
+            method: 'POST', headers: authW,
+            body: JSON.stringify({ capability: 'aimeat_memory_read', input: { key: 'prim.note' } }),
+        });
+        assert(JSON.stringify(mine.body ?? {}).includes('from invoke'),
+            `the owner who wrote it still reads it, got ${mine.status}`);
     });
 
     // ── 5. THE OLD DOOR IS UNCHANGED ─────────────────────────────────────────

@@ -108,8 +108,16 @@ export async function invokeNodeCapability(
     // so the caller reads the same envelope it would have got calling the route directly.
     if (response && typeof response === 'object' && (response as { ok?: unknown }).ok === false) {
       const err = (response as { error?: { code?: string; message?: string } }).error;
+      // THE STATUS IS THE ROUTE'S, NOT OURS. This door's whole claim is that it can do exactly what
+      // its caller can do and nothing more, which means a refusal here has to be the refusal the
+      // caller would have got at the route — same code AND same status. It reported 400 for
+      // everything until 2026-09-01, so a caller could not tell "you are not allowed" (403) from
+      // "there is no such thing" (404) from "you asked wrongly" (400), and the equivalence the
+      // catalogue's safety rests on was untrue in the one place anyone would look.
       return {
-        ok: false, status: 400, code: err?.code ?? 'CAPABILITY_REFUSED',
+        ok: false,
+        status: client.lastStatus >= 400 ? client.lastStatus : 400,
+        code: err?.code ?? 'CAPABILITY_REFUSED',
         message: err?.message ?? 'That capability refused the call.',
         details: response,
       };

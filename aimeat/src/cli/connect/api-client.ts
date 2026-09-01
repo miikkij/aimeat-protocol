@@ -10,6 +10,9 @@
  *   MCP tool call flows over the single persistent WS without per-tool changes.
  * @usage Imported by `aimeat connect` subcommands and MCP tools.
  * @version-history
+ *   v1.10.0 — 2026-09-01 — `lastStatus`: the HTTP status of the most recent call. The loopback
+ *     dispatcher behind /v1/invoke needs it to hand back the SAME refusal the target route
+ *     gave; without it every refusal came back as 400. Additive — nothing else reads it.
  *   v1.9.4 — 2026-05-28 — Update connector guidance and close one-shot CLI HTTP connections.
  *   v2.0.0 — 2026-06-10 — Phase 4: Transport seam (direct fetch default, tunnel override).
  *   v2.1.0 — 2026-08-01 — TARGET-058 Phase 11b: ApiResponse models `meta`. It always arrived; not
@@ -62,6 +65,18 @@ export class AimeatClient {
     return new AimeatClient(config.node_url, token);
   }
 
+  /**
+   * The HTTP status of the most recent call, or 0 before the first one.
+   *
+   * `send()` returns the parsed envelope and nothing else, which is what every caller wants and is
+   * why it was written that way. One caller needs more: the loopback dispatcher behind
+   * `/v1/invoke` has to hand back the SAME refusal the target route gave, and a refusal without
+   * its status is not the same refusal — it reported 400 where the route said 403, so a caller
+   * could not tell "you are not allowed" from "you asked wrongly". Recording it here is additive:
+   * nothing else reads it, and no existing call changes shape.
+   */
+  lastStatus = 0;
+
   /** Route subsequent requests through `t` (e.g. the tunnel). `null` restores direct fetch. */
   setTransport(t: Transport | null): void { this.transport = t; }
   hasTransport(): boolean { return this.transport !== null; }
@@ -80,6 +95,7 @@ export class AimeatClient {
   private async send(method: string, path: string, body?: unknown): Promise<ApiResponse> {
     if (this.transport && !path.startsWith('http')) {
       const r = await this.transport.request(method, path, { body });
+      this.lastStatus = r.status;
       return r.body as ApiResponse;
     }
     const url = path.startsWith('http') ? path : `${this.baseUrl}${path}`;
@@ -88,6 +104,7 @@ export class AimeatClient {
       headers: this.headers(),
       body: body !== undefined && body !== null ? JSON.stringify(body) : undefined,
     });
+    this.lastStatus = res.status;
     return res.json() as Promise<ApiResponse>;
   }
 
