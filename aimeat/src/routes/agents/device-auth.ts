@@ -4,6 +4,12 @@
  * SPDX-License-Identifier: MIT
  * @description RFC 8628 device authorization flow routes (authorize, token poll, consent info, verify submit). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.9.0 — 2026-09-01 — An agent approver must hold `agent:write`. This route's same-owner branch
+ *     is the ONLY way an agent creates an agent, and the permission word for it was read by nobody:
+ *     any same-owner agent qualified, so `concierge` and `workflow-manager` made agents as readily
+ *     as `crew-forge` and an owner who granted the three different permissions was shown a
+ *     distinction the node did not keep. Refusing is a fall-through, not a failure: the row stays
+ *     pending, the note names the missing scope, and the owner approves in their profile.
  *   v1.8.0 — 2026-08-24 — The onboarding test task comes from services/onboarding-test-task.ts
  *     like every other creation path, which changes its status from 'queued' to 'active' and adds
  *     the 'started' event: the smoke test needs no owner approval, and the onboarding validator
@@ -74,7 +80,7 @@ import { createOnboardingTestTask } from '../../services/onboarding-test-task.js
 import { detectPlatform } from '../../services/platform-detector.js';
 import { resolveOwnerByVerifiedEmail } from '../../services/contacts.js';
 import { DEVICE_AUTH_EXPIRY_MS, DEVICE_AUTH_EXPIRY_SECONDS, VALID_MODES } from './constants.js';
-import { uncoveredScopes, SCOPES_OUTSIDE_WILDCARD } from '../../utils/scope-coverage.js';
+import { uncoveredScopes, scopeIsCovered, SCOPES_OUTSIDE_WILDCARD } from '../../utils/scope-coverage.js';
 
 /** Validate requested scopes against the node maximum (shared by consent + auto-approve). */
 function scopesExceedNodeMax(config: AimeatConfig, finalScopes: string[]): string[] {
@@ -295,16 +301,34 @@ async function approveDeviceAuth(
  * as the SAME owner the registration is for — either the owner session itself, or one of
  * that owner's agents. App grants and ecosystem principals never qualify. An agent approver
  * additionally may not grant scopes beyond its own token's (checked by the caller).
+ *
+ * AN AGENT APPROVER MUST HOLD `agent:write`. This is the door that creates an agent — there is no
+ * other, and `registeredBy` has named the creating agent all along — so it is where the permission
+ * word for making agents has to be read. Until 2026-09-01 it was read by nobody: ANY same-owner
+ * agent qualified, so `concierge` and `workflow-manager` made agents exactly as readily as
+ * `crew-forge`, and an owner who granted the three of them different permissions was shown a
+ * distinction the node did not keep. `agent:write` is inside the wildcard, so an agent the owner
+ * gave full access to still qualifies; one given a narrower grant does not.
+ *
+ * Not holding it is not a failure. It returns `mayApprove: false` and the registration takes the
+ * ordinary pending path, where the owner decides — the same fall-through the scope-escalation
+ * check already uses, because both are "this agent may not settle this on its own".
  */
-function autoApprovePrincipal(req: Request, owner: string): { kind: 'owner' | 'agent'; scopes: string[] } | null {
+const APPROVER_SCOPE = 'agent:write';
+
+function autoApprovePrincipal(req: Request, owner: string): { kind: 'owner' | 'agent'; scopes: string[]; mayApprove: boolean } | null {
   const auth = req.auth;
   if (!auth || auth.anonymous) return null;
   const roles = auth.roles as string[];
   if (roles.includes('app') || roles.includes('ecosystem')) return null;
   const bare = auth.owner.includes('@') ? auth.owner.split('@')[0] : auth.owner;
   if (bare !== owner) return null;
-  if (roles.includes('agent')) return { kind: 'agent', scopes: (auth.scopes ?? []) as string[] };
-  if (roles.includes('owner')) return { kind: 'owner', scopes: [] };
+  if (roles.includes('agent')) {
+    const scopes = (auth.scopes ?? []) as string[];
+    return { kind: 'agent', scopes, mayApprove: scopeIsCovered(scopes, APPROVER_SCOPE) };
+  }
+  // The owner is not an agent and holds no scopes: their session IS the permission.
+  if (roles.includes('owner')) return { kind: 'owner', scopes: [], mayApprove: true };
   return null;
 }
 
@@ -435,7 +459,12 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
       const escalating = principal.kind === 'agent'
         ? uncoveredScopes(principal.scopes, autoScopes)
         : [];
-      if (escalating.length > 0) {
+      if (!principal.mayApprove) {
+        // An agent of this owner, but not one the owner allowed to make agents. Same landing as an
+        // escalating request: the row stays pending and the owner decides, so nothing is lost —
+        // only the settling-it-alone part is refused.
+        autoApproveNote = `Making an agent needs the ${APPROVER_SCOPE} permission, which this one does not have. The owner can approve this agent in their profile under Agents.`;
+      } else if (escalating.length > 0) {
         // No escalation via a sibling: fall through to the manual consent flow where the
         // OWNER decides — the request stays pending rather than failing the registration.
         autoApproveNote = `Scopes beyond the approving agent's own (${escalating.join(', ')}) need the owner's manual approval.`;
