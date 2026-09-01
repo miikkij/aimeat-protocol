@@ -38,18 +38,20 @@ const STDERR_MAX_BYTES = 8 * 1024;
 const HEARTBEAT_INTERVAL_MS = 5 * 60 * 1000;
 const DEFAULT_TIMEOUT_SECONDS = 3600;
 
-const inFlight = new Map<string, Set<string>>(); // agentName -> Set<taskId>
+// Keyed by GAII, not by name: two owners on one daemon both have `concierge`, and a name-keyed
+// set is one dedup window shared by two identities.
+const inFlight = new Map<string, Set<string>>(); // gaii -> Set<taskId>
 
-function markInFlight(agentName: string, taskId: string): boolean {
-  if (!inFlight.has(agentName)) inFlight.set(agentName, new Set());
-  const set = inFlight.get(agentName)!;
+function markInFlight(gaii: string, taskId: string): boolean {
+  if (!inFlight.has(gaii)) inFlight.set(gaii, new Set());
+  const set = inFlight.get(gaii)!;
   if (set.has(taskId)) return false;
   set.add(taskId);
   return true;
 }
 
-function clearInFlight(agentName: string, taskId: string): void {
-  inFlight.get(agentName)?.delete(taskId);
+function clearInFlight(gaii: string, taskId: string): void {
+  inFlight.get(gaii)?.delete(taskId);
 }
 
 export function isRunner(agent: RegisteredAgent): boolean {
@@ -90,7 +92,7 @@ async function postEvent(agent: RegisteredAgent, taskId: string, type: string, m
 export async function launchTaskRunner(agent: RegisteredAgent, task: TaskRunnerInput): Promise<void> {
   const runner = agent.config.runner;
   if (!runner) return;
-  if (!markInFlight(agent.agent, task.id)) {
+  if (!markInFlight(agent.gaii, task.id)) {
     console.error(`[runner:${agent.agent}] task ${task.id} already in flight, skip`);
     return;
   }
@@ -126,7 +128,7 @@ export async function launchTaskRunner(agent: RegisteredAgent, task: TaskRunnerI
       stdio: ['ignore', 'pipe', 'pipe'],
     });
   } catch (err) {
-    clearInFlight(agent.agent, task.id);
+    clearInFlight(agent.gaii, task.id);
     const message = `Runner spawn failed: ${(err as Error).message}`;
     console.error(`[runner:${agent.agent}] ${message}`);
     await failTask(agent, task.id, message);
@@ -165,7 +167,7 @@ export async function launchTaskRunner(agent: RegisteredAgent, task: TaskRunnerI
   child.on('error', async (err: Error) => {
     clearInterval(heartbeat);
     clearTimeout(timeoutTimer);
-    clearInFlight(agent.agent, task.id);
+    clearInFlight(agent.gaii, task.id);
     const message = `Runner subprocess error: ${err.message}`;
     console.error(`[runner:${agent.agent}] ${message}`);
     await failTask(agent, task.id, message);
@@ -174,7 +176,7 @@ export async function launchTaskRunner(agent: RegisteredAgent, task: TaskRunnerI
   child.on('exit', async (code: number | null, signal: NodeJS.Signals | null) => {
     clearInterval(heartbeat);
     clearTimeout(timeoutTimer);
-    clearInFlight(agent.agent, task.id);
+    clearInFlight(agent.gaii, task.id);
 
     if (signal === 'SIGTERM' || signal === 'SIGKILL') {
       const message = `Runner timed out after ${timeoutSec}s and was killed (${signal})`;

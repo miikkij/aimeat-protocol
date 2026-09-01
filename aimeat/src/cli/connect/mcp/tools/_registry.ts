@@ -17,7 +17,7 @@ export const agentNameSchema = z
   .string()
   .optional()
   .describe(
-    "Target agent name. Optional when only one agent is connected; when multiple are connected, defaults to the agent marked 'primary: true' in its per-agent config (or the first one if none is marked).",
+    "Which agent to act as. Optional when only one is connected; with several, defaults to the one marked 'primary: true' in its per-agent config (or the first if none is). A bare name works when only one connected agent has it; when two owners on this connector share a name, that is refused and both full identities are named, and you pass one of those instead.",
   );
 
 export function pickAgent(registry: AgentRegistry, agentName?: string): RegisteredAgent {

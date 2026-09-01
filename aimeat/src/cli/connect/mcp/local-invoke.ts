@@ -179,7 +179,7 @@ export function registerLocalInvokeRoutes(
       res.status(400).json({ ok: false, error: { code: 'UNKNOWN_AGENT', message: (err as Error).message } });
       return;
     }
-    const ch = channels.get(entry.agent);
+    const ch = channels.get(entry.gaii);
     if (!ch) { res.status(204).end(); return; }
     const item = await ch.next(waitMsOf(req));
     if (!item) { res.status(204).end(); return; }
@@ -197,7 +197,7 @@ export function registerLocalInvokeRoutes(
     const id = req.params.id as string;
     const body = (req.body && typeof req.body === 'object') ? req.body as { ok?: unknown; result?: unknown } : {};
     const ok = body.ok === true;
-    const ch = channels.get(entry.agent);
+    const ch = channels.get(entry.gaii);
     if (!ch || !ch.result(id, ok, body.result ?? null)) {
       res.status(404).json({ ok: false, error: { code: 'UNKNOWN_INVOKE', message: `No pending invoke "${id}" for ${entry.agent}. It was already answered, or the node stopped waiting.` } });
       return;

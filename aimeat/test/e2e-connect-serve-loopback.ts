@@ -146,7 +146,7 @@ await test('Daemon starts and writes the discovery file (tunnel transport)', asy
   const disc = await waitForDiscovery(home1).catch((err) => {
     throw new Error(`${err.message}\n--- daemon output ---\n${daemon1!.stderr()}`);
   });
-  assert(disc.schema_version === 1, `schema_version: ${disc.schema_version}`);
+  assert(disc.schema_version === 2, `schema_version: ${disc.schema_version}`);
   assert(disc.pid === daemon1!.child.pid, `pid ${disc.pid} != child pid ${daemon1!.child.pid}`);
   assert(typeof disc.port === 'number' && disc.port > 0, `port: ${disc.port}`);
   assert(disc.agents.length === 1, `agents: ${JSON.stringify(disc.agents)}`);
@@ -537,6 +537,113 @@ await test('Daemon degrades to direct transport and still serves the proxy', asy
   await waitForExit(daemon2!.child);
 });
 
+// ─── Two owners, one daemon, one agent name ───
+//
+// The basic-agents button gives every owner the same three names, so this is the first thing that
+// happens when two people share a connector. The registry, the channels and the invoke queues were
+// all keyed by the bare name, so the second `concierge` silently replaced the first — no error, and
+// load order deciding which one a task reached.
+console.log('\nTwo owners, one agent name');
+let home3 = '';
+let daemon3: { child: ChildProcess; stderr: () => string } | null = null;
+let lb3 = '';
+let acc3a: NodeAccount | null = null;
+let acc3b: NodeAccount | null = null;
+
+await test('Two owners each with `concierge` both load: two identities, neither replaced', async () => {
+  home3 = resolve(process.cwd(), `test/.tmp-serve-home3-${stamp}`);
+  acc3a = await registerOwnerAndAgent(BASE, NODE_ID, `twoa${stamp}`, 'concierge');
+  acc3b = await registerOwnerAndAgent(BASE, NODE_ID, `twob${stamp}`, 'concierge');
+  // One home, both credentials. The keychain filename is already owner-qualified; what was not was
+  // everything the daemon built from it.
+  writeConnectorHome(home3, 'concierge', acc3a.ownerName, BASE, acc3a.agentToken);
+  mkdirSync(join(home3, 'tokens'), { recursive: true });
+  writeFileSync(join(home3, 'tokens', `concierge@${acc3b.ownerName}.token`), acc3b.agentToken, 'utf-8');
+
+  daemon3 = spawnDaemon(home3);
+  const disc = await waitForDiscovery(home3).catch((err) => {
+    throw new Error(`${err.message}\n--- daemon stderr ---\n${daemon3!.stderr()}`);
+  });
+  lb3 = `http://127.0.0.1:${disc.port}`;
+
+  // serve.json must show two rows, or the surface is lying about what is served.
+  assert(disc.schema_version === 2, `schema_version should be 2, got ${disc.schema_version}`);
+  const ids = (disc.principals as any[]).map(p => p.id).sort();
+  assert(ids.length === 2, `expected two principals, got ${JSON.stringify(ids)}`);
+  assert(ids.includes(`concierge#${acc3a.ownerName}@${NODE_ID}`), `alice's identity missing: ${JSON.stringify(ids)}`);
+  assert(ids.includes(`concierge#${acc3b.ownerName}@${NODE_ID}`), `bob's identity missing: ${JSON.stringify(ids)}`);
+  const gaiis = (disc.agents as any[]).map(a => a.gaii).sort();
+  assert(gaiis.length === 2 && gaiis[0] !== gaiis[1], `the agents[] alias must distinguish them too: ${JSON.stringify(gaiis)}`);
+});
+
+await test('/local/status shows both owners distinctly', async () => {
+  const st = await json(lb3, '/local/status');
+  assert(st.status === 200, `status ${st.status}`);
+  const rows = (st.body.data?.agents ?? st.body.agents ?? []) as any[];
+  assert(rows.length === 2, `expected two rows, got ${JSON.stringify(rows.map(r => r.agent ?? r.gaii))}`);
+  const owners = rows.map(r => r.owner).sort();
+  assert(owners[0] !== owners[1], `two rows should be two owners, got ${JSON.stringify(owners)}`);
+});
+
+await test('A task for one owner\'s concierge reaches that owner and never the other', async () => {
+  // The whole point. Assign work to A's concierge; B's long-poll must stay empty.
+  const gaiiA = `concierge#${acc3a!.ownerName}@${NODE_ID}`;
+  const gaiiB = `concierge#${acc3b!.ownerName}@${NODE_ID}`;
+  // Owner A's own token, so the task lands on A's concierge — the node scopes `:name` by caller.
+  const made = await json(BASE, '/v1/agents/concierge/tasks', {
+    method: 'POST', headers: { Authorization: `Bearer ${acc3a!.ownerToken}` },
+    body: JSON.stringify({ title: 'for A only', description: 'routing check', status: 'queued' }),
+  });
+  assert(made.status === 201, `create task ${made.status}: ${JSON.stringify(made.body?.error)}`);
+  const idA = made.body.data.task.id as string;
+
+  // A's queue yields A's task, addressed to A's identity.
+  let seenByA: any = null;
+  for (let i = 0; i < 8 && !seenByA; i++) {
+    const r = await json(lb3, '/local/tasks/next?wait=2000', { headers: { 'X-Aimeat-Agent': gaiiA } });
+    if (r.status === 200 && r.body?.data?.task?.id === idA) seenByA = r.body.data;
+  }
+  assert(!!seenByA, `A never received its own task ${idA}`);
+  assert(seenByA.task.agentGaii === gaiiA, `A's task should be addressed to A, got ${seenByA.task.agentGaii}`);
+
+  // B's queue must never yield A's task. B is NOT empty — registration gives every agent its own
+  // onboarding task — so the property is "nothing of A's", not "nothing at all". Asserting
+  // emptiness would have passed for the wrong reason on an account that happened to be quiet.
+  for (let i = 0; i < 6; i++) {
+    const r = await json(lb3, '/local/tasks/next?wait=800', { headers: { 'X-Aimeat-Agent': gaiiB } });
+    if (r.status === 204) continue;
+    assert(r.body?.data?.task?.id !== idA, `B was given A's task ${idA} — the queues are not separate`);
+    assert(r.body?.data?.task?.agentGaii === gaiiB,
+      `everything on B's queue must be addressed to B, got ${r.body?.data?.task?.agentGaii}`);
+  }
+});
+
+await test('A bare name that could mean either is refused, and the refusal names both', async () => {
+  const r = await json(lb3, '/local/tasks/next?wait=200', { headers: { 'X-Aimeat-Agent': 'concierge' } });
+  assert(r.status >= 400, `expected a refusal, got ${r.status}`);
+  const said = JSON.stringify(r.body);
+  assert(said.includes(acc3a!.ownerName) && said.includes(acc3b!.ownerName),
+    `the refusal should name both identities, got ${said.slice(0, 300)}`);
+});
+
+await test('A full identity routes a /local/call to that owner and no other', async () => {
+  const gaiiA = `concierge#${acc3a!.ownerName}@${NODE_ID}`;
+  const gaiiB = `concierge#${acc3b!.ownerName}@${NODE_ID}`;
+  // A tool call that answers with who is asking: each identity must get its own owner back.
+  for (const [gaii, owner] of [[gaiiA, acc3a!.ownerName], [gaiiB, acc3b!.ownerName]] as [string, string][]) {
+    const r = await json(lb3, '/v1/agents?owner=' + encodeURIComponent(owner), { headers: { 'X-Aimeat-Agent': gaii } });
+    assert(r.status === 200, `${gaii}: proxy ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    const names = (r.body.data.agents as any[]).map(x => x.name);
+    assert(names.includes('concierge'), `${gaii} should see its own owner's concierge, got ${JSON.stringify(names)}`);
+  }
+});
+
+await test('Stop the two-owner daemon', async () => {
+  const sd = await json(lb3, '/local/shutdown', { method: 'POST' });
+  assert(sd.status === 200, `shutdown ${sd.status}`);
+  await waitForExit(daemon3!.child);
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 await test('Cascade-delete owner + stop children + remove temp homes', async () => {
@@ -544,12 +651,12 @@ await test('Cascade-delete owner + stop children + remove temp homes', async () 
     method: 'DELETE', headers: { Authorization: `Bearer ${account.ownerToken}` },
   });
   assert(status === 200, `owner delete status ${status}`);
-  for (const d of [daemon1, daemon2]) {
+  for (const d of [daemon1, daemon2, daemon3]) {
     if (d && d.child.exitCode === null) { try { d.child.kill('SIGKILL'); } catch { /* ignore */ } }
   }
   if (node2 && node2.exitCode === null) { try { node2.kill('SIGKILL'); } catch { /* ignore */ } }
   await sleep(300); // let handles release before rm
-  for (const dir of [home1, home2]) { try { rmSync(dir, { recursive: true, force: true }); } catch { /* ignore */ } }
+  for (const dir of [home1, home2, home3].filter(Boolean)) { try { rmSync(dir, { recursive: true, force: true }); } catch { /* ignore */ } }
   for (const suffix of ['', '-shm', '-wal']) { try { rmSync(node2Db + suffix, { force: true }); } catch { /* ignore */ } }
 });
 

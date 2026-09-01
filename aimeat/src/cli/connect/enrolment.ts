@@ -79,7 +79,7 @@ export interface EnrolDeps {
   /** Forward a request over the daemon's existing tunnel, so it authenticates as this daemon. */
   forward(method: string, path: string, opts: { body?: unknown }): Promise<{ status: number; body: unknown }>;
   /** Bring one newly credentialled agent into the live registry and give it its own tunnel. */
-  attach(entry: { agent: string; owner: string; config: AimeatPerAgentConfig }): Promise<void>;
+  attach(entry: { agent: string; owner: string; gaii: string; config: AimeatPerAgentConfig }): Promise<void>;
   /** The connector's own version, for the card's runtime block. */
   version?: string;
 }
@@ -184,7 +184,9 @@ export async function handleEnrolOffer(offer: unknown, deps: EnrolDeps): Promise
         mode: (prep.offered.mode as AimeatPerAgentConfig['mode']) ?? 'interactive',
       };
       savePerAgentConfig(e.name, perAgent);
-      await deps.attach({ agent: e.name, owner: offer.owner, config: perAgent });
+      // The identity the node just confirmed, carried straight through: the registry keys by it
+      // and must never have to assemble one from a name.
+      await deps.attach({ agent: e.name, owner: offer.owner, gaii: e.gaii, config: perAgent });
       attached.push(e.name);
     } catch (err) {
       logger.warn('enrolment: agent enrolled but could not be attached', { agent: e.name, error: String(err) });
