@@ -444,6 +444,13 @@ export async function mountRoutes(
   app.use(companiesRouter(config, storage));              // Company registry — {slug}.co.<apex> addresses
 
   // Agent tasks, directives, capabilities, and integration BEFORE agentsRouter to avoid /v1/agents/:name param conflicts
+  //
+  // Agent v2 goes FIRST in this block, not merely before agentsRouter. Its paths are literal
+  // (/v1/agents/v2/...), and every `:name` pattern in the block below matches them with
+  // name = 'v2' — /v1/agents/v2/messages was answered by agentMessagesRouter as "agent 'v2' not
+  // found" until this moved. Its own two `:gaii` paths (card, jwks.json) claim segments nothing
+  // else in this block uses.
+  app.use(agentsV2Router(config, storage));
   app.use(agentTasksRouter(config, storage, webhookDispatcher));
   app.use(schedulesRouter(config, storage, scheduler));
   app.use(workflowsRouter(config, storage, scheduler, workflowEngine));
@@ -472,9 +479,6 @@ export async function mountRoutes(
   app.use(webmcpRouter(config, storage));  // WebMCP bridge (TARGET-034 phase C) — before appsRouter (shares /v1/apps/:owner/:filename/*)
   app.use(agentOnboardingRouter(config, storage, webhookDispatcher));
   app.use(agentIntegrationRouter(config, storage));
-  // Agent v2 (key + card) BEFORE agentsRouter for the same reason as everything above it: its
-  // /v1/agents/v2/... paths would otherwise be matched by /v1/agents/:name with name = 'v2'.
-  app.use(agentsV2Router(config, storage));
   // The two primitives (Agent v2 V2): the node's own capability catalogue and the one door that
   // runs anything in it. Beside the 297 tools, never instead of them.
   app.use(invokeRouter(config, storage));

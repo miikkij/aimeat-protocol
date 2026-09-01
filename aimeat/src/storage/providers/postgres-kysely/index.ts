@@ -39,6 +39,7 @@ import { consentMethods } from './methods/consent.js';
 import { workMethods } from './methods/work.js';
 import { deviceAuthMethods } from './methods/device-auth.js';
 import { agentEnrolmentMethods } from './methods/agent-enrolment.js';
+import { agentV2MessagingMethods } from './methods/agent-v2-messaging.js';
 import { actionMethods } from './methods/actions.js';
 import { scheduleMethods } from './methods/schedules.js';
 import { agentTaskMethods } from './methods/agent-tasks.js';
@@ -148,6 +149,7 @@ Object.assign(
   workMethods,
   deviceAuthMethods,
   agentEnrolmentMethods,
+  agentV2MessagingMethods,
   actionMethods,
   scheduleMethods,
   agentTaskMethods,

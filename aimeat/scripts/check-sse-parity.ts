@@ -112,6 +112,15 @@ const EXEMPT: Record<string, string> = {
  * entry says which function carries it.
  */
 const DELEGATES: Record<string, string> = {
+    'src/mcp/agent-v2-messaging.ts': 'services/agent-v2-messaging-ops.ts, then '
+        + 'services/agent-v2-messaging.ts, and the announcement it makes is deliberately NOT a '
+        + 'change domain. A v2 turn is addressed to a PRINCIPAL, not to a view: the recipient is '
+        + 'told on the tunnel socket it is holding (emitDelivery, kind v2.message) or by a POST to '
+        + 'the delivery target it registered, and it reads the turn back with the same call either '
+        + 'way. No browser surface lists these, so an emitChange here would wake every open page on '
+        + 'the account for something none of them shows. Verified by reading the two notification '
+        + 'paths out of sendAgentV2Message. When a view for them is built, this entry becomes an '
+        + 'emit rather than a note.',
     'src/mcp/invoke.ts': 'services/node-invoke.ts, which does not write anything itself: it '
         + 'dispatches over loopback to the node\'s OWN route for the named capability, carrying the '
         + 'caller\'s bearer, so the write happens in that route and whatever it emits is emitted '

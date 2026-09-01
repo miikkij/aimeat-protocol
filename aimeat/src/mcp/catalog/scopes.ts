@@ -444,6 +444,17 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_dm_inbox: 'messages:read',
     aimeat_dm_thread: 'messages:read',
 
+    // Agent v2 messaging. Same words as the doors behind them, and the same words the DM tools take:
+    // sending on this account's behalf is one permission however the turn is shaped. Registering a
+    // delivery target rides agent:write, not a messaging word, because it configures a PRINCIPAL and
+    // what it configures is where this node makes an outbound call carrying a secret — the same
+    // class of act as setting an agent's webhook.
+    aimeat_v2_message_send: 'messages:send',
+    aimeat_v2_message_list: 'messages:read',
+    aimeat_v2_push_set: 'agent:write',
+    aimeat_v2_push_list: 'messages:read',
+    aimeat_v2_push_delete: 'agent:write',
+
     // Contacts (address book) — the owner's messaging graph, so the messaging scopes gate it:
     // reading the list / resolving an email rides messages:read; editing the book (save/remove)
     // rides messages:send (the same trust level as opening conversations on the owner's behalf).

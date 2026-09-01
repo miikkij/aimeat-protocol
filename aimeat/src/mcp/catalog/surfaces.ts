@@ -151,6 +151,11 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_workflow_save', 'aimeat_workflow_get', 'aimeat_workflow_run', 'aimeat_workflow_answer', 'aimeat_workflow_pending_inputs',
         'aimeat_message_inbox', 'aimeat_message_send', 'aimeat_message_history',
         'aimeat_dm_send', 'aimeat_dm_send_as_owner', 'aimeat_dm_ask', 'aimeat_dm_inbox', 'aimeat_dm_thread', 'aimeat_notify',
+        // A turn between two principals of ONE account, beside the owner thread and the federated
+        // DM above it rather than instead of either. Agent surface only: the service surface carries
+        // no messaging at all, and the primitives surface reaches these through aimeat_invoke.
+        'aimeat_v2_message_send', 'aimeat_v2_message_list',
+        'aimeat_v2_push_set', 'aimeat_v2_push_list', 'aimeat_v2_push_delete',
         'aimeat_company_list', 'aimeat_company_create', 'aimeat_company_update',
         'aimeat_company_front_page', 'aimeat_company_portfolio_publish',
         // Taking a shipped package into use, beside the company tools rather than with the four

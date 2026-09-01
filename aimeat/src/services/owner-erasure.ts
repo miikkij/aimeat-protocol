@@ -120,6 +120,18 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
       return n ? `agent_enrolment_grants:${n}` : null;
     }, deletionLog);
 
+    // Agent v2 messaging. The turns are this person's own content, and a delivery target is worse
+    // than stale: it holds a URL and a secret this node would keep POSTing to, addressed by a
+    // username that is released for reuse.
+    await step('agent_v2_messages', async () => {
+      const n = await storage.deleteAgentV2MessagesByOwner(name);
+      return n ? `agent_v2_messages:${n}` : null;
+    }, deletionLog);
+    await step('agent_v2_push_configs', async () => {
+      const n = await storage.deleteAgentV2PushConfigsByOwner(name);
+      return n ? `agent_v2_push_configs:${n}` : null;
+    }, deletionLog);
+
     // Outside accounts. Each row holds a SEALED credential to somebody's own Gmail, Outlook or
     // publishing account, addressed by the GHII string, and a deleted username is released for
     // reuse — so a surviving row would hand the next person to register that name the previous

@@ -1034,6 +1034,65 @@ components:
             type: string
           example: [research, analysis, translation]
 
+    AgentV2Message:
+      type: object
+      description: One turn between two principals of one account, in the A2A message shape.
+      properties:
+        messageId: { type: string }
+        role:
+          type: string
+          enum: [user, agent]
+          description: '`user` is whoever is asking, `agent` is whoever is answering. Not a principal type.'
+        parts:
+          type: array
+          items: { type: object }
+        contextId:
+          type: string
+          description: What the exchange is about. Every turn in one exchange carries the same one.
+        taskId:
+          type: string
+          nullable: true
+        from: { type: string }
+        to: { type: string }
+        owner: { type: string, description: Bare owner name. Every read is fenced on this. }
+        createdAt: { type: string, format: date-time }
+        metadata:
+          type: object
+          nullable: true
+
+    AgentV2PushConfig:
+      type: object
+      description: |
+        A registered delivery target, as it is READ. A2A's PushNotificationConfig minus the
+        credentials, which no read returns.
+      properties:
+        id: { type: string }
+        principal: { type: string, description: The principal these deliveries are for. }
+        url: { type: string }
+        token:
+          type: string
+          nullable: true
+          description: The receiver's own string, echoed back inside every delivery.
+        authentication:
+          type: object
+          nullable: true
+          properties:
+            schemes:
+              type: array
+              items: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        last_success_at: { type: string, format: date-time, nullable: true }
+        last_failure_at: { type: string, format: date-time, nullable: true }
+        fail_count:
+          type: integer
+          description: Consecutive failures. Reset by a success, and by re-registering.
+        disabled_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Set when the node stopped trying. Re-registering clears it.
+
     AgentProfile:
       type: object
       properties:
@@ -7167,6 +7226,332 @@ paths:
           description: No key is pinned for that agent, the signature does not verify, or the assertion was already spent
         '403':
           description: The account is deactivated
+
+  /v1/agents/v2/messages:
+    post:
+      operationId: sendAgentV2Message
+      summary: Send one turn to another principal on this account
+      description: |
+        A SIXTH MESSAGE KIND, BESIDE THE FIVE THIS NODE ALREADY HAS, and none of them changes. Agent
+        messages are an agent and its own owner in a dashboard thread; direct messages are a person
+        and another person, across nodes, behind a consent gate; notifications are one-directional
+        and self-targeted; web push is a transport for those; boards are posted once and read by
+        many. This carries a turn between two PRINCIPALS about one piece of work, with text, a file
+        pointer and a structured payload in the same turn, grouped by what it is about rather than
+        by who is in the room.
+
+        The shape is A2A's message: `role` + `parts` + `messageId` + `contextId` + `taskId`.
+
+        WITHIN ONE ACCOUNT. Sender and recipient are both principals of the authenticated owner. A
+        recipient on another account is refused with 403, not because it is dangerous but because it
+        is a different problem: reaching another person is what `POST /v1/messages` is for.
+
+        The recipient is LOOKED UP, not parsed: an identity naming the right owner is not evidence
+        that the principal exists, and a turn nothing will ever read must not be reported as sent.
+
+        Delivery is best-effort and separate from the record. A recipient holding a tunnel socket
+        gets a `deliver` frame of kind `v2.message`; a recipient with a registered delivery target
+        gets a POST. Either way the turn is stored first and readable with the GET below, so a
+        recipient that missed both catches up with `since`.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [to, parts]
+              properties:
+                to:
+                  type: string
+                  description: The recipient principal on this account — an agent GAII, an ecosystem app, or the owner GHII.
+                parts:
+                  type: array
+                  description: Ordered parts. At most 32, and a file part carries a URI rather than bytes.
+                  items:
+                    oneOf:
+                      - type: object
+                        required: [kind, text]
+                        properties:
+                          kind: { type: string, enum: [text] }
+                          text: { type: string, description: At most 64000 characters. }
+                          metadata: { type: object }
+                      - type: object
+                        required: [kind, file]
+                        properties:
+                          kind: { type: string, enum: [file] }
+                          file:
+                            type: object
+                            required: [uri]
+                            properties:
+                              uri: { type: string, description: An http or https address for the file. }
+                              name: { type: string }
+                              mimeType: { type: string }
+                          metadata: { type: object }
+                      - type: object
+                        required: [kind, data]
+                        properties:
+                          kind: { type: string, enum: [data] }
+                          data: { type: object, description: At most 64000 bytes serialized. }
+                          metadata: { type: object }
+                role:
+                  type: string
+                  enum: [user, agent]
+                  description: |
+                    Who is speaking, in the counterpart's terms: `user` is whoever is asking, `agent`
+                    is whoever is answering. NOT a principal type — an agent asking another agent
+                    sends `user`. Omitted means `user`.
+                contextId:
+                  type: string
+                  description: The exchange this turn belongs to. Omitted on a first turn, and the message id becomes it.
+                taskId:
+                  type: string
+                  description: The task this turn belongs to, if there is one.
+                metadata:
+                  type: object
+                  description: Carried along, never read by the node.
+      responses:
+        '201':
+          description: Stored, and notification attempted
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          spec: { type: string, enum: ['aimeat.message/v1'] }
+                          message: { $ref: '#/components/schemas/AgentV2Message' }
+        '400':
+          description: |
+            The turn is malformed. `details.defects` lists EVERY defect as `{field, reason}`, not the
+            first one — the caller is usually composing a turn it has not composed before.
+        '403':
+          description: The recipient belongs to another account, or the scope is missing
+        '404':
+          description: No principal of that name on this account
+    get:
+      operationId: listAgentV2Messages
+      summary: Read turns back, oldest first
+      description: |
+        Narrow by `context_id` for one exchange, `task_id` for one task's turns, `to`/`from` for one
+        party, or `since` for everything that arrived while a principal was offline — which is the
+        catch-up read the delivery paths are best-effort against. Only this account's turns.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: context_id
+          in: query
+          schema: { type: string }
+        - name: task_id
+          in: query
+          schema: { type: string }
+        - name: to
+          in: query
+          schema: { type: string }
+        - name: from
+          in: query
+          schema: { type: string }
+        - name: since
+          in: query
+          schema: { type: string, format: date-time }
+          description: Exclusive — turns created after this timestamp.
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50, maximum: 200 }
+      responses:
+        '200':
+          description: The turns
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          spec: { type: string, enum: ['aimeat.message/v1'] }
+                          messages:
+                            type: array
+                            items: { $ref: '#/components/schemas/AgentV2Message' }
+                          count: { type: integer }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/agents/v2/messages/{messageId}:
+    get:
+      operationId: getAgentV2Message
+      summary: One turn
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: messageId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: The turn
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          spec: { type: string, enum: ['aimeat.message/v1'] }
+                          message: { $ref: '#/components/schemas/AgentV2Message' }
+        '404':
+          description: No such turn on this account
+
+  /v1/agents/v2/push-config:
+    put:
+      operationId: setAgentV2PushConfig
+      summary: Register where to reach a principal that is not connected
+      description: |
+        A2A's PushNotificationConfig, field for field: `url`, `token`, `authentication.schemes` and
+        `authentication.credentials`.
+
+        THE CREDENTIALS ARE WRITE-ONLY. They are a secret this node sends outward on the owner's
+        behalf, in an Authorization header, only to the URL registered for them. No read returns
+        them — a read answers with the schemes, so a person can see what is configured. `token` is
+        different and IS returned, because it is the receiver's own string echoed back to it.
+
+        Omitting `authentication` on a replace CLEARS the stored credentials rather than keeping
+        them: a caller that has stopped sending a secret has said something.
+
+        A principal may register a target for ITSELF. The account holder may register one for any
+        principal on the account by naming it in `principal`, which is how a person wires up an agent
+        that is not running yet.
+
+        An `id` you send must be one already registered on this account (409 otherwise). The store
+        upserts on the id alone, so accepting an unknown one would let a caller overwrite another
+        account's delivery target.
+
+        Every outbound delivery goes through `safeFetch`, which validates the URL and re-validates
+        each redirect hop.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url: { type: string, description: An http or https address to POST a turn to. }
+                token: { type: string, description: An opaque string echoed back inside every delivery. }
+                authentication:
+                  type: object
+                  required: [schemes]
+                  properties:
+                    schemes:
+                      type: array
+                      items: { type: string }
+                      description: 'e.g. ["Bearer"]. The first names the Authorization header prefix.'
+                    credentials:
+                      type: string
+                      description: Stored and sent, never returned.
+                id: { type: string, description: Replace this existing target. Must already be registered on this account. }
+                principal: { type: string, description: 'Whose deliveries these are. Defaults to the caller; naming another principal is the account holder''s to do.' }
+      responses:
+        '200':
+          description: An existing target was replaced
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          push_config: { $ref: '#/components/schemas/AgentV2PushConfig' }
+        '201':
+          description: A new target was registered
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          push_config: { $ref: '#/components/schemas/AgentV2PushConfig' }
+        '400':
+          description: Malformed. `details.defects` lists every defect.
+        '403':
+          description: Registering for another principal without being the account holder, or that principal belongs to another account
+        '409':
+          description: The `id` sent is not one already registered on this account
+    get:
+      operationId: listAgentV2PushConfigs
+      summary: What delivery targets are registered
+      description: |
+        An agent sees its own targets. The account holder sees the account's, or one principal's by
+        naming it in `principal`. The stored credentials are never returned.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: principal
+          in: query
+          schema: { type: string }
+          description: Account holder only — whose targets to list.
+      responses:
+        '200':
+          description: The registered targets
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          push_configs:
+                            type: array
+                            items: { $ref: '#/components/schemas/AgentV2PushConfig' }
+                          count: { type: integer }
+
+  /v1/agents/v2/push-config/{id}:
+    delete:
+      operationId: deleteAgentV2PushConfig
+      summary: Stop delivering to one target
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Removed
+        '403':
+          description: That target belongs to another principal on this account
+        '404':
+          description: No such target on this account
 
   /v1/agents/{gaii}/card:
     get:

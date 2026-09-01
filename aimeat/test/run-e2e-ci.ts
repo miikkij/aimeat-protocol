@@ -219,6 +219,11 @@ const ALL_SUITES = [
     // itself, the proof that the old door is unchanged — the same call refused by scope directly is
     // refused through invoke, and nothing reachable before stopped being reachable.
     'test/e2e-agent-v2-primitives.ts',
+    // Agent v2 V4: the turn between two principals, and the delivery target that reaches one
+    // which is not connected. Starts a REAL loopback listener and reads what actually left the
+    // node: the envelope, the echoed token, the Authorization header. Half the suite asserts
+    // that the five message kinds which already existed answer exactly what they answered.
+    'test/e2e-agent-v2-messaging.ts',
     // Does an open page hear about work an agent does? 21 of the 31 writing tool files emitted no
     // SSE change domain at all, so the write landed and the screen stayed as it was.
     'test/e2e-mcp-sse-parity.ts',
