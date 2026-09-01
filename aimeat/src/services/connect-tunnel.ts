@@ -73,6 +73,10 @@ import type { Storage } from '../storage/interface.js';
 import { setTokenRevokedHook, type VerifiedToken } from '../auth/jwt.js';
 import { logger } from '../utils/logger.js';
 import {
+  principalsForOwner as rosterPrincipalsForOwner,
+  daemonsForOwner as rosterDaemonsForOwner,
+} from './connect-tunnel-roster.js';
+import {
   onDeliveryEvent, offDeliveryEvent, type DeliveryEvent,
   onMemoryWrittenEvent, offMemoryWrittenEvent, type MemoryWriteEvent,
 } from './event-bus.js';
@@ -93,6 +97,16 @@ interface ConnectConnection {
   principal: string;
   ws: WebSocket;
   identity: VerifiedToken;
+  /**
+   * Which INSTALLATION this socket belongs to, or null from a connector that does not say.
+   *
+   * One `connect serve` holds one socket per agent, so an owner's sockets used to be one
+   * undifferentiated set and two machines were indistinguishable from one. The daemon presents a
+   * stable id it minted once, and that is what turns "this owner's principals" into "this owner's
+   * daemons". Null is a connector older than 2026-09-01, and every one of those is grouped as a
+   * single legacy daemon — exactly the behaviour they had before, and no worse.
+   */
+  installId: string | null;
   /** The raw agent JWT verified at upgrade, reused verbatim as the forward bearer. */
   rawToken: string;
   lastHeartbeat: number;
@@ -203,7 +217,7 @@ export class ConnectTunnelManager {
    * connection for the same principal replaces the first — enforcing the
    * single-socket-per-principal invariant.
    */
-  handleConnection(ws: WebSocket, identity: VerifiedToken, rawToken: string): void {
+  handleConnection(ws: WebSocket, identity: VerifiedToken, rawToken: string, installId?: string | null): void {
     const principal = identity.sub;
 
     const existing = this.connections.get(principal);
@@ -217,7 +231,10 @@ export class ConnectTunnelManager {
     // Subscriptions are per-socket — drop the replaced session's; the new socket re-subscribes.
     this.clearSubscriptions(principal);
 
-    const conn: ConnectConnection = { principal, ws, identity, rawToken, lastHeartbeat: Date.now() };
+    const conn: ConnectConnection = {
+      principal, ws, identity, rawToken, lastHeartbeat: Date.now(),
+      installId: installId && installId.trim() !== '' ? installId.trim().slice(0, 64) : null,
+    };
     this.connections.set(principal, conn);
     this.stats.connectionsTotal++;
     this.stats.activeConnections = this.connections.size;
@@ -676,27 +693,19 @@ export class ConnectTunnelManager {
   }
 
   /**
-   * Every principal of this OWNER holding a live socket right now, sorted so two calls a moment
-   * apart pick the same one.
-   *
-   * The basic-agents button asks this twice and for two different reasons. First as a precondition:
-   * pressing it with no daemon connected has to say so and create nothing, and this is the only
-   * place that knows. Then to choose whom to offer the enrolment to — any of these sockets reaches
-   * the daemon, because one `connect serve` process holds all of an owner's tunnels.
-   *
-   * The limit worth knowing: two daemons on two machines, both connected for one owner, are
-   * indistinguishable from one daemon here, so the offer goes to whichever machine sorts first.
-   * Matched on the verified token's `owner` claim, which is the bare owner name on every principal
-   * family this tunnel accepts.
+   * Every principal of this OWNER holding a live socket right now. Body in
+   * connect-tunnel-roster.ts, which is where the daemon grouping beside it also lives.
    */
   principalsForOwner(owner: string): string[] {
-    const out: string[] = [];
-    for (const conn of this.connections.values()) {
-      if (conn.identity.owner !== owner) continue;
-      if (conn.ws.readyState !== WebSocket.OPEN) continue;
-      out.push(conn.principal);
-    }
-    return out.sort();
+    return rosterPrincipalsForOwner(this.connections.values(), owner);
+  }
+
+  /**
+   * An owner's connected DAEMONS, one entry per machine, grouped on the install id each connector
+   * presents. Body in connect-tunnel-roster.ts.
+   */
+  daemonsForOwner(owner: string): Array<{ installId: string | null; principals: string[] }> {
+    return rosterDaemonsForOwner(this.connections.values(), owner);
   }
 
   /** True if the agent currently holds an open tunnel socket. */

@@ -209,6 +209,12 @@ aimeat/locales/.todo-*.json
 aimeat/static/
 aimeat/.aimeat-manifest.json
 
+# The connector's OWN home when it runs from inside the repo. `getConfigDir()` is
+# `AIMEAT_HOME ?? cwd/.aimeat`, so a `pnpm dev` or an `aimeat connect` started from the tree writes
+# here: agent tokens, Ed25519 private keys, and the install id identifying this machine. None of it
+# is source and none of it may be committed by accident.
+.aimeat/
+
 # Machine-generated security audit reports (pnpm audit:report)
 secaudit/
 

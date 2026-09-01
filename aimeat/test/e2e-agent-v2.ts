@@ -96,10 +96,14 @@ interface FakeDaemon {
     close(): void;
 }
 
-function openDaemon(token: string): Promise<FakeDaemon> {
+function openDaemon(token: string, installId?: string): Promise<FakeDaemon> {
     return new Promise((resolve, reject) => {
         const wsUrl = BASE.replace(/^http/, 'ws') + '/v1/connect/tunnel';
-        const ws = new WebSocket(wsUrl, { headers: { Authorization: `Bearer ${token}` } });
+        // The install id says which MACHINE this socket is on. A real connector always sends one;
+        // omitting it here is how the suite also exercises the pre-2026-09-01 shape.
+        const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+        if (installId) headers['X-AIMEAT-Install'] = installId;
+        const ws = new WebSocket(wsUrl, { headers });
         const daemon: FakeDaemon = { ws, onEnrol: null, onInvoke: null, close: () => { try { ws.close(); } catch { /* already gone */ } } };
         const timer = setTimeout(() => reject(new Error('tunnel did not welcome in time')), 10_000);
         ws.on('message', (data) => {
@@ -947,6 +951,45 @@ async function run() {
 
     dA.close(); dB.close(); dC.close();
     void pressBody;
+    await test('two machines are two daemons, and the press can name which one', async () => {
+        // The V1 report carried this as a stated limitation: one `connect serve` holds one socket
+        // per agent, so two laptops looked like one set of principals and the offer went to
+        // whichever sorted first — possibly the machine the person was not sitting at.
+        // Its OWN owner: this press creates the basic agents, and doing that on the shared owner
+        // would leave nothing for the acceptance test above to create.
+        const m = await setupOwner('m');
+        const authM = { Authorization: `Bearer ${m.ownerToken}` };
+        const laptop = await addV1Agent(m.owner, m.ownerToken, 'two-machines-laptop');
+        const server = await addV1Agent(m.owner, m.ownerToken, 'two-machines-server');
+        const dLaptop = await openDaemon(laptop.token, 'install-laptop');
+        const dServer = await openDaemon(server.token, 'install-server');
+        try {
+            // Each machine answers only for itself, so the node can tell them apart.
+            const heard: string[] = [];
+            dLaptop.onEnrol = async () => { heard.push('laptop'); return { ok: false, result: { code: 'NO', message: 'not me' } }; };
+            dServer.onEnrol = async () => { heard.push('server'); return { ok: false, result: { code: 'NO', message: 'not me' } }; };
+
+            // Naming a machine that is not connected is refused rather than served by the other:
+            // "run this on my laptop" answered by the server is not a smaller version of the ask.
+            const nowhere = await json('/v1/agents/v2/basic-agents', {
+                method: 'POST', headers: authM, body: JSON.stringify({ install_id: 'install-nowhere' }),
+            });
+            assert(nowhere.status === 409, `expected 409 for an absent machine, got ${nowhere.status}`);
+            assert(nowhere.body?.error?.code === 'DAEMON_NOT_CONNECTED', `and a code that says so, got ${nowhere.body?.error?.code}`);
+            assert(heard.length === 0, `and nothing was offered to anybody, got ${JSON.stringify(heard)}`);
+
+            // Naming one that IS connected reaches that one.
+            await json('/v1/agents/v2/basic-agents', {
+                method: 'POST', headers: authM, body: JSON.stringify({ install_id: 'install-server' }),
+            });
+            assert(heard.length === 1 && heard[0] === 'server',
+                `the named machine should be the one asked, got ${JSON.stringify(heard)}`);
+        } finally {
+            dLaptop.close();
+            dServer.close();
+        }
+    });
+
 }
 
 run().then(() => {

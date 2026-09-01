@@ -4070,3 +4070,65 @@
 .pf .pf-agd-contracts .agc-where { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; font-size: 0.85rem; }
 .pf .pf-agd-contracts .agc-org { color: var(--text-dim); font-size: 0.78rem; }
 .pf .pf-agd-contracts .agc-since { color: var(--text-muted); font-size: 0.75rem; }
+
+/* ── How this agent is RUN: the badge in the header says what, this says so what ──
+   Two buttons rather than a dropdown, because there are two values and a dropdown for two is a
+   click spent finding out what the choices are. Neither pressed means nobody has decided, which is
+   not the same as 'spawn'. */
+.pf .pf-agd-runmode {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin: 0.6rem 0 0.2rem;
+  min-width: 0;
+}
+
+.pf .pf-agd-runmode-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.pf .pf-agd-runmode-choice {
+  display: inline-flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+/* THE BUTTONS ARE STYLED HERE RATHER THAN INHERITED. Measured in the browser: inside `.pf` the
+   shared `.btn-outline` computes to `border: 0` and no padding, so the pair rendered as two words
+   in a row — an accent-coloured word is a link, not a control, and nobody would think to press it.
+   The affordance is spelled out rather than assumed. */
+.pf .pf-agd-runmode-choice button {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 4px);
+  background: var(--card);
+  color: var(--text);
+  padding: 0.25rem 0.6rem;
+  font-size: 0.8rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.pf .pf-agd-runmode-choice button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+/* The chosen one reads as chosen without a second colour in the row: the accent border and weight
+   do it, and the row already has the badge above carrying the same word. */
+.pf .pf-agd-runmode-choice .is-on {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.pf .pf-agd-runmode-note {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}

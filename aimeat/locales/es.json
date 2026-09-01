@@ -7790,7 +7790,10 @@
       "runMode": {
         "spawn": "Bajo demanda",
         "resident": "Siempre activo",
-        "tooltip": "Cómo se ejecuta este agente. Bajo demanda: espera aquí y arranca cuando llega trabajo. Siempre activo: tu conector lo mantiene en marcha."
+        "tooltip": "Cómo se ejecuta este agente. Bajo demanda: espera aquí y arranca cuando llega trabajo. Siempre activo: tu conector lo mantiene en marcha.",
+        "label": "Cómo se ejecuta",
+        "saved": "Puesto en {mode}.",
+        "failed": "No se ha podido guardar. Inténtalo otra vez."
       },
       "basic": {
         "title": "Empieza con tres agentes",

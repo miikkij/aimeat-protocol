@@ -8011,7 +8011,10 @@
       "runMode": {
         "spawn": "Tarvittaessa",
         "resident": "Aina päällä",
-        "tooltip": "Miten tätä agenttia ajetaan. Tarvittaessa: se odottaa täällä ja käynnistyy kun töitä tulee. Aina päällä: yhdistimesi pitää sen käynnissä."
+        "tooltip": "Miten tätä agenttia ajetaan. Tarvittaessa: se odottaa täällä ja käynnistyy kun töitä tulee. Aina päällä: yhdistimesi pitää sen käynnissä.",
+        "label": "Miten se ajetaan",
+        "saved": "Asetettu: {mode}.",
+        "failed": "Tallennus ei onnistunut. Yritä uudelleen."
       },
       "basic": {
         "title": "Aloita kolmella agentilla",

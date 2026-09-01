@@ -85,6 +85,7 @@ import { t, tOr } from '/js/i18n.js';
 import { apiGet, apiPatch } from '/js/api.js';
 import { timeAgo } from '/js/utils.js';
 import { agentState, getDefaultTab } from './state-detector.js';
+import { RunModeSwitch, renderRunModeBadge } from './agent-card-run-mode.js';
 import { testWebhook, updateWebhook } from '/js/services/agent-integration.js';
 import TabReadme from './tab-readme.js';
 import TabIntegration from './tab-integration.js';
@@ -286,6 +287,10 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
 
         <!-- Tags (editable) -->
         <${TagStrip} agent=${agent} showToast=${showToast} />
+
+        <!-- How this agent is meant to be RUN. The badge in the header says what it is; this is
+             where it is changed, beside the other things about this one agent a person edits. -->
+        <${RunModeSwitch} agent=${agent} showToast=${showToast} />
 
         <!-- Capabilities — collapsed to a one-line summary ("14 tools · 5 skills"); the full
              pill wall took a third of the screen before the tabs. Click to expand. -->
@@ -592,17 +597,6 @@ function renderModeBadge(agent) {
   const mode = agent.mode || 'interactive';
   const label = t(`profile.agents.mode.${mode}`) || mode;
   return html`<span class="pf-agd-badge pf-agd-badge--mode pf-agd-badge--mode-${mode}" title=${t('profile.agents.mode.tooltip') || ''}>${label}</span>`;
-}
-
-/**
- * How the agent is meant to be RUN, when anyone has said. Absent on every agent that predates the
- * field, and absence is not 'spawn' — an agent nobody has decided about should not be shown as
- * though somebody had, so there is no badge at all rather than a guessed one.
- */
-function renderRunModeBadge(agent) {
-  const runMode = agent.run_mode;
-  if (!runMode) return '';
-  return html`<span class="pf-agd-badge pf-agd-badge--run pf-agd-badge--run-${runMode}" title=${t('profile.agents.runMode.tooltip') || ''}>${t(`profile.agents.runMode.${runMode}`) || runMode}</span>`;
 }
 
 // Editable tag strip shown in the expanded card header. The same owner-managed

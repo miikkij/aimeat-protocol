@@ -61,9 +61,37 @@ export interface BasicAgentsView {
  * the button so the precondition it refuses on and the state this reports cannot disagree.
  */
 export function daemonPrincipals(owner: string): string[] {
+  return connectedDaemons(owner).flatMap(d => d.principals);
+}
+
+/** One connected machine, and what it is holding. */
+export interface ConnectedDaemon {
+  /** Null from a connector older than 2026-09-01. */
+  installId: string | null;
+  principals: string[];
+  /** The principal an offer is handed to. First by sorted name, so a retry picks the same one. */
+  target: string;
+}
+
+/**
+ * An owner's connected DAEMONS, one entry per machine.
+ *
+ * The V1 report carried this as a stated limitation: one `connect serve` holds one socket per
+ * agent, so two laptops looked like one set of principals and the offer went to whichever sorted
+ * first — possibly the machine the person was not sitting at. The daemon now presents an install
+ * id and this groups on it.
+ *
+ * Ecosystem apps hold tunnels too, and one of those answering "create this person's agents" would
+ * be an app populating an account, so they are filtered out here as they always were — before the
+ * grouping, so a machine holding only apps is not reported as a daemon at all.
+ */
+export function connectedDaemons(owner: string): ConnectedDaemon[] {
   const tunnels = getActiveConnectTunnelManager();
   if (!tunnels) return [];
-  return tunnels.principalsForOwner(owner).filter(p => !p.startsWith('eco:'));
+  return tunnels.daemonsForOwner(owner)
+    .map(d => ({ ...d, principals: d.principals.filter(p => !p.startsWith('eco:')) }))
+    .filter(d => d.principals.length > 0)
+    .map(d => ({ installId: d.installId, principals: d.principals, target: d.principals[0] }));
 }
 
 /**
