@@ -24,16 +24,19 @@
  * @structure registerAgentV2TokenRoute(router, config, storage)
  * @usage registerAgentV2TokenRoute(router, config, storage);
  * @version-history
+ *   v1.1.0 — 2026-09-01 — The single-use spend moved to services/assertion-spend.ts, unchanged in
+ *     behaviour. It was the only implementation, the A2A door needed the same one, and a second
+ *     copy of a hash-and-namespace is how two doors come to disagree about what has been spent.
  *   v1.0.0 — 2026-08-31 — Initial (Agent v2, V1).
  */
 import type { Router } from 'express';
-import { createHash } from 'node:crypto';
 import { decodeProtectedHeader } from 'jose';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { error } from '../../middleware/envelope.js';
 import { isValidGAII } from '../../utils/gaii.js';
 import { verifyCardJws, base64KeyToJwkX } from '../../services/agent-card.js';
+import { spendAssertion } from '../../services/assertion-spend.js';
 import { issueJWT, generateSessionId, AccountDisabledError } from '../../auth/jwt.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { logger } from '../../utils/logger.js';
@@ -137,16 +140,17 @@ export function registerAgentV2TokenRoute(router: Router, config: AimeatConfig, 
       return;
     }
 
-    // Single use. The revoked-token table is the right store and the wrong name: it holds hashes
-    // that must not authenticate again, with a TTL and a sweep already running, which is exactly
-    // what a spent assertion needs. Written BEFORE the token is minted, so a failure below burns
-    // this assertion rather than leaving a replayable one in the caller's hands.
-    const spentHash = createHash('sha256').update(`agent-v2-assertion:${assertion}`).digest('hex');
-    if (await storage.isTokenRevoked(spentHash)) {
-      res.status(401).json(error(config.nodeId, 'ASSERTION_REPLAYED', 'That assertion has already been used. Sign a new one.'));
+    // Single use, through the shared spender. It used to be two inline lines here and nowhere else,
+    // and the A2A door then claimed the same behaviour in its header without having it — so the
+    // hash, the namespace and the write are one function now, and both doors share the namespace so
+    // an assertion is worth one call ACROSS them rather than one call each. Written BEFORE the
+    // token is minted, so a failure below burns this assertion rather than leaving a replayable one
+    // in the caller's hands.
+    const spend = await spendAssertion(storage, assertion, claims.exp);
+    if (!spend.ok) {
+      res.status(401).json(error(config.nodeId, 'ASSERTION_REPLAYED', spend.message));
       return;
     }
-    await storage.revokeToken(spentHash, claims.exp);
 
     const sessionId = generateSessionId();
     const ttl = config.agentV2TokenTtlSeconds;

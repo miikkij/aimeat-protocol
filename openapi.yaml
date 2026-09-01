@@ -8316,6 +8316,13 @@ paths:
         different key is refused with `A2A_KEY_CHANGED` rather than re-pinned, because on this road
         the key is the whole of the identity.
 
+        AN ASSERTION IS WORTH ONE CALL. It is spent the moment its signature verifies, before
+        anything is dispatched, so **sign a new one per request** — presenting the same one twice
+        answers `A2A_ASSERTION_REPLAYED`, whatever happened to the first call. An assertion past its
+        `exp` answers `A2A_ASSERTION_EXPIRED` instead: expiry is checked before reuse, so a caller
+        with a slow clock is told the true thing. The five-minute ceiling exists for clock skew
+        across machines this node does not administer; it is not a reuse window.
+
         WHAT THE STRANGER'S ROAD REACHES: `SendMessage` against a LISTED agent-work offering of that
         agent, `GetTask` and `CancelTask` on its own work. Nothing else. PUBLISHING THE OFFERING IS
         THE CONSENT — there is no approval screen and no new permission word, because listing agent
@@ -8327,7 +8334,9 @@ paths:
         own price and the seller's own payout address. Send the same message again with the signed
         proof in `X-PAYMENT`; the facilitator verifies and settles it, and only then is the work
         created and the provider told. Money moves buyer to seller directly — this node never holds
-        it. The refusal codes outside A2A's own set are -32040 (nothing is published for hire here),
+        it, and the operator's platform fee is booked against the SELLER at the same rate as a local
+        sale (`AIMEAT_COMMERCE_FEE_PERCENT`), as a receivable, never deducted from what you pay.
+        The refusal codes outside A2A's own set are -32040 (nothing is published for hire here),
         -32041 (not what you named, or you named nothing and there are several), -32042 (for sale,
         but this node cannot take your money right now) and -32043 (principals of this account only).
 
@@ -8364,7 +8373,8 @@ paths:
           schema: { type: string }
           description: |
             The stranger's road only. A compact JWS signed by the same key, claiming
-            { sub, aud, iat, exp, jti }. At most 300 seconds of life; proof of possession per request.
+            { sub, aud, iat, exp, jti }. At most 300 seconds of life, and SINGLE USE — sign a fresh
+            one for every request; a replayed one is refused with A2A_ASSERTION_REPLAYED.
         - name: X-PAYMENT
           in: header
           schema: { type: string }

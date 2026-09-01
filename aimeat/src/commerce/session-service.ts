@@ -15,6 +15,9 @@
  *   updateSessionItems · cancelSession · completeSession
  * @usage import { createSession, completeSession } from '../commerce/session-service.js';
  * @version-history
+ *   v2.5.0 — 2026-09-01 — `bookSessionlessSale`: the seller's fee and split legs for a MONEY sale
+ *     with no checkout session behind it, which is what a buyer from another node makes over the
+ *     A2A door. Same rate, same two functions, placed beside the leg it must stay in step with.
  *   v2.4.0 — 2026-08-29 — A money platform fee is always booked `receivable`. The Stripe branch wrote
  *     `connect`, which named the EE Connect platform removed on 2026-07-28: with the seller as
  *     merchant of record on their own key, nothing deducts the fee from the charge, so the label told
@@ -209,6 +212,78 @@ export async function recordMoneyPlatformFee(
     sellerGhii: args.sellerGhii, buyerGhii: args.buyerGhii, trackingCode: args.trackingCode,
     at: new Date().toISOString(),
   });
+}
+
+/**
+ * The seller's side of a MONEY sale that has no checkout session behind it.
+ *
+ * THE FEE IS A PROPERTY OF THE TRANSACTION, NOT OF THE BUYER'S ACCOUNT. The checkout session is
+ * where the local path happens to book it; it is not what makes it legitimate. A sale over the A2A
+ * door is made by a party with no account here and therefore no session, and charging it nothing
+ * would turn "have no account here" into the cheapest way to buy — which is the incentive this
+ * product least wants to create.
+ *
+ * SO IT IS THE SAME RATE, FROM THE SAME PLACE. `commerceFeePercent(config)` and `percentFee` are the
+ * two the checkout path calls, called here for the same reason: a second formula is a second rate
+ * the day somebody edits one of them. `test/unit/fee-parity.test.ts` asserts the two roads produce
+ * the same number for the same amount.
+ *
+ * IT LIVES BESIDE `completeSession`'s fee leg on purpose. These two must stay in step, and the way
+ * to make that likely is for a reader changing one to have the other on the screen.
+ *
+ * `buyerRef` is a GHII on every local path and a foreign agent's own identity on the A2A one. It is
+ * RECORDED, never resolved: this function must not be the place that quietly invents a local
+ * account for a party that does not have one.
+ *
+ * Never throws. The money has already moved and the buyer already has what they paid for; a
+ * bookkeeping failure is logged, not turned into a failed sale.
+ */
+export async function bookSessionlessSale(
+  storage: Storage,
+  config: AimeatConfig,
+  args: {
+    gross: number; currency: string;
+    sellerGhii: string; buyerRef: string;
+    /** The metered coordinate the sale happened at — what the seller's split is keyed to. */
+    ext: string; action: string;
+    trackingCode: string; handler: string; reference: string;
+  },
+): Promise<{ fee: number; net: number }> {
+  const fee = percentFee(args.gross, commerceFeePercent(config));
+  const net = args.gross - fee;
+  try {
+    // MONEY ONLY, like the checkout leg beside it: morsels pace usage, they are not revenue, and a
+    // fraction of them is not a share. A morsel-priced sale cannot reach this road anyway — the A2A
+    // door refuses one outright — so this is the guard staying true rather than a live branch.
+    if (!isMoneyCurrency(args.currency)) return { fee: 0, net: args.gross };
+    if (fee > 0) {
+      await recordMoneyPlatformFee(storage, config, {
+        fee, currency: args.currency, sellerGhii: args.sellerGhii,
+        buyerGhii: args.buyerRef, trackingCode: args.trackingCode, handler: args.handler,
+      });
+    }
+    // Then whoever the seller owes a share of their cut. Out of the seller's NET, never added to
+    // what the buyer paid — identical to both the checkout and the contracted paths.
+    if (net > 0) {
+      const split = await readSplit(storage, args.sellerGhii, args.ext, args.action);
+      const result = computeSplit(net, split, []);
+      if (result.lines.length) {
+        await bookBeneficiaryShares(storage, {
+          lines: result.lines,
+          trackingCode: `a2a_${args.trackingCode}_${args.action}`,
+          fromGhii: args.sellerGhii,
+          currency: args.currency,
+          buyerGhii: args.buyerRef,
+          reference: args.reference,
+        });
+      }
+    }
+  } catch (err) {
+    logger.error('[commerce] sessionless sale bookkeeping failed; the seller keeps the whole cut', {
+      seller: args.sellerGhii, trackingCode: args.trackingCode, error: String(err),
+    });
+  }
+  return { fee, net };
 }
 
 function requireOpen(session: CheckoutSessionRecord): void {
