@@ -468,6 +468,22 @@ async function run() {
             for (const tag of (rec?.tags ?? [])) {
                 assert(/^[a-z0-9._-]+$/.test(tag), `${n}: the agent record carries the tag "${tag}", which the runtime refuses`);
             }
+
+            // The agent must be able to ACT, not merely be well formed. A crew with no tools is a
+            // valid definition that does nothing: workflow-manager was sold as ordering work from
+            // other agents and had no delegation tool, so it planned jobs and sent nothing.
+            const tools = new Set<string>(doc.agents.flatMap((x: any) => x.tools ?? []));
+            assert(tools.has('memory'), `${n}: cannot read what the account holds`);
+            if (n === 'concierge' || n === 'workflow-manager') {
+                assert(tools.has('delegate'), `${n}: its description is about handing work on, and it declares no delegation tool`);
+            }
+
+            // And a spawn agent's work must start without a person: the node auto-activates a
+            // queued task only for a task-runner, so any other mode leaves every task in `queued`.
+            if (rec?.run_mode === 'spawn') {
+                assert(rec.mode === 'task-runner',
+                    `${n}: runs on spawn, so its mode must be task-runner or its tasks never start — got ${rec.mode}`);
+            }
         }
     });
 

@@ -79,6 +79,55 @@ describe('the tag charset, which is what this gate was written for', () => {
     });
 });
 
+describe('the tools, which is a different question from the shape', () => {
+    it('refuses a tool that is not on the fixed menu', () => {
+        // `crew_registry` shipped on crew-forge's Registrar — the one agent whose whole job is
+        // writing — and is not a tool at all. An unknown name is not a narrower tool; it is none.
+        const t = sound();
+        t.crewDef.agents[0].tools = ['crew_registry'];
+        const found = collectProblems([t]);
+        expect(found).toHaveLength(1);
+        expect(found[0].value).toBe('crew_registry');
+        expect(found[0].rule).toContain('fixed tool menu');
+    });
+
+    it('accepts the menu, including the exchange_* family', () => {
+        const t = sound();
+        t.crewDef.agents[0].tools = ['memory', 'delegate', 'dm', 'web', 'exchange_offer'];
+        expect(collectProblems([t])).toEqual([]);
+    });
+
+    it('requires workflow-manager to declare a delegation tool', () => {
+        // The failure this whole rule exists for: described as ordering work from other agents,
+        // declared zero tools, so it planned a job and sent nothing. Every shape rule passed it.
+        const wm = BASIC_AGENTS.find(a => a.name === 'workflow-manager')!;
+        const stripped = structuredClone(wm) as unknown as Shippable;
+        stripped.crewDef.agents.forEach(a => { a.tools = ['memory']; });
+        expect(rules(stripped)).toContain('must declare "delegate"');
+    });
+
+    it('requires concierge to declare one too — a front door that cannot hand on is half a door', () => {
+        const c = BASIC_AGENTS.find(a => a.name === 'concierge')!;
+        const stripped = structuredClone(c) as unknown as Shippable;
+        stripped.crewDef.agents.forEach(a => { a.tools = ['memory']; });
+        expect(rules(stripped)).toContain('must declare "delegate"');
+    });
+
+    it('and each of the three to be able to read what the account holds', () => {
+        for (const name of ['concierge', 'crew-forge', 'workflow-manager']) {
+            const t = structuredClone(BASIC_AGENTS.find(a => a.name === name)!) as unknown as Shippable;
+            t.crewDef.agents.forEach(a => { a.tools = (a.tools ?? []).filter(x => x !== 'memory'); });
+            expect(rules(t)).toContain('must declare "memory"');
+        }
+    });
+
+    it('says nothing about an agent it has no entry for — the table is deliberate, not a guess', () => {
+        const t = sound();               // name 'probe', no tools at all
+        t.crewDef.agents.forEach(a => { a.tools = undefined; });
+        expect(collectProblems([t])).toEqual([]);
+    });
+});
+
 describe('the shape rules', () => {
     it('needs a task carrying {{ctx.prompt}}, or the crew answers the same thing every run', () => {
         const t = sound();
