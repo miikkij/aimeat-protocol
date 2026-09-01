@@ -34,6 +34,13 @@
  *     discovery-file lifecycle, signal handling.
  * @usage Called by mcp/server.ts `runServe()` when `--http`/`--daemon` is set.
  * @version-history
+ *   v1.8.2 — 2026-09-02 — A long-poll that cannot name its agent is refused after a pause, not
+ *     instantly. All four polls here began with a resolve whose failure answered 400 in under a
+ *     millisecond, and every one of those failures is PERSISTENT (unknown agent, a bare name two
+ *     owners share, no default among several accounts), so a caller looping on it spun at loopback
+ *     speed forever. crewaimeat met the identical shape on their side and counted 14,627 abandoned
+ *     polls. Pacing lives in ./local-poll-guard.ts, which also holds the one copy of the `?wait=`
+ *     clamp these four had written out separately.
  *   v1.8.1 — 2026-09-01 — `/local/status` carries the SAME projection as serve.json. It holds a
  *     second copy of that shape, and when serve.json's `principals[].id` became the GAII the field
  *     was documented to be, this copy kept the bare agent name and its `agents[]` rows gained no
@@ -97,6 +104,7 @@ import { displayName } from '../agent-registry.js';
 import { startPollerForAgent } from './poller.js';
 import { AgentChannel, type SpaceRef } from './local-channel.js';
 import { InvokeChannel, registerLocalInvokeRoutes } from './local-invoke.js';
+import { pollWaitMs, refuseUnknownAgent } from './local-poll-guard.js';
 import { CONNECT_CLI_TOOLS } from '../tool-call.js';
 
 // Re-exported so the unit test (serve-wake-watermark.test.ts) and any importer keep resolving
@@ -380,14 +388,12 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
 
   // ── Push surface: long-poll fed by deliver/backlog (realtime, no spin) ──
   app.get('/local/tasks/next', async (req: Request, res: Response) => {
+    // The wait is read BEFORE the agent is resolved, because a refusal is paced by it too — see
+    // local-poll-guard.ts for why an instant 400 here is a hot loop.
+    const waitMs = pollWaitMs(req);
     let entry: RegisteredAgent;
     try { entry = resolveAgent(req); }
-    catch (err) {
-      res.status(400).json({ ok: false, error: { code: 'UNKNOWN_AGENT', message: (err as Error).message } });
-      return;
-    }
-    const rawWait = typeof req.query.wait === 'string' ? parseInt(req.query.wait, 10) : NaN;
-    const waitMs = Math.min(Math.max(Number.isFinite(rawWait) ? rawWait : 25_000, 0), 120_000);
+    catch (err) { await refuseUnknownAgent(res, err, waitMs); return; }
     const item = await channels.get(entry.gaii)!.nextTask(waitMs);
     if (!item) { res.status(204).end(); return; }
     res.json({
@@ -445,14 +451,10 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
   // GET /local/records/next?wait=ms[&agent=name] — long-poll for the next workspace record event.
   // Distinct from /local/tasks/next: a separate queue, so record wakes never intermix with real tasks.
   app.get('/local/records/next', async (req: Request, res: Response) => {
+    const waitMs = pollWaitMs(req);
     let entry: RegisteredAgent;
     try { entry = resolveAgent(req); }
-    catch (err) {
-      res.status(400).json({ ok: false, error: { code: 'UNKNOWN_AGENT', message: (err as Error).message } });
-      return;
-    }
-    const rawWait = typeof req.query.wait === 'string' ? parseInt(req.query.wait, 10) : NaN;
-    const waitMs = Math.min(Math.max(Number.isFinite(rawWait) ? rawWait : 25_000, 0), 120_000);
+    catch (err) { await refuseUnknownAgent(res, err, waitMs); return; }
     const item = await channels.get(entry.gaii)!.nextRecord(waitMs);
     if (!item) { res.status(204).end(); return; }
     res.json({
@@ -465,14 +467,10 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
   // Distinct queue from tasks + records (no intermixing). The wake carries a lightweight summary; read the
   // full body/attachments via aimeat_dm_thread(conversation_id) when the responder needs them.
   app.get('/local/dm/next', async (req: Request, res: Response) => {
+    const waitMs = pollWaitMs(req);
     let entry: RegisteredAgent;
     try { entry = resolveAgent(req); }
-    catch (err) {
-      res.status(400).json({ ok: false, error: { code: 'UNKNOWN_AGENT', message: (err as Error).message } });
-      return;
-    }
-    const rawWait = typeof req.query.wait === 'string' ? parseInt(req.query.wait, 10) : NaN;
-    const waitMs = Math.min(Math.max(Number.isFinite(rawWait) ? rawWait : 25_000, 0), 120_000);
+    catch (err) { await refuseUnknownAgent(res, err, waitMs); return; }
     const item = await channels.get(entry.gaii)!.nextDm(waitMs);
     if (!item) { res.status(204).end(); return; }
     res.json({
@@ -488,14 +486,10 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
   // This lets a multi-source agent (e.g. records+tasks like image-maker) wake on EVERY source instead of
   // only its single parked queue; older daemons keep using the per-queue endpoints, so this is additive.
   app.get('/local/wake/next', async (req: Request, res: Response) => {
+    const waitMs = pollWaitMs(req);
     let entry: RegisteredAgent;
     try { entry = resolveAgent(req); }
-    catch (err) {
-      res.status(400).json({ ok: false, error: { code: 'UNKNOWN_AGENT', message: (err as Error).message } });
-      return;
-    }
-    const rawWait = typeof req.query.wait === 'string' ? parseInt(req.query.wait, 10) : NaN;
-    const waitMs = Math.min(Math.max(Number.isFinite(rawWait) ? rawWait : 25_000, 0), 120_000);
+    catch (err) { await refuseUnknownAgent(res, err, waitMs); return; }
     const woke = await channels.get(entry.gaii)!.nextWake(waitMs);
     if (!woke) { res.status(204).end(); return; }
     res.json({ ok: true, data: { agent: entry.agent, owner: entry.owner, woke: true } });

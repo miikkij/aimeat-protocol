@@ -25,6 +25,9 @@
  *   // tunnel client: onInvoke: (frame) => inv.handleInvoke(frame)
  *   registerLocalInvokeRoutes(app, resolveAgent, invokeChannels);
  * @version-history
+ *   v1.0.2 — 2026-09-02 — An unresolvable poll is refused after a pause rather than instantly.
+ *     This is the endpoint whose fast 400 cost crewaimeat 14,627 abandoned polls in their own
+ *     runtime; the shape was on our side of it too. → ./local-poll-guard.ts
  *   v1.0.1 — 2026-08-28 — SECURITY (CodeQL js/resource-exhaustion): the long-poll setTimeout is
  *     bounded at the timer (Math.min(waitMs, MAX_WAIT_MS)), matching the [0, 120s] clamp waitMsOf
  *     already applies, so the duration is capped for any caller, not only the current route.
@@ -32,6 +35,7 @@
  */
 import type { Express, Request, Response } from 'express';
 import type { RegisteredAgent } from '../agent-registry.js';
+import { refuseUnknownAgent } from './local-poll-guard.js';
 
 /** Upper bound on a long-poll timer, matching the [0, 120s] clamp waitMsOf already applies. Re-applied
  *  at the setTimeout so the duration is bounded there, not only at the parser — a timer whose length
@@ -173,15 +177,15 @@ export function registerLocalInvokeRoutes(
 ): void {
   // GET /local/invoke/next?wait=ms[&agent=name] — long-poll for the next server-initiated invoke.
   app.get('/local/invoke/next', async (req: Request, res: Response) => {
+    // This is the exact endpoint whose instant 400 cost crewaimeat 14,627 abandoned polls, in
+    // their runtime rather than ours. The refusal is paced here as well — see local-poll-guard.ts.
+    const waitMs = waitMsOf(req);
     let entry: RegisteredAgent;
     try { entry = resolveAgent(req); }
-    catch (err) {
-      res.status(400).json({ ok: false, error: { code: 'UNKNOWN_AGENT', message: (err as Error).message } });
-      return;
-    }
+    catch (err) { await refuseUnknownAgent(res, err, waitMs); return; }
     const ch = channels.get(entry.gaii);
     if (!ch) { res.status(204).end(); return; }
-    const item = await ch.next(waitMsOf(req));
+    const item = await ch.next(waitMs);
     if (!item) { res.status(204).end(); return; }
     res.json({ ok: true, data: { agent: entry.agent, owner: entry.owner, ...item } });
   });

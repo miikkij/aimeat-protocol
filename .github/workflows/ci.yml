@@ -74,6 +74,10 @@ jobs:
         working-directory: aimeat
         run: pnpm check:profile-tabs
 
+      - name: Shipped crew definitions match the runtime's rules
+        working-directory: aimeat
+        run: pnpm check:crew-defs
+
       - name: Config coverage (every setting reachable in the admin Config tab)
         working-directory: aimeat
         run: pnpm check:config-coverage
