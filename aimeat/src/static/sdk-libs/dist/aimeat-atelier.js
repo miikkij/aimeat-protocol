@@ -1581,9 +1581,9 @@
       const host = el("div", { class: "ak-aide__panel" });
       into.appendChild(host);
       try {
-        const handle = ns.atelier.mosaic({ target: host, layout: { v: 1, blocks: panel.blocks }, sources: s.sources || {} });
+        const handle2 = ns.atelier.mosaic({ target: host, layout: { v: 1, blocks: panel.blocks }, sources: s.sources || {} });
         root.addEventListener("ak-destroy", function() {
-          handle.destroy();
+          handle2.destroy();
         }, { once: true });
       } catch (err) {
         console.warn("aimeat-atelier: a generated panel did not render — the words above stand alone.", err);
@@ -2512,14 +2512,14 @@
     const stamp2 = ++defsCounter;
     const defs = svg("defs", {});
     const sheenId = `ak-sheen-${stamp2}`;
-    const sheen = svg("linearGradient", { id: sheenId, x1: 0, y1: 0, x2: 0, y2: 1 });
+    const sheen2 = svg("linearGradient", { id: sheenId, x1: 0, y1: 0, x2: 0, y2: 1 });
     const s1 = svg("stop", { offset: "0", "stop-opacity": "0.22" });
     s1.style.stopColor = "var(--ak-chart-sheen)";
     const s2 = svg("stop", { offset: "1", "stop-opacity": "0" });
     s2.style.stopColor = "var(--ak-chart-sheen)";
-    sheen.appendChild(s1);
-    sheen.appendChild(s2);
-    defs.appendChild(sheen);
+    sheen2.appendChild(s1);
+    sheen2.appendChild(s2);
+    defs.appendChild(sheen2);
     for (let i = 0; i < seriesCount; i++) {
       const fade = svg("linearGradient", { id: `ak-fade-${stamp2}-${i}`, x1: 0, y1: 0, x2: 0, y2: 1 });
       const f1 = svg("stop", { offset: "0", "stop-opacity": "0.20" });
@@ -6330,9 +6330,9 @@
         resolveSource(p.source).then(function(data) {
           if (destroyed) return;
           wait.destroy();
-          const handle = create(data == null ? [] : data);
-          alive.handles.push(handle);
-          alive.bound.push({ name: p.source, kind, handle });
+          const handle2 = create(data == null ? [] : data);
+          alive.handles.push(handle2);
+          alive.bound.push({ name: p.source, kind, handle: handle2 });
         });
       }
       switch (block.component) {
@@ -6880,14 +6880,14 @@
   function confirm(spec) {
     return new Promise(function(resolve2) {
       let answer = false;
-      const handle = dialog({
+      const handle2 = dialog({
         title: spec.title,
         text: spec.text,
         from: "center",
         tone: spec.tone === "danger" ? "danger" : "plain",
         actions: [
           { id: "cancel", label: spec.cancelLabel || t("cancel"), tone: "ghost", run: function() {
-            handle.close("cancel");
+            handle2.close("cancel");
           } },
           {
             id: "confirm",
@@ -6895,7 +6895,7 @@
             tone: spec.tone === "danger" ? "danger" : "primary",
             run: function() {
               answer = true;
-              handle.close("confirm");
+              handle2.close("confirm");
             }
           }
         ],
@@ -6903,7 +6903,7 @@
           resolve2(answer);
         }
       });
-      const go = handle.el.querySelector('[data-ak-action="confirm"]');
+      const go = handle2.el.querySelector('[data-ak-action="confirm"]');
       if (go) go.focus();
     });
   }
@@ -6911,7 +6911,7 @@
     return new Promise(function(resolve2) {
       let answer = null;
       let field = null;
-      const handle = dialog({
+      const handle2 = dialog({
         title: spec.title,
         text: spec.text,
         from: "center",
@@ -6940,7 +6940,7 @@
         },
         actions: [
           { id: "cancel", label: t("cancel"), tone: "ghost", run: function() {
-            handle.close("cancel");
+            handle2.close("cancel");
           } },
           { id: "submit", label: spec.submitLabel || t("confirm"), tone: "primary", run: function() {
             submit();
@@ -6952,13 +6952,178 @@
       });
       function submit() {
         answer = field ? String(field.value) : null;
-        handle.close("submit");
+        handle2.close("submit");
       }
       if (field) field.focus();
     });
   }
   function sheet(spec) {
     return dialog({ ...spec, from: "bottom" });
+  }
+
+  // src/static/sdk-libs/atelier/materials.js
+  function handle(node, off) {
+    return { el: node, destroy() {
+      off();
+    } };
+  }
+  function spotlight(target) {
+    const node = (
+      /** @type {HTMLElement} */
+      resolve(target)
+    );
+    node.classList.add("ak-mat--spot");
+    const move = (e) => {
+      const r = node.getBoundingClientRect();
+      node.style.setProperty("--ak-spot-x", Math.round((e.clientX - r.left) / Math.max(r.width, 1) * 100) + "%");
+      node.style.setProperty("--ak-spot-y", Math.round((e.clientY - r.top) / Math.max(r.height, 1) * 100) + "%");
+    };
+    const leave = () => {
+      node.style.removeProperty("--ak-spot-x");
+      node.style.removeProperty("--ak-spot-y");
+    };
+    if (!reducedMotion()) {
+      node.addEventListener("pointermove", move);
+      node.addEventListener("pointerleave", leave);
+    }
+    return handle(node, () => {
+      node.removeEventListener("pointermove", move);
+      node.removeEventListener("pointerleave", leave);
+      leave();
+    });
+  }
+  function tilt(target, opts) {
+    const node = (
+      /** @type {HTMLElement} */
+      resolve(target)
+    );
+    const max = opts && opts.max || 10;
+    const lift = opts && opts.lift || 5;
+    node.classList.add("ak-move--tilt");
+    const move = (e) => {
+      const r = node.getBoundingClientRect();
+      const px = (e.clientX - r.left) / Math.max(r.width, 1) - 0.5;
+      const py = (e.clientY - r.top) / Math.max(r.height, 1) - 0.5;
+      node.style.transform = "perspective(650px) rotateX(" + (-py * max * 2).toFixed(2) + "deg) rotateY(" + (px * max * 2).toFixed(2) + "deg) translateY(-" + lift + "px)";
+    };
+    const leave = () => {
+      node.style.transform = "";
+    };
+    if (!reducedMotion()) {
+      node.addEventListener("pointermove", move);
+      node.addEventListener("pointerleave", leave);
+    }
+    return handle(node, () => {
+      node.removeEventListener("pointermove", move);
+      node.removeEventListener("pointerleave", leave);
+      leave();
+    });
+  }
+  function sheen(target) {
+    const node = (
+      /** @type {HTMLElement} */
+      resolve(target)
+    );
+    if (reducedMotion()) return false;
+    node.classList.add("ak-move--sheen");
+    node.classList.remove("is-sheening");
+    void node.offsetWidth;
+    node.classList.add("is-sheening");
+    const done = () => {
+      node.classList.remove("is-sheening");
+      node.removeEventListener("animationend", done);
+    };
+    node.addEventListener("animationend", done);
+    return true;
+  }
+  function odometer(target, value) {
+    const node = (
+      /** @type {HTMLElement} */
+      resolve(target)
+    );
+    const next = String(value);
+    const prev = node.getAttribute("data-odo") != null ? String(node.getAttribute("data-odo")) : node.textContent.trim();
+    node.setAttribute("data-odo", next);
+    if (prev === next || reducedMotion() || typeof node.animate !== "function") {
+      node.textContent = next;
+      return false;
+    }
+    node.classList.add("ak-odo");
+    const reel = el("span", { class: "ak-odo__reel" }, [el("span", {}, prev), el("span", {}, next)]);
+    node.textContent = "";
+    node.appendChild(reel);
+    const h = reel.firstChild ? (
+      /** @type {HTMLElement} */
+      reel.firstChild.offsetHeight
+    ) : 0;
+    const cs = getComputedStyle(node);
+    const span = (parseFloat(cs.getPropertyValue("--ak-motion")) || 200) * 3.5;
+    const anim = reel.animate([{ transform: "translateY(0)" }, { transform: "translateY(-" + h + "px)" }], {
+      duration: span,
+      easing: "cubic-bezier(0.2, 0.7, 0.3, 1)",
+      fill: "forwards"
+    });
+    const settle = () => {
+      node.textContent = next;
+    };
+    anim.addEventListener("finish", settle);
+    anim.addEventListener("cancel", settle);
+    return true;
+  }
+  function thumb(target) {
+    const node = (
+      /** @type {HTMLElement} */
+      resolve(target)
+    );
+    node.classList.add("ak-thumb");
+    const pill = el("span", { class: "ak-thumb__pill", "aria-hidden": "true" });
+    node.insertBefore(pill, node.firstChild);
+    const update = () => {
+      const on = node.querySelector('[aria-selected="true"], [aria-pressed="true"], [aria-current], .is-on');
+      if (!on) {
+        node.style.setProperty("--ak-thumb-w", "0px");
+        return;
+      }
+      const r = (
+        /** @type {HTMLElement} */
+        on
+      );
+      node.style.setProperty("--ak-thumb-left", r.offsetLeft + "px");
+      node.style.setProperty("--ak-thumb-top", r.offsetTop + "px");
+      node.style.setProperty("--ak-thumb-w", r.offsetWidth + "px");
+      node.style.setProperty("--ak-thumb-h", r.offsetHeight + "px");
+    };
+    const mo = typeof MutationObserver === "function" ? new MutationObserver(update) : null;
+    if (mo) mo.observe(node, { attributes: true, subtree: true, attributeFilter: ["aria-selected", "aria-pressed", "aria-current", "class"] });
+    update();
+    return { el: node, update, destroy() {
+      if (mo) mo.disconnect();
+      if (pill.parentNode) pill.parentNode.removeChild(pill);
+      node.classList.remove("ak-thumb");
+    } };
+  }
+  function deal(targets) {
+    let list2;
+    if (typeof targets === "string") list2 = Array.prototype.slice.call(document.querySelectorAll(targets));
+    else if (targets instanceof Element) list2 = [
+      /** @type {HTMLElement} */
+      targets
+    ];
+    else list2 = Array.prototype.slice.call(targets || []);
+    if (reducedMotion()) return 0;
+    list2.forEach((node, i) => {
+      node.style.setProperty("--ak-deal-i", String(i));
+      node.classList.remove("ak-move--deal");
+      void node.offsetWidth;
+      node.classList.add("ak-move--deal");
+      const done = () => {
+        node.classList.remove("ak-move--deal");
+        node.style.removeProperty("--ak-deal-i");
+        node.removeEventListener("animationend", done);
+      };
+      node.addEventListener("animationend", done);
+    });
+    return list2.length;
   }
 
   // src/static/sdk-libs/atelier/index.js
@@ -6968,7 +7133,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.40.0",
+    version: "0.41.0",
     // ── Shell and navigation ──
     app,
     section,
@@ -7046,6 +7211,13 @@
     crt,
     countdown,
     crawl,
+    // ── Materials and motion recipes that need a hand on the wheel (materials.css has the rest) ──
+    spotlight,
+    tilt,
+    sheen,
+    odometer,
+    thumb,
+    deal,
     // ── Data ──
     form,
     table,

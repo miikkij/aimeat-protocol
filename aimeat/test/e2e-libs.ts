@@ -1051,6 +1051,7 @@ await test('GET /v1/libs/aimeat-atelier.js — serves the Atelier kit with every
         'mosaic', 'appRef',
         'injectStyle', 'guardButtons', 'whileBusy', 'enter', 'kinetic', 'countUp', 'attention',
         'flapify', 'ransom', 'vu', 'typeout', 'dealIn',
+        'spotlight', 'tilt', 'sheen', 'odometer', 'thumb', 'deal',
     ]) {
         assert(text.includes(part), `should export ${part}`);
     }
