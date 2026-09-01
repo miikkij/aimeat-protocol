@@ -95,15 +95,37 @@ async function setupOwner(node: NodeState, ownerName: string): Promise<void> {
     node.ownerToken = tok.body.token;
 }
 
-async function addAndActivatePeer(node: NodeState, peerNodeId: string, peerUrl: string): Promise<void> {
+/** The far node's published verification key, read the way any stranger would read it. */
+async function publishedKey(peerUrl: string): Promise<string> {
+    const res = await fetch(`${peerUrl}/.well-known/aimeat`);
+    const body = await res.json() as { public_key?: string; data?: { public_key?: string } };
+    const key = body.public_key ?? body.data?.public_key ?? '';
+    assert(!!key, `no published key at ${peerUrl}/.well-known/aimeat: ${JSON.stringify(body).slice(0, 200)}`);
+    return key;
+}
+
+/**
+ * Register the far node as a peer, with the key it publishes. REGISTER ONLY — activation is a
+ * separate step and has to be, because activation runs a key exchange and the far end refuses one
+ * from a node it does not yet know. Both sides register first, then both activate.
+ *
+ * This used to register keyless and force `status: 'active'` with a PUT, which skipped the exchange
+ * entirely. A peer with no key cannot be created at all now, and activation has to earn its state.
+ */
+async function addPeer(node: NodeState, peerNodeId: string, peerUrl: string): Promise<void> {
     const add = await node.json('/v1/federation/peers', {
-        method: 'POST', headers: { Authorization: `Bearer ${node.ownerToken}` }, body: JSON.stringify({ node_id: peerNodeId, url: peerUrl }),
+        method: 'POST', headers: { Authorization: `Bearer ${node.ownerToken}` },
+        body: JSON.stringify({ node_id: peerNodeId, url: peerUrl, public_key: await publishedKey(peerUrl) }),
     });
     assert(add.status === 201, `add peer ${peerNodeId} on ${node.nodeId}: ${add.status} ${JSON.stringify(add.body)}`);
-    const act = await node.json(`/v1/federation/peers/${peerNodeId}`, {
-        method: 'PUT', headers: { Authorization: `Bearer ${node.ownerToken}` }, body: JSON.stringify({ status: 'active' }),
+    // The operator's approval, which is the real flow's second step: the key-exchange door accepts a
+    // peer that is `approved` or `active`, and a freshly registered one is `pending`. Both sides need
+    // this before either can activate, because activation asks the far end for a key exchange.
+    const ok = await node.json(`/v1/federation/peers/${peerNodeId}`, {
+        method: 'PUT', headers: { Authorization: `Bearer ${node.ownerToken}` },
+        body: JSON.stringify({ status: 'approved' }),
     });
-    assert(act.body.ok === true && act.body.data.status === 'active', `activate ${peerNodeId} on ${node.nodeId}: ${JSON.stringify(act.body.error)}`);
+    assert(ok.body.ok === true, `approve ${peerNodeId} on ${node.nodeId}: ${JSON.stringify(ok.body.error)}`);
 }
 
 async function signMsg(privKeyB64: string, message: string): Promise<string> {
@@ -150,8 +172,10 @@ await test('Register owners (operators)', async () => {
     await setupOwner(B!, `bob${ts}`);
 });
 await test('Peer A<->B (exchanges public keys)', async () => {
-    await addAndActivatePeer(A!, B!.nodeId, B!.baseUrl);
-    await addAndActivatePeer(B!, A!.nodeId, A!.baseUrl);
+    // BOTH register before EITHER activates: activation runs a key exchange, and the far end
+    // refuses one from a node it has never heard of.
+    await addPeer(A!, B!.nodeId, B!.baseUrl);
+    await addPeer(B!, A!.nodeId, A!.baseUrl);
     // Activate in BOTH directions: each activate makes the TARGET store the caller's public key,
     // so we need A→B and B→A for both peers to hold each other's key.
     const keAB = await A!.json('/v1/federation/peer/activate', {
@@ -254,8 +278,10 @@ await test('5b. A stranger on a third node who computes the thread id is still h
         await setupOwner(C, `carol${ts}`);
         // Peer A<->C so A accepts C's signed federation frame at all (the gate is about first
         // CONTACT, not about whether the wire is trusted).
-        await addAndActivatePeer(A!, C.nodeId, C.baseUrl);
-        await addAndActivatePeer(C, A!.nodeId, A!.baseUrl);
+        // Both register (with each other's published key) before either activates: activation runs a
+        // key exchange, and the far end refuses one from a node it has never heard of.
+        await addPeer(A!, C.nodeId, C.baseUrl);
+        await addPeer(C, A!.nodeId, A!.baseUrl);
         await A!.json('/v1/federation/peer/activate', {
             method: 'POST', headers: { Authorization: `Bearer ${A!.ownerToken}` }, body: JSON.stringify({ peer_node_id: C.nodeId }),
         });

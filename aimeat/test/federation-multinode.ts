@@ -221,11 +221,12 @@ async function setupOwner(node: NodeState, ownerName: string): Promise<void> {
  * the key pinned here and fails closed when there is none, so a peer added without one can be
  * reached but cannot prove it is itself.
  */
+/** `peerPublicKey` is REQUIRED: a peer record with no verification key can no longer be written. */
 async function addAndActivatePeer(
     node: NodeState,
     peerNodeId: string,
     peerUrl: string,
-    peerPublicKey?: string,
+    peerPublicKey: string,
 ): Promise<void> {
     // Add peer
     const { status, body } = await node.json('/v1/federation/peers', {
@@ -303,11 +304,11 @@ await test('Node A adds Node C as peer', async () => {
 });
 
 await test('Node B adds Node A as peer', async () => {
-    await addAndActivatePeer(nodeB!, 'aimeat-hub-001-testa', nodeA!.baseUrl);
+    await addAndActivatePeer(nodeB!, 'aimeat-hub-001-testa', nodeA!.baseUrl, nodeA!.nodeKey.publicKey);
 });
 
 await test('Node C adds Node A as peer', async () => {
-    await addAndActivatePeer(nodeC!, 'aimeat-hub-001-testa', nodeA!.baseUrl);
+    await addAndActivatePeer(nodeC!, 'aimeat-hub-001-testa', nodeA!.baseUrl, nodeA!.nodeKey.publicKey);
 });
 
 await test('Verify A has 2 peers, B and C have 1 each', async () => {
@@ -566,7 +567,7 @@ await test('A non-operator on Node B cannot add, re-tune or de-peer → 403, and
 
     const created = await nodeB!.json('/v1/federation/peers', {
         method: 'POST', headers: asOperator,
-        body: JSON.stringify({ node_id: throwId, url: 'http://localhost:49999' }),
+        body: JSON.stringify({ node_id: throwId, url: 'http://localhost:49999', public_key: nodeB!.nodeKey.publicKey }),
     });
     assert(created.status === 201, `fixture peer: ${created.status}: ${JSON.stringify(created.body.error)}`);
 
@@ -778,6 +779,7 @@ await test('Add a private peer on Node A', async () => {
         body: JSON.stringify({
             node_id: privatePeerId,
             url: 'http://localhost:9999',
+            public_key: nodeA!.nodeKey.publicKey,
         }),
     });
     assert(status === 201, `add private peer: ${status}: ${JSON.stringify(body)}`);

@@ -219,7 +219,7 @@ await test('5. open-join OFF (node C) → introduce stays pending, no peer creat
 });
 
 await test('6. directly added peer defaults to member tier', async () => {
-  const r = await A.json('/v1/federation/peers', { method: 'POST', headers: auth(A.ownerToken), body: JSON.stringify({ node_id: 'aimeat-test-001-direct', url: 'http://localhost:49997' }) });
+  const r = await A.json('/v1/federation/peers', { method: 'POST', headers: auth(A.ownerToken), body: JSON.stringify({ node_id: 'aimeat-test-001-direct', url: 'http://localhost:49997', public_key: 'placeholder-key-uncontacted-peer' }) });
   assert(r.status === 201, `add peer: ${r.status} ${JSON.stringify(r.body)}`);
   const list = await A.json('/v1/federation/peers', { headers: auth(A.ownerToken) });
   const d = list.body.data.peers.find((p: any) => p.node_id === 'aimeat-test-001-direct');
