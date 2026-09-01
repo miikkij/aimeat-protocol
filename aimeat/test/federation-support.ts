@@ -136,11 +136,20 @@ async function createAgent(node: NodeState, agentName: string, scopes: string[] 
  * peer's key-exchange route stores it on its own peer row. Run from both ends, each side ends up
  * holding the other's key, which is what every inbound signature is verified against.
  */
+/** The far node's published verification key, read the way any stranger would read it. */
+async function publishedKey(peerUrl: string): Promise<string> {
+    const res = await fetch(`${peerUrl}/.well-known/aimeat`);
+    const body = await res.json() as { public_key?: string; data?: { public_key?: string } };
+    const key = body.public_key ?? body.data?.public_key ?? '';
+    assert(!!key, `no published key at ${peerUrl}/.well-known/aimeat`);
+    return key;
+}
+
 async function linkAsContact(a: NodeState, b: NodeState): Promise<void> {
     for (const [self, peer] of [[a, b], [b, a]] as [NodeState, NodeState][]) {
         const add = await self.json('/v1/federation/peers', {
             method: 'POST', headers: auth(self.ownerToken),
-            body: JSON.stringify({ node_id: peer.nodeId, url: peer.baseUrl }),
+            body: JSON.stringify({ node_id: peer.nodeId, url: peer.baseUrl, public_key: await publishedKey(peer.baseUrl) }),
         });
         assert(add.status === 201, `add ${peer.nodeId} on ${self.nodeId}: ${add.status} ${JSON.stringify(add.body)}`);
         const put = await self.json(`/v1/federation/peers/${peer.nodeId}`, {
@@ -336,7 +345,9 @@ await test('S10. REFUSED — a second peer cannot also answer support', async ()
     // resolved by whichever peer the iterator reached first.
     const other = 'aimeat-peer-001-second';
     await C.json('/v1/federation/peers', {
-        method: 'POST', headers: auth(C.ownerToken), body: JSON.stringify({ node_id: other, url: 'http://localhost:49995' }),
+        // Never contacted, so any well-formed key does; it just has to have one.
+        method: 'POST', headers: auth(C.ownerToken),
+        body: JSON.stringify({ node_id: other, url: 'http://localhost:49995', public_key: 'placeholder-key-uncontacted-peer' }),
     });
     await C.json(`/v1/federation/peers/${other}`, {
         method: 'PUT', headers: auth(C.ownerToken), body: JSON.stringify({ status: 'active', tier: 'contact' }),

@@ -56,7 +56,16 @@ async function setupOwner(node: NodeState, ownerName: string): Promise<void> {
 }
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 async function addActivePeer(from: NodeState, to: NodeState) {
-  await from.json('/v1/federation/peers', { method: 'POST', headers: auth(from.ownerToken), body: JSON.stringify({ node_id: to.nodeId, url: to.baseUrl }) });
+  // The far node's own published key: a peer record with no verification key can no longer be
+  // written, because nothing could ever be checked against it.
+  const wk = await (await fetch(`${to.baseUrl}/.well-known/aimeat`)).json() as { public_key?: string; data?: { public_key?: string } };
+  const peerKey = wk.public_key ?? wk.data?.public_key ?? '';
+  assert(!!peerKey, `no published key for ${to.nodeId}: ${JSON.stringify(wk).slice(0, 200)}`);
+  const add = await from.json('/v1/federation/peers', {
+    method: 'POST', headers: auth(from.ownerToken),
+    body: JSON.stringify({ node_id: to.nodeId, url: to.baseUrl, public_key: peerKey }),
+  });
+  assert(add.status === 201, `add ${to.nodeId} on ${from.nodeId}: ${add.status} ${JSON.stringify(add.body)}`);
   await from.json(`/v1/federation/peers/${to.nodeId}`, { method: 'PUT', headers: auth(from.ownerToken), body: JSON.stringify({ status: 'active' }) });
 }
 

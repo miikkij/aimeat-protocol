@@ -169,43 +169,71 @@ await test('3. Admin lists pending requests', async () => {
     assert(found.status === 'pending', `found status: ${found.status}`);
 });
 
-await test('4. Admin approves request', async () => {
-    const { body } = await json(`/v1/admin/peering/requests/${peeringRequestId}`, {
+await test('4. Approving a request that carries NO key is refused', async () => {
+    // The OUTBOUND /peer/request door stores publicKey: '' — at that moment this node has not been
+    // told the other one's key. Approving it used to mint a keyless peer, which is a row whose only
+    // remaining purpose is to be trusted by the next thing that reads it. (An INBOUND introduce
+    // always carries a key; introduce.ts refuses without one.)
+    const { status, body } = await json(`/v1/admin/peering/requests/${peeringRequestId}`, {
         method: 'PUT',
         headers: { Authorization: `Bearer ${ownerToken}` },
         body: JSON.stringify({ decision: 'approve' }),
     });
-    assert(body.ok === true, `approve: ${JSON.stringify(body.error)}`);
-    assert(body.data.status === 'approved', `status: ${body.data.status}`);
+    assert(status === 409, `expected 409, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.error?.code === 'PEER_KEY_REQUIRED', `code: ${body.error?.code}`);
 });
 
-await test('5. Check request status (approved)', async () => {
+await test('5. …and the request is still pending, because nothing was written', async () => {
+    // Refuse before you write (invariant 14) applies to the REQUEST too: marking it approved and
+    // then refusing would leave an approved request with no peer behind it and no way to tell why.
     const { body } = await json(`/v1/federation/peer/request/${peeringRequestId}/status`, {
         headers: { Authorization: `Bearer ${ownerToken}` },
     });
     assert(body.ok === true, 'ok');
-    assert(body.data.status === 'approved', `status: ${body.data.status}`);
+    assert(body.data.status === 'pending', `status: ${body.data.status}`);
 });
 
-await test('6. Activate peering', async () => {
-    // The approve step adds the peer with the fromNodeId from the request.
-    // We need to activate it using that node ID.
-    const { body } = await json('/v1/federation/peer/activate', {
+await test('6. Activation runs key exchange first, and an unreachable peer is refused', async () => {
+    // `active` is the state every other gate reads as "this link works", so earning it has to mean
+    // something happened. This peer's URL points nowhere, so the exchange fails and the peer must be
+    // exactly what it was: pending.
+    const unreachableId = `aimeat-unreachable-${Date.now()}`;
+    const { status: created } = await json('/v1/federation/peers', {
         method: 'POST',
         headers: { Authorization: `Bearer ${ownerToken}` },
-        body: JSON.stringify({ peer_node_id: config_nodeIdFromRequest() }),
+        body: JSON.stringify({
+            node_id: unreachableId,
+            url: 'http://127.0.0.1:9899',
+            public_key: directPeerPubKeyB64,
+        }),
     });
-    assert(body.ok === true, `activate: ${JSON.stringify(body.error)}`);
-    assert(body.data.status === 'active', `status: ${body.data.status}`);
+    assert(created === 201, `setup create: ${created}`);
+
+    const { status, body } = await json('/v1/federation/peer/activate', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ peer_node_id: unreachableId }),
+    });
+    assert(status === 502, `expected 502, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.error?.code === 'KEY_EXCHANGE_FAILED', `code: ${body.error?.code}`);
+
+    const { body: listBody } = await json('/v1/federation/peers', {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    const after = listBody.data.peers.find((p: any) => p.node_id === unreachableId);
+    assert(after, 'the peer still exists');
+    assert(after.status === 'pending', `unchanged by a failed activation, got ${after.status}`);
 });
 
-// Helper: the peering request's fromNodeId is set to config.nodeId by the server
-function config_nodeIdFromRequest(): string {
-    // The server sets fromNodeId to config.nodeId (our own node id) when creating the request.
-    // So the peer was registered with key = config.nodeId = NODE_ID.
-    // But that would conflict - let's check by listing peers instead.
-    return NODE_ID;
-}
+await test('6b. A peer cannot be created without a key at all', async () => {
+    const { status, body } = await json('/v1/federation/peers', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ node_id: `aimeat-keyless-${Date.now()}`, url: 'http://localhost:9898' }),
+    });
+    assert(status === 400, `expected 400, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.error?.code === 'PEER_KEY_REQUIRED', `code: ${body.error?.code}`);
+});
 
 await test('7. Submit + reject a second request', async () => {
     const { status, body } = await json('/v1/federation/peer/request', {
@@ -554,6 +582,7 @@ await test('Setup: register peer for emergency de-peer', async () => {
         body: JSON.stringify({
             node_id: emergencyPeerId,
             url: 'http://localhost:9996',
+            public_key: directPeerPubKeyB64,
         }),
     });
     assert(status === 201, `status ${status}`);
@@ -633,7 +662,7 @@ await test('18b. Trust advisory (ban — auto de-peers)', async () => {
     await json('/v1/federation/peers', {
         method: 'POST',
         headers: { Authorization: `Bearer ${ownerToken}` },
-        body: JSON.stringify({ node_id: banPeerId, url: 'http://localhost:9995' }),
+        body: JSON.stringify({ node_id: banPeerId, url: 'http://localhost:9995', public_key: directPeerPubKeyB64 }),
     });
 
     const { status, body } = await json('/v1/federation/trust-advisory', {
@@ -665,7 +694,10 @@ await test('18c. Key exchange with known peer', async () => {
     await json('/v1/federation/peers', {
         method: 'POST',
         headers: { Authorization: `Bearer ${ownerToken}` },
-        body: JSON.stringify({ node_id: kxPeerId, url: 'http://localhost:9994' }),
+        // Registered with the SAME key it will present below. It used to be registered keyless, so
+        // the key-exchange door read the presented key as a first statement; with a key on file a
+        // DIFFERENT one is a rotation and the (pre-existing, correct) continuity guard refuses it.
+        body: JSON.stringify({ node_id: kxPeerId, url: 'http://localhost:9994', public_key: 'deadbeef1234567890abcdef' }),
     });
     // Activate the peer so key-exchange accepts it
     await json(`/v1/federation/peers/${kxPeerId}`, {
@@ -789,7 +821,7 @@ await test('27. Peer registration duplicate', async () => {
     const { status: s1 } = await json('/v1/federation/peers', {
         method: 'POST',
         headers: { Authorization: `Bearer ${ownerToken}` },
-        body: JSON.stringify({ node_id: dupId, url: 'http://localhost:9993' }),
+        body: JSON.stringify({ node_id: dupId, url: 'http://localhost:9993', public_key: directPeerPubKeyB64 }),
     });
     assert(s1 === 201, `first create: ${s1}`);
 
@@ -797,7 +829,7 @@ await test('27. Peer registration duplicate', async () => {
     const { status: s2, body } = await json('/v1/federation/peers', {
         method: 'POST',
         headers: { Authorization: `Bearer ${ownerToken}` },
-        body: JSON.stringify({ node_id: dupId, url: 'http://localhost:9992' }),
+        body: JSON.stringify({ node_id: dupId, url: 'http://localhost:9992', public_key: directPeerPubKeyB64 }),
     });
     assert(s2 === 409, `duplicate: ${s2}`);
     assert(body.ok === false, 'not ok');

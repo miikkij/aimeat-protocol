@@ -166,7 +166,16 @@ await test('6. pull from an unknown issuer is rejected (403)', async () => {
 await test('7. peer A↔P, then P pulls + applies A\'s signed policy', async () => {
   // Bidirectional peering to exchange node public keys.
   for (const [from, to] of [[A, P], [P, A]] as [NodeState, NodeState][]) {
-    await from.json('/v1/federation/peers', { method: 'POST', headers: auth(from.ownerToken), body: JSON.stringify({ node_id: to.nodeId, url: to.baseUrl }) });
+    // The far node's own published key: a peer record with no verification key can no longer be
+    // written, which is the point — nothing could ever be checked against it.
+    const wk = await (await fetch(`${to.baseUrl}/.well-known/aimeat`)).json() as { public_key?: string; data?: { public_key?: string } };
+    const peerKey = wk.public_key ?? wk.data?.public_key ?? '';
+    assert(!!peerKey, `no published key for ${to.nodeId}: ${JSON.stringify(wk).slice(0, 200)}`);
+    const add = await from.json('/v1/federation/peers', {
+      method: 'POST', headers: auth(from.ownerToken),
+      body: JSON.stringify({ node_id: to.nodeId, url: to.baseUrl, public_key: peerKey }),
+    });
+    assert(add.status === 201, `add ${to.nodeId} on ${from.nodeId}: ${add.status} ${JSON.stringify(add.body)}`);
     await from.json(`/v1/federation/peers/${to.nodeId}`, { method: 'PUT', headers: auth(from.ownerToken), body: JSON.stringify({ status: 'active' }) });
   }
   // activate P→A performs key exchange, caching A's node public key on P (peerKeyCache).

@@ -19606,6 +19606,15 @@ paths:
     post:
       operationId: activatePeering
       summary: Activate approved peering
+      description: |
+        KEY EXCHANGE RUNS FIRST, AND A FAILURE REFUSES THE ACTIVATION. `active` is the state every
+        other gate reads as "this link works", so earning it has to mean something happened: nothing
+        about the peer changes until the exchange has succeeded, and a failed attempt leaves the
+        record exactly as it was for the operator to retry once the far end is up.
+
+        A peer with no key on file adopts the one the exchange returned. A peer that already has one
+        and is presented a DIFFERENT one is refused as a rotation — that is re-established through
+        the introduce and approval flow, not by pressing activate.
       tags: [Federation]
       security:
         - BearerAuth: []
@@ -19621,6 +19630,14 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '404':
+          description: No peer with that node id
+        '409':
+          description: KEY_ROTATION_DENIED — the node presented a different key than the one on file
+        '502':
+          description: |
+            KEY_EXCHANGE_FAILED (the node could not be reached or answered nothing usable) or
+            PEER_KEY_REQUIRED (it returned no verification key). The peer is unchanged either way.
 
   /v1/federation/heartbeat:
     post:
@@ -19674,7 +19691,14 @@ paths:
     post:
       operationId: addPeer
       summary: Add peer manually
-      description: Manually add a peer node to the federation. Operator auth required.
+      description: |
+        Manually add a peer node to the federation. Operator auth required.
+
+        `public_key` IS REQUIRED. A peer record with no verification key is a row whose only
+        remaining purpose is to be trusted by the next thing that reads it: every gate that checks a
+        peer signature has to special-case the empty string or fail open, and one of them did. The
+        peer is created `pending`; `POST /v1/federation/peer/activate` is what makes it active, and
+        that runs key exchange first.
       tags: [Federation]
       security:
         - BearerAuth: []
@@ -19684,9 +19708,25 @@ paths:
           application/json:
             schema:
               type: object
+              required: [node_id, url, public_key]
+              properties:
+                node_id:
+                  type: string
+                  description: The peer's node id.
+                url:
+                  type: string
+                  description: The peer's base URL.
+                public_key:
+                  type: string
+                  minLength: 1
+                  description: The peer's Ed25519 verification key. Required — an empty one is refused.
       responses:
         '201':
           $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          description: PEER_KEY_REQUIRED — no `public_key`, so nothing could ever be checked against this peer
+        '409':
+          description: CONFLICT — a peer with that node id is already registered
 
   /v1/federation/directory:
     get:

@@ -5,6 +5,15 @@
  * @description Peering-request admin decisions + peer lifecycle routes (approve/reject/delete requests,
  *   activate, heartbeat, presence, peer list/add/update, visiting→member promotion). Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-09-01 — A KEYLESS PEER IS NO LONGER WRITABLE OR ACTIVATABLE. Both write paths
+ *     defaulted the key to `''` (POST /peers, and approving a request), and activate wrote
+ *     `status = 'active'` BEFORE running key exchange, then warned and answered 200 when it failed
+ *     — so an unreachable node became an active peer with no key. Now: `public_key` is required at
+ *     the direct door, approving a keyless request is refused before the request itself is marked,
+ *     the exchange runs first and a failure refuses the activation with the peer unchanged, and a
+ *     successful exchange's key is actually STORED (it used to be discarded, so a "completed"
+ *     activation left a keyless peer keyless). A different key on an established peer is refused as
+ *     a rotation, the same rule the key-exchange door applies.
  *   v1.2.0 — 2026-08-23 — SECURITY (audit AI-triage, invariant 14): PUT /peers/:nodeId stages every
  *     change on a copy and touches the live peers-Map object only after the last refusal has passed.
  *     A support_upstream 409 used to leave a half-applied peer in memory, diverging from storage.
@@ -61,6 +70,21 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
         }
 
         const newStatus = decision === 'approve' ? 'approved' : 'rejected';
+
+        // REFUSE BEFORE YOU WRITE (invariant 14), and that means before the REQUEST is marked too.
+        // The same rule as the direct door: no key, no peer record. An inbound introduce always
+        // carries one (introduce.ts refuses without it), so this bites only a request written by the
+        // OUTBOUND `POST /v1/federation/peer/request` path, which stores `publicKey: ''` because at
+        // that moment this node has not been told the other one's key. Approving such a request used
+        // to mint a keyless peer. Marking the request approved and then refusing would leave the
+        // operator an approved request with no peer behind it and no way to tell why.
+        const requestKey = (request.publicKey ?? '').trim();
+        if (decision === 'approve' && requestKey === '') {
+            res.status(409).json(error(config.nodeId, 'PEER_KEY_REQUIRED',
+                'This request carries no verification key for that node, so approving it would create a peer nothing can be checked against. Wait for that node to introduce itself, which is what brings its key.'));
+            return;
+        }
+
         await storage.updatePeeringRequest(id, {
             status: newStatus,
             updatedAt: new Date().toISOString(),
@@ -77,7 +101,7 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
             const peerInfo: PeerInfo = {
                 nodeId: request.fromNodeId ?? request.id,
                 url: request.targetUrl ?? request.fromNodeUrl,
-                publicKey: request.publicKey ?? '',
+                publicKey: requestKey,
                 status: 'approved',
                 addedAt: now,
                 lastSeen: now,
@@ -123,21 +147,60 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
             return;
         }
 
-        peer.status = 'active';
-        peer.lastSeen = new Date().toISOString();
-        await storage.saveFederationPeer(peer);
-
-        // A.3: Trigger key exchange on peering activation
+        // ── Key exchange FIRST, and a failure refuses the activation ──
+        //
+        // This used to write `status = 'active'` and save, then run the exchange, then log a warning
+        // and answer 200 whichever way it went. So an unreachable peer — or one that answered
+        // nothing usable — became an ACTIVE peer with whatever key it already had, which for a peer
+        // added before this round could be none at all. Active is the state every other gate reads
+        // as "this link works"; earning it has to mean something happened.
+        //
+        // Refuse before you write (invariant 14): nothing about the peer changes until the exchange
+        // has succeeded, so a failed activation leaves the record exactly as it was and the operator
+        // can press again once the far end is up.
         const keyExchangeResult = await performKeyExchange(peer.url, config, storage);
         if (!keyExchangeResult.success) {
-            logger.warn(`Key exchange failed during activation of peer ${peer_node_id}: ${keyExchangeResult.error}`);
+            logger.warn('Peer activation refused: key exchange failed', {
+                peer: peer_node_id, peerUrl: peer.url, reason: keyExchangeResult.error,
+            });
+            res.status(502).json(error(config.nodeId, 'KEY_EXCHANGE_FAILED',
+                `Could not exchange keys with that node, so it stays as it was: ${keyExchangeResult.error ?? 'no reason given'}. Check it is running and reachable, then try again.`));
+            return;
         }
+
+        // WHAT THE EXCHANGE RETURNED IS WORTH KEEPING, and the old code threw it away — a successful
+        // exchange left `peer.publicKey` untouched, so a keyless peer stayed keyless through a
+        // "completed" activation. A peer with no key adopts the one it just proved it serves.
+        const exchangedKey = keyExchangeResult.peerPublicKey ?? '';
+        if (!peer.publicKey && !exchangedKey) {
+            res.status(502).json(error(config.nodeId, 'PEER_KEY_REQUIRED',
+                'That node did not return a verification key, so there is still nothing to check its messages against. It stays as it was.'));
+            return;
+        }
+        if (peer.publicKey && exchangedKey && exchangedKey !== peer.publicKey) {
+            // Key continuity, the same rule the key-exchange door applies (lifecycle.ts): once a
+            // peer's key is established, a CHANGE to it is a rotation and needs proof of possession
+            // of the current one. Adopting it here because an operator pressed activate would be the
+            // rotation gate with a button in front of it.
+            logger.warn('Peer activation refused: the node presented a different key', {
+                peer: peer_node_id, peerUrl: peer.url,
+            });
+            res.status(409).json(error(config.nodeId, 'KEY_ROTATION_DENIED',
+                'That node is presenting a different verification key than the one on file. A new key is a new party until it is re-established through the introduce and approval flow.'));
+            return;
+        }
+
+        const now = new Date().toISOString();
+        peer.publicKey = peer.publicKey || exchangedKey;
+        peer.status = 'active';
+        peer.lastSeen = now;
+        await storage.saveFederationPeer(peer);
 
         res.json(success(config.nodeId, {
             peer_node_id,
             status: 'active',
-            activated_at: peer.lastSeen,
-            key_exchange: keyExchangeResult.success ? 'completed' : 'failed',
+            activated_at: now,
+            key_exchange: 'completed',
         }));
         emitChange('federation');
     });
@@ -293,6 +356,18 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
             return;
         }
 
+        // A PEER RECORD WITH NO KEY MUST BE IMPOSSIBLE TO WRITE. `public_key ?? ''` used to let this
+        // door create one in a single call, and an empty key is not a peer that is merely unusual —
+        // it is a row whose only remaining purpose is to be trusted by the next thing that reads it.
+        // Every gate that checks a peer signature has to special-case the empty string or fail open,
+        // and one of them did: federated login skipped verification entirely when the key was
+        // missing. Closing that gate made these rows useless; this stops them being written.
+        if (typeof public_key !== 'string' || public_key.trim() === '') {
+            res.status(400).json(error(config.nodeId, 'PEER_KEY_REQUIRED',
+                'A peer needs its verification key. Without one this node cannot check that anything claiming to come from that node really did.'));
+            return;
+        }
+
         if (peers.has(node_id)) {
             res.status(409).json(error(config.nodeId, 'CONFLICT', `Peer "${node_id}" already registered`));
             return;
@@ -302,7 +377,7 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
         const peerInfo: PeerInfo = {
             nodeId: node_id,
             url,
-            publicKey: public_key ?? '',
+            publicKey: public_key,
             status: 'pending',
             addedAt: now,
             lastSeen: now,
