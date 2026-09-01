@@ -20,6 +20,9 @@
  *   import { exchangeRouter } from './routes/exchange.js';
  *   app.use(exchangeRouter(config, storage));
  * @version-history
+ *   v1.6.0 — 2026-09-01 — Work that was paid up front at the A2A door delivers without a second
+ *     settlement: a buyer from another node holds no contract here, and metering it again would
+ *     either refuse the delivery or charge twice (Agent v2, V6a).
  *   v1.5.0 — 2026-07-28 — EARNINGS: GET /v1/exchange/earnings reads the seller's own accrued
  *     payables (per currency + the per-entry breakdown). The accrual rail booked these on every
  *     money-priced call and nothing exposed them — the exposure lived in the removed ee/ module,
@@ -743,6 +746,24 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
     if (!w || w.providerOwner !== owner) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such work of yours to deliver'));
     if (w.state !== 'open') return res.status(409).json(error(config.nodeId, 'WORK_NOT_OPEN', `This work is ${w.state}, so it cannot be changed now. Open it to see where it got to.`));
     const b = (req.body ?? {}) as Record<string, unknown>;
+
+    // WORK PAID UP FRONT SETTLES ONCE, AND IT ALREADY HAS. A buyer from another node holds no
+    // contract and no balance here — its money moved onchain at the A2A door before the work was
+    // opened — so metering it again on delivery would either refuse a task the provider was paid
+    // for or charge for it twice. The two markers are both written by that door and neither can be
+    // produced through this one: `/v1/exchange/work` always stamps `consumerOwner` from the caller,
+    // so an empty one means there was no local caller, and `chargedUnits` is 0 until something
+    // settles.
+    const prepaid = w.consumerOwner === '' && w.chargedUnits > 0;
+    if (prepaid) {
+      w.state = 'delivered'; w.output = b.output ?? null; w.deliveredAt = new Date().toISOString();
+      if (typeof b.note === 'string' && b.note) w.note = b.note.slice(0, 2000);
+      await putWork(storage, w);
+      // No notification: there is nobody on this node to tell. The buyer reads the result at the
+      // A2A door it created the work through.
+      return res.json(success(config.nodeId, { work: workView(w) }));
+    }
+
     // Settle the per-task price against the CONSUMER's contract (the consumer pays; the provider is credited).
     const before = await readEntitlementForCall(storage, w.consumerGaii, w.ext, w.action);
     if (!before || before.state !== 'active') {

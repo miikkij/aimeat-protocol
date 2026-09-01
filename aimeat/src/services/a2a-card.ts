@@ -14,13 +14,19 @@
  *   updates that never arrive. `pushNotifications: true` because V4 stores exactly the config A2A
  *   describes. Both are read from one place so the card and the refusal cannot disagree.
  *
- * @structure a2aCardFor(config, agent, baseUrl)
- * @usage const card = a2aCardFor(config, agent, 'https://node.example/v1/a2a/claude');
+ * @structure a2aCardFor(config, agent, baseUrl, opts)
+ * @usage const card = a2aCardFor(config, agent, 'https://node.example/v1/a2a/claude', { offerings });
  * @version-history
+ *   v1.1.0 — 2026-09-01 — What a stranger may buy is on the card: a LISTED offering becomes a skill
+ *     with its price, the x402 extension is declared, and the two ways in are separate security
+ *     schemes (V6a foreign path).
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V6a).
  */
 import type { AgentCard } from '@a2a-js/sdk';
 import { A2A_PROTOCOL_VERSION } from '@a2a-js/sdk';
+import type { Offering } from './exchange-market.js';
+import { A2A_X402_EXTENSION } from './a2a-offering.js';
+import { FOREIGN_HEADERS } from './a2a-foreign.js';
 
 /**
  * The A2A version almost every client in the world speaks today. The SDK ships a compatibility
@@ -72,7 +78,39 @@ function skillsFor(agent: AgentRecord): AgentCard['skills'] {
   }));
 }
 
-export function a2aCardFor(config: AimeatConfig, agent: AgentRecord, url: string): AgentCard {
+/**
+ * A published offering, as an A2A skill a stranger can act on.
+ *
+ * THE PRICE IS ON THE CARD because the card is what a buyer reads before deciding to knock. An
+ * offering whose price is only discoverable by starting a task makes every client start a task to
+ * window-shop. The id is the offering id, which is exactly what `metadata.offeringId` takes, so the
+ * card names the thing the request needs rather than something a client has to translate.
+ */
+function offeringSkills(offerings: Offering[]): AgentCard['skills'] {
+  return offerings.map(o => ({
+    id: o.offeringId,
+    name: o.title,
+    description: `${o.description || o.title} — ${o.basePrice} ${o.currency ?? 'morsel'} per ${o.unit}. Send this offeringId in message metadata; payment is settled with the x402 extension before the work starts.`,
+    tags: ['for-hire', o.surface?.kind === 'agent-work' ? o.surface.taskType : o.action],
+    examples: [],
+    inputModes: ['text/plain', 'application/json'],
+    outputModes: ['text/plain', 'application/json'],
+    securityRequirements: [{ schemes: { foreignCard: { list: ['*'] } } }],
+  }));
+}
+
+/**
+ * What else the card can carry. Both optional, because the two callers differ: the card route knows
+ * the agent's offerings, and a handler building the card for its own use may not care.
+ */
+export interface A2ACardOptions {
+  /** LISTED agent-work offerings — what a stranger may buy. */
+  offerings?: Offering[];
+}
+
+export function a2aCardFor(config: AimeatConfig, agent: AgentRecord, url: string, opts: A2ACardOptions = {}): AgentCard {
+  const offerings = opts.offerings ?? [];
+  const forHire = offerings.length > 0;
   return {
     name: agent.displayName || agent.name,
     description: agent.description
@@ -90,11 +128,18 @@ export function a2aCardFor(config: AimeatConfig, agent: AgentRecord, url: string
     capabilities: {
       streaming: A2A_SURFACE.streaming,
       pushNotifications: A2A_SURFACE.pushNotifications,
-      extensions: [],
+      // DECLARED ONLY WHEN THERE IS SOMETHING TO BUY. An agent whose owner has published nothing
+      // takes no payment on this road, and advertising the payment extension anyway would invite a
+      // client to sign a proof for a door that answers "there is nothing for sale here".
+      extensions: forHire
+        ? [{ uri: A2A_X402_EXTENSION, required: true, params: undefined,
+          description: 'Work for hire is quoted as x402 exact-scheme requirements on the first call and starts once the payment settles.' }]
+        : [],
       extendedAgentCard: false,
     },
-    // Every door behind this card is authenticated, and by the same bearer the rest of the node
-    // takes. Declaring it is how a client knows it needs one before it tries.
+    // TWO WAYS IN, AND THEY REACH DIFFERENT THINGS. A principal of this account gets the agent's
+    // own surface, the way V4 and V5 describe it. A stranger gets what the owner has published for
+    // hire and nothing else. Declaring both is how a client knows which one it is holding.
     securitySchemes: {
       bearer: {
         scheme: {
@@ -102,11 +147,25 @@ export function a2aCardFor(config: AimeatConfig, agent: AgentRecord, url: string
           value: { scheme: 'bearer', bearerFormat: 'JWT', description: 'An AIMEAT credential for a principal of this agent\'s account.' },
         },
       },
+      ...(forHire
+        ? {
+          foreignCard: {
+            scheme: {
+              $case: 'apiKeySecurityScheme',
+              value: {
+                location: 'header',
+                name: FOREIGN_HEADERS.card,
+                description: `Your own signed agent card in ${FOREIGN_HEADERS.card} and a fresh assertion signed by the same key in ${FOREIGN_HEADERS.assertion}. Your key is pinned on first sight and compared on every call after it. This reaches the skills tagged for-hire and nothing else.`,
+              },
+            },
+          },
+        }
+        : {}),
     },
     securityRequirements: [{ schemes: { bearer: { list: ['*'] } } }],
     defaultInputModes: ['text/plain', 'application/json'],
     defaultOutputModes: ['text/plain', 'application/json'],
-    skills: skillsFor(agent),
+    skills: [...skillsFor(agent), ...offeringSkills(offerings)],
     signatures: [],
   };
 }

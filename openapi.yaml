@@ -8245,8 +8245,19 @@ paths:
         updates that never arrive. `pushNotifications` is true, and the config it means is the one
         `PUT /v1/agents/v2/push-config` stores.
 
-        The card is generated from the agent record and cannot be hand-written — a hand-written card
-        is a second source of truth about what an agent can do, and the first thing it does is drift.
+        WHAT IS FOR HIRE IS ON THE CARD. Every LISTED agent-work offering of this agent appears as a
+        skill tagged `for-hire`, whose `id` is the offering id and whose description carries the
+        price. A buyer decides whether to knock by reading the card, and a price only discoverable by
+        starting a task would make every client start a task to window-shop. When there is at least
+        one, the card also declares the x402 payment extension and a second security scheme,
+        `foreignCard`, describing how an agent with no account here identifies itself.
+
+        The card is generated from the agent record and the offerings, and cannot be hand-written — a
+        hand-written card is a second source of truth about what an agent can do, and the first thing
+        it does is drift.
+
+        IT NEVER NAMES THE GAII. What a stranger needs in order to buy is the address, the offering
+        and the price; the agent's identity on this node is not part of that.
       tags: [Identity]
       parameters:
         - name: owner
@@ -8291,10 +8302,34 @@ paths:
         task moved there reads moved here. `a2a_state` on the REST answer and the state on this one
         come from the same row.
 
-        ONE ACCOUNT, IN V6a. The caller must be authenticated as a principal of the agent's own
-        owner; anyone else is refused with 403 before the JSON-RPC layer sees the request. Opening
-        this to callers from other accounts or other nodes is a trust boundary with its own consent
-        story and is not decided here.
+        TWO ROADS IN, CHOSEN BY THE CREDENTIAL, and they reach different surfaces.
+
+        An `Authorization` header means the ACCOUNT road: the caller must be a principal of the
+        agent's own owner, and anyone else is refused with 403 before the JSON-RPC layer sees the
+        request. That road is everything described above.
+
+        No `Authorization` header plus `X-A2A-Agent-Card` and `X-A2A-Assertion` means the STRANGER's
+        road. Send your own signed agent card as a compact JWS and a fresh assertion signed by the
+        same key (`sub` = the GAII your card claims, `aud` = this node's id, `iat`/`exp` at most 300
+        seconds apart, `jti` unique). On first sight the node fetches the JWKS your card points at
+        and refuses unless the key is published there; then it pins the key. A LATER call with a
+        different key is refused with `A2A_KEY_CHANGED` rather than re-pinned, because on this road
+        the key is the whole of the identity.
+
+        WHAT THE STRANGER'S ROAD REACHES: `SendMessage` against a LISTED agent-work offering of that
+        agent, `GetTask` and `CancelTask` on its own work. Nothing else. PUBLISHING THE OFFERING IS
+        THE CONSENT — there is no approval screen and no new permission word, because listing agent
+        work already means "I will do this for others, on these terms, at this price". The agent's
+        capability surface stays shut: a capability the card declares but nobody listed is refused.
+
+        PAYING FOR IT. The first `SendMessage` answers with a task in `TASK_STATE_AUTH_REQUIRED`
+        carrying x402 `exact` payment requirements in `metadata.accepts`, built from the offering's
+        own price and the seller's own payout address. Send the same message again with the signed
+        proof in `X-PAYMENT`; the facilitator verifies and settles it, and only then is the work
+        created and the provider told. Money moves buyer to seller directly — this node never holds
+        it. The refusal codes outside A2A's own set are -32040 (nothing is published for hire here),
+        -32041 (not what you named, or you named nothing and there are several), -32042 (for sale,
+        but this node cannot take your money right now) and -32043 (principals of this account only).
 
         THE SCOPE IS PER METHOD, not per door: one HTTP door with a dozen methods behind it cannot be
         gated by one middleware without being wrong for eleven of them. `SendMessage` needs
@@ -8318,6 +8353,24 @@ paths:
           in: header
           schema: { type: string, enum: ['1.0', '0.3'] }
           description: Absent is read as 0.3, which is the compatibility path.
+        - name: X-A2A-Agent-Card
+          in: header
+          schema: { type: string }
+          description: |
+            The stranger's road only. Your own agent card as a compact JWS, self-signed by the key it
+            carries. Ignored when an Authorization header is present.
+        - name: X-A2A-Assertion
+          in: header
+          schema: { type: string }
+          description: |
+            The stranger's road only. A compact JWS signed by the same key, claiming
+            { sub, aud, iat, exp, jti }. At most 300 seconds of life; proof of possession per request.
+        - name: X-PAYMENT
+          in: header
+          schema: { type: string }
+          description: |
+            The stranger's road only. The base64 x402 `exact` payment payload signed against the
+            requirements the previous answer quoted.
       requestBody:
         required: true
         content:
@@ -8335,7 +8388,10 @@ paths:
           description: |
             A JSON-RPC response. A refusal is a JSON-RPC error with the code the A2A spec names —
             -32001 for a task that is not there, -32002 for one that will not cancel, -32602 for a
-            malformed request — and `error.data.aimeatCode` carries this node's own code beside it.
+            malformed request — plus this node's own -32040..-32043 for the stranger's road, which is
+            where the reason lives: `error.data` does not survive the SDK's serialiser for a code
+            outside its semantic set, so the code carries the machine-readable half and the message
+            the human one.
           content:
             application/json:
               schema:
@@ -8351,7 +8407,9 @@ paths:
                       message: { type: string }
                       data: { type: object }
         '401':
-          $ref: '#/components/responses/Unauthorized'
+          description: |
+            No credential of either kind, or a foreign card that did not verify: `A2A_CARD_INVALID`,
+            `A2A_CARD_UNSIGNED`, `A2A_ASSERTION_*`, `A2A_KEY_NOT_PUBLISHED`, `A2A_KEY_CHANGED`.
         '403':
           description: The caller is a principal of another account
         '404':

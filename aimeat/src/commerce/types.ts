@@ -178,6 +178,20 @@ export interface PaymentHandler {
     instrument?: unknown;
     /** The session's seller — money handlers charge on the SELLER's own PSP credentials (psp). */
     seller?: { ghii: string; owner: string; psp?: unknown };
+    /**
+     * What the buyer is paying FOR, as the URL they were quoted at. Optional and additive: a
+     * checkout session is the usual answer and the handler derives it from `reference`, so nothing
+     * that omits this changes.
+     *
+     * It exists because a payment proof is signed against requirements that NAME the resource, and
+     * the A2A door quotes a foreign caller at the agent's own address rather than at a checkout
+     * session it has no account to hold. A handler rebuilding a different resource string than the
+     * one the buyer signed is a proof a strict facilitator refuses — so the quote and the collect
+     * are handed the same string instead of each deriving one.
+     */
+    resource?: string;
+    /** The line a receipt should carry. Same reasoning as `resource`; the handler has a default. */
+    description?: string;
   }): Promise<{ trackingCode: string }>;
   /** Pay one recipient their share of an already-collected amount. */
   payout(ctx: PaymentContext, args: {

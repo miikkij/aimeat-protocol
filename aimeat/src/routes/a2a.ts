@@ -13,12 +13,24 @@
  *   who asks. Everything behind it takes a credential, which the card declares so a client knows
  *   before it tries.
  *
- *   ONE ACCOUNT, IN V6a. The caller must be a principal of the same owner as the agent it is
- *   addressing. That is the same fence V4 and V5 apply and it is reached through the same
- *   functions — this route adds no rule of its own beyond finding the agent and checking the owner.
- *   Letting a caller from ANOTHER account or another node through this door is a real trust
- *   boundary with its own consent story, and it is not a decision to make on the way past. The card
- *   is honest about it: the security requirement is a bearer for this account.
+ *   THREE KINDS OF CALLER, AND EACH REACHES A DIFFERENT SURFACE.
+ *
+ *     nobody          the card, and nothing else
+ *     this account    the agent's own surface — V4 turns, V5 tasks, the same fence those apply
+ *     a stranger      what the owner has PUBLISHED for hire, paid for, and nothing else
+ *
+ *   THE THIRD ONE IS NOT AN EXTENSION OF THE SECOND. It is a separate handler over a separate
+ *   store, because "which caller am I" is exactly the question a fence answers, and a fence made of
+ *   `if (foreign)` branches inside methods is a fence with holes in it. A stranger never reaches
+ *   `AimeatA2ARequestHandler`, so no capability, tool or task of this account is one bug away.
+ *
+ *   PUBLISHING THE OFFERING IS THE CONSENT. There is no approval screen on the stranger's road and
+ *   no new permission word: listing agent work on the EXCHANGE already means "I will do this for
+ *   others, on these terms, at this price", and that listing is the whole of what a stranger may
+ *   ask for. Its price is settled through x402 before the work starts.
+ *
+ *   AND IT NEVER LEARNS A GAII. A stranger holds a work id and reads an offering; the agent behind
+ *   it stays an address on a public card.
  *
  *   WHY THE SDK IS HERE AT ALL. It owns the JSON-RPC framing, the method names, the error codes and
  *   the protobuf serialisation — the parts where being subtly wrong means a client fails in a way
@@ -28,6 +40,8 @@
  * @structure a2aRouter(config, storage)
  * @usage app.use(a2aRouter(config, storage));
  * @version-history
+ *   v1.2.0 — 2026-09-01 — A stranger can hire this agent: a verified foreign card reaches a
+ *     published offering, pays for it with x402 and reads the result, over a separate handler.
  *   v1.1.0 — 2026-09-01 — The OASF record (V6c): the third projection of the same agent.
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V6a).
  */
@@ -42,6 +56,9 @@ import { a2aCardFor } from '../services/a2a-card.js';
 import { oasfRecordFor } from '../services/oasf-projection.js';
 import { AimeatA2ARequestHandler } from '../services/a2a-handler.js';
 import type { A2ACaller } from '../services/a2a-handler.js';
+import { ForeignA2AHandler } from '../services/a2a-foreign-handler.js';
+import { identifyForeignCaller, FOREIGN_HEADERS } from '../services/a2a-foreign.js';
+import { offeringsForAgent } from '../services/a2a-offering.js';
 
 /** The address this node publishes for one agent's A2A interface. */
 function interfaceUrl(config: AimeatConfig, owner: string, agentName: string): string {
@@ -73,7 +90,8 @@ export function a2aRouter(config: AimeatConfig, storage: Storage): Router {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No agent of that name on this node.'));
       return;
     }
-    const card = a2aCardFor(config, agent, interfaceUrl(config, agent.owner, agent.name));
+    const offerings = await offeringsForAgent(storage, agent);
+    const card = a2aCardFor(config, agent, interfaceUrl(config, agent.owner, agent.name), { offerings });
     // The SDK's handler owns the ETag, Cache-Control and 304, which is the part of serving a card
     // that is easy to get subtly wrong.
     return agentCardHandler({ agentCardProvider: async () => card })(req, res, next);
@@ -99,41 +117,80 @@ export function a2aRouter(config: AimeatConfig, storage: Storage): Router {
     }));
   });
 
-  // ── The JSON-RPC surface. Authenticated, and fenced to the agent's own account. ──
-  router.use('/v1/a2a/:owner/:agent', requireAuth(), async (req: Request, res: Response, next: NextFunction) => {
-    const agent = await findAgent(req);
-    if (!agent) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No agent of that name on this node.'));
-      return;
-    }
-    // The same fence V4 and V5 apply, applied before the SDK sees the request: this road carries
-    // work between principals of ONE account.
-    if (agent.owner !== req.auth!.owner) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED',
-        'This A2A interface answers to principals of the agent\'s own account.'));
-      return;
-    }
+  const auth = requireAuth();
 
-    // The scopes travel with the caller because the gate is per JSON-RPC METHOD, not per HTTP
-    // door: one requireScope() here would have to name one word and be wrong for every other
-    // method behind it. The handler asks the same question requireScope asks, method by method.
-    const caller: A2ACaller = {
-      sub: req.auth!.sub, owner: req.auth!.owner,
-      roles: req.auth!.roles ?? [], scopes: req.auth!.scopes ?? [],
-    };
-    const card = a2aCardFor(config, agent, interfaceUrl(config, agent.owner, agent.name));
-    const handler = new AimeatA2ARequestHandler(storage, config, agent, caller, card);
-
+  /** Hand the request to the SDK, whichever handler is behind it. Framing is the SDK's job. */
+  function serveRpc(handler: AimeatA2ARequestHandler | ForeignA2AHandler, userName: string) {
     return jsonRpcHandler({
       requestHandler: handler,
       // A2A 1.0 is what this node answers, and 0.3 is what nearly every client sends today. The
       // SDK translates the older shape into the newer one and hands the same handler the result,
       // so there is one implementation behind both and the card declares both interfaces.
       legacyCompat: { enabled: true },
-      // The request is already authenticated by requireAuth above; this hands the SDK the identity
-      // it wants for its own context object. It is never the thing that decides access.
-      userBuilder: async () => ({ isAuthenticated: true, userName: req.auth!.sub }),
-    })(req, res, next);
+      // The caller was identified before this point — by requireAuth, or by a verified card and a
+      // fresh assertion. This only hands the SDK the identity it wants for its own context object.
+      // It is never the thing that decides access.
+      userBuilder: async () => ({ isAuthenticated: true, userName }),
+    });
+  }
+
+  // ── The JSON-RPC surface. Two roads in, chosen by which credential the caller brought. ──
+  //
+  // AN AUTHORIZATION HEADER MEANS THE ACCOUNT ROAD, its absence plus a signed card means the
+  // stranger's road, and neither means 401 naming both. Deciding on the presence of a bearer rather
+  // than on which headers look interesting is what keeps the choice unambiguous: a principal of
+  // this account cannot be quietly downgraded to a buyer by an extra header, and a stranger cannot
+  // reach the account road by sending one.
+  router.use('/v1/a2a/:owner/:agent', async (req: Request, res: Response, next: NextFunction) => {
+    const agent = await findAgent(req);
+    if (!agent) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No agent of that name on this node.'));
+      return;
+    }
+    const url = interfaceUrl(config, agent.owner, agent.name);
+
+    if (req.headers.authorization) {
+      return auth(req, res, async () => {
+        // The same fence V4 and V5 apply, applied before the SDK sees the request: this road
+        // carries work between principals of ONE account.
+        if (agent.owner !== req.auth!.owner) {
+          res.status(403).json(error(config.nodeId, 'ACCESS_DENIED',
+            'This A2A interface answers to principals of the agent\'s own account. To hire it from outside, drop the bearer and present your own signed agent card.'));
+          return;
+        }
+        // The scopes travel with the caller because the gate is per JSON-RPC METHOD, not per HTTP
+        // door: one requireScope() here would have to name one word and be wrong for every other
+        // method behind it. The handler asks the same question requireScope asks, method by method.
+        const caller: A2ACaller = {
+          sub: req.auth!.sub, owner: req.auth!.owner,
+          roles: req.auth!.roles ?? [], scopes: req.auth!.scopes ?? [],
+        };
+        const offerings = await offeringsForAgent(storage, agent);
+        const card = a2aCardFor(config, agent, url, { offerings });
+        return serveRpc(new AimeatA2ARequestHandler(storage, config, agent, caller, card), req.auth!.sub)(req, res, next);
+      });
+    }
+
+    if (!req.headers[FOREIGN_HEADERS.card]) {
+      // Two ways in, so the refusal names both. The header names go in `details`, where a program
+      // looks for them, rather than into a sentence a person has to read past.
+      res.status(401).json(error(config.nodeId, 'UNAUTHORIZED',
+        'Sign in as this account to use this agent, or send your own signed agent card to hire it.',
+        401, { use_it: 'Authorization: Bearer', hire_it: [FOREIGN_HEADERS.card, FOREIGN_HEADERS.assertion] }));
+      return;
+    }
+
+    const who = await identifyForeignCaller(config, storage, req.headers);
+    if (!who.ok) {
+      res.status(who.status).json(error(config.nodeId, who.code, who.message));
+      return;
+    }
+    const offerings = await offeringsForAgent(storage, agent);
+    const card = a2aCardFor(config, agent, url, { offerings });
+    const handler = new ForeignA2AHandler(storage, config, agent, who.peer, card, {
+      header: req.header('X-PAYMENT') ?? undefined,
+    });
+    return serveRpc(handler, who.peer.gaii)(req, res, next);
   });
 
   return router;

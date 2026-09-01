@@ -25,6 +25,9 @@
  * @structure X402_HANDLER_ID · x402PaymentHandler
  * @usage registerPaymentHandler(x402PaymentHandler(config, facilitator));
  * @version-history
+ *   v1.2.0 — 2026-09-01 — collect() takes an optional resource + description, so a caller that
+ *     quoted its own address (the A2A foreign door) settles against the string the buyer actually
+ *     signed instead of a checkout-session URL it never had (Agent v2, V6a).
  *   v1.1.0 — 2026-07-25 — EUR settles in EURC alongside USD/USDC: currencies derived from the
  *     network registry, asset selected by session currency, asset named in the tracking code (TARGET-042)
  *   v1.0.0 — 2026-07-18 — Initial non-custodial USDC handler (TARGET-042)
@@ -56,7 +59,7 @@ export function x402PaymentHandler(config: AimeatConfig, facilitator: X402Facili
     // would fail. Model 2 throughout: the session currency stays fiat, the token is the instrument.
     currencies: x402SettlementCurrencies(configured),
 
-    async collect(_ctx: PaymentContext, { amount, currency, reference, instrument, seller }) {
+    async collect(_ctx: PaymentContext, { amount, currency, reference, instrument, seller, resource, description }) {
       const network = getX402Network(config.x402Network);
       if (!network) {
         throw new PaymentError('X402_NETWORK_UNKNOWN', 500, `x402 network not in the registry: ${config.x402Network}`);
@@ -74,10 +77,13 @@ export function x402PaymentHandler(config: AimeatConfig, facilitator: X402Facili
       if (!payTo) {
         throw new PaymentError('SELLER_NO_X402_ADDRESS', 422, 'The seller has no x402 stablecoin payout address configured (commerce.psp)');
       }
+      // THE BUYER SIGNED A RESOURCE STRING, so this must be the same one. A checkout session is the
+      // usual thing being bought and stays the default; a caller that quoted its own address (the
+      // A2A door, which sells to parties holding no session here) passes it in.
       const requirements = buildExactRequirements({
         network, asset, payTo, amountMicros: amount,
-        resource: `${config.baseUrl}/v1/commerce/checkout-sessions/${reference}`,
-        description: `AIMEAT checkout ${reference}`,
+        resource: resource ?? `${config.baseUrl}/v1/commerce/checkout-sessions/${reference}`,
+        description: description ?? `AIMEAT checkout ${reference}`,
       });
 
       // No proof yet → 402 so the adapter answers with the exact-scheme accepts[] the buyer signs.
