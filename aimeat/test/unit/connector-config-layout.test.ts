@@ -140,6 +140,69 @@ describe('an old-layout install on first start', () => {
     });
 });
 
+describe('a restart, with both credential families in one home', () => {
+    beforeEach(() => { home = resolve(process.cwd(), `test/.tmp-layout-both-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`); });
+    afterEach(() => {
+        delete process.env.AIMEAT_HOME;
+        try { rmSync(home, { recursive: true, force: true }); } catch { /* best effort */ }
+    });
+
+    /** A v2 credential: a key file, and the per-agent config enrolment writes beside it. */
+    function keyedAgent(agent: string, owner: string, nodeUrl: string): void {
+        mkdirSync(join(home, 'keys'), { recursive: true });
+        writeFileSync(join(home, 'keys', `${agent}@${owner}.key`), JSON.stringify({
+            privateKey: { kty: 'OKP', crv: 'Ed25519', x: 'x', d: 'd' },
+            publicKey: { kty: 'OKP', crv: 'Ed25519', x: 'x' },
+            kid: 'k1', gaii: `${agent}#${owner}@${NODE}`, nodeId: NODE,
+        }), 'utf-8');
+        mkdirSync(join(home, 'agents', owner, agent), { recursive: true });
+        writeFileSync(newPath(agent, owner), yamlStringify({ node_url: nodeUrl }), 'utf-8');
+    }
+
+    /** A v1 credential: a bearer whose `sub` carries the identity. */
+    function tokenAgent(agent: string, owner: string, nodeUrl: string): void {
+        mkdirSync(join(home, 'tokens'), { recursive: true });
+        writeFileSync(join(home, 'tokens', `${agent}@${owner}.token`), bearerFor(`${agent}#${owner}@${NODE}`), 'utf-8');
+        mkdirSync(join(home, 'agents', owner, agent), { recursive: true });
+        writeFileSync(newPath(agent, owner), yamlStringify({ node_url: nodeUrl }), 'utf-8');
+    }
+
+    it('comes back with ALL of them, not just the token-based ones', async () => {
+        // The failure this pins: a daemon restarts and the agents the basic-agents button created
+        // are simply gone, because they hold a KEY and the loader only enumerated `tokens/`. Their
+        // credentials were on disk the whole time, one directory across. A daemon that serves an
+        // owner's whole crew must not lose most of it to a restart.
+        tokenAgent('alicebot', 'alice', 'http://a.example:1');
+        keyedAgent('concierge', 'alice', 'http://a.example:1');
+        keyedAgent('crew-forge', 'alice', 'http://a.example:1');
+        keyedAgent('concierge', 'bob', 'http://b.example:2');
+
+        const { loadAllAgents } = await loadModule();
+        const all = await loadAllAgents();
+        const gaiis = all.map(a => a.gaii).sort();
+        expect(gaiis).toEqual([
+            `alicebot#alice@${NODE}`,
+            `concierge#alice@${NODE}`,
+            `concierge#bob@${NODE}`,
+            `crew-forge#alice@${NODE}`,
+        ]);
+        // And a key-based one carries no bearer: agent-key.ts mints one per use.
+        expect(all.find(a => a.agent === 'concierge' && a.owner === 'alice')!.token).toBe('');
+        expect(all.find(a => a.agent === 'alicebot')!.token).not.toBe('');
+    });
+
+    it('and a migrated agent holding both is served once, from the key', async () => {
+        tokenAgent('concierge', 'alice', 'http://a.example:1');
+        keyedAgent('concierge', 'alice', 'http://a.example:1');
+
+        const { loadAllAgents } = await loadModule();
+        const all = await loadAllAgents();
+        expect(all).toHaveLength(1);
+        // The bearer is the thing being retired; the key is what the node will honour.
+        expect(all[0].gaii).toBe(`concierge#alice@${NODE}`);
+    });
+});
+
 describe('a new-layout install', () => {
     beforeEach(() => { home = resolve(process.cwd(), `test/.tmp-layout-new-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`); });
     afterEach(() => {

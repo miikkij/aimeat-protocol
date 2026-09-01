@@ -34,6 +34,17 @@
  * @structure BASIC_AGENTS · BasicAgentTemplate · basicAgentByName
  * @usage import { BASIC_AGENTS } from '../data/basic-agents.js';
  * @version-history
+ *   v1.3.0 — 2026-09-02 — TOOLS, and who owns `mode`.
+ *     Two of the three declared no tools at all. `workflow-manager` is sold as "orders work from
+ *     your other agents" and had no delegation tool, so it could plan a job and send nothing;
+ *     `concierge` could answer but never hand on, which is half a front door. `crew-forge`'s
+ *     Registrar held `crew_registry`, which is not on the fixed tool menu at all — not a narrower
+ *     tool, no tool — on the one agent whose entire job is writing. Each tool below now carries the
+ *     line of its own description that requires it, and check:crew-defs refuses both an off-menu
+ *     name and a basic agent that cannot do what it says it does.
+ *     `mode` is the NODE's, and the two spawn agents move from `coordinator` to `task-runner`:
+ *     the node auto-activates a queued task only for a task-runner, so as seeded every task for
+ *     these agents sat in `queued` waiting for a person nobody had told.
  *   v1.2.0 — 2026-09-01 — Each template carries its CREW DEFINITION, seeded at creation, because
  *     the deadlock above means nobody else can write one. `concierge` becomes `resident` on
  *     crewaimeat's measurement (~4 s of cold start before the model is even called, which is the
@@ -51,7 +62,24 @@ export interface BasicAgentTemplate {
   description: string;
   /** Exactly what this agent may do. Never widened by anything the caller sends. */
   scopes: string[];
-  /** Server-side operational mode (which Hello Integration flow, how the fleet views group it). */
+  /**
+   * Server-side operational mode. THE NODE OWNS THIS FIELD, AND THE RUNTIME MUST NOT SET IT.
+   *
+   * It looks like a description of how an agent runs, which is why two writers seemed reasonable.
+   * It is not. `mode` is a BEHAVIOURAL SWITCH ON THE NODE: services/agent-task-rules.ts activates a
+   * queued task without the owner if and only if the target's mode is `task-runner`, and that
+   * file's own words are that setting it is "the person saying start without asking me each time".
+   * It also decides which Hello Integration flow a new agent gets.
+   *
+   * So a runtime that stamps mode on every start is not stating a preference about itself — it is
+   * rewriting a standing instruction the owner gave the node, from a process the owner is not
+   * looking at. That is the same reason the connector's per-agent file stopped carrying `mode` on
+   * 2026-09-01: identity and permission live on the node, and this is a permission.
+   *
+   * The node serves it with run_mode, identity_version and card_enrolled in `GET /v1/agents`, so a
+   * runtime that wants to know reads it there. Changing it is an owner action
+   * (`PATCH /v1/agents/:name/mode`), not a start-up side effect.
+   */
   mode: 'autonomous' | 'interactive' | 'task-runner' | 'coordinator' | 'workstation';
   /** How it is meant to be run. Stored and shown; the runtime is what honours it. */
   runMode: RunMode;
@@ -115,12 +143,20 @@ export const BASIC_AGENTS: readonly BasicAgentTemplate[] = [
       agents: [
         {
           role: 'Triager',
+          // `memory`: its goal is "whether this account already holds the answer", and its
+          // backstory says to look in what the owner keeps before concluding anything is unknown.
+          // Without it there is nothing to look in and every question reads as unknown.
+          tools: ['memory'],
           goal: 'Work out what an incoming message is actually asking for, and whether this account already holds the answer.',
           backstory: 'You have read a great many first messages. You know that what someone writes first is rarely the whole request, and that the useful move is to name what is being asked before answering it. You look in what the owner already keeps before you conclude anything is unknown. When a message is really two requests, you say so rather than answering the easier one.',
           allow_delegation: false,
         },
         {
           role: 'Responder',
+          // `delegate`: "hands the rest to whoever should have it" is half of what a front door IS,
+          // and without a delegation tool it could only ever answer or drop. `dm`: it has to say
+          // who it passed something to, and the reply itself goes to a person.
+          tools: ['delegate', 'dm'],
           goal: 'Answer what can be answered from what is known, and hand on what cannot, naming who should have it.',
           backstory: 'You write the reply the person reads. You answer only from what was established, and where nothing was established you say that plainly instead of producing something that merely sounds right. When something belongs to another agent or to the owner, you say who you passed it to and why, because a request that vanishes into a queue is worse than one that was refused.',
           allow_delegation: false,
@@ -155,7 +191,12 @@ export const BASIC_AGENTS: readonly BasicAgentTemplate[] = [
       'task:read', 'task:write',
       'catalogue:read',
     ],
-    mode: 'coordinator',
+    // `task-runner`, not `coordinator`. This one runs on `spawn`: nothing is sitting there to accept
+    // work, so a queued task must activate on its own or it waits for a person who was never told.
+    // Seeded as `coordinator`, every task for the three basic agents stayed `queued` — the node
+    // auto-activates only for `task-runner` (services/agent-task-rules.ts). `coordinator` describes
+    // what it DOES; this field decides whether its work starts.
+    mode: 'task-runner',
     runMode: 'spawn',
     tags: ['crew.basic', 'role.crew-forge'],
     crewDef: {
@@ -165,6 +206,10 @@ export const BASIC_AGENTS: readonly BasicAgentTemplate[] = [
       agents: [
         {
           role: 'Designer',
+          // `memory`: it must see the roster and the definitions that already exist before writing
+          // a new agent, or its answer to "we need something that does X" is a duplicate of
+          // something the owner already has.
+          tools: ['memory'],
           goal: 'Turn "we need something that does X" into one agent: what it is for, the narrowest permissions that let it do that, and how it should run.',
           backstory: 'You have watched people solve a one-off problem by creating a permanent agent with every permission, and then live with it. You do the opposite: you name the job first, then the smallest set of things it must reach, and you write down what you deliberately left out. An agent that needs a permission you did not give it can ask; one that was handed everything never will.',
           allow_delegation: false,
@@ -174,7 +219,13 @@ export const BASIC_AGENTS: readonly BasicAgentTemplate[] = [
           goal: 'Create the agent on the node and give it its definition, or say exactly why it could not be created.',
           backstory: 'You do the writing. You use the node\'s own tools rather than reaching into storage, because the doors carry the checks and a direct write skips them. If the node refuses, you report its reason as it gave it rather than paraphrasing it into something reassuring.',
           allow_delegation: false,
-          tools: ['crew_registry'],
+          // WAS `crew_registry`, which is not a tool. The menu is fixed — memory, web,
+          // article_fetch, schedule, dm, delegate, image, app_build, local_memory, exchange — and a
+          // name outside it is not a narrower tool, it is no tool, so the Registrar had nothing to
+          // write with. A crew definition IS a memory record at `crews.registry.<agent>`, which is
+          // what its backstory means by using the node's own doors rather than reaching into
+          // storage. check:crew-defs now refuses an off-menu name so this cannot recur.
+          tools: ['memory'],
         },
       ],
       tasks: [
@@ -206,7 +257,12 @@ export const BASIC_AGENTS: readonly BasicAgentTemplate[] = [
       'messages:read', 'messages:send',
       'catalogue:read',
     ],
-    mode: 'coordinator',
+    // `task-runner`, not `coordinator`. This one runs on `spawn`: nothing is sitting there to accept
+    // work, so a queued task must activate on its own or it waits for a person who was never told.
+    // Seeded as `coordinator`, every task for the three basic agents stayed `queued` — the node
+    // auto-activates only for `task-runner` (services/agent-task-rules.ts). `coordinator` describes
+    // what it DOES; this field decides whether its work starts.
+    mode: 'task-runner',
     runMode: 'spawn',
     tags: ['crew.basic', 'role.workflow-manager'],
     crewDef: {
@@ -216,12 +272,20 @@ export const BASIC_AGENTS: readonly BasicAgentTemplate[] = [
       agents: [
         {
           role: 'Planner',
+          // `memory`: a step names one doer, and its backstory forbids inventing an agent that does
+          // not exist — so it has to be able to read who actually exists before naming anyone.
+          tools: ['memory'],
           goal: 'Break a job into steps that can each be given to one agent, in an order that respects what depends on what.',
           backstory: 'You have seen plans that were a list of wishes and plans that were a sequence somebody could actually run. You write the second kind. Every step names one doer and says what it needs from the steps before it. Where you do not know who should do something, you say so instead of inventing an agent.',
           allow_delegation: false,
         },
         {
           role: 'Dispatcher',
+          // `delegate`: "orders work from your other agents" IS this agent, and with no delegation
+          // tool it could not send a single step — the whole definition would plan a job and then
+          // do nothing, which is what shipped. `dm`: it holds the thread and reports done,
+          // outstanding and failed back to the person who asked.
+          tools: ['delegate', 'dm'],
           goal: 'Send each step to the agent that should do it, collect what comes back, and report the state of the whole job honestly.',
           backstory: 'You keep the thread. You know which steps are done, which are out, and which failed, and your summary says all three — a job reported as finished when a step failed is the one outcome that destroys the point of having you. You attribute every answer to the agent that gave it.',
           allow_delegation: false,
