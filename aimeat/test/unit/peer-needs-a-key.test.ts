@@ -55,9 +55,30 @@ describe('a federation peer needs a key to exist and to become active', () => {
 
     const auth = () => ({ Authorization: `Bearer ${opToken}`, 'Content-Type': 'application/json' });
 
-    async function post(path: string, body: unknown) {
-        const res = await fetch(`${base}${path}`, { method: 'POST', headers: auth(), body: JSON.stringify(body) });
+    async function send(method: 'POST' | 'PUT', path: string, body: unknown) {
+        const res = await fetch(`${base}${path}`, { method, headers: auth(), body: JSON.stringify(body) });
         return { status: res.status, body: await res.json() as { ok?: boolean; data?: Record<string, unknown>; error?: { code?: string } } };
+    }
+    const post = (path: string, body: unknown) => send('POST', path, body);
+    const put = (path: string, body: unknown) => send('PUT', path, body);
+
+    /**
+     * A peer row written the way one could be BEFORE the creation gate: straight into the map and
+     * storage, with no key. This is the population the PUT gate exists for — the routes cannot make
+     * one any more, and a test that could only build a keyless peer through a route would be
+     * testing a state that no longer occurs while the real one sat in production untested.
+     */
+    async function seedKeylessPeer(nodeId: string): Promise<void> {
+        const now = new Date().toISOString();
+        const row = {
+            nodeId, url: stubUrl, publicKey: '', status: 'pending', addedAt: now, lastSeen: now,
+            shareCatalogue: true, replicateMemory: true, allowRouting: true, allowMessaging: true,
+            allowBroadcast: true, allowSettlement: true, supportUpstream: false,
+            peerMode: 'federation' as const, allowFederatedAuth: false, federationAuthScopes: [],
+            tier: 'member' as const,
+        };
+        peers.set(nodeId, row);
+        await storage.saveFederationPeer(row);
     }
 
     beforeAll(async () => {
@@ -175,5 +196,68 @@ describe('a federation peer needs a key to exist and to become active', () => {
         expect(r.body.error?.code).toBe('KEY_ROTATION_DENIED');
         expect(peers.get(nodeId)?.status).toBe('pending');
         expect(peers.get(nodeId)?.publicKey).toBe(onFile.publicKey);
+    });
+
+    // ── The THIRD door: PUT, which sets status directly ──
+    //
+    // It survived the previous round on "with creation closed there is no keyless peer left to set
+    // active", which is true only of peers created after that change. A row written before it is
+    // still here, so these seed one directly rather than through a route.
+
+    it('a keyless peer cannot be set active through the PUT', async () => {
+        const nodeId = `putkeyless-${randomBytes(4).toString('hex')}`;
+        await seedKeylessPeer(nodeId);
+
+        const r = await put(`/v1/federation/peers/${nodeId}`, { status: 'active' });
+        expect(r.status).toBe(409);
+        expect(r.body.error?.code).toBe('PEER_KEY_REQUIRED');
+        // Refuse before you write: the live Map object is untouched, not half-updated.
+        expect(peers.get(nodeId)?.status).toBe('pending');
+        const stored = (await storage.listFederationPeers()).find(p => p.nodeId === nodeId);
+        expect(stored?.status).toBe('pending');
+    });
+
+    it('a peer given a key AND active in the same request succeeds', async () => {
+        // Evaluated against the STAGED peer, not the stored one: the operator who has the key in
+        // hand is not made to send two requests.
+        const kp = await generateKeyPair();
+        const nodeId = `putboth-${randomBytes(4).toString('hex')}`;
+        await seedKeylessPeer(nodeId);
+
+        const r = await put(`/v1/federation/peers/${nodeId}`, { status: 'active', public_key: kp.publicKey });
+        expect(r.body.error?.code, JSON.stringify(r.body.error)).toBeUndefined();
+        expect(r.status).toBe(200);
+        expect(r.body.data?.status).toBe('active');
+        expect(peers.get(nodeId)?.publicKey).toBe(kp.publicKey);
+    });
+
+    it('a peer that already has a key still activates through the PUT as before', async () => {
+        const kp = await generateKeyPair();
+        const nodeId = `puthaskey-${randomBytes(4).toString('hex')}`;
+        const created = await post('/v1/federation/peers', { node_id: nodeId, url: stubUrl, public_key: kp.publicKey });
+        expect(created.status).toBe(201);
+
+        const r = await put(`/v1/federation/peers/${nodeId}`, { status: 'active' });
+        expect(r.body.error?.code, JSON.stringify(r.body.error)).toBeUndefined();
+        expect(r.body.data?.status).toBe('active');
+    });
+
+    it('and setting any other field on a keyless peer is unaffected', async () => {
+        // The gate is about `active`, not about keyless peers generally. An operator must still be
+        // able to retune, retier and read one — otherwise the fix strands the very rows it is for.
+        const nodeId = `putother-${randomBytes(4).toString('hex')}`;
+        await seedKeylessPeer(nodeId);
+
+        const r = await put(`/v1/federation/peers/${nodeId}`, { url: 'http://127.0.0.1:9897', allow_routing: false });
+        expect(r.body.error?.code, JSON.stringify(r.body.error)).toBeUndefined();
+        expect(r.status).toBe(200);
+        expect(r.body.data?.allow_routing).toBe(false);
+        expect(peers.get(nodeId)?.url).toBe('http://127.0.0.1:9897');
+        expect(peers.get(nodeId)?.status).toBe('pending');
+
+        // Including a status that is not `active`.
+        const parked = await put(`/v1/federation/peers/${nodeId}`, { status: 'depeering' });
+        expect(parked.body.error?.code, JSON.stringify(parked.body.error)).toBeUndefined();
+        expect(parked.body.data?.status).toBe('depeering');
     });
 });

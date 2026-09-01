@@ -5,6 +5,11 @@
  * @description Peering-request admin decisions + peer lifecycle routes (approve/reject/delete requests,
  *   activate, heartbeat, presence, peer list/add/update, visiting→member promotion). Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 — 2026-09-01 — The THIRD door closed: `PUT /peers/:nodeId` refuses `status: 'active'`
+ *     when the resulting peer would still have no key. v1.3.0 left it on the argument that closing
+ *     creation left none to activate, which is true only of peers created after that change — a row
+ *     written before it is still here. Evaluated against the STAGED peer, so setting a key and
+ *     activating in one call still works, and placed with the other refusals, before the commit.
  *   v1.3.0 — 2026-09-01 — A KEYLESS PEER IS NO LONGER WRITABLE OR ACTIVATABLE. Both write paths
  *     defaulted the key to `''` (POST /peers, and approving a request), and activate wrote
  *     `status = 'active'` BEFORE running key exchange, then warned and answered 200 when it failed
@@ -465,6 +470,20 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
                 }
             }
             next.supportUpstream = support_upstream;
+        }
+
+        // THE THIRD DOOR TO `active`, and the one that survived the last round on a bad argument:
+        // "with creation closed there is no keyless peer left to set active" is true only of peers
+        // created AFTER that change. A row written before it is still here, still keyless, and this
+        // route would still flip it on. `active` is what federated login, replication and settlement
+        // read as "this link works", and none of them can check a signature against nothing.
+        //
+        // Evaluated against `next`, not `peer`, so setting a key and activating in ONE call still
+        // works — the operator who has the key in hand is not made to do it twice.
+        if (next.status === 'active' && !(next.publicKey ?? '').trim()) {
+            res.status(409).json(error(config.nodeId, 'PEER_KEY_REQUIRED',
+                'This peer has no verification key, so nothing it sends could be checked. Activate it instead — that exchanges keys with the node first.'));
+            return;
         }
 
         // All refusals are behind us: commit to the live object and persist the same state.

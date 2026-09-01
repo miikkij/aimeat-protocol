@@ -7,6 +7,9 @@
  * @structure FederationTab (default)
  * @usage Mounted by the admin dashboard tab router.
  * @version-history
+ *   v1.5.0 — 2026-09-01 — A peer with no verification key cannot be switched on, so the operator
+ *     needs to see whether they have any: a "Without a key" tile and a line naming them, both shown
+ *     only when the count is above zero.
  *   v1.4.0 — 2026-06-19 — Federation book: a Version column + "behind" badge in the live-peers
  *     table, and a Federation Book section (operators + resources + version + settings per node,
  *     with Rebuild on the primary / Mirror-from-genesis on leaves).
@@ -138,6 +141,11 @@ export default function FederationTab({ data, reload }) {
   const degradedPeers = livePeers.filter(p => p.status === 'degraded');
   const offlinePeers = livePeers.filter(p => p.status === 'offline');
   const depeeringPeers = livePeers.filter(p => p.status === 'depeering');
+  // A peer with no verification key cannot be activated, because nothing it sends could be checked.
+  // Rows written before that rule can still be here, and the operator is the only one who can see
+  // them: the fix is per peer (exchange its key) and the count is how they know there is anything
+  // to fix at all.
+  const keylessPeers = livePeers.filter(p => !p.public_key);
   const pendingRequests = peeringRequests.filter(r => r.status === 'pending');
   const historyRequests = peeringRequests.filter(r => r.status !== 'pending');
 
@@ -342,7 +350,17 @@ export default function FederationTab({ data, reload }) {
       { label: t('dashboard.fedDegradedPeers'), value: degradedPeers.length, tone: 'amber' },
       { label: t('dashboard.fedOfflinePeers'), value: offlinePeers.length, tone: 'red' },
       { label: t('dashboard.fedPendingRequests'), value: pendingRequests.length, tone: 'cyan' },
+      // Shown only when there ARE any: a permanent "0 without a key" tile is a number nobody reads,
+      // and the point of this one is that it appears when something needs doing.
+      ...(keylessPeers.length
+        ? [{ label: t('dashboard.fedKeylessPeers'), value: keylessPeers.length, tone: 'red' }]
+        : []),
     ]} />
+    ${keylessPeers.length > 0 && html`
+      <div class="adm-warn-box adm-mt-sm">
+        ${t('dashboard.fedKeylessPeersHint', { peers: keylessPeers.map(p => p.node_id).join(', ') })}
+      </div>
+    `}
 
     <!-- ═══ Federation Auth Policy ═══ -->
     <div class="adm-card adm-mt-lg">

@@ -784,6 +784,16 @@
 .adm-mb-lg { margin-bottom: 16px; }
 
 .adm-mt-sm { margin-top: 8px; }
+/* A one-line "this needs your attention" box. Same surface as .adm-config-changes, which is the
+   shape this repeats; that one carries the config editor's own layout, so the plain version lives
+   here for anything else that has to say something is wrong without building a card for it. */
+.adm-warn-box {
+  padding: 10px 12px;
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-border);
+  border-radius: 8px;
+  font-size: .85rem;
+}
 .adm-mt-md { margin-top: 12px; }
 .adm-mt-lg { margin-top: 16px; }
 
