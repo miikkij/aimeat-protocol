@@ -24,6 +24,7 @@
     "check:importmap": "cd aimeat && pnpm check:importmap",
     "check:surface-blocks": "cd aimeat && pnpm check:surface-blocks",
     "check:profile-tabs": "cd aimeat && pnpm check:profile-tabs",
+    "check:crew-defs": "cd aimeat && pnpm check:crew-defs",
     "check:config-coverage": "cd aimeat && pnpm check:config-coverage",
     "check:no-max-tokens": "cd aimeat && pnpm check:no-max-tokens",
     "check:openapi": "cd aimeat && pnpm check:openapi",

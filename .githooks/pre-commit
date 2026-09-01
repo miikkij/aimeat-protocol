@@ -8,6 +8,7 @@
 #   5. Importmap ↔ imports in sync       — pnpm check:importmap
 #   5b. Surface blocks have components    — pnpm check:surface-blocks
 #   5b. Every profile tab has a menu door — pnpm check:profile-tabs
+#   5b. Shipped crew defs match the rules — pnpm check:crew-defs
 #   5c. Every setting is in the Config tab — pnpm check:config-coverage
 #   6. No max_tokens caps on AI calls    — pnpm check:no-max-tokens
 #   7. openapi.yaml parse + $ref health  — pnpm check:openapi
@@ -71,6 +72,9 @@ pnpm -s check:surface-blocks
 
 echo "[pre-commit] Every profile tab reachable from the menu (check:profile-tabs)…"
 pnpm -s check:profile-tabs
+
+echo "[pre-commit] Shipped crew definitions match the runtime's rules (check:crew-defs)…"
+pnpm -s check:crew-defs
 
 echo "[pre-commit] Every setting reachable in the admin Config tab (check:config-coverage)…"
 pnpm -s check:config-coverage

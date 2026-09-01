@@ -107,10 +107,10 @@ export const BASIC_AGENTS: readonly BasicAgentTemplate[] = [
     ],
     mode: 'interactive',
     runMode: 'resident',
-    tags: ['crew:basic', 'role:concierge'],
+    tags: ['crew.basic', 'role.concierge'],
     crewDef: {
       readme_md: '# Concierge\\n\\nThe front door.\\n\\nIt reads what arrives, works out what it is about, answers what it can from what you already keep, and hands the rest to whoever should have it. It says who it passed something to, so nothing disappears into a queue you cannot see.\\n\\n**It answers and it routes. It does not decide anything on your behalf** — a request that needs a person waits for you, named.',
-      tags: ['crew:basic', 'role:concierge'],
+      tags: ['crew.basic', 'role.concierge'],
       process: 'sequential',
       agents: [
         {
@@ -157,10 +157,10 @@ export const BASIC_AGENTS: readonly BasicAgentTemplate[] = [
     ],
     mode: 'coordinator',
     runMode: 'spawn',
-    tags: ['crew:basic', 'role:crew-forge'],
+    tags: ['crew.basic', 'role.crew-forge'],
     crewDef: {
       readme_md: '# Crew forge\\n\\nMakes more agents for you, and clears away the ones it made.\\n\\nWhen a job needs an agent that does not exist yet, this writes one: the name, what it is for, what it may reach, and the definition it runs. It only ends agents it created itself — the node enforces that, not politeness.\\n\\n**It cannot widen its own permissions and it cannot change a sibling\'s.** Rewriting who may do what stays with you.',
-      tags: ['crew:basic', 'role:crew-forge'],
+      tags: ['crew.basic', 'role.crew-forge'],
       process: 'sequential',
       agents: [
         {
@@ -208,10 +208,10 @@ export const BASIC_AGENTS: readonly BasicAgentTemplate[] = [
     ],
     mode: 'coordinator',
     runMode: 'spawn',
-    tags: ['crew:basic', 'role:workflow-manager'],
+    tags: ['crew.basic', 'role.workflow-manager'],
     crewDef: {
       readme_md: '# Workflow manager\\n\\nOrders work from your other agents and keeps track of what came back.\\n\\nIt breaks a job into steps, sends each one to whoever should do it, and holds the thread: what was asked, what arrived, what is still out. A step that fails is reported as a step that failed, not quietly dropped from the summary.\\n\\n**It orders work; it does not do it.** What comes back is the other agents\' answer, and it says whose.',
-      tags: ['crew:basic', 'role:workflow-manager'],
+      tags: ['crew.basic', 'role.workflow-manager'],
       process: 'sequential',
       agents: [
         {

@@ -453,6 +453,21 @@ async function run() {
                 }
                 seen.add(t.id);
             }
+
+            // The rule this block did NOT have, and the one that mattered: a tag must match
+            // [a-z0-9._-]. Everything above was checked and correct while all six seeded
+            // definitions carried `crew:basic` and were refused by the runtime, because `:` is
+            // reserved there for versioned capability ids. The node accepted them and answered
+            // ok — it validates tags nowhere, so that was silence and not a second opinion.
+            // check:crew-defs proves the TEMPLATES; this proves what actually reached the store.
+            for (const tag of (doc.tags ?? [])) {
+                assert(/^[a-z0-9._-]+$/.test(tag), `${n}: seeded definition carries the tag "${tag}", which the runtime refuses`);
+            }
+            const rec = (await json('/v1/agents?owner=' + a.owner, { headers: authA }))
+                .body.data.agents.find((x: any) => x.name === n);
+            for (const tag of (rec?.tags ?? [])) {
+                assert(/^[a-z0-9._-]+$/.test(tag), `${n}: the agent record carries the tag "${tag}", which the runtime refuses`);
+            }
         }
     });
 
