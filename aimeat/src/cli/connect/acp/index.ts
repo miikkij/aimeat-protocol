@@ -18,6 +18,10 @@
  * @structure runAcp(flags)
  * @usage aimeat connect acp --agent claude
  * @version-history
+ *   v1.0.1 — 2026-09-01 — The session's owner comes from the CREDENTIAL, not from the per-agent
+ *     config file. That file is keyed by the bare agent name, so two owners with a `concierge`
+ *     share one and its `owner` field is whichever enrolled last: an ACP session for one of them
+ *     was attributed to the other.
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V6b).
  */
 import { Readable, Writable } from 'node:stream';
@@ -44,7 +48,15 @@ export async function runAcp(flags: Record<string, string>): Promise<void> {
       process.exit(1);
     }
     agentName = loaded.agent;
-    owner = loaded.config.owner;
+    // FROM THE CREDENTIAL, not from the config file. `agents/<name>/config.yaml` is keyed by the
+    // bare agent name, so two owners with a `concierge` share one file and its `owner` field is
+    // whichever of them enrolled last — an ACP session for B would have been attributed to A.
+    // `loaded.owner` comes from the credential filename, which is owner-qualified. Same shape as
+    // the CLI dispatch at tool-call.ts.
+    owner = loaded.owner;
+    // `node_url` is a genuine setting and legitimately lives in the config. It is shared by the
+    // same file, so two owners on DIFFERENT nodes would both be sent to whichever enrolled last;
+    // that is the config-directory problem, scoped in the spec rather than papered over here.
     nodeUrl = loaded.config.node_url;
     client = new AimeatClient(nodeUrl, loaded.token);
   } else {
