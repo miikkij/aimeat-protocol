@@ -536,6 +536,45 @@ export function applySchemaTables2(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_agent_enrolment_owner ON agent_enrolment_grants(owner);
     CREATE INDEX IF NOT EXISTS idx_agent_enrolment_expiresAt ON agent_enrolment_grants(expiresAt);
 
+    -- ── Agent v2 messaging ──
+    -- A turn between two principals about one piece of work, in the A2A message shape. The five
+    -- message kinds this node already has each answer a different question; see the reasoning in
+    -- types/agent-v2-messaging.ts and migration 0059. None of them changes.
+    CREATE TABLE IF NOT EXISTS agent_v2_messages (
+      messageId     TEXT PRIMARY KEY,
+      role          TEXT NOT NULL,
+      parts         TEXT NOT NULL DEFAULT '[]',
+      contextId     TEXT NOT NULL,
+      taskId        TEXT,
+      fromPrincipal TEXT NOT NULL,
+      toPrincipal   TEXT NOT NULL,
+      owner         TEXT NOT NULL,
+      createdAt     TEXT NOT NULL,
+      metadata      TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_agent_v2_msg_owner_context ON agent_v2_messages(owner, contextId, createdAt);
+    CREATE INDEX IF NOT EXISTS idx_agent_v2_msg_owner_to ON agent_v2_messages(owner, toPrincipal, createdAt);
+    CREATE INDEX IF NOT EXISTS idx_agent_v2_msg_task ON agent_v2_messages(taskId);
+
+    -- Where to reach a principal that is not connected. A2A's PushNotificationConfig, field for
+    -- field. authCredentials is write-only: no read returns it.
+    CREATE TABLE IF NOT EXISTS agent_v2_push_configs (
+      id              TEXT PRIMARY KEY,
+      principal       TEXT NOT NULL,
+      owner           TEXT NOT NULL,
+      url             TEXT NOT NULL,
+      token           TEXT,
+      authSchemes     TEXT NOT NULL DEFAULT '[]',
+      authCredentials TEXT,
+      createdAt       TEXT NOT NULL,
+      updatedAt       TEXT NOT NULL,
+      lastSuccessAt   TEXT,
+      lastFailureAt   TEXT,
+      failCount       INTEGER NOT NULL DEFAULT 0,
+      disabledAt      TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_agent_v2_push_owner_principal ON agent_v2_push_configs(owner, principal);
+
     -- ── Ecosystem Applications (GEAI principal) ──
     -- Mirror of the agents table, minus task/agent-only fields, plus the ecosystem binding fields.
     CREATE TABLE IF NOT EXISTS ecosystem_apps (

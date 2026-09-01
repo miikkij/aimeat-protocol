@@ -102,6 +102,35 @@ export interface AgentEnrolmentGrant {
   usedBy: string | null;
 }
 
+export interface AgentV2Message {
+  messageId: string;
+  role: string;
+  parts: Generated<Json>;
+  contextId: string;
+  taskId: string | null;
+  fromPrincipal: string;
+  toPrincipal: string;
+  owner: string;
+  createdAt: string;
+  metadata: Json | null;
+}
+
+export interface AgentV2PushConfig {
+  id: string;
+  principal: string;
+  owner: string;
+  url: string;
+  token: string | null;
+  authSchemes: Generated<string[]>;
+  authCredentials: string | null;
+  createdAt: string;
+  updatedAt: string;
+  lastSuccessAt: string | null;
+  lastFailureAt: string | null;
+  failCount: Generated<number>;
+  disabledAt: string | null;
+}
+
 export interface AgentActivity {
   agentGaii: string;
   date: string;
@@ -2086,6 +2115,8 @@ export interface DB {
   AgentUsageDaily: AgentUsageDaily;
   AgentUsageEvent: AgentUsageEvent;
   AgentUsageEventArchive: AgentUsageEventArchive;
+  AgentV2Message: AgentV2Message;
+  AgentV2PushConfig: AgentV2PushConfig;
   UsageCall: UsageCall;
   UsageCallArchive: UsageCallArchive;
   UsageRollup: UsageRollup;

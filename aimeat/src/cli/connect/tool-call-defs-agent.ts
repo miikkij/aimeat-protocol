@@ -222,6 +222,97 @@ export const agentTools: ConnectCliToolDefinition[] = [
             });
         },
     },
+    // ── Agent v2 messaging: a turn between two principals of ONE account ──
+    //
+    // The third door onto the same capability, and the one a fleet daemon actually calls. A
+    // parameter that exists on the two MCP surfaces and not here is DROPPED IN SILENCE, so the call
+    // succeeds having done less than it was asked — the same defect this repository paid for three
+    // times in one week. Every parameter below is proved to leave the process by
+    // test/unit/cli-tool-param-forwarding.test.ts, and the dispatch refuses one it does not declare.
+    {
+        name: 'aimeat_v2_message_send',
+        description: 'Send one turn to another principal on this same account, carrying text, a file pointer and a structured payload together. Distinct from aimeat_message_send (this agent and its own owner) and aimeat_dm_send (a person reaching a person).',
+        input: {
+            to: { type: 'string', required: true, description: 'The recipient principal on this account: an agent GAII, an ecosystem app, or the owner GHII.' },
+            parts: { type: 'array', required: true, description: 'Ordered parts. Each is {kind:"text",text} or {kind:"file",file:{uri,name?,mimeType?}} or {kind:"data",data:{...}}.' },
+            role: { type: 'string', description: 'Send "user" if you are asking and "agent" if you are answering. Default "user".' },
+            context_id: { type: 'string', description: 'The exchange this turn belongs to. Omit on the first turn.' },
+            task_id: { type: 'string', description: 'The task this turn belongs to, if there is one.' },
+            metadata: { type: 'object', description: 'Carried along, never read by the node.' },
+        },
+        handler: ({ client }, input) => {
+            const body: JsonObject = {
+                to: requiredString(input, 'to'),
+                parts: optionalArray(input, 'parts') ?? [],
+            };
+            const role = optionalString(input, 'role'); if (role) body.role = role;
+            const contextId = optionalString(input, 'context_id'); if (contextId) body.contextId = contextId;
+            const taskId = optionalString(input, 'task_id'); if (taskId) body.taskId = taskId;
+            const metadata = optionalRecord(input, 'metadata'); if (metadata) body.metadata = metadata;
+            return client.post('/v1/agents/v2/messages', body);
+        },
+    },
+    {
+        name: 'aimeat_v2_message_list',
+        description: 'Read turns back, oldest first. `since` is how a principal catches up on everything that arrived while it was offline.',
+        input: {
+            context_id: { type: 'string', description: 'One exchange.' },
+            task_id: { type: 'string', description: 'The turns of one task.' },
+            to: { type: 'string', description: 'Turns addressed to this principal.' },
+            from: { type: 'string', description: 'Turns sent by this principal.' },
+            since: { type: 'string', description: 'ISO timestamp, exclusive: turns created after it.' },
+            limit: { type: 'number', description: 'Max turns to return (default 50, max 200).' },
+        },
+        handler: ({ client }, input) => {
+            const q = new URLSearchParams();
+            const contextId = optionalString(input, 'context_id'); if (contextId) q.set('context_id', contextId);
+            const taskId = optionalString(input, 'task_id'); if (taskId) q.set('task_id', taskId);
+            const to = optionalString(input, 'to'); if (to) q.set('to', to);
+            const from = optionalString(input, 'from'); if (from) q.set('from', from);
+            const since = optionalString(input, 'since'); if (since) q.set('since', since);
+            const limit = optionalNumber(input, 'limit'); if (typeof limit === 'number') q.set('limit', String(limit));
+            const qs = q.toString() ? `?${q.toString()}` : '';
+            return client.get(`/v1/agents/v2/messages${qs}`);
+        },
+    },
+    {
+        name: 'aimeat_v2_push_set',
+        description: 'Register where to reach you when you are not connected: an https address this node POSTs a turn to. The credentials inside `authentication` are stored and sent in the Authorization header, and never returned to anyone.',
+        input: {
+            url: { type: 'string', required: true, description: 'The https address to POST a turn to.' },
+            token: { type: 'string', description: 'An opaque string echoed back inside every delivery.' },
+            authentication: { type: 'object', description: 'A block shaped { schemes: ["Bearer"], credentials: "..." }.' },
+            id: { type: 'string', description: 'Replace this existing target. It must be one already registered on this account.' },
+            principal: { type: 'string', description: 'Whose deliveries these are. Defaults to you.' },
+        },
+        handler: ({ client }, input) => {
+            const body: JsonObject = { url: requiredString(input, 'url') };
+            const token = optionalString(input, 'token'); if (token) body.token = token;
+            const auth = optionalRecord(input, 'authentication'); if (auth) body.authentication = auth;
+            const id = optionalString(input, 'id'); if (id) body.id = id;
+            const principal = optionalString(input, 'principal'); if (principal) body.principal = principal;
+            return client.put('/v1/agents/v2/push-config', body);
+        },
+    },
+    {
+        name: 'aimeat_v2_push_list',
+        description: 'What delivery targets are registered, and whether the node has been able to reach them. The stored credentials are never returned.',
+        input: {
+            principal: { type: 'string', description: 'Account holder only: whose targets to list. Omit for all of them.' },
+        },
+        handler: ({ client }, input) => {
+            const principal = optionalString(input, 'principal');
+            return client.get(`/v1/agents/v2/push-config${principal ? `?principal=${encodeURIComponent(principal)}` : ''}`);
+        },
+    },
+    {
+        name: 'aimeat_v2_push_delete',
+        description: 'Stop delivering to one registered target.',
+        input: {
+            id: { type: 'string', required: true, description: 'The target id, from aimeat_v2_push_list.' },
+        },
+        handler: ({ client }, input) => client.delete(`/v1/agents/v2/push-config/${encodeURIComponent(requiredString(input, 'id'))}`),
+    },
     {
         // ── Federated direct messages (the inbox / "Postilaatikko"), distinct from the agent↔owner
         //    aimeat_message_* tools above. Thin REST wrappers so no-LLM crews can send/read DMs via

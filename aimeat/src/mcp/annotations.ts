@@ -346,6 +346,16 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_dm_inbox: { title: 'Read Federated DM Inbox', readOnlyHint: true },
     aimeat_dm_thread: { title: 'Read Federated DM Thread', readOnlyHint: true },
 
+    // ── Agent v2 messaging (a turn between two principals of one account) ──
+    // Not openWorld: every one of these stays inside the account. The delivery target is the one
+    // thing that reaches outward, and it is a configuration, not a call — the outbound POST happens
+    // later, from the node, and goes through safeFetch.
+    aimeat_v2_message_send: { title: 'Send a Turn', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    aimeat_v2_message_list: { title: 'Read Turns', readOnlyHint: true },
+    aimeat_v2_push_set: { title: 'Register a Delivery Target', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_v2_push_list: { title: 'List Delivery Targets', readOnlyHint: true },
+    aimeat_v2_push_delete: { title: 'Remove a Delivery Target', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+
     // ── Companies (the registry + the co address family) ──
     aimeat_company_list: { title: 'List Companies', readOnlyHint: true },
     aimeat_company_create: { title: 'Register Company', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
