@@ -77,9 +77,11 @@ describe('the owner comes from the credential, not from the shared config file',
         const all = await loadAllAgents();
         const bob = all.find(a => a.gaii === `concierge#bob@${NODE}`);
         expect(bob, 'bob should be loaded under his own identity').toBeDefined();
-        // The config says alice. The credential says bob. The credential wins.
+        // The credential wins, and the config no longer even states an owner: reading the old
+        // shared file copies it into bob's own folder, and that write drops `agent`, `owner` and
+        // `mode`, which are the node's and the credential's facts rather than this file's.
         expect(bob!.owner).toBe('bob');
-        expect(bob!.config.owner).toBe('alice');   // the shared file, unchanged and still wrong for bob
+        expect(bob!.config.owner).toBeUndefined();
         const alice = all.find(a => a.gaii === `concierge#alice@${NODE}`);
         expect(alice!.owner).toBe('alice');
     });

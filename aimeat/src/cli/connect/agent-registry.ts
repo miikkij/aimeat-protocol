@@ -114,8 +114,23 @@ export class AgentRegistry {
     if (this.agents.size === 1) {
       return this.agents.values().next().value!;
     }
-    const primary = this.list().find(a => a.config.primary);
-    if (primary) return primary;
+    // PRIMARY IS PER OWNER. "Which is the default" only means something inside one account, so two
+    // owners each marking one is not a conflict to resolve — it is two correct answers to two
+    // different questions, and a caller who named neither an owner nor an agent has not asked
+    // either of them. Refusing is the same rule the bare name already follows.
+    const primaries = this.list().filter(a => a.config.primary);
+    const owners = new Set(primaries.map(a => a.owner));
+    if (owners.size > 1) {
+      const both = primaries.map(a => a.gaii).sort().join(', ');
+      throw new Error(`More than one account is connected here and each has its own default agent: ${both}. Say which one you mean.`);
+    }
+    if (primaries.length >= 1) return primaries[0];
+
+    // Nobody marked one. With two OWNERS present, picking the first is the same wrong guess.
+    const allOwners = new Set(this.list().map(a => a.owner));
+    if (allOwners.size > 1) {
+      throw new Error(`More than one account is connected here and none has a default agent: ${this.identities()}. Say which one you mean.`);
+    }
     const fallback = this.agents.values().next().value!;
     if (!this.warnedNoPrimary) {
       this.warnedNoPrimary = true;

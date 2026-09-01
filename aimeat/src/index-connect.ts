@@ -119,27 +119,58 @@ export async function runConnectCli(positionals: string[]): Promise<void> {
     if (c) console.log(JSON.stringify(c, null, 2));
     else console.log(`No config found. Expected at: ${getConfigDir()}/config.yaml`);
   } else if (connectAction === 'list') {
+    const { loadAllAgents, agentsOnLegacyLayout } = await import('./cli/connect/config.js');
     const { listAllTokens } = await import('./cli/connect/keychain.js');
-    const { loadPerAgentConfig } = await import('./cli/connect/config.js');
-    const tokens = await listAllTokens();
-    if (tokens.length === 0) { console.log('No agents connected. Run: aimeat connect'); }
+    const { AimeatClient: ListClient } = await import('./cli/connect/api-client.js');
+    const loaded = await loadAllAgents();
+    if (loaded.length === 0) { console.log('No agents connected. Run: aimeat connect'); }
     else {
-      console.log(`Connected agents (${tokens.length}):`);
-      for (const t of tokens) {
-        const pa = loadPerAgentConfig(t.agent);
-        // Server-side mode (what AIMEAT thinks this agent is) -- written by
-        // `connect add --mode <mode>`. Falls back to deriving from runner block
-        // for agents registered before the mode field existed.
-        const mode = pa?.mode ?? (pa?.runner?.command ? 'task-runner' : 'interactive');
+      // MODE COMES FROM THE NODE, which holds AgentRecord.mode and serves it with run_mode,
+      // identity_version and card_enrolled in one listing. The local mirror is gone: it was a
+      // second statement of the node's fact and could disagree with it.
+      //
+      // One call per (owner, node), best effort. This command used to make no network call at all
+      // and must keep working without one, so an unreachable node degrades to the runner-derived
+      // label with `?` beside it rather than failing the listing.
+      const modes = new Map<string, string>();
+      const asked = new Set<string>();
+      for (const a of loaded) {
+        const key = `${a.owner}|${a.config.node_url}`;
+        if (asked.has(key)) continue;
+        asked.add(key);
+        try {
+          const cl = new ListClient(a.config.node_url, a.token);
+          const r = await cl.get(`/v1/agents?owner=${encodeURIComponent(a.owner)}`);
+          for (const rec of ((r.data as { agents?: Array<{ name?: string; mode?: string }> })?.agents ?? [])) {
+            if (rec.name && rec.mode) modes.set(`${rec.name}@${a.owner}`, rec.mode);
+          }
+          // Being offline IS an answer here: the label falls back to the local guess, is
+          // printed with a `?`, and the note below says so. This listing must keep working
+          // with no network at all.
+          // eslint-disable-next-line aimeat/no-silent-catch -- see the three lines above
+        } catch { /* offline */ }
+      }
+
+      console.log(`Connected agents (${loaded.length}):`);
+      for (const a of loaded) {
+        const pa = a.config;
+        const fromNode = modes.get(`${a.agent}@${a.owner}`);
+        const mode = fromNode ?? `${pa.runner?.command ? 'task-runner' : 'interactive'}?`;
         // Runner readiness: task-runner mode alone is not enough; the connector
         // needs a `runner:` block to actually spawn the subprocess.
-        const runnerReady = Boolean(pa?.runner?.command);
-        const needsRunner = mode === 'task-runner' && !runnerReady;
-        const primary = pa?.primary ? ' (primary)' : '';
-        const nodeUrl = pa?.node_url ?? '(no per-agent config)';
+        const needsRunner = mode.startsWith('task-runner') && !pa.runner?.command;
+        const primary = pa.primary ? ' (primary)' : '';
         const warn = needsRunner ? '  [missing runner: block]' : '';
-        console.log(`  - ${t.agent}@${t.owner} [${mode}]${primary}${warn}  ->  ${nodeUrl}`);
-        if (pa?.runner) console.log(`      runner: ${pa.runner.command} ${(pa.runner.args ?? []).join(' ')}`);
+        console.log(`  - ${a.agent}@${a.owner} [${mode}]${primary}${warn}  ->  ${pa.node_url}`);
+        if (pa.runner) console.log(`      runner: ${pa.runner.command} ${(pa.runner.args ?? []).join(' ')}`);
+      }
+      if (modes.size === 0 && loaded.length > 0) {
+        console.log('  (a mode marked ? was guessed locally: the node could not be reached)');
+      }
+      const stale = agentsOnLegacyLayout(await listAllTokens());
+      if (stale.length > 0) {
+        console.log(`\n${stale.length} agent(s) still keep settings in the old shared layout: ${stale.join(', ')}`);
+        console.log('They are read from there and copied forward on first use. Nothing is deleted for you.');
       }
     }
   } else if (connectAction === 'remove') {
@@ -150,7 +181,7 @@ export async function runConnectCli(positionals: string[]): Promise<void> {
     }
     const ownerHint = connectFlags.owner;
     const { listAllTokens, deleteToken } = await import('./cli/connect/keychain.js');
-    const { perAgentConfigPath } = await import('./cli/connect/config.js');
+    const { perAgentConfigPath, legacyPerAgentConfigPath } = await import('./cli/connect/config.js');
     const fs = await import('node:fs');
     const path = await import('node:path');
     const tokens = await listAllTokens();
@@ -165,8 +196,15 @@ export async function runConnectCli(positionals: string[]): Promise<void> {
     await deleteToken(m.agent, m.owner);
     // Remove per-agent config directory (best-effort)
     try {
-      const dir = path.dirname(perAgentConfigPath(m.agent));
+      // Both layouts: this owner's own directory always, and the old SHARED one only when no
+      // other owner still has an agent of that name — that file may be their settings too.
+      const dir = path.dirname(perAgentConfigPath(m.agent, m.owner));
       if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
+      const stillShared = tokens.some(t => t.agent === m.agent && t.owner !== m.owner);
+      if (!stillShared) {
+        const legacyDir = path.dirname(legacyPerAgentConfigPath(m.agent));
+        if (fs.existsSync(legacyDir)) fs.rmSync(legacyDir, { recursive: true, force: true });
+      }
     } catch (err) { logger.warn('runConnectCli: ignore', { error: String(err) }); }
     console.log(`Removed ${m.agent}@${m.owner}.`);
   } else if (connectAction === 'add') {

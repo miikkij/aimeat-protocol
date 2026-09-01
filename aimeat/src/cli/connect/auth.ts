@@ -234,18 +234,14 @@ export async function runAuth(args: AuthArgs): Promise<void> {
       if (check.ok) {
         success('Already connected! Token is valid.');
         saveConfig({ node_url: nodeUrl, agent: agentName, owner });
-        // Idempotent --mode: refresh local per-agent config so `connect list` shows
-        // the right label without forcing the user to delete + recreate. Server-side
-        // mode is NOT changed here -- that requires owner role via Profile -> Agents
-        // or PATCH /v1/agents/:name/mode. This path only fixes labels for agents
-        // whose local config.yaml predates the mode field.
+        // `--mode` used to be mirrored into the local per-agent config so `connect list` could
+        // label the agent without a REST call. It is not written any more: the node holds
+        // AgentRecord.mode and serves it in GET /v1/agents alongside run_mode, identity_version
+        // and card_enrolled, so the local copy was a second statement of the node's fact that
+        // could disagree with it. Server-side mode still changes only through the owner's own
+        // door (Profile → Agents, or PATCH /v1/agents/:name/mode).
         if (mode) {
-          const existingPerAgent = loadPerAgentConfig(agentName);
-          if (existingPerAgent) {
-            savePerAgentConfig(agentName, { ...existingPerAgent, mode });
-            info(`Local per-agent config updated: mode=${mode}`);
-            info(`(Server-side mode is set separately at registration; this only fixes the local label.)`);
-          }
+          info(`--mode is set on the node, not locally; this connector reads it from GET /v1/agents.`);
         }
         await downloadAndPrintBundleGuide(client, agentName, success, info, warn);
         outro(buildNextStepsMessage(buildAgentOnboardingInstruction()));
@@ -344,20 +340,22 @@ export async function runAuth(args: AuthArgs): Promise<void> {
   // resolves to the primary agent when no agent_name is given).
   const tokensBefore = await listAllTokens();
   const sameAlreadyExists = tokensBefore.some(t => t.agent === agentName && t.owner === ownerHandle);
-  const isFirstAgent = tokensBefore.filter(t => !(t.agent === agentName && t.owner === ownerHandle)).length === 0;
+  // PER OWNER: "the first agent" means the first of THIS owner's. A second person connecting on a
+  // shared machine is not joining the first person's account, and marking their agent non-primary
+  // because somebody else already had one would make "the default" mean nothing inside either.
+  const isFirstAgentOfOwner = tokensBefore
+    .filter(t => t.owner === ownerHandle && t.agent !== agentName).length === 0;
 
   await storeToken(agentName, ownerHandle, token.access_token);
   success(`Token stored (aimeat:${agentName}@${ownerHandle})`);
 
-  // Per-agent config (~/.aimeat/agents/{agent}/config.yaml). Preserve any
-  // existing runner/wake/poll_interval if the agent is being re-connected.
-  const existingPerAgent = loadPerAgentConfig(agentName);
-  savePerAgentConfig(agentName, {
-    agent: agentName,
-    owner: ownerHandle,
+  // Per-agent config (<home>/agents/{owner}/{agent}/config.yaml). Preserve any existing
+  // runner/wake/poll_interval if the agent is being re-connected. `agent`, `owner` and `mode` are
+  // NOT written: identity comes from the credential and the mode is the node's.
+  const existingPerAgent = loadPerAgentConfig(agentName, ownerHandle);
+  savePerAgentConfig(agentName, ownerHandle, {
     node_url: nodeUrl,
-    primary: existingPerAgent?.primary ?? isFirstAgent,
-    mode: mode ?? existingPerAgent?.mode,
+    primary: existingPerAgent?.primary ?? isFirstAgentOfOwner,
     poll_interval: existingPerAgent?.poll_interval,
     wake: existingPerAgent?.wake,
     runner: existingPerAgent?.runner,
@@ -365,8 +363,10 @@ export async function runAuth(args: AuthArgs): Promise<void> {
 
   // Legacy global config -- kept so older single-agent code paths
   // (`loadConfig().agent`) keep working. The first-registered agent becomes the
-  // global's `agent`; later agents do not overwrite it.
-  if (isFirstAgent || sameAlreadyExists) {
+  // global's `agent`; later agents do not overwrite it. This one stays install-wide rather than
+  // per-owner: it is the single-agent layout's own file, and there is exactly one of it.
+  const isFirstOnThisMachine = tokensBefore.filter(t => !(t.agent === agentName && t.owner === ownerHandle)).length === 0;
+  if (isFirstOnThisMachine || sameAlreadyExists) {
     saveConfig({ node_url: nodeUrl, agent: agentName, owner: ownerHandle });
   }
 

@@ -10,14 +10,42 @@
  *   v1.10.0 -- 2026-05-29 -- Detect token/agent-record desync (valid token but server has no agent record) and print a concrete re-add command instead of the generic "Token invalid".
  */
 import { AimeatClient } from './api-client.js';
-import { loadConfig } from './config.js';
+import { loadConfig, agentsOnLegacyLayout } from './config.js';
+import { listAllTokens } from './keychain.js';
+
+/**
+ * How many agents still keep their settings in the OLD shared layout
+ * (`agents/<name>/config.yaml`, one file for every owner with that agent name).
+ *
+ * The connector reads that path forever and deletes nothing — a wrongly deleted credential
+ * directory is gone, and one `existsSync` per agent per start costs nothing. This line is what
+ * stops "forever" from meaning "invisible": cleanup becomes an operator's visible choice rather
+ * than a scheduled risk nobody agreed to.
+ */
+async function printLegacyLayoutNote(): Promise<void> {
+  try {
+    const stale = agentsOnLegacyLayout(await listAllTokens());
+    if (stale.length === 0) return;
+    console.log('');
+    console.log(`Old layout: ${stale.length} agent(s) still keep settings in a shared file: ${stale.join(', ')}`);
+    console.log('They are read from there and copied to their own folder on first use. Nothing is removed for you.');
+    // An extra informational line must never be the thing that fails `connect status`; the
+    // command's own answer is printed above it either way.
+    // eslint-disable-next-line aimeat/no-silent-catch -- see the two lines above
+  } catch { /* best effort */ }
+}
 
 export async function runStatus(): Promise<void> {
   const config = loadConfig();
-  if (!config) { console.log('Not configured. Run: npx aimeat connect'); return; }
+  if (!config) {
+    console.log('Not configured. Run: npx aimeat connect');
+    await printLegacyLayoutNote();
+    return;
+  }
   console.log(`Agent: ${config.agent}`);
   console.log(`Owner: ${config.owner}`);
   console.log(`Node:  ${config.node_url}`);
+  await printLegacyLayoutNote();
 
   try {
     const client = await AimeatClient.fromConfig();
