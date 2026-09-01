@@ -1,0 +1,218 @@
+/*
+ * @file aimeat-atelier/transitions.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description THE SCREEN MOVES, WRITTEN WHERE THEY BELONG. transitions.js names a kind on the
+ *   root element (data-ak-transition="wipe") and hands over an origin (--ak-iris-x / --ak-iris-y);
+ *   everything a person actually sees is here, on ::view-transition-old(root) and
+ *   ::view-transition-new(root). That is what lets a look retune every screen change by moving
+ *   --ak-motion and --ak-ease, with no JavaScript touched, and it is why the JS sets geometry
+ *   and never a colour.
+ *
+ *   SIX KINDS: fade (the two screens cross), wipe (the new one clipped in from an edge), curtain
+ *   (the old sinks against a tinted ground while the new rises), zoom (the old falls back, the
+ *   new comes forward), iris (the new opens through a circle from where the finger landed) and
+ *   slide (one screen leaves as the other arrives). Direction rides data-ak-transition-dir and
+ *   the curtain's tint rides data-ak-transition-colour, each one a token.
+ *
+ *   The pace is --ak-transition-span: twice the look's --ak-motion, because a whole screen is a
+ *   bigger change than a button and earns a longer beat. A call that names its own duration
+ *   overrides it on the root element for exactly the length of the move.
+ *
+ *   THE CURTAIN is the same department's manual cover, and it is what a browser with no View
+ *   Transitions falls back to. It is a fixed layer with one band, two halves or one iris in it;
+ *   the travel is a Web Animation the module owns, so nothing here animates on its own and an
+ *   idle page has nothing left running.
+ * @structure ::view-transition rules per kind · .ak-curtain and its three shapes · .ak-swap--flip
+ *   (the perspective a panel flip turns in) · reduced motion
+ * @version-history
+ *   v0.45.1 — 2026-09-02 — .ak-curtain-host / .ak-curtain--inset: the curtain over one element.
+ *   v0.45.0 — 2026-09-02 — Initial (the transitions module).
+ */
+
+:root {
+  /* How long a whole-screen change takes. transitions.js overrides this inline when a call
+     names its own duration, and removes it again when the move is over. */
+  --ak-transition-span: calc(var(--ak-motion, 200ms) * 2);
+  /* What a curtain is made of. Never a literal: the three named tints are the contract's own. */
+  --ak-curtain-tint: var(--ak-ink);
+}
+:root[data-ak-transition-colour='accent'] { --ak-curtain-tint: var(--ak-accent); }
+:root[data-ak-transition-colour='ink'] { --ak-curtain-tint: var(--ak-ink); }
+:root[data-ak-transition-colour='surface'] { --ak-curtain-tint: var(--ak-surface); }
+
+/* ── The screen moves ────────────────────────────────────────────────────────────────────── */
+/* Only `fade` wants the browser's default blend: two opaque screens added together is what makes
+   a cross-fade read as one image rather than two ghosts. Every other kind stacks, so it stands
+   the blend down and orders the two snapshots by hand. */
+:root[data-ak-transition='wipe']::view-transition-old(root),
+:root[data-ak-transition='wipe']::view-transition-new(root),
+:root[data-ak-transition='iris']::view-transition-old(root),
+:root[data-ak-transition='iris']::view-transition-new(root),
+:root[data-ak-transition='slide']::view-transition-old(root),
+:root[data-ak-transition='slide']::view-transition-new(root),
+:root[data-ak-transition='curtain']::view-transition-old(root),
+:root[data-ak-transition='curtain']::view-transition-new(root),
+:root[data-ak-transition='zoom']::view-transition-old(root),
+:root[data-ak-transition='zoom']::view-transition-new(root) {
+  mix-blend-mode: normal;
+}
+
+/* FADE: the two screens cross. */
+@keyframes ak-vt-out { to { opacity: 0; } }
+@keyframes ak-vt-in { from { opacity: 0; } }
+:root[data-ak-transition='fade']::view-transition-old(root) {
+  animation: ak-vt-out var(--ak-transition-span) var(--ak-ease, ease) both;
+}
+:root[data-ak-transition='fade']::view-transition-new(root) {
+  animation: ak-vt-in var(--ak-transition-span) var(--ak-ease, ease) both;
+}
+
+/* WIPE: the old screen stands still and the new one is clipped in from an edge. The direction
+   is where the wipe TRAVELS, so `left` is revealed from the right edge moving left. */
+@keyframes ak-vt-wipe-left { from { clip-path: inset(0 0 0 100%); } to { clip-path: inset(0 0 0 0); } }
+@keyframes ak-vt-wipe-right { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes ak-vt-wipe-up { from { clip-path: inset(100% 0 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes ak-vt-wipe-down { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0 0 0 0); } }
+:root[data-ak-transition='wipe']::view-transition-old(root) { animation: none; z-index: 0; }
+:root[data-ak-transition='wipe']::view-transition-new(root) {
+  animation: ak-vt-wipe-left var(--ak-transition-span) var(--ak-ease, ease) both;
+  z-index: 1;
+}
+:root[data-ak-transition='wipe'][data-ak-transition-dir='right']::view-transition-new(root) { animation-name: ak-vt-wipe-right; }
+:root[data-ak-transition='wipe'][data-ak-transition-dir='up']::view-transition-new(root) { animation-name: ak-vt-wipe-up; }
+:root[data-ak-transition='wipe'][data-ak-transition-dir='down']::view-transition-new(root) { animation-name: ak-vt-wipe-down; }
+
+/* CURTAIN: the old screen sinks and dims against the tint, and the new one rises through it. */
+@keyframes ak-vt-sink {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.94); }
+}
+@keyframes ak-vt-rise {
+  from { opacity: 0; transform: translateY(16%); }
+  to { opacity: 1; transform: translateY(0); }
+}
+:root[data-ak-transition='curtain']::view-transition { background: var(--ak-curtain-tint); }
+:root[data-ak-transition='curtain']::view-transition-old(root) {
+  animation: ak-vt-sink calc(var(--ak-transition-span) * 0.55) var(--ak-ease, ease) both;
+  transform-origin: 50% 40%;
+  z-index: 0;
+}
+:root[data-ak-transition='curtain']::view-transition-new(root) {
+  animation: ak-vt-rise calc(var(--ak-transition-span) * 0.6) var(--ak-ease, ease) calc(var(--ak-transition-span) * 0.4) both;
+  z-index: 1;
+}
+
+/* ZOOM: the old screen falls back as the new one comes forward. */
+@keyframes ak-vt-zoom-out {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.92); }
+}
+@keyframes ak-vt-zoom-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+:root[data-ak-transition='zoom']::view-transition-old(root) {
+  animation: ak-vt-zoom-out var(--ak-transition-span) var(--ak-ease, ease) both;
+  z-index: 0;
+}
+:root[data-ak-transition='zoom']::view-transition-new(root) {
+  animation: ak-vt-zoom-in var(--ak-transition-span) var(--ak-ease, ease) both;
+  z-index: 1;
+}
+
+/* IRIS: the new screen opens through a circle at the point the JS handed over (the last place a
+   finger landed, or the middle of the window). 150% reaches past the furthest corner. */
+@keyframes ak-vt-iris {
+  from { clip-path: circle(0% at var(--ak-iris-x, 50%) var(--ak-iris-y, 50%)); }
+  to { clip-path: circle(150% at var(--ak-iris-x, 50%) var(--ak-iris-y, 50%)); }
+}
+:root[data-ak-transition='iris']::view-transition-old(root) { animation: none; z-index: 0; }
+:root[data-ak-transition='iris']::view-transition-new(root) {
+  animation: ak-vt-iris var(--ak-transition-span) var(--ak-ease, ease) both;
+  z-index: 1;
+}
+
+/* SLIDE: one screen leaves as the other arrives, both travelling the same way. */
+@keyframes ak-vt-leave-left { to { transform: translateX(-100%); } }
+@keyframes ak-vt-leave-right { to { transform: translateX(100%); } }
+@keyframes ak-vt-leave-up { to { transform: translateY(-100%); } }
+@keyframes ak-vt-leave-down { to { transform: translateY(100%); } }
+@keyframes ak-vt-arrive-left { from { transform: translateX(100%); } }
+@keyframes ak-vt-arrive-right { from { transform: translateX(-100%); } }
+@keyframes ak-vt-arrive-up { from { transform: translateY(100%); } }
+@keyframes ak-vt-arrive-down { from { transform: translateY(-100%); } }
+:root[data-ak-transition='slide']::view-transition-old(root) {
+  animation: ak-vt-leave-left var(--ak-transition-span) var(--ak-ease, ease) both;
+  z-index: 0;
+}
+:root[data-ak-transition='slide']::view-transition-new(root) {
+  animation: ak-vt-arrive-left var(--ak-transition-span) var(--ak-ease, ease) both;
+  z-index: 1;
+}
+:root[data-ak-transition='slide'][data-ak-transition-dir='right']::view-transition-old(root) { animation-name: ak-vt-leave-right; }
+:root[data-ak-transition='slide'][data-ak-transition-dir='right']::view-transition-new(root) { animation-name: ak-vt-arrive-right; }
+:root[data-ak-transition='slide'][data-ak-transition-dir='up']::view-transition-old(root) { animation-name: ak-vt-leave-up; }
+:root[data-ak-transition='slide'][data-ak-transition-dir='up']::view-transition-new(root) { animation-name: ak-vt-arrive-up; }
+:root[data-ak-transition='slide'][data-ak-transition-dir='down']::view-transition-old(root) { animation-name: ak-vt-leave-down; }
+:root[data-ak-transition='slide'][data-ak-transition-dir='down']::view-transition-new(root) { animation-name: ak-vt-arrive-down; }
+
+/* ── The curtain ─────────────────────────────────────────────────────────────────────────── */
+/* Above the tour (97) and the palette (95), because a curtain is over EVERYTHING for the moment
+   it holds; a native <dialog> lives in the top layer and is unaffected either way. */
+/* A curtain over ONE element: the host is the positioning context, the layer sits inside it. */
+.ak-curtain-host { position: relative; overflow: clip; }
+.ak-curtain.ak-curtain--inset { position: absolute; z-index: 5; }
+.ak-curtain {
+  position: fixed;
+  inset: 0;
+  z-index: 98;
+  overflow: hidden;
+  pointer-events: none;
+  --ak-curtain-tint: var(--ak-ink);
+}
+.ak-curtain--accent { --ak-curtain-tint: var(--ak-accent); }
+.ak-curtain--ink { --ak-curtain-tint: var(--ak-ink); }
+.ak-curtain--surface { --ak-curtain-tint: var(--ak-surface); }
+/* While it covers, it also takes the pointer: nothing is clicked mid-swap. Once it has opened
+   again the layer is inert, and destroy() takes it off the page altogether. */
+.ak-curtain--on { pointer-events: auto; }
+
+.ak-curtain__band,
+.ak-curtain__half,
+.ak-curtain__iris {
+  position: absolute;
+  background: var(--ak-curtain-tint);
+}
+.ak-curtain__band,
+.ak-curtain__half { will-change: transform; }
+.ak-curtain__band { inset: 0; }
+/* The starting clip is set inline by the module (it knows the origin); this is the floor, so a
+   leaf is never a full-screen slab of tint for the frame before its animation starts. */
+.ak-curtain__iris { inset: 0; clip-path: circle(0px at 50% 50%); will-change: clip-path; }
+
+.ak-curtain--axis-x .ak-curtain__half { top: 0; bottom: 0; width: 50%; }
+.ak-curtain--axis-x .ak-curtain__half--a { left: 0; }
+.ak-curtain--axis-x .ak-curtain__half--b { right: 0; }
+.ak-curtain--axis-y .ak-curtain__half { left: 0; right: 0; height: 50%; }
+.ak-curtain--axis-y .ak-curtain__half--a { top: 0; }
+.ak-curtain--axis-y .ak-curtain__half--b { bottom: 0; }
+
+/* ── The panel flip ──────────────────────────────────────────────────────────────────────── */
+/* panelTransition puts this on the container for the length of a `flip` and takes it off after:
+   the depth a card turns in, and the rule that stops the back of a turned panel showing through. */
+.ak-swap--flip { perspective: 1100px; }
+.ak-swap--flip > * { backface-visibility: hidden; }
+
+/* ── Reduced motion ──────────────────────────────────────────────────────────────────────── */
+/* The module already answers this in JavaScript (the swap happens and nothing travels). This is
+   the second lock, for a transition already in flight when the setting changes. */
+@media (prefers-reduced-motion: reduce) {
+  :root[data-ak-transition]::view-transition-old(root),
+  :root[data-ak-transition]::view-transition-new(root) {
+    animation: none;
+  }
+  .ak-curtain__band,
+  .ak-curtain__half,
+  .ak-curtain__iris { will-change: auto; }
+}

@@ -5,6 +5,8 @@
  *   plus the /v1/libs catalogue and the generated JS sources themselves.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=libs
  * @version-history
+ *   v1.7.0 — 2026-09-02 — The show (director, storyRail, the anime.js show pieces, the
+ *     transitions) joins the export assertions (kit v0.45.0).
  *   v1.6.0 — 2026-09-02 — The kit's motion primitives (springFrames, spring, stagger, inView,
  *     scrollLink, drag, flipFrom) and the eleven parts that ride the motion libraries join the
  *     export assertions (kit v0.44.0).
@@ -1059,6 +1061,8 @@ await test('GET /v1/libs/aimeat-atelier.js — serves the Atelier kit with every
         'springFrames', 'spring', 'stagger', 'inView', 'scrollLink', 'drag', 'flipFrom',
         'carousel', 'lightbox', 'calendar', 'priceTable', 'thread', 'checkout',
         'sortable', 'cart', 'notices', 'facets',
+        'director', 'storyRail', 'textReveal', 'drawPath', 'gridWave', 'sequence', 'orbit',
+        'screenTransition', 'panelTransition', 'curtain',
     ]) {
         assert(text.includes(part), `should export ${part}`);
     }
