@@ -3912,6 +3912,14 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "state.listed": "Listed",
       "state.unlisted": "Unlisted",
       "state.draft": "Draft waiting",
+      "rail.kunto": "Something missing",
+      "kunto.noMap": "No data map",
+      "kunto.noAi": "No word on AI use",
+      "kunto.specOff": "Old build guide",
+      "kunto.seoOff": "Not found by search engines",
+      "kunto.stale60": "No changes in 60 days",
+      "kunto.noShot": "No screenshot",
+      "kunto.noSkill": "No skill",
       "sort.newest": "Newest",
       "sort.opens": "Most opened",
       "sort.name": "A → Z",
@@ -4900,6 +4908,14 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "state.listed": "Listalla",
       "state.unlisted": "Ei listalla",
       "state.draft": "Luonnos odottaa",
+      "rail.kunto": "Jotain puuttuu",
+      "kunto.noMap": "Ei datakarttaa",
+      "kunto.noAi": "Ei tietoa tekoälyn käytöstä",
+      "kunto.specOff": "Vanha rakennusohje",
+      "kunto.seoOff": "Hakukoneet eivät löydä",
+      "kunto.stale60": "Ei muutoksia 60 päivään",
+      "kunto.noShot": "Ei kuvakaappausta",
+      "kunto.noSkill": "Ei taitoa",
       "sort.newest": "Uusimmat",
       "sort.opens": "Avatuimmat",
       "sort.name": "A → Ö",
@@ -11347,8 +11363,9 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
   var refreshAll2;
   var setListingLoaded;
   var isListingLoaded;
+  var setBoundSkillApps;
   function initServerIo(deps) {
-    ({ getMainApps: getMainApps3, getServerState: getServerState2, getServerManifests: getServerManifests3, setServerManifests, getOwnServerApps, setOwnServerApps, getActiveTag, getSearchQuery, getSortMode, generateId: generateId4, renderApps: renderApps3, refreshAll: refreshAll2, setListingLoaded, isListingLoaded } = deps);
+    ({ getMainApps: getMainApps3, getServerState: getServerState2, getServerManifests: getServerManifests3, setServerManifests, getOwnServerApps, setOwnServerApps, getActiveTag, getSearchQuery, getSortMode, generateId: generateId4, renderApps: renderApps3, refreshAll: refreshAll2, setListingLoaded, isListingLoaded, setBoundSkillApps } = deps);
   }
   var lastAllServerApps = [];
   var lastCommunityApps = [];
@@ -12073,6 +12090,22 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
           renderCommunityApps(communityApps, aimeatUrl, communitySection, communityGrid, communityCountEl, currentOwner);
           renderFavorites(serverApps, aimeatUrl);
           applyServerFilter();
+          if (currentOwner && listTok) {
+            fetch(aimeatUrl + "/v1/skills?scope=user", { headers: listHeaders }).then(function(resp) {
+              return resp.ok ? resp.json() : null;
+            }).then(function(json2) {
+              var skills = json2 && json2.data && (json2.data.skills || json2.data) || [];
+              var bound = {};
+              for (var si = 0; si < skills.length; si++) {
+                var b = skills[si].metadata && skills[si].metadata.binding || skills[si].binding || "";
+                if (b.indexOf("app:") === 0) bound[b.slice(4)] = true;
+              }
+              setBoundSkillApps(bound);
+              renderApps3();
+            }).catch(function() {
+              setBoundSkillApps({});
+            });
+          }
         });
       }).catch(function() {
         setListingLoaded(true);
@@ -12351,6 +12384,25 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
   function getSortMode2() {
     return sortMode;
   }
+  var KUNTO_KEYS = ["noMap", "noAi", "specOff", "seoOff", "stale60", "noShot", "noSkill"];
+  var boundSkillApps = {};
+  function setBoundSkillApps2(v) {
+    boundSkillApps = v || {};
+  }
+  function kuntoFlags(sa) {
+    var m = sa.manifest || {};
+    var spec = sa.spec_check && sa.spec_check.status;
+    var age = sa.created_at ? Date.now() - Date.parse(sa.created_at) : 0;
+    return {
+      noMap: !(sa.data_map && sa.data_map.missing === false),
+      noAi: !(sa.ai_posture || m.aiPosture),
+      specOff: spec === "missing" || spec === "stale",
+      seoOff: sa.seo_state === "off",
+      stale60: age > 60 * 864e5,
+      noShot: !sa.has_screenshot,
+      noSkill: !boundSkillApps[(sa.owner || "") + "/" + (sa.filename || "")]
+    };
+  }
   function railItem(label2, count, on, onclick, isTag) {
     return '<button type="button" class="cat-rail-item' + (isTag ? " cat-rail-item--tag" : "") + (on ? " active" : "") + '" onclick="' + onclick + '"><span>' + escapeHtml(label2) + "</span>" + (typeof count === "number" ? '<span class="cat-rail-count">' + count + "</span>" : "") + "</button>";
   }
@@ -12405,7 +12457,16 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     }
     var bar = document.getElementById("state-bar");
     if (bar) {
-      bar.innerHTML = '<div class="cat-rail-label">' + escapeHtml(t("rail.state")) + "</div>" + railItem(t("state.listed"), listed, activeState === "listed", "window._launcher.filterByState('listed')", false) + railItem(t("state.unlisted"), unlisted, activeState === "unlisted", "window._launcher.filterByState('unlisted')", false) + railItem(t("state.draft"), drafts, activeState === "draft", "window._launcher.filterByState('draft')", false);
+      var kuntoHtml = "";
+      if (listingLoaded && entries.length) {
+        for (var k = 0; k < KUNTO_KEYS.length; k++) {
+          var key = KUNTO_KEYS[k];
+          var n = 0;
+          for (var j = 0; j < entries.length; j++) if (entries[j].kunto && entries[j].kunto[key]) n++;
+          if (n) kuntoHtml += railItem(t("kunto." + key), n, activeState === key, "window._launcher.filterByState('" + key + "')", false);
+        }
+      }
+      bar.innerHTML = '<div class="cat-rail-label">' + escapeHtml(t("rail.state")) + "</div>" + railItem(t("state.listed"), listed, activeState === "listed", "window._launcher.filterByState('listed')", false) + railItem(t("state.unlisted"), unlisted, activeState === "unlisted", "window._launcher.filterByState('unlisted')", false) + railItem(t("state.draft"), drafts, activeState === "draft", "window._launcher.filterByState('draft')", false) + (kuntoHtml ? '<div class="cat-rail-label">' + escapeHtml(t("rail.kunto")) + "</div>" + kuntoHtml : "");
     }
     var opensTotal = 0;
     for (var o = 0; o < entries.length; o++) opensTotal += entries[o].opens || 0;
@@ -12646,7 +12707,9 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
           // The row's facts: how often opened, when the current version landed, how big the file is.
           opens: sa.downloads || 0,
           createdAt: sa.created_at || null,
-          size: sa.size || 0
+          size: sa.size || 0,
+          // What the app is missing, for the condition rows in the rail (KUNTO_KEYS).
+          kunto: kuntoFlags(sa)
         };
         entries.push(se);
         if (fn) byFilename[fn] = se;
@@ -12708,6 +12771,9 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       });
       else if (activeState === "draft") filtered = filtered.filter(function(e) {
         return !!e.hasDraft;
+      });
+      else if (activeState && KUNTO_KEYS.indexOf(activeState) >= 0) filtered = filtered.filter(function(e) {
+        return !!(e.kunto && e.kunto[activeState]);
       });
       if (getSearchQuery2()) {
         var q = getSearchQuery2().toLowerCase();
@@ -13324,7 +13390,8 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       renderApps: renderApps4,
       refreshAll: refreshAll3,
       setListingLoaded: setListingLoaded2,
-      isListingLoaded: isListingLoaded2
+      isListingLoaded: isListingLoaded2,
+      setBoundSkillApps: setBoundSkillApps2
     });
     initRender({
       getMainApps: function() {
@@ -13355,6 +13422,14 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     var _urlLang = _params.get("lang");
     setLang(_urlLang === "fi" || _urlLang === "en" ? _urlLang : loadConfig().language === "fi" ? "fi" : "en");
     applyI18n();
+    var _urlFilter = _params.get("filter");
+    if (_urlFilter && (["listed", "unlisted", "draft"].indexOf(_urlFilter) >= 0 || KUNTO_KEYS.indexOf(_urlFilter) >= 0)) filterByState(_urlFilter);
+    var _urlQuery = (_params.get("q") || "").trim();
+    if (_urlQuery) {
+      searchQuery = _urlQuery;
+      var _searchEl = document.getElementById("search-input");
+      if (_searchEl) _searchEl.value = _urlQuery;
+    }
     var _savedView = "library";
     try {
       _savedView = localStorage.getItem("appCatalogView") || "library";

@@ -36,9 +36,9 @@ import { loadPromoted } from './promote.js';
 
 // Injected once at bootstrap by main.js: read getters + write setters for the shared app-state
 // (which stays main-owned), plus a few main-local fns.
-let getMainApps, getServerState, getServerManifests, setServerManifests, getOwnServerApps, setOwnServerApps, getActiveTag, getSearchQuery, getSortMode, generateId, renderApps, refreshAll, setListingLoaded, isListingLoaded;
+let getMainApps, getServerState, getServerManifests, setServerManifests, getOwnServerApps, setOwnServerApps, getActiveTag, getSearchQuery, getSortMode, generateId, renderApps, refreshAll, setListingLoaded, isListingLoaded, setBoundSkillApps;
 export function initServerIo(deps) {
-  ({ getMainApps, getServerState, getServerManifests, setServerManifests, getOwnServerApps, setOwnServerApps, getActiveTag, getSearchQuery, getSortMode, generateId, renderApps, refreshAll, setListingLoaded, isListingLoaded } = deps);
+  ({ getMainApps, getServerState, getServerManifests, setServerManifests, getOwnServerApps, setOwnServerApps, getActiveTag, getSearchQuery, getSortMode, generateId, renderApps, refreshAll, setListingLoaded, isListingLoaded, setBoundSkillApps } = deps);
 }
 
 // Cache of the last full server-app list (own + community) + base URL, so a favourite toggle can
@@ -903,6 +903,24 @@ function loadPublishedApps() {
           renderCommunityApps(communityApps, aimeatUrl, communitySection, communityGrid, communityCountEl, currentOwner);
           renderFavorites(serverApps, aimeatUrl); // ⭐ group pinned atop the Library
           applyServerFilter(); // re-apply any active search/tag to the community cards
+          // The "no skill" condition row: which apps a skill is bound to, from the owner's own skill
+          // list in ONE read. Fetched after the grid is up, so a slow or refused read only delays
+          // that one row; the grid re-renders when it lands.
+          if (currentOwner && listTok) {
+            fetch(aimeatUrl + '/v1/skills?scope=user', { headers: listHeaders })
+              .then(function (resp) { return resp.ok ? resp.json() : null; })
+              .then(function (json) {
+                var skills = (json && json.data && (json.data.skills || json.data)) || [];
+                var bound = {};
+                for (var si = 0; si < skills.length; si++) {
+                  var b = (skills[si].metadata && skills[si].metadata.binding) || skills[si].binding || '';
+                  if (b.indexOf('app:') === 0) bound[b.slice(4)] = true;
+                }
+                setBoundSkillApps(bound);
+                renderApps();
+              })
+              .catch(function () { setBoundSkillApps({}); });
+          }
         });
       })
       .catch(function() {
