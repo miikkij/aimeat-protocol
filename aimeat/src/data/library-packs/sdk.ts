@@ -10,6 +10,9 @@
  * @structure SDK_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
+ *   v1.4.0 — 2026-09-02 — aimeat-phaser: the Phaser 4 base (boot, packs, textures, audio, saves,
+ *     controls, hud, menus, transitions, platformer, settings), with the paved-path aiDoc
+ *     (wish-phaser4-design-book-page).
  *   v1.3.1 — 2026-08-30 — aimeat-social is "Boards" again, not "Boards (deprecated)": RFC v4.0 §27
  *     reinstated boards, and the aiDoc says which calls work for an anonymous visitor.
  *   v1.3.0 — 2026-08-27 — Add aimeat-atelier (the Atelier track's UI kit, TARGET-074). Requires
@@ -410,6 +413,48 @@ export const SDK_PACKS: LibraryPack[] = [
     modelTier: 'needs-doc',
     promptGroup: 'economy',
     promptLine: '- aimeat-exchange.js — the EXCHANGE marketplace from the browser: browse/search listings + their ODPS descriptors (`AIMEAT.exchange.list`, `get`, `odps`), publish your own supply (`publish` — needs input+output schema and `usageTerms`; price comes from the source, never the browser), see who is using it (`stats`, `consumers` — each row breaks down whether an app or an agent actually called), accept + switch off contracts (`accept`, `contracts`, `off`), read outbound `spend()` and accrued `earnings()`, and work the demand side (`needs`, `postNeed`, `bid`, `acceptBid`). Money stays integer micro-units — format with `fmtUnit`. Requires aimeat-auth + aimeat-commerce.',
+  },
+  {
+    id: 'aimeat-phaser',
+    kind: 'sdk',
+    category: 'ui',
+    title: 'Phaser 4 game base (boot, packs, saves, controls, menus, levels, settings)',
+    description: 'What every Phaser 4 game on this node otherwise re-guesses, ready: one call boots a game into an element with fit / resize / fixed scaling, fullscreen and pause on tab hide; resource packs with a progress bar and 404 reporting, generated tiles and a character with animations so a game runs with no files; the audio bus (master / music / sfx, unlock on a gesture, crossfade, synth sounds); ONE memory key per player for profile, settings, levels, scores and inventory, guest in the browser until login, a public leaderboard; keyboard, gamepad and a touch overlay as one control state; HUD; in-canvas menus with motions and scene transitions; an ASCII map as a platformer level; and the settings page on the Atelier kit\'s own form. Colours come from the Atelier tokens of the element it boots into.',
+    url: '/v1/libs/aimeat-phaser.js',
+    include: [
+      '<link rel="stylesheet" href="{{BASE_URL}}/lib/aimeat-phaser.css">',
+      '<script src="{{BASE_URL}}/v1/libs/aimeat-phaser.js"></script>',
+    ],
+    requires: [],
+    license: 'MIT',
+    apiSurface: 'AIMEAT.phaser',
+    aiDoc: [
+      'AIMEAT.phaser: the Phaser 4 base. It loads Phaser from THIS node (/lib/phaser@4.min.js) on first use; never link a CDN.',
+      'Boot: const h = await AIMEAT.phaser.game({ parent: el, width: 960, height: 540, scale: "fit"|"resize"|"fixed", fullscreen: "button", physics: "arcade", gravity: { y: 900 }, scenes: [scene] });',
+      '  h.game is the Phaser.Game; h.theme the Atelier tokens as numbers (theme.accent, theme.ink, theme.bg …); h.fullscreen(), h.exitFullscreen(), h.resize(w, h), h.destroy(). Under "resize" a scene gets a "resize" event with the new size.',
+      'Look: AIMEAT.phaser.theme(el) → { bg, surface, ink, inkDim, accent, ok, warn, err, line, ch1..ch4, font, fontDisplay, fontMono } from the --ak-* tokens, so text and shapes wear the app\'s own colours.',
+      'Assets without files: in create(): AIMEAT.phaser.textures.tiles(this, { size: 32 }) (tile-ground, tile-brick, tile-spike, tile-coin, tile-goal, tile-enemy) and textures.character(this, { key: "hero" }) (animations hero-idle / hero-run / hero-jump). Real files: const p = AIMEAT.phaser.pack({ id: "art", base: "/v1/pub/<owner>/mygame/", images: { sky: "sky.png" }, audio: { coin: ["coin.mp3", "coin.ogg"] } }); in preload(): AIMEAT.phaser.preloadPack(this, p) draws the progress bar and reports 404s.',
+      'Sound: const bus = AIMEAT.phaser.audio(h.game); bus.unlock() on the first pointer; bus.play("coin") or bus.synth("coin") when there is no file; bus.playMusic("theme", { loop: true, fade: 600 }); bus.master(0.8), bus.music(0.5), bus.sfx(1); bus.settings() / bus.apply(settings) for persistence.',
+      'Saves: const store = AIMEAT.phaser.saves({ app: "mygame", version: 1, defaults: { levels: {}, scores: [] } }); await store.load(); store.levels.best("l1", 1200); store.settings({ music: 0.5 }); store.save(). ONE memory key per player (mygame.save), guest in localStorage until AIMEAT.auth signs in, then merged; store.leaderboard() reads everyone\'s public mygame.score records through AIMEAT.data.search. Load aimeat-auth and aimeat-data for the signed-in path; without them the store is guest-only and never throws.',
+      'Controls: const c = AIMEAT.phaser.controls(this, { touch: "auto" }); in update(): c.update(); then c.left / c.right / c.jump / c.action / c.axis.x; c.justPressed("jump"); c.rebind("jump", ["SPACE"]). The touch overlay (joystick + two buttons) appears on coarse pointers.',
+      'Menus: scenes: [AIMEAT.phaser.titleScene({ key: "title", title: "RIDGE RUN", items: [{ label: "Play", scene: "play" }], motion: "stagger" }), play]; in a scene AIMEAT.phaser.menuItems(this, { x, y, items, motion: "slide" }); AIMEAT.phaser.pauseMenu(this, { onQuit }); await AIMEAT.phaser.transition(this, "play", { kind: "iris" }).',
+      'A level: const lvl = AIMEAT.phaser.platformer(this, { map: ["....o....", "..===....", "P...^..G#", "#########"], controls: c }); lvl.on("coin", n => hud.score(n * 10)); lvl.on("goal", () => store.levels.best("l1", score)); in update(): lvl.update().',
+      'HUD: const hud = AIMEAT.phaser.hud(this); hud.score(120); hud.lives(3); AIMEAT.phaser.toast(this, "Level up").',
+      'Settings page (DOM): AIMEAT.phaser.settingsPanel({ target: el, audio: bus, controls: c, saves: store, game: h }) renders volumes, fullscreen, touch controls, less motion and key bindings on the Atelier kit when it is on the page.',
+      'Physics: arcade by default; body.blocked.down is the ground test for a jump. Pause with h.sleep() / h.wake(); the library already sleeps the loop when the tab hides.',
+      'Publish checklist: boots signed out; resizes with the window; audio plays only after a gesture; a score written is read back without a reload; no CDN, no data: URI textures.',
+    ].join('\n'),
+    changelog: [
+      { version: '1.0.0', date: '2026-09-02', summary: 'Initial: boot, theme, packs, textures, audio, saves, controls, hud, menus, transitions, the platformer and the settings panel (wish-phaser4-design-book-page). Shown working on the Design Book\'s Phaser page.' },
+    ],
+    demoTemplateId: undefined,
+    tierHint: 'T1',
+    interviewTriggers: ['phaser', 'game', 'peli', 'arcade', 'platformer', 'tasohyppely', 'level', 'kenttä', 'fullscreen', 'gamepad', 'high score', 'pisteet', 'save game', 'tallennus'],
+    sizeEstimate: '~60KB',
+    status: 'preview',
+    modelTier: 'needs-doc',
+    promptGroup: 'media',
+    promptLine: '- aimeat-phaser.js — the Phaser 4 base (`AIMEAT.phaser`): `game()` boots into an element with fit/resize/fixed scaling and fullscreen, `pack`/`preloadPack` with a progress bar, `textures` generated tiles and a character, the `audio` bus, `saves` as ONE memory key per player with a public leaderboard, `controls` (keyboard, gamepad, touch), `hud`, in-canvas `titleScene`/`menuItems`/`pauseMenu`/`transition`, `platformer` from an ASCII map, and `settingsPanel` on the Atelier form. Loads Phaser from this node; pair with aimeat-auth + aimeat-data for signed-in saves.',
   },
   {
     id: 'aimeat-game',

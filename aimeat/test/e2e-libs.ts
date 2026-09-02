@@ -5,6 +5,8 @@
  *   plus the /v1/libs catalogue and the generated JS sources themselves.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=libs
  * @version-history
+ *   v1.8.0 — 2026-09-02 — aimeat-phaser.js coverage: every part exported, Phaser loaded from this
+ *     node and never a CDN, one save key per player, the version pin.
  *   v1.7.0 — 2026-09-02 — The show (director, storyRail, the anime.js show pieces, the
  *     transitions) joins the export assertions (kit v0.45.0).
  *   v1.6.0 — 2026-09-02 — The kit's motion primitives (springFrames, spring, stagger, inView,
@@ -910,6 +912,39 @@ await test('aimeat-exchange fmtUnit — money is money, morsels are morsels, and
     let threw2 = false;
     try { fmtUnit(5, 'bananas'); } catch { threw2 = true; }
     assert(threw2, 'an unrecognised unit must throw rather than fall through to morsels');
+});
+
+await test('GET /v1/libs/aimeat-phaser.js — serves the Phaser 4 base with every part', async () => {
+    const res = await fetch(`${BASE}/v1/libs/aimeat-phaser.js`);
+    assert(res.ok, `phaser lib failed: ${res.status}`);
+    const text = await res.text();
+    assert(res.headers.get('Content-Type')?.includes('javascript'), 'should be javascript');
+    for (const part of [
+        'ensurePhaser', 'theme', 'game', 'pack', 'preloadPack', 'textures', 'audio',
+        'saves', 'controls', 'hud', 'toast', 'menuItems', 'titleScene', 'pauseMenu', 'transition',
+        'platformer', 'parseMap', 'settingsPanel',
+    ]) {
+        assert(text.includes(part), `should export ${part}`);
+    }
+    // Phaser comes from THIS node, never a CDN: the one script the library loads is the vendored
+    // build, and the app CSP would refuse a CDN anyway.
+    assert(text.includes('/lib/phaser@4.min.js'), 'must load the vendored Phaser 4 build');
+    assert(!/cdn\.jsdelivr|cdnjs\.cloudflare|unpkg\.com/.test(text), 'must not name a CDN');
+    // The memory shape rule: ONE key per player, never one per score.
+    assert(text.includes('.save'), 'saves must write one key per player');
+});
+
+await test('GET /v1/libs/aimeat-phaser.js — the version an app prints moves with the library', async () => {
+    const [js, css] = await Promise.all([
+        fetch(`${BASE}/v1/libs/aimeat-phaser.js`).then((r) => r.text()),
+        fetch(`${BASE}/lib/aimeat-phaser.css`).then((r) => r.text()),
+    ]);
+    const shipped = js.match(/version:\s*["']([\d.]+)["']/)?.[1];
+    const newest = css.match(/@version-history\s*\n\s*\*\s*v([\d.]+)/)?.[1];
+    assert(shipped, 'the library must expose a version');
+    assert(newest, 'the stylesheet must carry a version history');
+    assert(shipped === newest,
+        `AIMEAT.phaser.version (${shipped}) must match the newest stylesheet version (${newest})`);
 });
 
 await test('GET /v1/libs/aimeat-game.js — serves the gamification kit with every component', async () => {

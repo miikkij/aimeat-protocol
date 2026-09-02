@@ -11,6 +11,8 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.13.0 -- 2026-09-02 -- aimeat-game-apps: phaser4 through aimeat-phaser is the paved path, and
+ *     saves are ONE key per player (myapp.save private, myapp.score public), never one per score.
  *   v1.12.0 -- 2026-08-25 -- aimeat-app-builder moves to its own module AND comes back from the
  *     node. Seeding is create-if-missing, which means a built-in skill can be edited in two places
  *     and reconciled in neither: the node's copy had gained a 2.9 kB section on 2026-08-16 ("Say it
@@ -623,7 +625,16 @@ from an external CDN; the include line in the pack doc points at this node's /li
 
 ## Pick the right engine
 
-- **phaser** — a GAME: scenes, physics, collisions, input, score, sound. The default for games.
+- **phaser4** (\`GET /v1/library-packs/phaser4\`) — a GAME: scenes, physics, collisions, input,
+  score, sound. The default for games. Load it THROUGH \`aimeat-phaser\`
+  (\`GET /v1/library-packs/aimeat-phaser\`): \`AIMEAT.phaser.game()\` boots into an element with
+  fit / resize / fixed scaling and fullscreen, \`textures\` generate tiles and a character with
+  animations, \`preloadPack\` draws the loading bar, \`audio\` is the bus, \`saves\` is the
+  memory shape, \`controls\` unifies keyboard, gamepad and touch, \`titleScene\` / \`menuItems\` /
+  \`pauseMenu\` / \`transition\` are the menus, \`platformer\` turns an ASCII map into a level and
+  \`settingsPanel\` is the settings page on the Atelier kit. The Design Book's Phaser page shows
+  each one running; copy from there rather than from memory. The old \`phaser\` pack is v3 and
+  stays only for the games that name it.
 - **pixi** — heavy 2D RENDERING without game logic: particles, dashboards with thousands of
   moving sprites, visual effects. You write the loop; no physics/input engine. NOTE v8 API:
   async \`app.init()\`, \`app.canvas\`, Graphics \`shape().fill()\` chain, \`PIXI.Assets.load\`.
@@ -639,11 +650,13 @@ Published AIMEAT apps are one HTML file — avoid external asset files entirely:
 
 ## AIMEAT glue that makes it a platform app (not just a canvas)
 
-- **High scores / leaderboard**: one PUBLIC memory key per player
-  (\`myapp.highscore\`, \`{ score, by, at }\`) written with aimeat-data; read everyone's with
-  \`AIMEAT.data.search('myapp.highscore')\`. Gate saving on login (aimeat-auth), render a
-  top-10. The comp-phaser-arcade template shows the exact pattern.
-- **Save games**: private memory key per user (\`visibility: 'private'\`).
+- **Saves, scores, levels, settings**: ONE private memory key per player
+  (\`myapp.save\`: { version, profile, settings, levels, scores, inventory }) and ONE public
+  key per player for the leaderboard (\`myapp.score\`: { name, best, level, updated }), read
+  across owners with \`AIMEAT.data.search('myapp.score')\`. \`AIMEAT.phaser.saves()\` does
+  exactly this, keeps a guest copy in the browser until sign-in and merges it then, and
+  version-gates the record. Never one key per score or per level: the budget is 1000 keys per
+  person.
 - **Multiplayer**: the \`realtime\` pack (AimeatRealtime rooms — WS + WebRTC + Yjs). Broadcast
   inputs/state deltas, never frames; throttle to ~30ms; register handlers BEFORE connect().
 - **Theme**: read the app CSS variables for colors so the game respects light/dark.
