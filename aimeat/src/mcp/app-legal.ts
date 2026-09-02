@@ -19,6 +19,9 @@
  * @structure registerAppLegalTools(mcp, storage, config, getAgentGaii)
  * @usage import { registerAppLegalTools } from './app-legal.js';
  * @version-history
+ *   v1.2.0 — 2026-09-02 — `playtest` on aimeat_app_audit: the same call opens the app in a headless
+ *     browser and reports the eight things a game gets wrong, through the same service the route
+ *     calls. An agent that has just published a game can look at it without a screen.
  *   v1.1.0 — 2026-08-29 — aimeat_app_legal_set takes aiProvenanceInputs; the audit read goes through
  *     ownerAppAudit() rather than storage.
  *   v1.0.0 — 2026-08-29 — Initial.
@@ -89,13 +92,19 @@ export function registerAppLegalTools(
     {
       filename: z.string().describe('The app, with its extension.'),
       limit: z.number().int().min(1).max(500).optional().describe('How many of the newest entries to return. Default 50.'),
+      playtest: z.boolean().optional().describe('Also open the app for real in a headless browser and report what it did. Slow (about a minute).'),
     },
     annotationsFor('aimeat_app_audit'),
-    async (args: { filename: string; limit?: number }) => {
-      // The lookup, the refusals and the slice live in the service; this door renders the answer.
-      const out = await ownerAppAudit(storage, config, { callerGaii: getAgentGaii(), filename: args.filename, limit: args.limit });
+    async (args: { filename: string; limit?: number; playtest?: boolean }) => {
+      // The lookup, the refusals, the slice and the live run all live in the service; this door
+      // renders the answer.
+      const out = await ownerAppAudit(storage, config, {
+        callerGaii: getAgentGaii(), filename: args.filename, limit: args.limit, playtest: args.playtest,
+      });
       if ('error' in out) return { content: [{ type: 'text' as const, text: out.error }], isError: true };
-      return { content: [{ type: 'text' as const, text: JSON.stringify({ filename: args.filename, total: out.total, entries: out.entries }, null, 2) }] };
+      return { content: [{ type: 'text' as const, text: JSON.stringify({
+        filename: args.filename, total: out.total, entries: out.entries, ...(out.live ? { live: out.live } : {}),
+      }, null, 2) }] };
     },
   );
 }

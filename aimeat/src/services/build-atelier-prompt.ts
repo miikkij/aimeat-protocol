@@ -26,6 +26,8 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.20.0 — 2026-09-02 — A game starts from shell-phaser-game; the prompt says so under the
+ *     shell line.
  *   v1.19.0 — 2026-09-02 — The motion paragraph names the spring hand: a look carries its own
  *     stiffness, damping and mass in --ak-spring-*, and the primitives read them off the
  *     element, so an author tunes the look rather than every call.
@@ -232,6 +234,11 @@ function composeBody(config: AimeatConfig): string {
   body += 'Start from the shell — fetch it, never invent the structure:\n\n'
     + '```\n'
     + `GET ${base}/v1/app-templates/shell-atelier\n`
+    + '```\n\n'
+    + 'A GAME starts from the game shell instead: the same frame with a Phaser canvas, a title '
+    + 'menu, pause, settings and a leaderboard already wired through aimeat-phaser:\n\n'
+    + '```\n'
+    + `GET ${base}/v1/app-templates/shell-phaser-game\n`
     + '```\n\n';
   body += 'The head is eight lines and stays that way: the ceremony (theme restore, login boot, '
     + 'mobile guards, designed states, accessibility wiring, motion) lives in the served kit, '

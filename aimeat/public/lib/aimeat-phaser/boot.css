@@ -22,6 +22,8 @@
  *   .ak-phaser__full
  * @usage  <link rel="stylesheet" href="/lib/aimeat-phaser.css">  (which imports this)
  * @version-history
+ *   v1.0.1 — 2026-09-02 — The fullscreen button sits in the bottom corner: the HUD draws the level
+ *     name top-right and the two overlapped.
  *   v1.0.0 — 2026-09-02 — Initial: the frame, the three scaling shapes and the corner button.
  */
 
@@ -79,7 +81,9 @@
 /* ── The button ────────────────────────────────────────────────────────────────────────────── */
 .ak-phaser__full {
   position: absolute;
-  inset-block-start: 8px;
+  /* The foot, not the head: the HUD owns the top corners (score left, level and clock right),
+     and a button in the same corner sat on the level name. */
+  inset-block-end: 8px;
   inset-inline-end: 8px;
   z-index: 2;
   display: inline-grid;

@@ -9,7 +9,9 @@
  *                                                  content, for the editor
  *   GET /v1/apps/:owner/:filename/legal/:kind      the page itself: the owner's HTML verbatim, a
  *                                                  markdown page rendered here, or a redirect
- *   GET /v1/apps/:owner/:filename/audit            the owner's audit log of the app's settings
+ *   GET /v1/apps/:owner/:filename/audit            the owner's audit log of the app's settings, and
+ *                                                  with ?playtest=true the app opened for real in a
+ *                                                  headless browser beside it (app-playtest.ts)
  *
  *   A legal page is pre-contract information, so it is served without the app's access code and
  *   for a parked app; only an operator-hidden app is a 404 to anyone but its owner, the same rule
@@ -17,6 +19,9 @@
  *   the MCP tool, both through services/app-legal.ts.
  * @structure registerLegalRoutes(router, config, storage, canonicalOwner)
  * @version-history
+ *   v1.2.0 — 2026-09-02 — `?playtest=true` on the audit read: the same service the MCP door calls
+ *     opens the app in a headless browser and answers with the eight things a game gets wrong. The
+ *     flag is read once, normalized, so `?playtest=false` never counts as yes.
  *   v1.1.1 — 2026-08-31 — Ownership is claimed by an authenticated principal, not by `req.auth`
  *     being set: in anonymous mode optionalAuth injects the node's anonymous owner, so an
  *     unauthenticated caller was answered as the owner of that owner's apps and given the legal
@@ -38,6 +43,7 @@ import {
   appSellsForMoney,
 } from '../../services/app-legal.js';
 import { readAppAudit } from '../../services/app-audit.js';
+import { auditAppWithPlaytest } from '../../services/app-playtest.js';
 import { applyServeMarks } from '../../services/app-serve-marks.js';
 import { loadServedProvenance, setProvenanceHeaders } from '../../services/ai-provenance-marks.js';
 import { appReviewedBy } from '../../services/app-marks.js';
@@ -80,6 +86,12 @@ export function registerLegalRoutes(
   // filename and a token and no owner name, and they need the same two answers the owner's own
   // browser gets. Registered before the `:owner` forms so `me` is never read as a name.
   const query = (req: Request) => { const i = req.originalUrl.indexOf('?'); return i >= 0 ? req.originalUrl.slice(i) : ''; };
+  // One reading of the flag, so `?playtest=true` and `?playtest=1` mean the same thing on every
+  // door and `?playtest=false` never reads as "yes" because the string is non-empty.
+  const wantsPlaytest = (raw: unknown): boolean => {
+    const value = Array.isArray(raw) ? raw[0] : raw;
+    return value === true || (typeof value === 'string' && ['true', '1', 'yes'].includes(value.toLowerCase()));
+  };
   // An agent needs app:write on these three — the scope the owner grants for managing an app is
   // the one that reads its settings and its log, and the only app scope the owner's checkboxes
   // carry (test/unit/scope-vocabulary-parity.test.ts). An owner passes on the role, as everywhere.
@@ -173,9 +185,16 @@ export function registerLegalRoutes(
     const limitRaw = Number(req.query.limit);
     const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(500, Math.floor(limitRaw)) : null;
     const entries = limit ? all.slice(Math.max(0, all.length - limit)).reverse() : all;
+    // `?playtest=true` also OPENS the app: the publish-time check on its bytes, then a live run in
+    // a headless browser. Same service the MCP door calls, so both answer identically; nothing is
+    // written, and a node with no browser answers ran:false with the reason rather than a 500.
+    const live = wantsPlaytest(req.query.playtest)
+      ? await auditAppWithPlaytest(storage, config, { ownerName: app.ownerName, filename: app.filename })
+      : null;
     res.json(success(config.nodeId, {
       owner: app.ownerName, filename: app.filename, entries, total: all.length,
       order: limit ? 'newest-first' : 'oldest-first',
+      ...(live ? { live } : {}),
     }));
   });
 }

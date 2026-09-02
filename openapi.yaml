@@ -3312,6 +3312,45 @@ components:
         url: { type: string, example: /v1/appdev/pitfalls/hardcoded-theme-colors }
       required: [pitfall, severity, message, url]
 
+    AppPlaytestResult:
+      type: object
+      description: >
+        What a published app did when the node opened it in a headless browser, signed out, at a
+        390x844 phone and a 1280x720 desktop. `ran: false` with a reason is a valid answer and the
+        one a node with no browser gives; an unavailable playtest is never a passed playtest.
+      properties:
+        ran: { type: boolean, description: False when the run could not happen at all. }
+        reason: { type: string, description: Why it did not run. Present only when ran is false. }
+        at: { type: string, format: date-time }
+        checks:
+          type: array
+          items:
+            type: object
+            description: One measured claim about the app, in a sentence a person can act on.
+            properties:
+              id:
+                type: string
+                enum: [boots, paints, clean-console, resizes, audio-gated, touch-targets, saves, reduced-motion]
+              ok: { type: boolean }
+              severity:
+                type: string
+                enum: [must, info]
+                description: A failing `must` counts in summary.failed; an `info` check never fails the run.
+              detail: { type: string, description: One plain sentence, written for whoever built the app. }
+              ms: { type: integer, description: How long the check took, where the number means something. }
+            required: [id, ok, severity, detail]
+        console:
+          type: object
+          properties:
+            errors: { type: array, items: { type: string }, description: At most ten, quoted as the browser gave them. }
+            warnings: { type: integer }
+        summary:
+          type: object
+          properties:
+            ok: { type: boolean }
+            failed: { type: integer, description: How many `must` checks failed. }
+      required: [ran, at, checks, console, summary]
+
     AppSummary:
       type: object
       description: Catalogue/publish view of an app (latest version), as returned by the apps endpoints.
@@ -48125,6 +48164,17 @@ paths:
         in their name — and the time. Owner only: anyone else gets 404. At most 500 entries are
         kept; older ones fall off. `me` in the owner slot resolves to the signed-in account.
         With `?limit=N` the newest N come back newest first; without it, the whole log oldest first.
+
+        With `?playtest=true` the node also OPENS the app: the same check the publish runs on its
+        bytes, then a live run in a headless browser with nobody signed in, at a 390x844 phone and
+        a 1280x720 desktop. Eight checks come back in `data.live.playtest.checks`, each with one
+        plain sentence: does it boot, is the canvas more than one flat colour after three seconds,
+        is the browser console clean and did every file this node was asked for arrive, does it
+        survive both screens without scrolling sideways, does it wait for a tap before starting
+        sound, are the controls at least 24 px on a phone, can it save (reported as information,
+        never a failure), and does it still start when reduced motion is asked for. The run changes
+        nothing and adds no entry to the log. A node with no browser answers `ran: false` with the
+        reason. It takes about a minute.
       tags: [Apps]
       security:
         - BearerAuth: []
@@ -48132,6 +48182,7 @@ paths:
         - { in: path, name: owner, required: true, schema: { type: string } }
         - { in: path, name: filename, required: true, schema: { type: string } }
         - { in: query, name: limit, required: false, schema: { type: integer, minimum: 1, maximum: 500 }, description: The newest N entries, newest first }
+        - { in: query, name: playtest, required: false, schema: { type: boolean }, description: Also open the app in a headless browser and report what it did }
       responses:
         '200':
           description: The log
@@ -48157,6 +48208,17 @@ paths:
                                 by: { type: string }
                                 action: { type: string }
                                 detail: { type: object, additionalProperties: true }
+                          live:
+                            type: object
+                            description: Present only with playtest=true. The bytes check and the live run.
+                            properties:
+                              artifact:
+                                type: object
+                                description: The same check every publish runs on the app's bytes.
+                                properties:
+                                  blocking: { type: array, items: { $ref: '#/components/schemas/AppArtifactFinding' } }
+                                  warnings: { type: array, items: { $ref: '#/components/schemas/AppArtifactFinding' } }
+                              playtest: { $ref: '#/components/schemas/AppPlaytestResult' }
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':

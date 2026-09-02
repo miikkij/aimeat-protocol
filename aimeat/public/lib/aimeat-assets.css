@@ -1,0 +1,16 @@
+/*
+ * @file aimeat-assets.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Stylesheet for the aimeat-assets SDK library (/v1/libs/aimeat-assets.js): the
+ *   gallery AIMEAT.assets.preview() draws from an app's manifest. The shell, the picture grid and
+ *   the sprite strip (gallery.css); the sound rows, the font specimens and the side-by-side texts
+ *   table (rows.css). Every value rides the Atelier --ak-* contract, so an asset library wears the
+ *   same look as the app around it; on a page without the kit the tokens' own fallbacks stand in.
+ * @structure @import gallery · rows
+ * @usage  <link rel="stylesheet" href="/lib/aimeat-assets.css">  (after /lib/aimeat-atelier.css when the app uses the kit)
+ * @version-history
+ *   v1.0.0 — 2026-09-02 — Initial.
+ */
+@import url('./aimeat-assets/gallery.css');
+@import url('./aimeat-assets/rows.css');

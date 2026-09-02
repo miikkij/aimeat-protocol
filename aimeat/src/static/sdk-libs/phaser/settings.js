@@ -27,6 +27,8 @@
  * @usage  const panel = AIMEAT.phaser.settingsPanel({ target: '#settings', audio: bus,
  *           controls: pad, saves: store, game: handle });
  * @version-history
+ *   v1.1.0 — 2026-09-02 — The defaults are the bus's own (master 1, sfx 1), and a stored touch or
+ *     motion choice is applied on build, not only shown.
  *   v1.0.0 — 2026-09-02 — Initial (wish-phaser4-design-book-page).
  */
 import { el, clear, resolve, uid, setMotion } from '../atelier/dom.js';
@@ -55,9 +57,10 @@ const ACTION_WORDS = {
  * that module does not publish it.
  */
 const DEFAULTS = {
-  master: 0.8,
+  // The same three the audio bus starts from (audio.js), so Reset lands where a fresh bus does.
+  master: 1,
   music: 0.6,
-  sfx: 0.8,
+  sfx: 1,
   muted: false,
   touch: false,
   keys: {
@@ -432,6 +435,10 @@ export function settingsPanel(spec) {
     clear(root);
     readers.length = 0;
     touchOn = !!stored().touch;
+    // What the store remembers is applied, not only shown: the overlay and the motion switch
+    // follow the stored choice, so a reload lands where the person left it.
+    if (s.controls && typeof s.controls.showTouch === 'function' && stored().touch != null) s.controls.showTouch(touchOn);
+    if (stored().motion === 'less' && !readLessMotion()) writeLessMotion(true);
 
     for (const name of sections) {
       if (name === 'audio') {

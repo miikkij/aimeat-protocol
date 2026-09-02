@@ -10,6 +10,8 @@
  * @structure SDK_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
+ *   v1.5.0 — 2026-09-02 — aimeat-assets: the asset manager (one manifest per app, files in storage,
+ *     atlas packer, sound export, texts, preview) with its paved-path aiDoc.
  *   v1.4.0 — 2026-09-02 — aimeat-phaser: the Phaser 4 base (boot, packs, textures, audio, saves,
  *     controls, hud, menus, transitions, platformer, settings), with the paved-path aiDoc
  *     (wish-phaser4-design-book-page).
@@ -415,6 +417,43 @@ export const SDK_PACKS: LibraryPack[] = [
     promptLine: '- aimeat-exchange.js — the EXCHANGE marketplace from the browser: browse/search listings + their ODPS descriptors (`AIMEAT.exchange.list`, `get`, `odps`), publish your own supply (`publish` — needs input+output schema and `usageTerms`; price comes from the source, never the browser), see who is using it (`stats`, `consumers` — each row breaks down whether an app or an agent actually called), accept + switch off contracts (`accept`, `contracts`, `off`), read outbound `spend()` and accrued `earnings()`, and work the demand side (`needs`, `postNeed`, `bid`, `acceptBid`). Money stays integer micro-units — format with `fmtUnit`. Requires aimeat-auth + aimeat-commerce.',
   },
   {
+    id: 'aimeat-assets',
+    kind: 'sdk',
+    category: 'media',
+    title: 'Asset manager (images, atlases, audio, texts, fonts, tilemaps as one manifest)',
+    description: 'The asset manager for a game or any media-heavy app: ONE manifest per app as one memory key (images, spritesheets, atlases, audio pairs, fonts, tilemaps, videos, texts per language), the files in the owner\'s storage at public addresses, and the everyday operations on top: load, list, resolve a key to its address, check every file before shipping, hand a Phaser pack over, translate a text, pack loose images into an atlas in the browser, render a synth sound to a WAV, upload a file and record it, and a DOM preview of the whole library on the Atelier tokens.',
+    url: '/v1/libs/aimeat-assets.js',
+    include: [
+      '<link rel="stylesheet" href="{{BASE_URL}}/lib/aimeat-assets.css">',
+      '<script src="{{BASE_URL}}/v1/libs/aimeat-assets.js"></script>',
+    ],
+    requires: [],
+    license: 'MIT',
+    apiSurface: 'AIMEAT.assets',
+    aiDoc: [
+      'AIMEAT.assets: one MANIFEST per app, one memory key (myapp.assets), the files in storage. Never one key per file, never a data: URI.',
+      'Declare: const m = AIMEAT.assets.manifest({ app: "myapp", version: 1, base: "/v1/pub/<owner-ghii>/myapp/", images: { hero: { file: "hero.png", frames: { frameWidth: 32, frameHeight: 32, count: 6 } } }, audio: { coin: { files: ["coin.mp3", "coin.ogg"], kind: "sfx" } }, texts: { en: { start: "Press start" }, fi: { start: "Paina start" } } });',
+      'Use: const lib = AIMEAT.assets.library({ app: "myapp", lang: "fi" }); await lib.load(); lib.url("hero"); lib.t("start"); const check = await lib.check() (missing files by key and status, before you ship).',
+      'Phaser: AIMEAT.phaser.preloadPack(this, lib) in preload() (the base accepts a library: it calls lib.toPack()).',
+      'Upload: await AIMEAT.assets.upload(file, { app: "myapp", key: "hero", kind: "images", visibility: "public" }) through aimeat-storage (load it), then lib.add("images", "hero", { file, w, h }); await lib.save(). Public visibility is what makes /v1/pub/<owner>/<key> load for every player, signed out included.',
+      'Atlas in the browser: const { png, json } = await AIMEAT.assets.packAtlas([{ key: "a", src: imgA }, { key: "b", src: imgB }]); upload both, then lib.add("atlases", "sheet", { texture, data }).',
+      'Sound to a file: const wav = await AIMEAT.assets.sound.record((ctx, out) => { /* oscillator into out */ }, 0.4); upload it as audio.',
+      'Preview: AIMEAT.assets.preview(el, lib) renders the library (thumbnails, frames, audio rows, texts side by side, missing files in red).',
+      'Load order: aimeat-auth and aimeat-data before this library when the manifest lives in memory; without them the library works from an inline manifest only.',
+    ].join('\n'),
+    changelog: [
+      { version: '1.0.0', date: '2026-09-02', summary: 'Initial: manifest, library, upload, packAtlas, sound export, texts, preview (wish-aimeat-assets-and-game-programme). Shown working on the Design Book\'s Phaser page.' },
+    ],
+    demoTemplateId: undefined,
+    tierHint: 'T1',
+    interviewTriggers: ['assets', 'asset', 'sprite', 'spritesheet', 'atlas', 'texture', 'sound files', 'game images', 'kuvat', 'äänet', 'assetit', 'tekstuuri', 'resource pack'],
+    sizeEstimate: '~25KB',
+    status: 'preview',
+    modelTier: 'needs-doc',
+    promptGroup: 'media',
+    promptLine: '- aimeat-assets.js — the asset manager (`AIMEAT.assets`): ONE manifest per app as one memory key (images, atlases, audio pairs, fonts, tilemaps, texts per language), files in storage at public addresses, `library()` to load / resolve / check / translate / hand a Phaser pack over, `packAtlas()` in the browser, `sound.record()` to a WAV, `upload()` through aimeat-storage, `preview()` on the Atelier tokens.',
+  },
+  {
     id: 'aimeat-phaser',
     kind: 'sdk',
     category: 'ui',
@@ -447,7 +486,7 @@ export const SDK_PACKS: LibraryPack[] = [
     changelog: [
       { version: '1.0.0', date: '2026-09-02', summary: 'Initial: boot, theme, packs, textures, audio, saves, controls, hud, menus, transitions, the platformer and the settings panel (wish-phaser4-design-book-page). Shown working on the Design Book\'s Phaser page.' },
     ],
-    demoTemplateId: undefined,
+    demoTemplateId: 'shell-phaser-game',
     tierHint: 'T1',
     interviewTriggers: ['phaser', 'game', 'peli', 'arcade', 'platformer', 'tasohyppely', 'level', 'kenttä', 'fullscreen', 'gamepad', 'high score', 'pisteet', 'save game', 'tallennus'],
     sizeEstimate: '~60KB',
