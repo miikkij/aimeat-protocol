@@ -1063,6 +1063,8 @@ await test('GET /v1/libs/aimeat-atelier.js — serves the Atelier kit with every
         'sortable', 'cart', 'notices', 'facets',
         'director', 'storyRail', 'textReveal', 'drawPath', 'gridWave', 'sequence', 'orbit',
         'screenTransition', 'panelTransition', 'curtain',
+        'morph', 'draggable', 'burst', 'scrub', 'layoutMove', 'swipeStack', 'micro',
+        'parallax', 'readingRail', 'intro', 'setMotion',
     ]) {
         assert(text.includes(part), `should export ${part}`);
     }

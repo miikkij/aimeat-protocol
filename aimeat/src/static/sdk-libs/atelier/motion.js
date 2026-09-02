@@ -14,7 +14,13 @@
  *   The spring is sampled into keyframes, so it plays on every browser the kit supports, and
  *   its feel (stiffness, damping, mass) is a number an app can name — the same three the
  *   vendored Motion pack uses, so a value tuned here reads the same there.
- * @structure springFrames · spring · stagger · inView · scrollLink · drag
+ *
+ *   THE FEEL BELONGS TO THE LOOK. When a call names no numbers, the three come off the ELEMENT
+ *   being moved, from --ak-spring-stiffness / --ak-spring-damping / --ak-spring-mass on the
+ *   Atelier contract; every look sets its own, so the same spring() bounces under carnival and
+ *   lands flat under editorial. A named number still wins, and a bare document with no kit CSS
+ *   falls back to the house 170/20/1.
+ * @structure springTokens · springFrames · spring · stagger · inView · scrollLink · drag
  * @usage
  *   AIMEAT.atelier.spring(card, { x: 0, scale: 1 }, { stiffness: 220, damping: 18 });
  *   AIMEAT.atelier.stagger(list.children, { from: 'up', each: 40 });
@@ -22,6 +28,12 @@
  *   AIMEAT.atelier.scrollLink(hero, [{ opacity: 1 }, { opacity: 0 }], { range: [0, 0.6] });
  *   AIMEAT.atelier.drag(handle, { onEnd(dx, dy) { if (dx > 80) accept(); } });
  * @version-history
+ *   v0.45.1 — 2026-09-02 — THE LOOK'S OWN HAND: springFrames, spring, drag and the springy
+ *     stagger read stiffness, damping and mass off the element's --ak-spring-* tokens when the
+ *     call names none, so an author tunes the LOOK instead of every call site. springFrames
+ *     gains an optional `el` to read from (it has no node of its own); spring, stagger and drag
+ *     pass theirs. drag's return travel followed suit: its old 260/22 was a pair of numbers
+ *     frozen in the primitive, and a look that means "no bounce" was overruled by them.
  *   v0.44.0 — 2026-09-02 — Initial.
  */
 import { resolve, reducedMotion } from './dom.js';
@@ -42,16 +54,40 @@ function transformOf(s) {
 }
 
 /**
+ * The look's spring hand, read off an element: the three --ak-spring-* tokens as numbers, and
+ * nothing for the ones that are absent or unreadable (a bare page without the kit CSS, a
+ * detached node, a document that has no getComputedStyle at all).
+ * @param {Element|null|undefined} el
+ * @returns {{ stiffness?: number, damping?: number, mass?: number }}
+ */
+function springTokens(el) {
+  if (!el || typeof getComputedStyle !== 'function') return {};
+  let cs;
+  try { cs = getComputedStyle(/** @type {Element} */ (el)); } catch { return {}; }
+  if (!cs) return {};
+  const num = function (name) {
+    const v = parseFloat(cs.getPropertyValue(name));
+    return isFinite(v) && v > 0 ? v : undefined;
+  };
+  return { stiffness: num('--ak-spring-stiffness'), damping: num('--ak-spring-damping'), mass: num('--ak-spring-mass') };
+}
+
+/**
  * Sample a damped spring from 0 to 1. Returns the progress samples and the time they span, so
  * the caller can turn them into keyframes (each sample is one frame at a fixed step).
- * @param {{ stiffness?: number, damping?: number, mass?: number, velocity?: number }} [opts]
+ *
+ * The three numbers come from the call, then from the look (the element in `el`, which the
+ * callers below pass, since this function has no node of its own), then from the house 170/20/1.
+ * @param {{ stiffness?: number, damping?: number, mass?: number, velocity?: number,
+ *   el?: Element|null }} [opts]
  * @returns {{ samples: number[], duration: number }}
  */
 export function springFrames(opts) {
   const o = opts || {};
-  const k = o.stiffness || 170;
-  const c = o.damping || 20;
-  const m = o.mass || 1;
+  const look = (o.stiffness && o.damping && o.mass) ? {} : springTokens(o.el);
+  const k = o.stiffness || look.stiffness || 170;
+  const c = o.damping || look.damping || 20;
+  const m = o.mass || look.mass || 1;
   const v0 = o.velocity || 0;
   const w0 = Math.sqrt(k / m);
   const zeta = c / (2 * Math.sqrt(k * m));
@@ -85,6 +121,7 @@ export function springFrames(opts) {
  * @param {Element|string} target
  * @param {{ x?: number, y?: number, scale?: number, rotate?: number, opacity?: number }} to
  * @param {{ stiffness?: number, damping?: number, mass?: number, velocity?: number }} [opts]
+ *   Unnamed numbers come from the element's own --ak-spring-* tokens, so the look moves it.
  * @returns {{ el: Element, finished: Promise<void>, cancel: () => void }}
  */
 export function spring(target, to, opts) {
@@ -107,7 +144,8 @@ export function spring(target, to, opts) {
     node.style.opacity = String(dest.opacity);
     return { el: node, finished: Promise.resolve(), cancel() { /* nothing in flight */ } };
   }
-  const sf = springFrames(opts);
+  // The element carries the look's hand; anything the call named still wins inside springFrames.
+  const sf = springFrames(Object.assign({}, opts, { el: node }));
   const frames = sf.samples.map(function (at, i) {
     const s = {};
     Object.keys(from).forEach(function (key) { s[key] = from[key] + (dest[key] - from[key]) * at; });
@@ -131,7 +169,10 @@ export function spring(target, to, opts) {
  * come from the look's tokens unless the call names them.
  * @param {ArrayLike<Element>|Element|string} targets
  * @param {{ from?: 'up'|'down'|'left'|'right'|'scale', each?: number, distance?: number,
- *   duration?: number, spring?: boolean, max?: number }} [opts]
+ *   duration?: number, spring?: boolean, max?: number,
+ *   stiffness?: number, damping?: number, mass?: number }} [opts]
+ *   With `spring: true` the physics comes from the first element's --ak-spring-* tokens unless
+ *   the call names its own, so the entrance bounces the way the look bounces.
  * @returns {{ finished: Promise<void> }}
  */
 export function stagger(targets, opts) {
@@ -155,7 +196,7 @@ export function stagger(targets, opts) {
   let frames = [{ opacity: 0, transform: start }, { opacity: 1, transform: end }];
   let timing = { duration: span, easing: ease, fill: 'backwards' };
   if (o.spring) {
-    const sf = springFrames({ stiffness: 200, damping: 16 });
+    const sf = springFrames({ el: kids[0], stiffness: o.stiffness, damping: o.damping, mass: o.mass });
     frames = sf.samples.map(function (at, i) {
       return { offset: i / (sf.samples.length - 1), opacity: Math.min(1, at * 1.4),
         transform: o.from === 'scale' ? 'scale(' + (0.92 + 0.08 * at) + ')' : start.replace(/[-\d.]+px/, function (px) { return (parseFloat(px) * (1 - at)).toFixed(2) + 'px'; }) };
@@ -276,7 +317,9 @@ export function scrollLink(target, frames, opts) {
  * @param {{ onStart?: (el: Element) => void, onMove?: (dx: number, dy: number, el: Element) => void,
  *   onEnd?: (dx: number, dy: number, velocity: { x: number, y: number }, el: Element) => void }} [handlers]
  * @param {{ axis?: 'x'|'y'|'both', back?: boolean, threshold?: number, bounds?: { x?: [number, number], y?: [number, number] },
- *   stiffness?: number, damping?: number }} [opts]
+ *   stiffness?: number, damping?: number, mass?: number }} [opts]
+ *   The return travel's physics comes from the element's --ak-spring-* tokens unless the call
+ *   names its own, so a card springs back the way its look springs.
  * @returns {{ el: Element, destroy: () => void }}
  */
 export function drag(target, handlers, opts) {
@@ -330,7 +373,8 @@ export function drag(target, handlers, opts) {
     const dx = s.x - was.bx;
     const dy = s.y - was.by;
     if (h.onEnd) h.onEnd(dx, dy, { x: was.vx, y: was.vy }, node);
-    if (o.back !== false) spring(node, { x: was.bx, y: was.by }, { stiffness: o.stiffness || 260, damping: o.damping || 22 });
+    // Unnamed, the return rides the look's hand (spring() reads the node's own --ak-spring-*).
+    if (o.back !== false) spring(node, { x: was.bx, y: was.by }, { stiffness: o.stiffness, damping: o.damping, mass: o.mass });
   };
   node.addEventListener('pointerdown', down);
   node.addEventListener('pointermove', move);

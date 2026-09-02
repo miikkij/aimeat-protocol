@@ -1,0 +1,252 @@
+/*
+ * @file aimeat-atelier/motion-show.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The clothes for the three Motion show pieces (motion-show.js): the layout whose
+ *   children glide to their new places, the pile of cards you throw away, and the small hover and
+ *   press reactions every kit control can wear. Every value rides the --ak-* contract, so all
+ *   three answer every look, palette and mode; no colour is written here that is not a token or a
+ *   color-mix over one.
+ *
+ *   THE NUMBERS COME FROM JAVASCRIPT, THE RULES LIVE HERE. Four custom properties carry
+ *   everything dynamic: --ak-ghost-x/y/w/h pins a departing child where it stood,
+ *   --ak-swipe-depth says where a card sits in the pile, --ak-swipe-tilt is how far the hand has
+ *   turned the top one, and --ak-swipe-yes / --ak-swipe-no weigh the two edge marks. Not one
+ *   geometry or colour rule is written from a script.
+ *
+ *   NOTHING ANIMATES ON ITS OWN. There is no keyframe animation in this file. The transitions
+ *   below fire on a change (a card rising through the pile, a mark taking weight) or under a hand
+ *   (the hover and press fallbacks, which come off the moment Motion lands and takes over), and
+ *   every one of them settles — so a resting layout, a resting stack and a resting button repaint
+ *   zero times.
+ * @structure .ak-layout (ghost) · .ak-swipe (deck · card · face · art · caption · marks ·
+ *   controls) · .ak-micro (lift · tilt · glow · squash · dip) · reduced-motion
+ * @usage  Imported by aimeat-atelier.css; the components are AIMEAT.atelier.layoutMove,
+ *   swipeStack and micro.
+ * @version-history
+ *   v0.46.0 — 2026-09-02 — Initial: the Motion show module (layoutMove, swipeStack, micro).
+ */
+
+/* ── The layout that moves ───────────────────────────────────────────────────────────────── */
+/* The container keeps whatever layout the app gave it (a grid, a flex row, a list): this part
+   moves children, it does not arrange them. Two things only are asked of it — that a child can
+   be transformed at all, and that a fresh child's own entrance does not fight the one the part
+   is about to play. */
+.ak-layout > * { will-change: transform; }
+/* While the part is springing a child, the stylesheet's own transform transition stands down —
+   a kit card already eases its hover lift, and a script writing the same transform frame by
+   frame would be smoothed by it and arrive a whole --ak-motion late. The class goes on for one
+   travel and comes off when it finishes, so the hover lift is unchanged the rest of the time. */
+.ak-layout > .is-moving { transition: none; }
+
+/* A child the app removed, held where it stood for exactly one fade. It is pinned to the
+   VIEWPORT box it was measured in and lives on the body, so no scroll box, transform ancestor or
+   overflow rule of the container can clip it or move it while it leaves. */
+.ak-layout__ghost {
+  position: fixed;
+  left: var(--ak-ghost-x, 0);
+  top: var(--ak-ghost-y, 0);
+  width: var(--ak-ghost-w, auto);
+  height: var(--ak-ghost-h, auto);
+  margin: 0;
+  z-index: 3;
+  pointer-events: none;
+  /* The clone inherited the child's class and with it whatever transitions that class carries;
+     the fade is a script's, so none of them apply to it. */
+  transition: none;
+}
+
+/* ── The pile of cards ───────────────────────────────────────────────────────────────────── */
+.ak-swipe { display: flex; flex-direction: column; align-items: center; gap: 14px; min-width: 0; }
+
+/* The deck is the stage: one card's worth of room, with the two behind it peeking out below.
+   Its own height is what keeps the controls still while cards come and go. */
+.ak-swipe__deck {
+  position: relative;
+  width: min(100%, 320px);
+  aspect-ratio: 3 / 4;
+  border-radius: var(--ak-radius);
+}
+.ak-swipe__deck:focus-visible { outline: 2px solid var(--ak-focus); outline-offset: 4px; }
+
+/* Every card fills the deck; the pile is made by the depth number, not by any per-card rule.
+   The top card (depth 0) sits at rest, so `drag` writing its inline transform starts from
+   identity and the two never disagree. */
+.ak-swipe__card {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  overflow: hidden;
+  background: var(--ak-surface);
+  color: var(--ak-ink);
+  border: var(--ak-line-w) solid var(--ak-line);
+  border-radius: var(--ak-radius);
+  box-shadow: var(--ak-elev-2);
+  transform:
+    translateY(calc(var(--ak-swipe-depth, 0) * 14px))
+    scale(calc(1 - var(--ak-swipe-depth, 0) * 0.05));
+  transition: transform var(--ak-motion) var(--ak-ease);
+  touch-action: none;
+}
+/* A card deeper in the pile is scenery: it takes no pointer and carries no shadow of its own. */
+.ak-swipe__card:not([aria-hidden='false']) { pointer-events: none; box-shadow: var(--ak-elev-1); }
+/* motion.css turns whatever is under the hand into a RELATIVE, raised block, which is right for a
+   row in a list and wrong for a card that is already placed inside its deck. This card keeps its
+   own placement and takes only the raise — and drops the transition, because `drag` writes the
+   transform frame by frame and a transition there would lag the pointer. */
+.ak-swipe .ak-swipe__card.ak-dragging {
+  position: absolute;
+  z-index: 4;
+  transition: none;
+}
+/* The same stand-down for the springs the part owns: the throw, the return into the pile and the
+   card undo brings back. `ak-dragging` comes off on pointerup, BEFORE the release is decided, so
+   the class the travel itself holds is a separate one. */
+.ak-swipe__card.is-moving { transition: none; z-index: 4; }
+.ak-swipe__card--ok { border-color: color-mix(in oklab, var(--ak-ok) 55%, var(--ak-line)); }
+.ak-swipe__card--warn { border-color: color-mix(in oklab, var(--ak-warn) 55%, var(--ak-line)); }
+.ak-swipe__card--err { border-color: color-mix(in oklab, var(--ak-err) 55%, var(--ak-line)); }
+
+/* The face carries the tilt, because the card itself carries the drag. */
+.ak-swipe__face {
+  position: relative;
+  display: flex; flex-direction: column;
+  flex: 1; min-width: 0;
+  transform: rotate(var(--ak-swipe-tilt, 0deg));
+  transform-origin: center bottom;
+  transition: transform var(--ak-motion) var(--ak-ease);
+}
+/* While the hand is on it the tilt follows the pointer frame by frame; a transition there would
+   lag the hand, so the drag class turns it off and the release turns it back on. */
+.ak-swipe__card.ak-dragging .ak-swipe__face { transition: none; }
+
+.ak-swipe__art {
+  flex: 1;
+  display: flex; align-items: center; justify-content: center;
+  min-height: 0;
+  background-size: cover;
+  background-position: center;
+}
+.ak-swipe__art--image { background-image: var(--ak-card-image); }
+/* The three deterministic washes — the same three hue worlds the card grid and the strip use, so
+   a stack, a grid and a carousel of the same items read as one set. */
+.ak-swipe__art--w1:not(.ak-swipe__art--image) {
+  background-image:
+    radial-gradient(at 28% 22%, color-mix(in oklab, var(--ak-bg) 46%, transparent), transparent 55%),
+    linear-gradient(135deg, color-mix(in oklab, var(--ak-accent) 62%, var(--ak-surface)), color-mix(in oklab, var(--ak-spectrum-2) 50%, var(--ak-surface)));
+}
+.ak-swipe__art--w2:not(.ak-swipe__art--image) {
+  background-image:
+    radial-gradient(at 72% 20%, color-mix(in oklab, var(--ak-bg) 46%, transparent), transparent 55%),
+    linear-gradient(160deg, color-mix(in oklab, var(--ak-spectrum-2) 58%, var(--ak-surface)), color-mix(in oklab, var(--ak-spectrum-3) 48%, var(--ak-surface)));
+}
+.ak-swipe__art--w3:not(.ak-swipe__art--image) {
+  background-image:
+    radial-gradient(at 50% 78%, color-mix(in oklab, var(--ak-bg) 42%, transparent), transparent 60%),
+    linear-gradient(115deg, color-mix(in oklab, var(--ak-spectrum-3) 56%, var(--ak-surface)), color-mix(in oklab, var(--ak-accent) 52%, var(--ak-surface)));
+}
+.ak-swipe__monogram {
+  font-family: var(--ak-font-display);
+  font-weight: 900;
+  font-size: calc(var(--ak-text-hero) * 1.1);
+  background-image: var(--ak-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 3px 0 color-mix(in oklab, var(--ak-ink) 30%, transparent));
+}
+
+.ak-swipe__caption {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 12px var(--ak-pad) 14px;
+  border-top: var(--ak-line-w) solid var(--ak-line);
+  background: var(--ak-surface);
+}
+.ak-swipe__label { font-weight: 650; color: var(--ak-ink); overflow-wrap: anywhere; }
+.ak-swipe__sub { font-size: var(--ak-text-fine); color: var(--ak-ink-dim); }
+
+/* The two edge marks: a wash of the answer's own tone up the side the hand is pulling toward.
+   They carry no words, so they need no dictionary, and they are hidden from the reader entirely
+   — the pull itself is the message, and the buttons underneath say it in words. */
+.ak-swipe__mark {
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 45%;
+  pointer-events: none;
+  transition: opacity var(--ak-motion) var(--ak-ease);
+}
+.ak-swipe__mark--right {
+  right: 0;
+  opacity: var(--ak-swipe-yes, 0);
+  background-image: linear-gradient(270deg, color-mix(in oklab, var(--ak-ok) 55%, transparent), transparent);
+}
+.ak-swipe__mark--left {
+  left: 0;
+  opacity: var(--ak-swipe-no, 0);
+  background-image: linear-gradient(90deg, color-mix(in oklab, var(--ak-err) 55%, transparent), transparent);
+}
+.ak-swipe__card.ak-dragging .ak-swipe__mark { transition: none; }
+
+/* The two answers, in reach of a thumb under the pile. */
+.ak-swipe__controls { display: flex; align-items: center; gap: 16px; }
+.ak-swipe .ak-swipe__go {
+  flex: none;
+  width: var(--ak-touch); height: var(--ak-touch);
+  padding: 0;
+  border-radius: var(--ak-radius-pill);
+  display: grid; place-items: center;
+  box-shadow: var(--ak-elev-1);
+}
+.ak-swipe .ak-swipe__go--left { color: var(--ak-err-text); }
+.ak-swipe .ak-swipe__go--right { color: var(--ak-ok-text); }
+.ak-swipe .ak-swipe__go[disabled] { opacity: 0.35; cursor: default; color: var(--ak-ink-dim); }
+
+/* ── The small reactions ─────────────────────────────────────────────────────────────────── */
+/* These four rules are the FLOOR: they carry the hover and the press until Motion lands, and the
+   part strips the class the moment it does, so the library and the stylesheet never both move the
+   same element. The glow keeps its class for good — a halo is a shadow, and a shadow belongs in
+   CSS where the accent already lives.
+
+   The transform transition rides the MODIFIER classes and never the plain .ak-micro marker, so it
+   leaves with them: Motion writes an element's transform frame by frame, and a transition left
+   behind on that element would smooth an already-smoothed travel. */
+.ak-micro--lift,
+.ak-micro--tilt,
+.ak-micro--squash,
+.ak-micro--dip { transition: transform var(--ak-motion) var(--ak-ease); }
+.ak-micro--glow { transition: box-shadow var(--ak-motion) var(--ak-ease); }
+
+.ak-micro--lift:hover,
+.ak-micro--lift:focus-visible { transform: translateY(-3px) scale(1.02); }
+.ak-micro--tilt:hover,
+.ak-micro--tilt:focus-visible { transform: rotate(-1.5deg) scale(1.015); }
+.ak-micro--squash:active { transform: scale(0.96); }
+.ak-micro--dip:active { transform: translateY(2px) scale(0.99); }
+
+/* The halo: the look's own accent, at the weight the rest of the kit gives a raised thing. */
+.ak-micro--glow:hover,
+.ak-micro--glow:focus-visible {
+  box-shadow:
+    var(--ak-elev-2),
+    0 0 0 3px color-mix(in oklab, var(--ak-accent) 28%, transparent);
+}
+
+/* ── Less motion: everything arrives, nothing travels ────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .ak-swipe__card,
+  .ak-swipe__face,
+  .ak-swipe__mark,
+  .ak-micro--lift,
+  .ak-micro--tilt,
+  .ak-micro--squash,
+  .ak-micro--dip,
+  .ak-micro--glow { transition: none; }
+  /* micro binds nothing under reduced motion, but a page that was already wearing the classes
+     when the setting changed must stop reacting rather than snap. */
+  .ak-micro--lift:hover,
+  .ak-micro--lift:focus-visible,
+  .ak-micro--tilt:hover,
+  .ak-micro--tilt:focus-visible,
+  .ak-micro--squash:active,
+  .ak-micro--dip:active { transform: none; }
+}
