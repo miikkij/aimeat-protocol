@@ -13,6 +13,7 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.1.0 — 2026-09-02 — The game shell is named beside the Atelier shell.
  *   v1.0.0 — 2026-08-27 — Initial (TARGET-074).
  */
 import type { BuiltinSkill } from './builtin-skills.js';
@@ -42,6 +43,7 @@ motion — lives in the kit and reaches your app from the node.
 \`\`\`
 GET /v1/prompts/build-app-atelier   ← the Atelier spec (re-fetch every time, it changes)
 GET /v1/app-templates/shell-atelier ← the shell (start from it, never invent structure)
+GET /v1/app-templates/shell-phaser-game ← a GAME starts here instead: canvas, menus, settings, leaderboard wired
 GET /v1/appdev/pitfalls             ← what bites app builders
 \`\`\`
 

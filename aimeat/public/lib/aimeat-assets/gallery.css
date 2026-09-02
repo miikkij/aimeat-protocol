@@ -1,0 +1,221 @@
+/*
+ * @file aimeat-assets/gallery.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The shell of the asset gallery AIMEAT.assets.preview() draws: the bar with the app's
+ *   name and what the library weighs, the sections, and the grid of picture cards with their
+ *   thumbnails and their facts.
+ *
+ *   NO COLOUR IS DECLARED HERE. Every value is an Atelier --ak-* token falling through to the
+ *   AIMEAT theme token that means the same thing and finally to a CSS system colour, which follows
+ *   light and dark on its own. So the gallery reads on a page with the kit, on a page with only the
+ *   theme, and on a page with neither.
+ *
+ *   NOTHING MOVES ON ITS OWN. The one transition is on hover and focus, and the sprite strip is
+ *   stepped from JavaScript only while a pointer rests on it. An idle gallery repaints zero times.
+ * @structure the --aka-* value chain · the bar · the sections · the grid, cards and thumbnails ·
+ *   the sprite strip · the missing mark
+ * @usage  <link rel="stylesheet" href="/lib/aimeat-assets.css">   (it imports this file)
+ * @version-history
+ *   v1.0.0 — 2026-09-02 — Initial.
+ */
+
+/* The value chain. Atelier first, the AIMEAT theme next, the browser's own system colours last. */
+.ak-assets {
+  --aka-surface: var(--ak-surface, var(--color-base-200, Canvas));
+  --aka-surface-2: var(--ak-surface-2, var(--color-base-100, Canvas));
+  --aka-ink: var(--ak-ink, var(--color-base-content, CanvasText));
+  --aka-ink-dim: var(--ak-ink-dim, GrayText);
+  --aka-line: var(--ak-line, var(--color-base-300, GrayText));
+  --aka-accent: var(--ak-accent, var(--color-primary, AccentColor));
+  --aka-err: var(--ak-err, var(--color-error, ActiveText));
+  --aka-radius: var(--ak-radius, var(--radius-box, 14px));
+  --aka-radius-sm: var(--ak-radius-sm, var(--radius-field, 9px));
+  --aka-gap: var(--ak-gap, var(--gap-card, 14px));
+  --aka-pad: var(--ak-pad, 16px);
+  --aka-touch: var(--ak-touch, 44px);
+  --aka-motion: var(--ak-motion, var(--motion-base, 200ms));
+  --aka-ease: var(--ak-ease, var(--ease-out, cubic-bezier(0.2, 0.7, 0.3, 1)));
+  --aka-font: var(--ak-font, var(--font-body, ui-sans-serif, system-ui, sans-serif));
+  --aka-font-mono: var(--ak-font-mono, var(--font-mono, ui-monospace, monospace));
+  --aka-fine: var(--ak-text-fine, var(--text-fine, 0.8125rem));
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--aka-gap);
+  font-family: var(--aka-font);
+  color: var(--aka-ink);
+}
+
+/* ── The bar: whose library this is, and how big it is ───────────────────────────────────── */
+
+.ak-assets__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: calc(var(--aka-gap) / 2);
+  padding-bottom: calc(var(--aka-gap) / 2);
+  border-bottom: 1px solid var(--aka-line);
+}
+
+.ak-assets__title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.ak-assets__summary {
+  margin: 0;
+  font-family: var(--aka-font-mono);
+  font-size: var(--aka-fine);
+  color: var(--aka-ink-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.ak-assets__body {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--aka-gap) * 1.5);
+}
+
+/* ── A section, and the count that says how much is in it ────────────────────────────────── */
+
+.ak-assets__section {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--aka-gap) / 2);
+  min-width: 0;
+}
+
+.ak-assets__head {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--aka-gap) / 2);
+  margin: 0;
+  font-size: var(--aka-fine);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--aka-ink-dim);
+}
+
+.ak-assets__count {
+  font-family: var(--aka-font-mono);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  padding: 0 0.4em;
+  border: 1px solid var(--aka-line);
+  border-radius: var(--aka-radius-sm);
+}
+
+/* ── The pictures ────────────────────────────────────────────────────────────────────────── */
+
+.ak-assets__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: var(--aka-gap);
+}
+
+.ak-assets__card {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--aka-gap) / 3);
+  margin: 0;
+  padding: calc(var(--aka-pad) / 2);
+  min-width: 0;
+  background: var(--aka-surface-2);
+  border: 1px solid var(--aka-line);
+  border-radius: var(--aka-radius);
+  transition: border-color var(--aka-motion) var(--aka-ease);
+}
+
+.ak-assets__card:hover,
+.ak-assets__card:focus-visible {
+  border-color: var(--aka-accent);
+}
+
+/* The frame holds the picture at a fixed height, so a row of cards lines up whatever the shapes
+   inside them are. The checkerboard is drawn from the tokens, so transparency reads in both modes. */
+.ak-assets__frame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 6.5rem;
+  padding: calc(var(--aka-pad) / 4);
+  border-radius: var(--aka-radius-sm);
+  background-color: var(--aka-surface);
+  background-image:
+    linear-gradient(45deg, var(--aka-line) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--aka-line) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--aka-line) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--aka-line) 75%);
+  background-size: 12px 12px;
+  background-position: 0 0, 0 6px, 6px -6px, -6px 0;
+  overflow: hidden;
+}
+
+.ak-assets__thumb {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+/* A sprite strip: the whole strip is the background, scaled so exactly one frame fills the box,
+   and --aka-frame (a plain number, set from JavaScript while a pointer rests here) slides it. */
+.ak-assets__thumb--strip {
+  --aka-frame: 0;
+  width: 100%;
+  height: 100%;
+  background-image: var(--aka-strip);
+  background-repeat: no-repeat;
+  background-size: calc(var(--aka-frames, 1) * 100%) 100%;
+  background-position-x: calc(var(--aka-frame) / max(var(--aka-frames, 1) - 1, 1) * 100%);
+  background-position-y: center;
+  image-rendering: pixelated;
+}
+
+.ak-assets__caption {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15em;
+  min-width: 0;
+}
+
+.ak-assets__key {
+  font-family: var(--aka-font-mono);
+  font-size: var(--aka-fine);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ak-assets__facts {
+  font-size: var(--aka-fine);
+  color: var(--aka-ink-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── What check() found ──────────────────────────────────────────────────────────────────── */
+
+/* A file whose address did not answer. The border carries it on a card, the tint carries it on a
+   row, and both are the error token rather than a colour of this file's own. */
+.ak-assets__card.is-missing,
+.ak-assets__row.is-missing {
+  border-color: var(--aka-err);
+  background: color-mix(in srgb, var(--aka-err) 10%, transparent);
+}
+
+.ak-assets__card.is-missing .ak-assets__facts,
+.ak-assets__row.is-missing .ak-assets__facts {
+  color: var(--aka-err);
+}
+
+.ak-assets__empty {
+  margin: 0;
+  padding: var(--aka-pad);
+  text-align: center;
+  color: var(--aka-ink-dim);
+  border: 1px dashed var(--aka-line);
+  border-radius: var(--aka-radius);
+}

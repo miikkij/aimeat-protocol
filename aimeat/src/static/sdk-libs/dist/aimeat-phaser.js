@@ -122,6 +122,284 @@
     return target;
   }
 
+  // src/static/sdk-libs/phaser/mobile.js
+  var PROMPT_TITLE = "Turn your phone";
+  var PROMPT_LANDSCAPE = "This game is played with the phone on its side.";
+  var PROMPT_PORTRAIT = "This game is played with the phone upright.";
+  var installEvent = null;
+  if (typeof window !== "undefined") {
+    window.addEventListener("beforeinstallprompt", function(ev) {
+      ev.preventDefault();
+      installEvent = ev;
+    });
+    window.addEventListener("appinstalled", function() {
+      installEvent = null;
+    });
+  }
+  var ICON_ROTATE = "M7 3h6a2 2 0 0 1 2 2v6h-2V5H7v14h3v2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm12.5 9.5 2.5 3-2.5 3v-2h-4a2 2 0 0 1-2-2v-2h2v2h4v-2z";
+  function icon(path) {
+    const ns = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("width", "40");
+    svg.setAttribute("height", "40");
+    svg.setAttribute("aria-hidden", "true");
+    svg.setAttribute("focusable", "false");
+    const shape = document.createElementNS(ns, "path");
+    shape.setAttribute("d", path);
+    shape.setAttribute("fill", "currentColor");
+    svg.appendChild(shape);
+    return svg;
+  }
+  function mobile(handle, opts) {
+    const o = opts || /** @type {MobileOptions} */
+    {};
+    const frame = handle && handle.frame ? handle.frame : typeof document !== "undefined" ? document.body : null;
+    const doc = frame ? frame.ownerDocument || document : null;
+    let dead = false;
+    let wanted = "any";
+    let prompt = null;
+    let query = null;
+    let onTurn = null;
+    function buildPrompt() {
+      if (prompt || !doc || !frame) return;
+      prompt = doc.createElement("div");
+      prompt.className = "ak-orient";
+      prompt.setAttribute("role", "status");
+      prompt.setAttribute("aria-live", "polite");
+      const card = doc.createElement("div");
+      card.className = "ak-orient__card";
+      card.appendChild(icon(ICON_ROTATE));
+      const title = doc.createElement("p");
+      title.className = "ak-orient__title";
+      title.textContent = o.title || PROMPT_TITLE;
+      card.appendChild(title);
+      const hint = doc.createElement("p");
+      hint.className = "ak-orient__hint";
+      card.appendChild(hint);
+      prompt.appendChild(card);
+      frame.appendChild(prompt);
+    }
+    function correct() {
+      if (wanted === "any") return true;
+      const portrait = query ? query.matches : false;
+      return wanted === "portrait" ? portrait : !portrait;
+    }
+    function paint() {
+      if (dead || !prompt) return;
+      const ok = correct();
+      prompt.classList.toggle("is-shown", !ok);
+      const hint = prompt.querySelector(".ak-orient__hint");
+      if (hint) {
+        hint.textContent = o.hint || (wanted === "portrait" ? PROMPT_PORTRAIT : PROMPT_LANDSCAPE);
+      }
+    }
+    function tryLock() {
+      const screenAny = typeof screen !== "undefined" ? (
+        /** @type {any} */
+        screen
+      ) : null;
+      const api = screenAny && screenAny.orientation;
+      if (!api || typeof api.lock !== "function" || wanted === "any") return;
+      if (!doc || !doc.fullscreenElement) return;
+      try {
+        const asked = api.lock(wanted);
+        if (asked && typeof asked.catch === "function") {
+          asked.catch(function(err) {
+            console.warn("[aimeat-phaser] the browser would not lock the orientation, so the prompt is doing the asking:", err);
+          });
+        }
+      } catch (err) {
+        console.warn("[aimeat-phaser] screen.orientation.lock was refused outright:", err);
+      }
+    }
+    function orientation(want) {
+      if (dead) return;
+      wanted = want === "landscape" || want === "portrait" ? want : "any";
+      buildPrompt();
+      if (!query && typeof matchMedia === "function") {
+        query = matchMedia("(orientation: portrait)");
+        onTurn = function() {
+          paint();
+          tryLock();
+        };
+        if (typeof query.addEventListener === "function") query.addEventListener("change", onTurn);
+        else if (typeof /** @type {any} */
+        query.addListener === "function") {
+          query.addListener(onTurn);
+        }
+      }
+      if (wanted === "any") {
+        const screenAny = typeof screen !== "undefined" ? (
+          /** @type {any} */
+          screen
+        ) : null;
+        if (screenAny && screenAny.orientation && typeof screenAny.orientation.unlock === "function") {
+          try {
+            screenAny.orientation.unlock();
+          } catch (err) {
+            console.warn("[aimeat-phaser] the orientation lock could not be released:", err);
+          }
+        }
+      }
+      paint();
+      tryLock();
+    }
+    let gauge = null;
+    function safeArea() {
+      const zero = { top: 0, right: 0, bottom: 0, left: 0 };
+      if (dead || !doc) return zero;
+      if (!gauge) {
+        gauge = doc.createElement("div");
+        gauge.setAttribute("aria-hidden", "true");
+        gauge.className = "ak-safe-probe";
+        (doc.body || doc.documentElement).appendChild(gauge);
+      }
+      const style = getComputedStyle(gauge);
+      const read = function(name) {
+        const n = parseFloat(style.getPropertyValue(name));
+        return isFinite(n) ? n : 0;
+      };
+      return {
+        top: read("padding-top"),
+        right: read("padding-right"),
+        bottom: read("padding-bottom"),
+        left: read("padding-left")
+      };
+    }
+    let sentinel = null;
+    let awake = false;
+    let onVisible = null;
+    function acquire() {
+      const nav = typeof navigator !== "undefined" ? (
+        /** @type {any} */
+        navigator
+      ) : null;
+      if (!nav || !nav.wakeLock || typeof nav.wakeLock.request !== "function") {
+        return Promise.resolve(false);
+      }
+      return nav.wakeLock.request("screen").then(
+        function(got) {
+          sentinel = got;
+          if (got && typeof got.addEventListener === "function") {
+            got.addEventListener("release", function() {
+              sentinel = null;
+            });
+          }
+          return true;
+        },
+        function(err) {
+          console.warn("[aimeat-phaser] the screen wake lock was refused:", err);
+          return false;
+        }
+      );
+    }
+    function keepAwake(on) {
+      if (dead) return Promise.resolve(false);
+      awake = !!on;
+      if (!awake) {
+        if (sentinel && typeof sentinel.release === "function") {
+          try {
+            sentinel.release();
+          } catch (err) {
+            console.warn("[aimeat-phaser] the wake lock would not release:", err);
+          }
+        }
+        sentinel = null;
+        return Promise.resolve(false);
+      }
+      if (!onVisible && doc) {
+        onVisible = function() {
+          if (dead || !awake || doc.hidden || sentinel) return;
+          acquire();
+        };
+        doc.addEventListener("visibilitychange", onVisible);
+      }
+      return acquire();
+    }
+    function install() {
+      return {
+        canInstall: !!installEvent,
+        prompt() {
+          const ev = installEvent;
+          if (!ev || typeof ev.prompt !== "function") {
+            return Promise.resolve(
+              /** @type {'unavailable'} */
+              "unavailable"
+            );
+          }
+          installEvent = null;
+          try {
+            ev.prompt();
+          } catch (err) {
+            console.warn("[aimeat-phaser] the install prompt was refused:", err);
+            return Promise.resolve(
+              /** @type {'unavailable'} */
+              "unavailable"
+            );
+          }
+          return Promise.resolve(ev.userChoice).then(
+            function(choice) {
+              return choice && choice.outcome === "accepted" ? "accepted" : "dismissed";
+            },
+            function(err) {
+              console.warn("[aimeat-phaser] the install prompt gave no answer:", err);
+              return "dismissed";
+            }
+          );
+        }
+      };
+    }
+    function vibrate(ms2) {
+      const n = typeof ms2 === "number" && isFinite(ms2) ? Math.max(1, Math.min(1e3, ms2)) : 20;
+      if (typeof navigator === "undefined" || typeof navigator.vibrate !== "function") return false;
+      try {
+        return !!navigator.vibrate(n);
+      } catch (err) {
+        console.warn("[aimeat-phaser] vibrate was refused:", err);
+        return false;
+      }
+    }
+    function destroy() {
+      if (dead) return;
+      dead = true;
+      if (query && onTurn) {
+        if (typeof query.removeEventListener === "function") query.removeEventListener("change", onTurn);
+        else if (typeof /** @type {any} */
+        query.removeListener === "function") {
+          query.removeListener(onTurn);
+        }
+      }
+      query = null;
+      onTurn = null;
+      if (onVisible && doc) doc.removeEventListener("visibilitychange", onVisible);
+      onVisible = null;
+      awake = false;
+      if (sentinel && typeof sentinel.release === "function") {
+        try {
+          sentinel.release();
+        } catch (err) {
+          console.warn("[aimeat-phaser] the wake lock would not release on the way out:", err);
+        }
+      }
+      sentinel = null;
+      if (prompt && prompt.parentNode) prompt.parentNode.removeChild(prompt);
+      prompt = null;
+      if (gauge && gauge.parentNode) gauge.parentNode.removeChild(gauge);
+      gauge = null;
+    }
+    if (o.orientation) orientation(o.orientation);
+    if (o.keepAwake) keepAwake(true);
+    return {
+      orientation,
+      safeArea,
+      keepAwake,
+      install,
+      vibrate,
+      destroy
+    };
+  }
+
   // src/static/sdk-libs/phaser/boot.js
   var PHASER_URL = "/lib/phaser@4.min.js";
   var phaserPromise = null;
@@ -280,7 +558,7 @@
   };
   var ICON_ENTER = "M4 9V4h5v2H6v3H4zm11-5h5v5h-2V6h-3V4zM4 15h2v3h3v2H4v-5zm14 0h2v5h-5v-2h3v-3z";
   var ICON_LEAVE = "M9 4h2v5H6V7h3V4zm4 0h2v3h3v2h-5V4zM6 15h5v5H9v-3H6v-2zm7 0h5v2h-3v3h-2v-5z";
-  function icon(path) {
+  function icon2(path) {
     const ns = "http://www.w3.org/2000/svg";
     const svg = document.createElementNS(ns, "svg");
     svg.setAttribute("viewBox", "0 0 24 24");
@@ -326,6 +604,8 @@
         backgroundColor: groundColour(look2, s.background),
         transparent: !!s.transparent,
         pixelArt: !!s.pixelArt,
+        // The gamepad plugin is off in Phaser unless asked; controls() reads it, so it is on here.
+        input: { gamepad: s.gamepad !== false },
         scale: {
           mode: scaleMode,
           autoCenter: mode === "fit" ? Phaser.Scale.CENTER_BOTH : Phaser.Scale.NO_CENTER,
@@ -371,7 +651,7 @@
       button.setAttribute("aria-label", label);
       button.setAttribute("title", label);
       clear(button);
-      button.appendChild(icon(inside ? ICON_LEAVE : ICON_ENTER));
+      button.appendChild(icon2(inside ? ICON_LEAVE : ICON_ENTER));
     };
     if (s.fullscreen === "button") {
       button = el("button", {
@@ -385,7 +665,7 @@
             else g.scale.startFullscreen();
           }
         }
-      }, icon(ICON_ENTER));
+      }, icon2(ICON_ENTER));
       frame.appendChild(button);
       g.scale.on("enterfullscreen", onFullscreenChange);
       g.scale.on("leavefullscreen", onFullscreenChange);
@@ -410,7 +690,14 @@
       else g.loop.wake();
     };
     if (pauseOnHide) document.addEventListener("visibilitychange", onVisibility);
-    return {
+    let phone = null;
+    if (s.mobile) {
+      phone = mobile({ frame, game: g }, {
+        orientation: s.mobile.orientation,
+        keepAwake: s.mobile.keepAwake
+      });
+    }
+    const handle = {
       game: g,
       frame,
       theme: look2,
@@ -478,10 +765,16 @@
           g.scale.off("enterfullscreen", onFullscreenChange);
           g.scale.off("leavefullscreen", onFullscreenChange);
         }
+        if (phone) {
+          phone.destroy();
+          phone = null;
+        }
         g.destroy(true);
         if (frame.parentNode) frame.parentNode.removeChild(frame);
       }
     };
+    if (phone) handle.mobile = phone;
+    return handle;
   }
 
   // src/static/sdk-libs/phaser/assets.js
@@ -555,6 +848,18 @@
       json: urlMap(s.json, base, id),
       bitmapFonts: entryMap(s.bitmapFonts, base, id, ["texture", "data"])
     });
+  }
+  function fromLibrary(lib) {
+    if (!lib || typeof lib.toPack !== "function") {
+      throw new Error("fromLibrary() takes an aimeat-assets library: the object with toPack(), url() and t() that AIMEAT.assets.library({ app }) hands back. Await it first, or pass the promise straight to preloadPack(), which waits for it.");
+    }
+    return pack(lib.toPack());
+  }
+  function isLibrary(value) {
+    return !!value && typeof value.toPack === "function";
+  }
+  function isThenable(value) {
+    return !!value && typeof value.then === "function";
   }
   function loadingStatus() {
     const P = (
@@ -644,7 +949,15 @@
   function preloadPack(scene, packOrPacks, opts) {
     const o = opts || /** @type {PreloadOptions} */
     {};
-    const manifests = Array.isArray(packOrPacks) ? packOrPacks : [packOrPacks];
+    const given = Array.isArray(packOrPacks) ? packOrPacks : [packOrPacks];
+    if (given.some(isThenable)) {
+      return Promise.all(given).then(function(settled) {
+        return preloadPack(scene, settled, o);
+      });
+    }
+    const manifests = given.map(function(entry) {
+      return isLibrary(entry) ? fromLibrary(entry) : entry;
+    });
     const loader = scene.load;
     const mine = /* @__PURE__ */ new Set();
     let queued = 0;
@@ -782,16 +1095,17 @@
     g.fillStyle(dark, 1).fillRect(0, size - Math.round(edge / 2), size, Math.round(edge / 2));
   }
   function tiles(scene, spec) {
-    const s = spec || { kinds: {} };
+    const s = spec || {};
     const look2 = theme(scene.game.canvas);
     const size = s.size || 32;
-    const prefix = s.prefix || "";
+    const prefix = s.prefix != null ? s.prefix : "tile-";
+    const kinds = s.kinds || { ground: true, brick: true, spike: true, coin: true, goal: true, enemy: true };
     const made = [];
-    for (const kind in s.kinds || {}) {
+    for (const kind in kinds) {
       const key = prefix + kind;
       made.push(key);
       if (scene.textures.exists(key)) continue;
-      const asked = s.kinds[kind];
+      const asked = kinds[kind];
       const token = TILE_COLOUR[kind] || "accent";
       const colour = typeof asked === "number" ? asked : look2[token];
       const g = pen(scene);
@@ -1174,6 +1488,1579 @@
     return bus;
   }
 
+  // src/static/sdk-libs/phaser/tokens.js
+  var OVERLAY_DEPTH = 1e6;
+  var FALLBACK_EASE = "Cubic.easeOut";
+  function look(scene) {
+    const canvas = scene && scene.game ? scene.game.canvas : null;
+    return theme(canvas ? canvas.parentElement : null);
+  }
+  function channels(value) {
+    const n = typeof value === "number" && isFinite(value) ? value : 0;
+    return { r: n >> 16 & 255, g: n >> 8 & 255, b: n & 255 };
+  }
+  function ms(value, fallback) {
+    if (typeof value === "number" && isFinite(value)) return value;
+    if (typeof value === "string") {
+      const n = parseFloat(value);
+      if (isFinite(n)) return /\ds\s*$/.test(value) && !/ms\s*$/.test(value) ? n * 1e3 : n;
+    }
+    return fallback;
+  }
+  function curve(th) {
+    const e = th && th.ease;
+    return typeof e === "string" && e.indexOf("(") < 0 && e.indexOf(",") < 0 ? e : FALLBACK_EASE;
+  }
+
+  // src/static/sdk-libs/phaser/juice.js
+  var JUICE_DEPTH = 960;
+  var SHAKE_STRENGTH = 6e-3;
+  var SHAKE_MAX = 0.05;
+  var SHAKE_MS = 180;
+  var FRAME_MS = 16;
+  var SCALE_FLOOR = 0.02;
+  var COMBO_MS = 900;
+  function tone(th, want, fallback) {
+    if (typeof want === "number" && isFinite(want)) return want;
+    if (want === "ok") return th.ok;
+    if (want === "warn") return th.warn;
+    if (want === "err") return th.err;
+    if (want === "accent") return th.accent;
+    if (want === "ink") return th.ink;
+    return fallback;
+  }
+  function keyOf(prefix, colour) {
+    return "ak-juice-" + prefix + "-" + (colour >>> 0 & 16777215).toString(16);
+  }
+  function particleTexture(scene, shape, colour) {
+    const key = keyOf(shape, colour);
+    if (scene.textures && scene.textures.exists(key)) return key;
+    const g = scene.make.graphics({ add: false });
+    g.fillStyle(colour, 1);
+    let w = 8;
+    let h = 8;
+    if (shape === "dot") {
+      g.fillCircle(4, 4, 4);
+    } else if (shape === "chip") {
+      w = 7;
+      h = 10;
+      g.fillRect(0, 0, w, h);
+    } else {
+      w = 12;
+      h = 3;
+      g.fillRect(0, 0, w, h);
+    }
+    g.generateTexture(key, w, h);
+    g.destroy();
+    return key;
+  }
+  var BURSTS = {
+    coin: function(th) {
+      return {
+        shape: "dot",
+        colour: th.ch3,
+        count: 10,
+        life: 560,
+        config: {
+          speed: { min: 60, max: 170 },
+          angle: { min: -150, max: -30 },
+          gravityY: 340,
+          lifespan: { min: 380, max: 560 },
+          scale: { start: 1, end: 0 },
+          emitting: false
+        }
+      };
+    },
+    hit: function(th) {
+      return {
+        shape: "spark",
+        colour: th.err,
+        count: 12,
+        life: 340,
+        config: {
+          speed: { min: 90, max: 260 },
+          angle: { min: 0, max: 360 },
+          lifespan: { min: 200, max: 340 },
+          rotate: { min: -180, max: 180 },
+          scale: { start: 1, end: 0.2 },
+          alpha: { start: 1, end: 0.2 },
+          emitting: false
+        }
+      };
+    },
+    dust: function(th) {
+      return {
+        shape: "dot",
+        colour: th.inkDim,
+        count: 8,
+        life: 460,
+        config: {
+          speed: { min: 20, max: 80 },
+          angle: { min: 190, max: 350 },
+          gravityY: 40,
+          lifespan: { min: 300, max: 460 },
+          scale: { start: 0.9, end: 0.1 },
+          alpha: { start: 0.55, end: 0 },
+          emitting: false
+        }
+      };
+    },
+    spark: function(th) {
+      return {
+        shape: "spark",
+        colour: th.accent,
+        count: 14,
+        life: 300,
+        config: {
+          speed: { min: 120, max: 340 },
+          angle: { min: 0, max: 360 },
+          lifespan: { min: 180, max: 300 },
+          rotate: { min: -180, max: 180 },
+          scale: { start: 1, end: 0 },
+          blendMode: "ADD",
+          emitting: false
+        }
+      };
+    },
+    confetti: function(th) {
+      return {
+        shape: "chip",
+        colour: th.ch1,
+        count: 22,
+        life: 1e3,
+        config: {
+          speed: { min: 140, max: 320 },
+          angle: { min: -160, max: -20 },
+          gravityY: 430,
+          lifespan: { min: 640, max: 1e3 },
+          rotate: { min: -180, max: 180 },
+          scale: { start: 1, end: 0.7 },
+          alpha: { start: 1, end: 0.2 },
+          tint: [th.ch1, th.ch2, th.ch3, th.ch4],
+          emitting: false
+        }
+      };
+    }
+  };
+  function juice(scene, opts) {
+    const o = opts || /** @type {JuiceOptions} */
+    {};
+    const th = o.theme || look(scene);
+    const depth = typeof o.depth === "number" ? o.depth : JUICE_DEPTH;
+    const ease = curve(th);
+    const pace = ms(th.motion, 200);
+    let dead = false;
+    const world = scene.physics && scene.physics.world ? scene.physics.world : null;
+    const anims = scene.anims && typeof scene.anims.globalTimeScale === "number" ? scene.anims : null;
+    const base = {
+      time: scene.time ? scene.time.timeScale : 1,
+      tweens: scene.tweens ? scene.tweens.timeScale : 1,
+      world: world ? world.timeScale : 1,
+      anims: anims ? anims.globalTimeScale : 1
+    };
+    const timeouts = /* @__PURE__ */ new Set();
+    const timers = [];
+    const objects = [];
+    let ramp = 0;
+    function later(wait, run) {
+      const id = setTimeout(function() {
+        timeouts.delete(id);
+        if (!dead) run();
+      }, Math.max(0, wait));
+      timeouts.add(id);
+    }
+    function own(obj) {
+      objects.push(obj);
+      return obj;
+    }
+    function disown(obj) {
+      const at = objects.indexOf(obj);
+      if (at >= 0) objects.splice(at, 1);
+    }
+    function setSpeed(scale) {
+      const k = Math.max(SCALE_FLOOR, scale);
+      if (scene.time) scene.time.timeScale = base.time * k;
+      if (scene.tweens) scene.tweens.timeScale = base.tweens * k;
+      if (world) world.timeScale = base.world / k;
+      if (anims) anims.globalTimeScale = base.anims * k;
+    }
+    function restoreSpeed() {
+      if (scene.time) scene.time.timeScale = base.time;
+      if (scene.tweens) scene.tweens.timeScale = base.tweens;
+      if (world) world.timeScale = base.world;
+      if (anims) anims.globalTimeScale = base.anims;
+    }
+    function shake(strength, msWanted) {
+      if (dead || reducedMotion() || !scene.cameras || !scene.cameras.main) return false;
+      const power = Math.min(SHAKE_MAX, Math.max(0, typeof strength === "number" && isFinite(strength) ? strength : SHAKE_STRENGTH));
+      const span = Math.max(FRAME_MS, typeof msWanted === "number" && isFinite(msWanted) ? msWanted : SHAKE_MS);
+      scene.cameras.main.shake(span, power);
+      return true;
+    }
+    function flash(colour, msWanted) {
+      if (dead || !scene.cameras || !scene.cameras.main) return false;
+      const c = channels(tone(th, colour, th.accent));
+      const span = Math.max(FRAME_MS, typeof msWanted === "number" && isFinite(msWanted) ? msWanted : 120);
+      scene.cameras.main.flash(span, c.r, c.g, c.b);
+      return true;
+    }
+    function hitStop(msWanted, scale) {
+      if (dead || reducedMotion()) return false;
+      const span = Math.max(FRAME_MS, typeof msWanted === "number" && isFinite(msWanted) ? msWanted : 90);
+      const k = Math.max(SCALE_FLOOR, typeof scale === "number" && isFinite(scale) ? scale : 0.05);
+      if (ramp) {
+        cancelAnimationFrame(ramp);
+        ramp = 0;
+      }
+      setSpeed(k);
+      later(span, restoreSpeed);
+      return true;
+    }
+    function slowmo(msWanted, scale) {
+      if (dead || reducedMotion()) return false;
+      const span = Math.max(FRAME_MS, typeof msWanted === "number" && isFinite(msWanted) ? msWanted : 600);
+      const k = Math.max(SCALE_FLOOR, Math.min(1, typeof scale === "number" && isFinite(scale) ? scale : 0.35));
+      if (ramp) {
+        cancelAnimationFrame(ramp);
+        ramp = 0;
+      }
+      setSpeed(k);
+      later(span, function() {
+        const back = Math.max(FRAME_MS, span * 0.5);
+        const from = performance.now();
+        const step = function(now) {
+          if (dead) return;
+          const p = Math.min(1, (now - from) / back);
+          setSpeed(k + (1 - k) * (1 - (1 - p) * (1 - p)));
+          if (p < 1) {
+            ramp = requestAnimationFrame(step);
+            return;
+          }
+          ramp = 0;
+          restoreSpeed();
+        };
+        ramp = requestAnimationFrame(step);
+      });
+      return true;
+    }
+    function burst(x, y, kind, burstOpts) {
+      if (dead || reducedMotion() || !scene.add) return null;
+      const make = BURSTS[kind] || BURSTS.hit;
+      const preset = make(th);
+      const b = burstOpts || {};
+      const colour = tone(th, b.colour, preset.colour);
+      const key = particleTexture(scene, preset.shape, colour);
+      const config = {};
+      for (const name in preset.config) config[name] = preset.config[name];
+      if (b.config) for (const name in b.config) config[name] = b.config[name];
+      const emitter = scene.add.particles(x, y, key, config);
+      emitter.setDepth(typeof b.depth === "number" ? b.depth : depth - 20);
+      if (typeof b.scrollFactor === "number") emitter.setScrollFactor(b.scrollFactor);
+      own(emitter);
+      emitter.explode(Math.max(1, typeof b.count === "number" ? b.count : preset.count));
+      later(preset.life + 80, function() {
+        disown(emitter);
+        emitter.destroy();
+      });
+      return emitter;
+    }
+    function number(x, y, text, numOpts) {
+      if (dead || !scene.add) return null;
+      const n = numOpts || {};
+      const size = Math.max(8, typeof n.size === "number" ? n.size : 22);
+      const label = scene.add.text(x, y, text == null ? "" : String(text), {
+        fontFamily: th.fontDisplay,
+        fontSize: size + "px",
+        color: hex(tone(th, n.tone, th.ink))
+      }).setOrigin(0.5, 1).setDepth(depth);
+      own(label);
+      const still = reducedMotion();
+      const span = Math.max(200, typeof n.ms === "number" ? n.ms : Math.max(600, pace * 3));
+      const rise = still ? 0 : typeof n.rise === "number" ? n.rise : 38;
+      scene.tweens.add({
+        targets: label,
+        y: y - rise,
+        alpha: 0,
+        duration: span,
+        ease: still ? "Linear" : ease,
+        onComplete: function() {
+          disown(label);
+          label.destroy();
+        }
+      });
+      return label;
+    }
+    function pointOf(target) {
+      if (!target) return { x: scene.scale.width / 2, y: scene.scale.height / 2 };
+      if (typeof target.x === "number" && typeof target.y === "number") {
+        return { x: target.x, y: target.y };
+      }
+      const canvas = scene.game && scene.game.canvas;
+      if (target.nodeType !== 1 || !canvas) return { x: scene.scale.width / 2, y: scene.scale.height / 2 };
+      const box = target.getBoundingClientRect();
+      const frame = canvas.getBoundingClientRect();
+      const kx = frame.width > 0 ? scene.scale.width / frame.width : 1;
+      const ky = frame.height > 0 ? scene.scale.height / frame.height : 1;
+      return {
+        x: (box.left + box.width / 2 - frame.left) * kx,
+        y: (box.top + box.height / 2 - frame.top) * ky
+      };
+    }
+    let comboBox = null;
+    let comboTimer = 0;
+    function dropCombo() {
+      if (!comboBox) return;
+      const box = comboBox;
+      comboBox = null;
+      disown(box);
+      if (!box.scene) return;
+      scene.tweens.add({
+        targets: box,
+        alpha: 0,
+        duration: Math.max(120, pace),
+        onComplete: function() {
+          box.destroy();
+        }
+      });
+    }
+    function combo(target, comboOpts) {
+      if (dead || !scene.add) return null;
+      const c = comboOpts || /** @type {any} */
+      {};
+      const count = Math.max(0, Math.round(typeof c.count === "number" ? c.count : 0));
+      const at = pointOf(target);
+      const size = (typeof c.size === "number" ? c.size : 26) + Math.min(count, 20) * 1.6;
+      if (!comboBox) {
+        const digits2 = scene.add.text(0, 0, "", {
+          fontFamily: th.fontDisplay,
+          fontSize: size + "px",
+          color: hex(th.accent)
+        }).setOrigin(0.5, 1);
+        const word2 = scene.add.text(0, 4, "", {
+          fontFamily: th.fontMono,
+          fontSize: "12px",
+          color: hex(th.inkDim)
+        }).setOrigin(0.5, 0);
+        comboBox = own(scene.add.container(at.x, at.y, [digits2, word2]).setDepth(depth));
+        comboBox.setData("digits", digits2);
+        comboBox.setData("word", word2);
+      }
+      const digits = comboBox.getData("digits");
+      const word = comboBox.getData("word");
+      digits.setFontSize(size);
+      digits.setText(String(count));
+      word.setText(c.label ? String(c.label) : "");
+      word.setVisible(!!c.label);
+      comboBox.setPosition(at.x, at.y);
+      comboBox.setAlpha(1);
+      comboBox.setScale(1);
+      if (!reducedMotion()) {
+        scene.tweens.add({
+          targets: comboBox,
+          scale: 1.35,
+          duration: Math.max(60, pace * 0.4),
+          yoyo: true,
+          ease: "Back.easeOut"
+        });
+      }
+      if (comboTimer) {
+        clearTimeout(comboTimer);
+        timeouts.delete(comboTimer);
+        comboTimer = 0;
+      }
+      const hold = Math.max(200, typeof c.ms === "number" ? c.ms : COMBO_MS);
+      const id = setTimeout(function() {
+        timeouts.delete(id);
+        comboTimer = 0;
+        if (!dead) dropCombo();
+      }, hold);
+      timeouts.add(id);
+      comboTimer = id;
+      return comboBox;
+    }
+    function pop(gameObject, scale) {
+      if (dead || reducedMotion() || !gameObject || !gameObject.scene || !scene.tweens) return false;
+      const k = Math.max(1.01, typeof scale === "number" && isFinite(scale) ? scale : 1.18);
+      const fromX = typeof gameObject.scaleX === "number" ? gameObject.scaleX : 1;
+      const fromY = typeof gameObject.scaleY === "number" ? gameObject.scaleY : 1;
+      scene.tweens.add({
+        targets: gameObject,
+        scaleX: fromX * k,
+        scaleY: fromY / k,
+        duration: Math.max(FRAME_MS, pace * 0.5),
+        yoyo: true,
+        ease: "Quad.easeOut",
+        onComplete: function() {
+          if (!gameObject.scene) return;
+          gameObject.setScale(fromX, fromY);
+        }
+      });
+      return true;
+    }
+    function trail(gameObject, trailOpts) {
+      if (dead || reducedMotion() || !gameObject || !gameObject.scene || !scene.add) return false;
+      const t = trailOpts || {};
+      const count = Math.max(1, Math.min(12, Math.round(typeof t.count === "number" ? t.count : 5)));
+      const step = Math.max(FRAME_MS, typeof t.step === "number" ? t.step : 40);
+      const span = Math.max(FRAME_MS, typeof t.ms === "number" ? t.ms : 280);
+      const top = Math.max(0, Math.min(1, typeof t.alpha === "number" ? t.alpha : 0.5));
+      for (let i = 0; i < count; i++) {
+        const timer = scene.time.delayedCall(i * step, function() {
+          if (dead || !gameObject.scene) return;
+          const frame = gameObject.frame ? gameObject.frame.name : void 0;
+          const ghost = scene.add.image(gameObject.x, gameObject.y, gameObject.texture.key, frame);
+          ghost.setOrigin(gameObject.originX, gameObject.originY).setScale(gameObject.scaleX, gameObject.scaleY).setRotation(gameObject.rotation).setFlipX(!!gameObject.flipX).setFlipY(!!gameObject.flipY).setAlpha(top).setDepth((gameObject.depth || 0) - 1);
+          if (typeof t.tint === "number") ghost.setTint(t.tint);
+          own(ghost);
+          scene.tweens.add({
+            targets: ghost,
+            alpha: 0,
+            duration: span,
+            ease: "Quad.easeOut",
+            onComplete: function() {
+              disown(ghost);
+              ghost.destroy();
+            }
+          });
+        });
+        timers.push(timer);
+      }
+      return true;
+    }
+    function destroy() {
+      if (dead) return;
+      dead = true;
+      if (scene.events && typeof scene.events.off === "function") {
+        scene.events.off("shutdown", destroy);
+        scene.events.off("destroy", destroy);
+      }
+      for (const id of timeouts) clearTimeout(id);
+      timeouts.clear();
+      comboTimer = 0;
+      comboBox = null;
+      for (const timer of timers) {
+        if (timer && typeof timer.remove === "function") timer.remove(false);
+      }
+      timers.length = 0;
+      if (ramp) {
+        cancelAnimationFrame(ramp);
+        ramp = 0;
+      }
+      for (const obj of objects.slice()) {
+        if (!obj) continue;
+        if (scene.tweens) scene.tweens.killTweensOf(obj);
+        if (typeof obj.destroy === "function" && obj.scene !== void 0) obj.destroy();
+      }
+      objects.length = 0;
+      restoreSpeed();
+    }
+    if (scene.events && typeof scene.events.once === "function") {
+      scene.events.once("shutdown", destroy);
+      scene.events.once("destroy", destroy);
+    }
+    return {
+      shake,
+      hitStop,
+      flash,
+      burst,
+      number,
+      combo,
+      slowmo,
+      pop,
+      trail,
+      destroy
+    };
+  }
+
+  // src/static/sdk-libs/phaser/net.js
+  var INPUT = "i";
+  var STATE = "s";
+  var MESSAGE = "m";
+  var INPUT_RATE = 30;
+  var STATE_RATE = 100;
+  var JOIN_MS = 12e3;
+  function realtimeClass() {
+    const root = typeof window !== "undefined" ? (
+      /** @type {any} */
+      window
+    ) : null;
+    return root && typeof root.AimeatRealtime === "function" ? root.AimeatRealtime : null;
+  }
+  function sessionToken() {
+    const root = typeof window !== "undefined" ? (
+      /** @type {any} */
+      window.AIMEAT
+    ) : null;
+    const auth = root && root.auth;
+    if (!auth || typeof auth.getSession !== "function") return null;
+    try {
+      const s = auth.getSession();
+      return s && s.jwt || null;
+    } catch (err) {
+      console.warn("[aimeat-phaser] auth.getSession failed, so there is no room to join:", err);
+      return null;
+    }
+  }
+  function lowest(ids) {
+    let best = null;
+    for (const id of ids) {
+      const s = String(id);
+      if (best === null || s < best) best = s;
+    }
+    return best;
+  }
+  function net(spec) {
+    const s = spec || /** @type {NetSpec} */
+    {};
+    const rate = Math.max(10, typeof s.rate === "number" && isFinite(s.rate) ? s.rate : INPUT_RATE);
+    const nick = s.name || "player";
+    let rt = null;
+    let me = null;
+    let roomId = null;
+    let host = null;
+    let dead = false;
+    const roster = /* @__PURE__ */ new Map();
+    let echo = null;
+    const inputWindow = { last: "", at: 0, timer: 0, held: (
+      /** @type {any} */
+      null
+    ), hasHeld: false };
+    const stateWindow = { at: 0, timer: 0, held: (
+      /** @type {any} */
+      null
+    ), hasHeld: false, every: STATE_RATE };
+    const wired = [];
+    function tell(which, args) {
+      const fn = (
+        /** @type {any} */
+        s[which]
+      );
+      if (typeof fn !== "function") return;
+      try {
+        fn.apply(null, args);
+      } catch (err) {
+        console.warn("[aimeat-phaser] the net " + which + " handler threw:", err);
+      }
+    }
+    function elect() {
+      host = lowest(Array.from(roster.keys()));
+    }
+    function put(kind, data) {
+      if (dead || !rt || !me) return false;
+      const packet = { k: kind, f: me, t: Date.now(), d: data };
+      if (echo) packet.e = echo;
+      rt.broadcast(packet);
+      return true;
+    }
+    function onBroadcast(msg) {
+      const p = msg && msg.payload;
+      if (!p || typeof p !== "object" || typeof p.f !== "string") return;
+      if (p.f === me) return;
+      if (typeof p.t === "number") echo = [p.f, p.t];
+      if (Array.isArray(p.e) && p.e[0] === me && typeof p.e[1] === "number") {
+        const known = roster.get(p.f);
+        if (known) known.latency = Math.max(0, Date.now() - p.e[1]);
+      }
+      if (p.k === INPUT) {
+        tell("onInput", [p.f, p.d]);
+        return;
+      }
+      if (p.k === STATE) {
+        tell("onState", [p.f, p.d]);
+        return;
+      }
+      if (p.k === MESSAGE) tell("onMessage", [p.f, p.d]);
+    }
+    function wire2(ready, refuse) {
+      const add = function(event, fn) {
+        rt.on(event, fn);
+        wired.push([event, fn]);
+      };
+      add("joined", function(msg) {
+        me = msg && msg.peerId ? String(msg.peerId) : null;
+        roomId = msg && msg.roomId || roomId;
+        roster.clear();
+        if (me) roster.set(me, { id: me, name: nick });
+        const existing = msg && msg.peers || [];
+        for (const p of existing) {
+          if (!p || !p.peerId) continue;
+          roster.set(String(p.peerId), { id: String(p.peerId), name: p.nick || "player" });
+        }
+        elect();
+        if (!me) {
+          refuse(new Error("The room answered without saying which peer we are, so there is nobody to send input as. Try joining again."));
+          return;
+        }
+        ready({ id: me, room: String(roomId), isHost: host === me });
+      });
+      add("peer-joined", function(msg) {
+        if (!msg || !msg.peerId) return;
+        const peer = { id: String(msg.peerId), name: msg.nick || "player" };
+        roster.set(peer.id, peer);
+        elect();
+        tell("onPeer", [peer, true]);
+      });
+      add("peer-left", function(msg) {
+        if (!msg || !msg.peerId) return;
+        const id2 = String(msg.peerId);
+        const peer = roster.get(id2) || { id: id2, name: "player" };
+        roster.delete(id2);
+        elect();
+        tell("onPeer", [peer, false]);
+      });
+      add("peer-presence", function(msg) {
+        if (!msg || !msg.peerId) return;
+        const known = roster.get(String(msg.peerId));
+        if (known && msg.state && typeof msg.state.name === "string") known.name = msg.state.name;
+      });
+      add("broadcast", onBroadcast);
+      add("close", function(msg) {
+        roster.clear();
+        host = null;
+        tell("onClose", [msg || {}]);
+      });
+      add("error", function(msg) {
+        console.warn("[aimeat-phaser] the room reported an error:", msg);
+      });
+    }
+    function findRoom() {
+      return rt.listRooms({ app_type: s.app }).then(function(rooms) {
+        const matching = (rooms || []).filter(function(r) {
+          return r && r.name === s.room;
+        });
+        if (matching.length) {
+          return String(lowest(matching.map(function(r) {
+            return r.id;
+          })));
+        }
+        return rt.createRoom({ app_type: s.app, name: s.room, is_public: true }).then(function(made) {
+          return String(made.id);
+        });
+      });
+    }
+    function connect() {
+      if (dead) return Promise.reject(new Error("This net link was destroyed. Make a new one."));
+      if (rt && me) return Promise.resolve({ id: me, room: String(roomId), isHost: host === me });
+      const Realtime = realtimeClass();
+      if (!Realtime) {
+        return Promise.reject(new Error('Multiplayer needs the realtime library, which this page has not loaded. Add this line before the game runs:\n  <script src="' + NODE_URL + '/lib/realtime.js"><\/script>'));
+      }
+      const token = sessionToken();
+      if (!token) {
+        return Promise.reject(new Error("A room belongs to an account, so multiplayer needs somebody signed in. Include aimeat-auth.js and call AIMEAT.auth.login() before connecting."));
+      }
+      if (!s.room || !s.app) {
+        return Promise.reject(new Error("net() needs both a room name and an app type: two games must not meet in a room that happens to share a name."));
+      }
+      rt = new Realtime(NODE_URL, token);
+      return findRoom().then(function(found) {
+        roomId = found;
+        return new Promise(function(ok, fail) {
+          let settled = false;
+          const timer = setTimeout(function() {
+            if (settled) return;
+            settled = true;
+            fail(new Error("The room at " + NODE_URL + " did not answer within " + Math.round(JOIN_MS / 1e3) + " seconds. The node may be unreachable from here, or the sign-in may have expired."));
+          }, JOIN_MS);
+          wire2(
+            function(info) {
+              if (settled) return;
+              settled = true;
+              clearTimeout(timer);
+              ok(info);
+            },
+            function(err) {
+              if (settled) return;
+              settled = true;
+              clearTimeout(timer);
+              fail(err);
+            }
+          );
+          rt.connect(roomId, nick);
+        });
+      });
+    }
+    function sendInput(input) {
+      if (dead || !rt || !me) return false;
+      const text = JSON.stringify(input === void 0 ? null : input);
+      if (text === inputWindow.last) return false;
+      const now = Date.now();
+      const since = now - inputWindow.at;
+      if (since >= rate) {
+        inputWindow.last = text;
+        inputWindow.at = now;
+        inputWindow.hasHeld = false;
+        inputWindow.held = null;
+        return put(INPUT, input);
+      }
+      inputWindow.held = input;
+      inputWindow.hasHeld = true;
+      if (inputWindow.timer) return false;
+      inputWindow.timer = setTimeout(function() {
+        inputWindow.timer = 0;
+        if (dead || !inputWindow.hasHeld) return;
+        const held = inputWindow.held;
+        inputWindow.hasHeld = false;
+        inputWindow.held = null;
+        inputWindow.last = JSON.stringify(held === void 0 ? null : held);
+        inputWindow.at = Date.now();
+        put(INPUT, held);
+      }, rate - since);
+      return false;
+    }
+    function sendState(state, opts) {
+      if (dead || !rt || !me) return false;
+      if (opts && typeof opts.every === "number" && isFinite(opts.every)) {
+        stateWindow.every = Math.max(20, opts.every);
+      }
+      const now = Date.now();
+      const since = now - stateWindow.at;
+      if (since >= stateWindow.every) {
+        stateWindow.at = now;
+        stateWindow.hasHeld = false;
+        stateWindow.held = null;
+        return put(STATE, state);
+      }
+      stateWindow.held = state;
+      stateWindow.hasHeld = true;
+      if (stateWindow.timer) return false;
+      stateWindow.timer = setTimeout(function() {
+        stateWindow.timer = 0;
+        if (dead || !stateWindow.hasHeld) return;
+        const held = stateWindow.held;
+        stateWindow.hasHeld = false;
+        stateWindow.held = null;
+        stateWindow.at = Date.now();
+        put(STATE, held);
+      }, stateWindow.every - since);
+      return false;
+    }
+    function send(msg) {
+      return put(MESSAGE, msg);
+    }
+    function peers() {
+      const out = [];
+      for (const peer of roster.values()) {
+        if (peer.id === me) continue;
+        out.push(peer.latency === void 0 ? { id: peer.id, name: peer.name } : { id: peer.id, name: peer.name, latency: peer.latency });
+      }
+      return out;
+    }
+    function isHost() {
+      return !!me && host === me;
+    }
+    function id() {
+      return me;
+    }
+    function stopWindows() {
+      if (inputWindow.timer) clearTimeout(inputWindow.timer);
+      if (stateWindow.timer) clearTimeout(stateWindow.timer);
+      inputWindow.timer = 0;
+      stateWindow.timer = 0;
+      inputWindow.held = null;
+      stateWindow.held = null;
+      inputWindow.hasHeld = false;
+      stateWindow.hasHeld = false;
+    }
+    function leave() {
+      stopWindows();
+      roster.clear();
+      host = null;
+      me = null;
+      if (rt && typeof rt.leave === "function") rt.leave();
+    }
+    function destroy() {
+      if (dead) return;
+      dead = true;
+      stopWindows();
+      if (rt) {
+        for (const pair of wired) rt.off(pair[0], pair[1]);
+        if (typeof rt.disconnect === "function") rt.disconnect();
+      }
+      wired.length = 0;
+      roster.clear();
+      host = null;
+      me = null;
+      rt = null;
+    }
+    return {
+      connect,
+      leave,
+      peers,
+      sendInput,
+      sendState,
+      send,
+      isHost,
+      id,
+      destroy
+    };
+  }
+
+  // src/static/sdk-libs/phaser/editor.js
+  var EMPTY = ".";
+  var DEFAULT_LEGEND = {
+    "#": { kind: "ground", label: "Ground" },
+    "=": { kind: "brick", label: "Brick" },
+    "^": { kind: "spike", label: "Spike" },
+    o: { kind: "coin", label: "Coin" },
+    E: { kind: "enemy", label: "Enemy" },
+    P: { kind: "spawn", label: "Player start" },
+    G: { kind: "goal", label: "Goal" },
+    ".": { kind: "empty", label: "Eraser" }
+  };
+  var DEFAULT_COLS = 26;
+  var DEFAULT_ROWS = 12;
+  var DEFAULT_TILE = 24;
+  var MIN_SIZE = 2;
+  var MAX_SIZE = 400;
+  var HISTORY_MAX = 60;
+  var ROLE = {
+    ground: "line",
+    brick: "inkDim",
+    spike: "err",
+    coin: "warn",
+    enemy: "accent",
+    spawn: "ch1",
+    goal: "ok",
+    empty: "surface"
+  };
+  var UNIQUE = { spawn: true, goal: true };
+  var AS_LETTER = { spawn: true, goal: true };
+  var RULE_ALPHA = 0.35;
+  function clamp(value, low, high, fallback) {
+    const n = Math.floor(Number(value));
+    return isFinite(n) ? Math.max(low, Math.min(high, n)) : fallback;
+  }
+  function normalizeLegend(custom) {
+    const source = Object.assign({}, DEFAULT_LEGEND, custom || {});
+    const out = (
+      /** @type {Record<string, Mark>} */
+      {}
+    );
+    for (const char in source) {
+      const raw = source[char];
+      const entry = typeof raw === "string" ? { kind: raw, label: "", colour: "" } : raw || { kind: "empty" };
+      out[char] = {
+        char,
+        kind: entry.kind || "empty",
+        label: entry.label || entry.kind || char,
+        colour: entry.colour
+      };
+    }
+    return out;
+  }
+  function blankMap(cols, rows, legend) {
+    let floor = EMPTY;
+    for (const char in legend) if (legend[char].kind === "ground") {
+      floor = char;
+      break;
+    }
+    const out = [];
+    for (let y = 0; y < rows; y += 1) out.push((y === rows - 1 ? floor : EMPTY).repeat(cols));
+    return out;
+  }
+  function toGrid(rows, wanted) {
+    const lines = Array.isArray(rows) && rows.length ? rows : [""];
+    let cols = wanted || 0;
+    if (!cols) for (const line of lines) cols = Math.max(cols, String(line == null ? "" : line).length);
+    cols = Math.max(1, cols);
+    const grid = (
+      /** @type {string[][]} */
+      []
+    );
+    for (const line of lines) {
+      const text = String(line == null ? "" : line);
+      const row = (
+        /** @type {string[]} */
+        []
+      );
+      for (let x = 0; x < cols; x += 1) {
+        const char = text.charAt(x);
+        row.push(char === "" || char === " " ? EMPTY : char);
+      }
+      grid.push(row);
+    }
+    return grid;
+  }
+  function colourOf(mark, paint) {
+    const named = mark && mark.colour;
+    if (named && ROLE[named] && paint[ROLE[named]]) return paint[ROLE[named]];
+    if (named && paint[named]) return paint[named];
+    return paint[ROLE[mark ? mark.kind : "empty"]] || paint.ink;
+  }
+  function letterOn(ctx, text, font, px, py, size) {
+    ctx.font = Math.round(size * 0.72) + "px " + font;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, px + size / 2, py + size * 0.54);
+  }
+  function drawCell(ctx, mark, paint, px, py, size) {
+    ctx.fillStyle = paint.surface;
+    ctx.fillRect(px, py, size, size);
+    const kind = mark ? mark.kind : "empty";
+    if (!mark || kind === "empty") return;
+    const mid = size / 2;
+    ctx.fillStyle = colourOf(mark, paint);
+    if (kind === "coin") {
+      ctx.beginPath();
+      ctx.arc(px + mid, py + mid, Math.max(2, size * 0.3), 0, Math.PI * 2);
+      ctx.fill();
+    } else if (kind === "spike") {
+      ctx.beginPath();
+      ctx.moveTo(px, py + size);
+      ctx.lineTo(px + mid, py + size * 0.2);
+      ctx.lineTo(px + size, py + size);
+      ctx.fill();
+    } else if (AS_LETTER[kind]) {
+      letterOn(ctx, mark.char, paint.fontMono, px, py, size);
+    } else {
+      ctx.fillRect(px, py, size, size);
+      ctx.fillStyle = paint.surface;
+      if (kind === "brick") {
+        ctx.fillRect(px, py + mid - size * 0.04, size, size * 0.08);
+        ctx.fillRect(px + mid - size * 0.04, py, size * 0.08, mid);
+        ctx.fillRect(px + size * 0.21, py + mid, size * 0.08, mid);
+      } else if (kind === "enemy") {
+        const r = Math.max(1, size * 0.09);
+        ctx.beginPath();
+        ctx.arc(px + size * 0.34, py + size * 0.4, r, 0, Math.PI * 2);
+        ctx.arc(px + size * 0.66, py + size * 0.4, r, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (!ROLE[kind]) {
+        letterOn(ctx, mark.char, paint.fontMono, px, py, size);
+      }
+    }
+  }
+  function levelEditor(spec) {
+    const s = spec || /** @type {any} */
+    {};
+    const legend = normalizeLegend(s.legend);
+    const tile = clamp(s.tile || DEFAULT_TILE, 8, 96, DEFAULT_TILE);
+    const readOnly = !!s.readOnly;
+    const store = s.store || null;
+    const useSaves = !!(store && typeof store.set === "function" && typeof store.save === "function" && typeof store.get === "function");
+    let grid = toGrid(s.map && s.map.length ? s.map : blankMap(DEFAULT_COLS, DEFAULT_ROWS, legend));
+    let cols = grid[0].length;
+    let rowCount = grid.length;
+    const past = (
+      /** @type {string[][][]} */
+      []
+    );
+    const future = (
+      /** @type {string[][][]} */
+      []
+    );
+    let paint = (
+      /** @type {Record<string, string>|null} */
+      null
+    );
+    const cursor = { x: 0, y: 0 };
+    let toolChar = offered()[0] || EMPTY;
+    let painting = false;
+    let strokeDirty = false;
+    let strokeBefore = (
+      /** @type {string[]|null} */
+      null
+    );
+    let textBefore = (
+      /** @type {string[]|null} */
+      null
+    );
+    let syncing = false;
+    let levels = (
+      /** @type {SavedLevel[]} */
+      []
+    );
+    let currentId = "";
+    let gone = false;
+    const root = el("div", { class: "ak-leveled" + (readOnly ? " ak-leveled--readonly" : "") });
+    resolve(s.target, document.body).appendChild(root);
+    const canvas = (
+      /** @type {HTMLCanvasElement} */
+      el("canvas", {
+        class: "ak-leveled__grid",
+        tabindex: "0",
+        "aria-label": "The level map. Arrow keys move the cursor, space paints, the number keys pick a tool."
+      })
+    );
+    const palette = el("div", { class: "ak-leveled__palette", role: "group", "aria-label": "Tools" });
+    const status = el("p", { class: "ak-leveled__status", role: "status" });
+    const ascii = (
+      /** @type {HTMLTextAreaElement} */
+      el("textarea", {
+        class: "ak-leveled__ascii",
+        spellcheck: "false",
+        rows: "8",
+        readonly: readOnly,
+        "aria-label": "The map as text"
+      })
+    );
+    const nameInput = (
+      /** @type {HTMLInputElement} */
+      el("input", {
+        type: "text",
+        class: "ak-input ak-leveled__name",
+        placeholder: "Level name",
+        "aria-label": "Level name",
+        disabled: readOnly
+      })
+    );
+    const picker = (
+      /** @type {HTMLSelectElement} */
+      el("select", {
+        class: "ak-input ak-leveled__picker",
+        "aria-label": "Saved levels"
+      })
+    );
+    const colsInput = sizeField("Columns", true);
+    const rowsInput = sizeField("Rows", false);
+    const swatches = (
+      /** @type {Array<{ canvas: HTMLCanvasElement, mark: Mark }>} */
+      []
+    );
+    const toolButtons = (
+      /** @type {HTMLButtonElement[]} */
+      []
+    );
+    const toolMarks = (
+      /** @type {Mark[]} */
+      []
+    );
+    function sizeField(label, isCols) {
+      const input = (
+        /** @type {HTMLInputElement} */
+        el("input", {
+          type: "number",
+          class: "ak-input ak-leveled__size",
+          disabled: readOnly,
+          min: String(MIN_SIZE),
+          max: String(MAX_SIZE),
+          "aria-label": label,
+          on: { change: function() {
+            const n = clamp(input.value, MIN_SIZE, MAX_SIZE, isCols ? cols : rowCount);
+            api.resize(isCols ? n : cols, isCols ? rowCount : n);
+          } }
+        })
+      );
+      return input;
+    }
+    function button(label, run, needsWrite) {
+      return el("button", {
+        type: "button",
+        class: "ak-btn ak-btn--ghost",
+        "data-ak-noguard": true,
+        disabled: !!(needsWrite && readOnly),
+        on: { click: run }
+      }, label);
+    }
+    function offered() {
+      const asked = Array.isArray(s.tools) && s.tools.length ? s.tools : Object.keys(legend);
+      return asked.filter(function(char) {
+        return !!legend[char] && legend[char].kind !== "empty";
+      });
+    }
+    function build() {
+      for (const char of offered()) toolMarks.push(legend[char]);
+      toolMarks.push(legend[EMPTY] || { char: EMPTY, kind: "empty", label: "Eraser" });
+      for (let i = 0; i < toolMarks.length; i += 1) palette.appendChild(toolButton(toolMarks[i], i));
+      root.appendChild(el("div", { class: "ak-leveled__bar" }, [
+        el("div", { class: "ak-leveled__group" }, [
+          el("span", { class: "ak-leveled__legendword", text: "Size" }),
+          colsInput,
+          el("span", { class: "ak-leveled__times", text: "x" }),
+          rowsInput
+        ]),
+        el("div", { class: "ak-leveled__group" }, [
+          button("Undo", function() {
+            api.undo();
+          }, true),
+          button("Redo", function() {
+            api.redo();
+          }, true),
+          button("Clear", function() {
+            api.clear();
+          }, true),
+          button("Copy as JS", copyAsJs)
+        ]),
+        store ? el("div", { class: "ak-leveled__group ak-leveled__group--store" }, [
+          nameInput,
+          picker,
+          button("Save", function() {
+            void saveLevel();
+          }, true),
+          button("Load", loadLevel),
+          button("New", newLevel, true),
+          button("Delete", function() {
+            void deleteLevel();
+          }, true)
+        ]) : null
+      ]));
+      root.appendChild(el("div", { class: "ak-leveled__main" }, [
+        palette,
+        el("div", { class: "ak-leveled__stage" }, canvas)
+      ]));
+      root.appendChild(status);
+      root.appendChild(ascii);
+    }
+    function toolButton(mark, index) {
+      const swatch = (
+        /** @type {HTMLCanvasElement} */
+        el("canvas", {
+          class: "ak-leveled__swatch",
+          width: "24",
+          height: "24",
+          "aria-hidden": "true"
+        })
+      );
+      swatches.push({ canvas: swatch, mark });
+      const node = (
+        /** @type {HTMLButtonElement} */
+        el("button", {
+          type: "button",
+          class: "ak-btn ak-btn--ghost ak-leveled__tool",
+          "data-ak-noguard": true,
+          "aria-pressed": String(mark.char === toolChar),
+          disabled: readOnly,
+          title: mark.label + " (" + mark.char + ")",
+          on: { click: function() {
+            api.tool(mark.char);
+          } }
+        }, [
+          swatch,
+          el("span", { class: "ak-leveled__toolname", text: mark.label }),
+          index < 9 ? el("kbd", { class: "ak-leveled__hint", text: String(index + 1) }) : null
+        ])
+      );
+      toolButtons.push(node);
+      return node;
+    }
+    function colours() {
+      if (!paint) paint = theme.css(root);
+      return paint;
+    }
+    function context() {
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const ctx = canvas.getContext("2d");
+      if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      return ctx;
+    }
+    function sizeCanvas() {
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      canvas.width = Math.round(cols * tile * dpr);
+      canvas.height = Math.round(rowCount * tile * dpr);
+      canvas.style.setProperty("--akl-w", cols * tile + "px");
+      canvas.style.setProperty("--akl-h", rowCount * tile + "px");
+    }
+    function overlay(ctx, p, box) {
+      ctx.globalAlpha = RULE_ALPHA;
+      ctx.strokeStyle = p.line;
+      ctx.lineWidth = 1;
+      if (box) {
+        ctx.strokeRect(box[0] * tile + 0.5, box[1] * tile + 0.5, tile, tile);
+      } else {
+        ctx.beginPath();
+        for (let x = 0; x <= cols; x += 1) {
+          ctx.moveTo(x * tile + 0.5, 0);
+          ctx.lineTo(x * tile + 0.5, rowCount * tile);
+        }
+        for (let y = 0; y <= rowCount; y += 1) {
+          ctx.moveTo(0, y * tile + 0.5);
+          ctx.lineTo(cols * tile, y * tile + 0.5);
+        }
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      if (document.activeElement !== canvas) return;
+      ctx.strokeStyle = p.accent;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(cursor.x * tile + 1, cursor.y * tile + 1, tile - 2, tile - 2);
+    }
+    function paintAll() {
+      const ctx = context();
+      if (!ctx) return;
+      const p = colours();
+      ctx.fillStyle = p.bg;
+      ctx.fillRect(0, 0, cols * tile, rowCount * tile);
+      for (let y = 0; y < rowCount; y += 1) {
+        for (let x = 0; x < cols; x += 1) drawCell(ctx, legend[grid[y][x]] || null, p, x * tile, y * tile, tile);
+      }
+      overlay(ctx, p, null);
+      for (const item of swatches) {
+        const swatchCtx = item.canvas.getContext("2d");
+        if (swatchCtx) drawCell(swatchCtx, item.mark, p, 0, 0, item.canvas.width);
+      }
+    }
+    function paintOne(x, y) {
+      const ctx = context();
+      if (!ctx) return;
+      const p = colours();
+      drawCell(ctx, legend[grid[y][x]] || null, p, x * tile, y * tile, tile);
+      overlay(ctx, p, [x, y]);
+    }
+    function cellAt(ev) {
+      const box = canvas.getBoundingClientRect();
+      if (!box.width || !box.height) return null;
+      const x = Math.floor((ev.clientX - box.left) / (box.width / cols));
+      const y = Math.floor((ev.clientY - box.top) / (box.height / rowCount));
+      return x < 0 || y < 0 || x >= cols || y >= rowCount ? null : { x, y };
+    }
+    function put(x, y, char) {
+      if (grid[y][x] === char) return false;
+      const mark = legend[char];
+      if (mark && UNIQUE[mark.kind]) {
+        for (let yy = 0; yy < rowCount; yy += 1) {
+          for (let xx = 0; xx < cols; xx += 1) {
+            const other = legend[grid[yy][xx]];
+            if (other && other.kind === mark.kind) {
+              grid[yy][xx] = EMPTY;
+              paintOne(xx, yy);
+            }
+          }
+        }
+      }
+      grid[y][x] = char;
+      paintOne(x, y);
+      return true;
+    }
+    function onDown(ev) {
+      if (readOnly) return;
+      const cell = cellAt(ev);
+      if (!cell) return;
+      ev.preventDefault();
+      canvas.focus();
+      try {
+        canvas.setPointerCapture(ev.pointerId);
+      } catch (err) {
+        console.warn("[aimeat-phaser] the pointer could not be captured, painting still works:", err);
+      }
+      painting = true;
+      strokeDirty = false;
+      strokeBefore = rowsNow();
+      cursor.x = cell.x;
+      cursor.y = cell.y;
+      if (put(cell.x, cell.y, toolChar)) strokeDirty = true;
+    }
+    function onMove(ev) {
+      if (!painting) return;
+      const cell = cellAt(ev);
+      if (cell && put(cell.x, cell.y, toolChar)) strokeDirty = true;
+    }
+    function onUp(ev) {
+      if (!painting) return;
+      painting = false;
+      try {
+        canvas.releasePointerCapture(ev.pointerId);
+      } catch (err) {
+        console.warn("[aimeat-phaser] the pointer capture could not be released:", err);
+      }
+      if (!strokeDirty || !strokeBefore) return;
+      commit(strokeBefore);
+      strokeBefore = null;
+      changed();
+    }
+    function onKey(ev) {
+      const key = ev.key;
+      if (ev.ctrlKey || ev.metaKey) {
+        if (key === "z" || key === "Z") {
+          ev.preventDefault();
+          if (ev.shiftKey) api.redo();
+          else api.undo();
+        } else if (key === "y" || key === "Y") {
+          ev.preventDefault();
+          api.redo();
+        }
+        return;
+      }
+      if (/^[1-9]$/.test(key)) {
+        const mark = toolMarks[Number(key) - 1];
+        if (mark) {
+          ev.preventDefault();
+          api.tool(mark.char);
+        }
+        return;
+      }
+      const step = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[key];
+      if (step) {
+        ev.preventDefault();
+        cursor.x = Math.max(0, Math.min(cols - 1, cursor.x + step[0]));
+        cursor.y = Math.max(0, Math.min(rowCount - 1, cursor.y + step[1]));
+        paintAll();
+        return;
+      }
+      if ((key === " " || key === "Enter") && !readOnly) {
+        ev.preventDefault();
+        const before = rowsNow();
+        if (!put(cursor.x, cursor.y, toolChar)) return;
+        commit(before);
+        changed();
+      }
+    }
+    function rowsNow() {
+      return grid.map(function(row) {
+        return row.join("");
+      });
+    }
+    function relayout() {
+      rowCount = grid.length;
+      cols = grid[0] ? grid[0].length : 1;
+      sizeCanvas();
+      cursor.x = Math.min(cursor.x, cols - 1);
+      cursor.y = Math.min(cursor.y, rowCount - 1);
+      paintAll();
+      colsInput.value = String(cols);
+      rowsInput.value = String(rowCount);
+    }
+    function adopt(next, tell) {
+      grid = next;
+      relayout();
+      syncing = true;
+      ascii.value = rowsNow().join("\n");
+      syncing = false;
+      if (tell) changed();
+    }
+    function commit(before) {
+      past.push(toGrid(before, before[0] ? before[0].length : cols));
+      if (past.length > HISTORY_MAX) past.shift();
+      future.length = 0;
+    }
+    function changed() {
+      if (typeof s.onChange !== "function") return;
+      try {
+        s.onChange(rowsNow());
+      } catch (err) {
+        console.warn("[aimeat-phaser] a levelEditor onChange listener threw:", err);
+      }
+    }
+    function onText() {
+      if (syncing || readOnly) return;
+      grid = toGrid(ascii.value.split("\n"));
+      relayout();
+      changed();
+    }
+    function asJs() {
+      const quoted = rowsNow().map(function(row) {
+        return "  '" + row.replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'";
+      });
+      return "[\n" + quoted.join(",\n") + "\n]";
+    }
+    function say(words) {
+      status.textContent = words;
+    }
+    function copyAsJs() {
+      const clip = navigator.clipboard;
+      if (!clip || typeof clip.writeText !== "function") {
+        say("This browser keeps the clipboard closed. The rows are in the text box below.");
+        return;
+      }
+      clip.writeText(asJs()).then(function() {
+        say("Copied. Paste it straight into a source file.");
+      }, function(err) {
+        console.warn("[aimeat-phaser] the clipboard refused the level:", err);
+        say("The clipboard refused. The rows are in the text box below.");
+      });
+    }
+    async function refreshLevels() {
+      try {
+        if (useSaves) {
+          if (typeof store.load === "function") await store.load();
+          const state = store.get();
+          levels = Array.isArray(state && state.levelSet) ? state.levelSet : [];
+        } else {
+          const list = typeof store.load === "function" ? await store.load() : [];
+          levels = Array.isArray(list) ? list : [];
+        }
+      } catch (err) {
+        console.warn("[aimeat-phaser] the saved levels could not be read:", err);
+        say("The saved levels could not be read.");
+        return;
+      }
+      if (!gone) fillPicker();
+    }
+    async function writeLevels(done) {
+      try {
+        if (useSaves) {
+          store.set({ levelSet: levels });
+          await store.save();
+        } else if (typeof store.save === "function") await store.save(levels);
+      } catch (err) {
+        console.warn("[aimeat-phaser] the levels could not be written:", err);
+        say("The levels could not be written to the store.");
+        return;
+      }
+      fillPicker();
+      say(done);
+    }
+    function fillPicker() {
+      clear(picker);
+      picker.appendChild(el("option", { value: "", text: levels.length ? "Pick a level" : "Nothing saved yet" }));
+      for (const level of levels) {
+        picker.appendChild(el("option", { value: level.id, text: level.name || level.id }));
+      }
+      picker.value = currentId;
+    }
+    function picked() {
+      const wanted = picker.value;
+      return levels.filter(function(level) {
+        return level.id === wanted;
+      })[0] || null;
+    }
+    async function saveLevel() {
+      const name = nameInput.value.trim() || "Untitled level";
+      const found = levels.filter(function(level) {
+        return level.id === currentId;
+      })[0];
+      const record = found || { id: uid("level"), name, rows: [], updated: "" };
+      record.name = name;
+      record.rows = rowsNow();
+      record.updated = (/* @__PURE__ */ new Date()).toISOString();
+      if (!found) levels.push(record);
+      currentId = record.id;
+      await writeLevels('Saved as "' + name + '".');
+    }
+    function loadLevel() {
+      const found = picked();
+      if (!found) {
+        say("Pick a level first.");
+        return;
+      }
+      currentId = found.id;
+      nameInput.value = found.name || "";
+      commit(rowsNow());
+      adopt(toGrid(found.rows || []), true);
+      say('Opened "' + (found.name || found.id) + '".');
+    }
+    function newLevel() {
+      currentId = "";
+      nameInput.value = "";
+      picker.value = "";
+      api.clear();
+      say("A fresh map. Save it to give it a name.");
+    }
+    async function deleteLevel() {
+      const found = picked();
+      if (!found) {
+        say("Pick a level first.");
+        return;
+      }
+      levels = levels.filter(function(level) {
+        return level.id !== found.id;
+      });
+      if (currentId === found.id) currentId = "";
+      await writeLevels('Deleted "' + (found.name || found.id) + '".');
+    }
+    const redraw = function() {
+      paintAll();
+    };
+    const invalidate = function() {
+      paint = null;
+      paintAll();
+    };
+    const onTextFocus = function() {
+      textBefore = rowsNow();
+    };
+    const onTextChange = function() {
+      if (textBefore) {
+        commit(textBefore);
+        textBefore = null;
+      }
+    };
+    const scheme = typeof matchMedia === "function" ? matchMedia("(prefers-color-scheme: dark)") : null;
+    const bound = (
+      /** @type {Array<[HTMLElement, string, any]>} */
+      [
+        [canvas, "pointerdown", onDown],
+        [canvas, "pointermove", onMove],
+        [canvas, "pointerup", onUp],
+        [canvas, "pointercancel", onUp],
+        [canvas, "keydown", onKey],
+        [canvas, "focus", redraw],
+        [canvas, "blur", redraw],
+        [ascii, "input", onText],
+        [ascii, "focus", onTextFocus],
+        [ascii, "change", onTextChange]
+      ]
+    );
+    for (const [node, type, fn] of bound) node.addEventListener(type, fn);
+    if (scheme) scheme.addEventListener("change", invalidate);
+    const api = {
+      el: root,
+      /** The map as it stands, one string per row. @returns {string[]} */
+      rows() {
+        return rowsNow();
+      },
+      /** Put a map in the editor. It goes on the undo stack, so a person can come back from it, and
+       *  it is NOT reported through onChange: the app asked for it and already knows.
+       *  @param {string[]} next @returns {void} */
+      set(next) {
+        commit(rowsNow());
+        adopt(toGrid(Array.isArray(next) && next.length ? next : blankMap(cols, rowCount, legend)), false);
+      },
+      /** Pick the mark the grid paints; one this editor does not offer leaves the tool where it was.
+       *  @param {string} char @returns {string} the mark now in hand */
+      tool(char) {
+        const wanted = String(char);
+        if (toolMarks.filter(function(m) {
+          return m.char === wanted;
+        }).length) toolChar = wanted;
+        for (let i = 0; i < toolButtons.length; i += 1) {
+          toolButtons[i].setAttribute("aria-pressed", String(toolMarks[i].char === toolChar));
+        }
+        return toolChar;
+      },
+      /** Back one state. @returns {void} */
+      undo() {
+        const previous = past.pop();
+        if (!previous) {
+          say("Nothing to undo.");
+          return;
+        }
+        future.push(toGrid(rowsNow(), cols));
+        adopt(previous, true);
+      },
+      /** Forward one state. @returns {void} */
+      redo() {
+        const next = future.pop();
+        if (!next) {
+          say("Nothing to redo.");
+          return;
+        }
+        past.push(toGrid(rowsNow(), cols));
+        adopt(next, true);
+      },
+      /** An empty map of the same size, with its floor back. @returns {void} */
+      clear() {
+        commit(rowsNow());
+        adopt(toGrid(blankMap(cols, rowCount, legend)), true);
+      },
+      /** Change the map's size: cells outside it are dropped, new ones start empty.
+       *  @param {number} nextCols @param {number} nextRows @returns {void} */
+      resize(nextCols, nextRows) {
+        const wide = clamp(nextCols, MIN_SIZE, MAX_SIZE, cols);
+        const tall = clamp(nextRows, MIN_SIZE, MAX_SIZE, rowCount);
+        if (wide === cols && tall === rowCount) return;
+        commit(rowsNow());
+        const lines = rowsNow().slice(0, tall);
+        while (lines.length < tall) lines.push("");
+        adopt(toGrid(lines, wide), true);
+      },
+      destroy() {
+        if (gone) return;
+        gone = true;
+        for (const [node, type, fn] of bound) node.removeEventListener(type, fn);
+        if (scheme) scheme.removeEventListener("change", invalidate);
+        past.length = 0;
+        future.length = 0;
+        swatches.length = 0;
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+    build();
+    api.tool(toolChar);
+    adopt(grid, false);
+    if (store) void refreshLevels();
+    return api;
+  }
+
   // src/static/sdk-libs/phaser/save.js
   var GUEST_PREFIX = "ak.phaser.";
   var DEBOUNCE_MS = 300;
@@ -1301,7 +3188,11 @@
     return {
       name: state.profile.name || "",
       best: num(state.best),
-      level: state.level != null ? state.level : null,
+      // The level a board row shows: the app's own `state.level` when it keeps one, else how many
+      // levels this player has unlocked, which the library does maintain.
+      level: state.level != null ? state.level : Object.keys(state.levels || {}).filter(function(k) {
+        return state.levels[k] && state.levels[k].unlocked;
+      }).length,
       updated: (/* @__PURE__ */ new Date()).toISOString()
     };
   }
@@ -2211,30 +4102,6 @@
     return box;
   }
 
-  // src/static/sdk-libs/phaser/tokens.js
-  var OVERLAY_DEPTH = 1e6;
-  var FALLBACK_EASE = "Cubic.easeOut";
-  function look(scene) {
-    const canvas = scene && scene.game ? scene.game.canvas : null;
-    return theme(canvas ? canvas.parentElement : null);
-  }
-  function channels(value) {
-    const n = typeof value === "number" && isFinite(value) ? value : 0;
-    return { r: n >> 16 & 255, g: n >> 8 & 255, b: n & 255 };
-  }
-  function ms(value, fallback) {
-    if (typeof value === "number" && isFinite(value)) return value;
-    if (typeof value === "string") {
-      const n = parseFloat(value);
-      if (isFinite(n)) return /\ds\s*$/.test(value) && !/ms\s*$/.test(value) ? n * 1e3 : n;
-    }
-    return fallback;
-  }
-  function curve(th) {
-    const e = th && th.ease;
-    return typeof e === "string" && e.indexOf("(") < 0 && e.indexOf(",") < 0 ? e : FALLBACK_EASE;
-  }
-
   // src/static/sdk-libs/phaser/transitions.js
   function transition(scene, toKey, opts) {
     const o = opts || {};
@@ -2874,7 +4741,7 @@
   }
 
   // src/static/sdk-libs/phaser/level.js
-  var DEFAULT_LEGEND = {
+  var DEFAULT_LEGEND2 = {
     "#": "ground",
     "=": "brick",
     "^": "spike",
@@ -2906,7 +4773,7 @@
   var ENEMY_SHARE = 0.42;
   function parseMap(rows, legend) {
     const lines = Array.isArray(rows) ? rows : [];
-    const marks = Object.assign({}, DEFAULT_LEGEND, legend || {});
+    const marks = Object.assign({}, DEFAULT_LEGEND2, legend || {});
     const tiles2 = [];
     const coins = [];
     const enemies = [];
@@ -3170,11 +5037,9 @@
         scene.events.off("shutdown", api.destroy);
         for (const key in handlers) handlers[key].length = 0;
         scene.tweens.killTweensOf(player);
-        coins.clear(true, true);
-        spikes.clear(true, true);
-        goal.clear(true, true);
-        enemies.clear(true, true);
-        ground.clear(true, true);
+        [coins, spikes, goal, enemies, ground].forEach(function(group) {
+          if (group && group.children) group.clear(true, true);
+        });
         player.destroy();
       }
     };
@@ -3224,9 +5089,10 @@
     pause: "Pause"
   };
   var DEFAULTS = {
-    master: 0.8,
+    // The same three the audio bus starts from (audio.js), so Reset lands where a fresh bus does.
+    master: 1,
     music: 0.6,
-    sfx: 0.8,
+    sfx: 1,
     muted: false,
     touch: false,
     keys: {
@@ -3490,6 +5356,8 @@
       clear(root);
       readers.length = 0;
       touchOn = !!stored().touch;
+      if (s.controls && typeof s.controls.showTouch === "function" && stored().touch != null) s.controls.showTouch(touchOn);
+      if (stored().motion === "less" && !readLessMotion()) writeLessMotion(true);
       for (const name of sections) {
         if (name === "audio") {
           const body = block(root, "Sound");
@@ -3576,17 +5444,24 @@
      * The library version. It MUST match the newest entry in /lib/aimeat-phaser.css's version
      * history; e2e-libs.ts fails when the two drift.
      */
-    version: "1.0.0",
+    version: "1.1.0",
     // ── Boot and the look ──
     ensurePhaser,
     theme,
     game,
-    // ── Assets ──
+    // ── Assets (a pack by hand, or an aimeat-assets library through fromLibrary) ──
     pack,
     preloadPack,
+    fromLibrary,
     textures,
     // ── Sound ──
     audio,
+    // ── Feel, players together, phones ──
+    juice,
+    net,
+    mobile,
+    // ── The level editor (DOM), writing rows the platformer plays ──
+    levelEditor,
     // ── Saves, controls, HUD ──
     saves,
     controls,

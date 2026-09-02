@@ -9,6 +9,7 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.26.0 -- 2026-09-02 -- Add e2e-app-playtest.ts: the game playtest bench through the audit door.
  *   v1.25.0 -- 2026-08-29 -- Add e2e-app-rows.ts: an app on an organism row space, the two-hand rule.
  *   v1.24.0 -- 2026-08-29 -- Add e2e-app-legal.ts: the app's own legal pages and its audit log.
  *   v1.23.0 -- 2026-08-29 -- Add e2e-app-marks.ts: the badge and install switches and the named reviewer.
@@ -131,6 +132,7 @@ const ALL_SUITES = [
     'test/e2e-app-draft-edit.ts',
     'test/e2e-app-screenshot-capture.ts',
     'test/e2e-app-publish-gate.ts',
+    'test/e2e-app-playtest.ts',
     'test/e2e-app-ui.ts',
     'test/e2e-designbook.ts',
     'test/e2e-app-fork.ts',

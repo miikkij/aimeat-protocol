@@ -11,6 +11,9 @@
  * @structure appSettingsTools: ConnectCliToolDefinition[]
  * @usage import { appSettingsTools } from './tool-call-defs-apps-settings.js';
  * @version-history
+ *   v1.2.0 -- 2026-09-02 -- aimeat_app_audit forwards `playtest`, so a fleet agent on this door can
+ *     have the node open its app in a headless browser. The third surface gets the parameter in the
+ *     same change as the other two, which is the whole point of this file existing.
  *   v1.1.0 -- 2026-08-29 -- aimeat_app_legal_set forwards ai_provenance / ai_provenance_id in the PATCH body.
  *   v1.0.0 -- 2026-08-29 -- Extracted from tool-call-defs-apps.ts (max-file-lines), no behaviour change.
  */
@@ -104,16 +107,21 @@ export const appSettingsTools: ConnectCliToolDefinition[] = [
         },
     },
     {
-        // → GET /v1/apps/me/:filename/audit — the owner's audit log of the app's settings.
+        // → GET /v1/apps/me/:filename/audit — the owner's audit log of the app's settings, and on
+        // request the app opened for real in the node's headless browser.
         name: 'aimeat_app_audit',
-        description: 'Read one of your apps\' audit log: every change to how the app is offered, newest first, with who made it and when.',
+        description: 'Read one of your apps\' audit log: every change to how the app is offered, newest first, with who made it and when. With playtest, also open the app for real and report what it did.',
         input: {
             filename: { type: 'string', required: true, description: 'The app, with its extension.' },
             limit: { type: 'number', description: 'How many of the newest entries to return. Default 50, at most 500.' },
+            playtest: { type: 'boolean', description: 'Also open the app in a headless browser and report what it did. Slow (about a minute).' },
         },
         handler: ({ client }, input) => {
             const limit = Math.min(500, Math.max(1, Number(input.limit ?? 50) || 50));
-            return client.get(`/v1/apps/me/${encodeURIComponent(requiredString(input, 'filename'))}/audit?limit=${limit}`);
+            // The flag travels to the node, which owns the browser. A door that read it and did
+            // nothing with it would be the silent drop this dispatch exists to refuse.
+            const playtest = optionalBoolean(input, 'playtest') ? '&playtest=true' : '';
+            return client.get(`/v1/apps/me/${encodeURIComponent(requiredString(input, 'filename'))}/audit?limit=${limit}${playtest}`);
         },
     },
     {

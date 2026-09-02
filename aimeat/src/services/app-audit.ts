@@ -29,11 +29,15 @@
  * @structure
  *   - recordAppAudit(storage, args) — append one entry
  *   - readAppAudit(storage, ownerGhii, filename) — the entries, newest last
- *   - ownerAppAudit(storage, config, { callerGaii, filename, limit }) — the agent-shaped read
+ *   - ownerAppAudit(storage, config, { callerGaii, filename, limit, playtest }) — the agent-shaped
+ *     read, and on request the live run of the app beside it
  *   - AppAuditAction — the vocabulary
  * @usage
  *   await recordAppAudit(storage, { ownerGhii, filename, by: actorGhii, action: 'legal.set', detail: { kind: 'terms' } });
  * @version-history
+ *   v1.1.0 — 2026-09-02 — `playtest` on the read: the same door also opens the app in a headless
+ *     browser and answers with what it saw (services/app-playtest.ts). The log is unchanged by it,
+ *     because looking at an app is not a change to how it is offered.
  *   v1.0.0 — 2026-08-29 — Initial.
  */
 import type { AimeatConfig } from '../config.js';
@@ -41,6 +45,7 @@ import type { Storage } from '../storage/interface.js';
 import type { MemoryRecord } from '../storage/types/commerce.js';
 import { logger } from '../utils/logger.js';
 import { resolveAppOwnerScope } from './app-lifecycle.js';
+import { auditAppWithPlaytest, type AppPlaytestBundle } from './app-playtest.js';
 
 export const APP_AUDIT_SPEC = 'aimeat.app-audit/v1';
 export const APP_AUDIT_MAX = 500;
@@ -102,19 +107,28 @@ export async function readAppAudit(storage: Storage, ownerGhii: string, filename
  * The agent-shaped read: the caller's own identity and an app name, the newest `limit` entries
  * newest first. The lookup and the refusals live here so the MCP door renders what comes back and
  * touches no storage of its own.
+ *
+ * With `playtest`, the same call also OPENS the app: the publish-time check on its bytes, then the
+ * live run in a headless browser (services/app-playtest.ts). It is one door on purpose — "what do
+ * we know about this app" is one question, and an agent that has to find a second tool to ask the
+ * live half of it asks neither. The run is read-only: nothing about the app changes, and no entry
+ * is added to the log, because a playtest is not a change to how the app is offered.
  */
 export async function ownerAppAudit(
   storage: Storage,
   config: AimeatConfig,
-  args: { callerGaii: string; filename: string; limit?: number },
-): Promise<{ total: number; entries: AppAuditEntry[] } | { error: string }> {
+  args: { callerGaii: string; filename: string; limit?: number; playtest?: boolean },
+): Promise<{ total: number; entries: AppAuditEntry[]; live?: AppPlaytestBundle } | { error: string }> {
   const scope = await resolveAppOwnerScope(storage, config, args.callerGaii);
   if (!scope) return { error: 'This connection is not acting for an owner, so it has no app to read the log of.' };
   const app = await storage.getApp(scope.ownerGhii, args.filename);
   if (!app) return { error: `No app named "${args.filename}" in your catalogue.` };
   const all = await readAppAudit(storage, scope.ownerGhii, args.filename);
   const limit = Math.min(APP_AUDIT_MAX, Math.max(1, Math.floor(args.limit ?? 50)));
-  return { total: all.length, entries: all.slice(Math.max(0, all.length - limit)).reverse() };
+  const entries = all.slice(Math.max(0, all.length - limit)).reverse();
+  if (!args.playtest) return { total: all.length, entries };
+  const live = await auditAppWithPlaytest(storage, config, { ownerName: scope.ownerName, filename: args.filename });
+  return live ? { total: all.length, entries, live } : { total: all.length, entries };
 }
 
 export async function recordAppAudit(

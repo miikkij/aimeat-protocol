@@ -12,6 +12,7 @@
  *   import { registerAtelierPrompt } from './prompts-atelier.js';
  *   registerAtelierPrompt(router, config);   // BEFORE /v1/prompts/:tier
  * @version-history
+ *   v1.1.0 — 2026-09-02 — The game shell is a link beside the Atelier shell.
  *   v1.0.0 — 2026-08-27 — Initial (TARGET-074).
  */
 import type { Router } from 'express';
@@ -47,6 +48,7 @@ export function registerAtelierPrompt(router: Router, config: AimeatConfig): voi
       spec_token: buildAtelierSpecToken(config),
     }, [
       { description: 'The Atelier shell (start from it, never invent structure)', method: 'GET', url: '/v1/app-templates/shell-atelier' },
+      { description: 'The game shell: the same frame with a Phaser canvas, menus, settings and a leaderboard wired', method: 'GET', url: '/v1/app-templates/shell-phaser-game' },
       { description: 'Publish the finished app (pass spec_token)', method: 'POST', url: '/v1/apps' },
     ]));
   });
