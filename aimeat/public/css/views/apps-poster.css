@@ -1,0 +1,100 @@
+/**
+ * @file apps-poster.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The Apps page in the poster face (ap- prefix; design canvas "AIMEAT Sovellukset-
+ *   sivu", direction A). The shared parts come from organism.css's og- rules; this file carries
+ *   what the page adds: the rows of what waits (a draft, an app acting in the owner's name) with
+ *   the panel that opens under one, the condition rows with their big numbers, the list of the
+ *   apps that changed last, the agents-and-skills facts, the form for a finished file.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-02 — Initial.
+ */
+
+.og-apps .og-chip--coral { border-color: var(--accent); color: var(--accent); }
+.og-apps .og-empty { margin: 0; font-size: .9rem; color: var(--text-dim); }
+.og-apps .og-doors > a { text-decoration: none; }
+.og-apps .og-door:disabled { opacity: .5; cursor: default; }
+.og-apps .og-mast-actions .og-slab { text-decoration: none; }
+.ap-hint { margin: .7rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--text-dim); }
+.ap-empty { margin: 0; padding: .3rem 0 .6rem; font-size: .95rem; line-height: 1.55; font-weight: 600; color: var(--text-dim); }
+.ap-empty b { color: var(--text); font-weight: 800; }
+.ap-doors { margin-top: .9rem; }
+.ap-doors--top { margin-top: 0; }
+
+/* ── What waits: a draft, an app acting in your name ───────────────────────────────────────── */
+.ap-rows { display: flex; flex-direction: column; }
+.ap-row { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1.2rem; padding: .75rem 0; border-bottom: 1px solid var(--border); }
+.ap-row-main { flex: 1 1 18rem; min-width: 0; }
+.ap-row-main b { display: block; font-size: .95rem; font-weight: 800; color: var(--text); }
+.ap-row-main small { display: block; margin-top: .15rem; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); overflow-wrap: anywhere; }
+.ap-row-ctl { display: flex; align-items: center; gap: .9rem; flex-wrap: wrap; }
+.ap-panel { flex: 1 1 100%; margin-top: .4rem; padding: .8rem 1rem; border: 3px dashed var(--accent); background: var(--card-bg); }
+.ap-panel-lead { margin: 0 0 .5rem; font-size: .9rem; line-height: 1.55; color: var(--text); }
+.ap-panel .og-label { display: block; margin: .6rem 0 .3rem; }
+.ap-code { margin: 0; padding: .6rem .8rem; border: 2px solid var(--text); background: var(--bg-dim); font-family: var(--font-mono); font-size: .72rem; line-height: 1.5; color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 16rem; overflow: auto; }
+.ap-code--add { border-left: 6px solid var(--success-fg); }
+.ap-code--del { border-left: 6px solid var(--accent); }
+.ap-scopes { display: flex; flex-wrap: wrap; gap: .4rem; }
+.ap-scopes span { font-family: var(--font-mono); font-size: .72rem; padding: .15rem .5rem; border: 1px solid var(--text); background: var(--card-bg); color: var(--text); }
+
+/* ── The condition rows ────────────────────────────────────────────────────────────────────── */
+.ap-kn { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr) auto; gap: 0 1rem; align-items: stretch; }
+.ap-kn > div { padding: .75rem 0; border-bottom: 1px solid var(--border); min-width: 0; display: grid; align-content: center; }
+.ap-kn-n { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.9rem; line-height: 1; letter-spacing: .01em; color: var(--text); }
+.ap-kn-n--loud { color: var(--accent); }
+.ap-kn-w b { font-size: .95rem; font-weight: 800; color: var(--text); }
+.ap-kn-w small { display: block; margin-top: .2rem; font-size: .82rem; line-height: 1.45; color: var(--text-dim); }
+.ap-kn-go { justify-items: end; }
+.ap-kn-go .og-door { font-size: .72rem; white-space: nowrap; text-decoration: none; }
+
+/* ── The apps that changed last ────────────────────────────────────────────────────────────── */
+.ap-list { display: grid; grid-template-columns: 2.2rem minmax(0, 1.1fr) minmax(0, 1.3fr) minmax(6rem, .8fr) 3.5rem auto; gap: 0 .9rem; align-items: stretch; }
+.ap-list > div { padding: .7rem 0; border-bottom: 1px solid var(--border); min-width: 0; display: grid; align-content: center; }
+.ap-list > .ap-head { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.ap-list > .ap-head--r { text-align: right; }
+.ap-list > .ap-av { width: 2.2rem; height: 2.2rem; padding: 0; box-sizing: border-box; display: flex; align-items: center; justify-content: center; align-self: center; border: 2px solid var(--text); font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: .85rem; color: var(--text); }
+.ap-nm { font-weight: 800; font-size: .95rem; color: var(--text); }
+.ap-nm small { display: block; font-family: var(--font-mono); font-size: .7rem; font-weight: 400; color: var(--text-dim); margin-top: .1rem; overflow-wrap: anywhere; }
+/* Both override the grid the row cells share: the description clamps to three lines, the doors sit side by side. */
+.ap-list > .ap-ds { font-size: .82rem; line-height: 1.45; color: var(--text-dim); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; align-self: center; }
+.ap-st { font-family: var(--font-mono); font-size: .72rem; line-height: 1.4; color: var(--text-dim); }
+.ap-op { font-weight: 800; font-size: .95rem; text-align: right; white-space: nowrap; color: var(--text); }
+.ap-list > .ap-go { display: flex; gap: .9rem; align-items: center; justify-content: flex-end; white-space: nowrap; }
+.ap-go .og-door { font-size: .72rem; text-decoration: none; }
+
+/* ── Agents and skills ─────────────────────────────────────────────────────────────────────── */
+.ap-kv { display: grid; grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr); gap: .8rem 1.2rem; align-items: start; }
+.ap-k { font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); padding-top: .25rem; }
+.ap-v { font-size: .95rem; line-height: 1.5; color: var(--text); min-width: 0; }
+.ap-v small { display: block; margin-top: .15rem; font-size: .82rem; line-height: 1.45; color: var(--text-dim); }
+.ap-skl { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .5rem; }
+.ap-skl span { font-family: var(--font-mono); font-size: .72rem; padding: .15rem .5rem; border: 1px solid var(--text); background: var(--card-bg); color: var(--text); }
+.ap-json { font-family: var(--font-mono); font-size: .76rem; line-height: 1.5; width: 100%; box-sizing: border-box; margin-top: .6rem; }
+
+/* ── The finished file ─────────────────────────────────────────────────────────────────────── */
+.ap-form-label { display: block; margin-top: 1.4rem; }
+.ap-form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1rem 1.8rem; margin-top: .6rem; align-items: end; }
+.ap-field { display: block; min-width: 0; }
+.ap-field .og-label { display: block; margin-bottom: .3rem; }
+.ap-field .og-input { width: 100%; box-sizing: border-box; }
+.ap-field--wide { grid-column: 1 / -1; }
+.ap-field--send { display: flex; justify-content: flex-end; align-items: end; }
+.ap-file { padding: .4rem 0; font-size: .85rem; }
+
+/* ── Phone ─────────────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 860px) {
+  .ap-kn { grid-template-columns: 3.6rem minmax(0, 1fr); }
+  .ap-kn-n { font-size: 1.5rem; }
+  .ap-kn-go { grid-column: 2; justify-items: start; padding-top: 0; }
+  .ap-list { grid-template-columns: 2.2rem minmax(0, 1fr); }
+  .ap-list > .ap-head { display: none; }
+  .ap-list > .ap-ds, .ap-list > .ap-st, .ap-list > .ap-op { display: none; }
+  .ap-list > .ap-nm { border-bottom: 0; padding-bottom: .2rem; }
+  .ap-list > .ap-go { grid-column: 2; justify-content: flex-start; padding-top: 0; }
+  .ap-kv { grid-template-columns: 1fr; gap: .3rem 0; }
+  .ap-k { padding-top: .6rem; }
+  .ap-form { grid-template-columns: 1fr; }
+  .ap-field--send { justify-content: flex-start; }
+}
