@@ -5,6 +5,9 @@
  *   plus the /v1/libs catalogue and the generated JS sources themselves.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=libs
  * @version-history
+ *   v1.10.0 — 2026-09-03 — aimeat-phaser wave two: the twenty-three new exports asserted (fx,
+ *     parallax, dayNight, sprites, world map, tile world, status, achievements, dialogue,
+ *     chiptune, designers, boss, brain).
  *   v1.9.1 — 2026-09-02 — The assets version check reads a three-part version: the atlas packer's
  *     TexturePacker format field (version "1.0") sits earlier in the bundle.
  *   v1.9.0 — 2026-09-02 — aimeat-assets.js coverage: every part exported, the self-describing
@@ -954,6 +957,11 @@ await test('GET /v1/libs/aimeat-phaser.js — serves the Phaser 4 base with ever
         'saves', 'controls', 'hud', 'toast', 'menuItems', 'titleScene', 'pauseMenu', 'transition',
         'platformer', 'parseMap', 'settingsPanel',
         'juice', 'net', 'mobile', 'fromLibrary', 'levelEditor',
+        // Wave two (wish-phaser-fx-sprites-parallax-worldmap)
+        'fx', 'parallax', 'dayNight', 'spriteSheet', 'animations', 'actor', 'spriteFromLibrary',
+        'worldMap', 'worldMapScene', 'tileWorld', 'minimap', 'status', 'achievements', 'trophyRoom',
+        'dialogue', 'cutscene', 'chiptune', 'fxDesigner', 'parallaxDesigner', 'boss', 'brain',
+        'behaviours', 'pathfind',
     ]) {
         assert(text.includes(part), `should export ${part}`);
     }

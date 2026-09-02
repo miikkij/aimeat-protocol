@@ -31,6 +31,12 @@
  *   const P = AIMEAT.phaser;
  *   const h = await P.game({ parent: '#stage', scale: 'fit', fullscreen: 'button', scenes: [play] });
  * @version-history
+ *   v1.2.0 — 2026-09-02 — Wave two (wish-phaser-fx-sprites-parallax-worldmap): fx (particle presets
+ *     on the theme: weather, bursts, followers), parallax (generated layer stacks, presets, time
+ *     of day; the platformer's backdrop takes them), sprites (generated animated sheets,
+ *     animations from real strips, the actor with its state machine, sprites from an
+ *     aimeat-assets library), worldMap and worldMapScene (the overworld: nodes, paths, walker,
+ *     locks, stars, fog).
  *   v1.1.0 — 2026-09-02 — The game programme (wish-aimeat-assets-and-game-programme): juice (shake,
  *     hit-stop, flash, bursts, numbers, combo, slowmo, pop, trail), net (players together over
  *     the realtime pack: inputs and state deltas, host by lowest id), mobile (orientation prompt,
@@ -43,10 +49,24 @@ import { attach } from '../_core/namespace.js';
 import { ensurePhaser, theme, game } from './boot.js';
 import { pack, preloadPack, fromLibrary, textures } from './assets.js';
 import { audio } from './audio.js';
+import { chiptune } from './chiptune.js';
 import { juice } from './juice.js';
 import { net } from './net.js';
 import { mobile } from './mobile.js';
 import { levelEditor } from './editor.js';
+import { fx } from './fx.js';
+import { parallax } from './parallax.js';
+import { dayNight } from './daynight.js';
+import { spriteSheet, animations, actor, spriteFromLibrary } from './sprites.js';
+import { worldMap, worldMapScene } from './worldmap.js';
+import { tileWorld, minimap } from './tileworld.js';
+import { status } from './status.js';
+import { achievements, trophyRoom } from './achievements.js';
+import { dialogue } from './dialogue.js';
+import { cutscene } from './cutscene.js';
+import { fxDesigner, parallaxDesigner } from './designer.js';
+import { boss } from './boss.js';
+import { brain, behaviours, pathfind } from './ai.js';
 import { saves } from './save.js';
 import { controls } from './controls.js';
 import { hud, toast } from './hud.js';
@@ -59,7 +79,7 @@ const phaser = {
    * The library version. It MUST match the newest entry in /lib/aimeat-phaser.css's version
    * history; e2e-libs.ts fails when the two drift.
    */
-  version: '1.1.0',
+  version: '1.2.0',
 
   // ── Boot and the look ──
   ensurePhaser, theme, game,
@@ -67,14 +87,24 @@ const phaser = {
   // ── Assets (a pack by hand, or an aimeat-assets library through fromLibrary) ──
   pack, preloadPack, fromLibrary, textures,
 
-  // ── Sound ──
-  audio,
+  // ── Sound: the bus, and a tune generated on it ──
+  audio, chiptune,
 
   // ── Feel, players together, phones ──
   juice, net, mobile,
 
-  // ── The level editor (DOM), writing rows the platformer plays ──
-  levelEditor,
+  // ── The DOM panels: the level editor, and the two designers that tune fx and parallax live ──
+  levelEditor, fxDesigner, parallaxDesigner,
+
+  // ── Effects, backdrops, sprites and the overworld ──
+  fx, parallax, dayNight, spriteSheet, animations, actor, spriteFromLibrary, worldMap, worldMapScene,
+  tileWorld, minimap,
+
+  // ── The player's status, trophies, talk ──
+  status, achievements, trophyRoom, dialogue, cutscene,
+
+  // ── Enemies that think, and the boss fight ──
+  brain, behaviours, pathfind, boss,
 
   // ── Saves, controls, HUD ──
   saves, controls, hud, toast,

@@ -1,0 +1,331 @@
+/*
+ * @file aimeat-phaser/designer.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The two designer panels fxDesigner() and parallaxDesigner() draw beside a game
+ *   canvas: the preset picker, the sliders with their read-outs, the layer rows, the button bar,
+ *   the status line and the code box.
+ *
+ *   ONE COLUMN AT 360 PX, TWO WHEN THE PANEL IS WIDER. The grid asks the panel's own width with a
+ *   container query, not the window's, because a designer sits in a side column and the window
+ *   says nothing about how much room that column has.
+ *
+ *   TWO JOBS, AND THE SECOND ONE STANDS DOWN. The panel's own layout (.ak-designer__*) is always
+ *   this file's. The kit's classes it also writes (.ak-btn, .ak-input, .ak-toggle,
+ *   .ak-form__label) are dressed here ONLY as a floor, inside @layer akp-fallback: an unlayered
+ *   rule beats a layered one whatever its specificity, so the moment a page loads
+ *   aimeat-atelier.css the kit takes every one of them back.
+ *
+ *   NO COLOUR IS DECLARED HERE. Every value is the Atelier token, falling through to the AIMEAT
+ *   theme token that means the same thing and finally to a CSS system colour, so the panel reads
+ *   on a page with the kit, on a page with only the theme, and on a page with neither.
+ *
+ *   NOTHING MOVES. No transition and no animation anywhere in this file, so the less-motion
+ *   switch has nothing to do here and an idle panel repaints zero times.
+ * @structure the --akd-* value chain · the head and the grid · the controls · the layer rows ·
+ *   the bar, the status line and the code box · @layer akp-fallback (the kitless floor)
+ * @usage  <link rel="stylesheet" href="/lib/aimeat-phaser.css">   (it imports this file)
+ * @version-history
+ *   v1.0.0 — 2026-09-02 — Initial: the clothes of fxDesigner and parallaxDesigner.
+ */
+
+/* The value chain. Atelier first, the AIMEAT theme next, the browser's own system colours last:
+   system keywords follow light and dark on their own, so the floor is never the wrong mode. */
+.ak-designer {
+  --akd-surface: var(--ak-surface, var(--color-base-200, Canvas));
+  --akd-surface-2: var(--ak-surface-2, var(--color-base-100, Canvas));
+  --akd-ink: var(--ak-ink, var(--color-base-content, CanvasText));
+  --akd-ink-dim: var(--ak-ink-dim, GrayText);
+  --akd-line: var(--ak-line, var(--color-base-300, GrayText));
+  --akd-accent: var(--ak-accent, var(--color-primary, AccentColor));
+  --akd-radius: var(--ak-radius, var(--radius-box, 14px));
+  --akd-radius-sm: var(--ak-radius-sm, var(--radius-field, 9px));
+  --akd-gap: var(--ak-gap, var(--gap-card, 14px));
+  --akd-pad: var(--ak-pad, 16px);
+  --akd-touch: var(--ak-touch, 44px);
+  --akd-font: var(--ak-font, var(--font-body, ui-sans-serif, system-ui, sans-serif));
+  --akd-font-mono: var(--ak-font-mono, var(--font-mono, ui-monospace, monospace));
+  --akd-fine: var(--ak-text-fine, var(--text-fine, 0.8125rem));
+
+  container-type: inline-size;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--akd-gap);
+  font-family: var(--akd-font);
+  color: var(--akd-ink);
+  min-width: 0;
+}
+
+/* ── The head and the grid ──────────────────────────────────────────────────────────────────── */
+.ak-designer__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--akd-gap);
+}
+
+.ak-designer__head .ak-designer__field { flex: 1 1 12rem; min-width: 0; }
+
+.ak-designer__caption {
+  margin: 0 0 calc(var(--akd-touch) / 4);
+  font-size: var(--akd-fine);
+  color: var(--akd-ink-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* One column fits 360 px; the panel's own width, not the window's, decides when there are two. */
+.ak-designer__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: calc(var(--akd-gap) / 2) var(--akd-gap);
+  min-width: 0;
+}
+
+@container (min-width: 34rem) {
+  .ak-designer__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ak-designer__grid--layer { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* ── The controls ───────────────────────────────────────────────────────────────────────────── */
+.ak-designer__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ak-designer__field--inline {
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: calc(var(--akd-gap) / 2);
+  min-height: var(--akd-touch);
+}
+
+/* A pair is a fieldset with its own legend; the browser's fieldset box is taken off. */
+.ak-designer__pair {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-inline-size: 0;
+}
+
+.ak-designer__pair legend {
+  padding: 0;
+  margin-bottom: 4px;
+}
+
+.ak-designer__half { min-width: 0; }
+
+.ak-designer__control {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--akd-gap) / 2);
+  min-height: var(--akd-touch);
+  min-width: 0;
+}
+
+/* The slider itself. accent-color is the whole styling job on a modern browser, and it takes a
+   custom property, so the look's accent reaches the thumb and the filled track at once. */
+.ak-designer__range {
+  flex: 1 1 auto;
+  min-width: 0;
+  accent-color: var(--akd-accent);
+  height: var(--akd-touch);
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.ak-designer__value {
+  font-family: var(--akd-font-mono);
+  font-size: var(--akd-fine);
+  color: var(--akd-ink-dim);
+  min-width: 6ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ak-designer__select {
+  width: 100%;
+  min-height: var(--akd-touch);
+}
+
+.ak-designer__number {
+  flex: 1 1 6rem;
+  min-width: 0;
+  min-height: var(--akd-touch);
+  font-family: var(--akd-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── The layer rows ─────────────────────────────────────────────────────────────────────────── */
+.ak-designer__layers {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--akd-gap) / 2);
+  min-width: 0;
+}
+
+.ak-designer__layer {
+  background: var(--akd-surface);
+  border: 1px solid var(--akd-line);
+  border-radius: var(--akd-radius);
+  padding: calc(var(--akd-pad) * 0.75);
+  min-width: 0;
+}
+
+.ak-designer__layer-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--akd-gap) / 2) var(--akd-gap);
+  margin-bottom: calc(var(--akd-gap) / 2);
+}
+
+.ak-designer__kind {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 650;
+  color: var(--akd-ink);
+}
+
+.ak-designer__name {
+  margin-left: 0.5ch;
+  font-family: var(--akd-font-mono);
+  font-size: var(--akd-fine);
+  font-weight: 400;
+  color: var(--akd-ink-dim);
+}
+
+.ak-designer__add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: calc(var(--akd-gap) / 2) var(--akd-gap);
+}
+
+.ak-designer__add .ak-designer__field { flex: 1 1 12rem; min-width: 0; }
+
+/* ── The bar, the status line and the code box ──────────────────────────────────────────────── */
+.ak-designer__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--akd-gap) / 2);
+}
+
+/* The copy and export buttons sit at the right end when there is room. */
+.ak-designer__push { flex: 1 1 auto; }
+
+.ak-designer__status {
+  margin: 0;
+  min-height: 1.2em;
+  font-size: var(--akd-fine);
+  color: var(--akd-ink-dim);
+}
+
+.ak-designer__code {
+  width: 100%;
+  min-height: 8rem;
+  resize: vertical;
+  font-family: var(--akd-font-mono);
+  font-size: var(--akd-fine);
+  line-height: 1.35;
+  white-space: pre;
+  overflow: auto;
+  color: var(--akd-ink);
+  background: var(--akd-surface);
+  border: 1px solid var(--akd-line);
+  border-radius: var(--akd-radius-sm);
+  padding: calc(var(--akd-gap) / 2);
+}
+
+.ak-designer__code[hidden] { display: none; }
+
+/* ── The kitless floor ────────────────────────────────────────────────────────────────────────
+   The Atelier class names the panels write, dressed for a page that never loaded
+   aimeat-atelier.css. LAYERED on purpose: an unlayered declaration wins over a layered one
+   whatever its specificity, so the kit takes all of this back the moment it exists, with no
+   !important and no load-order rule needed to arrange it. */
+@layer akp-fallback {
+  .ak-designer .ak-form__label {
+    font-size: 0.95rem;
+    color: var(--akd-ink);
+    cursor: pointer;
+  }
+
+  /* The switch: a checkbox the browser draws, sized to the touch floor and tinted by the look. */
+  .ak-designer .ak-toggle {
+    inline-size: 1.35rem;
+    block-size: 1.35rem;
+    margin: 0;
+    accent-color: var(--akd-accent);
+    cursor: pointer;
+  }
+
+  .ak-designer .ak-input {
+    font: inherit;
+    color: var(--akd-ink);
+    background: var(--akd-surface-2);
+    border: 1px solid var(--akd-line);
+    border-radius: var(--akd-radius-sm);
+    padding: 6px 8px;
+  }
+
+  .ak-designer .ak-btn {
+    font: inherit;
+    font-size: var(--akd-fine);
+    min-height: var(--akd-touch);
+    padding: 0 14px;
+    border-radius: var(--akd-radius-sm);
+    border: 1px solid var(--akd-line);
+    background: var(--akd-surface-2);
+    color: var(--akd-ink);
+    cursor: pointer;
+  }
+
+  .ak-designer .ak-btn:hover {
+    background: color-mix(in oklab, var(--akd-accent) 10%, var(--akd-surface-2));
+    border-color: var(--akd-accent);
+  }
+
+  .ak-designer .ak-btn--ghost {
+    background: none;
+    border-color: transparent;
+    color: var(--akd-accent);
+  }
+
+  .ak-designer .ak-btn--primary {
+    background: var(--akd-accent);
+    border-color: var(--akd-accent);
+    color: var(--akd-surface-2);
+  }
+
+  .ak-designer .ak-btn:focus-visible,
+  .ak-designer .ak-toggle:focus-visible,
+  .ak-designer .ak-input:focus-visible {
+    outline: 2px solid var(--akd-accent);
+    outline-offset: 2px;
+  }
+
+  /* Named for a screen reader, absent from the screen, and anchored so the 1px box never escapes
+     its container (the Atelier kit's v0.3.4 lesson). */
+  .ak-designer .ak-sr-only {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+}
