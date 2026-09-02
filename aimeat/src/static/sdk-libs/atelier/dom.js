@@ -14,11 +14,16 @@
  *   appear instantly), uses transform/opacity only, and collapses to end states under
  *   prefers-reduced-motion. Finished WAAPI animations leave nothing running, so an idle Atelier
  *   surface repaints zero times — the finish gate measures exactly that.
- * @structure el · append · $ · $$ · clear · uid · reducedMotion · resolve · injectStyle ·
- *   busy · guardButtons · whileBusy · enter · kinetic · countUp · attention
+ * @structure el · append · $ · $$ · clear · uid · reducedMotion · setMotion · resolve ·
+ *   injectStyle · busy · guardButtons · whileBusy · enter · kinetic · countUp · attention
  * @usage  import { el, $, injectStyle, enter } from './dom.js';
  *   el('div', { class: 'ak-card', vars: { '--ak-fill': '42%' }, on: { click: fn } }, ['text']);
  * @version-history
+ *   v0.46.0 — 2026-09-02 — LESS MOTION IS THE VIEWER'S TO ASK FOR, not only the operating
+ *     system's: reducedMotion() now answers true for the root's data-ak-motion="less" as well,
+ *     setMotion() writes it and remembers it, and the remembered choice is put back on the root
+ *     when this module loads. Every component that already asks reducedMotion() obeys the switch
+ *     without a line changing.
  *   v0.3.0 — 2026-08-29 — kinetic(): the headline that arrives one letter at a time on the
  *     look's spring and then behaves — opted in by the look via `--ak-kinetic`, capped at 80
  *     characters, aria-label preserves the word, reduced motion is a no-op.
@@ -117,13 +122,61 @@ export function uid(prefix) {
   return (prefix || 'ak') + '-' + seq;
 }
 
+/** Where the viewer's own motion choice is remembered, and the mark it leaves on the root. */
+const MOTION_KEY = 'ak.motion';
+const MOTION_ATTR = 'data-ak-motion';
+
 /**
- * Does the viewer ask for less motion? Animated components check this and jump to the end state.
+ * Does the viewer ask for less motion? Two voices, and either one is enough: the operating
+ * system's own setting, and the kit's switch (data-ak-motion="less" on the root, written by
+ * setMotion). Animated components check this and jump to the end state, so the switch reaches
+ * every one of them without any of them knowing it exists.
  * @returns {boolean}
  */
 export function reducedMotion() {
+  if (typeof document !== 'undefined' && document.documentElement
+    && document.documentElement.getAttribute(MOTION_ATTR) === 'less') return true;
   return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
+
+/**
+ * Put the motion decision in the viewer's hands: 'less' marks the root so every component here
+ * takes its still path, 'auto' hands the decision back to the operating system. The choice is
+ * remembered for this origin and announced on the window as 'ak-motion', so a second control (or
+ * an app that keeps its own answer) can follow it.
+ * @param {'auto'|'less'} mode
+ * @returns {'auto'|'less'}  the mode now in force
+ */
+export function setMotion(mode) {
+  const next = mode === 'less' ? 'less' : 'auto';
+  if (typeof document !== 'undefined' && document.documentElement) {
+    document.documentElement.setAttribute(MOTION_ATTR, next);
+  }
+  try { localStorage.setItem(MOTION_KEY, next); } catch { /* storage blocked, this page still obeys */ }
+  try {
+    window.dispatchEvent(new CustomEvent('ak-motion', { detail: { motion: next } }));
+  } catch { /* no window to tell */ }
+  return next;
+}
+
+/** Whether the remembered choice has already been put back, so the restore runs exactly once. */
+let motionRestored = false;
+
+/**
+ * Carry the remembered choice onto the root. Called from this module's own scope, which every
+ * part of the kit imports, so the decision is in force before the first component draws rather
+ * than from whenever the first control happens to mount.
+ * @returns {void}
+ */
+function restoreMotion() {
+  if (motionRestored || typeof document === 'undefined' || !document.documentElement) return;
+  motionRestored = true;
+  try {
+    const saved = localStorage.getItem(MOTION_KEY);
+    if (saved === 'less' || saved === 'auto') document.documentElement.setAttribute(MOTION_ATTR, saved);
+  } catch { /* storage blocked, the operating system's setting still decides */ }
+}
+restoreMotion();
 
 /**
  * Resolve a target that may be a selector, an element, or nothing.

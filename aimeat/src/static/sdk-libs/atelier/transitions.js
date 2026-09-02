@@ -9,6 +9,8 @@
  *     panelTransition(from, to, kind, opts)  one panel gives way to another in the same slot:
  *                                            crossfade, slide, flip, morph, push
  *     curtain(opts)                          the manual cover: cover(), swap, uncover()
+ *     intro(opts)                            the OPENING curtain: already down at first paint,
+ *                                            it parts once the page is worth looking at
  *
  *   THE SCREEN MOVE IS THE BROWSER'S. Where document.startViewTransition exists, the kind is a
  *   data attribute on the root element and transitions.css owns the choreography through
@@ -32,13 +34,18 @@
  *   NO COLOUR LIVES HERE. The curtain's tint is --ak-curtain-tint, chosen by a class; the JS
  *   sets geometry (a transform, a clip radius, a height) and never a colour.
  * @structure screenTransition(kind, run, opts) → Promise · panelTransition(from, to, kind, opts)
- *   → Promise · curtain(opts) → { cover, uncover, destroy }
+ *   → Promise · curtain(opts) → { cover, uncover, destroy } · intro(opts) → Promise
  * @usage
  *   await AIMEAT.atelier.screenTransition('iris', function () { host.replaceChildren(next); });
  *   await AIMEAT.atelier.panelTransition(oldPanel, newPanel, 'slide', { direction: 'left' });
  *   const c = AIMEAT.atelier.curtain({ kind: 'halves', colour: 'accent' });
  *   await c.cover(); rebuild(); await c.uncover(); c.destroy();
+ *   AIMEAT.atelier.intro({ kind: 'halves' });   // as early in the page as it can be called
  * @version-history
+ *   v0.46.0 — 2026-09-02 — intro(): the opening curtain, down before the first paint and parting
+ *     once the hold has passed and the fonts have landed (capped, so a font that never arrives
+ *     cannot hold the page shut). curtain gains `start: 'covered'`, which is what intro is built
+ *     on: the layer arrives in its shut state, so there is nothing to animate in.
  *   v0.45.1 — 2026-09-02 — curtain takes a `host`: the cover over ONE element (a stage, a card)
  *     instead of the screen, so a showcase can demonstrate the shapes without covering the page.
  *   v0.45.0 — 2026-09-02 — Initial (the transitions module: screen moves on View Transitions,
@@ -62,6 +69,11 @@ const TOWARD = { left: 'translateX(100%)', right: 'translateX(-100%)', up: 'tran
 
 /** Which screen move the curtain stands in for when the browser has no View Transitions. */
 const STAND_IN = { fade: 'band', wipe: 'band', slide: 'band', zoom: 'halves', curtain: 'halves', iris: 'iris' };
+
+/** The opening curtain's own two numbers: the shortest hold worth having, and the ceiling on the
+ *  whole wait, because a font that never arrives must not keep the page shut. */
+const INTRO_HOLD_MS = 120;
+const INTRO_CAP_MS = 1500;
 
 /**
  * The last place a pointer went down, which is where an iris opens from when the call does not
@@ -151,9 +163,11 @@ function originIn(host, from) {
  * With a `host` the curtain covers that ONE element instead of the screen (a stage, a card, a
  * panel): the layer sits inside it, the origin is read in the host's own box, and the host is
  * marked .ak-curtain-host for the positioning context.
+ * With `start: 'covered'` the layer arrives ALREADY SHUT, which is how a page opens under a
+ * curtain: there is nothing to animate in, and the first move anyone sees is the parting.
  * @param {{ kind?: 'band'|'halves'|'iris', colour?: 'accent'|'ink'|'surface',
  *   from?: { x: number, y: number }, direction?: 'left'|'right'|'up'|'down', duration?: number,
- *   host?: Element|string }} [opts]
+ *   host?: Element|string, start?: 'open'|'covered' }} [opts]
  * @returns {{ cover: () => Promise<void>, uncover: () => Promise<void>, destroy: () => void }}
  */
 export function curtain(opts) {
@@ -179,8 +193,8 @@ export function curtain(opts) {
     leaves.push(el('div', { class: kind === 'iris' ? 'ak-curtain__iris' : 'ak-curtain__band' }));
   }
 
-  // The open state is set inline BEFORE the layer is appended: an animation's first frame is one
-  // paint away, and without this the tint flashes over the screen for that frame.
+  // The starting state is set inline BEFORE the layer is appended: an animation's first frame is
+  // one paint away, and without this the tint flashes over the screen for that frame.
   const open = kind === 'iris'
     ? ['circle(0px at ' + point.x + 'px ' + point.y + 'px)']
     : kind === 'halves' ? [AWAY[axis === 'y' ? 'up' : 'left'], AWAY[axis === 'y' ? 'down' : 'right']] : [TOWARD[dir]];
@@ -189,10 +203,12 @@ export function curtain(opts) {
   // back to their own edges and an iris shrinks back to its origin, so for those two the way out
   // is the way in.
   const past = kind === 'band' ? [AWAY[dir]] : open;
-  let parked = open;
+  // Where the layer BEGINS: open for the manual cover, shut for the opening curtain.
+  const begun = o.start === 'covered' ? shut : open;
+  let parked = begun;
   leaves.forEach(function (leaf, i) {
-    if (kind === 'iris') leaf.style.clipPath = open[i];
-    else leaf.style.transform = open[i];
+    if (kind === 'iris') leaf.style.clipPath = begun[i];
+    else leaf.style.transform = begun[i];
     layer.appendChild(leaf);
   });
   if (host) {
@@ -205,7 +221,10 @@ export function curtain(opts) {
 
   const ms = spanOf(layer, o.duration);
   const ease = easeOf(layer);
-  let covered = false;
+  let covered = o.start === 'covered';
+  // A layer that arrives shut takes the pointer from the first frame, the same as one that
+  // closed on request: nothing under an opening curtain is clickable.
+  if (covered) layer.classList.add('ak-curtain--on');
   let gone = false;
 
   /** @param {string[]} from @param {string[]} to @returns {Promise<void>} */
@@ -251,6 +270,47 @@ export function curtain(opts) {
       if (host && !host.querySelector('.ak-curtain')) host.classList.remove('ak-curtain-host');
     },
   };
+}
+
+/**
+ * THE OPENING CURTAIN. A page's first paint is the ugliest frame it will ever draw: unstyled
+ * text in a fallback face, a layout that jumps once the real one arrives. This covers it before
+ * anyone sees it (the layer is built already shut, so nothing animates in), holds while the
+ * page becomes itself, and then parts with its kind's own move and takes itself off the page.
+ *
+ * The hold is whichever comes LATER: the caller's `hold` (120ms by default, which is about one
+ * frame of settling) or document.fonts.ready, because the fonts are what makes a first paint
+ * look broken. Both are capped at 1500ms, so a font that never arrives cannot keep the page
+ * shut. Under reduced motion the curtain still covers the ugly frame and then drops without
+ * travelling, which is the still version of the same promise.
+ *
+ * Called as early in the page as it can be: after this module has loaded, before the app builds.
+ * @param {{ kind?: 'halves'|'iris'|'band', colour?: 'accent'|'ink'|'surface', hold?: number }} [opts]
+ * @returns {Promise<void>}  settles when the screen is uncovered and the layer is gone
+ */
+export function intro(opts) {
+  const o = opts || {};
+  const hold = typeof o.hold === 'number' && o.hold >= 0 ? Math.min(o.hold, INTRO_CAP_MS) : INTRO_HOLD_MS;
+  const cover = curtain({
+    kind: /** @type {'band'|'halves'|'iris'} */ (oneOf(CURTAIN_KINDS, o.kind)),
+    colour: o.colour,
+    start: 'covered',
+  });
+
+  /** @type {Array<Promise<void>>} */
+  const waits = [new Promise(function (settle) { setTimeout(settle, hold); })];
+  const fonts = typeof document !== 'undefined' ? /** @type {any} */ (document).fonts : null;
+  if (fonts && fonts.ready && typeof fonts.ready.then === 'function') {
+    waits.push(fonts.ready.then(function () { /* the text has its own shape now */ },
+      function () { /* no news from the fonts; the hold decides */ }));
+  }
+
+  let capTimer = /** @type {any} */ (null);
+  const capped = new Promise(function (settle) { capTimer = setTimeout(settle, INTRO_CAP_MS); });
+  const done = function () { clearTimeout(capTimer); };
+  return Promise.race([Promise.all(waits), capped])
+    .then(function () { done(); return cover.uncover(); })
+    .then(function () { cover.destroy(); }, function (err) { done(); cover.destroy(); throw err; });
 }
 
 /**

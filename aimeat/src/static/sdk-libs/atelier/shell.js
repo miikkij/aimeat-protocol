@@ -15,11 +15,22 @@
  *   horizontally, fixed bottom UI and the scroller both reserve var(--aimeat-chrome-bottom), and
  *   every interactive element the shell renders meets the touch minimum — all of it in the
  *   stylesheet, none of it the app's to remember.
+ *
+ *   THE BAR IS WHERE THE KIT MEETS THE TWO PRESENTATION DECISIONS. Light/dark belongs to the
+ *   account pill (aimeat-auth's mode switch travels with it), so the shell does not draw that
+ *   control: it catches its click on the way down and lets the new theme open from the button
+ *   as an iris. Motion is the shell's own switch, beside it. Both write on the root element, so
+ *   both reach every component without one of them being told.
  * @structure app(spec) → { el, main, set, status, t, i18n, destroy } · section(spec) ·
  *   tabs(spec) · bottomNav(spec)
  * @usage  const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  *         a.main.appendChild(view);   // the main element is yours to fill
  * @version-history
+ *   v0.46.0 — 2026-09-02 — The bar carries the kit's transitions: the theme flip opens as an
+ *     IRIS from the mode button's own centre (the click is caught in the bar's capture phase and
+ *     replayed inside the transition, because the control flips the root the moment it is let
+ *     through), set({ look }) changes the look behind a CURTAIN unless the call says
+ *     `quiet: true`, and a LESS-MOTION switch stands beside the account pill.
  *   v0.4.0 — 2026-08-28 — The boot gate presents the APP: while login resolves, the status card
  *     is the whole page (centered, main hidden — .ak-app--gate), and the sign-in card carries the
  *     app's own name and its `tagline` before the how-to. The second AEB review met a bare system
@@ -32,9 +43,10 @@
  *     a default hint pointing at the account pill.
  *   v0.1.0 — 2026-08-27 — Initial (TARGET-074 phase 1, slice 1).
  */
-import { el, append, clear, resolve, uid, injectStyle, enter } from './dom.js';
+import { el, append, clear, resolve, uid, injectStyle, enter, setMotion } from './dom.js';
 import { t, i18n } from './i18n.js';
 import { emptyState } from './state.js';
+import { screenTransition, curtain } from './transitions.js';
 
 /** How often the boot poll looks for a session the silent login produced without an event. */
 const BOOT_POLL_MS = 300;
@@ -44,11 +56,63 @@ const BOOT_POLL_MS = 300;
  * signed-out first visit never reads as a hung page. */
 const SIGNIN_GRACE_MS = 2500;
 
+/** The namespace SVG is drawn in: an icon is a shape, never a character from a font. */
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+/** The mark on the root that says the viewer asked for less motion (dom.js writes it). */
+const MOTION_ATTR = 'data-ak-motion';
+
+/** The account pill's own light/dark control, which the shell wraps in an iris. */
+const MODE_BUTTON = '#aimeat-mode-switch button[data-mode]';
+
+/**
+ * The less-motion switch's words. The kit's dictionary has no key of its own for this yet, so a
+ * host that supplies one wins and English is the floor, never the bare key on screen.
+ * @returns {string}
+ */
+function motionLabel() {
+  const said = t('lessMotion');
+  return said === 'lessMotion' ? 'Less motion' : said;
+}
+
+/**
+ * The switch's mark: three speed lines, and a stroke through them the stylesheet reveals when
+ * the switch is pressed. Drawn in currentColor, so it is the bar's own ink in every look.
+ * @returns {SVGElement}
+ */
+function motionIcon() {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('width', '18');
+  svg.setAttribute('height', '18');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '2');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('aria-hidden', 'true');
+  const lines = document.createElementNS(SVG_NS, 'path');
+  lines.setAttribute('class', 'ak-app__motion-lines');
+  lines.setAttribute('d', 'M4 7h15M4 12h11M4 17h7');
+  const slash = document.createElementNS(SVG_NS, 'path');
+  slash.setAttribute('class', 'ak-app__motion-slash');
+  slash.setAttribute('d', 'M20 4 5 20');
+  svg.appendChild(lines);
+  svg.appendChild(slash);
+  return svg;
+}
+
+/** Is the kit's own less-motion switch on right now? (The OS setting is a separate voice, and
+ *  the switch reports itself, not the operating system.) @returns {boolean} */
+function motionIsLess() {
+  return document.documentElement.getAttribute(MOTION_ATTR) === 'less';
+}
+
 /**
  * @typedef {object} AppHandle
  * @property {HTMLElement} el
  * @property {HTMLElement} main
- * @property {(patch: { title?: string, look?: string }) => void} set
+ * @property {(patch: { title?: string, look?: string, density?: 'comfortable'|'compact',
+ *   quiet?: boolean }) => void} set
  * @property {(kind: 'loading'|'ready'|'empty'|'error'|'signin'|'none', opts?: { title?: string, hint?: string, onRetry?: () => void }) => void} status
  * @property {(key: string, vars?: Record<string, any>) => string} t
  * @property {typeof i18n} i18n
@@ -73,7 +137,56 @@ export function app(spec) {
 
   const heading = el('span', { class: 'ak-app__title', id: titleId, text: state.title });
   const pill = el('span', { class: 'ak-app__pill', id: 'login' });
-  const bar = el('header', { class: 'ak-app__bar' }, [heading, pill]);
+
+  // The LESS-MOTION switch, beside the account pill's own theme control: one small button, its
+  // state in aria-pressed, its words in the title. Everything downstream already asks
+  // reducedMotion(), so this one click quiets the whole kit.
+  const motionBtn = el('button', {
+    type: 'button',
+    class: 'ak-app__motion',
+    'data-ak-noguard': true,
+    'aria-pressed': motionIsLess() ? 'true' : 'false',
+    title: motionLabel(),
+    'aria-label': motionLabel(),
+    on: {
+      click: function () { setMotion(motionIsLess() ? 'auto' : 'less'); },
+    },
+  }, motionIcon());
+  // The switch follows the choice rather than owning it: a second control, or the app's own
+  // call to setMotion, moves this one too.
+  const syncMotion = function () {
+    motionBtn.setAttribute('aria-pressed', motionIsLess() ? 'true' : 'false');
+  };
+  window.addEventListener('ak-motion', syncMotion);
+
+  const bar = el('header', { class: 'ak-app__bar' }, [heading, motionBtn, pill]);
+
+  // THE THEME OPENS AS AN IRIS. The light/dark control is not the shell's: it travels inside
+  // the account pill and flips <html data-theme> the instant it is clicked, which is one frame
+  // too early for anything to photograph the old screen. So the click is caught here on the way
+  // DOWN, held, and replayed inside a screen transition opening from the button's own centre:
+  // the control still does the flip, in its own code, one beat later. Under reduced motion
+  // screenTransition just runs, and the replay is the plain flip it always was.
+  let replaying = false;
+  const onBarClick = function (ev) {
+    if (replaying) return;
+    const start = /** @type {Element|null} */ (ev.target);
+    if (!start || typeof start.closest !== 'function') return;
+    const btn = /** @type {HTMLElement|null} */ (start.closest(MODE_BUTTON));
+    if (!btn || !bar.contains(btn) || btn.getAttribute('aria-pressed') === 'true') return;
+    ev.preventDefault();
+    ev.stopImmediatePropagation();
+    // The kit's double-click guard has nothing to protect on an instant toggle, and it would
+    // read the replay as the repeat it swallows. This is the guard's own opt-out, set on the
+    // control the first time it is used.
+    btn.setAttribute('data-ak-noguard', '');
+    const box = btn.getBoundingClientRect();
+    screenTransition('iris', function () {
+      replaying = true;
+      try { btn.click(); } finally { replaying = false; }
+    }, { from: { x: box.left + box.width / 2, y: box.top + box.height / 2 } });
+  };
+  bar.addEventListener('click', onBarClick, true);
 
   const statusHost = el('div', { class: 'ak-app__status' });
   const main = el('main', { class: 'ak-app__main ak-scroll' });
@@ -220,6 +333,8 @@ export function app(spec) {
 
   const stopLang = i18n.onChange(function () {
     heading.textContent = state.title;
+    motionBtn.setAttribute('title', motionLabel());
+    motionBtn.setAttribute('aria-label', motionLabel());
   });
 
   // Deferred one tick ON PURPOSE: with requireLogin off — or a session already live when app()
@@ -232,11 +347,26 @@ export function app(spec) {
     el: root,
     main: main,
 
-    /** @param {{ title?: string, look?: string, density?: 'comfortable'|'compact' }} patch */
+    /** @param {{ title?: string, look?: string, density?: 'comfortable'|'compact',
+     *    quiet?: boolean }} patch */
     set(patch) {
       if (!patch) return;
       if (patch.title != null) { state.title = patch.title; heading.textContent = state.title; }
-      if (patch.look != null) { state.look = patch.look; root.setAttribute('data-ak-look', state.look); }
+      if (patch.look != null && patch.look !== state.look) {
+        state.look = patch.look;
+        const dress = function () { root.setAttribute('data-ak-look', state.look); };
+        // A LOOK is the whole surface changing its mind at once: face, colours, corners and
+        // pace. Seen half-done it reads as a page breaking, so the halves close over it, the
+        // attribute changes behind them, and they part on the new look. `quiet: true` is the way
+        // out for an app changing the look while nobody is looking at the result.
+        if (patch.quiet) { dress(); } else {
+          const cover = curtain({ kind: 'halves', colour: 'accent' });
+          cover.cover()
+            .then(dress)
+            .then(function () { return cover.uncover(); })
+            .then(function () { cover.destroy(); }, function (err) { cover.destroy(); throw err; });
+        }
+      }
       // Density is token-driven, so it is free: compact tightens padding and gaps while the
       // touch minimum stays untouched — a preference, never an accessibility trade.
       if (patch.density != null) root.classList.toggle('ak-app--compact', patch.density === 'compact');
@@ -248,6 +378,8 @@ export function app(spec) {
 
     destroy() {
       stopLang();
+      window.removeEventListener('ak-motion', syncMotion);
+      bar.removeEventListener('click', onBarClick, true);
       if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
       if (graceTimer) { clearTimeout(graceTimer); graceTimer = null; }
       if (statusCard) statusCard.destroy();

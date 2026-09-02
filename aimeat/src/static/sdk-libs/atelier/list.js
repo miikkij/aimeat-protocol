@@ -14,6 +14,10 @@
  * @structure list(spec) → { el, set, destroy } · listDetail(spec) → { el, set, select, destroy }
  * @usage  AIMEAT.atelier.list({ target: a.main, items, onPick(item) { open(item); } });
  * @version-history
+ *   v0.46.0 — 2026-09-02 — The morph is the kit's own now: `morph` from mosaic-motion.js drives
+ *     it, and the pair is the two TITLES (the row's words and the detail's heading), so the
+ *     name travels out of the list into the pane instead of a whole row growing into a panel.
+ *     The pane itself is still the partner when the detail has no heading of its own.
  *   v0.5.0 — 2026-08-28 — The row-to-detail MORPH: the picked row opens into the detail pane via
  *     a shared view-transition-name (plain swap without View Transitions or under reduced motion).
  *   v0.4.0 — 2026-08-28 — A pick is visible: the clicked row keeps a selected mark (class +
@@ -25,6 +29,12 @@
 import { el, append, clear, resolve, enter, reducedMotion } from './dom.js';
 import { t } from './i18n.js';
 import { emptyState } from './state.js';
+import { morph } from './mosaic-motion.js';
+
+/** The host writes the detail, so the kit LOOKS for its title rather than dictating one: the
+ *  element the host marked, and failing that the first heading in the pane. */
+const DETAIL_MARKED = '.ak-listdetail__title';
+const DETAIL_HEADING = 'h1, h2, h3';
 
 /**
  * @typedef {object} ListItem
@@ -218,6 +228,31 @@ export function listDetail(spec) {
     spec.renderDetail(item, detailBody);
   }
 
+  /** The element on the detail side wearing the shared name right now, and the timer that takes
+   *  it off again. `morph` keeps the transition handle, so the release is a bounded wait set
+   *  well past the end of the move rather than a promise this module was given. */
+  let held = /** @type {HTMLElement|null} */ (null);
+  let holdTimer = /** @type {any} */ (null);
+
+  /** Take the shared name off the detail side, whether the move has landed or been overtaken. */
+  function release() {
+    if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+    if (held) { held.style.viewTransitionName = ''; held = null; }
+  }
+
+  /** How long the name is held: six of the look's own beats, which is well past any one move. */
+  function holdFor(node) {
+    return (parseFloat(getComputedStyle(node).getPropertyValue('--ak-motion')) || 200) * 6;
+  }
+
+  /** The detail's own title: what the host marked, else its first heading, else the whole pane
+   *  (which is what this move did before it travelled by title). @returns {HTMLElement} */
+  function detailTitle() {
+    return /** @type {HTMLElement} */ (detailBody.querySelector(DETAIL_MARKED)
+      || detailBody.querySelector(DETAIL_HEADING)
+      || detail);
+  }
+
   /** @param {string|null} id */
   function select(id) {
     selected = id;
@@ -230,21 +265,25 @@ export function listDetail(spec) {
       }
       renderDetail();
     };
-    // The ROW-TO-DETAIL morph: the picked row carries the morph name in the old state, the detail
-    // pane carries it in the new one, and the browser animates one into the other — the row opens
-    // into its detail instead of the detail merely appearing. Plain swap without View Transitions
-    // or under reduced motion.
+    // THE TITLE TRAVELS. The picked row's own words wear the shared name in the old state, the
+    // detail's heading wears it in the new one, and the browser carries the first into the
+    // second, so the row opens into its detail instead of the detail merely appearing. The row
+    // hands the name over INSIDE the change, because two elements may not wear one name in the
+    // same state. Plain swap without View Transitions or under reduced motion.
     const picked = /** @type {HTMLElement|null} */ (id != null
       ? Array.from(root.querySelectorAll('.ak-list__row')).find(function (r) { return r.getAttribute('data-ak-id') === id; }) ?? null
       : null);
-    if (picked && typeof document.startViewTransition === 'function' && !reducedMotion()) {
-      picked.style.viewTransitionName = 'ak-morph';
-      const vt = document.startViewTransition(function () {
-        picked.style.viewTransitionName = '';
-        detail.style.viewTransitionName = 'ak-morph';
+    const moving = /** @type {HTMLElement|null} */ (picked
+      ? (picked.querySelector('.ak-list__title') || picked) : null);
+    release();
+    if (moving && typeof document.startViewTransition === 'function' && !reducedMotion()) {
+      morph(moving, function () {
+        moving.style.viewTransitionName = '';
         mark();
+        held = detailTitle();
+        held.style.viewTransitionName = 'ak-morph';
       });
-      vt.finished.finally(function () { detail.style.viewTransitionName = ''; });
+      holdTimer = setTimeout(release, holdFor(detail));
     } else {
       mark();
     }
@@ -276,6 +315,7 @@ export function listDetail(spec) {
     },
     select: select,
     destroy() {
+      release();
       if (detailEmptyCard) detailEmptyCard.destroy();
       master.destroy();
       if (root.parentNode) root.parentNode.removeChild(root);
