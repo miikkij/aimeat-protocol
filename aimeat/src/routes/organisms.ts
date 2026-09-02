@@ -107,6 +107,7 @@ import { registerOrganismWorkspaceAccessRoutes } from './organisms/workspace-acc
 import { inviteAcceptRouter } from './invite-accept.js';
 import { registerOrganismWorkspaceOpsRoutes } from './organisms/workspace-ops.js';
 import { registerOrganismWorkspaceRowRoutes } from './organisms/workspace-rows.js';
+import { registerOrganismWorkspaceDocumentRoutes } from './organisms/workspace-documents.js';
 import { registerOrganismGateRoutes } from './organisms/gates.js';
 import { registerOrganismIntakeRoutes } from './organisms/intake.js';
 
@@ -127,6 +128,8 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
   // Row spaces. Registered after the ops routes so the existing, more specific
   // /workspace/records* and /workspace/public/* paths keep matching first.
   registerOrganismWorkspaceRowRoutes(router, config, storage);
+  // In-place document edits, for the same reason and in the same place in the order.
+  registerOrganismWorkspaceDocumentRoutes(router, config, storage);
   registerOrganismGateRoutes(router, config, storage, H);
   registerOrganismIntakeRoutes(router, config, storage, H);
 

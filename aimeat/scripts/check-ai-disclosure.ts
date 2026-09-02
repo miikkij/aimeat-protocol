@@ -312,6 +312,19 @@ const AI_PROVENANCE_REVIEWED_WITHOUT = [
   // read by nobody else: not published, not public interest. The record carries the sender's
   // name in front of the title, which is the attribution a reader needs, and the owner can mute it.
   'aimeat_notify',
+  // DECIDED, 2026-09-02. The two in-place document edits change PART of a document, and the bytes
+  // that end up stored are the whole document — most of which the caller never sent and, in a shared
+  // workspace, never wrote. A declaration attached to those bytes would say "a person wrote this"
+  // about passages the declaring agent has not seen, which is a false statement of exactly the kind
+  // this programme exists to prevent. There is no per-passage provenance and designing one is not
+  // this slice.
+  //
+  // PROVENANCE IS NOT LOST. The node stamps the merged document against the writing principal
+  // through provenanceForWrite(), which is what PATCH /v1/memory does for a partial write and for
+  // the same reason: the merged value is what a reader gets. What is refused is only the CALLER's
+  // claim about text that is not all theirs.
+  'aimeat_workspace_doc_append',
+  'aimeat_workspace_doc_section_replace',
   'aimeat_app_template_propose',
   'aimeat_appdev_pitfall_report',
   'aimeat_board_create',

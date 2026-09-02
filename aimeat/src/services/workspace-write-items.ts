@@ -13,11 +13,14 @@
  *   memory-backed, has an id where one is required) before anything is written. Documents get an
  *   auto-generated id when the caller gives none, so a half-written batch that the caller retries
  *   would otherwise duplicate the documents that already landed.
- * @structure MAX_BATCH_ITEMS · genDocId() · normalizeWriteItems() · resolveWriteItem()
+ * @structure MAX_BATCH_ITEMS · genDocId() · normalizeWriteItems() · resolveSpace() · resolveWriteItem()
  * @usage const norm = normalizeWriteItems({ space, value, id, section, items });
  *   if ('error' in norm) return fail(norm.error);
  *   const resolved = norm.items.map(it => resolveWriteItem(it, objectTypes));
  * @version-history
+ *   v1.1.0 — 2026-09-02 — resolveSpace() split out of resolveWriteItem(), which now calls it. The
+ *     in-place document edits need the same manifest lookup and the same two refusals, and a second
+ *     copy of "No space named X" is a second sentence to keep true.
  *   v1.0.0 — 2026-07-31 — Initial: batch normalisation shared by the three workspace_write surfaces.
  */
 
@@ -41,6 +44,16 @@ export interface WriteItemInput {
     value: unknown;
     id?: string;
     section?: string;
+}
+
+/** A space the caller may write: it exists in the manifest, and it is memory-backed. */
+export interface ResolvedSpace {
+    /** The objectType NAME, which is what a caller and an error message should say. */
+    name: string;
+    /** Its namespace, which is what the memory key is built from. */
+    namespace: string;
+    /** Documents (`{ title, markdown }`) rather than schema-validated records. */
+    isDoc: boolean;
 }
 
 /** A write the caller may perform: the space is real, memory-backed, and the id is settled. */
@@ -117,20 +130,24 @@ export function normalizeWriteItems(args: {
 }
 
 /**
- * Check one item against the workspace manifest and settle its id. Returns the resolved write or a
- * message written for the agent that has to fix the call. `at` names the item in a batch, so the
- * caller learns WHICH of twenty documents was wrong instead of that "the batch" failed.
+ * Resolve a space NAME (or its namespace) against the workspace manifest, and refuse a backing whose
+ * data does not live in workspace records.
+ *
+ * Shared by the write path below and by the in-place document edits (services/workspace-doc-edit.ts),
+ * so "no space named X" and "that backing is not writable here" are one sentence with one meaning
+ * however the caller arrived. `at` names the item in a batch, so the caller learns WHICH of twenty
+ * documents was wrong instead of that "the batch" failed.
  */
-export function resolveWriteItem(
-    item: WriteItemInput,
+export function resolveSpace(
+    space: string,
     objectTypes: WriteObjectType[],
     at?: string,
-): ResolvedWriteItem | { error: string } {
+): ResolvedSpace | { error: string } {
     const where = at ? `${at}: ` : '';
-    const ot = objectTypes.find(o => o.name === item.space || o.namespace === item.space);
+    const ot = objectTypes.find(o => o.name === space || o.namespace === space);
     if (!ot || !ot.namespace) {
         const names = objectTypes.map(o => o.name).filter(Boolean).join(', ');
-        return { error: `${where}No space named "${item.space}" in this workspace. Available spaces: ${names || '(none)'}. Pass the space NAME, not its namespace.` };
+        return { error: `${where}No space named "${space}" in this workspace. Available spaces: ${names || '(none)'}. Pass the space NAME, not its namespace.` };
     }
     // A non-memory space's data does NOT live in workspace records — writing it here would store
     // memory keys that no read surface ever lists. That silent black hole is how 16 published
@@ -142,8 +159,27 @@ export function resolveWriteItem(
                 : `${where}Space "${ot.name}" has backing '${ot.backing}', which workspace writes do not support. Update the space to backing:'memory' (aimeat_workspace_update); files and knowledge packages attach via workspace Sources or embedded document images.`,
         };
     }
-    // Old manifests declared documents as kind:'document' without a mode — honour the intent.
-    const isDoc = ot.mode === 'document' || (!ot.mode && ot.kind === 'document');
+    return {
+        name: ot.name || space,
+        namespace: ot.namespace,
+        // Old manifests declared documents as kind:'document' without a mode — honour the intent.
+        isDoc: ot.mode === 'document' || (!ot.mode && ot.kind === 'document'),
+    };
+}
+
+/**
+ * Check one item against the workspace manifest and settle its id. Returns the resolved write or a
+ * message written for the agent that has to fix the call.
+ */
+export function resolveWriteItem(
+    item: WriteItemInput,
+    objectTypes: WriteObjectType[],
+    at?: string,
+): ResolvedWriteItem | { error: string } {
+    const where = at ? `${at}: ` : '';
+    const ot = resolveSpace(item.space, objectTypes, at);
+    if ('error' in ot) return ot;
+    const isDoc = ot.isDoc;
     const fromValue = item.value && typeof item.value === 'object' && !Array.isArray(item.value)
         ? String((item.value as Record<string, unknown>).id ?? '').trim()
         : '';

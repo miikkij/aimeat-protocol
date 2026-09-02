@@ -224,7 +224,7 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
       readme: z.string().optional().describe('New markdown readme/intro (replaces the current one)'),
       add_spaces: z.any().optional().describe('ADDITIVE (safe): an ARRAY of objectTypes to UNION into the manifest — the server keeps everything else and skips any whose name/namespace already exists. Pass just { name, namespace, mode } (+ a schema in `schemas`); defaults are filled. Prefer this over `manifest` to add spaces. Cannot remove/rename.'),
       manifest: z.any().optional().describe('FULL replacement manifest (objectTypes + policy/gate + settings) as a JSON OBJECT. For genuine restructuring (rename/remove a space, change policy.alwaysGate). Read the workspace first; the id is preserved.'),
-      schemas: z.any().optional().describe('Map of namespace → JSON Schema (object) to lock (strict) for a records space.'),
+      schemas: z.any().optional().describe('Map of namespace → JSON Schema (object) to lock (strict) for a records space. REPLACES the locked schema rather than merging into it, so read the current one first: GET /v1/memory/{key}/schema, keyed on a full RECORD key (organism.<org>.w.<ws>.<namespace>.<id>.draft), not on the space root. Do not invent a maxLength — the real ceiling is the memory value budget the node enforces on the whole record.'),
     },
     annotationsFor('aimeat_workspace_update'),
     async ({ organism_id, ws, name, readme, add_spaces, manifest, schemas }) => {

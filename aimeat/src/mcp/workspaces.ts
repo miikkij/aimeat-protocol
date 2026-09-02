@@ -126,6 +126,7 @@ import { checkOrganismNamespaceAccess } from '../services/organism-namespace-acc
 import { workspaceRowIndex } from '../services/workspace-rows/row-service.js';
 import type { RowObjectType } from '../services/workspace-rows/row-space.js';
 import { registerWorkspaceRowTools } from './workspace-rows.js';
+import { registerWorkspaceDocumentTools } from './workspace-documents.js';
 import { archivedRefusal, checkWorkspaceWriteLimits } from '../services/workspace-write-guards.js';
 import { parseGAII, isSameOwner } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
@@ -234,7 +235,9 @@ export function registerWorkspaceTools(
     ): Promise<void> => writeWorkspaceRecord({ storage, config },
         // `owner` is the namespace, `principal` is the hand. An agent writing a member's record is
         // both, and the write tally is what tells them apart.
-        { key, value, owner, prev, aiProvenanceId, principal: agentGaii });
+        // The outcome is dropped on purpose: with no `ifVersion` the write cannot be refused, so
+        // there is nothing here to check. The in-place document edits pass one and do check.
+        { key, value, owner, prev, aiProvenanceId, principal: agentGaii }).then(() => undefined);
 
     // ── workspace-access helpers (shared with the GET/POST workspace-access routes) ──
     const bareOwner = (gaii: string) => (gaii.includes('#') ? gaii.split('#')[1] : gaii).split('@')[0];
@@ -645,7 +648,7 @@ export function registerWorkspaceTools(
             readme: z.string().optional().describe('New markdown readme/intro (replaces the current one)'),
             add_spaces: z.any().optional().describe('ADDITIVE (safe): an ARRAY of objectTypes to UNION into the manifest — the server keeps everything else and skips any whose name/namespace already exists. Pass just { name, namespace, mode } (+ a schema in `schemas`); defaults are filled. Use this to provision spaces instead of sending the whole manifest. Cannot remove/rename — use `manifest` for that.'),
             manifest: z.any().optional().describe('FULL replacement manifest (objectTypes + policy/gate + settings) as a JSON OBJECT. For genuine restructuring (rename/remove a space, change policy.alwaysGate). Read the workspace first; the id is preserved. To only ADD spaces, prefer `add_spaces`.'),
-            schemas: z.any().optional().describe('Map of namespace → JSON Schema (object) to lock (strict) for a records space.'),
+            schemas: z.any().optional().describe('Map of namespace → JSON Schema (object) to lock (strict) for a records space. REPLACES the locked schema rather than merging into it, so read the current one first: GET /v1/memory/{key}/schema, keyed on a full RECORD key (organism.<org>.w.<ws>.<namespace>.<id>.draft), not on the space root. Do not invent a maxLength — the real ceiling is the memory value budget the node enforces on the whole record.'),
             apps: z.any().optional().describe('FULL replacement list of apps pinned to this workspace ([] clears). ARRAY of { owner, filename, label? } referencing published apps (/v1/apps). Pinning is launch-context/presentation only — workspace data access stays gated per call. Creator/admin only.'),
         },
         annotationsFor('aimeat_workspace_update'),
@@ -683,6 +686,9 @@ export function registerWorkspaceTools(
     // max-file-lines boundary. They call services/workspace-rows/row-service.ts, which is what
     // the REST routes call too, so neither door can answer differently from the other.
     registerWorkspaceRowTools(mcp, { storage, config, agentGaii, writerGaii, ownerName });
+    // The two in-place DOCUMENT edits, extracted for the same reason and calling the same service
+    // the REST routes call: services/workspace-doc-edit.ts.
+    registerWorkspaceDocumentTools(mcp, { storage, config, agentGaii, ownerName });
 
     mcp.tool('aimeat_workspace_object_delete', descriptionFor('aimeat_workspace_object_delete'),
         { organism_id: z.string(), ws: z.string(), namespace: z.string(), id: z.string() },

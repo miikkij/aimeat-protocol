@@ -9,6 +9,8 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.27.0 -- 2026-09-02 -- Add e2e-workspace-doc-edit.ts: in-place document edits, the byte-identity
+ *            of everything they do not touch, and two concurrent appends both surviving.
  *   v1.26.0 -- 2026-09-02 -- Add e2e-app-playtest.ts: the game playtest bench through the audit door.
  *   v1.25.0 -- 2026-08-29 -- Add e2e-app-rows.ts: an app on an organism row space, the two-hand rule.
  *   v1.24.0 -- 2026-08-29 -- Add e2e-app-legal.ts: the app's own legal pages and its audit log.
@@ -409,6 +411,7 @@ const ALL_SUITES = [
     'test/e2e-workspace-retention.ts',
     'test/e2e-workspace-backing-gate.ts',
     'test/e2e-workspace-rows.ts',
+    'test/e2e-workspace-doc-edit.ts',
     'test/e2e-workspace-public-sharing.ts',
     'test/e2e-workspace-public-records.ts',
     'test/e2e-workspace-member-records.ts',
