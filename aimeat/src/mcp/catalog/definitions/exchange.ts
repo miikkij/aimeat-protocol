@@ -13,6 +13,8 @@
  *   Morsels are plain integers; money is 6-decimal micro-units. The two never mix.
  * @usage import { exchangeTools } from './definitions/exchange.js';
  * @version-history
+ *   v1.1.1 — 2026-09-03 — Say WHY the six agentMcp tools are off the CLI dispatch, and where a fleet
+ *     agent reaches them instead. The bare "Not a CLI fallback" had been read as a missing door twice.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 8b: aimeat_exchange_work_deliver documents `ai_provenance`.
  *     The delivered output is the thing the buyer paid for, so how it was made belongs in the terms.
  *   v1.0.0 — 2026-07-20 — Initial EXCHANGE MCP tool definitions (10 tools)
@@ -24,7 +26,18 @@ import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenan
 /** The "act on EXCHANGE" tools (invoke/work/proposals) are on BOTH MCP surfaces so ANY agent can act: the
  *  PUBLIC /v1/mcp (hosted clients like Claude chat — the server tool threads the session token so app-tool
  *  invoke can run the backing capability) AND the CONNECTOR MCP (`aimeat connect serve` — tunnelled fleet
- *  agents get them as thin REST proxies over the same routes). Not a CLI fallback. */
+ *  agents get them as thin REST proxies over the same routes). Not a CLI fallback.
+ *
+ *  That last sentence is a DECISION, not an omission, and it has been read as a gap twice. These six
+ *  are two-sided acts under a metered contract: they charge a budget, settle against a counterparty,
+ *  or run a provider's backing capability with the provider's own keys. A fleet agent reaches them
+ *  through the connector MCP tool above, which carries the agent's session. `/local/call/<tool>` is
+ *  the shell's own dispatch and holds no such session, so a door there would be a second, weaker
+ *  implementation of the metering — the one thing `check:mcp-tools` exists to prevent. If a runtime
+ *  cannot find `aimeat_app_tool_invoke` on `/local/call/`, it is asking the wrong door: the tool is
+ *  registered at src/cli/connect/mcp/tools/exchange.ts. Measured 2026-09-03: 267 of the 300 catalog
+ *  entries carry cliFallback and all 267 have a handler; 33 do not, 24 of which are not on the
+ *  connector at all, leaving these six plus three owner-account tools. */
 const agentMcp: ToolVisibility = { publicMcp: true, connectorMcp: true, cliFallback: false };
 
 export const exchangeTools: AimeatToolDefinition[] = [

@@ -65,11 +65,17 @@ export const commerceCliTools: ConnectCliToolDefinition[] = [
             const provenance = optionalRecord(input, 'provenance');
             if (odps) value.odps = odps;
             if (provenance) value.provenance = provenance;
+            // `owner_scope: true` — the manifest belongs to the OWNER whichever principal publishes
+            // it. Without it an agent's write lands under the agent's GAII while every reader looks
+            // under the owner's, so the publish returns 200 and the tool is invisible to everyone.
+            // The same line is missing on this surface and the connector MCP; the node's own MCP
+            // already scoped it. Three surfaces, one rule.
             return client.post('/v1/memory', {
                 key: `apps.${requiredString(input, 'app_id')}.tools`,
                 value,
                 visibility: 'public',
                 tags: ['commerce', 'app-tools'],
+                owner_scope: true,
             });
         },
     },

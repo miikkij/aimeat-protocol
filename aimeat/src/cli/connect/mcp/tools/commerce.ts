@@ -49,11 +49,20 @@ export function registerCommerceTools(mcp: McpServer, registry: AgentRegistry): 
     app_id: z.string().describe('The app\'s published filename (manifest key is apps.{app_id}.tools).'),
     tools: z.array(z.record(z.string(), z.unknown())).describe('Full tool list: [{ name, description?, inputSchema?, action_id?, agent?, price?, priceMoney? }].'),
   }, annotationsFor('aimeat_app_tools_publish'), async ({ app_id, tools }) => {
+    // `owner_scope: true` — AN APP TOOL BELONGS TO THE OWNER, WHICHEVER PRINCIPAL PUBLISHED IT.
+    // Without it an AGENT's write lands in the agent's own namespace
+    // (`concierge#bob@node`), while every reader looks the manifest up under the OWNER
+    // (`getMemory(`${ownerName}@${nodeId}`, appToolsKey(app))` in mcp/exchange-run.ts and
+    // commerce/sellable-resolvers.ts). Publish answered 200 and the tool was invisible to
+    // everyone, the publishing agent included. The node's own MCP already passed the equivalent
+    // (`ownerScoped: true` through writeMemoryRecord); this surface did not, which is how the two
+    // disagreed. Measured 2026-09-02 against a live node.
     return out(await client.post('/v1/memory', {
       key: `apps.${app_id}.tools`,
       value: { version: 1, updatedAt: new Date().toISOString(), tools },
       visibility: 'public',
       tags: ['commerce', 'app-tools'],
+      owner_scope: true,
     }));
   });
 
