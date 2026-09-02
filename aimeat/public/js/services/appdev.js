@@ -6,10 +6,12 @@
  *   AppDev knowledge base: learned pitfalls (list/share/outdated/delete), agent-proposed
  *   template proposals (list/get/delete), the curated pitfall registry, and the copyable
  *   research-first prompts (appdev-flow + build-app) for starting a coding agent right.
- * @structure getFlowPromptText · getBuildPromptText · getCuratedPitfalls · getLearnedPitfalls ·
+ * @structure getFlowPromptText · getBuildPromptText · getCuratedPitfalls · queryLearnedPitfalls ·
  *   updateLearnedPitfall · deleteLearnedPitfall · getTemplateProposals · deleteTemplateProposal
- * @usage import { getLearnedPitfalls } from '/js/services/appdev.js';
+ * @usage import { queryLearnedPitfalls } from '/js/services/appdev.js';
  * @version-history
+ *   v1.1.0 — 2026-09-03 — queryLearnedPitfalls() replaces getLearnedPitfalls(): one page with
+ *     filters, search and facets instead of every entry with its body (AppDev page, poster face).
  *   v1.0.0 — 2026-07-19 — initial (AppDev KB UI phase).
  */
 import { api, apiGet, apiPatch, apiDelete } from '/js/api.js';
@@ -38,10 +40,20 @@ export async function getCuratedPitfalls(params = {}) {
   return data?.data || { pitfalls: [], total: 0, facets: {} };
 }
 
-/** Own learned entries (+ optionally other owners' shared ones). */
-export async function getLearnedPitfalls(includeShared) {
-  const data = await apiGet(`/v1/appdev/pitfalls/learned${includeShared ? '?include_shared=1' : ''}`);
-  return data?.data || { pitfalls: [], total: 0 };
+/**
+ * One page of the learned entries with the counts around it: { pitfalls, total, offset, limit,
+ * facets (the whole scope), filtered_facets (what the filter left), community (what other owners
+ * shared) }. Params: include_shared, status (active|outdated|all), severity, category, model,
+ * applies_to, shared (true|false), q, sort (updated|severity), limit, offset.
+ */
+export async function queryLearnedPitfalls(params = {}) {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v === undefined || v === null || v === '') continue;
+    q.set(k, typeof v === 'boolean' ? (v ? '1' : '0') : String(v));
+  }
+  const data = await apiGet(`/v1/appdev/pitfalls/learned?${q}`);
+  return data?.data || { pitfalls: [], total: 0, offset: 0, limit: 25, facets: {}, filtered_facets: {}, community: 0 };
 }
 
 /** Toggle share (platform-wide) / status (active|outdated) on an own entry. */

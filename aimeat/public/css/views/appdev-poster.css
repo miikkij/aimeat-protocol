@@ -1,0 +1,92 @@
+/**
+ * @file appdev-poster.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The AppDev page in the poster face (ad- prefix; design canvas "AppDev: tieto ja
+ *   kiihdytys", direction A). The shared parts come from organism.css's og- rules; this file
+ *   carries what the page adds: the two prompt rows, the tier lines, the filter chips and the
+ *   search line, the list of pitfalls and proposals (severity mark, title, area and model, doors)
+ *   with the panel that opens under one row, and the how-it-accrues facts.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-03 — Initial.
+ */
+
+.og-appdev .og-chip--coral { border-color: var(--accent); color: var(--accent); }
+.og-appdev .og-doors > a { text-decoration: none; }
+.og-appdev .og-door:disabled { opacity: .5; cursor: default; }
+.og-appdev .og-mast-actions .og-slab { text-decoration: none; }
+.ad-hint { margin: .7rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--text-dim); }
+.ad-empty { margin: 0; padding: .3rem 0 .6rem; font-size: .95rem; line-height: 1.55; font-weight: 600; color: var(--text-dim); }
+.ad-empty b { color: var(--text); font-weight: 800; }
+
+/* ── The two prompts ───────────────────────────────────────────────────────────────────────── */
+.ad-prl { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) auto; gap: 0 1.2rem; align-items: stretch; }
+.ad-pr { display: contents; }
+.ad-pr > div { padding: .8rem 0; border-bottom: 1px solid var(--border); min-width: 0; display: grid; align-content: center; }
+.ad-pr-nm { font-size: 1rem; font-weight: 800; color: var(--text); }
+.ad-pr-nm small { display: block; margin-top: .2rem; font-family: var(--font-mono); font-size: .7rem; font-weight: 400; color: var(--text-dim); overflow-wrap: anywhere; }
+.ad-pr-ds { font-size: .85rem; line-height: 1.5; color: var(--text-dim); }
+/* The rows are display: contents, so a cell's parent selector is the row, never the grid. */
+.ad-pr > .ad-pr-go { display: flex; justify-content: flex-end; align-items: center; gap: .9rem; white-space: nowrap; }
+.ad-pr-go .og-door { font-size: .72rem; text-decoration: none; }
+.ad-tier { display: grid; grid-template-columns: 3.5rem minmax(0, 1fr); gap: .35rem .9rem; margin-top: .8rem; font-size: .9rem; line-height: 1.5; color: var(--text); }
+.ad-tier b { font-family: var(--font-mono); font-size: .8rem; font-weight: 800; color: var(--accent); }
+
+/* ── Filters and the search line ───────────────────────────────────────────────────────────── */
+.ad-facets { display: flex; flex-wrap: wrap; gap: .45rem; margin: .6rem 0 .3rem; }
+.ad-facet { font-family: var(--font-mono); font-size: .72rem; padding: .15rem .55rem; border: 1px solid var(--text); background: var(--card-bg); color: var(--text); cursor: pointer; line-height: 1.5; }
+.ad-facet em { font-style: normal; color: var(--text-dim); margin-left: .35rem; }
+.ad-facet.is-on { background: var(--sun); border-color: var(--sun); color: var(--on-sun); }
+.ad-facet.is-on em { color: var(--on-sun); opacity: .75; }
+.ad-facet:disabled { opacity: .45; cursor: default; }
+.ad-search { display: flex; align-items: center; gap: 1rem; margin: .8rem 0 .6rem; }
+.ad-search .og-input { flex: 1 1 auto; min-width: 0; }
+.ad-search small { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); white-space: nowrap; }
+
+/* ── The list: a severity mark, the title, area and model, the doors; a panel under one row ── */
+.ad-pl { display: grid; grid-template-columns: 5.6rem minmax(0, 1fr) minmax(8rem, 12rem) auto; gap: 0 .9rem; align-items: stretch; }
+.ad-p { display: contents; }
+.ad-p > div { padding: .65rem 0; border-bottom: 1px solid var(--border); min-width: 0; display: grid; align-content: center; }
+.ad-p--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.ad-p--dim > div { opacity: .6; }
+.ad-sv b { display: inline-block; justify-self: start; padding: .1rem .45rem; border: 2px solid var(--text); font-family: var(--font-mono); font-size: .64rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text); white-space: nowrap; }
+.ad-sv b.is-crit { background: var(--accent); border-color: var(--accent); color: #fff; }
+.ad-sv b.is-info { border-color: var(--border); color: var(--text-dim); }
+.ad-ti { font-size: .92rem; font-weight: 800; line-height: 1.35; color: var(--text); overflow-wrap: anywhere; }
+.ad-ti small { display: block; margin-top: .15rem; font-family: var(--font-mono); font-size: .7rem; font-weight: 400; color: var(--text-dim); }
+.ad-me { font-family: var(--font-mono); font-size: .72rem; line-height: 1.45; color: var(--text-dim); overflow-wrap: anywhere; }
+.ad-me b { display: block; font-weight: 700; color: var(--text); }
+.ad-p > .ad-go { display: flex; justify-content: flex-end; align-items: center; gap: .8rem; white-space: nowrap; }
+.ad-go .og-door { font-size: .72rem; text-decoration: none; }
+.ad-p > .ad-open { grid-column: 1 / -1; display: block; margin: 0 0 .2rem 6.5rem; padding: .8rem 1rem .9rem; border: 3px dashed var(--accent); background: var(--card-bg); font-size: .9rem; line-height: 1.55; color: var(--text); }
+.ad-open .og-label { display: block; margin: .6rem 0 .2rem; }
+.ad-open .og-label:first-child { margin-top: 0; }
+.ad-open p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ad-open code { font-family: var(--font-mono); font-size: .78rem; background: var(--bg-dim); padding: .05rem .3rem; }
+.ad-open .og-chips { margin-top: .4rem; }
+.ad-more { display: flex; align-items: center; gap: 1rem; margin-top: .8rem; }
+.ad-more small { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
+
+/* ── How it accrues ────────────────────────────────────────────────────────────────────────── */
+.ad-kv { display: grid; grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr); gap: .8rem 1.2rem; align-items: start; }
+.ad-k { font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); padding-top: .25rem; }
+.ad-v { font-size: .95rem; line-height: 1.5; color: var(--text); min-width: 0; }
+.ad-v small { display: block; margin-top: .15rem; font-size: .82rem; line-height: 1.45; color: var(--text-dim); }
+
+/* ── Phone ─────────────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 860px) {
+  .ad-prl { grid-template-columns: minmax(0, 1fr); }
+  .ad-pr > .ad-pr-ds { border-bottom: 0; padding-top: 0; }
+  .ad-pr > .ad-pr-nm { border-bottom: 0; padding-bottom: .2rem; }
+  .ad-pr > .ad-pr-go { justify-content: flex-start; padding-top: 0; flex-wrap: wrap; }
+  .ad-search { flex-wrap: wrap; }
+  .ad-pl { grid-template-columns: 5.6rem minmax(0, 1fr); }
+  .ad-p--head > div { display: none; }
+  .ad-p > .ad-ti { border-bottom: 0; padding-bottom: .2rem; }
+  .ad-p > .ad-me { grid-column: 2; border-bottom: 0; padding-top: 0; padding-bottom: .2rem; }
+  .ad-p > .ad-go { grid-column: 2; justify-content: flex-start; padding-top: 0; flex-wrap: wrap; }
+  .ad-p > .ad-open { margin-left: 0; }
+  .ad-kv { grid-template-columns: 1fr; gap: .3rem 0; }
+  .ad-k { padding-top: .6rem; }
+}

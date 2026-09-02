@@ -12,6 +12,9 @@
  * @structure registerAppdevPitfallTools() — aimeat_appdev_pitfall_report / _list / _delete
  * @usage registerAppdevPitfallTools(mcp, storage, config, () => agentGaii, emitResourceUpdated);
  * @version-history
+ *   v1.3.0 -- 2026-09-03 -- The list's filter, sort, facet and page step is services/appdev-kb.ts
+ *     filterPitfalls(), shared with the REST route the AppDev page reads; the tool keeps merging
+ *     the curated registry in before it. Same output shape.
  *   v1.2.0 -- 2026-08-11 -- The delete calls services/appdev-kb.ts deletePitfallEntry(), the same
  *     function the REST door calls, instead of repeating the record delete and the manifest
  *     cleanup here. The live update moved into that function, so both doors now emit it.
@@ -35,14 +38,13 @@ import {
     PITFALL_PACKAGE_ID, PITFALL_PREFIX, PITFALL_MANIFEST_KEY, PITFALL_SLUG_RE, slugifyKb,
     listOwnerScopeMemory as kbListOwnerScope, ownIdentitySet as kbOwnIdentitySet,
     findOwnEntry as kbFindOwnEntry, upsertPitfallManifest,
-    pitfallEntryKey, deletePitfallEntry,
-    type LearnedPitfallValue,
+    pitfallEntryKey, deletePitfallEntry, filterPitfalls,
+    type LearnedPitfallValue, type PitfallLike,
 } from '../services/appdev-kb.js';
 
 export { PITFALL_PACKAGE_ID };
 
 const SEVERITIES = ['info', 'warn', 'critical'] as const;
-const SEV_RANK: Record<string, number> = { critical: 0, warn: 1, info: 2 };
 
 type PitfallEntryValue = LearnedPitfallValue;
 
@@ -211,37 +213,20 @@ export function registerAppdevPitfallTools(
                 }
             }
 
-            let filtered = entries;
-            if (wantStatus !== 'all') filtered = filtered.filter(e => e.status === wantStatus);
-            if (category) filtered = filtered.filter(e => e.category === slugify(category) || e.id === category);
-            if (normModel) filtered = filtered.filter(e => e.model === null || e.model === normModel);
-            if (applies_to) filtered = filtered.filter(e => (e.applies_to as string[]).includes(applies_to.toLowerCase()));
-
-            filtered.sort((a, b) => {
-                const s = (SEV_RANK[a.severity as string] ?? 1) - (SEV_RANK[b.severity as string] ?? 1);
-                if (s !== 0) return s;
-                return String(b.updated ?? '').localeCompare(String(a.updated ?? ''));
+            // The filter, sort, facet and page step is filterPitfalls(), the same one the profile
+            // page's REST route calls. Facets here count what the filter left, as they always did.
+            const page = filterPitfalls(entries as PitfallLike[], {
+                status: wantStatus, category, model: normModel, applies_to, sort: 'severity', limit, offset,
             });
-
-            const facets: { category: Record<string, number>; model: Record<string, number>; source: Record<string, number> } = { category: {}, model: {}, source: {} };
-            for (const e of filtered) {
-                const c = (e.category as string | null) ?? '(curated)';
-                facets.category[c] = (facets.category[c] ?? 0) + 1;
-                if (e.model) facets.model[e.model as string] = (facets.model[e.model as string] ?? 0) + 1;
-                facets.source[e.source as string] = (facets.source[e.source as string] ?? 0) + 1;
-            }
-
-            const lim = limit ?? 25;
-            const off = offset ?? 0;
             return {
                 content: [{
                     type: 'text' as const,
                     text: JSON.stringify({
-                        pitfalls: filtered.slice(off, off + lim),
-                        total: filtered.length,
-                        offset: off,
-                        limit: lim,
-                        facets,
+                        pitfalls: page.pitfalls,
+                        total: page.total,
+                        offset: page.offset,
+                        limit: page.limit,
+                        facets: page.filtered_facets,
                         hint: 'Full learned entries: aimeat_knowledge_get package_id=appdev-pitfalls. Curated detail: GET /v1/appdev/pitfalls/{id}.',
                     }, null, 2),
                 }],

@@ -12196,10 +12196,14 @@ paths:
       operationId: listLearnedAppdevPitfalls
       summary: The caller's learned appdev pitfalls (profile UI management surface)
       description: >-
-        Full-body learned pitfall entries in the caller's owner scope (own GHII + every
-        same-owner agent), any visibility; with include_shared=1 also other owners'
-        public-shared entries (source: shared, read-only). Curated registry entries are
-        served separately at GET /v1/appdev/pitfalls.
+        One page of full-body learned pitfall entries in the caller's owner scope (own GHII +
+        every same-owner agent), any visibility; with include_shared=1 also other owners'
+        public-shared entries (source: shared, read-only). Filtered, sorted and paged by the
+        same step the aimeat_appdev_pitfall_list MCP tool uses. data.facets count the whole
+        scope (so filter chips keep their numbers while a filter is on), data.filtered_facets
+        count what the filter left, and data.community is how many entries other owners have
+        shared whether or not they are included. Curated registry entries are served
+        separately at GET /v1/appdev/pitfalls.
       tags: [Discovery]
       security:
         - BearerAuth: []
@@ -12207,9 +12211,42 @@ paths:
         - name: include_shared
           in: query
           schema: { type: boolean, default: false }
+        - name: status
+          in: query
+          description: Default all on this door (the page hides outdated itself with status=active).
+          schema: { type: string, enum: [active, outdated, all], default: all }
+        - name: severity
+          in: query
+          schema: { type: string, enum: [info, warn, critical] }
+        - name: category
+          in: query
+          schema: { type: string }
+        - name: model
+          in: query
+          schema: { type: string }
+        - name: applies_to
+          in: query
+          schema: { type: string }
+        - name: shared
+          in: query
+          description: Own entries only, true = shared platform-wide, false = private.
+          schema: { type: boolean }
+        - name: q
+          in: query
+          description: Case-insensitive text over title, symptom, resolution, app and model.
+          schema: { type: string, maxLength: 200 }
+        - name: sort
+          in: query
+          schema: { type: string, enum: [updated, severity], default: updated }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
       responses:
         '200':
-          description: data.pitfalls (full bodies) + data.total
+          description: data.pitfalls (one page, full bodies) + total, offset, limit, facets, filtered_facets, community
         '401':
           $ref: '#/components/responses/Unauthorized'
 
