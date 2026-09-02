@@ -116,9 +116,11 @@ describe('the tools, which is a different question from the shape', () => {
         expect(rules(stripped)).toContain('must declare "delegate"');
     });
 
-    it('and each of the three to be able to read what the account holds', () => {
-        for (const name of ['concierge', 'crew-forge', 'workflow-manager']) {
-            const t = structuredClone(BASIC_AGENTS.find(a => a.name === name)!) as unknown as Shippable;
+    it('and every SHIPPED agent to be able to read what the account holds', () => {
+        // Iterates the real set rather than a list of names, so it followed crew-forge out on
+        // 2026-09-02 without needing an edit — and will follow the next change the same way.
+        for (const template of BASIC_AGENTS) {
+            const t = structuredClone(template) as unknown as Shippable;
             t.crewDef.agents.forEach(a => { a.tools = (a.tools ?? []).filter(x => x !== 'memory'); });
             expect(rules(t)).toContain('must declare "memory"');
         }

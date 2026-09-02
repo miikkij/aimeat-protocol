@@ -15,8 +15,7 @@
  *   THE REFUSALS COME FIRST in the order that matters: a daemon cannot enrol for another owner,
  *   cannot get more scope than the template grants, cannot spend a grant twice, cannot submit a card
  *   signed by a key other than the one it carries, and cannot press the button at all without being
- *   the account holder. crew-forge, the agent that creates agents, cannot create one for anybody
- *   else.
+ *   the account holder. An agent granted `agent:write` cannot create one for anybody else.
  *
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-v2
  * @version-history
@@ -32,7 +31,7 @@ const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const ENROL_CAPABILITY = 'aimeat.agents.enrol';
 const KEY_GRANT = 'urn:aimeat:params:oauth:grant-type:agent-key';
-const BASIC_NAMES = ['concierge', 'crew-forge', 'workflow-manager'];
+const BASIC_NAMES = ['concierge', 'workflow-manager'];
 
 let passed = 0;
 let failed = 0;
@@ -319,7 +318,7 @@ async function run() {
 
     // ── 4. The button ─────────────────────────────────────────────────────────
     let pressBody: any;
-    await test('one press, three agents, nothing pasted and nothing restarted', async () => {
+    await test('one press, the whole basic set, nothing pasted and nothing restarted', async () => {
         dA.onEnrol = async (offer) => {
             const cards: string[] = [];
             for (const offered of offer.agents) {
@@ -338,8 +337,8 @@ async function run() {
         const r = await json('/v1/agents/v2/basic-agents', { method: 'POST', headers: authA });
         pressBody = r.body;
         assert(r.status === 200, `expected 200, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
-        assert((r.body.data.created as string[]).length === 3, `expected 3 created, got ${JSON.stringify(r.body.data.created)}`);
-        assert((r.body.data.enrolled as any[]).length === 3, `expected 3 enrolled, got ${JSON.stringify(r.body.data.enrolled)}`);
+        assert((r.body.data.created as string[]).length === BASIC_NAMES.length, `expected ${BASIC_NAMES.length} created, got ${JSON.stringify(r.body.data.created)}`);
+        assert((r.body.data.enrolled as any[]).length === BASIC_NAMES.length, `expected ${BASIC_NAMES.length} enrolled, got ${JSON.stringify(r.body.data.enrolled)}`);
     });
 
     await test('the ask retires itself once the person has pressed, with nobody ticking it off', async () => {
@@ -366,7 +365,7 @@ async function run() {
         assert(r.status === 200, `the v1 agent should still answer, got ${r.status}`);
     });
 
-    await test('the three agents are listed with their run mode and credential state', async () => {
+    await test('the basic agents are listed with their run mode and credential state', async () => {
         const list = await json('/v1/agents?owner=' + a.owner, { headers: authA });
         for (const n of BASIC_NAMES) {
             const rec = (list.body.data.agents as any[]).find(x => x.name === n);
@@ -402,7 +401,7 @@ async function run() {
         assert((none.body.data.agents as any[]).length === 0, 'an unknown run mode returns nothing, never everything');
     });
 
-    // ── The definitions: three agents that have something to BE ────────────────
+    // ── The definitions: every basic agent has something to BE ─────────────────
     //
     // crewaimeat measured the deadlock: publish needs a runtime, a runtime needs a definition, a
     // definition would need publishing. So the definition has to exist before first start, and the
@@ -538,11 +537,14 @@ async function run() {
     });
 
     await test('the card asked for the wildcard and was granted the template instead', async () => {
+        // The template's scopes win over anything the card asked for. `workflow-manager` is the one
+        // to read here now: it coordinates, so it carries work and workflow words, and deliberately
+        // not the wildcard. (This used to read crew-forge, which left the basic set on 2026-09-02.)
         const list = await json('/v1/agents?owner=' + a.owner, { headers: authA });
-        const forge = (list.body.data.agents as any[]).find(x => x.name === 'crew-forge');
-        assert(!forge.default_scopes.includes('*'), 'crew-forge must not hold the wildcard');
-        assert(forge.default_scopes.includes('agent:write'), 'crew-forge should hold agent:write');
-        assert(!forge.default_scopes.includes('agent:permissions'), 'crew-forge must not hold agent:permissions');
+        const wm = (list.body.data.agents as any[]).find(x => x.name === 'workflow-manager');
+        assert(!wm.default_scopes.includes('*'), 'workflow-manager must not hold the wildcard');
+        assert(wm.default_scopes.includes('work:request'), 'workflow-manager should hold work:request');
+        assert(!wm.default_scopes.includes('agent:permissions'), 'no basic agent may hold agent:permissions');
     });
 
     // ── 5. The card verifies from outside, using only the published JWKS ──────
@@ -843,7 +845,7 @@ async function run() {
             body: JSON.stringify({ grant_id: grantC, cards }),
         });
         assert(r.status === 200, `expected 200, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
-        assert((r.body.data.enrolled as any[]).length === 3, 'all three should come back');
+        assert((r.body.data.enrolled as any[]).length === BASIC_NAMES.length, `all ${BASIC_NAMES.length} should come back`);
     });
 
     await test('the same grant cannot be spent again', async () => {
@@ -859,16 +861,27 @@ async function run() {
         assert(r.body?.error?.code === 'ALREADY_USED', `expected ALREADY_USED, got ${r.body?.error?.code}`);
     });
 
-    // ── 8. crew-forge creates agents for its owner and for nobody else ────────
-    await test('crew-forge cannot create an agent for a different owner', async () => {
-        const gaii = `crew-forge#${a.owner}@${NODE_ID}`;
-        const assertion = await signAssertion(gaii, keysByAgent.get('crew-forge')!);
-        const mint = await json('/v1/agents/v2/token', { method: 'POST', body: JSON.stringify({ grant_type: KEY_GRANT, assertion }) });
-        assert(mint.status === 200, `crew-forge mint ${mint.status}`);
-        const forgeToken = mint.body.access_token as string;
+    // -- 8. The agent:write fence on the auto-approve branch ------------------
+    //
+    // These used to be driven by `crew-forge`, which held `agent:write` and was one of the three
+    // basic agents. It LEFT the basic set on 2026-09-02 (see the tombstone in data/basic-agents.ts):
+    // creation moved to a proposal the owner approves, because an agent that creates agents adds a
+    // hop, spends the owner's tokens, and takes the person out of the moment their account gains a
+    // principal.
+    //
+    // THE FENCE STAYS, and so do these tests. It is correct regardless of who knocks, and the
+    // branch is still reachable by any agent an owner grants `agent:write` -- so the tests now make
+    // such an agent instead of relying on one shipping by default. What they assert is unchanged:
+    // holding the word settles a registration on the spot, and not holding it never does.
+    // `memory:write` because proposing an agent IS a memory write — the proposal record and the row
+    // on the owner's list — and the propose route is gated on it in middleware. `agent:write` is
+    // what the auto-approve fence below reads. Deliberately NOT the wildcard: the escalation tests
+    // need a proposer with a real ceiling to exceed.
+    const writer = await addV1Agent(a.owner, a.ownerToken, 'fence-writer', ['agent:write', 'memory:read', 'memory:write']);
 
+    await test('an agent with agent:write cannot create for a DIFFERENT owner', async () => {
         const r = await json('/v1/agents/device-authorize', {
-            method: 'POST', headers: { Authorization: `Bearer ${forgeToken}` },
+            method: 'POST', headers: { Authorization: `Bearer ${writer.token}` },
             body: JSON.stringify({ agent_name: 'forged-sibling', owner: b.owner, scopes: ['memory:read'] }),
         });
         // The cross-owner case falls through to the ordinary pending flow: no auto-approval, no
@@ -879,24 +892,15 @@ async function run() {
         assert(!names.includes('forged-sibling'), 'no agent may appear under the other owner');
     });
 
-    await test('crew-forge cannot hand a sibling more than it holds itself', async () => {
-        const gaii = `crew-forge#${a.owner}@${NODE_ID}`;
-        const assertion = await signAssertion(gaii, keysByAgent.get('crew-forge')!);
-        const mint = await json('/v1/agents/v2/token', { method: 'POST', body: JSON.stringify({ grant_type: KEY_GRANT, assertion }) });
-        const forgeToken = mint.body.access_token as string;
+    await test('and cannot hand a sibling more than it holds itself', async () => {
         const r = await json('/v1/agents/device-authorize', {
-            method: 'POST', headers: { Authorization: `Bearer ${forgeToken}` },
+            method: 'POST', headers: { Authorization: `Bearer ${writer.token}` },
             body: JSON.stringify({ agent_name: 'over-reacher', owner: a.owner, scopes: ['account:security'] }),
         });
         assert(r.body?.data?.auto_approved !== true, 'an escalating registration must wait for the owner');
     });
 
-    // ── 8a. Making an agent needs agent:write ─────────────────────────────────
-    //
-    // This route's same-owner branch is the ONLY way an agent creates an agent, and until
-    // 2026-09-01 it read no scope at all: every same-owner agent qualified. The owner's three
-    // basic agents are granted different permissions on purpose — only crew-forge is given
-    // agent:write — and that distinction was not kept. These four tests are that distinction.
+    // -- 8a. Holding the word is what decides it ------------------------------
     const mintFor = async (name: string, owner: string) => {
         const assertion = await signAssertion(`${name}#${owner}@${NODE_ID}`, keysByAgent.get(name)!);
         const mint = await json('/v1/agents/v2/token', { method: 'POST', body: JSON.stringify({ grant_type: KEY_GRANT, assertion }) });
@@ -904,32 +908,29 @@ async function run() {
         return mint.body.access_token as string;
     };
 
-    await test('crew-forge holds agent:write, so its registration is settled on the spot', async () => {
+    await test('an agent holding agent:write settles its registration on the spot', async () => {
         const r = await json('/v1/agents/device-authorize', {
-            method: 'POST', headers: { Authorization: `Bearer ${await mintFor('crew-forge', a.owner)}` },
-            body: JSON.stringify({ agent_name: 'forged-by-forge', owner: a.owner, scopes: ['memory:read'] }),
+            method: 'POST', headers: { Authorization: `Bearer ${writer.token}` },
+            body: JSON.stringify({ agent_name: 'forged-by-writer', owner: a.owner, scopes: ['memory:read'] }),
         });
         assert(r.status === 200, `expected 200, got ${r.status}`);
-        assert(r.body?.data?.auto_approved === true, 'crew-forge is the one that may do this');
+        assert(r.body?.data?.auto_approved === true, 'holding agent:write is what may do this');
         const list = await json('/v1/agents?owner=' + a.owner, { headers: authA });
-        assert((list.body.data.agents as any[]).some(x => x.name === 'forged-by-forge'), 'the agent should exist');
+        assert((list.body.data.agents as any[]).some(x => x.name === 'forged-by-writer'), 'the agent should exist');
 
-        // And `registeredBy` named the forge — proven through the gate that reads it rather than
-        // through a listing field, because that is where the value has to be right. The forge may
-        // end what it made; a sibling of the same owner, holding the same delete word, may not.
+        // `registeredBy` named the writer -- proven through the gate that READS it rather than a
+        // listing field. A sibling holding the same delete word may not end what it did not make.
         const sibling = await addV1Agent(a.owner, a.ownerToken, 'not-the-registrar', ['agent:delete']);
-        const bySibling = await json('/v1/agents/forged-by-forge', {
+        const bySibling = await json('/v1/agents/forged-by-writer', {
             method: 'DELETE', headers: { Authorization: `Bearer ${sibling.token}` },
         });
         assert(bySibling.status === 403, `a sibling that did not register it must be refused, got ${bySibling.status}`);
-        const byForge = await json('/v1/agents/forged-by-forge', {
-            method: 'DELETE', headers: { Authorization: `Bearer ${await mintFor('crew-forge', a.owner)}` },
-        });
-        assert(byForge.status === 200, `the forge that made it may end it, got ${byForge.status}`);
+        const byOwner = await json('/v1/agents/forged-by-writer', { method: 'DELETE', headers: authA });
+        assert(byOwner.status === 200, `the owner may end it, got ${byOwner.status}`);
     });
 
-    for (const name of ['concierge', 'workflow-manager']) {
-        await test(`${name} does not, and is told which permission is missing`, async () => {
+    for (const name of BASIC_NAMES) {
+        await test(`${name} does not hold agent:write, and is told which permission is missing`, async () => {
             const r = await json('/v1/agents/device-authorize', {
                 method: 'POST', headers: { Authorization: `Bearer ${await mintFor(name, a.owner)}` },
                 body: JSON.stringify({ agent_name: `forged-by-${name}`, owner: a.owner, scopes: ['memory:read'] }),
@@ -946,7 +947,6 @@ async function run() {
             assert(said.includes('agent:write'), `the refusal must name the scope: ${said}`);
             assert(/profile/i.test(said), `and where the owner approves it: ${said}`);
 
-            // Nothing was created, and no credential is waiting for anyone to collect.
             const list = await json('/v1/agents?owner=' + a.owner, { headers: authA });
             assert(!(list.body.data.agents as any[]).some(x => x.name === `forged-by-${name}`),
                 'no agent may exist before the owner approves');
@@ -954,7 +954,7 @@ async function run() {
     }
 
     await test('the owner\'s own session is unaffected by any of this', async () => {
-        // The owner holds no scopes at all — their session IS the permission — so a rule about
+        // The owner holds no scopes at all -- their session IS the permission -- so a rule about
         // scopes must not reach them.
         const r = await json('/v1/agents/device-authorize', {
             method: 'POST', headers: authA,
@@ -962,6 +962,154 @@ async function run() {
         });
         assert(r.status === 200, `expected 200, got ${r.status}`);
         assert(r.body?.data?.auto_approved === true, 'an owner registering their own agent is still immediate');
+    });
+
+    // ── 8c. An agent proposes an agent; the owner approves it ────────────────
+    //
+    // This is what replaced crew-forge on 2026-09-02. Creating an agent is two data writes and does
+    // not need an agent of its own; writing a GOOD definition is a reasoning task, best done by the
+    // model the owner is already talking to. So an agent PROPOSES, and the owner — in person, on
+    // their own session — is what turns a proposal into a principal.
+    const PROPOSED_DEF = {
+        readme_md: '# Reader',
+        tags: ['role.reader'],
+        process: 'sequential' as const,
+        listen_for: ['tasks'],
+        agents: [{ role: 'Reader', goal: 'read', backstory: 'You read.', allow_delegation: false, tools: ['memory'] }],
+        tasks: [{ id: 'read', description: 'Read this: {{ctx.prompt}}', expected_output: 'notes', agent: 'Reader' }],
+    };
+
+    let proposalId = '';
+    await test('an agent proposes an agent, and NOTHING is created', async () => {
+        const r = await json('/v1/agents/v2/agent-proposals', {
+            method: 'POST', headers: { Authorization: `Bearer ${writer.token}` },
+            body: JSON.stringify({
+                name: 'proposed-reader', display_name: 'Reader',
+                purpose: 'Reads long documents and answers questions about them.',
+                scopes: ['memory:read'], mode: 'task-runner', run_mode: 'spawn',
+                crew_def: PROPOSED_DEF,
+            }),
+        });
+        assert(r.status === 201, `expected 201, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        assert(r.body.data.created === false, 'a proposal must create nothing');
+        proposalId = r.body.data.proposal.id;
+
+        // The whole point: the account does not have this agent yet.
+        const list = await json('/v1/agents?owner=' + a.owner, { headers: authA });
+        assert(!(list.body.data.agents as any[]).some(x => x.name === 'proposed-reader'),
+            'the proposed agent must not exist before the owner approves');
+    });
+
+    await test('the owner sees it waiting', async () => {
+        const r = await json('/v1/agents/v2/agent-proposals', { headers: authA });
+        assert(r.status === 200, `list ${r.status}`);
+        const mine = (r.body.data.proposals as any[]).find(p => p.id === proposalId);
+        assert(!!mine && mine.state === 'proposed', `expected a waiting proposal, got ${JSON.stringify(mine?.state)}`);
+        assert(mine.proposed_by === writer.gaii, `it should name who asked, got ${mine.proposed_by}`);
+    });
+
+    await test('an agent cannot approve its own proposal — that gate is the owner in person', async () => {
+        const r = await json(`/v1/agents/v2/agent-proposals/${proposalId}/approve`, {
+            method: 'POST', headers: { Authorization: `Bearer ${writer.token}` },
+        });
+        assert(r.status === 403, `expected 403, got ${r.status}`);
+        const list = await json('/v1/agents?owner=' + a.owner, { headers: authA });
+        assert(!(list.body.data.agents as any[]).some(x => x.name === 'proposed-reader'), 'still nothing created');
+    });
+
+    await test('the owner approves, and the agent exists WITH its definition', async () => {
+        const r = await json(`/v1/agents/v2/agent-proposals/${proposalId}/approve`, { method: 'POST', headers: authA });
+        assert(r.status === 200, `expected 200, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        assert(r.body.data.created === true && r.body.data.seeded === true, 'created and seeded together');
+
+        const gaii = `proposed-reader#${a.owner}@${NODE_ID}`;
+        const rec = (await json('/v1/agents?owner=' + a.owner, { headers: authA }))
+            .body.data.agents.find((x: any) => x.name === 'proposed-reader');
+        assert(!!rec, 'the agent should exist now');
+        assert(rec.mode === 'task-runner' && rec.run_mode === 'spawn', 'it carries what was proposed');
+
+        // Seeded in the AGENT's own namespace, the same read the runtime does.
+        const def = await json(`/v1/memory/${encodeURIComponent(gaii)}/crews.registry.proposed-reader`, { headers: authA });
+        assert(def.status === 200, `the definition should be there, got ${def.status}`);
+    });
+
+    await test('and approving twice is refused rather than creating a second one', async () => {
+        const r = await json(`/v1/agents/v2/agent-proposals/${proposalId}/approve`, { method: 'POST', headers: authA });
+        assert(r.status === 409, `expected 409, got ${r.status}`);
+    });
+
+    await test('a proposal cannot ask for more scope than the proposer holds', async () => {
+        const r = await json('/v1/agents/v2/agent-proposals', {
+            method: 'POST', headers: { Authorization: `Bearer ${writer.token}` },
+            body: JSON.stringify({
+                name: 'too-wide', purpose: 'Would hold more than the agent proposing it.',
+                scopes: ['account:security'],
+            }),
+        });
+        assert(r.status === 403, `expected 403, got ${r.status}`);
+        assert(r.body?.error?.code === 'SCOPE_ESCALATION', `got ${r.body?.error?.code}`);
+    });
+
+    await test('a proposal cannot name another owner', async () => {
+        const r = await json('/v1/agents/v2/agent-proposals', {
+            method: 'POST', headers: { Authorization: `Bearer ${writer.token}` },
+            body: JSON.stringify({
+                name: 'for-somebody-else', purpose: 'Belongs to a different account entirely.',
+                scopes: ['memory:read'], for_owner: b.owner,
+            }),
+        });
+        assert(r.status === 403, `expected 403, got ${r.status}`);
+        const list = await json('/v1/agents?owner=' + b.owner, { headers: authB });
+        assert(!(list.body.data.agents as any[]).some(x => x.name === 'for-somebody-else'), 'nothing under the other owner');
+    });
+
+    await test('an ecosystem principal cannot propose an agent', async () => {
+        const ecoToken = await mintEcoToken(a.owner, authA, `propose-eco-${Date.now().toString(36)}`);
+        const r = await json('/v1/agents/v2/agent-proposals', {
+            method: 'POST', headers: { Authorization: `Bearer ${ecoToken}` },
+            body: JSON.stringify({ name: 'eco-made', purpose: 'An app should not add principals.', scopes: [] }),
+        });
+        assert(r.status === 403, `expected 403, got ${r.status}`);
+        assert(r.body?.error?.code === 'ACCESS_DENIED', `got ${r.body?.error?.code}`);
+    });
+
+    await test('a definition that could not run is refused at PROPOSAL time, not at approval', async () => {
+        // The seed door validates nothing and cannot: there is no runtime to ask, which is the
+        // circle that ended crew-forge. So an empty definition would be written down happily and
+        // refused by the runtime at first start — the "agent with nothing to be" the seed exists to
+        // remove. Catching it here means the owner is never shown a proposal that could not work.
+        const bad = await json('/v1/agents/v2/agent-proposals', {
+            method: 'POST', headers: { Authorization: `Bearer ${writer.token}` },
+            body: JSON.stringify({
+                name: 'doomed-agent', purpose: 'Its definition has no agents and no tasks.',
+                scopes: ['memory:read'],
+                crew_def: { readme_md: '', tags: [], process: 'sequential', listen_for: [], agents: [], tasks: [] },
+            }),
+        });
+        assert(bad.status === 400, `expected 400, got ${bad.status}: ${JSON.stringify(bad.body?.data)}`);
+        assert(bad.body?.error?.code === 'INVALID_CREW_DEF', `got ${bad.body?.error?.code}`);
+
+        const list = await json('/v1/agents?owner=' + a.owner, { headers: authA });
+        assert(!(list.body.data.agents as any[]).some(x => x.name === 'doomed-agent'), 'nothing created');
+        const props = await json('/v1/agents/v2/agent-proposals', { headers: authA });
+        assert(!(props.body.data.proposals as any[]).some(p => p.name === 'doomed-agent'),
+            'and it never reached the owner\'s list');
+    });
+
+    await test('a task naming an agent the definition does not have is refused too', async () => {
+        const r = await json('/v1/agents/v2/agent-proposals', {
+            method: 'POST', headers: { Authorization: `Bearer ${writer.token}` },
+            body: JSON.stringify({
+                name: 'orphan-task', purpose: 'Its one task names a role that does not exist.',
+                scopes: ['memory:read'],
+                crew_def: {
+                    readme_md: '# x', tags: [], process: 'sequential', listen_for: ['tasks'],
+                    agents: [{ role: 'Reader', goal: 'g', backstory: 'b', allow_delegation: false }],
+                    tasks: [{ id: 't', description: 'do {{ctx.prompt}}', expected_output: 'e', agent: 'Nobody' }],
+                },
+            }),
+        });
+        assert(r.status === 400 && r.body?.error?.code === 'INVALID_CREW_DEF', `got ${r.status} ${r.body?.error?.code}`);
     });
 
     // ── 8b. A first crew definition for an agent that has no runtime ─────────
@@ -1153,7 +1301,7 @@ async function run() {
         const r = await json('/v1/agents/v2/basic-agents', { method: 'POST', headers: authA });
         assert(r.status === 200, `expected 200, got ${r.status}`);
         assert((r.body.data.created as string[]).length === 0, 'nothing should be created the second time');
-        assert((r.body.data.skipped as any[]).length === 3, 'all three should be reported as already there');
+        assert((r.body.data.skipped as any[]).length === BASIC_NAMES.length, `all ${BASIC_NAMES.length} should be reported as already there`);
     });
 
     // ── 11. The v1 path is untouched ──────────────────────────────────────────
@@ -1372,10 +1520,10 @@ async function run() {
     // process and one directory; the node is what has to keep them apart, and these are the
     // doors that were actually walked with a live daemon on 2026-09-01.
     //
-    // Both owners press the button, so both have a `concierge`, a `crew-forge` and a
-    // `workflow-manager` — the same three NAMES under two accounts, which is the shape that
-    // makes a bare-name assumption anywhere in the stack visible.
-    console.log('\n=== Agent v2: two owners, the same three names ===\n');
+    // Both owners press the button, so both have a `concierge` and a `workflow-manager` — the same
+    // NAMES under two accounts, which is the shape that makes a bare-name assumption anywhere in
+    // the stack visible.
+    console.log('\n=== Agent v2: two owners, the same agent names ===\n');
     {
         const one = await setupOwner('iso1');
         const two = await setupOwner('iso2');

@@ -7248,6 +7248,174 @@ paths:
         '409':
           description: LIST_FULL — the owner's open-items list is at its cap
 
+  /v1/agents/v2/agent-proposals:
+    post:
+      operationId: proposeAgent
+      summary: Propose a new agent for this account. Creates nothing.
+      description: |
+        An agent designs an agent and puts it in front of its owner. NOTHING IS CREATED HERE: the
+        proposal lands on the owner's open-items list, and the owner approves it in their own
+        session through the owner-gated route below.
+
+        This replaced `crew-forge`, the basic agent that used to create agents, on 2026-09-02.
+        Creating an agent is two data writes -- a record and a definition at
+        `crews.registry.<agent>` -- and the spawner runs whatever the roster says, so it does not
+        need an agent of its own. Writing a GOOD definition is a reasoning task, and the strongest
+        model the owner has is the one they are already talking to.
+
+        TWO CEILINGS. A proposer may not ask for a scope it does not itself hold, and an owner
+        session (which holds no scopes, because the session IS the permission) is exempt from that
+        check. A proposal for another owner is refused, as is one from an `app` or `ecosystem`
+        principal: consent to use an account is not permission to add a principal to it.
+
+        If a `crew_def` is offered it must be able to run -- at least one agent, at least one task,
+        one task taking `{{ctx.prompt}}`, and every task naming a role the definition has. The seed
+        door itself validates nothing and cannot, so a definition that could not work is refused
+        here rather than written down and refused later by the runtime.
+
+        Device authorization is untouched. An agent that brings its own runtime still connects from
+        its own machine and the owner approves it in the browser with the scopes they pick.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, purpose]
+              properties:
+                name:
+                  type: string
+                  description: 3-40 chars, lowercase letters, digits and hyphens, starting with a letter.
+                display_name: { type: string }
+                purpose:
+                  type: string
+                  description: What this agent is for, in a sentence the owner can decide from.
+                scopes:
+                  type: array
+                  items: { type: string }
+                mode:
+                  type: string
+                  enum: [autonomous, interactive, task-runner, coordinator, workstation]
+                run_mode:
+                  type: string
+                  enum: [resident, spawn]
+                crew_def:
+                  type: object
+                  nullable: true
+                  description: What it would BE, in the runtime's crew-definition shape.
+                for_owner:
+                  type: string
+                  description: Must be the caller's own owner when given.
+      responses:
+        '201':
+          description: The proposal is waiting for the owner. Nothing was created.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          created: { type: boolean, enum: [false] }
+                          next_step: { type: string }
+                          proposal: { type: object }
+        '400': { description: A name, purpose or crew definition that could not work }
+        '403': { description: Another owner, an app or ecosystem principal, or more scope than the proposer holds }
+        '409': { description: An agent of that name already exists on this account }
+    get:
+      operationId: listAgentProposals
+      summary: What has been proposed on this account, and what was decided
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Proposals, newest first
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          waiting: { type: integer }
+                          proposals:
+                            type: array
+                            items: { type: object }
+        '403': { description: An app or ecosystem principal }
+
+  /v1/agents/v2/agent-proposals/{id}/approve:
+    post:
+      operationId: approveAgentProposal
+      summary: The owner approves a proposal. Creates the agent and seeds its definition, atomically.
+      description: |
+        THE ACCOUNT HOLDER IN PERSON. Not `requireRole('owner')`, which admits an agent JWT carrying
+        the human's name: adding a principal is a change to the account itself, so it takes the
+        owner principal, the same gate the basic-agents button uses.
+
+        CREATE AND SEED ARE ONE STEP. An agent that exists with nothing to be cannot start and
+        cannot be given a definition afterwards, because publishing one asks the target's runtime to
+        validate it and a new agent has none. So a failed seed deletes the agent it just made and
+        the answer says nothing changed.
+
+        `registeredBy` records WHO ASKED, not who approved -- it is the creation ledger and the
+        fence the sibling-delete gate reads. The owner's approval is recorded as an account event.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: The agent exists, with its definition
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          created: { type: boolean }
+                          seeded: { type: boolean }
+                          next_step: { type: string }
+                          agent: { type: object }
+        '403': { description: Not the account holder in person }
+        '404': { description: No such proposal on this account }
+        '409': { description: Already settled, or the name has been taken since }
+        '502': { description: The definition could not be seeded, so nothing was created }
+
+  /v1/agents/v2/agent-proposals/{id}/decline:
+    post:
+      operationId: declineAgentProposal
+      summary: The owner declines a proposal
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Recorded; nothing was created }
+        '403': { description: Not the account holder in person }
+        '404': { description: No such proposal on this account }
+        '409': { description: Already settled }
   /v1/agents/v2/enrol:
     post:
       operationId: enrolAgentsV2

@@ -86,6 +86,14 @@ export const RESERVED_OWNER_KEY_PREFIXES = [
   // granted app or a delegated agent must not be able to erase or forge the record of its own
   // changes. Measured 2026-08-29: nothing wrote an `audit.*` key through the memory API.
   'audit.',
+  // 2026-09-02: `agents.proposals.<id>` is a proposed AGENT waiting for the owner
+  // (services/agent-proposals.ts), and the approve route ACTS on it: it reads the scopes, the mode
+  // and the run mode out of that record and creates a principal carrying them. The proposer's
+  // scope ceiling is checked when the proposal is WRITTEN, so a granted app that could write the
+  // key directly would skip the ceiling entirely -- forge a proposal carrying any scopes it liked,
+  // and the owner approving a name and a purpose would mint it. Only the propose route writes this
+  // prefix; the owner reads and settles through the agent-proposals routes.
+  'agents.proposals.',
 ] as const;
 
 /** True iff `key` falls under a reserved, server-trusted owner-namespace prefix. */

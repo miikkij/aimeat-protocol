@@ -8127,8 +8127,8 @@
         "failed": "That could not be saved. Try again."
       },
       "basic": {
-        "title": "Start with three agents",
-        "desc": "A front door that answers, one that makes you more agents, and one that orders work from the others. You do not have to set anything up.",
+        "title": "Start with two agents",
+        "desc": "A front door that answers what arrives, and one that orders work from your other agents. You do not have to set anything up.",
         "button": "Create them",
         "working": "Creating…",
         "done": "{count} agents are ready.",

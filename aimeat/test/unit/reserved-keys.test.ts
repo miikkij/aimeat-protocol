@@ -40,13 +40,17 @@ const ACCOUNTANTS_KEY = 'finance.accountants';
 const PSP_KEY = 'commerce.psp';
 
 describe('the list holds every prefix the server reads and acts on', () => {
-    it('carries all nine, and a removal is a test failure rather than a silent regression', () => {
+    it('carries all ten, and a removal is a test failure rather than a silent regression', () => {
         // `audit.` (2026-08-29): the per-app audit log, which a granted app must not rewrite.
         // `notifications.` (2026-08-30): the owner's notification settings, which notify() acts on
         // to drop a muted sender before the write; an app that could write it could silence the
         // budget and security notifications about itself.
+        // `agents.proposals.` (2026-09-02): a proposed AGENT waiting for the owner. The approve
+        // route reads the scopes out of that record and creates a principal carrying them, and the
+        // proposer's ceiling is checked when the proposal is written — so an app that could write
+        // the key would skip the ceiling and have the owner mint whatever it asked for.
         expect([...RESERVED_OWNER_KEY_PREFIXES].sort()).toEqual(
-            ['ai-usage.', 'audit.', 'chat.', 'commerce.', 'finance.', 'notifications.', 'openrouter.', 'profile.', 'signals.'],
+            ['agents.proposals.', 'ai-usage.', 'audit.', 'chat.', 'commerce.', 'finance.', 'notifications.', 'openrouter.', 'profile.', 'signals.'],
         );
     });
 

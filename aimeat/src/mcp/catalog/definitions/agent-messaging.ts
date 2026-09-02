@@ -162,7 +162,7 @@ export const agentMessagingTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_agent_basics_get',
-        description: "What this account would get from the one-press basic agents, and whether it can happen right now. Returns the three agents (concierge, which answers and routes; crew-forge, which makes more agents; workflow-manager, which orders work from the others), the permissions each would hold, which already exist, and whether the owner's connector is running. READ ONLY: you cannot create them. Creating agents changes the account, so the person does it themselves. Hand them `approval_url` and say `next_step` — it is already written for them and true for this account's current state — then call this again to see `enrolled` turn true.",
+        description: "What this account would get from the one-press basic agents, and whether it can happen right now. Returns the two agents (concierge, which answers what arrives and routes the rest; workflow-manager, which orders work from the owner's other agents), the permissions each would hold, which already exist, and whether the owner's connector is running. READ ONLY: you cannot create them. Creating agents changes the account, so the person does it themselves. Hand them `approval_url` and say `next_step` — it is already written for them and true for this account's current state — then call this again to see `enrolled` turn true. To propose a DIFFERENT agent, one you have designed for a job these two do not cover, use aimeat_agent_propose: it puts the proposal in front of the owner and creates nothing until they approve.",
         caller: 'agent',
         visibility: agentEverywhere,
         input: {},
