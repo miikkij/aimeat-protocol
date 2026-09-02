@@ -50,6 +50,10 @@ class ServeClient:
     header is needed here -- `X-Aimeat-Agent` selects which registered agent the call runs as."""
 
     def __init__(self, base_url: str, agent_name: str | None = None, session: Any = None) -> None:
+        # `agent_name` is what ROUTES, so on a daemon holding two owners it must be the full GAII:
+        # a bare name that two owners share is refused there by design, and rightly. A single-owner
+        # daemon resolves a bare name as it always did. daemon.AgentIdentity.gaii is the value to
+        # pass — read from the credential rather than assembled.
         self.base_url = base_url.rstrip("/")
         self.agent_name = agent_name
         self.session = session or requests.Session()
