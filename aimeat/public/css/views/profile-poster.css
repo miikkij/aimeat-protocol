@@ -337,10 +337,9 @@
 .pf .wallet-request, .pf .mem-tools-section, .pf .mem-detail, .pf .mem-browse-panel, .pf .mem-bulkbar, .pf .pn-card, .pf .pn-setup, .pf .agent-cta, .pf .create-form,
 .pf .ext-detail-section, .pf .platform-content, .pf .pf-agd-governance-section, .pf .agd-governance-section, .pf .pf-agd-services-info, .pf .agd-services-info,
 .pf .pf-agd-create-form, .pf .agd-create-form, .pf .pf-agd-builder, .pf .agd-builder, .pf .pf-agd-cgroup-empty, .pf .pf-agd-msg-proposed-task, .pf .agd-msg-proposed-task,
-.pf .pf-agd-directives-content, .pf .hm-step, .pf .stat-card, .pf .pf-usage-card {
+.pf .pf-agd-directives-content, .pf .stat-card, .pf .pf-usage-card {
   background: none; border: 0; border-top: 3px solid var(--text); border-radius: 0; box-shadow: none; padding: 1rem 0 1.25rem;
 }
-.pf .hm-step--proof { border-left: 0; border-top-color: var(--accent); }
 .pf .stat-card { padding: 0.9rem 0 1rem; }
 /* Rows: one rule under each, the row's own words in bold */
 .pf .sch-card, .pf .of-card, .pf .wf-card, .pf .cap-item, .pf .pf-nb-note, .pf .pf-nb-hit, .pf .mem-browse-item, .pf .mem-discover-item,
