@@ -1,0 +1,129 @@
+/*
+ * @file aimeat-atelier/lenis-more.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The clothes for the two scroll pieces in lenis-more.js: the PARALLAX box, whose
+ *   layers travel at their own speeds, and the READING RAIL, the contents of a long article with
+ *   the current heading lit and a line saying how far through it the reader is. Every value
+ *   rides the --ak-* contract, so both answer every look, palette and mode; there is no colour of
+ *   its own here and nothing animates on its own.
+ *
+ *   A LAYER'S POSITION IS TWO CUSTOM PROPERTIES AND NOTHING ELSE. JS sets `--ak-plx-x` and
+ *   `--ak-plx-y` in pixels from where the box stands on the screen; the transform that reads them
+ *   lives here, so under reduced motion the same rule can simply refuse to move.
+ *
+ *   THE RAIL IS FIXED TO THE WINDOW, unless it was given a host, where it is absolute inside
+ *   `.ak-reading-host`. Under 900px it stops being a column down the side and becomes a strip
+ *   across the top, its list scrolling sideways and its progress line turning with it.
+ * @structure .ak-parallax (layer) · .ak-reading (line · fill · list · item · link) ·
+ *   .ak-reading-host · the 900px fold · reduced-motion
+ * @version-history
+ *   v0.46.0 — 2026-09-02 — Initial (wish-atelier-story-director-show).
+ */
+
+/* ── The parallax box ─────────────────────────────────────────────────────────────────────── */
+/* The box is the frame the layers travel inside, so it is the positioning context and it clips:
+   a layer that leads the page would otherwise hang over whatever comes next. */
+.ak-parallax {
+  position: relative;
+  overflow: hidden;
+}
+.ak-parallax__layer {
+  transform: translate3d(var(--ak-plx-x, 0px), var(--ak-plx-y, 0px), 0);
+}
+
+/* ── The reading rail ─────────────────────────────────────────────────────────────────────── */
+.ak-reading {
+  position: fixed;
+  inset-inline-end: 16px;
+  inset-block-start: 50%;
+  transform: translateY(-50%);
+  z-index: 4;
+  display: flex;
+  gap: 10px;
+  max-inline-size: 15rem;
+  padding: 10px;
+  border: var(--ak-line-w) solid var(--ak-line);
+  border-radius: var(--ak-radius);
+  background: var(--ak-glass);
+  backdrop-filter: blur(var(--ak-blur));
+  color: var(--ak-ink);
+  font-size: var(--ak-text-fine);
+}
+/* Inside a host: against .ak-reading-host rather than against the window. */
+.ak-reading--inset { position: absolute; }
+.ak-reading-host { position: relative; }
+
+/* How far through the article the reader is: one number from JS, --ak-fill. */
+.ak-reading__line {
+  flex: none;
+  inline-size: 3px;
+  border-radius: var(--ak-radius-pill);
+  background: var(--ak-surface-2);
+  overflow: hidden;
+}
+.ak-reading__fill {
+  display: block;
+  inline-size: 100%;
+  block-size: var(--ak-fill, 0%);
+  border-radius: var(--ak-radius-pill);
+  background: var(--ak-accent);
+}
+
+.ak-reading__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ak-reading__item { min-inline-size: 0; }
+.ak-reading__item--deep { padding-inline-start: 10px; }
+
+.ak-reading__link {
+  display: block;
+  /* The 24px floor the kit's small controls stand on. */
+  min-block-size: 24px;
+  padding: 4px 6px;
+  border-radius: var(--ak-radius-sm);
+  color: var(--ak-ink-dim);
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color var(--ak-motion) var(--ak-ease), background var(--ak-motion) var(--ak-ease);
+}
+.ak-reading__link:hover { color: var(--ak-ink); }
+.ak-reading__link:focus-visible { outline: 2px solid var(--ak-focus); outline-offset: 2px; }
+.ak-reading__link[aria-current='true'] {
+  color: var(--ak-accent-text);
+  background: color-mix(in oklab, var(--ak-accent) 12%, transparent);
+}
+
+/* ── Under 900px: the column folds into a strip across the top ────────────────────────────── */
+@media (max-width: 900px) {
+  .ak-reading {
+    inset-inline: 0;
+    inset-block-start: 0;
+    transform: none;
+    max-inline-size: none;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 10px;
+    border-inline: 0;
+    border-block-start: 0;
+    border-radius: 0;
+  }
+  .ak-reading__line { inline-size: 100%; block-size: 3px; }
+  .ak-reading__fill { inline-size: var(--ak-fill, 0%); block-size: 100%; }
+  .ak-reading__list { flex-direction: row; overflow-x: auto; overscroll-behavior-x: contain; }
+  .ak-reading__item--deep { padding-inline-start: 0; }
+}
+
+/* ── Less motion: the layers stand still and the rail changes at once ─────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .ak-parallax__layer { transform: none; }
+  .ak-reading__link { transition: none; }
+}

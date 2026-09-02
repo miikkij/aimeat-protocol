@@ -26,6 +26,9 @@
  * @structure ::view-transition rules per kind · .ak-curtain and its three shapes · .ak-swap--flip
  *   (the perspective a panel flip turns in) · reduced motion
  * @version-history
+ *   v0.46.0 — 2026-09-02 — The kit's own less-motion switch joins the reduced-motion lock: a
+ *     root marked data-ak-motion="less" stops an in-flight move the same way the operating
+ *     system's setting does.
  *   v0.45.1 — 2026-09-02 — .ak-curtain-host / .ak-curtain--inset: the curtain over one element.
  *   v0.45.0 — 2026-09-02 — Initial (the transitions module).
  */
@@ -216,3 +219,13 @@
   .ak-curtain__half,
   .ak-curtain__iris { will-change: auto; }
 }
+/* The kit's own switch is the second voice, and it says the same thing. A viewer whose operating
+   system asks for nothing can still ask here (the app bar's less-motion control writes
+   data-ak-motion on the root), and a move already in flight when they do stops travelling. */
+:root[data-ak-motion='less'][data-ak-transition]::view-transition-old(root),
+:root[data-ak-motion='less'][data-ak-transition]::view-transition-new(root) {
+  animation: none;
+}
+:root[data-ak-motion='less'] .ak-curtain__band,
+:root[data-ak-motion='less'] .ak-curtain__half,
+:root[data-ak-motion='less'] .ak-curtain__iris { will-change: auto; }

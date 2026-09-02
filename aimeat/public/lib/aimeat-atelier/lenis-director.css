@@ -17,8 +17,18 @@
  *   THE RAIL IS FIXED TO THE WINDOW, unless the story lives in a well, where it is absolute
  *   inside `.ak-story` (the well's own host). The label arrives on hover or focus and the two
  *   transitions that carry it are the only motion in this file.
- * @structure .ak-story (well · track · meter) · .ak-scene (hold · stick) · .ak-rail (dot · mark · label)
+ *
+ *   THE SIDEWAYS CHAPTER IS ONE ROW AND ONE NUMBER. A scene with `axis: 'x'` keeps its own
+ *   children as the panels of `.ak-chapter__track`, a viewport wide each; JS sets
+ *   `--ak-chapter-x` (how far the row has moved, in per-cent of a panel) from the scene's own
+ *   progress and sets nothing else, so the travel is a scroll position rather than an animation.
+ * @structure .ak-story (well · track · meter) · .ak-act (hold · stick) ·
+ *   .ak-chapter (track · panel) · .ak-rail (dot · mark · label)
  * @version-history
+ *   v0.46.1 — 2026-09-02 — .ak-scene* becomes .ak-act*: the scene3d component owns .ak-scene.
+ *   v0.46.0 — 2026-09-02 — The sideways chapter's clothes: .ak-act--x, .ak-chapter and the
+ *     row of viewport-wide panels the scene's progress carries across
+ *     (wish-atelier-story-director-show).
  *   v0.45.0 — 2026-09-02 — Initial (wish-atelier-motion-libraries-and-parts, the Lenis director).
  */
 
@@ -58,22 +68,56 @@
 }
 
 /* ── A scene, and the hold that keeps one on screen ───────────────────────────────────────── */
-.ak-scene {
+.ak-act {
   position: relative;
   min-inline-size: 0;
   scroll-margin-block-start: 8px;
 }
 
-.ak-scene__hold {
+.ak-act__hold {
   --ak-story-vh: 100dvh;
   position: relative;
   /* (1 + n) viewports of travel, of which the first is the scene simply arriving. */
   block-size: calc(var(--ak-hold, 2) * var(--ak-story-vh));
 }
-.ak-scene__stick {
+.ak-act__stick {
   position: sticky;
   inset-block-start: 0;
   block-size: var(--ak-story-vh);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* ── The sideways chapter: one row of viewport-wide panels ────────────────────────────────── */
+/* The scene gives its whole height to the row. It clips, because the panels to either side are
+   not the reader's business until the travel brings them over. */
+.ak-act--x {
+  display: flex;
+  flex: 1 1 auto;
+  min-block-size: 0;
+  overflow: hidden;
+}
+.ak-chapter {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  overflow: hidden;
+}
+/* The one number JS sets: how far the row has moved, in per-cent of a panel. */
+.ak-chapter__track {
+  display: flex;
+  block-size: 100%;
+  inline-size: 100%;
+  transform: translate3d(var(--ak-chapter-x, 0%), 0, 0);
+}
+/* A panel is a screenful and behaves like one: full width, its content centred, no scrollbar of
+   its own to swallow the story's. The author's element keeps every other rule it had. */
+.ak-chapter__panel {
+  flex: 0 0 100%;
+  inline-size: 100%;
+  min-inline-size: 0;
+  block-size: 100%;
   display: flex;
   flex-direction: column;
   justify-content: center;

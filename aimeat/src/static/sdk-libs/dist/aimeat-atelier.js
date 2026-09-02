@@ -70,9 +70,38 @@
     seq += 1;
     return (prefix || "ak") + "-" + seq;
   }
+  var MOTION_KEY = "ak.motion";
+  var MOTION_ATTR = "data-ak-motion";
   function reducedMotion() {
+    if (typeof document !== "undefined" && document.documentElement && document.documentElement.getAttribute(MOTION_ATTR) === "less") return true;
     return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
   }
+  function setMotion(mode) {
+    const next = mode === "less" ? "less" : "auto";
+    if (typeof document !== "undefined" && document.documentElement) {
+      document.documentElement.setAttribute(MOTION_ATTR, next);
+    }
+    try {
+      localStorage.setItem(MOTION_KEY, next);
+    } catch {
+    }
+    try {
+      window.dispatchEvent(new CustomEvent("ak-motion", { detail: { motion: next } }));
+    } catch {
+    }
+    return next;
+  }
+  var motionRestored = false;
+  function restoreMotion() {
+    if (motionRestored || typeof document === "undefined" || !document.documentElement) return;
+    motionRestored = true;
+    try {
+      const saved = localStorage.getItem(MOTION_KEY);
+      if (saved === "less" || saved === "auto") document.documentElement.setAttribute(MOTION_ATTR, saved);
+    } catch {
+    }
+  }
+  restoreMotion();
   function resolve(target, fallback) {
     if (!target) return fallback || document.body;
     if (typeof target === "string") return $(target) || fallback || document.body;
@@ -275,8 +304,8 @@
     }
     const span = opts && opts.ms || 600;
     const t0 = performance.now();
-    const tick = function(now) {
-      const p = Math.min(1, (now - t0) / span);
+    const tick = function(now2) {
+      const p = Math.min(1, (now2 - t0) / span);
       const eased = 1 - (1 - p) * (1 - p);
       node.textContent = fmt(from + (to - from) * eased);
       if (p < 1) requestAnimationFrame(tick);
@@ -288,6 +317,7 @@
   var BASE = {
     en: {
       loading: "Loading…",
+      lessMotion: "Less motion",
       ready: "Ready.",
       retry: "Try again",
       close: "Close",
@@ -357,6 +387,7 @@
     },
     fi: {
       loading: "Ladataan…",
+      lessMotion: "Vähemmän liikettä",
       ready: "Valmis.",
       retry: "Yritä uudelleen",
       close: "Sulje",
@@ -426,6 +457,7 @@
     },
     es: {
       loading: "Cargando…",
+      lessMotion: "Menos movimiento",
       ready: "Listo.",
       retry: "Inténtalo otra vez",
       close: "Cerrar",
@@ -800,16 +832,509 @@
     };
   }
 
+  // src/static/sdk-libs/atelier/mosaic-motion.js
+  function transition(run) {
+    if (typeof document.startViewTransition === "function" && !reducedMotion()) {
+      document.startViewTransition(run);
+    } else {
+      run();
+    }
+  }
+  function morph(moving, run) {
+    if (typeof document.startViewTransition !== "function" || reducedMotion()) {
+      run();
+      return;
+    }
+    moving.style.viewTransitionName = "ak-morph";
+    const vt = document.startViewTransition(run);
+    vt.finished.finally(function() {
+      moving.style.viewTransitionName = "";
+    });
+  }
+
+  // src/static/sdk-libs/atelier/transitions.js
+  var SCREEN_KINDS = ["fade", "wipe", "curtain", "zoom", "iris", "slide"];
+  var PANEL_KINDS = ["crossfade", "slide", "flip", "morph", "push"];
+  var CURTAIN_KINDS = ["band", "halves", "iris"];
+  var TINTS = ["accent", "ink", "surface"];
+  var DIRECTIONS = ["left", "right", "up", "down"];
+  var AWAY = { left: "translateX(-100%)", right: "translateX(100%)", up: "translateY(-100%)", down: "translateY(100%)" };
+  var TOWARD = { left: "translateX(100%)", right: "translateX(-100%)", up: "translateY(100%)", down: "translateY(-100%)" };
+  var STAND_IN = { fade: "band", wipe: "band", slide: "band", zoom: "halves", curtain: "halves", iris: "iris" };
+  var INTRO_HOLD_MS = 120;
+  var INTRO_CAP_MS = 1500;
+  var lastPoint = null;
+  if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+    window.addEventListener("pointerdown", function(ev) {
+      lastPoint = { x: ev.clientX, y: ev.clientY };
+    }, { capture: true, passive: true });
+  }
+  function originOf(from) {
+    if (from && typeof from.x === "number" && typeof from.y === "number") return { x: from.x, y: from.y };
+    if (lastPoint) return { x: lastPoint.x, y: lastPoint.y };
+    const w = typeof window !== "undefined" ? window.innerWidth : 0;
+    const h = typeof window !== "undefined" ? window.innerHeight : 0;
+    return { x: w / 2, y: h / 2 };
+  }
+  function spanOf(node, ms) {
+    if (ms) return ms;
+    const cs = getComputedStyle(node);
+    return (parseFloat(cs.getPropertyValue("--ak-motion")) || 200) * 2;
+  }
+  function easeOf2(node) {
+    const cs = getComputedStyle(node);
+    return (cs.getPropertyValue("--ak-ease") || "").trim() || "cubic-bezier(0.2, 0.7, 0.3, 1)";
+  }
+  function oneOf(set, value) {
+    return set.indexOf(value) >= 0 ? String(value) : set[0];
+  }
+  function playAll(runs) {
+    const settled = runs.map(function(r) {
+      if (typeof r.node.animate !== "function") return Promise.resolve();
+      const anim = r.node.animate(r.frames, r.timing);
+      return anim.finished.then(function() {
+        anim.cancel();
+      }, function() {
+      });
+    });
+    return Promise.all(settled).then(function() {
+    });
+  }
+  function reachOf(point) {
+    const w = typeof window !== "undefined" ? window.innerWidth : 0;
+    const h = typeof window !== "undefined" ? window.innerHeight : 0;
+    const dx = Math.max(point.x, w - point.x);
+    const dy = Math.max(point.y, h - point.y);
+    return Math.ceil(Math.sqrt(dx * dx + dy * dy));
+  }
+  function originIn(host, from) {
+    const r = host.getBoundingClientRect();
+    const src = from && typeof from.x === "number" ? from : lastPoint;
+    if (src) {
+      const x = src.x - r.left;
+      const y = src.y - r.top;
+      if (x >= 0 && y >= 0 && x <= r.width && y <= r.height) return { x, y };
+    }
+    return { x: r.width / 2, y: r.height / 2 };
+  }
+  function curtain(opts) {
+    const o = opts || {};
+    const kind = oneOf(CURTAIN_KINDS, o.kind);
+    const tint = o.colour && TINTS.indexOf(o.colour) >= 0 ? o.colour : "ink";
+    const dir = oneOf(DIRECTIONS, o.direction);
+    const axis = dir === "up" || dir === "down" ? "y" : "x";
+    const host = o.host ? (
+      /** @type {HTMLElement} */
+      resolve(o.host)
+    ) : null;
+    const point = host ? originIn(host, o.from) : originOf(o.from);
+    const reach = host ? Math.ceil(Math.hypot(host.clientWidth, host.clientHeight)) : reachOf(point);
+    const layer = el("div", {
+      class: "ak-root ak-curtain ak-curtain--" + kind + " ak-curtain--" + tint + " ak-curtain--axis-" + axis,
+      "aria-hidden": "true"
+    });
+    const leaves = [];
+    if (kind === "halves") {
+      leaves.push(el("div", { class: "ak-curtain__half ak-curtain__half--a" }));
+      leaves.push(el("div", { class: "ak-curtain__half ak-curtain__half--b" }));
+    } else {
+      leaves.push(el("div", { class: kind === "iris" ? "ak-curtain__iris" : "ak-curtain__band" }));
+    }
+    const open = kind === "iris" ? ["circle(0px at " + point.x + "px " + point.y + "px)"] : kind === "halves" ? [AWAY[axis === "y" ? "up" : "left"], AWAY[axis === "y" ? "down" : "right"]] : [TOWARD[dir]];
+    const shut = kind === "iris" ? ["circle(" + reach + "px at " + point.x + "px " + point.y + "px)"] : ["none", "none"];
+    const past = kind === "band" ? [AWAY[dir]] : open;
+    const begun = o.start === "covered" ? shut : open;
+    let parked = begun;
+    leaves.forEach(function(leaf, i) {
+      if (kind === "iris") leaf.style.clipPath = begun[i];
+      else leaf.style.transform = begun[i];
+      layer.appendChild(leaf);
+    });
+    if (host) {
+      host.classList.add("ak-curtain-host");
+      layer.classList.add("ak-curtain--inset");
+      host.appendChild(layer);
+    } else {
+      document.body.appendChild(layer);
+    }
+    const ms = spanOf(layer, o.duration);
+    const ease = easeOf2(layer);
+    let covered = o.start === "covered";
+    if (covered) layer.classList.add("ak-curtain--on");
+    let gone = false;
+    function travel3(from, to) {
+      if (gone) return Promise.resolve();
+      const land = function() {
+        leaves.forEach(function(leaf, i) {
+          if (kind === "iris") leaf.style.clipPath = to[i];
+          else leaf.style.transform = to[i];
+        });
+      };
+      if (reducedMotion() || typeof leaves[0].animate !== "function") {
+        land();
+        return Promise.resolve();
+      }
+      const runs = leaves.map(function(leaf, i) {
+        return {
+          node: leaf,
+          frames: kind === "iris" ? [{ clipPath: from[i] }, { clipPath: to[i] }] : [{ transform: from[i] }, { transform: to[i] }],
+          timing: { duration: ms, easing: ease, fill: (
+            /** @type {FillMode} */
+            "both"
+          ) }
+        };
+      });
+      return playAll(runs).then(land);
+    }
+    return {
+      cover() {
+        if (covered) return Promise.resolve();
+        covered = true;
+        layer.classList.add("ak-curtain--on");
+        const was = parked;
+        parked = shut;
+        return travel3(was, shut);
+      },
+      uncover() {
+        if (!covered) return Promise.resolve();
+        covered = false;
+        parked = past;
+        return travel3(shut, past).then(function() {
+          layer.classList.remove("ak-curtain--on");
+        });
+      },
+      destroy() {
+        gone = true;
+        if (layer.parentNode) layer.parentNode.removeChild(layer);
+        if (host && !host.querySelector(".ak-curtain")) host.classList.remove("ak-curtain-host");
+      }
+    };
+  }
+  function intro(opts) {
+    const o = opts || {};
+    const hold = typeof o.hold === "number" && o.hold >= 0 ? Math.min(o.hold, INTRO_CAP_MS) : INTRO_HOLD_MS;
+    const cover = curtain({
+      kind: (
+        /** @type {'band'|'halves'|'iris'} */
+        oneOf(CURTAIN_KINDS, o.kind)
+      ),
+      colour: o.colour,
+      start: "covered"
+    });
+    const waits = [new Promise(function(settle3) {
+      setTimeout(settle3, hold);
+    })];
+    const fonts = typeof document !== "undefined" ? (
+      /** @type {any} */
+      document.fonts
+    ) : null;
+    if (fonts && fonts.ready && typeof fonts.ready.then === "function") {
+      waits.push(fonts.ready.then(
+        function() {
+        },
+        function() {
+        }
+      ));
+    }
+    let capTimer = (
+      /** @type {any} */
+      null
+    );
+    const capped = new Promise(function(settle3) {
+      capTimer = setTimeout(settle3, INTRO_CAP_MS);
+    });
+    const done = function() {
+      clearTimeout(capTimer);
+    };
+    return Promise.race([Promise.all(waits), capped]).then(function() {
+      done();
+      return cover.uncover();
+    }).then(function() {
+      cover.destroy();
+    }, function(err) {
+      done();
+      cover.destroy();
+      throw err;
+    });
+  }
+  function screenTransition(kind, run, opts) {
+    const o = opts || {};
+    const move = oneOf(SCREEN_KINDS, kind);
+    const root = document.documentElement;
+    if (reducedMotion()) return Promise.resolve(run()).then(function() {
+    });
+    if (typeof document.startViewTransition !== "function") {
+      const cover = curtain({
+        kind: (
+          /** @type {'band'|'halves'|'iris'} */
+          STAND_IN[move]
+        ),
+        colour: o.colour,
+        from: o.from,
+        direction: o.direction,
+        duration: o.duration
+      });
+      return cover.cover().then(function() {
+        return run();
+      }).then(function() {
+        return cover.uncover();
+      }).then(function() {
+        cover.destroy();
+      }, function(err) {
+        cover.destroy();
+        throw err;
+      });
+    }
+    const point = originOf(o.from);
+    root.setAttribute("data-ak-transition", move);
+    if (o.direction && DIRECTIONS.indexOf(o.direction) >= 0) root.setAttribute("data-ak-transition-dir", o.direction);
+    if (o.colour && TINTS.indexOf(o.colour) >= 0) root.setAttribute("data-ak-transition-colour", o.colour);
+    root.style.setProperty("--ak-iris-x", point.x + "px");
+    root.style.setProperty("--ak-iris-y", point.y + "px");
+    if (o.duration) root.style.setProperty("--ak-transition-span", o.duration + "ms");
+    const clear2 = function() {
+      root.removeAttribute("data-ak-transition");
+      root.removeAttribute("data-ak-transition-dir");
+      root.removeAttribute("data-ak-transition-colour");
+      root.style.removeProperty("--ak-iris-x");
+      root.style.removeProperty("--ak-iris-y");
+      root.style.removeProperty("--ak-transition-span");
+    };
+    return document.startViewTransition(run).finished.then(clear2, clear2);
+  }
+  function heightOf(node) {
+    const cs = getComputedStyle(node);
+    const box = node.getBoundingClientRect().height;
+    if (cs.boxSizing === "border-box") return box;
+    const pad = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+    const edge = (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
+    return Math.max(0, box - pad - edge);
+  }
+  function whenMorphDone(moving, cap) {
+    return new Promise(function(settle3) {
+      let done = false;
+      const finish = function() {
+        if (done) return;
+        done = true;
+        if (obs) obs.disconnect();
+        clearTimeout(timer);
+        settle3();
+      };
+      const obs = typeof MutationObserver === "function" ? new MutationObserver(function() {
+        if (!moving.style.viewTransitionName) finish();
+      }) : null;
+      if (obs) obs.observe(moving, { attributes: true, attributeFilter: ["style"] });
+      const timer = setTimeout(finish, cap);
+    });
+  }
+  function panelTransition(from, to, kind, opts) {
+    const o = opts || {};
+    const move = oneOf(PANEL_KINDS, kind);
+    const parent = (
+      /** @type {HTMLElement|null} */
+      from && from.parentElement
+    );
+    if (!parent || !to || from === to) return Promise.resolve();
+    const swap = function() {
+      parent.insertBefore(to, from);
+      if (from.parentNode) from.parentNode.removeChild(from);
+    };
+    if (reducedMotion() || typeof from.animate !== "function") {
+      swap();
+      return Promise.resolve();
+    }
+    const ms = spanOf(from, o.duration);
+    const ease = easeOf2(from);
+    const dir = oneOf(DIRECTIONS, o.direction);
+    const moving = (
+      /** @type {HTMLElement|null} */
+      o.moving || null
+    );
+    if (move === "morph") {
+      if (!moving || typeof document.startViewTransition !== "function") {
+        return panelTransition(from, to, "crossfade", o);
+      }
+      const done = whenMorphDone(moving, ms * 6);
+      morph(moving, swap);
+      return done;
+    }
+    const outgoing = (
+      /** @type {HTMLElement} */
+      from
+    );
+    const incoming = (
+      /** @type {HTMLElement} */
+      to
+    );
+    const box = outgoing.getBoundingClientRect();
+    const seat = parent.getBoundingClientRect();
+    const pcs = getComputedStyle(parent);
+    const startH = heightOf(parent);
+    const kept = { position: parent.style.position, overflow: parent.style.overflow };
+    if (pcs.position === "static") parent.style.position = "relative";
+    parent.style.overflow = "hidden";
+    if (move === "flip") parent.classList.add("ak-swap--flip");
+    parent.insertBefore(incoming, outgoing);
+    outgoing.style.position = "absolute";
+    outgoing.style.boxSizing = "border-box";
+    outgoing.style.margin = "0";
+    outgoing.style.top = box.top - seat.top - (parseFloat(pcs.borderTopWidth) || 0) + parent.scrollTop + "px";
+    outgoing.style.left = box.left - seat.left - (parseFloat(pcs.borderLeftWidth) || 0) + parent.scrollLeft + "px";
+    outgoing.style.width = box.width + "px";
+    outgoing.style.height = box.height + "px";
+    const endH = heightOf(parent);
+    const runs = [];
+    if (Math.abs(endH - startH) > 1) {
+      runs.push({
+        node: parent,
+        frames: [{ height: startH + "px" }, { height: endH + "px" }],
+        timing: { duration: ms, easing: ease, fill: (
+          /** @type {FillMode} */
+          "backwards"
+        ) }
+      });
+    }
+    if (move === "flip") {
+      const half = Math.round(ms / 2);
+      runs.push({
+        node: outgoing,
+        frames: [{ transform: "rotateY(0deg)", opacity: 1 }, { transform: "rotateY(-90deg)", opacity: 0 }],
+        timing: { duration: half, easing: "ease-in", fill: (
+          /** @type {FillMode} */
+          "forwards"
+        ) }
+      });
+      runs.push({
+        node: incoming,
+        frames: [{ transform: "rotateY(90deg)", opacity: 0 }, { transform: "rotateY(0deg)", opacity: 1 }],
+        timing: { duration: half, delay: half, easing: "ease-out", fill: (
+          /** @type {FillMode} */
+          "backwards"
+        ) }
+      });
+    } else if (move === "crossfade") {
+      runs.push({ node: outgoing, frames: [{ opacity: 1 }, { opacity: 0 }], timing: { duration: ms, easing: ease, fill: (
+        /** @type {FillMode} */
+        "forwards"
+      ) } });
+      runs.push({ node: incoming, frames: [{ opacity: 0 }, { opacity: 1 }], timing: { duration: ms, easing: ease, fill: (
+        /** @type {FillMode} */
+        "backwards"
+      ) } });
+    } else {
+      const fade = move === "slide";
+      runs.push({
+        node: outgoing,
+        frames: [{ transform: "none", opacity: 1 }, { transform: AWAY[dir], opacity: fade ? 0 : 1 }],
+        timing: { duration: ms, easing: ease, fill: (
+          /** @type {FillMode} */
+          "forwards"
+        ) }
+      });
+      runs.push({
+        node: incoming,
+        frames: [{ transform: TOWARD[dir], opacity: fade ? 0 : 1 }, { transform: "none", opacity: 1 }],
+        timing: { duration: ms, easing: ease, fill: (
+          /** @type {FillMode} */
+          "backwards"
+        ) }
+      });
+    }
+    return playAll(runs).then(function() {
+      if (outgoing.parentNode) outgoing.parentNode.removeChild(outgoing);
+      incoming.style.removeProperty("transform");
+      incoming.style.removeProperty("opacity");
+      parent.classList.remove("ak-swap--flip");
+      parent.style.position = kept.position;
+      parent.style.overflow = kept.overflow;
+      parent.style.removeProperty("height");
+    });
+  }
+
   // src/static/sdk-libs/atelier/shell.js
   var BOOT_POLL_MS = 300;
   var SIGNIN_GRACE_MS = 2500;
+  var SVG_NS = "http://www.w3.org/2000/svg";
+  var MOTION_ATTR2 = "data-ak-motion";
+  var MODE_BUTTON = "#aimeat-mode-switch button[data-mode]";
+  function motionLabel() {
+    const said = t("lessMotion");
+    return said === "lessMotion" ? "Less motion" : said;
+  }
+  function motionIcon() {
+    const svg6 = document.createElementNS(SVG_NS, "svg");
+    svg6.setAttribute("viewBox", "0 0 24 24");
+    svg6.setAttribute("width", "18");
+    svg6.setAttribute("height", "18");
+    svg6.setAttribute("fill", "none");
+    svg6.setAttribute("stroke", "currentColor");
+    svg6.setAttribute("stroke-width", "2");
+    svg6.setAttribute("stroke-linecap", "round");
+    svg6.setAttribute("aria-hidden", "true");
+    const lines = document.createElementNS(SVG_NS, "path");
+    lines.setAttribute("class", "ak-app__motion-lines");
+    lines.setAttribute("d", "M4 7h15M4 12h11M4 17h7");
+    const slash = document.createElementNS(SVG_NS, "path");
+    slash.setAttribute("class", "ak-app__motion-slash");
+    slash.setAttribute("d", "M20 4 5 20");
+    svg6.appendChild(lines);
+    svg6.appendChild(slash);
+    return svg6;
+  }
+  function motionIsLess() {
+    return document.documentElement.getAttribute(MOTION_ATTR2) === "less";
+  }
   function app(spec) {
     injectStyle();
     const state = { title: spec.title, look: spec.look || "vivid" };
     const titleId = uid("ak-app-title");
     const heading = el("span", { class: "ak-app__title", id: titleId, text: state.title });
     const pill = el("span", { class: "ak-app__pill", id: "login" });
-    const bar = el("header", { class: "ak-app__bar" }, [heading, pill]);
+    const motionBtn = el("button", {
+      type: "button",
+      class: "ak-app__motion",
+      "data-ak-noguard": true,
+      "aria-pressed": motionIsLess() ? "true" : "false",
+      title: motionLabel(),
+      "aria-label": motionLabel(),
+      on: {
+        click: function() {
+          setMotion(motionIsLess() ? "auto" : "less");
+        }
+      }
+    }, motionIcon());
+    const syncMotion = function() {
+      motionBtn.setAttribute("aria-pressed", motionIsLess() ? "true" : "false");
+    };
+    window.addEventListener("ak-motion", syncMotion);
+    const bar = el("header", { class: "ak-app__bar" }, [heading, motionBtn, pill]);
+    let replaying = false;
+    const onBarClick = function(ev) {
+      if (replaying) return;
+      const start = (
+        /** @type {Element|null} */
+        ev.target
+      );
+      if (!start || typeof start.closest !== "function") return;
+      const btn = (
+        /** @type {HTMLElement|null} */
+        start.closest(MODE_BUTTON)
+      );
+      if (!btn || !bar.contains(btn) || btn.getAttribute("aria-pressed") === "true") return;
+      ev.preventDefault();
+      ev.stopImmediatePropagation();
+      btn.setAttribute("data-ak-noguard", "");
+      const box = btn.getBoundingClientRect();
+      screenTransition("iris", function() {
+        replaying = true;
+        try {
+          btn.click();
+        } finally {
+          replaying = false;
+        }
+      }, { from: { x: box.left + box.width / 2, y: box.top + box.height / 2 } });
+    };
+    bar.addEventListener("click", onBarClick, true);
     const statusHost = el("div", { class: "ak-app__status" });
     const main = el("main", { class: "ak-app__main ak-scroll" });
     const footer = spec.footer != null ? el("footer", { class: "ak-app__foot", text: spec.footer }) : null;
@@ -941,21 +1466,39 @@
     }
     const stopLang = i18n.onChange(function() {
       heading.textContent = state.title;
+      motionBtn.setAttribute("title", motionLabel());
+      motionBtn.setAttribute("aria-label", motionLabel());
     });
     setTimeout(startBoot, 0);
     return {
       el: root,
       main,
-      /** @param {{ title?: string, look?: string, density?: 'comfortable'|'compact' }} patch */
+      /** @param {{ title?: string, look?: string, density?: 'comfortable'|'compact',
+       *    quiet?: boolean }} patch */
       set(patch) {
         if (!patch) return;
         if (patch.title != null) {
           state.title = patch.title;
           heading.textContent = state.title;
         }
-        if (patch.look != null) {
+        if (patch.look != null && patch.look !== state.look) {
           state.look = patch.look;
-          root.setAttribute("data-ak-look", state.look);
+          const dress = function() {
+            root.setAttribute("data-ak-look", state.look);
+          };
+          if (patch.quiet) {
+            dress();
+          } else {
+            const cover = curtain({ kind: "halves", colour: "accent" });
+            cover.cover().then(dress).then(function() {
+              return cover.uncover();
+            }).then(function() {
+              cover.destroy();
+            }, function(err) {
+              cover.destroy();
+              throw err;
+            });
+          }
         }
         if (patch.density != null) root.classList.toggle("ak-app--compact", patch.density === "compact");
       },
@@ -964,6 +1507,8 @@
       i18n,
       destroy() {
         stopLang();
+        window.removeEventListener("ak-motion", syncMotion);
+        bar.removeEventListener("click", onBarClick, true);
         if (pollTimer) {
           clearInterval(pollTimer);
           pollTimer = null;
@@ -1780,6 +2325,8 @@
   }
 
   // src/static/sdk-libs/atelier/list.js
+  var DETAIL_MARKED = ".ak-listdetail__title";
+  var DETAIL_HEADING = "h1, h2, h3";
   function fillRow(row, item) {
     clear(row);
     const text = el("span", { class: "ak-list__text" }, [
@@ -1937,6 +2484,33 @@
       }
       spec.renderDetail(item, detailBody);
     }
+    let held = (
+      /** @type {HTMLElement|null} */
+      null
+    );
+    let holdTimer = (
+      /** @type {any} */
+      null
+    );
+    function release() {
+      if (holdTimer) {
+        clearTimeout(holdTimer);
+        holdTimer = null;
+      }
+      if (held) {
+        held.style.viewTransitionName = "";
+        held = null;
+      }
+    }
+    function holdFor(node) {
+      return (parseFloat(getComputedStyle(node).getPropertyValue("--ak-motion")) || 200) * 6;
+    }
+    function detailTitle() {
+      return (
+        /** @type {HTMLElement} */
+        detailBody.querySelector(DETAIL_MARKED) || detailBody.querySelector(DETAIL_HEADING) || detail
+      );
+    }
     function select(id) {
       selected = id;
       const mark = function() {
@@ -1954,16 +2528,19 @@
           return r.getAttribute("data-ak-id") === id;
         }) ?? null : null
       );
-      if (picked && typeof document.startViewTransition === "function" && !reducedMotion()) {
-        picked.style.viewTransitionName = "ak-morph";
-        const vt = document.startViewTransition(function() {
-          picked.style.viewTransitionName = "";
-          detail.style.viewTransitionName = "ak-morph";
+      const moving = (
+        /** @type {HTMLElement|null} */
+        picked ? picked.querySelector(".ak-list__title") || picked : null
+      );
+      release();
+      if (moving && typeof document.startViewTransition === "function" && !reducedMotion()) {
+        morph(moving, function() {
+          moving.style.viewTransitionName = "";
           mark();
+          held = detailTitle();
+          held.style.viewTransitionName = "ak-morph";
         });
-        vt.finished.finally(function() {
-          detail.style.viewTransitionName = "";
-        });
+        holdTimer = setTimeout(release, holdFor(detail));
       } else {
         mark();
       }
@@ -1992,6 +2569,7 @@
       },
       select,
       destroy() {
+        release();
         if (detailEmptyCard) detailEmptyCard.destroy();
         master.destroy();
         if (root.parentNode) root.parentNode.removeChild(root);
@@ -2472,9 +3050,9 @@
   }
 
   // src/static/sdk-libs/atelier/chart-core.js
-  var SVG_NS = "http://www.w3.org/2000/svg";
+  var SVG_NS2 = "http://www.w3.org/2000/svg";
   function svg(name, attrs) {
-    const node = document.createElementNS(SVG_NS, name);
+    const node = document.createElementNS(SVG_NS2, name);
     for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
     return node;
   }
@@ -2654,7 +3232,7 @@
     const points = (data && Array.isArray(data.points) ? data.points : []).filter((p) => p && typeof p.x === "number" && typeof p.y === "number");
     if (!points.length) return ctx.empty();
     ctx.root.setAttribute("aria-label", (ctx.title ? ctx.title + " — " : "") + points.length + " pts");
-    const W6 = 560;
+    const W7 = 560;
     const H4 = 300;
     const PAD3 = { top: 16, right: 16, bottom: 36, left: 50 };
     let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
@@ -2672,11 +3250,11 @@
     xMax = Math.ceil(xMax / xStep) * xStep;
     yMin = Math.floor(yMin / yStep) * yStep;
     yMax = Math.ceil(yMax / yStep) * yStep;
-    const X = (v) => PAD3.left + (W6 - PAD3.left - PAD3.right) * ((v - xMin) / (xMax - xMin));
+    const X = (v) => PAD3.left + (W7 - PAD3.left - PAD3.right) * ((v - xMin) / (xMax - xMin));
     const Y = (v) => PAD3.top + (H4 - PAD3.top - PAD3.bottom) * (1 - (v - yMin) / (yMax - yMin));
-    const node = svg("svg", { viewBox: `0 0 ${W6} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
+    const node = svg("svg", { viewBox: `0 0 ${W7} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
     for (let v = yMin; v <= yMax + yStep / 2; v += yStep) {
-      node.appendChild(svg("line", { x1: PAD3.left, x2: W6 - PAD3.right, y1: Y(v), y2: Y(v), class: "ak-chart__grid" }));
+      node.appendChild(svg("line", { x1: PAD3.left, x2: W7 - PAD3.right, y1: Y(v), y2: Y(v), class: "ak-chart__grid" }));
       const tk = svg("text", { x: PAD3.left - 8, y: Y(v) + 4, class: "ak-chart__tick", "text-anchor": "end" });
       tk.textContent = fmtTick(v);
       node.appendChild(tk);
@@ -2731,14 +3309,14 @@
     const steps2 = (data && Array.isArray(data.steps) ? data.steps : []).filter((s) => s && typeof s.value === "number" && s.value >= 0);
     if (!steps2.length || steps2[0].value <= 0) return ctx.empty();
     ctx.root.setAttribute("aria-label", (ctx.title ? ctx.title + " — " : "") + steps2.map((s) => s.label + " " + s.value).join(", "));
-    const W6 = 460;
+    const W7 = 460;
     const STEP_H = 44;
     const GAP = 7;
     const BAND = 340;
     const CX = 195;
     const H4 = steps2.length * (STEP_H + GAP) - GAP + 8;
     const first = steps2[0].value;
-    const node = svg("svg", { viewBox: `0 0 ${W6} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
+    const node = svg("svg", { viewBox: `0 0 ${W7} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
     const still = ctx.still();
     const half = (v) => Math.max(v / first * BAND, 18) / 2;
     steps2.forEach((s, i) => {
@@ -2759,7 +3337,7 @@
       const name = svg("text", { x: CX, y: y + STEP_H / 2 + 5, class: "ak-chart__funnellabel", "text-anchor": "middle" });
       name.textContent = `${s.label} · ${fmtTick(s.value)}`;
       node.appendChild(name);
-      const pct = svg("text", { x: W6 - 10, y: y + STEP_H / 2 + 5, class: "ak-chart__funnelpct", "text-anchor": "end" });
+      const pct = svg("text", { x: W7 - 10, y: y + STEP_H / 2 + 5, class: "ak-chart__funnelpct", "text-anchor": "end" });
       pct.textContent = Math.round(s.value / first * 100) + " %";
       node.appendChild(pct);
     });
@@ -2811,10 +3389,10 @@
     const items = (data && Array.isArray(data.items) ? data.items : []).filter((s) => s && typeof s.value === "number" && s.value > 0).sort((a, b) => b.value - a.value);
     if (!items.length) return ctx.empty();
     ctx.root.setAttribute("aria-label", (ctx.title ? ctx.title + " — " : "") + items.map((s) => s.label + " " + s.value).join(", "));
-    const W6 = 560;
+    const W7 = 560;
     const H4 = 320;
-    const node = svg("svg", { viewBox: `0 0 ${W6} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
-    const cells = squarify(items.map((s, i) => ({ v: s.value, s, i })), 2, 2, W6 - 4, H4 - 4);
+    const node = svg("svg", { viewBox: `0 0 ${W7} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
+    const cells = squarify(items.map((s, i) => ({ v: s.value, s, i })), 2, 2, W7 - 4, H4 - 4);
     const still = ctx.still();
     cells.forEach((c, n) => {
       const G = 2.5;
@@ -2872,15 +3450,15 @@
     }
     const maxDepth = Math.max(...[...byId.values()].map((m) => m.depth));
     ctx.root.setAttribute("aria-label", (ctx.title ? ctx.title + " — " : "") + nodes.map((n) => n.label || n.id).join(", "));
-    const W6 = 560;
+    const W7 = 560;
     const H4 = 320;
     const NODE_W = 12;
     const PAD_Y = 10;
     const cols = [];
     for (const m of byId.values()) (cols[m.depth] = cols[m.depth] || []).push(m);
     const scale = (H4 - PAD_Y * 2 - 8 * Math.max(...cols.map((c) => (c || []).length - 1), 0)) / Math.max(...cols.map((c) => (c || []).reduce((a, m) => a + Math.max(m.in, m.out), 0)), 1e-9);
-    const colX = (d) => 8 + (maxDepth ? (W6 - NODE_W - 16) * (d / maxDepth) : 0);
-    const node = svg("svg", { viewBox: `0 0 ${W6} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
+    const colX = (d) => 8 + (maxDepth ? (W7 - NODE_W - 16) * (d / maxDepth) : 0);
+    const node = svg("svg", { viewBox: `0 0 ${W7} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
     let colourIdx = 0;
     for (const col of cols) {
       if (!col) continue;
@@ -2938,14 +3516,14 @@
     if (axes.length < 3 || !series.length) return ctx.empty();
     const max = typeof data.max === "number" && data.max > 0 ? data.max : series.reduce((m, s) => s.values.reduce((m2, v) => Math.max(m2, Number(v) || 0), m), 0) || 1;
     ctx.root.setAttribute("aria-label", (ctx.title ? ctx.title + " — " : "") + series.map((s) => s.label).join(", "));
-    const W6 = 460;
+    const W7 = 460;
     const H4 = 340;
-    const CX = W6 / 2;
+    const CX = W7 / 2;
     const CY = H4 / 2 + 4;
     const R = 118;
     const angle = (i) => -Math.PI / 2 + 2 * Math.PI * i / axes.length;
     const at = (i, r) => `${(CX + Math.cos(angle(i)) * r).toFixed(1)} ${(CY + Math.sin(angle(i)) * r).toFixed(1)}`;
-    const node = svg("svg", { viewBox: `0 0 ${W6} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
+    const node = svg("svg", { viewBox: `0 0 ${W7} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
     for (const frac of [0.25, 0.5, 0.75, 1]) {
       node.appendChild(svg("polygon", {
         points: axes.map((a, i) => at(i, R * frac)).join(" "),
@@ -3343,9 +3921,9 @@
   var W2 = 720;
   var H2 = 420;
   var PAD2 = 46;
-  var SVG_NS2 = "http://www.w3.org/2000/svg";
+  var SVG_NS3 = "http://www.w3.org/2000/svg";
   function svg2(name, attrs) {
-    const node = document.createElementNS(SVG_NS2, name);
+    const node = document.createElementNS(SVG_NS3, name);
     for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
     return node;
   }
@@ -3448,9 +4026,9 @@
   // src/static/sdk-libs/atelier/waveform.js
   var W3 = 720;
   var H3 = 120;
-  var SVG_NS3 = "http://www.w3.org/2000/svg";
+  var SVG_NS4 = "http://www.w3.org/2000/svg";
   function svg3(name, attrs) {
-    const node = document.createElementNS(SVG_NS3, name);
+    const node = document.createElementNS(SVG_NS4, name);
     for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
     return node;
   }
@@ -3644,17 +4222,17 @@
     let settleUntil = 0;
     let disposed = false;
     const clock = { start: 0 };
-    function frame(now) {
+    function frame(now2) {
       raf = 0;
       if (disposed) return;
-      const entering = now < entranceUntil;
+      const entering = now2 < entranceUntil;
       if (entering) {
-        const p = easeOut(Math.min(1, (now - clock.start) / (entranceUntil - clock.start)));
+        const p = easeOut(Math.min(1, (now2 - clock.start) / (entranceUntil - clock.start)));
         applyEntrance(p);
       }
       controls.update();
       renderer.render(scene, camera);
-      if (entering || now < settleUntil) raf = requestAnimationFrame(frame);
+      if (entering || now2 < settleUntil) raf = requestAnimationFrame(frame);
     }
     function wake(settleMs) {
       settleUntil = Math.max(settleUntil, performance.now() + (settleMs || 0));
@@ -3974,11 +4552,11 @@
       [{ height: from + "px", opacity: opening ? 0.4 : 1 }, { height: to + "px", opacity: opening ? 1 : 0.4 }],
       { duration: span, easing: ease }
     );
-    const settle2 = function() {
+    const settle3 = function() {
       panel.style.height = opening ? "auto" : "0px";
     };
-    anim.onfinish = settle2;
-    anim.oncancel = settle2;
+    anim.onfinish = settle3;
+    anim.oncancel = settle3;
   }
   function reveal(spec) {
     const root = el("div", { class: "ak-root ak-reveal" });
@@ -4115,7 +4693,7 @@
     }
     node.appendChild(panel);
     document.body.appendChild(node);
-    const travel2 = side === "bottom" ? "0, 100%" : side === "right" ? "100%, 0" : "-100%, 0";
+    const travel3 = side === "bottom" ? "0, 100%" : side === "right" ? "100%, 0" : "-100%, 0";
     function motion() {
       const cs = getComputedStyle(node);
       return {
@@ -4129,7 +4707,7 @@
       if (reducedMotion() || typeof panel.animate !== "function") return;
       const { span, ease } = motion();
       panel.animate(
-        [{ transform: "translate(" + travel2 + ")" }, { transform: "none" }],
+        [{ transform: "translate(" + travel3 + ")" }, { transform: "none" }],
         { duration: span * 1.4, easing: ease }
       );
     }
@@ -4142,7 +4720,7 @@
       if (reducedMotion() || typeof panel.animate !== "function") return done();
       const { span, ease } = motion();
       const anim = panel.animate(
-        [{ transform: "none" }, { transform: "translate(" + travel2 + ")" }],
+        [{ transform: "none" }, { transform: "translate(" + travel3 + ")" }],
         { duration: span, easing: ease }
       );
       anim.onfinish = done;
@@ -4226,26 +4804,6 @@
     };
   }
 
-  // src/static/sdk-libs/atelier/mosaic-motion.js
-  function transition(run) {
-    if (typeof document.startViewTransition === "function" && !reducedMotion()) {
-      document.startViewTransition(run);
-    } else {
-      run();
-    }
-  }
-  function morph(moving, run) {
-    if (typeof document.startViewTransition !== "function" || reducedMotion()) {
-      run();
-      return;
-    }
-    moving.style.viewTransitionName = "ak-morph";
-    const vt = document.startViewTransition(run);
-    vt.finished.finally(function() {
-      moving.style.viewTransitionName = "";
-    });
-  }
-
   // src/static/sdk-libs/atelier/mosaic-layout.js
   function appRef() {
     try {
@@ -4278,7 +4836,7 @@
   var CANVAS_MIN = 0.35;
   var CANVAS_MAX = 1.6;
   var CANVAS_STEP = 1.18;
-  function projectCanvas(units, morph2) {
+  function projectCanvas(units, morph3) {
     const field = el("div", { class: "ak-mosaic__field" });
     const cam = { x: 0, y: 0, scale: 0.6 };
     let focused = null;
@@ -4313,7 +4871,7 @@
       } }
     }, "↩ " + t("back"));
     function focus(u) {
-      morph2(u.el, function() {
+      morph3(u.el, function() {
         focused = u;
         focusHost.hidden = false;
         viewport.hidden = true;
@@ -4327,7 +4885,7 @@
     function unfocus() {
       if (!focused) return;
       const u = focused;
-      morph2(u.el, function() {
+      morph3(u.el, function() {
         focused = null;
         u.tile.insertBefore(u.el, u.tile.lastChild);
         focusHost.hidden = true;
@@ -4395,6 +4953,48 @@
   }
 
   // src/static/sdk-libs/atelier/mosaic-projections.js
+  var PINNED = ["position", "box-sizing", "margin", "top", "left", "width", "height"];
+  function unitSwapper(box, units, live) {
+    let epoch = 0;
+    const restore = function() {
+      const on = live();
+      for (const u of units) {
+        for (const name of PINNED) u.el.style.removeProperty(name);
+        u.el.hidden = u.el !== on;
+        box.appendChild(u.el);
+      }
+    };
+    return function(from, to, settle3) {
+      if (from === to) {
+        to.hidden = false;
+        settle3();
+        return;
+      }
+      if (typeof document.startViewTransition === "function" && !reducedMotion()) {
+        transition(function() {
+          from.hidden = true;
+          to.hidden = false;
+          settle3();
+        });
+        return;
+      }
+      if (reducedMotion()) {
+        from.hidden = true;
+        to.hidden = false;
+        settle3();
+        return;
+      }
+      to.hidden = false;
+      if (to.parentNode) to.parentNode.removeChild(to);
+      const mine = ++epoch;
+      const move = panelTransition(from, to, "crossfade");
+      settle3();
+      const tidy = function() {
+        if (mine === epoch) restore();
+      };
+      move.then(tidy, tidy);
+    };
+  }
   function projectStack(units, alive) {
     const box = el("div", { class: "ak-mosaic__units ak-mosaic__units--grid" });
     for (const u of units) {
@@ -4429,6 +5029,9 @@
     let current2 = 0;
     let open = false;
     const items = [];
+    const swap = unitSwapper(box, units, function() {
+      return units[current2] ? units[current2].el : null;
+    });
     const heading = el("h2", { class: "ak-mosaic__unittitle" });
     const panel = el("div", {
       class: "ak-mosaic__overlay",
@@ -4472,10 +5075,8 @@
     }
     function show(index) {
       if (typeof index === "number") {
-        transition(function() {
-          units[current2].el.hidden = true;
+        swap(units[current2].el, units[index].el, function() {
           current2 = index;
-          units[current2].el.hidden = false;
           mark();
           enter(units[current2].el);
         });
@@ -4536,12 +5137,13 @@
     }
     let current2 = 0;
     const items = [];
+    const swap = unitSwapper(box, units, function() {
+      return units[current2] ? units[current2].el : null;
+    });
     function show(index) {
       if (index === current2 && !units[index].el.hidden) return;
-      transition(function() {
-        units[current2].el.hidden = true;
+      swap(units[current2].el, units[index].el, function() {
         current2 = index;
-        units[current2].el.hidden = false;
         items.forEach(function(btn, i) {
           btn.classList.toggle("ak-mosaic__railitem--on", i === index);
         });
@@ -4570,12 +5172,13 @@
       box.appendChild(u.el);
     }
     let current2 = 0;
+    const swap = unitSwapper(box, units, function() {
+      return units[current2] ? units[current2].el : null;
+    });
     function show(index) {
       if (index === current2 && !units[index].el.hidden) return;
-      transition(function() {
-        units[current2].el.hidden = true;
+      swap(units[current2].el, units[index].el, function() {
         current2 = index;
-        units[current2].el.hidden = false;
         enter(units[current2].el);
       });
     }
@@ -4627,11 +5230,13 @@
     }
     let current2 = 0;
     const where = el("span", { class: "ak-mosaic__flowstep", "aria-live": "polite" });
+    const swap = unitSwapper(box, units, function() {
+      return units[current2] ? units[current2].el : null;
+    });
     function show(index) {
-      transition(function() {
-        units[current2].el.hidden = true;
-        current2 = Math.max(0, Math.min(units.length - 1, index));
-        units[current2].el.hidden = false;
+      const step = Math.max(0, Math.min(units.length - 1, index));
+      swap(units[current2].el, units[step].el, function() {
+        current2 = step;
         where.textContent = current2 + 1 + " / " + units.length;
         prev.disabled = current2 === 0;
         next.disabled = current2 === units.length - 1;
@@ -4673,9 +5278,9 @@
   }
 
   // src/static/sdk-libs/atelier/ops.js
-  var SVG_NS4 = "http://www.w3.org/2000/svg";
+  var SVG_NS5 = "http://www.w3.org/2000/svg";
   function svg4(name, attrs) {
-    const node = document.createElementNS(SVG_NS4, name);
+    const node = document.createElementNS(SVG_NS5, name);
     for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
     return node;
   }
@@ -4899,11 +5504,30 @@
   function transformOf(s) {
     return "translate(" + s.x + "px, " + s.y + "px) scale(" + s.scale + ") rotate(" + s.rotate + "deg)";
   }
+  function springTokens(el2) {
+    if (!el2 || typeof getComputedStyle !== "function") return {};
+    let cs;
+    try {
+      cs = getComputedStyle(
+        /** @type {Element} */
+        el2
+      );
+    } catch {
+      return {};
+    }
+    if (!cs) return {};
+    const num = function(name) {
+      const v = parseFloat(cs.getPropertyValue(name));
+      return isFinite(v) && v > 0 ? v : void 0;
+    };
+    return { stiffness: num("--ak-spring-stiffness"), damping: num("--ak-spring-damping"), mass: num("--ak-spring-mass") };
+  }
   function springFrames(opts) {
     const o = opts || {};
-    const k = o.stiffness || 170;
-    const c = o.damping || 20;
-    const m = o.mass || 1;
+    const look = o.stiffness && o.damping && o.mass ? {} : springTokens(o.el);
+    const k = o.stiffness || look.stiffness || 170;
+    const c = o.damping || look.damping || 20;
+    const m = o.mass || look.mass || 1;
     const v0 = o.velocity || 0;
     const w0 = Math.sqrt(k / m);
     const zeta = c / (2 * Math.sqrt(k * m));
@@ -4957,7 +5581,7 @@
       return { el: node, finished: Promise.resolve(), cancel() {
       } };
     }
-    const sf = springFrames(opts);
+    const sf = springFrames(Object.assign({}, opts, { el: node }));
     const frames = sf.samples.map(function(at, i) {
       const s = {};
       Object.keys(from).forEach(function(key) {
@@ -5008,7 +5632,7 @@
     let frames = [{ opacity: 0, transform: start }, { opacity: 1, transform: end }];
     let timing = { duration: span, easing: ease, fill: "backwards" };
     if (o.spring) {
-      const sf = springFrames({ stiffness: 200, damping: 16 });
+      const sf = springFrames({ el: kids[0], stiffness: o.stiffness, damping: o.damping, mass: o.mass });
       frames = sf.samples.map(function(at, i) {
         return {
           offset: i / (sf.samples.length - 1),
@@ -5167,11 +5791,11 @@
       }
       if (axis === "x") dy = 0;
       if (axis === "y") dx = 0;
-      const now = performance.now();
-      const dt = Math.max(now - active.t, 1);
+      const now2 = performance.now();
+      const dt = Math.max(now2 - active.t, 1);
       active.vx = (e.clientX - active.lx) / dt * 1e3;
       active.vy = (e.clientY - active.ly) / dt * 1e3;
-      active.t = now;
+      active.t = now2;
       active.lx = e.clientX;
       active.ly = e.clientY;
       const s = stateOf(node);
@@ -5195,7 +5819,7 @@
       const dx = s.x - was.bx;
       const dy = s.y - was.by;
       if (h.onEnd) h.onEnd(dx, dy, { x: was.vx, y: was.vy }, node);
-      if (o.back !== false) spring(node, { x: was.bx, y: was.by }, { stiffness: o.stiffness || 260, damping: o.damping || 22 });
+      if (o.back !== false) spring(node, { x: was.bx, y: was.by }, { stiffness: o.stiffness, damping: o.damping, mass: o.mass });
     };
     node.addEventListener("pointerdown", down);
     node.addEventListener("pointermove", move);
@@ -5315,11 +5939,11 @@
       easing: "cubic-bezier(0.2, 0.7, 0.3, 1)",
       fill: "forwards"
     });
-    const settle2 = () => {
+    const settle3 = () => {
       node.textContent = next;
     };
-    anim.addEventListener("finish", settle2);
-    anim.addEventListener("cancel", settle2);
+    anim.addEventListener("finish", settle3);
+    anim.addEventListener("cancel", settle3);
     return true;
   }
   function thumb(target) {
@@ -5427,8 +6051,8 @@
       body.insertBefore(row, others[index] || null);
       all.forEach(function(r, i) {
         const stood = held.get(r) || 0;
-        const travel2 = before[i] - r.offsetTop + stood;
-        if (travel2 || stood) flipFrom(r, 0, travel2, CARRY);
+        const travel3 = before[i] - r.offsetTop + stood;
+        if (travel3 || stood) flipFrom(r, 0, travel3, CARRY);
       });
       held.clear();
     }
@@ -5576,9 +6200,9 @@
     }
     return 'url("' + v.replace(/"/g, "%22") + '")';
   }
-  function money(amount, currency) {
+  function money(amount2, currency) {
     const unit = currency || "€";
-    const n = Number(amount) || 0;
+    const n = Number(amount2) || 0;
     const hasIntl = typeof Intl === "object" && Intl && typeof Intl.NumberFormat === "function";
     if (hasIntl && /^[A-Za-z]{3}$/.test(unit)) {
       return new Intl.NumberFormat(void 0, { style: "currency", currency: unit.toUpperCase() }).format(n);
@@ -5822,7 +6446,7 @@
     function kindOf(kind) {
       return KINDS.indexOf(kind) >= 0 ? kind : "info";
     }
-    function settle2(dot) {
+    function settle3(dot) {
       if (!dot || dot.hidden) return;
       const done = function() {
         dot.hidden = true;
@@ -5850,7 +6474,7 @@
         if (!rec) return;
         rec.item.read = true;
         rec.node.classList.remove("is-unread");
-        settle2(rec.dot);
+        settle3(rec.dot);
       });
       if (markAll.parentNode) markAll.parentNode.removeChild(markAll);
       if (s.onRead) s.onRead(ids);
@@ -7606,10 +8230,10 @@
   function dayLabelOf(at) {
     const d = dateOf(at);
     if (!d) return "Earlier";
-    const now = /* @__PURE__ */ new Date();
+    const now2 = /* @__PURE__ */ new Date();
     const key = dayKeyOf(at);
-    if (key === dayKeyOf(now)) return "Today";
-    const back = new Date(now.getTime() - 864e5);
+    if (key === dayKeyOf(now2)) return "Today";
+    const back = new Date(now2.getTime() - 864e5);
     if (key === dayKeyOf(back)) return "Yesterday";
     if (typeof Intl === "object" && Intl.DateTimeFormat) {
       return new Intl.DateTimeFormat(void 0, { weekday: "short", day: "numeric", month: "short" }).format(d);
@@ -8116,8 +8740,8 @@
   }
   function monthStart(value) {
     const m = /^(\d{4})-(\d{1,2})/.exec(String(value == null ? "" : value));
-    const now = /* @__PURE__ */ new Date();
-    if (!m) return new Date(now.getFullYear(), now.getMonth(), 1);
+    const now2 = /* @__PURE__ */ new Date();
+    if (!m) return new Date(now2.getFullYear(), now2.getMonth(), 1);
     return new Date(Number(m[1]), Number(m[2]) - 1, 1);
   }
   function chevron(dir) {
@@ -8181,7 +8805,7 @@
       if (events.length > 3) wrap.appendChild(el("span", { class: "ak-calendar__more" }, "+" + (events.length - 3)));
       return wrap;
     }
-    function travel2(cells) {
+    function travel3(cells) {
       if (!cells.length) return;
       const asked = Date.now();
       withAnime(function(a) {
@@ -8236,7 +8860,7 @@
         }
         grid.appendChild(row);
       }
-      travel2(cells);
+      travel3(cells);
     }
     function turn(step) {
       shown = new Date(shown.getFullYear(), shown.getMonth() + step, 1);
@@ -8380,9 +9004,9 @@
     }
     function card(plan2) {
       const value = Math.round(priceFor(plan2, period));
-      const amount = el("span", { class: "ak-price__amount" }, money3(value, currency));
+      const amount2 = el("span", { class: "ak-price__amount" }, money3(value, currency));
       const per = el("span", { class: "ak-price__per" }, "/" + period);
-      figures.push({ plan: plan2, amount, per, shown: value });
+      figures.push({ plan: plan2, amount: amount2, per, shown: value });
       const features = el("ul", { class: "ak-price__features" });
       (Array.isArray(plan2.features) ? plan2.features : []).forEach(function(f) {
         features.appendChild(el("li", { class: "ak-price__feature" }, [
@@ -8395,7 +9019,7 @@
       }, [
         plan2.highlight ? el("span", { class: "ak-price__chip" }, "Most chosen") : null,
         el("h3", { class: "ak-price__name" }, String(plan2.name || plan2.id)),
-        el("div", { class: "ak-price__figure" }, [amount, per]),
+        el("div", { class: "ak-price__figure" }, [amount2, per]),
         features,
         plan2.note ? el("p", { class: "ak-price__note" }, String(plan2.note)) : null,
         el("button", {
@@ -8575,7 +9199,7 @@
     let index = 0;
     let flight = null;
     let driving = false;
-    let settle2 = 0;
+    let settle3 = 0;
     let swiped = false;
     let emptyCard = null;
     let dead = false;
@@ -8696,9 +9320,9 @@
       next.disabled = index >= items.length - 1;
     }
     function release(ms) {
-      if (settle2) clearTimeout(settle2);
-      settle2 = window.setTimeout(function() {
-        settle2 = 0;
+      if (settle3) clearTimeout(settle3);
+      settle3 = window.setTimeout(function() {
+        settle3 = 0;
         driving = false;
         syncFromScroll();
       }, ms);
@@ -8816,7 +9440,7 @@
       destroy: function() {
         dead = true;
         if (flight && typeof flight.stop === "function") flight.stop();
-        if (settle2) clearTimeout(settle2);
+        if (settle3) clearTimeout(settle3);
         if (resizing) cancelAnimationFrame(resizing);
         swipe.destroy();
         viewport.removeEventListener("scroll", onScroll);
@@ -8998,9 +9622,9 @@
   }
 
   // src/static/sdk-libs/atelier/atlas.js
-  var SVG_NS5 = "http://www.w3.org/2000/svg";
+  var SVG_NS6 = "http://www.w3.org/2000/svg";
   function svg5(name, attrs) {
-    const node = document.createElementNS(SVG_NS5, name);
+    const node = document.createElementNS(SVG_NS6, name);
     for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
     return node;
   }
@@ -9024,10 +9648,10 @@
     let destroyed = false;
     let geo = null;
     let pending = spec.data === void 0 ? null : spec.data;
-    ensureGeometry().then(function(loaded2) {
+    ensureGeometry().then(function(loaded3) {
       if (destroyed) return;
       wait.destroy();
-      geo = loaded2;
+      geo = loaded3;
       render(pending);
     }).catch(function() {
       if (destroyed) return;
@@ -10309,9 +10933,13 @@
   }
   var JUMP = 0.9;
   var LERP = 0.09;
+  var SNAP_DELAY = 120;
+  var SNAP_TOLERANCE = 0.1;
+  var SNAP_REST = 0.05;
+  var SNAP_TRIES = 3;
   function pin(node, holds) {
-    const outer = el("div", { class: "ak-scene__hold", vars: { "--ak-hold": String(1 + holds) } });
-    const stick = el("div", { class: "ak-scene__stick" });
+    const outer = el("div", { class: "ak-act__hold", vars: { "--ak-hold": String(1 + holds) } });
+    const stick = el("div", { class: "ak-act__stick" });
     const parent = node.parentNode;
     if (parent) parent.insertBefore(outer, node);
     stick.appendChild(node);
@@ -10323,6 +10951,32 @@
     if (!outer || !outer.parentNode) return;
     outer.parentNode.insertBefore(sc.el, outer);
     outer.parentNode.removeChild(outer);
+  }
+  function chapterise(node) {
+    const panels = (
+      /** @type {HTMLElement[]} */
+      Array.prototype.slice.call(node.children)
+    );
+    if (!panels.length) return null;
+    const track = el("div", { class: "ak-chapter__track" });
+    const box = el("div", { class: "ak-chapter" }, [track]);
+    panels.forEach(function(p) {
+      p.classList.add("ak-chapter__panel");
+      track.appendChild(p);
+    });
+    node.appendChild(box);
+    node.classList.add("ak-act--x");
+    return { box, track, panels };
+  }
+  function unchapterise(sc) {
+    const ch = sc.chapter;
+    if (!ch) return;
+    ch.panels.forEach(function(p) {
+      p.classList.remove("ak-chapter__panel");
+      sc.el.appendChild(p);
+    });
+    if (ch.box.parentNode) ch.box.parentNode.removeChild(ch.box);
+    sc.el.classList.remove("ak-act--x");
   }
   function playEnter(node, kind) {
     if (typeof kind === "function") {
@@ -10383,6 +11037,9 @@
   function clamp01(n) {
     return n < 0 ? 0 : n > 1 ? 1 : n;
   }
+  function now() {
+    return typeof performance === "object" && performance && typeof performance.now === "function" ? performance.now() : Date.now();
+  }
   function director(spec) {
     const s = spec || /** @type {any} */
     {};
@@ -10402,9 +11059,13 @@
         console.warn('aimeat-atelier: story scene "' + raw.id + '" has no element on the page, skipped');
         return;
       }
-      node.classList.add("ak-scene");
-      node.setAttribute("data-ak-scene", String(raw.id));
-      const holds = Math.max(0, Number(raw.hold) || 0);
+      node.classList.add("ak-act");
+      node.setAttribute("data-ak-act", String(raw.id));
+      const chapter = raw.axis === "x" ? chapterise(node) : null;
+      const holds = Math.max(
+        Math.max(0, Number(raw.hold) || 0),
+        chapter ? chapter.panels.length : 0
+      );
       scenes.push({
         id: String(raw.id),
         el: node,
@@ -10413,7 +11074,8 @@
         label: String(raw.label || raw.id),
         spec: raw,
         entered: false,
-        inside: false
+        inside: false,
+        chapter
       });
     });
     function sizeHolds() {
@@ -10440,6 +11102,7 @@
           opts.content = scroller.firstElementChild || scroller;
         }
         lenis = new Lenis(opts);
+        if (isPage) window.__akLenis = lenis;
       }, function(err) {
         console.warn("aimeat-atelier: lenis did not load, the browser scrolls this story", err);
       });
@@ -10480,7 +11143,12 @@
         const r = (sc.outer || sc.el).getBoundingClientRect();
         if (i === 0) first = r;
         last = r;
-        if (sc.spec.onProgress) sc.spec.onProgress(progressOf(sc, r, vTop, vH), sc.el);
+        const p = progressOf(sc, r, vTop, vH);
+        if (sc.chapter) {
+          const across = Math.max(0, sc.chapter.panels.length - 1);
+          sc.chapter.track.style.setProperty("--ak-chapter-x", -across * 100 * p + "%");
+        }
+        if (sc.spec.onProgress) sc.spec.onProgress(p, sc.el);
         const gap = r.top <= mid && r.bottom >= mid ? 0 : Math.min(Math.abs(r.top - mid), Math.abs(r.bottom - mid));
         if (gap < bestGap) {
           bestGap = gap;
@@ -10499,6 +11167,8 @@
     }
     let rafId = 0;
     const onScroll = function() {
+      settleTries = 0;
+      armSnap();
       if (rafId) return;
       rafId = requestAnimationFrame(function() {
         rafId = 0;
@@ -10550,6 +11220,7 @@
       if (i < 0) return;
       const target = scenes[i].outer || scenes[i].el;
       const o = opts || {};
+      jumpUntil = now() + (o.duration || JUMP) * 1e3;
       if (lenis) {
         lenis.scrollTo(target, { offset: o.offset || 0, duration: o.duration || JUMP });
       } else {
@@ -10564,6 +11235,98 @@
       const from = curIdx < 0 ? 0 : curIdx;
       const to = Math.max(0, Math.min(scenes.length - 1, from + by));
       if (to !== from || curIdx < 0) go(scenes[to].id);
+    }
+    function goPanel(sc, index) {
+      const outer = sc.outer;
+      const ch = sc.chapter;
+      if (!outer || !ch) return;
+      const vH = isPage ? window.innerHeight : scroller.clientHeight;
+      const across = Math.max(1, ch.panels.length - 1);
+      const travel3 = Math.max(0, outer.offsetHeight - vH);
+      const want = Math.min(Math.max(index, 0), across) / across * travel3;
+      jumpUntil = now() + JUMP * 1e3;
+      if (lenis) {
+        lenis.scrollTo(outer, { offset: want, duration: JUMP });
+        return;
+      }
+      const vTop = isPage ? 0 : scroller.getBoundingClientRect().top;
+      const how = (
+        /** @type {ScrollToOptions} */
+        {
+          top: outer.getBoundingClientRect().top - vTop + want,
+          behavior: reducedMotion() ? "auto" : "smooth"
+        }
+      );
+      if (isPage) window.scrollBy(how);
+      else scroller.scrollBy(how);
+    }
+    const chapterDoors = [];
+    scenes.forEach(function(sc) {
+      if (!sc.chapter || !sc.outer) return;
+      const ch = sc.chapter;
+      const fn = function(ev) {
+        const t2 = (
+          /** @type {Element|null} */
+          /** @type {any} */
+          ev.target
+        );
+        if (!t2) return;
+        let i = -1;
+        ch.panels.forEach(function(p, n) {
+          if (p === t2 || p.contains(t2)) i = n;
+        });
+        if (i < 0) return;
+        ch.box.scrollLeft = 0;
+        goPanel(sc, i);
+      };
+      ch.box.addEventListener("focusin", fn);
+      chapterDoors.push({ box: ch.box, fn });
+    });
+    const snapCfg = s.snap && typeof s.snap === "object" ? s.snap : {};
+    const snapOn = !!s.snap;
+    const snapDelay = snapCfg.delay !== void 0 ? Number(snapCfg.delay) : SNAP_DELAY;
+    const snapTol = snapCfg.tolerance !== void 0 ? clamp01(Number(snapCfg.tolerance)) : SNAP_TOLERANCE;
+    let settleTimer = 0;
+    let settleTries = 0;
+    let jumpUntil = 0;
+    function armSnap() {
+      if (!snapOn || !scenes.length) return;
+      if (settleTimer) clearTimeout(settleTimer);
+      settleTimer = setTimeout(settle3, snapDelay);
+    }
+    function settle3() {
+      settleTimer = 0;
+      if (dead || !snapOn || !scenes.length) return;
+      if (now() < jumpUntil) return;
+      if (lenis && Math.abs(Number(lenis.velocity) || 0) > SNAP_REST) {
+        settleTries += 1;
+        if (settleTries <= SNAP_TRIES) armSnap();
+        return;
+      }
+      const vH = isPage ? window.innerHeight : scroller.clientHeight;
+      const vTop = isPage ? 0 : scroller.getBoundingClientRect().top;
+      let held = false;
+      scenes.forEach(function(sc) {
+        if (held || !sc.outer) return;
+        const r = sc.outer.getBoundingClientRect();
+        const top = r.top - vTop;
+        const room2 = r.bottom - vTop - vH;
+        if (top < -1 && room2 > 1) held = true;
+      });
+      if (held) return;
+      let near = -1;
+      let gap = Infinity;
+      scenes.forEach(function(sc, i) {
+        const d = (sc.outer || sc.el).getBoundingClientRect().top - vTop;
+        if (Math.abs(d) < Math.abs(gap)) {
+          gap = d;
+          near = i;
+        }
+      });
+      if (near < 0) return;
+      const room = Math.abs(gap);
+      if (room <= snapTol * vH || room > vH) return;
+      go(scenes[near].id);
     }
     const onKey = function(ev) {
       if (editing() || ev.metaKey || ev.ctrlKey || ev.altKey) return;
@@ -10615,6 +11378,10 @@
           cancelAnimationFrame(rafId);
           rafId = 0;
         }
+        if (settleTimer) {
+          clearTimeout(settleTimer);
+          settleTimer = 0;
+        }
         if (io) {
           io.disconnect();
           io = null;
@@ -10622,16 +11389,26 @@
         scroller.removeEventListener("scroll", onScroll);
         window.removeEventListener("resize", onResize);
         if (wantKeys) window.removeEventListener("keydown", onKey);
+        chapterDoors.forEach(function(d) {
+          d.box.removeEventListener("focusin", d.fn);
+        });
+        chapterDoors.length = 0;
         if (lenis) {
+          const w = (
+            /** @type {any} */
+            window
+          );
+          if (w.__akLenis === lenis) w.__akLenis = null;
           lenis.destroy();
           lenis = null;
         }
         if (rail && rail.nav.parentNode) rail.nav.parentNode.removeChild(rail.nav);
         if (host && hostMarked) host.classList.remove("ak-story");
         scenes.forEach(function(sc) {
+          unchapterise(sc);
           unpin(sc);
-          sc.el.classList.remove("ak-scene");
-          sc.el.removeAttribute("data-ak-scene");
+          sc.el.classList.remove("ak-act");
+          sc.el.removeAttribute("data-ak-act");
         });
       }
     };
@@ -10668,6 +11445,277 @@
     };
   }
 
+  // src/static/sdk-libs/atelier/lenis-more.js
+  var JUMP2 = 0.9;
+  var READ_LINE = 3;
+  function nearestScroller2(node) {
+    let p = node.parentElement;
+    while (p && p !== document.body) {
+      const oy = getComputedStyle(p).overflowY;
+      if ((oy === "auto" || oy === "scroll") && p.scrollHeight > p.clientHeight) return p;
+      p = p.parentElement;
+    }
+    return window;
+  }
+  function viewOf(scroller) {
+    if (scroller === window) return { h: window.innerHeight, top: 0 };
+    const box = (
+      /** @type {Element} */
+      scroller
+    );
+    return { h: box.clientHeight, top: box.getBoundingClientRect().top };
+  }
+  function clamp012(n) {
+    return n < 0 ? 0 : n > 1 ? 1 : n;
+  }
+  function layersOf(node, named) {
+    if (named && named.length) {
+      const out = [];
+      named.forEach(function(raw) {
+        if (!raw) return;
+        const found = (
+          /** @type {HTMLElement|null} */
+          typeof raw.el === "string" ? node.querySelector(raw.el) || document.querySelector(raw.el) : raw.el || null
+        );
+        if (!found) {
+          console.warn('aimeat-atelier: parallax layer "' + String(raw.el) + '" is not on the page, skipped');
+          return;
+        }
+        out.push({ el: found, speed: Number(raw.speed) || 0, axis: raw.axis === "x" ? "x" : "y" });
+      });
+      return out;
+    }
+    return (
+      /** @type {HTMLElement[]} */
+      Array.prototype.slice.call(node.children).filter(function(kid) {
+        return kid.hasAttribute("data-speed");
+      }).map(function(kid) {
+        return {
+          el: kid,
+          speed: parseFloat(kid.getAttribute("data-speed") || "0") || 0,
+          axis: (
+            /** @type {'y'|'x'} */
+            kid.getAttribute("data-axis") === "x" ? "x" : "y"
+          )
+        };
+      })
+    );
+  }
+  function parallax(target, opts) {
+    const node = (
+      /** @type {HTMLElement} */
+      resolve(target)
+    );
+    const o = opts || {};
+    const subject = o.subject ? (
+      /** @type {HTMLElement} */
+      resolve(o.subject)
+    ) : node;
+    const layers = layersOf(node, o.layers);
+    const limit = o.clamp !== void 0 ? Math.abs(Number(o.clamp)) : Infinity;
+    node.classList.add("ak-parallax");
+    layers.forEach(function(L) {
+      L.el.classList.add("ak-parallax__layer");
+    });
+    const undress = function() {
+      layers.forEach(function(L) {
+        L.el.classList.remove("ak-parallax__layer");
+        L.el.style.removeProperty("--ak-plx-x");
+        L.el.style.removeProperty("--ak-plx-y");
+      });
+      node.classList.remove("ak-parallax");
+    };
+    if (reducedMotion() || !layers.length) {
+      return { el: node, progress() {
+        return 0;
+      }, destroy() {
+        undress();
+      } };
+    }
+    const scroller = (
+      /** @type {any} */
+      o.scroller || nearestScroller2(node)
+    );
+    let last = 0;
+    const tick = function() {
+      const r = node.getBoundingClientRect();
+      const s = subject === node ? r : subject.getBoundingClientRect();
+      const v = viewOf(scroller);
+      last = clamp012((v.top + v.h - s.top) / Math.max(v.h + s.height, 1));
+      layers.forEach(function(L) {
+        const raw = (last - 0.5) * L.speed * r.height;
+        const d = raw < -limit ? -limit : raw > limit ? limit : raw;
+        L.el.style.setProperty(L.axis === "x" ? "--ak-plx-x" : "--ak-plx-y", d.toFixed(2) + "px");
+      });
+    };
+    let rafId = 0;
+    const onScroll = function() {
+      if (rafId) return;
+      rafId = requestAnimationFrame(function() {
+        rafId = 0;
+        tick();
+      });
+    };
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    tick();
+    return {
+      el: node,
+      progress() {
+        return last;
+      },
+      destroy() {
+        scroller.removeEventListener("scroll", onScroll);
+        window.removeEventListener("resize", onScroll);
+        if (rafId) {
+          cancelAnimationFrame(rafId);
+          rafId = 0;
+        }
+        undress();
+      }
+    };
+  }
+  function slugOf(text) {
+    return String(text || "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
+  }
+  function freeId(text) {
+    const base = slugOf(text);
+    if (!base) return uid("ak-heading");
+    if (!document.getElementById(base)) return base;
+    let n = 2;
+    while (document.getElementById(base + "-" + n)) n += 1;
+    return base + "-" + n;
+  }
+  function readingRail(spec) {
+    const s = spec || /** @type {any} */
+    {};
+    const article = (
+      /** @type {HTMLElement} */
+      resolve(s.article)
+    );
+    const heads = (
+      /** @type {HTMLElement[]} */
+      Array.prototype.slice.call(article.querySelectorAll(s.headings || "h2"))
+    );
+    const named = [];
+    const items = heads.map(function(h) {
+      if (!h.id) {
+        h.id = freeId(h.textContent);
+        named.push(h);
+      }
+      return {
+        id: h.id,
+        head: h,
+        text: (h.textContent || "").trim() || h.id,
+        deep: String(h.tagName).toUpperCase() !== "H2"
+      };
+    });
+    const fill = el("span", { class: "ak-reading__fill", "aria-hidden": "true" });
+    const line = el("div", { class: "ak-reading__line", "aria-hidden": "true" }, [fill]);
+    const links = items.map(function(it) {
+      return el("a", {
+        class: "ak-reading__link",
+        href: "#" + it.id,
+        on: {
+          click: function(ev) {
+            ev.preventDefault();
+            jump(it);
+          }
+        }
+      }, it.text);
+    });
+    const list2 = el("ol", { class: "ak-reading__list" }, links.map(function(a, i) {
+      return el("li", { class: "ak-reading__item" + (items[i].deep ? " ak-reading__item--deep" : "") }, [a]);
+    }));
+    const nav = el("nav", {
+      class: "ak-reading" + (s.target ? " ak-reading--inset" : ""),
+      "aria-label": "Contents"
+    }, [line, list2]);
+    const parent = (
+      /** @type {HTMLElement} */
+      s.target ? resolve(s.target) : document.body
+    );
+    let marked = false;
+    if (s.target && !parent.classList.contains("ak-reading-host")) {
+      parent.classList.add("ak-reading-host");
+      marked = true;
+    }
+    parent.appendChild(nav);
+    let curIdx = -1;
+    function mark(i) {
+      if (i === curIdx) return;
+      curIdx = i;
+      links.forEach(function(a, n) {
+        if (n === i) a.setAttribute("aria-current", "true");
+        else a.removeAttribute("aria-current");
+        a.classList.toggle("is-current", n === i);
+      });
+    }
+    function jump(it) {
+      const glide = (
+        /** @type {any} */
+        window.__akLenis
+      );
+      if (glide && typeof glide.scrollTo === "function") {
+        glide.scrollTo(it.head, { duration: JUMP2 });
+      } else {
+        it.head.scrollIntoView({ block: "start", behavior: reducedMotion() ? "auto" : "smooth" });
+      }
+      mark(items.indexOf(it));
+      if (s.onPick) s.onPick(it.id);
+    }
+    const scroller = (
+      /** @type {any} */
+      s.scroller || nearestScroller2(article)
+    );
+    const tick = function() {
+      const v = viewOf(scroller);
+      const r = article.getBoundingClientRect();
+      const through = clamp012((v.top - r.top) / Math.max(1, r.height - v.h));
+      fill.style.setProperty("--ak-fill", (through * 100).toFixed(2) + "%");
+      const edge = v.top + v.h / READ_LINE;
+      let at = 0;
+      items.forEach(function(it, i) {
+        if (it.head.getBoundingClientRect().top <= edge) at = i;
+      });
+      mark(items.length ? at : -1);
+    };
+    let rafId = 0;
+    const onScroll = function() {
+      if (rafId) return;
+      rafId = requestAnimationFrame(function() {
+        rafId = 0;
+        tick();
+      });
+    };
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    tick();
+    return {
+      el: nav,
+      set(patch) {
+        if (!patch || patch.current == null) return;
+        const i = typeof patch.current === "number" ? patch.current : items.findIndex(function(it) {
+          return it.id === String(patch.current);
+        });
+        mark(i);
+      },
+      destroy() {
+        scroller.removeEventListener("scroll", onScroll);
+        window.removeEventListener("resize", onScroll);
+        if (rafId) {
+          cancelAnimationFrame(rafId);
+          rafId = 0;
+        }
+        if (nav.parentNode) nav.parentNode.removeChild(nav);
+        if (marked) parent.classList.remove("ak-reading-host");
+        named.forEach(function(h) {
+          h.removeAttribute("id");
+        });
+      }
+    };
+  }
+
   // src/static/sdk-libs/atelier/anime-show.js
   var W5 = (
     /** @type {any} */
@@ -10676,7 +11724,7 @@
   var animePromise2 = null;
   var animeOff2 = false;
   var LATE = 400;
-  var SVG_NS6 = "http://www.w3.org/2000/svg";
+  var SVG_NS7 = "http://www.w3.org/2000/svg";
   function ensureAnime2() {
     if (W5.anime && W5.anime.animate) return Promise.resolve(W5.anime);
     if (animePromise2) return animePromise2;
@@ -10776,7 +11824,7 @@
       if (by === "lines") return sp.lines;
       return sp.words;
     }
-    function travel2(a, list2) {
+    function travel3(a, list2) {
       if (!list2 || !list2.length) return;
       a.animate(list2, Object.assign({}, REVEAL_FROM[from], {
         duration,
@@ -10805,7 +11853,7 @@
         const api = a.text || {};
         const make = typeof api.splitText === "function" ? api.splitText : typeof api.split === "function" ? api.split : null;
         if (!make) {
-          travel2(a, fallback());
+          travel3(a, fallback());
           return;
         }
         const cfg2 = (
@@ -10819,7 +11867,7 @@
         splitter.addEffect(function(sp) {
           if (!played) {
             played = true;
-            travel2(a, piecesOf(sp));
+            travel3(a, piecesOf(sp));
           }
           return function() {
           };
@@ -10843,7 +11891,7 @@
     };
   }
   var DRAWABLE = "path, line, polyline, circle, rect";
-  function nearestScroller2(node) {
+  function nearestScroller3(node) {
     let p = node.parentElement;
     while (p && p !== document.body) {
       const oy = getComputedStyle(p).overflowY;
@@ -10899,7 +11947,7 @@
       withAnime2(function(a) {
         drawablesOf(a);
         reset();
-        const scroller = o.scroller || nearestScroller2(node);
+        const scroller = o.scroller || nearestScroller3(node);
         let rafId = 0;
         const tick = function() {
           const r = node.getBoundingClientRect();
@@ -11146,11 +12194,11 @@
     if (o.path && typeof o.path !== "string") {
       path = o.path;
     } else if (typeof o.path === "string" && o.path.trim()) {
-      stage = document.createElementNS(SVG_NS6, "svg");
+      stage = document.createElementNS(SVG_NS7, "svg");
       stage.setAttribute("class", "ak-orbit__stage");
       stage.setAttribute("viewBox", o.viewBox || "0 0 100 100");
       stage.setAttribute("aria-hidden", "true");
-      path = document.createElementNS(SVG_NS6, "path");
+      path = document.createElementNS(SVG_NS7, "path");
       path.setAttribute("class", "ak-orbit__path");
       path.setAttribute("d", o.path);
       path.setAttribute("fill", "none");
@@ -11258,352 +12306,1097 @@
     };
   }
 
-  // src/static/sdk-libs/atelier/transitions.js
-  var SCREEN_KINDS = ["fade", "wipe", "curtain", "zoom", "iris", "slide"];
-  var PANEL_KINDS = ["crossfade", "slide", "flip", "morph", "push"];
-  var CURTAIN_KINDS = ["band", "halves", "iris"];
-  var TINTS = ["accent", "ink", "surface"];
-  var DIRECTIONS = ["left", "right", "up", "down"];
-  var AWAY = { left: "translateX(-100%)", right: "translateX(100%)", up: "translateY(-100%)", down: "translateY(100%)" };
-  var TOWARD = { left: "translateX(100%)", right: "translateX(-100%)", up: "translateY(100%)", down: "translateY(-100%)" };
-  var STAND_IN = { fade: "band", wipe: "band", slide: "band", zoom: "halves", curtain: "halves", iris: "iris" };
-  var lastPoint = null;
-  if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
-    window.addEventListener("pointerdown", function(ev) {
-      lastPoint = { x: ev.clientX, y: ev.clientY };
-    }, { capture: true, passive: true });
-  }
-  function originOf(from) {
-    if (from && typeof from.x === "number" && typeof from.y === "number") return { x: from.x, y: from.y };
-    if (lastPoint) return { x: lastPoint.x, y: lastPoint.y };
-    const w = typeof window !== "undefined" ? window.innerWidth : 0;
-    const h = typeof window !== "undefined" ? window.innerHeight : 0;
-    return { x: w / 2, y: h / 2 };
-  }
-  function spanOf(node, ms) {
-    if (ms) return ms;
-    const cs = getComputedStyle(node);
-    return (parseFloat(cs.getPropertyValue("--ak-motion")) || 200) * 2;
-  }
-  function easeOf2(node) {
-    const cs = getComputedStyle(node);
-    return (cs.getPropertyValue("--ak-ease") || "").trim() || "cubic-bezier(0.2, 0.7, 0.3, 1)";
-  }
-  function oneOf(set, value) {
-    return set.indexOf(value) >= 0 ? String(value) : set[0];
-  }
-  function playAll(runs) {
-    const settled = runs.map(function(r) {
-      if (typeof r.node.animate !== "function") return Promise.resolve();
-      const anim = r.node.animate(r.frames, r.timing);
-      return anim.finished.then(function() {
-        anim.cancel();
-      }, function() {
-      });
-    });
-    return Promise.all(settled).then(function() {
-    });
-  }
-  function reachOf(point) {
-    const w = typeof window !== "undefined" ? window.innerWidth : 0;
-    const h = typeof window !== "undefined" ? window.innerHeight : 0;
-    const dx = Math.max(point.x, w - point.x);
-    const dy = Math.max(point.y, h - point.y);
-    return Math.ceil(Math.sqrt(dx * dx + dy * dy));
-  }
-  function originIn(host, from) {
-    const r = host.getBoundingClientRect();
-    const src = from && typeof from.x === "number" ? from : lastPoint;
-    if (src) {
-      const x = src.x - r.left;
-      const y = src.y - r.top;
-      if (x >= 0 && y >= 0 && x <= r.width && y <= r.height) return { x, y };
-    }
-    return { x: r.width / 2, y: r.height / 2 };
-  }
-  function curtain(opts) {
-    const o = opts || {};
-    const kind = oneOf(CURTAIN_KINDS, o.kind);
-    const tint = o.colour && TINTS.indexOf(o.colour) >= 0 ? o.colour : "ink";
-    const dir = oneOf(DIRECTIONS, o.direction);
-    const axis = dir === "up" || dir === "down" ? "y" : "x";
-    const host = o.host ? (
-      /** @type {HTMLElement} */
-      resolve(o.host)
-    ) : null;
-    const point = host ? originIn(host, o.from) : originOf(o.from);
-    const reach = host ? Math.ceil(Math.hypot(host.clientWidth, host.clientHeight)) : reachOf(point);
-    const layer = el("div", {
-      class: "ak-root ak-curtain ak-curtain--" + kind + " ak-curtain--" + tint + " ak-curtain--axis-" + axis,
-      "aria-hidden": "true"
-    });
-    const leaves = [];
-    if (kind === "halves") {
-      leaves.push(el("div", { class: "ak-curtain__half ak-curtain__half--a" }));
-      leaves.push(el("div", { class: "ak-curtain__half ak-curtain__half--b" }));
-    } else {
-      leaves.push(el("div", { class: kind === "iris" ? "ak-curtain__iris" : "ak-curtain__band" }));
-    }
-    const open = kind === "iris" ? ["circle(0px at " + point.x + "px " + point.y + "px)"] : kind === "halves" ? [AWAY[axis === "y" ? "up" : "left"], AWAY[axis === "y" ? "down" : "right"]] : [TOWARD[dir]];
-    const shut = kind === "iris" ? ["circle(" + reach + "px at " + point.x + "px " + point.y + "px)"] : ["none", "none"];
-    const past = kind === "band" ? [AWAY[dir]] : open;
-    let parked = open;
-    leaves.forEach(function(leaf, i) {
-      if (kind === "iris") leaf.style.clipPath = open[i];
-      else leaf.style.transform = open[i];
-      layer.appendChild(leaf);
-    });
-    if (host) {
-      host.classList.add("ak-curtain-host");
-      layer.classList.add("ak-curtain--inset");
-      host.appendChild(layer);
-    } else {
-      document.body.appendChild(layer);
-    }
-    const ms = spanOf(layer, o.duration);
-    const ease = easeOf2(layer);
-    let covered = false;
-    let gone = false;
-    function travel2(from, to) {
-      if (gone) return Promise.resolve();
-      const land = function() {
-        leaves.forEach(function(leaf, i) {
-          if (kind === "iris") leaf.style.clipPath = to[i];
-          else leaf.style.transform = to[i];
-        });
+  // src/static/sdk-libs/atelier/anime-more.js
+  var W6 = (
+    /** @type {any} */
+    window
+  );
+  var animePromise3 = null;
+  var animeOff3 = false;
+  var LATE2 = 400;
+  function ensureAnime3() {
+    if (W6.anime && W6.anime.animate) return Promise.resolve(W6.anime);
+    if (animePromise3) return animePromise3;
+    animePromise3 = new Promise(function(ok, fail) {
+      const s = document.createElement("script");
+      s.src = NODE_URL + "/lib/anime@4.min.js";
+      s.onload = function() {
+        ok(W6.anime);
       };
-      if (reducedMotion() || typeof leaves[0].animate !== "function") {
-        land();
-        return Promise.resolve();
+      s.onerror = function() {
+        animePromise3 = null;
+        fail(new Error("anime failed to load"));
+      };
+      document.head.appendChild(s);
+    });
+    return animePromise3;
+  }
+  function withAnime3(run, without) {
+    if (animeOff3 || reducedMotion()) {
+      if (without) without();
+      return;
+    }
+    ensureAnime3().then(run, function() {
+      animeOff3 = true;
+      if (without) without();
+    });
+  }
+  function warmAnime3() {
+    if (animeOff3 || reducedMotion()) return;
+    ensureAnime3().then(null, function() {
+      animeOff3 = true;
+    });
+  }
+  function onCue2(run, without) {
+    const asked = Date.now();
+    withAnime3(function(a) {
+      if (Date.now() - asked > LATE2) {
+        if (without) without();
+        return;
       }
-      const runs = leaves.map(function(leaf, i) {
-        return {
-          node: leaf,
-          frames: kind === "iris" ? [{ clipPath: from[i] }, { clipPath: to[i] }] : [{ transform: from[i] }, { transform: to[i] }],
-          timing: { duration: ms, easing: ease, fill: (
-            /** @type {FillMode} */
-            "both"
-          ) }
-        };
+      run(a);
+    }, without);
+  }
+  function nearestScroller4(node) {
+    let p = node.parentElement;
+    while (p && p !== document.body) {
+      const oy = getComputedStyle(p).overflowY;
+      if ((oy === "auto" || oy === "scroll") && p.scrollHeight > p.clientHeight) return p;
+      p = p.parentElement;
+    }
+    return window;
+  }
+  function toElements2(targets) {
+    if (!targets) return [];
+    if (typeof targets === "string") return Array.prototype.slice.call(document.querySelectorAll(targets));
+    if (targets instanceof Element) return [
+      /** @type {HTMLElement} */
+      targets
+    ];
+    if (typeof targets.length === "number") return Array.prototype.slice.call(targets);
+    return [];
+  }
+  var END_KEYS2 = ["x", "y", "scale", "rotate", "opacity"];
+  function endOf2(value) {
+    if (Array.isArray(value)) return value.length ? endOf2(value[value.length - 1]) : null;
+    if (value && typeof value === "object" && "to" in value) return (
+      /** @type {any} */
+      value.to
+    );
+    return value;
+  }
+  function settle2(node, props) {
+    let moved = false;
+    const at = { x: 0, y: 0, scale: 1, rotate: 0 };
+    END_KEYS2.forEach(function(key) {
+      const end = endOf2(props[key]);
+      if (end == null) return;
+      moved = true;
+      if (key === "opacity") node.style.opacity = String(end);
+      else at[key] = parseFloat(String(end)) || 0;
+    });
+    if (!moved) return;
+    if (props.x !== void 0 || props.y !== void 0 || props.scale !== void 0 || props.rotate !== void 0) {
+      node.style.transform = "translate(" + at.x + "px, " + at.y + "px) scale(" + (props.scale === void 0 ? 1 : at.scale) + ") rotate(" + at.rotate + "deg)";
+    }
+  }
+  var MORPHABLE = "path, polygon, polyline";
+  function geometryProp(shape) {
+    return (shape.tagName || "").toLowerCase() === "path" ? "d" : "points";
+  }
+  function morph2(target, opts) {
+    const o = opts || {};
+    const root = resolve(target);
+    const duration = o.duration || 720;
+    const isSvg = (root.tagName || "").toLowerCase() === "svg";
+    root.classList.add("ak-morph");
+    const shown = (
+      /** @type {any} */
+      isSvg ? root.querySelector(MORPHABLE + ":not([data-shape])") || root.querySelector(MORPHABLE) : root
+    );
+    if (shown) shown.classList.add("ak-morph__shape");
+    const spares = {};
+    const made = [];
+    if (isSvg) {
+      Array.prototype.slice.call(root.querySelectorAll(MORPHABLE + "[data-shape]")).forEach(function(s) {
+        s.classList.add("ak-morph__spare");
+        spares[s.getAttribute("data-shape")] = s;
       });
-      return playAll(runs).then(land);
+    }
+    if (o.shapes && isSvg) {
+      Object.keys(o.shapes).forEach(function(name) {
+        if (spares[name]) return;
+        const spare = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        spare.setAttribute("class", "ak-morph__spare");
+        spare.setAttribute("data-shape", name);
+        spare.setAttribute("d", String(o.shapes[name]));
+        root.appendChild(spare);
+        spares[name] = spare;
+        made.push(spare);
+      });
+    }
+    const names = Object.keys(spares);
+    let at = shown && shown.getAttribute ? shown.getAttribute("data-shape") : null;
+    warmAnime3();
+    function to(name) {
+      const spare = spares[name];
+      if (!shown || !spare) return Promise.resolve();
+      const prop = geometryProp(shown);
+      at = name;
+      return new Promise(function(done) {
+        const swap = function() {
+          shown.setAttribute(prop, spare.getAttribute(prop) || "");
+          done();
+        };
+        onCue2(function(a) {
+          const props = (
+            /** @type {any} */
+            { duration, ease: o.ease || "inOutQuad" }
+          );
+          props[prop] = a.svg.morphTo(spare, o.precision);
+          props.onComplete = function() {
+            done();
+          };
+          try {
+            a.animate(shown, props);
+          } catch {
+            swap();
+          }
+        }, swap);
+      });
+    }
+    function cycle() {
+      if (!names.length) return Promise.resolve();
+      const i = at === null ? 0 : (names.indexOf(at) + 1) % names.length;
+      return to(names[i]);
     }
     return {
-      cover() {
-        if (covered) return Promise.resolve();
-        covered = true;
-        layer.classList.add("ak-curtain--on");
-        const was = parked;
-        parked = shut;
-        return travel2(was, shut);
+      el: root,
+      to,
+      cycle,
+      /** The name of the shape on the screen, or null while the author's own shape is showing. */
+      current: function() {
+        return at;
       },
-      uncover() {
-        if (!covered) return Promise.resolve();
-        covered = false;
-        parked = past;
-        return travel2(shut, past).then(function() {
-          layer.classList.remove("ak-curtain--on");
+      /** Every name this call can reach, in the order `cycle` walks them. */
+      names: function() {
+        return names.slice();
+      },
+      destroy: function() {
+        made.forEach(function(spare) {
+          spare.remove();
         });
+        made.length = 0;
+        Object.keys(spares).forEach(function(name) {
+          if (spares[name].parentNode) spares[name].classList.remove("ak-morph__spare");
+        });
+        if (shown) shown.classList.remove("ak-morph__shape");
+        root.classList.remove("ak-morph");
+      }
+    };
+  }
+  var HOME_MS = 420;
+  function draggable(target, opts) {
+    const o = opts || {};
+    const node = (
+      /** @type {HTMLElement} */
+      resolve(target)
+    );
+    const axis = o.axis === "x" || o.axis === "y" ? o.axis : "both";
+    const home = o.release === "spring";
+    const quiet = reducedMotion();
+    node.classList.add("ak-tug");
+    let dg = null;
+    let floor = null;
+    const seat = { x: 0, y: 0 };
+    const base = { x: 0, y: 0 };
+    let held = false;
+    let gone = false;
+    const say = function(fn) {
+      if (fn) fn(x(), y());
+    };
+    function x() {
+      return dg ? dg.x : seat.x;
+    }
+    function y() {
+      return dg ? dg.y : seat.y;
+    }
+    floor = drag(node, {
+      onStart: function() {
+        held = true;
+        base.x = seat.x;
+        base.y = seat.y;
+        node.classList.add("ak-tug--held");
+        if (o.onGrab) o.onGrab();
       },
-      destroy() {
+      onMove: function(dx, dy) {
+        seat.x = axis === "y" ? 0 : base.x + dx;
+        seat.y = axis === "x" ? 0 : base.y + dy;
+        say(o.onDrag);
+      },
+      onEnd: function() {
+        held = false;
+        node.classList.remove("ak-tug--held");
+        say(o.onRelease);
+        if (home) {
+          seat.x = 0;
+          seat.y = 0;
+        }
+        handover();
+      }
+    }, { axis, back: home, stiffness: o.stiffness });
+    function axisParam(which) {
+      if (axis === "x" && which === "y" || axis === "y" && which === "x") return false;
+      const s = o.snap;
+      if (s && typeof s === "object" && !Array.isArray(s)) {
+        const own = (
+          /** @type {any} */
+          s[which]
+        );
+        if (own !== void 0) return { snap: own };
+      }
+      return true;
+    }
+    function build(a) {
+      if (gone || dg || held) return;
+      const at = { x: seat.x, y: seat.y };
+      if (floor) {
+        floor.destroy();
+        floor = null;
+      }
+      node.style.transform = "";
+      const params = (
+        /** @type {any} */
+        {
+          x: axisParam("x"),
+          y: axisParam("y"),
+          onGrab: function() {
+            held = true;
+            node.classList.add("ak-tug--held");
+            if (o.onGrab) o.onGrab();
+          },
+          onDrag: function() {
+            say(o.onDrag);
+          },
+          onRelease: function() {
+            held = false;
+            node.classList.remove("ak-tug--held");
+            say(o.onRelease);
+            if (home) set(0, 0);
+          },
+          onSnap: function() {
+            say(o.onSnap);
+          }
+        }
+      );
+      if (o.container) params.container = o.container;
+      if (typeof o.stiffness === "number") params.releaseStiffness = o.stiffness;
+      if (typeof o.snap === "number" || Array.isArray(o.snap)) params.snap = o.snap;
+      if (quiet) {
+        params.velocityMultiplier = 0;
+        params.maxVelocity = 0;
+        params.minVelocity = 0;
+      }
+      dg = a.createDraggable(node, params);
+      if (at.x || at.y) {
+        dg.setX(at.x, true);
+        dg.setY(at.y, true);
+      }
+    }
+    function handover() {
+      if (gone || dg || held) return;
+      withAnime3(build);
+    }
+    function set(nx, ny) {
+      const tx = axis === "y" ? 0 : Number(nx) || 0;
+      const ty = axis === "x" ? 0 : Number(ny) || 0;
+      seat.x = tx;
+      seat.y = ty;
+      if (!dg) {
+        node.style.transform = "translate(" + tx + "px, " + ty + "px)";
+        return;
+      }
+      if (quiet) {
+        dg.setX(tx);
+        dg.setY(ty);
+        return;
+      }
+      dg.animate.translateX(tx, HOME_MS);
+      dg.animate.translateY(ty, HOME_MS);
+    }
+    handover();
+    return {
+      el: node,
+      /** How far right of its origin the element stands, in pixels. */
+      x,
+      /** How far below its origin the element stands, in pixels. */
+      y,
+      set,
+      /** Back to where it started. */
+      reset: function() {
+        set(0, 0);
+      },
+      destroy: function() {
         gone = true;
-        if (layer.parentNode) layer.parentNode.removeChild(layer);
-        if (host && !host.querySelector(".ak-curtain")) host.classList.remove("ak-curtain-host");
+        if (floor) {
+          floor.destroy();
+          floor = null;
+        }
+        if (dg) {
+          dg.revert();
+          dg = null;
+        }
+        node.style.transform = "";
+        node.classList.remove("ak-tug", "ak-tug--held");
       }
     };
   }
-  function screenTransition(kind, run, opts) {
+  var BURST_KINDS = ["dot", "confetti", "spark"];
+  var BURST_TONES = ["accent", "ok", "warn", "err", "ch1", "ch2", "ch3", "ch4"];
+  var RING_MS = 440;
+  function burst(target, opts) {
     const o = opts || {};
-    const move = oneOf(SCREEN_KINDS, kind);
-    const root = document.documentElement;
-    if (reducedMotion()) return Promise.resolve(run()).then(function() {
+    const host = (
+      /** @type {HTMLElement} */
+      resolve(target)
+    );
+    const count = Math.max(1, Math.min(200, Math.round(o.count || 24)));
+    const kinds = (o.kinds || BURST_KINDS).filter(function(k) {
+      return BURST_KINDS.indexOf(k) >= 0;
     });
-    if (typeof document.startViewTransition !== "function") {
-      const cover = curtain({
-        kind: (
-          /** @type {'band'|'halves'|'iris'} */
-          STAND_IN[move]
-        ),
-        colour: o.colour,
-        from: o.from,
-        direction: o.direction,
-        duration: o.duration
-      });
-      return cover.cover().then(function() {
-        return run();
-      }).then(function() {
-        return cover.uncover();
-      }).then(function() {
-        cover.destroy();
-      }, function(err) {
-        cover.destroy();
-        throw err;
-      });
-    }
-    const point = originOf(o.from);
-    root.setAttribute("data-ak-transition", move);
-    if (o.direction && DIRECTIONS.indexOf(o.direction) >= 0) root.setAttribute("data-ak-transition-dir", o.direction);
-    if (o.colour && TINTS.indexOf(o.colour) >= 0) root.setAttribute("data-ak-transition-colour", o.colour);
-    root.style.setProperty("--ak-iris-x", point.x + "px");
-    root.style.setProperty("--ak-iris-y", point.y + "px");
-    if (o.duration) root.style.setProperty("--ak-transition-span", o.duration + "ms");
-    const clear2 = function() {
-      root.removeAttribute("data-ak-transition");
-      root.removeAttribute("data-ak-transition-dir");
-      root.removeAttribute("data-ak-transition-colour");
-      root.style.removeProperty("--ak-iris-x");
-      root.style.removeProperty("--ak-iris-y");
-      root.style.removeProperty("--ak-transition-span");
+    const tones = (o.tones || ["accent", "ch1", "ch2", "ch3"]).filter(function(t2) {
+      return BURST_TONES.indexOf(t2) >= 0;
+    });
+    const spread = typeof o.spread === "number" ? Math.max(1, Math.min(360, o.spread)) : 360;
+    const distance = o.distance || 140;
+    const duration = o.duration || 1100;
+    const box = host.getBoundingClientRect();
+    const at = o.from || { x: box.width / 2, y: box.height / 2 };
+    const lend = getComputedStyle(host).position === "static";
+    if (lend) host.classList.add("ak-burst-host");
+    const layer = el("div", { class: "ak-burst", "aria-hidden": "true" });
+    layer.style.setProperty("--ak-burst-x", (Number(at.x) || 0) + "px");
+    layer.style.setProperty("--ak-burst-y", (Number(at.y) || 0) + "px");
+    host.appendChild(layer);
+    const clean = function() {
+      layer.remove();
+      if (lend) host.classList.remove("ak-burst-host");
     };
-    return document.startViewTransition(run).finished.then(clear2, clear2);
-  }
-  function heightOf(node) {
-    const cs = getComputedStyle(node);
-    const box = node.getBoundingClientRect().height;
-    if (cs.boxSizing === "border-box") return box;
-    const pad = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
-    const edge = (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
-    return Math.max(0, box - pad - edge);
-  }
-  function whenMorphDone(moving, cap) {
-    return new Promise(function(settle2) {
-      let done = false;
+    if (reducedMotion() || animeOff3) {
+      const ring2 = el("span", { class: "ak-burst__ring" });
+      layer.appendChild(ring2);
+      if (typeof ring2.animate !== "function") {
+        clean();
+        return Promise.resolve();
+      }
+      const pulse = ring2.animate(
+        [{ transform: "scale(0.25)", opacity: 0.85 }, { transform: "scale(1)", opacity: 0 }],
+        { duration: RING_MS, easing: "cubic-bezier(0.2, 0.7, 0.3, 1)", fill: "forwards" }
+      );
+      return pulse.finished.then(clean, clean);
+    }
+    return new Promise(function(done) {
       const finish = function() {
-        if (done) return;
-        done = true;
-        if (obs) obs.disconnect();
-        clearTimeout(timer);
-        settle2();
+        clean();
+        done();
       };
-      const obs = typeof MutationObserver === "function" ? new MutationObserver(function() {
-        if (!moving.style.viewTransitionName) finish();
-      }) : null;
-      if (obs) obs.observe(moving, { attributes: true, attributeFilter: ["style"] });
-      const timer = setTimeout(finish, cap);
+      onCue2(function(a) {
+        const rand = a.utils.random;
+        const bits = [];
+        for (let i = 0; i < count; i++) {
+          const kind = kinds.length ? kinds[i % kinds.length] : "dot";
+          const tone = tones.length ? tones[i % tones.length] : "accent";
+          bits.push(el("span", { class: "ak-burst__bit ak-burst__bit--" + kind + " ak-burst__bit--" + tone }));
+        }
+        bits.forEach(function(bit) {
+          layer.appendChild(bit);
+        });
+        const tl = a.createTimeline({ defaults: { ease: "outQuad" } });
+        bits.forEach(function(bit) {
+          const deg = spread >= 360 ? rand(0, 359) : -90 + rand(-spread / 2, spread / 2);
+          const rad = deg * Math.PI / 180;
+          const reach = rand(distance * 0.45, distance);
+          const rise = Math.round(duration * 0.42);
+          const dx = Math.cos(rad) * reach;
+          const dy = Math.sin(rad) * reach;
+          tl.add(bit, {
+            x: [0, dx],
+            // Out, then down: the second beat is gravity, and it always ends below the first.
+            y: [
+              { to: dy, duration: rise, ease: "outCubic" },
+              { to: dy + reach * 1.35, duration: duration - rise, ease: "inCubic" }
+            ],
+            rotate: [0, rand(-540, 540)],
+            scale: [
+              { to: rand(80, 115) / 100, duration: Math.round(duration * 0.16), ease: "outBack" },
+              { to: 0.2, duration: duration - Math.round(duration * 0.16), ease: "inQuad" }
+            ],
+            opacity: [
+              { to: 1, duration: 60 },
+              { to: 0, duration: duration - 60, ease: "inQuad" }
+            ],
+            duration
+          }, 0);
+        });
+        tl.then(finish);
+      }, finish);
     });
   }
-  function panelTransition(from, to, kind, opts) {
+  function scrub(target, steps2, opts) {
     const o = opts || {};
-    const move = oneOf(PANEL_KINDS, kind);
-    const parent = (
-      /** @type {HTMLElement|null} */
-      from && from.parentElement
-    );
-    if (!parent || !to || from === to) return Promise.resolve();
-    const swap = function() {
-      parent.insertBefore(to, from);
-      if (from.parentNode) from.parentNode.removeChild(from);
-    };
-    if (reducedMotion() || typeof from.animate !== "function") {
-      swap();
-      return Promise.resolve();
-    }
-    const ms = spanOf(from, o.duration);
-    const ease = easeOf2(from);
-    const dir = oneOf(DIRECTIONS, o.direction);
-    const moving = (
-      /** @type {HTMLElement|null} */
-      o.moving || null
-    );
-    if (move === "morph") {
-      if (!moving || typeof document.startViewTransition !== "function") {
-        return panelTransition(from, to, "crossfade", o);
-      }
-      const done = whenMorphDone(moving, ms * 6);
-      morph(moving, swap);
-      return done;
-    }
-    const outgoing = (
+    const node = (
       /** @type {HTMLElement} */
-      from
+      resolve(target)
     );
-    const incoming = (
-      /** @type {HTMLElement} */
-      to
-    );
-    const box = outgoing.getBoundingClientRect();
-    const seat = parent.getBoundingClientRect();
-    const pcs = getComputedStyle(parent);
-    const startH = heightOf(parent);
-    const kept = { position: parent.style.position, overflow: parent.style.overflow };
-    if (pcs.position === "static") parent.style.position = "relative";
-    parent.style.overflow = "hidden";
-    if (move === "flip") parent.classList.add("ak-swap--flip");
-    parent.insertBefore(incoming, outgoing);
-    outgoing.style.position = "absolute";
-    outgoing.style.boxSizing = "border-box";
-    outgoing.style.margin = "0";
-    outgoing.style.top = box.top - seat.top - (parseFloat(pcs.borderTopWidth) || 0) + parent.scrollTop + "px";
-    outgoing.style.left = box.left - seat.left - (parseFloat(pcs.borderLeftWidth) || 0) + parent.scrollLeft + "px";
-    outgoing.style.width = box.width + "px";
-    outgoing.style.height = box.height + "px";
-    const endH = heightOf(parent);
-    const runs = [];
-    if (Math.abs(endH - startH) > 1) {
-      runs.push({
-        node: parent,
-        frames: [{ height: startH + "px" }, { height: endH + "px" }],
-        timing: { duration: ms, easing: ease, fill: (
-          /** @type {FillMode} */
-          "backwards"
-        ) }
-      });
-    }
-    if (move === "flip") {
-      const half = Math.round(ms / 2);
-      runs.push({
-        node: outgoing,
-        frames: [{ transform: "rotateY(0deg)", opacity: 1 }, { transform: "rotateY(-90deg)", opacity: 0 }],
-        timing: { duration: half, easing: "ease-in", fill: (
-          /** @type {FillMode} */
-          "forwards"
-        ) }
-      });
-      runs.push({
-        node: incoming,
-        frames: [{ transform: "rotateY(90deg)", opacity: 0 }, { transform: "rotateY(0deg)", opacity: 1 }],
-        timing: { duration: half, delay: half, easing: "ease-out", fill: (
-          /** @type {FillMode} */
-          "backwards"
-        ) }
-      });
-    } else if (move === "crossfade") {
-      runs.push({ node: outgoing, frames: [{ opacity: 1 }, { opacity: 0 }], timing: { duration: ms, easing: ease, fill: (
-        /** @type {FillMode} */
-        "forwards"
-      ) } });
-      runs.push({ node: incoming, frames: [{ opacity: 0 }, { opacity: 1 }], timing: { duration: ms, easing: ease, fill: (
-        /** @type {FillMode} */
-        "backwards"
-      ) } });
-    } else {
-      const fade = move === "slide";
-      runs.push({
-        node: outgoing,
-        frames: [{ transform: "none", opacity: 1 }, { transform: AWAY[dir], opacity: fade ? 0 : 1 }],
-        timing: { duration: ms, easing: ease, fill: (
-          /** @type {FillMode} */
-          "forwards"
-        ) }
-      });
-      runs.push({
-        node: incoming,
-        frames: [{ transform: TOWARD[dir], opacity: fade ? 0 : 1 }, { transform: "none", opacity: 1 }],
-        timing: { duration: ms, easing: ease, fill: (
-          /** @type {FillMode} */
-          "backwards"
-        ) }
-      });
-    }
-    return playAll(runs).then(function() {
-      if (outgoing.parentNode) outgoing.parentNode.removeChild(outgoing);
-      incoming.style.removeProperty("transform");
-      incoming.style.removeProperty("opacity");
-      parent.classList.remove("ak-swap--flip");
-      parent.style.position = kept.position;
-      parent.style.overflow = kept.overflow;
-      parent.style.removeProperty("height");
+    const list2 = (Array.isArray(steps2) ? steps2 : []).filter(function(s) {
+      return s && s.targets && s.props;
     });
+    let tl = null;
+    let watcher = null;
+    let bound = null;
+    let last = 0;
+    let gone = false;
+    if (reducedMotion()) {
+      list2.forEach(function(step) {
+        toElements2(step.targets).forEach(function(n) {
+          settle2(n, step.props);
+        });
+      });
+      return {
+        el: node,
+        get timeline() {
+          return null;
+        },
+        progress: function() {
+          return 1;
+        },
+        destroy: function() {
+        }
+      };
+    }
+    function bindByHand() {
+      const scroller = o.container || nearestScroller4(node);
+      let rafId = 0;
+      const tick = function() {
+        const r = node.getBoundingClientRect();
+        const h = scroller === window ? window.innerHeight : (
+          /** @type {Element} */
+          scroller.clientHeight
+        );
+        const top = scroller === window ? 0 : (
+          /** @type {Element} */
+          scroller.getBoundingClientRect().top
+        );
+        last = Math.max(0, Math.min(1, (top + h - r.top) / Math.max(h + r.height, 1)));
+        if (tl) tl.seek(tl.duration * last);
+      };
+      const onScrolled = function() {
+        if (!rafId) rafId = requestAnimationFrame(function() {
+          rafId = 0;
+          tick();
+        });
+      };
+      scroller.addEventListener("scroll", onScrolled, { passive: true });
+      window.addEventListener("resize", onScrolled);
+      tick();
+      bound = function() {
+        scroller.removeEventListener("scroll", onScrolled);
+        window.removeEventListener("resize", onScrolled);
+        if (rafId) cancelAnimationFrame(rafId);
+      };
+    }
+    withAnime3(function(a) {
+      if (gone) return;
+      if (typeof a.onScroll === "function") {
+        watcher = a.onScroll(
+          /** @type {any} */
+          {
+            target: node,
+            container: o.container,
+            axis: o.axis === "x" ? "x" : "y",
+            enter: o.enter,
+            leave: o.leave,
+            // The observer's progress IS the timeline's clock, 1:1, rather than a play/pause cue.
+            sync: true,
+            onUpdate: function(w) {
+              last = w.progress;
+            }
+          }
+        );
+        tl = a.createTimeline({ autoplay: watcher });
+      } else {
+        tl = a.createTimeline({ autoplay: false });
+      }
+      list2.forEach(function(step) {
+        tl.add(step.targets, step.props, step.at);
+      });
+      if (!watcher) bindByHand();
+    }, function() {
+      list2.forEach(function(step) {
+        toElements2(step.targets).forEach(function(n) {
+          settle2(n, step.props);
+        });
+      });
+      last = 1;
+    });
+    return {
+      el: node,
+      /** The anime timeline itself, once the library has landed. Null until then. */
+      get timeline() {
+        return tl;
+      },
+      /** How far the reader has carried the choreography, 0 to 1. */
+      progress: function() {
+        return last;
+      },
+      destroy: function() {
+        gone = true;
+        if (bound) {
+          bound();
+          bound = null;
+        }
+        if (watcher) {
+          watcher.revert();
+          watcher = null;
+        }
+        if (tl) {
+          tl.revert();
+          tl = null;
+        }
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/motion-show.js
+  function loaded2() {
+    return (
+      /** @type {any} */
+      window.Motion
+    );
+  }
+  var motionPromise2 = null;
+  function ensureMotion2() {
+    if (loaded2() && loaded2().animate) return Promise.resolve(loaded2());
+    if (motionPromise2) return motionPromise2;
+    motionPromise2 = new Promise(function(ok, fail) {
+      const s = document.createElement("script");
+      s.src = NODE_URL + "/lib/motion@13.min.js";
+      s.onload = function() {
+        ok(loaded2());
+      };
+      s.onerror = function() {
+        motionPromise2 = null;
+        fail(new Error("motion failed to load"));
+      };
+      document.head.appendChild(s);
+    });
+    return motionPromise2;
+  }
+  function travel2() {
+    if (reducedMotion()) return null;
+    const M = loaded2();
+    return M && typeof M.animate === "function" ? M : null;
+  }
+  var FEEL2 = { stiffness: 260, damping: 26 };
+  var TOSS = { stiffness: 170, damping: 22 };
+  var BACK = { stiffness: 320, damping: 28 };
+  var DEPTH = 3;
+  var TILT = 0.06;
+  var SPIN = 18;
+  var LOB = 60;
+  var FLICK2 = 480;
+  var TONES12 = ["ok", "warn", "err"];
+  function rowsOf5(data) {
+    if (Array.isArray(data)) return data;
+    if (data && Array.isArray(data.items)) return data.items;
+    return [];
+  }
+  function safeImage2(url) {
+    if (!url) return null;
+    const v = String(url);
+    if (/^data:/i.test(v)) {
+      console.warn("aimeat-atelier: card image data: URIs are refused — upload the image to storage and pass its URL.");
+      return null;
+    }
+    return v;
+  }
+  function layerOf2(url) {
+    const v = safeImage2(url);
+    return v ? 'url("' + v.replace(/"/g, "%22") + '")' : null;
+  }
+  function washOf3(id) {
+    let h = 0;
+    const s = String(id);
+    for (let i = 0; i < s.length; i++) h = h * 31 + s.charCodeAt(i) | 0;
+    return Math.abs(h) % 3 + 1;
+  }
+  function icon2(kind) {
+    const node = svg("svg", {
+      class: "ak-icon",
+      viewBox: "0 0 24 24",
+      width: 20,
+      height: 20,
+      "aria-hidden": "true",
+      fill: "none",
+      stroke: "currentColor",
+      "stroke-width": 2,
+      "stroke-linecap": "round",
+      "stroke-linejoin": "round"
+    });
+    node.appendChild(svg("path", { d: kind === "left" ? "M15 5 L8 12 L15 19" : "M9 5 L16 12 L9 19" }));
+    return node;
+  }
+  function springFrom(node, from, to, feel) {
+    spring(node, from, feel).cancel();
+    return spring(node, to, feel);
+  }
+  function whileMoving(node, run) {
+    node.classList.add("is-moving");
+    const free = function() {
+      node.classList.remove("is-moving");
+    };
+    const anim = run();
+    if (anim && anim.finished && typeof anim.finished.then === "function") anim.finished.then(free, free);
+    else free();
+    return anim;
+  }
+  function paceOf(node) {
+    const cs = getComputedStyle(node);
+    const ms = parseFloat(cs.getPropertyValue("--ak-motion")) || 200;
+    const raw = (cs.getPropertyValue("--ak-ease") || "").trim();
+    const nums = raw.match(/-?\d*\.?\d+/g);
+    const ease = nums && nums.length >= 4 ? nums.slice(0, 4).map(Number) : [0.2, 0.7, 0.3, 1];
+    return { duration: ms / 1e3, ease };
+  }
+  function layoutMove(container, opts) {
+    const node = (
+      /** @type {HTMLElement} */
+      resolve(container)
+    );
+    const o = opts || {};
+    const keyed = o.keyed || "data-id";
+    const feel = { stiffness: o.stiffness || FEEL2.stiffness, damping: o.damping || FEEL2.damping };
+    const wantEnter = o.enter !== false;
+    const wantExit = o.exit !== false;
+    let ghosts = [];
+    let dead = false;
+    let running = false;
+    node.classList.add("ak-layout");
+    ensureMotion2().then(function() {
+    }, function() {
+      if (!dead) node.classList.add("ak-layout--floor");
+    });
+    function kids() {
+      return (
+        /** @type {HTMLElement[]} */
+        Array.prototype.slice.call(node.children).filter(function(k) {
+          return !k.classList.contains("ak-layout__ghost");
+        })
+      );
+    }
+    function keyOf(kid) {
+      const k = kid.getAttribute(keyed);
+      return k == null ? kid : k;
+    }
+    function drop(ghost) {
+      const at = ghosts.indexOf(ghost);
+      if (at >= 0) ghosts.splice(at, 1);
+      if (ghost.parentNode) ghost.parentNode.removeChild(ghost);
+    }
+    function ghostOf(kid, box) {
+      const ghost = (
+        /** @type {HTMLElement} */
+        kid.cloneNode(true)
+      );
+      ghost.className = kid.className + " ak-layout__ghost";
+      ghost.setAttribute("aria-hidden", "true");
+      ghost.removeAttribute("id");
+      ghost.style.setProperty("--ak-ghost-x", box.left + "px");
+      ghost.style.setProperty("--ak-ghost-y", box.top + "px");
+      ghost.style.setProperty("--ak-ghost-w", box.width + "px");
+      ghost.style.setProperty("--ak-ghost-h", box.height + "px");
+      document.body.appendChild(ghost);
+      ghosts.push(ghost);
+      const M = travel2();
+      const done = function() {
+        drop(ghost);
+      };
+      if (!M) {
+        spring(ghost, { opacity: 0, scale: 0.94 }, feel).finished.then(done);
+        return;
+      }
+      M.animate(ghost, { opacity: [1, 0], scale: [1, 0.94] }, Object.assign({ type: "spring" }, feel)).finished.then(done, done);
+    }
+    function glide(kid, dx, dy, M) {
+      whileMoving(kid, function() {
+        return M ? M.animate(kid, { x: [dx, 0], y: [dy, 0] }, Object.assign({ type: "spring" }, feel)) : flipFrom(kid, dx, dy, feel);
+      });
+    }
+    function grow(kid, M) {
+      whileMoving(kid, function() {
+        return M ? M.animate(kid, { scale: [0.88, 1], opacity: [0, 1] }, Object.assign({ type: "spring" }, feel)) : springFrom(kid, { scale: 0.88, opacity: 0 }, { scale: 1, opacity: 1 }, feel);
+      });
+    }
+    function update(run) {
+      if (typeof run !== "function") return;
+      if (dead || reducedMotion() || running) {
+        run();
+        return;
+      }
+      running = true;
+      try {
+        const before = /* @__PURE__ */ new Map();
+        kids().forEach(function(kid) {
+          before.set(keyOf(kid), { el: kid, box: kid.getBoundingClientRect() });
+        });
+        run();
+        const M = travel2();
+        const seen = /* @__PURE__ */ new Set();
+        kids().forEach(function(kid) {
+          const key = keyOf(kid);
+          seen.add(key);
+          const was = before.get(key);
+          if (!was) {
+            if (wantEnter) grow(kid, M);
+            return;
+          }
+          const now2 = kid.getBoundingClientRect();
+          const dx = was.box.left - now2.left;
+          const dy = was.box.top - now2.top;
+          if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+          glide(kid, dx, dy, M);
+        });
+        if (!wantExit) return;
+        before.forEach(function(was, key) {
+          if (seen.has(key)) return;
+          if (was.el.parentNode === node) return;
+          ghostOf(was.el, was.box);
+        });
+      } finally {
+        running = false;
+      }
+    }
+    return {
+      el: node,
+      update,
+      destroy: function() {
+        dead = true;
+        ghosts.slice().forEach(drop);
+        node.classList.remove("ak-layout", "ak-layout--floor");
+      }
+    };
+  }
+  function swipeStack(spec) {
+    const s = spec || {};
+    const threshold = typeof s.threshold === "number" && s.threshold > 0 ? s.threshold : 90;
+    const root = el("section", { class: "ak-root ak-swipe", "aria-roledescription": "card stack" });
+    if (s.target) resolve(s.target).appendChild(root);
+    const deck = el("div", { class: "ak-swipe__deck", tabindex: "0", role: "group", "aria-label": "Cards" });
+    const left = deckButton("left", "Swipe left");
+    const right = deckButton("right", "Swipe right");
+    const controls = el("div", { class: "ak-swipe__controls" }, [left, right]);
+    root.appendChild(deck);
+    root.appendChild(controls);
+    let items = [];
+    let index = 0;
+    const history = [];
+    let live = [];
+    let emptyCard = null;
+    let flying = false;
+    let dead = false;
+    function deckButton(kind, label) {
+      const b = (
+        /** @type {HTMLButtonElement} */
+        el("button", {
+          type: "button",
+          class: "ak-btn ak-swipe__go ak-swipe__go--" + kind,
+          "aria-label": label,
+          "data-ak-noguard": true,
+          on: { click: function() {
+            swipe(kind);
+          } }
+        })
+      );
+      b.appendChild(icon2(kind));
+      return b;
+    }
+    function buildCard2(item) {
+      const layer = layerOf2(item.image);
+      const art = el("span", {
+        class: "ak-swipe__art ak-swipe__art--w" + washOf3(item.id) + (layer ? " ak-swipe__art--image" : ""),
+        "aria-hidden": "true",
+        vars: layer ? { "--ak-card-image": layer } : null
+      }, layer ? null : el(
+        "span",
+        { class: "ak-swipe__monogram" },
+        (Array.from(String(item.title || item.id || "?"))[0] || "?").toUpperCase()
+      ));
+      const caption = el("span", { class: "ak-swipe__caption" }, [
+        el("span", { class: "ak-swipe__label" }, String(item.title || item.id || "")),
+        item.sub != null ? el("span", { class: "ak-swipe__sub" }, String(item.sub)) : null
+      ].filter(Boolean));
+      const face = el("span", { class: "ak-swipe__face" }, [
+        art,
+        caption,
+        el("span", { class: "ak-swipe__mark ak-swipe__mark--right", "aria-hidden": "true" }),
+        el("span", { class: "ak-swipe__mark ak-swipe__mark--left", "aria-hidden": "true" })
+      ]);
+      const tone = TONES12.indexOf(item.tone) >= 0 ? " ak-swipe__card--" + item.tone : "";
+      const card = (
+        /** @type {HTMLElement} */
+        el("article", {
+          class: "ak-swipe__card" + tone,
+          "data-ak-id": item.id,
+          "aria-label": String(item.title || item.id || "")
+        }, [face])
+      );
+      return { card, face };
+    }
+    function setDepth(card, d) {
+      card.style.setProperty("--ak-swipe-depth", String(d));
+    }
+    function pull(face, dx) {
+      const share = Math.max(-1, Math.min(1, dx / threshold));
+      face.style.setProperty("--ak-swipe-tilt", (dx * TILT).toFixed(2) + "deg");
+      face.style.setProperty("--ak-swipe-yes", String(Math.max(0, share)));
+      face.style.setProperty("--ak-swipe-no", String(Math.max(0, -share)));
+    }
+    function settle3(card, face) {
+      pull(face, 0);
+      whileMoving(card, function() {
+        return spring(card, { x: 0, y: 0 }, BACK);
+      });
+    }
+    function arm() {
+      const top = live[0];
+      if (!top || top.hand) return;
+      top.hand = drag(top.el, {
+        onMove: function(dx) {
+          pull(top.face, dx);
+        },
+        onEnd: function(dx, dy, velocity) {
+          if (Math.abs(dx) > threshold || Math.abs(velocity.x) > FLICK2) toss(dx < 0 ? "left" : "right", dx, dy);
+          else settle3(top.el, top.face);
+        }
+      }, { axis: "both", back: false });
+    }
+    function render() {
+      live.forEach(function(c) {
+        if (c.hand) c.hand.destroy();
+      });
+      live = [];
+      clear(deck);
+      if (emptyCard) {
+        emptyCard.destroy();
+        emptyCard = null;
+      }
+      const rest = items.length - index;
+      left.disabled = rest <= 0;
+      right.disabled = rest <= 0;
+      if (rest <= 0) {
+        deck.hidden = true;
+        const e = s.empty || {};
+        emptyCard = emptyState({ target: root, tone: "quiet", title: e.title || t("empty"), hint: e.hint || t("emptyHint") });
+        return;
+      }
+      deck.hidden = false;
+      const shown = Math.min(DEPTH, rest);
+      live = new Array(shown);
+      for (let d = shown - 1; d >= 0; d--) {
+        const item = items[index + d];
+        const built = buildCard2(item);
+        setDepth(built.card, d);
+        built.card.setAttribute("aria-hidden", d === 0 ? "false" : "true");
+        deck.appendChild(built.card);
+        live[d] = { el: built.card, face: built.face, item, hand: null };
+      }
+      arm();
+    }
+    function toss(direction, dx, dy) {
+      const top = live[0];
+      if (!top || flying) return;
+      flying = true;
+      if (top.hand) {
+        top.hand.destroy();
+        top.hand = null;
+      }
+      const card = top.el;
+      const item = top.item;
+      const dir = direction === "left" ? -1 : 1;
+      const off = dir * (window.innerWidth + card.offsetWidth);
+      const done = function() {
+        flying = false;
+        if (card.parentNode) card.parentNode.removeChild(card);
+        history.push({ index, direction });
+        index += 1;
+        render();
+        if (s.onSwipe) s.onSwipe(item, direction);
+        if (index >= items.length && s.onEmpty) s.onEmpty();
+      };
+      const M = travel2();
+      whileMoving(card, function() {
+        return M ? M.animate(
+          card,
+          { x: [dx, off], y: [dy, dy + LOB], rotate: [0, dir * SPIN], opacity: [1, 0] },
+          Object.assign({ type: "spring" }, TOSS)
+        ) : spring(card, { x: off, y: dy, opacity: 0 }, TOSS);
+      }).finished.then(done, done);
+    }
+    function swipe(direction) {
+      if (!live[0] || flying) return;
+      toss(direction === "left" ? "left" : "right", 0, 0);
+    }
+    function undo() {
+      const back = history.pop();
+      if (!back || flying) return;
+      index = back.index;
+      render();
+      const top = live[0];
+      if (!top) return;
+      const dir = back.direction === "left" ? -1 : 1;
+      const from = dir * (window.innerWidth + top.el.offsetWidth);
+      const M = travel2();
+      whileMoving(top.el, function() {
+        return M ? M.animate(
+          top.el,
+          { x: [from, 0], rotate: [dir * SPIN, 0], opacity: [0, 1] },
+          Object.assign({ type: "spring" }, TOSS)
+        ) : springFrom(top.el, { x: from, opacity: 0 }, { x: 0, opacity: 1 }, TOSS);
+      });
+    }
+    const onKey = function(ev) {
+      const k = (
+        /** @type {KeyboardEvent} */
+        ev.key
+      );
+      if (k === "ArrowLeft") {
+        ev.preventDefault();
+        swipe("left");
+      } else if (k === "ArrowRight") {
+        ev.preventDefault();
+        swipe("right");
+      }
+    };
+    deck.addEventListener("keydown", onKey);
+    function load(data) {
+      items = rowsOf5(data);
+      index = 0;
+      history.length = 0;
+      render();
+    }
+    load(s.data);
+    ensureMotion2().then(function() {
+    }, function() {
+      if (!dead) root.classList.add("ak-swipe--floor");
+    });
+    return {
+      el: root,
+      set: function(patch) {
+        if (patch && "data" in patch) load(patch.data);
+      },
+      swipe,
+      undo,
+      destroy: function() {
+        dead = true;
+        live.forEach(function(c) {
+          if (c.hand) c.hand.destroy();
+        });
+        live = [];
+        deck.removeEventListener("keydown", onKey);
+        if (emptyCard) emptyCard.destroy();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+  var MOVES = {
+    lift: { on: { y: -3, scale: 1.02 }, off: { y: 0, scale: 1 } },
+    tilt: { on: { rotate: -1.5, scale: 1.015 }, off: { rotate: 0, scale: 1 } },
+    squash: { on: { scale: 0.96 }, off: { scale: 1 } },
+    dip: { on: { y: 2, scale: 0.99 }, off: { y: 0, scale: 1 } }
+  };
+  function amount(move, k) {
+    if (k === 1) return move;
+    const out = {};
+    Object.keys(move).forEach(function(key) {
+      out[key] = key === "scale" ? 1 + (move[key] - 1) * k : move[key] * k;
+    });
+    return out;
+  }
+  function micro(target, opts) {
+    const node = (
+      /** @type {HTMLElement} */
+      resolve(target)
+    );
+    const o = opts || {};
+    const hoverKind = o.hover === void 0 ? "lift" : o.hover;
+    const pressKind = o.press === void 0 ? "squash" : o.press;
+    const k = typeof o.scale === "number" && o.scale > 0 ? o.scale : 1;
+    const nodes = o.selector ? (
+      /** @type {HTMLElement[]} */
+      Array.prototype.slice.call(node.querySelectorAll(o.selector))
+    ) : [node];
+    const handles = [];
+    const classes = ["ak-micro"];
+    let dead = false;
+    if (hoverKind === "glow") classes.push("ak-micro--glow");
+    else if (hoverKind && MOVES[hoverKind]) classes.push("ak-micro--" + hoverKind);
+    if (pressKind && MOVES[pressKind]) classes.push("ak-micro--" + pressKind);
+    if (reducedMotion() || classes.length === 1 || !nodes.length) {
+      return { el: node, destroy: function() {
+      } };
+    }
+    nodes.forEach(function(n) {
+      n.classList.add.apply(n.classList, classes);
+    });
+    const owned = classes.filter(function(c) {
+      return c !== "ak-micro" && c !== "ak-micro--glow";
+    });
+    function bind(M) {
+      const feel = paceOf(node);
+      const hoverMove = hoverKind && hoverKind !== "glow" ? MOVES[hoverKind] : null;
+      const pressMove = pressKind ? MOVES[pressKind] : null;
+      nodes.forEach(function(n) {
+        owned.forEach(function(c) {
+          n.classList.remove(c);
+        });
+        if (hoverMove) {
+          handles.push(M.hover(n, function() {
+            M.animate(n, amount(hoverMove.on, k), feel);
+            return function() {
+              M.animate(n, amount(hoverMove.off, k), feel);
+            };
+          }));
+        }
+        if (pressMove) {
+          handles.push(M.press(n, function() {
+            M.animate(n, amount(pressMove.on, k), feel);
+            return function() {
+              M.animate(n, amount(pressMove.off, k), feel);
+            };
+          }));
+        }
+      });
+    }
+    if (owned.length) {
+      ensureMotion2().then(function(M) {
+        if (dead || reducedMotion() || !M || typeof M.hover !== "function") return;
+        bind(M);
+      }, function() {
+      });
+    }
+    return {
+      el: node,
+      destroy: function() {
+        dead = true;
+        handles.forEach(function(stop) {
+          if (typeof stop === "function") stop();
+        });
+        handles.length = 0;
+        nodes.forEach(function(n) {
+          n.classList.remove.apply(n.classList, classes);
+        });
+      }
+    };
   }
 
   // src/static/sdk-libs/atelier/index.js
@@ -11613,7 +13406,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.45.0",
+    version: "0.46.0",
     // ── Shell and navigation ──
     app,
     section,
@@ -11733,14 +13526,25 @@
     //    pieces, and the transitions between screens and between panels ──
     director,
     storyRail,
+    parallax,
+    readingRail,
     textReveal,
     drawPath,
     gridWave,
     sequence,
     orbit,
+    morph: morph2,
+    draggable,
+    burst,
+    scrub,
+    layoutMove,
+    swipeStack,
+    micro,
     screenTransition,
     panelTransition,
     curtain,
+    intro,
+    setMotion,
     // ── Data ──
     form,
     table,

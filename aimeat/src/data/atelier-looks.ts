@@ -29,6 +29,14 @@
  * @usage
  *   import { LOOKS, STRUCTURES } from '../data/atelier-looks.js';
  * @version-history
+ *   v1.7.0 — 2026-09-02 — A FEEL PER LOOK: every entry declares the spring hand
+ *     (--ak-spring-stiffness / --ak-spring-damping / --ak-spring-mass), so the kit's spring,
+ *     drag and staggered entrance move the way the look moves: terminal at 380/32/0.8 is a
+ *     state change, carnival at 200/12/1 swings twice, editorial at 120/26/1 never bounces.
+ *     Speed and curve were already the look's (--ak-motion, --ak-ease); the physics was three
+ *     numbers frozen in the primitive, which meant a spring felt the same under every look on
+ *     the shelf. The contract carries the three (mode-independent) and REQUIRED_BASE makes the
+ *     matrix prove each look resolves them.
  *   v1.6.0 — 2026-09-01 — BROADCAST: the night-gallery world the developer accepted on the
  *     Atelier Next canvas — two proven grounds (violet night, pale violet paper), maximum
  *     display weight with the accent landing a step off, printed offset depth in the spectrum
@@ -75,7 +83,10 @@ export interface AtelierLook {
   imagery: string;
   /** Structure recipes this look uses, by id. */
   structures: string[];
-  /** Token overrides on the --ak-* contract. Empty for the base look (vivid IS the contract). */
+  /** Token overrides on the --ak-* contract. The base look (vivid) IS the contract, so it
+   *  overrides nothing but the SPRING HAND: every look states its own three
+   *  --ak-spring-* numbers, because a look block nested inside another look would otherwise
+   *  wear the outer look's bounce (the same trap the never-inherited trio was written for). */
   tokens: Record<string, string>;
   /** A WORLD owns its ground: literal values for the ground tokens (bg, surface, surface-2,
    *  ink, ink-dim, line), one set per mode — paper for a print world, phosphor for a machine
@@ -99,8 +110,13 @@ export const LOOKS: readonly AtelierLook[] = [
     feel: 'the default — an aurora hero on the derived spectrum, tinted cards, glass chrome, a real entrance; pick when unsure',
     imagery: 'bright layered gradient-mesh abstract, soft grain, airy light ground',
     structures: [],
-    tokens: {},
-    note: 'The base contract IS vivid; this entry exists for the picker and the prompt table.',
+    tokens: {
+      // The house hand: arrives promptly and stops just short of a bounce.
+      '--ak-spring-stiffness': '170',
+      '--ak-spring-damping': '20',
+      '--ak-spring-mass': '1',
+    },
+    note: 'The base contract IS vivid; this entry exists for the picker and the prompt table. The spring hand restates the contract\'s own three numbers so a vivid block nested inside a loud look keeps the house feel instead of inheriting its bounce.',
   },
   {
     id: 'flat',
@@ -119,6 +135,10 @@ export const LOOKS: readonly AtelierLook[] = [
       '--ak-enter-stagger': '0ms',
       '--ak-elev-2': 'var(--ak-elev-1)',
       '--ak-weight-display': '650',
+      // Instant and dead flat: overdamped, so a move that must happen never bounces on arrival.
+      '--ak-spring-stiffness': '320',
+      '--ak-spring-damping': '34',
+      '--ak-spring-mass': '0.9',
     },
     note: 'The opt-out is a choice the spec records, not an accident — and even flat darkens the action fill, because body-size text on the raw accent fails on the aimeat palette.',
   },
@@ -138,6 +158,10 @@ export const LOOKS: readonly AtelierLook[] = [
       '--ak-enter-stagger': '30ms',
       '--ak-hero-min': '18dvh',
       '--ak-weight-display': '650',
+      // Quiet and sure: critically damped, so it settles once and does not restate itself.
+      '--ak-spring-stiffness': '150',
+      '--ak-spring-damping': '24',
+      '--ak-spring-mass': '1',
     },
     note: 'A whisper of tint, hairlines over shadows, a lower hero, a shorter entrance. Calm, not flat.',
   },
@@ -164,6 +188,10 @@ export const LOOKS: readonly AtelierLook[] = [
       '--ak-enter-distance': '0px',
       '--ak-enter-stagger': '60ms',
       '--ak-motion': 'var(--motion-slow, 320ms)',
+      // Calm and settled: a slow, heavy arrival with no overshoot, like paper coming to rest.
+      '--ak-spring-stiffness': '120',
+      '--ak-spring-damping': '26',
+      '--ak-spring-mass': '1',
     },
     note: 'Structure carries the page, not depth — the front page of a paper.',
   },
@@ -184,6 +212,10 @@ export const LOOKS: readonly AtelierLook[] = [
       '--ak-enter-stagger': '55ms',
       '--ak-ease': 'cubic-bezier(0.34, 1.56, 0.64, 1)',
       '--ak-weight-display': '800',
+      // Rubbery: the spring matches the overshoot curve above, so a sticker wobbles into place.
+      '--ak-spring-stiffness': '220',
+      '--ak-spring-damping': '14',
+      '--ak-spring-mass': '1',
     },
     note: 'The playful form language the game kit proved. The 3% secondary tint is deliberate: at 4% the aimeat palette\'s near-white card sank into the page (check:atelier, step 1.09).',
   },
@@ -207,6 +239,10 @@ export const LOOKS: readonly AtelierLook[] = [
       '--ak-enter-stagger': '20ms',
       '--ak-motion': 'var(--motion-fast, 120ms)',
       '--ak-weight-display': '700',
+      // Console-quick: stiff and light, a hair of overshoot so the panel still reads as alive.
+      '--ak-spring-stiffness': '300',
+      '--ak-spring-damping': '26',
+      '--ak-spring-mass': '0.9',
     },
     note: 'The neon is the edge, not the fill: the ring and glow carry the current, the tint stays at 4% so a card never sinks into a light page.',
   },
@@ -226,6 +262,10 @@ export const LOOKS: readonly AtelierLook[] = [
       '--ak-elev-1': 'none',
       '--ak-enter-distance': '24px',
       '--ak-enter-stagger': '70ms',
+      // Weighty: extra mass and a soft damping, so a poster statement lands and rocks once.
+      '--ak-spring-stiffness': '190',
+      '--ak-spring-damping': '18',
+      '--ak-spring-mass': '1.1',
     },
     note: 'The band\'s ground is the brand gradient itself — poster means committing; the scrim under the title is still what AK-SCRIM verifies.',
   },
@@ -253,6 +293,10 @@ export const LOOKS: readonly AtelierLook[] = [
       '--ak-enter-distance': '0px',
       '--ak-enter-stagger': '70ms',
       '--ak-motion': 'var(--motion-slow, 320ms)',
+      // Editorial's own hand, slower: the biggest paper moves last and never springs back.
+      '--ak-spring-stiffness': '110',
+      '--ak-spring-damping': '26',
+      '--ak-spring-mass': '1.1',
     },
     note: 'Editorial\'s bigger sibling: square everything, darker hairlines, a masthead that owns the fold.',
   },
@@ -277,6 +321,10 @@ export const LOOKS: readonly AtelierLook[] = [
       '--ak-enter-distance': '10px',
       '--ak-enter-stagger': '70ms',
       '--ak-motion': 'var(--motion-slow, 320ms)',
+      // Weightless and slow: critically damped, so nothing in the room draws attention to itself.
+      '--ak-spring-stiffness': '130',
+      '--ak-spring-damping': '24',
+      '--ak-spring-mass': '1',
     },
     note: 'The room recedes so the work can speak: no shadows, no tints, hairline edges, a thin giant title over the full-bleed band.',
   },
@@ -303,6 +351,10 @@ export const LOOKS: readonly AtelierLook[] = [
       '--ak-weight-display': '900',
       '--ak-enter-distance': '10px',
       '--ak-enter-stagger': '30ms',
+      // Blunt: very stiff, barely a wobble, so a block arrives where it was going and stops dead.
+      '--ak-spring-stiffness': '340',
+      '--ak-spring-damping': '30',
+      '--ak-spring-mass': '1',
     },
     note: 'Depth as printed offset, never blur; the accent appears as the display type\'s hard shadow.',
   },
@@ -356,6 +408,11 @@ export const LOOKS: readonly AtelierLook[] = [
       '--ak-enter-distance': '4px',
       '--ak-enter-stagger': '15ms',
       '--ak-motion': 'var(--motion-fast, 120ms)',
+      // Mechanical: the stiffest hand in the registry, light and near-critical. A state change
+      // rather than a movement, because a machine does not ease.
+      '--ak-spring-stiffness': '380',
+      '--ak-spring-damping': '32',
+      '--ak-spring-mass': '0.8',
     },
     note: 'Everything is the mono face and a hairline grid; the grain stays on, like phosphor.',
   },
@@ -387,6 +444,10 @@ export const LOOKS: readonly AtelierLook[] = [
       '--ak-hero-ink': 'var(--ak-accent-ink)',
       '--ak-hero-ink-dim': 'var(--ak-accent-ink)',
       '--ak-display-stroke': '0',
+      // Bouncy: the loudest hand there is, a real overshoot and two visible swings back.
+      '--ak-spring-stiffness': '200',
+      '--ak-spring-damping': '12',
+      '--ak-spring-mass': '1',
     },
     note: 'The front-demo2 register as arithmetic: a three-hue brand banner (every stop mixed over ink, so the mesh cap never applies and AK-GRAD proves the action ink on each), the INVERSE BAND (light hero ink on the saturated ground, a thin dark scrim instead of the pale wash — the pair AK-SCRIM now proves), depth as printed offset like brutalist, the tilt doing the sticker work. Loud is a look, not an accident.',
   },
@@ -420,6 +481,10 @@ export const LOOKS: readonly AtelierLook[] = [
       '--ak-hero-ink': 'var(--ak-accent-ink)',
       '--ak-hero-ink-dim': 'var(--ak-accent-ink)',
       '--ak-display-stroke': '0',
+      // Carnival's bounce with room-scale weight: bigger things swing wider and take longer.
+      '--ak-spring-stiffness': '210',
+      '--ak-spring-damping': '13',
+      '--ak-spring-mass': '1.2',
     },
     note: 'The developer\'s ask, verbatim in spirit: why is everything a lane in the middle of the screen? Billboard drops the measure column entirely (--ak-main-max 100%) and grows the banner to half the viewport — carnival\'s inverse band and printed depth, at room scale. The narrow-screen story is unchanged: the column was never narrower than the phone.',
   },
@@ -473,6 +538,10 @@ export const LOOKS: readonly AtelierLook[] = [
       '--ak-enter-stagger': '50ms',
       '--ak-ease': 'cubic-bezier(0.2, 0.9, 0.3, 1)',
       '--ak-hero-min': '30dvh',
+      // Pressed: firm and quick with one small rebound, the way a plate meets paper.
+      '--ak-spring-stiffness': '180',
+      '--ak-spring-damping': '22',
+      '--ak-spring-mass': '1',
     },
     note: 'The print-shop world: separation comes from the 2px accent-mixed edge and the paper grain, never from a shadow (print has none). The display shadow is the second ink landing a millimetre off, and the masthead is a solid ink plate so the pair AK-SCRIM proves stays the same arithmetic carnival passes.',
   },
@@ -523,6 +592,10 @@ export const LOOKS: readonly AtelierLook[] = [
       '--ak-enter-stagger': '70ms',
       '--ak-motion': '260ms',
       '--ak-ease': 'cubic-bezier(0.22, 1, 0.36, 1)',
+      // Floating: soft and heavy, so a glass panel glides to rest instead of snapping to it.
+      '--ak-spring-stiffness': '160',
+      '--ak-spring-damping': '20',
+      '--ak-spring-mass': '1.2',
     },
     note: 'The atmosphere half of the lit-stage direction: spotlight ambient, glass panels, glow depth — proven in both modes by the matrix, truest in the dark. The WebGL ground (universe camera, twin scenes) arrives as a vendored lib on top; this look is its guaranteed flat fallback.',
   },
@@ -541,6 +614,10 @@ export const LOOKS: readonly AtelierLook[] = [
       '--ak-enter-distance': '26px',
       '--ak-enter-stagger': '70ms',
       '--ak-weight-display': '800',
+      // Drifting: the loosest hand, heavy and slow to settle, motion as weather.
+      '--ak-spring-stiffness': '140',
+      '--ak-spring-damping': '18',
+      '--ak-spring-mass': '1.3',
     },
     note: 'The spectrum spreads wider (+120/-90), the band grows, the glass deepens — the look for an app that wants to feel like weather.',
   },
@@ -599,6 +676,10 @@ export const LOOKS: readonly AtelierLook[] = [
       '--ak-enter-stagger': '60ms',
       '--ak-ease': 'cubic-bezier(0.34, 1.3, 0.5, 1)',
       '--ak-hero-min': '30dvh',
+      // Snappy and springy: a hard cut in, one overshoot, gone. The station ident's timing.
+      '--ak-spring-stiffness': '260',
+      '--ak-spring-damping': '16',
+      '--ak-spring-mass': '1',
     },
     note: 'The night-gallery direction the developer accepted on the Atelier Next canvas (2026-09-01): a WORLD with two proven grounds — violet night by default, a pale violet paper in light — display type at maximum weight with the accent landing a step off, printed offset depth in the spectrum hues, sticker tilt. The channel colours stay the contract\'s television neons on purpose: retuning them from the palette accent was tried and muddied the signal yellow into olive, and the identity IS the neon.',
   },

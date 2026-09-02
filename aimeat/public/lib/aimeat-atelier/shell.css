@@ -12,10 +12,13 @@
  *   status and bottom navigation never move; the page never scrolls horizontally; and both the
  *   scroller and the fixed bottom bar reserve the node's injected chrome strip
  *   (--ak-chrome-bottom), so nothing ever draws under the platform's own controls.
- * @structure ak-app · ak-hero · ak-statrow · ak-section · ak-tabs · ak-bottomnav · ak-empty ·
- *   ak-loading · ak-skeleton · shared primitives (ak-btn, ak-scroll, focus, ak-busy)
+ * @structure ak-app · ak-app__motion · ak-hero · ak-statrow · ak-section · ak-tabs ·
+ *   ak-bottomnav · ak-empty · ak-loading · ak-skeleton · shared primitives (ak-btn, ak-scroll,
+ *   focus, ak-busy)
  * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
  * @version-history
+ *   v0.46.0 — 2026-09-02 — .ak-app__motion: the bar's less-motion switch, on the tokens, pressed
+ *     state visible in the ground and in the mark's own stroke.
  *   v0.7.0 — 2026-08-29 — The figure numeral sizes against its own container (cqi), never the
  *     viewport: an 11vw numeral in a narrow side span overflowed 30px at mid widths the
  *     390/1280 bench never measures.
@@ -106,6 +109,36 @@
   white-space: nowrap;
 }
 .ak-app__pill { flex: none; }
+/* The LESS-MOTION switch: the viewer's brake on the kit's movement, sitting beside the account
+   pill (whose own control is light/dark). It is pushed to the right so the two read as one
+   cluster against the title. Pressed is a state you can SEE, because the ground takes a little
+   accent and the mark gains its stroke: a toggle whose only tell is aria-pressed is a toggle
+   nobody can tell the state of. */
+.ak-app__motion {
+  flex: none;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--ak-touch);
+  min-height: var(--ak-touch);
+  padding: 0 8px;
+  border: var(--ak-line-w) solid var(--ak-line);
+  border-radius: var(--ak-radius-sm);
+  background: var(--ak-surface);
+  color: var(--ak-ink);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: filter var(--ak-motion) var(--ak-ease);
+}
+.ak-app__motion:hover { filter: brightness(1.04); }
+.ak-app__motion[aria-pressed='true'] {
+  background: color-mix(in oklab, var(--ak-accent) 12%, var(--ak-surface));
+  border-color: color-mix(in oklab, var(--ak-accent) 45%, var(--ak-line));
+  color: var(--ak-accent-text);
+}
+.ak-app__motion-slash { opacity: 0; }
+.ak-app__motion[aria-pressed='true'] .ak-app__motion-slash { opacity: 1; }
 /* A hero below carries the same name at display size (hero.js sets the class), so the bar's copy
  * yields to the screen reader alone — the name appears once, where it is largest. */
 .ak-app--hero-titled .ak-app__title {
