@@ -31,9 +31,26 @@
  *   answer: a crew that declares no tools is perfectly valid and perfectly inert. That half is
  *   ours, because the descriptions those agents are sold under are ours.
  *
- * @structure TAG_CHARSET · TOOL_MENU · MUST_BE_ABLE_TO · checkTags · checkDefinition · report
+ *   AND IT DOES NOT HOLD THEIR VOCABULARY. It briefly did: a copy of crewaimeat's tool menu lived
+ *   here, went stale, and rejected `crew_registry` — a tool they had ADDED for the very agent this
+ *   file then stripped it from. A hard-coded allowlist for someone else's list can only be behind,
+ *   and it fails closed against the newest names while looking authoritative. A tool this file
+ *   rejects may simply be NEWER than this file, so it checks the shape of a name and not its
+ *   membership. When the two disagree about whether a tool exists, they are right.
+ *
+ * @structure TAG_CHARSET · TOOL_NAME_SHAPE · MUST_BE_ABLE_TO · checkTags · checkDefinition · report
  * @usage pnpm check:crew-defs   (runs in .githooks/pre-commit and CI)
  * @version-history
+ *   v1.2.0 — 2026-09-02 — Stops enforcing a tool MENU, and checks the wake.
+ *     The menu was crewaimeat's, copied, and the copy went stale: it rejected `crew_registry`, a
+ *     tool they added in their first round for crew-forge specifically, and on that authority I
+ *     removed it from the one agent whose job is creating agents. Membership is theirs; this now
+ *     checks only that a tool name has a tool name's shape.
+ *     New rule, specific on purpose: an `interactive` agent must listen for something other than
+ *     tasks. The node auto-activates a queued task only for a `task-runner`, so `concierge` — whose
+ *     `listen_for` was unset and therefore `["tasks"]` — waited for the one thing that would never
+ *     arrive. `listen_for` must also be stated rather than defaulted, because a wrong default is
+ *     silent.
  *   v1.1.0 — 2026-09-02 — Two rules about TOOLS. (1) A tool must be on the fixed menu: a name
  *     outside it is not a narrower tool, it is no tool, and `crew_registry` had shipped on the one
  *     agent whose whole job is writing. (2) MUST_BE_ABLE_TO, a by-name table saying what each basic
@@ -54,19 +71,24 @@ import { BASIC_AGENTS, type CrewDefDoc } from '../src/data/basic-agents.js';
 const TAG_CHARSET = /^[a-z0-9._-]+$/;
 
 /**
- * The fixed tool menu, as this repo states it in src/mcp/catalog/definitions/crew.ts. A definition
- * that needs a tool of its own is a Python crew, not a definition — so a name outside this list is
- * not a narrower tool, it is NO tool, and the agent silently has nothing to work with.
+ * THE TOOL MENU IS NOT OURS, SO THIS FILE NO LONGER ENFORCES ONE.
  *
- * `crew_registry` shipped on crew-forge's Registrar, whose entire job is writing. It is not on the
- * menu and never was.
+ * It used to. A copy of crewaimeat's list lived here and in a comment in
+ * src/mcp/catalog/definitions/crew.ts, and on 2026-09-02 that copy rejected `crew_registry` as
+ * "not a tool" — so I removed it from crew-forge's Registrar, the one agent whose entire job is
+ * creating agents, on the authority of a stale transcription. crewaimeat had ADDED that tool in
+ * their first round, for exactly that agent. The copy was older than the list.
+ *
+ * A hard-coded allowlist for someone else's vocabulary can only ever be behind. It fails closed
+ * against the newest and most useful names, and the failure looks authoritative. So what is
+ * checked now is the SHAPE of a tool name — non-empty, no whitespace, the grammar every tool on
+ * their menu follows — and nothing about membership. A typo is still caught. A tool this file has
+ * never heard of goes through, because it is more likely to be newer than wrong.
+ *
+ * If a definition passes here and crewaimeat's validator rejects a tool, THEY ARE RIGHT: the tool
+ * does not exist or is spelled wrong. Fix the definition, not this file.
  */
-const TOOL_MENU = new Set([
-  'memory', 'web', 'article_fetch', 'schedule', 'dm', 'delegate',
-  'image', 'app_build', 'local_memory', 'exchange',
-]);
-/** `exchange_*` verbs are the one family allowed beyond an exact menu name. */
-const TOOL_PREFIXES = ['exchange_'];
+const TOOL_NAME_SHAPE = /^[a-z][a-z0-9_]*$/;
 
 /** The tool that lets one agent give work to another. Nothing else on the menu does. */
 const DELEGATION_TOOL = 'delegate';
@@ -115,6 +137,7 @@ export interface Problem {
 export interface Shippable {
   name: string;
   tags: string[];
+  mode: string;
   crewDef: CrewDefDoc;
 }
 
@@ -135,8 +158,24 @@ function checkTags(where: string, tags: unknown): void {
   }
 }
 
-function checkDefinition(name: string, def: CrewDefDoc): void {
+function checkDefinition(name: string, def: CrewDefDoc, mode: string): void {
   const at = (part: string) => `${name} → crewDef.${part}`;
+
+  // THE MODE AND THE DEFINITION MUST AGREE ABOUT HOW WORK ARRIVES. SPECIFIC ON PURPOSE: this is a
+  // rule about one field's interaction with one node behaviour, not a general property of crew
+  // definitions, and it is here because the two disagreed in the shipped set.
+  //
+  // `interactive` means the node does NOT auto-activate a queued task (services/agent-task-rules.ts
+  // does that only for `task-runner`). So an interactive agent's tasks sit there by design — and
+  // `concierge` was shipped with `listen_for` unset, which defaults to `["tasks"]`. It waited for
+  // the one thing that would never arrive, and not for the one that would.
+  if (!Array.isArray(def.listen_for) || def.listen_for.length === 0) {
+    fail(at('listen_for'), def.listen_for,
+      'state it rather than taking the default: the default is ["tasks"], and a wrong default is silent');
+  } else if (mode === 'interactive' && def.listen_for.every(s => s === 'tasks')) {
+    fail(at('listen_for'), JSON.stringify(def.listen_for),
+      `mode is "interactive", so the node will not auto-activate this agent's tasks — it must listen for something other than tasks (messages, dms, records) or nothing will ever wake it`);
+  }
 
   checkTags(at('tags'), def.tags);
 
@@ -163,10 +202,11 @@ function checkDefinition(name: string, def: CrewDefDoc): void {
       fail(at(`agents[${i}].allow_delegation`), agent?.allow_delegation, 'allow_delegation must be stated, true or false');
     }
     for (const tool of agent?.tools ?? []) {
-      const known = TOOL_MENU.has(tool) || TOOL_PREFIXES.some(p => tool.startsWith(p));
-      if (!known) {
+      // Shape only. Membership belongs to crewaimeat — see TOOL_NAME_SHAPE above for why this
+      // stopped asserting a list it cannot keep current.
+      if (typeof tool !== 'string' || !TOOL_NAME_SHAPE.test(tool)) {
         fail(at(`agents[${i}].tools`), tool,
-          `not on the fixed tool menu (${[...TOOL_MENU].join(', ')}, exchange_*) — an unknown name is not a narrower tool, it is no tool`);
+          'a tool name is lowercase letters, digits and underscores, starting with a letter — this is a shape check, not a menu; crewaimeat decides which tools exist');
       }
     }
     if (typeof agent?.role === 'string') {
@@ -239,7 +279,7 @@ export function collectProblems(templates: readonly Shippable[]): Problem[] {
     // The agent RECORD's tags travel to the node and to every listing that shows them, and they
     // are written from the same template — so both places are checked, not just the definition's.
     checkTags(`${template.name} → tags`, template.tags);
-    checkDefinition(template.name, template.crewDef);
+    checkDefinition(template.name, template.crewDef, template.mode);
   }
   return problems;
 }

@@ -23,10 +23,12 @@ function sound(): Shippable {
     return {
         name: 'probe',
         tags: ['crew.basic', 'role.probe'],
+        mode: 'task-runner',
         crewDef: {
             readme_md: '# Probe',
             tags: ['crew.basic', 'role.probe'],
             process: 'sequential',
+            listen_for: ['tasks'],
             agents: [
                 { role: 'Reader', goal: 'read', backstory: 'You read.', allow_delegation: false },
                 { role: 'Writer', goal: 'write', backstory: 'You write.', allow_delegation: false },
@@ -80,21 +82,22 @@ describe('the tag charset, which is what this gate was written for', () => {
 });
 
 describe('the tools, which is a different question from the shape', () => {
-    it('refuses a tool that is not on the fixed menu', () => {
-        // `crew_registry` shipped on crew-forge's Registrar — the one agent whose whole job is
-        // writing — and is not a tool at all. An unknown name is not a narrower tool; it is none.
+    it('does NOT enforce a menu — a tool it has not heard of may simply be newer', () => {
+        // This file briefly held a copy of crewaimeat's menu. The copy went stale and rejected
+        // `crew_registry`, a tool they had ADDED for crew-forge specifically, and on that authority
+        // it was stripped from the one agent whose job is creating agents. Membership is theirs.
         const t = sound();
-        t.crewDef.agents[0].tools = ['crew_registry'];
-        const found = collectProblems([t]);
-        expect(found).toHaveLength(1);
-        expect(found[0].value).toBe('crew_registry');
-        expect(found[0].rule).toContain('fixed tool menu');
+        t.crewDef.agents[0].tools = ['crew_registry', 'memory', 'exchange_offer', 'something_new'];
+        expect(collectProblems([t])).toEqual([]);
     });
 
-    it('accepts the menu, including the exchange_* family', () => {
+    it('but still catches a name that cannot be a tool name at all', () => {
         const t = sound();
-        t.crewDef.agents[0].tools = ['memory', 'delegate', 'dm', 'web', 'exchange_offer'];
-        expect(collectProblems([t])).toEqual([]);
+        t.crewDef.agents[0].tools = ['Crew Registry'];
+        const found = collectProblems([t]);
+        expect(found).toHaveLength(1);
+        expect(found[0].value).toBe('Crew Registry');
+        expect(found[0].rule).toContain('shape check, not a menu');
     });
 
     it('requires workflow-manager to declare a delegation tool', () => {
@@ -125,6 +128,45 @@ describe('the tools, which is a different question from the shape', () => {
         const t = sound();               // name 'probe', no tools at all
         t.crewDef.agents.forEach(a => { a.tools = undefined; });
         expect(collectProblems([t])).toEqual([]);
+    });
+});
+
+describe('the wake: the mode and the definition must agree about how work arrives', () => {
+    it('refuses an interactive agent that listens only for tasks', () => {
+        // The shipped concierge. `interactive` means the node does not auto-activate its queued
+        // tasks — deliberately — and `listen_for` was unset, which defaults to ["tasks"]. It waited
+        // for the one thing that would never arrive and not for the one that would.
+        const t = sound();
+        t.mode = 'interactive';
+        t.crewDef.listen_for = ['tasks'];
+        expect(rules(t)).toContain('must listen for something other than tasks');
+    });
+
+    it('accepts an interactive agent that listens for messages', () => {
+        const t = sound();
+        t.mode = 'interactive';
+        t.crewDef.listen_for = ['messages', 'dms'];
+        expect(collectProblems([t])).toEqual([]);
+    });
+
+    it('leaves a task-runner listening for tasks alone — that is exactly right for one', () => {
+        const t = sound();
+        t.mode = 'task-runner';
+        t.crewDef.listen_for = ['tasks'];
+        expect(collectProblems([t])).toEqual([]);
+    });
+
+    it('refuses an unstated listen_for, because the default is silent', () => {
+        const t = sound();
+        (t.crewDef as { listen_for?: string[] }).listen_for = undefined;
+        expect(rules(t)).toContain('a wrong default is silent');
+    });
+
+    it('and the shipped concierge listens for messages, not tasks', () => {
+        const c = BASIC_AGENTS.find(a => a.name === 'concierge')!;
+        expect(c.mode).toBe('interactive');
+        expect(c.crewDef.listen_for).not.toEqual(['tasks']);
+        expect(c.crewDef.listen_for).toContain('messages');
     });
 });
 

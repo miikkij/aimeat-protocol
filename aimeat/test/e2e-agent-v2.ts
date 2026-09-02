@@ -484,6 +484,16 @@ async function run() {
                 assert(rec.mode === 'task-runner',
                     `${n}: runs on spawn, so its mode must be task-runner or its tasks never start — got ${rec.mode}`);
             }
+
+            // The mode and the definition must agree about how work ARRIVES. An `interactive`
+            // agent's queued tasks are deliberately not auto-activated, so a definition that
+            // listens only for tasks waits for the one thing that will never come.
+            assert(Array.isArray(doc.listen_for) && doc.listen_for.length > 0,
+                `${n}: listen_for must be stated, not left to default to ["tasks"]`);
+            if (rec?.mode === 'interactive') {
+                assert(doc.listen_for.some((s: string) => s !== 'tasks'),
+                    `${n}: interactive, so nothing will auto-activate its tasks — it listens for ${JSON.stringify(doc.listen_for)} and will never wake`);
+            }
         }
     });
 

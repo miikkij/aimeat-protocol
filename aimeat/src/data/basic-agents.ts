@@ -105,6 +105,16 @@ export interface CrewDefDoc {
   readme_md: string;
   tags: string[];
   process: 'sequential' | 'hierarchical';
+  /**
+   * WHICH WAKE STARTS THIS CREW: any of `tasks`, `messages`, `records`, `dms`.
+   *
+   * Stated on every definition here, never left to the default, because the default is `["tasks"]`
+   * and a wrong default is silent. `concierge` is `interactive` — its tasks deliberately stay
+   * queued, because a resident front door takes work as messages — and it was shipped listening
+   * for tasks and nothing else. It waited for the one thing that would never arrive and not for
+   * the one that would, and the mode and the definition disagreed about how work reaches it.
+   */
+  listen_for: string[];
   agents: Array<{ role: string; goal: string; backstory: string; allow_delegation: boolean; tools?: string[] }>;
   tasks: Array<{ id: string; description: string; expected_output: string; agent: string; context?: string[] }>;
 }
@@ -140,6 +150,10 @@ export const BASIC_AGENTS: readonly BasicAgentTemplate[] = [
       readme_md: '# Concierge\\n\\nThe front door.\\n\\nIt reads what arrives, works out what it is about, answers what it can from what you already keep, and hands the rest to whoever should have it. It says who it passed something to, so nothing disappears into a queue you cannot see.\\n\\n**It answers and it routes. It does not decide anything on your behalf** — a request that needs a person waits for you, named.',
       tags: ['crew.basic', 'role.concierge'],
       process: 'sequential',
+      // NOT tasks. Its mode is `interactive`, which means the node does NOT auto-activate its
+      // queued tasks — deliberately, because it is resident and user-facing. Work reaches it as a
+      // message or a DM, so those are what it waits on.
+      listen_for: ['messages', 'dms'],
       agents: [
         {
           role: 'Triager',
@@ -203,6 +217,8 @@ export const BASIC_AGENTS: readonly BasicAgentTemplate[] = [
       readme_md: '# Crew forge\\n\\nMakes more agents for you, and clears away the ones it made.\\n\\nWhen a job needs an agent that does not exist yet, this writes one: the name, what it is for, what it may reach, and the definition it runs. It only ends agents it created itself — the node enforces that, not politeness.\\n\\n**It cannot widen its own permissions and it cannot change a sibling\'s.** Rewriting who may do what stays with you.',
       tags: ['crew.basic', 'role.crew-forge'],
       process: 'sequential',
+      // Task-runner, like the other spawn agent: work arrives as a task the node has activated.
+      listen_for: ['tasks'],
       agents: [
         {
           role: 'Designer',
@@ -219,13 +235,13 @@ export const BASIC_AGENTS: readonly BasicAgentTemplate[] = [
           goal: 'Create the agent on the node and give it its definition, or say exactly why it could not be created.',
           backstory: 'You do the writing. You use the node\'s own tools rather than reaching into storage, because the doors carry the checks and a direct write skips them. If the node refuses, you report its reason as it gave it rather than paraphrasing it into something reassuring.',
           allow_delegation: false,
-          // WAS `crew_registry`, which is not a tool. The menu is fixed — memory, web,
-          // article_fetch, schedule, dm, delegate, image, app_build, local_memory, exchange — and a
-          // name outside it is not a narrower tool, it is no tool, so the Registrar had nothing to
-          // write with. A crew definition IS a memory record at `crews.registry.<agent>`, which is
-          // what its backstory means by using the node's own doors rather than reaching into
-          // storage. check:crew-defs now refuses an off-menu name so this cannot recur.
-          tools: ['memory'],
+          // `crew_registry` IS a tool, and I removed it on 2026-09-02 believing it was not. The
+          // menu I checked it against was crewaimeat's, copied into a comment in this repo, and it
+          // had changed: they added `crew_registry` in their first round precisely because the
+          // forge could not otherwise create anything. The copy went stale and I trusted the copy
+          // over the runtime that owns the list. `memory` stays beside it — the definition it
+          // writes is a memory record — but the registry tool is what makes an agent.
+          tools: ['crew_registry', 'memory'],
         },
       ],
       tasks: [
@@ -269,6 +285,9 @@ export const BASIC_AGENTS: readonly BasicAgentTemplate[] = [
       readme_md: '# Workflow manager\\n\\nOrders work from your other agents and keeps track of what came back.\\n\\nIt breaks a job into steps, sends each one to whoever should do it, and holds the thread: what was asked, what arrived, what is still out. A step that fails is reported as a step that failed, not quietly dropped from the summary.\\n\\n**It orders work; it does not do it.** What comes back is the other agents\' answer, and it says whose.',
       tags: ['crew.basic', 'role.workflow-manager'],
       process: 'sequential',
+      // Its mode is task-runner: the node activates its queued tasks without the owner, so a
+      // task IS how work reaches it.
+      listen_for: ['tasks'],
       agents: [
         {
           role: 'Planner',
