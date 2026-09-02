@@ -23,6 +23,8 @@ class _Resp:
 
 class _Api:
     agent_name = "bot"
+    # The real _Api carries both since 0.24.0: the NAME builds paths, the GAII routes.
+    gaii = "bot"
 
     def __init__(self, gets):
         self._gets = list(gets)

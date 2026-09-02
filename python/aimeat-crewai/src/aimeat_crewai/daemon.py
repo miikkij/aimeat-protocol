@@ -14,6 +14,23 @@ This is the second half of the AIMEAT-CrewAI integration story:
     them up automatically.
 
 Changelog:
+  0.24.0 -- The credential's NAME and the routing IDENTITY are two values. This package drove both
+    from one `agent_name`, and in a two-owner home they diverge: the filename is
+    `keys/crew-forge@isoalice.key` and routing wants
+    `X-Aimeat-Agent: crew-forge#isoalice@aimeat-iso-001-a`. Passing a GAII where a name belonged
+    searched for `keys/crew-forge#isoalice@node@*.key` and found nothing; passing a name where a
+    GAII belonged routed to whichever owner matched first, or -- since the connector started
+    refusing an ambiguous bare name -- to nothing. `AgentIdentity` + `resolve_agent_identity()` now
+    carry both, and THE GAII IS READ, NOT ASSEMBLED: out of the v2 key file's own field or the v1
+    bearer's `sub`. Building it from parts would be a fourth place that has to agree about the node
+    id. `_Api` routes by `identity.gaii` (header and every `/local/*` `agent=` param) and builds
+    `/v1/agents/{name}/...` from `identity.name`; a bare string is still accepted and behaves
+    exactly as before, which is correct on a single-owner daemon.
+    Also `serve_params()` matches a row by EITHER `agent` or `gaii`. serve.json has carried `gaii`
+    since schema 2 and this compared only the bare name, so an agent addressed by its full identity
+    -- the only unambiguous way on a two-owner daemon -- was called "not registered" by the daemon
+    holding its socket, and the error then listed the bare names: it printed the halves it had not
+    compared.
   0.23.1 -- The per-agent config is read from the path the connector actually uses. It moved to
     `agents/{owner}/{agent}/config.yaml` on 2026-09-01 (one shared file gave two owners with a
     `concierge` a single node_url and a single runner command between them). This still read the old
