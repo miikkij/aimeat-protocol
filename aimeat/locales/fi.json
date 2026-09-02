@@ -1210,7 +1210,7 @@
   "mcppage.stripProofOk": "yhteys toimii",
   "mcppage.stripNotYet": "Ei vielä",
   "mcppage.stripProofPending": "varmistettu",
-  "mcppage.stripProvenSub": "{date}, tekoälysi kirjoitti tänne",
+  "mcppage.stripProvenSub": "{date}, tekoäly kirjoitti tänne",
   "mcppage.stripNotYetSub": "anna kehote, niin tulos näkyy tässä",
   "mcppage.stripLast": "viimeksi käytössä",
   "mcppage.stripLastNone": "ei vielä keskusteluja",
