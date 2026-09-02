@@ -22,6 +22,8 @@
  *   import { McpQuickConnect } from '/components/McpInstall.js';
  *   html`<${McpQuickConnect} serverName=${agentName} />`
  * @version-history
+ *   v1.1.0 — 2026-09-02 — The double-click install scripts (`install.scripts`, GET /v1/connect/install)
+ *     render beside the one-click links, in the setup guide and in the quick row alike.
  *   v1.0.0 — 2026-08-27 — Initial.
  */
 import { h } from 'preact';
@@ -50,7 +52,7 @@ function fileUrl(file, serverName) {
 
 /** Every tool the node says can be attached by a link or a file, in the table's own order. */
 function withInstall(tools) {
-  return (tools ?? []).filter((tool) => tool?.mcp?.install?.link || tool?.mcp?.install?.file);
+  return (tools ?? []).filter((tool) => tool?.mcp?.install?.link || tool?.mcp?.install?.file || tool?.mcp?.install?.scripts?.length);
 }
 
 /**
@@ -59,7 +61,7 @@ function withInstall(tools) {
  */
 export function McpInstallRow({ tool, serverName }) {
   const install = tool?.mcp?.install;
-  if (!install || (!install.link && !install.file)) return null;
+  if (!install || (!install.link && !install.file && !install.scripts?.length)) return null;
 
   return html`
     <div class="mcpi mcpi--tool">
@@ -69,6 +71,11 @@ export function McpInstallRow({ tool, serverName }) {
           <a class="btn-primary btn-sm" href=${install.link.href}>${install.link.label}</a>
           <span class="mcpi-note">${install.link.note}</span>
         </div>` : null}
+      ${(install.scripts ?? []).map((sc) => html`
+        <div class="mcpi-oneclick" key=${sc.os}>
+          <a class="btn-primary btn-sm" href=${fileUrl(sc, serverName)} download=${sc.filename}>${sc.label}</a>
+          <span class="mcpi-note">${sc.note}</span>
+        </div>`)}
       ${install.file ? html`
         <div class="mcpi-file">
           <a class="btn-outline btn-sm" href=${fileUrl(install.file, serverName)} download=${install.file.filename}>
@@ -99,6 +106,7 @@ export function McpQuickConnect({ serverName, guideHref = '/v1/profile?tab=mcp',
 
   const links = installable.filter((tool) => tool.mcp.install.link);
   const files = installable.filter((tool) => tool.mcp.install.file);
+  const scripts = installable.flatMap((tool) => (tool.mcp.install.scripts ?? []).map((sc) => ({ tool, sc })));
   const commands = installable.filter((tool) => tool.mcp.command && !tool.mcp.install.link);
   const emphasis = title ? 'btn-primary btn-sm' : 'btn-outline btn-sm';
 
@@ -107,11 +115,15 @@ export function McpQuickConnect({ serverName, guideHref = '/v1/profile?tab=mcp',
       ${title ? html`<div class="mcpi-title">${title}</div>` : null}
       ${lead ? html`<p class="mcpi-lead">${lead}</p>` : null}
 
-      ${links.length ? html`
+      ${links.length || scripts.length ? html`
         <div class="mcpi-oneclick">
           ${links.map(tool => html`
             <a key=${tool.id} class=${emphasis} href=${tool.mcp.install.link.href}>
               ${tool.mcp.install.link.label}
+            </a>`)}
+          ${scripts.map(({ tool, sc }) => html`
+            <a key=${tool.id + sc.os} class=${emphasis} href=${fileUrl(sc, serverName)} download=${sc.filename} title=${sc.note}>
+              ${sc.label}
             </a>`)}
         </div>` : null}
 

@@ -79,6 +79,8 @@ export interface Agent {
   cardJws: string | null;
   cardIssuedAt: string | null;
   enrolledAt: string | null;
+  mcpClient: string | null;
+  mcpLastSeen: string | null;
   scheduleConstraintDefaults: Json | null;
   tags: string[] | null;
   technicalCapabilities: Json | null;

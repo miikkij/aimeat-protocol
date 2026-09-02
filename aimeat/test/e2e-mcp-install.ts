@@ -178,6 +178,12 @@ await test('Every install shortcut the tool table advertises actually resolves',
             assert(typeof file.where === 'string' && file.where.length > 10,
                 `${tool.id} must say where the saved file goes`);
         }
+        for (const sc of tool.mcp.install.scripts ?? []) {
+            const res = await fetch(sc.url);
+            assert(res.status === 200, `${tool.id} ${sc.os} script url ${res.status}: ${sc.url}`);
+            assert((res.headers.get('content-disposition') ?? '').includes(sc.filename),
+                `${tool.id} ${sc.os} script must be served under the filename the table shows`);
+        }
         const link = tool.mcp.install.link;
         if (link) {
             assert(/^(https:|cursor:)/.test(link.href),
@@ -192,6 +198,30 @@ await test('Every install shortcut the tool table advertises actually resolves',
                 `${tool.id} link must carry THIS node's address, got ${cfg.url}`);
         }
     }
+});
+
+await test('The double-click script runs the same one-liner the table shows, per desktop', async () => {
+    // What a person double-clicks and never reads: the command inside must be the table's, at user
+    // scope, with THIS node's address, or the click succeeds and nothing is attached.
+    const win = await fetch(`${BASE}/v1/connect/install?client=claude-code&os=windows`);
+    assert(win.status === 200, `windows ${win.status}`);
+    assert((win.headers.get('content-disposition') ?? '').includes('aimeat-mcp-install.cmd'), 'windows filename');
+    const cmd = await win.text();
+    assert(cmd.includes(`claude mcp add --transport http aimeat ${BASE}/v1/mcp -s user`), `windows command: ${cmd}`);
+    assert(cmd.includes('\r\n'), 'a .cmd file carries CRLF line endings');
+    assert(!/token|secret|bearer/i.test(cmd), 'nothing credential-shaped in a public script');
+
+    const mac = await fetch(`${BASE}/v1/connect/install?client=claude-code&os=mac&name=My%20Node`);
+    assert(mac.status === 200, `mac ${mac.status}`);
+    assert((mac.headers.get('content-disposition') ?? '').includes('aimeat-mcp-install.command'), 'mac filename');
+    const sh = await mac.text();
+    assert(sh.startsWith('#!/bin/bash'), 'a .command file starts with its shebang');
+    assert(sh.includes(`claude mcp add --transport http my-node ${BASE}/v1/mcp -s user`), `the server name is reduced like the file's: ${sh}`);
+
+    const badOs = await json('/v1/connect/install?client=claude-code&os=linux');
+    assert(badOs.status === 400 && badOs.body.error?.code === 'INVALID_OS', `unknown desktop refused: ${badOs.status}`);
+    const noScript = await json('/v1/connect/install?client=cursor&os=windows');
+    assert(noScript.status === 400 && noScript.body.error?.code === 'NO_SCRIPT', `a link-installed client has no script: ${noScript.status}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

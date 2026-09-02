@@ -158,8 +158,8 @@
       "sha": "6618969bc19e53c6"
     },
     "test/e2e-mcp-install.ts": {
-      "reason": "Reviewed 2026-08-27, written with the suite. The surface is ONE public GET (/v1/connect/mcp.json) that returns a config file holding this node's MCP address and a name the caller picked. It reads nothing owned by anybody, so there is no principal to refuse: 401 and 403 are not answers it can give, and asserting one would mean inventing a gate the feature does not have. The fence it DOES have is tested instead, in 'The door tells a second principal nothing about the first': two registered owners and an unauthenticated caller must get byte-identical bytes, with neither owner's name in them. That is the failure worth catching here, because the day this route starts reflecting its caller, a door that takes no auth is handing one person's account to whoever asks next.",
-      "sha": "cc52437f927a6ce0"
+      "reason": "Reviewed 2026-08-27, re-reviewed 2026-09-02 when the second door was added. The surface is TWO public GETs (/v1/connect/mcp.json and /v1/connect/install) that return a config file or a double-click script holding this node's MCP address and a name the caller picked. They read nothing owned by anybody, so there is no principal to refuse: 401 and 403 are not answers they can give, and asserting one would mean inventing a gate the feature does not have. Their only refusals are 400s for a client or desktop they do not know, which the suite asserts by code. The fence the doors DO have is tested instead, in 'The door tells a second principal nothing about the first': two registered owners and an unauthenticated caller must get byte-identical bytes, with neither owner's name in them. That is the failure worth catching here, because the day these routes start reflecting their caller, a door that takes no auth is handing one person's account to whoever asks next.",
+      "sha": "f9112fd67afd1dbb"
     }
   }
 }
