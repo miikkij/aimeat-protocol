@@ -23,6 +23,8 @@
  * @structure GAME_SKILL_ENTRIES: the seven entries, entry skill first
  * @usage import { GAME_SKILL_ENTRIES } from './builtin-skills-games.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-03 -- aimeat-phaser-world and aimeat-phaser-story join (wave two), and the
+ *     entry skill's table names them.
  *   v1.0.0 -- 2026-09-02 -- Initial: aimeat-phaser and the six area skills, written against
  *     aimeat-phaser 1.0.0 (boot, assets, audio, save, controls, hud, menus, transitions, tokens,
  *     level, settings).
@@ -31,6 +33,7 @@ import type { BuiltinSkill } from './builtin-skills.js';
 import { PHASER_BOOT_SKILL, PHASER_ASSETS_SKILL } from './builtin-skills-games.boot-assets.js';
 import { PHASER_SAVES_SKILL, PHASER_CONTROLS_HUD_SKILL } from './builtin-skills-games.saves-controls.js';
 import { PHASER_MENUS_LEVELS_SKILL, PHASER_AUDIO_JUICE_SKILL } from './builtin-skills-games.menus-audio.js';
+import { PHASER_WORLD_SKILL, PHASER_STORY_SKILL } from './builtin-skills-games.world.js';
 
 /** The entry skill: which area skill to load, the paved path, and the two rules. */
 const PHASER_ENTRY_SKILL: BuiltinSkill = {
@@ -71,6 +74,8 @@ Without them the game still runs, and everything it saves stays in the browser.
 | keyboard, gamepad, touch, HUD, toast, settings page | \`node:aimeat-phaser-controls-hud\` |
 | menus, title screen, pause menu, scene changes, levels | \`node:aimeat-phaser-menus-levels\` |
 | sound, music, the synth, screen feel | \`node:aimeat-phaser-audio-juice\` |
+| particle effects, parallax backdrops, day and night, generated sprites and the actor, enemy brains and pathfinding, the boss fight, the overworld map, the tile world and minimap, the designer panels | \`node:aimeat-phaser-world\` |
+| dialogue and cutscenes, the player's status HUD, achievements and the trophy room, chiptune music | \`node:aimeat-phaser-story\` |
 
 ## Quick Start: the paved path
 
@@ -169,7 +174,7 @@ beside each one. Copy from a demo that runs rather than from memory of an API.
 `,
 };
 
-/** The seven game skills, entry first. */
+/** The nine game skills, entry first. */
 export const GAME_SKILL_ENTRIES: BuiltinSkill[] = [
   PHASER_ENTRY_SKILL,
   PHASER_BOOT_SKILL,
@@ -178,4 +183,6 @@ export const GAME_SKILL_ENTRIES: BuiltinSkill[] = [
   PHASER_CONTROLS_HUD_SKILL,
   PHASER_MENUS_LEVELS_SKILL,
   PHASER_AUDIO_JUICE_SKILL,
+  PHASER_WORLD_SKILL,
+  PHASER_STORY_SKILL,
 ];

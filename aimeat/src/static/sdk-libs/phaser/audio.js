@@ -26,6 +26,8 @@
  *   bus.synth('coin');
  *   bus.playMusic('theme', { loop: true, fade: 800 });
  * @version-history
+ *   v1.1.0 — 2026-09-02 — The bus exposes its context and destination, so chiptune() and any
+ *     other generated voice connect under the same master and mute as a loaded track.
  *   v1.0.0 — 2026-09-02 — Initial: the two channels, the crossfade, the synth voices and the
  *     unlock handling.
  */
@@ -302,6 +304,16 @@ export function audio(game, opts) {
     /** @returns {boolean} may this page make a sound yet? */
     get unlocked() {
       return !game.sound.locked;
+    },
+
+    /** The Web Audio context the game plays through, or null on a backend without one. */
+    get context() {
+      return game.sound.context || null;
+    },
+
+    /** Where a generated voice connects: the game's master mute node, so master and mute reach it. */
+    get destination() {
+      return game.sound.destination || (game.sound.context ? game.sound.context.destination : null);
     },
 
     /**

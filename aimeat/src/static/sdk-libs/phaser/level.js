@@ -22,12 +22,16 @@
  *         level.on('coin', (n) => hud.set({ score: n }));
  *         // in scene.update(): level.update();
  * @version-history
+ *   v1.1.0 — 2026-09-02 — parallaxBackdrop takes a preset name or a parallax() spec (true keeps the
+ *     drawn blocks every level so far already has), and spec.player takes an actor handle from
+ *     sprites.js: the actor then animates and moves itself off the same controls state.
  *   v1.0.1 — 2026-09-02 — destroy() on a scene shutdown no longer clears groups Phaser has already
  *     emptied (a restart threw inside Phaser's Group.clear).
  *   v1.0.0 — 2026-09-02 — Initial (wish-phaser4-design-book-page).
  */
 import { reducedMotion } from '../atelier/dom.js';
 import { look, channels } from './tokens.js';
+import { parallax } from './parallax.js';
 
 /** The marks every AIMEAT platformer understands without saying so. */
 const DEFAULT_LEGEND = {
@@ -156,13 +160,16 @@ function ensureTexture(scene, key, kind, size, th) {
  *   map: string[], legend?: Record<string, string>, tile?: number,
  *   textures?: Partial<Record<'ground'|'brick'|'spike'|'coin'|'goal'|'enemy'|'player', string>>,
  *   gravity?: number,
- *   player?: { speed?: number, jump?: number, doubleJump?: boolean },
- *   controls?: any, camera?: 'follow'|'fixed', bounds?: boolean, parallaxBackdrop?: boolean,
- * }} spec
+ *   player?: { speed?: number, jump?: number, doubleJump?: boolean } | any,
+ *   controls?: any, camera?: 'follow'|'fixed', bounds?: boolean,
+ *   parallaxBackdrop?: boolean|string|object,
+ * }} spec  player also takes an actor handle from sprites.js (recognised by its .sprite);
+ *   parallaxBackdrop takes a parallax() preset name or spec, and true keeps the drawn blocks
  * @returns {{
  *   player: any,
  *   groups: { ground: any, coins: any, enemies: any, spikes: any, goal: any },
  *   map: any,
+ *   backdrop: any,
  *   on: (event: string, fn: (value?: any) => any) => () => void,
  *   update: () => void, reset: () => void, destroy: () => void,
  * }}
@@ -174,7 +181,9 @@ export function platformer(scene, spec) {
   const tile = s.tile || 32;
   const map = parseMap(s.map || [], s.legend);
   const tex = Object.assign({}, DEFAULT_TEXTURES, s.textures || {});
-  const move = Object.assign({ speed: 220, jump: 420, doubleJump: false }, s.player || {});
+  // An actor handle (sprites.js) is recognised by its sprite; its `move` has the options' shape.
+  const given = s.player && s.player.sprite ? s.player : null;
+  const move = Object.assign({ speed: 220, jump: 420, doubleJump: false }, given ? given.move : (s.player || {}));
   const pxW = Math.max(tile, map.width * tile);
   const pxH = Math.max(tile, map.height * tile);
   const fadeMs = 180;
@@ -195,7 +204,12 @@ export function platformer(scene, spec) {
 
   scene.physics.world.gravity.y = s.gravity != null ? s.gravity : 900;
   if (s.bounds !== false) scene.physics.world.setBounds(0, 0, pxW, pxH);
-  if (s.parallaxBackdrop) drawParallax(scene, th, pxW, pxH);
+  // true keeps the two drawn blocks every level published so far already has. A preset name or
+  // a spec goes straight to parallax(), which fits the camera rather than the world.
+  /** @type {any} */
+  let backdrop = null;
+  if (s.parallaxBackdrop === true) drawParallax(scene, th, pxW, pxH);
+  else if (s.parallaxBackdrop) backdrop = parallax(scene, s.parallaxBackdrop);
 
   // ── The world ────────────────────────────────────────────────────────────────────────────────
   const ground = scene.physics.add.staticGroup();
@@ -212,11 +226,15 @@ export function platformer(scene, spec) {
   const goal = scene.physics.add.staticGroup();
   const enemies = scene.physics.add.group();
 
-  const playerKey = ensureTexture(scene, tex.player, 'player', tile, th);
+  const playerKey = given ? given.key : ensureTexture(scene, tex.player, 'player', tile, th);
   const start = map.spawn || { x: 1, y: Math.max(0, map.height - 2) };
-  const player = scene.physics.add.sprite(start.x * tile + tile / 2, start.y * tile + tile / 2, playerKey);
-  player.setBounce(0.04);
-  player.setCollideWorldBounds(s.bounds !== false);
+  const player = given ? given.sprite : scene.physics.add.sprite(start.x * tile + tile / 2, start.y * tile + tile / 2, playerKey);
+  if (given) {
+    player.setPosition(start.x * tile + tile / 2, start.y * tile + tile / 2);
+  } else {
+    player.setBounce(0.04);
+    player.setCollideWorldBounds(s.bounds !== false);
+  }
 
   scene.physics.add.collider(player, ground);
   scene.physics.add.collider(enemies, ground);
@@ -303,6 +321,11 @@ export function platformer(scene, spec) {
     if (dead || finished) return;
     dead = true;
     if (emit('die')) { dead = false; return; }
+    // An actor plays its death clip first, then stands on the spawn again.
+    if (given) {
+      given.die(function () { placePlayer(); given.reset(); dead = false; });
+      return;
+    }
     player.setVelocity(0, 0);
     const c = channels(th.bg);
     const cam = scene.cameras.main;
@@ -353,6 +376,7 @@ export function platformer(scene, spec) {
     player: player,
     groups: { ground: ground, coins: coins, enemies: enemies, spikes: spikes, goal: goal },
     map: map,
+    backdrop: backdrop,
 
     /**
      * Listen for 'coin' (the running count), 'die', 'goal' or 'land'. A 'die' listener that
@@ -380,7 +404,10 @@ export function platformer(scene, spec) {
       wasDown = onGround;
 
       patrol();
-      if (dead || finished) { animate(0, onGround); return; }
+      if (dead || finished) { if (!given) animate(0, onGround); return; }
+      // An actor reads the same controls state and animates itself; the block below is the
+      // drawn player's.
+      if (given) { given.update(s.controls); return; }
 
       const c = s.controls;
       const left = !!(c && c.left);
@@ -419,7 +446,9 @@ export function platformer(scene, spec) {
       [coins, spikes, goal, enemies, ground].forEach(function (group) {
         if (group && group.children) group.clear(true, true);
       });
-      player.destroy();
+      if (backdrop) { backdrop.destroy(); backdrop = null; }
+      // An actor owns its sprite and destroys it on shutdown itself.
+      if (!given) player.destroy();
     },
   };
 
