@@ -36,6 +36,15 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.45.0 — 2026-09-02 — THE SHOW: lenis-director.css (the rail, the pinned scene, the story
+ *     well), anime-show.css (the reveal, draw, wave and orbit pieces) and transitions.css (the
+ *     curtain layers and the view-transition kinds) join the imports
+ *     (wish-atelier-story-director-show). Pinned to the JS version, as ever.
+ *   v0.44.0 — 2026-09-02 — MOTION: five sheets join the imports — motion.css (the classes the
+ *     drag primitive holds an element under), motion-parts.css (carousel, lightbox),
+ *     anime-parts.css (calendar, priceTable), lenis-parts.css (thread, checkout) and
+ *     flow-parts.css (sortable, cart, notices, facets) — wish-atelier-motion-libraries-and-
+ *     parts. Pinned to the JS version, as ever.
  *   v0.42.0 — 2026-09-01 — NINE PARTS: parts.css joins the imports — the toast stack, the
  *     command palette, the compare slider, the progress ring, the crew stack, the drop zone,
  *     the tour, the poll and the key hints, every value on the contract.
@@ -221,6 +230,14 @@
 @import url('./aimeat-atelier/mtv.css');
 @import url('./aimeat-atelier/materials.css');
 @import url('./aimeat-atelier/parts.css');
+@import url('./aimeat-atelier/motion.css');
+@import url('./aimeat-atelier/motion-parts.css');
+@import url('./aimeat-atelier/anime-parts.css');
+@import url('./aimeat-atelier/lenis-parts.css');
+@import url('./aimeat-atelier/flow-parts.css');
+@import url('./aimeat-atelier/lenis-director.css');
+@import url('./aimeat-atelier/anime-show.css');
+@import url('./aimeat-atelier/transitions.css');
 @import url('./aimeat-atelier/scenics.css');
 @import url('./aimeat-atelier/patterns.css');
 @import url('./aimeat-atelier/mosaic.css');

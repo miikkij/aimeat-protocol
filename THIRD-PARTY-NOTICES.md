@@ -71,6 +71,9 @@ tarball is. "Installed by the operator" means AIMEAT does not ship the file at a
 | [three.js](https://threejs.org) | 0.128.0 (r128) | MIT | Copyright © 2010-2026 three.js authors | served by the node | notice only |
 | [three.js + example addons (OrbitControls, Sky, RGBELoader, GLTFLoader, RoomEnvironment, BufferGeometryUtils, SkeletonUtils)](https://threejs.org) | 0.185.1 (r185) | MIT | Copyright © 2010-2026 three.js authors | served by the node | notice only |
 | [Leaflet](https://leafletjs.com) | 1.9.4 | BSD-2-Clause | Copyright (c) 2010-2023, Volodymyr Agafonkin; Copyright (c) 2010-2011, CloudMade | served by the node | notice only |
+| [Motion](https://motion.dev) | 13.1.1 | MIT | Copyright (c) 2024 Motion B.V. (https://motion.dev) | served by the node | notice only |
+| [anime.js](https://animejs.com) | 4.5.0 | MIT | Copyright (c) 2025 Julian Garnier | served by the node | notice only |
+| [Lenis](https://lenis.darkroom.engineering) | 1.3.26 | MIT | Copyright (c) 2024 darkroom.engineering | served by the node | notice only |
 | [p5.js](https://p5js.org) | 1.11.13 | LGPL-2.1-only | Copyright (c) The Processing Foundation and the p5.js contributors | served by the node | **see below** |
 | [p5.js](https://p5js.org) | 2.3.2 | LGPL-2.1-only | Copyright (c) The Processing Foundation and the p5.js contributors | served by the node | **see below** |
 | [PixiJS](https://pixijs.com) | 8.20.1 | MIT | Copyright (c) 2013-2023 Mathew Groves, Chad Engler | served by the node | notice only |
@@ -2283,6 +2286,20 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+```
+
+### anime.js 4.5.0
+
+```text
+The MIT License
+
+Copyright (c) 2025 Julian Garnier
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
 ### ansi-regex 5.0.1, ansi-styles 4.3.0, array-differ 3.0.0, array-union 2.1.0, arrify 2.0.1, camelcase 5.3.1, chalk 4.1.2, find-up 4.1.0, has-flag 4.0.0, is-fullwidth-code-point 3.0.0, locate-path 5.0.0, mimic-fn 2.1.0, npm-run-path 4.0.1, p-limit 2.3.0, p-locate 4.1.0, p-try 2.2.0, path-exists 4.0.0, path-key 3.1.1, shebang-regex 3.0.0, string-width 4.2.3, strip-ansi 6.0.1, strip-final-newline 2.0.0, supports-color 7.2.0, wrap-ansi 6.2.0
@@ -7285,6 +7302,20 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
+### Lenis 1.3.26
+
+```text
+The MIT License
+
+Copyright (c) 2024 darkroom.engineering
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
 ### levn 0.3.0, optionator 0.8.3, prelude-ls 1.1.2, type-check 0.3.2
 
 ```text
@@ -7647,6 +7678,32 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
+```
+
+### Motion 13.1.1
+
+```text
+The MIT License (MIT)
+
+Copyright (c) 2024 [Motion](https://motion.dev) B.V.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 ```
 
 ### ms 2.0.0

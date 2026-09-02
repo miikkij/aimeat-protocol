@@ -23,9 +23,14 @@
  *   v1.5.0 — 2026-08-29 — NEW leaflet pack (1.9.4, /lib/leaflet@1/): the REAL map on
  *     OpenStreetMap tiles — the developer's words after an offline abstraction missed the ask.
  *     The creative/3D/game packs moved whole to ./vendored-creative.ts (800-line rule).
+ *   v1.6.0 — 2026-09-02 — NEW motion packs, in ./vendored-motion.ts (800-line rule): motion 13.1.1
+ *     (the vanilla core under Framer Motion), anime.js 4.5.0 (timelines) and lenis 1.3.26 (smooth
+ *     scroll). All three are modelTier 'frontier' — each pins an API that broke against the one
+ *     models write from memory.
  */
 import type { LibraryPack } from '../library-packs.js';
 import { CREATIVE_PACKS } from './vendored-creative.js';
+import { MOTION_PACKS } from './vendored-motion.js';
 
 export const VENDORED_PACKS: LibraryPack[] = [
   {
@@ -522,6 +527,8 @@ export const VENDORED_PACKS: LibraryPack[] = [
   // The creative/3D/game packs (three, three-world, p5, pixi, phaser) moved whole to
   // ./vendored-creative.ts under the 800-line rule — one list, two files.
   ...CREATIVE_PACKS,
+  // motion, anime and lenis live in ./vendored-motion.ts for the same reason: one list, three files.
+  ...MOTION_PACKS,
   {
     id: 'fonts',
     kind: 'vendored',

@@ -13,6 +13,9 @@
  * @structure designbookRouter(config, storage): Router
  * @usage mounted by server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.3.1 — 2026-09-02 — The preview's img-src is the app policy (* data: blob:). Framed from
+ *     design-book.apps.aimeat.io, 'self' meant the subdomain and every illustration on the apex
+ *     was blocked — found on prod the day the gallery front shipped.
  *   v1.3.0 — 2026-08-30 — GET /v1/designbook/:id/preview: the part rendered as the page the
  *     bench measures, sessionless, for the browsable gallery (wish-designbook-graafinen-selailu).
  *   v1.2.0 — 2026-08-29 — DELETE /v1/designbook/:id: real cleanup for junk with zero
@@ -124,6 +127,12 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
       // inline script needs the request's CSP nonce; the part's body cannot mint a script tag of
       // its own (the builder escapes `</` and the genre pages are the node's own templates).
       const { injectCspNonce } = await import('../utils/csp-nonce.js');
+      // The page is a rendering of an app part, so its PICTURES follow the app policy (img-src *,
+      // the same a published app runs under): a part's illustration lives on the apex (/v1/pub)
+      // and a map part draws tiles, while the gallery frames this page from the app origin, where
+      // 'self' is the subdomain and every apex picture was blocked. Scripts keep the nonce rule.
+      const csp = String(res.getHeader('Content-Security-Policy') ?? '');
+      res.setHeader('Content-Security-Policy', csp.replace(/img-src [^;]*/, 'img-src * data: blob:'));
       res.setHeader('Cache-Control', 'no-store');
       res.setHeader('X-Robots-Tag', 'noindex');
       res.type('html').send(injectCspNonce(html, res.locals.cspNonce as string | undefined));

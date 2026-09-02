@@ -31,6 +31,20 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.45.0 — 2026-09-02 — THE SHOW (wish-atelier-story-director-show): director and storyRail
+ *     on Lenis (scenes in order, each with its entrance, hold and progress; the rail; the keys),
+ *     the anime.js show pieces textReveal, drawPath, gridWave, sequence and orbit, and the
+ *     transitions screenTransition, panelTransition and curtain (View Transitions where the
+ *     browser has them, a curtain layer where not). The AIMEAT story page is the first app on
+ *     the director.
+ *   v0.44.0 — 2026-09-02 — MOTION (wish-atelier-motion-libraries-and-parts, stages 2 and 3).
+ *     The kit's own primitives: spring, stagger, inView, scrollLink and drag on the Web
+ *     Animations API (springFrames for the curve, flipFrom for a FLIP on the spring) — no
+ *     dependency, finite, a no-op under reduced motion. Eleven parts on top, each riding ONE
+ *     library lazy-loaded from this node: carousel and lightbox (Motion), calendar and
+ *     priceTable (anime.js), thread and checkout (Lenis), sortable, cart, notices and facets
+ *     (the primitives), and the kanban card now travels to its column on a spring. Every part
+ *     renders and works before its library lands; the library only adds the travel.
  *   v0.42.0 — 2026-09-01 — NINE PARTS the canvas found missing (stage 3): ring (progress toward
  *     a whole), crew (people and agents as one stack, with the live dot), poll (one question,
  *     live shares), keys (declared shortcuts, rendered), dropzone (bring-a-file; the app
@@ -232,6 +246,14 @@ import { crt, countdown, crawl } from './mtv.js';
 import { spotlight, tilt, sheen, odometer, thumb, deal } from './materials.js';
 import { ring, crew, poll, keys, dropzone } from './parts.js';
 import { toast, palette, compare, tour } from './parts-ui.js';
+import { springFrames, spring, stagger, inView, scrollLink, drag } from './motion.js';
+import { carousel, lightbox } from './motion-parts.js';
+import { calendar, priceTable } from './anime-parts.js';
+import { thread, checkout } from './lenis-parts.js';
+import { sortable, cart, notices, facets, flipFrom } from './flow-parts.js';
+import { director, storyRail } from './lenis-director.js';
+import { textReveal, drawPath, gridWave, sequence, orbit } from './anime-show.js';
+import { screenTransition, panelTransition, curtain } from './transitions.js';
 
 const atelier = {
   /**
@@ -239,7 +261,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.42.0',
+  version: '0.45.0',
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,
@@ -291,6 +313,22 @@ const atelier = {
 
   // ── The nine parts the canvas found missing (ring, crew, poll, keys also mosaic blocks) ──
   ring, crew, poll, keys, dropzone, toast, palette, compare, tour,
+
+  // ── The kit's own motion primitives (Web Animations API, no dependency, finite, reduced-motion safe) ──
+  springFrames, spring, stagger, inView, scrollLink, drag, flipFrom,
+
+  // ── The parts that ride the motion libraries: Motion (carousel, lightbox), anime.js (calendar,
+  //    priceTable), Lenis (thread, checkout) — each lazy-loads its pack from this node ──
+  carousel, lightbox, calendar, priceTable, thread, checkout,
+
+  // ── The parts on the kit's own primitives (sortable, notices, facets also mosaic blocks) ──
+  sortable, cart, notices, facets,
+
+  // ── The show: the Lenis director (scenes in order, each with its motion), the anime.js show
+  //    pieces, and the transitions between screens and between panels ──
+  director, storyRail,
+  textReveal, drawPath, gridWave, sequence, orbit,
+  screenTransition, panelTransition, curtain,
 
   // ── Data ──
   form, table, searchBar,
