@@ -6,7 +6,11 @@
  *   curated pitfalls index, learned-pitfall model facets).
  * @usage registered in test/run-e2e-ci.ts; run via the e2e harness
  *   (cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=appdev-overview).
- * @version-history v1.0.0 — 2026-07-19 — initial (AppDev KB Phase 5).
+ * @version-history
+ *   v1.1.0 — 2026-09-03 — +the learned list as a page: paging, status default, severity/model/
+ *     category/shared/q filters, scope vs filtered facets, severity sort, the community count and
+ *     cross-owner isolation on the paged door (AppDev page, poster face).
+ *   v1.0.0 — 2026-07-19 — initial (AppDev KB Phase 5).
  */
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -186,6 +190,93 @@ await test('learned KB REST: seed via memory → list → PATCH share → cross-
     assert(ad === 200, `A delete ${ad}`);
     const { body: after } = await json('/v1/appdev/pitfalls/learned', { headers: { Authorization: `Bearer ${tokenA}` } });
     assert(!after.data.pitfalls.some((p: any) => p.slug === 'ui-test-entry'), 'entry survived delete');
+});
+
+// ── The learned list as a page: filters, search, facets and the community count (AppDev page, poster face) ──
+
+await test('learned KB REST: pages, filters, searches, counts facets and says how many others shared', async () => {
+    const seedOne = async (token: string, slug: string, extra: Record<string, unknown>) => {
+        const now = new Date().toISOString();
+        const value = {
+            title: `Paged ${slug}`, symptom: `symptom of ${slug}`, resolution: `resolution of ${slug}`,
+            model: 'claude-haiku-4.5', category: 'data', slug, applies_to: ['app'],
+            severity: 'warn', status: 'active', reported_by: 'ui-e2e', created: now, updated: now, ...extra,
+        };
+        const { status } = await json('/v1/memory', {
+            method: 'POST', headers: { Authorization: `Bearer ${token}` },
+            body: JSON.stringify({
+                key: `packages/appdev-pitfalls/data/${slug}`, value,
+                visibility: extra.visibility ?? 'owner', tags: ['knowledge-entry', 'pitfall', 'model:claude-haiku-4.5'],
+            }),
+        });
+        assert(status === 200 || status === 201, `seed ${slug}: ${status}`);
+    };
+    const a = { Authorization: `Bearer ${tokenA}` };
+    // Owner A: three active warnings, one critical from another model, one outdated. Owner B: one shared.
+    await seedOne(tokenA, 'page-a1', {});
+    await seedOne(tokenA, 'page-a2', { updated: '2026-01-02T00:00:00.000Z' });
+    await seedOne(tokenA, 'page-a3', { title: 'Paged needle-title', app_ref: `${ownerA}/needle.html` });
+    await seedOne(tokenA, 'page-crit', { severity: 'critical', model: 'goose' });
+    await seedOne(tokenA, 'page-old', { status: 'outdated' });
+    await seedOne(tokenB, 'page-b-shared', { visibility: 'public' });
+
+    // Paging: two pages that do not overlap, the default sort newest first, full bodies on a page.
+    const { body: p1 } = await json('/v1/appdev/pitfalls/learned?status=active&limit=2&offset=0', { headers: a });
+    const { body: p2 } = await json('/v1/appdev/pitfalls/learned?status=active&limit=2&offset=2', { headers: a });
+    assert(p1.data.total === 4 && p2.data.total === 4, `active total expected 4, got ${p1.data.total}/${p2.data.total}`);
+    assert(p1.data.pitfalls.length === 2 && p1.data.limit === 2 && p2.data.offset === 2, 'page shape wrong');
+    const keys1 = new Set(p1.data.pitfalls.map((p: any) => p.key));
+    assert(p2.data.pitfalls.every((p: any) => !keys1.has(p.key)), 'pages overlap');
+    assert(p1.data.pitfalls[0].symptom && p1.data.pitfalls[0].resolution, 'page rows lack full bodies');
+    const all = [...p1.data.pitfalls, ...p2.data.pitfalls];
+    assert(all[all.length - 1].slug === 'page-a2', `oldest entry should be last, got ${all.map((p: any) => p.slug).join(',')}`);
+    assert(!all.some((p: any) => p.slug === 'page-old'), 'status=active leaked an outdated entry');
+
+    // The default on this door is every status, as before the page existed.
+    const { body: dflt } = await json('/v1/appdev/pitfalls/learned', { headers: a });
+    assert(dflt.data.pitfalls.some((p: any) => p.slug === 'page-old'), 'default status hid the outdated entry');
+    assert(dflt.data.limit === 25 && dflt.data.offset === 0, 'default paging wrong');
+
+    // Facets count the whole scope while a filter is on; filtered_facets count what is left.
+    const { body: crit } = await json('/v1/appdev/pitfalls/learned?severity=critical&limit=1', { headers: a });
+    assert(crit.data.total === 1 && crit.data.pitfalls[0].slug === 'page-crit', 'severity filter wrong');
+    assert(crit.data.facets.severity.warn === 4 && crit.data.facets.severity.critical === 1, `scope facets wrong: ${JSON.stringify(crit.data.facets.severity)}`);
+    assert(crit.data.filtered_facets.model.goose === 1 && !crit.data.filtered_facets.model['claude-haiku-4.5'], 'filtered facets wrong');
+    assert(crit.data.facets.status.outdated === 1 && crit.data.facets.shared.private === 5, `status/shared facets wrong: ${JSON.stringify(crit.data.facets)}`);
+
+    // Model, category, shared and text filters.
+    const { body: byModel } = await json('/v1/appdev/pitfalls/learned?model=goose', { headers: a });
+    assert(byModel.data.total === 1, `model filter expected 1, got ${byModel.data.total}`);
+    const { body: byCat } = await json('/v1/appdev/pitfalls/learned?category=data&status=all', { headers: a });
+    assert(byCat.data.total === 5, `category filter expected 5, got ${byCat.data.total}`);
+    const { body: byShared } = await json('/v1/appdev/pitfalls/learned?shared=1', { headers: a });
+    assert(byShared.data.total === 0, `shared=1 expected 0 own shared, got ${byShared.data.total}`);
+    const { body: byQ } = await json('/v1/appdev/pitfalls/learned?q=NEEDLE', { headers: a });
+    assert(byQ.data.total === 1 && byQ.data.pitfalls[0].slug === 'page-a3', 'q did not match title/app_ref case-insensitively');
+    const { body: byQBody } = await json('/v1/appdev/pitfalls/learned?q=resolution+of+page-a1', { headers: a });
+    assert(byQBody.data.total === 1 && byQBody.data.pitfalls[0].slug === 'page-a1', 'q did not search the resolution');
+
+    // Severity sort ranks the critical first.
+    const { body: bySev } = await json('/v1/appdev/pitfalls/learned?sort=severity&limit=1', { headers: a });
+    assert(bySev.data.pitfalls[0].slug === 'page-crit', 'sort=severity did not rank the critical first');
+
+    // The community count is there whether or not B's entry is included; B's private data never is.
+    assert(p1.data.community === 1, `community expected 1, got ${p1.data.community}`);
+    assert(!dflt.data.pitfalls.some((p: any) => p.slug === 'page-b-shared'), 'B entry included without include_shared');
+    const { body: withB } = await json('/v1/appdev/pitfalls/learned?include_shared=1&status=all', { headers: a });
+    const bRow = withB.data.pitfalls.find((p: any) => p.slug === 'page-b-shared');
+    assert(bRow && bRow.source === 'shared' && withB.data.facets.source.shared === 1, 'shared entry missing from include_shared page');
+    assert(withB.data.total === 6, `include_shared total expected 6, got ${withB.data.total}`);
+
+    // Clean up every seeded entry, both owners.
+    for (const slug of ['page-a1', 'page-a2', 'page-a3', 'page-crit', 'page-old']) {
+        const { status } = await json(`/v1/appdev/pitfalls/learned/data/${slug}`, { method: 'DELETE', headers: a });
+        assert(status === 200, `cleanup ${slug}: ${status}`);
+    }
+    const { status: bDel } = await json('/v1/appdev/pitfalls/learned/data/page-b-shared', { method: 'DELETE', headers: { Authorization: `Bearer ${tokenB}` } });
+    assert(bDel === 200, `cleanup B: ${bDel}`);
+    const { body: after } = await json('/v1/appdev/pitfalls/learned?status=all&include_shared=1', { headers: a });
+    assert(!after.data.pitfalls.some((p: any) => String(p.slug).startsWith('page-')), 'seeded entries survived cleanup');
 });
 
 await test('templates REST: seed manifest → list/get with source app → cross-owner 404 → DELETE', async () => {

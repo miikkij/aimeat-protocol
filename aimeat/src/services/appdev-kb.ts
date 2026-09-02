@@ -8,10 +8,16 @@
  *   so the MCP tools (mcp/appdev-pitfalls.ts) and the profile-UI REST routes
  *   (routes/appdev-pitfalls.ts) can never drift. Owner scope = the owner GHII + every
  *   same-owner agent GAII, deduped by key GHII-first.
- * @structure listOwnerScopeMemory · findOwnEntry · listLearnedPitfalls · setPitfallFlags ·
- *   deletePitfallEntry · upsertPitfallManifest · pitfallEntryKey · PITFALL_* constants
+ * @structure listOwnerScopeMemory · findOwnEntry · listLearnedPitfalls · queryLearnedPitfalls ·
+ *   filterPitfalls · pitfallFacets · setPitfallFlags · deletePitfallEntry · upsertPitfallManifest ·
+ *   pitfallEntryKey · PITFALL_* constants
  * @usage import { listLearnedPitfalls, setPitfallFlags } from './appdev-kb.js';
  * @version-history
+ *   v1.2.0 -- 2026-09-03 -- filterPitfalls() and pitfallFacets(): the filter, sort, facet and page
+ *     step the MCP list tool had inline, now shared with the REST route through
+ *     queryLearnedPitfalls() (AppDev page, poster face). The page used to fetch every entry with
+ *     its full body and filter in the browser; +q text search, +severity and shared filters,
+ *     +status default, +the count of what other owners have shared.
  *   v1.1.0 -- 2026-08-11 -- deletePitfallEntry() is now the only delete: the MCP tool had its own
  *     copy (storage.deleteMemory + manifest cleanup) and emitted the live update, while this one,
  *     which the REST door calls, did not. Deleting an entry in the browser left it on every other
@@ -178,6 +184,19 @@ function toEntry(rec: MemoryRecord, source: 'own' | 'shared'): LearnedPitfallEnt
     };
 }
 
+/** Other owners' public-shared entries, as full entries (source 'shared', owner set). */
+async function listSharedByOthers(
+    storage: Storage, config: AimeatConfig, callerGaii: string,
+): Promise<LearnedPitfallEntry[]> {
+    const ownIds = await ownIdentitySet(storage, config, callerGaii);
+    const { items } = await storage.listAllMemory({ prefix: PITFALL_PREFIX, visibility: 'public', limit: 500 });
+    return items
+        .filter(rec => rec.key !== PITFALL_MANIFEST_KEY)
+        .filter(rec => !ownIds.has(rec.ownerGaii))
+        .filter(rec => (rec.tags ?? []).includes('pitfall'))
+        .map(rec => toEntry(rec, 'shared'));
+}
+
 /**
  * Full-body learned-pitfall listing for the UI: the caller's own entries (any visibility)
  * and, with includeShared, other owners' public entries. Curated registry entries are NOT
@@ -191,14 +210,135 @@ export async function listLearnedPitfalls(
         .filter(r => r.key !== PITFALL_MANIFEST_KEY)
         .map(r => toEntry(r, 'own'));
     if (!opts.includeShared) return own;
-    const ownIds = await ownIdentitySet(storage, config, callerGaii);
-    const { items } = await storage.listAllMemory({ prefix: PITFALL_PREFIX, visibility: 'public', limit: 500 });
-    const shared = items
-        .filter(rec => rec.key !== PITFALL_MANIFEST_KEY)
-        .filter(rec => !ownIds.has(rec.ownerGaii))
-        .filter(rec => (rec.tags ?? []).includes('pitfall'))
-        .map(rec => toEntry(rec, 'shared'));
-    return [...own, ...shared];
+    return [...own, ...await listSharedByOthers(storage, config, callerGaii)];
+}
+
+/* ── One filter, sort, facet and page step for both doors ─────────────────────────────────────
+ * The MCP list tool had pagination and facets and the REST route the profile page reads did not,
+ * so the page fetched every entry with its full body (112 rows, about 150 kB on the production
+ * node, growing with every build) and filtered in the browser. The step below is what both call
+ * now; the tool still merges the curated registry in before it, which is why it takes anything
+ * that carries the index fields rather than a LearnedPitfallEntry. */
+
+export const SEVERITY_RANK: Record<string, number> = { critical: 0, warn: 1, info: 2 };
+const LIST_MAX_LIMIT = 100;
+
+/** The fields the step reads. Curated entries carry category null and an id; learned ones a key. */
+export interface PitfallLike {
+    id?: string;
+    key?: string;
+    title?: string;
+    symptom?: string;
+    resolution?: string;
+    fix?: string;
+    category?: string | null;
+    slug?: string | null;
+    model?: string | null;
+    applies_to?: string[];
+    severity?: string;
+    status?: string;
+    updated?: string;
+    shared?: boolean;
+    source?: string;
+    app_ref?: string;
+}
+
+export interface PitfallListQuery {
+    /** Default 'active': outdated entries are kept but hidden. */
+    status?: 'active' | 'outdated' | 'all';
+    severity?: string;
+    category?: string;
+    /** A curated entry carries no model and passes any model filter. */
+    model?: string;
+    applies_to?: string;
+    /** Own entries only: true = shared platform-wide, false = private. */
+    shared?: boolean;
+    /** Case-insensitive text over title, symptom, resolution, app and model. */
+    q?: string;
+    /** Default 'updated' (newest first); 'severity' ranks critical first, newest first within a class. */
+    sort?: 'updated' | 'severity';
+    limit?: number;
+    offset?: number;
+}
+
+export interface PitfallFacets {
+    severity: Record<string, number>;
+    category: Record<string, number>;
+    model: Record<string, number>;
+    status: Record<string, number>;
+    shared: Record<string, number>;
+    source: Record<string, number>;
+    /** Learned entries by the app they point at; '(none)' for the ones that name no app. */
+    app: Record<string, number>;
+}
+
+export function pitfallFacets(entries: PitfallLike[]): PitfallFacets {
+    const f: PitfallFacets = { severity: {}, category: {}, model: {}, status: {}, shared: {}, source: {}, app: {} };
+    const bump = (m: Record<string, number>, k: string) => { m[k] = (m[k] ?? 0) + 1; };
+    for (const e of entries) {
+        bump(f.severity, e.severity ?? 'warn');
+        bump(f.category, e.category ?? '(curated)');
+        if (e.model) bump(f.model, e.model);
+        bump(f.status, e.status ?? 'active');
+        if (e.source !== 'curated') {
+            bump(f.shared, e.shared ? 'shared' : 'private');
+            bump(f.app, e.app_ref || '(none)');
+        }
+        bump(f.source, e.source ?? 'own');
+    }
+    return f;
+}
+
+export function filterPitfalls<T extends PitfallLike>(entries: T[], query: PitfallListQuery): {
+    pitfalls: T[]; total: number; offset: number; limit: number; facets: PitfallFacets; filtered_facets: PitfallFacets;
+} {
+    const wantStatus = query.status ?? 'active';
+    const model = query.model?.trim().toLowerCase();
+    const category = query.category ? slugifyKb(query.category) : undefined;
+    const area = query.applies_to?.trim().toLowerCase();
+    const q = query.q?.trim().toLowerCase();
+    let out = entries;
+    if (wantStatus !== 'all') out = out.filter(e => (e.status ?? 'active') === wantStatus);
+    if (query.severity) out = out.filter(e => (e.severity ?? 'warn') === query.severity);
+    if (category) out = out.filter(e => e.category === category || e.id === query.category);
+    if (model) out = out.filter(e => e.model == null || e.model === model);
+    if (area) out = out.filter(e => (e.applies_to ?? []).includes(area));
+    if (query.shared !== undefined) out = out.filter(e => e.source === 'curated' || !!e.shared === query.shared);
+    if (q) {
+        out = out.filter(e => [e.title, e.symptom, e.resolution, e.fix, e.app_ref, e.model, e.category, e.slug, e.id]
+            .some(v => typeof v === 'string' && v.toLowerCase().includes(q)));
+    }
+    const byUpdated = (a: PitfallLike, b: PitfallLike) => String(b.updated ?? '').localeCompare(String(a.updated ?? ''));
+    out = [...out].sort(query.sort === 'severity'
+        ? (a, b) => ((SEVERITY_RANK[a.severity ?? 'warn'] ?? 1) - (SEVERITY_RANK[b.severity ?? 'warn'] ?? 1)) || byUpdated(a, b)
+        : byUpdated);
+    const limit = Number.isFinite(query.limit) ? Math.min(Math.max(query.limit as number, 1), LIST_MAX_LIMIT) : 25;
+    const offset = Number.isFinite(query.offset) && (query.offset as number) > 0 ? (query.offset as number) : 0;
+    return {
+        pitfalls: out.slice(offset, offset + limit),
+        total: out.length,
+        offset,
+        limit,
+        facets: pitfallFacets(entries),
+        filtered_facets: pitfallFacets(out),
+    };
+}
+
+/**
+ * The learned list the profile page reads: one page of full entries with the counts around it.
+ * `facets` count the whole scope (own, plus other owners' shared with includeShared) so filter
+ * chips keep their numbers while a filter is on; `filtered_facets` count what the filter left;
+ * `community` is how many entries other owners have shared, whether or not they are included, so
+ * the page can say the number is zero instead of offering a toggle that shows nothing.
+ */
+export async function queryLearnedPitfalls(
+    storage: Storage, config: AimeatConfig, callerGaii: string,
+    query: PitfallListQuery & { includeShared?: boolean },
+) {
+    const own = await listLearnedPitfalls(storage, config, callerGaii);
+    const shared = await listSharedByOthers(storage, config, callerGaii);
+    const scope = query.includeShared ? [...own, ...shared] : own;
+    return { ...filterPitfalls(scope, query), community: shared.length };
 }
 
 /** Toggle the share (visibility) and/or status flags on one of the caller's own entries. */

@@ -10,6 +10,10 @@
  * @structure appdevPitfallsRouter(config, storage) → Router
  * @usage app.use(appdevPitfallsRouter(config, storage)) from the routes loader.
  * @version-history
+ *   v1.2.0 — 2026-09-03 — GET /learned pages, filters (status, severity, category, model, area,
+ *     shared, q text search), sorts and returns facets + the community count, through the same
+ *     step the MCP list tool uses (AppDev page, poster face). It served every entry with its full
+ *     body before, 112 rows and about 150 kB on the production node.
  *   v1.1.0 — 2026-07-19 — learned-entry management for the profile UI: GET /learned (full
  *     bodies, own + optional shared), PATCH /learned/:category/:slug (share/status flags),
  *     DELETE /learned/:category/:slug — registered before /:id (route-ordering).
@@ -25,7 +29,7 @@ import {
   getAppdevPitfalls, getAppdevPitfallFacets,
 } from '../data/appdev-pitfalls.js';
 import {
-  listLearnedPitfalls, setPitfallFlags, deletePitfallEntry,
+  queryLearnedPitfalls, setPitfallFlags, deletePitfallEntry,
 } from '../services/appdev-kb.js';
 
 const MAX_LIMIT = 100;
@@ -37,13 +41,33 @@ export function appdevPitfallsRouter(config: AimeatConfig, storage: Storage): Ro
   // ── LEARNED entries (the profile UI's management surface) — MUST be registered before
   // the parameterized /v1/appdev/pitfalls/:id route or "learned" would match as an id. ──
 
-  // GET /v1/appdev/pitfalls/learned[?include_shared=1] — the caller's own learned entries
-  // (full bodies, any visibility) + optionally other owners' public-shared entries.
+  // GET /v1/appdev/pitfalls/learned[?include_shared=1&status=&severity=&category=&model=
+  //   &applies_to=&shared=&q=&sort=&limit=&offset=] — one page of the caller's own learned
+  // entries (full bodies, any visibility) + optionally other owners' public-shared entries, with
+  // the facet counts around it. The step is the one the MCP list tool uses (appdev-kb.ts).
   router.get('/v1/appdev/pitfalls/learned', requireAuth(), async (req, res) => {
     const identity = resolveIdentity(req.auth!, config.nodeId);
-    const includeShared = req.query.include_shared === '1' || req.query.include_shared === 'true';
-    const entries = await listLearnedPitfalls(storage, config, identity, { includeShared });
-    res.json(success(config.nodeId, { pitfalls: entries, total: entries.length }));
+    const str = (v: unknown, max = 200) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : undefined);
+    const bool = (v: unknown) => (v === '1' || v === 'true' ? true : v === '0' || v === 'false' ? false : undefined);
+    const num = (v: unknown) => { const n = Number.parseInt(String(v ?? ''), 10); return Number.isFinite(n) ? n : undefined; };
+    const status = str(req.query.status);
+    const sort = str(req.query.sort);
+    const page = await queryLearnedPitfalls(storage, config, identity, {
+      includeShared: bool(req.query.include_shared) === true,
+      // This door defaults to every status: it served the whole scope before it could page, and
+      // the page asks for status=active itself when it wants outdated hidden.
+      status: status === 'active' || status === 'outdated' ? status : 'all',
+      severity: str(req.query.severity),
+      category: str(req.query.category),
+      model: str(req.query.model),
+      applies_to: str(req.query.applies_to),
+      shared: bool(req.query.shared),
+      q: str(req.query.q),
+      sort: sort === 'severity' ? 'severity' : 'updated',
+      limit: num(req.query.limit),
+      offset: num(req.query.offset),
+    });
+    res.json(success(config.nodeId, page));
   });
 
   // PATCH /v1/appdev/pitfalls/learned/:category/:slug — toggle share (visibility) / status.

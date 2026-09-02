@@ -2,321 +2,257 @@
  * @file appdev-tab.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Profile → AppDev — the human-facing window into the AppDev knowledge base:
- *   (1) copyable start prompts (the research-first flow prompt for Claude Code/OpenHands +
- *   the canonical build-app prompt), (2) learned pitfalls with share/outdated/delete
- *   management and model/app attribution, (3) agent-proposed template proposals with
- *   derived-from links and proofs, (4) the curated node registry (read-only). Everything an
- *   owner needs to follow what agents learned and to start the next build right.
- * @structure AppDevTab (default export) — sections: StartPrompts · LearnedPitfalls ·
- *   TemplateProposals · CuratedPitfalls
- * @usage registered in views/profile.js TABS + landing-page.cards.js SIDEBAR_GROUPS (id 'appdev').
+ * @description Profile › AppDev: what the person's coding agents learned while building apps, and
+ *   the right start for the next build. The two prompts (flow, build), the pitfalls the agents
+ *   filed with filters, search and paging from the server, the template proposals, the platform's
+ *   own registry with counts first and rows on demand, and how it all accrues. Holds the state,
+ *   the loads and the handlers; renders the poster face (appdev/page.js, appdev/rows.js). Live:
+ *   re-reads the filed pitfalls and the proposals on a memory update.
+ * @structure AppDevTab — state, loads, handlers, the ctx bag, render
+ * @usage registered in views/profile.js TABS as id 'appdev'.
  * @version-history
+ *   v2.0.0 — 2026-09-03 — The poster face (design canvas "AppDev: tieto ja kiihdytys", direction A).
+ *     On the production node the page was 117 cards in one column, 13 429 px, two checkboxes as
+ *     the only filter, and the 88 kB build prompt fetched on every open. The filed pitfalls now
+ *     come twenty at a time from the server, filtered by severity, area, model, visibility and
+ *     text; the build prompt is fetched when it is copied and downloaded as a file; the registry
+ *     shows its counts before its rows; the page says how it accrues and who reads it.
+ *   v1.1.0 — 2026-08-08 — Copy labels from the shared common.* keys.
  *   v1.0.0 — 2026-07-19 — initial (AppDev KB UI phase).
- *   v1.1.0 — 2026-08-08 — Copy labels now resolve from the shared common.copy / common.copied / common.copyPrompt /
- *       common.copyLink / common.copyUrl keys; the per-view copy label keys this file used were
- *       removed from both locales. Same words on screen.
  */
-import { h } from 'preact';
-import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
-import htm from 'htm';
-const html = htm.bind(h);
-import { t } from '/js/i18n.js';
-import { Spinner, KebabMenu } from './shared.js';
-import { CopyButton } from '/components/CopyButton.js';
-import { CardMenu } from '/components/CardMenu.js';
+import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
+import { t, getLocale } from '/js/i18n.js';
+import { useConfirm } from '/components/Modal.js';
+import { apiGet } from '/js/api.js';
 import { listOpenItems, addOpenItem, switchOff } from '/js/services/open-items.js';
 import { swallowed } from '/js/swallowed.js';
+import { onLiveUpdate } from '/lib/live-updates.js';
 import {
-  getFlowPromptText, getBuildPromptText, getCuratedPitfalls, getLearnedPitfalls,
+  getFlowPromptText, getBuildPromptText, getCuratedPitfalls, queryLearnedPitfalls,
   updateLearnedPitfall, deleteLearnedPitfall, getTemplateProposals, deleteTemplateProposal,
 } from '/js/services/appdev.js';
+import { a, goTab } from './appdev/frame.js';
+import { renderPage } from './appdev/page.js';
 
-const SEV_CLASS = { critical: 'pf-adk-sev--critical', warn: 'pf-adk-sev--warn', info: 'pf-adk-sev--info' };
+const PAGE = 20;
+const FILTERS0 = { severity: '', category: '', model: '', status: 'active', shared: undefined, includeShared: false };
 
-function sevBadge(severity) {
-  return html`<span class="pf-adk-sev ${SEV_CLASS[severity] || SEV_CLASS.info}">${t('profile.appdev.severity.' + (severity || 'info'))}</span>`;
-}
-
-function chip(text, cls = '') {
-  if (!text) return null;
-  return html`<span class="pf-adk-chip ${cls}">${text}</span>`;
-}
-
-// ── Section 1: copyable start prompts ──────────────────────────────────────
-function StartPrompts({ locale, showToast }) {
-  const [flow, setFlow] = useState(null);
-  const [build, setBuild] = useState(null);
-  const [open, setOpen] = useState(null); // 'flow' | 'build' | null
-
-  useEffect(() => {
-    getFlowPromptText().then(setFlow).catch(() => setFlow(''));
-    getBuildPromptText(locale).then(setBuild).catch(() => setBuild(''));
-  }, [locale]);
-
-  const box = (id, title, desc, text) => html`
-    <div class="card pf-adk-prompt-card">
-      <div class="pf-adk-prompt-head">
-        <div>
-          <div class="pf-adk-prompt-title">${title}</div>
-          <div class="section-desc">${desc}</div>
-        </div>
-        <div class="pf-adk-prompt-actions">
-          <button class="btn-ghost" onClick=${() => setOpen(open === id ? null : id)}>
-            ${open === id ? t('profile.appdev.hidePrompt') : t('profile.appdev.showPrompt')}
-          </button>
-          ${text != null && html`<${CopyButton} text=${text} className="btn-primary" label=${t('common.copyPrompt')} onCopied=${() => showToast(t('profile.appdev.copied'))} />`}
-        </div>
-        ${/* The dots, in the same corner they are in on every other card. Building an app is the
-             clearest case of something you decide to do now and get to later, and P12 names this
-             surface. */''}
-        <${PromptCardMenu} id=${id} title=${title} />
-      </div>
-      ${open === id && html`<pre class="pf-adk-prompt-body">${text ?? t('profile.loading')}</pre>`}
-    </div>`;
-
-  return html`
-    <div class="section-title">${t('profile.appdev.promptsTitle')}</div>
-    <div class="section-desc">${t('profile.appdev.promptsDesc')}</div>
-    ${box('flow', t('profile.appdev.flowPromptTitle'), t('profile.appdev.flowPromptDesc'), flow)}
-    ${box('build', t('profile.appdev.buildPromptTitle'), t('profile.appdev.buildPromptDesc'), build)}
-  `;
-}
-
-
-/**
- * The corner menu for one prompt card: what state this piece of work is in, and the one thing you
- * can do about it from here.
- */
-function PromptCardMenu({ id, title }) {
-  const [item, setItem] = useState(null);
-  const origin = `appdev.${id}`;
-
-  const find = useCallback(async () => {
-    try {
-      const list = await listOpenItems();
-      setItem(list.find(i => i.origin === origin) ?? null);
-    // eslint-disable-next-line aimeat/no-silent-catch -- the card and its prompt work without the light
-    } catch { /* no light, still a working card */ }
-  }, [origin]);
-
-  useEffect(() => { find(); }, [find]);
-  useEffect(() => {
-    const handler = () => find();
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
-  }, [find]);
-
-  const state = item?.status === 'working' ? 'working' : item ? 'open' : 'off';
-  return html`<${CardMenu} state=${state} label=${title} actions=${[{
-    label: item ? (t('openItems.toggleOff') || 'Take it off your open items')
-                : (t('openItems.toggleOn') || 'Put it on your open items'),
-    run: async () => {
-      if (item) { await switchOff(item.id); setItem(null); }
-      else { setItem(await addOpenItem({ title, kind: 'app', prompt_ref: id === 'build' ? 'build-app' : null, origin })); }
-    },
-  }]} />`;
-}
-
-// ── Section 2: learned pitfalls ────────────────────────────────────────────
-function LearnedPitfalls({ showToast }) {
-  const [data, setData] = useState(null);
-  const [includeShared, setIncludeShared] = useState(false);
-  const [showOutdated, setShowOutdated] = useState(false);
+export default function AppDevTab({ showToast }) {
+  const { confirm, ConfirmUI } = useConfirm();
+  const [flow, setFlow] = useState('');
+  const [build, setBuild] = useState('');           // fetched when copied, not on open (88 kB)
+  const [buildLength, setBuildLength] = useState(0);
+  const [shown, setShown] = useState(null);         // 'flow' while the flow prompt is open inline
+  const [openItems, setOpenItems] = useState({});   // { flow: item, build: item }
+  const [learned, setLearned] = useState(null);     // the current page + facets, null while loading
+  const [critical, setCritical] = useState(null);   // facets of the critical entries, for the strip
+  const [filters, setFiltersState] = useState(FILTERS0);
+  const [q, setQState] = useState('');
+  const [allAreas, setAllAreas] = useState(false);
+  const [proposals, setProposals] = useState(null);
+  const [curatedSummary, setCuratedSummary] = useState(null);
+  const [curated, setCurated] = useState(null);
+  const [curatedFilter, setCuratedFilterState] = useState({ severity: '', area: '' });
+  const [overview, setOverview] = useState({ templates: 0, packs: 0, packsProven: 0 });
   const [expanded, setExpanded] = useState(null);
+  const [busy, setBusy] = useState(null);
 
-  async function load(shared = includeShared) {
-    try { setData(await getLearnedPitfalls(shared)); } catch (err) { swallowed('appdev-tab', err); setData({ pitfalls: [], total: 0 }); }
-  }
-  const liveRef = useRef(load); liveRef.current = load;
-  useEffect(() => { liveRef.current(includeShared); }, [includeShared]);
-  useEffect(() => {
-    const handler = () => liveRef.current();
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
+  const fail = (e, fallback) => showToast?.(e?.error?.message || e?.response?.error?.message || e?.message || fallback || t('profile.error'), true);
+
+  /* ── loads ── */
+
+  // The filters and the search live in refs as well as state so a live update or "show more"
+  // re-reads exactly what is on screen without re-creating the load on every keystroke.
+  const filtersRef = useRef(filters); filtersRef.current = filters;
+  const qRef = useRef(q); qRef.current = q;
+
+  const loadLearned = useCallback(async (offset = 0, append = false) => {
+    try {
+      const { includeShared, ...F } = filtersRef.current;
+      const res = await queryLearnedPitfalls({ ...F, include_shared: includeShared || undefined, q: qRef.current, limit: PAGE, offset });
+      setLearned((prev) => (append && prev ? { ...res, pitfalls: [...prev.pitfalls, ...res.pitfalls] } : res));
+    } catch (err) { swallowed('appdev-tab: learned', err); setLearned((prev) => prev || { pitfalls: [], total: 0, limit: PAGE, offset: 0, facets: {}, filtered_facets: {}, community: 0 }); }
   }, []);
+
+  const loadCritical = useCallback(async () => {
+    try {
+      const res = await queryLearnedPitfalls({ severity: 'critical', status: 'active', limit: 1 });
+      setCritical(res.filtered_facets || {});
+    } catch (err) { swallowed('appdev-tab: critical', err); }
+  }, []);
+
+  const loadProposals = useCallback(async () => {
+    try { setProposals((await getTemplateProposals()).templates || []); }
+    catch (err) { swallowed('appdev-tab: proposals', err); setProposals([]); }
+  }, []);
+
+  useEffect(() => {
+    loadLearned();
+    loadCritical();
+    loadProposals();
+    // The flow prompt is small and the slab copies it at the click, so it is read once on open.
+    getFlowPromptText().then(setFlow).catch((err) => swallowed('appdev-tab: flow', err));
+    getCuratedPitfalls({ limit: 1 }).then(setCuratedSummary).catch((err) => swallowed('appdev-tab: curated', err));
+    apiGet('/v1/appdev/overview?sections=library_packs,app_templates')
+      .then((res) => {
+        const d = res?.data || {};
+        const packs = d.library_packs?.items || [];
+        setOverview({ templates: d.app_templates?.total || 0, packs: d.library_packs?.total || 0, packsProven: packs.filter((p) => (p.proven_models || []).length).length });
+      })
+      .catch((err) => swallowed('appdev-tab: overview', err));
+    listOpenItems()
+      .then((list) => setOpenItems({ flow: list.find((i) => i.origin === 'appdev.flow') || null, build: list.find((i) => i.origin === 'appdev.build') || null }))
+      .catch((err) => swallowed('appdev-tab: open items', err));
+  }, [loadLearned, loadCritical, loadProposals]);
+
+  const liveRef = useRef(null);
+  liveRef.current = () => { loadLearned(); loadCritical(); loadProposals(); };
+  useEffect(() => onLiveUpdate(['memory'], () => liveRef.current()), []);
+
+  /* ── filters, search, paging ── */
+
+  function setFilters(patch) {
+    const next = { ...filtersRef.current, ...patch };
+    filtersRef.current = next;
+    setFiltersState(next);
+    setExpanded(null);
+    loadLearned();
+  }
+
+  const searchTimer = useRef(null);
+  function setQ(value) {
+    setQState(value);
+    qRef.current = value;
+    clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => loadLearned(), 300);
+  }
+
+  async function loadMore() {
+    if (!learned) return;
+    setBusy('more');
+    try { await loadLearned(learned.pitfalls.length, true); }
+    finally { setBusy(null); }
+  }
+
+  const toggleRow = (key) => setExpanded(expanded === key ? null : key);
+
+  /* ── the filed pitfalls ── */
 
   async function toggleShare(p) {
+    setBusy(p.key);
     try {
       await updateLearnedPitfall(p.category, p.slug, { share: !p.shared });
-      showToast(!p.shared ? t('profile.appdev.sharedOn') : t('profile.appdev.sharedOff'));
-      load();
-    } catch (e) { showToast(e.message, true); }
+      showToast?.(!p.shared ? a('sharedToast') : a('privateToast'));
+      await loadLearned();
+    } catch (e) { fail(e); }
+    finally { setBusy(null); }
   }
+
   async function toggleOutdated(p) {
+    setBusy(p.key);
     try {
       await updateLearnedPitfall(p.category, p.slug, { status: p.status === 'outdated' ? 'active' : 'outdated' });
-      load();
-    } catch (e) { showToast(e.message, true); }
+      showToast?.(p.status === 'outdated' ? a('activeToast') : a('outdatedToast'));
+      await Promise.all([loadLearned(), loadCritical()]);
+    } catch (e) { fail(e); }
+    finally { setBusy(null); }
   }
-  async function remove(p) {
+
+  function removeLearned(p) {
+    confirm(a('removeConfirm', { title: p.title }), async () => {
+      setBusy(p.key);
+      try {
+        await deleteLearnedPitfall(p.category, p.slug);
+        showToast?.(a('removedToast'));
+        if (expanded === p.key + (p.owner || '')) setExpanded(null);
+        await Promise.all([loadLearned(), loadCritical()]);
+      } catch (e) { fail(e); }
+      finally { setBusy(null); }
+    }, { danger: true });
+  }
+
+  /* ── the proposals ── */
+
+  function removeProposal(p) {
+    confirm(a('removeProposalConfirm', { title: p.title }), async () => {
+      setBusy('tpl:' + p.id);
+      try {
+        await deleteTemplateProposal(p.id);
+        showToast?.(a('removedToast'));
+        if (expanded === 'tpl:' + p.id) setExpanded(null);
+        await loadProposals();
+      } catch (e) { fail(e); }
+      finally { setBusy(null); }
+    }, { danger: true });
+  }
+
+  /* ── the registry ── */
+
+  async function loadCurated() {
+    setBusy('curated');
+    try { setCurated(await getCuratedPitfalls({ limit: 100 })); }
+    catch (e) { fail(e); }
+    finally { setBusy(null); }
+  }
+
+  function setCuratedFilter(patch) {
+    setCuratedFilterState({ ...curatedFilter, ...patch });
+    if (!curated) loadCurated();
+  }
+
+  /* ── the prompts ── */
+
+  const buildPromise = useRef(null);
+  function prefetchBuild() {
+    if (build || buildPromise.current) return buildPromise.current;
+    buildPromise.current = getBuildPromptText(getLocale())
+      .then((text) => { setBuild(text); setBuildLength(text.length); return text; })
+      .catch((err) => { buildPromise.current = null; swallowed('appdev-tab: build prompt', err); return ''; });
+    return buildPromise.current;
+  }
+
+  async function copyBuild() {
+    setBusy('build');
     try {
-      await deleteLearnedPitfall(p.category, p.slug);
-      showToast(t('profile.appdev.deleted'));
-      load();
-    } catch (e) { showToast(e.message, true); }
+      // Usually already here from the hover; otherwise the fetch runs inside the click's activation.
+      const text = build || await prefetchBuild();
+      if (!text) throw new Error(a('buildUnavailable'));
+      await navigator.clipboard.writeText(text);
+      showToast?.(a('buildCopiedToast'));
+    } catch (e) { fail(e, a('buildUnavailable')); }
+    finally { setBusy(null); }
   }
 
-  if (!data) return html`<${Spinner} text=${t('profile.loading')} />`;
-  let rows = data.pitfalls;
-  if (!showOutdated) rows = rows.filter(p => p.status !== 'outdated');
-
-  return html`
-    <div class="section-title">${t('profile.appdev.learnedTitle')}</div>
-    <div class="section-desc">${t('profile.appdev.learnedDesc')}</div>
-    <div class="pf-adk-filters">
-      <label class="pf-adk-filter"><input type="checkbox" checked=${includeShared} onChange=${e => setIncludeShared(e.target.checked)} /> ${t('profile.appdev.showShared')}</label>
-      <label class="pf-adk-filter"><input type="checkbox" checked=${showOutdated} onChange=${e => setShowOutdated(e.target.checked)} /> ${t('profile.appdev.showOutdated')}</label>
-    </div>
-    ${rows.length === 0 && html`<div class="card pf-adk-empty">${t('profile.appdev.learnedEmpty')}</div>`}
-    ${rows.map(p => html`
-      <div class="card pf-adk-row ${p.status === 'outdated' ? 'pf-adk-row--outdated' : ''}" key=${p.key + (p.owner || '')}>
-        <div class="pf-adk-row-head" onClick=${() => setExpanded(expanded === p.key ? null : p.key)}>
-          <div class="pf-adk-row-title">
-            ${sevBadge(p.severity)}
-            <span>${p.title}</span>
-          </div>
-          <div class="pf-adk-row-chips">
-            ${chip(p.category, 'pf-adk-chip--cat')}
-            ${chip(p.model, 'pf-adk-chip--model')}
-            ${p.source === 'shared' && chip(t('profile.appdev.fromCommunity'), 'pf-adk-chip--shared')}
-            ${p.source === 'own' && p.shared && chip(t('profile.appdev.sharedBadge'), 'pf-adk-chip--shared')}
-            ${p.status === 'outdated' && chip(t('profile.appdev.outdatedBadge'), 'pf-adk-chip--outdated')}
-          </div>
-          ${p.source === 'own' && html`
-            <${KebabMenu} label=${t('profile.appdev.actions')} items=${[
-              { label: p.shared ? t('profile.appdev.unshare') : t('profile.appdev.share'), onClick: () => toggleShare(p) },
-              { label: p.status === 'outdated' ? t('profile.appdev.markActive') : t('profile.appdev.markOutdated'), onClick: () => toggleOutdated(p) },
-              { divider: true },
-              { label: t('profile.appdev.delete'), danger: true, onClick: () => remove(p) },
-            ]} />`}
-        </div>
-        ${expanded === p.key && html`
-          <div class="pf-adk-row-body">
-            <div><strong>${t('profile.appdev.symptom')}:</strong> ${p.symptom}</div>
-            <div><strong>${t('profile.appdev.resolution')}:</strong> ${p.resolution}</div>
-            ${p.app_ref && html`<div><strong>${t('profile.appdev.relatedApp')}:</strong> <code>${p.app_ref}</code></div>`}
-            ${p.owner && html`<div><strong>${t('profile.appdev.sharedBy')}:</strong> <code>${p.owner}</code></div>`}
-          </div>`}
-      </div>`)}
-  `;
-}
-
-// ── Section 3: template proposals ──────────────────────────────────────────
-function TemplateProposals({ showToast }) {
-  const [data, setData] = useState(null);
-  const [expanded, setExpanded] = useState(null);
-
-  async function load() {
-    try { setData(await getTemplateProposals()); } catch (err) { swallowed('appdev-tab', err); setData({ templates: [], total: 0 }); }
-  }
-  useEffect(() => { load(); }, []);
-  const liveRef = useRef(load); liveRef.current = load;
-  useEffect(() => {
-    const handler = () => liveRef.current();
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
-  }, []);
-
-  async function remove(tpl) {
+  async function toggleOpenItem(id) {
+    setBusy('item:' + id);
     try {
-      await deleteTemplateProposal(tpl.id);
-      showToast(t('profile.appdev.deleted'));
-      load();
-    } catch (e) { showToast(e.message, true); }
+      const current = openItems[id];
+      if (current) {
+        await switchOff(current.id);
+        setOpenItems({ ...openItems, [id]: null });
+        showToast?.(a('offWorklistToast'));
+      } else {
+        const title = a(id === 'flow' ? 'flowTitle' : 'buildTitle');
+        const item = await addOpenItem({ title, kind: 'app', prompt_ref: id === 'build' ? 'build-app' : null, origin: 'appdev.' + id });
+        setOpenItems({ ...openItems, [id]: item });
+        showToast?.(a('toWorklistToast', { title }));
+      }
+    } catch (e) { fail(e); }
+    finally { setBusy(null); }
   }
 
-  if (!data) return html`<${Spinner} text=${t('profile.loading')} />`;
-
-  return html`
-    <div class="section-title">${t('profile.appdev.templatesTitle')}</div>
-    <div class="section-desc">${t('profile.appdev.templatesDesc')}</div>
-    ${data.templates.length === 0 && html`<div class="card pf-adk-empty">${t('profile.appdev.templatesEmpty')}</div>`}
-    ${data.templates.map(tpl => html`
-      <div class="card pf-adk-row" key=${tpl.id}>
-        <div class="pf-adk-row-head" onClick=${() => setExpanded(expanded === tpl.id ? null : tpl.id)}>
-          <div class="pf-adk-row-title">
-            ${chip(tpl.tier, 'pf-adk-chip--tier')}
-            <span>${tpl.title}</span>
-          </div>
-          <div class="pf-adk-row-chips">
-            ${chip(tpl.model, 'pf-adk-chip--model')}
-            ${chip(tpl.startMode, 'pf-adk-chip--cat')}
-            ${(tpl.proofs || []).length > 0 && chip(t('profile.appdev.proofsCount', { count: tpl.proofs.length }), 'pf-adk-chip--proof')}
-          </div>
-          <${KebabMenu} label=${t('profile.appdev.actions')} items=${[
-            { label: t('profile.appdev.openSourceApp'), onClick: () => window.open(`/v1/apps/${encodeURIComponent(tpl.derivedFrom.owner)}/${encodeURIComponent(tpl.derivedFrom.filename)}`, '_blank') },
-            { divider: true },
-            { label: t('profile.appdev.delete'), danger: true, onClick: () => remove(tpl) },
-          ]} />
-        </div>
-        ${expanded === tpl.id && html`
-          <div class="pf-adk-row-body">
-            <div>${tpl.description}</div>
-            <div><strong>${t('profile.appdev.derivedFrom')}:</strong> <code>${tpl.derivedFrom.owner}/${tpl.derivedFrom.filename}</code> v${tpl.derivedFrom.version}</div>
-            <div><strong>${t('profile.appdev.reuseNotes')}:</strong> ${tpl.reuseNotes}</div>
-            ${(tpl.packs || []).length > 0 && html`<div><strong>${t('profile.appdev.packs')}:</strong> ${tpl.packs.map(pk => chip(pk, 'pf-adk-chip--cat'))}</div>`}
-            ${(tpl.proofs || []).length > 0 && html`
-              <div><strong>${t('profile.appdev.proofs')}:</strong>
-                ${tpl.proofs.map(pr => chip(`${pr.model}: ${pr.verdict}`, pr.verdict === 'pass' ? 'pf-adk-chip--proof' : 'pf-adk-chip--outdated'))}
-              </div>`}
-          </div>`}
-      </div>`)}
-  `;
+  const ctx = {
+    flow, buildLength, shown, openItems, learned, critical, filters, q, allAreas, proposals,
+    curatedSummary, curated, curatedFilter, expanded, busy, ConfirmUI, showToast, goTab,
+    templates: overview.templates, packs: overview.packs, packsProven: overview.packsProven,
+    appsTaught: countApps(learned), noApp: learned ? countNoApp(learned) : 0,
+    setFilters, setQ, setAllAreas, loadMore, toggleRow, toggleShare, toggleOutdated, removeLearned,
+    removeProposal, loadCurated, setCuratedFilter, prefetchBuild, copyBuild, toggleOpenItem,
+    toggleShow: (id) => setShown(shown === id ? null : id),
+  };
+  return renderPage(ctx);
 }
 
-// ── Section 4: curated registry (read-only) ────────────────────────────────
-function CuratedPitfalls() {
-  const [data, setData] = useState(null);
-  const [filter, setFilter] = useState('');
-  const [expanded, setExpanded] = useState(null);
-  const [show, setShow] = useState(false);
-
-  const dataRef = useRef(data); dataRef.current = data;
-  useEffect(() => {
-    if (show && !dataRef.current) getCuratedPitfalls().then(setData).catch(() => setData({ pitfalls: [], facets: {} }));
-  }, [show]);
-
-  const areas = data?.facets?.applies_to ? Object.keys(data.facets.applies_to) : [];
-  let rows = data?.pitfalls ?? [];
-  if (filter) rows = rows.filter(p => (p.appliesTo || []).includes(filter));
-
-  return html`
-    <div class="section-title">${t('profile.appdev.curatedTitle')}</div>
-    <div class="section-desc">${t('profile.appdev.curatedDesc')}</div>
-    ${!show && html`<button class="btn-outline" onClick=${() => setShow(true)}>${t('profile.appdev.showCurated')}</button>`}
-    ${show && !data && html`<${Spinner} text=${t('profile.loading')} />`}
-    ${show && data && html`
-      <div class="pf-adk-filters">
-        <button class="btn-ghost ${filter === '' ? 'pf-adk-filter--active' : ''}" onClick=${() => setFilter('')}>${t('profile.appdev.allAreas')}</button>
-        ${areas.map(a => html`<button class="btn-ghost ${filter === a ? 'pf-adk-filter--active' : ''}" onClick=${() => setFilter(filter === a ? '' : a)}>${a} (${data.facets.applies_to[a]})</button>`)}
-      </div>
-      ${rows.map(p => html`
-        <div class="card pf-adk-row" key=${p.id}>
-          <div class="pf-adk-row-head" onClick=${() => setExpanded(expanded === p.id ? null : p.id)}>
-            <div class="pf-adk-row-title">${sevBadge(p.severity)}<span>${p.title}</span></div>
-            <div class="pf-adk-row-chips">${(p.appliesTo || []).map(a => chip(a, 'pf-adk-chip--cat'))}</div>
-          </div>
-          ${expanded === p.id && html`
-            <div class="pf-adk-row-body">
-              <div><strong>${t('profile.appdev.symptom')}:</strong> ${p.symptom}</div>
-              <div><strong>${t('profile.appdev.resolution')}:</strong> ${p.fix}</div>
-            </div>`}
-        </div>`)}
-    `}
-  `;
-}
-
-// ── The tab ────────────────────────────────────────────────────────────────
-export default function AppDevTab({ showToast, locale }) {
-  return html`
-    <div class="pf-adk">
-      <div class="section-title">${t('profile.appdev.title')}</div>
-      <div class="section-desc">${t('profile.appdev.desc')}</div>
-      <${StartPrompts} locale=${locale} showToast=${showToast} />
-      <${LearnedPitfalls} showToast=${showToast} />
-      <${TemplateProposals} showToast=${showToast} />
-      <${CuratedPitfalls} />
-    </div>
-  `;
-}
+/** How many distinct apps the filed entries point at, and how many point at none: from the scope facets. */
+function countApps(learned) { return learned?.facets?.app ? Object.keys(learned.facets.app).filter((k) => k !== '(none)').length : 0; }
+function countNoApp(learned) { return learned?.facets?.app?.['(none)'] || 0; }
