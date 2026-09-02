@@ -419,11 +419,16 @@ def test_serve_params_matches_the_gaii_row(monkeypatch) -> None:
     ]}
     monkeypatch.setattr(mcp_client, "ensure_serve", lambda **kw: doc)
 
-    # The full identity is accepted...
+    # The full identity is accepted, and the session carries it.
     p = mcp_client.serve_params(agent_name="concierge#isobob@n")
     assert "5555" in p["url"]
-    # ...and so is a bare name, unchanged.
-    assert "5555" in mcp_client.serve_params(agent_name="concierge")["url"]
+    assert p["headers"]["X-Aimeat-Agent"] == "concierge#isobob@n"
+
+    # A bare name two owners share is REFUSED. This test used to assert it was accepted, which
+    # encoded the ambiguity as acceptable — picking one is the silent-replace defect one layer up.
+    import pytest
+    with pytest.raises(mcp_client.AimeatServeError, match="more than one agent"):
+        mcp_client.serve_params(agent_name="concierge")
 
 
 def test_serve_params_unknown_agent_lists_identities_not_bare_names(monkeypatch) -> None:
@@ -438,6 +443,87 @@ def test_serve_params_unknown_agent_lists_identities_not_bare_names(monkeypatch)
         mcp_client.serve_params(agent_name="workflow-manager#isobob@n")
     # It must name what it DID compare against, or the message repeats the original mistake.
     assert "concierge#isoalice@n" in str(e.value)
+
+
+def test_session_carries_the_named_agents_gaii(monkeypatch) -> None:
+    """The session says who it is. It used to send nothing, and an anonymous session on a
+    two-owner daemon is refused — which the MCP adapter experienced as a 30-second timeout with
+    nothing reported, while the daemon's refusal named the fix and went unread."""
+    from aimeat_crewai import mcp_client
+
+    doc = {"port": 7001, "agents": [
+        {"agent": "concierge", "gaii": "concierge#isoalice@n"},
+        {"agent": "crew-forge", "gaii": "crew-forge#isoalice@n"},
+    ]}
+    monkeypatch.setattr(mcp_client, "ensure_serve", lambda **kw: doc)
+
+    p = mcp_client.serve_params(agent_name="crew-forge")
+    assert p["headers"]["X-Aimeat-Agent"] == "crew-forge#isoalice@n"   # the GAII, not the name
+    assert p["headers"]["Authorization"].startswith("Bearer ")          # placeholder, unchanged
+
+
+def test_a_bare_name_resolves_when_it_is_unambiguous(monkeypatch) -> None:
+    from aimeat_crewai import mcp_client
+
+    doc = {"port": 7002, "agents": [
+        {"agent": "concierge", "gaii": "concierge#isoalice@n"},
+        {"agent": "workflow-manager", "gaii": "workflow-manager#isobob@n"},
+    ]}
+    monkeypatch.setattr(mcp_client, "ensure_serve", lambda **kw: doc)
+
+    # Two owners on the daemon, but only one agent carries this NAME, so it is not ambiguous.
+    p = mcp_client.serve_params(agent_name="workflow-manager")
+    assert p["headers"]["X-Aimeat-Agent"] == "workflow-manager#isobob@n"
+
+
+def test_omitting_the_agent_with_one_loaded_works_as_today(monkeypatch) -> None:
+    from aimeat_crewai import mcp_client
+
+    doc = {"port": 7003, "agents": [{"agent": "loopbot", "gaii": "loopbot#alice@n"}]}
+    monkeypatch.setattr(mcp_client, "ensure_serve", lambda **kw: doc)
+
+    p = mcp_client.serve_params()
+    assert p["headers"]["X-Aimeat-Agent"] == "loopbot#alice@n"
+
+
+def test_omitting_the_agent_with_several_loaded_refuses_at_once(monkeypatch) -> None:
+    """An instant refusal that names the candidates beats a silent 30-second timeout."""
+    from aimeat_crewai import mcp_client
+    import pytest
+
+    doc = {"port": 7004, "agents": [
+        {"agent": "concierge", "gaii": "concierge#isoalice@n"},
+        {"agent": "concierge", "gaii": "concierge#isobob@n"},
+    ]}
+    monkeypatch.setattr(mcp_client, "ensure_serve", lambda **kw: doc)
+
+    with pytest.raises(mcp_client.AimeatServeError) as e:
+        mcp_client.serve_params()
+    msg = str(e.value)
+    assert "concierge#isoalice@n" in msg and "concierge#isobob@n" in msg
+    assert "agent_name" in msg          # and it says what to do about it
+
+
+def test_an_older_schema_1_daemon_still_gets_its_bare_name(monkeypatch) -> None:
+    """No `gaii` on the row means a connector that predates schema 2. The bare name is all it ever
+    had and all it can route by, so behaviour against one is unchanged."""
+    from aimeat_crewai import mcp_client
+
+    doc = {"port": 7005, "agents": [{"agent": "oldbot"}]}
+    monkeypatch.setattr(mcp_client, "ensure_serve", lambda **kw: doc)
+
+    assert mcp_client.serve_params()["headers"]["X-Aimeat-Agent"] == "oldbot"
+
+
+def test_stdio_and_http_params_are_untouched() -> None:
+    """They are for environments with no local connector; the loopback's identity is not their
+    problem, and neither should grow an X-Aimeat-Agent header."""
+    from aimeat_crewai.mcp_client import http_params, stdio_params
+
+    h = http_params(node_url="https://aimeat.io", agent_token="t")
+    assert set(h["headers"]) == {"Authorization"}
+    s = stdio_params(agent_name="bot")
+    assert "connect" in s.args and "serve" in s.args
 
 
 def test_daemon_default_tool_filter_exported_and_curated() -> None:
