@@ -42,6 +42,7 @@ import { initializeSchema } from './schema.js';
 
 import type { SqliteInternals } from './methods/internal.js';
 import { ownerMethods } from './methods/owner.js';
+import { agentMethods } from './methods/agents.js';
 import { cascadeMethods } from './methods/owner-cascade.js';
 import { ownerMemoryBulkMethods } from './methods/owner-memory-bulk.js';
 import { ownerMemoryScopeMethods } from './methods/owner-memory-scope.js';
@@ -190,6 +191,7 @@ export interface SqliteStorage extends Storage, SqliteInternals {}
 Object.assign(
   SqliteStorage.prototype,
   ownerMethods,
+  agentMethods,
   cascadeMethods,
   ownerMemoryBulkMethods,
   ownerMemoryScopeMethods,

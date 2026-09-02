@@ -60,7 +60,7 @@
  *     as the default selection in the pickers.
  */
 import type { AimeatConfig } from '../config.js';
-import { mcpConfigFile, mcpInstallLink, type McpInstallClientId } from './mcp-install.js';
+import { MCP_INSTALL_SCRIPT_OS, mcpConfigFile, mcpInstallLink, mcpInstallScript, type McpInstallClientId } from './mcp-install.js';
 
 export interface AiToolParam {
     /** The field label as the tool's own UI spells it. */
@@ -90,6 +90,11 @@ export interface AiToolInstall {
     link?: { label: string; href: string; note: string };
     /** The client's own config file, from GET /v1/connect/mcp.json. Carries no credential. */
     file?: { label: string; url: string; filename: string; where: string };
+    /**
+     * A script a person double-clicks, from GET /v1/connect/install: one per desktop, for the
+     * client that has a one-line command and no install link (Claude Code). Absent for the rest.
+     */
+    scripts?: { os: 'windows' | 'mac'; label: string; url: string; filename: string; note: string }[];
 }
 
 export interface AiTool {
@@ -147,6 +152,26 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
     const install = (id: McpInstallClientId, where: string, linkLabel?: string): AiToolInstall => {
         const href = mcpInstallLink(id, mcpUrl);
         const { filename } = mcpConfigFile(id, mcpUrl);
+        // The double-click scripts, for the client that has them. The route decides which client
+        // that is (mcp-install.ts), so a client this table lists can never advertise a script the
+        // route refuses to serve.
+        const scripts = MCP_INSTALL_SCRIPT_OS.flatMap((os) => {
+            const sc = mcpInstallScript(id, os, mcpUrl);
+            if (!sc) return [];
+            return [{
+                os,
+                label: os === 'windows'
+                    ? s(l, 'Windows: download the install script', 'Windows: lataa asennusskripti')
+                    : s(l, 'Mac: download the install script', 'Mac: lataa asennusskripti'),
+                url: `${node}/v1/connect/install?client=${id}&os=${os}`,
+                filename: sc.filename,
+                note: os === 'windows'
+                    ? s(l, 'Double-click the file: it runs the one command and waits for a key so you can read the result.',
+                        'Kaksoisklikkaa tiedostoa: se ajaa yhden komennon ja odottaa näppäintä, jotta ehdit lukea tuloksen.')
+                    : s(l, 'Double-click the file. If the Mac refuses a downloaded script, right-click it and choose Open, once.',
+                        'Kaksoisklikkaa tiedostoa. Jos Mac ei suostu avaamaan ladattua skriptiä, klikkaa sitä hiiren oikealla ja valitse Open, kerran.'),
+            }];
+        });
         return {
             ...(href && linkLabel ? {
                 link: {
@@ -156,6 +181,7 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
                         'Sovellus pyytää vahvistuksen, ja kirjautuminen avautuu sen jälkeen selaimessa.'),
                 },
             } : {}),
+            ...(scripts.length ? { scripts } : {}),
             file: {
                 label: s(l, `Download ${filename}`, `Lataa ${filename}`),
                 url: `${node}/v1/connect/mcp.json?client=${id}`,

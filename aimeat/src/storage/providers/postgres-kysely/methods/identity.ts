@@ -63,6 +63,7 @@ function toAgentRecord(r: Selectable<Agent>): AgentRecord {
     runMode: (r.runMode ?? undefined) as AgentRecord['runMode'],
     identityVersion: (r.identityVersion ?? undefined) as AgentRecord['identityVersion'],
     cardJws: r.cardJws ?? null, cardIssuedAt: r.cardIssuedAt ?? null, enrolledAt: r.enrolledAt ?? null,
+    mcpClient: r.mcpClient ?? null, mcpLastSeen: r.mcpLastSeen ?? null,
     scheduleConstraintDefaults: (r.scheduleConstraintDefaults ?? undefined) as AgentRecord['scheduleConstraintDefaults'],
     createdAt: iso(r.createdAt), lastSeen: iso(r.lastSeen),
   };
@@ -150,6 +151,7 @@ export const identityMethods = {
       model: a.model ?? null, modelDetectedBy: a.modelDetectedBy ?? null, consoleUrl: a.consoleUrl ?? null, registeredBy: a.registeredBy ?? null,
       runMode: a.runMode ?? null, identityVersion: a.identityVersion ?? null,
       cardJws: a.cardJws ?? null, cardIssuedAt: a.cardIssuedAt ?? null, enrolledAt: a.enrolledAt ?? null,
+      mcpClient: a.mcpClient ?? null, mcpLastSeen: a.mcpLastSeen ?? null,
       tags: a.tags ?? [], createdAt: new Date(a.createdAt), lastSeen: new Date(a.lastSeen),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any).returningAll().execute();

@@ -225,6 +225,20 @@ await test('Initialize MCP session', async () => {
     });
 });
 
+// The per-agent truth the MCP page lists: opening the session marked the AGENT, not only the
+// per-tool session row. Until 2026-09-02 nothing did, so a connector used daily read as last seen
+// weeks ago on the Agents page, and the tool row named whichever agent opened it first.
+await test('0b. Opening the session marks the agent as spoken over MCP, from this client', async () => {
+    const { status, body } = await json('/v1/agents', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(status === 200, `agents ${status}`);
+    const me = (body.data?.agents ?? []).find((a: any) => a.name === agentName);
+    assert(me, 'the session agent is listed');
+    assert(typeof me.mcp_client === 'string' && me.mcp_client.length > 0, `mcp_client: ${JSON.stringify(me.mcp_client)}`);
+    assert(typeof me.mcp_last_seen === 'string', `mcp_last_seen: ${JSON.stringify(me.mcp_last_seen)}`);
+    assert(Date.now() - Date.parse(me.mcp_last_seen) < 60_000, `mcp_last_seen is now, got ${me.mcp_last_seen}`);
+    assert(Date.now() - Date.parse(me.last_seen) < 60_000, `last_seen moved too, got ${me.last_seen}`);
+});
+
 // ─── Phase 1: Tool Registration ───
 console.log('\nPhase 1 — Tool Registration');
 
@@ -429,6 +443,28 @@ await test('12. platform is required, whichever door asks', async () => {
     });
     assert(status === 400, `status ${status}`);
     assert(body.error?.code === 'INVALID_INPUT', `code: ${JSON.stringify(body.error)}`);
+});
+
+// ─── Phase 5: the agent goes, and its connection row goes with it ───
+console.log('\nPhase 5 — Delete the agent');
+
+await test('13. The MCP session row names the agent that opened it', async () => {
+    const { body } = await json('/v1/chat-instances', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const mine = (body.data?.chat_instances ?? []).filter((ci: any) => ci.agent_gaii === agentGaii);
+    assert(mine.length >= 1, `expected the session row to carry agent_gaii ${agentGaii}, got ${JSON.stringify(body.data?.chat_instances?.map((c: any) => [c.id, c.agent_gaii]))}`);
+});
+
+await test('14. Deleting the agent removes its connection rows, so the list cannot name an agent that is gone', async () => {
+    const del = await json(`/v1/agents/${encodeURIComponent(agentName)}`, {
+        method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(del.status === 200, `delete ${del.status}: ${JSON.stringify(del.body?.error)}`);
+    const { body } = await json('/v1/chat-instances', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const left = (body.data?.chat_instances ?? []).filter((ci: any) => ci.agent_gaii === agentGaii);
+    assert(left.length === 0, `rows still naming the deleted agent: ${JSON.stringify(left.map((c: any) => c.id))}`);
+    // The row the owner registered over HTTP (test 9) names no agent and stays.
+    const rest = (body.data?.chat_instances ?? []).find((ci: any) => ci.id === restInstanceId);
+    assert(rest, 'the owner\'s own HTTP-registered session is untouched');
 });
 
 // ─── Summary ───

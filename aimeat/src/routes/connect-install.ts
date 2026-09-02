@@ -22,7 +22,7 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import { error } from '../middleware/envelope.js';
-import { MCP_INSTALL_CLIENTS, isMcpInstallClient, mcpConfigFile } from '../services/mcp-install.js';
+import { MCP_INSTALL_CLIENTS, MCP_INSTALL_SCRIPT_OS, isMcpInstallClient, isMcpInstallScriptOs, mcpConfigFile, mcpInstallScript } from '../services/mcp-install.js';
 
 export function connectInstallRouter(config: AimeatConfig): Router {
   const router = Router();
@@ -46,6 +46,35 @@ export function connectInstallRouter(config: AimeatConfig): Router {
     // a day. Public: there is nothing per-person in it to leak into a shared cache.
     res.setHeader('Cache-Control', 'public, max-age=300');
     res.type('application/json').send(`${JSON.stringify(file.config, null, 2)}\n`);
+  });
+
+  // GET /v1/connect/install?client=claude-code&os=windows|mac&name=<server name>
+  // The double-click version of the same thing: a script that runs the one-liner. Same public,
+  // secretless footing as the file above, and the same rule about the filename being ours.
+  router.get('/v1/connect/install', (req, res) => {
+    const client = req.query.client;
+    const os = req.query.os;
+    if (!isMcpInstallClient(client)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_CLIENT',
+        `client must be one of: ${MCP_INSTALL_CLIENTS.join(', ')}`));
+      return;
+    }
+    if (!isMcpInstallScriptOs(os)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_OS',
+        `os must be one of: ${MCP_INSTALL_SCRIPT_OS.join(', ')}`));
+      return;
+    }
+    const mcpUrl = `${config.baseUrl.replace(/\/+$/, '')}/v1/mcp`;
+    const script = mcpInstallScript(client, os, mcpUrl, req.query.name);
+    if (!script) {
+      res.status(400).json(error(config.nodeId, 'NO_SCRIPT',
+        'Only Claude Code has a script to double-click. For this tool, use the one-click link or save the file the connect page offers.',
+        400, { client, file: `/v1/connect/mcp.json?client=${client}` }));
+      return;
+    }
+    res.setHeader('Content-Disposition', `attachment; filename="${script.filename}"`);
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    res.type('text/plain; charset=utf-8').send(script.text);
   });
 
   return router;

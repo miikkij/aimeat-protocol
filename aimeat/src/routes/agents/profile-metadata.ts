@@ -194,6 +194,11 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
         morsel_balance: a.morselBalance,
         created_at: a.createdAt,
         last_seen: a.lastSeen,
+        // The tool this agent last spoke from over MCP and when, written only by the MCP door: the
+        // MCP page lists the AIs a person connected by these, agent by agent. Null until the
+        // first session (services/agent-mcp-touch.ts).
+        mcp_client: a.mcpClient ?? null,
+        mcp_last_seen: a.mcpLastSeen ?? null,
         // The account-level verdict, computed once on the server (services/agent-health.ts). The
         // frontend used to derive this itself from fields this response does not carry, so two of
         // its three problem conditions could never fire and a broken webhook read as healthy.

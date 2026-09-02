@@ -1212,6 +1212,22 @@ components:
         last_seen:
           type: string
           format: date-time
+        mcp_client:
+          type: string
+          nullable: true
+          description: >-
+            The AI tool this agent last spoke from over MCP, as the MCP door names it from the
+            client's registered name (`claude`, `claude-code`, `claude-desktop`, `chatgpt`,
+            `cursor`, …), the raw client name when none match, or `unknown` when the client sent
+            none. Null for an agent that has never opened an MCP session.
+        mcp_last_seen:
+          type: string
+          format: date-time
+          nullable: true
+          description: >-
+            When this agent last opened or spoke on an MCP session. Written only by the MCP door,
+            so unlike `last_seen` it tells MCP use from any other request. Null until the first
+            session.
         health:
           $ref: '#/components/schemas/AgentHealth'
 
@@ -10787,6 +10803,46 @@ paths:
                 additionalProperties: true
         '400':
           description: Unknown client id
+
+  /v1/connect/install:
+    get:
+      operationId: getMcpInstallScript
+      summary: A script a person double-clicks to attach this node to Claude Code
+      description: >-
+        The double-click form of the one-liner the tool table shows: a `.cmd` for Windows or a
+        `.command` for a Mac that runs `claude mcp add --transport http <name> <url> -s user` and
+        waits for a key so the result can be read. Claude Code is the one client that has a command
+        and no install link; the others install from a link (Cursor, VS Code) or a file.
+
+        Public and secretless like `/v1/connect/mcp.json`: the sign-in happens in the browser the
+        command opens, as whoever signs in. Answers with the FILE, not the envelope, for the same
+        reason that route does.
+      tags:
+        - Discovery
+      parameters:
+        - name: client
+          in: query
+          required: true
+          schema: { type: string, enum: [claude-code] }
+        - name: os
+          in: query
+          required: true
+          schema: { type: string, enum: [windows, mac] }
+        - name: name
+          in: query
+          schema: { type: string }
+          description: The server name inside the command (default `aimeat`), sanitized like the file's.
+      responses:
+        '200':
+          description: >-
+            The script, `Content-Disposition: attachment` named `aimeat-mcp-install.cmd` or
+            `aimeat-mcp-install.command`.
+          content:
+            text/plain:
+              schema:
+                type: string
+        '400':
+          description: Unknown client or desktop, or a client that installs from a link or a file instead
 
   /v1/prompts/open-items:
     get:

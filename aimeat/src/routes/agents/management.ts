@@ -472,6 +472,19 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
     }
     evictAgentTelemetry(agent.gaii);
 
+    // The MCP connection rows are per TOOL, upserted by every session, and each keeps the agent
+    // that opened the tool's first session. Left behind, a row would go on naming an agent that no
+    // longer exists (aimeat.io's Claude row did, for months). Best effort after the agent is gone:
+    // a row that survives a failure here shows as a stale tool row, which the page can carry.
+    try {
+      const rows = await storage.listChatInstances({ ownerName });
+      const mine = rows.filter(r => r.agentGaii === agent.gaii);
+      for (const r of mine) await storage.deleteChatInstance(r.id);
+      if (mine.length) emitChange('chat');
+    } catch (err) {
+      logger.warn('deleteAgent: connection rows not removed', { gaii: agent.gaii, error: String(err) });
+    }
+
     // Revoking the sessions made the node refuse this agent; it did not tell the connector holding
     // its socket. A tunnel verifies its bearer once, at upgrade, so without this the deleted agent
     // kept a live socket reading `online` on `/local/status` until something happened to make a

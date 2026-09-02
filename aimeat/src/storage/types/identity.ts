@@ -168,6 +168,15 @@ export interface AgentRecord {
   cardIssuedAt?: string | null;
   /** When this agent's key was pinned and its card accepted. Null for an agent that never enrolled. */
   enrolledAt?: string | null;
+  /**
+   * The AI tool this agent last spoke from over MCP ('claude', 'claude-code', 'cursor', … as the
+   * MCP door names them), and when. Written by the MCP door on every session it opens, so the MCP
+   * page can list the AIs a person has connected as agents rather than as tools, and say when each
+   * was last used. Null for an agent that has never opened an MCP session. `lastSeen` alone could
+   * not say this: the REST middleware touches it too, so it does not tell MCP use from any other.
+   */
+  mcpClient?: string | null;
+  mcpLastSeen?: string | null;
 }
 
 /**

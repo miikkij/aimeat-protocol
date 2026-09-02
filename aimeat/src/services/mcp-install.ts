@@ -119,3 +119,60 @@ export function mcpInstallLink(clientId: McpInstallClientId, mcpUrl: string, ser
             return null;
     }
 }
+
+/** The desktops a double-click install script is written for. */
+export const MCP_INSTALL_SCRIPT_OS = ['windows', 'mac'] as const;
+export type McpInstallScriptOs = typeof MCP_INSTALL_SCRIPT_OS[number];
+
+export function isMcpInstallScriptOs(value: unknown): value is McpInstallScriptOs {
+    return typeof value === 'string' && (MCP_INSTALL_SCRIPT_OS as readonly string[]).includes(value);
+}
+
+export interface McpInstallScript {
+    /** What the saved file is called: `.cmd` on Windows, `.command` on a Mac. */
+    filename: string;
+    /** The script, line endings as the desktop expects them (CRLF on Windows). */
+    text: string;
+}
+
+/**
+ * A script a person double-clicks to attach this node to Claude Code, for the clients that have a
+ * one-line command and no install link: today that is Claude Code alone. Null for the others.
+ *
+ * WHAT IT RUNS IS THE SAME ONE-LINER THE TOOL TABLE SHOWS, at user scope so the server is there in
+ * every project, and then it waits for a key so the person can read what happened before the window
+ * closes. It holds nothing private (the OAuth sign-in happens in the browser the command opens), so
+ * it can be served to anyone who asks, like the config file. On a Mac a downloaded `.command` file
+ * may need to be allowed once in the Finder (right click → Open), which the page says beside it.
+ */
+export function mcpInstallScript(clientId: McpInstallClientId, os: McpInstallScriptOs, mcpUrl: string, serverName?: unknown): McpInstallScript | null {
+    if (clientId !== 'claude-code') return null;
+    const name = normalizeServerName(serverName);
+    const command = `claude mcp add --transport http ${name} ${mcpUrl} -s user`;
+    if (os === 'windows') {
+        return {
+            filename: 'aimeat-mcp-install.cmd',
+            text: [
+                '@echo off',
+                'echo Attaching AIMEAT to Claude Code ...',
+                command,
+                'echo.',
+                'echo Done. Start a NEW Claude Code session, then run /mcp to see the server.',
+                'pause',
+                '',
+            ].join('\r\n'),
+        };
+    }
+    return {
+        filename: 'aimeat-mcp-install.command',
+        text: [
+            '#!/bin/bash',
+            'echo "Attaching AIMEAT to Claude Code ..."',
+            command,
+            'echo',
+            'echo "Done. Start a NEW Claude Code session, then run /mcp to see the server."',
+            'read -n 1 -s -r -p "Press any key to close."',
+            '',
+        ].join('\n'),
+    };
+}

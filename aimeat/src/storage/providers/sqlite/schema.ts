@@ -432,6 +432,9 @@ export function initializeSchema(db: Database.Database): void {
   safeAddColumn('agents', 'cardJws', 'TEXT');
   safeAddColumn('agents', 'cardIssuedAt', 'TEXT');
   safeAddColumn('agents', 'enrolledAt', 'TEXT');
+  // Which AI tool the agent last spoke from over MCP, and when (migration 0063 on Postgres).
+  safeAddColumn('agents', 'mcpClient', 'TEXT');
+  safeAddColumn('agents', 'mcpLastSeen', 'TEXT');
 
   // device_auth.mode -- mode the CLI passed to /v1/agents/device-authorize.
   // verify-route reads this when the owner approves, and propagates it to

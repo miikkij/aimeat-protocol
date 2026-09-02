@@ -157,6 +157,7 @@ import { proactiveGuidance } from '../services/proactive-mode.js';
 import { registerManagedPrompts } from './prompts-managed.js';
 import { registerOAuthRoutes } from './oauth.js';
 import { registerChatInstance, touchChatInstance } from '../services/chat-instance-write.js';
+import { markAgentMcpUse } from '../services/agent-mcp-touch.js';
 
 // ── Resource change event bus ──
 // Allows REST routes and MCP tools to emit resource change events
@@ -205,6 +206,10 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
     // after four hours. The sweep below closes any session with no request for
     // config.mcpSessionIdleMinutes; a returning client gets the spec's 404 and re-initializes.
     const sessionLastSeen = new Map<string, number>();
+    // Which agent a session belongs to and which tool it came from, so the requests that follow the
+    // initialize can keep the agent's MCP use current (services/agent-mcp-touch.ts) without a
+    // second token parse. Cleaned wherever the other session maps are.
+    const sessionAgents = new Map<string, { gaii: string; platform: string }>();
     // Every 10 s: the scan is a Map walk over a handful of sessions, and a short interval is what
     // lets the idle floor go sub-minute (the E2E proves expiry with a 6-second idle).
     const SWEEP_EVERY_MS = 10_000;
@@ -222,6 +227,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
                 sessionChatInstances.delete(id);
                 sessionTokens.delete(id);
                 sessionLastSeen.delete(id);
+                sessionAgents.delete(id);
             }
         }
         if (reaped > 0) logger.info(`MCP idle sweep: closed ${reaped} session(s) idle over ${config.mcpSessionIdleMinutes} min (${transports.size} remain)`);
@@ -431,6 +437,9 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
                 // per call would have every open browser re-fetching the list dozens of times a minute.
                 touchChatInstance({ storage }, ciId, { notify: false }).catch(err => { logger.warn('handleMcpPost: continuing after a suppressed failure', { error: String(err) }); });
             }
+            // The agent's own MCP-use mark, throttled inside: the MCP page reads "viimeksi" from it.
+            const who = sessionAgents.get(sessionId);
+            if (who) void markAgentMcpUse(storage, who.gaii, who.platform);
             // Refresh the session's bearer token from THIS request before dispatching: the client
             // rotates its access token mid-session, and capability invocation re-presents it.
             const box = sessionTokens.get(sessionId);
@@ -500,6 +509,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
 
         // Validate agent exists and has a real owner
         let chatInstanceId: string | undefined;
+        let sessionAgentInfo: { gaii: string; platform: string } | undefined;
         let sessionScopes: string[]; // assigned from agent.defaultScopes in the validation block below
 
         {
@@ -579,6 +589,13 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
             // rescue email keys off. Fire-and-forget; must never delay or break the session.
             const { recordFirstMcpCall } = await import('../services/onboarding-funnel.js');
             void recordFirstMcpCall(storage, config, sessionOwner, platform);
+
+            // The agent itself learns it was used over MCP, from which tool, and when. The session
+            // row above is per TOOL and keeps the first agent that ever opened it; this is the
+            // per-agent truth the MCP page lists. Forced: the session's first request is the one
+            // that carries a client name worth recording, whatever the throttle says.
+            sessionAgentInfo = { gaii: authenticatedGaii, platform };
+            void markAgentMcpUse(storage, authenticatedGaii, platform, { force: true });
         }
 
         // Create transport and MCP server for this session
@@ -595,6 +612,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
                 sessionChatInstances.delete(transport.sessionId);
                 sessionTokens.delete(transport.sessionId);
                 sessionLastSeen.delete(transport.sessionId);
+                sessionAgents.delete(transport.sessionId);
             }
         };
 
@@ -610,6 +628,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
             if (chatInstanceId) {
                 sessionChatInstances.set(transport.sessionId, chatInstanceId);
             }
+            if (sessionAgentInfo) sessionAgents.set(transport.sessionId, sessionAgentInfo);
         }
     };
 
