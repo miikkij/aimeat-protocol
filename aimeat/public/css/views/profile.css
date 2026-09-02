@@ -1788,15 +1788,6 @@
 .pf .cs-create-hint  { margin: 0; font-size: .75rem; color: var(--muted, #6B7280); font-style: italic; }
 .pf .cs-section-sub  { font-size: .9rem; margin-top: 1rem; }
 
-/* ── MCP tab ── */
-.pf .mcp-hint-box    { margin-bottom: 1rem; padding: .5rem .75rem; background: rgba(130,100,255,.06); border: 1px solid rgba(130,100,255,.15); border-radius: .25rem; font-size: .82rem; }
-.pf .mcp-hint-link   { color: var(--accent, #E8564A); text-decoration: underline; }
-.pf .mcp-empty-body  { padding: .75rem 1rem; font-size: .85rem; color: var(--muted, #6B7280); }
-.pf .mcp-empty-sub   { margin: 0; font-size: .8rem; }
-.pf .mcp-id-small    { font-size: .7rem; word-break: break-all; }
-.pf .mcp-badge-sm    { font-size: .7rem; }
-.pf .mcp-badge-xs    { font-size: .65rem; }
-
 /* ── Federation tab ── */
 .pf .fed-status-text { font-size: .8rem; }
 .pf .fed-status-text.online  { color: var(--success); }
