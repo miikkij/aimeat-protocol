@@ -1,0 +1,17 @@
+/*
+ * @file aimeat-atelier/motion.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The classes the kit's motion primitives (motion.js) put on an element while they
+ *   hold it: the draggable surface and the one under the hand. No animation lives here; the
+ *   travel is a Web Animation the primitive owns, so nothing idles.
+ * @structure .ak-drag · .ak-dragging
+ * @version-history
+ *   v0.44.0 — 2026-09-02 — Initial (wish-atelier-motion-libraries-and-parts, stage 2).
+ */
+
+/* A surface a hand can carry: no text selection under the pointer, the browser's own pan
+   gestures stand down so the drag gets every pointer event. */
+.ak-drag { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+.ak-dragging { cursor: grabbing; will-change: transform; z-index: 2; position: relative; }
+.ak-dragging * { pointer-events: none; }

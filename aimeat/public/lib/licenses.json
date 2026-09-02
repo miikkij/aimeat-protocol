@@ -126,6 +126,54 @@
       "purl": "pkg:npm/leaflet@1.9.4"
     },
     {
+      "id": "motion",
+      "name": "Motion",
+      "version": "13.1.1",
+      "spdx": "MIT",
+      "copyright": "Copyright (c) 2024 Motion B.V. (https://motion.dev)",
+      "homepage": "https://motion.dev",
+      "source": "https://cdn.jsdelivr.net/npm/motion@13.1.1/dist/motion.js",
+      "licenseFile": "LICENSES/motion.txt",
+      "files": [
+        "motion@13.min.js"
+      ],
+      "modified": false,
+      "note": "The vanilla-JavaScript core that Framer Motion is built on, by Matt Perry. The dist file is the UMD build and is already minified upstream; the @13 suffix is this node's compatibility pin, not an upstream filename.",
+      "purl": "pkg:npm/motion@13.1.1"
+    },
+    {
+      "id": "anime",
+      "name": "anime.js",
+      "version": "4.5.0",
+      "spdx": "MIT",
+      "copyright": "Copyright (c) 2025 Julian Garnier",
+      "homepage": "https://animejs.com",
+      "source": "https://cdn.jsdelivr.net/npm/animejs@4.5.0/dist/bundles/anime.umd.min.js",
+      "licenseFile": "LICENSES/anime.txt",
+      "files": [
+        "anime@4.min.js"
+      ],
+      "modified": false,
+      "purl": "pkg:npm/animejs@4.5.0"
+    },
+    {
+      "id": "lenis",
+      "name": "Lenis",
+      "version": "1.3.26",
+      "spdx": "MIT",
+      "copyright": "Copyright (c) 2024 darkroom.engineering",
+      "homepage": "https://lenis.darkroom.engineering",
+      "source": "https://cdn.jsdelivr.net/npm/lenis@1.3.26/dist/",
+      "licenseFile": "LICENSES/lenis.txt",
+      "files": [
+        "lenis@1.min.js",
+        "lenis@1.css"
+      ],
+      "modified": false,
+      "note": "Both files are needed: the stylesheet carries the html.lenis rules without which the hijacked scroll container never gets its height.",
+      "purl": "pkg:npm/lenis@1.3.26"
+    },
+    {
       "id": "p5",
       "name": "p5.js",
       "version": "1.11.13",

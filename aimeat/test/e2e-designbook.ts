@@ -9,6 +9,9 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=designbook
  * @version-history
+ *   v1.1.1 — 2026-09-02 — The preview's img-src is asserted to be the app policy (it was the
+ *     SPA's 'self', which blocked every apex illustration once the gallery framed it from an
+ *     app origin). Failed on the old route first.
  *   v1.1.0 — 2026-08-30 — The preview route joins the contract: a published part renders as a
  *     page (kit + body), an illustration as its words, a genre as its template's own document,
  *     an unknown address as 404.
@@ -222,6 +225,10 @@ const GOOD_BODY = {
         const res = await fetch(`${BASE}/v1/designbook/${partId}/preview`);
         assert(res.status === 200, `preview is 200, got ${res.status}`);
         assert((res.headers.get('content-type') ?? '').includes('text/html'), 'preview answers text/html');
+        // Framed from an app origin, 'self' is the subdomain: the pictures must follow the app policy.
+        const csp = res.headers.get('content-security-policy') ?? '';
+        assert(/img-src \* data: blob:/.test(csp), `preview img-src is the app policy, got: ${csp.match(/img-src [^;]*/)?.[0]}`);
+        assert(/script-src 'self' 'nonce-/.test(csp), 'preview scripts keep the nonce rule');
         const page = await res.text();
         assert(page.includes('aimeat-atelier'), 'the page loads the kit');
         assert(page.includes('"component":"hero"'), 'the page carries the part\'s own blocks');

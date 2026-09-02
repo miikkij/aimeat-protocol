@@ -1,0 +1,248 @@
+/*
+ * @file aimeat-atelier/lenis-parts.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The clothes for the two Lenis-backed parts: the discussion thread (a fixed-height
+ *   well of day-grouped bubbles over a composer) and the checkout (one long page in four sections
+ *   with a step rail beside it). Every value rides the --ak-* contract, so both answer every look,
+ *   palette and mode; no colour of their own, and no motion that idles.
+ *
+ *   MINE IS THE ACCENT TINT AND AN AGENT IS SQUARE. The two shape rules the thread carries are the
+ *   kit's own vocabulary: the accent marks what this person said, and a squared bubble marks an
+ *   agent exactly as the crew stack squares an agent's face.
+ * @structure .ak-thread (well · day · msg · bubble · avatar · meta · composer) ·
+ *   .ak-checkout (rail · well · page · section · lines · ships · totals · settled)
+ * @version-history
+ *   v0.44.0 — 2026-09-02 — Initial (wish-atelier-motion-libraries-and-parts, the Lenis pair).
+ */
+
+/* ── The thread: a well with a hand on it, and a composer under it ────────────────────────── */
+.ak-thread { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.ak-thread__title { margin: 0; }
+
+.ak-thread__well {
+  position: relative;
+  height: 22rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--ak-pad);
+  border: var(--ak-line-w) solid var(--ak-line);
+  border-radius: var(--ak-radius);
+  background: var(--ak-surface);
+  color: var(--ak-ink);
+}
+.ak-thread__well:focus-visible { outline: 2px solid var(--ak-focus); outline-offset: 2px; }
+.ak-thread__stream { display: flex; flex-direction: column; gap: 10px; }
+
+/* The day divider: a hairline with the day sitting on it. */
+.ak-thread__day {
+  display: flex; align-items: center; gap: 10px;
+  margin: 6px 0 2px;
+  font-family: var(--ak-font-mono);
+  font-size: var(--ak-text-fine);
+  color: var(--ak-ink-dim);
+}
+.ak-thread__day::before,
+.ak-thread__day::after { content: ''; flex: 1; height: var(--ak-line-w); background: var(--ak-line); }
+
+.ak-thread__msg { display: flex; gap: 8px; align-items: flex-end; max-width: 84%; }
+.ak-thread__msg--mine { flex-direction: row-reverse; margin-left: auto; }
+
+.ak-thread__avatar {
+  flex: none;
+  width: 28px; height: 28px;
+  border-radius: var(--ak-radius-pill);
+  display: grid; place-items: center;
+  background: color-mix(in oklab, var(--ak-spectrum-2) 70%, var(--ak-ink));
+  color: var(--ak-accent-ink);
+  font-family: var(--ak-font-display);
+  font-weight: var(--ak-weight-display);
+  font-size: var(--ak-text-fine);
+}
+.ak-thread__msg--mine .ak-thread__avatar { background: var(--ak-accent); }
+/* An agent is square, the same rule the crew stack draws. */
+.ak-thread__msg--agent .ak-thread__avatar { border-radius: var(--ak-radius-sm); }
+
+.ak-thread__bubble {
+  min-width: 0;
+  padding: 8px 12px;
+  border-radius: var(--ak-radius);
+  border-bottom-left-radius: var(--ak-radius-sm);
+  background: var(--ak-surface-2);
+  color: var(--ak-ink);
+  border: var(--ak-line-w) solid var(--ak-line);
+}
+.ak-thread__msg--mine .ak-thread__bubble {
+  border-bottom-left-radius: var(--ak-radius);
+  border-bottom-right-radius: var(--ak-radius-sm);
+  background: color-mix(in oklab, var(--ak-accent) 16%, var(--ak-surface));
+  border-color: color-mix(in oklab, var(--ak-accent) 40%, var(--ak-line));
+}
+/* An agent speaks from a squared bubble: the shape says who, before a word is read. */
+.ak-thread__msg--agent .ak-thread__bubble { border-radius: var(--ak-radius-sm); }
+
+.ak-thread__who {
+  font-size: var(--ak-text-fine);
+  font-weight: 700;
+  color: var(--ak-accent-text);
+}
+.ak-thread__text { margin: 2px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ak-thread__meta {
+  display: flex; align-items: baseline; gap: 8px; justify-content: flex-end;
+  margin-top: 4px;
+  font-size: var(--ak-text-fine);
+  color: var(--ak-ink-dim);
+}
+.ak-thread__time { font-variant-numeric: tabular-nums; }
+.ak-thread__status--read { color: var(--ak-ok-text); }
+.ak-thread__status--failed { color: var(--ak-err-text); font-weight: 700; }
+
+.ak-thread__composer { display: flex; gap: 8px; align-items: flex-end; }
+.ak-thread__composer .ak-thread__input { flex: 1; min-width: 0; }
+.ak-thread__composer .ak-btn { flex: none; }
+
+/* ── The checkout: a rail, and one long page beside it ────────────────────────────────────── */
+.ak-checkout {
+  display: grid;
+  grid-template-columns: minmax(9rem, 13rem) minmax(0, 1fr);
+  gap: var(--ak-gap);
+  align-items: start;
+}
+
+.ak-checkout__rail {
+  display: flex; flex-direction: column; gap: 4px;
+  position: sticky; top: 0;
+}
+.ak-checkout__back { align-self: flex-start; margin-bottom: 4px; }
+.ak-checkout__step {
+  display: flex; align-items: center; gap: 10px;
+  min-height: var(--ak-touch);
+  padding: 6px 10px;
+  border: var(--ak-line-w) solid transparent;
+  border-radius: var(--ak-radius-sm);
+  background: none;
+  color: var(--ak-ink-dim);
+  font: inherit; font-size: var(--ak-text-fine); text-align: left;
+  cursor: pointer;
+  transition: background var(--ak-motion) var(--ak-ease), color var(--ak-motion) var(--ak-ease);
+}
+.ak-checkout__step:hover { background: var(--ak-surface-2); }
+.ak-checkout__step[aria-current='step'] {
+  background: color-mix(in oklab, var(--ak-accent) 12%, var(--ak-surface));
+  border-color: color-mix(in oklab, var(--ak-accent) 42%, var(--ak-line));
+  color: var(--ak-ink);
+  font-weight: 700;
+}
+.ak-checkout__step-n {
+  flex: none;
+  width: 22px; height: 22px;
+  display: grid; place-items: center;
+  border-radius: var(--ak-radius-pill);
+  background: var(--ak-surface-2);
+  color: var(--ak-ink-dim);
+  font-family: var(--ak-font-mono);
+}
+.ak-checkout__step[aria-current='step'] .ak-checkout__step-n {
+  background: var(--ak-accent);
+  color: var(--ak-accent-ink);
+}
+
+.ak-checkout__well {
+  position: relative;
+  max-height: 34rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: var(--ak-line-w) solid var(--ak-line);
+  border-radius: var(--ak-radius);
+  background: var(--ak-surface);
+  color: var(--ak-ink);
+}
+.ak-checkout__page { display: flex; flex-direction: column; }
+.ak-checkout__section {
+  padding: var(--ak-pad);
+  border-bottom: var(--ak-line-w) solid var(--ak-line);
+}
+.ak-checkout__section:last-child { border-bottom: 0; }
+.ak-checkout__heading { margin: 0 0 10px; font-size: var(--ak-text-title); color: var(--ak-ink); }
+.ak-checkout__quiet { margin: 0; font-size: var(--ak-text-fine); color: var(--ak-ink-dim); }
+
+/* The order lines and the running total. */
+.ak-checkout__lines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.ak-checkout__line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 4px 12px;
+  align-items: baseline;
+  padding: 8px 10px;
+  border-radius: var(--ak-radius-sm);
+  background: var(--ak-surface-2);
+}
+.ak-checkout__line-main { display: flex; flex-direction: column; min-width: 0; }
+.ak-checkout__line-title { font-weight: 700; color: var(--ak-ink); }
+.ak-checkout__line-sub { font-size: var(--ak-text-fine); color: var(--ak-ink-dim); }
+.ak-checkout__qty { font-family: var(--ak-font-mono); font-size: var(--ak-text-fine); color: var(--ak-ink-dim); }
+.ak-checkout__figure { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ak-checkout__sum {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-top: 10px; padding-top: 8px;
+  border-top: var(--ak-line-w) solid var(--ak-line);
+  font-weight: 700;
+}
+
+/* Delivery: the choices, priced. */
+.ak-checkout__ships { display: flex; flex-direction: column; gap: 6px; }
+.ak-checkout__ship {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  min-height: var(--ak-touch);
+  padding: 6px 10px;
+  border: var(--ak-line-w) solid var(--ak-line);
+  border-radius: var(--ak-radius-sm);
+  background: var(--ak-surface);
+  cursor: pointer;
+}
+.ak-checkout__ship:has(.ak-checkout__radio:checked) {
+  border-color: color-mix(in oklab, var(--ak-accent) 55%, var(--ak-line));
+  background: color-mix(in oklab, var(--ak-accent) 10%, var(--ak-surface));
+}
+.ak-checkout__radio { accent-color: var(--ak-accent); width: 18px; height: 18px; }
+.ak-checkout__ship-label { color: var(--ak-ink); }
+
+/* Review: the totals, the refusal and the settled state. */
+.ak-checkout__totals { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+.ak-checkout__total { display: flex; justify-content: space-between; align-items: baseline; }
+.ak-checkout__total--grand {
+  margin-top: 6px; padding-top: 8px;
+  border-top: 2px solid var(--ak-ink);
+  font-family: var(--ak-font-display);
+  font-weight: var(--ak-weight-display);
+  font-size: var(--ak-text-title);
+}
+.ak-checkout__place { margin-top: 12px; }
+.ak-checkout__refusal { margin: 10px 0 0; font-size: var(--ak-text-fine); color: var(--ak-err-text); font-weight: 700; }
+.ak-checkout__settled {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--ak-ok);
+  border-radius: 0 var(--ak-radius-sm) var(--ak-radius-sm) 0;
+  background: color-mix(in oklab, var(--ak-ok) 10%, var(--ak-surface));
+  color: var(--ak-ink);
+  font-weight: 700;
+}
+
+/* ── The phone: the rail becomes a strip across the top ───────────────────────────────────── */
+@media (max-width: 640px) {
+  .ak-checkout { grid-template-columns: minmax(0, 1fr); }
+  .ak-checkout__rail {
+    position: static;
+    flex-direction: row;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+  .ak-checkout__step { flex: none; }
+  .ak-checkout__well { max-height: 26rem; }
+  .ak-thread__msg { max-width: 94%; }
+}
