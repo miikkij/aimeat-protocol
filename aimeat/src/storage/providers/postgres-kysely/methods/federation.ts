@@ -45,6 +45,7 @@ function toFederationPeer(r: Selectable<FederationPeer>): FederationPeerRecord {
     availabilityPct: r.availabilityPct ?? null,
     softwareVersion: r.softwareVersion ?? null,
     nodeCardHash: r.nodeCardHash ?? null,
+    relayClaimAt: r.relayClaimAt ? iso(r.relayClaimAt) : null,
   };
 }
 function toPeeringRequest(r: Selectable<PeeringRequest>): PeeringRequestRecord {
@@ -93,6 +94,7 @@ export const federationMethods = {
       heartbeatOk: peer.heartbeatOk ?? 0, heartbeatTotal: peer.heartbeatTotal ?? 0,
       availabilityWindow: peer.availabilityWindow ?? null, availabilityPct: peer.availabilityPct ?? null,
       softwareVersion: peer.softwareVersion ?? null, nodeCardHash: peer.nodeCardHash ?? null,
+      relayClaimAt: peer.relayClaimAt ? new Date(peer.relayClaimAt) : null,
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await this.db.insertInto('FederationPeer').values({ nodeId: peer.nodeId, addedAt: new Date(peer.addedAt), ...shared } as any)

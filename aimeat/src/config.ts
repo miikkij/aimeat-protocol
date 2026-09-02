@@ -284,6 +284,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     burnRate: parseFloat(process.env.AIMEAT_BURN_RATE ?? '0.10'),
     extendedFeaturesEnabled: process.env.AIMEAT_EXTENDED_FEATURES !== 'false',
     maxRelayHops: parseInt(process.env.AIMEAT_MAX_RELAY_HOPS ?? '3', 10),
+    federationRelayClaim: process.env.AIMEAT_FEDERATION_RELAY_CLAIM === 'required' ? 'required' : 'optional',
     depeeringGracePeriodHours: parseInt(process.env.AIMEAT_DEPEERING_GRACE_HOURS ?? '72', 10),
     keyCacheRefreshMinutes: parseInt(process.env.AIMEAT_KEY_CACHE_REFRESH_MINUTES ?? '5', 10),
     memoryQuotaMb: parseInt(process.env.AIMEAT_MEMORY_QUOTA_MB ?? '10', 10),

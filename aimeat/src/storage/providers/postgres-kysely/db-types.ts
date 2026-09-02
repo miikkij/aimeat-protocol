@@ -1303,6 +1303,7 @@ export interface FederationPeer {
   nodeCardHash: string | null;
   nodeId: string;
   peerMode: Generated<string>;
+  relayClaimAt: Timestamp | null;
   publicKey: Generated<string>;
   replicateMemory: Generated<boolean>;
   shareCatalogue: Generated<boolean>;

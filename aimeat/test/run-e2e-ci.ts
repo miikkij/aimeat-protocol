@@ -9,6 +9,10 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.28.0 -- 2026-09-03 -- Add e2e-federation-relay-claim.ts, in ALL_SUITES and in the guard tier:
+ *            eleven of its seventeen assertions are a refusal, and the capability it proves did not
+ *            exist before (a receiving node could not refuse a relay). It spawns its own node on
+ *            40291 with its own sqlite file, so it neither needs nor disturbs the shared server.
  *   v1.27.0 -- 2026-09-02 -- Add e2e-workspace-doc-edit.ts: in-place document edits, the byte-identity
  *            of everything they do not touch, and two concurrent appends both surviving.
  *   v1.26.0 -- 2026-09-02 -- Add e2e-app-playtest.ts: the game playtest bench through the audit door.
@@ -271,6 +275,7 @@ const ALL_SUITES = [
     'test/e2e-federation-contact-link.ts',
     'test/federation-support.ts',
     'test/e2e-federation-policy.ts',
+    'test/e2e-federation-relay-claim.ts',
     'test/e2e-federation-nodeinfo.ts',
     'test/e2e-federation-book.ts',
     'test/federation-mesh.ts',
@@ -577,6 +582,7 @@ const GUARD_SUITES = [
     'test/e2e-money-audit.ts',              // no path mints, double-spends or bills the wrong account
     'test/e2e-zip-security.ts',             // an uploaded archive cannot write outside where it was unpacked
     'test/e2e-federation-contact-link.ts',  // a contact link carries messages and refuses every other door
+    'test/e2e-federation-relay-claim.ts',   // a receiving node refuses a relay from a peer it demoted
     'test/e2e-static-hardening.ts',         // a dotfile (.env, .env~, .git/) is refused before any static handler
     'test/e2e-owner-deactivation.ts',       // deactivating an account ends every credential family, now (BR-04)
     'test/e2e-saml-login.ts',               // the organisation sign-in doors: who signs in, and every refusal (BR-04)

@@ -122,6 +122,25 @@ describe('a peer\'s flags survive the round trip', () => {
         }
     }, 30_000);
 
+    it('relayClaimAt persists when set and reads back null when never written', async () => {
+        // The one piece of state the receiving relay gate keeps. It decides whether an UNCLAIMED
+        // relay from that peer is refused, so a column that reads back null when it was written
+        // reopens the downgrade this whole mechanism closes — and it would do it silently, in the
+        // direction nobody notices: the door opens.
+        for (const { name, storage } of provs) {
+            const never = `aimeat-test-relayclaim-never-${name}`;
+            const seen = `aimeat-test-relayclaim-seen-${name}`;
+            const when = '2026-09-03T10:11:12.000Z';
+            await storage.saveFederationPeer(peerAt('member', never));
+            await storage.saveFederationPeer(peerAt('member', seen, { relayClaimAt: when }));
+
+            expect((await readBack(storage, never)).relayClaimAt ?? null, `${name}: never signed`).toBe(null);
+            const back = (await readBack(storage, seen)).relayClaimAt;
+            expect(back, `${name}: has signed`).toBeTruthy();
+            expect(new Date(back!).toISOString(), `${name}: the same instant came back`).toBe(when);
+        }
+    }, 30_000);
+
     it('supportUpstream persists when set and defaults to off when not', async () => {
         for (const { name, storage } of provs) {
             const off = `aimeat-test-upstream-off-${name}`;

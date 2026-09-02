@@ -247,6 +247,12 @@ export interface FederationPeerRecord {
   softwareVersion?: string | null;
   /** Hash of the peer's node-card, for federation-book change detection. */
   nodeCardHash?: string | null;
+  /** When this peer first presented a VALID signed relay claim. Set by the receiving gate, never
+   *  by the peer: it is written from a claim this node verified against the key it pinned. Once
+   *  set, an unclaimed relay from that peer is refused even while the node is still on the
+   *  permissive setting, which is what stops an updated peer downgrading itself back out of the
+   *  gate. Legacy rows and peers that have never relayed are null. */
+  relayClaimAt?: string | null;
 }
 
 // Phase B.1 — Replication Queue (federation data sync)

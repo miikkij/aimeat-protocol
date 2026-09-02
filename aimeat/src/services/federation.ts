@@ -100,6 +100,10 @@ export interface PeerInfo {
     softwareVersion?: string | null;
     /** Hash of the peer's node-card, for change-detection when assembling the federation book. */
     nodeCardHash?: string | null;
+    /** When this peer first presented a valid signed relay claim. Written from a verified claim,
+     *  so a peer cannot set it; it is what stops an updated peer going back to unclaimed relays.
+     *  See src/middleware/relay-gate.ts. */
+    relayClaimAt?: string | null;
 }
 
 /**
