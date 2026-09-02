@@ -14,6 +14,16 @@ This is the second half of the AIMEAT-CrewAI integration story:
     them up automatically.
 
 Changelog:
+  0.25.1 -- The two call sites that build the liaison's MCP session now pass `identity.gaii`,
+    not the bare `agent_name`. 0.25.0 taught the SESSION to carry an identity and this file kept
+    handing it the credential's NAME, so a two-owner daemon refused every liaison it opened --
+    correctly, and with a message naming exactly what to send. The daemon resolved the identity
+    at the top of `run_crew_daemon` and used it everywhere else (the `_Api` header, every
+    `/local/*` `agent=` param) and then dropped it at the one door that needed it most. Two sites,
+    not one: the long-lived liaison and the per-task EXECUTE worker. `test_serve_params_identity`
+    pins both by reading this module's source, because the next call site added will look like
+    the two that were wrong.
+
   0.25.0 -- The MCP session says who it is. `serve_params()` sent only the placeholder
     `Authorization` header the daemon never validates, and no `X-Aimeat-Agent` at all, on the
     documented assumption that "the daemon uses its primary agent" when none is named. That default
@@ -1536,7 +1546,7 @@ def run_crew_daemon(
         print(f"[daemon:{agent_name}] EXECUTE(worker) task {task_id}: {title}")
         try:
             with create_liaison_agent(
-                mcp_server_params=serve_params(agent_name=agent_name, **serve_opts),
+                mcp_server_params=serve_params(agent_name=identity.gaii, **serve_opts),
                 agent_name=agent_name,
                 tool_filter=resolved_tool_filter,
                 llm=llm,
@@ -1597,7 +1607,7 @@ def run_crew_daemon(
     # stays open for the whole daemon's lifetime. Each crew.kickoff() reuses
     # the same liaison instance.
     with create_liaison_agent(
-        mcp_server_params=serve_params(agent_name=agent_name, **serve_opts),
+        mcp_server_params=serve_params(agent_name=identity.gaii, **serve_opts),
         agent_name=agent_name,
         tool_filter=resolved_tool_filter,
         llm=llm,
