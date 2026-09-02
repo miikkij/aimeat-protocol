@@ -30,6 +30,9 @@ class _FakeApi:
     def __init__(self, agent_name: str = "image-maker",
                  tasks: _FakeResp | None = None, records: _FakeResp | None = None):
         self.agent_name = agent_name
+        # The real _Api carries both since 0.24.0: the NAME builds /v1/agents/{name}/... paths,
+        # the GAII routes. A fake without one is a fake of an _Api that no longer exists.
+        self.gaii = agent_name
         self._tasks = tasks
         self._records = records
         self.calls: list[tuple[str, dict[str, Any]]] = []

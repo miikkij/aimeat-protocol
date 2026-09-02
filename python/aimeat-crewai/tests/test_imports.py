@@ -317,6 +317,129 @@ def test_read_token_missing_names_both_places(tmp_path, monkeypatch) -> None:
         _read_token("nonexistent-agent")
 
 
+def _write_key(home, agent, owner, gaii) -> None:
+    import json as _json
+    (home / "keys").mkdir(exist_ok=True)
+    (home / "keys" / f"{agent}@{owner}.key").write_text(_json.dumps({"gaii": gaii, "kid": "k1"}))
+
+
+def _write_bearer(home, agent, owner, sub) -> None:
+    import base64 as _b64, json as _json
+    (home / "tokens").mkdir(exist_ok=True)
+    b64 = lambda o: _b64.urlsafe_b64encode(_json.dumps(o).encode()).decode().rstrip("=")
+    (home / "tokens" / f"{agent}@{owner}.token").write_text(
+        f"{b64({'alg': 'EdDSA'})}.{b64({'sub': sub})}.sig"
+    )
+
+
+def test_identity_gaii_is_read_from_a_v2_key(tmp_path, monkeypatch) -> None:
+    """The credential's NAME and the routing IDENTITY are two values, and the GAII is READ.
+
+    Driving both from one `agent_name` produced a search for
+    keys/crew-forge#isoalice@node@*.key when the caller held a GAII, and routed to whichever
+    owner matched first when it held a name."""
+    from aimeat_crewai.daemon import resolve_agent_identity
+
+    monkeypatch.setenv("AIMEAT_HOME", str(tmp_path))
+    _write_key(tmp_path, "crew-forge", "isoalice", "crew-forge#isoalice@aimeat-iso-001-a")
+
+    ident = resolve_agent_identity("crew-forge", owner="isoalice")
+    assert ident.name == "crew-forge"                                  # what the FILE is called
+    assert ident.owner == "isoalice"
+    assert ident.gaii == "crew-forge#isoalice@aimeat-iso-001-a"        # what ROUTING wants
+
+
+def test_identity_gaii_is_read_from_a_v1_bearer_sub(tmp_path, monkeypatch) -> None:
+    from aimeat_crewai.daemon import resolve_agent_identity
+
+    monkeypatch.setenv("AIMEAT_HOME", str(tmp_path))
+    _write_bearer(tmp_path, "alicebot", "isoalice", "alicebot#isoalice@aimeat-iso-001-a")
+
+    ident = resolve_agent_identity("alicebot")
+    assert ident.gaii == "alicebot#isoalice@aimeat-iso-001-a"
+    assert ident.name == "alicebot"
+
+
+def test_identity_refuses_a_credential_carrying_no_identity(tmp_path, monkeypatch) -> None:
+    """Guessing a GAII would put the wrong agent on the wire, so it is refused instead."""
+    from aimeat_crewai.daemon import resolve_agent_identity
+    from aimeat_crewai import AimeatLiaisonError
+    import pytest
+
+    monkeypatch.setenv("AIMEAT_HOME", str(tmp_path))
+    (tmp_path / "keys").mkdir()
+    (tmp_path / "keys" / "mystery@alice.key").write_text("{}")
+
+    with pytest.raises(AimeatLiaisonError, match="carries no identity"):
+        resolve_agent_identity("mystery", owner="alice")
+
+
+def test_two_owners_one_name_resolve_to_two_identities(tmp_path, monkeypatch) -> None:
+    """The case the whole separation is for: same name, two accounts, one home."""
+    from aimeat_crewai.daemon import resolve_agent_identity
+
+    monkeypatch.setenv("AIMEAT_HOME", str(tmp_path))
+    _write_key(tmp_path, "concierge", "isoalice", "concierge#isoalice@aimeat-iso-001-a")
+    _write_key(tmp_path, "concierge", "isobob", "concierge#isobob@aimeat-iso-001-a")
+
+    a = resolve_agent_identity("concierge", owner="isoalice")
+    b = resolve_agent_identity("concierge", owner="isobob")
+    assert a.name == b.name == "concierge"      # one name
+    assert a.gaii != b.gaii                     # two identities
+
+
+def test_api_routes_by_gaii_and_builds_paths_from_the_name(tmp_path, monkeypatch) -> None:
+    from aimeat_crewai.daemon import _Api, AgentIdentity
+
+    ident = AgentIdentity(name="concierge", owner="isoalice", gaii="concierge#isoalice@aimeat-iso-001-a")
+    api = _Api("http://127.0.0.1:1234", ident)
+    assert api.session.headers["X-Aimeat-Agent"] == "concierge#isoalice@aimeat-iso-001-a"
+    assert api.agent_name == "concierge"
+    assert api.gaii == "concierge#isoalice@aimeat-iso-001-a"
+
+
+def test_api_still_accepts_a_bare_string(tmp_path) -> None:
+    """A single-owner caller that predates AgentIdentity behaves exactly as before."""
+    from aimeat_crewai.daemon import _Api
+
+    api = _Api("http://127.0.0.1:1234", "loopbot")
+    assert api.session.headers["X-Aimeat-Agent"] == "loopbot"
+    assert api.agent_name == "loopbot"
+
+
+def test_serve_params_matches_the_gaii_row(monkeypatch) -> None:
+    """serve.json has carried `gaii` on every agents[] row since schema 2, and this compared only
+    the bare name — so an agent addressed by its full identity was called unregistered by the
+    daemon holding its socket, and the error listed the halves it had not compared."""
+    from aimeat_crewai import mcp_client
+
+    doc = {"port": 5555, "agents": [
+        {"agent": "concierge", "gaii": "concierge#isoalice@n"},
+        {"agent": "concierge", "gaii": "concierge#isobob@n"},
+    ]}
+    monkeypatch.setattr(mcp_client, "ensure_serve", lambda **kw: doc)
+
+    # The full identity is accepted...
+    p = mcp_client.serve_params(agent_name="concierge#isobob@n")
+    assert "5555" in p["url"]
+    # ...and so is a bare name, unchanged.
+    assert "5555" in mcp_client.serve_params(agent_name="concierge")["url"]
+
+
+def test_serve_params_unknown_agent_lists_identities_not_bare_names(monkeypatch) -> None:
+    from aimeat_crewai import mcp_client
+    from aimeat_crewai.mcp_client import AimeatServeError
+    import pytest
+
+    doc = {"port": 5555, "agents": [{"agent": "concierge", "gaii": "concierge#isoalice@n"}]}
+    monkeypatch.setattr(mcp_client, "ensure_serve", lambda **kw: doc)
+
+    with pytest.raises(AimeatServeError) as e:
+        mcp_client.serve_params(agent_name="workflow-manager#isobob@n")
+    # It must name what it DID compare against, or the message repeats the original mistake.
+    assert "concierge#isoalice@n" in str(e.value)
+
+
 def test_daemon_default_tool_filter_exported_and_curated() -> None:
     """0.3.2 ships a curated default tool list for daemon liaisons so the LLM
     schema package stays small enough for litellm / smaller models."""

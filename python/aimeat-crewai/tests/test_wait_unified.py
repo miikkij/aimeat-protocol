@@ -25,6 +25,9 @@ class _FakeApi:
     def __init__(self, agent_name: str = "image-maker", resp: _FakeResp | None = None,
                  raise_exc: bool = False):
         self.agent_name = agent_name
+        # The real _Api carries both since 0.24.0: the NAME builds /v1/agents/{name}/... paths,
+        # the GAII routes. A fake without one is a fake of an _Api that no longer exists.
+        self.gaii = agent_name
         self._resp = resp or _FakeResp(204)
         self._raise = raise_exc
         self.calls = 0
