@@ -471,11 +471,20 @@ def serve_params(
         start_timeout=start_timeout,
     )
     if agent_name is not None:
-        known = [a.get("agent") for a in doc.get("agents", [])]
-        if agent_name not in known:
+        # MATCH ON EITHER, BECAUSE THE CALLER MAY HOLD EITHER. `serve.json` schema 2 carries a
+        # `gaii` on every agents[] row beside the bare `agent`, and this checked only the bare
+        # name — so an agent addressed by its full identity, which is the only unambiguous way to
+        # address one on a two-owner daemon, was reported as "not registered" by the very daemon
+        # holding its socket. The error then listed the bare names, so it printed the halves it had
+        # not compared: the defect was visible in its own message.
+        rows = doc.get("agents", []) or []
+        names = [a.get("agent") for a in rows]
+        gaiis = [a.get("gaii") for a in rows]
+        if agent_name not in names and agent_name not in gaiis:
+            served = ", ".join(str(g or n) for n, g in zip(names, gaiis)) or "none"
             raise AimeatServeError(
                 f"Agent '{agent_name}' is not registered with the local serve "
-                f"daemon (it serves: {', '.join(map(str, known)) or 'none'}). "
+                f"daemon (it serves: {served}). "
                 f"Run: aimeat connect add --agent {agent_name} ..."
             )
     return http_params(

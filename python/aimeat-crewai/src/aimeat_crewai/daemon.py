@@ -216,11 +216,14 @@ in the supervisor should prevent crash loops.
 """
 from __future__ import annotations
 
+import base64
+import json
 import signal
 import sys
 import threading
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
@@ -249,11 +252,22 @@ class _Api:
     makes the 30s poll cycle effectively free.
     """
 
-    def __init__(self, base_url: str, agent_name: str, session: Any = None) -> None:
+    def __init__(self, base_url: str, identity: "AgentIdentity | str", session: Any = None) -> None:
+        # ROUTING TAKES THE GAII, PATHS TAKE THE NAME. On a daemon holding two owners a bare name
+        # is ambiguous and the connector refuses it by design, so the header must carry the full
+        # identity; the node's `/v1/agents/{name}/...` routes are scoped by the caller the header
+        # just named, so the bare name is right there and reads better in a log.
+        # A plain string is still accepted for callers that predate AgentIdentity: it is used for
+        # both, which is exactly the old behaviour and correct on a single-owner daemon.
+        if isinstance(identity, str):
+            self.agent_name = identity
+            self.gaii = identity
+        else:
+            self.agent_name = identity.name
+            self.gaii = identity.gaii
         self.base_url = base_url.rstrip("/")
-        self.agent_name = agent_name
         self.session = session or requests.Session()
-        self.session.headers.update({"X-Aimeat-Agent": agent_name})
+        self.session.headers.update({"X-Aimeat-Agent": self.gaii})
 
     def get(self, path: str, **kwargs: Any) -> Any:
         kwargs.setdefault("timeout", 15)
@@ -266,6 +280,124 @@ class _Api:
     def patch(self, path: str, **kwargs: Any) -> Any:
         kwargs.setdefault("timeout", 15)
         return self.session.patch(f"{self.base_url}{path}", **kwargs)
+
+
+def _locate_credential(agent_name: str, owner: str | None = None) -> Path:
+    """
+    The credential file this machine holds for `agent_name`, of either family.
+
+    `agent_name` is the BARE NAME here, always: the file is `{name}@{owner}`, so handing this a
+    GAII produces a search for `keys/crew-forge#isoalice@node@*.key`, which matches nothing and
+    reports the agent as unknown when its key is sitting right there.
+    """
+    import glob
+
+    home_dir = aimeat_home()
+    tokens_dir = home_dir / "tokens"
+    keys_dir = home_dir / "keys"
+
+    if owner:
+        token_path = tokens_dir / f"{agent_name}@{owner}.token"
+        key_path = keys_dir / f"{agent_name}@{owner}.key"
+        if token_path.is_file():
+            return token_path
+        if key_path.is_file():
+            return key_path
+        raise AimeatLiaisonError(
+            f"No credential for {agent_name}@{owner} on this machine "
+            f"(looked for {token_path} and {key_path}). "
+            f"Run: aimeat connect add --agent {agent_name} --owner {owner} ..."
+        )
+
+    matches = sorted(
+        glob.glob(str(tokens_dir / f"{agent_name}@*.token"))
+        + glob.glob(str(keys_dir / f"{agent_name}@*.key"))
+    )
+    if not matches:
+        raise AimeatLiaisonError(
+            f"No credential for '{agent_name}' on this machine (looked in {tokens_dir} and {keys_dir}). "
+            f"Run: aimeat connect add --agent {agent_name} --owner <owner> --url <node-url>"
+        )
+    owners = sorted({Path(m).stem.split("@", 1)[1] for m in matches})
+    if len(owners) > 1:
+        raise AimeatLiaisonError(
+            f"Multiple owners have an agent named '{agent_name}' ({', '.join(owners)}). "
+            f"Pass `owner=<name>` to disambiguate."
+        )
+    return Path(matches[0])
+
+
+@dataclass(frozen=True)
+class AgentIdentity:
+    """
+    An agent's NAME and its IDENTITY, which are not the same string and must not be driven from
+    one value.
+
+    This package used a single `agent_name` for two jobs, and in a two-owner home they diverge:
+
+      name   what the CREDENTIAL FILE is called -- `keys/crew-forge@isoalice.key`
+      gaii   what ROUTING wants -- `X-Aimeat-Agent: crew-forge#isoalice@aimeat-iso-001-a`
+
+    Passing a GAII where a name belonged produced a search for
+    `keys/crew-forge#isoalice@aimeat-iso-001-a@*.key`, and passing a name where a GAII belonged
+    routed to whichever owner's agent happened to match first -- or, since the connector started
+    refusing an ambiguous bare name, to nothing at all.
+
+    THE GAII IS READ, NOT ASSEMBLED. It comes out of the credential itself: a v2 key file carries
+    it as a field, a v1 bearer carries it as the `sub` claim. Building `f"{agent}#{owner}@{node}"`
+    would be a fourth place that has to agree about the node id, and the three that already exist
+    are the reason this class is here.
+    """
+
+    name: str
+    owner: str
+    gaii: str
+
+
+def _gaii_from_credential(credential_file: Path) -> str | None:
+    """The identity the credential itself carries. None when it carries none we can read."""
+    try:
+        raw = credential_file.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+
+    if credential_file.suffix == ".key":
+        try:
+            value = json.loads(raw).get("gaii")
+        except (ValueError, AttributeError):
+            return None
+        return value if isinstance(value, str) and value else None
+
+    # A bearer: the identity is the `sub` claim of an unverified read. Verification is the node's
+    # job and happens on every call; all that is wanted here is the name to route by.
+    parts = raw.split(".")
+    if len(parts) < 2:
+        return None
+    try:
+        payload = parts[1]
+        payload += "=" * (-len(payload) % 4)
+        value = json.loads(base64.urlsafe_b64decode(payload)).get("sub")
+    except Exception:
+        return None
+    return value if isinstance(value, str) and value else None
+
+
+def resolve_agent_identity(agent_name: str, owner: str | None = None) -> AgentIdentity:
+    """
+    Read this machine's identity for `agent_name`: the credential's own name and its GAII.
+
+    Raises AimeatLiaisonError when there is no credential here, or when the credential carries no
+    identity this package can read -- guessing one would put the wrong agent on the wire.
+    """
+    credential_file = _locate_credential(agent_name, owner)
+    resolved_owner = credential_file.stem.split("@", 1)[1]
+    gaii = _gaii_from_credential(credential_file)
+    if not gaii:
+        raise AimeatLiaisonError(
+            f"The credential at {credential_file} carries no identity this package can read. "
+            f"Re-run: aimeat connect add --agent {agent_name} --owner {resolved_owner} ..."
+        )
+    return AgentIdentity(name=agent_name, owner=resolved_owner, gaii=gaii)
 
 
 def _read_token(agent_name: str, owner: str | None = None) -> tuple[str, str]:
@@ -303,43 +435,7 @@ def _read_token(agent_name: str, owner: str | None = None) -> tuple[str, str]:
     Returns (token, node_url). The token is "" for a v2 agent, because there is
     no bearer on disk to return and nothing consumes it.
     """
-    import glob
-
-    home_dir = aimeat_home()
-    tokens_dir = home_dir / "tokens"
-    keys_dir = home_dir / "keys"
-
-    # Locate a credential of EITHER family.
-    if owner:
-        token_path = tokens_dir / f"{agent_name}@{owner}.token"
-        key_path = keys_dir / f"{agent_name}@{owner}.key"
-        if token_path.is_file():
-            credential_file = token_path
-        elif key_path.is_file():
-            credential_file = key_path
-        else:
-            raise AimeatLiaisonError(
-                f"No credential for {agent_name}@{owner} on this machine "
-                f"(looked for {token_path} and {key_path}). "
-                f"Run: aimeat connect add --agent {agent_name} --owner {owner} ..."
-            )
-    else:
-        matches = sorted(
-            glob.glob(str(tokens_dir / f"{agent_name}@*.token"))
-            + glob.glob(str(keys_dir / f"{agent_name}@*.key"))
-        )
-        if not matches:
-            raise AimeatLiaisonError(
-                f"No credential for '{agent_name}' on this machine (looked in {tokens_dir} and {keys_dir}). "
-                f"Run: aimeat connect add --agent {agent_name} --owner <owner> --url <node-url>"
-            )
-        owners = sorted({Path(m).stem.split("@", 1)[1] for m in matches})
-        if len(owners) > 1:
-            raise AimeatLiaisonError(
-                f"Multiple owners have an agent named '{agent_name}' ({', '.join(owners)}). "
-                f"Pass `owner=<name>` to disambiguate."
-            )
-        credential_file = Path(matches[0])
+    credential_file = _locate_credential(agent_name, owner)
 
     # A key is the agent's private signing material and is not a bearer: read the file only when it
     # IS one. The distinction is the suffix, and the caller wants neither.
@@ -355,6 +451,7 @@ def _read_token(agent_name: str, owner: str | None = None) -> tuple[str, str]:
     # and one runner command between them. Reading only the old path found nothing on any current
     # install and fell through to the default below, which is aimeat.io: a local test agent would
     # have reported PRODUCTION as its node. Nothing calls it, but a runtime that trusted it would.
+    home_dir = aimeat_home()
     credential_owner = credential_file.stem.split("@", 1)[1]
     config_paths = [
         home_dir / "agents" / credential_owner / agent_name / "config.yaml",
@@ -461,7 +558,7 @@ def _is_cancelled(api: _Api, task_id: str) -> bool:
     #    owner-scoped `agents.cancel.*` memory scan (100 records) before every dispatch. Fall back to
     #    the legacy scan only if the serve daemon is too old to expose /local/cancelled (404).
     try:
-        r = api.get("/local/cancelled", params={"agent": api.agent_name}, timeout=10)
+        r = api.get("/local/cancelled", params={"agent": api.gaii}, timeout=10)
         if r.status_code == 200:
             return task_id in (r.json().get("data", {}).get("cancelled", []) or [])
         if r.status_code != 404:
@@ -593,7 +690,7 @@ def _wait_unified(api: _Api, seconds: float, stop: dict[str, Any]) -> str:
         try:
             r = api.get(
                 "/local/wake/next",
-                params={"wait": wait_ms, "agent": api.agent_name},
+                params={"wait": wait_ms, "agent": api.gaii},
                 timeout=wait_ms / 1000 + 10,
             )
             if r.status_code == 200:
@@ -650,7 +747,7 @@ def _wait_for_work(
                 try:
                     rt = api.get(
                         "/local/tasks/next",
-                        params={"wait": 0, "agent": api.agent_name},
+                        params={"wait": 0, "agent": api.gaii},
                         timeout=10,
                     )
                     if rt.status_code == 200:
@@ -661,7 +758,7 @@ def _wait_for_work(
             try:
                 r = api.get(
                     wake_path,
-                    params={"wait": wait_ms, "agent": api.agent_name},
+                    params={"wait": wait_ms, "agent": api.gaii},
                     timeout=wait_ms / 1000 + 10,
                 )
                 if r.status_code == 200:
@@ -698,7 +795,7 @@ def _drain_records(api: _Api, max_items: int = 50) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for _ in range(max_items):
         try:
-            r = api.get("/local/records/next", params={"wait": 0, "agent": api.agent_name}, timeout=10)
+            r = api.get("/local/records/next", params={"wait": 0, "agent": api.gaii}, timeout=10)
             if r.status_code != 200:
                 break
             event = r.json().get("data", {}).get("event")
@@ -794,7 +891,7 @@ def _drain_dms(api: _Api, max_items: int = 50) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for _ in range(max_items):
         try:
-            r = api.get("/local/dm/next", params={"wait": 0, "agent": api.agent_name}, timeout=10)
+            r = api.get("/local/dm/next", params={"wait": 0, "agent": api.gaii}, timeout=10)
             if r.status_code != 200:
                 break
             event = r.json().get("data", {}).get("event")
@@ -818,7 +915,7 @@ def _next_invoke(api: _Api, wait_ms: int) -> dict[str, Any] | None | str:
     serve daemon predates the endpoint (404) so the caller can stop polling instead of spinning."""
     r = api.get(
         "/local/invoke/next",
-        params={"wait": wait_ms, "agent": api.agent_name},
+        params={"wait": wait_ms, "agent": api.gaii},
         timeout=wait_ms / 1000 + 10,
     )
     if r.status_code == 404:
@@ -834,7 +931,7 @@ def _answer_invoke(api: _Api, invoke_id: str, ok: bool, result: Any) -> bool:
     the daemon no longer knows the id (already answered, or the node stopped waiting)."""
     r = api.post(
         f"/local/invoke/{invoke_id}/result",
-        params={"agent": api.agent_name},
+        params={"agent": api.gaii},
         json={"ok": ok, "result": result},
         timeout=10,
     )
@@ -1214,6 +1311,9 @@ def run_crew_daemon(
     # Fail fast with the connector's own guidance if the agent was never
     # registered locally -- the serve daemon needs the same home dir. The
     # node_url is informational only; actual calls go through the loopback.
+    # Read the identity once, here, and carry it. `agent_name` is the credential's NAME; `identity
+    # .gaii` is what routing wants, and on a daemon holding two owners those cannot be one string.
+    identity = resolve_agent_identity(agent_name, owner=owner)
     _token, node_url = _read_token(agent_name, owner=owner)
     listen_set = set(listen_for)
     serve_opts = dict(serve_options or {})
@@ -1229,7 +1329,7 @@ def run_crew_daemon(
     # the bearer token itself; X-Aimeat-Agent routes to the right identity.
     discovery = ensure_serve(**serve_opts)
     loopback_base = f"http://127.0.0.1:{discovery['port']}"
-    api = _Api(loopback_base, agent_name)
+    api = _Api(loopback_base, identity)
 
     # Per-LLM-call usage -> node ledger (LEDGER TARGET-016). Subscribes once to CrewAI's
     # event bus and POSTs an llm_call telemetry event per call over this same loopback, so
