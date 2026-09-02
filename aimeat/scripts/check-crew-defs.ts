@@ -115,9 +115,9 @@ const MUST_BE_ABLE_TO: Record<string, { tool: string; because: string }[]> = {
     { tool: DELEGATION_TOOL, because: 'it is a front door that hands on what it cannot answer' },
     { tool: 'memory', because: 'it answers from what the account already holds' },
   ],
-  'crew-forge': [
-    { tool: 'memory', because: 'a crew definition IS a memory record, and it reads the roster before writing one' },
-  ],
+  // `crew-forge` left BASIC_AGENTS on 2026-09-02 (see the tombstone in src/data/basic-agents.ts),
+  // so its entry is gone with it. This table judges what this repo SHIPS; an entry for something
+  // it does not ship would never run and would slowly become a description of the past.
   'workflow-manager': [
     { tool: DELEGATION_TOOL, because: 'ordering work from other agents is its entire description' },
     { tool: 'memory', because: 'it names doers, and must read who exists rather than invent one' },

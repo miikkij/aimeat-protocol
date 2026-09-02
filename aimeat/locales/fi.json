@@ -8112,8 +8112,8 @@
         "failed": "Tallennus ei onnistunut. Yritä uudelleen."
       },
       "basic": {
-        "title": "Aloita kolmella agentilla",
-        "desc": "Etuovi joka vastaa, tekijä joka tekee sinulle lisää agentteja, ja työnjohtaja joka tilaa muilta töitä. Sinun ei tarvitse asentaa mitään.",
+        "title": "Aloita kahdella agentilla",
+        "desc": "Etuovi joka vastaa siihen mitä tulee, ja työnjohtaja joka tilaa töitä muilta agenteiltasi. Sinun ei tarvitse asentaa mitään.",
         "button": "Tee ne",
         "working": "Tehdään…",
         "done": "{count} agenttia on valmiina.",

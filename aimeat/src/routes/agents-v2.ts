@@ -42,6 +42,7 @@ import { registerAgentCardRoutes } from './agents-v2/card.js';
 import { registerAgentV2MessagingRoutes } from './agents-v2/messaging.js';
 import { registerAgentV2TaskRoutes } from './agents-v2/tasks.js';
 import { registerAgentV2MigrateRoutes } from './agents-v2/migrate.js';
+import { registerAgentProposalRoutes } from './agents-v2/agent-proposals.js';
 
 export function agentsV2Router(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -54,6 +55,7 @@ export function agentsV2Router(config: AimeatConfig, storage: Storage): Router {
   registerAgentV2TaskRoutes(router, config, storage);
   registerAgentV2MigrateRoutes(router, config, storage);
   registerAgentCardRoutes(router, config, storage);
+  registerAgentProposalRoutes(router, config, storage);
 
   return router;
 }

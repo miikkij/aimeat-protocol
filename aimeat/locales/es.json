@@ -7891,8 +7891,8 @@
         "failed": "No se ha podido guardar. Inténtalo otra vez."
       },
       "basic": {
-        "title": "Empieza con tres agentes",
-        "desc": "Una puerta de entrada que responde, uno que te crea más agentes y otro que encarga trabajo a los demás. No tienes que configurar nada.",
+        "title": "Empieza con dos agentes",
+        "desc": "Una puerta de entrada que responde a lo que llega, y otro que encarga trabajo a tus demás agentes. No tienes que configurar nada.",
         "button": "Créalos",
         "working": "Creando…",
         "done": "Ya tienes {count} agentes listos.",

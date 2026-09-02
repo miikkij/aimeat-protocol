@@ -31,9 +31,21 @@
  *   its owner, so it carries agent:write and agent:delete, and deliberately not agent:permissions
  *   (rewriting a sibling's permission set stays with the person) and not the wildcard.
  *
+ *   WHAT DOES NOT BELONG IN THIS FILE. `BASIC_AGENTS` is the set a node gives EVERY owner on day
+ *   one, before they have chosen anything. A third-party or vendor agent — something the owner
+ *   picks — is not that, and putting one here would make the node maintain a catalogue on somebody
+ *   else's behalf. That is the same shape as the crew tool menu whose copy went stale in this repo
+ *   and rejected a tool the runtime had added: a list you do not own can only ever be behind.
+ *   Adding to this set should be a decision someone argues for, not a habit.
+ *
  * @structure BASIC_AGENTS · BasicAgentTemplate · basicAgentByName
  * @usage import { BASIC_AGENTS } from '../data/basic-agents.js';
  * @version-history
+ *   v2.0.0 — 2026-09-02 — TWO basic agents. `crew-forge` leaves the set; the tombstone where its
+ *     template stood carries the reasoning. Creating an agent is two data writes and does not need
+ *     an agent of its own, and writing a good definition is a reasoning task best done by the model
+ *     the owner is already talking to. Creation moves to a proposal the owner approves
+ *     (routes/agents-v2/agent-proposals.ts). Existing crew-forge agents are untouched.
  *   v1.3.0 — 2026-09-02 — TOOLS, and who owns `mode`.
  *     Two of the three declared no tools at all. `workflow-manager` is sold as "orders work from
  *     your other agents" and had no delegation tool, so it could plan a job and send nothing;
@@ -193,74 +205,27 @@ export const BASIC_AGENTS: readonly BasicAgentTemplate[] = [
       ],
     },
   },
-  {
-    name: 'crew-forge',
-    displayName: 'Crew forge',
-    description: 'Makes more agents for you when they are needed, and clears away the ones it made.',
-    scopes: [
-      'memory:read', 'memory:write',
-      // The two words that let it do its job on siblings it created. `agent:delete` is fenced a
-      // second time at the route: an agent may only end an agent whose registration it authorized.
-      'agent:write', 'agent:delete',
-      'task:read', 'task:write',
-      'catalogue:read',
-    ],
-    // `task-runner`, not `coordinator`. This one runs on `spawn`: nothing is sitting there to accept
-    // work, so a queued task must activate on its own or it waits for a person who was never told.
-    // Seeded as `coordinator`, every task for the three basic agents stayed `queued` — the node
-    // auto-activates only for `task-runner` (services/agent-task-rules.ts). `coordinator` describes
-    // what it DOES; this field decides whether its work starts.
-    mode: 'task-runner',
-    runMode: 'spawn',
-    tags: ['crew.basic', 'role.crew-forge'],
-    crewDef: {
-      readme_md: '# Crew forge\\n\\nMakes more agents for you, and clears away the ones it made.\\n\\nWhen a job needs an agent that does not exist yet, this writes one: the name, what it is for, what it may reach, and the definition it runs. It only ends agents it created itself — the node enforces that, not politeness.\\n\\n**It cannot widen its own permissions and it cannot change a sibling\'s.** Rewriting who may do what stays with you.',
-      tags: ['crew.basic', 'role.crew-forge'],
-      process: 'sequential',
-      // Task-runner, like the other spawn agent: work arrives as a task the node has activated.
-      listen_for: ['tasks'],
-      agents: [
-        {
-          role: 'Designer',
-          // `memory`: it must see the roster and the definitions that already exist before writing
-          // a new agent, or its answer to "we need something that does X" is a duplicate of
-          // something the owner already has.
-          tools: ['memory'],
-          goal: 'Turn "we need something that does X" into one agent: what it is for, the narrowest permissions that let it do that, and how it should run.',
-          backstory: 'You have watched people solve a one-off problem by creating a permanent agent with every permission, and then live with it. You do the opposite: you name the job first, then the smallest set of things it must reach, and you write down what you deliberately left out. An agent that needs a permission you did not give it can ask; one that was handed everything never will.',
-          allow_delegation: false,
-        },
-        {
-          role: 'Registrar',
-          goal: 'Create the agent on the node and give it its definition, or say exactly why it could not be created.',
-          backstory: 'You do the writing. You use the node\'s own tools rather than reaching into storage, because the doors carry the checks and a direct write skips them. If the node refuses, you report its reason as it gave it rather than paraphrasing it into something reassuring.',
-          allow_delegation: false,
-          // `crew_registry` IS a tool, and I removed it on 2026-09-02 believing it was not. The
-          // menu I checked it against was crewaimeat's, copied into a comment in this repo, and it
-          // had changed: they added `crew_registry` in their first round precisely because the
-          // forge could not otherwise create anything. The copy went stale and I trusted the copy
-          // over the runtime that owns the list. `memory` stays beside it — the definition it
-          // writes is a memory record — but the registry tool is what makes an agent.
-          tools: ['crew_registry', 'memory'],
-        },
-      ],
-      tasks: [
-        {
-          id: 'design',
-          description: 'Design the agent this job needs. What is being asked: {{ctx.prompt}}\\n\\nGive it a short lowercase name, one sentence saying what it is for, the narrowest list of permissions that lets it do that, and whether it should be resident or spawned. Say which permissions you considered and deliberately left out.',
-          expected_output: 'One agent design: name, purpose, permissions, run mode, and what was left out and why.',
-          agent: 'Designer',
-        },
-        {
-          id: 'register',
-          description: 'Create the designed agent and publish its definition. Use the node\'s own tools. If anything is refused, stop and report the refusal verbatim; do not create a partial agent and do not retry with wider permissions.',
-          expected_output: 'The created agent\'s name and identity, or the refusal exactly as the node gave it.',
-          agent: 'Registrar',
-          context: ['design'],
-        },
-      ],
-    },
-  },
+  // ── crew-forge WAS HERE, AND WAS REMOVED ON PURPOSE — 2026-09-02 ──────────
+  //
+  // Not lost in a merge. Creating an agent is two data writes — a record on the node and a
+  // definition at `crews.registry.<agent>` — and the spawner runs whatever the roster says. That
+  // is not an act that needs an agent of its own.
+  //
+  // Writing a GOOD definition is a reasoning task, and the strongest model the owner has is the
+  // one they are already talking to. Routing it through a spawned worker added a hop, spent the
+  // owner's own tokens, and took the person out of the one moment the design says they belong in:
+  // when their account gains a new principal.
+  //
+  // The ceiling made the case. crew-forge could design a valid definition and then not publish it:
+  // `aimeat_crew_publish` asks the TARGET's runtime to validate, a brand-new agent has none, so it
+  // answered AGENT_OFFLINE every time. Creation moves to the chat path — an agent PROPOSES, the
+  // owner approves, and the owner-gated route creates and seeds atomically (routes/agents-v2/
+  // agent-proposals.ts). Device authorization is untouched: an agent that brings its own runtime
+  // still connects from its own machine with the scopes the owner picks.
+  //
+  // EXISTING crew-forge AGENTS ARE UNTOUCHED. They keep their record, their definition and their
+  // scopes, and they keep working; `crew-forge` is still the default runner name that
+  // routes/apps/agents-deploy.ts looks for. The button simply stops creating new ones.
   {
     name: 'workflow-manager',
     displayName: 'Workflow manager',
