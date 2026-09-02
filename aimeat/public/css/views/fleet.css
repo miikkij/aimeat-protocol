@@ -5,6 +5,10 @@
  * @description The Agents section (/v1/fleet): one row per agent, with the credential state as the
  *   thing the eye lands on. Prefix `flt-`.
  * @version-history
+ *   v1.2.0 — 2026-09-03 — .flt-live, .flt-hidden and a readable group heading; .flt-dot is gone.
+ *   v1.1.0 — 2026-09-03 — The rows group by state, so the sentence is styled once instead of
+ *     fifty-two times, and the monospace identity column is gone. The migration banner is a
+ *     column: it says four things now, and four sentences sharing a row are read in no order.
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V3).
  */
 
@@ -103,18 +107,6 @@
   text-decoration: underline;
 }
 
-.flt-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--border);
-  flex: 0 0 auto;
-}
-
-.flt-dot--on {
-  background: var(--success, #10b981);
-}
-
 .flt-badge {
   font-size: 0.7rem;
   text-transform: uppercase;
@@ -148,10 +140,70 @@
 .flt-state--unreadable { color: var(--danger, #E8564A); }
 .flt-state--unknown { color: var(--text-muted); }
 
-.flt-row-note {
+/* ── One state, one sentence, then its rows ──
+   The note used to be per row. On this developer's own account that rendered the identical three
+   lines fifty-two times, which is one fact typeset as a wall. It belongs to the STATE, so it sits
+   on the group and the rows under it carry only what differs. */
+.flt-group {
+  margin-bottom: 1.4rem;
+}
+
+.flt-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0 0 0.15rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.flt-group-kind,
+.flt-group-count {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+/* The state word carries the colour; the heading does not. As a heading colour, --text-muted made
+   "Never connected" the palest text on the page, above six agents' worth of rows. */
+.flt-group-head { color: var(--text); }
+
+/* ...and the two states whose colour IS the muted grey do not get it at heading size. --text-muted
+   on the page ground is about 2.3:1, which is fine for an inline aside and not for the word six
+   agents are filed under. Measured in a design review: "Never connected" disappeared while the rows
+   beneath it stayed crisp, so the group read as loose cards with no owner. */
+.flt-group-head .flt-state--never,
+.flt-group-head .flt-state--unknown { color: var(--text); }
+
+/* What the filter took away, said where the filter is, because on an account whose healthy agents
+   are all below the fold pressing it changed nothing a person could see. */
+.flt-hidden {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+/* Replaces the unlabelled 8x8 dot. Only on the rows where it is true, so it is a difference. */
+.flt-live {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--success, #10b981);
+  white-space: nowrap;
+}
+
+/* The countdown, the one thing a row has that its neighbours do not. */
+.flt-days {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.flt-group-note {
+  margin: 0 0 0.6rem;
+  max-width: 60ch;
   font-size: 0.85rem;
   color: var(--text-muted);
-  margin-top: 0.3rem;
 }
 
 .flt-row-meta {
@@ -163,11 +215,9 @@
   color: var(--text-muted);
 }
 
-.flt-gaii {
-  font-family: var(--font-mono);
-  overflow-wrap: anywhere;
-  min-width: 0;
-}
+/* .flt-gaii is gone with the column it styled. The full identity was the agent's name followed by
+   an owner and node identical on every row, set in monospace so the repetition was the loudest
+   thing on the page. It is the name link's tooltip now. */
 
 @media (max-width: 600px) {
   /* On a phone the state belongs under the name rather than pushed to a right edge that is not
@@ -181,24 +231,48 @@
    Above the list rather than inside it: it is about several agents at once, and a control repeated
    per row would ask the person to do one at a time the thing they want done to all of them. */
 .flt-migrate {
+  /* A COLUMN, NOT A ROW. It was a flex row: one sentence beside a button, which is the shape for
+     one sentence. It now says four things in the order a person needs them — what is wrong, what
+     the press does, what it costs, what it needs — and four sentences competing for a row's width
+     are read in no order at all. */
   display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
   border: 1px solid var(--warn, #F59E0B);
   border-radius: var(--radius);
   background: var(--card);
-  padding: 0.75rem 0.9rem;
+  padding: 0.9rem 1rem;
   margin-bottom: 1rem;
   min-width: 0;
 }
 
+.flt-migrate-head {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
 .flt-migrate-line {
   margin: 0;
-  flex: 1 1 18rem;
   min-width: 0;
+  max-width: 60ch;
   font-size: 0.9rem;
+  line-height: 1.45;
 }
+
+/* What it needs, or that it has it. The one line whose answer changes what the person does next,
+   so it is not the same grey as the two above it. */
+.flt-migrate-line.is-blocked { color: var(--warn, #F59E0B); }
+.flt-migrate-line.is-ready { color: var(--success, #10b981); }
+
+/* Full size, not btn-sm: this is the one thing on the page that acts. */
+.flt-migrate button { margin-top: 0.5rem; }
+
+/* The reassurance. True and worth saying, but it is not the problem or the action, so it does not
+   compete with either. */
+.flt-migrate-keeps { color: var(--text-muted); font-size: 0.85rem; }
 
 /* A DISABLED BUTTON HAS TO LOOK DISABLED. Measured on the real page: with no connector running
    the button is correctly `disabled`, and it rendered at full opacity with a pointer cursor — so
@@ -211,8 +285,7 @@
 
 /* The answer stays where the person is looking. Full width so it never squeezes the button. */
 .flt-migrate-outcome {
-  flex-basis: 100%;
-  margin: 0;
+  margin: 0.2rem 0 0;
   font-size: 0.85rem;
   color: var(--text-muted);
 }
