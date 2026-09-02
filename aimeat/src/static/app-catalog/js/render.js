@@ -52,12 +52,35 @@ export function setIframeUrl(v) { currentIframeUrl = v; }
 
 // ── The rail: the state filter and the tags, each with its count ──────────────────────────
 // The view and the search are main-owned; these three are the rail's own.
-let activeState = null;      // null | 'listed' | 'unlisted' | 'draft' — library view only
+let activeState = null;      // null | 'listed' | 'unlisted' | 'draft' | one of KUNTO_KEYS — library view only
 let sortMode = 'newest';     // 'newest' | 'opens' | 'name' — every list
 let tagsExpanded = false;    // the tag list folds after TAGS_FOLDED rows
 let lastEntries = [];        // the owner's entries from the last render, for a re-count without a re-fetch
 const TAGS_FOLDED = 8;
 export function getSortMode() { return sortMode; }
+
+// ── The condition rows: what an app is missing, from the same list the grid is built from ──
+// The profile's Apps page counts the same seven things and links here with ?filter=<key>, so a
+// number on that page opens exactly these rows. The keys are the contract between the two pages.
+export const KUNTO_KEYS = ['noMap', 'noAi', 'specOff', 'seoOff', 'stale60', 'noShot', 'noSkill'];
+// The apps a skill is bound to ("owner/filename"), read once per listing by server-io: the seventh
+// row cannot be answered from the app list alone.
+let boundSkillApps = {};
+export function setBoundSkillApps(v) { boundSkillApps = v || {}; }
+function kuntoFlags(sa) {
+  var m = sa.manifest || {};
+  var spec = sa.spec_check && sa.spec_check.status;
+  var age = sa.created_at ? (Date.now() - Date.parse(sa.created_at)) : 0;
+  return {
+    noMap: !(sa.data_map && sa.data_map.missing === false),
+    noAi: !(sa.ai_posture || m.aiPosture),
+    specOff: spec === 'missing' || spec === 'stale',
+    seoOff: sa.seo_state === 'off',
+    stale60: age > 60 * 864e5,
+    noShot: !sa.has_screenshot,
+    noSkill: !boundSkillApps[(sa.owner || '') + '/' + (sa.filename || '')]
+  };
+}
 
 function railItem(label, count, on, onclick, isTag) {
   return '<button type="button" class="cat-rail-item' + (isTag ? ' cat-rail-item--tag' : '') + (on ? ' active' : '') +
@@ -119,10 +142,22 @@ function renderStateBar(entries) {
   }
   var bar = document.getElementById('state-bar');
   if (bar) {
+    // The condition rows count the same entries; a row with nothing behind it stays off the rail,
+    // and the whole group waits for the listing, or it would show seven zeros before the first load.
+    var kuntoHtml = '';
+    if (listingLoaded && entries.length) {
+      for (var k = 0; k < KUNTO_KEYS.length; k++) {
+        var key = KUNTO_KEYS[k];
+        var n = 0;
+        for (var j = 0; j < entries.length; j++) if (entries[j].kunto && entries[j].kunto[key]) n++;
+        if (n) kuntoHtml += railItem(t('kunto.' + key), n, activeState === key, 'window._launcher.filterByState(\'' + key + '\')', false);
+      }
+    }
     bar.innerHTML = '<div class="cat-rail-label">' + escapeHtml(t('rail.state')) + '</div>' +
       railItem(t('state.listed'), listed, activeState === 'listed', 'window._launcher.filterByState(\'listed\')', false) +
       railItem(t('state.unlisted'), unlisted, activeState === 'unlisted', 'window._launcher.filterByState(\'unlisted\')', false) +
-      railItem(t('state.draft'), drafts, activeState === 'draft', 'window._launcher.filterByState(\'draft\')', false);
+      railItem(t('state.draft'), drafts, activeState === 'draft', 'window._launcher.filterByState(\'draft\')', false) +
+      (kuntoHtml ? '<div class="cat-rail-label">' + escapeHtml(t('rail.kunto')) + '</div>' + kuntoHtml : '');
   }
   // The band under the masthead says the same numbers, plus how often the apps were opened.
   var opensTotal = 0;
@@ -428,7 +463,9 @@ function buildLibraryEntries(localApps, serverApps) {
         // gap for everyone but the owner, so a gap arriving here IS the viewer's own app.
         aiPosture: sa.ai_posture || null,
         // The row's facts: how often opened, when the current version landed, how big the file is.
-        opens: sa.downloads || 0, createdAt: sa.created_at || null, size: sa.size || 0
+        opens: sa.downloads || 0, createdAt: sa.created_at || null, size: sa.size || 0,
+        // What the app is missing, for the condition rows in the rail (KUNTO_KEYS).
+        kunto: kuntoFlags(sa)
       };
       entries.push(se);
       if (fn) byFilename[fn] = se;
@@ -482,6 +519,7 @@ function renderApps() {
     if (activeState === 'listed') filtered = filtered.filter(function (e) { return e.published && !e.parked; });
     else if (activeState === 'unlisted') filtered = filtered.filter(function (e) { return !!e.parked; });
     else if (activeState === 'draft') filtered = filtered.filter(function (e) { return !!e.hasDraft; });
+    else if (activeState && KUNTO_KEYS.indexOf(activeState) >= 0) filtered = filtered.filter(function (e) { return !!(e.kunto && e.kunto[activeState]); });
 
     // Filter by getSearchQuery(): the name, a tag, or what it does
     if (getSearchQuery()) {

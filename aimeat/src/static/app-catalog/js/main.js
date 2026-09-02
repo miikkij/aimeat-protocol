@@ -35,7 +35,7 @@ import { initSettings, applyTheme, updateThemeToggle, toggleTheme, getThemePref,
 import { initAppsIo, setEditingAppId, showModal, requireSignInThen, prefillFromHtml, closeModal, switchTab, handleFileDrop, handleSave } from './apps-io.js';
 import { initServerIo, isOperatorSession, showPublishModal, submitPublish, toggleCommunity, switchView, showSubdomainModal, submitSubdomainAssign, unassignSubdomain, closeConsents, openConsents, revokeConsent, toggleBackupMenu, toggleCreateMenu, closeCreateMenu, toggleCortexBar, exportBackupZip, importBackupPick, importBackupFile, backupUpdateSummary, backupSelectAll, submitBackupRestore, loadPublishedApps, refreshFavoritesUI, applyServerFilter, unpublishApp, toggleParkApp, toggleForkApp, deleteServerApp } from './server-io.js';
 import { toggleRow } from './rows.js';
-import { initRender, filterByState, setSort, toggleAllTags, getSortMode, setListingLoaded, isListingLoaded, setServerManifests, setOwnServerApps, setIframeUrl, serverStateByFilename, serverAppManifests, ownAppProtection, ownServerApps, currentIframeUrl, renderTags, filterByTag, launchApp, launchInTab, viewPublished, launchInIframe, renderApps, closeIframe, openExternal, showContextMenu, hideContextMenu, handleContextAction, viewSource, generateSharePrompt, generateHomepagePrompt } from './render.js';
+import { initRender, filterByState, KUNTO_KEYS, setBoundSkillApps, setSort, toggleAllTags, getSortMode, setListingLoaded, isListingLoaded, setServerManifests, setOwnServerApps, setIframeUrl, serverStateByFilename, serverAppManifests, ownAppProtection, ownServerApps, currentIframeUrl, renderTags, filterByTag, launchApp, launchInTab, viewPublished, launchInIframe, renderApps, closeIframe, openExternal, showContextMenu, hideContextMenu, handleContextAction, viewSource, generateSharePrompt, generateHomepagePrompt } from './render.js';
 import { initAppAgents, showAppAgentsModal, agentsDeploy, agentsUndeploy } from './app-agents.js';
 import { checkLegacyLocalApps } from './migrate.js';
 import { toggleFavorite } from './favorites.js';
@@ -284,7 +284,8 @@ import { toggleFavorite } from './favorites.js';
       getSearchQuery: function () { return searchQuery; },
       getSortMode: getSortMode,
       generateId: generateId, renderApps: renderApps, refreshAll: refreshAll,
-      setListingLoaded: setListingLoaded, isListingLoaded: isListingLoaded
+      setListingLoaded: setListingLoaded, isListingLoaded: isListingLoaded,
+      setBoundSkillApps: setBoundSkillApps
     });
     initRender({
       getMainApps: function () { return allApps; },
@@ -308,6 +309,19 @@ import { toggleFavorite } from './favorites.js';
       ? _urlLang
       : ((loadConfig().language === 'fi') ? 'fi' : 'en'));
     applyI18n();
+    // A ?filter= from the profile's Apps page opens the library on one state or condition row:
+    // the number a person clicked there is exactly the rows they get here. Set before the listing
+    // loads; the first render reads it like a rail click.
+    var _urlFilter = _params.get('filter');
+    if (_urlFilter && (['listed', 'unlisted', 'draft'].indexOf(_urlFilter) >= 0 || KUNTO_KEYS.indexOf(_urlFilter) >= 0)) filterByState(_urlFilter);
+    // A ?q= is a search typed in advance: the profile's Apps page sends an app's name so its row is
+    // the first thing on screen. The input shows the same text, so clearing it clears the search.
+    var _urlQuery = (_params.get('q') || '').trim();
+    if (_urlQuery) {
+      searchQuery = _urlQuery;
+      var _searchEl = document.getElementById('search-input');
+      if (_searchEl) _searchEl.value = _urlQuery;
+    }
     // Restore the last-used view (Kirjasto / Yhteisö); defaults to Library.
     var _savedView = 'library';
     try { _savedView = localStorage.getItem('appCatalogView') || 'library'; } catch (e) { /* private mode */ }
