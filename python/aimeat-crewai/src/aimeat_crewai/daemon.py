@@ -14,6 +14,23 @@ This is the second half of the AIMEAT-CrewAI integration story:
     them up automatically.
 
 Changelog:
+  0.25.0 -- The MCP session says who it is. `serve_params()` sent only the placeholder
+    `Authorization` header the daemon never validates, and no `X-Aimeat-Agent` at all, on the
+    documented assumption that "the daemon uses its primary agent" when none is named. That default
+    is gone: `primary` became per-owner, so a daemon holding two owners has two correct answers and
+    refuses rather than guessing. Every liaison opened an anonymous session, the daemon refused it,
+    and the MCP adapter -- waiting on a socket rather than reading a status -- timed out after 30
+    seconds having reported nothing, while the refusal that named the fix went unread. The resolved
+    GAII is now sent on the session, never the bare name.
+    MINOR, NOT PATCH: `serve_params()` now RAISES where it used to return, when the identity is
+    ambiguous -- a bare name two owners share, or none given with several loaded. That is a
+    contract change even though the path it replaces did not work. The refusal is immediate and
+    names the candidates, in the same words the connector registry and the daemon's own MCP
+    endpoint use; a half-minute of silence is worse than being told which identity to send.
+    The stdio and direct-HTTP param builders are untouched -- they are for environments with no
+    local connector, and the loopback's identity is not their problem. (Naming them in full here
+    would break test_no_per_task_subprocess_churn, which greps this module for the stdio builder
+    to prove the worker path never spawns one per task.)
   0.24.0 -- The credential's NAME and the routing IDENTITY are two values. This package drove both
     from one `agent_name`, and in a two-owner home they diverge: the filename is
     `keys/crew-forge@isoalice.key` and routing wants

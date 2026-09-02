@@ -447,10 +447,24 @@ def serve_params(
     Authorization and holds the real agent tokens itself. The Bearer value
     returned here is a documented placeholder, never validated.
 
-    Agent selection: the usual MCP `agent_name` tool parameter (the liaison
-    persona passes it); when omitted the daemon uses its primary agent. Pass
-    `agent_name` here to fail fast if that agent is not registered with the
-    local connector.
+    AGENT SELECTION: THE SESSION SAYS WHO IT IS. The resolved GAII is sent as
+    `X-Aimeat-Agent` on every request of this MCP session, so the daemon knows
+    which identity the session speaks as before a single tool is called.
+
+    It used to send nothing and rely on the daemon picking its primary agent.
+    That default is gone: `primary` became per-owner, so a daemon holding two
+    owners has two correct answers and refuses rather than guessing one. An
+    anonymous session is therefore refused at connect time, and the adapter --
+    which is waiting on a socket, not reading a status -- simply timed out after
+    30 seconds having reported nothing. The node's refusal already said exactly
+    what to do ("Send it as X-Aimeat-Agent on this MCP session"); nobody saw it.
+
+    `agent_name` may be a bare name or a full GAII. A bare name resolves when
+    exactly one loaded agent carries it, and is REFUSED naming both identities
+    when two owners share it -- the same rule the connector registry applies,
+    because picking one would be the silent-replace defect moved one layer up.
+    Omitting it resolves the single loaded agent, and is refused at once, naming
+    the candidates, when there are several.
 
     Keep using `stdio_params()` / `http_params()` for environments without a
     local connector install (CI, serverless) -- they are unchanged.
@@ -459,8 +473,10 @@ def serve_params(
         Dict suitable for `MCPServerAdapter` (same shape as `http_params()`).
 
     Raises:
-        AimeatServeError: No live daemon and it could not be (auto-)started,
-            or `agent_name` is not registered with the daemon.
+        AimeatServeError: No live daemon and it could not be (auto-)started;
+            `agent_name` is not registered with the daemon; or the identity is
+            ambiguous -- a bare name two owners share, or no name at all while
+            several agents are loaded.
     """
     doc = ensure_serve(
         aimeat_command=aimeat_command,
@@ -470,24 +486,65 @@ def serve_params(
         auto_start=auto_start,
         start_timeout=start_timeout,
     )
-    if agent_name is not None:
-        # MATCH ON EITHER, BECAUSE THE CALLER MAY HOLD EITHER. `serve.json` schema 2 carries a
-        # `gaii` on every agents[] row beside the bare `agent`, and this checked only the bare
-        # name — so an agent addressed by its full identity, which is the only unambiguous way to
-        # address one on a two-owner daemon, was reported as "not registered" by the very daemon
-        # holding its socket. The error then listed the bare names, so it printed the halves it had
-        # not compared: the defect was visible in its own message.
-        rows = doc.get("agents", []) or []
-        names = [a.get("agent") for a in rows]
-        gaiis = [a.get("gaii") for a in rows]
-        if agent_name not in names and agent_name not in gaiis:
-            served = ", ".join(str(g or n) for n, g in zip(names, gaiis)) or "none"
-            raise AimeatServeError(
-                f"Agent '{agent_name}' is not registered with the local serve "
-                f"daemon (it serves: {served}). "
-                f"Run: aimeat connect add --agent {agent_name} ..."
-            )
-    return http_params(
+    params = http_params(
         node_url=f"http://127.0.0.1:{doc['port']}",
         agent_token="loopback-trusted",  # placeholder -- loopback MCP has no auth
+    )
+    params["headers"]["X-Aimeat-Agent"] = _resolve_session_identity(doc, agent_name)
+    return params
+
+
+def _resolve_session_identity(doc: dict[str, Any], agent_name: str | None) -> str:
+    """
+    WHICH IDENTITY THIS MCP SESSION SPEAKS AS. Returns a GAII.
+
+    Refusing here is the point. The alternative is what shipped: no header at all, the daemon
+    refusing an anonymous session, and the MCP adapter timing out after 30 seconds having reported
+    nothing -- while the daemon's refusal, which names the candidates and says to send
+    `X-Aimeat-Agent`, went unread because nobody was reading a status.
+
+    An instant refusal that says which identity to send beats a silent half-minute. This is the
+    same rule the connector registry and the daemon's own MCP endpoint already apply; it is the
+    third place, and it agrees with them rather than inventing a third behaviour.
+    """
+    rows = [r for r in (doc.get("agents") or []) if isinstance(r, dict)]
+    def ident(row: dict[str, Any]) -> str:
+        # A schema-1 daemon carries no `gaii`. The bare name is all it ever had and all it can
+        # route by, so fall back to it: unchanged behaviour against an older connector.
+        return str(row.get("gaii") or row.get("agent") or "")
+
+    served = ", ".join(ident(r) for r in rows) or "none"
+
+    if not rows:
+        raise AimeatServeError(
+            "The local serve daemon has no agents loaded. Run: aimeat connect add --agent <name> "
+            "--owner <owner> --url <node-url>"
+        )
+
+    if agent_name is None:
+        if len(rows) == 1:
+            return ident(rows[0])
+        raise AimeatServeError(
+            f"More than one agent is connected here, so this session has to say which one it is: "
+            f"{served}. Pass agent_name=<full identity> to serve_params()."
+        )
+
+    exact = [r for r in rows if r.get("gaii") == agent_name]
+    if exact:
+        return ident(exact[0])
+
+    by_name = [r for r in rows if r.get("agent") == agent_name]
+    if len(by_name) == 1:
+        return ident(by_name[0])
+    if len(by_name) > 1:
+        both = ", ".join(sorted(ident(r) for r in by_name))
+        raise AimeatServeError(
+            f"'{agent_name}' is the name of more than one agent on this connector: {both}. "
+            f"Say which one by passing its full identity instead of the name."
+        )
+
+    raise AimeatServeError(
+        f"Agent '{agent_name}' is not registered with the local serve "
+        f"daemon (it serves: {served}). "
+        f"Run: aimeat connect add --agent {agent_name} ..."
     )
