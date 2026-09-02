@@ -481,6 +481,8 @@
         "aimeat-fonts.css",
         "aimeat-game.css",
         "aimeat-game/**",
+   "aimeat-phaser.css",
+   "aimeat-phaser/**",
         "aimeat-theme.css",
         "fonts.css",
         "live-updates.js",

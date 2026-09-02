@@ -1,0 +1,198 @@
+/*
+ * @file aimeat-phaser/controls.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The on-screen controls for a Phaser game on this node: a joystick pad in the bottom
+ *   left and two round buttons in the bottom right, built as ordinary DOM by
+ *   src/static/sdk-libs/phaser/controls.js and dressed here. Imported by /lib/aimeat-phaser.css,
+ *   never linked on its own.
+ *
+ *   NO COLOUR IS WRITTEN HERE. Every one is an --ak-* token from the Atelier contract, aliased once
+ *   at the top of the block so a rule below reads a short name. Where a page carries no theme at
+ *   all the aliases fall through to the CSS system colours (canvas, canvastext, currentColor),
+ *   which follow the reader's light or dark setting on their own, so the pad is still legible with
+ *   no stylesheet above it and still contains no literal of its own.
+ *
+ *   THE PAD DECIDES WHEN IT SHOWS, NOT THE SCRIPT. controls.js writes data-ak-touch="auto|on|off"
+ *   and the media query below answers 'auto': shown on a coarse pointer, absent otherwise. So a
+ *   tablet that gains a mouse, or a laptop with a touchscreen, needs nothing re-evaluated in
+ *   JavaScript, and a game that wants the pad on a desktop asks for 'on' and gets it.
+ *
+ *   IT NEVER SWALLOWS THE CANVAS. The overlay itself takes no pointer events: only the stick and
+ *   the two buttons do, so a tap anywhere between them lands on the game. Each of those three sets
+ *   touch-action none, which is what stops a drag on the stick from scrolling the page underneath.
+ *
+ *   MOTION ONLY WHERE A FINGER IS. The knob has a transition so it springs back to the middle when
+ *   released, and no transition at all while it is held (a lagging knob under a moving thumb reads
+ *   as a broken control). Nothing here animates on its own, and reduced motion removes what is
+ *   left.
+ * @structure the host positioning class · the overlay root and its visibility · the stick and its
+ *   knob · the button bank · reduced motion
+ * @usage  @import'ed by /lib/aimeat-phaser.css. AIMEAT.phaser.controls(scene) builds the markup.
+ * @version-history
+ *   v1.0.0 - 2026-09-02 - Initial: the stick, the two buttons, and the coarse-pointer rule.
+ */
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   THE HOST
+   The overlay is placed inside the game's own frame, so the frame has to be a positioning
+   context. controls.js adds this class to the canvas's parent and removes it on destroy.
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+.ak-touchpad-host {
+  position: relative;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   THE OVERLAY
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+.ak-touchpad {
+  /* The whole palette of this file, resolved once. */
+  --tp-ink: var(--ak-ink, canvastext);
+  --tp-surface: var(--ak-surface, canvas);
+  --tp-line: var(--ak-line, currentColor);
+  --tp-accent: var(--ak-accent, canvastext);
+  --tp-round: var(--ak-radius-pill, 999px);
+  --tp-pace: var(--ak-motion, 200ms);
+  --tp-curve: var(--ak-ease, cubic-bezier(0.2, 0.7, 0.3, 1));
+
+  /* The safe inset on a phone with a notch or a home bar, with a plain margin as the floor. */
+  --tp-inset-x: max(16px, env(safe-area-inset-left, 0px));
+  --tp-inset-r: max(16px, env(safe-area-inset-right, 0px));
+  --tp-inset-y: max(16px, env(safe-area-inset-bottom, 0px));
+
+  position: absolute;
+  inset: 0;
+  display: none;
+  z-index: 5;
+  pointer-events: none;
+  font-family: var(--ak-font, ui-sans-serif, system-ui, sans-serif);
+  color: var(--tp-ink);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Asked for outright: shown on every pointer. */
+.ak-touchpad[data-ak-touch='on'] {
+  display: block;
+}
+
+/* Left to the device: shown where fingers are the pointer. */
+@media (pointer: coarse) {
+  .ak-touchpad[data-ak-touch='auto'] {
+    display: block;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   THE STICK
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+.ak-touchpad__stick {
+  position: absolute;
+  left: var(--tp-inset-x);
+  bottom: var(--tp-inset-y);
+  width: 132px;
+  height: 132px;
+  border-radius: var(--tp-round);
+  border: 1px solid color-mix(in oklab, var(--tp-line) 74%, transparent);
+  background: color-mix(in oklab, var(--tp-surface) 62%, transparent);
+  box-shadow: var(--ak-elev-1, none);
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.ak-touchpad__stick.is-held {
+  border-color: color-mix(in oklab, var(--tp-accent) 60%, var(--tp-line));
+}
+
+.ak-touchpad__knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 54px;
+  height: 54px;
+  margin: -27px 0 0 -27px;
+  border-radius: var(--tp-round);
+  background: color-mix(in oklab, var(--tp-accent) 58%, var(--tp-surface));
+  border: 1px solid color-mix(in oklab, var(--tp-ink) 22%, transparent);
+  /* controls.js writes the two percentages; they resolve against the knob's own box. */
+  transform: translate(var(--ak-touchpad-knob-x, 0%), var(--ak-touchpad-knob-y, 0%));
+  transition: transform var(--tp-pace) var(--tp-curve);
+}
+
+/* Under a moving thumb the knob follows the finger exactly, with nothing in between. */
+.ak-touchpad__stick.is-held .ak-touchpad__knob {
+  transition: none;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   THE BUTTONS
+   Two thumbs, two sizes: jump is the bigger of the pair because it is pressed the most and
+   missed the most.
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+.ak-touchpad__bank {
+  position: absolute;
+  right: var(--tp-inset-r);
+  bottom: var(--tp-inset-y);
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  pointer-events: none;
+}
+
+.ak-touchpad__btn {
+  pointer-events: auto;
+  touch-action: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--ak-touch, 44px);
+  min-height: var(--ak-touch, 44px);
+  width: 76px;
+  height: 76px;
+  padding: 0;
+  border-radius: var(--tp-round);
+  border: 1px solid color-mix(in oklab, var(--tp-line) 74%, transparent);
+  background: color-mix(in oklab, var(--tp-surface) 74%, transparent);
+  box-shadow: var(--ak-elev-1, none);
+  color: inherit;
+  font: inherit;
+  font-size: 0.875rem;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: transform var(--tp-pace) var(--tp-curve),
+              background-color var(--tp-pace) var(--tp-curve);
+}
+
+.ak-touchpad__btn--jump {
+  width: 92px;
+  height: 92px;
+  font-size: 0.9375rem;
+  background: color-mix(in oklab, var(--tp-accent) 26%, var(--tp-surface));
+}
+
+.ak-touchpad__btn.is-held {
+  transform: scale(0.93);
+  background: color-mix(in oklab, var(--tp-accent) 58%, var(--tp-surface));
+}
+
+.ak-touchpad__btn:focus-visible {
+  outline: 2px solid var(--ak-focus, var(--tp-accent));
+  outline-offset: 2px;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   LESS MOTION
+   The knob still returns to the middle; it just does it at once rather than over a curve.
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  .ak-touchpad__knob,
+  .ak-touchpad__btn {
+    transition: none;
+  }
+}
+
+:root[data-ak-motion='less'] .ak-touchpad__knob,
+:root[data-ak-motion='less'] .ak-touchpad__btn {
+  transition: none;
+}

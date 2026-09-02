@@ -1,0 +1,17 @@
+/*
+ * @file aimeat-phaser.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Stylesheet for the aimeat-phaser SDK library (/v1/libs/aimeat-phaser.js): the DOM
+ *   the library puts around and over a Phaser canvas. The frame and the fullscreen button
+ *   (boot.css), the touch overlay (controls.css) and the settings page when the Atelier kit is
+ *   absent (settings.css). Every value rides the Atelier --ak-* contract, so a game wears the same
+ *   look as the app around it; on a page without the kit the tokens' own fallbacks stand in.
+ * @structure @import boot · controls · settings
+ * @usage  <link rel="stylesheet" href="/lib/aimeat-phaser.css">  (after /lib/aimeat-atelier.css when the app uses the kit)
+ * @version-history
+ *   v1.0.0 — 2026-09-02 — Initial (wish-phaser4-design-book-page).
+ */
+@import url('./aimeat-phaser/boot.css');
+@import url('./aimeat-phaser/controls.css');
+@import url('./aimeat-phaser/settings.css');
