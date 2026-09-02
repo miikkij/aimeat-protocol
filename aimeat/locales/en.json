@@ -563,6 +563,7 @@
     "expired": "This request has expired.",
     "newScope": "new",
     "area": {
+      "agent": "creating and removing your agents",
       "memory": "your saved data",
       "storage": "the files you keep here",
       "catalogue": "the public catalogue",
@@ -8049,7 +8050,11 @@
         "connected": "Your connector is running, so they can start straight away",
         "notConnected": "Your connector is not running",
         "notConnectedHint": "These agents run on your own machine. Start your connector with \"aimeat connect serve\" and this button will work.",
-        "whatYouGet": "What you get"
+        "whatYouGet": "What you get",
+        "reaches": "Reaches:",
+        "actsAlone": "starts on its own",
+        "actsAloneWhy": "Work sent to this agent starts without asking you first.",
+        "actsAloneNotice": "{names} start work as soon as it arrives, without asking you each time. You can change that for any agent later."
       },
       "taskRunner": {
         "title": "Connect a CrewAI crew (Liaison Agent pattern)",

@@ -26,6 +26,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { apiGet, apiPost } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
+import { areaLine } from '/js/consent-vocab.js';
 
 /** The plug icon: what "your connector is connected" looks like without a word for it. */
 const PlugIcon = html`<svg class="pf-agd-basic-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 2v6"></path><path d="M15 2v6"></path><path d="M6 8h12v4a6 6 0 0 1-12 0z"></path><path d="M12 18v4"></path></svg>`;
@@ -33,7 +34,10 @@ const PlugIcon = html`<svg class="pf-agd-basic-icon" viewBox="0 0 24 24" width="
 export default function BasicAgentsPanel({ session, showToast, onCreated }) {
   const [state, setState] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [expanded, setExpanded] = useState(false);
+  // Open while there is still something to press. What each agent gets, and which of them start
+  // work without asking, is what the person is agreeing to — so it is on the screen at the moment
+  // they decide, not one click away. Once they all exist it collapses back to a summary.
+  const [expanded, setExpanded] = useState(null);
 
   async function load() {
     try {
@@ -82,6 +86,12 @@ export default function BasicAgentsPanel({ session, showToast, onCreated }) {
   const missing = (state.agents ?? []).filter(a => !a.exists || !a.enrolled);
   const allThere = missing.length === 0;
   const connected = state.daemon_connected === true;
+  const open = expanded === null ? !allThere : expanded;
+  // `task-runner` is, in the node's own words, "the person saying start without asking me each
+  // time" — services/agent-task-rules.ts activates a queued task for one without the owner. That
+  // is the single most consequential thing about this button, so it is named rather than left in
+  // a mode string nobody outside the code reads.
+  const actsAlone = (state.agents ?? []).filter(a => a.mode === 'task-runner');
 
   return html`
     <div class="pf-agd-basic">
@@ -103,11 +113,11 @@ export default function BasicAgentsPanel({ session, showToast, onCreated }) {
       </div>
       ${!connected && html`<div class="pf-agd-basic-hint">${t('profile.agents.basic.notConnectedHint')}</div>`}
 
-      <button class="expand-btn" onClick=${() => setExpanded(!expanded)}>
+      <button class="expand-btn" onClick=${() => setExpanded(!open)}>
         <span>${t('profile.agents.basic.whatYouGet')}</span>
-        <span class="pf-chevron ${expanded ? 'pf-chevron-open' : ''}">▼</span>
+        <span class="pf-chevron ${open ? 'pf-chevron-open' : ''}">▼</span>
       </button>
-      ${expanded && html`
+      ${open && html`
         <ul class="pf-agd-basic-list">
           ${(state.agents ?? []).map(a => html`
             <li class="pf-agd-basic-item" key=${a.name}>
@@ -116,12 +126,25 @@ export default function BasicAgentsPanel({ session, showToast, onCreated }) {
                 <span class="pf-agd-badge pf-agd-badge--run pf-agd-badge--run-${a.run_mode}">
                   ${t(`profile.agents.runMode.${a.run_mode}`)}
                 </span>
+                ${a.mode === 'task-runner' && html`
+                  <span class="pf-agd-basic-alone" title=${t('profile.agents.basic.actsAloneWhy')}>
+                    ${t('profile.agents.basic.actsAlone')}
+                  </span>`}
                 ${a.enrolled && html`<span class="pf-agd-basic-have">${t('profile.agents.basic.have')}</span>`}
               </div>
               <div class="pf-agd-basic-item-desc">${a.description}</div>
+              ${(a.scopes ?? []).length > 0 && html`
+                <div class="pf-agd-basic-item-gets">
+                  <span class="pf-agd-basic-gets-label">${t('profile.agents.basic.reaches')}</span>
+                  <span>${areaLine(a.scopes, t)}</span>
+                </div>`}
             </li>
           `)}
         </ul>
+        ${actsAlone.length > 0 && html`
+          <div class="pf-agd-basic-notice">
+            ${t('profile.agents.basic.actsAloneNotice').replace('{names}', actsAlone.map(a => a.display_name || a.name).join(', '))}
+          </div>`}
       `}
     </div>
   `;
