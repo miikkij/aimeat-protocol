@@ -28,6 +28,8 @@
  *   if (store.levels.best('2-1', 4200)) store.score(4200);
  *   const top = await store.leaderboard({ limit: 10 });
  * @version-history
+ *   v1.1.0 - 2026-09-02 - The public row's level falls back to the count of unlocked levels, which
+ *     the library maintains, instead of a field nothing set.
  *   v1.0.0 - 2026-09-02 - Initial: the one-key save store, guest mode, the sign-in merge, the
  *     public score subset and the leaderboard read.
  */
@@ -199,7 +201,10 @@ function defaultPublic(state) {
   return {
     name: state.profile.name || '',
     best: num(state.best),
-    level: state.level != null ? state.level : null,
+    // The level a board row shows: the app's own `state.level` when it keeps one, else how many
+    // levels this player has unlocked, which the library does maintain.
+    level: state.level != null ? state.level
+      : Object.keys(state.levels || {}).filter(function (k) { return state.levels[k] && state.levels[k].unlocked; }).length,
     updated: new Date().toISOString(),
   };
 }

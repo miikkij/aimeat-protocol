@@ -18,6 +18,8 @@
  *   runScreenshotCapturePass() one batch scan; captureAppScreenshot() one app, with its own
  *   per-owner throttle; renderAndStore() the shared render both paths use.
  * @version-history
+ *   v1.5.0 — 2026-09-02 — NO_HEADLESS_BROWSER: the "there is none" sentence moves here, beside the
+ *     launcher that decides it, so the guarantee bench and the app playtest answer alike.
  *   v1.4.0 — 2026-08-28 — launchBrowser() PROVES a page opens before handing the browser out
  *     (a root chromium launches fine and then crashes every target — the first production
  *     bench found it), and a final no-sandbox/-dev-shm attempt joins the ladder, tried only
@@ -180,6 +182,15 @@ async function renderAndStore(
     await page.close();
   }
 }
+
+/**
+ * What every bench says when this machine has no browser to run it in. One sentence, in one place,
+ * because the Design Book's guarantee bench and the app playtest are both answering the same
+ * question and an operator reading two different wordings would go looking for two problems.
+ */
+export const NO_HEADLESS_BROWSER =
+  'No headless browser on this node. Install one with `npx playwright install --with-deps chromium`, '
+  + 'or run this on a node that has Edge or Chrome.';
 
 /**
  * The same headless browser, lent out: launch, hand over a context, always close, and answer null

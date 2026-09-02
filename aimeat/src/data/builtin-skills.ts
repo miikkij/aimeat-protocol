@@ -11,6 +11,11 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.14.0 -- 2026-09-02 -- The seven game skills join from builtin-skills-games.ts: aimeat-phaser
+ *     (the entry) plus one per area of the library (boot, assets, saves, controls and the HUD,
+ *     menus and levels, audio). They are a module for the same reason aimeat-app-builder was in
+ *     v1.12.0: this file was at 672 of its 800 lines and the seven are roughly 1500. The
+ *     aimeat-game-apps phaser bullet now names aimeat-phaser as the entry skill.
  *   v1.13.0 -- 2026-09-02 -- aimeat-game-apps: phaser4 through aimeat-phaser is the paved path, and
  *     saves are ONE key per player (myapp.save private, myapp.score public), never one per score.
  *   v1.12.0 -- 2026-08-25 -- aimeat-app-builder moves to its own module AND comes back from the
@@ -63,6 +68,7 @@ import { HATCHERY_SKILL_ENTRY } from './builtin-skills.hatchery.js';
 import { WORKSTATION_SKILL_ENTRY } from './builtin-skills.workstation.js';
 import { APP_BUILDER_SKILL_ENTRY } from './builtin-skills.app-builder.js';
 import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
+import { GAME_SKILL_ENTRIES } from './builtin-skills-games.js';
 
 export interface BuiltinSkill {
   name: string;
@@ -78,6 +84,7 @@ export const BUILTIN_SKILLS: BuiltinSkill[] = [
   WORKSTATION_SKILL_ENTRY,
   APP_BUILDER_SKILL_ENTRY,
   APP_BUILDER_ATELIER_SKILL_ENTRY,
+  ...GAME_SKILL_ENTRIES,
   {
     name: 'aimeat-node-guide',
     visibility: 'public',
@@ -626,7 +633,9 @@ from an external CDN; the include line in the pack doc points at this node's /li
 ## Pick the right engine
 
 - **phaser4** (\`GET /v1/library-packs/phaser4\`) — a GAME: scenes, physics, collisions, input,
-  score, sound. The default for games. Load it THROUGH \`aimeat-phaser\`
+  score, sound. The default for games. **Load the skill \`node:aimeat-phaser\` first: it is the
+  entry point, and it names the six area skills (boot, assets, saves, controls and the HUD, menus
+  and levels, audio) for whichever part you are working on.** Load the library THROUGH \`aimeat-phaser\`
   (\`GET /v1/library-packs/aimeat-phaser\`): \`AIMEAT.phaser.game()\` boots into an element with
   fit / resize / fixed scaling and fullscreen, \`textures\` generate tiles and a character with
   animations, \`preloadPack\` draws the loading bar, \`audio\` is the bus, \`saves\` is the

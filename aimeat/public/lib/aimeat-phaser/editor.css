@@ -1,0 +1,258 @@
+/*
+ * @file aimeat-phaser/editor.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The level editor levelEditor() draws: the control bar, the tool palette with its
+ *   painted swatches, the scrolling grid, the status line and the text view of the same rows.
+ *
+ *   THE GRID'S SIZE COMES FROM JS AS TWO NUMBERS, NOT AS STYLE. The canvas carries --akl-w and
+ *   --akl-h, written by the module when the map is resized; every other value in the layout is
+ *   this file's. So the rule stays in CSS and only the measurement crosses over.
+ *
+ *   NO COLOUR IS DECLARED HERE. Every value is the Atelier token, falling through to the AIMEAT
+ *   theme token that means the same thing and finally to a CSS system colour, so the editor reads
+ *   on a page with the kit, on a page with only the theme, and on a page with neither.
+ *
+ *   NOTHING ANIMATES. The editor has no motion at all, which is why it needs no reduced-motion
+ *   branch and why an idle editor repaints zero times.
+ * @structure the --akl-* value chain · the bar · the palette · the grid · the text view ·
+ *   @layer akp-fallback (the kitless floor for the Atelier classes the module writes)
+ * @usage  <link rel="stylesheet" href="/lib/aimeat-phaser.css">   (it imports this file)
+ * @version-history
+ *   v1.1.0 — 2026-09-02 — Initial: the editor's clothes (the level editor).
+ */
+
+/* The value chain. Atelier first, the AIMEAT theme next, the browser's own system colours last:
+   system keywords follow light and dark on their own, so the floor is never the wrong mode. */
+.ak-leveled {
+  --akl-surface: var(--ak-surface, var(--color-base-200, Canvas));
+  --akl-surface-2: var(--ak-surface-2, var(--color-base-100, Canvas));
+  --akl-ink: var(--ak-ink, var(--color-base-content, CanvasText));
+  --akl-ink-dim: var(--ak-ink-dim, GrayText);
+  --akl-line: var(--ak-line, var(--color-base-300, GrayText));
+  --akl-accent: var(--ak-accent, var(--color-primary, AccentColor));
+  --akl-radius: var(--ak-radius, var(--radius-box, 14px));
+  --akl-radius-sm: var(--ak-radius-sm, var(--radius-field, 9px));
+  --akl-gap: var(--ak-gap, var(--gap-card, 14px));
+  --akl-pad: var(--ak-pad, 16px);
+  --akl-touch: var(--ak-touch, 44px);
+  --akl-font: var(--ak-font, var(--font-body, ui-sans-serif, system-ui, sans-serif));
+  --akl-font-mono: var(--ak-font-mono, var(--font-mono, ui-monospace, monospace));
+  --akl-fine: var(--ak-text-fine, var(--text-fine, 0.8125rem));
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--akl-gap);
+  font-family: var(--akl-font);
+  color: var(--akl-ink);
+  min-width: 0;
+}
+
+/* ── The bar ─────────────────────────────────────────────────────────────────────────────────
+   Size, the edit buttons and the store row, wrapping into as many lines as the width needs. */
+.ak-leveled__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--akl-gap);
+}
+
+.ak-leveled__group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--akl-gap) / 2);
+  min-width: 0;
+}
+
+.ak-leveled__group--store {
+  flex: 1 1 20rem;
+  justify-content: flex-end;
+}
+
+.ak-leveled__legendword {
+  font-size: var(--akl-fine);
+  color: var(--akl-ink-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.ak-leveled__times {
+  color: var(--akl-ink-dim);
+  font-family: var(--akl-font-mono);
+}
+
+.ak-leveled__size {
+  width: 5rem;
+  min-height: var(--akl-touch);
+  font-family: var(--akl-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.ak-leveled__name { flex: 1 1 9rem; min-width: 0; min-height: var(--akl-touch); }
+.ak-leveled__picker { flex: 0 1 12rem; min-width: 0; min-height: var(--akl-touch); }
+
+/* ── The palette and the grid ───────────────────────────────────────────────────────────────── */
+.ak-leveled__main {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--akl-gap);
+  min-width: 0;
+}
+
+.ak-leveled__palette {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 0 0 auto;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+/* One tool: its picture, its word, and the number key that reaches it. */
+.ak-leveled__tool {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--akl-gap) / 2);
+  justify-content: flex-start;
+  min-height: var(--akl-touch);
+  width: 100%;
+  text-align: left;
+}
+
+.ak-leveled__tool[aria-pressed='true'] {
+  outline: 2px solid var(--akl-accent);
+  outline-offset: -2px;
+  background: color-mix(in oklab, var(--akl-accent) 14%, transparent);
+}
+
+.ak-leveled__swatch {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  border-radius: 3px;
+  border: 1px solid var(--akl-line);
+}
+
+.ak-leveled__toolname {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--akl-fine);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ak-leveled__hint {
+  font-family: var(--akl-font-mono);
+  font-size: var(--akl-fine);
+  color: var(--akl-ink-dim);
+  border: 1px solid var(--akl-line);
+  border-radius: 4px;
+  padding: 0 4px;
+  flex: 0 0 auto;
+}
+
+/* The map is as wide as it is; the stage carries the scrollbar rather than the page. */
+.ak-leveled__stage {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: auto;
+  background: var(--akl-surface-2);
+  border: 1px solid var(--akl-line);
+  border-radius: var(--akl-radius);
+  padding: calc(var(--akl-gap) / 2);
+}
+
+/* The two custom properties are the module's only crossing into style: the map's measured size. */
+.ak-leveled__grid {
+  display: block;
+  width: var(--akl-w, 100%);
+  height: var(--akl-h, auto);
+  max-width: none;
+  cursor: crosshair;
+  touch-action: none;
+  border-radius: var(--akl-radius-sm);
+}
+
+.ak-leveled__grid:focus-visible {
+  outline: 2px solid var(--akl-accent);
+  outline-offset: 2px;
+}
+
+.ak-leveled--readonly .ak-leveled__grid { cursor: default; }
+
+/* ── What the editor says, and the rows themselves ──────────────────────────────────────────── */
+.ak-leveled__status {
+  margin: 0;
+  min-height: 1.2em;
+  font-size: var(--akl-fine);
+  color: var(--akl-ink-dim);
+}
+
+.ak-leveled__ascii {
+  width: 100%;
+  min-height: 8rem;
+  resize: vertical;
+  font-family: var(--akl-font-mono);
+  font-size: var(--akl-fine);
+  line-height: 1.35;
+  white-space: pre;
+  overflow-wrap: normal;
+  overflow-x: auto;
+  color: var(--akl-ink);
+  background: var(--akl-surface);
+  border: 1px solid var(--akl-line);
+  border-radius: var(--akl-radius-sm);
+  padding: calc(var(--akl-gap) / 2);
+}
+
+/* Under a narrow window the palette lies down over the map instead of squeezing it to a column. */
+@media (max-width: 44rem) {
+  .ak-leveled__main { flex-direction: column; }
+
+  .ak-leveled__palette {
+    flex-direction: row;
+    flex-wrap: wrap;
+    max-height: none;
+    width: 100%;
+  }
+
+  .ak-leveled__tool { width: auto; }
+  .ak-leveled__group--store { justify-content: flex-start; }
+}
+
+/* ── The kitless floor ────────────────────────────────────────────────────────────────────────
+   The Atelier class names the module writes (.ak-btn, .ak-input) dressed for a page that never
+   loaded aimeat-atelier.css. LAYERED on purpose: an unlayered declaration wins over a layered one
+   whatever its specificity, so the kit takes all of this back the moment it exists, with no
+   !important and no load-order rule needed to arrange it. */
+@layer akp-fallback {
+  .ak-leveled .ak-btn {
+    font: inherit;
+    min-height: var(--akl-touch);
+    padding: 0 calc(var(--akl-gap) / 1.5);
+    color: var(--akl-ink);
+    background: var(--akl-surface);
+    border: 1px solid var(--akl-line);
+    border-radius: var(--akl-radius-sm);
+    cursor: pointer;
+  }
+
+  .ak-leveled .ak-btn:hover { border-color: var(--akl-accent); }
+  .ak-leveled .ak-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+  .ak-leveled .ak-input {
+    font: inherit;
+    color: var(--akl-ink);
+    background: var(--akl-surface);
+    border: 1px solid var(--akl-line);
+    border-radius: var(--akl-radius-sm);
+    padding: 0 calc(var(--akl-gap) / 2);
+  }
+
+  .ak-leveled .ak-input:focus-visible {
+    outline: 2px solid var(--akl-accent);
+    outline-offset: 1px;
+  }
+}

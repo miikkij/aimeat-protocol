@@ -1,0 +1,170 @@
+/*
+ * @file aimeat-phaser/mobile.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The phone half of a game's clothes: the prompt that asks for the device to be
+ *   turned, the invisible probe the safe area is measured through, and the extra room the touch
+ *   overlay and the fullscreen button need once the frame has taken over the whole screen. Built
+ *   as ordinary DOM by src/static/sdk-libs/phaser/mobile.js and dressed here. Imported by
+ *   /lib/aimeat-phaser.css, never linked on its own.
+ *
+ *   NO COLOUR IS WRITTEN HERE. Every one is an --ak-* token from the Atelier contract, aliased
+ *   once at the top of the block so the rules below read a short name. Where a page carries no
+ *   theme at all the aliases fall through to the CSS system colours (canvas, canvastext,
+ *   currentColor), which follow the reader's light or dark setting by themselves, so the prompt is
+ *   legible with no stylesheet above it and still carries no literal of its own.
+ *
+ *   THE PROMPT IS SHOWN BY A CLASS, NOT BY A MEDIA QUERY. Which way up the game wants to be is a
+ *   decision the game makes at runtime, so mobile.js compares the device against it and toggles
+ *   .is-shown. The stylesheet decides only what the prompt LOOKS like, and it covers the frame
+ *   completely, because a game that cannot be played until the phone turns has nothing to show
+ *   behind the words.
+ *
+ *   THE PROBE IS A MEASURING DEVICE, NOT A LAYOUT. env(safe-area-inset-*) has no JavaScript
+ *   reader, so .ak-safe-probe carries the four values as padding and mobile.js reads them back
+ *   off its computed style. It has no size, takes no pointers, and is out of the flow, so it can
+ *   sit in the body without moving anything.
+ *
+ *   THE INSETS ONLY MATTER IN FULL SCREEN. In the page the browser's own chrome already keeps the
+ *   canvas clear of a notch; in full screen it does not, and the jump button ends up under the
+ *   home bar. So the extra room is scoped to .ak-phaser:fullscreen, raising the floor
+ *   controls.css already set rather than replacing it.
+ * @structure .ak-orient (+ .is-shown, __card, __title, __hint) · .ak-safe-probe ·
+ *   .ak-phaser:fullscreen insets for .ak-touchpad and .ak-phaser__full · reduced motion
+ * @usage  @import'ed by /lib/aimeat-phaser.css. AIMEAT.phaser.mobile(handle) builds the markup.
+ * @version-history
+ *   v1.1.0 — 2026-09-02 — Initial: the orientation prompt, the safe-area probe and the
+ *     fullscreen insets.
+ */
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   THE ORIENTATION PROMPT
+   It fills the frame it was mounted in, so it covers the game rather than sitting beside it.
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+.ak-orient {
+  /* The whole palette of this file, resolved once. */
+  --or-ink: var(--ak-ink, canvastext);
+  --or-dim: var(--ak-ink-dim, currentColor);
+  --or-bg: var(--ak-bg, canvas);
+  --or-surface: var(--ak-surface, canvas);
+  --or-line: var(--ak-line, currentColor);
+  --or-accent: var(--ak-accent, canvastext);
+  --or-pace: var(--ak-motion, 200ms);
+  --or-curve: var(--ak-ease, cubic-bezier(0.2, 0.7, 0.3, 1));
+
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: none;
+  place-items: center;
+  padding: max(16px, env(safe-area-inset-top, 0px))
+    max(16px, env(safe-area-inset-right, 0px))
+    max(16px, env(safe-area-inset-bottom, 0px))
+    max(16px, env(safe-area-inset-left, 0px));
+  background: var(--or-bg);
+  color: var(--or-ink);
+  font-family: var(--ak-font, ui-sans-serif, system-ui, sans-serif);
+  text-align: center;
+  /* Pointer events stay on (the default), which is deliberate: while the prompt is up it swallows
+     every tap, so a press meant for a level the player cannot see never reaches it. Selecting the
+     words is not what a finger on a game is for, so that goes. */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.ak-orient.is-shown {
+  display: grid;
+}
+
+.ak-orient__card {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  max-width: 22rem;
+  padding: 24px 28px;
+  background: var(--or-surface);
+  border: var(--ak-line-w, 1px) solid var(--or-line);
+  border-radius: var(--ak-radius, 14px);
+}
+
+.ak-orient__card svg {
+  display: block;
+  color: var(--or-accent);
+}
+
+.ak-orient__title {
+  margin: 0;
+  font-family: var(--ak-font-display, var(--ak-font, ui-sans-serif, system-ui, sans-serif));
+  font-size: 1.35rem;
+  line-height: 1.2;
+  color: var(--or-ink);
+}
+
+.ak-orient__hint {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--or-dim);
+}
+
+/* The card arrives once, when the prompt appears. Nothing repeats and nothing runs while the
+   prompt sits there, so a phone held the wrong way still repaints zero times. */
+.ak-orient.is-shown .ak-orient__card {
+  animation: ak-orient-in var(--or-pace) var(--or-curve) both;
+}
+
+@keyframes ak-orient-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   THE SAFE-AREA PROBE
+   No size, no pointers, out of the flow: it exists to be measured and nothing else.
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+.ak-safe-probe {
+  position: fixed;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  width: 0;
+  height: 0;
+  padding-block-start: env(safe-area-inset-top, 0px);
+  padding-inline-end: env(safe-area-inset-right, 0px);
+  padding-block-end: env(safe-area-inset-bottom, 0px);
+  padding-inline-start: env(safe-area-inset-left, 0px);
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   FULL SCREEN
+   The browser's chrome is gone, so the notch and the home bar are the game's problem now. Both
+   rules RAISE the floor controls.css and boot.css already set, rather than replacing it.
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+.ak-phaser:fullscreen .ak-touchpad {
+  --tp-inset-x: max(24px, env(safe-area-inset-left, 0px));
+  --tp-inset-r: max(24px, env(safe-area-inset-right, 0px));
+  --tp-inset-y: max(24px, env(safe-area-inset-bottom, 0px));
+}
+
+.ak-phaser:fullscreen .ak-phaser__full {
+  inset-block-start: max(8px, env(safe-area-inset-top, 0px));
+  inset-inline-end: max(8px, env(safe-area-inset-right, 0px));
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   LESS MOTION
+   The prompt is an instruction, so it stays; only the way it arrives goes.
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  .ak-orient.is-shown .ak-orient__card {
+    animation: none;
+  }
+}

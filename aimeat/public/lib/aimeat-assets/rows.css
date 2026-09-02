@@ -1,0 +1,166 @@
+/*
+ * @file aimeat-assets/rows.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The parts of the asset gallery that are lists rather than pictures: the sound rows
+ *   with their play button, the font specimens, the plain file rows for atlases, tilemaps and
+ *   videos, and the texts table that puts every language beside every other.
+ *
+ *   THE GAP IS THE POINT OF THE TABLE. A key that a language has not been given yet is drawn as a
+ *   striped cell rather than as an empty one, because an empty cell reads as a blank string and a
+ *   striped one reads as work left to do. It uses the line token, so it is visible without
+ *   shouting.
+ *
+ *   NO COLOUR IS DECLARED HERE either: every value comes from the --aka-* chain gallery.css sets
+ *   on .ak-assets, so both files answer the same tokens.
+ * @structure the rows · the play button · the font specimen · the texts table
+ * @usage  <link rel="stylesheet" href="/lib/aimeat-assets.css">   (it imports this file)
+ * @version-history
+ *   v1.0.0 — 2026-09-02 — Initial.
+ */
+
+.ak-assets__rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--aka-gap) / 3);
+}
+
+/* One row: the control (when there is one), the key, and the facts pushed to the far end. Under a
+   narrow panel the facts wrap under the key rather than squeezing it to nothing. */
+.ak-assets__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--aka-gap) / 2);
+  min-height: var(--aka-touch);
+  padding: calc(var(--aka-pad) / 3) calc(var(--aka-pad) / 2);
+  background: var(--aka-surface-2);
+  border: 1px solid var(--aka-line);
+  border-radius: var(--aka-radius-sm);
+  min-width: 0;
+}
+
+.ak-assets__row .ak-assets__key {
+  flex: 0 1 auto;
+}
+
+.ak-assets__row .ak-assets__facts {
+  margin-left: auto;
+  text-align: right;
+}
+
+.ak-assets__file {
+  flex: 1 1 12rem;
+  min-width: 0;
+  font-family: var(--aka-font-mono);
+  font-size: var(--aka-fine);
+  color: var(--aka-ink-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── The play button ─────────────────────────────────────────────────────────────────────── */
+
+.ak-assets__play {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--aka-touch);
+  height: var(--aka-touch);
+  padding: 0;
+  color: var(--aka-ink);
+  background: var(--aka-surface);
+  border: 1px solid var(--aka-line);
+  border-radius: 50%;
+  cursor: pointer;
+  transition:
+    border-color var(--aka-motion) var(--aka-ease),
+    color var(--aka-motion) var(--aka-ease);
+}
+
+.ak-assets__play:hover,
+.ak-assets__play:focus-visible {
+  color: var(--aka-accent);
+  border-color: var(--aka-accent);
+}
+
+.ak-assets__play svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* ── The font specimen ───────────────────────────────────────────────────────────────────── */
+
+/* The specimen asks for the family by name and nothing else: this stylesheet does not load a font
+   file, so what is shown is what the app itself has actually put on the page. */
+.ak-assets__row--font {
+  align-items: baseline;
+}
+
+.ak-assets__specimen {
+  flex: 1 1 14rem;
+  min-width: 0;
+  font-family: var(--aka-family), var(--aka-font);
+  font-size: 1.05rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── The texts, side by side ─────────────────────────────────────────────────────────────── */
+
+/* A wide table scrolls inside its own box; the page never scrolls sideways because of it. */
+.ak-assets__table {
+  display: block;
+  overflow-x: auto;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--aka-fine);
+}
+
+.ak-assets__table th,
+.ak-assets__table td {
+  text-align: left;
+  vertical-align: top;
+  padding: calc(var(--aka-pad) / 3) calc(var(--aka-pad) / 2) calc(var(--aka-pad) / 3) 0;
+  border-bottom: 1px solid var(--aka-line);
+}
+
+.ak-assets__table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--aka-surface);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--aka-ink-dim);
+}
+
+.ak-assets__table tbody th {
+  font-weight: 400;
+  white-space: nowrap;
+  padding-right: var(--aka-pad);
+}
+
+.ak-assets__cell {
+  min-width: 8rem;
+  max-width: 22rem;
+}
+
+/* A language that has not been given this key yet. Stripes rather than a blank, because a blank
+   looks like a translation that says nothing. */
+.ak-assets__cell.is-gap {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    var(--aka-line) 0,
+    var(--aka-line) 1px,
+    transparent 1px,
+    transparent 7px
+  );
+  background-clip: content-box;
+}

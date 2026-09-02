@@ -13,6 +13,8 @@
  *     - use-case   : composes an app-shell + components (+ optional package) (future).
  * @structure AppTemplate · getAppTemplates() · getAppTemplateIndex()
  * @version-history
+ *   v1.15.0 — 2026-09-02 — shell-phaser-game: the GAME shell on the Atelier track (Atelier app
+ *     shell + the served aimeat-phaser base). Body in ./app-templates/game-shell.ts.
  *   v1.14.0 — 2026-08-29 — comp-leaflet-map: the real-map component template (leaflet pack).
  *   v1.13.0 — 2026-08-29 — kind `genre` + the thirteen approved genre scaffolds (bodies in
  *     ./app-templates/genres.ts) and the `track` field: genres are Atelier-only in the prompts.
@@ -39,6 +41,7 @@
  */
 
 import { SHELL_PURE_CLIENT, SHELL_CORTEX, SHELL_EXTENSION, SHELL_ATELIER } from './app-templates/shells.js';
+import { SHELL_PHASER_GAME } from './app-templates/game-shell.js';
 import {
   COMP_AUTH_GATED,
   COMP_PRIVATE_STORE,
@@ -138,6 +141,20 @@ const TEMPLATES: AppTemplate[] = [
     packs: ['aimeat-atelier'],
     content: SHELL_ATELIER,
   },
+  {
+    // The GAME shell, on the same track: the Atelier app shell with a Phaser 4 game inside it,
+    // on the served aimeat-phaser base. `kind: 'app-shell'` is what puts it in the shells list
+    // every picker and prompt menu reads (buildPromptTemplateSections filters on that kind);
+    // `track: 'atelier'` is what says which guide built it.
+    id: 'shell-phaser-game',
+    kind: 'app-shell',
+    track: 'atelier',
+    title: 'Phaser game (Atelier shell + aimeat-phaser)',
+    description: 'A whole small game to fork: the Atelier shell with the sign-in pill, a title screen with Play / Settings / Leaderboard, a playable level built from an ASCII map with keyboard, gamepad and touch controls, a HUD, coin and win sounds, a pause menu, one save record per player with the best per level, the settings page in a side panel, and the public board. Replace the map, the words and the look; the physics is already right.',
+    libs: ['aimeat-auth', 'aimeat-data', 'aimeat-atelier', 'aimeat-phaser'],
+    packs: ['phaser4'],
+    content: SHELL_PHASER_GAME,
+  },
   { id: 'comp-auth-gated', kind: 'component', title: 'Auth-gated section', description: 'Show/hide a section based on login state.', libs: ['aimeat-auth'], content: COMP_AUTH_GATED },
   { id: 'comp-private-store', kind: 'component', title: 'Private store', description: 'Save / list / remove a per-owner private collection.', libs: ['aimeat-data'], content: COMP_PRIVATE_STORE },
   { id: 'comp-shared-feed', kind: 'component', title: 'Shared feed', description: 'A public community feed — each user writes their own key, everyone reads.', libs: ['aimeat-data'], content: COMP_SHARED_FEED },
@@ -226,6 +243,7 @@ const TRANSLATIONS: Record<string, Record<string, { title: string; description?:
     'shell-cortex': { title: 'Datasovellus — valmiit taulukot, lomakkeet & kaaviot' },
     'shell-extension': { title: 'Yhdistetty sovellus — hakee ulkoista dataa / ajastetut tehtävät (edistynyt)' },
     'shell-atelier': { title: 'Atelier-sovellus — komponenttikitin rata (vibrantti oletuksena)', description: 'Atelier-rakennusrata: kahdeksan rivin head, servattu komponenttikitti (shell, hero, listat, lomakkeet, taulukot, seitsemän ulkoasupresettiä) ja rakenteelliset mobiili- ja saavutettavuustakuut. Ohjeena GET /v1/prompts/build-app-atelier ja node:aimeat-app-builder-atelier, ei vakiorakennusohje.' },
+    'shell-phaser-game': { title: 'Phaser-peli (Atelier-kuori + aimeat-phaser)', description: 'Valmis pieni peli haarautettavaksi: Atelier-kuori ja kirjautuminen, alkuruutu (Pelaa / Asetukset / Tulostaulu), pelattava kenttä ASCII-kartasta, ohjaus näppäimistöltä, ohjaimelta ja kosketusnäytöltä, HUD, kolikko- ja voittoäänet, taukovalikko, yksi tallennustietue pelaajaa kohden ja kenttäkohtaiset ennätykset, asetukset sivupaneelissa sekä julkinen tulostaulu. Vaihda kartta, sanat ja ulkoasu, fysiikka on jo kunnossa.' },
     'usecase-realtime-social': { title: 'Reaaliaikainen yhteisöhuone', description: 'Live-huone: kirjautuneet käyttäjät saavat live-läsnäolon + chatin pysyvällä historialla. Chatit, läsnäolotaulut, moninpeliaulat.' },
     'usecase-marketplace': { title: 'Kauppapaikka (yhden myyjän myymälä)', description: 'Kuka tahansa selaa + hakee julkisia ilmoituksia ja avaa yksityiskohdat; myyjä lisää ilmoituksia kuvilla.' },
     'usecase-homepage': { title: 'Kotisivu / henkilökohtainen sivusto', description: 'Yhden kirjoittajan julkinen sivusto: kuka tahansa katselee profiilia + blogia; omistaja muokkaa ja julkaisee.' },

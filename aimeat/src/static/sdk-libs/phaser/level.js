@@ -22,6 +22,8 @@
  *         level.on('coin', (n) => hud.set({ score: n }));
  *         // in scene.update(): level.update();
  * @version-history
+ *   v1.0.1 — 2026-09-02 — destroy() on a scene shutdown no longer clears groups Phaser has already
+ *     emptied (a restart threw inside Phaser's Group.clear).
  *   v1.0.0 — 2026-09-02 — Initial (wish-phaser4-design-book-page).
  */
 import { reducedMotion } from '../atelier/dom.js';
@@ -412,11 +414,11 @@ export function platformer(scene, spec) {
       scene.events.off('shutdown', api.destroy);
       for (const key in handlers) handlers[key].length = 0;
       scene.tweens.killTweensOf(player);
-      coins.clear(true, true);
-      spikes.clear(true, true);
-      goal.clear(true, true);
-      enemies.clear(true, true);
-      ground.clear(true, true);
+      // On a scene shutdown Phaser has already emptied the groups when this runs, and clear() on
+      // an emptied group throws inside Phaser; an explicit destroy() mid-play still has them.
+      [coins, spikes, goal, enemies, ground].forEach(function (group) {
+        if (group && group.children) group.clear(true, true);
+      });
       player.destroy();
     },
   };

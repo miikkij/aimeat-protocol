@@ -21,16 +21,26 @@
  *
  *   NOTHING HERE LOOPS. The observer and the visibility listener are the only standing
  *   subscriptions, both removed by destroy().
+ *
+ *   THE PHONE HALF IS ASKED FOR, NEVER ASSUMED. `spec.mobile` wires mobile.js onto the handle as
+ *   `handle.mobile`, and a spec that does not mention it leaves the handle without the member and
+ *   the page without a single extra listener. It is wired here rather than by the app because the
+ *   orientation prompt belongs INSIDE the frame, and the frame is what this file owns.
  * @structure ensurePhaser · theme (+ theme.css, hex) · game(spec) → handle
  * @usage
  *   import { game, theme } from './boot.js';
  *   const h = await game({ parent: '#stage', scale: 'fit', fullscreen: 'button', scenes: [play] });
  *   h.theme.accent   // 0xe8564a on the default palette, a number Phaser accepts anywhere
  * @version-history
+ *   v1.1.1 — 2026-09-02 — The gamepad plugin is on in the game config (spec.gamepad, default
+ *     true), so controls() can read a pad at all.
+ *   v1.1.0 — 2026-09-02 — spec.mobile wires the phone half onto the handle: the orientation
+ *     prompt inside the frame, the wake lock and the measured safe area. Absent unless asked for.
  *   v1.0.0 — 2026-09-02 — Initial: the loader, the token reader and the framed boot.
  */
 import { NODE_URL } from '../_core/config.js';
 import { el, clear, reducedMotion } from '../atelier/dom.js';
+import { mobile } from './mobile.js';
 
 /** The vendored engine, served by this node. The phaser@4 filename is the compatibility
  *  contract: version 3 stays where it is, so every game already published keeps running. */
@@ -356,12 +366,19 @@ function groundColour(look, want) {
  * @property {'arcade'|'matter'|null} [physics]  Default 'arcade'. null runs with no physics.
  * @property {{ x?: number, y?: number }} [gravity]  Default { y: 0 }.
  * @property {boolean} [pixelArt]
+ * @property {boolean} [gamepad]  the gamepad plugin, on unless false
  * @property {'bg'|'surface'|'ink'|number} [background]  Default 'bg'.
  * @property {boolean} [pauseOnHide]       Default true: the loop sleeps while the tab is hidden.
  * @property {number} [fps]                target frames per second. Default: Phaser's own.
  * @property {boolean} [transparent]       let the page show through the canvas.
  * @property {string} [fullscreenLabel]    the button's label when it will enter full screen.
  * @property {string} [exitFullscreenLabel] and when it will leave.
+ * @property {{ orientation?: 'landscape'|'portrait'|'any', keepAwake?: boolean, safeArea?: true }} [mobile]
+ *   the phone half, wired onto the handle as `handle.mobile`. `orientation` puts the "Turn your
+ *   phone" prompt in the frame and asks for the lock in full screen; `keepAwake` holds the screen
+ *   on and re-asks after a hidden tab; `safeArea: true` asks for nothing on its own and is how a
+ *   game says it wants the handle only to measure the notch. Any one of the three is enough, and
+ *   a spec without this member gets no `handle.mobile` and no listeners at all.
  * @property {(game: any) => void} [onReady]
  */
 
@@ -378,6 +395,9 @@ function groundColour(look, want) {
  * @property {() => void} sleep
  * @property {() => void} wake
  * @property {() => boolean} reducedMotion  does the viewer ask for less motion?
+ * @property {any} [mobile]                 the phone half, present only when spec.mobile asked
+ *   for it: orientation(want), safeArea(), keepAwake(on), install(), vibrate(ms), destroy().
+ *   The game handle's own destroy() takes it down with everything else.
  * @property {() => void} destroy
  */
 
@@ -413,6 +433,8 @@ export function game(spec) {
       backgroundColor: groundColour(look, s.background),
       transparent: !!s.transparent,
       pixelArt: !!s.pixelArt,
+      // The gamepad plugin is off in Phaser unless asked; controls() reads it, so it is on here.
+      input: { gamepad: s.gamepad !== false },
       scale: {
         mode: scaleMode,
         autoCenter: mode === 'fit' ? Phaser.Scale.CENTER_BOTH : Phaser.Scale.NO_CENTER,
@@ -534,7 +556,19 @@ function wire(g, frame, parent, look, mode, s) {
   };
   if (pauseOnHide) document.addEventListener('visibilitychange', onVisibility);
 
-  return {
+  // The phone half, and only when the spec asked. Built here because the orientation prompt goes
+  // INSIDE the frame, so it travels into full screen with the picture like everything else.
+  /** @type {any} */
+  let phone = null;
+  if (s.mobile) {
+    phone = mobile({ frame: frame, game: g }, {
+      orientation: s.mobile.orientation,
+      keepAwake: s.mobile.keepAwake,
+    });
+  }
+
+  /** @type {any} */
+  const handle = {
     game: g,
     frame: frame,
     theme: look,
@@ -605,8 +639,16 @@ function wire(g, frame, parent, look, mode, s) {
         g.scale.off('enterfullscreen', onFullscreenChange);
         g.scale.off('leavefullscreen', onFullscreenChange);
       }
+      if (phone) {
+        phone.destroy();
+        phone = null;
+      }
       g.destroy(true);
       if (frame.parentNode) frame.parentNode.removeChild(frame);
     },
   };
+
+  // Present only when it was asked for, so `if (h.mobile)` is a real question a game can ask.
+  if (phone) handle.mobile = phone;
+  return handle;
 }
