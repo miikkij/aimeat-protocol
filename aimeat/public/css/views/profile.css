@@ -497,15 +497,6 @@
 .pf .detail-label{font-size:.7rem;color:var(--text-dim,#6B7280);text-transform:uppercase;letter-spacing:.05em}
 .pf .detail-value{font-size:.85rem;color:var(--text,#1A1A2E);word-break:break-all}
 .pf .detail-value.mono{font-family: var(--font-mono);font-size:.8rem}
-.pf .app-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem}
-.pf .app-card{background:var(--bg-card,#FFFFFF);border:1px solid var(--border,#E5E7EB);border-radius:var(--radius,12px);overflow:hidden;transition:all .2s}
-.pf .app-card:hover{border-color:var(--accent,#E8564A);transform:translateY(-2px)}
-.pf .app-screenshot{width:100%;height:180px;object-fit:cover;background:rgba(0,0,0,.04);display:flex;align-items:center;justify-content:center}
-.pf .app-screenshot img{width:100%;height:100%;object-fit:cover}
-.pf .app-screenshot .placeholder{color:var(--text-dim,#6B7280);font-size:2rem}
-.pf .app-info{padding:1rem}
-.pf .app-info .app-name{font-weight:600;font-size:.95rem;margin-bottom:.3rem}
-.pf .app-info .app-meta{font-size:.75rem;color:var(--text-dim,#6B7280)}
 .pf .file-grid{display:flex;flex-direction:column;gap:.5rem}
 .pf .file-card{display:flex;align-items:center;gap:1rem;padding:.75rem 1rem;background:var(--bg-card,#FFFFFF);border:1px solid var(--border,#E5E7EB);border-radius:var(--radius,12px);transition:all .2s}
 .pf .file-card:hover{border-color:var(--accent,#E8564A)}
@@ -590,7 +581,6 @@
   .pf .wallet-overview{grid-template-columns:repeat(2,1fr)}
   .pf .action-bar{flex-direction:column;align-items:stretch}
   .pf .search-bar{max-width:100%}
-  .pf .app-grid{grid-template-columns:1fr}
   .pf .consent-table,.pf .audit-table{font-size:.75rem}
   .pf .consent-table th,.pf .consent-table td,.pf .audit-table th,.pf .audit-table td{padding:.4rem}
 }
@@ -3588,10 +3578,6 @@
 .pf-skl-frontmatter { background: var(--bg-dim); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.5rem 0.6rem; font-size: 0.74rem; color: var(--muted); white-space: pre-wrap; margin-bottom: 0.5rem; }
 .pf-skl-body-md { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem 1rem; font-size: 0.86rem; max-height: 32rem; overflow: auto; }
 /* ── App-bound skills (2d) on My Apps cards ── */
-.pf-app-skills { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.4rem; }
-.pf-app-skill-chip { display: inline-flex; align-items: center; gap: 0.25rem; }
-.pf-app-skill-x { background: none; border: none; color: inherit; cursor: pointer; font-size: 0.85rem; padding: 0 0.1rem; line-height: 1; }
-.pf-app-skill-picker { display: inline-flex; align-items: center; gap: 0.4rem; }
 
 /* ── AppDev tab (pf-adk-*) — knowledge base + start prompts (AppDev KB UI phase) ── */
 .pf-adk .section-title { margin-top: 1.6rem; }
