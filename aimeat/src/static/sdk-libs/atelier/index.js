@@ -31,6 +31,12 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.46.0 — 2026-09-02 — ROUND THREE (wish-atelier-motion-round-three): layoutMove, swipeStack
+ *     and micro on Motion; morph, draggable, burst and scrub on anime.js; the director learns
+ *     snap and sideways chapters, with parallax and readingRail beside it; the transitions reach
+ *     the kit's own places (the theme switch as an iris, a look change under a curtain, a picked
+ *     row morphing into its detail, intro() for the first paint) and setMotion with the visible
+ *     less-motion switch; every look carries its spring hand in --ak-spring-*.
  *   v0.45.0 — 2026-09-02 — THE SHOW (wish-atelier-story-director-show): director and storyRail
  *     on Lenis (scenes in order, each with its entrance, hold and progress; the rail; the keys),
  *     the anime.js show pieces textReveal, drawPath, gridWave, sequence and orbit, and the
@@ -252,8 +258,12 @@ import { calendar, priceTable } from './anime-parts.js';
 import { thread, checkout } from './lenis-parts.js';
 import { sortable, cart, notices, facets, flipFrom } from './flow-parts.js';
 import { director, storyRail } from './lenis-director.js';
+import { parallax, readingRail } from './lenis-more.js';
 import { textReveal, drawPath, gridWave, sequence, orbit } from './anime-show.js';
-import { screenTransition, panelTransition, curtain } from './transitions.js';
+import { morph, draggable, burst, scrub } from './anime-more.js';
+import { layoutMove, swipeStack, micro } from './motion-show.js';
+import { screenTransition, panelTransition, curtain, intro } from './transitions.js';
+import { setMotion } from './dom.js';
 
 const atelier = {
   /**
@@ -261,7 +271,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.45.0',
+  version: '0.46.0',
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,
@@ -326,9 +336,11 @@ const atelier = {
 
   // ── The show: the Lenis director (scenes in order, each with its motion), the anime.js show
   //    pieces, and the transitions between screens and between panels ──
-  director, storyRail,
+  director, storyRail, parallax, readingRail,
   textReveal, drawPath, gridWave, sequence, orbit,
-  screenTransition, panelTransition, curtain,
+  morph, draggable, burst, scrub,
+  layoutMove, swipeStack, micro,
+  screenTransition, panelTransition, curtain, intro, setMotion,
 
   // ── Data ──
   form, table, searchBar,

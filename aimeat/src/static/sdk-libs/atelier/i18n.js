@@ -15,6 +15,7 @@
  * @usage  AIMEAT.atelier.i18n.use({ fi: { addTask: 'Lisää tehtävä' }, en: { addTask: 'Add task' } });
  *         AIMEAT.atelier.i18n.t('addTask');
  * @version-history
+ *   v0.3.0 — 2026-09-02 — lessMotion (en/fi/es): the label of the bar's less-motion switch.
  *   v0.2.1 — 2026-08-28 — copilot* keys become aide* (the component was renamed before any app
  *     uses it), visible titles per language: Aide / Apuri / Ayudante.
  *   v0.2.0 — 2026-08-28 — The aide's words (title, notice, no-AI state, run/confirm) and the
@@ -27,6 +28,7 @@
 const BASE = {
   en: {
     loading: 'Loading…',
+    lessMotion: 'Less motion',
     ready: 'Ready.',
     retry: 'Try again',
     close: 'Close',
@@ -86,6 +88,7 @@ const BASE = {
   },
   fi: {
     loading: 'Ladataan…',
+    lessMotion: 'Vähemmän liikettä',
     ready: 'Valmis.',
     retry: 'Yritä uudelleen',
     close: 'Sulje',
@@ -145,6 +148,7 @@ const BASE = {
   },
   es: {
     loading: 'Cargando…',
+    lessMotion: 'Menos movimiento',
     ready: 'Listo.',
     retry: 'Inténtalo otra vez',
     close: 'Cerrar',

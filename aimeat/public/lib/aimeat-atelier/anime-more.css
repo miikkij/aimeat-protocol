@@ -1,0 +1,152 @@
+/*
+ * @file aimeat-atelier/anime-more.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The clothes for the four remaining anime.js pieces: the shape that becomes another
+ *   shape, the element the hand carries, the celebration that is gone when it ends, and the
+ *   choreography the reader plays. Every value rides the --ak-* contract, so all four answer
+ *   every look, palette and mode; no colour is written here that is not a token or a color-mix
+ *   over one, and the eight burst tones are eight token reads.
+ *
+ *   `scrub` has no clothes: like `sequence`, it choreographs the app's OWN elements and never
+ *   introduces one of its own, which is why there is no .ak-scrub class to find here.
+ *
+ *   NOTHING IN THIS FILE ANIMATES. Every piece of travel is written in JavaScript, runs once per
+ *   cue and is skipped or shortened under reduced motion. What lives here is the geometry the
+ *   travel needs (a shape a morph can reach, a spare that is in the document but not on the
+ *   screen, a particle that starts at the point the burst was fired from, an element a transform
+ *   can carry) plus the grab cursor and a focus ring on the one thing that is handled — which is
+ *   all an idle surface should ever repaint for.
+ * @structure .ak-morph (shape, spares) · .ak-tug (the carried element) ·
+ *   .ak-burst (host, layer, the three kinds, the eight tones, the reduced-motion ring) ·
+ *   reduced-motion
+ * @usage  Imported by aimeat-atelier.css; the components are AIMEAT.atelier.morph, draggable,
+ *   burst and scrub.
+ * @version-history
+ *   v0.46.0 — 2026-09-02 — Initial: morph, draggable, burst and scrub.
+ */
+
+/* ── The shape that becomes another shape ────────────────────────────────────────────────── */
+.ak-morph {
+  display: block;
+  max-width: 100%;
+}
+/* The shape wears the accent unless the author gave it a fill of its own; anime rewrites the
+ * geometry attribute and never the paint, so whatever is declared here survives every morph. */
+.ak-morph__shape {
+  fill: var(--ak-accent);
+}
+.ak-morph--quiet .ak-morph__shape {
+  fill: var(--ak-ink-dim);
+}
+.ak-morph--outline .ak-morph__shape {
+  fill: none;
+  stroke: var(--ak-accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+/* A spare is IN the document and not on the screen. It is painted away rather than hidden,
+ * because a shape behind `display: none` has no length to measure and anime's resampler asks
+ * every spare for its length before the first morph. */
+.ak-morph__spare {
+  fill: none;
+  stroke: none;
+  pointer-events: none;
+}
+
+/* ── The element the hand carries ────────────────────────────────────────────────────────── */
+/* touch-action is what stops a phone from scrolling the page instead of carrying the element,
+ * and it has to be on the element before the first touch, so it lives here and not in the JS. */
+.ak-tug {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.ak-tug--held {
+  cursor: grabbing;
+  z-index: 2;
+  box-shadow: var(--ak-elev-2);
+}
+.ak-tug:focus-visible {
+  outline: 2px solid var(--ak-focus);
+  outline-offset: 2px;
+}
+
+/* ── The celebration ─────────────────────────────────────────────────────────────────────── */
+/* Lent to a host that is not positioned, for the length of the burst, and taken back after. */
+.ak-burst-host {
+  position: relative;
+}
+/* The layer covers the host and lets every click through; the particles overflow it on purpose,
+ * because a celebration clipped to the button it came out of is a celebration in a box. */
+.ak-burst {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 3;
+}
+/* Every particle is born at the point the burst was fired from: the JS writes that point once,
+ * on the layer, as two lengths, and the transform the timeline drives is all that moves. */
+.ak-burst__bit {
+  position: absolute;
+  left: var(--ak-burst-x, 50%);
+  top: var(--ak-burst-y, 50%);
+  background: var(--ak-accent);
+  will-change: transform, opacity;
+}
+.ak-burst__bit--dot {
+  width: 9px;
+  height: 9px;
+  margin: -4.5px;
+  border-radius: var(--ak-radius-pill);
+}
+.ak-burst__bit--confetti {
+  width: 7px;
+  height: 11px;
+  margin: -5.5px -3.5px;
+  border-radius: 1px;
+}
+.ak-burst__bit--spark {
+  width: 2px;
+  height: 14px;
+  margin: -7px -1px;
+  border-radius: var(--ak-radius-pill);
+}
+/* The eight tones, and the whole of this component's palette: four states from the contract and
+ * the four channel colours a look may retune. */
+.ak-burst__bit--accent { background: var(--ak-accent); }
+.ak-burst__bit--ok     { background: var(--ak-ok); }
+.ak-burst__bit--warn   { background: var(--ak-warn); }
+.ak-burst__bit--err    { background: var(--ak-err); }
+.ak-burst__bit--ch1    { background: var(--ak-crt-ch1); }
+.ak-burst__bit--ch2    { background: var(--ak-crt-ch2); }
+.ak-burst__bit--ch3    { background: var(--ak-crt-ch3); }
+.ak-burst__bit--ch4    { background: var(--ak-crt-ch4); }
+/* Less motion asked for: one ring, at the point, once. The JS drives it as a Web Animation and
+ * takes it off the page after; what is here is where it stands and what it is made of. */
+.ak-burst__ring {
+  position: absolute;
+  left: var(--ak-burst-x, 50%);
+  top: var(--ak-burst-y, 50%);
+  width: 96px;
+  height: 96px;
+  margin: -48px;
+  border: 2px solid var(--ak-accent);
+  border-radius: var(--ak-radius-pill);
+}
+
+/* ── Less motion asked for ───────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  /* Nothing here is travelling, so nothing here needs a compositor layer held open for it. */
+  .ak-burst__bit,
+  .ak-tug {
+    will-change: auto;
+  }
+  /* The carried element still lifts under the hand, because the hand is what put it there. */
+  .ak-tug--held {
+    box-shadow: var(--ak-elev-1);
+  }
+}

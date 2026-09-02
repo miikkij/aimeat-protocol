@@ -26,6 +26,9 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.19.0 — 2026-09-02 — The motion paragraph names the spring hand: a look carries its own
+ *     stiffness, damping and mass in --ak-spring-*, and the primitives read them off the
+ *     element, so an author tunes the look rather than every call.
  *   v1.18.0 — 2026-09-02 — The kit's motion primitives (spring, stagger, inView, scrollLink,
  *     drag) named beside the recipes, and the three vendored animation packs (motion, anime,
  *     lenis) pointed at with the read-the-doc-first rule, because each changed its API after
@@ -401,7 +404,10 @@ function composeBody(config: AimeatConfig): string {
     + '(rise). NEVER use it as decoration, never on more than one element at a time, and never '
     + 'INSTEAD of words: a gesture is on top of the message, because a person who does not see '
     + 'motion must still be told. The pace and curve come from the look (`--ak-motion`, '
-    + '`--ak-ease`), so the same call feels springy in one app and snappy in another.\n\n';
+    + '`--ak-ease`), so the same call feels springy in one app and snappy in another. The SPRING '
+    + 'is the look\'s too: each one carries its own stiffness, damping and mass in '
+    + '`--ak-spring-*`, and the kit\'s primitives (`spring`, `drag`, `stagger({ spring: true })`) '
+    + 'read them off the element they move, so you tune the look and never the call.\n\n';
 
   body += '## Imagery\n\n';
   body += 'Images are generated, uploaded and referenced — never inlined and never stock. The '

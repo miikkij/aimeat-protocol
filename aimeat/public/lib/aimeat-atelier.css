@@ -31,11 +31,24 @@
  *   MOTION IS FINITE. The entrance tokens drive a one-shot choreography in JS; the only CSS
  *   animations here (skeleton shimmer, loading pulse) carry a finite iteration count, so an
  *   idle Atelier surface repaints zero times and the finish gate can measure that.
+ *
+ *   A LOOK CARRIES ITS OWN HAND. Speed and curve were always on the contract (--ak-motion,
+ *   --ak-ease); the SPRING is too, as --ak-spring-stiffness / --ak-spring-damping /
+ *   --ak-spring-mass. The kit's primitives read the three off the element they are moving, so
+ *   the same spring() call bounces under carnival and lands flat under editorial without the
+ *   app naming a number. They are mode-independent: declared once in the light block, never
+ *   re-declared for dark.
  * @structure @import (shell) · the --ak-* token contract (light) · dark re-declaration ·
  *   look presets ([data-ak-look]) · reduced-motion
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.46.0 — 2026-09-02 — ROUND THREE: motion-show.css, anime-more.css and lenis-more.css join
+ *     the imports (wish-atelier-motion-round-three). Pinned to the JS version, as ever.
+ *   v0.45.1 — 2026-09-02 — THE SPRING HAND joins the contract: --ak-spring-stiffness,
+ *     --ak-spring-damping and --ak-spring-mass, declared once (mode-independent) and set by
+ *     every look, so a feel belongs to the look instead of to whoever wrote the call. The kit's
+ *     spring, drag and staggered entrance read them off the element (motion.js).
  *   v0.45.0 — 2026-09-02 — THE SHOW: lenis-director.css (the rail, the pinned scene, the story
  *     well), anime-show.css (the reveal, draw, wave and orbit pieces) and transitions.css (the
  *     curtain layers and the view-transition kinds) join the imports
@@ -236,7 +249,10 @@
 @import url('./aimeat-atelier/lenis-parts.css');
 @import url('./aimeat-atelier/flow-parts.css');
 @import url('./aimeat-atelier/lenis-director.css');
+@import url('./aimeat-atelier/lenis-more.css');
 @import url('./aimeat-atelier/anime-show.css');
+@import url('./aimeat-atelier/anime-more.css');
+@import url('./aimeat-atelier/motion-show.css');
 @import url('./aimeat-atelier/transitions.css');
 @import url('./aimeat-atelier/scenics.css');
 @import url('./aimeat-atelier/patterns.css');
@@ -350,6 +366,18 @@
   /* Vivid entrance: components rise in, staggered. Flat zeroes both and nothing animates. */
   --ak-enter-distance: 14px;
   --ak-enter-stagger:  40ms;
+  /* THE SPRING HAND. --ak-motion is how long a move takes; these three are how it MOVES while it
+   * takes it: the physics the kit's spring, drag and staggered entrance sample their keyframes
+   * from (motion.js: springFrames reads them off the element when the call names no number).
+   * Higher stiffness arrives sooner, lower damping overshoots and settles back, more mass adds
+   * weight to both. The house hand is 170/20/1, which lands just short of a bounce. Every look
+   * declares its own three, so an author tunes the LOOK and every call follows.
+   * MODE-INDEPENDENT ON PURPOSE: a spring is a feel, not a colour, and a card does not want a
+   * different bounce at night, so these are declared once here and the dark block below leaves
+   * them alone, the way --ak-motion, --ak-ease and the entrance pair already are. */
+  --ak-spring-stiffness: 170;
+  --ak-spring-damping:   20;
+  --ak-spring-mass:      1;
 
   /* ── The node's injected bottom controls — never draw under them ──────────────────────── */
   --ak-chrome-bottom: var(--aimeat-chrome-bottom, 56px);
