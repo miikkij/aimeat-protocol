@@ -33,6 +33,10 @@
  *   if (!gate.ok) { res.status(gate.status).json(error(config.nodeId, gate.code, gate.message)); return; }
  *   // ...then verify the signature against gate.peer.publicKey
  * @version-history
+ *   v1.1.0 — 2026-09-03 — `allowRouting` is out of the vocabulary. No door ever asked for it, so its
+ *     refusal text had never been sent to anyone, and it pointed the wrong way: routing is the
+ *     SENDER's policy, checked in routes/federation-sync/routing.ts against its own record of the
+ *     target. A permission word enforced on no door does not exist. The flag itself is untouched.
  *   v1.0.0 — 2026-08-23 — Initial, with the contact tier: message/receipt/storage-grant, broadcast,
  *     settlement, presence, memory-list and templates each name a word now.
  */
@@ -46,10 +50,16 @@ import type { PeerInfo } from './federation.js';
 export type PeerCapability =
   | 'shareCatalogue'
   | 'replicateMemory'
-  | 'allowRouting'
   | 'allowMessaging'
   | 'allowBroadcast'
   | 'allowSettlement';
+// `allowRouting` was in this list and in DENIED below, saying "This peer may not route or relay
+// through this node" — and no door ever asked for it, so that sentence had never been sent to
+// anyone. It also pointed the wrong way: routing is decided by the SENDER, in its own record of the
+// target (routes/federation-sync/routing.ts), not by the receiver of a relayed call. A permission
+// word enforced on no door does not exist, so it is out of the vocabulary rather than left here
+// implying a check that is not made. The flag itself is untouched: it is a real policy, just not an
+// inbound one. Adding a receiving-side gate needs a SIGNED relay claim first — see the spec draft.
 
 export type PeerGateResult =
   | { ok: true; peer: PeerInfo }
@@ -60,7 +70,6 @@ export type PeerGateResult =
 const DENIED: Record<PeerCapability, string> = {
   shareCatalogue: 'This peer may not read or sync the catalogue on this node',
   replicateMemory: 'This peer may not replicate memory to or from this node',
-  allowRouting: 'This peer may not route or relay through this node',
   allowMessaging: 'This peer may not deliver messages to this node',
   allowBroadcast: 'This peer may not broadcast to this node',
   allowSettlement: 'This peer may not settle balances on this node',

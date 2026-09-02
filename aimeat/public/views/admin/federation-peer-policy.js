@@ -21,6 +21,9 @@
  *   - PeerPolicyCell — the per-peer control group
  * @usage <${PeerPolicyCell} peer=${p} onUpdate=${(field, value) => doUpdatePolicy(p.node_id, field, value)} />
  * @version-history
+ *   v1.1.0 — 2026-09-03 — The routing switch carries a sentence saying which way it points, and is
+ *     labelled "Relay to this peer". Every other switch here answers "may this peer do X on my
+ *     node"; that one alone points outward, and nothing said so.
  *   v1.0.0 — 2026-08-23 — Initial, with the contact tier.
  */
 import { h } from 'preact';
@@ -47,7 +50,11 @@ const CAPABILITIES = [
   { field: 'allow_broadcast', label: 'fedAllowBroadcast' },
   { field: 'allow_settlement', label: 'fedAllowSettlement' },
   { field: 'replicate_memory', label: 'fedReplicateMemory' },
-  { field: 'allow_routing', label: 'fedAllowRouting' },
+  // The only one that needs its direction spelled out. Every other switch here answers "may this
+  // peer do X on my node"; this one says whether MY node forwards to them. An operator who turns it
+  // off expecting to shut that peer out has changed nothing about what arrives — measured on two
+  // local nodes 2026-09-02.
+  { field: 'allow_routing', label: 'fedAllowRouting', hint: 'fedAllowRoutingHint' },
   { field: 'allow_federated_auth', label: 'fedAllowAuth' },
 ];
 
@@ -85,16 +92,19 @@ export default function PeerPolicyCell({ peer, onUpdate }) {
     const on = cap.field === 'allow_federated_auth' ? !!peer[cap.field] : peer[cap.field] !== false;
     const allowed = ceiling[cap.field];
     return html`
-          <label class="adm-text-sm adm-peer-policy-row" key=${cap.field}>
-            <input
-              type="checkbox"
-              checked=${on && allowed}
-              disabled=${!allowed}
-              onChange=${(e) => onUpdate(cap.field, e.target.checked)}
-            />
-            <span class=${allowed ? '' : 'adm-text-dim'}>${t(`dashboard.${cap.label}`)}</span>
-            ${!allowed && html`<span class="adm-peer-policy-locked" title=${t('dashboard.fedTierLocked')}>\u{1F512}</span>`}
-          </label>`;
+          <div class="adm-peer-policy-item" key=${cap.field}>
+            <label class="adm-text-sm adm-peer-policy-row">
+              <input
+                type="checkbox"
+                checked=${on && allowed}
+                disabled=${!allowed}
+                onChange=${(e) => onUpdate(cap.field, e.target.checked)}
+              />
+              <span class=${allowed ? '' : 'adm-text-dim'}>${t(`dashboard.${cap.label}`)}</span>
+              ${!allowed && html`<span class="adm-peer-policy-locked" title=${t('dashboard.fedTierLocked')}>\u{1F512}</span>`}
+            </label>
+            ${cap.hint && html`<p class="adm-peer-policy-hint">${t(`dashboard.${cap.hint}`)}</p>`}
+          </div>`;
   })}
 
       <select
