@@ -12,7 +12,8 @@
  *   v1.28.0 -- 2026-09-03 -- Add e2e-federation-relay-claim.ts, in ALL_SUITES and in the guard tier:
  *            eleven of its seventeen assertions are a refusal, and the capability it proves did not
  *            exist before (a receiving node could not refuse a relay). It spawns its own node on
- *            40291 with its own sqlite file, so it neither needs nor disturbs the shared server.
+ *            40293 with its own sqlite file, so it neither needs nor disturbs the shared server
+ *            (40291 is e2e-sealed-config's; see docs/pitfalls.md §38).
  *   v1.27.0 -- 2026-09-02 -- Add e2e-workspace-doc-edit.ts: in-place document edits, the byte-identity
  *            of everything they do not touch, and two concurrent appends both surviving.
  *   v1.26.0 -- 2026-09-02 -- Add e2e-app-playtest.ts: the game playtest bench through the audit door.
