@@ -15,6 +15,8 @@
  *   - checkSdkLibs()  → --check: fail (non-zero) if any committed bundle is stale vs its sources
  * @usage  pnpm build:sdk   ·   pnpm check:sdk   (also run by `pnpm dev`)
  * @version-history
+ *   v1.6.0 — 2026-09-02 — Register aimeat-phaser (the Phaser 4 base: boot, packs, saves, controls,
+ *     menus, levels, settings; wish-phaser4-design-book-page).
  *   v1.5.0 — 2026-08-29 — Register aimeat-rows (AIMEAT.rows: an app's door to an organism row space).
  *   v1.4.0 — 2026-08-27 — Register aimeat-atelier (the Atelier track's UI kit, TARGET-074).
  *   v1.3.0 — 2026-08-01 — `.css` files import as TEXT. aimeat-ai's disclose() needs the platform's
@@ -68,6 +70,7 @@ export const SDK_LIBS: SdkLib[] = [
   { name: 'commerce', entry: 'commerce/index.js' },
   { name: 'exchange', entry: 'exchange/index.js' },
   { name: 'game', entry: 'game/index.js' },
+  { name: 'phaser', entry: 'phaser/index.js' },
   { name: 'webmcp', entry: 'webmcp/index.js' },
   { name: 'markdown', entry: 'markdown/index.js' },
   { name: 'iam', entry: 'iam/index.js' },
