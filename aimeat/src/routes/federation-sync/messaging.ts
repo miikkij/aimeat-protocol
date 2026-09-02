@@ -302,7 +302,16 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
             await storage.createDirectMessage({
                 id: message.id,
                 ownerGhii: deliveryGhii,
-                conversationId: message.conversationId,
+                // DERIVED WHEN THE PEER OMITS IT. `conversationId` is NOT NULL in storage but is not
+                // in this route's required list, so a message that passed every check here — an
+                // active peer, a valid signature, an accepted contact — died on the insert with
+                // "NOT NULL constraint failed: direct_messages.conversationId" and the peer got a
+                // 500. A door that accepts a payload and then cannot store it is telling the far
+                // side the wrong thing about whose fault it is. The id is deterministic from the
+                // two identities (conversationIdFor), which is exactly what the local send path
+                // computes, so deriving it here puts the message in the same thread it would have
+                // landed in had the peer sent one. Measured against a second local node 2026-09-02.
+                conversationId: message.conversationId ?? conversationIdFor(message.senderGhii, recipientGhii),
                 subject: message.subject ?? undefined,
                 senderGhii: message.senderGhii,
                 recipientGhii,

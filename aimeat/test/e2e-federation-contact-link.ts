@@ -154,6 +154,28 @@ await test('P1. A contact peer CAN deliver a direct message', async () => {
     assert(r.body.data.delivered === true, `delivered, got ${JSON.stringify(r.body.data)}`);
 });
 
+await test('P1b. A message with NO conversationId is delivered, not 500', async () => {
+    // Measured against a real second node on 2026-09-02. `conversationId` is NOT NULL in storage
+    // but is not in this route's required list, so a message that passed every check — an active
+    // peer, a valid signature, an accepted contact — died on the insert with
+    // "NOT NULL constraint failed: direct_messages.conversationId" and the PEER got a 500. A door
+    // that accepts a payload and then cannot store it tells the far side the wrong thing about
+    // whose fault it is. The id is derived from the two identities, the same way the local send
+    // path computes it, so the message lands in the thread it belongs to.
+    const message = {
+        id: randomUUID(),
+        // conversationId deliberately absent — this is the whole test.
+        senderGhii: `someone@${C_NODE}`,
+        recipientGhii: V.ownerGhii,
+        deliveryGhii: V.ownerGhii,
+        body: 'No conversation id on this one.',
+        createdAt: new Date().toISOString(),
+    };
+    const r = await asPeer('/v1/federation/message', { source_node: C_NODE, message, timestamp: new Date().toISOString() });
+    assert(r.status === 200, `expected 200, got ${r.status}: ${JSON.stringify(r.body)}`);
+    assert(r.body.data.delivered === true, `delivered, got ${JSON.stringify(r.body.data)}`);
+});
+
 await test('P2. A contact peer CAN send a read receipt', async () => {
     const r = await asPeer('/v1/federation/message/receipt', {
         source_node: C_NODE, message_id: deliveredMessageId, kind: 'read', timestamp: new Date().toISOString(),
