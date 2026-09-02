@@ -212,6 +212,9 @@ export function initializeSchema(db: Database.Database): void {
   // Federation book / version visibility — peer software version + node-card hash
   safeAddColumn('federation_peers', 'softwareVersion', 'TEXT');
   safeAddColumn('federation_peers', 'nodeCardHash', 'TEXT');
+  // NULL, deliberately, for every existing row: it means "this peer has never proved it can sign a
+  // relay claim", which is exactly true of a peer that predates the column.
+  safeAddColumn('federation_peers', 'relayClaimAt', 'TEXT');
 
   // The `contact` tier (federation's floor: messages and nothing else) needs words for three doors
   // that had none, so they could be refused. DEFAULT 1 is deliberate: every peer that exists today

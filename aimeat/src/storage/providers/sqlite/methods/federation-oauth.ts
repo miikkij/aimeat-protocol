@@ -333,8 +333,8 @@ export const federationOauthMethods = {
 
   async saveFederationPeer(this: SqliteStorage, peer: FederationPeerRecord): Promise<void> {
     this.db.prepare(
-      `INSERT OR REPLACE INTO federation_peers (nodeId, url, publicKey, status, addedAt, lastSeen, shareCatalogue, replicateMemory, allowRouting, allowMessaging, allowBroadcast, allowSettlement, supportUpstream, peerMode, allowFederatedAuth, federationAuthScopes, tier, availability, expiresAt, heartbeatOk, heartbeatTotal, availabilityWindow, availabilityPct, softwareVersion, nodeCardHash)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT OR REPLACE INTO federation_peers (nodeId, url, publicKey, status, addedAt, lastSeen, shareCatalogue, replicateMemory, allowRouting, allowMessaging, allowBroadcast, allowSettlement, supportUpstream, peerMode, allowFederatedAuth, federationAuthScopes, tier, availability, expiresAt, heartbeatOk, heartbeatTotal, availabilityWindow, availabilityPct, softwareVersion, nodeCardHash, relayClaimAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(peer.nodeId, peer.url, peer.publicKey, peer.status, peer.addedAt, peer.lastSeen,
       peer.shareCatalogue ? 1 : 0, peer.replicateMemory ? 1 : 0, peer.allowRouting ? 1 : 0,
       peer.allowMessaging ? 1 : 0, peer.allowBroadcast ? 1 : 0, peer.allowSettlement ? 1 : 0,
@@ -343,7 +343,7 @@ export const federationOauthMethods = {
       (peer.federationAuthScopes ?? []).join(','),
       peer.tier ?? 'member', peer.availability ?? null, peer.expiresAt ?? null,
       peer.heartbeatOk ?? 0, peer.heartbeatTotal ?? 0, peer.availabilityWindow ?? null, peer.availabilityPct ?? null,
-      peer.softwareVersion ?? null, peer.nodeCardHash ?? null);
+      peer.softwareVersion ?? null, peer.nodeCardHash ?? null, peer.relayClaimAt ?? null);
   },
 
   async listFederationPeers(this: SqliteStorage): Promise<FederationPeerRecord[]> {
@@ -376,6 +376,7 @@ export const federationOauthMethods = {
       availabilityPct: r.availabilityPct == null ? null : (r.availabilityPct as number),
       softwareVersion: (r.softwareVersion as string) ?? null,
       nodeCardHash: (r.nodeCardHash as string) ?? null,
+      relayClaimAt: (r.relayClaimAt as string) ?? null,
     }));
   },
 

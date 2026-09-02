@@ -211,6 +211,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
 
   // ── Federation (mutable) ──
   { key: 'maxRelayHops', dotPath: 'federation.max_relay_hops', envVar: 'AIMEAT_MAX_RELAY_HOPS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max relay hops for federated requests', range: '1-10' },
+  { key: 'federationRelayClaim', dotPath: 'federation.relay_claim', envVar: 'AIMEAT_FEDERATION_RELAY_CLAIM', type: 'string', validate: v => v === 'optional' || v === 'required', immutable: false, description: "Must an inbound relayed request carry a signed relay claim? 'required' refuses one without; 'optional' (default) lets an older peer through and is a migration position rather than protection", range: 'optional | required' },
 
   // ── Rate Limits (mutable, per-endpoint with global fallback) ──
   { key: 'rlGlobal', dotPath: 'rate_limits.global', envVar: 'AIMEAT_RL_GLOBAL', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Global rate limit (requests/second)', range: '1-10000' },

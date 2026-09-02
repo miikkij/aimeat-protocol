@@ -5,6 +5,11 @@
  * @description Cross-node query routing — multi-hop relay with signed route manifest + routing-fee debit,
  *   GAII→node resolution, and cross-node work submission. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-09-03 — Every outbound relay carries a SIGNED relay claim (services/relay-claim.ts)
+ *     so the receiving node can refuse a relay it does not want. Until now `allowRouting` was read
+ *     only here, on the sender: Stage B measured that demoting peer B on node A did not stop B
+ *     relaying into A. Both directions are enforced now and neither replaced the other — the check
+ *     below still decides what THIS node relays outward.
  *   v1.0.0 — 2026-07-13 — Extracted from federation-sync.ts (max-file-lines)
  */
 
@@ -21,6 +26,7 @@ import { validateOutboundUrl } from '../../utils/url-validator.js';
 import type { RouteHop, RouteManifest } from '../../types/route-manifest.js';
 import { buildHopSigningMessage } from '../../types/route-manifest.js';
 import { emitChange } from '../../services/event-bus.js';
+import { buildRelayClaim } from '../../services/relay-claim.js';
 
 export function registerRoutingRoutes(router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): void {
     // ── Cross-Node Query Routing ──
@@ -118,6 +124,12 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
                     res.status(400).json(error(config.nodeId, 'INVALID_URL', targetUrlCheck.reason ?? 'URL validation failed'));
                     return;
                 }
+                // The receiving node decides whether it accepts a relay from US, and it needs proof
+                // rather than the header below — anyone can type that one. One claim per forwarded
+                // request, bound to this method and this path, single-use at the far end.
+                const claim = await buildRelayClaim(storage, config, {
+                    audience: target_node, method: method ?? 'GET', path, caller: requesterGaii,
+                });
                 const response = await fetch(targetUrl, {
                     method: method ?? 'GET',
                     headers: {
@@ -125,6 +137,7 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
                         'X-Forwarded-From': config.nodeId,
                         'X-Relay-Hops': String(hops - 1),
                         'X-Relay-Path': relayPath,
+                        ...(claim ?? {}),
                     },
                     ...(reqBody && ['POST', 'PUT', 'PATCH'].includes((method ?? 'GET').toUpperCase())
                         ? { body: JSON.stringify(reqBody) }
@@ -173,6 +186,13 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
                     logger.warn(`Blocked outbound relay to peer ${relay.nodeId}: ${relayUrlCheck.reason}`);
                     continue;
                 }
+                // ONE HOP, ONE CLAIM: this one is written for the NEXT node and covers the call we
+                // are actually making to it, which is a POST to its own /v1/federation/route. The
+                // node after that gets its own claim from that node. A receiver only ever decides
+                // about its own peer, which is the only party it has a pinned key for.
+                const hopClaim = await buildRelayClaim(storage, config, {
+                    audience: relay.nodeId, method: 'POST', path: '/v1/federation/route', caller: requesterGaii,
+                });
                 const response = await fetch(relayUrl, {
                     method: 'POST',
                     headers: {
@@ -181,6 +201,7 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
                         'X-Forwarded-From': config.nodeId,
                         'X-Relay-Hops': String(hops - 1),
                         'X-Relay-Path': relayPath,
+                        ...(hopClaim ?? {}),
                     },
                     body: JSON.stringify({
                         target_node,
@@ -325,12 +346,18 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
                 workSignature = await sign(nodeKey.privateKey, JSON.stringify(workPayload));
             }
 
+            // This call carries X-Forwarded-From, so to the receiving node it IS a relay and its
+            // gate will ask for a claim. Signed here for the same reason and in the same shape.
+            const workClaim = await buildRelayClaim(storage, config, {
+                audience: target_node, method: 'POST', path: '/v1/work/request', caller: req.auth!.sub,
+            });
             const response = await fetch(`${peer.url}/v1/work/request`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-Forwarded-From': config.nodeId,
                     'X-Requester-Node': config.nodeId,
+                    ...(workClaim ?? {}),
                 },
                 body: JSON.stringify({
                     ...workPayload,

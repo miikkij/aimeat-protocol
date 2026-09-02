@@ -5267,6 +5267,30 @@ components:
                         example: FEATURE_DISABLED
 
   parameters:
+    RelayClaim:
+      name: X-Relay-Claim
+      in: header
+      required: false
+      schema:
+        type: string
+      description: >
+        A relaying node's signed proof that this request is its relay: base64url of the exact JSON
+        `{ relay, aud, method, path, caller, iat, exp, jti }` that was signed. THIS HEADER IS NOT
+        DECLARED ON EVERY PATH, and it is understood on every path: a relay turns
+        POST /v1/federation/route on the relaying node into an ordinary HTTP call to any endpoint on
+        the receiver, so the gate that reads it is global (src/middleware/relay-gate.ts) rather than
+        a property of one route. Declared here so the shape has one home. Emitted by
+        POST /v1/federation/route and POST /v1/federation/cross-node/work.
+    RelaySignature:
+      name: X-Relay-Signature
+      in: header
+      required: false
+      schema:
+        type: string
+      description: >
+        base64 Ed25519 signature over the DECODED bytes of X-Relay-Claim, made with the relaying
+        node's own node key, which is the key the receiver has pinned for that peer. Sent with
+        X-Relay-Claim and meaningless without it.
     TrackingCode:
       name: tc
       in: path
@@ -35762,6 +35786,37 @@ paths:
     post:
       operationId: federationRoute
       summary: Route request to remote node
+      description: |
+        Forward a request to a peer node, directly or through one more relay.
+
+        TWO POLICIES, BOTH ENFORCED, AND NEITHER REPLACED THE OTHER. This node's own
+        `allow_routing` on the TARGET peer decides what it is willing to relay outward, and refuses
+        with 403 POLICY_DENIED. What the RECEIVING node is willing to accept is its decision, and
+        until 2026-09-03 it had no way to make one: `x-forwarded-from` is a header anyone can type,
+        so a gate resting on it would have looked like protection while being none. Stage B measured
+        the consequence on 2026-09-02, when demoting peer B on node A did not stop B relaying into A.
+
+        So every forwarded request now carries a SIGNED RELAY CLAIM (`X-Relay-Claim` +
+        `X-Relay-Signature`, see components/parameters): base64url of the JSON that was signed,
+        covering the relaying node, the receiving node, the method, the exact request-target, the
+        principal being relayed for, a five-minute window and a single-use `jti`. One hop, one claim:
+        in a multi-hop relay each node signs for the node it hands to, so a receiver only ever
+        decides about a peer whose key it has pinned.
+
+        WHAT A RECEIVER ANSWERS, on any path a relay reaches, always 403 and never 401. A 401 would
+        invite a retry with credentials, and no credential of the original caller's fixes any of
+        these. Every message says the refusal is about the link between the two nodes rather than
+        about the caller being relayed for.
+          - `RELAY_NOT_PERMITTED` - the receiver has `allow_routing` off for the relaying peer
+          - `RELAY_PEER_UNKNOWN` - no active peering with the relaying node
+          - `RELAY_CLAIM_REQUIRED` - no claim, and the receiver requires one (`federation.relay_claim`
+            = `required`), or that peer has signed one before and may not go back to sending none
+          - `RELAY_CLAIM_INVALID` - the claim does not decode or is missing fields
+          - `RELAY_CLAIM_WRONG_NODE` - written for another node
+          - `RELAY_CLAIM_MISMATCH` - signed for a different method or request-target
+          - `RELAY_CLAIM_EXPIRED` / `RELAY_CLAIM_TOO_LONG` / `RELAY_CLAIM_FUTURE` - outside its window
+          - `RELAY_CLAIM_UNSIGNED` - not signed by the key the receiver has pinned for that peer
+          - `RELAY_CLAIM_SPENT` - that claim was already used; a claim is worth one forwarded request
       tags: [Federation]
       security:
         - BearerAuth: []
@@ -35774,6 +35829,10 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '403':
+          description: >
+            This node will not relay to that target (POLICY_DENIED), or the receiving node refused
+            the relay (a RELAY_* code, listed above, passed through with the far end's status).
 
   /v1/federation/resolve/{gaii}:
     get:
@@ -35797,7 +35856,10 @@ paths:
     post:
       operationId: crossNodeWork
       summary: Cross-node work request
-      description: Forward a work request to a remote node.
+      description: >
+        Forward a work request to a remote node. This call carries `X-Forwarded-From`, so to the
+        receiving node it IS a relay: it is signed with the same relay claim as
+        POST /v1/federation/route and meets the same gate there, with the same RELAY_* refusals.
       tags: [Federation]
       security:
         - BearerAuth: []

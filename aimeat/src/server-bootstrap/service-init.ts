@@ -232,6 +232,7 @@ export async function initializeServices(
         availabilityPct: sp.availabilityPct ?? null,
         softwareVersion: sp.softwareVersion ?? null,
         nodeCardHash: sp.nodeCardHash ?? null,
+        relayClaimAt: sp.relayClaimAt ?? null,
       });
     }
     if (savedPeers.length > 0) {

@@ -37,6 +37,7 @@ import { setupStaticFiles } from './server-bootstrap/static-files.js';
 import { initializeConfig } from './server-bootstrap/config-init.js';
 import { initializeServices } from './server-bootstrap/service-init.js';
 import { setupGuards } from './server-bootstrap/middleware-guards.js';
+import { relayGate } from './middleware/relay-gate.js';
 import { mountRoutes } from './server-bootstrap/routes-loader.js';
 import { systemFaultReporter } from './middleware/system-fault.js';
 import { perfTraceMiddleware } from './services/perf-trace.js';
@@ -202,6 +203,13 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
     { get: () => services.maintenanceCache },
     invalidateHasOwnersCache,
   );
+
+  // ── The receiving half of relay control ──
+  // Mounted here, after the peer list exists and before any route: a relayed request targets an
+  // arbitrary path, so there is no one route this could hang on. It is after the rate limiter on
+  // purpose — a signature verification is work, and work done before the limiter is work an
+  // unlimited caller can spend for you. Traffic carrying no relay header is passed on untouched.
+  app.use(relayGate(config, storage, services.peers));
 
   // ── Route Mounting ──
   const { realtimeManager } = await mountRoutes(app, config, storage, {

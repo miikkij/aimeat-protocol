@@ -290,6 +290,17 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   burnRate: number;
   extendedFeaturesEnabled: boolean;
   maxRelayHops: number;
+  /**
+   * Does an inbound RELAYED request have to carry a signed relay claim?
+   *
+   * `required` is the protection: a relayed request with no claim is refused, so this node
+   * decides which peers may relay to it. `optional` (the default) lets an unclaimed relay through,
+   * because a peer running older software sends none — a migration position, not protection, since
+   * a peer that does not want to be refused can simply omit the header. In BOTH modes a claim that
+   * is present is fully checked, and a peer that has ever presented a valid one may not go back to
+   * sending none. See src/middleware/relay-gate.ts.
+   */
+  federationRelayClaim: 'optional' | 'required';
   depeeringGracePeriodHours: number;
   keyCacheRefreshMinutes: number;
   memoryQuotaMb: number;
