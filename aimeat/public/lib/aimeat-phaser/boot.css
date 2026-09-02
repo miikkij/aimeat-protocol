@@ -1,0 +1,121 @@
+/*
+ * @file aimeat-phaser/boot.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The frame the aimeat-phaser library wraps around a game's canvas, and the full
+ *   screen button that sits in its corner.
+ *
+ *   THE FRAME IS WHAT GOES FULL SCREEN, not the canvas. Everything an app draws over the game in
+ *   the DOM lives inside .ak-phaser, so it travels into full screen with the picture instead of
+ *   being left behind on the page. That is the whole reason the library wraps anything at all.
+ *
+ *   EVERY VALUE IS ON THE ATELIER CONTRACT. There is not one colour here that is not an --ak-*
+ *   token, so a game wears whatever palette, look and mode the page is wearing, and a change to
+ *   the theme reaches the game without a line of this file moving. On a page that never loaded
+ *   /lib/aimeat-atelier.css the tokens are absent and the frame is plain: the game itself still
+ *   has its colours, because boot.js carries a fallback set for exactly that page.
+ *
+ *   THE ASPECT RATIO IS A CUSTOM PROPERTY, --ak-phaser-ratio, written by boot.js from the design
+ *   size under `scale: 'fit'`. The rule that uses it stays here, so only the number comes from
+ *   JavaScript.
+ * @structure .ak-phaser (+ --fit / --resize / --fixed, :fullscreen) · .ak-phaser canvas ·
+ *   .ak-phaser__full
+ * @usage  <link rel="stylesheet" href="/lib/aimeat-phaser.css">  (which imports this)
+ * @version-history
+ *   v1.0.0 — 2026-09-02 — Initial: the frame, the three scaling shapes and the corner button.
+ */
+
+/* ── The frame ─────────────────────────────────────────────────────────────────────────────── */
+.ak-phaser {
+  position: relative;
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  background: var(--ak-bg);
+  color: var(--ak-ink);
+  border: var(--ak-line-w, 1px) solid var(--ak-line);
+  border-radius: var(--ak-radius, 14px);
+  font-family: var(--ak-font);
+  /* The canvas is the content; a stray tap must not select the page around it. */
+  touch-action: manipulation;
+}
+
+/* 'fit' keeps the design's shape, so the letterbox is the frame's edge rather than a band of
+   page ground inside it. */
+.ak-phaser--fit {
+  aspect-ratio: var(--ak-phaser-ratio, 16 / 9);
+}
+
+/* 'resize' follows the box it was given: the height comes from the parent, and the observer in
+   boot.js tells the game about it. */
+.ak-phaser--resize {
+  height: 100%;
+  min-height: 12rem;
+}
+
+/* 'fixed' is exactly the design size, so the frame shrinks to the canvas rather than stretching. */
+.ak-phaser--fixed {
+  width: max-content;
+  max-width: 100%;
+}
+
+.ak-phaser canvas {
+  display: block;
+  max-width: 100%;
+}
+
+/* ── Full screen ───────────────────────────────────────────────────────────────────────────── */
+.ak-phaser:fullscreen {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+/* ── The button ────────────────────────────────────────────────────────────────────────────── */
+.ak-phaser__full {
+  position: absolute;
+  inset-block-start: 8px;
+  inset-inline-end: 8px;
+  z-index: 2;
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  cursor: pointer;
+  opacity: 0.55;
+  background: var(--ak-surface);
+  color: var(--ak-ink-dim);
+  border: var(--ak-line-w, 1px) solid var(--ak-line);
+  border-radius: var(--ak-radius-sm, 8px);
+  transition:
+    opacity var(--ak-motion, 200ms) var(--ak-ease, ease),
+    color var(--ak-motion, 200ms) var(--ak-ease, ease);
+}
+
+.ak-phaser__full:hover,
+.ak-phaser__full:focus-visible {
+  opacity: 1;
+  color: var(--ak-accent);
+}
+
+.ak-phaser__full:focus-visible {
+  outline: 2px solid var(--ak-accent);
+  outline-offset: 2px;
+}
+
+.ak-phaser__full svg {
+  display: block;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ak-phaser__full {
+    transition: none;
+  }
+}

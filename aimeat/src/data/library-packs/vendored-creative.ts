@@ -9,6 +9,8 @@
  * @structure CREATIVE_PACKS: LibraryPack[]
  * @usage Imported by ./vendored.ts only. Do not import directly.
  * @version-history
+ *   v1.1.0 — 2026-09-02 — phaser4 points at aimeat-phaser as the paved path (wish-phaser4-design-
+ *     book-page).
  *   v1.0.0 — 2026-08-29 — Extracted from vendored.ts when the leaflet pack pushed it past
  *     the cap. No entry changed.
  */
@@ -300,6 +302,7 @@ export const CREATIVE_PACKS: LibraryPack[] = [
     apiSurface: 'window.Phaser',
     aiDoc: [
       'Phaser 4 as the window.Phaser global (self-hosted — never load phaser from a CDN).',
+      'THE PAVED PATH IS aimeat-phaser (GET /v1/library-packs/aimeat-phaser): AIMEAT.phaser.game() boots into an element (fit / resize / fixed, fullscreen, pause on tab hide), textures.tiles/character generate assets, preloadPack loads real packs with a progress bar, audio is the bus, saves is the ONE-key-per-player memory shape, controls unifies keyboard/gamepad/touch, titleScene/menuItems/pauseMenu/transition are the menus, platformer builds a level from an ASCII map, settingsPanel is the settings page. Load aimeat-phaser and it loads this build for you. Below is the bare-engine recipe for a game that does not want the base.',
       'Boot: new Phaser.Game({ type: Phaser.AUTO, parent: el, scale: { mode: Phaser.Scale.FIT,',
       '  autoCenter: Phaser.Scale.CENTER_BOTH, width: 800, height: 600 },',
       '  physics: { default: "arcade", arcade: { gravity: { y: 0 } } }, scene: { preload, create, update } });',
@@ -318,6 +321,7 @@ export const CREATIVE_PACKS: LibraryPack[] = [
       'Pause the game loop when the tab hides (game.loop.sleep()/wake()) to be battery-friendly.',
     ].join('\n'),
     changelog: [
+      { version: '4.2.1', date: '2026-09-02', summary: 'The aimeat-phaser base lands on top (boot, packs, textures, audio, saves, controls, menus, levels, settings) and the Design Book gets its Phaser page, so every part is shown running; the aiDoc points at the paved path first.' },
       { version: '4.2.1', date: '2026-08-31', summary: 'Initial vendoring of phaser 4.2.1 at /lib/phaser@4.min.js, BESIDE phaser@3.min.js rather than over it: the @3 file is the compatibility contract for every game already published and is never touched again. Preview until a demo template and an AEB run exist on v4. Scene API and the everyday calls are as in v3; the renderer rewrite is what breaks custom pipelines and v3 plugins.' },
     ],
     skillRef: 'aimeat-game-apps',
