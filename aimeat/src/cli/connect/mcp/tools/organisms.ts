@@ -364,6 +364,37 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
     return out(await client.delete(path));
   });
 
+  // ── In-place DOCUMENT edits ───────────────────────────────────────────────────────────────────
+  // The connector half of the two document tools. Thin calls to the same routes the node MCP
+  // reaches through services/workspace-doc-edit.ts, so the section lookup, the byte-identical
+  // splice and the compare-and-swap retry are the node's answer on this door too — which matters
+  // here more than anywhere, because a retry loop implemented twice is a retry loop that differs.
+  const docPath = (organism_id: string, space: string, docId: string, ws: string, op: string) =>
+    `/v1/organisms/${encodeURIComponent(organism_id)}/workspace/documents/${encodeURIComponent(space)}/${encodeURIComponent(docId)}/${op}`
+    + `?${new URLSearchParams({ ws }).toString()}`;
+
+  mcp.tool('aimeat_workspace_doc_append', descriptionFor('aimeat_workspace_doc_append'), {
+    organism_id: z.string().describe('Organism identifier'),
+    ws: z.string().describe('Workspace id'),
+    space: z.string().describe('The document space, by objectType name or namespace'),
+    id: z.string().describe('The document id, from the workspace index'),
+    markdown: z.string().describe('The markdown to add; nothing already in the document is touched'),
+    section: z.string().optional().describe("Add at the end of THIS section instead of the document's end. The heading's exact text"),
+  }, annotationsFor('aimeat_workspace_doc_append'), async ({ organism_id, ws, space, id, markdown, section }) => out(
+    await client.post(docPath(organism_id, space, id, ws, 'append'), { markdown, ...(section ? { section } : {}) }),
+  ));
+
+  mcp.tool('aimeat_workspace_doc_section_replace', descriptionFor('aimeat_workspace_doc_section_replace'), {
+    organism_id: z.string().describe('Organism identifier'),
+    ws: z.string().describe('Workspace id'),
+    space: z.string().describe('The document space, by objectType name or namespace'),
+    id: z.string().describe('The document id, from the workspace index'),
+    section: z.string().describe('The heading text to replace, exactly as the document spells it'),
+    markdown: z.string().describe('The whole replacement section, starting with its heading line'),
+  }, annotationsFor('aimeat_workspace_doc_section_replace'), async ({ organism_id, ws, space, id, section, markdown }) => out(
+    await client.post(docPath(organism_id, space, id, ws, 'section'), { section, markdown }),
+  ));
+
   // → POST /v1/organisms/:id/(archive|unarchive) — archive/restore an organism or a scoped subtree.
   mcp.tool('aimeat_organism_archive', descriptionFor('aimeat_organism_archive'), {
     organism_id: z.string().describe('The organism id.'),

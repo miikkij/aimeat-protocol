@@ -261,6 +261,11 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_workspace_publish:                 'memory:write',
     aimeat_workspace_revert_to_draft:         'memory:write',
     aimeat_workspace_write:                   'memory:write',
+    // The in-place document edits write the SAME record aimeat_workspace_write writes — a workspace
+    // draft — so they answer to the same word, and their REST routes enforce that word and not the
+    // organism:write their neighbours on that router use.
+    aimeat_workspace_doc_append:              'memory:write',
+    aimeat_workspace_doc_section_replace:     'memory:write',
 
     // Writes keys the server itself trusts (openrouter.*, ai-usage.*, profile.*).
     aimeat_operator_ai_config:                'memory:write-reserved',

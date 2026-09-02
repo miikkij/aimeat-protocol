@@ -29720,6 +29720,111 @@ paths:
         '403': { description: Not a member, or the space's writeRole refuses this caller }
         '404': { description: No such workspace, space or row }
 
+  /v1/organisms/{id}/workspace/documents/{space}/{docId}/append:
+    post:
+      operationId: appendToWorkspaceDocument
+      summary: Add markdown to a workspace document without resending it
+      description: |
+        Adds markdown to the end of a document, or to the end of one named section.
+
+        WHY IT EXISTS. `aimeat_workspace_write` (a POST /v1/memory of the whole draft) replaces the
+        document. So amending a 57,723-character design spec meant retyping all of it through a
+        hand-authored value, whose failure mode is silent corruption — and two sessions in two days
+        correctly refused to do that and filed their findings in separate documents instead, which is
+        how a decision record rots.
+
+        IT NEVER REWRITES. The new text is INSERTED: the blank lines around it are computed from what
+        the two halves already end and begin with, and no existing character is removed. So the
+        original content stays a byte-identical prefix (or, with `section`, a byte-identical prefix
+        and suffix) of the result.
+
+        CONCURRENCY. Read, compute, compare-and-swap, and on a lost swap re-read and re-apply. Two
+        sessions appending to one document both survive; neither wins by clobbering. After six lost
+        swaps in a row the call answers 409 rather than looping.
+
+        `section` names a heading by its exact TEXT (the leading `#`s are optional) and the text lands
+        at the end of that section, before the next heading at the same level or higher. A heading
+        that matches nothing, or matches twice, is refused with both line numbers named — guessing
+        which one the caller meant is how an edit lands in the wrong half of a long document.
+        Headings inside fenced code blocks are not headings.
+
+        The edit targets the `.draft`, seeding it from the published `.latest` when a published
+        document has no draft yet. The live `.latest` stays live until somebody publishes.
+      tags: [Organisms]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+        - { name: space, in: path, required: true, schema: { type: string }, description: The document space, by objectType name or namespace }
+        - { name: docId, in: path, required: true, schema: { type: string }, description: The document instance id }
+        - { name: ws, in: query, required: true, schema: { type: string }, description: Workspace id }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [markdown]
+              properties:
+                markdown: { type: string, description: 'The markdown to add' }
+                section: { type: string, description: "Add at the end of this section instead of the document's end; the heading's exact text" }
+      responses:
+        '200': { description: '{ key, id, space, namespace, version, bytes, seeded_from_published, section?, attempts }' }
+        '400': { description: No `markdown`, no `ws`, or the space holds records rather than documents }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: Not a member, no consent, or not approved to write this workspace }
+        '404': { description: No such workspace, space or document, or no heading matching `section` }
+        '409': { description: The document is archived, or it kept changing under six retries }
+        '413': { description: The edited document is over the memory value ceiling or the owner's byte quota }
+        '422': { description: The instance is not stored as a document, or the result fails the space's locked schema }
+
+  /v1/organisms/{id}/workspace/documents/{space}/{docId}/section:
+    post:
+      operationId: replaceWorkspaceDocumentSection
+      summary: Replace one section of a workspace document
+      description: |
+        Replaces a heading and its body, leaving every other byte of the document exactly as it was.
+        The parts outside the section are carried through untouched rather than reprinted, so a
+        reader diffing two versions sees one section change and not a reformatted document.
+
+        `markdown` is the WHOLE replacement INCLUDING its heading line. A block that does not start
+        with a heading is refused rather than guessed at: keeping the old heading when the caller
+        omits it would make one call mean two different things depending on what was typed, and the
+        failure would be silent. Carrying the heading also makes renaming a section free, which is
+        otherwise a whole-document rewrite.
+
+        A section runs to the next heading at the same level or higher, so replacing `## Tests` takes
+        its `### Unit` subsection with it. `section` is matched on heading TEXT, exactly; two matches
+        is a refusal naming both with their line numbers. Headings inside fenced code blocks are not
+        headings.
+
+        Same compare-and-swap and the same draft/publish behaviour as the append above.
+      tags: [Organisms]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+        - { name: space, in: path, required: true, schema: { type: string }, description: The document space, by objectType name or namespace }
+        - { name: docId, in: path, required: true, schema: { type: string }, description: The document instance id }
+        - { name: ws, in: query, required: true, schema: { type: string }, description: Workspace id }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [section, markdown]
+              properties:
+                section: { type: string, description: 'The heading text to replace, exactly as the document spells it' }
+                markdown: { type: string, description: 'The whole replacement section, starting with its heading line' }
+      responses:
+        '200': { description: '{ key, id, space, namespace, version, bytes, seeded_from_published, section, attempts }' }
+        '400': { description: No `section` or `markdown`, a replacement not starting with a heading, or a records space }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: Not a member, no consent, or not approved to write this workspace }
+        '404': { description: No such workspace, space or document, or no heading matching `section` }
+        '409': { description: The document is archived, an ambiguous heading, or six lost retries }
+        '413': { description: The edited document is over the memory value ceiling or the owner's byte quota }
+        '422': { description: The instance is not stored as a document, or the result fails the space's locked schema }
+
   /v1/organisms/{id}/export:
     get:
       operationId: exportOrganism

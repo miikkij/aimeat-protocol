@@ -37,6 +37,9 @@
  *   const prev = await findWorkspaceRecord(storage, key);
  *   await writeWorkspaceRecord({ storage, config }, { key, value, owner: ownerGhii, prev });
  * @version-history
+ *   v1.1.0 — 2026-09-02 — `ifVersion`: the write can be a compare-and-swap, and it reports whether it
+ *     landed. In-place document edits (append, section replace) read, compute and write, and without
+ *     this two sessions editing one spec would silently lose one of the two.
  *   v1.0.0 — 2026-08-11 — Initial (August 2026 audit step 8). The write, the collapse and the family
  *     delete move out of src/mcp/workspaces.ts; the fan-out every other write surface runs
  *     (afterMemoryWrite) comes with them, so an agent's workspace write stops being silent.
@@ -74,6 +77,28 @@ export interface WorkspaceRecordWrite {
      * cannot name a principal, and then nothing is counted rather than something wrong being.
      */
     principal?: string;
+    /**
+     * COMPARE-AND-SWAP. Omit for the historical behaviour, which is last-write-wins: the caller
+     * replaces the whole value and does not care what was there.
+     *
+     * A number means "land this only if the stored record is still at that version"; `null` means
+     * "only if the key is still absent". Both refuse by returning `{ written: false }` having
+     * written NOTHING, so a caller that read, computed and lost the race re-reads and recomputes on
+     * top of the winner instead of over it.
+     *
+     * This exists for the in-place document edits, and it is the difference between two sessions
+     * appending to one spec and one of them silently disappearing. Do not simplify it back into a
+     * read-then-write: the read and the write are two round trips, and everything that matters here
+     * happens between them.
+     */
+    ifVersion?: number | null;
+}
+
+/** What a write did. `written: false` means a compare-and-swap refused and nothing was stored. */
+export interface WorkspaceWriteOutcome {
+    written: boolean;
+    /** The version now at the key: the one this write created, or the one that beat it. */
+    version: number;
 }
 
 /**
@@ -94,15 +119,19 @@ export async function findWorkspaceRecord(storage: Storage, key: string): Promis
  *
  * Attribution costs nothing here: the immutable `.version.N` snapshots and the activity timeline
  * keep the writing agent's GAII, so holding current state under the member GHII loses no history.
+ *
+ * With `ifVersion` the store is a compare-and-swap and the write may be REFUSED — check the
+ * outcome. Nothing after the swap runs when it was refused: no collapse, no change event, no
+ * fan-out, because nothing was stored and announcing a write that did not happen is its own defect.
  */
 export async function writeWorkspaceRecord(
     deps: WorkspaceWriteDeps,
     input: WorkspaceRecordWrite,
-): Promise<void> {
+): Promise<WorkspaceWriteOutcome> {
     const { storage } = deps;
     const prev = input.prev === undefined ? await findWorkspaceRecord(storage, input.key) : input.prev;
     const now = new Date().toISOString();
-    await storage.setMemory({
+    const record = {
         key: input.key,
         ownerGaii: input.owner,
         value: input.value,
@@ -113,7 +142,20 @@ export async function writeWorkspaceRecord(
         version: prev ? prev.version + 1 : 1,
         createdAt: prev?.createdAt ?? now,
         updatedAt: now,
-    });
+    };
+
+    if (input.ifVersion !== undefined) {
+        // The guarded path. `null` is "only if still absent", which is the FIRST write of a key,
+        // where there is no version to compare against — without it two sessions starting the same
+        // draft at the same moment would each believe they created it.
+        const swapped = input.ifVersion === null
+            ? await requireCas(storage, 'createMemoryIfAbsent').call(storage, record)
+            : await requireCas(storage, 'setMemoryIfVersion').call(storage, record, input.ifVersion);
+        if (!swapped) return { written: false, version: prev?.version ?? 0 };
+    } else {
+        await storage.setMemory(record);
+    }
+
     if (prev && prev.ownerGaii !== input.owner) await collapseKeyTo(storage, input.key, input.owner);
 
     // What the write sets off, which is the half this path used to skip. POST /v1/memory has emitted
@@ -123,6 +165,22 @@ export async function writeWorkspaceRecord(
     // the next scheduled federation sync. Same act, same consequences, whichever door it came in.
     emitChange('memory');
     await afterMemoryWrite(deps, input.owner, input.key, !!prev, input.principal);
+    return { written: true, version: record.version };
+}
+
+/**
+ * The two atomic primitives are OPTIONAL on the repository interface, so a backend without them must
+ * say so rather than fall through to a plain upsert — that fallback is exactly the last-write-wins
+ * this guard exists to avoid, and it would be invisible. Both shipped backends implement them.
+ */
+function requireCas<K extends 'setMemoryIfVersion' | 'createMemoryIfAbsent'>(
+    storage: Storage, method: K,
+): NonNullable<Storage[K]> {
+    const fn = storage[method];
+    if (!fn) {
+        throw new Error(`CAS_UNSUPPORTED: this storage backend has no ${method}, so a safe in-place edit is not possible on it.`);
+    }
+    return fn as NonNullable<Storage[K]>;
 }
 
 /**

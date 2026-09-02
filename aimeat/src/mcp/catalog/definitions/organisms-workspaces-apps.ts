@@ -22,6 +22,9 @@
 import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere } from './types.js';
 import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenance-note.js';
+// Documents and rows: the two surfaces that edit PART of a workspace object rather than replace
+// one. Spread in place below, so the catalog order is exactly what it was before the extraction.
+import { workspaceSpaceTools } from './workspace-spaces.js';
 
 export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
     {
@@ -333,63 +336,7 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
             id: { type: 'string', required: true, description: 'The instance id to delete (draft + latest + all versions).' },
         },
     },
-    {
-        name: 'aimeat_workspace_rows_append',
-        description: "Add rows to a workspace ROW space — the shape for what a GROUP accumulates (received messages, events, readings, a log) rather than for records a person authors one by one. A row space is declared in the manifest with backing:'rows'; it is charged to the workspace and the organism instead of to whoever wrote the row, keeps no version history, and never appears row-by-row in a workspace index (the index shows a count). Send one row, or up to 500 in `rows`. Supplying `row_id` makes the append IDEMPOTENT: repeating it REPLACES that row and keeps its original createdAt, so re-running an ingest updates instead of duplicating. `occurred_at` is when the thing happened in the world (a message's own date, not now) and is what reads are ordered and bounded by. Refused before anything is written if the space is not a row space, the caller may not write it, a row is over the size ceiling, or the workspace/organism quota is reached.",
-        caller: 'agent',
-        visibility: agentEverywhere,
-        input: {
-            organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
-            ws: { type: 'string', required: true, description: 'Workspace id.' },
-            space: { type: 'string', required: true, description: "The row space, by objectType name (e.g. 'mailmessage') or namespace." },
-            body: { type: 'object', description: 'The row, for the single-row form. Use `rows` for many.' },
-            row_id: { type: 'string', description: 'Optional caller id for the single-row form. Repeating one REPLACES that row.' },
-            occurred_at: { type: 'string', description: 'ISO 8601: when it happened in the world. Defaults to now.' },
-            rows: { type: 'array', description: 'Up to 500 rows, each { body, row_id?, occurred_at? }.' },
-        },
-    },
-    {
-        name: 'aimeat_workspace_rows_read',
-        description: "Read one page of a workspace ROW space, newest first by occurred_at. Keyset-cursored: follow `cursor` for the next page, and a null cursor is the last one — a page boundary can neither skip nor repeat a row even when many share one instant. FILTERING WORKS ONLY ON THE FIELDS THE SPACE DECLARED in its manifest `indexOn` (at most three); pass them in `where`, and anything else is REFUSED with the list that does work rather than ignored, so a filtered page is always really filtered. The answer carries `indexed` so you learn that list from the response. `since`/`until` bound occurred_at inclusively; `changed_since` bounds updated_at exclusively and is what an incremental sync follows.",
-        caller: 'agent',
-        visibility: agentEverywhere,
-        input: {
-            organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
-            ws: { type: 'string', required: true, description: 'Workspace id.' },
-            space: { type: 'string', required: true, description: 'The row space, by objectType name or namespace.' },
-            where: { type: 'object', description: 'Filter as { field: value }, using only fields the space declares in indexOn.' },
-            since: { type: 'string', description: 'ISO 8601: occurred_at at or after this.' },
-            until: { type: 'string', description: 'ISO 8601: occurred_at at or before this.' },
-            changed_since: { type: 'string', description: 'ISO 8601: rows whose updated_at is strictly after this.' },
-            limit: { type: 'number', description: 'Rows per page, default 100, max 500.' },
-            cursor: { type: 'string', description: 'Opaque cursor from the previous page.' },
-            order: { type: 'string', description: "'desc' (default, newest first) or 'asc'." },
-        },
-    },
-    {
-        name: 'aimeat_workspace_rows_stats',
-        description: 'What a workspace ROW space holds, without reading a row: how many, how many bytes, the oldest and newest occurred_at, and when anything last landed. This is what a workspace index shows for a row space instead of its rows, and it is one aggregate rather than a scan, so it stays honest at any size. Read it before a wide query to know what you are about to ask for.',
-        caller: 'agent',
-        visibility: agentEverywhere,
-        input: {
-            organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
-            ws: { type: 'string', required: true, description: 'Workspace id.' },
-            space: { type: 'string', required: true, description: 'The row space, by objectType name or namespace.' },
-        },
-    },
-    {
-        name: 'aimeat_workspace_rows_delete',
-        description: 'Remove rows from a workspace ROW space: one row by `row_id`, or everything that LANDED before `before` (retention by age). Retention keys on when the row was written to this node, never on when the event happened, so a five-year-old message ingested today is not swept on arrival. Pass exactly one of `row_id` or `before` — there is deliberately no "delete everything" form. Irreversible; a row space keeps no version history to restore from.',
-        caller: 'agent',
-        visibility: agentEverywhere,
-        input: {
-            organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
-            ws: { type: 'string', required: true, description: 'Workspace id.' },
-            space: { type: 'string', required: true, description: 'The row space, by objectType name or namespace.' },
-            row_id: { type: 'string', description: 'Remove this one row.' },
-            before: { type: 'string', description: 'ISO 8601: remove every row created before this.' },
-        },
-    },
+    ...workspaceSpaceTools,
     {
         name: 'aimeat_workspace_update',
         description: "Update a workspace IN PLACE — its name, readme, and/or its STRUCTURE — without changing its id (so nothing referencing it gets orphaned). To ADD spaces, pass `add_spaces` (an ARRAY of objectTypes): the server UNIONS them into the manifest, skips any whose name/namespace already exists, and fills sensible defaults — the safe, deterministic way to provision (no need to resend the whole manifest). To rename/remove a space, toggle the publish gate (policy.alwaysGate), or change settings, pass a full replacement `manifest`. Pass `schemas` to lock a records space's JSON Schema. Creator-only (or an org admin). The single tool for evolving a workspace's shape — no separate add-space/remove-space/set-gate tool.",
@@ -402,7 +349,7 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
             readme: { type: 'string', required: false, description: 'New markdown readme/intro (replaces the current one).' },
             add_spaces: { type: 'array', required: false, description: 'ADDITIVE: objectTypes to UNION into the manifest (skip-if-exists). Pass just { name, namespace, mode } (+ a schema in `schemas`); defaults are filled. Preferred over `manifest` for adding spaces. Returns { added, skipped }. Cannot remove/rename.' },
             manifest: { type: 'object', required: false, description: 'Full replacement manifest (objectTypes + policy/gate + settings) — for restructuring (rename/remove a space, change the gate). The id is preserved and the manifest is schema-validated. To only ADD spaces, prefer add_spaces. May also carry an optional top-level objectives[] (the measurability convention: why the organism exists + KPIs with kind value/cost/roi/outcome/quality and a source that can sum/count the organism\'s own records) and an objectType servesObjective linking a space to an objective; both optional — see "Recording purpose & value" in docs/agent-workspace-contracts.md.' },
-            schemas: { type: 'object', required: false, description: 'Map of namespace → JSON Schema (object) to lock (strict) for a records space.' },
+            schemas: { type: 'object', required: false, description: "Map of namespace → JSON Schema (object) to lock (strict) for a records space. READ THE CURRENT SCHEMA FIRST: this REPLACES the locked schema, it does not merge into it, so a schema you write without having read drops whatever else the old one said. GET /v1/memory/{key}/schema returns it, keyed on a full RECORD key (organism.<org>.w.<ws>.<namespace>.<id>.draft), not on the space root. And do not invent a maxLength: the real ceiling is the memory value budget the node enforces on the whole record (1024 kB by default), and a field cap smaller than that is a number somebody guessed, which is how a notes field filled up at 4000 characters for no reason anyone could name." },
         },
     },
     {

@@ -236,6 +236,35 @@ export const organismTools: ConnectCliToolDefinition[] = [
                 : client.delete(`/v1/organisms/${org}/workspace/rows/${space}${query({ ws, before })}`);
         },
     },
+    // ── In-place DOCUMENT edits. Same door, same reason as the row entries above: this is what a
+    //    fleet daemon actually calls, and it is the surface a parameter added to the other two has
+    //    historically failed to reach. `section` is optional on the append and required on the
+    //    replace, and both ride in the BODY — the route reads nothing about the edit from the URL.
+    {
+        name: 'aimeat_workspace_doc_append',
+        handler: ({ client }, input) => {
+            const org = encodeURIComponent(requiredString(input, 'organism_id'));
+            const space = encodeURIComponent(requiredString(input, 'space'));
+            const docId = encodeURIComponent(requiredString(input, 'id'));
+            const section = optionalString(input, 'section');
+            return client.post(
+                `/v1/organisms/${org}/workspace/documents/${space}/${docId}/append${query({ ws: requiredString(input, 'ws') })}`,
+                { markdown: requiredString(input, 'markdown'), ...(section ? { section } : {}) },
+            );
+        },
+    },
+    {
+        name: 'aimeat_workspace_doc_section_replace',
+        handler: ({ client }, input) => {
+            const org = encodeURIComponent(requiredString(input, 'organism_id'));
+            const space = encodeURIComponent(requiredString(input, 'space'));
+            const docId = encodeURIComponent(requiredString(input, 'id'));
+            return client.post(
+                `/v1/organisms/${org}/workspace/documents/${space}/${docId}/section${query({ ws: requiredString(input, 'ws') })}`,
+                { section: requiredString(input, 'section'), markdown: requiredString(input, 'markdown') },
+            );
+        },
+    },
     // ── Agent SCHEDULES (parity with the agent MCP surface; routes enforce ownership). create/list/
     //    update/delete wrap /v1/schedules; report_internal is a structured memory write (no REST route). ──
     {
