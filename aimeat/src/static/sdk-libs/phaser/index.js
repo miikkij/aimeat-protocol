@@ -31,13 +31,22 @@
  *   const P = AIMEAT.phaser;
  *   const h = await P.game({ parent: '#stage', scale: 'fit', fullscreen: 'button', scenes: [play] });
  * @version-history
+ *   v1.1.0 — 2026-09-02 — The game programme (wish-aimeat-assets-and-game-programme): juice (shake,
+ *     hit-stop, flash, bursts, numbers, combo, slowmo, pop, trail), net (players together over
+ *     the realtime pack: inputs and state deltas, host by lowest id), mobile (orientation prompt,
+ *     safe area, wake lock, install), fromLibrary (an aimeat-assets library as the pack) and the
+ *     levelEditor (rows the platformer plays, saved to the game's key).
  *   v1.0.0 — 2026-09-02 — Initial: boot, theme, packs, textures, audio, saves, controls, hud,
  *     menus, transitions, the platformer and the settings panel.
  */
 import { attach } from '../_core/namespace.js';
 import { ensurePhaser, theme, game } from './boot.js';
-import { pack, preloadPack, textures } from './assets.js';
+import { pack, preloadPack, fromLibrary, textures } from './assets.js';
 import { audio } from './audio.js';
+import { juice } from './juice.js';
+import { net } from './net.js';
+import { mobile } from './mobile.js';
+import { levelEditor } from './editor.js';
 import { saves } from './save.js';
 import { controls } from './controls.js';
 import { hud, toast } from './hud.js';
@@ -50,16 +59,22 @@ const phaser = {
    * The library version. It MUST match the newest entry in /lib/aimeat-phaser.css's version
    * history; e2e-libs.ts fails when the two drift.
    */
-  version: '1.0.0',
+  version: '1.1.0',
 
   // ── Boot and the look ──
   ensurePhaser, theme, game,
 
-  // ── Assets ──
-  pack, preloadPack, textures,
+  // ── Assets (a pack by hand, or an aimeat-assets library through fromLibrary) ──
+  pack, preloadPack, fromLibrary, textures,
 
   // ── Sound ──
   audio,
+
+  // ── Feel, players together, phones ──
+  juice, net, mobile,
+
+  // ── The level editor (DOM), writing rows the platformer plays ──
+  levelEditor,
 
   // ── Saves, controls, HUD ──
   saves, controls, hud, toast,

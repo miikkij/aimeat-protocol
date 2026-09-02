@@ -393,9 +393,13 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
   mcp.tool('aimeat_app_audit', descriptionFor('aimeat_app_audit'), {
     filename: z.string().describe('The app, with its extension.'),
     limit: z.number().int().min(1).max(500).optional().describe('How many of the newest entries to return. Default 50.'),
+    playtest: z.boolean().optional().describe('Also open the app for real in a headless browser and report what it did. Slow (about a minute).'),
   }, annotationsFor('aimeat_app_audit'), async (args) => {
     // `?limit=N` makes the node answer newest-first, the same order the node MCP door gives.
-    return out(await client.get(`/v1/apps/me/${encodeURIComponent(args.filename)}/audit?limit=${args.limit ?? 50}`));
+    // `?playtest=true` makes the node open the app as well; the run happens there, where the
+    // browser is, so this door is a pass-through like every other.
+    const playtest = args.playtest ? '&playtest=true' : '';
+    return out(await client.get(`/v1/apps/me/${encodeURIComponent(args.filename)}/audit?limit=${args.limit ?? 50}${playtest}`));
   });
 
   // → GET /v1/admin/seo/status — is this node findable, and what is left to do. Operator-only.

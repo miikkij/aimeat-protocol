@@ -21,6 +21,8 @@
  * @usage
  *   const result = await runPartBench(storage, config, 'leiska-cover');
  * @version-history
+ *   v1.3.1 — 2026-09-02 — The "no browser here" sentence comes from screenshot-capture
+ *     (NO_HEADLESS_BROWSER), so this bench and the app playtest say the same thing.
  *   v1.3.0 — 2026-08-30 — The page builder moved whole to preview.ts (pure extraction:
  *     DEMO_LAYOUT_FOR_TOKENS, renderableBodyFor, benchPageHtml) so the gallery's preview route
  *     and this bench render the SAME page — one implementation, per the copied-logic rule.
@@ -38,7 +40,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { systemGhiiFor } from '../compliance-register.js';
-import { withHeadlessContext } from '../screenshot-capture.js';
+import { withHeadlessContext, NO_HEADLESS_BROWSER } from '../screenshot-capture.js';
 import { DesignBookService, partKey, type DesignBookPart } from './service.js';
 import { DesignBookError } from './validate.js';
 import { renderableBodyFor, benchPageHtml } from './preview.js';
@@ -152,7 +154,7 @@ export async function runPartBench(
       };
     }
     if (measured === null) {
-      return { ran: false, reason: 'No headless browser on this node — install one with `npx playwright install --with-deps chromium`, or run the bench on a node that has Edge or Chrome.', at };
+      return { ran: false, reason: NO_HEADLESS_BROWSER, at };
     }
     viewports.push({
       viewport: vp.id,

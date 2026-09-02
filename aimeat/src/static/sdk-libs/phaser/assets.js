@@ -17,14 +17,23 @@
  *   simple shading, and a small hero with idle, run and jump animations. Every colour is a
  *   theme number, so the same generated art re-tones with the palette and the mode.
  *
+ *   fromLibrary() takes the other road in: an aimeat-assets library, where somebody has already
+ *   named and organised a set of art, hands over the same manifest shape through its toPack().
+ *   So a pack written by hand and a pack chosen from a library are the same object from here on.
+ *
  *   NOTHING LOOPS but the run cycle, which loops because a run cycle is what the caller asked
  *   for. The progress bar is torn down the moment the load finishes.
- * @structure pack · preloadPack (+ the in-canvas bar) · textures.shapes / .tiles / .character
+ * @structure pack · fromLibrary · preloadPack (+ the in-canvas bar) · textures.shapes / .tiles /
+ *   .character
  * @usage
  *   const art = pack({ id: 'level1', base: '/v1/pub/alice/game/', images: { sky: 'sky.png' } });
  *   function preload() { preloadPack(this, art); }        // the scene manager starts the loader
  *   async function create() { await preloadPack(this, art); }   // this call starts it
  * @version-history
+ *   v1.1.1 — 2026-09-02 — textures.tiles defaults to the 'tile-' prefix and the platformer's six
+ *     kinds, so the call the aiDoc shows produces the keys level.js looks for.
+ *   v1.1.0 — 2026-09-02 — fromLibrary(lib) turns an aimeat-assets library into a pack, and
+ *     preloadPack accepts a library, or a promise of one, wherever it accepts a pack.
  *   v1.0.0 — 2026-09-02 — Initial: the manifest, the loader with the in-canvas bar, and the
  *     generated shapes, tiles and character.
  */
@@ -164,6 +173,46 @@ export function pack(spec) {
   });
 }
 
+/**
+ * The pack an aimeat-assets library describes.
+ *
+ * A library is somebody's organised set of art: `library({ app })` from the aimeat-assets lib
+ * hands back an object with `url(key)`, `t(key)` and `toPack()`, and `toPack()` returns exactly
+ * the shape pack() takes. So this is one line, and it is here so a caller never has to know
+ * which of the two produced the manifest.
+ *
+ * TWO CALL SHAPES, and the difference is when the library is ready:
+ *
+ *   const lib = await AIMEAT.assets.library({ app: 'ridge' });
+ *   const art = fromLibrary(lib);            // resolved: an ordinary pack, usable in preload()
+ *   preloadPack(this, AIMEAT.assets.library({ app: 'ridge' }));   // a promise: see preloadPack
+ *
+ * The second shape is the convenient one and it costs a load that starts after preload() has
+ * returned, because the library has to arrive first. preloadPack handles that itself; this
+ * function does not, and refuses a promise with words rather than returning a broken manifest.
+ *
+ * @param {{ toPack: () => any }} lib  an aimeat-assets library
+ * @returns {Readonly<any>} the pack
+ */
+export function fromLibrary(lib) {
+  if (!lib || typeof lib.toPack !== 'function') {
+    throw new Error('fromLibrary() takes an aimeat-assets library: the object with toPack(), '
+      + 'url() and t() that AIMEAT.assets.library({ app }) hands back. Await it first, or pass the '
+      + 'promise straight to preloadPack(), which waits for it.');
+  }
+  return pack(lib.toPack());
+}
+
+/** Is this a library rather than a pack? One question, asked in one place. */
+function isLibrary(value) {
+  return !!value && typeof value.toPack === 'function';
+}
+
+/** Is this something to wait for? */
+function isThenable(value) {
+  return !!value && typeof value.then === 'function';
+}
+
 /* ────────────────────────────────────────────────────────────────────────────────────────────
    The load
    ──────────────────────────────────────────────────────────────────────────────────────────── */
@@ -273,6 +322,13 @@ function progressBar(scene, look, place) {
  * A file that fails is COLLECTED, not thrown: one missing sprite must not take the level with it.
  * The result says exactly which addresses did not answer.
  *
+ * WHAT IT ACCEPTS: a pack from pack(), an aimeat-assets library (anything with toPack(), turned
+ * into a pack here), a promise of either, or an array mixing all of them. A PROMISE COSTS THE
+ * PRELOAD SLOT: the manifest cannot be registered until it arrives, and by then preload() has
+ * returned and the scene manager has started and finished a loader with nothing in it. The load
+ * then starts itself, during create, which works and is slower to first frame. Await the library
+ * once at the top of the game and pass the resolved pack if that matters.
+ *
  * @param {any} scene
  * @param {any|any[]} packOrPacks
  * @param {PreloadOptions} [opts]
@@ -280,7 +336,17 @@ function progressBar(scene, look, place) {
  */
 export function preloadPack(scene, packOrPacks, opts) {
   const o = opts || /** @type {PreloadOptions} */ ({});
-  const manifests = Array.isArray(packOrPacks) ? packOrPacks : [packOrPacks];
+  const given = Array.isArray(packOrPacks) ? packOrPacks : [packOrPacks];
+  // Anything to wait for is waited for first, and then the whole call runs again on real packs.
+  // One recursion, never two: the resolved values cannot themselves be promises.
+  if (given.some(isThenable)) {
+    return Promise.all(given).then(function (settled) {
+      return preloadPack(scene, settled, o);
+    });
+  }
+  const manifests = given.map(function (entry) {
+    return isLibrary(entry) ? fromLibrary(entry) : entry;
+  });
   const loader = scene.load;
   /** @type {Set<string>} */
   const mine = new Set();
@@ -483,21 +549,25 @@ function drawTile(g, kind, colour, size, look) {
  * in front when given), so a level built from the ASCII map in level.js can name them directly.
  * @param {any} scene
  * @param {{ size?: number, prefix?: string,
- *   kinds: Record<string, number|boolean|undefined> }} spec
+ *   kinds?: Record<string, number|boolean|undefined> }} [spec]  prefix defaults to 'tile-' and
+ *   kinds to the platformer's six (ground, brick, spike, coin, goal, enemy)
  * @returns {string[]} the keys made
  */
 function tiles(scene, spec) {
-  const s = spec || { kinds: {} };
+  const s = spec || {};
   const look = theme(scene.game.canvas);
   const size = s.size || 32;
-  const prefix = s.prefix || '';
+  // The platformer looks for tile-ground, tile-brick and friends: that prefix and that set are
+  // the defaults, so textures.tiles(scene, { size: 32 }) is enough for a level to wear its art.
+  const prefix = s.prefix != null ? s.prefix : 'tile-';
+  const kinds = s.kinds || { ground: true, brick: true, spike: true, coin: true, goal: true, enemy: true };
   /** @type {string[]} */
   const made = [];
-  for (const kind in s.kinds || {}) {
+  for (const kind in kinds) {
     const key = prefix + kind;
     made.push(key);
     if (scene.textures.exists(key)) continue;
-    const asked = s.kinds[kind];
+    const asked = kinds[kind];
     const token = TILE_COLOUR[kind] || 'accent';
     const colour = typeof asked === 'number' ? asked : look[token];
     const g = pen(scene);

@@ -10,6 +10,8 @@
  * @version-history
  * v2.4.0 - 2026-08-29 - aimeat-rows.js joins SDK_LIB_NAMES. It was built and committed on the same
  *   day and served 404 on prod, because the build registry and this list are two lists.
+ * v2.5.0 - 2026-09-02 - New library aimeat-assets.js: the asset manager (one manifest per app as
+ *   one memory key, files in storage, the browser-side atlas packer, sound export, texts).
  * v2.4.0 - 2026-09-02 - New library aimeat-phaser.js: the Phaser 4 base (boot, packs, saves,
  *   controls, menus, levels, the settings page). It loads Phaser from this node and reaches the
  *   node only through the data and auth libraries the app loaded (wish-phaser4-design-book-page).
@@ -181,7 +183,7 @@ const SDK_LIB_NAMES = [
   'speech', 'data', 'wallet', 'ai', 'capabilities', 'agents', 'agentface', 'intake', 'organism',
   'workflows', 'header', 'editor', 'live', 'storage', 'social', 'work', 'commerce', 'exchange',
   'webmcp', 'markdown', 'audio', 'tunnel', 'game', 'iam', 'connect', 'datapackage', 'events',
-  'atelier', 'phaser',
+  'atelier', 'phaser', 'assets',
   // aimeat-rows.js — an app's door to an organism row space (the two-hand rule). Built by
   // scripts/build-sdk-libs.ts since 2026-08-29; this list is the second place a lib is named,
   // and a lib missing here is a 404 that the publish gate turns into APP_ARTIFACT_BROKEN.

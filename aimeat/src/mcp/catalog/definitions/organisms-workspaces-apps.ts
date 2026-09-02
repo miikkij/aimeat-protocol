@@ -5,6 +5,9 @@
  * @description Public memory reads, organism + workspace lifecycle, wallet transactions, HTML apps, extensions, IAM design, and cortex tool definitions (incl. operator-only aimeat_admin_mint).
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.5.0 — 2026-09-02 — aimeat_app_audit takes `playtest`: the node opens the app in a real
+ *     browser and answers with what it saw, which is how an agent with no screen looks at the game
+ *     it just published.
  *   v1.4.0 — 2026-08-29 — aimeat_app_legal_set (the app's own legal pages; money, never morsels, makes
  *     a shop; ai_provenance on the write) and aimeat_app_audit (its log).
  *   v1.3.0 — 2026-08-29 — aimeat_app_marks_set: the badge and install-chip switches on one app.
@@ -747,12 +750,13 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_app_audit',
-        description: 'Read one of your apps\' audit log: every change to how the app is offered, newest first, with who made it (you, or which agent in your name), when, and what — a legal page set or removed (with the format, size and a hash of the text), the badge or install offer switched, a reviewer declared or withdrawn, search visibility, parked or unparked, forking, an access code set or cleared (never the code), copy-protection flags, the name or description. The log is the owner\'s and nobody else\'s; it is what lets an app that sells something or handles personal data show what was in force on a given day.',
+        description: 'Read one of your apps\' audit log: every change to how the app is offered, newest first, with who made it (you, or which agent in your name), when, and what — a legal page set or removed (with the format, size and a hash of the text), the badge or install offer switched, a reviewer declared or withdrawn, search visibility, parked or unparked, forking, an access code set or cleared (never the code), copy-protection flags, the name or description. The log is the owner\'s and nobody else\'s; it is what lets an app that sells something or handles personal data show what was in force on a given day. With playtest: true the node also OPENS the app the way a stranger does, in a real browser with nobody signed in, and answers with what it saw — whether anything was on screen within eight seconds, whether the canvas is one flat colour three seconds in (the black screen a player calls broken), errors in the browser console and files the node refused to serve, whether the page survives a phone and a desktop without scrolling sideways, whether sound waits for a tap the way every browser demands, whether the controls are big enough for a thumb, whether progress can be saved, and whether it still starts for someone who asked for less motion. Run it after publishing a game: it is the only way to see the app without a screen. It takes about a minute, changes nothing, and on a node with no browser it says so instead of pretending to pass.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
             filename: { type: 'string', required: true, description: 'The app, with its extension.' },
             limit: { type: 'number', description: 'How many of the newest entries to return. Default 50, at most 500.' },
+            playtest: { type: 'boolean', description: 'Also open the app in a headless browser and report what it did. Slow (about a minute).' },
         },
     },
     {

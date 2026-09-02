@@ -15,6 +15,8 @@
  *   - checkSdkLibs()  → --check: fail (non-zero) if any committed bundle is stale vs its sources
  * @usage  pnpm build:sdk   ·   pnpm check:sdk   (also run by `pnpm dev`)
  * @version-history
+ *   v1.7.0 — 2026-09-02 — Register aimeat-assets (the asset manager: one manifest per app, files in
+ *     storage, the atlas packer, sound export, texts; wish-aimeat-assets-and-game-programme).
  *   v1.6.0 — 2026-09-02 — Register aimeat-phaser (the Phaser 4 base: boot, packs, saves, controls,
  *     menus, levels, settings; wish-phaser4-design-book-page).
  *   v1.5.0 — 2026-08-29 — Register aimeat-rows (AIMEAT.rows: an app's door to an organism row space).
@@ -71,6 +73,7 @@ export const SDK_LIBS: SdkLib[] = [
   { name: 'exchange', entry: 'exchange/index.js' },
   { name: 'game', entry: 'game/index.js' },
   { name: 'phaser', entry: 'phaser/index.js' },
+  { name: 'assets', entry: 'assets/index.js' },
   { name: 'webmcp', entry: 'webmcp/index.js' },
   { name: 'markdown', entry: 'markdown/index.js' },
   { name: 'iam', entry: 'iam/index.js' },

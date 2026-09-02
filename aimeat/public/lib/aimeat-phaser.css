@@ -10,8 +10,12 @@
  * @structure @import boot · controls · settings
  * @usage  <link rel="stylesheet" href="/lib/aimeat-phaser.css">  (after /lib/aimeat-atelier.css when the app uses the kit)
  * @version-history
+ *   v1.1.0 — 2026-09-02 — mobile.css (the orientation prompt, safe-area padding) and editor.css
+ *     (the level editor) join the imports (wish-aimeat-assets-and-game-programme).
  *   v1.0.0 — 2026-09-02 — Initial (wish-phaser4-design-book-page).
  */
 @import url('./aimeat-phaser/boot.css');
 @import url('./aimeat-phaser/controls.css');
 @import url('./aimeat-phaser/settings.css');
+@import url('./aimeat-phaser/mobile.css');
+@import url('./aimeat-phaser/editor.css');
