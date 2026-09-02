@@ -11,6 +11,7 @@
  *   - gaiiCache/peerFailures: in-memory resolution cache and consecutive-failure counters
  *
  * @version-history
+ *   v1.2.0 — 2026-09-03 — `allowRouting` on PeerInfo says which way it points (see federation-tiers).
  *   v1.1.0 — 2026-08-10 — Security audit H-13/H-14: LIVENESS_RECOVERABLE and OPERATOR_PARKED, the peer
  *     statuses a liveness signal may lift and the ones only an operator may leave.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
@@ -71,6 +72,9 @@ export interface PeerInfo {
     lastSeen: string;
     shareCatalogue: boolean;
     replicateMemory: boolean;
+    /** THE ONE FLAG THAT POINTS OUTWARD. Its neighbours all ask "may this peer do X here"; this one
+     *  says this node may forward traffic TO this peer, as a destination or as a relay hop. It does
+     *  not stop the peer from sending here, which that peer decides on its own side. */
     allowRouting: boolean;
     /** May this peer deliver direct messages, read receipts and attachment grants here? */
     allowMessaging: boolean;
