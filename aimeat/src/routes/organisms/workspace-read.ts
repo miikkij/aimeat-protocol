@@ -20,6 +20,11 @@
  *   v1.5.0 — 2026-08-14 — SECURITY: POST /v1/organisms/:id/comments is gated by
  *     requireScope('organism:write'). requireRoleOrScope('agent', …) admitted every agent on its
  *     role before reading the word, so the permission bound the MCP tool surface and not this door.
+ *   v1.6.0 — 2026-09-03 — The workspace read returns `schemas`: the JSON Schemas locked on its
+ *     records spaces, keyed by namespace. Locks live in the schema store rather than in the
+ *     manifest, so a caller could REPLACE a schema it had no way to read first — and the advice in
+ *     the tool that replaces them was to fetch GET /v1/memory/{key}/schema, which an MCP-only agent
+ *     cannot call. Empty when the caller cannot read the workspace.
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
@@ -29,7 +34,7 @@ import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js
 import { resolveIdentity, isSameOwner, isGEAI } from '../../utils/gaii.js';
 import { authorizeRead } from '../../services/access-guard.js';
 import { ecoMayReadKey } from '../../services/ecosystem-access.js';
-import { isMemoryBackedSpace } from '../../services/workspace-meta.js';
+import { isMemoryBackedSpace, readWorkspaceSchemas } from '../../services/workspace-meta.js';
 import { workspaceRowIndex } from '../../services/workspace-rows/row-service.js';
 import { emitChange } from '../../services/event-bus.js';
 import { searchOrganismContent } from '../../services/organism-search.js';
@@ -240,8 +245,14 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
     // Only inside a named workspace: a row space belongs to one, never to the organism at large.
     const rowSpaces = ws ? await workspaceRowIndex({ storage, config }, id, ws, objectTypes) : {};
 
+    // The JSON Schemas locked on this workspace's record spaces, keyed by namespace. Locks live in
+    // the schema store rather than in the manifest, so without this a caller could replace a schema
+    // it had no way of reading first. Empty when the caller cannot read the workspace.
+    const schemas = canReadWorkspace ? await readWorkspaceSchemas(storage, id, ws) : {};
+
     res.json(success(config.nodeId, {
       manifest, readme, apps, objects, drafts, decisions, resources, todos,
+      ...(Object.keys(schemas).length ? { schemas } : {}),
       ...(Object.keys(rowSpaces).length ? { row_spaces: rowSpaces } : {}),
     }, [
       { description: 'Read the manifest directly', method: 'GET', url: `/v1/memory/${encodeURIComponent(`${nsRoot}meta.manifest`)}` },

@@ -1,6 +1,6 @@
 # MSM Esimerkit — Marketplace & Palveluekosysteemi
 
-Tämä hakemisto sisältää valmiita MEAT Service Manifest (MSM) -esimerkkitiedostoja,
+Tämä hakemisto sisältää valmiita Machine Service Manifest (MSM) -esimerkkitiedostoja,
 jotka kuvaavat palvelut diagrammeista `08-marketplace-disruption.md` ja
 `09-service-ecosystem.md`.
 

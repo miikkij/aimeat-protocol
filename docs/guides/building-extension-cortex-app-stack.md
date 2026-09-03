@@ -544,13 +544,13 @@ aimeat_cortex_activate --name mytool
   // Your cortex lib:
   await loadScript('/v1/cortex/mytool/libs/mytool.js');
 
-  // ─── Ensure session ───
-  const session = await AIMEAT.auth.ensureSession();
-  if (!session) {
-    document.getElementById('app').innerHTML =
-      '<button onclick="AIMEAT.auth.login()">Log in</button>';
-    return;
-  }
+  // ─── Session ───
+  // On an app origin login() is silent: it restores an existing session, or returns null. The login
+  // bar is the only interactive sign-in path, so mount it and let the login event re-enter boot().
+  AIMEAT.auth.mountLoginButton('#login');
+  AIMEAT.auth.on('login', boot);
+  const session = await AIMEAT.auth.login();
+  if (!session) return;   // the login bar is on screen; boot() runs again after sign-in
 
   // ─── Load translations + initial data ───
   const lang = navigator.language.startsWith('fi') ? 'fi' : 'en';

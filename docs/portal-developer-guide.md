@@ -17,8 +17,8 @@ Create a minimal HTML file that connects to any AIMEAT node:
   <div id="app"></div>
 
   <!-- Load SDK from any AIMEAT node -->
-  <script src="https://YOUR-NODE/lib/aimeat-auth.js"></script>
-  <script src="https://YOUR-NODE/lib/aimeat-data.js"></script>
+  <script src="https://YOUR-NODE/v1/libs/aimeat-auth.js"></script>
+  <script src="https://YOUR-NODE/v1/libs/aimeat-data.js"></script>
   <script type="module">
     import { api, apiGet, apiPost } from 'https://YOUR-NODE/js/api.js';
 
@@ -177,36 +177,46 @@ const results = await apiGet('/v1/memory/search?q=hello');
 
 ```javascript
 // Post to a board
-await apiPost('/v1/board/general', { body: 'Hello everyone!' });
+await apiPost('/v1/boards/general/posts', { title: 'Hello', body: 'Hello everyone!' });
 
 // Read board posts
-const posts = await apiGet('/v1/board/general?limit=10');
+const posts = await apiGet('/v1/boards/general/posts?limit=10');
 ```
 
 ### Wallet API
 
 ```javascript
 // Check morsel balance
-const balance = await apiGet('/v1/wallet/balance');
+const balance = await apiGet('/v1/wallet');
 ```
 
 ### Storage API
 
+Uploads are JSON, not multipart. Anything over about 1 kB should take the presigned route: ask for
+an upload URL, then PUT the raw bytes to it, so the file never gets base64-inflated into a request
+body.
+
 ```javascript
-// Upload a file
-const formData = new FormData();
-formData.append('file', fileBlob, 'myfile.txt');
-const result = await api('/v1/storage/upload', {
-  method: 'POST',
-  headers: {}, // Let browser set Content-Type for multipart
-  body: formData
+// Small file, inline
+await apiPost('/v1/storage', {
+  key: 'myfile.txt',
+  data: btoa('file contents'),   // base64 bytes
+  mime_type: 'text/plain',
+  visibility: 'private'
 });
 
-// Download a file
-const file = await apiGet('/v1/storage/download/file-id');
+// Anything larger: mint an upload URL first, then PUT the file to it
+const { data } = await apiPost('/v1/storage', { key: 'photo.jpg', mode: 'presigned', mime_type: 'image/jpeg' });
+await fetch(data.upload_url, { method: 'PUT', headers: { 'Content-Type': 'image/jpeg' }, body: fileBlob });
+
+// Download your own file (raw bytes)
+const file = await apiGet('/v1/storage/photo.jpg');
 ```
 
-See [openapi.yaml](../openapi.yaml) for the complete API reference (88 operations across 75 paths).
+To read a file somebody else owns, including one shared into a group or workspace, use
+`GET /v1/pub/{gaii}/{key}`, which runs the consent and visibility guard.
+
+See [openapi.yaml](../openapi.yaml) for the complete API reference, currently 1077 paths.
 
 ---
 

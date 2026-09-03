@@ -61,6 +61,36 @@ export interface ReadPath {
     /** True when the target is not a plain table — an FTS index, a view, a join alias. */
     alternateTarget: boolean;
     provider: 'postgres-kysely' | 'sqlite';
+    /** What the query selects BY, which decides whether a missing filter means anything. */
+    selector: Selector;
+}
+
+/**
+ * How a read picks its rows, and why the distinction is the whole of question B.
+ *
+ * Reading the eleven tables the first version called "disagreeing" showed one rule holding in every
+ * one of them: a read BY IDENTITY (`id = ?`, `tokenHash = ?`, `sessionId = ?`) returns whatever
+ * exists and the caller gates it, while a read BY STATE (`revoked = 0`, `status = 'pending'`)
+ * filters because the state IS the question. Those are different questions, and a table where one
+ * filters and the other does not is not disagreeing with itself — it is answering two things.
+ *
+ * `memory` was the real finding precisely because it broke that: `getMemory` filtered `deletedAt`
+ * on a BY-IDENTITY read, which obliges every by-identity sibling to do the same, and two did not.
+ *
+ * So the unit worth comparing is not the table. It is the table's by-identity reads, against each
+ * other. Grouping by table made ten coherent tables look like ten questions and buried the one that
+ * mattered among forty-three rows.
+ */
+export type Selector = 'identity' | 'state' | 'other';
+
+const IDENTITY_COLUMN = /\b(id|key|code|hash|gaii|sessionId|deviceCode|userCode|tokenHash|grantId)\b\s*(=|IN)/i;
+const STATE_COLUMN = /\b(deletedAt|archived|revoked|disabled|expiresAt|status|ttl)\w*\b\s*(=|<|>|IS)/i;
+
+function selectorOf(sql: string): Selector {
+    const where = /\bWHERE\b([\s\S]*)$/i.exec(sql)?.[1] ?? '';
+    if (STATE_COLUMN.test(where)) return 'state';
+    if (IDENTITY_COLUMN.test(where)) return 'identity';
+    return 'other';
 }
 
 /** The nearest enclosing named function, so a finding points at something a person can open. */
@@ -74,7 +104,20 @@ function enclosingName(node: ts.Node): string {
     return '(anonyymi)';
 }
 
-/** Every state column named anywhere inside the enclosing function of `node`. */
+/**
+ * The shared filters, by name. A read that goes through one of these is correct by construction and
+ * has no column to name.
+ *
+ * Added after the fix for the memory bulk read made this instrument blind to its own repair: the
+ * clause moved behind `NOT_DELETED_SQL`, the function text stopped containing the word `deletedAt`,
+ * and the row stayed on the candidate list. That is the fourth time in this audit that naming a
+ * thing properly hid it from a detector that reads text — which is the same lesson the whole wish is
+ * about, arriving from the instrument's side. A detector that only knows columns punishes exactly
+ * the codebases that centralised their rule.
+ */
+const SHARED_FILTERS = ['NOT_DELETED_SQL', 'archivedSql', 'isVisible', 'isLive'] as const;
+
+/** Every state column — or shared filter — named anywhere inside the enclosing function of `node`. */
 function mentionsIn(node: ts.Node, source: ts.SourceFile): string[] {
     let scope: ts.Node = node;
     for (let n: ts.Node | undefined = node; n; n = n.parent) {
@@ -84,7 +127,7 @@ function mentionsIn(node: ts.Node, source: ts.SourceFile): string[] {
         }
     }
     const text = scope.getText(source);
-    return STATE_COLUMNS.filter(c => text.includes(c));
+    return [...STATE_COLUMNS.filter(c => text.includes(c)), ...SHARED_FILTERS.filter(f => text.includes(f))];
 }
 
 /** A target that is not a plain table: the shared filter never reaches it. */
@@ -132,6 +175,7 @@ export function readPaths(files: readonly ts.SourceFile[], root: string): ReadPa
                     out.push({
                         target: arg.text, file: rel, line: at(node), fn: enclosingName(node),
                         mentions: mentionsIn(node, source), alternateTarget: isAlternate(arg.text), provider,
+                        selector: selectorOf(node.parent?.getText(source) ?? ''),
                     });
                 }
             }
@@ -145,6 +189,7 @@ export function readPaths(files: readonly ts.SourceFile[], root: string): ReadPa
                     out.push({
                         target: m[1], file: rel, line: at(node), fn: enclosingName(node),
                         mentions: mentionsIn(node, source), alternateTarget: isAlternate(m[1]), provider,
+                        selector: selectorOf(sql),
                     });
                 }
                 // A target chosen at run time — see PARAMETERISED. Matched separately because the
@@ -154,6 +199,7 @@ export function readPaths(files: readonly ts.SourceFile[], root: string): ReadPa
                     out.push({
                         target: PARAMETERISED, file: rel, line: at(node), fn: enclosingName(node),
                         mentions: mentionsIn(node, source), alternateTarget: true, provider,
+                        selector: selectorOf(sql),
                     });
                 }
             }

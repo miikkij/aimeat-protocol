@@ -22,7 +22,7 @@ One more, from how this is sold rather than built: lead with what a person gets,
 
 The AIMEAT protocol (AI Memory Exchange and Action Transfer) and its reference implementation. Three parts:
 
-- **The spec.** `openapi.yaml` is the canonical API contract. `docs/AIMEAT-RFC-v4.0-Core-full.md` (generic federatable Core) + `docs/AIMEAT-RFC-v4.0-Platform-full.md` (the aimeat.io platform on top of it). v4.0 reframes the economy as meters rather than currencies and deprecates micro-memory, OTK/Tier 0.5, legacy Ed25519 challenge-response and boards. It is a conceptual reframe, not an API break.
+- **The spec.** `openapi.yaml` is the canonical API contract. `docs/AIMEAT-RFC-v4.0-Core-full.md` (generic federatable Core) + `docs/AIMEAT-RFC-v4.0-Platform-full.md` (the aimeat.io platform on top of it). v4.0 reframes the economy as meters rather than currencies and deprecates micro-memory, OTK/Tier 0.5 and the legacy Ed25519 challenge-response; micro-memory and the three OTK write routes were then deleted from the code on 2026-08-23. **Boards were deprecated and reinstated on 2026-08-30**, so they are current: 57 live on aimeat.io, they have a Boards page, a front-page block and `AIMEAT.social`. v4.0 is a conceptual reframe, not an API break.
 - **The node** in `aimeat/`: Node 24, TypeScript, Express 5, port 40050, pnpm. Frontend is a Preact + HTM SPA with no build step (the app-catalog is the one exception, an esbuild build).
 - **`python/aimeat-crewai/`**, a pip-installable CrewAI integration. Part of this repo, with its own version line. When agent-facing capabilities change (offers, workflow signals, onboarding, MCP surface), keep it in sync. The node schema wins on any mismatch.
 

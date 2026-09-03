@@ -28480,6 +28480,18 @@ paths:
                               type: array
                               items: {}
                             description: Records keyed by the manifest's objectType name
+                          schemas:
+                            type: object
+                            additionalProperties:
+                              type: object
+                            description: >
+                              The JSON Schemas currently locked on this workspace's records spaces,
+                              keyed by NAMESPACE (omitted when none). Locks live in the schema store
+                              (`organism.{id}.w.{ws}.{namespace}`, applyTo `prefix`) rather than in
+                              the manifest, so this is the read that makes a safe edit possible: the
+                              map is in the shape PUT .../workspace and aimeat_workspace_update take
+                              back, and that write REPLACES a namespace's schema rather than merging
+                              into it.
                           decisions:
                             type: array
                             items: {}

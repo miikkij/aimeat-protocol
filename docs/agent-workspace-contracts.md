@@ -94,8 +94,11 @@ UNIONS them into the manifest, **skips any that already exist**, and fills the o
 you never resend (or risk corrupting) the whole manifest. Deterministic + safe.
 
 ```text
-# 1. (optional) Read the workspace to see what's already there
-aimeat_workspace_read({ organism_id, ws })            → manifest.objectTypes (existing spaces)
+# 1. Read the workspace to see what's already there. Not optional when you are touching schemas:
+#    the index answers with `manifest.objectTypes` (existing spaces) AND `schemas` (what is LOCKED
+#    on each records space now, keyed by namespace). `schemas` on the write below REPLACES a
+#    namespace's schema rather than merging into it, so read, edit the one entry, send the map back.
+aimeat_workspace_read({ organism_id, ws })            → manifest.objectTypes, schemas
 
 # 2. ADD the contract's spaces. Pass just { name, namespace, mode } per space — defaults
 #    (schemaRef/writeRole/cardinality/backing/versioned) are filled. Lock record schemas in the same

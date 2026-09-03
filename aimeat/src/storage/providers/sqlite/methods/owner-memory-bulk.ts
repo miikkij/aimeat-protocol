@@ -15,6 +15,7 @@
  */
 import type { MemoryRecord } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
+import { NOT_DELETED_SQL } from '../repos/memory.js';
 
 export const ownerMemoryBulkMethods = {
   // BULK PRIMITIVE (Phase 1) — many keys under one owner in ONE `key IN (…)` query. Live rows only
@@ -22,7 +23,7 @@ export const ownerMemoryBulkMethods = {
   async getMemoryByKeys(this: SqliteStorage, ownerGaii: string, keys: string[]): Promise<MemoryRecord[]> {
     if (keys.length === 0) return [];
     const placeholders = keys.map(() => '?').join(',');
-    const rows = this.db.prepare(`SELECT * FROM memory WHERE ownerGaii = ? AND key IN (${placeholders})`).all(ownerGaii, ...keys) as Record<string, unknown>[];
+    const rows = this.db.prepare(`SELECT * FROM memory WHERE ownerGaii = ? AND key IN (${placeholders})${NOT_DELETED_SQL}`).all(ownerGaii, ...keys) as Record<string, unknown>[];
     const out: MemoryRecord[] = [];
     for (const row of rows) {
       const record = this.deserializeMemory(row);
@@ -42,7 +43,7 @@ export const ownerMemoryBulkMethods = {
   async getMemoryByKeysAnyOwner(this: SqliteStorage, keys: string[]): Promise<MemoryRecord[]> {
     if (keys.length === 0) return [];
     const placeholders = keys.map(() => '?').join(',');
-    const rows = this.db.prepare(`SELECT * FROM memory WHERE key IN (${placeholders})`).all(...keys) as Record<string, unknown>[];
+    const rows = this.db.prepare(`SELECT * FROM memory WHERE key IN (${placeholders})${NOT_DELETED_SQL}`).all(...keys) as Record<string, unknown>[];
     const out: MemoryRecord[] = [];
     for (const row of rows) {
       const record = this.deserializeMemory(row);

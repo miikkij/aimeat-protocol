@@ -5,6 +5,10 @@
  * @description Public memory reads, organism + workspace lifecycle, wallet transactions, HTML apps, extensions, IAM design, and cortex tool definitions (incl. operator-only aimeat_admin_mint).
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.6.0 — 2026-09-03 — aimeat_workspace_read's index carries the locked `schemas`, and
+ *     aimeat_workspace_update's `schemas` now points at that read instead of at
+ *     GET /v1/memory/{key}/schema — a REST call an MCP-only agent cannot make, which left the tool
+ *     telling every caller to do the impossible before an overwrite.
  *   v1.5.0 — 2026-09-02 — aimeat_app_audit takes `playtest`: the node opens the app in a real
  *     browser and answers with what it saw, which is how an agent with no screen looks at the game
  *     it just published.
@@ -256,7 +260,7 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_workspace_read',
-        description: 'Read one workspace in TWO steps so you never pull a huge blob. DEFAULT (no `ids`) returns the INDEX: the manifest (the objectTypes it declares — each a records space with a JSON schema, or a document space of markdown pages) plus, per space, EVERY instance as { id, title, updated, version, bytes, published, has_draft } — titles only, NO bodies — so it stays small however many/large the documents are. Scan the index (or aimeat_workspace_overview for the same as a Markdown map), pick the ids that likely hold what you need, then call this again with `ids:[...]` to BATCH-OPEN just those instances\' full values. Version history (.version.N) is never returned here — read a specific version via the memory API. Member-only.',
+        description: 'Read one workspace in TWO steps so you never pull a huge blob. DEFAULT (no `ids`) returns the INDEX: the manifest (the objectTypes it declares — each a records space with a JSON schema, or a document space of markdown pages), the JSON Schemas currently LOCKED on the records spaces as `schemas` (keyed by namespace, in the shape aimeat_workspace_update takes back — read this before you change one, because that update REPLACES rather than merges), plus, per space, EVERY instance as { id, title, updated, version, bytes, published, has_draft } — titles only, NO bodies — so it stays small however many/large the documents are. Scan the index (or aimeat_workspace_overview for the same as a Markdown map), pick the ids that likely hold what you need, then call this again with `ids:[...]` to BATCH-OPEN just those instances\' full values. Version history (.version.N) is never returned here — read a specific version via the memory API. Member-only.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
@@ -349,7 +353,7 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
             readme: { type: 'string', required: false, description: 'New markdown readme/intro (replaces the current one).' },
             add_spaces: { type: 'array', required: false, description: 'ADDITIVE: objectTypes to UNION into the manifest (skip-if-exists). Pass just { name, namespace, mode } (+ a schema in `schemas`); defaults are filled. Preferred over `manifest` for adding spaces. Returns { added, skipped }. Cannot remove/rename.' },
             manifest: { type: 'object', required: false, description: 'Full replacement manifest (objectTypes + policy/gate + settings) — for restructuring (rename/remove a space, change the gate). The id is preserved and the manifest is schema-validated. To only ADD spaces, prefer add_spaces. May also carry an optional top-level objectives[] (the measurability convention: why the organism exists + KPIs with kind value/cost/roi/outcome/quality and a source that can sum/count the organism\'s own records) and an objectType servesObjective linking a space to an objective; both optional — see "Recording purpose & value" in docs/agent-workspace-contracts.md.' },
-            schemas: { type: 'object', required: false, description: "Map of namespace → JSON Schema (object) to lock (strict) for a records space. READ THE CURRENT SCHEMA FIRST: this REPLACES the locked schema, it does not merge into it, so a schema you write without having read drops whatever else the old one said. GET /v1/memory/{key}/schema returns it, keyed on a full RECORD key (organism.<org>.w.<ws>.<namespace>.<id>.draft), not on the space root. And do not invent a maxLength: the real ceiling is the memory value budget the node enforces on the whole record (1024 kB by default), and a field cap smaller than that is a number somebody guessed, which is how a notes field filled up at 4000 characters for no reason anyone could name." },
+            schemas: { type: 'object', required: false, description: "Map of namespace → JSON Schema (object) to lock (strict) for a records space. READ THE CURRENT SCHEMAS FIRST: this REPLACES the locked schema, it does not merge into it, so a schema you write without having read drops whatever else the old one said. aimeat_workspace_read (the default index call) returns them as `schemas`, keyed by namespace, in exactly this shape — read, edit the one entry, send the map back. And do not invent a maxLength: the real ceiling is the memory value budget the node enforces on the whole record (1024 kB by default), and a field cap smaller than that is a number somebody guessed, which is how a notes field filled up at 4000 characters for no reason anyone could name." },
         },
     },
     {

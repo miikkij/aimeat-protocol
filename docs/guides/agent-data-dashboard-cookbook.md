@@ -345,11 +345,13 @@ async function boot() {
   await loadScript('/v1/cortex/findings/libs/findings.js');
 
   setStatus('Authenticating…');
-  const session = await AIMEAT.auth.ensureSession();
+  // login() is silent on an app origin: it restores an existing session and returns null otherwise.
+  // The login bar is the only interactive sign-in path; never hand-roll a sign-in button.
+  AIMEAT.auth.mountLoginButton('#login');
+  AIMEAT.auth.on('login', boot);
+  const session = await AIMEAT.auth.login();
   if (!session) {
-    document.body.innerHTML = '<div style="padding:40px;">' +
-      '<h1>Log in to view findings</h1>' +
-      '<button onclick="AIMEAT.auth.login()">Log in</button></div>';
+    setStatus('Sign in to view findings.');
     return;
   }
 

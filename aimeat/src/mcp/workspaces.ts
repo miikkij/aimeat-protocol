@@ -17,6 +17,12 @@
  *   - _access (request/list/decide) + _member_grant / _member_revoke / _members (creator-managed roles)
  * @usage import { registerWorkspaceTools } from './workspaces.js';
  * @version-history
+ *   v1.21.0 -- 2026-09-03 -- The index read returns `schemas`, the locked JSON Schemas keyed by
+ *     namespace, in the shape _update takes back. An agent could replace a workspace's schemas but
+ *     had no way to read them: _update's own advice was GET /v1/memory/{key}/schema, a call an
+ *     MCP-only client cannot make, so the safe read-edit-write round-trip was impossible and an
+ *     update dropped whatever the previous schema said. Index only: the batch-open branch is about
+ *     one record's content. Same field on the REST read and the connector door.
  *   v1.20.0 -- 2026-08-26 -- Workspace ROW spaces. The index read reports a row space as a COUNT and
  *     a span rather than as rows, which is the property the whole backing exists for: this read
  *     materialises every memory value to derive a title and truncates at 5000 with no signal, so a
@@ -136,7 +142,7 @@ import { checkDeleteGuard } from '../services/write-guards.js';
 import { authorizeRead } from '../services/access-guard.js';
 import { canReadWorkspace } from '../services/workspace-access.js';
 import { buildOrganismOverview, buildWorkspaceOverview, entryTitle } from '../services/structure-overview.js';
-import { updateWorkspaceMeta, WorkspaceMetaError, isMemoryBackedSpace, listOrganismWorkspaceEntries } from '../services/workspace-meta.js';
+import { updateWorkspaceMeta, WorkspaceMetaError, isMemoryBackedSpace, listOrganismWorkspaceEntries, readWorkspaceSchemas } from '../services/workspace-meta.js';
 import { emitChange } from '../services/event-bus.js';
 import { updateOrganismStructure } from '../services/structure-snapshot.js';
 import { normalizeDocValueImages } from '../services/doc-images.js';
@@ -426,9 +432,17 @@ export function registerWorkspaceTools(
                 manifest.objectTypes as RowObjectType[] | undefined);
             for (const [name, s] of Object.entries(rowSpaces)) counts[name] = s.rows;
 
+            // The locked schemas, keyed by namespace, in the shape aimeat_workspace_update takes
+            // back. On the index only: it belongs beside the manifest, and the batch-open branch is
+            // about one record's content. This is the read that makes a safe schema edit possible —
+            // `schemas` replaces rather than merges, and there is no other way to see the current one.
+            const schemas = await readWorkspaceSchemas(storage, organism_id, ws);
+
             return ok({ organism_id, ws, mode: 'index', manifest, apps, counts, index,
+                ...(Object.keys(schemas).length ? { schemas } : {}),
                 ...(Object.keys(rowSpaces).length ? { row_spaces: rowSpaces } : {}),
                 hint: 'Titles only. Open the ones you need with aimeat_workspace_read(ids:["<id>", ...]) to get their full values.'
+                    + (Object.keys(schemas).length ? ' `schemas` is what is locked on each records space now — edit that map and send it back through aimeat_workspace_update, which REPLACES it.' : '')
                     + (Object.keys(rowSpaces).length ? ' Row spaces show a count and a span here; read their rows with aimeat_workspace_rows_read.' : '') });
         });
 
@@ -648,7 +662,7 @@ export function registerWorkspaceTools(
             readme: z.string().optional().describe('New markdown readme/intro (replaces the current one)'),
             add_spaces: z.any().optional().describe('ADDITIVE (safe): an ARRAY of objectTypes to UNION into the manifest — the server keeps everything else and skips any whose name/namespace already exists. Pass just { name, namespace, mode } (+ a schema in `schemas`); defaults are filled. Use this to provision spaces instead of sending the whole manifest. Cannot remove/rename — use `manifest` for that.'),
             manifest: z.any().optional().describe('FULL replacement manifest (objectTypes + policy/gate + settings) as a JSON OBJECT. For genuine restructuring (rename/remove a space, change policy.alwaysGate). Read the workspace first; the id is preserved. To only ADD spaces, prefer `add_spaces`.'),
-            schemas: z.any().optional().describe('Map of namespace → JSON Schema (object) to lock (strict) for a records space. REPLACES the locked schema rather than merging into it, so read the current one first: GET /v1/memory/{key}/schema, keyed on a full RECORD key (organism.<org>.w.<ws>.<namespace>.<id>.draft), not on the space root. Do not invent a maxLength — the real ceiling is the memory value budget the node enforces on the whole record.'),
+            schemas: z.any().optional().describe('Map of namespace → JSON Schema (object) to lock (strict) for a records space. REPLACES the locked schema rather than merging into it, so read the current ones first: aimeat_workspace_read (the default index call) returns them as `schemas`, keyed by namespace, in exactly this shape — read, edit the one entry, send the map back. Do not invent a maxLength — the real ceiling is the memory value budget the node enforces on the whole record.'),
             apps: z.any().optional().describe('FULL replacement list of apps pinned to this workspace ([] clears). ARRAY of { owner, filename, label? } referencing published apps (/v1/apps). Pinning is launch-context/presentation only — workspace data access stays gated per call. Creator/admin only.'),
         },
         annotationsFor('aimeat_workspace_update'),
