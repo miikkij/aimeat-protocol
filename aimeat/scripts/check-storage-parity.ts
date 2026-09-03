@@ -19,6 +19,10 @@
  *   cd aimeat && pnpm check:storage-parity --strict   # the hook/CI gate
  *   cd aimeat && pnpm check:storage-parity --seed     # rewrite the exemption file
  * @version-history
+ *   v1.1.0 — 2026-09-04 — SQLITE_NAME_OVERRIDES: the second way this gate goes blind. A table the two
+ *     providers NAME differently can never match the case/plural candidates, so its SQLite side is
+ *     permanently absent and the exemption silencing it reads like a decision. MemoryVersion (SQLite:
+ *     memory_history) was in that state for 25 days.
  *   v1.0.0 — 2026-08-10 — Initial (August 2026 audit, step 5c / systemic pattern 5).
  */
 import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
@@ -90,8 +94,26 @@ function ownerScopedTables(schema: string): Map<string, string[]> {
     return tables;
 }
 
+/**
+ * Tables the two providers do not merely spell differently, but NAME differently, so no amount of
+ * case and plural juggling below will ever connect them.
+ *
+ * This is the second way this gate can be blind, and it is quieter than the first. A missing owner
+ * column (the list above) makes the table invisible entirely; a missing name mapping makes the
+ * POSTGRES side visible and the SQLITE side permanently absent, so the table reports as "missing in
+ * sqlite" forever and the exemption that silences it reads like a decision somebody made. MemoryVersion
+ * sat in the exemption file from 2026-08-10 to 2026-09-04 in exactly that state: SQLite calls the
+ * table memory_history, and neither provider cleared it, but only one of those two facts was true of
+ * the report. Add a line here in the same change that names a table differently on the two sides.
+ */
+const SQLITE_NAME_OVERRIDES: Record<string, string> = {
+    MemoryVersion: 'memory_history',
+};
+
 /** The SQLite table name for a Postgres table: PascalCase to snake_case, pluralised loosely. */
 function sqliteCandidates(pgTable: string): string[] {
+    const override = SQLITE_NAME_OVERRIDES[pgTable];
+    if (override) return [override];
     const snake = pgTable.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
     return [snake, `${snake}s`, `${snake}es`, pgTable.toLowerCase(), `${pgTable.toLowerCase()}s`];
 }
