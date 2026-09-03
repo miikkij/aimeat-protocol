@@ -19,6 +19,10 @@ tmp/
 .env.development
 logs/**
 *.log
+# A rotated log is not a *.log: services/auth-audit.ts renames the refusal log to `<path>.1` when it
+# passes AIMEAT_AUTH_LOG_MAX_BYTES, and the E2E server points that path at test/.auth-failures.log,
+# so a local sweep eventually drops a multi-megabyte `.log.1` that nothing here matched.
+*.log.[0-9]*
 
 # Removed 2026-07-28: the enterprise edition is gone (one edition, no ee/ seam). Kept ignored so a
 # leftover local checkout of the old private module can never be committed here by accident.
