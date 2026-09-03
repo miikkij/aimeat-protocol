@@ -371,29 +371,11 @@ export async function mountRoutes(
   app.use(mirrorReadOnly);
 
   app.use(ownersRouter(config, storage));
-  // Resolve /v1/agents/me/... to /v1/agents/{actual-name}/... by decoding agent name from JWT
-  app.use((req, _res, next) => {
-    if (!req.url.startsWith('/v1/agents/me') && !req.originalUrl.startsWith('/v1/agents/me')) { next(); return; }
-    const tail = req.originalUrl.slice('/v1/agents/me'.length);
-    if (tail && !tail.startsWith('/')) { next(); return; } // /v1/agents/memory etc.
-    if (tail.startsWith('/handbook')) { next(); return; } // /v1/agents/me/handbook is a fixed route, not an alias
-    const auth = req.headers.authorization;
-    if (!auth?.startsWith('Bearer ')) { next(); return; }
-    try {
-      const payload = JSON.parse(Buffer.from(auth.split('.')[1], 'base64url').toString());
-      const sub = payload.sub as string;
-      const hashIdx = sub?.indexOf('#');
-      const atIdx = sub?.lastIndexOf('@');
-      if (hashIdx >= 0 && atIdx > hashIdx) {
-        const agentName = sub.slice(0, hashIdx);
-        const rewritten = `/v1/agents/${encodeURIComponent(agentName)}${tail}`;
-        req.url = rewritten;
-        req.originalUrl = rewritten;
-      }
-    // eslint-disable-next-line aimeat/no-silent-catch -- auth verification happens later in requireAuth()
-    } catch { /* auth verification happens later in requireAuth() */ }
-    next();
-  });
+  // The `/v1/agents/me` rewrite used to be duplicated here, inline, and this copy was the one that
+  // fired for the bare `/v1/agents/me` that ACP asks for. It sliced a BARE NAME out of the
+  // credential, which is not a key anything is stored under, so that path answered 404 for every
+  // agent that ever asked. One implementation now, in middleware/agent-me-alias.ts, mounted in
+  // server.ts, and it rewrites to the identity rather than to a name assembled from one.
 
   // Commerce core (TARGET-033): one registry of payment handlers and one of sellable resolvers,
   // advertised at /.well-known/ucp. Every rail is core — morsels on this node's ledger, cards on

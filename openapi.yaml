@@ -8768,6 +8768,49 @@ paths:
         '404':
           description: No published card for that agent
 
+    post:
+      operationId: reissueAgentCard
+      summary: An agent re-issues its own signed card
+      description: |
+        The card is signed by the AGENT's key, which lives on its connector, so the node cannot
+        re-issue alone. Until 2026-09-03 `cardJws` was written in exactly one place — enrolment —
+        and never again: the connector signs `skills: []` there with a comment saying the runtime
+        declares them later, and nothing ever did. So `aimeat_agent_capabilities_report` updated the
+        agent record while the signed card went on asserting nothing, permanently.
+
+        **A re-issue, not an enrolment.** No grant is needed because nothing new is admitted: the
+        caller is already authenticated as this agent, and the card must be signed by the key
+        ALREADY ON RECORD. A card carrying a different key is refused and pointed at enrolment, so
+        this door can change what an agent SAYS and never who it IS. Self only — an owner does not
+        hold the key, so a card they submitted would not be this agent's card.
+
+        `issued_at` moves. Nothing pins the card: the A2A trust-on-first-use pin holds the key
+        (`keyX`/`kid`) and re-reads the card on every sighting, so a re-issue under the same key is
+        invisible to a peer that has met this agent before.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [card]
+              properties:
+                card:
+                  type: string
+                  description: The agent's card as a compact JWS, signed by the key already on record.
+      responses:
+        '200':
+          description: Stored, with the node's `card_issued_at` and the skill count it now asserts.
+        '403':
+          description: Not this agent. Nobody else holds the key it is signed with.
+        '409':
+          description: Not enrolled yet, or the card carries a different key.
+        '422':
+          description: Unreadable, names another agent, or is not signed by the key it carries.
+
   /v1/agents/{gaii}/card/extended:
     get:
       operationId: getAgentCardExtended
@@ -19053,6 +19096,29 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
 
+  /.well-known/agent-card.json:
+    get:
+      operationId: wellKnownAgentCards
+      summary: Which agents this node offers to other agents (A2A discovery)
+      description: |
+        A2A's standard location, at the node root. Until 2026-09-03 it answered 404: the per-agent
+        cards lived at `/v1/a2a/{owner}/{agent}/agent-card.json` and a stranger found one only if
+        somebody handed them the URL, so a foreign agent arriving with nothing but the hostname
+        could not ask this node who it has.
+
+        **Both addresses stay.** The per-agent path is unchanged and is still the card's real home;
+        this is a directory that points at them.
+
+        **It lists agents with a PUBLISHED OFFERING and nothing else.** That is not a filter bolted
+        on: it is already this node's consent model for strangers — a foreign caller may reach an
+        agent because its owner published an offering, and nothing else opens that door — so the
+        listing obeys the same sentence. An agent with no offering is not hidden; it is not for sale.
+
+        Public, like the cards it points at, and it says nothing they do not.
+      tags: [A2A]
+      responses:
+        '200':
+          description: The node, and its offered agents with a link to each real card.
   /.well-known/mcp.json:
     get:
       operationId: mcpServerCard

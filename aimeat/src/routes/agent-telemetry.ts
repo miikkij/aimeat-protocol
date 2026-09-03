@@ -28,7 +28,7 @@ import type { Storage, TelemetryEvent } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { refuseNotYours } from '../middleware/refusals.js';
 import { requireAuth } from '../auth/middleware.js';
-import { buildGAII } from '../utils/gaii.js';
+import { agentGaiiFromIdentifier } from '../utils/gaii.js';
 import { pushTelemetry, recordTelemetryActivity, listTelemetryBuffered } from '../services/telemetry-buffer.js';
 
 /* ── Zod validation schema ── */
@@ -45,7 +45,7 @@ export function agentTelemetryRouter(config: AimeatConfig, storage: Storage): Ro
   /** Build GAII for the named agent under the authenticated owner */
   function resolveAgentGaii(req: Express.Request, agentName: string): string {
     const owner = req.auth!.owner as string;
-    return buildGAII(agentName, owner, config.nodeId);
+    return agentGaiiFromIdentifier(agentName, owner, config.nodeId);
   }
 
   /** Check if current session can access an agent's telemetry */

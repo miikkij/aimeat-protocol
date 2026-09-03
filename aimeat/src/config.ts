@@ -412,6 +412,9 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     // 32 concurrent calls is far past anything measured (38 agents sending occasional JSON, the
     // daemon at 1.09% of a core idle) and far short of a runaway — the crew side has one on record
     // that made the same call 347 times.
+    // The per-CALL ceiling on the bulk credential migration. The button chunks itself against
+    // it, so this bounds one request rather than one person's fleet.
+    agentMigrateMaxPerPress: parseInt(process.env.AIMEAT_AGENT_MIGRATE_MAX_PER_PRESS ?? '50', 10),
     connectTunnelMaxInflightPerIdentity: parseInt(process.env.AIMEAT_CONNECT_TUNNEL_MAX_INFLIGHT ?? '32', 10),
     // The largest answer one identity may put on a wire eleven others are waiting on. Defaults to
     // the same ceiling that already bounded a whole socket, so nothing that worked stops working.

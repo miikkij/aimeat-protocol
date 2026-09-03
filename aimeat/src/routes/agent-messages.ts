@@ -41,7 +41,7 @@ import type { Storage, AgentMessageRecord } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { refuseNotYours } from '../middleware/refusals.js';
-import { resolveIdentity, buildGAII, isSameOwner } from '../utils/gaii.js';
+import { resolveIdentity, agentGaiiFromIdentifier, isSameOwner } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
 import { AgentMessageStatusSchema } from '../models/agent-message-schemas.js';
@@ -62,7 +62,7 @@ export function agentMessagesRouter(config: AimeatConfig, storage: Storage, webh
   /** Build GAII for the named agent under the authenticated owner */
   function resolveAgentGaii(req: Express.Request, agentName: string): string {
     const owner = req.auth!.owner as string;
-    return buildGAII(agentName, owner, config.nodeId);
+    return agentGaiiFromIdentifier(agentName, owner, config.nodeId);
   }
 
   /**

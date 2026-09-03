@@ -28,7 +28,7 @@ import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { refuseNotYours } from '../middleware/refusals.js';
 import { requireAuth } from '../auth/middleware.js';
-import { buildGAII } from '../utils/gaii.js';
+import { agentGaiiFromIdentifier } from '../utils/gaii.js';
 import { recomputeAndCacheStatistics } from '../services/agent-statistics.js';
 import { createAgentActivityOverviewService } from '../services/db/agent-activity-overview-db-service.js';
 import { createAgentQualityOverviewService } from '../services/db/agent-quality-overview-db-service.js';
@@ -42,7 +42,7 @@ export function agentActivityRouter(config: AimeatConfig, storage: Storage): Rou
   /** Build GAII for the named agent under the authenticated owner */
   function resolveAgentGaii(req: Express.Request, agentName: string): string {
     const owner = req.auth!.owner as string;
-    return buildGAII(agentName, owner, config.nodeId);
+    return agentGaiiFromIdentifier(agentName, owner, config.nodeId);
   }
 
   /** Check if current session can access this agent */
