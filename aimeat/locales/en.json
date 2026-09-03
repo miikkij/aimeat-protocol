@@ -5122,7 +5122,12 @@
       "doneAll": "Done. They can all sign in again, and nothing else about them changed.",
       "donePartial": "{n} can sign in again. {stuck} could not be reached and are exactly as they were — press again, or check the connector on their machine.",
       "failed": "That did not work. Nothing changed.",
-      "actionRow": "New sign-in"
+      "actionRow": "New sign-in",
+      "rowDone": "Done. It has its own key now and can sign in again.",
+      "rowStuck": "It did not move. Nothing changed, so you can press again.",
+      "refused": "Your connector refused the move. Nothing changed: the agents are exactly as they were.",
+      "connectorFailed": "Your connector did not finish the move. Nothing changed. Check that it is running and up to date, then press again.",
+      "rowNotNeeded": "It does not need moving — it can already sign in."
     },
     "groupCount": "{n} agents",
     "groupCountOne": "1 agent",

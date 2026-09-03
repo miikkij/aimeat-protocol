@@ -177,8 +177,16 @@ export default function FleetView({ embedded = false, starter = null } = {}) {
   const [signedIn, setSignedIn] = useState(hasSession());
   const [onlyProblems, setOnlyProblems] = useState(false);
   const [migration, setMigration] = useState(null);
-  const [migrating, setMigrating] = useState(false);
+  // WHICH press is running, not WHETHER one is. A single boolean was read by all eighteen row
+  // buttons at once, so pressing one turned every one of them into "Working…" — and a person who
+  // pressed the button on web-researcher watched the whole list change and could not tell what they
+  // had just done. `'*'` is the banner's press; anything else is that agent's name.
+  const [migrating, setMigrating] = useState(null);
   const [outcome, setOutcome] = useState(null);
+  // The answer to a ROW's press, on that row. The banner's outcome line is 1000px above the button
+  // that was pressed, so the result of a per-row press landed off-screen and the row simply went
+  // back to how it looked — which reads as nothing having happened.
+  const [rowOutcome, setRowOutcome] = useState(null);
 
   // The response also carries `credential_summary`, the same counts as one object. This page has the
   // rows in hand and has to filter them anyway, so it counts them itself; the summary is for a
@@ -218,25 +226,44 @@ export default function FleetView({ embedded = false, starter = null } = {}) {
    */
   async function migrate(only) {
     if (migrating) return;
-    setMigrating(true);
-    setOutcome(null);
+    setMigrating(only ?? '*');
+    // The answer goes where the press was. A row's press answers on its row; the banner's answers
+    // under the banner.
+    const say = only
+      ? (ok, text) => { setRowOutcome({ name: only, ok, text }); }
+      : (ok, text) => { setOutcome({ ok, text }); };
+    if (only) setRowOutcome(null); else setOutcome(null);
     try {
       const resp = await apiPost('/v1/agents/v2/migrate', only ? { agents: [only] } : {});
       // Composed here for the same reason the banner is: `next_step` is the node's English. The
       // numbers are the node's, the sentence is the reader's.
       const moved = (resp?.data?.moved ?? []).length;
       const stuck = (resp?.data?.still_stuck ?? []).length;
-      setOutcome({
-        ok: true,
-        text: stuck === 0
-          ? t('fleet.migrate.doneAll')
-          : t('fleet.migrate.donePartial').replace('{n}', String(moved)).replace('{stuck}', String(stuck)),
-      });
+      // ONE AGENT IS NOT A TALLY. "1 moved, 0 stuck" about a single agent a person named is a
+      // report on a batch of one, and the person has to do arithmetic to learn whether the thing
+      // they pressed worked. It says which of the two happened, in a sentence.
+      if (only) say(moved > 0, moved > 0 ? t('fleet.migrate.rowDone') : t('fleet.migrate.rowStuck'));
+      else say(true, stuck === 0
+        ? t('fleet.migrate.doneAll')
+        : t('fleet.migrate.donePartial').replace('{n}', String(moved)).replace('{stuck}', String(stuck)));
     } catch (err) {
       swallowed('fleet: migrate', err);
-      setOutcome({ ok: false, text: t('fleet.migrate.failed') });
+      // THE NODE'S REFUSALS ARE ACTIONABLE AND WERE BEING THROWN AWAY. A 502 here means the
+      // connector did not finish or refused, and both say "nothing changed, the agents are exactly
+      // as they were" — the one fact a person needs before deciding whether to press again. The
+      // generic "it failed" told them none of that.
+      const code = err?.code;
+      const key = code === 'ENROL_REFUSED' ? 'fleet.migrate.refused'
+        : code === 'ENROL_FAILED' ? 'fleet.migrate.connectorFailed'
+          : code === 'NO_DAEMON' ? 'fleet.migrate.needConnector'
+            : code === 'NOTHING_TO_MIGRATE' ? 'fleet.migrate.rowNotNeeded'
+              : 'fleet.migrate.failed';
+      // NOTHING_TO_MIGRATE is not a failure to the person: the agent is already fine. It reads as
+      // one only because it arrives as a non-2xx, and colouring it red would send somebody hunting
+      // for a fault that is a thing already done.
+      say(code === 'NOTHING_TO_MIGRATE', t(key));
     } finally {
-      setMigrating(false);
+      setMigrating(null);
       await loadRef.current();
     }
   }
@@ -403,12 +430,17 @@ export default function FleetView({ embedded = false, starter = null } = {}) {
                             Only on the rows it can act on: a row this button would refuse must not
                             carry it, and `movable` is the node's own answer, not a guess from the
                             state word. Sits at the end of the row so the name still leads. */''}
+                      ${/* ONLY THE PRESSED BUTTON SAYS "WORKING". `migrating` names the agent, not
+                            a boolean: as a boolean every one of the eighteen buttons read it, so
+                            pressing one changed all of them and a person could not tell which press
+                            was theirs. The rest go disabled, which is true — one move at a time —
+                            and says so without claiming to be busy. */''}
                       ${movable.has(a.name) && html`
                         <button class="btn-ghost btn-sm flt-row-move"
-                                disabled=${migrating || !connectorReady}
+                                disabled=${!!migrating || !connectorReady}
                                 title=${connectorReady ? '' : t('fleet.migrate.needConnector')}
                                 onClick=${() => migrate(a.name)}>
-                          ${migrating ? t('fleet.migrate.working') : t('fleet.migrate.actionRow')}
+                          ${migrating === a.name ? t('fleet.migrate.working') : t('fleet.migrate.actionRow')}
                         </button>
                       `}
                       ${/* The credential kind moved to the group header: it is now part of what
@@ -424,6 +456,14 @@ export default function FleetView({ embedded = false, starter = null } = {}) {
                           ? t('fleet.messagesOne')
                           : t('fleet.messages').replace('{n}', String(a.stats.messages.total))}</span>` : ''}
                       </div>
+                    `}
+                    ${/* WHAT THE PRESS DID, ON THE ROW IT WAS PRESSED ON. It went to the banner's
+                          outcome line, which on this account sits a thousand pixels above the
+                          button — so a person pressed, watched every button flicker, and got their
+                          answer somewhere they were not looking. The row's own comment about the
+                          banner said this already: a state belongs where the person is reading. */''}
+                    ${rowOutcome?.name === a.name && html`
+                      <p class="flt-row-said ${rowOutcome.ok ? 'is-ok' : 'is-bad'}">${rowOutcome.text}</p>
                     `}
                   </li>
                 `)}

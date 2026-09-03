@@ -4978,7 +4978,12 @@
       "doneAll": "Listo. Ya pueden entrar otra vez, y no cambió nada más en ellos.",
       "donePartial": "{n} ya pueden entrar. A {stuck} no se les alcanzó y están exactamente igual: vuelve a pulsar o revisa el conector en su máquina.",
       "failed": "No funcionó. Nada cambió.",
-      "actionRow": "Acceso nuevo"
+      "actionRow": "Acceso nuevo",
+      "rowDone": "Listo. Ya tiene su propia clave y puede volver a entrar.",
+      "rowStuck": "No se movió. Nada cambió, así que puedes volver a pulsar.",
+      "refused": "Tu conector rechazó el traslado. Nada cambió: los agentes están exactamente como estaban.",
+      "connectorFailed": "Tu conector no terminó el traslado. Nada cambió. Comprueba que está en marcha y actualizado, y vuelve a pulsar.",
+      "rowNotNeeded": "No necesita traslado: ya puede entrar."
     },
     "groupCount": "{n} agentes",
     "groupCountOne": "1 agente",
