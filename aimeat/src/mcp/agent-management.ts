@@ -102,7 +102,7 @@ export function registerAgentManagementTools(
         descriptionFor('aimeat_agent_run_mode_set'),
         {
             target_agent_name: z.string().describe('Agent whose run mode to set (same owner as the caller).'),
-            run_mode: z.enum(['spawn', 'resident']).describe("'spawn' = started per job; 'resident' = kept running."),
+            run_mode: z.enum(['spawn', 'resident']).nullable().describe("'spawn' = started per job; 'resident' = kept running; null = nobody has said, and a spawner leaves it alone."),
         },
         annotationsFor('aimeat_agent_run_mode_set'),
         async ({ target_agent_name, run_mode }) => {

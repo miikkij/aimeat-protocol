@@ -4977,7 +4977,8 @@
       "working": "En ello…",
       "doneAll": "Listo. Ya pueden entrar otra vez, y no cambió nada más en ellos.",
       "donePartial": "{n} ya pueden entrar. A {stuck} no se les alcanzó y están exactamente igual: vuelve a pulsar o revisa el conector en su máquina.",
-      "failed": "No funcionó. Nada cambió."
+      "failed": "No funcionó. Nada cambió.",
+      "actionRow": "Acceso nuevo"
     },
     "groupCount": "{n} agentes",
     "groupCountOne": "1 agente",
@@ -8415,10 +8416,12 @@
       "runMode": {
         "spawn": "Bajo demanda",
         "resident": "Siempre activo",
-        "tooltip": "Cómo se ejecuta este agente. Bajo demanda: espera aquí y arranca cuando llega trabajo. Siempre activo: tu conector lo mantiene en marcha.",
+        "tooltip": "Cómo se ejecuta este agente. Bajo demanda: espera aquí y arranca cuando llega trabajo. Siempre activo: tu conector lo mantiene en marcha. Sin decidir: nadie lo ha dicho, así que nada lo inicia por su cuenta. Puedes cambiar entre los tres cuando quieras.",
         "label": "Cómo se ejecuta",
         "saved": "Puesto en {mode}.",
-        "failed": "No se ha podido guardar. Inténtalo otra vez."
+        "failed": "No se ha podido guardar. Inténtalo otra vez.",
+        "unset": "Sin decidir",
+        "cleared": "Queda sin decidir. Nada lo iniciará por su cuenta."
       },
       "basic": {
         "title": "Empieza con dos agentes",

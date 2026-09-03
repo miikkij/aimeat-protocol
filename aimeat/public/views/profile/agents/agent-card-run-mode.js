@@ -60,7 +60,9 @@ export function RunModeSwitch({ agent, showToast }) {
     setRunMode(next);
     try {
       await apiPatch(`/v1/agents/${encodeURIComponent(agent.name)}/run-mode`, { run_mode: next });
-      showToast?.(t('profile.agents.runMode.saved').replace('{mode}', t(`profile.agents.runMode.${next}`)), 'success');
+      showToast?.(next === null
+        ? t('profile.agents.runMode.cleared')
+        : t('profile.agents.runMode.saved').replace('{mode}', t(`profile.agents.runMode.${next}`)), 'success');
     } catch (err) {
       // Put it back: a switch that stays where the person moved it after the write failed is a
       // screen that disagrees with the node, which is worse than the failure.
@@ -75,14 +77,20 @@ export function RunModeSwitch({ agent, showToast }) {
   return html`
     <div class="pf-agd-runmode">
       <span class="pf-agd-runmode-label">${t('profile.agents.runMode.label')}</span>
+      ${/* THREE CHOICES, NOT TWO, AND EVERY ONE OF THEM REACHABLE FROM EVERY OTHER. `unset` is on
+            screen because it is a real state and the one an agent starts in: nobody has said, so a
+            spawner leaves it alone. With two buttons a person could enter a decision and never
+            leave it — a mistaken `spawn` put an agent on the roster for good, and the only way back
+            was an API call nobody would find. crewaimeat-dev hit exactly that on 2026-09-03 and
+            could not undo a test agent. `null` on the wire; the button is the third choice here. */''}
       <div class="pf-agd-runmode-choice" role="group" aria-label=${t('profile.agents.runMode.label')}>
-        ${['spawn', 'resident'].map(value => html`
+        ${[['spawn', 'spawn'], ['resident', 'resident'], [null, 'unset']].map(([value, key]) => html`
           <button
             class="btn-outline btn-sm ${runMode === value ? 'is-on' : ''}"
             aria-pressed=${runMode === value ? 'true' : 'false'}
             disabled=${saving}
             onClick=${() => choose(value)}>
-            ${t(`profile.agents.runMode.${value}`)}
+            ${t(`profile.agents.runMode.${key}`)}
           </button>
         `)}
       </div>

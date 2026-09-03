@@ -243,6 +243,20 @@
   white-space: nowrap;
 }
 
+/* MOVE THIS ONE. The banner moves the whole stuck fleet; this moves the agent on this row, which is
+   what a person wants while they are testing one daemon, or watching one agent, or unwilling to
+   touch seventeen others. Pushed to the right edge so the name still leads and the button lands in
+   the same column on every row that has one. */
+.flt-row-move {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.flt-row-move:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 /* The countdown, the one thing a row has that its neighbours do not. */
 .flt-days {
   font-family: var(--font-mono);
@@ -344,4 +358,7 @@
 @media (max-width: 600px) {
   .flt-group-head { font-size: 1.05rem; }
   .flt-title { font-size: 2rem; }
+  /* `margin-left: auto` on a row that has wrapped strands the control on a line of its own against
+     a right edge that is not there. Same trap the state word already carries a rule for. */
+  .flt-row-move { margin-left: 0; }
 }

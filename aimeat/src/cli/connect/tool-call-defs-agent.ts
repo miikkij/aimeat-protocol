@@ -139,14 +139,19 @@ export const agentTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_agent_run_mode_set',
-        description: "Set how one of your agents is RUN: 'spawn' (data on the node until work arrives; a worker starts per job and unwinds after) or 'resident' (kept up). Works on ANY agent you own, whatever runs it — an agent whose behaviour lives in code is not a lesser agent. Recorded here and honoured by the runtime; the node never enforces it.",
+        description: "Set how one of your agents is RUN: 'spawn' (data on the node until work arrives; a worker starts per job and unwinds after), 'resident' (kept up), or null to take it back to nobody-has-said so a spawner leaves it alone. Works on ANY agent you own, whatever runs it — an agent whose behaviour lives in code is not a lesser agent. Recorded here and honoured by the runtime; the node never enforces it.",
         input: {
             target_agent_name: { type: 'string', required: true, description: 'Agent whose run mode to set.' },
-            run_mode: { type: 'string', required: true, enum: ['spawn', 'resident'], description: "'spawn' or 'resident'." },
+            run_mode: { type: 'string', required: true, enum: ['spawn', 'resident'], description: "'spawn', 'resident', or null to leave it unset." },
         },
+        // `requiredString` cannot carry this one: null is a VALUE here, not a missing field, and it
+        // would throw on the only surface a fleet daemon actually calls. That is the three-surfaces
+        // trap in its usual shape — the node MCP and the connector MCP take a change and this
+        // dispatch quietly does not. Read explicitly, and let anything else fail at the route,
+        // which is where the vocabulary is decided.
         handler: ({ client }, input) => client.patch(
             `/v1/agents/${encodeURIComponent(requiredString(input, 'target_agent_name'))}/run-mode`,
-            { run_mode: requiredString(input, 'run_mode') },
+            { run_mode: input.run_mode === null ? null : requiredString(input, 'run_mode') },
         ),
     },
     {

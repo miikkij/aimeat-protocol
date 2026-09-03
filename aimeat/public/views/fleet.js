@@ -209,12 +209,19 @@ export default function FleetView({ embedded = false, starter = null } = {}) {
    * not — and a state belongs where the person is already looking rather than in something that
    * disappears while they read the list it changed.
    */
-  async function migrate() {
+  /**
+   * `only` names ONE agent; without it the whole stuck fleet moves.
+   *
+   * The route has taken `{ agents: [...] }` since it was written and this page never sent it, so
+   * the only control on screen was "move all eighteen" — and a person who wanted one agent moved
+   * had no button at all. Asked for by name on 2026-09-03, hunted for on the page, not there.
+   */
+  async function migrate(only) {
     if (migrating) return;
     setMigrating(true);
     setOutcome(null);
     try {
-      const resp = await apiPost('/v1/agents/v2/migrate', {});
+      const resp = await apiPost('/v1/agents/v2/migrate', only ? { agents: [only] } : {});
       // Composed here for the same reason the banner is: `next_step` is the node's English. The
       // numbers are the node's, the sentence is the reader's.
       const moved = (resp?.data?.moved ?? []).length;
@@ -288,6 +295,12 @@ export default function FleetView({ embedded = false, starter = null } = {}) {
 
   const problems = agents.filter(a => NEEDS_ATTENTION.has(a.credential?.state));
   const shown = onlyProblems ? problems : agents;
+
+  // WHICH ROWS GET A MOVE BUTTON, answered by the node rather than re-derived here. `would_move` is
+  // what POST would actually act on; a second opinion computed from the state word would eventually
+  // disagree with it, and the row that disagrees is the one offering a button that refuses.
+  const movable = new Set((migration?.would_move ?? []).map(m => m.name));
+  const connectorReady = (migration?.daemons ?? []).length > 0;
 
   // Grouped by the state they are in, because the state is what the sentence is about. A group of
   // one still gets a header: a lone row with its sentence above it reads the same as the others,
@@ -383,6 +396,21 @@ export default function FleetView({ embedded = false, starter = null } = {}) {
                             default, so only a departure from it is worth a badge. */''}
                       ${a.mode && a.mode !== 'interactive' && html`<span class="flt-badge">${t(`profile.agents.mode.${a.mode}`)}</span>`}
                       ${a.run_mode && html`<span class="flt-badge flt-badge--run">${t(`profile.agents.runMode.${a.run_mode}`)}</span>`}
+                      ${/* MOVE THIS ONE. The banner above moves everything at once, which is right
+                            when a person wants the fleet fixed and useless when they want one agent
+                            fixed — and one agent is what a person wants while they are testing, or
+                            watching a particular daemon, or unwilling to touch seventeen others.
+                            Only on the rows it can act on: a row this button would refuse must not
+                            carry it, and `movable` is the node's own answer, not a guess from the
+                            state word. Sits at the end of the row so the name still leads. */''}
+                      ${movable.has(a.name) && html`
+                        <button class="btn-ghost btn-sm flt-row-move"
+                                disabled=${migrating || !connectorReady}
+                                title=${connectorReady ? '' : t('fleet.migrate.needConnector')}
+                                onClick=${() => migrate(a.name)}>
+                          ${migrating ? t('fleet.migrate.working') : t('fleet.migrate.actionRow')}
+                        </button>
+                      `}
                       ${/* The credential kind moved to the group header: it is now part of what
                             DEFINES the group, so a badge repeating it on every row said nothing.
                             What is left here is the countdown, which differs row to row. */''}

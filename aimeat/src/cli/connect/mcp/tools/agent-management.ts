@@ -97,7 +97,7 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
     {
       agent_name: agentNameSchema,
       target_agent_name: z.string().describe("Agent whose run mode to set (same owner; pass the caller's own name to self-set)."),
-      run_mode: z.enum(['spawn', 'resident']).describe("'spawn' = started per job; 'resident' = kept running."),
+      run_mode: z.enum(['spawn', 'resident']).nullable().describe("'spawn' = started per job; 'resident' = kept running; null = nobody has said, and a spawner leaves it alone."),
     },
     async ({ agent_name, target_agent_name, run_mode }) => {
       const { client } = pickAgent(registry, agent_name);

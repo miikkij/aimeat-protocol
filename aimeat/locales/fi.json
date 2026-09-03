@@ -5106,7 +5106,8 @@
       "working": "Tehdään…",
       "doneAll": "Valmis. Ne pääsevät taas sisään, eikä niissä muuttunut mitään muuta.",
       "donePartial": "{n} pääsee taas sisään. {stuck} jäi tavoittamatta, ja ne ovat tasan ennallaan — paina uudestaan tai katso konnektori niiden koneella.",
-      "failed": "Ei onnistunut. Mikään ei muuttunut."
+      "failed": "Ei onnistunut. Mikään ei muuttunut.",
+      "actionRow": "Uusi kirjautuminen"
     },
     "groupCount": "{n} agenttia",
     "groupCountOne": "1 agentti",
@@ -8636,10 +8637,12 @@
       "runMode": {
         "spawn": "Tarvittaessa",
         "resident": "Aina päällä",
-        "tooltip": "Miten tätä agenttia ajetaan. Tarvittaessa: se odottaa täällä ja käynnistyy kun töitä tulee. Aina päällä: yhdistimesi pitää sen käynnissä.",
+        "tooltip": "Miten tätä agenttia ajetaan. Tarvittaessa: se odottaa täällä ja käynnistyy kun töitä tulee. Aina päällä: yhdistimesi pitää sen käynnissä. Ei päätetty: kukaan ei ole sanonut, joten mikään ei käynnistä sitä itsestään. Voit vaihtaa näiden kolmen välillä milloin tahansa.",
         "label": "Miten se ajetaan",
         "saved": "Asetettu: {mode}.",
-        "failed": "Tallennus ei onnistunut. Yritä uudelleen."
+        "failed": "Tallennus ei onnistunut. Yritä uudelleen.",
+        "unset": "Ei päätetty",
+        "cleared": "Jätettiin päättämättä. Mikään ei käynnistä sitä itsestään."
       },
       "basic": {
         "title": "Aloita kahdella agentilla",

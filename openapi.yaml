@@ -8894,7 +8894,13 @@ paths:
       summary: How this agent is meant to be run
       description: |
         `spawn` (the agent is data on the node until work arrives; the runtime starts a worker for
-        the job and it unwinds) or `resident` (the runtime keeps it up).
+        the job and it unwinds), `resident` (the runtime keeps it up), or `null` for nobody has
+        said, which is where every agent starts and where one can be put back.
+
+        **`null` is a value, not an absence.** A field a caller can enter and not leave makes
+        "nobody has said" a one-way door: a mistaken `spawn` would sit on the spawner's roster for
+        good. Sending `null` clears it; omitting the field is refused, because wiping a setting
+        because a key was missing is a write nobody can see coming.
 
         The node STORES and SHOWS this and does not enforce it, exactly as with
         `max_concurrent_tasks`: the runtime is the only party that can honour it. Same-owner gated
@@ -8926,12 +8932,13 @@ paths:
               properties:
                 run_mode:
                   type: string
-                  enum: [spawn, resident]
+                  nullable: true
+                  enum: [spawn, resident, null]
       responses:
         '200':
-          description: The new run mode
+          description: The new run mode, or null if it was cleared
         '400':
-          description: run_mode is not one of the two values
+          description: run_mode is not one of the two values or null
         '403':
           description: Not your agent
         '404':

@@ -4130,18 +4130,26 @@
 }
 
 /* THE BUTTONS ARE STYLED HERE RATHER THAN INHERITED. Measured in the browser: inside `.pf` the
-   shared `.btn-outline` computes to `border: 0` and no padding, so the pair rendered as two words
-   in a row — an accent-coloured word is a link, not a control, and nobody would think to press it.
-   The affordance is spelled out rather than assumed. */
+   shared `.btn-outline` computes to `border: 0` and no padding, so the row rendered as bare words
+   — an accent-coloured word is a link, not a control, and nobody would think to press it. The
+   affordance is spelled out rather than assumed, in the poster's own chip shape: square, mono, a
+   2px frame, the chosen one on the sun. */
 .pf .pf-agd-runmode-choice button {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm, 4px);
-  background: var(--card);
+  border: 2px solid var(--border);
+  border-radius: 0;
+  background: transparent;
   color: var(--text);
-  padding: 0.25rem 0.6rem;
-  font-size: 0.8rem;
-  font-family: inherit;
+  padding: 0.15rem 0.6rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: uppercase;
   cursor: pointer;
+}
+
+.pf .pf-agd-runmode-choice button:hover:not(.is-on):not(:disabled) {
+  border-color: var(--text);
 }
 
 .pf .pf-agd-runmode-choice button:disabled {
@@ -4149,11 +4157,14 @@
   opacity: 0.6;
 }
 
-/* The chosen one reads as chosen without a second colour in the row: the accent border and weight
-   do it, and the row already has the badge above carrying the same word. */
+/* THE CHOSEN ONE SITS ON THE SUN, which is how a selection reads everywhere else inside. It was
+   coral, and with two choices that was merely off-face; with three it was wrong. Coral carries a
+   meaning on these pages — it is the colour of an agent that cannot sign in — so "Not decided",
+   rendered in it, read as an alarm about the ordinary state every agent starts in. */
 .pf .pf-agd-runmode-choice .is-on {
-  border-color: var(--accent);
-  color: var(--accent);
+  background: var(--sun);
+  border-color: var(--text);
+  color: var(--on-sun);
   font-weight: 600;
 }
 
