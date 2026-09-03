@@ -85,8 +85,9 @@ function main(): void {
     // honest limit of what syntax answers, and the second list needs the component read.
     const DOM_EVENTS = new Set(['onClick', 'onDblClick', 'onSubmit', 'onInput', 'onFocus', 'onBlur',
         'onMouseDown', 'onMouseUp', 'onKeyDown', 'onKeyUp', 'onKeyPress']);
-    const native = handlers.filter(h => DOM_EVENTS.has(h.prop));
-    const props = handlers.filter(h => !DOM_EVENTS.has(h.prop));
+    // The tag decides, not the prop name: a browser event on a real element, or a component prop.
+    const native = handlers.filter(h => h.tag === 'element' && DOM_EVENTS.has(h.prop));
+    const props = handlers.filter(h => !(h.tag === 'element' && DOM_EVENTS.has(h.prop)));
 
     say(`### Selaimen oma tapahtuma — ${native.length}`);
     say();

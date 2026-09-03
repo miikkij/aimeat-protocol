@@ -52,7 +52,7 @@ import type { Storage, AgentRecord } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
 import { error } from '../middleware/envelope.js';
 import { buildGAII } from '../utils/gaii.js';
-import { a2aCardFor } from '../services/a2a-card.js';
+import { a2aCardFor, directoryDescriptionFor } from '../services/a2a-card.js';
 import { oasfRecordFor } from '../services/oasf-projection.js';
 import { AimeatA2ARequestHandler } from '../services/a2a-handler.js';
 import type { A2ACaller } from '../services/a2a-handler.js';
@@ -121,7 +121,7 @@ export function a2aRouter(config: AimeatConfig, storage: Storage): Router {
         owner: agent.owner,
         gaii: agent.gaii,
         display_name: agent.displayName ?? agent.name,
-        description: agent.description ?? '',
+        description: directoryDescriptionFor(agent.description, offerings),
         agent_card: `${interfaceUrl(config, agent.owner, agent.name)}/agent-card.json`,
         interface: interfaceUrl(config, agent.owner, agent.name),
         // The count, not the offerings: what each one costs is on the card, and saying it twice is

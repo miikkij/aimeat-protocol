@@ -54,6 +54,20 @@ export interface HandlerCandidate {
     arity: number;
     /** The first parameter's name — what decides whether this is a defect or ordinary code. */
     firstParam: string;
+    /**
+     * The tag the prop sits on: a DOM element, or a component.
+     *
+     * THE ONLY THING THAT SEPARATES THE TWO CASES. A browser calls `onSubmit` on a `<form>` with an
+     * Event and nothing else, so a function wanting data is wrong there. A component calls its own
+     * `onSubmit(body)` because that is what the prop is for. The prop's NAME says nothing: the three
+     * surviving candidates were all `onSubmit` on `<${RateModal}>` and `<${RequestChangesModal}>`,
+     * and `onPress` — the prop that actually broke — was a component prop too.
+     *
+     * In HTM the distinction is written down: `<div onClick=…>` is an element and
+     * `<${Modal} onSubmit=…>` is a component. That is readable, and it is the difference between a
+     * list of three false positives and a list that means something.
+     */
+    tag: 'element' | 'component';
 }
 
 /**
@@ -220,15 +234,37 @@ export function handlerArity(files: readonly ts.SourceFile[], root: string): Han
     const out: HandlerCandidate[] = [];
 
     for (const source of files) {
-        // Every function declared in this file, by name, with how many parameters it takes.
-        const arity = new Map<string, { n: number; first: string }>();
+        // Every function declared in this file, by name, with how many parameters it takes — and
+        // WHERE it is declared, because a name can be declared more than once in a file and the
+        // template that uses it resolves to the nearest one that encloses it.
+        //
+        // landing-page.modals.js declares `save` three times, once per component. A file-wide map
+        // keyed by name kept the last, so the parameterless `save` at line 56 was reported with the
+        // signature of the one at line 360 — two candidates that were the map's fault, not the
+        // code's. Same mistake as the dead-zone detector's: a name matched where a binding should
+        // have been resolved.
+        interface Decl { n: number; first: string; start: number; end: number }
+        const arity = new Map<string, Decl[]>();
+        const add = (name: string, d: Decl): void => { arity.set(name, [...(arity.get(name) ?? []), d]); };
         const collect = (n: ts.Node): void => {
             const nameOf = (ps: ts.NodeArray<ts.ParameterDeclaration>): string =>
                 ps[0] && ts.isIdentifier(ps[0].name) ? ps[0].name.text : '';
-            if (ts.isFunctionDeclaration(n) && n.name) arity.set(n.name.text, { n: n.parameters.length, first: nameOf(n.parameters) });
+            // The range recorded is the ENCLOSING function's, because that is what a use has to sit
+            // inside for this declaration to be the one it means.
+            const scopeOf = (node: ts.Node): { start: number; end: number } => {
+                for (let p: ts.Node | undefined = node.parent; p; p = p.parent) {
+                    if (ts.isFunctionDeclaration(p) || ts.isFunctionExpression(p) || ts.isArrowFunction(p)) {
+                        return { start: p.getStart(source), end: p.getEnd() };
+                    }
+                }
+                return { start: 0, end: source.getEnd() };
+            };
+            if (ts.isFunctionDeclaration(n) && n.name) {
+                add(n.name.text, { n: n.parameters.length, first: nameOf(n.parameters), ...scopeOf(n) });
+            }
             if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && n.initializer
                 && (ts.isArrowFunction(n.initializer) || ts.isFunctionExpression(n.initializer))) {
-                arity.set(n.name.text, { n: n.initializer.parameters.length, first: nameOf(n.initializer.parameters) });
+                add(n.name.text, { n: n.initializer.parameters.length, first: nameOf(n.initializer.parameters), ...scopeOf(n) });
             }
             ts.forEachChild(n, collect);
         };
@@ -237,10 +273,19 @@ export function handlerArity(files: readonly ts.SourceFile[], root: string): Han
         const text = source.getText();
         for (const m of text.matchAll(/\b(on[A-Z][A-Za-z]*)=\$\{\s*([A-Za-z_$][\w$]*)\s*\}/g)) {
             const [, prop, fn] = m;
-            const info = arity.get(fn);
+            const at = m.index ?? 0;
+            // The innermost declaration whose scope contains this use — the one the name means here.
+            const info = (arity.get(fn) ?? [])
+                .filter(d => d.start <= at && at <= d.end)
+                .sort((a, b) => (b.end - b.start) - (a.end - a.start))
+                .pop();
+            // Walk back to the tag this prop sits on. In HTM a component is interpolated —
+            // `<${Modal} …>` — and an element is written out, `<form …>`.
+            const open = text.lastIndexOf('<', at);
+            const tag: 'element' | 'component' = text.slice(open + 1, open + 3) === '${' ? 'component' : 'element';
             if (info !== undefined && info.n > 0 && !EVENT_NAMES.has(info.first)) {
-                const line = source.getLineAndCharacterOfPosition(m.index ?? 0).line + 1;
-                out.push({ file: rel(source, root), line, prop, fn, arity: info.n, firstParam: info.first });
+                const line = source.getLineAndCharacterOfPosition(at).line + 1;
+                out.push({ file: rel(source, root), line, prop, fn, arity: info.n, firstParam: info.first, tag });
             }
         }
     }
