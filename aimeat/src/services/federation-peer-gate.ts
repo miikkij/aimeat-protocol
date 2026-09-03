@@ -52,10 +52,16 @@ export type PeerCapability =
   | 'replicateMemory'
   | 'allowMessaging'
   | 'allowBroadcast'
-  | 'allowSettlement';
-// `allowRouting` was in this list and in DENIED below, saying "This peer may not route or relay
-// through this node" — and no door ever asked for it, so that sentence had never been sent to
-// anyone. It also pointed the wrong way: routing is decided by the SENDER, in its own record of the
+  | 'allowSettlement'
+  | 'allowRouting';
+// `allowRouting` LEFT this list on 2026-09-03 and came back the same week, and both moves were
+// right. It went because no door asked for it, so its refusal had never been sent to anyone and it
+// pointed the wrong way: routing is the SENDER's policy, decided in its own record of the target
+// (routes/federation-sync/routing.ts). It is back because services/relay-claim.ts is the door the
+// removal named as the precondition — a peer now SIGNS a relay claim with its node key, so a
+// receiver can tell a relayed call from a direct one and refuse the relationship rather than the
+// caller. The word is enforced on a real door now, which is the only thing that ever made it exist.
+// The historical note it replaced: It also pointed the wrong way: routing is decided by the SENDER, in its own record of the
 // target (routes/federation-sync/routing.ts), not by the receiver of a relayed call. A permission
 // word enforced on no door does not exist, so it is out of the vocabulary rather than left here
 // implying a check that is not made. The flag itself is untouched: it is a real policy, just not an
@@ -73,6 +79,10 @@ const DENIED: Record<PeerCapability, string> = {
   allowMessaging: 'This peer may not deliver messages to this node',
   allowBroadcast: 'This peer may not broadcast to this node',
   allowSettlement: 'This peer may not settle balances on this node',
+  // Named as a RELATIONSHIP, not as a permission of the original caller: a relayed call is
+  // refused because of the link between the two nodes, and no credential the caller holds can
+  // change that. Saying it any other way sends the end user looking for a fault of their own.
+  allowRouting: 'This node does not accept relayed requests from that peer',
 };
 
 /**
