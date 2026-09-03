@@ -9,6 +9,10 @@
  *   upsert is one multi-row INSERT … ON CONFLICT, and searchText uses the GENERATED tsvector + GIN
  *   (ranked, best-first). Bound to PostgresKyselyStorage via the prototype merge in ../index.ts.
  * @version-history
+ *   v1.5.0 — 2026-09-03 — createMemoryIfAbsent treats a row in the bin as absent and takes it over
+ *     (new value, tombstone cleared), as setMemory already did. A DO NOTHING against a binned row
+ *     answered null on every retry, so the workspace append could never seed a draft for a
+ *     document whose draft a publish had just binned (VERSION_CONFLICT "at version 0", 2026-09-03).
  *   v1.4.0 — 2026-08-17 — listAllMemoryMeta: cross-owner enumeration with the META_COLS projection
  *     (no value column), for scheduled scans that only decide from keys + timestamps.
  *   v1.3.0 — 2026-08-11 — `groupId` is written on the UPDATE paths and on createMemoryIfAbsent, not
@@ -130,11 +134,16 @@ export const memoryMethods = {
   },
 
   async createMemoryIfAbsent(this: PostgresKyselyStorage, record: MemoryRecord): Promise<MemoryRecord | null> {
-    // The create half of the compare-and-swap pair. onConflict doNothing means the unique index on
-    // (ownerGaii, key) decides the winner, so two writers racing to start the same shared record
-    // cannot both think they created it — the loser gets null and re-reads to merge.
-    const res = await this.db.insertInto('Memory').values({
-      ownerGaii: record.ownerGaii, key: record.key,
+    // The create half of the compare-and-swap pair. The unique index on (ownerGaii, key) decides the
+    // winner, so two writers racing to start the same shared record cannot both think they created
+    // it — the loser gets null and re-reads to merge.
+    //
+    // A ROW IN THE BIN IS ABSENT. It has left every read, so the caller that asked "only if absent"
+    // saw nothing there; a DO NOTHING against it answered null forever (until the sweeper), and the
+    // workspace append re-read and lost six times in a row on a document whose draft a publish had
+    // just binned. The conflict branch therefore takes the row over, with the new value and a clean
+    // tombstone, exactly as setMemory does on a binned key — and only then: a LIVE row still wins.
+    const cols = {
       value: jsonb(record.value), visibility: record.visibility, tags: record.tags ?? [],
       groupId: resolveGroupId(record, null), workspaceRef: record.workspaceRef ?? null, ttlHours: record.ttlHours,
       version: record.version, createdAt: new Date(record.createdAt), updatedAt: new Date(record.updatedAt),
@@ -142,9 +151,14 @@ export const memoryMethods = {
       trackable: record.trackable ?? false,
       byteSize: byteSize(record.value), searchBlob: buildSearchBlob(record),
       aiProvenanceId: record.aiProvenanceId ?? null,
+    };
+    const res = await this.db.insertInto('Memory')
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any)
-      .onConflict(oc => oc.columns(['ownerGaii', 'key']).doNothing())
+      .values({ ownerGaii: record.ownerGaii, key: record.key, ...cols } as any)
+      .onConflict(oc => oc.columns(['ownerGaii', 'key'])
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .doUpdateSet({ ...cols, deletedAt: null, deletedBy: null } as any)
+        .where('Memory.deletedAt', 'is not', null))
       .executeTakeFirst();
     return (res.numInsertedOrUpdatedRows ?? 0n) > 0n ? record : null;
   },

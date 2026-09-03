@@ -14,6 +14,10 @@
  *   none of those throw, and none of them are visible in the answer the caller gets back. So every
  *   assertion here compares the WHOLE document against what it must be, not just the new part.
  * @version-history
+ *   v1.1.0 — 2026-09-03 — A published document whose draft went to the bin takes an append: the
+ *     draft is seeded from `.latest` over the binned row. Before the storage fix this was six
+ *     losing swaps and VERSION_CONFLICT "at version 0" on every published document (seen on
+ *     aimeat.io the same day, on the build note this change is recorded in).
  *   v1.0.0 — 2026-09-02 — Initial (wish-workspace-append-ja-osiomuokkaus).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=workspace-doc-edit
@@ -137,6 +141,37 @@ await test('an append lands at the end, and the document in front of it is byte-
     const after = await readDoc('doc-1');
     assert(after.startsWith(DOC), 'the original document is no longer a byte-identical prefix');
     assert(after.endsWith('## Open questions\n\nDoes it hold?\n'), `tail: ${JSON.stringify(after.slice(-60))}`);
+});
+
+await test('a published document whose draft is in the bin takes an append, seeded from the published version', async () => {
+    // What a publish leaves behind: `.latest` holds the document, and the `.draft` row is in the
+    // bin (deleteMemory stamps a tombstone; the row stays under its unique key until the sweeper).
+    // The append must read `.latest`, create the draft over the binned row, and land the text.
+    const latestKey = draftKey('doc-pub').replace(/\.draft$/, '.latest');
+    await putDoc('doc-pub', 'Published', DOC);
+    const del = await json(`/v1/memory/${encodeURIComponent(draftKey('doc-pub'))}`, { method: 'DELETE', headers: authA() });
+    assert(del.status === 200, `bin the draft: ${del.status} ${JSON.stringify(del.body)}`);
+    const pub = await json('/v1/memory', {
+        method: 'POST', headers: authA(),
+        body: JSON.stringify({ key: latestKey, value: { id: 'doc-pub', title: 'Published', markdown: DOC }, visibility: 'private' }),
+    });
+    assert(pub.status === 200 || pub.status === 201, `publish ${pub.status}: ${JSON.stringify(pub.body)}`);
+    const gone = await json(`/v1/memory/${encodeURIComponent(draftKey('doc-pub'))}`, { headers: authA() });
+    assert(gone.status === 404, `the binned draft must be out of every read, got ${gone.status}`);
+
+    const r = await json(appendUrl('doc-pub'), {
+        method: 'POST', headers: authA(),
+        body: JSON.stringify({ markdown: '## After publishing\n\nStill amendable.' }),
+    });
+    assert(r.status === 200, `append over a binned draft ${r.status}: ${JSON.stringify(r.body)}`);
+    assert(r.body.data.seeded_from_published === true || r.body.data.seededFromPublished === true,
+        `the draft must come from .latest: ${JSON.stringify(r.body.data)}`);
+    const after = await readDoc('doc-pub');
+    assert(after.startsWith(DOC), 'the published document is no longer a byte-identical prefix of the draft');
+    assert(after.endsWith('## After publishing\n\nStill amendable.\n'), `tail: ${JSON.stringify(after.slice(-60))}`);
+    // And the live copy is untouched until somebody publishes, as after aimeat_workspace_write.
+    const live = await json(`/v1/memory/${encodeURIComponent(latestKey)}`, { headers: authA() });
+    assert(live.status === 200 && String(live.body.data.value.markdown) === DOC, 'the published version must not change on an append');
 });
 
 await test('an append under a named section lands there, and everything else is byte-identical', async () => {
