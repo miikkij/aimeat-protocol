@@ -152,6 +152,7 @@ export const TOOL_SCOPES: Record<string, string> = {
     // Reconfigure ANOTHER of the owner's agents. An agent describing itself needs nothing;
     // reaching sideways at a sibling principal with its own identity and trust score does.
     aimeat_agent_mode_set:                    'agent:write',
+    aimeat_agent_description_set:             'agent:write',
     aimeat_agent_run_mode_set:                'agent:write',
     aimeat_agent_runtime_report:              'agent:write',
     aimeat_agent_console_set:                 'agent:write',

@@ -92,6 +92,21 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
   );
 
   mcp.tool(
+    'aimeat_agent_description_set',
+    descriptionFor('aimeat_agent_description_set'),
+    {
+      agent_name: agentNameSchema,
+      target_agent_name: z.string().describe('Agent whose description to set (same owner; pass your own name to describe yourself).'),
+      description: z.string().describe('What this agent is, in a sentence or two. Empty clears it.'),
+    },
+    async ({ agent_name, target_agent_name, description }) => {
+      const { client } = pickAgent(registry, agent_name);
+      const resp = await client.patch(`/v1/agents/${encodeURIComponent(target_agent_name)}/description`, { description });
+      return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    },
+  );
+
+  mcp.tool(
     'aimeat_agent_run_mode_set',
     descriptionFor('aimeat_agent_run_mode_set'),
     {
