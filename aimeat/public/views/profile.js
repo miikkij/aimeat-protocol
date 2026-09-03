@@ -10,6 +10,8 @@
  *   updateStats, navigate, renderTab) rendering LandingPage + a toast pill.
  * @usage Lazy-loaded route component for /v1/profile.
  * @version-history
+ *   2026-09-03 — The AI tab (id 'ai', alias 'generator') renders the poster-face AI page
+ *     (profile/ai-tab.js) instead of the collapsible OpenRouter panel.
  *   2026-09-03 — A `fleet` tab: "Your agents", the Agents v2 section, which was a page reached by a
  *     sidebar link above the menu rather than through it. The Agents tab below it is untouched.
  *   2026-08-29 — A signed-out ?tab=mcp goes to the connect story (/v1/connect-your-ai) instead of the
@@ -74,7 +76,7 @@ import SkillsTab from './profile/skills-tab.js';
 import OrganismsTab from './profile/organisms-tab.js';
 import OffersTab from './profile/offers-tab.js';
 import NotificationsTab from './profile/notifications-tab.js';
-import { OpenRouterSettings } from './profile/openrouter-settings.js';
+import AiSettingsTab from './profile/ai-tab.js';
 import { AiTransparencyCard } from './profile/ai-transparency-card.js';
 import { ComplianceCard } from './profile/compliance-card.js';
 import CalibratorTab from './profile/calibrator-tab.js';
@@ -92,17 +94,20 @@ import LibrariesTab from './profile/libraries-tab.js';
 // Each tab has a minTier: 'new' | 'active' | 'experienced'
 // Tabs with minTier <= current tier are visible in the tab bar.
 // Deep links (?tab=X) bypass tier filtering.
-// The former "Generator" tab now hosts only the AI-provider (OpenRouter) settings,
-// opened by default. The Generator feature itself was removed.
-// The AI tab hosts the provider settings AND, below them, the owner's own transparency view: what
-// they published with a model in it, how much of it carries a label, and what this node records
-// about a model call (TARGET-058 Phase 8 — the deployer's access to the logging policy).
-function OpenRouterTab(props) {
+// The AI tab (route id 'ai'; 'generator' is its old name and still resolves, because the chat, the
+// home cards and two account-event links point at it): the provider settings in the poster face
+// AND, below them, the owner's own transparency view: what they published with a model in it, how
+// much of it carries a label, and what this node records about a model call (TARGET-058 Phase 8).
+function AiTab(props) {
   return html`
-    <${OpenRouterSettings} ...${props} startOpen=${true} />
+    <${AiSettingsTab} ...${props} />
     <${AiTransparencyCard} />
     <${ComplianceCard} />`;
 }
+
+/** Old tab ids that still arrive in links and in a remembered session. */
+const TAB_ALIASES = { generator: 'ai' };
+const canonicalTab = (id) => TAB_ALIASES[id] || id;
 
 const TABS = [
   { id: 'messages',      key: 'profile.tabs.inbox',          component: InboxTab,          minTier: 'new' },
@@ -147,7 +152,7 @@ const TABS = [
   // 'new', not 'active', for the same reason as the mcp tab above: the own-key road is one of the
   // two ways OFF the node's key, offered to a brand-new person by the chat's status line — a door
   // that leads to a tab the menu refuses to show is a dead end.
-  { id: 'generator',     key: 'profile.generator.openrouter.title', component: OpenRouterTab, minTier: 'new' },
+  { id: 'ai',            key: 'profile.generator.openrouter.title', component: AiTab,           minTier: 'new' },
   { id: 'calibrator',   key: 'profile.calibrator.tabLabel', component: CalibratorTab,     minTier: 'active' },
   { id: 'packages',      key: 'profile.tabs.packages',       component: PackagesTab,       minTier: 'active' },
   { id: 'libraries',     key: 'librariesTab.tabLabel',       component: LibrariesTab,      minTier: 'new' },
@@ -156,7 +161,7 @@ const TABS = [
 export default function Profile({ navigate, locale }) {
   const [session, setSession] = useState(null);
   const savedTab = () => {
-    const id = sessionStorage.getItem('aimeat-profile-tab');
+    const id = canonicalTab(sessionStorage.getItem('aimeat-profile-tab'));
     // Default to 'home' (landing page) instead of a specific tab
     if (id === 'home') return 'home';
     return id && TABS.some(t => t.id === id) ? id : 'home';
@@ -229,7 +234,7 @@ export default function Profile({ navigate, locale }) {
   // URL tab param (deep links bypass tier filtering)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const tab = params.get('tab');
+    const tab = canonicalTab(params.get('tab'));
     if (tab && TABS.some(t => t.id === tab)) {
       setActiveTab(tab);
       setVisitedTabs(prev => { const next = new Set(prev); next.add(tab); return next; });
