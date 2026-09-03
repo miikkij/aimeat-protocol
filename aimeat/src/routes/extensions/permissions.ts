@@ -64,6 +64,40 @@ export function canManageExtensionAs(
 }
 
 /**
+ * May this caller SEE an extension instance somebody created?
+ *
+ * The read counterpart of canManageInstalledExt, and it exists because the three write doors on
+ * /v1/extensions/:name/instances were fenced and the two read doors were not. `requireAuth()` was
+ * the whole gate on GET, so any authenticated principal on the node could list every owner's
+ * instances of any installed extension and open one by id: the instance ids, `createdBy` (another
+ * owner's NAME), status, timestamps, and every config value the manifest had not marked secret —
+ * endpoints, tenant ids, account identifiers. Secret-marked fields were masked, so credentials did
+ * not leak; the shape around them did. Found 2026-09-04 by giving e2e-extension-secrets a second
+ * principal, which it had never had.
+ *
+ * DELIBERATELY NOT canManageInstalledExt. That one also demands the WRITE permission (owner role or
+ * the ext:write scope), which is the right bar for delete and the wrong one for read: an agent
+ * scoped to read its owner's own configuration should not need write to do it. Operator bypasses,
+ * as everywhere in this file; otherwise the caller's owner must be the one who created the row.
+ */
+export function canSeeExtensionInstanceAs(
+  caller: { owner: string; roles: string[] },
+  createdBy: string,
+): boolean {
+  if (caller.roles.includes('operator')) return true;
+  // createdBy is a bare owner name; accept a GHII/GAII form defensively, as resolveGatedApp does.
+  const creator = createdBy.toLowerCase().split('@')[0].split('#').pop() ?? '';
+  return caller.owner.toLowerCase() === creator;
+}
+
+/** canSeeExtensionInstanceAs for an Express request. */
+export function canSeeExtensionInstance(req: Request, createdBy: string): boolean {
+  const auth = req.auth;
+  if (!auth) return false;
+  return canSeeExtensionInstanceAs({ owner: auth.owner, roles: auth.roles || [] }, createdBy);
+}
+
+/**
  * Which app does this extension gate, if any — and only when the extension's installer owns it.
  *
  * An extension declares the app whose membership it enforces with `config: { app: owner/file.html }`,
