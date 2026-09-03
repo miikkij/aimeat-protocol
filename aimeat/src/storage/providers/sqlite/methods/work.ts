@@ -393,9 +393,22 @@ export const workMethods = {
     return post;
   },
 
+  /**
+   * One post by id — and an expired one is gone here too, the way it is gone from listPosts below.
+   *
+   * Without the check a post whose lifetime had run out was gone from the board and still readable
+   * at its own address, which is ending only in the list. The row is removed on the read that
+   * notices, which is what listPosts does with the same condition.
+   */
   async getPost(this: SqliteStorage, boardId: string, postId: string): Promise<BoardPostRecord | null> {
     const row = this.db.prepare('SELECT * FROM board_posts WHERE boardId = ? AND id = ?').get(boardId, postId) as Record<string, unknown> | undefined;
-    return row ? this.deserializePost(row) : null;
+    if (!row) return null;
+    const post = this.deserializePost(row);
+    if (post.ttlExpiresAt && new Date(post.ttlExpiresAt).getTime() < Date.now()) {
+      this.db.prepare('DELETE FROM board_posts WHERE boardId = ? AND id = ?').run(boardId, postId);
+      return null;
+    }
+    return post;
   },
 
   async listPosts(this: SqliteStorage, boardId: string, opts?: { category?: string; cursor?: string; limit?: number }): Promise<BoardPostRecord[]> {

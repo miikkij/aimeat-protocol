@@ -115,9 +115,24 @@ export function createPost(db: Database.Database, post: BoardPostRecord): BoardP
   return post;
 }
 
+/**
+ * One post by id — and an expired one is gone here too, the way it is gone from the listing.
+ *
+ * listPosts drops a post whose TTL has passed and deletes the row as it goes; this read did not,
+ * so a post that had disappeared from the board was still readable by its own address. A post given
+ * a lifetime is meant to end, and ending only in the list is not ending. The row is removed here as
+ * well, for the same reason listPosts removes it: the read that notices is the cheapest place to
+ * clean up, and leaving it would mean the next read has to notice again.
+ */
 export function getPost(db: Database.Database, boardId: string, postId: string): BoardPostRecord | null {
   const row = db.prepare('SELECT * FROM board_posts WHERE boardId = ? AND id = ?').get(boardId, postId) as Record<string, unknown> | undefined;
-  return row ? deserializePost(row) : null;
+  if (!row) return null;
+  const post = deserializePost(row);
+  if (post.ttlExpiresAt && new Date(post.ttlExpiresAt).getTime() < Date.now()) {
+    db.prepare('DELETE FROM board_posts WHERE boardId = ? AND id = ?').run(boardId, postId);
+    return null;
+  }
+  return post;
 }
 
 export function listPosts(db: Database.Database, boardId: string, opts?: { category?: string; cursor?: string; limit?: number }): BoardPostRecord[] {

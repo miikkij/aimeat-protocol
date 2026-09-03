@@ -31,10 +31,12 @@
 #  15. Owner-scoped tables vs cascades  — pnpm check:storage-parity
 #  16. Sandbox entry points on builder — pnpm check:ext-entrypoints
 #  17. One capability one impl       — pnpm check:shared-impl
-#  18. An agent writes, page hears it — pnpm check:sse-parity
-#  19. No decision written out twice  — pnpm check:copied-logic
-#  20. Published surfaces + release   — pnpm check:liaison-surface
-#  21. The vitest unit suite          — pnpm test
+#  18. Run-time-chosen read targets  — pnpm check:runtime-read-targets
+#  19. v2 surfaces stay projections  — pnpm check:surface-focus
+#  20. An agent writes, page hears it — pnpm check:sse-parity
+#  21. No decision written out twice  — pnpm check:copied-logic
+#  22. Published surfaces + release   — pnpm check:liaison-surface
+#  23. The vitest unit suite          — pnpm test
 #
 # These are the "green before commit" checks. E2E/Playwright are intentionally NOT here
 # (too slow / need a DB) — run those before pushing a feature (see CLAUDE.md Rule 1).
@@ -164,6 +166,12 @@ pnpm -s check:ext-entrypoints
 
 echo "[pre-commit] MCP tools call what REST calls (check:shared-impl)…"
 pnpm -s check:shared-impl
+
+echo "[pre-commit] A read that picks its table at run time is listed (check:runtime-read-targets)…"
+pnpm -s check:runtime-read-targets
+
+echo "[pre-commit] The v2 surfaces are still projections (check:surface-focus)…"
+pnpm -s check:surface-focus
 
 echo "[pre-commit] An agent writes, and the open page hears about it (check:sse-parity)…"
 pnpm -s check:sse-parity
