@@ -311,13 +311,21 @@ API.
 
 ## 6. What needs to be built
 
-The pieces of the local-first workflow that don't exist yet:
+The pieces of the local-first workflow that don't exist yet.
+
+> **Status, 3 September 2026.** The focused MCP surface in §6.1 was built: `/v2/mcp/appdev` is live,
+> alongside `/v2/mcp/agent`, `/v2/mcp/service` and `/v2/mcp/admin`, and `aimeat connect client <id>
+> --surface appdev` points a chat client at it. The four `aimeat_appdev_*` tools proposed below were
+> **not** built and do not exist; what carries those names today is a different set
+> (`aimeat_appdev_overview`, `aimeat_appdev_pitfall_list`, `aimeat_appdev_pitfall_report`,
+> `aimeat_appdev_pitfall_delete`, `aimeat_appdev_proof_attach`), which is the app-building knowledge
+> base rather than a deploy pipeline. Read §6 as a proposal, not as a description of the node.
 
 ### 6.1 `v2/mcp/appdev` — focused MCP surface
 
-A NEW MCP namespace, separate from the bloated `/v1/mcp` (which already
-has 123 tools and confuses smaller LLMs). Only the tools an appdev
-session needs:
+A NEW MCP namespace, separate from the bloated `/v1/mcp` (which had 123
+tools when this was written and carries 303 today, enough to confuse
+smaller LLMs). Only the tools an appdev session needs:
 
 | Tool | Purpose |
 |---|---|

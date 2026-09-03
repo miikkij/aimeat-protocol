@@ -1,79 +1,44 @@
 # DeepSeek — AIMEAT Platform Report
 
-**Vendor:** DeepSeek  
-**URL:** https://www.deepseek.com  
-**Updated:** March 2026
+**Vendor:** DeepSeek · **URL:** https://www.deepseek.com
+**Vendor facts checked:** 3 September 2026
+**Shortest path:** run a DeepSeek model inside a client that speaks MCP (Goose, LM Studio, Cursor), not the DeepSeek web chat.
 
-## Plans & Tiers
+## Can it reach a node?
 
-| Product | Price | Key Features |
-|---------|-------|-------------|
-| DeepSeek Chat (Web) | Free | DeepSeek-V3.2, 128K context, web-based chat |
-| DeepSeek API | Pay-as-you-go | OpenAI-compatible API, function calling, batch processing |
+| Road | Works | How |
+|---|---|---|
+| MCP, the web chat | No | There is no connector surface in the chat |
+| MCP, via a client | Yes | The models handle tool calling well; the MCP client is Goose, LM Studio, Cursor or your own |
+| Manual prompt | Yes, free | The chat writes a complete AIMEAT app from the node's build prompt |
+| HTTP | Yes, via the API | Cheap enough to run an agent loop against a node continuously |
 
-## Core Features (March 2026)
+## What is worth knowing
 
-### DeepSeek Chat (Web App)
-- **Free access** to DeepSeek-V3.2 — competitive with GPT-4 class models
-- **Deep thinking mode** (R1) — Step-by-step reasoning, similar to o1
-- **Code generation** — DeepSeek Coder excels at programming tasks
-- **Web search** — Real-time search integration in chat
-- **File upload** — Document analysis and processing
-- **No MCP support** — Web chat cannot connect to external MCP servers
-- **No HTTP requests** — Cannot make external API calls from the web interface
-- **No artifacts/canvas** — Code output is inline in chat only
+The current lineup is **V4 Pro** (the flagship), **V4 Flash** (cost-optimised) and **R1** (reasoning),
+with R1 distillations from 1.5B to 70B that run on consumer hardware. V4 Pro is about $1.04 per
+million input tokens and $1.20 per million output; V4 Flash is roughly two orders of magnitude
+cheaper, which is what makes DeepSeek interesting for anything that runs on a schedule. New API
+accounts get 5 million free tokens for 30 days.
 
-### DeepSeek API
-- **OpenAI-compatible API** — Use existing OpenAI SDKs with changed base_url
-- **Models:** deepseek-chat (V3.2 non-thinking), deepseek-reasoner (V3.2 thinking)
-- **Function calling** — Full tool use support via API
-- **128K context window**
-- **Extremely cost-effective** — Significantly cheaper than OpenAI/Anthropic
-- **Streaming support** — Real-time response streaming
+The local distillations matter here too: an R1 distill on your own machine, driven by LM Studio or
+Goose, reaches an AIMEAT node with no vendor in the path at all.
 
-## MCP Support
+## Connecting it
 
-- **Web App:** No MCP support. DeepSeek Chat has no connector/plugin system.
-- **API:** DeepSeek API supports function calling, so it can be used as a backend for MCP clients (Claude Desktop, VS Code, LM Studio, Cursor, etc.) via community bridges.
-- **Third-party:** DeepSeek models can be added to MCP-compatible hosts like LM Studio, Cursor, or other tools that allow custom model providers.
+**Through Goose**, which is the least work:
 
-## Code Generation / Apps
+```bash
+npx aimeat connect client goose --url https://your-node --owner your-handle
+# then set an OpenRouter (or DeepSeek) key and pick a DeepSeek model
+GOOSE_MODEL=deepseek/deepseek-v4-pro ~/.aimeat-goose/launch-goose.sh
+```
 
-- Excellent code generation quality (DeepSeek Coder)
-- Generates full HTML/CSS/JS applications
-- Cannot preview or run code — output is text only in web chat
-- R1 (reasoning mode) provides step-by-step coding with explanations
-- For privacy: run DeepSeek locally via Ollama or LM Studio
+**Through LM Studio** if you are running a distilled model locally: add the node to the app's
+`mcp.json` and load a model that does tool calling well.
 
-## API
+## What to expect
 
-- Fully OpenAI-compatible: `base_url: https://api.deepseek.com`
-- Supports chat completions, function calling, streaming
-- Very competitive pricing (~10x cheaper than GPT-4)
-- Can be used from any application that supports OpenAI API format
-
----
-
-## AIMEAT Integration Recommendations
-
-### 🖥️ Apps (Prompt Package)
-**Available on: DeepSeek Chat (Free) and DeepSeek API**
-
-DeepSeek Chat can generate complete AIMEAT HTML applications. Since it can't preview code inline, copy the generated HTML and save it as a file.
-
-**Prompt:** Copy the AIMEAT Application Builder prompt into DeepSeek Chat. DeepSeek will interview you and generate a complete .html file. Copy the code, save as a file, and open in your browser.
-
-### 🔌 MCP
-**Not available on DeepSeek Chat web interface**
-
-DeepSeek's web chat does not support MCP connectors. However, you can use DeepSeek models via:
-- **LM Studio** — Download DeepSeek models locally, use LM Studio's MCP client
-- **VS Code** — Use DeepSeek as model provider in Copilot/Cursor with MCP enabled
-- **Cursor** — Add DeepSeek API as custom model, then use MCP servers
-
-### 📡 API
-**Available on: DeepSeek Chat (limited, via code generation)**
-
-DeepSeek Chat cannot make direct HTTP calls. Copy the API integration prompt into chat — DeepSeek will explain the steps and generate code you can run yourself. For programmatic access, use the DeepSeek API with function calling to build AIMEAT integration.
-
-**Developer path:** Use DeepSeek API as backend for your own AIMEAT client application. The OpenAI-compatible API makes it easy to swap in as an LLM provider.
+Good code generation for the price, and reliable enough at tool calling to drive a node through an
+MCP client. The web chat cannot reach a node; treat it as a place to generate an app file you publish
+by hand.

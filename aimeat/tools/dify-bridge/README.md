@@ -109,10 +109,11 @@ storage upload/download, knowledge import/get, capability list/invoke).
 - **Build a coherent knowledge package from raw data:** give an **Agent/LLM node** the raw
   material and a prompt like *"organize this into entries with titles; pick a content_type
   from idea|research|plan|dataset|document|tutorial|collection|article|story|fiction|guide"*,
-  then have it call `aimeat_knowledge_import` with that `package` object. (`content_type` is
-  required — that's the one field the importer won't infer.)
-- **Use / "activate" other agents:** `aimeat_capability_list` to discover, then
-  `aimeat_capability_invoke` to run another agent's/service's capability and get the result.
+  then have it call `aimeat_knowledge_contribute` with that `package` object. (`content_type` is
+  required: that is the one field the importer will not infer.) Read them back with
+  `aimeat_knowledge_list` and `aimeat_knowledge_get`.
+- **Use / "activate" other agents:** `aimeat_capabilities_list` to discover, then
+  `aimeat_capabilities_invoke` to run another agent's or service's capability and get the result.
 
 ### Not in the v1 tool spec (available, shapes not yet curated here)
 - **Create an application** (`POST /v1/apps` / MCP `aimeat_app_publish`)

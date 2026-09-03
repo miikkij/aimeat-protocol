@@ -1,99 +1,46 @@
 # LM Studio — AIMEAT Platform Report
 
-**Vendor:** LM Studio  
-**URL:** https://lmstudio.ai  
-**Updated:** March 2026
+**Vendor:** LM Studio · **URL:** https://lmstudio.ai
+**Vendor facts checked:** 3 September 2026
+**Shortest path:** add the node to LM Studio's `mcp.json`, load a model that does tool calling, and go. Free.
 
-## Plans & Tiers
+## Can it reach a node?
 
-| Plan | Price | Key Features |
-|------|-------|-------------|
-| LM Studio | Free | Local model inference, OpenAI-compatible API, MCP client & server, GUI |
+| Road | Works | How |
+|---|---|---|
+| MCP | Yes, since 0.3.17 | Local and remote MCP servers, added through `mcp.json` or an "Add to LM Studio" button. OAuth for remote servers since 0.4.10 |
+| Manual prompt | Yes | Any loaded model can write an app from the node's build prompt |
+| HTTP | Yes | LM Studio serves an OpenAI-compatible local API you can drive from your own code |
 
-## Core Features (March 2026)
+## What is worth knowing
 
-- **100% Free** — Open-source, no subscription required
-- **Local models** — Run any Hugging Face model (Llama, Qwen, Mistral, DeepSeek, etc.)
-- **OpenAI-compatible API** — Local server on localhost:1234 with standard API format
-- **MCP Client** (v0.3.6+) — Connect to external MCP servers for tool use
-- **MCP Server** (via bridge) — Expose local models as MCP server for other clients
-- **GUI chat interface** — Visual conversation management
-- **GPU acceleration** — NVIDIA, AMD, Apple Silicon support
-- **Model quantization** — Q4, Q5, Q8 quantization for memory efficiency
-- **Function calling** — Supported with tool-capable models (Qwen, Llama, Mistral, Hermes)
-- **Tool call confirmations** — Review and approve tool calls before execution
-- **Privacy** — All data stays local, no internet required
+Free, and it runs entirely on your machine. The current stable build is 0.4.16 (8 June 2026); the
+line has moved quickly through the year: OAuth for MCP servers in 0.4.10, stable MTP speculative
+decoding in 0.4.14, tensor parallelism across several GPUs in 0.4.15, and an 8k default context plus
+a companion iPhone and iPad app in 0.4.16.
 
-## MCP Support
+This is the combination that makes a **personal node** genuinely private: an AIMEAT node on your own
+machine, a model on the same machine, and nothing leaving the house.
 
-- **As MCP Client (v0.3.6+):**
-  - Settings → MCP section → Add Server → Enter MCP server URL/command
-  - Supports local (stdio) and remote (HTTP) MCP servers
-  - Tool call confirmation dialogs for safety
-  - Uses `mcp.json` configuration (Cursor-compatible format)
+## Connecting it
 
-- **As MCP Server (via bridge):**
-  - Install `lmstudio-mcp-server` bridge
-  - Expose local models to other MCP clients (Claude Desktop, etc.)
+Add the node as a remote MCP server in the app's `mcp.json`:
 
-## Recommended Models for MCP/Tool Calling
-
-| Model | Size | Tool Calling | Notes |
-|-------|------|-------------|-------|
-| Qwen 2.5 7B Instruct | 7B | Excellent | Best tool calling support |
-| Llama 3.3 8B Instruct | 8B | Strong | Good general-purpose |
-| Mistral 7B Instruct v0.3 | 7B | Good | Balanced speed/quality |
-| Hermes 3 8B | 8B | Excellent | Specifically tuned for function calling |
-
-## Code Generation / Apps
-
-- Code generation quality depends on the loaded model
-- Larger models (13B+) produce better code output
-- DeepSeek Coder models are excellent for code generation locally
-- No inline preview — chat output only
-- Can generate complete HTML applications
-
-## API
-
-- Local API at `http://localhost:1234/v1/`
-- Fully OpenAI-compatible: chat completions, function calling, streaming
-- Works with any OpenAI SDK by changing base_url
-- No external API calls required — everything runs on your machine
-
----
-
-## AIMEAT Integration Recommendations
-
-### 🖥️ Apps (Prompt Package)
-**Available on: LM Studio (Free — all features)**
-
-Load a code-capable model (DeepSeek Coder, Qwen 2.5) and paste the AIMEAT Application Builder prompt. LM Studio will generate a complete .html file. Quality depends on the model loaded.
-
-**Best models for app generation:** DeepSeek Coder V2 16B, Qwen 2.5 32B Instruct, Llama 3.3 70B
-
-### 🔌 MCP
-**Available on: LM Studio (Free — v0.3.6+)**
-
-1. Open **Settings → MCP section**
-2. Click **"Edit mcp.json"**
-3. Add AIMEAT MCP server:
 ```json
 {
   "mcpServers": {
-    "aimeat": {
-      "url": "{NODE_URL}/v1/mcp"
-    }
+    "aimeat": { "url": "https://your-node/v1/mcp" }
   }
 }
 ```
-4. Save and restart. AIMEAT tools appear in chat.
-5. Use a tool-capable model (Qwen 2.5, Hermes 3) and set temperature to ≤0.1
 
-**Tip:** Tool call confirmation dialogs let you review each AIMEAT action before execution.
+Use `https://your-node/v2/mcp/agent` instead if the model starts drowning in tools, then approve the
+agent from your profile → Agents.
 
-### 📡 API
-**Available on: LM Studio (via tool-capable models)**
+## What to expect
 
-Load a model with function calling support. LM Studio can execute API calls via tools if connected to an MCP server, or generate code that you run manually. The local API server can also be used as a backend for custom AIMEAT client applications.
-
-**Developer path:** Use LM Studio's OpenAI-compatible API as the LLM backend for your own AIMEAT agent. Complete privacy — no data leaves your machine.
+Model choice decides everything here. The best local tool-callers in mid-2026 are Qwen2.5-72B-Instruct
+and Llama-3.1-70B-Instruct, with Mistral-Nemo-Instruct a lighter option on a smaller GPU. A model that
+is weak at tool calling will hallucinate tool names rather than call them, and the fix is the model,
+not the node. Local models still trail the frontier ones on long multi-step tool sequences, so keep
+the surface small (`/v2/mcp/agent` or `/v2/mcp/appdev`) and the tasks short.

@@ -455,9 +455,15 @@ moderation:
 
 Marketplace and auction economics. Only relevant for `type: "marketplace"` or auction-type services. For connecting external payment providers (Stripe, MobilePay) to your marketplace, see the [MSM Manual](./msm-manual.md).
 
+> **The node does not act on this block** (checked 3 September 2026). The CSM parser reads `service`,
+> `schema_mode`, `data_schema`, `consent_requirements`, `moderation` and `ui_hints`; an `economy`
+> block is carried along with the manifest and enforced by nothing. Write it as a statement of intent
+> for whoever builds the service, and put the fee where it is actually charged: in the app, or in an
+> EXCHANGE listing's price.
+
 | Field | Type | Description |
 |-------|------|-------------|
-| `listing_fee_morsels` | integer | Cost in morsels (the AIMEAT microcurrency) to create a listing. |
+| `listing_fee_morsels` | integer | What creating a listing should cost in morsels. A morsel paces how much gets written; it is not a currency and buys nothing. |
 | `escrow_enabled` | boolean | Whether payments go through escrow. |
 | `escrow_release_on` | string | When escrow releases funds. Typically `"buyer_confirmation"`. |
 | `bid_increment_minimum` | number | Minimum bid increment for auctions. |
