@@ -7,9 +7,10 @@
  *   run, the checkpoints that did not pass in words, the judge a calibration actually uses (its own
  *   or the AI page's choice), the crumb and the cross-page rail links.
  * @structure x · STEPS · dateWord · timeWord · durationWords · isEmptyRun · runAverage · runsInOrder ·
- *   failedWords · stepsDone · judgeOf · candidateWords · crumb · pageLinks · openTab
+ *   labelWords · failedWords · stepsDone · judgeOf · candidatesOf · crumb · pageLinks · openTab
  * @usage import { x, STEPS, judgeOf } from './frame.js';
  * @version-history
+ *   v1.0.1 — 2026-09-04 — labelWords: a stored label without the maker prefix and the appended price.
  *   v1.0.0 — 2026-09-04 — Initial (design canvas "AIMEAT Kalibraattori-sivu", direction A).
  */
 import { h } from 'preact';
@@ -72,6 +73,19 @@ export function runsInOrder(batches) {
     .map((b, i) => ({ ...b, number: i + 1 }));
 }
 
+/**
+ * A stored model label as a name: without the maker prefix and without the price the old editor
+ * appended, so "Mistral: Mistral Small 4 — $0.15/$0.60 /M" reads "Mistral Small 4". The labels
+ * on aimeat.io's runs were stored that way and cannot be rewritten.
+ */
+export function labelWords(label) {
+  let s = String(label || '');
+  s = s.replace(/\s+[—–-]+\s+\$.*$/, '');
+  const i = s.indexOf(': ');
+  if (i > 0) s = s.slice(i + 2);
+  return s.trim();
+}
+
 /** The checkpoints one model did not pass, as words: "formatting, required sections". */
 export function failedWords(model) {
   const dims = model?.step2_analysis?.dimensions || [];
@@ -97,7 +111,7 @@ export function stepsDone(batch) {
  */
 export function judgeOf(project, settings) {
   const own = project?.reasoningLlm?.modelId;
-  if (own) return { modelId: own, label: project.reasoningLlm.label || own, own: true };
+  if (own) return { modelId: own, label: labelWords(project.reasoningLlm.label) || own, own: true };
   const s = settings || {};
   if (s.reasoningModel) return { modelId: s.reasoningModel, label: s.reasoningModel, own: false, source: 'reasoning' };
   if (s.model) return { modelId: s.model, label: s.model, own: false, source: 'default' };

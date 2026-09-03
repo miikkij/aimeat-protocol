@@ -14,6 +14,8 @@
  *   optionProposals · applyOption · stepPrompts · pasteInto · PENDING_*
  * @usage import { runAll, stepPrompts, pasteInto } from './engine.js';
  * @version-history
+ *   v1.0.1 — 2026-09-04 — Progress words and copy-door labels through labelWords; the prompts sent
+ *     to the models keep the stored label as before.
  *   v1.0.0 — 2026-09-04 — Initial; the step logic lifted from calibrator-batch.js v1.1.0 and
  *     calibrator-batch.helpers.js v1.0.0, with the judge resolved by role when the calibration has
  *     no judge of its own.
@@ -22,6 +24,7 @@ import { t } from '/js/i18n.js';
 import { swallowed } from '/js/swallowed.js';
 import { authHeaders } from '/js/services/auth.js';
 import { updateBatch, createVersion } from '/js/services/calibrator.js';
+import { labelWords } from './frame.js';
 
 const x = (key, vars) => t('calpage.' + key, vars);
 
@@ -237,7 +240,7 @@ export async function runStep3(ctx, batch) {
     if (m.step2_analysis?.status !== 'done') continue;
     done++;
     const candidate = (ctx.project.candidateModels || []).find((c) => c.id === m.modelId);
-    say(ctx, x('progress.reflectJudge', { model: m.modelLabel, i: done, n: eligible }));
+    say(ctx, x('progress.reflectJudge', { model: labelWords(m.modelLabel), i: done, n: eligible }));
     const judgeComposed = composeReflection(ctx.project, ctx.version, m);
     let judgeProposals;
     try {
@@ -247,7 +250,7 @@ export async function runStep3(ctx, batch) {
     } catch (e) {
       judgeProposals = { proposals: [], reasoning: '', error: e.message, promptSent: judgeComposed, rawResponse: null };
     }
-    say(ctx, x('progress.reflectSelf', { model: m.modelLabel, i: done, n: eligible }));
+    say(ctx, x('progress.reflectSelf', { model: labelWords(m.modelLabel), i: done, n: eligible }));
     const selfComposed = composeSelf(ctx.project, ctx.version, m);
     let selfProposals;
     try {
@@ -302,11 +305,11 @@ export async function applyOption(ctx, batch, key) {
 export function stepPrompts(step, ctx, batch) {
   const models = batch?.models || [];
   if (step === 'generate') return [{ label: x('promptFor.generate'), text: ctx.version.prompt || '' }];
-  if (step === 'analyze') return models.filter((m) => m.step1_generation?.status === 'done').map((m) => ({ label: m.modelLabel, text: composeAnalysis(ctx.project, ctx.version, m) }));
+  if (step === 'analyze') return models.filter((m) => m.step1_generation?.status === 'done').map((m) => ({ label: labelWords(m.modelLabel), text: composeAnalysis(ctx.project, ctx.version, m) }));
   if (step === 'reflect') {
     return models.filter((m) => m.step2_analysis?.status === 'done').flatMap((m) => [
-      { label: x('promptFor.judge', { model: m.modelLabel }), text: composeReflection(ctx.project, ctx.version, m) },
-      { label: x('promptFor.self', { model: m.modelLabel }), text: composeSelf(ctx.project, ctx.version, m) },
+      { label: x('promptFor.judge', { model: labelWords(m.modelLabel) }), text: composeReflection(ctx.project, ctx.version, m) },
+      { label: x('promptFor.self', { model: labelWords(m.modelLabel) }), text: composeSelf(ctx.project, ctx.version, m) },
     ]);
   }
   return [{ label: x('promptFor.synthesize'), text: composeSynthesis(ctx.project, ctx.version, batch) }];

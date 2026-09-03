@@ -128,6 +128,19 @@ describe('frame: runs', () => {
   });
 });
 
+describe('frame: labels', () => {
+  it('drops the maker prefix and the price the old editor appended', () => {
+    expect(frame.labelWords('Mistral: Mistral Small 4 — $0.15/$0.60 /M')).toBe('Mistral Small 4');
+    expect(frame.labelWords('Qwen: Qwen3.6 Plus — $0.18/$1.07 /M')).toBe('Qwen3.6 Plus');
+    expect(frame.labelWords('Kimi K2.5')).toBe('Kimi K2.5');
+    expect(frame.labelWords('')).toBe('');
+    expect(frame.labelWords(undefined)).toBe('');
+  });
+  it('is applied to a calibration\'s own judge label', () => {
+    expect(frame.judgeOf({ reasoningLlm: { modelId: 'qwen/qwen3.6-plus', label: 'Qwen: Qwen3.6 Plus — $0.18/$1.07 /M' } }, {}).label).toBe('Qwen3.6 Plus');
+  });
+});
+
 describe('frame: the judge', () => {
   it('keeps a calibration\'s own judge, else the AI page\'s reasoning model, else its default', () => {
     expect(frame.judgeOf({ reasoningLlm: { modelId: 'x/own', label: 'Own' } }, { reasoningModel: 'y/r' })).toMatchObject({ modelId: 'x/own', own: true });

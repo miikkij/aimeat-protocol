@@ -10,6 +10,10 @@
  *   box; the version rows and the two editors; the model rows and the picker; the score chart with
  *   its legend; the two roads. NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.0.1 — 2026-09-04 — Seen on aimeat.io: the score column was `auto` with unwrapped labels and
+ *     took the row, the words column shrank to one letter, and the cells' `align-self: center` put
+ *     each bottom rule under its own content instead of on the row. Every column is bounded now,
+ *     labels clip with an ellipsis, cells stretch and centre their content.
  *   v1.0.0 — 2026-09-04 — Initial (replaces calibrator.css v2.1.0).
  */
 
@@ -36,21 +40,23 @@
 .cal-rename .og-input { font-family: var(--font-poster); font-size: 1.6rem; font-weight: var(--font-poster-weight); text-transform: uppercase; }
 
 /* ── The rows: calibrations, runs ──────────────────────────────────────────────────────────── */
-.cal-rows { display: grid; grid-template-columns: minmax(11rem, 1.1fr) auto minmax(0, 1.5fr) auto; gap: 0 1.1rem; align-items: stretch; }
+/* Every column is bounded (minmax(0, …)): a long model label must wrap or clip inside its column,
+   never widen it. An `auto` score column with three unwrapped labels once took the whole row on
+   aimeat.io and left the words column one letter wide. The cells stretch to the row and centre their
+   content inside (align-content), so the bottom rule sits on the row's bottom in every cell. */
+.cal-rows { display: grid; grid-template-columns: minmax(10rem, 1fr) minmax(0, 1.2fr) minmax(0, 1.4fr) auto; gap: 0 1.1rem; align-items: stretch; }
 .cal-row { display: contents; }
 .cal-row > div { padding: .7rem 0; border-bottom: 1px solid var(--border); min-width: 0; display: grid; align-content: center; }
 .cal-row--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
 .cal-row.is-open > div { border-bottom: 0; }
 .cal-row.is-archived .og-tbl-name { color: var(--text-dim); }
-.cal-row > .cal-nm { display: block; align-self: center; }
-.cal-nm small { display: block; margin-top: .15rem; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); }
-.cal-row > .cal-sc { display: block; align-self: center; white-space: nowrap; }
-.cal-sc b { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.5rem; line-height: 1; }
-.cal-sc small { display: block; font-family: var(--font-mono); font-size: .68rem; color: var(--text-dim); }
-.cal-sc--many { display: flex !important; gap: 1rem; flex-wrap: wrap; align-items: flex-end; }
-.cal-sc--many span { display: grid; }
+.cal-nm small { display: block; margin-top: .15rem; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); overflow-wrap: anywhere; }
+.cal-sc b { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.5rem; line-height: 1; white-space: nowrap; }
+.cal-sc small { display: block; max-width: 100%; font-family: var(--font-mono); font-size: .68rem; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal-sc--many { display: flex !important; gap: .6rem 1rem; flex-wrap: wrap; align-items: flex-end; align-content: center; }
+.cal-sc--many span { display: grid; min-width: 0; max-width: 9rem; }
 .cal-sc--many b { font-size: 1.25rem; }
-.cal-row > .cal-w { display: block; align-self: center; font-size: .85rem; line-height: 1.5; color: var(--text-dim); overflow-wrap: anywhere; }
+.cal-row > .cal-w { font-size: .85rem; line-height: 1.5; color: var(--text-dim); overflow-wrap: anywhere; }
 .cal-w b { color: var(--text); font-weight: 800; }
 .cal-row > .cal-go { display: flex; justify-content: flex-end; align-items: center; gap: .8rem; white-space: nowrap; }
 .cal-go .og-door { font-size: .72rem; }
@@ -126,13 +132,13 @@
 .cal-mr > div { padding: .7rem 0; border-bottom: 1px solid var(--border); min-width: 0; display: grid; align-content: center; }
 .cal-mr--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
 .cal-mr.is-open > div { border-bottom: 0; }
-.cal-mr > .cal-role { display: block; align-self: center; font-size: .9rem; font-weight: 800; }
+.cal-mr > .cal-role { font-size: .9rem; font-weight: 800; }
 .cal-role small { display: block; margin-top: .1rem; font-family: var(--font-mono); font-size: .7rem; font-weight: 400; color: var(--text-dim); }
-.cal-mr > .cal-model { display: block; align-self: center; font-size: .9rem; line-height: 1.4; overflow-wrap: anywhere; }
+.cal-mr > .cal-model { font-size: .9rem; line-height: 1.4; overflow-wrap: anywhere; }
 .cal-model b { font-weight: 800; }
 .cal-model code { display: inline-block; margin-left: .4rem; font-family: var(--font-mono); font-size: .72rem; background: var(--bg-dim); padding: .05rem .35rem; }
 .cal-model small { display: block; margin-top: .15rem; font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
-.cal-mr > .cal-facts { display: block; align-self: center; font-family: var(--font-mono); font-size: .74rem; color: var(--text-dim); }
+.cal-mr > .cal-facts { font-family: var(--font-mono); font-size: .74rem; color: var(--text-dim); overflow-wrap: anywhere; }
 .cal-mr > .cal-go { display: flex; justify-content: flex-end; align-items: center; white-space: nowrap; }
 .cal-add { margin-top: .8rem; }
 .cal-add small { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
