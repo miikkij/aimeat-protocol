@@ -31,6 +31,7 @@
       form, the dashed aside, the "what the node sees" list and the log.
     v1.5.0 — 2026-08-29 — The "Legal pages" section (.lg-*): one row per kind with the editor inside
       the row, a sun rule on the recommended ones; the audit log reuses .mk-log.
+    v1.6.0 — 2026-09-03 — The Needs section's chips (.dtl-chips / .dtl-chip): one per cortex or extension.
 */
 
 /* ── Tokens the poster needs on top of the catalog's own ─────────────────────────────────── */
@@ -299,6 +300,9 @@ footer .footer-brand { grid-column: 1 / -1; font-family: var(--font-poster); fon
 #detail-body { counter-reset: dtl-chapter; }
 .dtl-section { background: transparent; border: 0; border-radius: 0; padding: 0; margin: 112px 0 0; counter-increment: dtl-chapter; }
 .dtl-band + .dtl-section { margin-top: 72px; }
+/* What the app needs: the cortexes it loads and the extensions it calls, one chip each. */
+.dtl-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.dtl-chip { font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px; padding: 2px 8px; border: 1px solid var(--text, #111); color: var(--text, #111); background: var(--card-bg, transparent); }
 .dtl-section > h3 {
   display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 12px;
   font-family: var(--font-poster-section); font-weight: var(--font-poster-section-weight); text-transform: uppercase; font-size: 1.9rem; line-height: .95; letter-spacing: -.03em;

@@ -16,6 +16,7 @@
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  *   v1.1.0 — 2026-07-13 — Moved record/type declarations into ./types/* and re-exported them
  *     (max-file-lines); Storage interface + repository wiring stay here
+ *   v1.2.0 — 2026-09-03 — DependencyRepository and ComponentVersionRepository join the Storage composite; their types re-exported.
  */
 
 // ── Re-exported record/type declarations ───────────────────────────
@@ -28,6 +29,8 @@ export * from './types/auth.js';
 export * from './types/commerce.js';
 export * from './types/apps.js';
 export * from './types/organisms-federation.js';
+export * from './types/dependencies.js';
+export * from './types/component-versions.js';
 export * from './types/agents-messaging.js';
 export * from './types/agent-v2-messaging.js';
 export * from './types/agent-v2-tasks.js';
@@ -72,6 +75,8 @@ import type { NotificationTemplateRepository } from './repositories/notification
 import type { KnowledgeRepository } from './repositories/knowledge.repository.js';
 import type { SchedulerRepository } from './repositories/scheduler.repository.js';
 import type { ExtensionInstanceRepository } from './repositories/extension-instance.repository.js';
+import type { DependencyRepository } from './repositories/dependency.repository.js';
+import type { ComponentVersionRepository } from './repositories/component-version.repository.js';
 import type { ReplicationQueueRepository } from './repositories/replication-queue.repository.js';
 import type { DeviceAuthRepository } from './repositories/device-auth.repository.js';
 import type { AgentEnrolmentRepository } from './repositories/agent-enrolment.repository.js';
@@ -118,7 +123,7 @@ export interface Storage extends
   AppRepository, AppMarketplaceRepository, SubdomainSiteRepository, AppGrantRepository, ConfigRepository,
   NotificationTemplateRepository,
   KnowledgeRepository, SchedulerRepository,
-  ExtensionInstanceRepository, ReplicationQueueRepository,
+  ExtensionInstanceRepository, ReplicationQueueRepository, DependencyRepository, ComponentVersionRepository,
   DeviceAuthRepository,
   AgentEnrolmentRepository,
   AgentV2MessagingRepository,

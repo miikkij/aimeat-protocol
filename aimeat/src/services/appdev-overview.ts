@@ -14,6 +14,7 @@
  *   import { buildAppdevOverview } from '../services/appdev-overview.js';
  *   const overview = await buildAppdevOverview(storage, config, identity, { model, sections });
  * @version-history
+ *   v1.2.0 — 2026-09-03 — App items carry `requires` (the dependency map), so an agent sees what exists before rebuilding it.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 5: each app carries its `ai_posture`, and the section
  *     states the disclosure contract. Research-first is the moment to learn this — an agent that
  *     sees which of its own apps already declare copies that wiring instead of re-deriving it.
@@ -27,6 +28,7 @@ import { getLibraryPacks } from '../data/library-packs.js';
 import { getAppTemplateIndex } from '../data/app-templates.js';
 import { getAppdevPitfallIndex, getAppdevPitfallFacets } from '../data/appdev-pitfalls.js';
 import { listSkills, type SkillAccessor } from './skills.js';
+import { dependencyIndex, appRef as depAppRef } from './dependency-map.js';
 import { logger } from '../utils/logger.js';
 
 const CAP = 25;
@@ -101,6 +103,9 @@ export async function buildAppdevOverview(
         const { apps, total } = await storage.listApps({
             limit: CAP + 1, offset: 0, ownerGaii: ownerGhii, viewerGhii: ownerGhii,
         });
+        // What each app loads and calls, from the dependency map: an agent about to build reads
+        // here which cortexes and extensions its owner's apps already lean on, and reuses them.
+        const deps = await dependencyIndex(storage);
         out.apps = {
             items: apps.slice(0, CAP).map(a => ({
                 filename: a.filename,
@@ -111,6 +116,7 @@ export async function buildAppdevOverview(
                 version: a.versionNumber,
                 forkable: a.forkable ?? false,
                 forked_from: a.manifest?.forkedFrom ?? null,
+                requires: deps.byApp.get(depAppRef(a.ownerName, a.filename)) ?? { cortex: [], extensions: [] },
                 // TARGET-058: what this app says about the AI inside it. An agent researching
                 // before a build reads this to find the apps that already do it right and copy
                 // THAT, rather than re-deriving the disclosure wiring from the spec. These are the
@@ -120,7 +126,7 @@ export async function buildAppdevOverview(
             })),
             total,
             truncated: total > CAP,
-            drill_down: 'aimeat_app_get {filename} for metadata; the app URL for source',
+            drill_down: 'aimeat_app_get {filename} for metadata; the app URL for source; GET /v1/dependencies for who uses which cortex and extension',
             ai_transparency: 'An app that generates text/images/audio/video calls '
                 + 'AIMEAT.ai.disclose(r.provenance) so the reader sees the label, attaches the record '
                 + 'to what it stores with AIMEAT.ai.declare(item, r.provenance), and declares '

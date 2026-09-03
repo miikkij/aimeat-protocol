@@ -11,6 +11,7 @@
  *   import { registerExtensionsTools } from './extensions.js';
  *   registerExtensionsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v2.1.0 — 2026-09-03 — extension_list carries installed_by and used_by; extension_get carries used_by (the dependency map).
  *   v2.0.0 — 2026-08-11 — Install, activate, deactivate and delete go through
  *     services/extension-lifecycle.ts instead of calling storage here. Four side effects the HTTP
  *     door has always had were missing on this one: deleting removed the row and left the scheduled
@@ -67,6 +68,7 @@ import { logger } from '../utils/logger.js';
 import { generateUploadToken, buildUploadMeta } from '../services/upload-token.js';
 import { makeExtensionFiles } from '../services/extension-files.js';
 import { annotationsFor } from './annotations.js';
+import { dependencyIndex, dependentsOf, visibleAppRefs, usedBySummary } from '../services/dependency-map.js';
 import { descriptionFor } from './catalog/shape.js';
 import { defineAppIam } from '../services/iam/define-app-iam.js';
 
@@ -81,6 +83,13 @@ export function registerExtensionsTools(
     sessionScopes: string[] = [],
 ): void {
     const agentGaii = getAgentGaii();
+    /** The caller's owner GHII, the key the app listing decides visibility by. */
+    const viewerGhii = () => { const o = parseGAII(agentGaii)?.owner; return o ? `${o}@${config.nodeId}` : undefined; };
+    /** The dependants of one extension, with the names of apps this caller may see. */
+    const usedByFor = async (name: string) => {
+        const { visible } = await visibleAppRefs(storage, viewerGhii());
+        return usedBySummary(await dependentsOf(storage, 'extension', name), visible);
+    };
 
     /**
      * The caller, in the shape canManageExtensionAs() and the install caps expect.
@@ -155,6 +164,10 @@ export function registerExtensionsTools(
         async () => {
             const extensions = await storage.listExtensions();
             const active = extensions.filter(e => e.status === 'active');
+            // Who uses each one, from the dependency map — the same rows GET /v1/extensions carries,
+            // so an agent deciding whether to build or reuse reads what the page reads.
+            const deps = await dependencyIndex(storage);
+            const { visible } = await visibleAppRefs(storage, viewerGhii());
             return {
                 content: [{
                     type: 'text' as const,
@@ -163,6 +176,8 @@ export function registerExtensionsTools(
                         version: ext.version,
                         description: ext.description,
                         author: ext.author,
+                        installed_by: ext.installedBy,
+                        used_by: usedBySummary(deps.byExtension.get(ext.name), visible),
                         actions: ext.actions.map(a => ({
                             id: a.id,
                             method: a.method,
@@ -691,6 +706,7 @@ export function registerExtensionsTools(
                         installed_by: ext.installedBy,
                         installed_at: ext.installedAt,
                         activated_at: ext.activatedAt,
+                        used_by: await usedByFor(name),
                     }, null, 2),
                 }],
             };

@@ -25,6 +25,7 @@
  *     to tell whether it did.
  *   v1.7.0 -- 2026-07-13 -- Add GET /v1/prompts/build-app: the canonical app-building prompt (same
  *     text as the app-catalog Create-new-app button), node-served so agentic coders get the paved path.
+ *   v1.10.0 -- 2026-09-03 -- GET /v1/prompts/build-cortex, registered from routes/prompts-cortex.ts (this file is at the size limit).
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -40,6 +41,7 @@ import { OFFERINGS_HANDBOOK } from '../services/offerings-handbook.js';
 import { buildAppPrompt, buildAppSpecToken } from '../services/build-app-prompt.js';
 import { PLAYBOOKS } from '../services/home-playbooks.js';
 import { buildExtensionPrompt } from '../services/build-extension-prompt.js';
+import { registerBuildCortexPrompt } from './prompts-cortex.js';
 import { buildAppdevFlowPrompt } from '../services/appdev-flow-prompt.js';
 import { HELLO_MCP_KEY, buildHelloMcpPrompt, buildOrganismSetupPrompt } from '../services/hello-mcp.js';
 import { registerIntentPoolPrompt } from './prompts-intent-pool.js';
@@ -316,6 +318,10 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
       { description: 'See it on the market once priced', method: 'GET', url: '/v1/exchange/offerings' },
     ]));
   });
+
+  // GET /v1/prompts/build-cortex — the canonical "build a cortex" prompt, its own module
+  // (routes/prompts-cortex.ts). MUST be registered before /v1/prompts/:tier.
+  registerBuildCortexPrompt(router, config);
 
   // GET /v1/prompts/appdev-flow — the paste-able research-first flow prompt: what a user gives
   // Claude Code / OpenHands to make MCP-connected app building start from research (existing

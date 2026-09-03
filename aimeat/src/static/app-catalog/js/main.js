@@ -16,6 +16,7 @@
  *   v2.4.0 — 2026-08-29 — Marks and authorship: expose marksToggle / marksDeclare / marksWithdraw.
  *   v2.5.0 — 2026-08-29 — Legal pages and audit log: expose legalEdit / legalCancel / legalSave /
  *     legalRemove / legalFormatHint / auditMore.
+ *   v2.6.0 — 2026-09-03 — getServerAppRow handed to initDetail.
  */
 import { t, getLang, setLang, applyI18n } from './i18n.js';
 import { escapeHtml, jsArg, sourceLabel, sourceLabelText, bareOwnerName, sameOwner, filterAttr, isSameOriginUrl, currentOwnerName, generateId, readFileAsText } from './util.js';
@@ -33,7 +34,7 @@ import { legalEdit, legalCancel, legalSave, legalRemove, legalFormatHint, legalS
 import { loadCortexExtensions, showCortexPopup, cortexCopy, getCortexOwnerToken, openCortexEditor, cortexEditorAddLib, cortexEditorSave, cortexEditorExport, closeCortexEditor, openPromptBuilder, closePbPanel, buildPromptFromBuilder, updatePbPreview } from './cortex.js';
 import { initSettings, applyTheme, updateThemeToggle, toggleTheme, getThemePref, openSettings, saveSettings, syncConfigToServer, loadConfigFromServer, closeSettings, openHelp, closeHelp } from './settings.js';
 import { initAppsIo, setEditingAppId, showModal, requireSignInThen, prefillFromHtml, closeModal, switchTab, handleFileDrop, handleSave } from './apps-io.js';
-import { initServerIo, isOperatorSession, showPublishModal, submitPublish, toggleCommunity, switchView, showSubdomainModal, submitSubdomainAssign, unassignSubdomain, closeConsents, openConsents, revokeConsent, toggleBackupMenu, toggleCreateMenu, closeCreateMenu, toggleCortexBar, exportBackupZip, importBackupPick, importBackupFile, backupUpdateSummary, backupSelectAll, submitBackupRestore, loadPublishedApps, refreshFavoritesUI, applyServerFilter, unpublishApp, toggleParkApp, toggleForkApp, deleteServerApp } from './server-io.js';
+import { initServerIo, isOperatorSession, showPublishModal, submitPublish, toggleCommunity, switchView, showSubdomainModal, submitSubdomainAssign, unassignSubdomain, closeConsents, openConsents, revokeConsent, toggleBackupMenu, toggleCreateMenu, closeCreateMenu, toggleCortexBar, exportBackupZip, importBackupPick, importBackupFile, backupUpdateSummary, backupSelectAll, submitBackupRestore, loadPublishedApps, refreshFavoritesUI, applyServerFilter, unpublishApp, toggleParkApp, toggleForkApp, deleteServerApp, getServerAppRow } from './server-io.js';
 import { toggleRow } from './rows.js';
 import { initRender, filterByState, KUNTO_KEYS, setBoundSkillApps, setSort, toggleAllTags, getSortMode, setListingLoaded, isListingLoaded, setServerManifests, setOwnServerApps, setIframeUrl, serverStateByFilename, serverAppManifests, ownAppProtection, ownServerApps, currentIframeUrl, renderTags, filterByTag, launchApp, launchInTab, viewPublished, launchInIframe, renderApps, closeIframe, openExternal, showContextMenu, hideContextMenu, handleContextAction, viewSource, generateSharePrompt, generateHomepagePrompt } from './render.js';
 import { initAppAgents, showAppAgentsModal, agentsDeploy, agentsUndeploy } from './app-agents.js';
@@ -268,7 +269,8 @@ import { toggleFavorite } from './favorites.js';
       getServerManifests: function () { return serverAppManifests; },
       getOwnProtection: function () { return ownAppProtection; },
       setIframeUrl: setIframeUrl, isOperatorSession: isOperatorSession,
-      deleteServerApp: deleteServerApp
+      deleteServerApp: deleteServerApp,
+      getServerAppRow: getServerAppRow
     });
     initAppAgents({ getServerManifests: function () { return serverAppManifests; } });
     initSettings({ generateId: generateId, renderApps: renderApps, loadPublishedApps: loadPublishedApps });

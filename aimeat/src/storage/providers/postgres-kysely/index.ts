@@ -18,6 +18,7 @@
  *   v1.0.0 — 2026-07-15 — Phase 5: provider skeleton + migration runner + memory domain.
  *   v1.1.0 — 2026-08-11 — Storage.transaction(): `db` becomes a getter over an AsyncLocalStorage-
  *     bound transaction, so every existing `this.db` call joins an open one without being changed.
+ *   v1.2.0 — 2026-09-03 — dependencyMethods and componentVersionMethods bound.
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { Kysely, PostgresDialect } from 'kysely';
@@ -79,6 +80,8 @@ import { templateListingMethods } from './methods/template-listings.js';
 import { agentDirectiveMethods, agentActivityMethods, agentWebhookMethods, sharingGroupMethods } from './methods/agent-misc.js';
 import { identityExtraMethods } from './methods/identity-extras.js';
 import { systemPromptMethods, replicationQueueMethods } from './methods/system-extras.js';
+import { dependencyMethods } from './methods/dependencies.js';
+import { componentVersionMethods } from './methods/component-versions.js';
 
 /** Internal helpers the method groups call on `this` but that are NOT part of the public Storage API. */
 interface PgKyselyInternals {
@@ -138,6 +141,8 @@ Object.assign(
   PostgresKyselyStorage.prototype,
   memoryMethods,
   systemMethods,
+  dependencyMethods,
+  componentVersionMethods,
   identityMethods,
   walletMethods,
   sessionMethods,

@@ -6,6 +6,7 @@
  *   /v1/admin/apps/similar, /v1/admin/apps/watermark/decode, /v1/admin/apps/:owner/:filename/moderate,
  *   DELETE /v1/admin/apps/:owner/:filename. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.9.0 — 2026-09-03 — GET /v1/apps carries `requires` per app (the dependency map).
  *   v1.8.0 — 2026-08-29 — The listing carries the legal pages as their state; the text is stripped.
  *   v1.7.0 — 2026-08-29 — The public listing strips `authorshipLog`; the reviewer's name stays public.
  *   v1.6.0 — 2026-08-24 — The catalogue carries `data_map`, on exactly the terms the AI posture
@@ -40,6 +41,7 @@ import type { CanonicalOwner } from './helpers.js';
 import { logger } from '../../utils/logger.js';
 import { appSeoState } from '../../services/app-seo.js';
 import { stripLegalContent } from '../../services/app-legal.js';
+import { dependencyIndex, appRef as depAppRef } from '../../services/dependency-map.js';
 
 export function registerCatalogueAdminRoutes(
     router: Router,
@@ -92,6 +94,8 @@ export function registerCatalogueAdminRoutes(
         for (const [gaii, files] of Object.entries(filesByOwner)) {
             for (const f of files) if (f.key.startsWith('apps/screenshots/')) screenshotKeys.add(`${gaii} ${f.key}`);
         }
+        // What each app needs (cortexes it loads, extensions it calls), from the dependency map.
+        const deps = await dependencyIndex(storage);
 
         const result = apps.map((app) => {
             const metricKey = `${app.ownerGaii} ${app.filename}`;
@@ -170,6 +174,7 @@ export function registerCatalogueAdminRoutes(
                 forks,
                 download_url: `/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}`,
                 screenshot_url: hasScreenshot ? `/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}/screenshot` : null,
+                requires: deps.byApp.get(depAppRef(app.ownerName, app.filename)) ?? { cortex: [], extensions: [] },
                 created_at: app.createdAt,
             };
         });

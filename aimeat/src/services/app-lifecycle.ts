@@ -43,6 +43,7 @@
  *   v1.0.0 — 2026-08-11 — August 2026 audit step 8, unit "apps". Extracted from routes/apps/drafts.ts,
  *     routes/apps/fork-manage.ts, mcp/apps.ts and mcp/apps-fork.ts, which held two copies of each of
  *     these four acts.
+ *   v1.1.0 — 2026-09-03 — A fork refreshes the dependency map for the new app; a delete forgets its edges.
  */
 import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
@@ -58,6 +59,7 @@ import { appQuotaRefusal } from './install-quotas.js';
 import { lintAppAiDisclosure } from './app-ai-posture.js';
 import { publishApp, type PublishAppRefusal, type PublishAppResult } from './app-publish.js';
 import type { DeclaredProvenance } from './ai-provenance.js';
+import { refreshAppDependencies, forgetDependencies, appRef as depAppRef } from './dependency-map.js';
 
 /**
  * What a catalogue filename may look like. One spelling, because four doors used to carry their own
@@ -388,6 +390,10 @@ export async function forkApp(
     ...(source.aiProvenanceId ? { aiProvenanceId: source.aiProvenanceId } : {}),
   });
 
+  // The fork's bytes are the source's, so its dependencies are too; the map gets its own row set.
+  await refreshAppDependencies(storage, { ownerName: callerOwner, filename: newFilename, versionNumber: 1, mimeType: source.mimeType, data: source.data, manifest: forkedManifest })
+    .catch(err => logger.warn('forkApp: dependency map not refreshed', { filename: newFilename, error: String(err) }));
+
   // Copy the source screenshot into the fork's bucket so the fork renders with the same catalogue
   // thumbnail. Best-effort: a missing thumbnail is not worth failing a fork over.
   try {
@@ -490,6 +496,8 @@ export async function deleteOwnedApp(
       // because getAppByOwnerName takes ownerName as the key — but defense in depth.)
       if (app.ownerName !== ownerName) break;
       await storage.deleteApp(app.ownerGaii, filename);
+      await forgetDependencies(storage, 'app', depAppRef(ownerName, filename))
+        .catch(err => logger.warn('deleteOwnedApp: dependency map not cleared', { filename, error: String(err) }));
       await storage.deleteStorageFile(app.ownerGaii, `apps/screenshots/${filename}`)
         .catch(err => { logger.warn('deleteOwnedApp: continuing after a suppressed failure', { error: String(err) }); });
       sweepCount++;

@@ -9,6 +9,7 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   v1.11.0 — 2026-09-03 — Mounts the dependencies router (GET /v1/dependencies).
  *   v1.10.0 — 2026-08-27 — Mount connectInstallRouter (GET /v1/connect/mcp.json — the downloadable
  *     MCP config file, so a client can be attached without walking its settings menu). To make room
  *     for it: pure extraction of the process-level buffers and listeners to process-buffers.ts.
@@ -137,6 +138,7 @@ import { appUiRouter } from '../routes/app-ui.js';
 import { designbookRouter } from '../routes/designbook.js';
 import { appdevPitfallsRouter } from '../routes/appdev-pitfalls.js';
 import { appdevOverviewRouter } from '../routes/appdev-overview.js';
+import { dependenciesRouter } from '../routes/dependencies.js';
 import { libraryPacksRouter } from '../routes/library-packs.js';
 import { appsRouter } from '../routes/apps.js';
 import { appMembersRouter } from '../routes/app-members.js';
@@ -694,6 +696,7 @@ export async function mountRoutes(
   app.use(designbookRouter(config, storage));
   app.use(appdevPitfallsRouter(config, storage));
   app.use(appdevOverviewRouter(config, storage));
+  app.use(dependenciesRouter(config, storage));
   app.use(libraryPacksRouter(config, storage));
   // Backup routes BEFORE appsRouter so /v1/apps/backup/* never collides with
   // the parameterized /v1/apps/:owner/:filename routes.

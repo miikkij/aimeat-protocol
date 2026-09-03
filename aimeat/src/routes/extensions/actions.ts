@@ -7,6 +7,7 @@
  *   consent/trust/notify/email) and runs the action script. Extracted from src/routes/extensions.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.8.0 — 2026-09-03 — An action address may pin a version (name@version) through resolveExtensionForCall; an unknown version is a 404 that says so.
  *   v1.7.0 — 2026-08-10 — Both handlers resolve the gated app through resolveGatedApp instead of
  *     reading config.app directly.
  *   v1.6.0 — 2026-08-10 — Both handlers take their sandbox context from buildExtensionCtx instead
@@ -55,6 +56,7 @@ import { recordCallDuration } from '../../services/call-timing.js';
 import { getEncryptionKey } from '../../services/encryption.js';
 import { getExtSecretKeys, getInstanceSecretKeys, decryptSecretFields } from '../../services/extension-secrets.js';
 import type { EmailService } from '../../services/email.js';
+import { resolveExtensionForCall } from '../../services/component-versions.js';
 
 export function registerExtensionActionRoutes(router: Router, config: AimeatConfig, storage: Storage, emailService?: EmailService): void {
   // ── GET /v1/ext-hash — the node's published ctx.hash, as source ──
@@ -76,7 +78,9 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
 
   // ── POST /v1/ext/:extName/:instanceId/:actionId — Instance-scoped action execution ──
   router.post('/v1/ext/:extName/:instanceId/:actionId', requireAuth(), async (req, res) => {
-    const extName = req.params.extName as string;
+    // `:extName` may pin a version (`name@1.2.0`): the call then runs that kept version's code.
+    const resolved = await resolveExtensionForCall(storage, req.params.extName as string);
+    const extName = resolved.name;
     const instanceId = req.params.instanceId as string;
     const actionId = req.params.actionId as string;
     const callerGaii = resolveIdentity(req.auth!, config.nodeId);
@@ -86,11 +90,13 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
 
     try {
       // Look up the extension
-      const ext = await storage.getExtension(extName);
-      if (!ext) {
-        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${extName}" not found`));
+      if (!resolved.ok) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', resolved.reason === 'version'
+          ? `Version "${resolved.pinned}" of extension "${extName}" is not kept on this node`
+          : `Extension "${extName}" not found`));
         return;
       }
+      const ext = resolved.ext;
 
       // Extension must be active
       if (ext.status !== 'active') {
@@ -245,7 +251,10 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
 
   // ── POST /v1/ext/:extName/:actionId — Dynamic action execution ──
   router.post('/v1/ext/:extName/:actionId', requireAuth(), async (req, res) => {
-    const extName = req.params.extName as string;
+    // `:extName` may pin a version (`name@1.2.0`): the call then runs that kept version's code,
+    // with the live record's status, settings and instances.
+    const resolved = await resolveExtensionForCall(storage, req.params.extName as string);
+    const extName = resolved.name;
     const actionId = req.params.actionId as string;
     const callerGaii = resolveIdentity(req.auth!, config.nodeId);
     // Who PAYS and whose namespace this runs in is `callerGaii`; who ACTED may be a hosted app, and
@@ -254,11 +263,13 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
 
     try {
       // Look up the extension
-      const ext = await storage.getExtension(extName);
-      if (!ext) {
-        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${extName}" not found`));
+      if (!resolved.ok) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', resolved.reason === 'version'
+          ? `Version "${resolved.pinned}" of extension "${extName}" is not kept on this node`
+          : `Extension "${extName}" not found`));
         return;
       }
+      const ext = resolved.ext;
 
       // Extension must be active
       if (ext.status !== 'active') {

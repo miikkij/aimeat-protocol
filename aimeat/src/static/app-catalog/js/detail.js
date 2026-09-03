@@ -34,6 +34,7 @@
  *     weekend, and the stamps cannot tell those apart.
  *   2026-08-25 — The data map section, between ABOUT and EDIT WITH AI. Until it existed the map
  *     was written, stamped and summarised everywhere and there was nowhere to read one in full.
+ *   v1.8.0 — 2026-09-03 — A Needs section: the cortexes the app loads and the extensions it calls, from the server row's `requires`.
  *   v1.7.0 — 2026-08-17 — Delete deletes: the Actions button routes an own published app to the
  *     node delete (it only emptied a page-session record before, so the app came back), is hidden
  *     on an app that is not ours, and the duplicate "Remove from server" leaves the manage row.
@@ -75,9 +76,9 @@ import { saveWorkingCopy, loadCheckpoints, getCheckpoints, readCheckpoint, delet
 
 // Injected once at bootstrap by main.js. Functions are main-local; the get* return main's LIVE
 // state (so reads + in-place mutations propagate across the reassignments main does each render).
-let refreshAll, loadPublishedApps, renderApps, updateModeToggle, getCortexOwnerToken, launchApp, viewPublished, viewSource, generateId, generateSharePrompt, openPromptBuilder, showPublishModal, getMainApps, getServerState, getServerManifests, getOwnProtection, setIframeUrl, isOperatorSession, deleteServerApp;
+let refreshAll, loadPublishedApps, renderApps, updateModeToggle, getCortexOwnerToken, launchApp, viewPublished, viewSource, generateId, generateSharePrompt, openPromptBuilder, showPublishModal, getMainApps, getServerState, getServerManifests, getOwnProtection, setIframeUrl, isOperatorSession, deleteServerApp, getServerAppRow;
 export function initDetail(deps) {
-  ({ refreshAll, loadPublishedApps, renderApps, updateModeToggle, getCortexOwnerToken, launchApp, viewPublished, viewSource, generateId, generateSharePrompt, openPromptBuilder, showPublishModal, getMainApps, getServerState, getServerManifests, getOwnProtection, setIframeUrl, isOperatorSession, deleteServerApp } = deps);
+  ({ refreshAll, loadPublishedApps, renderApps, updateModeToggle, getCortexOwnerToken, launchApp, viewPublished, viewSource, generateId, generateSharePrompt, openPromptBuilder, showPublishModal, getMainApps, getServerState, getServerManifests, getOwnProtection, setIframeUrl, isOperatorSession, deleteServerApp, getServerAppRow } = deps);
 }
 
 // ── App Detail View ───────────────────────────────
@@ -565,6 +566,27 @@ function renderDetailView() {
       '</div>';
   }
 
+  // ── NEEDS: the cortexes this app loads and the extensions it calls, from the dependency map the
+  // listing carries (read from the published source at publish; a pinned version shows after @). ──
+  var requiresHtml = '';
+  if (hasServer && app.published && typeof getServerAppRow === 'function') {
+    var srvRow = getServerAppRow(detailServerOwner(app), app.publishedFilename || app.filename);
+    var req = srvRow && srvRow.requires ? srvRow.requires : null;
+    var reqNames = [];
+    if (req) {
+      (req.cortex || []).forEach(function (d) { reqNames.push(escapeHtml(d.pinned ? d.name + '@' + d.pinned : d.name)); });
+      (req.extensions || []).forEach(function (d) { reqNames.push(escapeHtml(d.pinned ? d.name + '@' + d.pinned : d.name)); });
+    }
+    requiresHtml =
+      '<div class="dtl-section">' +
+        '<h3>' + t('detail.requires') + '</h3>' +
+        '<p class="dtl-desc">' + t('detail.requiresHint') + '</p>' +
+        (reqNames.length
+          ? '<div class="dtl-chips">' + reqNames.map(function (n) { return '<span class="dtl-chip">' + n + '</span>'; }).join('') + '</div>'
+          : '<span style="color:var(--text-muted);font-size:.85rem">' + t('detail.requiresNone') + '</span>') +
+      '</div>';
+  }
+
   // ── VERSIONS ──
   var versionsHtml =
     '<div class="dtl-section">' +
@@ -770,7 +792,7 @@ function renderDetailView() {
   var bodyEl = document.getElementById('detail-body');
   bodyEl.innerHTML =
     heroHtml + bandHtml +
-    statusHtml + aiHtml + aboutHtml + dataMapHtml + historyHtml + versionsHtml +
+    statusHtml + aiHtml + aboutHtml + dataMapHtml + requiresHtml + historyHtml + versionsHtml +
     mgmtHtml + skillsHtml + seoHtml + marksHtml + legalHtml + promoteHtml + odpsHtml + monetizeHtml + costHtml + agentsHtml + actionsHtml;
   // The chapter number over every headline ("03 / 09") is a CSS counter; only the total needs
   // counting here, and it goes on the body as a string so the stylesheet can print it. Counted

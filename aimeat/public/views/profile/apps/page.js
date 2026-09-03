@@ -13,6 +13,7 @@
  * @usage import { renderPage } from './apps/page.js';
  * @version-history
  *   v1.0.0 — 2026-09-02 — Initial.
+ *   v1.1.0 — 2026-09-03 — A newest row says what the app needs (requiresLine): the cortexes it loads and the extensions it calls, with a pinned version after the at sign.
  */
 import { h } from 'preact';
 import htm from 'htm';
@@ -209,7 +210,7 @@ function secNewest(ctx, apps) {
           return html`
             <div class="ap-av" key=${'a' + ref} aria-hidden="true">${initials(nameOf(app))}</div>
             <div class="ap-nm" key=${'n' + ref}>${nameOf(app)}<small>${a('rowMeta', { version: app.manifest?.version || '', n: app.version_number || 1, date: day(app.created_at), size: kb(app.size) })}</small></div>
-            <div class="ap-ds" key=${'d' + ref}>${app.manifest?.descriptions?.[getLocale()] || app.manifest?.description || ''}</div>
+            <div class="ap-ds" key=${'d' + ref}>${app.manifest?.descriptions?.[getLocale()] || app.manifest?.description || ''}${requiresLine(app)}</div>
             <div class="ap-st" key=${'s' + ref}>${noteFor(app, flags, grantRefs, legal)}</div>
             <div class="ap-op" key=${'o' + ref}>${app.downloads || 0}</div>
             <div class="ap-go" key=${'g' + ref}>
@@ -220,6 +221,18 @@ function secNewest(ctx, apps) {
       </div>
       <p class="ap-hint">${a('newestHint')}</p>
     <//>`;
+}
+
+/**
+ * What the app loads and calls, from the dependency map the list carries: the cortexes and
+ * extensions by name, with the version when the app pinned one.
+ */
+function requiresLine(app) {
+  const r = app.requires;
+  if (!r) return null;
+  const names = [...(r.cortex || []), ...(r.extensions || [])].map((d) => d.pinned ? `${d.name}@${d.pinned}` : d.name);
+  if (!names.length) return null;
+  return html`<small class="ap-req">${a('requires', { list: names.join(' · ') })}</small>`;
 }
 
 /* ── The first step, when there is nothing yet ────────────────────────────────────────────────── */

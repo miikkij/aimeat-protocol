@@ -1272,6 +1272,27 @@ export interface Extension {
   version: string;
 }
 
+export interface ComponentVersion {
+  kind: string;
+  name: string;
+  version: string;
+  snapshot: Json;
+  bytes: Generated<number>;
+  createdAt: Generated<Timestamp>;
+  createdBy: string;
+}
+
+export interface DependencyEdge {
+  fromKind: string;
+  fromRef: string;
+  fromVersion: string;
+  toKind: string;
+  toName: string;
+  toVersion: string | null;
+  via: string;
+  updatedAt: Generated<Timestamp>;
+}
+
 export interface ExtensionInstance {
   config: Generated<Json>;
   createdAt: Generated<Timestamp>;
@@ -2191,6 +2212,8 @@ export interface DB {
   ExecutionLog: ExecutionLog;
   Extension: Extension;
   ExtensionInstance: ExtensionInstance;
+  DependencyEdge: DependencyEdge;
+  ComponentVersion: ComponentVersion;
   FederationPeer: FederationPeer;
   FinanceCounter: FinanceCounter;
   FinanceFiscalYear: FinanceFiscalYear;

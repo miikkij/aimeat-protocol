@@ -21,6 +21,7 @@
  *   v2.1.0 — 2026-08-28 — The poster face: rows are numbered index lines with a panel (the doors
  *     as a slab and underlined words, one line about who published it and when); a filtered-out
  *     row's panel hides with it.
+ *   v2.3.0 — 2026-09-03 — getServerAppRow(owner, filename): the server's own row for one app, for the detail's Needs section.
  */
 import { escapeHtml, jsArg, bareOwnerName, sameOwner, filterAttr } from './util.js';
 import { getAllApps, saveApp } from './db.js';
@@ -44,6 +45,15 @@ export function initServerIo(deps) {
 // Cache of the last full server-app list (own + community) + base URL, so a favourite toggle can
 // re-render the favourites view + all star states without a network round-trip.
 let lastAllServerApps = [];
+
+/** The server's own row for one app (owner + filename), as the last listing returned it; null if unlisted. */
+function getServerAppRow(owner, filename) {
+  for (var i = 0; i < (lastAllServerApps || []).length; i++) {
+    var sa = lastAllServerApps[i];
+    if (sameOwner(sa.owner, owner) && sa.filename === filename) return sa;
+  }
+  return null;
+}
 let lastCommunityApps = [];
 let lastAimeatUrl = '';
 
@@ -1213,6 +1223,7 @@ export {
   refreshFavoritesUI,
   rerenderServerLists,
   getCommunityApps,
+  getServerAppRow,
   getFavoriteServerApps,
   applyServerFilter,
   unpublishApp,

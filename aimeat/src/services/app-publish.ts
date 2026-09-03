@@ -39,6 +39,7 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   v1.8.0 — 2026-09-03 — A publish refreshes the dependency map from the published source.
  *   v1.7.0 — 2026-08-29 — `legal` (the app's own pages) carries forward on a republish.
  *   v1.6.0 — 2026-08-29 — `marks`, `authorship` and `authorshipLog` carry forward on a republish.
  *   v1.5.0 — 2026-08-27 — The build track (TARGET-074): `<meta name="aimeat-track">` in the app's
@@ -87,6 +88,7 @@ import { ensureAppSubdomain } from '../routes/subdomains.js';
 import { appSeoIndexable } from './app-seo.js';
 import { submitToIndexNow, appSubmitUrls } from './indexnow.js';
 import { logger } from '../utils/logger.js';
+import { refreshAppDependencies } from './dependency-map.js';
 
 /**
  * The manifest fields a caller may state. **`undefined` means "not mentioned"** and is filled from
@@ -400,6 +402,11 @@ export async function publishApp(
     createdAt: new Date().toISOString(),
     ...(aiProvenanceId ? { aiProvenanceId } : {}),
   });
+
+  // The dependency map follows the bytes: what this version loads and calls, read from the source
+  // just stored, replaces whatever the previous version had. Best-effort, the publish stands.
+  await refreshAppDependencies(storage, { ownerName, filename, versionNumber: newVersion, mimeType, data, manifest })
+    .catch(err => logger.warn('publishApp: dependency map not refreshed', { filename, owner: ownerName, error: String(err) }));
 
   const downloadUrl = `/v1/apps/${encodeURIComponent(ownerName)}/${encodeURIComponent(filename)}`;
   const now = new Date().toISOString();

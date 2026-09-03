@@ -10899,6 +10899,35 @@ paths:
                               `spec_check.status` ok | stale | missing | skipped.
                             example: atelier-3c81f0a29b4d
 
+  /v1/prompts/build-cortex:
+    get:
+      operationId: getBuildCortexPrompt
+      summary: Canonical "build an AIMEAT cortex" prompt
+      description: >-
+        The node-served, single-source-of-truth cortex-building prompt: the manifest and its
+        components, the browser library and its api_surface, install and update (POST /v1/cortex,
+        PUT /v1/cortex/{name}), versions and the pinned address, and the dependency map to read
+        before building. The Extensions tab used to carry its own copy of this text. data.prompt is
+        the complete copy-paste prompt; data.body the platform core. Public.
+      tags:
+        - Discovery
+      parameters:
+        - name: lang
+          in: query
+          schema: { type: string, default: en }
+        - name: owner
+          in: query
+          schema: { type: string }
+        - name: idea
+          in: query
+          schema: { type: string }
+        - name: format
+          in: query
+          description: txt returns text/plain
+          schema: { type: string, enum: [txt] }
+      responses:
+        '200':
+          description: data.prompt, data.body, data.lang
   /v1/prompts/build-extension:
     get:
       operationId: getBuildExtensionPrompt
@@ -33037,6 +33066,83 @@ paths:
           $ref: '#/components/responses/NotFound'
 
   # ── Extensions ───────────────────────────────────────────
+  /v1/extensions/{name}/versions:
+    get:
+      operationId: listExtensionVersions
+      summary: The kept versions of an extension, newest first
+      description: >-
+        Every install and update keeps a snapshot of the extension (its actions with their scripts,
+        limits and required APIs). An address that pins a version, `/v1/ext/<name>@<version>/<action>`,
+        runs that snapshot's code with the live record's status, settings and instances; the bare
+        address runs the latest. An app built against one version keeps running it after the
+        extension moves on; the dependency map records which version each app pinned.
+      tags: [Extensions]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: data.name, data.current, data.versions[] (version, created_at, created_by, bytes, call_url), data.total
+        '404':
+          description: No such extension
+
+  /v1/cortex/{name}/versions:
+    get:
+      operationId: listCortexVersions
+      summary: The kept versions of a cortex, newest first
+      description: >-
+        Every install and update keeps a snapshot of the cortex (manifest, components, library
+        files). An address that pins a version, `/v1/cortex/<name>@<version>/libs/<file>`, serves
+        that snapshot's bytes (cacheable, immutable); the bare address serves the latest and is
+        never cached. An app built against one version keeps loading it after the cortex moves on.
+      tags: [Cortex]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: data.name, data.current, data.versions[] (version, created_at, created_by, bytes, lib_url), data.total
+        '404':
+          description: No such cortex
+
+  /v1/dependencies:
+    get:
+      operationId: getDependencyMap
+      summary: The dependency map — who uses an extension or a cortex, and what an app needs
+      description: >-
+        Read from the served bytes at publish and install time, never written by hand: an app that
+        loads a cortex carries `/v1/cortex/<name>/libs/…` in its HTML, and an app or a cortex library
+        that calls an extension carries `/v1/ext/<name>/…`. The app manifest's usesCortex is merged
+        in as a declared edge. A pinned address (`<name>@1.2.0`) records the version; a bare one
+        records null (the latest). With `extension` or `cortex` the answer is who uses it (apps and
+        cortexes); with `app` (owner/filename) it is what the app needs; with no filter it is the
+        whole map, which is what an agent reads before building so it reuses what exists. Parked or
+        operator-hidden apps are counted for everyone and named only to their owner. The extension,
+        cortex and app lists carry the same rows as `used_by` and `requires`.
+      tags: [Discovery]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: extension
+          in: query
+          schema: { type: string }
+        - name: cortex
+          in: query
+          schema: { type: string }
+        - name: app
+          in: query
+          description: owner/filename
+          schema: { type: string }
+      responses:
+        '200':
+          description: data.used_by (apps, apps_total, cortexes) · data.requires (cortex, extensions) · or data.extensions + data.cortexes + data.apps for the whole map
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /v1/extensions:
     get:
       operationId: listExtensions

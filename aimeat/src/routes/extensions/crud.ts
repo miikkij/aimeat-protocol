@@ -14,11 +14,12 @@
  *                         tools now call too. These handlers keep the permission decision, the
  *                         envelope and the wording; the quota, the secret handling, the swap, the
  *                         schedule bookkeeping and the memory cleanup are one implementation.
+ *   v1.3.0 — 2026-09-03 — GET /v1/extensions is optionalAuth and carries installedBy, used_by and the manifest schedules; the detail carries versions; GET /:name/versions.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { requireAuth, requireScope, optionalAuth } from '../../auth/middleware.js';
+import { requireAuth, requireScope, requireAnyScope, optionalAuth } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import type { Scheduler } from '../../services/scheduler.js';
@@ -28,6 +29,8 @@ import {
 } from '../../services/extension-lifecycle.js';
 import { ExtensionInstallSchema, validateBody } from '../../models/schemas.js';
 import { getExtSecretKeys, maskSecretFields } from '../../services/extension-secrets.js';
+import { dependencyIndex, visibleAppRefs, usedBySummary } from '../../services/dependency-map.js';
+import { listVersions } from '../../services/component-versions.js';
 import { buildExtensionRecordFromManifest } from './manifest.js';
 import { hasExtWritePermission, canManageInstalledExt } from './permissions.js';
 import { generateUploadToken, buildUploadMeta } from '../../services/upload-token.js';
@@ -35,9 +38,13 @@ import { resolveIdentity } from '../../utils/gaii.js';
 
 export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig, storage: Storage, scheduler?: Scheduler): void {
   // ── GET /v1/extensions — List installed extensions ────────────
-  router.get('/v1/extensions', async (_req, res) => {
+  router.get('/v1/extensions', optionalAuth(), async (req, res) => {
     try {
       const extensions = await storage.listExtensions();
+      // Who calls each extension (apps and cortexes), from the dependency map: one read for the list.
+      // Names of parked or hidden apps go only to their owner; the counts go to everyone.
+      const deps = await dependencyIndex(storage);
+      const { visible } = await visibleAppRefs(storage, req.auth?.owner ? `${req.auth.owner}@${config.nodeId}` : undefined);
       res.json(success(config.nodeId, {
         extensions: extensions.map(ext => ({
           name: ext.name,
@@ -45,6 +52,14 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
           description: ext.description,
           author: ext.author,
           status: ext.status,
+          // The list said nothing about whose an extension is, so a page listing "your" extensions
+          // showed every owner's with a stop button the server then refused.
+          installedBy: ext.installedBy,
+          used_by: usedBySummary(deps.byExtension.get(ext.name), visible),
+          // The schedules the manifest declares (id, cron, action), so a list can say "runs on a
+          // clock" without reading every extension's detail. Their last runs are the scheduler's.
+          schedules: (Array.isArray(ext.config?.__schedules) ? ext.config.__schedules as Array<Record<string, unknown>> : [])
+            .map(s => ({ id: s.id, cron: s.cron, action: s.action })),
           actionCount: ext.actions.length,
           actions: ext.actions.map(a => ({ id: a.id, method: a.method })),
           requiredApis: ext.requiredApis,
@@ -285,6 +300,8 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       res.json(success(config.nodeId, {
         extension: {
           ...ext,
+          // The kept versions, newest first; `/v1/ext/<name>@<version>/<action>` runs one of them.
+          versions: (await listVersions(storage, 'extension', name)).map(v => ({ version: v.version, created_at: v.createdAt })),
           // Never return secret config values (or the internal __secretKeys marker) — masked instead.
           config: maskSecretFields(ext.config, getExtSecretKeys(ext)),
           actions: ext.actions.map(a => ({
@@ -305,6 +322,22 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       logger.error('Failed to get extension', { error: (err as Error).message });
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to get extension'));
     }
+  });
+
+  // ── GET /v1/extensions/:name/versions — the kept versions, newest first ──
+  router.get('/v1/extensions/:name/versions', requireAuth(), requireAnyScope('memory:read', 'app:write', 'cortex:write'), async (req, res) => {
+    const name = req.params.name as string;
+    const ext = await storage.getExtension(name);
+    if (!ext) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found`));
+      return;
+    }
+    const versions = await listVersions(storage, 'extension', name);
+    res.json(success(config.nodeId, {
+      name, current: ext.version,
+      versions: versions.map(v => ({ version: v.version, created_at: v.createdAt, created_by: v.createdBy, bytes: v.bytes, call_url: `/v1/ext/${encodeURIComponent(name)}@${v.version}/{action}` })),
+      total: versions.length,
+    }));
   });
 
   // ── GET /v1/extensions/:name/actions/:actionId — Get action script content ──
