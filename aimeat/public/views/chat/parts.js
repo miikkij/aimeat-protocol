@@ -16,6 +16,7 @@
  *   - StatusBar — which agent, what is left to spend, and what is wrong when something is
  * @usage import { ThreadList, Turn, Composer, StatusBar } from './chat/parts.js';
  * @version-history
+ *   v1.3.1 — 2026-09-03 — The "use your own key" link goes to ?tab=ai, the AI page's route id.
  *   v1.3.0 — 2026-08-28 — ThreadList takes children, rendered under the list: the rail now carries
  *     everything that is not the conversation (the poster chat, vertical space first).
  *   v1.2.0 — 2026-08-17 — StatusBar speaks human: "Your agent" with the raw GAII in the tooltip
@@ -544,7 +545,7 @@ export function StatusBar({ status, onReset }) {
             <span class="chat-status-agent" title=${status.agent_name}>${tr('chat.statusYourAgent', 'Your agent')}</span>
             ${payer && html`<span class="chat-status-key">${payer()}</span>`}
             ${elsewhere && html`<span class="chat-status-elsewhere">${elsewhere}</span>`}
-            ${ownKeyLink && html`<a class="chat-status-ownkey" href="/v1/profile?tab=generator">${ownKeyLink} →</a>`}
+            ${ownKeyLink && html`<a class="chat-status-ownkey" href="/v1/profile?tab=ai">${ownKeyLink} →</a>`}
             ${status.model && html`<span class="chat-model chat-status-model"
                 title=${tr('chat.modelTitle', 'The model that answered this turn')}>${status.model}</span>`}
             ${onReset && html`

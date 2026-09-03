@@ -1,0 +1,124 @@
+/**
+ * @file ai-poster.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The AI page in the poster face (ai- prefix; design canvas "AIMEAT Tekoäly-sivu",
+ *   direction A). The shared parts come from organism.css's og- rules; this file carries what the
+ *   page adds: the connection rows (a label, the words, the doors) with the provider choice and the
+ *   key field, the model rows (role, model with price, what it does, the door) and the picker that
+ *   opens under one, the budget bar, the app table with caps written on the row, the chart frame,
+ *   and the fine-tuning fields.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-03 — Initial.
+ */
+
+.og-ai .og-door:disabled, .og-ai .og-slab:disabled { opacity: .5; cursor: default; }
+.og-ai .og-doors > a { text-decoration: none; }
+.og-ai .og-slab--sm { padding: .55rem .9rem; font-size: .74rem; }
+.ai-hint { margin: .7rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--text-dim); }
+.ai-para { margin: 0 0 .6rem; font-size: .95rem; line-height: 1.55; color: var(--text); }
+.ai-empty { margin: 0; padding: .3rem 0 .8rem; font-size: .95rem; line-height: 1.55; font-weight: 600; color: var(--text-dim); }
+.ai-empty b { color: var(--text); font-weight: 800; }
+.ai-msg { display: block; margin-top: .4rem; font-size: .82rem; line-height: 1.5; color: var(--success-fg); }
+.ai-msg.is-err { color: var(--accent); }
+.is-warn { color: var(--accent); }
+
+/* ── Label / words / doors rows (connection, budget facts, fine-tuning) ─────────────────────── */
+.ai-kv { display: grid; grid-template-columns: minmax(7rem, 10rem) minmax(0, 1fr); gap: .8rem 1.2rem; align-items: start; margin-top: .4rem; }
+.ai-k { font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); line-height: 1.8; padding-top: .2rem; }
+.ai-v { font-size: .92rem; line-height: 1.5; color: var(--text); min-width: 0; overflow-wrap: anywhere; }
+.ai-v small { display: block; margin-top: .2rem; font-size: .8rem; line-height: 1.5; color: var(--text-dim); }
+.ai-v code, .ai-rule code { display: inline-block; max-width: 100%; margin: .1rem 0; font-family: var(--font-mono); font-size: .74rem; background: var(--bg-dim); padding: .1rem .35rem; overflow-wrap: anywhere; }
+.ai-v .og-doors { margin-top: .6rem; }
+.ai-radios { display: flex; flex-wrap: wrap; gap: .4rem 1.4rem; }
+.ai-radio { display: inline-flex; align-items: center; gap: .5rem; font-size: .9rem; font-weight: 600; color: var(--text); cursor: pointer; }
+.ai-radio input { accent-color: var(--text); width: 1rem; height: 1rem; margin: 0; }
+.ai-field { display: flex; align-items: center; gap: .8rem; padding: .5rem .7rem; border: 1px dashed var(--text); background: var(--bg-dim); margin-top: .4rem; }
+.ai-field .og-input { flex: 1 1 auto; min-width: 0; }
+.ai-field .og-door { font-size: .72rem; flex: none; white-space: nowrap; }
+.ai-num { width: 7rem; }
+.ai-inline { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1rem; }
+.ai-inline label { font-size: .85rem; color: var(--text-dim); }
+.ai-check { display: inline-flex; align-items: center; gap: .5rem; font-size: .9rem; color: var(--text); }
+.ai-check input { accent-color: var(--text); width: 1rem; height: 1rem; margin: 0; }
+
+/* ── The model rows: role, model, what it does, the door ───────────────────────────────────── */
+.ai-rl { display: grid; grid-template-columns: 9rem minmax(0, 1.2fr) minmax(0, 1fr) auto; gap: 0 1rem; align-items: stretch; }
+.ai-r { display: contents; }
+.ai-r > div { padding: .7rem 0; border-bottom: 1px solid var(--border); min-width: 0; display: grid; align-content: center; }
+.ai-r--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.ai-r.is-open > div { border-bottom: 0; }
+.ai-r > .ai-role { display: block; align-self: center; font-size: .9rem; font-weight: 800; color: var(--text); }
+.ai-role small { display: block; margin-top: .1rem; font-family: var(--font-mono); font-size: .7rem; font-weight: 400; color: var(--text-dim); }
+.ai-r > .ai-model { display: block; align-self: center; font-size: .9rem; font-weight: 600; line-height: 1.4; color: var(--text); overflow-wrap: anywhere; }
+.ai-model code { font-family: var(--font-mono); font-size: .74rem; font-weight: 500; background: var(--bg-dim); padding: .05rem .35rem; }
+.ai-model small { display: block; margin-top: .15rem; font-family: var(--font-mono); font-size: .72rem; font-weight: 400; color: var(--text-dim); }
+.ai-model .is-unset { color: var(--text-dim); font-weight: 400; }
+.ai-r > .ai-what { display: block; align-self: center; font-size: .85rem; line-height: 1.5; color: var(--text-dim); }
+.ai-r > .ai-go { display: flex; justify-content: flex-end; align-items: center; gap: .8rem; white-space: nowrap; }
+.ai-go .og-door { font-size: .72rem; }
+.ai-r > .ai-open { grid-column: 1 / -1; display: block; margin: 0 0 .4rem; padding: 1rem 1.2rem 1.1rem; border: 3px solid var(--text); box-shadow: 8px 8px 0 var(--sun); background: var(--card-bg); font-size: .9rem; line-height: 1.55; color: var(--text); }
+.ai-lead { margin: 0 0 .5rem; font-size: .95rem; line-height: 1.55; }
+.ai-open .og-doors { margin-top: .9rem; }
+
+/* ── The picker under an opened row ────────────────────────────────────────────────────────── */
+.ai-pick { margin-top: .5rem; border: 2px solid var(--text); background: var(--bg); }
+.ai-pick .og-input { border: 0; border-bottom: 2px solid var(--text); }
+.ai-pick-group { padding: .4rem .75rem .1rem; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.ai-pick-list { list-style: none; margin: 0; padding: 0; max-height: 24rem; overflow: auto; }
+.ai-pick-row { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) auto auto; gap: 0 .9rem; align-items: center; padding: .45rem .75rem; border-bottom: 1px solid var(--border); }
+.ai-pick-row.is-on { background: var(--sun); color: var(--on-sun); }
+.ai-pick-btn { display: contents; }
+.ai-pick-row b { font-size: .85rem; font-weight: 800; color: var(--text); }
+.ai-pick-row code { display: block; font-family: var(--font-mono); font-size: .68rem; color: var(--text-dim); }
+.ai-pick-row .ai-pick-trait { font-size: .78rem; color: var(--text-dim); }
+.ai-pick-row .ai-pick-price, .ai-pick-row .ai-pick-ctx { font-family: var(--font-mono); font-size: .72rem; text-align: right; white-space: nowrap; }
+.ai-pick-row .ai-pick-ctx { color: var(--text-dim); }
+.ai-pick-row.is-on b, .ai-pick-row.is-on code, .ai-pick-row.is-on .ai-pick-trait, .ai-pick-row.is-on .ai-pick-ctx { color: var(--on-sun); }
+.ai-pick-row a { color: inherit; text-decoration: none; }
+.ai-pick-row button { all: unset; cursor: pointer; display: contents; }
+.ai-pick-more { display: flex; align-items: center; gap: 1rem; padding: .5rem .75rem; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); }
+.ai-pick-more .og-door { font-size: .7rem; }
+.ai-pick-empty { padding: .6rem .75rem; font-size: .85rem; color: var(--text-dim); }
+.ai-stt-result { margin-top: .6rem; padding: .6rem .75rem; border: 1px solid var(--border); background: var(--bg); font-size: .88rem; line-height: 1.5; }
+.ai-stt-result small { display: block; margin-top: .2rem; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); }
+
+/* ── The budget bar and the app table ──────────────────────────────────────────────────────── */
+.ai-bar { position: relative; height: 1.6rem; border: 2px solid var(--text); background: var(--card-bg); margin-top: .5rem; overflow: hidden; }
+.ai-bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--sun); }
+.ai-bar i.is-warn { background: var(--accent); }
+.ai-bar span { position: absolute; left: .6rem; top: 0; line-height: 1.4rem; font-family: var(--font-mono); font-size: .74rem; color: var(--text); }
+.ai-apps { display: grid; grid-template-columns: minmax(0, 1.4fr) 6rem 6rem 7.5rem 5.5rem; gap: 0 .9rem; margin-top: .6rem; font-size: .86rem; line-height: 1.5; }
+.ai-apps > div { padding: .5rem 0; border-bottom: 1px solid var(--border); min-width: 0; overflow-wrap: anywhere; }
+.ai-apps .ai-h { padding: 0 0 .3rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.ai-apps .ai-n { text-align: right; font-family: var(--font-mono); font-size: .78rem; color: var(--text); }
+.ai-apps .ai-n.is-dim { color: var(--text-dim); }
+.ai-apps .ai-app b { font-weight: 800; }
+.ai-apps .ai-app small { display: block; font-family: var(--font-mono); font-size: .68rem; color: var(--text-dim); }
+.ai-apps .ai-cap { text-align: right; font-family: var(--font-mono); font-size: .78rem; color: var(--text-dim); }
+.ai-apps .ai-cap .og-input { width: 5.5rem; padding: .15rem .4rem; font-size: .78rem; text-align: right; }
+.ai-more { display: flex; align-items: center; gap: 1rem; margin-top: .6rem; flex-wrap: wrap; }
+.ai-more small { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
+.ai-chart { margin-top: .6rem; padding: .6rem .6rem .2rem; border: 2px solid var(--text); background: var(--card-bg); }
+.ai-chart-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: .4rem; flex-wrap: wrap; }
+.ai-chart-head small { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
+.ai-metric { display: flex; gap: .3rem; }
+.ai-metric button { font-family: var(--font-mono); font-size: .7rem; padding: .1rem .5rem; border: 1px solid var(--text); background: var(--card-bg); color: var(--text); cursor: pointer; }
+.ai-metric button.is-on { background: var(--sun); border-color: var(--sun); color: var(--on-sun); }
+
+/* ── Phone ─────────────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 860px) {
+  .ai-kv { grid-template-columns: 1fr; gap: .3rem 0; }
+  .ai-k { padding-top: .6rem; }
+  .ai-rl { grid-template-columns: minmax(0, 1fr); }
+  .ai-r--head > div { display: none; }
+  .ai-r > .ai-role, .ai-r > .ai-model, .ai-r > .ai-what { border-bottom: 0; padding-bottom: .15rem; }
+  .ai-r > .ai-model, .ai-r > .ai-what { padding-top: 0; }
+  .ai-r > .ai-go { justify-content: flex-start; padding-top: .1rem; flex-wrap: wrap; }
+  .ai-pick-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .ai-pick-row .ai-pick-trait { grid-column: 1 / -1; }
+  .ai-apps { grid-template-columns: minmax(0, 1fr) 5rem 5.5rem; }
+  .ai-apps .ai-today, .ai-apps .ai-calls { display: none; }
+  .ai-field { flex-wrap: wrap; }
+}

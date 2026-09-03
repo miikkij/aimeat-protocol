@@ -16,6 +16,13 @@
  *   acceptsImages / modelPageUrl / rankModels
  * @usage import { chatPriceLabel, rankModels } from './pricing.js';
  * @version-history
+ *   v1.1.0 — 2026-09-03 — Two things the catalogue taught since August. A price of -1 is
+ *     OpenRouter's "varies" (the auto routers), and multiplying it by a million printed
+ *     "$-1000000.000 / M" on eight recommended rows; chatPriceLabel now says "price varies". And a
+ *     model that does not produce TEXT (Lyria 3 makes music) sat at the top of the chat
+ *     recommendations because it has the largest context in its price band; answersInText() keeps
+ *     the chat, reasoning, execution and vision lists to models that can answer a chat turn, and
+ *     producesImages() is the pool for the image role.
  *   v1.0.0 — 2026-08-01 — Extracted from the settings panel as part of the OpenRouter settings rework.
  */
 
@@ -48,12 +55,43 @@ export function acceptsAudio(model) {
 }
 
 /**
+ * Whether the model can answer a chat turn at all. A provider that does not describe its outputs is
+ * taken at its word; one that does and leaves text out (a music or image model) is not a chat model
+ * however large its context.
+ */
+export function answersInText(model) {
+  const out = model?.output_modalities;
+  return !Array.isArray(out) || out.includes('text');
+}
+
+/**
+ * Whether the model is a chat model and nothing else. Lyria 3 declares text AND audio out and is a
+ * music model with a 1 M context and a price of zero, which put it at the top of the free band; a
+ * recommendation for a chat turn wants models that only answer in text (or text and images).
+ */
+export function answersOnlyInText(model) {
+  const out = model?.output_modalities;
+  return !Array.isArray(out) || (out.includes('text') && out.every((o) => o === 'text' || o === 'image'));
+}
+
+/** Whether the model produces images: the pool for the image-generation role. */
+export function producesImages(model) {
+  return Array.isArray(model?.output_modalities) && model.output_modalities.includes('image');
+}
+
+/** OpenRouter reports -1 for a router whose price depends on the model it picks. */
+export function priceVaries(model) {
+  return Number(model?.pricing?.prompt) < 0;
+}
+
+/**
  * "$5.00 / M in · $25.00 / M out" for a chat model, or null when the provider reported no pricing
  * (LM Studio and self-hosted endpoints do not).
  */
 export function chatPriceLabel(model, t) {
   const inUsd = fmtUsdPerMillion(perMillion(model?.pricing?.prompt));
   if (inUsd === null) return null;
+  if (priceVaries(model)) return t('profile.openrouter.price.varies');
   if (isFree(model)) return t('profile.openrouter.price.free');
   const outUsd = fmtUsdPerMillion(perMillion(model?.pricing?.completion));
   const inPart = t('profile.openrouter.price.perMillionIn', { usd: inUsd });
@@ -99,25 +137,33 @@ export function contextLabel(model) {
  *    surfaces one sensible default per budget rather than 336 undifferentiated rows.
  */
 export function rankModels(models, modality) {
-  const list = Array.isArray(models) ? models.slice() : [];
+  const all = Array.isArray(models) ? models.slice() : [];
+  // A price of -1 means "varies": it is not the cheapest of anything, so it sorts last.
   const priceOf = (m) => {
     const n = Number(m?.pricing?.prompt);
-    return Number.isFinite(n) ? n : Number.POSITIVE_INFINITY;
+    return Number.isFinite(n) && n >= 0 ? n : Number.POSITIVE_INFINITY;
   };
 
   if (modality === 'transcription' || modality === 'speech') {
-    return list.sort((a, b) => priceOf(a) - priceOf(b));
+    return all.sort((a, b) => priceOf(a) - priceOf(b));
+  }
+  if (modality === 'image') {
+    return all.filter(producesImages).sort((a, b) => priceOf(a) - priceOf(b));
   }
 
+  // Everything below recommends a model for a CHAT turn, so a model that also makes music or video
+  // is out before any ranking, whatever its context length.
+  const list = all.filter(answersOnlyInText);
   if (modality === 'vision') {
     return list.filter(acceptsImages).sort((a, b) => priceOf(a) - priceOf(b));
   }
 
   const byContext = (a, b) => (Number(b.context_length) || 0) - (Number(a.context_length) || 0);
+  const paid = (m) => !isFree(m) && !priceVaries(m) && perMillion(m?.pricing?.prompt) !== null;
   const bands = [
     list.filter((m) => isFree(m)),
-    list.filter((m) => !isFree(m) && perMillion(m?.pricing?.prompt) !== null && perMillion(m.pricing.prompt) < 1),
-    list.filter((m) => perMillion(m?.pricing?.prompt) !== null && perMillion(m.pricing.prompt) >= 1),
+    list.filter((m) => paid(m) && perMillion(m.pricing.prompt) < 1),
+    list.filter((m) => paid(m) && perMillion(m.pricing.prompt) >= 1),
   ];
   const picked = [];
   const seen = new Set();
@@ -126,11 +172,11 @@ export function rankModels(models, modality) {
       if (!seen.has(m.id)) { seen.add(m.id); picked.push(m); }
     }
   }
-  // The free router is a genuine default (no vendor pinned) and is worth offering even when the
-  // banding above did not surface it.
+  // The free router is a genuine default (no vendor pinned), so it leads the list whenever the
+  // catalogue has it, whether or not the banding above surfaced it.
   const free = list.find((m) => m.id === 'openrouter/free');
-  if (free && !seen.has(free.id)) picked.unshift(free);
-  return picked;
+  if (!free) return picked;
+  return [free, ...picked.filter((m) => m.id !== free.id)];
 }
 
 /** Case-insensitive match over id and display name. */

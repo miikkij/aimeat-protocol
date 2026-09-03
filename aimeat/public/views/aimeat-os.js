@@ -9,6 +9,7 @@
  *   - AimeatOsView — main Preact component (hero + steps + CTAs)
  * @usage import AimeatOsView from '/views/aimeat-os.js'
  * @version-history
+ *   v1.0.1 — 2026-09-03 — The link to the AI settings goes to ?tab=ai, the page's route id.
  *   v1.0.0 — 2026-03-17 — Initial reference documentation page
  *   v2.0.0 — 2026-03-17 — Rewrite: landing page with i18n
  *   v3.0.0 — 2026-03-18 — Full redesign: clean landing page, proper CSS, i18n
@@ -386,7 +387,7 @@ function AimeatOsView({ navigate }) {
 
   const onGenerator = (e) => {
     e.preventDefault();
-    navigate('/v1/profile?tab=generator');
+    navigate('/v1/profile?tab=ai');
   };
 
   return html`
@@ -426,7 +427,7 @@ function AimeatOsView({ navigate }) {
 
       <div class="os-generator-hint">
         <span>${t('aimeatOs.generatorHint')} </span>
-        <a href="/v1/profile?tab=generator" onClick=${onGenerator}>${t('aimeatOs.generatorLink')}</a>
+        <a href="/v1/profile?tab=ai" onClick=${onGenerator}>${t('aimeatOs.generatorLink')}</a>
       </div>
     </div>
   `;

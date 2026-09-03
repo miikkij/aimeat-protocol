@@ -16,6 +16,7 @@
  *   - ChatView — the page: status, conversations, one live turn
  * @usage import ChatView from '/views/chat.js'
  * @version-history
+ *   v2.0.1 — 2026-09-03 — The bring-your-own-key link goes to ?tab=ai, the AI page's route id.
  *   v2.0.0 — 2026-08-28 — The poster chat, vertical space first (Jouni: "the chat space is what
  *     matters, and the input at the bottom"). Everything that is not the conversation moves into
  *     the rail: the conversation's name, the status line, Copy conversation, Reset session, the AI
@@ -624,7 +625,7 @@ export default function ChatView() {
                         <p class="chat-cap-title">${tr('chat.capTitle', 'This conversation has used up its free ride.')}</p>
                         <p class="chat-cap-body">${tr('chat.capBody', "Chat here runs on the house's own AI budget, and this session has reached its share (about 50,000 tokens). The conversation stays right here — nothing is lost. Two ways to keep going:")}</p>
                         <div class="chat-cap-actions">
-                            <a class="btn-primary" href="/v1/profile?tab=generator">${tr('chat.capOwnKey', 'Bring your own key →')}</a>
+                            <a class="btn-primary" href="/v1/profile?tab=ai">${tr('chat.capOwnKey', 'Bring your own key →')}</a>
                             ${/* The store is the one price door; a node without one offers only the key. */''}
                             ${storeHref() ? html`<a class="btn-outline" href=${storeHref()} target="_blank" rel="noopener">${tr('chat.capOwnPlace', 'Get your own place →')}</a>` : ''}
                         </div>

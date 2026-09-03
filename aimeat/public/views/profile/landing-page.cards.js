@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Profile home dashboard cards, home sub-components, and the sidebar group model. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   2026-09-03 — The AI page's menu item is route id 'ai' (was 'generator'), and the usage card's
+ *     own-key door goes there.
  *   2026-09-03 — "Your agents" heads the Automation group, above the Agents tab it feeds into.
  *   2026-08-28 — The poster overview: a stat is icon, numeral and label in three spans, so the
  *     stylesheet can set the numeral big on the band and drop the emoji.
@@ -252,7 +254,7 @@ export function UsageCard({ switchTab, initialUsage }) {
         <div class="pf-usage-exhausted text-meta-sm">
           ${t('profile.landing.usageAiSpent')}
           ${' '}
-          <button type="button" class="btn-ghost btn-sm" onClick=${() => switchTab('generator')}>
+          <button type="button" class="btn-ghost btn-sm" onClick=${() => switchTab('ai')}>
             ${t('profile.landing.usageAiOwnKeyCta')}
           </button>
           ${' '}
@@ -710,10 +712,9 @@ export const SIDEBAR_GROUPS = [
     { id: 'skills', labelKey: 'skills.tabLabel' },
     { id: 'packages', labelKey: 'profile.tabs.packages' },
     { id: 'portfolio', labelKey: 'portfolio.tabLabel' },
-    /* AI-provider (OpenRouter) key + spend budget. Route id is still 'generator' — the Generator tab
-     * was repurposed to host only these settings when the Generator feature was removed (2026-07-18).
-     * Re-added to the menu 2026-07-19 after it was orphaned (reachable only by ?tab=generator). */
-    { id: 'generator', labelKey: 'profile.generator.openrouter.title' },
+    /* The AI page: which model answers, on whose key, within what daily budget. Route id 'ai'
+     * since 2026-09-03; 'generator' (the tab it grew out of) still resolves through profile.js. */
+    { id: 'ai', labelKey: 'profile.generator.openrouter.title' },
     { id: 'calibrator', labelKey: 'profile.calibrator.tabLabel' },
     /* TODO(owner 2026-06-10): "work" placement is undecided — parked at the bottom of
      * Build & Share until re-evaluated. */

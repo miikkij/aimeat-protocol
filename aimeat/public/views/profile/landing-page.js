@@ -17,6 +17,9 @@
  *   - PresencePill + PresenceDialog — header status pill that opens the availability settings dialog
  *   - LandingPage — main orchestrator (default export)
  * @version-history
+ *   v3.16.0 — 2026-09-03 — The AI page's route id is 'ai'; 'generator' (its old name, still in
+ *     the chat's link and two account-event links) resolves to it from the URL and from a
+ *     remembered session.
  *   v3.15.0 — 2026-09-03 — The hand-placed /v1/fleet link is gone from above the menu. It is a
  *     section of Settings & Controls now and comes through the menu like everything else; a
  *     capability a person has to be told the address of is not finished.
@@ -125,6 +128,9 @@ import {
 /* ───── Tier heuristic ───── */
 
 const TIER_LEVELS = { 'new': 0, 'active': 1, 'experienced': 2 };
+/** Old tab ids that still arrive in links and in a remembered session ('generator' became 'ai'). */
+const TAB_ALIASES = { generator: 'ai' };
+const canonicalTab = (id) => (id && TAB_ALIASES[id]) || id;
 
 /**
  * Compute user tier from stats and session data.
@@ -168,10 +174,10 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
       const saved = sessionStorage.getItem('aimeat-profile-tab');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed && parsed.tabId && parsed.slot) return parsed;
+        if (parsed && parsed.tabId && parsed.slot) return { ...parsed, tabId: canonicalTab(parsed.tabId) };
       }
       // Fall back to a ?tab= deep link (also how Back/Forward restores a tab).
-      const tabId = new URLSearchParams(window.location.search).get('tab');
+      const tabId = canonicalTab(new URLSearchParams(window.location.search).get('tab'));
       if (tabId) return { tabId, slot: 'main' };
     // eslint-disable-next-line aimeat/no-silent-catch -- ignore
     } catch { /* ignore */ }
@@ -296,7 +302,7 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
    * tabs you opened and finally land on Home, instead of leaving the profile. */
   useEffect(() => {
     const onPop = () => {
-      const tabId = new URLSearchParams(window.location.search).get('tab');
+      const tabId = canonicalTab(new URLSearchParams(window.location.search).get('tab'));
       fromPopRef.current = true;
       try {
         if (tabId && !(INFRA_TAB_IDS.has(tabId) && !isOperator)) {
