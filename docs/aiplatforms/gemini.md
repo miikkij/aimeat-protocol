@@ -1,96 +1,40 @@
 # Gemini — AIMEAT Platform Report
 
-**Vendor:** Google  
-**URL:** https://gemini.google.com  
-**Updated:** March 2026
+**Vendor:** Google · **URL:** https://gemini.google.com
+**Vendor facts checked:** 3 September 2026
+**Shortest path:** Gemini CLI with the node as an MCP server. In the consumer chat, the manual road.
 
-## Plans & Tiers
+## Can it reach a node?
 
-| Plan | Price | Key Features |
-|------|-------|-------------|
-| Gemini (Free) | $0 | Gemini 2.0 Flash, search, code generation, limited usage |
-| Gemini Advanced | $19.99/mo | Gemini 2.5 Pro, 3 Pro Preview, 1M context, Gems, extensions |
-| Gemini API (Free Tier) | $0 | Rate-limited access to Flash and Pro models for development |
-| Gemini API (Pay-as-you-go) | Usage-based | Full production access, no rate limits |
+| Road | Works | How |
+|---|---|---|
+| MCP, consumer chat | **No** | Google has not shipped general custom MCP connectors in the Gemini app |
+| MCP, Gemini Spark | Partly | A custom app can be connected by MCP server URL, but only inside Spark tasks and only with Spark access |
+| MCP, Gemini Enterprise | Yes | Connected apps → Add MCP server, administrator-configured, with service-account authentication since June 2026 |
+| MCP, Gemini CLI | Yes | The CLI is an MCP client and takes server instructions into its system prompt |
+| Manual prompt | Yes, every plan | The road for anybody on the consumer app |
+| HTTP | Yes | The chat browses public endpoints; the API's function calling drives anything you build |
 
-## Core Features (March 2026)
+## Plans that matter
 
-### Gemini Chat
-- **Gemini 3 Pro** — Latest frontier model with advanced reasoning
-- **Google Search Integration** — Deep integration with Google Search
-- **Extensions** — Google Workspace, YouTube, Maps, Flights, Hotels
-- **Gems** — Custom AI assistants with specific personalities/instructions
-- **Code execution** — Python sandbox for computations and data analysis
-- **Canvas** — Code and content editing workspace (similar to ChatGPT Canvas)
-- **Image generation** — Built-in Imagen model
-- **File upload** — Documents, images, audio, video analysis
-- **URL browsing** — Can read and analyze web pages
-- **1M context** (Advanced) — Massive context window for large documents
+Google's consumer AI plans are AI Plus ($4.99/mo), AI Pro ($19.99/mo) and AI Ultra ($99.99 or
+$199.99/mo), plus a free tier. Pro and Ultra raise the limits in Gemini Code Assist and the Gemini
+CLI, which is the part that matters here: the CLI is where Gemini can actually hold a node connection.
 
-### Gemini API / AI Studio
-- **Function calling** — Full tool use support across all models
-- **Gemini 3 series** — Pro ($2-4/1M input), Flash ($0.50/1M input)
-- **Context caching** — Optimize costs for repeated contexts
-- **Batch processing** — Async batch completions
-- **Multimodal** — Text, image, audio, video input
+## Connecting it
 
-### Gemini CLI
-- **Extensions** — Framework for CLI plugins and integrations
-- **MCP support** — Connect to MCP servers via Gemini CLI extensions
-- **Open source** — Terminal-based AI agent
+**Gemini CLI** is the path. Add the node as an MCP server in the CLI's configuration, pointing at
+`https://your-node/v1/mcp` (or `/v2/mcp/appdev` when the session is about building apps), then
+approve the agent from your profile → Agents.
 
-## MCP Support
+**Gemini Enterprise:** an administrator adds the node under Connected apps → Add MCP server. This is
+the route for a company that wants everyone's Gemini to see the same node.
 
-- **Gemini Chat:** No native MCP connector UI. Extensions provide limited integration.
-- **Gemini API:** Full function calling — can be used as backend for MCP clients
-- **Gemini CLI:** MCP support via extensions framework, open-source extensible
-- **Google ADK:** McpToolset class for programmatic MCP integration
-- **Third-party:** Gemini models work in VS Code, Cursor, and other MCP-compatible hosts
+**The consumer app:** use the manual road. The node composes the prompt, you paste it in, and you
+bring the result back. Nothing is connected, which is also why nothing leaks.
 
-## Code Generation / Apps
+## What to expect
 
-- Strong code generation capabilities across all plans
-- Canvas workspace for interactive code editing (Advanced)
-- URL browsing allows reading documentation and API specs
-- Can generate complete single-file HTML applications
-- Free plan has solid code generation (Gemini Flash is very capable)
-
-## API
-
-- Gemini Developer API via AI Studio
-- Generous free tier for development and testing
-- Function calling with structured output (Gemini 3 series)
-- Google Cloud Vertex AI for enterprise deployment
-- Compatible with many MCP client frameworks
-
----
-
-## AIMEAT Integration Recommendations
-
-### 🖥️ Apps (Prompt Package)
-**Available on: All plans (Free and Advanced)**
-
-Gemini can generate complete HTML applications with AIMEAT integration. The free plan (Gemini Flash) is surprisingly capable for code generation.
-
-**Prompt:** Copy the AIMEAT Application Builder prompt into Gemini. It will interview you and generate a complete .html file. With Gemini Advanced's Canvas, you can edit the generated code interactively.
-
-### 🔌 MCP
-**Not available in Gemini Chat web interface**
-
-Gemini Chat does not have a native MCP connector UI. Use Gemini models via:
-- **Gemini CLI** — Install Gemini CLI, add MCP extension for AIMEAT
-- **VS Code** — Select Gemini as model in Copilot, use MCP servers
-- **Google ADK** — Use McpToolset for programmatic AIMEAT MCP integration
-- **Cursor** — Add Gemini API as model provider with MCP enabled
-
-### 📡 API
-**Available on: All plans (Gemini can browse URLs)**
-
-Gemini (Advanced) can browse URLs directly. Paste the AIMEAT public endpoints:
-- Catalogue: `{NODE_URL}/v1/catalogue`
-- Node info: `{NODE_URL}/`
-- Discovery: `{NODE_URL}/.well-known/aimeat`
-
-Gemini can read and analyze the data. For full API access, copy the API integration prompt — Gemini will generate the code to run locally.
-
-**Developer path:** Use Gemini API's function calling to build AIMEAT applications. The generous free tier makes it ideal for development and testing.
+Gemini writes a complete single-file AIMEAT app well, including on the free tier, and Canvas is a
+comfortable place to edit one. Its browsing reads public endpoints (`/v1/catalogue`, `/`,
+`/.well-known/aimeat`, `/llms.txt`) and can explain a node to you without any account at all.

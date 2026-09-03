@@ -1,6 +1,14 @@
 ## Appendix A: Complete Endpoint Reference
 
-> **Note:** `openapi.yaml` is the canonical, always-current endpoint contract — prefer it over this hand-maintained table. **Deprecated (v4.0):** Tier 0.5 / OTK (`/v1/auth/otk`, `/initial-otk`, `/v1/auth/session`, `/challenge`), micro-memory (`/v1/mm`), and the legacy Ed25519 challenge-response `POST /v1/auth/token` — kept for compatibility, off the mainline; new integrations use device auth + MCP.
+> **Note:** `openapi.yaml` is the canonical, always-current endpoint contract, and it carries 1077
+> paths against the 103 listed here. Prefer it over this hand-maintained table.
+>
+> **Removed, not merely deprecated (checked 3 September 2026):** the Tier 0.5 one-time-key writes
+> (`POST /v1/auth/otk`, `POST /v1/auth/initial-otk`, `GET /v1/auth/session`) and micro-memory
+> (`GET /v1/mm`, `GET /v1/mm/{gaii}/{set}`) were deleted from the code on 23 August 2026 and answer
+> 404 on every current node; the E2E suite asserts it. They have been dropped from the tables below.
+> `GET /v1/auth/challenge` still exists and still serves the legacy Ed25519 challenge-response
+> `POST /v1/auth/token`, which is deprecated: new integrations use device authorization plus MCP.
 
 **Bootstrap & Auth**
 
@@ -12,19 +20,9 @@
 | POST | `/v1/auth/token` | Signature | Core | Get JWT session token |
 | POST | `/v1/auth/refresh` | Bearer | Core | Refresh JWT |
 | POST | `/v1/auth/revoke` | Bearer | Core | Revoke JWT |
-| GET | `/v1/auth/challenge` | None | Core | Get signing challenge (Tier 0.5) |
-| GET | `/v1/auth/session` | None* | Core | Submit signed challenge, get OTK (*sig in params) |
-| POST | `/v1/auth/otk` | Bearer | Core | Generate one-time key for Tier 0.5 actions |
-| POST | `/v1/auth/initial-otk` | Bearer | Core | Generate Initial OTK (dormant until first use) |
+| GET | `/v1/auth/challenge` | None | Core | Get signing challenge for the legacy `POST /v1/auth/token` |
 | GET | `/v1/prompts/{tier}` | None | Core | AI system prompts for tier |
 | GET | `/v1/prompts/anonymous/share` | None | Core | Share prompt for anonymous mode |
-
-**Micro-Memory (Tier 0.5)**
-
-| Method | Path | Auth | Tier | Description |
-|--------|------|------|------|-------------|
-| GET | `/v1/mm` | OTK | Core | Micro-memory operations (op=add/del/mod/list/config) |
-| GET | `/v1/mm/{gaii}/{set}` | None* | Core | Read public micro-memory set (*public sets only) |
 
 **Identity & Registration**
 

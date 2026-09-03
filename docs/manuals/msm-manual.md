@@ -1,4 +1,4 @@
-# MSM Manual -- Market Service Manifest
+# MSM Manual -- Machine Service Manifest
 
 *AIMEAT Protocol -- Developer & User Guide*
 
@@ -6,7 +6,7 @@
 
 ## 1. What is MSM?
 
-A Market Service Manifest (MSM) is a YAML file that describes an external API so that AI can understand it, call it, and build automations around it. Think of it as an instruction card: it tells an AI agent what a service does, how to authenticate, what inputs it needs, and what outputs it returns. There is no SDK, no runtime library, no backend code. MSM is just a structured description.
+A Machine Service Manifest (MSM) is a YAML file that describes an external API so that AI can understand it, call it, and build automations around it. Think of it as an instruction card: it tells an AI agent what a service does, how to authenticate, what inputs it needs, and what outputs it returns. There is no SDK, no runtime library, no backend code. MSM is just a structured description.
 
 The key insight is that AI reads the MSM once, builds the integration code, tests it, and then the automation runs on its own -- without AI in the loop. AI is the *builder*, not the runtime caller. It designs the pipeline, wires up the API calls, handles error paths, and deploys the result as a background job or webhook handler. AI only comes back if something breaks or the requirements change. This makes MSM fundamentally different from tool-calling frameworks where AI sits in the middle of every request. With MSM, you get a permanent automation that just works.
 

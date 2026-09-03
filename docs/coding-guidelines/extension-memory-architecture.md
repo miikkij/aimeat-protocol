@@ -127,7 +127,7 @@ const tr = await AIMEAT.myLib.getTranslations('fi');
 └──────────────────────┬──────────────────────────────────┘
                        │ HTTP calls
 ┌──────────────────────▼──────────────────────────────────┐
-│  EXTENSION (V8 sandbox, server-side)                    │
+│  EXTENSION (QuickJS-WASM sandbox, server-side)          │
 │  Owns: ext:{name} namespace (read/write)                │
 │  Reads: owner namespace via getPublic(gaii, key)        │
 │  Fetches: external APIs via ctx.fetch()                 │

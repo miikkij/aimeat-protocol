@@ -116,9 +116,25 @@ export function tdzClosures(files: readonly ts.SourceFile[], root: string): TdzC
                     collectDecls(scope);
 
                     const closureLine = at(node);
+
+                    // Names the CLOSURE declares for itself. Without this the detector reads a
+                    // shadowed name as a reference to the outer one and reports a dead zone that
+                    // cannot exist: routes/a2a.ts declares its own `offerings` and `card` inside the
+                    // authorized branch, and the outer pair of the same names lives on the branch
+                    // that only runs when there is no authorization at all. Shadowing is how a
+                    // handler keeps its own copy, so a detector blind to it flags good code and
+                    // buries the real thing among it.
+                    const shadowed = new Set<string>();
+                    const collectShadows = (n: ts.Node): void => {
+                        if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name)) shadowed.add(n.name.text);
+                        if (ts.isParameter(n) && ts.isIdentifier(n.name)) shadowed.add(n.name.text);
+                        ts.forEachChild(n, collectShadows);
+                    };
+                    collectShadows(node);
+
                     const seen = new Set<string>();
                     const readIdentifiers = (n: ts.Node): void => {
-                        if (ts.isIdentifier(n) && declared.has(n.text) && !seen.has(n.text)) {
+                        if (ts.isIdentifier(n) && declared.has(n.text) && !seen.has(n.text) && !shadowed.has(n.text)) {
                             const declaredLine = declared.get(n.text) as number;
                             const isOwnDeclaration = n.parent && ts.isVariableDeclaration(n.parent) && n.parent.name === n;
                             if (!isOwnDeclaration && declaredLine > closureLine) {

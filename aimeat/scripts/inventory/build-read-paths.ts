@@ -58,9 +58,15 @@ function main(): void {
     say('Osa poluista mainitsee tilasarakkeen, osa ei. Se ei ole vika sinänsä — mutta se on');
     say('se muoto jossa yksi polku jää jaetun suodattimen ulkopuolelle.');
     say();
+    say('Verrattavana ovat vain saman taulun **avaimella hakevat** luvut. Tilalla hakeva luku');
+    say('suodattaa koska tila ON sen kysymys, eikä se ole eri mieltä avainhaun kanssa vaan vastaa');
+    say('toiseen asiaan. Yhdellätoista taululla luettuna se sääntö piti joka kerta; `memory` oli');
+    say('ainoa joka rikkoi sen, ja siksi se oli ainoa oikea löytö.');
+    say();
     let disagreeing = 0;
-    for (const [table, list] of [...byTable.entries()].sort()) {
+    for (const [table, all] of [...byTable.entries()].sort()) {
         const cols = declared.get(table);
+        const list = all.filter(p => p.selector === 'identity');
         if (!cols || list.length < 2) continue;
         const withMention = list.filter(p => p.mentions.length > 0);
         const without = list.filter(p => p.mentions.length === 0);

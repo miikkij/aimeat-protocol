@@ -37,6 +37,11 @@
  *     declared wrong (indexOn/retention on a memory space, more than three indexed fields, and
  *     versioned:true). readWorkspaceManifest() is lifted here from the MCP tool's local copy so
  *     every surface resolves a space through one read.
+ *   v1.8.0 — 2026-09-03 — readWorkspaceSchemas(): the locked schemas, keyed by namespace, in the
+ *     shape `schemas` takes back. An agent could REPLACE a workspace's schemas over MCP but had no
+ *     way to READ them: the tool's own advice was to fetch GET /v1/memory/{key}/schema first, which
+ *     an MCP-only client cannot do, so the safe round-trip was impossible and an update dropped
+ *     whatever the previous schema said. Both read surfaces now return them.
  */
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
@@ -91,6 +96,33 @@ export async function readWorkspaceManifest(
   const { items } = await storage.listAllMemory({ prefix: key, limit: 100 });
   const rec = items.find(r => r.key === key);
   return rec ? (rec.value as WorkspaceManifest) : null;
+}
+
+/**
+ * The JSON Schemas locked on a workspace's record spaces, keyed by NAMESPACE.
+ *
+ * The shape is deliberately the one `updateWorkspaceMeta`'s `schemas` option takes, so a caller can
+ * read, edit one entry and send the map straight back. That symmetry is the whole point: `schemas`
+ * REPLACES rather than merges, and until this existed the only way to see the current schema was
+ * `GET /v1/memory/{key}/schema`, which an MCP-only agent cannot call. A tool that can overwrite what
+ * it cannot read is a tool that quietly drops whatever the old schema said.
+ *
+ * Locks live in the schema store (keyPattern `organism.{id}.w.{ws}.{namespace}`, applyTo 'prefix'),
+ * not in the manifest, which is why this is a second read rather than a field on the manifest.
+ */
+export async function readWorkspaceSchemas(
+  storage: Storage, organismId: string, wsId?: string,
+): Promise<Record<string, Record<string, unknown>>> {
+  const root = wsId ? `organism.${organismId}.w.${wsId}.` : `organism.${organismId}.`;
+  const out: Record<string, Record<string, unknown>> = {};
+  for (const lock of await storage.listSchemas(root)) {
+    const namespace = lock.keyPattern.slice(root.length);
+    // A lock on the root itself carries no namespace, and a workspace-scoped read must not surface
+    // another workspace's locks — `organism.{id}.` is a prefix of `organism.{id}.w.{other}.` too.
+    if (!namespace || (!wsId && namespace.startsWith('w.'))) continue;
+    out[namespace] = lock.schemaJson;
+  }
+  return out;
 }
 
 /** Gate + normalize a manifest's objectTypes before any manifest write (create, full replace,
