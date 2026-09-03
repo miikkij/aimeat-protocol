@@ -2,492 +2,194 @@
  * @file wallet-tab.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Profile tab for morsel wallet: balance overview, lifetime stats,
- *   morsel request form, and transaction history with expandable details.
+ * @description Profile tab: the wallet in the poster face. Morsels first (what they are, the
+ *   balance and its daily pace, where they came from and went to, the ledger in words), money
+ *   apart from them (the shares owed to you, purchases and sales, the three payout rails), and
+ *   how your AI uses the wallet. This file holds the reads and the handlers: the composite mount,
+ *   the whole ledger in pages, the payout rails, the beneficiary shares and the agents' names; the
+ *   day's morsels when there is room, a rail's key or address, the filters and the opened rows. The
+ *   render is wallet/page.js and wallet/rows.js.
+ * @structure WalletTab() — state + handlers → renderPage(ctx)
+ * @usage registered in profile.js TABS as id 'wallet'
  * @version-history
- *   v1.7.0 — 2026-08-06 — Expandable "how do I get this" help under the Card and Stablecoin rails:
- *     step-by-step setup instructions with links (Stripe registration + API keys page; Base-compatible
- *     wallet install), so a seller who has neither credential can get one without leaving the page.
- *     The x402 help adds a testnet step only when the node settles on a test network.
- *   v1.6.0 — 2026-07-28 — One "Selling & payments" section replaces the separate PSP and x402 blocks:
- *     card, stablecoin and invoice rails render from a single GET /v1/commerce/payout, and the Stripe
- *     key is written through /v1/commerce/payout/stripe. The old block called the removed edition's
- *     own endpoint and hid itself when that 404'd, so on a node without the module a seller was never
- *     shown the credential field at all.
- *   v1.5.1 — 2026-07-25 — The x402 chip reports every currency → token pair the node can settle
- *     (USD → USDC, EUR → EURC) instead of a single hardcoded token (TARGET-042).
- *   v1.5.0 — 2026-07-25 — Payout rails: an x402 USDC payout-address section beside the Stripe one, so a
- *     seller can set the address a stablecoin sale settles to and tell the two rails apart (Stripe moves
- *     fiat through a provider; x402 settles USDC on-chain to an address the seller controls).
- *   v1.0.0 — 2026-03-16 — Initial wallet tab
- *   v1.1.0 — 2026-03-17 — Replace inline styles with CSS classes
- *   v1.2.0 — 2026-05-22 — Show info message for federated users instead of infinite spinner
- *   v1.3.0 — 2026-06-02 — Component unification (#1): copy buttons use canonical
- *     <CopyButton>; delete local copyToClipboard helper + dead copied-state/handlers.
- *   v1.4.0 — 2026-07-16 — Mount folds the tab's wallet+transactions AND MoneyActivity's checkout+orders
- *     into ONE GET /v1/wallet/overview (WalletTabService); MoneyActivity seeds from `initial` + skips its
- *     own mount fetch. The Selling & payments section keeps its own payout call. Falls back to the
- *     individual endpoints if the composite is unavailable. (Phase 4 slice 3 — frontend half.)
- *   v1.5.0 — 2026-07-18 — Vaihe 3 card-cohesion: the two remaining unframed sections now sit in a `.card`
- *     like the balance/lifetime/history sections do — PSP `.wallet-psp` block and MoneyActivity's
- *     purchases/sales `.tx-list`s (were bare blocks straight under their section headers). Campsite Rule 8:
- *     the tx-item / tx-item-wrap dividers + hover swapped hardcoded rgba(232,86,74,…) for --border /
- *     --accent-subtle tokens (theme-aware).
- *   v1.8.0 — 2026-08-08 — Copy labels now resolve from the shared common.copy / common.copied / common.copyPrompt /
- *       common.copyLink / common.copyUrl keys; the per-view copy label keys this file used were
- *       removed from both locales. Same words on screen.
+ *   v2.0.0 — 2026-09-04 — The poster face (design canvas "AIMEAT Lompakko-sivu", direction A): the
+ *     lifetime from every row kind, the pace that credits without a row said as a figure, the rows
+ *     in words with who made the call, the shares owed to you on the page, a stale checkout no
+ *     longer counted as a purchase, the request form replaced by one door that shows only below
+ *     the cap, every word through the locales.
+ *   v1.8.0 — 2026-08-08 — Copy labels from the shared common.copy keys.
+ *   v1.7.0 — 2026-08-06 — Expandable per-rail setup help under the Card and Stablecoin rails.
+ *   v1.6.0 — 2026-07-28 — One "Selling & payments" section from GET /v1/commerce/payout.
+ *   v1.4.0 — 2026-07-16 — Mount folds the reads into GET /v1/wallet/overview.
+ *   v1.0.0 — 2026-03-16 — Initial wallet tab.
  */
-import { h } from 'preact';
-import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
-import htm from 'htm';
-const html = htm.bind(h);
+import { useState, useEffect, useCallback, useMemo } from 'preact/hooks';
 import { t } from '/js/i18n.js';
-import { escHtml, timeAgo, fmtMoney } from '/js/utils.js';
-import { Spinner } from './shared.js';
-import { CopyButton } from '/components/CopyButton.js';
-import { getWallet, getTransactions, requestMorsels } from '/js/services/wallet.js';
-import { apiGet, apiPut, apiDelete } from '/js/api.js';
+import { useConfirm } from '/components/Modal.js';
 import { swallowed } from '/js/swallowed.js';
+import { apiGet, apiPut, apiPost, apiDelete } from '/js/api.js';
+import { renderPage } from './wallet/page.js';
+import { x, GRANTED, openTab, morsels } from './wallet/frame.js';
 
-/**
- * Map backend transaction type to a display label.
- */
-function txTypeLabel(tx) {
-  const type = tx.type || '';
-  if (type === 'allowance' || type === 'daily_allowance') return t('profile.wallet.allowance');
-  if (type === 'welcome_bonus') return t('profile.wallet.welcomeBonus');
-  if (type === 'earned') return t('profile.wallet.earned');
-  if (type === 'spent') return t('profile.wallet.spent');
-  // Fallback based on amount sign
-  return tx.amount > 0 ? t('profile.wallet.earned') : t('profile.wallet.shared');
-}
+const PAGE = 200;
+const MAX_PAGES = 5;
+const FIRST_SHOWN = 10;
+const flashFor = (setter) => (text, error = false) => { setter({ text, error }); setTimeout(() => setter(null), 7000); };
+const errText = (e, fallback) => e?.error?.message || e?.response?.error?.message || e?.message || (typeof e === 'string' ? e : '') || fallback || t('profile.error');
 
-/* Expandable per-rail setup help: a <details> disclosure under a rail card with numbered steps and
- * external links, for the seller who has neither a Stripe key nor a wallet address yet. Steps are
- * plain i18n keys; a step may carry links rendered after its text. Collapsed by default so the
- * section stays compact for sellers who are already configured. */
-function RailHelp({ titleKey, steps }) {
-  return html`
-    <details class="wallet-rail-help">
-      <summary>${t(titleKey)}</summary>
-      <ol class="wallet-rail-help-steps">
-        ${steps.map(s => html`<li key=${s.key}>
-          ${t(s.key)}
-          ${(s.links || []).map((l, i) => html`${i > 0 ? ' · ' : ' '}<a href=${l.href} target="_blank" rel="noopener noreferrer">${l.label}</a>`)}
-        </li>`)}
-      </ol>
-    </details>`;
-}
-
-const STRIPE_HELP_STEPS = [
-  { key: 'profile.wallet.cardHelpStep1', links: [{ href: 'https://dashboard.stripe.com/register', label: 'dashboard.stripe.com/register' }] },
-  { key: 'profile.wallet.cardHelpStep2', links: [{ href: 'https://dashboard.stripe.com/apikeys', label: 'dashboard.stripe.com/apikeys' }] },
-  { key: 'profile.wallet.cardHelpStep3' },
-  { key: 'profile.wallet.cardHelpStep4' },
-];
-
-function x402HelpSteps(testnet) {
-  return [
-    { key: 'profile.wallet.x402HelpStep1', links: [
-      { href: 'https://www.coinbase.com/wallet', label: 'Coinbase Wallet' },
-      { href: 'https://metamask.io/', label: 'MetaMask' },
-    ] },
-    { key: 'profile.wallet.x402HelpStep2' },
-    { key: 'profile.wallet.x402HelpStep3' },
-    ...(testnet ? [{ key: 'profile.wallet.x402HelpStep4' }] : []),
-  ];
-}
-
-/* "Selling & payments" — every rail that can pay this seller, from ONE read of /v1/commerce/payout.
- *
- * The three rails are shown together because the question a seller actually has is "can I take
- * money yet, and how does it reach me", and the answers differ in kind:
- *   - Card (Stripe): runs on the seller's OWN secret key. They are the merchant of record, the money
- *     lands on their Stripe balance, and this node holds neither key nor funds.
- *   - Stablecoin (x402): settles on-chain straight to an address the seller controls. The token
- *     follows the price (USD → USDC, EUR → EURC) and ONE address receives them all, so the chip
- *     reports the pairs this node can really settle instead of naming a single token. A money sale
- *     over x402 with no address fails with SELLER_NO_X402_ADDRESS, which this section prevents.
- *   - Invoice: always available because it captures nothing — the order completes and the amount is
- *     booked as a payable the seller bills offline.
- * Nothing here is edition-gated: the node has no platform account of its own to gate it on. */
-function SellingSection() {
-  const [state, setState] = useState(null);
-  const [keyIn, setKeyIn] = useState('');
-  const [addr, setAddr] = useState('');
+export default function WalletTab({ session, showToast, onStats }) {
+  const { confirm, ConfirmUI } = useConfirm();
+  const [wallet, setWallet] = useState(null);
+  const [rows, setRows] = useState([]);
+  const [rowsTotal, setRowsTotal] = useState(0);
+  const [sessions, setSessions] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [payout, setPayout] = useState(null);
+  const [earnings, setEarnings] = useState(null);
+  const [agents, setAgents] = useState([]);
+  const [filter, setFilterState] = useState('all');
+  const [shown, setShown] = useState(FIRST_SHOWN);
+  const [openTx, setOpenTx] = useState(null);
+  const [openRail, setOpenRail] = useState(null);
+  const [openShares, setOpenShares] = useState(false);
+  const [keyDraft, setKeyDraft] = useState('');
+  const [addrDraft, setAddrDraft] = useState('');
+  const [railMsg, setRailMsg] = useState(null);
+  const [requestMsg, setRequestMsg] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState('');
-  const load = useCallback(() => {
-    apiGet('/v1/commerce/payout').then(r => setState(r.data ?? null)).catch(() => setState(false));
+
+  const toast = (m, isErr) => showToast?.(m, !!isErr);
+  const federated = !!session?.federated;
+
+  /* ── Reads ─────────────────────────────────────────────────────────────────────────────────── */
+
+  /** The whole ledger, newest first, in pages; stops at MAX_PAGES so a huge store cannot stall the page. */
+  const loadRows = useCallback(async (total) => {
+    const all = [];
+    for (let page = 1; page <= MAX_PAGES; page++) {
+      const r = await apiGet(`/v1/wallet/transactions?per_page=${PAGE}&page=${page}`).catch((e) => { swallowed('wallet: rows', e); return null; });
+      const list = r?.data?.transactions || [];
+      all.push(...list);
+      if (list.length < PAGE) break;
+    }
+    setRows(all);
+    if (typeof total !== 'number') setRowsTotal(all.length);
   }, []);
+
+  const load = useCallback(async () => {
+    if (federated) return;
+    try {
+      const ov = await apiGet('/v1/wallet/overview').then((r) => r?.data).catch((e) => { swallowed('wallet: overview', e); return null; });
+      if (ov?.wallet) {
+        setWallet(ov.wallet);
+        onStats?.({ balance: ov.wallet.balance ?? '-' });
+        setRows(ov.transactions?.transactions || []);
+        setRowsTotal(ov.transactions?.total ?? (ov.transactions?.transactions || []).length);
+        setSessions(ov.checkoutSessions?.sessions || []);
+        setOrders(ov.orders?.orders || []);
+        if ((ov.transactions?.total ?? 0) > (ov.transactions?.transactions || []).length) loadRows(ov.transactions.total);
+      } else {
+        const w = await apiGet('/v1/wallet').then((r) => r?.data).catch((e) => { swallowed('wallet: wallet', e); return null; });
+        if (w) { setWallet(w); onStats?.({ balance: w.balance ?? '-' }); }
+        loadRows();
+      }
+    } catch (e) { swallowed('wallet: load', e); }
+    apiGet('/v1/commerce/payout').then((r) => setPayout(r?.data ?? false)).catch((e) => { swallowed('wallet: payout', e); setPayout(false); });
+    apiGet('/v1/commerce/beneficiary/earnings').then((r) => setEarnings(r?.data ?? null)).catch((e) => { swallowed('wallet: earnings', e); setEarnings(null); });
+    apiGet('/v1/agents').then((r) => setAgents(Array.isArray(r?.data?.agents) ? r.data.agents : Array.isArray(r?.data) ? r.data : [])).catch((e) => { swallowed('wallet: agents', e); });
+  }, [federated, loadRows]);   // eslint-disable-line react-hooks/exhaustive-deps -- onStats is a stable prop wrapper
+
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
     const handler = () => load();
     window.addEventListener('aimeat-live-update', handler);
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, [load]);
-  // false = commerce is off on this node (503) — there is nothing to sell through.
-  if (state === null || state === false) return null;
 
-  const stripe = state.stripe || {};
-  const x = state.x402 || {};
-  const addrValid = /^0x[a-fA-F0-9]{40}$/.test(addr.trim());
+  /* ── What the page reads off the state ─────────────────────────────────────────────────────── */
 
-  async function run(fn, okMsg) {
-    setBusy(true); setMsg('');
-    try { await fn(); setMsg(okMsg); load(); }
-    catch (e) { setMsg(e.message || 'Failed'); }
-    finally { setBusy(false); }
-  }
+  const self = wallet?.gaii || '';
+  const counts = useMemo(() => ({
+    all: rows.length,
+    in: rows.filter((tx) => Number(tx.amount) > 0 && !GRANTED.has(tx.type)).length,
+    out: rows.filter((tx) => Number(tx.amount) < 0).length,
+    agent: rows.filter((tx) => tx.initiator_gaii).length,
+  }), [rows]);
+  const filtered = useMemo(() => rows.filter((tx) => (
+    filter === 'in' ? Number(tx.amount) > 0 && !GRANTED.has(tx.type)
+      : filter === 'out' ? Number(tx.amount) < 0
+        : filter === 'agent' ? !!tx.initiator_gaii
+          : true)), [rows, filter]);
+  const first = rows.length ? rows[rows.length - 1].timestamp : null;
+  const last = rows.length ? rows[0].timestamp : null;
 
-  return html`
-    <div class="section-title mt-2">${t('profile.wallet.sellingTitle')}</div>
-    <div class="section-desc">${t('profile.wallet.sellingDesc')}</div>
+  /** The shares owed to you, in the currency that carries the most; a share with no currency is morsels. */
+  const shares = useMemo(() => {
+    const totals = earnings?.totals || {};
+    const keys = Object.keys(totals);
+    if (!keys.length) return null;
+    const key = keys.sort((a, b) => ((totals[b].accrued || 0) + (totals[b].released || 0)) - ((totals[a].accrued || 0) + (totals[a].released || 0)))[0];
+    const tt = totals[key];
+    const currency = key === 'null' || key === 'undefined' ? null : key;
+    const entries = (earnings.entries || []).filter((e) => (e.currency ?? null) === currency);
+    return {
+      currency, accrued: tt.accrued || 0, released: tt.released || 0, paid: tt.paid || 0,
+      total: (tt.accrued || 0) + (tt.released || 0) + (tt.paid || 0),
+      accruedCount: entries.filter((e) => e.status === 'accrued').length,
+      releasedCount: entries.filter((e) => e.status === 'released').length,
+    };
+  }, [earnings]);
+  const railsOn = payout ? 1 + (payout.stripe?.configured ? 1 : 0) + (payout.x402?.enabled && payout.x402?.configured ? 1 : 0) : 0;
 
-    <div class="card wallet-psp">
-      <div class="wallet-rail-row">
-        <strong>${t('profile.wallet.railCard')}</strong>
-        ${stripe.configured
-          ? html`<span class="pf-psp-chip pf-psp-chip--ok">${t('profile.wallet.pspConfigured')} ${stripe.keyHint || ''}</span>`
-          : html`<span class="pf-psp-chip pf-psp-chip--warn">${t('profile.wallet.pspMissing')}</span>`}
-        <span class="pf-psp-chip">${(stripe.currencies || []).join(' · ')}</span>
-      </div>
-      <div class="wallet-psp-row">
-        <input class="input-field input-sm wallet-psp-input" type="password" placeholder="sk_live_…"
-               value=${keyIn} onInput=${(e) => setKeyIn(e.target.value)} />
-        <button class="btn-primary btn-sm" disabled=${busy || keyIn.trim().length < 8}
-                onClick=${() => run(async () => { await apiPut('/v1/commerce/payout/stripe', { secret_key: keyIn.trim() }); setKeyIn(''); }, t('profile.wallet.pspSaved'))}>
-          ${t('profile.wallet.pspSave')}</button>
-        ${stripe.configured && html`<button class="btn-ghost btn-sm" disabled=${busy}
-                onClick=${() => run(() => apiDelete('/v1/commerce/payout/stripe'), t('profile.wallet.pspRemoved'))}>
-          ${t('profile.wallet.pspRemove')}</button>`}
-      </div>
-      <span class="text-meta">${t('profile.wallet.railCardNote')}</span>
-      <${RailHelp} titleKey="profile.wallet.cardHelpTitle" steps=${STRIPE_HELP_STEPS} />
-    </div>
+  /* ── Handlers ──────────────────────────────────────────────────────────────────────────────── */
 
-    ${x.enabled && html`
-      <div class="card wallet-psp">
-        <div class="wallet-rail-row">
-          <strong>${t('profile.wallet.railStablecoin')}</strong>
-          ${x.configured
-            ? html`<span class="pf-psp-chip pf-psp-chip--ok">${t('profile.wallet.x402Configured')} <code>${x.address}</code></span>`
-            : html`<span class="pf-psp-chip pf-psp-chip--warn">${t('profile.wallet.x402Missing')}</span>`}
-          <span class="pf-psp-chip">${(x.assets || []).map(a => `${a.currency} → ${a.symbol}`).join(' · ')} · ${x.network}${x.testnet ? ` · ${t('profile.wallet.x402Testnet')}` : ''}</span>
-        </div>
-        <div class="wallet-psp-row">
-          <input class="input-field input-sm wallet-psp-input" type="text" spellcheck="false" placeholder="0x…"
-                 value=${addr} onInput=${(e) => setAddr(e.target.value)} />
-          <button class="btn-primary btn-sm" disabled=${busy || !addrValid}
-                  onClick=${() => run(async () => { await apiPut('/v1/commerce/payout/x402', { address: addr.trim() }); setAddr(''); }, t('profile.wallet.x402Saved'))}>
-            ${t('profile.wallet.x402Save')}</button>
-          ${x.configured && html`<button class="btn-ghost btn-sm" disabled=${busy}
-                  onClick=${() => run(() => apiDelete('/v1/commerce/payout/x402'), t('profile.wallet.x402Removed'))}>
-            ${t('profile.wallet.x402Remove')}</button>`}
-        </div>
-        ${addr.trim() && !addrValid && html`<span class="text-meta">${t('profile.wallet.x402Invalid')}</span>`}
-        <${RailHelp} titleKey="profile.wallet.x402HelpTitle" steps=${x402HelpSteps(!!x.testnet)} />
-      </div>`}
+  const setFilter = (f) => { setFilterState(f); setShown(FIRST_SHOWN); setOpenTx(null); };
+  const showMore = () => setShown((n) => n + 20);
+  const toggleTx = (id) => setOpenTx((cur) => (cur === id ? null : id));
+  const toggleRail = (id) => { setOpenRail((cur) => (cur === id ? null : id)); setKeyDraft(''); setAddrDraft(''); setRailMsg(null); };
+  const toggleShares = () => setOpenShares((v) => !v);
 
-    <div class="card wallet-psp">
-      <div class="wallet-rail-row">
-        <strong>${t('profile.wallet.railInvoice')}</strong>
-        <span class="pf-psp-chip pf-psp-chip--ok">${t('profile.wallet.railInvoiceReady')}</span>
-      </div>
-      <span class="text-meta">${t('profile.wallet.railInvoiceNote')}</span>
-    </div>
-
-    ${msg && html`<span class="text-meta">${msg}</span>`}`;
-}
-
-/* "Money purchases & sales" — real-money (EUR/USD) checkout activity, separate from morsels.
- * Purchases come from the buyer's checkout sessions, sales from received orders; both filtered to
- * money currencies (minor units → major). Renders nothing when there is no money activity. */
-function MoneyActivity({ initial }) {
-  // Seeded from GET /v1/wallet/overview (checkoutSessions + orders, money currencies only); else self-loads.
-  const [data, setData] = useState(() => {
-    if (!initial) return null;
-    const m = (x) => x.currency && x.currency !== 'morsel';
-    return { purchases: (initial.checkoutSessions?.sessions ?? []).filter(m), sales: (initial.orders?.orders ?? []).filter(m) };
-  });
-  const load = useCallback(async () => {
+  const requestToday = async () => {
+    const cap = Number(wallet?.daily_allowance?.accumulation_cap) || 0;
+    const pace = Number(wallet?.daily_allowance?.amount) || 0;
+    const amount = Math.max(1, Math.min(pace, cap - (Number(wallet?.balance) || 0)));
+    setBusy('request');
+    const flash = flashFor(setRequestMsg);
     try {
-      const [s, o] = await Promise.all([
-        apiGet('/v1/commerce/checkout-sessions?limit=100').catch(err => { swallowed('wallet-tab: m', err); return null; }),
-        apiGet('/v1/commerce/orders?limit=100').catch(err => { swallowed('wallet-tab: m', err); return null; }),
-      ]);
-      const money = (x) => x.currency && x.currency !== 'morsel';
-      const purchases = (s?.data?.sessions ?? []).filter(money);
-      const sales = (o?.data?.orders ?? []).filter(money);
-      setData({ purchases, sales });
-    } catch (err) { swallowed('wallet-tab', err); setData({ purchases: [], sales: [] }); }
-  }, []);
-  useEffect(() => { if (!initial) load(); }, [load]);   // eslint-disable-line react-hooks/exhaustive-deps -- seed once from `initial`; fetch only when unseeded
-  if (!data || (!data.purchases.length && !data.sales.length)) return null;
-  const money = (amt, cur) => fmtMoney(amt, cur);
-  const row = (x, isSale) => html`
-    <div class="tx-item" key=${x.id}>
-      <span>${(x.items?.[0]?.title) || (isSale ? t('profile.wallet.moneySale') : t('profile.wallet.moneyPurchase'))}
-        <span class="text-meta"> · ${x.status}</span></span>
-      <span class="tx-amount ${isSale ? 'success' : ''}">${isSale ? '+' : ''}${money(isSale ? (x.receipt?.earned ?? x.total) : x.total, x.currency)}</span>
-    </div>`;
-  return html`
-    <div class="section-title mt-2">${t('profile.wallet.moneyTitle')}</div>
-    <div class="section-desc">${t('profile.wallet.moneyDesc')}</div>
-    ${data.purchases.length ? html`
-      <div class="text-meta mb-1">${t('profile.wallet.moneyPurchases')}</div>
-      <div class="card"><div class="tx-list">${data.purchases.map(x => row(x, false))}</div></div>` : null}
-    ${data.sales.length ? html`
-      <div class="text-meta mb-1 mt-1">${t('profile.wallet.moneySales')}</div>
-      <div class="card"><div class="tx-list">${data.sales.map(x => row(x, true))}</div></div>` : null}`;
-}
+      const r = await apiPost('/v1/wallet/request', { amount });
+      if (r?.ok === false) throw r;
+      const said = x('requested', { n: morsels(r.data?.granted ?? amount), balance: r.data?.new_balance ?? '' });
+      flash(said);
+      toast(said);
+      await load();
+    } catch (e) { flash(errText(e, x('requestFailed')), true); }
+    setBusy(false);
+  };
 
-export default function WalletTab({ session, showToast, onStats }) {
-  const [walletData, setWalletData] = useState(null);
-  const [walletTx, setWalletTx] = useState(null);
-  const [expandedTx, setExpandedTx] = useState(null);
-  const [moneyInitial, setMoneyInitial] = useState(null);   // seeds MoneyActivity from the composite
-
-  // Request form state
-  const [reqAmount, setReqAmount] = useState('');
-  const [reqReason, setReqReason] = useState('');
-  const [reqLoading, setReqLoading] = useState(false);
-
-  useEffect(() => {
-    if (session) loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadData is a loader defined below (recreated each render); effect intentionally re-runs only when session changes.
-  }, [session]);
-
-  // Live update listener
-  const liveRef = useRef(loadData);
-  liveRef.current = loadData;
-  useEffect(() => {
-    const handler = () => liveRef.current();
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
-  }, []);
-
-  async function loadData() {
+  const rail = async (work, okText) => {
+    setBusy('rail');
+    const flash = flashFor(setRailMsg);
     try {
-      // Mount: ONE composite call (GET /v1/wallet/overview) seeds wallet + recent transactions AND the
-      // MoneyActivity section (checkout-sessions + orders). The Selling & payments section stays on its own
-      // /v1/me/psp call. Falls back to the individual wallet endpoints if the composite is unavailable.
-      const ov = await apiGet('/v1/wallet/overview').then(r => r?.data).catch(err => { swallowed('wallet-tab: loadData', err); return null; });
-      if (ov?.wallet) {
-        setWalletData(ov.wallet);
-        onStats?.({ balance: ov.wallet.balance ?? '-' });
-        setWalletTx(ov.transactions?.transactions || []);
-        setMoneyInitial(ov);
-        return;
-      }
-      // Fallback — the tab's own two reads (MoneyActivity self-loads when moneyInitial stays null).
-      const resp = await getWallet();
-      const w = resp?.data || resp || {};
-      setWalletData(w);
-      onStats?.({ balance: w.balance ?? '-' });
-      try {
-        const tx = await getTransactions(20);
-        setWalletTx(tx);
-      } catch (err) { swallowed('wallet-tab', err); setWalletTx([]); }
-    } catch (err) { swallowed('wallet-tab', err); setWalletData(null); }
-  }
+      const r = await work();
+      if (r?.ok === false) throw r;
+      flash(okText);
+      toast(okText);
+      setKeyDraft(''); setAddrDraft('');
+      const p = await apiGet('/v1/commerce/payout').catch((e) => { swallowed('wallet: payout', e); return null; });
+      if (p?.data) setPayout(p.data);
+    } catch (e) { flash(errText(e, x('saveFailed')), true); }
+    setBusy(false);
+  };
+  const saveStripe = () => rail(() => apiPut('/v1/commerce/payout/stripe', { secret_key: keyDraft.trim() }), x('rail.keySaved'));
+  const saveX402 = () => rail(() => apiPut('/v1/commerce/payout/x402', { address: addrDraft.trim() }), x('rail.addressSaved'));
+  const removeStripe = () => confirm(x('rail.confirmRemoveKey'), () => rail(() => apiDelete('/v1/commerce/payout/stripe'), x('rail.keyRemoved')), { danger: true });
+  const removeX402 = () => confirm(x('rail.confirmRemoveAddress'), () => rail(() => apiDelete('/v1/commerce/payout/x402'), x('rail.addressRemoved')), { danger: true });
 
-  const toggleTx = useCallback((id) => {
-    setExpandedTx(prev => prev === id ? null : id);
-  }, []);
-
-  async function handleRequestMorsels(e) {
-    e.preventDefault();
-    const amount = parseInt(reqAmount, 10);
-    if (!amount || amount <= 0) return;
-    setReqLoading(true);
-    try {
-      const resp = await requestMorsels(amount, reqReason || undefined);
-      const granted = resp?.granted ?? amount;
-      const newBalance = resp?.new_balance ?? '?';
-      const msg = t('profile.wallet.requestSuccess')
-        .replace('{amount}', granted)
-        .replace('{balance}', newBalance);
-      showToast?.(msg, 'success');
-      setReqAmount('');
-      setReqReason('');
-      // Reload wallet data to reflect new balance
-      await loadData();
-    } catch (err) {
-      showToast?.(t('profile.wallet.requestError') + ': ' + (err.message || t('profile.unknownError')), 'error');
-    } finally {
-      setReqLoading(false);
-    }
-  }
-
-  if (session?.federated) {
-    return html`
-      <div class="section-title">${t('profile.wallet.title')}</div>
-      <div class="section-desc">${t('profile.wallet.desc')}</div>
-      <div class="alert alert-info">
-        <span class="alert-msg">${t('profile.wallet.federatedInfo')}</span>
-      </div>
-      <div class="text-meta mt-1">
-        ${t('profile.wallet.federatedHomeNode')}: <strong>${session.homeNode || '?'}</strong>
-      </div>
-    `;
-  }
-
-  if (!walletData) return html`<${Spinner} text=${t('profile.wallet.loading')} />`;
-  const w = walletData;
-  const escrow = w.in_escrow ?? w.escrow ?? 0;
-  const lifetime = w.lifetime || {};
-
-  return html`
-    <div class="section-title">${t('profile.wallet.title')}</div>
-    <div class="section-desc">${t('profile.wallet.desc')}</div>
-
-    <!-- Balance overview cards -->
-    <div class="wallet-overview">
-      <div class="wallet-card">
-        <div class="amount neutral">${w.balance ?? 0}</div>
-        <div class="wlabel">${t('profile.wallet.balance')}</div>
-      </div>
-      <div class="wallet-card">
-        <div class="amount neutral">${escrow}</div>
-        <div class="wlabel">${t('profile.wallet.inEscrow')}</div>
-      </div>
-      <div class="wallet-card">
-        <div class="amount positive">${(w.balance ?? 0) - escrow}</div>
-        <div class="wlabel">${t('profile.wallet.available')}</div>
-      </div>
-      <div class="wallet-card">
-        <div class="amount neutral">${w.daily_allowance?.amount ?? w.daily_allowance ?? 50}</div>
-        <div class="wlabel">${t('profile.wallet.dailyAllowance')}</div>
-      </div>
-    </div>
-
-    <!-- Selling & payments: every rail that can pay this seller, from one read -->
-    <${SellingSection} />
-
-    <!-- Real-money (EUR/USD) purchases & sales, separate from the morsel ledger -->
-    <${MoneyActivity} initial=${moneyInitial} />
-
-    <!-- Copy balance button -->
-    <div class="mb-1">
-      <${CopyButton}
-        text=${`Balance: ${w.balance ?? 0} | Available: ${(w.balance ?? 0) - escrow} | Escrow: ${escrow}`}
-        label=${t('profile.wallet.copyBalance')}
-        copiedLabel=${t('common.copied')}
-        className="btn-outline btn-sm" />
-    </div>
-
-    <!-- Lifetime stats -->
-    ${(lifetime.earned != null || lifetime.spent != null) && html`
-      <div class="section-title">${t('profile.wallet.lifetime')}</div>
-      <div class="wallet-lifetime">
-        <div class="stat-card"><div class="stat-card-value mono success">${lifetime.earned ?? 0}</div><div class="stat-card-label">${t('profile.wallet.lifetimeEarned')}</div></div>
-        <div class="stat-card"><div class="stat-card-value mono danger">${lifetime.spent ?? 0}</div><div class="stat-card-label">${t('profile.wallet.lifetimeSpent')}</div></div>
-        <div class="stat-card"><div class="stat-card-value mono">${lifetime.received_allowance ?? 0}</div><div class="stat-card-label">${t('profile.wallet.lifetimeAllowance')}</div></div>
-        <div class="stat-card"><div class="stat-card-value mono">${lifetime.welcome_bonus ?? 0}</div><div class="stat-card-label">${t('profile.wallet.lifetimeWelcome')}</div></div>
-      </div>
-    `}
-
-    <!-- Request morsels form -->
-    <div class="wallet-request">
-      <div class="wr-title">${t('profile.wallet.requestTitle')}</div>
-      <div class="wr-desc">${t('profile.wallet.requestDesc')}</div>
-      <form onSubmit=${handleRequestMorsels}>
-        <div class="wr-row">
-          <div class="wr-field">
-            <label>${t('profile.wallet.requestAmount')}</label>
-            <input type="number" min="1" max="500" step="1"
-              value=${reqAmount}
-              onInput=${e => setReqAmount(e.target.value)}
-              placeholder=${t('profile.wallet.requestAmountHint')}
-              class="wallet-input-w"
-              required />
-          </div>
-          <div class="wr-field wallet-reason-field">
-            <label>${t('profile.wallet.requestReason')}</label>
-            <input type="text"
-              value=${reqReason}
-              onInput=${e => setReqReason(e.target.value)}
-              placeholder=${t('profile.wallet.requestReasonPlaceholder')} />
-          </div>
-          <button type="submit" class="btn-primary btn-sm" disabled=${reqLoading}>
-            ${reqLoading ? t('profile.wallet.requesting') : t('profile.wallet.requestBtn')}
-          </button>
-        </div>
-      </form>
-    </div>
-
-    <!-- Transaction history -->
-    <div class="section-title section-title-spaced">${t('profile.wallet.recentTx')}</div>
-    ${(!walletTx || walletTx.length === 0)
-      ? html`<div class="empty">${t('profile.wallet.empty')}</div>`
-      : html`<div class="card"><div class="tx-list">
-          ${walletTx.map(tx => {
-            const isCredit = tx.amount > 0;
-            const typeLabel = txTypeLabel(tx);
-            const isExpanded = expandedTx === tx.id;
-            const txCopyText = [
-              `ID: ${tx.id || '-'}`,
-              `Type: ${tx.type || '-'}`,
-              `Amount: ${tx.amount}`,
-              tx.counterparty_gaii ? `Counterparty: ${tx.counterparty_gaii}` : null,
-              tx.tracking_code ? `Tracking: ${tx.tracking_code}` : null,
-              tx.timestamp ? `Time: ${tx.timestamp}` : null,
-            ].filter(Boolean).join('\n');
-            return html`
-              <div class="tx-item-wrap">
-                <div class="tx-item" onClick=${() => toggleTx(tx.id)}>
-                  <div>
-                    <span class="tx-type">${typeLabel}</span>
-                    ${' '}
-                    <span class="work-desc-text">${escHtml(tx.description || tx.memo || '')}</span>
-                  </div>
-                  <div class="work-tx-right">
-                    <div>
-                      <div class="tx-amount ${isCredit ? 'credit' : 'debit'}">${isCredit ? '+' : ''}${tx.amount}</div>
-                      <div class="tx-date">${tx.timestamp ? timeAgo(tx.timestamp) : (tx.created_at ? timeAgo(tx.created_at) : '')}</div>
-                    </div>
-                    <span class="expand-arrow">${isExpanded ? '\u25B2' : '\u25BC'}</span>
-                  </div>
-                </div>
-                ${isExpanded && html`
-                  <div class="tx-detail">
-                    ${tx.id && html`
-                      <span class="tx-detail-label">ID</span>
-                      <span class="tx-detail-value">${escHtml(tx.id)}</span>
-                    `}
-                    ${tx.type && html`
-                      <span class="tx-detail-label">Type</span>
-                      <span class="tx-detail-value">${escHtml(tx.type)}</span>
-                    `}
-                    ${tx.counterparty_gaii && html`
-                      <span class="tx-detail-label">${t('profile.wallet.counterparty')}</span>
-                      <span class="tx-detail-value">${escHtml(tx.counterparty_gaii)}</span>
-                    `}
-                    ${tx.tracking_code && html`
-                      <span class="tx-detail-label">${t('profile.wallet.trackingCode')}</span>
-                      <span class="tx-detail-value">${escHtml(tx.tracking_code)}</span>
-                    `}
-                    ${tx.timestamp && html`
-                      <span class="tx-detail-label">${t('profile.wallet.timestamp')}</span>
-                      <span class="tx-detail-value">${new Date(tx.timestamp).toLocaleString()}</span>
-                    `}
-                    ${!tx.counterparty_gaii && !tx.tracking_code && !tx.timestamp && html`
-                      <span class="tx-detail-value work-grid-span">${t('profile.wallet.noDetails')}</span>
-                    `}
-                    <div class="work-grid-span">
-                      <span onClick=${(e) => e.stopPropagation()}>
-                        <${CopyButton}
-                          text=${txCopyText}
-                          label=${t('common.copy')}
-                          copiedLabel=${t('common.copied')}
-                          className="btn-outline btn-sm" />
-                      </span>
-                    </div>
-                  </div>
-                `}
-              </div>`;
-          })}
-        </div></div>`
-    }`;
+  const ctx = {
+    session, federated, wallet, rows, rowsTotal, rowsPartial: rows.length < rowsTotal, sessions, orders, payout, earnings, agents, self,
+    filter, shown, filtered, counts, first, last, shares, railsOn, openTx, openRail, openShares, keyDraft, addrDraft, railMsg, requestMsg, busy, ConfirmUI,
+    setFilter, showMore, toggleTx, toggleRail, toggleShares, setKeyDraft, setAddrDraft, saveStripe, saveX402, removeStripe, removeX402, requestToday,
+    openAgents: () => openTab('agents'),
+  };
+  return renderPage(ctx);
 }
