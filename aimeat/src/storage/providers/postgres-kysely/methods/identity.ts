@@ -61,6 +61,10 @@ function toAgentRecord(r: Selectable<Agent>): AgentRecord {
     dailySpendLimit: r.dailySpendLimit ?? undefined,
     consoleUrl: r.consoleUrl ?? undefined, registeredBy: r.registeredBy ?? undefined,
     runMode: (r.runMode ?? undefined) as AgentRecord['runMode'],
+    // JSONB comes back parsed on pg; a string means an older row or a driver that did not.
+    runtimeSource: (typeof r.runtimeSource === 'string'
+      ? JSON.parse(r.runtimeSource)
+      : r.runtimeSource ?? null) as AgentRecord['runtimeSource'],
     identityVersion: (r.identityVersion ?? undefined) as AgentRecord['identityVersion'],
     cardJws: r.cardJws ?? null, cardIssuedAt: r.cardIssuedAt ?? null, enrolledAt: r.enrolledAt ?? null,
     mcpClient: r.mcpClient ?? null, mcpLastSeen: r.mcpLastSeen ?? null,
@@ -149,7 +153,8 @@ export const identityMethods = {
       webhookLastFailure: a.webhookLastFailure ? new Date(a.webhookLastFailure) : null, webhookFailCount: a.webhookFailCount ?? 0,
       platform: a.platform ?? null, platformVersion: a.platformVersion ?? null, platformDetectedBy: a.platformDetectedBy ?? null,
       model: a.model ?? null, modelDetectedBy: a.modelDetectedBy ?? null, consoleUrl: a.consoleUrl ?? null, registeredBy: a.registeredBy ?? null,
-      runMode: a.runMode ?? null, identityVersion: a.identityVersion ?? null,
+      runMode: a.runMode ?? null, runtimeSource: a.runtimeSource ? JSON.stringify(a.runtimeSource) : null,
+      identityVersion: a.identityVersion ?? null,
       cardJws: a.cardJws ?? null, cardIssuedAt: a.cardIssuedAt ?? null, enrolledAt: a.enrolledAt ?? null,
       mcpClient: a.mcpClient ?? null, mcpLastSeen: a.mcpLastSeen ?? null,
       tags: a.tags ?? [], createdAt: new Date(a.createdAt), lastSeen: new Date(a.lastSeen),
@@ -188,7 +193,7 @@ export const identityMethods = {
   async updateAgent(this: PostgresKyselyStorage, gaii: string, updates: Partial<AgentRecord>): Promise<AgentRecord | null> {
     // Json columns must be wrapped with jsonb(); Date columns need Date coercion. Everything else passes
     // through. Build the SET map from only the keys present so a partial update touches nothing extra.
-    const jsonCols = new Set(['technicalCapabilities', 'domainCapabilities', 'activityStats', 'modulesLoaded', 'agentLimitations', 'languages', 'scheduleConstraintDefaults']);
+    const jsonCols = new Set(['technicalCapabilities', 'domainCapabilities', 'activityStats', 'modulesLoaded', 'agentLimitations', 'languages', 'scheduleConstraintDefaults', 'runtimeSource']);
     const dateCols = new Set(['createdAt', 'lastSeen', 'webhookLastSuccess', 'webhookLastFailure']);
     const data: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(updates)) {
