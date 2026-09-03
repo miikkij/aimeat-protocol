@@ -355,6 +355,13 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_memory_search: 'memory:read',
     aimeat_memory_read_public: 'memory:read',
     aimeat_memory_write: 'memory:write',
+    // `memory:delete` finally reaches a tool. It was a scope an owner could grant that no tool
+    // anywhere asked for, so granting it did nothing for an agent using tools.
+    aimeat_memory_delete: 'memory:delete',
+    // RESTORE IS A WRITE, not a delete. Putting a record back into the working set is making it
+    // exist again, and an agent trusted to remove things is not automatically trusted to make
+    // them reappear under a name someone else may now be using.
+    aimeat_memory_restore: 'memory:write',
     // No new word for the data map. It reads and writes a memory record, and a `datamap:*` word
     // would be a permission that has to be enforced on every door or does not exist (invariant 15).
     aimeat_datamap_get: 'memory:read',

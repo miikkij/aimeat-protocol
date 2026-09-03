@@ -86,6 +86,11 @@ export function applySchemaTables1(db: Database.Database): void {
       archivedAt     TEXT,
       archivedBy     TEXT,
       archivedRoot   TEXT,
+      -- IN THE BIN. Deleted, and undoable for as long as the grace window lasts. Not the same as
+      -- archived: an archived row is kept and out of the way, a deleted one answers 404 by key and
+      -- is genuinely removed by the sweeper once the window passes.
+      deletedAt      TEXT,
+      deletedBy      TEXT,
       -- ATTACHED AI provenance (TARGET-058): the ai_provenance row describing how this value was
       -- produced. NULL = unstated, which is not the same as "a human wrote it".
       aiProvenanceId TEXT,

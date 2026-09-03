@@ -64,6 +64,7 @@ export function rowToRecord(r: Selectable<Memory>): MemoryRecord {
   if (r.archivedAt) rec.archivedAt = iso(r.archivedAt);
   if (r.archivedBy) rec.archivedBy = r.archivedBy;
   if (r.archivedRoot) rec.archivedRoot = r.archivedRoot;
+  if (r.deletedAt) { rec.deletedAt = (r.deletedAt instanceof Date ? r.deletedAt.toISOString() : String(r.deletedAt)); rec.deletedBy = r.deletedBy ?? null; }
   if (r.aiProvenanceId) rec.aiProvenanceId = r.aiProvenanceId;
   return rec;
 }

@@ -173,7 +173,16 @@ export const ownerMethods = {
   // ══════════════════════════════════════════════════════════
 
   async setMemory(this: SqliteStorage, record: MemoryRecord): Promise<MemoryRecord> {
-    const existing = await this.getMemory(record.ownerGaii, record.key);
+    // WRITING A KEY THAT IS IN THE BIN BRINGS IT BACK, with the new value. The probe must therefore
+    // see deleted rows, which `getMemory` deliberately does not: read through that and a key in the
+    // bin looks absent, the write takes the INSERT branch, and it collides with the row that is
+    // still there under the same primary key. That surfaced as a 500 on the workspace draft path.
+    //
+    // The old value is not recoverable after this, and that is the right rule: the bin protects
+    // against a DELETE, not against an overwrite, exactly as it never protected against one before.
+    const rawRow = this.db.prepare('SELECT * FROM memory WHERE ownerGaii = ? AND key = ?')
+      .get(record.ownerGaii, record.key) as Record<string, unknown> | undefined;
+    const existing = rawRow ? this.deserializeMemory(rawRow) : null;
     // Trackable is a property of the key: inherit the existing setting if the writer didn't specify, so
     // a generic rewrite never silently turns tracking off. Archiving keeps the PREVIOUS version.
     const trackable = record.trackable ?? existing?.trackable ?? false;
@@ -200,7 +209,7 @@ export const ownerMethods = {
       this.db.prepare(
         `UPDATE memory SET value = ?, visibility = ?, groupId = ?, workspaceRef = ?, tags = ?, ttlHours = ?, version = ?,
          createdAt = ?, updatedAt = ?, flagCount = ?, allowedOrigins = ?, trackable = ?, byteSize = ?,
-         aiProvenanceId = ? WHERE ownerGaii = ? AND key = ?`
+         aiProvenanceId = ?, deletedAt = NULL, deletedBy = NULL WHERE ownerGaii = ? AND key = ?`
       ).run(
         valueStr, record.visibility, groupId, record.workspaceRef ?? null,
         JSON.stringify(record.tags), record.ttlHours,
@@ -302,7 +311,11 @@ export const ownerMethods = {
   },
 
   async getMemory(this: SqliteStorage, ownerGaii: string, key: string): Promise<MemoryRecord | null> {
-    const row = this.db.prepare('SELECT * FROM memory WHERE ownerGaii = ? AND key = ?').get(ownerGaii, key) as Record<string, unknown> | undefined;
+    // A DELETED RECORD READS AS GONE, which is the difference between the bin and the archive: an
+    // archived row is still resolvable by key on purpose, a deleted one must answer 404 or the
+    // delete did nothing a person can see. The row is still there — that is what makes it undoable
+    // — and the restore path reads it with its own query naming `deletedAt`.
+    const row = this.db.prepare('SELECT * FROM memory WHERE ownerGaii = ? AND key = ? AND deletedAt IS NULL').get(ownerGaii, key) as Record<string, unknown> | undefined;
     if (!row) return null;
     const record = this.deserializeMemory(row);
     if (this.isMemoryExpired(record)) {
@@ -408,11 +421,49 @@ export const ownerMethods = {
     return { items, total };
   },
 
-  async deleteMemory(this: SqliteStorage, ownerGaii: string, key: string): Promise<boolean> {
-    const result = this.db.prepare('DELETE FROM memory WHERE ownerGaii = ? AND key = ?').run(ownerGaii, key);
+  /**
+   * INTO THE BIN, NOT OUT OF THE DATABASE. Every caller of `deleteMemory` gets the undo for free,
+   * which is the point: a delete is a delete wherever it is pressed, and there is exactly one place
+   * that decides how long it can be taken back.
+   *
+   * A key already in the bin answers false rather than being re-stamped: deleting twice must not
+   * restart the clock, or a loop that retries could keep a record out of reach forever.
+   */
+  async deleteMemory(this: SqliteStorage, ownerGaii: string, key: string, deletedBy?: string): Promise<boolean> {
+    const result = this.db.prepare(
+      'UPDATE memory SET deletedAt = ?, deletedBy = ? WHERE ownerGaii = ? AND key = ? AND deletedAt IS NULL'
+    ).run(new Date().toISOString(), deletedBy ?? null, ownerGaii, key);
     return result.changes > 0;
   },
 
+  /** Out of the bin, whole. Returns false when nothing of that key is in it — including when the
+   *  sweeper has already been past, which is the honest answer to "can I have it back". */
+  async restoreMemory(this: SqliteStorage, ownerGaii: string, key: string): Promise<boolean> {
+    const result = this.db.prepare(
+      'UPDATE memory SET deletedAt = NULL, deletedBy = NULL WHERE ownerGaii = ? AND key = ? AND deletedAt IS NOT NULL'
+    ).run(ownerGaii, key);
+    return result.changes > 0;
+  },
+
+  /** What is in this owner's bin, newest first. The one read that is allowed to see it. */
+  async listDeletedMemory(this: SqliteStorage, ownerGaii: string): Promise<MemoryRecord[]> {
+    const rows = this.db.prepare(
+      'SELECT * FROM memory WHERE ownerGaii = ? AND deletedAt IS NOT NULL ORDER BY deletedAt DESC'
+    ).all(ownerGaii) as Array<Record<string, unknown>>;
+    return rows.map(r => this.deserializeMemory(r));
+  },
+
+  /** The sweeper's hand. Everything deleted before `cutoff` goes for good — this is the call that
+   *  makes "delete" mean delete, and the only one in the memory path that destroys anything. */
+  async purgeDeletedMemory(this: SqliteStorage, cutoffIso: string): Promise<number> {
+    const result = this.db.prepare(
+      'DELETE FROM memory WHERE deletedAt IS NOT NULL AND deletedAt < ?'
+    ).run(cutoffIso);
+    return result.changes;
+  },
+
+  /** STILL A HARD DELETE, deliberately. This is owner erasure — the cascade behind account deletion
+   *  — and a person asking to be forgotten is not asking for a bin with their data in it. */
   async deleteAllMemory(this: SqliteStorage, ownerGaii: string): Promise<number> {
     const result = this.db.prepare('DELETE FROM memory WHERE ownerGaii = ?').run(ownerGaii);
     return result.changes;
@@ -507,6 +558,10 @@ export const ownerMethods = {
     if (row.archivedAt) record.archivedAt = row.archivedAt as string;
     if (row.archivedBy) record.archivedBy = row.archivedBy as string;
     if (row.archivedRoot) record.archivedRoot = row.archivedRoot as string;
+    // The bin. Two deserialisers exist in this provider — this one and the private copy in
+    // repos/memory.ts that only searchTextMemory uses — so a field added to one is invisible
+    // through the other, which is exactly how the bin listing came back with no date on it.
+    if (row.deletedAt) { record.deletedAt = row.deletedAt as string; record.deletedBy = (row.deletedBy as string) ?? null; }
     if (row.aiProvenanceId) record.aiProvenanceId = row.aiProvenanceId as string;
     return record;
   },

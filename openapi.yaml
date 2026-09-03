@@ -12800,6 +12800,51 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { description: The session does not carry memory:read }
 
+  /v1/memory/deleted:
+    get:
+      operationId: listDeletedMemory
+      summary: What is in the bin
+      description: >
+        Every memory entry this principal has deleted and not yet lost, newest
+        first, each with the moment it stops being takeable back. Its own path
+        rather than a flag on the listing: "what do I have" and "what did I
+        throw away" are different questions, and a flag would put the bin one
+        typo away from every AI-facing material assembly.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+  /v1/memory/{key}/restore:
+    post:
+      operationId: restoreMemory
+      summary: Take a deleted entry back
+      description: >
+        Put a deleted memory entry back, whole, as long as the grace window has
+        not closed. Refused with NOT_RESTORABLE once it has been removed for
+        good — which is also the answer when it was never deleted or was never
+        yours, because telling those apart would make this a way to ask whether
+        somebody else's key exists.
+
+
+        Gated on `memory:write`, not `memory:delete`: putting a record back into
+        the working set is making it exist again, and an agent trusted to remove
+        things is not automatically trusted to make them reappear.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /v1/memory/{key}:
     get:
       operationId: readMemory
@@ -12883,11 +12928,24 @@ paths:
       operationId: deleteMemory
       summary: Delete memory
       description: >
-        Delete a memory entry by key. Owner sessions may delete entries stored
-        under any of their own agents — if the key is not found under the
-        owner's GHII, the server looks it up across the owner's agents and
-        deletes the match. Operators may delete any owner's entry by passing
-        the `owner` query parameter.
+        Delete a memory entry by key. It leaves every read at once — by key, in
+        lists, in searches, in the archive search — and stays takeable back for
+        `memoryDeleteGraceDays` (default 7), after which a sweeper removes it
+        for good. The answer carries `restorable_until`, and
+        `POST /v1/memory/{key}/restore` is the way back.
+
+
+        This node deliberately had no delete for most of its life: a value could
+        be emptied but never removed, so nothing could be lost by accident. The
+        grace window is how that caution survives having a delete. A grace of 0
+        makes the removal immediate and final, which is an operator's decision
+        to make deliberately.
+
+
+        Owner sessions may delete entries stored under any of their own agents —
+        if the key is not found under the owner's GHII, the server looks it up
+        across the owner's agents and deletes the match. Operators may delete
+        any owner's entry by passing the `owner` query parameter.
       tags: [Memory]
       security:
         - BearerAuth: []

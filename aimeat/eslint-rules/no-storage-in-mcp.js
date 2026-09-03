@@ -75,6 +75,7 @@ const EXEMPT = new Set([
   'src/mcp/commerce.ts',
   'src/mcp/companies.ts',
   'src/mcp/consent.ts',
+  'src/mcp/core-boards.ts',            // pure extraction out of core.ts (max-file-lines), same backlog
   'src/mcp/core-admin.ts',
   'src/mcp/core-storage.ts',
   'src/mcp/core.ts',

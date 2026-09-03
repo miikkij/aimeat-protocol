@@ -17,6 +17,7 @@
  */
 
 import type { Router } from 'express';
+import { deleteMemoryRecord, restoreMemoryRecord } from '../../services/memory-bin.js';
 import { requireAuth, requireRole, requireScope, requireExternalPrincipal } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { MemoryUpdateSchema, validateBody } from '../../models/schemas.js';
@@ -40,6 +41,34 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
   const { config, storage, memoryDb, stats, peers, resolve, workspaceAccess } = ctx;
 
   // GET /v1/memory/:key — read a memory entry
+  // BEFORE `/v1/memory/:key`, AND THAT IS THE WHOLE REASON IT SITS HERE. Express matches in
+  // registration order, so declared after it this route never runs: the literal `deleted`
+  // becomes the key and the answer is "Memory key not found: deleted" — a 404 that looks like
+  // an empty bin and is really a route that was never reached.
+  // GET /v1/memory/deleted — what is in the bin, and how long each one has left.
+  //
+  // Its own route rather than a flag on the listing, because the two answer different questions: the
+  // listing is "what do I have", this is "what did I throw away". A flag would have put the bin one
+  // typo away from every AI-facing material assembly, which is the mistake the whole exclusion
+  // machinery exists to prevent.
+  router.get('/v1/memory/deleted', requireAuth(), requireExternalPrincipal(), requireScope('memory:read'), async (req, res) => {
+    const gaii = resolve(req);
+    const graceMs = config.memoryDeleteGraceDays * 86_400_000;
+    const rows = await storage.listDeletedMemory(gaii);
+    res.json(success(config.nodeId, {
+      items: rows.map(r => ({
+        key: r.key,
+        deleted_at: r.deletedAt,
+        deleted_by: r.deletedBy ?? null,
+        // What a person actually needs: not the date it went, but how long they have left.
+        restorable_until: graceMs > 0 && r.deletedAt
+          ? new Date(new Date(r.deletedAt).getTime() + graceMs).toISOString()
+          : null,
+      })),
+      grace_days: config.memoryDeleteGraceDays,
+    }));
+  });
+
   router.get('/v1/memory/:key', requireAuth(), requireExternalPrincipal(), requireScope('memory:read'), workspaceAccess, async (req, res) => {
     let gaii = resolve(req);
     const key = decodeURIComponent(req.params.key as string);
@@ -150,39 +179,19 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
       return;
     }
 
-    // Defense-in-depth: verify ownership before deletion
-    // Operators can delete any key by passing ?owner=... query parameter
+    // WHO MAY REMOVE WHAT lives in services/memory-bin.ts, because the tool surfaces ask the same
+    // question and a second copy here is the drift this codebase keeps paying for. What stays in
+    // the route is what belongs to the route: the operator's ?owner= override (a ROLE check, and
+    // roles are the door's business), the owner-scope opt-in, and the workspace guard below.
     const ownerOverride = req.query.owner as string | undefined;
-    let effectiveOwner = (ownerOverride && req.auth!.roles.includes('operator')) ? ownerOverride : gaii;
-    let existing = await storage.getMemory(effectiveOwner, key);
-
-    // The owner can delete anything the owner owns, whoever wrote it. Mirrors the cross-agent
-    // lookup in PUT /v1/memory/:key — without it, an owner (whose GAII is the GHII) deleting a key
-    // stored under one of their agents would get a spurious 404. Only kicks in when no explicit
-    // operator ?owner= override was supplied.
-    //
-    // `?owner_scope=true` extends the same reach to another same-owner principal that already
-    // carries memory:delete — an app grant, or an agent — exactly as GET /v1/memory/:key does for
-    // reads (same-owner-access invariant). Without the opt-in an app the owner authorised could
-    // LIST an agent-written key (list defaults to the owner scope) and then fail to delete it,
-    // which is how a delete button came to point at a record it could never remove.
     const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
-    const ownerScopeDelete = isOwnerSession || req.query.owner_scope === 'true';
-    if (!existing && ownerScopeDelete && !ownerOverride) {
-      const agents = await storage.getAgentsByOwner(req.auth!.owner as string);
-      for (const agent of agents) {
-        const found = await storage.getMemory(agent.gaii, key);
-        if (found) { existing = found; effectiveOwner = agent.gaii; break; }
-      }
-    }
-    if (!existing) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Memory key not found: ${key}`));
-      return;
-    }
-    if (existing.ownerGaii !== effectiveOwner && !req.auth!.roles.includes('operator')) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only delete your own memory records'));
-      return;
-    }
+    const binReq = {
+      caller: gaii,
+      ownerName: req.auth!.owner as string,
+      key,
+      ownerScope: isOwnerSession || req.query.owner_scope === 'true',
+      ownerOverride: (ownerOverride && req.auth!.roles.includes('operator')) ? ownerOverride : null,
+    };
 
     // TARGET-009 S1/S3: an append-only workspace namespace (manifest create_only) refuses
     // .latest/.version deletes on every path — existing events can never be erased.
@@ -192,23 +201,67 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
       return;
     }
 
-    const deleted = await storage.deleteMemory(effectiveOwner, key);
-    if (!deleted) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Memory key not found: ${key}`));
+    // Who to ask, if somebody later wonders where it went. The principal, not the owner name:
+    // `req.auth.owner` is the human on an agent token too, so it would name the wrong party.
+    // The tombstone, and the moment it stops being takeable back.
+    const outcome = await deleteMemoryRecord({ storage, config }, binReq);
+    if (!outcome.ok) {
+      res.status(404).json(error(config.nodeId, outcome.code, outcome.message));
       return;
     }
 
-    emitResourceUpdated(effectiveOwner, `aimeat://memory/${encodeURIComponent(key)}`);
-    emitResourceListChanged(effectiveOwner);
+    emitResourceUpdated(outcome.ownerGaii, `aimeat://memory/${encodeURIComponent(key)}`);
+    emitResourceListChanged(outcome.ownerGaii);
 
+    // THE WAY BACK IS IN THE ANSWER. A person who has just deleted something by mistake should not
+    // have to go looking for how to undo it, and an agent reading this envelope learns the route
+    // without being told. `restorable_until` is the promise the sweeper keeps.
+    const graceDays = outcome.graceDays;
     res.json(success(config.nodeId, {
       deleted: true,
       key,
+      restorable_until: outcome.restorableUntil,
+      grace_days: graceDays,
     }, [
+      ...(graceDays > 0
+        ? [{ description: 'Changed your mind — put it back', method: 'POST', url: `/v1/memory/${encodeURIComponent(key)}/restore` }]
+        : []),
+      { description: 'See everything waiting to be removed', method: 'GET', url: '/v1/memory/deleted' },
       { description: 'List remaining memory keys', method: 'GET', url: '/v1/memory' },
-      { description: 'Write a new memory entry', method: 'POST', url: '/v1/memory' },
     ]));
     emitChange('memory');
+  });
+
+  // POST /v1/memory/:key/restore — take it back.
+  //
+  // `memory:write`, not `memory:delete`: restoring puts a record back into the working set, which is
+  // a write. An agent trusted to remove things is not automatically trusted to make them reappear,
+  // and the person who has to live with the record is the one whose scope should say so.
+  router.post('/v1/memory/:key/restore', requireAuth(), requireExternalPrincipal(), requireScope('memory:write'), async (req, res) => {
+    const gaii = resolve(req);
+    const key = decodeURIComponent(req.params.key as string);
+    const out = await restoreMemoryRecord({ storage, config }, {
+      caller: gaii, ownerName: req.auth!.owner as string, key,
+      // Same reach as the delete beside it, and for the same reason: whoever could remove a
+      // sibling's key has to be able to put it back, or the undo is narrower than the act.
+      ownerScope: (req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent')) || req.query.owner_scope === 'true',
+    });
+    const restored = out.ok;
+    if (!restored) {
+      // ONE REFUSAL FOR THREE CAUSES, said as the one thing a person can act on. It was never
+      // deleted, it was never yours, or the window closed and it is genuinely gone — and the node
+      // cannot tell the first two apart without turning this route into a way to ask whether
+      // somebody else's key exists.
+      res.status(404).json(error(config.nodeId, 'NOT_RESTORABLE',
+        'There is nothing of that name waiting to be put back. Either it was never deleted, or it has already been removed for good.'));
+      return;
+    }
+    emitResourceUpdated(gaii, `aimeat://memory/${encodeURIComponent(key)}`);
+    emitResourceListChanged(gaii);
+    emitChange('memory');
+    res.json(success(config.nodeId, { restored: true, key }, [
+      { description: 'Read it', method: 'GET', url: `/v1/memory/${encodeURIComponent(key)}` },
+    ]));
   });
 
   // PUT /v1/memory/:key — update memory with optimistic locking

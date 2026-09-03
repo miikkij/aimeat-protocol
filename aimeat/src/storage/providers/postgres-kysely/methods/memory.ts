@@ -42,10 +42,19 @@ function annotation(value: unknown, field: '_actor' | '_event'): string | null {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function applyArchive(q: any, archived?: ArchiveFilter) {
+  // THE BIN IS HIDDEN ON EVERY BRANCH, `include` and `only` alike. A deleted record is not an
+  // archived one: archived means kept and out of the way, deleted means on its way out, and an
+  // archive search that returned the bin would make the two words mean one thing. Every bulk read
+  // passes through here, which is why this is the only place it has to be said.
+  q = q.where('deletedAt', 'is', null);
   if (archived === 'only') return q.where('archived', '=', true);
   if (archived === 'include') return q;
   return q.where('archived', '=', false);   // default: exclude archived
 }
+
+/** Live AND not in the bin. The by-key reads do not pass through applyArchive, so they ask here. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const isVisible = (r: any): boolean => isLive(r) && !r.deletedAt;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function applyList(q: any, opts?: ListOpts) {
   if (opts?.prefix) q = q.where('key', 'like', opts.prefix + '%');
@@ -95,6 +104,10 @@ export const memoryMethods = {
         // Write-through, deliberately NOT inherited from `existing`: a new value is new content, and
         // keeping the old provenance id would assert something about bytes that no longer exist.
         aiProvenanceId: record.aiProvenanceId ?? null,
+        // WRITING A KEY THAT IS IN THE BIN BRINGS IT BACK, with the new value. The bin protects
+        // against a DELETE, not against an overwrite — exactly as nothing ever protected against
+        // one — so the old value does not survive this and is not meant to.
+        deletedAt: null, deletedBy: null,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any).where('ownerGaii', '=', record.ownerGaii).where('key', '=', record.key).execute();
     } else {
@@ -175,14 +188,14 @@ export const memoryMethods = {
 
   async getMemory(this: PostgresKyselyStorage, ownerGaii: string, key: string): Promise<MemoryRecord | null> {
     const r = await this.db.selectFrom('Memory').selectAll().where('ownerGaii', '=', ownerGaii).where('key', '=', key).executeTakeFirst();
-    if (!r || !isLive(r)) return null;
+    if (!r || !isVisible(r)) return null;
     return rowToRecord(r);
   },
 
   async getMemoryByKeys(this: PostgresKyselyStorage, ownerGaii: string, keys: string[]): Promise<MemoryRecord[]> {
     if (keys.length === 0) return [];
     const rows = await this.db.selectFrom('Memory').selectAll().where('ownerGaii', '=', ownerGaii).where('key', 'in', keys).execute();
-    return rows.filter(isLive).map(rowToRecord);
+    return rows.filter(isVisible).map(rowToRecord);
   },
 
   // BULK PRIMITIVE (Phase 2) — many keys across ALL owners in ONE `key IN (…)` query (no owner filter).
@@ -191,7 +204,7 @@ export const memoryMethods = {
   async getMemoryByKeysAnyOwner(this: PostgresKyselyStorage, keys: string[]): Promise<MemoryRecord[]> {
     if (keys.length === 0) return [];
     const rows = await this.db.selectFrom('Memory').selectAll().where('key', 'in', keys).execute();
-    return rows.filter(isLive).map(rowToRecord);
+    return rows.filter(isVisible).map(rowToRecord);
   },
 
   async bulkSetMemory(this: PostgresKyselyStorage, records: MemoryRecord[]): Promise<MemoryRecord[]> {
@@ -223,9 +236,44 @@ export const memoryMethods = {
     return records;
   },
 
-  async deleteMemory(this: PostgresKyselyStorage, ownerGaii: string, key: string): Promise<boolean> {
-    const r = await this.db.deleteFrom('Memory').where('ownerGaii', '=', ownerGaii).where('key', '=', key).executeTakeFirst();
-    return Number(r.numDeletedRows ?? 0) > 0;
+  /**
+   * INTO THE BIN, NOT OUT OF THE DATABASE. Every caller of `deleteMemory` gets the undo for free,
+   * which is the point: a delete is a delete wherever it is pressed, and one place decides how long
+   * it can be taken back. A key already in the bin answers false rather than being re-stamped —
+   * deleting twice must not restart the clock.
+   */
+  async deleteMemory(this: PostgresKyselyStorage, ownerGaii: string, key: string, deletedBy?: string): Promise<boolean> {
+    const r = await this.db.updateTable('Memory')
+      .set({ deletedAt: new Date(), deletedBy: deletedBy ?? null })
+      .where('ownerGaii', '=', ownerGaii).where('key', '=', key).where('deletedAt', 'is', null)
+      .executeTakeFirst();
+    return Number(r.numUpdatedRows ?? 0) > 0;
+  },
+
+  /** Out of the bin, whole. False when nothing of that key is in it — including after the sweeper
+   *  has been past, which is the honest answer to "can I have it back". */
+  async restoreMemory(this: PostgresKyselyStorage, ownerGaii: string, key: string): Promise<boolean> {
+    const r = await this.db.updateTable('Memory')
+      .set({ deletedAt: null, deletedBy: null })
+      .where('ownerGaii', '=', ownerGaii).where('key', '=', key).where('deletedAt', 'is not', null)
+      .executeTakeFirst();
+    return Number(r.numUpdatedRows ?? 0) > 0;
+  },
+
+  /** What is in this owner's bin, newest first. The one read allowed to see it. */
+  async listDeletedMemory(this: PostgresKyselyStorage, ownerGaii: string): Promise<MemoryRecord[]> {
+    const rows = await this.db.selectFrom('Memory').selectAll()
+      .where('ownerGaii', '=', ownerGaii).where('deletedAt', 'is not', null)
+      .orderBy('deletedAt', 'desc').execute();
+    return rows.map(rowToRecord);
+  },
+
+  /** The sweeper's hand: the one call in the memory path that destroys anything. */
+  async purgeDeletedMemory(this: PostgresKyselyStorage, cutoffIso: string): Promise<number> {
+    const r = await this.db.deleteFrom('Memory')
+      .where('deletedAt', 'is not', null).where('deletedAt', '<', new Date(cutoffIso))
+      .executeTakeFirst();
+    return Number(r.numDeletedRows ?? 0);
   },
 
   async deleteAllMemory(this: PostgresKyselyStorage, ownerGaii: string): Promise<number> {
@@ -263,7 +311,7 @@ export const memoryMethods = {
 
   async listMemory(this: PostgresKyselyStorage, ownerGaii: string, opts?: ListOpts): Promise<MemoryRecord[]> {
     const rows = await applyList(this.db.selectFrom('Memory').selectAll().where('ownerGaii', '=', ownerGaii), opts).execute();
-    return rows.filter(isLive).map(rowToRecord);
+    return rows.filter(isVisible).map(rowToRecord);
   },
 
   async listMemoryMeta(this: PostgresKyselyStorage, ownerGaii: string, opts?: ListOpts): Promise<MemoryMetaRow[]> {
@@ -274,7 +322,7 @@ export const memoryMethods = {
   async listMemoryForOwners(this: PostgresKyselyStorage, ownerGaiis: string[], opts?: ListOpts): Promise<MemoryRecord[]> {
     if (ownerGaiis.length === 0) return [];
     const rows = await applyList(this.db.selectFrom('Memory').selectAll().where('ownerGaii', 'in', ownerGaiis), opts).execute();
-    return rows.filter(isLive).map(rowToRecord);
+    return rows.filter(isVisible).map(rowToRecord);
   },
 
   async listMemoryMetaForOwners(this: PostgresKyselyStorage, ownerGaiis: string[], opts?: ListOpts): Promise<MemoryMetaRow[]> {
@@ -312,7 +360,7 @@ export const memoryMethods = {
     let q = applyList(this.db.selectFrom('Memory').selectAll().where('ownerGaii', '=', ownerGaii), opts as ListOpts);
     q = q.where(sql<boolean>`"searchBlob" ILIKE ${'%' + query + '%'}`);
     const rows = await q.limit(opts?.limit ?? 100).execute();
-    return rows.filter(isLive).map(rowToRecord);
+    return rows.filter(isVisible).map(rowToRecord);
   },
 
   async searchText(this: PostgresKyselyStorage, query: string, opts?: MemoryTextSearchOpts): Promise<MemoryTextHit[]> {

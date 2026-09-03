@@ -54,6 +54,28 @@ export interface MemoryRecord {
    */
   archivedRoot?: string;
   /**
+   * IN THE BIN. Set when someone deleted this record, and it is what makes the delete undoable.
+   *
+   * THIS NODE USED TO HAVE NO DELETE AT ALL, on purpose: a value could be emptied but never removed,
+   * so nothing could be lost by accident. That principle cost something real — an agent could write
+   * memory through a tool and never clean up after itself, and `memory:delete` was a permission an
+   * owner could grant that reached no tool at all. A delete with a way back keeps the principle and
+   * pays the cost: the record leaves every read the moment it is deleted, and comes back whole for
+   * as long as the grace window lasts.
+   *
+   * DELETED IS NOT ARCHIVED, and the two must not be read as one. Archived means kept and out of the
+   * way: still resolvable by key, findable with an explicit archive search, restored by intent.
+   * Deleted means gone: it answers 404 by key, it is absent from the archive search too, and after
+   * the window it is genuinely removed — `memoryDeleteGraceDays`, default 7, and the sweeper does
+   * the removing. A "delete" that never deletes would be a word that lies.
+   *
+   * It stops counting against the key ceiling the moment it is set, so cleaning up can never be the
+   * thing that locks an agent out of writing.
+   */
+  deletedAt?: string | null;
+  /** Identity (GHII/GAII) that deleted the record. Who to ask, if someone wonders where it went. */
+  deletedBy?: string | null;
+  /**
    * The ATTACHED half of AI provenance (TARGET-058): the id of an `AiProvenanceRecordRow` describing
    * how this record's VALUE was produced. Absent means UNSTATED — never "a human wrote it".
    *

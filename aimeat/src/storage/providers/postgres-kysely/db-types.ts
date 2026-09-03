@@ -1498,6 +1498,8 @@ export interface Memory {
   archivedRoot: string | null;
   byteSize: Generated<number>;
   createdAt: Generated<Timestamp>;
+  deletedAt: Timestamp | null;
+  deletedBy: string | null;
   flagCount: Generated<number>;
   groupId: string | null;
   id: Generated<string>;
