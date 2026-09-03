@@ -13,12 +13,14 @@
  * @version-history
  *   v1.0.0 — 2026-09-02 — Initial: motion 13.1.1, anime.js 4.5.0, lenis 1.3.26 vendored under
  *     /lib/ for published apps and the Atelier kit (wish-atelier-motion-libraries-and-parts).
+ *   v1.1.0 — 2026-09-03 — showcaseUrl on motion, anime and lenis: their Design Book sections.
  */
 import type { LibraryPack } from '../library-packs.js';
 
 export const MOTION_PACKS: LibraryPack[] = [
   {
     id: 'motion',
+    showcaseUrl: 'https://design-book.apps.aimeat.io/',
     kind: 'vendored',
     category: 'ui',
     title: 'Motion (animation, scroll and gestures)',
@@ -78,6 +80,7 @@ export const MOTION_PACKS: LibraryPack[] = [
   },
   {
     id: 'anime',
+    showcaseUrl: 'https://design-book.apps.aimeat.io/',
     kind: 'vendored',
     category: 'ui',
     title: 'anime.js 4 (timelines and sequenced animation)',
@@ -141,6 +144,7 @@ export const MOTION_PACKS: LibraryPack[] = [
   },
   {
     id: 'lenis',
+    showcaseUrl: 'https://design-book.apps.aimeat.io/',
     kind: 'vendored',
     category: 'ui',
     title: 'Lenis (smooth scroll)',

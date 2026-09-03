@@ -11,6 +11,7 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=dependency-map
  * @version-history
  *   v1.0.0 — 2026-09-03 — Initial (dependency map, slice 1; brief doc-mtkr34qa1dg1).
+ *   v1.1.0 — 2026-09-03 — A library pack an app includes is an edge: ?pack=, requires.packs, the pack index used_by, and the edge goes with the app.
  */
 
 import * as ed from '@noble/ed25519';
@@ -169,6 +170,24 @@ await test('a parked app is counted for a stranger and named only to its owner',
     assert(mine.data.used_by.apps.some((a: any) => a.owner === ownerB), `owner cannot see own parked dependant: ${JSON.stringify(mine.data.used_by)}`);
     assert(theirs.data.used_by.apps_total >= 2, `stranger count lost the parked app: ${JSON.stringify(theirs.data.used_by)}`);
     assert(!theirs.data.used_by.apps.some((a: any) => a.owner === ownerB), `stranger was handed a parked app's name: ${JSON.stringify(theirs.data.used_by)}`);
+});
+
+await test('a library pack an app includes is an edge too: ?pack=, requires.packs and the pack index used_by', async () => {
+    const src = `<!DOCTYPE html><html><head><script src="/v1/libs/aimeat-auth.js"></script><script src="https://example.test/lib/chartjs@4.js"></script></head><body></body></html>`;
+    const pub = await json('/v1/apps', auth(tokenA, { method: 'POST', body: JSON.stringify({ filename: 'dep-pack.html', content: b64(src), name: 'Dep pack app', description: 'includes packs', category: 'utility' }) }));
+    assert(pub.status === 201 || pub.status === 200, `publish ${pub.status}: ${JSON.stringify(pub.body).slice(0, 200)}`);
+    const { body: d } = await json(`/v1/dependencies?pack=aimeat-auth`, auth(tokenA));
+    assert(d.data.pack === 'aimeat-auth' && d.data.used_by.apps.some((a: any) => a.owner === ownerA && a.filename === 'dep-pack.html'), `?pack= used_by: ${JSON.stringify(d.data)}`);
+    const { body: r } = await json(`/v1/dependencies?app=${ownerA}/dep-pack.html`, auth(tokenA));
+    const packs = r.data.requires.packs.map((p: any) => p.name).sort();
+    assert(packs.join(',') === 'aimeat-auth,chartjs', `requires.packs: ${JSON.stringify(r.data.requires)}`);
+    const { body: idx } = await json('/v1/library-packs');
+    const chart = idx.data.packs.find((p: any) => p.id === 'chartjs');
+    assert(chart && chart.used_by.apps >= 1 && chart.used_by.app_names.includes(`${ownerA}/dep-pack.html`), `pack index used_by: ${JSON.stringify(chart?.used_by)}`);
+    const del = await json('/v1/apps/dep-pack.html', auth(tokenA, { method: 'DELETE' }));
+    assert(del.status === 200, `delete ${del.status}`);
+    const { body: after } = await json(`/v1/dependencies?pack=chartjs`, auth(tokenA));
+    assert(!after.data.used_by.apps.some((a: any) => a.filename === 'dep-pack.html'), 'deleted app still listed under the pack');
 });
 
 await test('?app= without a slash → 400', async () => {

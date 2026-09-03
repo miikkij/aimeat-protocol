@@ -12218,7 +12218,10 @@ paths:
         tools/aeb/acceleration-tiers.md. Two sources merge: scope "node" (the curated registry —
         every AI-facing library list derives from it: build-app prompt, GET /v1/libs, bootstrap,
         llms.txt) and scope "community" (active + public user-installed cortex extensions that ship
-        a lib component; always status "preview", no tier/proofs — unvetted by the node). Public (CORS *).
+        a lib component; always status "preview", no tier/proofs — unvetted by the node). Every pack
+        also carries used_by ({apps, cortexes, app_names[], cortex_names[]}: the published apps whose
+        source includes the pack, read by the dependency map), and a node pack may carry supersededBy
+        (a deprecated pack's replacement) and showcaseUrl (where it is seen working). Public (CORS *).
       tags:
         - Discovery
       parameters:
@@ -33237,13 +33240,17 @@ paths:
         - name: cortex
           in: query
           schema: { type: string }
+        - name: pack
+          in: query
+          description: A library pack id from /v1/library-packs (sdk, vendored or bundle kind; a cortex-kind pack is asked for with ?cortex=)
+          schema: { type: string }
         - name: app
           in: query
           description: owner/filename
           schema: { type: string }
       responses:
         '200':
-          description: data.used_by (apps, apps_total, cortexes) · data.requires (cortex, extensions) · or data.extensions + data.cortexes + data.apps for the whole map
+          description: data.used_by (apps, apps_total, cortexes) · data.requires (cortex, extensions, packs) · or data.extensions + data.cortexes + data.packs + data.apps for the whole map
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':

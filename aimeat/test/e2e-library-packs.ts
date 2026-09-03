@@ -15,6 +15,7 @@
  *     wasm are served with the right content-type and an immutable cache. The wasm is checked with
  *     HEAD (no 32 MB transfer) and the failure message names `pnpm vendor:libs`, since a missing
  *     vendored asset is the one way this pack breaks.
+ *   v1.2.0 — 2026-09-03 — A deprecated pack names its successor; every pack carries used_by; showcaseUrl; the fi and es overlays.
  */
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
@@ -412,6 +413,21 @@ await test('community pack: a stranger cannot publish proofs onto another owner\
 
   await json(`/v1/memory/libpack.proofs.${extName}`, { method: 'DELETE', headers: bAuth });
   await json(`/v1/cortex/${extName}`, { method: 'DELETE', headers: aAuth });
+});
+
+await test('a deprecated pack names its successor and every pack says who uses it', async () => {
+  const { body } = await json('/v1/library-packs');
+  const packs = body.data.packs as any[];
+  const three = packs.find(p => p.id === 'three');
+  assert(three && three.status === 'deprecated' && three.supersededBy === 'three-world', `three: ${JSON.stringify({ status: three?.status, supersededBy: three?.supersededBy })}`);
+  assert(packs.every(p => p.used_by && typeof p.used_by.apps === 'number' && Array.isArray(p.used_by.app_names)), 'a pack lacks used_by');
+  const showcased = packs.filter(p => typeof p.showcaseUrl === 'string');
+  assert(showcased.length >= 5 && showcased.every(p => /^https:\/\//.test(p.showcaseUrl)), `showcaseUrl: ${showcased.length}`);
+  const { body: fi } = await json('/v1/library-packs?lang=fi');
+  const auth = (fi.data.packs as any[]).find(p => p.id === 'aimeat-auth');
+  assert(auth && /Kirjautuminen/.test(auth.description) && auth.title === 'Auth & session', `fi overlay: ${JSON.stringify({ title: auth?.title, description: auth?.description?.slice(0, 40) })}`);
+  const { body: es } = await json('/v1/library-packs?lang=es');
+  assert((es.data.packs as any[]).find(p => p.id === 'pixi')?.title === 'PixiJS 8 (2D WebGL)', 'es overlay missing');
 });
 
 await test('installing a community pack refuses an anonymous caller', async () => {

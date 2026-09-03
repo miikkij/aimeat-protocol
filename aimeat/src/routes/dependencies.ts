@@ -12,6 +12,7 @@
  * @usage app.use(dependenciesRouter(config, storage)) from the routes loader.
  * @version-history
  *   v1.0.0 — 2026-09-03 — Initial (dependency map, slice 1).
+ *   v1.1.0 — 2026-09-03 — ?pack= answers who uses one library pack; the whole map carries `packs`.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -28,14 +29,15 @@ export function dependenciesRouter(config: AimeatConfig, storage: Storage): Rout
     const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
     const extension = str(req.query.extension);
     const cortex = str(req.query.cortex);
+    const pack = str(req.query.pack);
     const app = str(req.query.app);
     const { visible } = await visibleAppRefs(storage, `${viewer}@${config.nodeId}`);
     const name = (a: { owner: string; filename: string }) => visible.has(appRef(a.owner, a.filename));
 
-    if (extension || cortex) {
-      const d = await dependentsOf(storage, extension ? 'extension' : 'cortex', (extension ?? cortex)!);
+    if (extension || cortex || pack) {
+      const d = await dependentsOf(storage, extension ? 'extension' : cortex ? 'cortex' : 'pack', (extension ?? cortex ?? pack)!);
       res.json(success(config.nodeId, {
-        ...(extension ? { extension } : { cortex }),
+        ...(extension ? { extension } : cortex ? { cortex } : { pack }),
         used_by: {
           apps: d.apps.filter(name),
           apps_total: d.apps.length,
@@ -61,10 +63,12 @@ export function dependenciesRouter(config: AimeatConfig, storage: Storage): Rout
     res.json(success(config.nodeId, {
       extensions: rows(idx.byExtension),
       cortexes: rows(idx.byCortex),
+      packs: rows(idx.byPack),
       apps: [...idx.byApp].filter(([ref]) => visible.has(ref)).map(([ref, r]) => ({ app: ref, requires: r })),
     }, [
       { description: 'Who uses one extension', method: 'GET', url: '/v1/dependencies?extension={name}' },
       { description: 'Who uses one cortex', method: 'GET', url: '/v1/dependencies?cortex={name}' },
+      { description: 'Who uses one library pack', method: 'GET', url: '/v1/dependencies?pack={id}' },
       { description: 'What one app needs', method: 'GET', url: '/v1/dependencies?app={owner}/{filename}' },
     ]));
   });

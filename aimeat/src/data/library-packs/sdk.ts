@@ -10,6 +10,7 @@
  * @structure SDK_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
+ *   v1.7.0 — 2026-09-03 — showcaseUrl on aimeat-phaser, aimeat-assets and aimeat-atelier: the Design Book shows them working.
  *   v1.6.0 — 2026-09-03 — aimeat-phaser wave two in the aiDoc: effects, parallax, day and night,
  *     sprites and the actor, enemy brains and pathfinding, the boss, the overworld, the tile
  *     world, dialogue and cutscenes, status, trophies, chiptune, the two designer panels
@@ -422,6 +423,7 @@ export const SDK_PACKS: LibraryPack[] = [
   },
   {
     id: 'aimeat-assets',
+    showcaseUrl: 'https://design-book.apps.aimeat.io/',
     kind: 'sdk',
     category: 'media',
     title: 'Asset manager (images, atlases, audio, texts, fonts, tilemaps as one manifest)',
@@ -459,6 +461,7 @@ export const SDK_PACKS: LibraryPack[] = [
   },
   {
     id: 'aimeat-phaser',
+    showcaseUrl: 'https://design-book.apps.aimeat.io/',
     kind: 'sdk',
     category: 'ui',
     title: 'Phaser 4 game base (boot, packs, saves, controls, menus, levels, settings, effects, sprites, worlds, enemies, bosses, dialogue, music)',
@@ -541,6 +544,7 @@ export const SDK_PACKS: LibraryPack[] = [
   },
   {
     id: 'aimeat-atelier',
+    showcaseUrl: 'https://design-book.apps.aimeat.io/',
     kind: 'sdk',
     category: 'ui',
     title: 'Atelier UI kit',

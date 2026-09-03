@@ -20,6 +20,8 @@
  *   · buildLlmsPacksTable()
  * @usage import { getLibraryPacks, buildPromptLibrarySections } from '../data/library-packs.js';
  * @version-history
+ *   v1.1.0 — 2026-09-03 — The index carries supersededBy and showcaseUrl; the Finnish and Spanish
+ *     overlays live in ./library-packs/translations.ts and cover every node pack.
  *   2026-07-19 — Self-reported acceleration proofs (AppDev KB Phase 8): community-pack + template proofs; self_reported labeling
  *   v1.0.0 — 2026-07-16 — initial registry + surface generators (Library Acceleration Program,
  *     Phase 1: kills the 4-way hardcoded lib-list drift).
@@ -28,6 +30,7 @@
 import { SDK_PACKS } from './library-packs/sdk.js';
 import { CORTEX_PACKS } from './library-packs/cortex.js';
 import { VENDORED_PACKS } from './library-packs/vendored.js';
+import { TRANSLATIONS } from './library-packs/translations.js';
 
 export interface PackChange {
   /** The pack version this entry describes. */
@@ -107,6 +110,8 @@ export interface LibraryPack {
    * the ONLY moment this can be said, because the old pack is what an existing app still names.
    */
   supersededBy?: string;
+  /** Where the pack is seen working (the Design Book, a showcase app): a public address, when one exists. */
+  showcaseUrl?: string;
   /**
    * The strongest model-strength this pack is reliably-and-accelerated on — a WARNING label, not a
    * gate (an unlabelled pack still ships). Driven by API-version drift from training data:
@@ -139,21 +144,6 @@ export interface LibraryPack {
 
 const PACKS: LibraryPack[] = [...SDK_PACKS, ...CORTEX_PACKS, ...VENDORED_PACKS];
 
-// Localized title/description overlays for picker-visible packs (same pattern as
-// app-templates.ts TRANSLATIONS). English lives on the pack itself.
-const TRANSLATIONS: Record<string, Record<string, { title: string; description?: string }>> = {
-  fi: {
-    styling: { title: 'Tyylipino (Tailwind + daisyUI)', description: 'Itse isännöity Tailwind CSS v4 + daisyUI v5 + AIMEAT-teemasilta — utility-luokat ilman käsin kirjoitettua CSS:ää, seuraa vaalea/tumma-teemaa.' },
-    chartjs: { title: 'Chart.js 4 (raaka)', description: 'Chart.js v4 itse isännöitynä (window.Chart) — koko Chart.js-API omiin kaavioihin; aimeat-charts-cortex on saman tiedoston helpompi kääre.' },
-    mermaid: { title: 'Mermaid-kaaviot', description: 'Mermaid v11 itse isännöitynä — vuokaaviot, sekvenssi-/luokka-/tilakaaviot, gantt ja mindmapit tekstimäärittelyistä.' },
-    three: { title: 'three.js (3D)', description: 'three.js r128 itse isännöitynä (window.THREE) — WebGL-3D-scenet: geometriat, materiaalit, valot, kamerat.' },
-    p5: { title: 'p5.js (luova koodaus)', description: 'p5.js v1 itse isännöitynä — generatiivinen taide, interaktiiviset luonnokset, partikkelit setup()/draw()-mallilla.' },
-    pixi: { title: 'PixiJS 8 (2D WebGL)', description: 'PixiJS v8 itse isännöitynä — nopea WebGL/WebGPU-2D-renderöinti: spritet, partikkelit, filtterit, tuhansia liikkuvia objekteja.' },
-    phaser: { title: 'Phaser 3 (pelimoottori)', description: 'Phaser v3 itse isännöitynä — täysi 2D-pelimoottori: scenet, arcade-fysiikka, syötteet, spritet, animaatiot, ääni.' },
-    'aimeat-flow': { title: 'Flow-/mindmap-editori', description: 'Muokattavat drag-and-drop-prosessi- ja miellekarttakaaviot — yksi create()-kutsu, presetit, tallennus flow:*-muistiin. Moottori on wrapperin sisäinen.' },
-    realtime: { title: 'Realtime-huoneet (AimeatRealtime)', description: 'WebSocket-P2P-huoneet, WebRTC-datakanavat ja Yjs CRT -jaettu tila — moninpelit, live-yhteistyö ja chat.' },
-  },
-};
 
 /** All library packs. */
 export function getLibraryPacks(): LibraryPack[] {
@@ -175,7 +165,7 @@ export function renderPackText(text: string, baseUrl: string): string {
  * Pass a lang (e.g. 'fi') for localized title/description where a translation exists.
  */
 export function getLibraryPackIndex(lang?: string): Array<
-  Pick<LibraryPack, 'id' | 'kind' | 'category' | 'title' | 'description' | 'url' | 'include' | 'requires' | 'version' | 'license' | 'apiSurface' | 'demoTemplateId' | 'skillRef' | 'tierHint' | 'interviewTriggers' | 'sizeEstimate' | 'status' | 'modelTier' | 'proofs' | 'apiCaveat'>
+  Pick<LibraryPack, 'id' | 'kind' | 'category' | 'title' | 'description' | 'url' | 'include' | 'requires' | 'version' | 'license' | 'apiSurface' | 'demoTemplateId' | 'skillRef' | 'tierHint' | 'interviewTriggers' | 'sizeEstimate' | 'status' | 'modelTier' | 'proofs' | 'apiCaveat' | 'supersededBy' | 'showcaseUrl'>
 > {
   const tr = (lang && TRANSLATIONS[lang]) || null;
   return PACKS.map(p => {
@@ -190,6 +180,8 @@ export function getLibraryPackIndex(lang?: string): Array<
       sizeEstimate: p.sizeEstimate, status: p.status,
       // AI-acceleration tier + per-model proof ledger + the frontier-pack caveat (tools/aeb/acceleration-tiers.md).
       modelTier: p.modelTier, proofs: p.proofs, apiCaveat: p.apiCaveat,
+      // A deprecated pack names what replaces it; a pack with a public showcase says where it is seen working.
+      supersededBy: p.supersededBy, showcaseUrl: p.showcaseUrl,
     };
   });
 }
