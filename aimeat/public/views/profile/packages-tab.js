@@ -2,565 +2,227 @@
  * @file packages-tab.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Profile tab for managing package instances, browsing available packages,
- *   and exploring the template gallery. Displays three sub-views: My Instances (installed
- *   packages with status/update/remove), Browse Packages (search/filter/install), and
- *   Template Gallery (community listings with ratings).
- * @structure
- *   - PackagesTab (default export) — main tab component with sub-view navigation
- * @usage
- *   import PackagesTab from './profile/packages-tab.js';
- *   <PackagesTab session={session} showToast={showToast} navigate={navigate} locale={locale} />
+ * @description Profile tab: ready-made wholes that install as the owner's own. One read
+ *   (GET /v1/packages/tab: installed instances, the owner's own packages, the template listings
+ *   and every public package) plus the best-effort federation listings; the page joins listings and
+ *   packages into one offer per group. This file is the state and the handlers (open a row, install
+ *   with a name given on the row, check and apply an update, remove an instance, import and export
+ *   a zip, propose to the gallery, change a publication's visibility, archive it, copy the
+ *   package-builder request, sync the federation listings); the render is packages/page.js and
+ *   packages/rows.js.
+ * @structure PackagesTab() — state (data, remote, expanded, versions, updates, installForm, filter) + handlers → renderPage(ctx)
+ * @usage registered in profile.js TABS as id 'packages'
  * @version-history
+ *   v2.0.0 — 2026-09-03 — Poster face (design canvas "AIMEAT Paketit-sivu", direction A): one page
+ *     instead of three sub-views; what is on offer is every author's public package joined with its
+ *     gallery listing, not the owner's own; the install name is asked on the row instead of a
+ *     browser prompt; the update check answers in words on the opened row; the raw locale key and
+ *     the emoji are gone; the Generator, removed in July, is no longer named.
  *   2026-08-25 — The data-map strip removed: the map describes an APP, and a package is an
  *     installer rather than the thing somebody opens to work on.
+ *   v1.6.0 — 2026-07-16 — Mount folds the 3 LOCAL reads into ONE GET /v1/packages/tab.
  *   v1.0.0 — 2026-03-15 — initial implementation (Phase 6)
- *   v1.1.0 — 2026-03-16 — restyle to match extensions-tab pattern (grid cards, consistent CSS)
- *   v1.2.0 — 2026-03-17 — add "Open in Generator" / "Edit in Generator" buttons for
- *     importing packages into generator projects (fork vs edit detection)
- *   v1.3.0 — 2026-03-20 — add ZIP upload/download and template proposal buttons
- *   v1.4.0 — 2026-03-20 — add remote templates section with federation sync
- *   v1.5.0 — 2026-05-05 — add intro section, i18n for categories/featured, fix status badge label
- *   v1.6.0 — 2026-07-16 — Mount folds the 3 LOCAL reads (instances + packages + templates) into ONE
- *     GET /v1/packages/tab (PackagesTabService); the cross-node federation-templates call stays separate.
- *     Falls back to the individual reads if the composite is unavailable. (Phase 4 slice 6 — frontend.)
  */
-import { h } from 'preact';
-import { useState, useEffect, useCallback } from 'preact/hooks';
-import htm from 'htm';
-import { onLiveUpdate } from '/lib/live-updates.js';
-import { EmptyState } from '/components/EmptyState.js';
-import { StatusDot } from '/components/StatusDot.js';
-const html = htm.bind(h);
+import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import { t } from '/js/i18n.js';
-import { escHtml, copyToClipboard } from '/js/utils.js';
-import { Spinner } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
-import * as pkgService from '/js/services/packages.js';
-import { apiGet } from '/js/api.js';
+import { getNodeUrl, getSession } from '/js/services/auth.js';
+import { onLiveUpdate } from '/lib/live-updates.js';
 import { swallowed } from '/js/swallowed.js';
+import { copyToClipboard } from '/js/utils.js';
+import { apiGet } from '/js/api.js';
+import * as pkgService from '/js/services/packages.js';
+import { renderPage } from './packages/page.js';
+import { x, joinOffers } from './packages/frame.js';
 
-// ─── InstanceCard ───────────────────────────────────────────────────────────
-// Expanded card for one installed package instance: shows every component's
-// status + type, with direct action buttons (Launch an app in a new tab,
-// jump to extensions/cortex tab for management, copy the registered name).
-// Components produced via packages-install are stored with status:'active'
-// at creation time (see component-registrar.ts), so the green "active" chip
-// here matches reality without re-fetching the underlying extension/cortex.
-// Profile reads ?tab=<id> on mount and routes to the matching tab; hash
-// fragments don't switch tabs. The IDs here are the profile tab IDs.
-const COMP_TYPE_META = {
-  app:         { icon: '\u{1F4F1}', tabId: 'apps' },
-  extension:   { icon: '\u{1F50C}', tabId: 'extensions' },
-  cortex:      { icon: '\u{1F9E0}', tabId: 'extensions' },
-  memory:      { icon: '\u{1F4BE}', tabId: 'memory' },
-  translation: { icon: '\u{1F310}', tabId: 'memory' },
-  csm:         { icon: '\u{1F4D0}', tabId: 'memory' },
-  msm:         { icon: '\u{1F4DC}', tabId: 'memory' },
-};
-
-function InstanceCard({ inst, session, onCheckUpdate, onRemove, navigate }) {
-  const [expanded, setExpanded] = useState(true);
-  const comps = inst.installedComponents || [];
-  const owner = session?.owner || '';
-
-  // Build a deterministic action per component type.
-  function actionsFor(c) {
-    const meta = COMP_TYPE_META[c.type] || {};
-    const acts = [];
-    if (c.type === 'app') {
-      const url = `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(c.registeredAs)}?mode=inline`;
-      acts.push(html`
-        <a class="btn-primary btn-sm pf-no-underline" href=${url} target="_blank" rel="noopener">
-          ${t('packages.launch') || 'Launch'}
-        </a>
-      `);
-    }
-    if (c.type === 'extension' || c.type === 'cortex') {
-      acts.push(html`
-        <button class="btn-outline btn-sm" onClick=${() => {
-          // Profile reads ?tab=<id> on mount; this preserves the activeTab
-          // state via the same path the landing-page tab cards use.
-          const url = `/v1/profile?tab=${meta.tabId || 'extensions'}`;
-          if (typeof navigate === 'function') navigate(url);
-          else window.location.href = url;
-        }}>
-          ${t('packages.manage') || 'Manage'}
-        </button>
-      `);
-    }
-    if (c.type === 'memory' || c.type === 'translation' || c.type === 'csm' || c.type === 'msm') {
-      acts.push(html`
-        <button class="btn-outline btn-sm" onClick=${() => {
-          const url = `/v1/profile?tab=${meta.tabId || 'memory'}`;
-          if (typeof navigate === 'function') navigate(url);
-          else window.location.href = url;
-        }}>
-          ${t('packages.inspect') || 'Inspect'}
-        </button>
-      `);
-    }
-    // Copy registered name — useful for debugging or wiring up custom things.
-    acts.push(html`
-      <button class="btn-ghost btn-sm" title=${c.registeredAs} onClick=${() => copyToClipboard(c.registeredAs)}>
-        \u{1F4CB}
-      </button>
-    `);
-    return acts;
-  }
-
-  // INSTALLED == installed AND active+running. Show a clarifying sub-label so
-  // the user doesn't confuse it with the two-step extension/cortex lifecycle.
-  const installedSubLabel = inst.status === 'installed'
-    ? (t('packages.statusInstalledActive') || 'active & running')
-    : '';
-
-  return html`
-    <div class="pkg-card pkg-card-expanded" key=${inst.id}>
-      <div class="pkg-card-header">
-        <span class="pkg-card-name">${escHtml(inst.label || inst.packageGroupId)}</span>
-        <span class="pkg-badge pkg-badge-${inst.status}" title=${installedSubLabel}>
-          ${inst.status}${installedSubLabel ? html` <span class="pkg-badge-sub">· ${installedSubLabel}</span>` : ''}
-        </span>
-      </div>
-      <div class="pkg-card-meta">
-        <span class="pkg-card-version">${escHtml(inst.packageVersion)}</span>
-        <span>· ${comps.length} ${t('packages.components') || 'components'}</span>
-        <button class="btn-ghost btn-xs" onClick=${() => setExpanded(v => !v)}>
-          ${expanded ? (t('common.hide') || 'Hide') : (t('common.show') || 'Show')}
-        </button>
-      </div>
-      ${expanded && comps.length > 0 && html`
-        <ul class="pkg-comp-list">
-          ${comps.map(c => html`
-            <li class="pkg-comp" key=${c.componentId}>
-              <span class="pkg-comp-icon">${COMP_TYPE_META[c.type]?.icon || '\u{1F4E6}'}</span>
-              <span class="pkg-comp-id">${escHtml(c.componentId)}</span>
-              <span class="pkg-comp-type">${c.type}</span>
-              <span class="pkg-comp-status">
-                <${StatusDot} status="active" title=${t('packages.statusActive') || 'Active'} />
-                ${c.customized ? html`<span class="pkg-comp-customized" title=${t('packages.customizedHint') || 'Customized after install'}>✏</span>` : ''}
-              </span>
-              <span class="pkg-comp-actions">${actionsFor(c)}</span>
-            </li>
-          `)}
-        </ul>
-      `}
-      <div class="pkg-card-footer">
-        <div class="pkg-card-actions">
-          <button class="btn-outline btn-sm" onClick=${onCheckUpdate}>${t('packages.checkUpdate') || 'Check Update'}</button>
-          <button class="btn-danger btn-sm" onClick=${onRemove}>${t('packages.remove') || 'Remove'}</button>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-export default function PackagesTab({ session, showToast, navigate }) {
+export default function PackagesTab({ session, showToast }) {
+  const sess = session || getSession();
+  const ownerName = sess?.owner || '';
+  const isOperator = !!sess?.roles?.includes('operator');
   const { confirm, ConfirmUI } = useConfirm();
-  const [instances, setInstances] = useState([]);
-  const [packages, setPackages] = useState([]);
-  const [templates, setTemplates] = useState([]);
-  const [remoteTemplates, setRemoteTemplates] = useState([]);
-  const [syncing, setSyncing] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [view, setView] = useState('instances');
-  const [search, setSearch] = useState('');
-  const [category, setCategory] = useState('');
+  const fileRef = useRef(null);
+  const [data, setData] = useState(null);
+  const [remote, setRemote] = useState([]);
+  const [expanded, setExpanded] = useState(null);
+  const [versions, setVersions] = useState({});
+  const [updates, setUpdates] = useState({});
+  const [installForm, setInstallForm] = useState(null);
+  const [filter, setFilterState] = useState({ who: '', cat: '' });
+  const [query, setQuery] = useState('');
+  const [shown, setShown] = useState(20);
+  const [busy, setBusy] = useState(false);
 
-  const loadData = useCallback(async ({ showSpinner = true } = {}) => {
-    if (showSpinner) setLoading(true);
+  const fail = (e, fallback) => showToast?.(e?.error?.message || e?.response?.error?.message || e?.message || (typeof e === 'string' ? e : '') || fallback || t('profile.error'), true);
+
+  const load = useCallback(async () => {
     try {
-      // Mount: ONE composite (GET /v1/packages/tab) seeds the three LOCAL sections (installed instances +
-      // owner's packages + newest templates). Falls back to the three individual reads on failure. The
-      // cross-node federation-templates call below stays separate (best-effort outbound).
-      const ov = await apiGet('/v1/packages/tab').then(r => r?.data).catch(err => { swallowed('packages-tab: PackagesTab', err); return null; });
-      if (ov) {
-        setInstances(ov.instances?.instances ?? []);
-        setPackages(ov.packages?.packages ?? []);
-        setTemplates(ov.templates?.templates ?? []);
-      } else {
-        const [instRes, pkgRes, tplRes] = await Promise.all([
-          pkgService.listInstances({ status: 'installed' }),
-          pkgService.listPackages({ author: session?.owner }),
-          pkgService.listTemplates({ sort: 'newest' }),
-        ]);
-        if (instRes.ok) setInstances(instRes.data?.instances ?? []);
-        if (pkgRes.ok) setPackages(pkgRes.data?.packages ?? []);
-        if (tplRes.ok) setTemplates(tplRes.data?.templates ?? []);
-      }
-      // Load remote/federated templates (best-effort)
+      const r = await apiGet('/v1/packages/tab');
+      setData(r?.data || { instances: { instances: [] }, packages: { packages: [] }, templates: { templates: [] }, available: { packages: [] } });
+    } catch (e) { swallowed('packages: tab', e); setData({ instances: { instances: [] }, packages: { packages: [] }, templates: { templates: [] }, available: { packages: [] } }); }
+    // The federation listings are another node's answer: best effort, never on the page's critical path.
+    try {
+      const fed = await pkgService.listFederationTemplates({ limit: 50 });
+      setRemote(fed?.ok ? (fed.data?.templates ?? []) : []);
+    } catch (e) { swallowed('packages: federation', e); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => onLiveUpdate(['packages'], load), [load]);
+
+  const instances = data?.instances?.instances ?? [];
+  const own = data?.packages?.packages ?? [];
+  const templates = data?.templates?.templates ?? [];
+  const offers = data ? joinOffers(data.available?.packages ?? [], templates, remote) : [];
+  const offerByGroup = Object.fromEntries(offers.map((o) => [o.group, o]));
+  const ownByGroup = Object.fromEntries(own.map((p) => [p.packageGroupId, p]));
+  const listingByGroup = Object.fromEntries(templates.map((l) => [l.packageGroupId, l]));
+
+  const toggle = (key, item) => {
+    if (expanded === key) { setExpanded(null); return; }
+    setExpanded(key);
+    if (key.startsWith('p:') && !versions[item.packageGroupId]) {
+      pkgService.getPackageVersions(item.packageGroupId).then((r) => setVersions((m) => ({ ...m, [item.packageGroupId]: r?.data?.versions ?? [] }))).catch((e) => swallowed('packages: versions', e));
+    }
+    if (key.startsWith('i:') && !updates[item.id]) checkUpdate(item);
+  };
+  const jumpTo = (group) => {
+    const key = ownByGroup[group] ? 'p:' + group : 'o:' + group;
+    setExpanded(key);
+    setTimeout(() => document.getElementById('pk-row-' + group.replace(/[^a-z0-9]/gi, '-'))?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  };
+
+  /* ── Installed packages ──────────────────────────────────────────────────────────────────── */
+  const checkUpdate = async (inst) => {
+    setUpdates((m) => ({ ...m, [inst.id]: { checking: true } }));
+    try {
+      const r = await pkgService.checkUpdate(inst.id);
+      if (!r?.ok) { setUpdates((m) => ({ ...m, [inst.id]: { error: r?.error?.message || x('updateFailed') } })); return; }
+      setUpdates((m) => ({ ...m, [inst.id]: { updateAvailable: !!r.data?.updateAvailable, latestVersion: r.data?.latestVersion } }));
+    } catch (e) { setUpdates((m) => ({ ...m, [inst.id]: { error: e?.message || x('updateFailed') } })); }
+  };
+  const applyUpdate = (inst, upd) => {
+    confirm(x('confirmUpdate', { version: upd.latestVersion }), async () => {
+      setBusy(true);
       try {
-        const fedRes = await pkgService.listFederationTemplates({ limit: 50 });
-        if (fedRes.ok) setRemoteTemplates(fedRes.data?.templates ?? []);
-      } catch (err) { swallowed('packages-tab: PackagesTab', err); }
-    } catch (err) { swallowed('packages-tab: PackagesTab', err); }
-    setLoading(false);
-  }, [session?.owner]);
-
-  useEffect(() => { loadData(); }, [loadData]);
-
-  // Live updates
-  useEffect(() => onLiveUpdate(['packages'], () => loadData({ showSpinner: false })), [loadData]);
-
-  const handleInstall = async (groupId) => {
-    const label = prompt(t('packages.labelPrompt') || 'Instance label (optional):');
-    if (label === null) return;
-    const res = await pkgService.installPackage(groupId, { label: label || '' });
-    if (res.ok) {
-      showToast(t('packages.installed'));
-      loadData();
-    } else {
-      showToast(res.error || 'Install failed', true);
-    }
+        const cur = await pkgService.getInstance(inst.id);
+        const components = (cur?.data?.installedComponents || []).map((c) => ({ componentId: c.componentId, action: (c.type === 'memory' || c.type === 'translation') ? 'skip' : 'replace' }));
+        const r = await pkgService.applyMigration(inst.id, { targetVersion: upd.latestVersion, components });
+        if (!r?.ok) { fail(r); return; }
+        showToast?.(x('updatedToast', { name: inst.label || inst.packageGroupId }));
+        setUpdates((m) => ({ ...m, [inst.id]: undefined }));
+        load();
+      } catch (e) { fail(e); } finally { setBusy(false); }
+    }, { title: x('applyUpdate') });
+  };
+  const removeInstance = (inst) => {
+    confirm(x('confirmRemove', { name: inst.label || inst.packageGroupId, n: (inst.installedComponents || []).length }), async () => {
+      try {
+        const r = await pkgService.removeInstance(inst.id, true);
+        if (!r?.ok) { fail(r); return; }
+        showToast?.(x('removedToast', { name: inst.label || inst.packageGroupId }));
+        setExpanded(null);
+        load();
+      } catch (e) { fail(e); }
+    }, { title: x('removeInstance'), danger: true });
   };
 
-  const handleRemove = async (id) => {
-    confirm(t('packages.confirmRemove') || 'Remove this instance?', async () => {
-      const res = await pkgService.removeInstance(id, true);
-      if (res.ok) {
-        showToast(t('packages.instanceRemoved'));
-        loadData();
-      } else {
-        showToast(res.error || 'Remove failed', true);
-      }
-    }, { danger: true });
-  };
-
-  const handleCheckUpdate = async (id) => {
-    const res = await pkgService.checkUpdate(id);
-    if (res.ok && res.data) {
-      if (res.data.updateAvailable) {
-        confirm(
-          `${t('packages.updateAvailable')}: ${res.data.latestVersion}\n\n${t('packages.applyUpdateConfirm') || 'Apply update? Your data (memory, settings) will be preserved. Apps, extensions, and schemas will be updated to the latest version.'}`,
-          async () => {
-            const instRes = await pkgService.getInstance(id);
-            const installed = instRes.data?.installedComponents || [];
-            const components = installed.map(c => ({
-              componentId: c.componentId,
-              action: (c.type === 'memory' || c.type === 'translation') ? 'skip' : 'replace',
-            }));
-            const applyRes = await pkgService.applyMigration(id, {
-              targetVersion: res.data.latestVersion,
-              components,
-            });
-            if (applyRes.ok) {
-              showToast(t('packages.updateApplied') || 'Update applied successfully');
-              loadData();
-            } else {
-              showToast(applyRes.error?.message || 'Update failed', true);
-            }
-          },
-        );
-      } else {
-        showToast(t('packages.noUpdateAvailable'));
-      }
-    } else {
-      showToast(res.error || 'Check failed', true);
-    }
-  };
-
-
-  const handleDownloadZip = async (groupId, name) => {
+  /* ── Offers and own publications ─────────────────────────────────────────────────────────── */
+  const setInstallLabel = (key, label) => setInstallForm({ key, label });
+  const install = async (o, label) => {
+    const key = ownByGroup[o.group] ? 'p:' + o.group : 'o:' + o.group;
+    setBusy(key);
     try {
-      const blob = await pkgService.exportPackageZip(groupId);
+      const r = await pkgService.installPackage(o.group, { label: (label || '').trim() });
+      if (!r?.ok) { fail(r); return; }
+      const n = (r.data?.instance?.installedComponents || r.data?.installedComponents || []).length;
+      showToast?.(x('installedToast', { name: (label || '').trim() || o.title, n }));
+      setInstallForm(null);
+      setExpanded(null);
+      load();
+      setTimeout(() => document.getElementById('pk-installed')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+    } catch (e) { fail(e); } finally { setBusy(false); }
+  };
+  const download = async (group, name) => {
+    try {
+      const blob = await pkgService.exportPackageZip(group);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
-      a.download = `${name}.zip`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      a.href = url; a.download = `${name}.zip`;
+      document.body.appendChild(a); a.click(); a.remove();
       URL.revokeObjectURL(url);
-    } catch (e) {
-      showToast(t('packages.exportFailed') || e.message, true);
-    }
+    } catch (e) { fail(e, x('exportFailed')); }
+  };
+  const setVisibility = async (p, visibility) => {
+    setBusy(true);
+    try {
+      const r = await pkgService.updatePackage(p.packageGroupId, { visibility });
+      if (!r?.ok) { fail(r); return; }
+      showToast?.(visibility === 'public' ? x('madePublicToast', { name: p.name }) : x('madePrivateToast', { name: p.name }));
+      load();
+    } catch (e) { fail(e); } finally { setBusy(false); }
+  };
+  const propose = async (p) => {
+    setBusy(true);
+    try {
+      const r = await pkgService.proposeAsTemplate(p.packageGroupId);
+      if (!r?.ok) { fail(r); return; }
+      showToast?.(x('proposedToast', { name: p.name }));
+      load();
+    } catch (e) { fail(e); } finally { setBusy(false); }
+  };
+  const archive = (p) => {
+    confirm(x('confirmArchive', { name: p.name }), async () => {
+      try {
+        const r = await pkgService.archivePackageGroup(p.packageGroupId);
+        if (!r?.ok) { fail(r); return; }
+        showToast?.(x('archivedToast', { name: p.name }));
+        setExpanded(null);
+        load();
+      } catch (e) { fail(e); }
+    }, { title: x('archive'), danger: true });
   };
 
-  const handleUploadZip = async (e) => {
+  /* ── A new package: the request, or a zip ────────────────────────────────────────────────── */
+  const copyPrompt = async () => {
+    setBusy('prompt');
+    try {
+      const r = await apiGet('/v1/prompts/package-builder');
+      const content = r?.data?.content;
+      if (!content) { fail(null, x('promptFailed')); return; }
+      const ok = await copyToClipboard(content);
+      showToast?.(ok === false ? x('copyFailed') : x('promptCopiedToast'), ok === false);
+    } catch (e) { fail(e, x('promptFailed')); } finally { setBusy(false); }
+  };
+  const pickZip = () => fileRef.current?.click();
+  const importZip = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
+    setBusy('import');
     try {
-      await pkgService.importPackageZip(file);
-      showToast(t('packages.importSuccess') || 'Package imported');
-      loadData();
-    } catch (err) {
-      showToast(err.message || t('packages.importFailed'), true);
-    }
+      const r = await pkgService.importPackageZip(file);
+      showToast?.(x('importedToast', { name: r?.data?.name || r?.data?.package?.name || file.name }));
+      load();
+    } catch (err) { fail(err, x('importFailed')); } finally { setBusy(false); }
   };
-
-  const handleProposeAsTemplate = async (groupId) => {
+  const syncRemote = async () => {
+    setBusy('sync');
     try {
-      const res = await pkgService.proposeAsTemplate(groupId);
-      if (res.ok) {
-        showToast(t('packages.proposePending'));
-        loadData();
-      } else {
-        showToast(res.error || 'Proposal failed', true);
-      }
-    } catch (e) {
-      showToast(e.message, true);
-    }
+      const r = await pkgService.syncFederationTemplates();
+      if (!r?.ok) { fail(r); return; }
+      showToast?.(x('syncedToast'));
+      load();
+    } catch (e) { fail(e); } finally { setBusy(false); }
   };
 
-  // Archive every version of a package group (own-author only, enforced server-side).
-  // Already-installed instances stay intact — only the package source is removed
-  // from the gallery + browse listings so it can no longer be re-installed.
-  const handleDeletePackage = (groupId, name) => {
-    confirm(
-      (t('packages.confirmDeletePackage') || 'Delete the package "{name}" and all its versions? Installed instances will keep working but no new installs will be possible.').replace('{name}', name || groupId),
-      async () => {
-        try {
-          const res = await pkgService.archivePackageGroup(groupId);
-          if (res.ok) {
-            showToast(t('packages.packageDeleted') || 'Package deleted');
-            loadData();
-          } else {
-            showToast(res.error || (t('packages.deleteFailed') || 'Delete failed'), true);
-          }
-        } catch (e) {
-          showToast(e.message, true);
-        }
-      },
-      { danger: true },
-    );
+  const ctx = {
+    nodeUrl: getNodeUrl(), ownerName, isOperator, showToast, ConfirmUI, fileRef,
+    data, instances, own, offers, offerByGroup, ownByGroup, listingByGroup,
+    expanded, versions, updates, installForm, filter, query, shown, busy,
+    setFilter: (patch) => { setFilterState((f) => ({ ...f, ...patch })); setShown(20); },
+    setQuery: (q) => { setQuery(q); setShown(20); },
+    setShown,
+    toggle, jumpTo, checkUpdate, applyUpdate, removeInstance, setInstallLabel, install, download, setVisibility, propose, archive,
+    copyPrompt, pickZip, importZip, syncRemote,
   };
-
-  const handleSyncFederation = async () => {
-    setSyncing(true);
-    try {
-      const res = await pkgService.syncFederationTemplates();
-      if (res.ok) {
-        showToast(t('packages.federation.syncSuccess') || 'Federation sync complete');
-        loadData();
-      } else {
-        showToast(res.error?.message || 'Sync failed', true);
-      }
-    } catch (e) {
-      showToast(e.message, true);
-    }
-    setSyncing(false);
-  };
-
-  const isOperator = session?.roles?.includes('operator');
-
-  const copyPackagePrompt = async () => {
-    try {
-      const res = await fetch('/v1/prompts/package-builder');
-      const json = await res.json();
-      if (json.ok && json.data?.content) {
-        copyToClipboard(json.data.content);
-        showToast(t('packages.promptCopied') || 'Prompt copied! Paste it into AI Chat.');
-      } else {
-        showToast('Failed to load prompt', true);
-      }
-    } catch (err) {
-      swallowed('packages-tab: copyPackagePrompt', err);
-      showToast('Failed to load prompt', true);
-    }
-  };
-
-  if (loading) return html`<${Spinner} />`;
-
-  const filtered = packages.filter(p => {
-    if (search && !p.name?.toLowerCase().includes(search.toLowerCase()) && !p.description?.toLowerCase().includes(search.toLowerCase())) return false;
-    if (category && p.category !== category) return false;
-    return true;
-  });
-
-  return html`
-    <div class="pkg-tab">
-      <div class="section-title">${t('packages.title')}</div>
-      <div class="section-desc">${t('packages.desc')}</div>
-      <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:1.25rem;align-items:center">
-        <button class="btn-primary" onClick=${copyPackagePrompt}>
-          ${'\u{1F916}'} ${t('packages.createWithAi') || 'Create Package with AI'}
-        </button>
-        <span style="font-size:.8rem;color:var(--text-dim,#6B7280);max-width:420px">${t('packages.createWithAiDesc') || 'Copy this prompt and paste it into any AI. Describe what you want to build and the AI will create an installable package.'}</span>
-      </div>
-      <div class="pkg-nav">
-        <button class=${view === 'instances' ? 'active' : ''} onClick=${() => setView('instances')}>
-          \u{1F4E6} ${t('packages.myInstances') || 'My Instances'} (${instances.length})
-        </button>
-        <button class=${view === 'browse' ? 'active' : ''} onClick=${() => setView('browse')}>
-          \u{1F50D} ${t('packages.browse') || 'Browse Packages'}
-        </button>
-        <button class=${view === 'gallery' ? 'active' : ''} onClick=${() => setView('gallery')}>
-          \u{2B50} ${t('packages.gallery') || 'Template Gallery'}
-        </button>
-      </div>
-
-      ${view === 'instances' && html`
-        <div class="pkg-section">
-          <h3>${t('packages.myInstances') || 'My Instances'}</h3>
-          ${instances.length === 0 ? html`
-            <${EmptyState} text=${t('packages.noInstances') || 'No packages installed yet.'} />
-          ` : html`
-            <div class="pkg-grid">
-              ${instances.map(inst => html`
-                <${InstanceCard}
-                  key=${inst.id}
-                  inst=${inst}
-                  session=${session}
-                  onCheckUpdate=${() => handleCheckUpdate(inst.id)}
-                  onRemove=${() => handleRemove(inst.id)}
-                  navigate=${navigate}
-                />
-              `)}
-            </div>
-          `}
-        </div>
-      `}
-
-      ${view === 'browse' && html`
-        <div class="pkg-section">
-          <div class="pkg-section-header">
-            <h3>${t('packages.browse') || 'Available Packages'}</h3>
-            <input type="file" id="pkg-zip-file" accept=".zip" style="display:none" onChange=${handleUploadZip} />
-            <button class="btn-outline" onClick=${() => document.getElementById('pkg-zip-file')?.click()}>
-              ${t('packages.uploadZip') || 'Upload ZIP'}
-            </button>
-          </div>
-          <div class="pkg-filters">
-            <input type="text" placeholder=${t('packages.search') || 'Search...'}
-              value=${search} onInput=${e => setSearch(e.target.value)} />
-            <select value=${category} onChange=${e => setCategory(e.target.value)}>
-              <option value="">${t('packages.allCategories') || 'All Categories'}</option>
-              <option value="signage">${t('packages.categories.signage') || 'Signage'}</option>
-              <option value="marketplace">${t('packages.categories.marketplace') || 'Marketplace'}</option>
-              <option value="iot">${t('packages.categories.iot') || 'IoT'}</option>
-              <option value="social">${t('packages.categories.social') || 'Social'}</option>
-              <option value="productivity">${t('packages.categories.productivity') || 'Productivity'}</option>
-              <option value="communication">${t('packages.categories.communication') || 'Communication'}</option>
-              <option value="other">${t('packages.categories.other') || 'Other'}</option>
-            </select>
-          </div>
-          ${filtered.length === 0 ? html`
-            <${EmptyState} text=${t('packages.noPackages') || 'No packages available.'} />
-          ` : html`
-            <div class="pkg-grid">
-              ${filtered.map(pkg => html`
-                <div class="pkg-card" key=${pkg.id}>
-                  <div class="pkg-card-header">
-                    <span class="pkg-card-name">${escHtml(pkg.name)}</span>
-                    ${pkg.category && html`<span class="pkg-tag">${pkg.category}</span>`}
-                  </div>
-                  <div class="pkg-card-desc">${escHtml(pkg.description || '')}</div>
-                  <div class="pkg-card-meta">
-                    <span class="pkg-card-version">${pkg.version}</span>
-                    <span>${t('packages.by') || 'by'} ${escHtml(pkg.author)}</span>
-                    <span>\u00B7 ${pkg.components?.length ?? 0} ${t('packages.components') || 'components'}</span>
-                  </div>
-                  ${pkg.templateStatus === 'rejected' && pkg.rejectionReason && html`
-                    <div class="pkg-rejection">
-                      ${t('packages.moderation.rejectionReason')}: ${escHtml(pkg.rejectionReason)}
-                    </div>
-                  `}
-                  <div class="pkg-card-footer">
-                    <div class="pkg-card-actions">
-                      <button class="btn-primary btn-sm" onClick=${() => handleInstall(pkg.packageGroupId)}>
-                        ${t('packages.install') || 'Install'}
-                      </button>
-                      <button class="btn-outline btn-sm" onClick=${() => handleDownloadZip(pkg.packageGroupId, pkg.name)}>
-                        ${t('packages.downloadZip') || 'Download ZIP'}
-                      </button>
-                      ${pkg.status === 'published' && !pkg.templateStatus && pkg.author === session?.owner && html`
-                        <button class="btn-outline btn-sm" onClick=${() => handleProposeAsTemplate(pkg.packageGroupId)}>
-                          ${t('packages.proposeAsTemplate') || 'Propose as Template'}
-                        </button>
-                      `}
-                      ${pkg.author === session?.owner && html`
-                        <button class="btn-danger btn-sm" onClick=${() => handleDeletePackage(pkg.packageGroupId, pkg.name)}>
-                          ${t('packages.delete') || 'Delete'}
-                        </button>
-                      `}
-                    </div>
-                  </div>
-                </div>
-              `)}
-            </div>
-          `}
-        </div>
-      `}
-
-      ${view === 'gallery' && html`
-        <div class="pkg-section">
-          <h3>${t('packages.gallery') || 'Template Gallery'}</h3>
-          ${templates.length === 0 ? html`
-            <${EmptyState} text=${t('packages.noTemplates') || 'No templates available yet.'} />
-          ` : html`
-            <div class="pkg-grid">
-              ${templates.map(tpl => html`
-                <div class="pkg-card" key=${tpl.id}>
-                  <div class="pkg-card-header">
-                    <span class="pkg-card-name">${escHtml(tpl.title)}</span>
-                    ${tpl.featured && html`<span class="pkg-badge pkg-badge-featured">\u2B50 ${t('packages.featured') || 'Featured'}</span>`}
-                  </div>
-                  <div class="pkg-card-desc">${escHtml(tpl.description || '')}</div>
-                  <div class="pkg-card-meta">
-                    <span>${t('packages.by') || 'by'} ${escHtml(tpl.packageAuthor)}</span>
-                    <span>\u00B7 \u2B50 ${tpl.rating?.toFixed(1) ?? '0.0'} (${tpl.reviewCount ?? 0})</span>
-                    <span>\u00B7 ${tpl.installCount ?? 0} ${t('packages.installs') || 'installs'}</span>
-                  </div>
-                  <div class="pkg-card-footer">
-                    <div class="pkg-card-actions">
-                      <button class="btn-primary btn-sm" onClick=${() => handleInstall(tpl.packageGroupId)}>
-                        ${t('packages.install') || 'Install'}
-                      </button>
-                      <button class="btn-outline btn-sm" onClick=${() => handleDownloadZip(tpl.packageGroupId, tpl.title)}>
-                        ${t('packages.downloadZip') || 'Download ZIP'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              `)}
-            </div>
-          `}
-
-          ${remoteTemplates.length > 0 && html`
-            <div class="pkg-section-header pkg-remote-header">
-              <h3>${t('packages.federation.remoteTemplates') || 'Remote Templates'}</h3>
-              ${isOperator && html`
-                <button class="btn-outline" onClick=${handleSyncFederation} disabled=${syncing}>
-                  ${syncing
-                    ? (t('dashboard.loading') || 'Loading...')
-                    : (t('packages.federation.syncFromFederation') || 'Sync from Federation')}
-                </button>
-              `}
-            </div>
-            <div class="pkg-grid">
-              ${remoteTemplates.map(rt => html`
-                <div class="pkg-card" key=${rt.id || rt.title}>
-                  <div class="pkg-card-header">
-                    <span class="pkg-card-name">${escHtml(rt.title || rt.name || '')}</span>
-                    <span class="pkg-tag">${escHtml(rt.sourceNode || t('packages.federation.sourceNode') || 'Remote')}</span>
-                  </div>
-                  <div class="pkg-card-desc">${escHtml(rt.description || '')}</div>
-                  <div class="pkg-card-meta">
-                    ${rt.author ? html`<span>${t('packages.by') || 'by'} ${escHtml(rt.author)}</span>` : null}
-                    ${rt.category ? html`<span>\u00B7 ${escHtml(rt.category)}</span>` : null}
-                    ${rt.installCount != null ? html`<span>\u00B7 ${rt.installCount} ${t('packages.installs') || 'installs'}</span>` : null}
-                  </div>
-                  <div class="pkg-card-footer">
-                    <div class="pkg-card-actions">
-                      ${rt.packageGroupId ? html`
-                        <button class="btn-primary btn-sm" onClick=${() => handleInstall(rt.packageGroupId)}>
-                          ${t('packages.federation.installFromRemote') || 'Install'}
-                        </button>
-                        <button class="btn-outline btn-sm" onClick=${() => handleDownloadZip(rt.packageGroupId, rt.title || rt.name)}>
-                          ${t('packages.downloadZip') || 'Download ZIP'}
-                        </button>
-                      ` : null}
-                    </div>
-                  </div>
-                </div>
-              `)}
-            </div>
-          `}
-        </div>
-      `}
-      <${ConfirmUI} />
-    </div>
-  `;
+  return renderPage(ctx);
 }

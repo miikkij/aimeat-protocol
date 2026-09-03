@@ -1500,6 +1500,11 @@ await test('Packages tab overview composite folds the 3 local reads (Phase 4 DbS
   assert(Array.isArray(d.instances?.instances), 'instances is an array');
   assert(Array.isArray(d.packages?.packages), 'packages is an array');
   assert(Array.isArray(d.templates?.templates), 'templates is an array');
+  // What is on offer (2026-09-03): every author's public published packages, not only the owner's.
+  // The seeded examples are the system's, so at least one row is somebody else's.
+  assert(Array.isArray(d.available?.packages), 'available is an array');
+  assert(d.available.packages.every((p: any) => p.visibility === 'public' && p.status === 'published'), 'available carries public published packages only');
+  assert(d.available.packages.some((p: any) => p.author !== ownerName), `available has another author's package: ${d.available.packages.map((p: any) => p.author).join(',')}`);
   // The instances section matches the standalone endpoint (both owner-scoped, installed).
   const { body: inst } = await json('/v1/instances?status=installed', { headers: authed(ownerToken) });
   assert(d.instances.total === inst.data.total, `overview instances (${d.instances.total}) == /v1/instances (${inst.data.total})`);

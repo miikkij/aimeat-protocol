@@ -348,13 +348,13 @@
 .pf .stat-card { padding: 0.9rem 0 1rem; }
 /* Rows: one rule under each, the row's own words in bold */
 .pf .sch-card, .pf .of-card, .pf .wf-card, .pf .cap-item, .pf .pf-nb-note, .pf .pf-nb-hit, .pf .mem-browse-item, .pf .mem-discover-item,
-.pf .app-card, .pf .file-card, .pf .post-card, .pf .ext-card, .pf .ext-bundled-card, .pf .pkg-card, .pf .pf-agd-task-item, .pf .agd-task-item,
+.pf .app-card, .pf .file-card, .pf .post-card, .pf .ext-card, .pf .ext-bundled-card, .pf .pf-agd-task-item, .pf .agd-task-item,
 .pf .pf-agd-log-entry, .pf .agd-log-entry, .pf .pf-agd-todo-item, .pf .agd-todo-item, .pf .pf-agd-service-card, .pf .agd-service-card,
 .pf .pf-agd-crew-template, .pf .pf-agd-crew-card, .pf .mbr-card, .pf .fnd-cal-card, .pf .pf-agd-config-item, .pf .pf-agd-quality-review-row,
 .pf .pf-agd-step, .pf .pf-ld-card, .pf .lib-proof-row {
   background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0; box-shadow: none; padding: 0.9rem 0;
 }
-.pf .sch-card:hover, .pf .of-card:hover, .pf .wf-card:hover, .pf .cap-item:hover, .pf .app-card:hover, .pf .ext-card:hover, .pf .pkg-card:hover, .pf .pf-agd-crew-template:hover, .pf .mbr-card:hover {
+.pf .sch-card:hover, .pf .of-card:hover, .pf .wf-card:hover, .pf .cap-item:hover, .pf .app-card:hover, .pf .ext-card:hover, .pf .pf-agd-crew-template:hover, .pf .mbr-card:hover {
   transform: none; box-shadow: none; border-color: var(--accent); background: none;
 }
 .pf .of-card--open, .pf .pf-agd-crew-template.selected, .pf .pf-agd-crew-template--on { border-bottom-color: var(--accent); }
@@ -371,7 +371,7 @@
 .pf .sch-badge, .pf .sch-tag, .pf .sch-preset, .pf .of-badge, .pf .of-status, .pf .of-chip, .pf .of-group-count, .pf .wf-badge,
 .pf .pf-agd-status, .pf .agd-status, .pf .pf-agd-cap-badge, .pf .agd-cap-badge, .pf .pf-agd-cap-type, .pf .agd-cap-type, .pf .pf-agd-filter-pill,
 .pf .pf-agd-event-badge, .pf .pf-agd-role-badge, .pf .pf-agd-env-badge, .pf .agd-env-badge, .kpkg-badge, .kpkg-tag, .pf .file-tag, .pf .ext-comp-tag,
-.pf .ext-visibility-badge, .pf .pkg-card-version, .pf .ext-card-version, .pf .brd-member-tag, .pf .scope-badge, .pf .pf-ureport-btn, .pf .pf-usage-chip, .pf .pf-agd-quality-dur-chip {
+.pf .ext-visibility-badge, .pf .ext-card-version, .pf .brd-member-tag, .pf .scope-badge, .pf .pf-ureport-btn, .pf .pf-usage-chip, .pf .pf-agd-quality-dur-chip {
   border-radius: 0; background: none; border: 2px solid currentColor;
   font-family: var(--font-mono); font-size: 0.68rem; font-weight: 500; letter-spacing: 0; text-transform: none; padding: 1px 7px; line-height: 1.5;
 }
@@ -408,42 +408,42 @@
 .pf .pf-or-mrow--on { background: var(--sun); color: var(--on-sun); padding-left: 0.5rem; }
 .pf .dsc-item-title, .pf .pf-eco-name { font-weight: var(--font-poster-strong-weight); }
 /* Sections and panels */
-.pf .pf-or-wrapper, .pf .pf-or-section, .pf .pf-eco-section, .pf .pf-skl-section, .pf .pkg-section, .pf .cap-create-section, .pf .pf-eco-auto-flow-card, .pf .pf-eco-mcp, .pf .pf-eco-recipe {
+.pf .pf-or-wrapper, .pf .pf-or-section, .pf .pf-eco-section, .pf .pf-skl-section, .pf .cap-create-section, .pf .pf-eco-auto-flow-card, .pf .pf-eco-mcp, .pf .pf-eco-recipe {
   background: none; border: 0; border-top: 3px solid var(--text); border-radius: 0; box-shadow: none; padding: 1rem 0 1.25rem;
 }
 .pf .pf-or-panel, .pf .pf-or-picker, .pf .pf-eco-data-pre, .pf .pf-eco-mcp-sample-prompt, .pf .pf-skl-body-md, .pf .pf-skl-editor-md, .pf .pf-eco-cmd {
   border: 2px solid var(--text); border-radius: 0; background: var(--bg-dim); box-shadow: none;
 }
-.pf .pf-or-section-title, .pf .pf-eco-section-title, .pf .pf-skl-section-title, .pf .pkg-section-header, .pf .cap-info-title {
+.pf .pf-or-section-title, .pf .pf-eco-section-title, .pf .pf-skl-section-title, .pf .cap-info-title {
   font-family: var(--font-poster-section); font-weight: var(--font-poster-section-weight);
   font-size: 1.7rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); text-transform: uppercase; color: var(--text);
 }
 /* Chips */
 .pf .dsc-facet, .pf .dsc-type-badge, .pf .dsc-tag, .pf .dsc-scope-btn, .pf .pf-eco-status, .pf .pf-eco-pill, .pf .pf-eco-chip, .pf .pf-eco-count-badge, .pf .pf-eco-rec-chip,
-.pf .cap-badge, .pf .cap-tag, .pf .pkg-badge, .pf .pkg-tag, .pf .pkg-comp-type, .pf .pkg-nav button, .pf .lib-tier-btn, .pf .vis-pill, .pf .pf-or-status, .pf .pf-skl-version, .pf .pf-eco-auto-status-chip, .pf .pf-eco-setup-progress-chip {
+.pf .cap-badge, .pf .cap-tag, .pf .lib-tier-btn, .pf .vis-pill, .pf .pf-or-status, .pf .pf-skl-version, .pf .pf-eco-auto-status-chip, .pf .pf-eco-setup-progress-chip {
   border-radius: 0; background: none; border: 2px solid currentColor; color: var(--text);
   font-family: var(--font-mono); font-size: 0.68rem; font-weight: 500; letter-spacing: 0; text-transform: none; padding: 1px 7px; line-height: 1.5;
 }
-.pf .dsc-type-badge, .pf .cap-badge-callable, .pf .pf-eco-status-pending, .pf .pkg-badge-featured { color: var(--accent); }
-.pf .pf-eco-status-active, .pf .pkg-badge-installed, .pf .pkg-badge-active, .pf .pkg-badge-published, .pf .pf-or-status--on { color: var(--success-fg); }
-.pf .pf-eco-status-revoked, .pf .pkg-badge-error { color: var(--danger); }
-.pf .dsc-facet-active, .pf .dsc-scope-active, .pf .pkg-nav button.active, .pf .lib-tier-btn.lib-tier-active { background: var(--sun); color: var(--on-sun); border-color: var(--text); }
-.pf .dsc-facet:hover, .pf .dsc-scope-btn:hover, .pf .pkg-nav button:hover:not(.active), .pf .lib-tier-btn:hover { background: none; border-color: var(--accent); color: var(--accent); }
-.pf .pkg-nav button, .pf .dsc-scope-btn, .pf .lib-tier-btn { font-family: var(--font-showroom-body); font-weight: var(--font-poster-text-weight); font-size: 0.8rem; padding: 4px 10px; }
+.pf .dsc-type-badge, .pf .cap-badge-callable, .pf .pf-eco-status-pending{ color: var(--accent); }
+.pf .pf-eco-status-active, .pf .pf-or-status--on { color: var(--success-fg); }
+.pf .pf-eco-status-revoked{ color: var(--danger); }
+.pf .dsc-facet-active, .pf .dsc-scope-active, .pf .lib-tier-btn.lib-tier-active { background: var(--sun); color: var(--on-sun); border-color: var(--text); }
+.pf .dsc-facet:hover, .pf .dsc-scope-btn:hover, .pf .lib-tier-btn:hover { background: none; border-color: var(--accent); color: var(--accent); }
+.pf .dsc-scope-btn, .pf .lib-tier-btn { font-family: var(--font-showroom-body); font-weight: var(--font-poster-text-weight); font-size: 0.8rem; padding: 4px 10px; }
 /* The quiet actions the older tabs draw as small framed buttons */
-.pf .ext-card-actions button, .pf .pkg-card-actions button:not(.btn-primary), .pf .pf-eco-adv-actions button {
+.pf .ext-card-actions button, .pf .pf-eco-adv-actions button {
   background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0; box-shadow: none; padding: 0 0 1px;
   font-family: var(--font-showroom-body); font-weight: var(--font-poster-strong-weight); font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text);
 }
-.pf .ext-card-actions button:hover, .pf .pkg-card-actions button:not(.btn-primary):hover { background: none; color: var(--accent); border-color: var(--accent); }
+.pf .ext-card-actions button:hover{ background: none; color: var(--accent); border-color: var(--accent); }
 .pf .ext-card-actions button.danger { color: var(--accent); border-color: var(--accent); }
 /* Search fields the older tabs draw as boxes */
-.pf .dsc-search, .pf .cap-search-input, .pf .lib-search, .pf .pf-or-msearch, .pf .pkg-filters input, .pf .fnd-cal-create-input {
+.pf .dsc-search, .pf .cap-search-input, .pf .lib-search, .pf .pf-or-msearch, .pf .fnd-cal-create-input {
   background: transparent; border: 0; border-bottom: 3px solid var(--text); border-radius: 0; padding: 8px 0;
   font-family: var(--font-showroom-body); font-weight: var(--font-poster-text-weight); color: var(--text); box-shadow: none;
 }
 .pf .dsc-search:focus, .pf .cap-search-input:focus, .pf .lib-search:focus, .pf .pf-or-msearch:focus { border-color: var(--accent); outline: none; box-shadow: none; }
-.pf .pkg-filters select, .pf .cap-filter-select, .pf .pf-or-select { border: 2px solid var(--text); border-radius: 0; background: var(--bg); }
+.pf .cap-filter-select, .pf .pf-or-select { border: 2px solid var(--text); border-radius: 0; background: var(--bg); }
 
 /* ── The starter card: "begin with two agents" ──────────────────────────────────────────────
    It was written in the classic shell in September, after this skin, and named nothing this file
