@@ -230,6 +230,7 @@ pnpm test:e2e:postgres-kysely    # E2E, production backend
 pnpm test:e2e:sqlite             # E2E, fast local backend
 pnpm check:importmap             # spa.html importmap vs absolute imports
 pnpm check:locales --list        # how much of en.json each language carries
+pnpm debt                        # every ratcheted backlog, and the last date it fell
 pnpm locale:extract es --prefix profile.agents.   # the next slice to translate
 pnpm locale:merge es locales/.todo-es.json        # …and back in, validated
 pnpm start -- --db postgres-kysely --db-url postgresql://localhost:5432/aimeat
