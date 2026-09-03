@@ -30,6 +30,12 @@
  *   if (outcome === 'online') { const { status, body } = await client.forward('GET', '/v1/memory'); }
  *   await client.close();
  * @version-history
+ *   2026-09-03 — A refused `attach` is an ANSWER. The `error` frame carrying it resolves the
+ *     promise waiting on its id instead of letting it sit out the request timeout, and the identity
+ *     comes off a socket it never got on. Found on a real 50-agent fleet: sixteen expired
+ *     credentials, each recorded as a passenger before the node had judged it and never removed,
+ *     held a 30s timer apiece and were re-attempted on every reconnect — 24 log lines accusing
+ *     agents that were up of failing to re-attach. The fence held; the log did not.
  *   2026-09-03 — Carries several identities on one socket: `attachIdentity` proves each one's own
  *     credential, inbound frames route on `agent`, and a 401 or `auth_revoked` for an attached
  *     identity stops that one rather than the connection eleven others use. Attachments are
@@ -185,6 +191,18 @@ interface TunnelFrame {
  */
 const TOKEN_DEAD_CODES = new Set(['UNAUTHORIZED', 'INVALID_TOKEN', 'TOKEN_EXPIRED']);
 
+/**
+ * The node's answers to `attach` that are a VERDICT ON THE CREDENTIAL rather than a hiccup: it did
+ * not verify, it was revoked, it is not an agent, it names someone else. Each one means retrying
+ * with the same credential will be refused again for the same reason, so the identity comes off
+ * this socket and its owner is told.
+ *
+ * ATTACH_FAILED is deliberately NOT here. It is what the node sends when the socket went away
+ * underneath the frame or the attach threw — a transient, and evicting on it would take an agent
+ * off a working fleet for a blip.
+ */
+const ATTACH_REFUSAL_CODES = new Set(['ATTACH_UNAUTHORIZED', 'ATTACH_FORBIDDEN']);
+
 const RE_AUTH_GUIDANCE = 'Run: aimeat connect';
 /** Cap a single token-refresh timer chunk; the chain re-evaluates each firing. */
 const MAX_TIMER_CHUNK_MS = 24 * 60 * 60 * 1000;
@@ -271,10 +289,20 @@ export class ConnectTunnelClient {
    * verifies an upgrade, so riding a socket someone else opened grants nothing. Resolves true when
    * the node accepts. Called again after every reconnect, because a socket's attachments die with
    * the socket.
+   *
+   * THE MAP IS WHO IS ON THE SOCKET, so a refused identity does not stay in it. It used to be
+   * written before the node had judged the credential — refuse before you write, invariant 14, in
+   * the connector — and nothing removed it when the answer came back no. Measured on a real fleet
+   * on 2026-09-03: sixteen expired credentials, each recorded as a passenger it had never been,
+   * re-attempted on every reconnect and logged 24 `could not re-attach` lines naming agents that
+   * were up. Nothing was actually knocked off — the fence held — but the log said otherwise, and a
+   * log that accuses the wrong thing costs someone an afternoon.
    */
   async attachIdentity(identity: TunnelIdentity): Promise<boolean> {
     this.identities.set(identity.gaii, identity);
-    return this.sendAttach(identity);
+    const ok = await this.sendAttach(identity);
+    if (!ok) this.identities.delete(identity.gaii);
+    return ok;
   }
 
   private async sendAttach(identity: TunnelIdentity): Promise<boolean> {
@@ -654,6 +682,25 @@ export class ConnectTunnelClient {
       }
       case 'error': {
         console.error(`[${this.label}] Server error frame: ${frame.code ?? ''} ${frame.message ?? ''}`);
+        // AN ANSWER IS AN ANSWER, INCLUDING NO. A refused `attach` comes back as this frame,
+        // carrying the id it refuses, and this case used to log and walk away — so the promise
+        // waiting on that id sat until the request timeout, holding a timer, for every refused
+        // credential, on every reconnect. Sixteen dead tokens on one real fleet meant sixteen of
+        // them at a time (2026-09-03).
+        const pa = frame.id ? this.pendingAttach.get(frame.id) : undefined;
+        if (pa && frame.id) { clearTimeout(pa.timer); this.pendingAttach.delete(frame.id); pa.resolve(false); }
+        // The node judging a credential is the same verdict a forwarded 401 carries, so it takes
+        // the same fence: it stops THAT identity and tells its owner, and the connection the other
+        // forty-eight are riding does not notice.
+        if (ATTACH_REFUSAL_CODES.has(frame.code ?? '')) {
+          const who = typeof frame.agent === 'string' ? frame.agent : '';
+          const att = who ? this.identities.get(who) : undefined;
+          if (att) {
+            this.identities.delete(who);
+            try { att.onAuthFailure?.(`Attach refused: ${frame.code} ${frame.message ?? ''}`.trim()); }
+            catch (err) { console.error(`[${this.label}] onAuthFailure handler error: ${(err as Error).message}`); }
+          }
+        }
         break;
       }
       case 'disconnect': {
