@@ -316,6 +316,16 @@ await test('The same upload as JSON { html } — the door an MCP agent can reach
     assert(!JSON.stringify(beforeEnable.body).includes('json upload'),
         'and the page bytes must not leak in the refusal');
 
+    // The config read says where the stored page IS, even while it is not published: the Portfolio
+    // tab previews from this address, and a page taken off the web must still be previewable.
+    const before = await json('/v1/portfolio/config', auth(t));
+    assert(before.status === 200 && before.body.data.html && typeof before.body.data.html.url === 'string',
+        `config must carry html.url for a stored page, got ${JSON.stringify(before.body.data)}`);
+    assert(before.body.data.html.size_kb >= 0 && typeof before.body.data.html.stored_at === 'string', 'html carries size_kb and stored_at');
+    const file = await fetch(`${BASE}${before.body.data.html.url}`);
+    assert(file.status === 200, `the stored page must be readable at html.url, got ${file.status}`);
+    assert((await file.text()).includes('<h1>json upload</h1>'), 'and it must be the page that was sent');
+
     const cfg = await json('/v1/portfolio/config', auth(t, { method: 'PUT', body: JSON.stringify({ enabled: true }) }));
     assert(cfg.status === 200, `enable ${cfg.status}: ${JSON.stringify(cfg.body.error)}`);
 

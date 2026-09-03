@@ -49111,6 +49111,19 @@ paths:
                             type: string
                             nullable: true
                             description: The standalone portfolio-origin URL, or null when disabled / username is not a valid DNS label.
+                          html:
+                            type: object
+                            nullable: true
+                            description: >-
+                              The stored page itself (portfolio/index.html), or null when no page has been made.
+                              Present whether or not the portfolio is enabled: the file does not move when the page
+                              is taken off the web, so the owner can still preview it.
+                            properties:
+                              url:
+                                type: string
+                                description: Public-file address of the stored page (`/v1/pub/{gaii}/portfolio/index.html`).
+                              size_kb: { type: integer }
+                              stored_at: { type: string, format: date-time }
         '401':
           $ref: '#/components/responses/Unauthorized'
     put:

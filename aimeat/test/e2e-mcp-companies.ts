@@ -268,6 +268,24 @@ await test('6. aimeat_company_portfolio_publish serves the page at the address',
     assert(served.body.includes(MARKER), 'the served document is not the published page');
 });
 
+await test("6b. aimeat_portfolio_publish answers with an address this node serves", async () => {
+    // The tool used to hand back `/p/{owner}`, an address no route has ever answered: the person
+    // was told to look at a 404. The answer is now the apex page, and it is asserted by OPENING it,
+    // not by reading the string.
+    const pf = await connectAgent('mcppf', ['storage:write', 'memory:read']);
+    const out = toolJson(await mcpRpc(pf.session, 'tools/call', {
+        name: 'aimeat_portfolio_publish', arguments: { html: PAGE },
+    }, nextId()));
+    assert(out.published === true, 'the page reports as unpublished');
+    assert(typeof out.url === 'string' && out.url.endsWith(`/v1/portfolio/${pf.owner}`),
+        `the answer must name the served page, got ${out.url}`);
+    assert('standalone_url' in out, 'the answer must carry standalone_url (null when the node has no portfolio origin)');
+    const served = await fetch(out.url);
+    assert(served.status === 200, `the address the person is told to open must answer 200, got ${served.status}`);
+    const dead = await fetch(`${BASE}/p/${pf.owner}`);
+    assert(dead.status === 404, `nothing serves /p/, so the tool must not name it (got ${dead.status})`);
+});
+
 await test("7. an app front page pointing at someone else's app is refused", async () => {
     const body = await mcpRpc(full.session, 'tools/call', {
         name: 'aimeat_company_front_page',

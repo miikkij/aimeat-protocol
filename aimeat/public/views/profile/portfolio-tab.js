@@ -2,208 +2,169 @@
  * @file portfolio-tab.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Profile tab for the portfolio. NOT a landing page: with no published
- *   portfolio it forwards straight to the builder (an empty two-button page was a wasted
- *   click); with one published it earns its place — public URL with copy, last updated,
- *   and Visit / Edit / Unpublish.
+ * @description Profile tab: the person's own page at their address. One read (GET
+ *   /v1/portfolio/config: the switches, the standalone address and where the stored page is), the
+ *   member showcase count and, best effort, the home's record of which AI wrote the welcome mat;
+ *   the page's own HTML is fetched from its public-file address for the title and the preview. This
+ *   file is the state and the handlers (publish and unpublish, the search-engine and badge switches,
+ *   the preview, a pasted or chosen HTML file published from here, the request copied for the
+ *   person's AI, the welcome-mat prompt, the agent's rule); the render is portfolio/page.js.
+ * @structure PortfolioTab() — state (data, members, ai, pageHtml, previewOpen, paste, matPrompt, busy) + handlers → renderPage(ctx)
+ * @usage registered in profile.js TABS as id 'portfolio'
  * @version-history
+ *   v3.0.0 — 2026-09-03 — Poster face (design canvas "AIMEAT Portfolio-sivu", direction A): one page
+ *     that says where the page is, who can see it and who wrote it, previews it, and offers the three
+ *     roads to change it, the AI first. The tab no longer forwards to the builder when nothing is
+ *     published: the empty state is a page with the three roads to a first one. A page taken off
+ *     the web keeps its preview and the way back. The standalone address and its badge switch, which
+ *     lived only in the builder, are here; a finished HTML can be pasted or chosen and published
+ *     from here.
+ *   v2.1.0 — 2026-08-08 — Copy labels now resolve from the shared common.copy / common.copied keys.
  *   v2.0.0 — 2026-06-10 — Replace the two-button landing: auto-forward to the builder when
  *     nothing is published; published state shows URL + last updated + Visit/Edit/Unpublish.
  *   v1.1.0 — 2026-03-17 — Replace inline styles with CSS classes
  *   v1.0.0 — 2026-03-16 — Initial portfolio tab
- *   v2.1.0 — 2026-08-08 — Copy labels now resolve from the shared common.copy / common.copied / common.copyPrompt /
- *       common.copyLink / common.copyUrl keys; the per-view copy label keys this file used were
- *       removed from both locales. Same words on screen.
  */
-import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
-import htm from 'htm';
-const html = htm.bind(h);
+import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import { t, getLocale } from '/js/i18n.js';
-
-// t() echoes the key when a translation is missing (e.g. a server still serving
-// pre-update locales) — fall back to readable English instead of raw keys.
-const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
-import { apiGet, apiPut } from '/js/api.js';
-import { Spinner } from './shared.js';
-import { CopyButton } from '/components/CopyButton.js';
 import { useConfirm } from '/components/Modal.js';
+import { getNodeUrl, getSession } from '/js/services/auth.js';
+import { onLiveUpdate } from '/lib/live-updates.js';
+import { swallowed } from '/js/swallowed.js';
+import { copyToClipboard } from '/js/utils.js';
+import { apiGet, apiPut } from '/js/api.js';
+import { stampCspNonce } from '/views/portfolio/shared.js';
+import { renderPage } from './portfolio/page.js';
+import { x, titleOf, aiRequest, agentRule } from './portfolio/frame.js';
+
+const DEFAULT_MAX_KB = 512;
 
 export default function PortfolioTab({ session, navigate, showToast }) {
+  const sess = session || getSession();
+  const ownerName = sess?.owner || '';
   const { confirm, ConfirmUI } = useConfirm();
-  // undefined = loading, null = no config, object = config
-  const [cfg, setCfg] = useState(undefined);
-  const [seoBusy, setSeoBusy] = useState(false);
+  const fileRef = useRef(null);
+  const [data, setData] = useState(null);
+  const [members, setMembers] = useState(null);
+  const [ai, setAi] = useState(null);
+  const [pageHtml, setPageHtml] = useState('');
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [paste, setPaste] = useState('');
+  const [matPrompt, setMatPrompt] = useState('');
+  const [busy, setBusy] = useState(false);
 
-  const load = () => apiGet('/v1/portfolio/config')
-    .then(r => setCfg(r?.data?.config || null))
-    .catch(() => setCfg(null));
-  useEffect(() => { load(); }, []);
+  const toast = (msg, isErr) => showToast?.(msg, !!isErr);
+  const fail = (e, fallback) => toast(e?.error?.message || e?.response?.error?.message || e?.message || (typeof e === 'string' ? e : '') || fallback || t('profile.error'), true);
 
-  // No published portfolio → the builder IS the page. Forward instead of showing
-  // two buttons on 90% whitespace. CRITICAL: clear the profile's remembered-open-tab
-  // first — otherwise every later /v1/profile visit restores this tab, which forwards
-  // again, and the user can never reach the profile home (bounce loop).
-  // Forward to the builder once cfg resolves to "not published". Keyed on cfg only: navigate is a
-  // prop function of uncertain stability, and adding it could re-fire the forward before unmount.
-  // Unpublished but PREVIOUSLY PUBLISHED is its own state, and it used to have no page at all.
-  // The forward below sent anyone whose portfolio was switched off straight into the builder, where
-  // nothing said the old page still existed — so pressing Unpublish read as having destroyed the
-  // work. It never did: unpublishing writes `enabled: false` and does not touch the stored HTML.
-  // `publishedAt` is the evidence that a page is sitting there, and it earns a card of its own.
-  const wasPublished = !!(cfg && (cfg.publishedAt || cfg.htmlSizeKb));
+  const load = useCallback(async () => {
+    try {
+      const r = await apiGet('/v1/portfolio/config');
+      const d = r?.data || { config: null, standalone_url: null, html: null };
+      setData(d);
+      // The page's own words: the title comes from the file, and the preview shows the same bytes.
+      if (d.html?.url) {
+        try {
+          const res = await fetch(d.html.url, { cache: 'no-store' });
+          setPageHtml(res.ok ? await res.text() : '');
+        } catch (e) { swallowed('portfolio: page html', e); setPageHtml(''); }
+      } else setPageHtml('');
+    } catch (e) { swallowed('portfolio: config', e); setData({ config: null, standalone_url: null, html: null }); }
+    // The showcase count and the home's record of the mat's author: neither is on the critical path.
+    try {
+      const m = await apiGet('/v1/portfolio/members');
+      setMembers(typeof m?.data?.total === 'number' ? m.data.total : (m?.data?.members || []).length);
+    } catch (e) { swallowed('portfolio: members', e); }
+    try {
+      const h = await apiGet('/v1/home/state');
+      setAi(h?.data?.state?.ai || null);
+    } catch (e) { swallowed('portfolio: home state', e); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => onLiveUpdate(['portfolio'], load), [load]);
 
+  // The welcome-mat request is shown on the empty page, so it is fetched only there.
   useEffect(() => {
-    if (cfg !== undefined && !cfg?.enabled && !wasPublished) {
-      try { sessionStorage.removeItem('aimeat-profile-tab'); } catch { /* noop */ }   // eslint-disable-line aimeat/no-silent-catch -- noop
-      navigate('/v1/portfolio');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cfg, wasPublished]);
+    if (!data || data.html) return;
+    apiGet(`/v1/prompts/welcome-mat?lang=${encodeURIComponent(getLocale())}`)
+      .then((r) => setMatPrompt(r?.data?.prompt || ''))
+      .catch((e) => swallowed('portfolio: mat prompt', e));
+  }, [data]);
 
-  if (cfg === undefined) return html`<${Spinner} text=${t('loading') || 'Loading…'} />`;
-  if (!cfg?.enabled && !wasPublished) return null; // nothing here yet — forwarding to the builder
+  const cfg = data?.config || {};
+  const maxKb = DEFAULT_MAX_KB;
 
-  const url = `${window.location.origin}/v1/portfolio/${encodeURIComponent(session.owner)}`;
-
-  const handleRepublish = async () => {
-    setSeoBusy(true);
+  /** One field changed, the rest left where it was: the PUT merges onto the stored record. */
+  const patch = async (fields, key, onDone) => {
+    setBusy(key);
     try {
-      // The stored HTML was never touched, so this is the whole restore: one field back to true.
-      await apiPut('/v1/portfolio/config', { ...cfg, enabled: true, tags: ['portfolio'] });
-      setCfg({ ...cfg, enabled: true });
-      showToast?.(tr('portfolio.builder.republished', 'Your portfolio is public again.'));
-    } catch (e) {
-      showToast?.(e.message || 'Failed', true);
-    } finally {
-      setSeoBusy(false);
-    }
+      await apiPut('/v1/portfolio/config', { ...fields, tags: ['portfolio'] });
+      setData((d) => ({ ...d, config: { ...(d?.config || {}), ...fields } }));
+      onDone?.();
+    } catch (e) { fail(e); } finally { setBusy(false); }
   };
 
-  const handleSeoToggle = async () => {
-    setSeoBusy(true);
+  const setEnabled = (on) => {
+    if (on) { patch({ enabled: true }, 'enable', () => toast(x('republishedToast'))); return; }
+    confirm(x('confirmUnpublish'), () => patch({ enabled: false, unpublishedAt: new Date().toISOString() }, 'enable', () => toast(x('unpublishedToast'))), { danger: true });
+  };
+  const setSeo = (on) => patch({ seoIndex: on }, 'seo', () => toast(on ? x('searchOnToast') : x('searchOffToast')));
+  const setBadge = (on) => patch({ showBadge: on }, 'badge', () => toast(on ? x('badgeOnToast') : x('badgeOffToast')));
+
+  const togglePreview = () => setPreviewOpen((v) => !v);
+  const previewDoc = () => stampCspNonce(pageHtml);
+
+  const aiRequestText = () => aiRequest(ownerName, !!data?.html);
+  const copyAiRequest = async () => { await copyToClipboard(aiRequestText()); toast(x('copiedRequest')); };
+  const copyRule = async () => { await copyToClipboard(agentRule(ownerName, getNodeUrl())); toast(x('copiedRule')); };
+  const copyMatPrompt = async () => {
+    setBusy('mat');
     try {
-      const next = !cfg.seoIndex;
-      // The PUT merges over what is already stored, so this changes the one field and leaves the
-      // rest of the portfolio config exactly where it was.
-      await apiPut('/v1/portfolio/config', { ...cfg, seoIndex: next, tags: ['portfolio'] });
-      setCfg({ ...cfg, seoIndex: next });
-      showToast?.(next
-        ? tr('portfolio.builder.seoOnOk', 'Search engines can find your portfolio. They usually take a few days.')
-        : tr('portfolio.builder.seoOffOk', 'Taken out of search engines.'));
-    } catch (e) {
-      showToast?.(e.message || 'Failed', true);
-    } finally {
-      setSeoBusy(false);
-    }
+      let p = matPrompt;
+      if (!p) {
+        const r = await apiGet(`/v1/prompts/welcome-mat?lang=${encodeURIComponent(getLocale())}`);
+        p = r?.data?.prompt || '';
+        setMatPrompt(p);
+      }
+      if (!p) { toast(t('profile.error'), true); return; }
+      await copyToClipboard(p);
+      toast(x('copiedMat'));
+    } catch (e) { fail(e); } finally { setBusy(false); }
   };
 
-  const handleUnpublish = () => {
-    confirm(tr('portfolio.builder.unpublishConfirm', 'Take your portfolio off the web? Nothing is deleted \u2014 the page stays stored here and you can make it public again from this tab whenever you like.'), async () => {
-      try {
-        await apiPut('/v1/portfolio/config', { ...cfg, enabled: false, tags: ['portfolio'] });
-        // Stay here. Forwarding to the builder is what made this act read as destructive: the
-        // page vanished, the builder said nothing about it, and the way back did not exist. The
-        // card this now falls through to says the page is still stored and offers to restore it.
-        setCfg({ ...cfg, enabled: false });
-        showToast?.(tr('portfolio.builder.unpublished',
-          'Taken off the web. The page is still stored here — you can make it public again below.'));
-      } catch (e) { showToast?.(e.message || 'Failed', true); }
-    }, { danger: true });
+  const pickFile = () => fileRef.current?.click();
+  const readFile = (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => setPaste(String(reader.result || ''));
+    reader.readAsText(f);
+    e.target.value = '';
+  };
+  const publishPaste = async () => {
+    const html = (paste || '').trim();
+    if (!html) return;
+    if (!/<html[\s>]/i.test(html) || !/<\/html>/i.test(html)) { toast(x('pasteNotWhole'), true); return; }
+    setBusy('publish');
+    try {
+      const up = await apiPut('/v1/portfolio/upload', { html });
+      if (up?.ok === false) throw up;
+      // Bringing a page here means publishing it: a page nobody can open is not published.
+      if (!cfg.enabled) await apiPut('/v1/portfolio/config', { enabled: true, tags: ['portfolio'] });
+      setPaste('');
+      setPreviewOpen(false);
+      toast(x('publishedToast', { n: Math.max(1, up?.data?.sizeKb ?? Math.ceil(html.length / 1024)) }));
+      await load();
+    } catch (e) { fail(e); } finally { setBusy(false); }
   };
 
-  // Switched off, with a page still sitting there. Says so, and offers the one thing that was
-  // missing: the way back. Everything else on this tab describes a live page, so it stays hidden.
-  if (!cfg.enabled) {
-    return html`
-      <div class="tab-content">
-        <div class="section-title">${t('portfolio.builder.heading')}</div>
-        <div class="card">
-          <div class="mem-item">
-            <span class="mem-key">${tr('portfolio.builder.offLabel', 'Status')}</span>
-            <span>${tr('portfolio.builder.offBody',
-              'Your portfolio is not public right now. It has not been deleted — the page you built is still stored here, exactly as it was.')}</span>
-          </div>
-          ${cfg.publishedAt && html`
-            <div class="mem-item">
-              <span class="mem-key">${tr('portfolio.builder.lastUpdated', 'Last updated')}</span>
-              <span>${new Date(cfg.publishedAt).toLocaleString(getLocale() === 'fi' ? 'fi-FI' : undefined)}</span>
-            </div>
-          `}
-          ${cfg.htmlSizeKb && html`
-            <div class="mem-item">
-              <span class="mem-key">${tr('portfolio.builder.sizeLabel', 'Size')}</span>
-              <span>${cfg.htmlSizeKb} KB</span>
-            </div>
-          `}
-          <div class="card-actions">
-            <button class="btn-primary btn-sm" disabled=${seoBusy} onClick=${handleRepublish}>
-              ${tr('portfolio.builder.republish', 'Make it public again')}
-            </button>
-            <button class="btn-outline btn-sm" onClick=${() => navigate('/v1/portfolio')}>
-              ${tr('portfolio.builder.editBtn', 'Edit in builder')}
-            </button>
-          </div>
-        </div>
-        <${ConfirmUI} />
-      </div>
-    `;
-  }
-
-  return html`
-    <div class="tab-content">
-      <div class="section-title">${t('portfolio.builder.heading')}</div>
-      <div class="section-desc">${t('portfolio.builder.enabled')}</div>
-
-      <div class="card">
-        <div class="mem-item">
-          <span class="mem-key">${tr('portfolio.builder.publicUrl', 'Public URL')}</span>
-          <span class="access-copy-val">
-            <a href=${url} target="_blank">${url}</a>
-            <${CopyButton} text=${url} className="btn-ghost btn-sm" label="📋"
-              onCopied=${() => showToast?.(t('common.copied') || 'Copied')} />
-          </span>
-        </div>
-        ${cfg.publishedAt && html`
-          <div class="mem-item">
-            <span class="mem-key">${tr('portfolio.builder.lastUpdated', 'Last updated')}</span>
-            <span>${new Date(cfg.publishedAt).toLocaleString(getLocale() === 'fi' ? 'fi-FI' : undefined)}</span>
-          </div>
-        `}
-        ${cfg.htmlSizeKb && html`
-          <div class="mem-item">
-            <span class="mem-key">${tr('portfolio.builder.sizeLabel', 'Size')}</span>
-            <span>${cfg.htmlSizeKb} KB</span>
-          </div>
-        `}
-        <div class="card-actions">
-          <a class="btn-outline btn-sm" href=${url} target="_blank">${tr('portfolio.builder.visitBtn', 'Visit')}</a>
-          <button class="btn-outline btn-sm" onClick=${() => navigate('/v1/portfolio')}>${tr('portfolio.builder.editBtn', 'Edit in builder')}</button>
-          <button class="btn-danger btn-sm" onClick=${handleUnpublish}>${tr('portfolio.builder.unpublish', 'Unpublish')}</button>
-        </div>
-      </div>
-
-      <!-- Two switches, not one. Publishing puts the page online and on this node's member
-           showcase; letting a search engine list a page carrying your own name is a separate
-           question, and it is the one worth asking separately. Off until asked. -->
-      <div class="card">
-        <div class="mem-item">
-          <span class="mem-key">${tr('portfolio.builder.seoLabel', 'Search engines')}</span>
-          <span>${cfg.seoIndex
-            ? tr('portfolio.builder.seoOn', 'Your portfolio can be found in search engines.')
-            : tr('portfolio.builder.seoOff', 'Your portfolio is not in search engines. The page works and can be shared by link.')}</span>
-        </div>
-        <div class="card-actions">
-          <button class=${cfg.seoIndex ? 'btn-outline btn-sm' : 'btn-primary btn-sm'}
-                  disabled=${seoBusy}
-                  onClick=${handleSeoToggle}>
-            ${cfg.seoIndex
-              ? tr('portfolio.builder.seoTurnOff', 'Take it out of search engines')
-              : tr('portfolio.builder.seoTurnOn', 'Let search engines find it')}
-          </button>
-        </div>
-      </div>
-      <${ConfirmUI} />
-    </div>
-  `;
+  const ctx = {
+    data, members, ai, pageHtml, previewOpen, paste, matPrompt, busy, maxKb, ownerName,
+    standaloneUrl: data?.standalone_url || null,
+    title: titleOf(pageHtml),
+    navigate, toast, fileRef, ConfirmUI,
+    setEnabled, setSeo, setBadge, togglePreview, previewDoc,
+    aiRequestText, copyAiRequest, copyRule, copyMatPrompt,
+    setPaste, pickFile, readFile, publishPaste,
+  };
+  return renderPage(ctx);
 }

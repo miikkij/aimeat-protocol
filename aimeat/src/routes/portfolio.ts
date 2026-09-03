@@ -8,6 +8,11 @@
  * @structure catalog / members / config (GET+PUT) / upload / data/:username
  *   portfolioWriteGaii() / portfolioReadGaiis() — which identity a portfolio is stored under
  * @version-history
+ *   v1.7.0 — 2026-09-03 — GET /v1/portfolio/config also says where the stored page IS: `html`
+ *     carries the public-file address of portfolio/index.html, its size and when it was stored, or
+ *     null when no page has been made. The Portfolio tab previews the page and reads its title from
+ *     that address, and it works for a page taken off the web too, since the public reader
+ *     (data/:username) refuses those and the file itself does not move.
  *   v1.6.0 — 2026-08-10 — PUT /v1/portfolio/upload also accepts application/json { html }. The
  *     raw text/html body is what a browser sends and what this route was built for, but the
  *     connector has one JSON dispatch point for every request, so an agent served locally could
@@ -336,15 +341,32 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
     // Read across every identity this owner's portfolio could live under: the mat is written
     // under the GHII before any agent exists, and must stay visible once one does.
     let value: unknown = null;
-    for (const gaii of await portfolioReadGaiis(storage, ownerName, config.nodeId)) {
+    const candidates = await portfolioReadGaiis(storage, ownerName, config.nodeId);
+    for (const gaii of candidates) {
       const mem = await storage.getMemory(gaii, PORTFOLIO_CONFIG_KEY);
       if (mem?.value) { value = mem.value; break; }
+    }
+    // The stored page itself, wherever it lives. Metadata only: the tab fetches the bytes from the
+    // public-file address when it previews, and a config read stays a config read.
+    let html: { url: string; size_kb: number; stored_at: string } | null = null;
+    for (const gaii of candidates) {
+      const meta = await storage.getStorageFileMeta(gaii, PORTFOLIO_HTML_KEY);
+      if (meta) {
+        html = {
+          url: `/v1/pub/${encodeURIComponent(gaii)}/${PORTFOLIO_HTML_KEY}`,
+          // Whole kilobytes, rounded up: a 300-byte page is "1 kB", never "0 kB".
+          size_kb: Math.ceil(meta.size / 1024),
+          stored_at: meta.createdAt,
+        };
+        break;
+      }
     }
     res.json(success(config.nodeId, {
       config: value,
       // Where the portfolio is (or would be) served standalone — null when the
       // portfolio origin is disabled or the username isn't a valid DNS label.
       standalone_url: portfolioStandaloneUrl(config, ownerName),
+      html,
     }));
   });
 
