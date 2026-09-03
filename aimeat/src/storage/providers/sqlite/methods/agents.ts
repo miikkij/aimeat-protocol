@@ -12,6 +12,7 @@
  *     in that file's header: consoleUrl (v1.4.0), registeredBy (v1.5.0).
  */
 import type { AgentRecord } from '../../../interface.js';
+import { logger } from '../../../../utils/logger.js';
 import type { SqliteStorage } from '../index.js';
 
 export const agentMethods = {
@@ -21,8 +22,8 @@ export const agentMethods = {
       this.db.prepare(
         `INSERT INTO agents (gaii, name, owner, displayName, description, capabilities, publicKey, trustScore, morselBalance, createdAt, lastSeen, semantic, allowedOrigins, defaultScopes, federate,
          webhookUrl, webhookSecret, webhookEnabled, webhookLastSuccess, webhookLastFailure, webhookFailCount, platform, platformVersion, platformDetectedBy, model, modelDetectedBy, tags, mode, maxConcurrentTasks, consoleUrl, registeredBy,
-         runMode, identityVersion, cardJws, cardIssuedAt, enrolledAt, mcpClient, mcpLastSeen)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         runMode, runtimeSource, identityVersion, cardJws, cardIssuedAt, enrolledAt, mcpClient, mcpLastSeen)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         agent.gaii, agent.name, agent.owner,
         agent.displayName ?? null, agent.description ?? null,
@@ -43,6 +44,7 @@ export const agentMethods = {
         agent.consoleUrl ?? null,
         agent.registeredBy ?? null,
         agent.runMode ?? null,
+        agent.runtimeSource ? JSON.stringify(agent.runtimeSource) : null,
         agent.identityVersion ?? null,
         agent.cardJws ?? null,
         agent.cardIssuedAt ?? null,
@@ -97,7 +99,7 @@ export const agentMethods = {
        webhookUrl = ?, webhookSecret = ?, webhookEnabled = ?, webhookLastSuccess = ?, webhookLastFailure = ?, webhookFailCount = ?,
        platform = ?, platformVersion = ?, platformDetectedBy = ?, model = ?, modelDetectedBy = ?, tags = ?, mode = ?, maxConcurrentTasks = ?,
        dailySpendLimit = ?, scheduleConstraintDefaults = ?, consoleUrl = ?, registeredBy = ?,
-       runMode = ?, identityVersion = ?, cardJws = ?, cardIssuedAt = ?, enrolledAt = ?,
+       runMode = ?, runtimeSource = ?, identityVersion = ?, cardJws = ?, cardIssuedAt = ?, enrolledAt = ?,
        mcpClient = ?, mcpLastSeen = ?
        WHERE gaii = ?`
     ).run(
@@ -132,6 +134,7 @@ export const agentMethods = {
       // rule stated in one place.
       updated.registeredBy ?? null,
       updated.runMode ?? null,
+      updated.runtimeSource ? JSON.stringify(updated.runtimeSource) : null,
       updated.identityVersion ?? null,
       updated.cardJws ?? null,
       updated.cardIssuedAt ?? null,
@@ -286,6 +289,12 @@ export const agentMethods = {
     if (row.consoleUrl) record.consoleUrl = row.consoleUrl as string;
     if (row.registeredBy) record.registeredBy = row.registeredBy as string;
     if (row.runMode) record.runMode = row.runMode as AgentRecord['runMode'];
+    if (row.runtimeSource) {
+      // A row written before this column, or by a build that stored something else, must not stop
+      // an agent loading: the field is a report about someone else's disk, not a load-bearing one.
+      try { record.runtimeSource = JSON.parse(row.runtimeSource as string); }
+      catch (err) { logger.warn('agents: unreadable runtimeSource, ignoring', { gaii: record.gaii, error: String(err) }); }
+    }
     if (row.identityVersion != null) record.identityVersion = row.identityVersion as 1 | 2;
     if (row.cardJws) record.cardJws = row.cardJws as string;
     if (row.cardIssuedAt) record.cardIssuedAt = row.cardIssuedAt as string;

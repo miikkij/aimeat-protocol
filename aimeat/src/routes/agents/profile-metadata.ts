@@ -34,11 +34,10 @@ import { calculateTrustScore } from '../../services/trust.js';
 import { emitChange } from '../../services/event-bus.js';
 import { markAgentSeen } from '../../services/telemetry-buffer.js';
 import { listByAgent as listEngagementsByAgent } from '../../services/workspace-engagements.js';
-import { setAgentTags, setAgentMode, setAgentConsoleUrl, type AgentWriteRefusal } from '../../services/agent-profile-write.js';
+import { setAgentTags, setAgentMode, setAgentConsoleUrl, type AgentWriteRefusal , setAgentRunMode, setAgentRuntimeSource } from '../../services/agent-profile-write.js';
 import { logger } from '../../utils/logger.js';
 import { computeAgentHealthMany } from '../../services/agent-health.js';
 import type { AgentOnboardingRecord } from '../../storage/types/agents-messaging.js';
-import { isRunMode, RUN_MODES } from '../../models/agent-card.js';
 import { credentialHealthForOwner, summariseCredentialHealth } from '../../services/agent-credential-health.js';
 
 /** HTTP status for a refusal from services/agent-profile-write.ts. */
@@ -225,6 +224,9 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
         // recorded here and honoured by the runtime; the node never enforces either. `run_mode` is
         // null on an agent nobody has said anything about, which is not the same as 'spawn'.
         run_mode: a.runMode ?? null,
+        // What code backs it, as the runtime last said. The only answer this node has to "what was
+        // running when this ran" for a crew whose definition lives on someone else's disk.
+        runtime_source: a.runtimeSource ?? null,
         identity_version: a.identityVersion ?? 1,
         // Credential health at a glance: a v2 agent with no card is created and unconnected.
         card_enrolled: !!a.enrolledAt,
@@ -371,37 +373,55 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
   // what /console-url beside it already asks for. An owner session bypasses scopes, so the person
   // is unaffected; a fleet runtime that has worked out an agent must stay up is the other caller
   // this exists for, and the same-owner check below is its second fence.
+  //
+  // IT NEVER ASKED FOR A DEFINITION, and that was worth measuring rather than assuming: reported as
+  // impossible for a code-backed crew on 2026-09-03, tried against a real definition-less agent,
+  // and it set the mode and put the agent on the `?run_mode=spawn` roster. What was actually
+  // missing was a door an AGENT could reach — `mode` had a tool on all three surfaces and this had
+  // none, so only a human with an owner session over HTTP could set it. The mode belongs to the
+  // NODE, not to a definition: `agent-task-rules.ts` auto-activates a queued task only for
+  // `task-runner`, and a switch the node acts on cannot live on a file the node never reads.
   router.patch('/v1/agents/:name/run-mode', requireAuth(), requireScope('agent:write'), async (req, res) => {
-    const identifier = decodeURIComponent(req.params.name as string);
-    const gaii = identifier.includes('#') ? identifier : buildGAII(identifier, req.auth!.owner, config.nodeId);
-    const agent = await storage.getAgent(gaii);
-    if (!agent) {
-      res.status(404).json(error(config.nodeId, 'AGENT_NOT_FOUND', `Agent not found: ${identifier}`));
+    const outcome = await setAgentRunMode({ storage, config }, req.auth!.owner as string,
+      decodeURIComponent(req.params.name as string), req.body?.run_mode);
+    if (!outcome.ok) {
+      res.status(outcome.code === 'AGENT_NOT_FOUND' ? 404 : outcome.code === 'INVALID_INPUT' ? 400 : 403)
+        .json(error(config.nodeId, outcome.code, outcome.message));
       return;
     }
-    if (agent.owner !== req.auth!.owner) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only update your own agents'));
-      return;
-    }
-
-    const value = req.body?.run_mode;
-    if (!isRunMode(value)) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `run_mode must be one of: ${RUN_MODES.join(', ')}`));
-      return;
-    }
-
-    const updated = await storage.updateAgent(gaii, { runMode: value });
-    if (!updated) {
-      res.status(404).json(error(config.nodeId, 'AGENT_NOT_FOUND', `Agent not found: ${identifier}`));
-      return;
-    }
-
     res.json(success(config.nodeId, {
-      gaii: updated.gaii,
-      name: updated.name,
-      run_mode: updated.runMode ?? null,
+      gaii: outcome.agent.gaii, name: outcome.agent.name, run_mode: outcome.agent.runMode ?? null,
     }));
-    emitChange('agents');
+  });
+
+  /**
+   * PATCH /v1/agents/:name/runtime-source — the runtime says what code backs this agent.
+   *
+   * WHY IT EXISTS. Published `aimeat` 3.11.0 and a working tree's 3.11.0 were different code for
+   * days, and the version number could not tell them apart; it cost half a day hunting a bug that
+   * was a missing publish. The same hole is wider for a crew: a JSON definition is a versioned
+   * record on this node, so "which one ran" has an answer, and a CODE-backed crew has no definition
+   * here at all. Nothing could say what ran.
+   *
+   * DECLARED, NEVER CHECKED. The node does not run the process and cannot read the disk, so a
+   * server-side opinion about the hash would be a guess with a schema. What the node CAN do is
+   * record the claim and stamp its own time on it, which is the difference between an unanswerable
+   * question and one answered by a party who might be wrong.
+   *
+   * `agent:write` and the same-owner fence, exactly like run-mode above: the caller here is a fleet
+   * runtime reporting about itself.
+   */
+  router.patch('/v1/agents/:name/runtime-source', requireAuth(), requireScope('agent:write'), async (req, res) => {
+    const outcome = await setAgentRuntimeSource({ storage, config }, req.auth!.owner as string,
+      decodeURIComponent(req.params.name as string), req.body?.runtime_source);
+    if (!outcome.ok) {
+      res.status(outcome.code === 'AGENT_NOT_FOUND' ? 404 : outcome.code === 'INVALID_INPUT' ? 400 : 403)
+        .json(error(config.nodeId, outcome.code, outcome.message));
+      return;
+    }
+    res.json(success(config.nodeId, {
+      gaii: outcome.agent.gaii, name: outcome.agent.name, runtime_source: outcome.agent.runtimeSource ?? null,
+    }));
   });
 
   // PATCH /v1/agents/:name/max-concurrent-tasks — owner sets how many tasks the

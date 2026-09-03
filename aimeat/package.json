@@ -168,7 +168,8 @@
     "audit:full": "pnpm audit:triage && pnpm audit:report",
     "audit:security": "tsx scripts/security-report.ts",
     "outdated:libs": "tsx scripts/check-lib-freshness.ts",
-    "libs:usage": "tsx scripts/check-lib-usage.ts"
+    "libs:usage": "tsx scripts/check-lib-usage.ts",
+    "check:version-drift": "node scripts/check-version-drift.mjs"
   },
   "keywords": [
     "aimeat",

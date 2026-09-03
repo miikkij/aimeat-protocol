@@ -255,6 +255,8 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // ── Owner-managed agent classification ──
     aimeat_agent_tags_set: { title: 'Set Agent Tags', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_agent_mode_set: { title: 'Set Agent Mode', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_agent_run_mode_set: { title: 'Set Agent Run Mode', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_agent_runtime_report: { title: 'Report What Code Runs This Agent', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_agent_console_set: { title: 'Set Agent Console Address', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_agent_basics_get: { title: 'Basic Agents: What and Whether', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_agent_basics_request: { title: 'Ask the Owner for the Basic Agents', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },

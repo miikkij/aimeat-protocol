@@ -370,6 +370,85 @@ export async function setAgentProfile(
  * Progress on steps that carry over (same id) is preserved. Best-effort: a sync failure must never
  * fail the mode change, which is the write the caller asked for.
  */
+/**
+ * How an agent is meant to be RUN, set by anyone acting for its owner.
+ *
+ * IT IS THE NODE'S SWITCH, NOT A DEFINITION'S. `agent-task-rules.ts` auto-activates a queued task
+ * only for a `task-runner`, and a spawner's roster is `GET /v1/agents?run_mode=spawn` — both read
+ * the node's record. A crew whose behaviour lives in Python has no definition here at all, and if
+ * this rode on one it could never be spawned however it was written. It does not: the field is on
+ * the agent, like `mode` and `maxConcurrentTasks`, and for the same reason.
+ *
+ * Recorded here and honoured by the runtime. The node never enforces it: it does not start the
+ * process, and a server-side check about a process the server does not run is a second opinion.
+ */
+export async function setAgentRunMode(
+    deps: AgentWriteDeps,
+    callerOwner: string,
+    identifier: string,
+    rawRunMode: unknown,
+): Promise<AgentWriteOutcome> {
+    const target = await loadSameOwnerAgent(deps, callerOwner, identifier,
+        'You can only set the run mode of agents owned by the same owner');
+    if (!target.ok) return target;
+
+    if (rawRunMode !== 'spawn' && rawRunMode !== 'resident') {
+        return { ok: false, code: 'INVALID_INPUT', message: "run_mode must be 'spawn' or 'resident'" };
+    }
+    const updated = await deps.storage.updateAgent(target.gaii, { runMode: rawRunMode });
+    if (!updated) return { ok: false, code: 'AGENT_NOT_FOUND', message: `Agent not found: ${identifier}` };
+    emitChange('agents');
+    return { ok: true, agent: updated };
+}
+
+/**
+ * What code backs an agent, as its runtime describes it.
+ *
+ * DECLARED, NEVER CHECKED. Every field but one is the runtime's word about a disk this node cannot
+ * read; `reportedAt` is the node's clock, and it is what turns "what was it running" into a
+ * question with an answer rather than a guess. Strings are trimmed and bounded because a report
+ * from a runtime is untrusted input like any other.
+ *
+ * `null` clears it — a runtime that stops being the thing that runs this agent should be able to
+ * say so, and a stale claim is worse than none.
+ */
+export async function setAgentRuntimeSource(
+    deps: AgentWriteDeps,
+    callerOwner: string,
+    identifier: string,
+    raw: unknown,
+): Promise<AgentWriteOutcome> {
+    const target = await loadSameOwnerAgent(deps, callerOwner, identifier,
+        'You can only report the runtime of agents owned by the same owner');
+    if (!target.ok) return target;
+
+    if (raw === null) {
+        const cleared = await deps.storage.updateAgent(target.gaii, { runtimeSource: null });
+        if (!cleared) return { ok: false, code: 'AGENT_NOT_FOUND', message: `Agent not found: ${identifier}` };
+        emitChange('agents');
+        return { ok: true, agent: cleared };
+    }
+    const src = raw as Record<string, unknown>;
+    if (!src || typeof src !== 'object' || Array.isArray(src) || typeof src.kind !== 'string' || !src.kind.trim()) {
+        return { ok: false, code: 'INVALID_INPUT',
+            message: 'runtime_source needs a `kind` (e.g. "python" or "crew-def"), or null to clear it' };
+    }
+    const str = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : undefined);
+    const stored = {
+        kind: src.kind.trim().slice(0, 64),
+        ...(str(src.file, 512) ? { file: str(src.file, 512) } : {}),
+        ...(str(src.sha256, 128) ? { sha256: str(src.sha256, 128) } : {}),
+        ...(str(src.commit, 128) ? { commit: str(src.commit, 128) } : {}),
+        ...(str(src.runtime, 128) ? { runtime: str(src.runtime, 128) } : {}),
+        ...(Number.isInteger(src.definition_revision) ? { definitionRevision: src.definition_revision as number } : {}),
+        reportedAt: new Date().toISOString(),
+    };
+    const updated = await deps.storage.updateAgent(target.gaii, { runtimeSource: stored });
+    if (!updated) return { ok: false, code: 'AGENT_NOT_FOUND', message: `Agent not found: ${identifier}` };
+    emitChange('agents');
+    return { ok: true, agent: updated };
+}
+
 export async function setAgentMode(
     deps: AgentWriteDeps,
     callerOwner: string,
