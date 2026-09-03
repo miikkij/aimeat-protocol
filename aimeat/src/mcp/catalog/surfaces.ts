@@ -273,7 +273,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_group_list', 'aimeat_group_get', 'aimeat_group_create', 'aimeat_group_add_member', 'aimeat_group_remove_member',
         'aimeat_share_create', 'aimeat_share_list', 'aimeat_share_revoke',
         'aimeat_consent_grant', 'aimeat_consent_list', 'aimeat_consent_revoke',
-        'aimeat_agent_mode_set', 'aimeat_agent_run_mode_set', 'aimeat_agent_runtime_report',
+        'aimeat_agent_mode_set', 'aimeat_agent_run_mode_set', 'aimeat_agent_runtime_report', 'aimeat_agent_description_set',
         'aimeat_agent_tags_set', 'aimeat_agent_console_set',
         // Read-only: what the one-press basic agents would give this account, and whether the
         // owner's connector is up. On 'agent' beside the three above because its caller is one of

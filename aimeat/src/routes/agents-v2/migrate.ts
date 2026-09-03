@@ -50,8 +50,14 @@ import { logger } from '../../utils/logger.js';
 /** The same wait the basic-agents button allows: keypairs, signatures and one round trip. */
 const ENROL_INVOKE_TIMEOUT_MS = 45_000;
 
-/** More than this in one press is a mistake rather than a fleet. */
-const MAX_PER_PRESS = 50;
+/**
+ * The per-CALL ceiling lives in config now (`AIMEAT_AGENT_MIGRATE_MAX_PER_PRESS`, default 50).
+ *
+ * It was a hard `const` here, and "more than this in one press is a mistake rather than a fleet"
+ * is true of an API caller and false of a person looking at their own list: an account with 51
+ * movable agents got TOO_MANY and nothing else, while the per-row button worked 51 times. The cap
+ * stays, and the PRESS chunks itself against it — see the `next_batch` field on the response.
+ */
 
 /**
  * Which of this owner's agents would move, and why.
@@ -170,11 +176,15 @@ export function registerAgentV2MigrateRoutes(router: Router, config: AimeatConfi
         undefined, { skipped }));
       return;
     }
-    if (movable.length > MAX_PER_PRESS) {
-      res.status(400).json(error(config.nodeId, 'TOO_MANY',
-        refuse('TOO_MANY', `Move at most ${MAX_PER_PRESS} at a time. Name a subset in \`agents\`.`)));
-      return;
-    }
+    // ONE PRESS TAKES A BATCH, AND SAYS WHAT IS LEFT. The cap bounds this CALL; the page presses
+    // again while `next_batch` is non-zero. Refusing outright is right for a caller that named a
+    // thousand agents itself and wrong for a person who simply has a fleet, and only the second one
+    // ever happens through the button. Named agents are honoured in the order given, so a caller
+    // driving this itself gets a deterministic sequence rather than a shuffled one.
+    const cap = Math.max(1, config.agentMigrateMaxPerPress);
+    const total = movable.length;
+    const batch = movable.slice(0, cap);
+    const deferred = movable.slice(cap).map(a => a.name);
 
     // REFUSE BEFORE WRITING. With no connector there is nobody to generate the keys, and a grant
     // written now would be a spent-looking record with nothing behind it.
@@ -187,7 +197,7 @@ export function registerAgentV2MigrateRoutes(router: Router, config: AimeatConfi
           ? 'That connector is not connected right now. Start it, or leave install_id out to use whichever one is.'
           : 'Your connector is not running, so there is nothing here to hold the new keys. Start it with `aimeat connect serve` and press again.',
         { daemons: daemons.length, askedFor: askedFor || null }),
-        undefined, { would_move: movable.map(a => a.name) }));
+        undefined, { would_move: batch.map(a => a.name) }));
       return;
     }
 
@@ -195,7 +205,7 @@ export function registerAgentV2MigrateRoutes(router: Router, config: AimeatConfi
     await storage.createAgentEnrolmentGrant({
       id: grantId,
       owner,
-      agents: movable.map(a => a.name),
+      agents: batch.map(a => a.name),
       // The one thing that makes this different from the button: these rows are still v1.
       kind: 'migrate',
       createdBy: owner,
@@ -212,7 +222,7 @@ export function registerAgentV2MigrateRoutes(router: Router, config: AimeatConfi
       owner,
       enrol_url: '/v1/agents/v2/enrol',
       token_url: '/v1/agents/v2/token',
-      agents: movable.map(a => ({
+      agents: batch.map(a => ({
         name: a.name,
         gaii: a.gaii,
         display_name: a.displayName ?? a.name,
@@ -239,7 +249,7 @@ export function registerAgentV2MigrateRoutes(router: Router, config: AimeatConfi
       logger.warn('migrate: the daemon did not complete the enrolment', { owner, grantId, error: String(err) });
       res.status(502).json(error(config.nodeId, code,
         'Your connector did not finish the move. Nothing changed: the agents are exactly as they were. Check that it is up to date and press again.',
-        undefined, { would_move: movable.map(a => a.name) }));
+        undefined, { would_move: batch.map(a => a.name) }));
       return;
     }
 
@@ -247,17 +257,17 @@ export function registerAgentV2MigrateRoutes(router: Router, config: AimeatConfi
       logger.warn('migrate: the daemon refused', { owner, grantId, result: enrolResult.result });
       res.status(502).json(error(config.nodeId, 'ENROL_REFUSED',
         'Your connector refused the move. Nothing changed: the agents are exactly as they were.',
-        undefined, { detail: enrolResult.result, would_move: movable.map(a => a.name) }));
+        undefined, { detail: enrolResult.result, would_move: batch.map(a => a.name) }));
       return;
     }
 
     // Read the truth back rather than believing the answer: the daemon reports what it submitted,
     // and what MOVED is what the enrol route wrote.
     const after = await storage.getAgentsByOwner(owner);
-    const moved = movable
+    const moved = batch
       .filter(a => after.find(x => x.gaii === a.gaii)?.identityVersion === 2)
       .map(a => a.name);
-    const stillStuck = movable.map(a => a.name).filter(n => !moved.includes(n));
+    const stillStuck = batch.map(a => a.name).filter(n => !moved.includes(n));
 
     // NO ACCOUNT EVENT. The kinds are a closed union and adding one is a locale key in three
     // languages plus a call site — worth it for something a person needs told about without asking,
@@ -271,6 +281,12 @@ export function registerAgentV2MigrateRoutes(router: Router, config: AimeatConfi
       still_stuck: stillStuck,
       skipped,
       install_id: chosen.installId,
+      // WHAT IS LEFT, so the page can press again rather than the person pressing per row. Zero
+      // means the fleet is done. `deferred` names them, because a caller driving this itself
+      // should not have to re-derive the list the node already has.
+      next_batch: deferred.length,
+      deferred,
+      total_movable: total,
       next_step: stillStuck.length === 0
         ? 'Done. Those agents sign themselves in with their own key now, and nothing else about them changed.'
         : `${moved.length} moved. ${stillStuck.length} did not, and are exactly as they were — press again, or read the connector's log.`,

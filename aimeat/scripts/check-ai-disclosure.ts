@@ -276,6 +276,19 @@ const AI_PROVENANCE_REVIEWED_WITHOUT = [
   // visibility is not authorship. The bytes a reader eventually gets are the app's, and
   // aimeat_app_publish stamps those.
   'aimeat_app_seo_set',
+  // DECIDED, 2026-09-03, on the precedent directly above. An agent's `description` is catalogue
+  // metadata about the agent — the same class of text as an app's own `name` and `description`,
+  // which this project decided long ago need no provenance. It is one sentence saying what a thing
+  // IS, not authored prose delivered to a reader, and the A2A card that carries it is a descriptor
+  // rather than a work product.
+  //
+  // The line worth holding: provenance belongs on what an agent PRODUCES, not on how it labels
+  // itself. Its task deliverables, its published documents and its app bytes all mint records
+  // through provenanceForWrite, and none of that changes. Demanding a declaration for a
+  // self-description while the neighbouring tags, console URL and app description take theirs
+  // silently would teach callers that the declaration is arbitrary, which is the fastest way to
+  // make every declaration worthless.
+  'aimeat_agent_description_set',
   // aimeat_app_legal_set was listed here for a few hours on 2026-08-29 with an open question:
   // should an AI-drafted legal page carry its own provenance record? The developer's answer was
   // yes, so the tool now takes aiProvenanceInputs and services/app-legal.ts mints through

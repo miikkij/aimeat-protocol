@@ -58,7 +58,7 @@ import { AimeatA2ARequestHandler } from '../services/a2a-handler.js';
 import type { A2ACaller } from '../services/a2a-handler.js';
 import { ForeignA2AHandler } from '../services/a2a-foreign-handler.js';
 import { identifyForeignCaller, FOREIGN_HEADERS } from '../services/a2a-foreign.js';
-import { offeringsForAgent } from '../services/a2a-offering.js';
+import { offeringsForAgent, publishedAgentOfferings } from '../services/a2a-offering.js';
 
 /** The address this node publishes for one agent's A2A interface. */
 function interfaceUrl(config: AimeatConfig, owner: string, agentName: string): string {
@@ -84,6 +84,53 @@ export function a2aRouter(config: AimeatConfig, storage: Storage): Router {
   // `router.get(fullPath)` hands it the full path, its inner route does not match, it calls next(),
   // and the request lands on the node's terminal 404 as "Route not found" — which is what happened,
   // and which reads like the route was never registered at all.
+  /**
+   * GET /.well-known/agent-card.json — A2A's standard front door, at the NODE root.
+   *
+   * WHY IT HAS TO EXIST. The per-agent cards live at `/v1/a2a/:owner/:agent/agent-card.json`, which
+   * a stranger finds only if somebody hands them the URL. A foreign agent that arrives knowing
+   * nothing but the hostname could not ask this node who it has, so discovery did not work at all —
+   * the standard location answered 404.
+   *
+   * BOTH ADDRESSES STAY. The per-agent path is unchanged and is still the card's real home; this
+   * one is a directory that points at them.
+   *
+   * WHAT IT LISTS, AND WHY THAT IS NOT A FILTER. Only agents with a PUBLISHED OFFERING. That is
+   * already this node's consent model for strangers — a foreign caller may reach an agent because
+   * its owner published an offering, and nothing else opens that door — so the listing obeys the
+   * same sentence rather than inventing a second one. An agent with no offering is not hidden; it
+   * is not for sale.
+   *
+   * PUBLIC, like the cards it points at, and it says nothing they do not.
+   */
+  router.get('/.well-known/agent-card.json', async (_req, res) => {
+    const published = await publishedAgentOfferings(storage, config);
+    const base = config.baseUrl.replace(/\/+$/, '');
+    res.setHeader('Cache-Control', 'public, max-age=60');
+    res.json({
+      // Not an AgentCard itself: a card describes ONE agent, and pretending this is one would make
+      // a directory look like an agent with a very odd skill list. A registry with `url`s, which is
+      // what a stranger needs to go and read the real cards.
+      name: config.nodeId,
+      description: `Agents on ${config.nodeId} that are offered to other agents.`,
+      protocol: 'a2a',
+      node: config.nodeId,
+      url: base,
+      agents: published.map(({ agent, offerings }) => ({
+        name: agent.name,
+        owner: agent.owner,
+        gaii: agent.gaii,
+        display_name: agent.displayName ?? agent.name,
+        description: agent.description ?? '',
+        agent_card: `${interfaceUrl(config, agent.owner, agent.name)}/agent-card.json`,
+        interface: interfaceUrl(config, agent.owner, agent.name),
+        // The count, not the offerings: what each one costs is on the card, and saying it twice is
+        // how the two come to disagree.
+        offerings: offerings.length,
+      })),
+    });
+  });
+
   router.use('/v1/a2a/:owner/:agent/agent-card.json', async (req, res, next) => {
     const agent = await findAgent(req);
     if (!agent) {

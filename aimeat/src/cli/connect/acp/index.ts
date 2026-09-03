@@ -91,7 +91,13 @@ export async function runAcp(flags: Record<string, string>): Promise<void> {
   // The node id is in the GAII the node itself hands back, so it is read rather than guessed: a
   // guessed one would make every task assignment miss by a suffix.
   const me = await client.get('/v1/agents/me');
-  const gaii = (me.data as { agent?: { gaii?: string } })?.agent?.gaii;
+  // `GET /v1/agents/:gaii` answers with the profile at the TOP of `data`, so the identity is
+  // `data.gaii`. This read `data.agent.gaii` and had never been right — it could not be caught,
+  // because the route it asks answered 404 for every agent until 2026-09-03 (the `/me` rewrite
+  // resolved the caller to a bare name). Two defects stacked: fixing the first only revealed the
+  // second. `data.agent.gaii` is kept as a fallback for a node that answers the other shape.
+  const meData = me.data as { gaii?: string; agent?: { gaii?: string } } | undefined;
+  const gaii = meData?.gaii ?? meData?.agent?.gaii;
   if (!gaii) {
     note(`Could not read this agent's identity from ${nodeUrl}. Is the credential still good? Run: aimeat connect status`);
     process.exit(1);

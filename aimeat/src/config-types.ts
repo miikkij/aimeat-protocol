@@ -506,6 +506,16 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
    * isolation a private socket per agent gave away for free has to be a rule instead. Both caps are
    * per IDENTITY: the noisy agent is the one refused, and its neighbours never notice.
    */
+  /**
+   * How many agents ONE call to POST /v1/agents/v2/migrate may move.
+   *
+   * A ceiling for an API caller, where more than this in one request is a mistake rather than a
+   * fleet. It is NOT a ceiling on what a person may fix: the button chunks itself, pressing this
+   * many at a time until the fleet is done, so an account with 51 stuck agents is one press and not
+   * fifty-one. It was a hard 50 in the route until 2026-09-03, and an owner with 51 got TOO_MANY
+   * and nothing else.
+   */
+  agentMigrateMaxPerPress: number;
   connectTunnelMaxInflightPerIdentity: number;
   connectTunnelMaxResponseBytes: number;
   /** How long the Crew tab's "Try" waits for a running crew to finish one trial run (invoke over the tunnel). */

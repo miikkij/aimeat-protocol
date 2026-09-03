@@ -244,11 +244,26 @@ export default function FleetView({ embedded = false, starter = null } = {}) {
       : (ok, text) => { setOutcome({ ok, text }); };
     if (only) setRowOutcome(null); else setOutcome(null);
     try {
-      const resp = await apiPost('/v1/agents/v2/migrate', only ? { agents: [only] } : {});
-      // Composed here for the same reason the banner is: `next_step` is the node's English. The
-      // numbers are the node's, the sentence is the reader's.
-      const moved = (resp?.data?.moved ?? []).length;
-      const stuck = (resp?.data?.still_stuck ?? []).length;
+      // ONE AGENT, OR THE WHOLE FLEET, AND THEY ARE DIFFERENT PRESSES. A row's press names one
+      // agent and is one call. The banner's press is however many the account has, and the node
+      // caps what one CALL may move — which is right for an API caller and wrong for a person
+      // looking at their own list: on an account with 51 movable agents the banner used to answer
+      // TOO_MANY and do nothing while the row button worked fifty-one times. So the banner keeps
+      // pressing while the node says there is a next batch, and shows how far it has got.
+      let moved = 0;
+      let stuck = 0;
+      let guard = 0;
+      for (;;) {
+        const resp = await apiPost('/v1/agents/v2/migrate', only ? { agents: [only] } : {});
+        moved += (resp?.data?.moved ?? []).length;
+        stuck = (resp?.data?.still_stuck ?? []).length;
+        const left = only ? 0 : (resp?.data?.next_batch ?? 0);
+        // A batch that moved NOTHING would loop for ever: the same agents come back movable and the
+        // node offers the same next_batch. Stop on no progress and let the outcome say so.
+        if (left <= 0 || (resp?.data?.moved ?? []).length === 0) break;
+        say(true, t('fleet.migrate.working') + ` ${moved}/${moved + left}`);
+        if (++guard > 200) break;   // 200 batches at the default cap is 10 000 agents
+      }
       // ONE AGENT IS NOT A TALLY. "1 moved, 0 stuck" about a single agent a person named is a
       // report on a batch of one, and the person has to do arithmetic to learn whether the thing
       // they pressed worked. It says which of the two happened, in a sentence.
