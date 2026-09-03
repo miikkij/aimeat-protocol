@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: MIT
  * @description Owner and Memory storage methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.7.0 — 2026-09-03 — createMemoryIfAbsent treats a row in the bin as absent and takes it over
+ *     (new value, tombstone cleared), as setMemory already did; a DO NOTHING against a binned row
+ *     answered null on every retry, and the workspace append could never seed a draft for a
+ *     document whose draft a publish had just binned.
  *   v1.6.0 — 2026-09-02 — The Agents group moved out to methods/agents.ts by pure extraction when
  *     this file reached the 800-line limit; nothing else changed.
  *   v1.1.0 — 2026-08-23 — Owner lifecycle columns (disabledAt/disabledBy/managedBy, BR-04) carried
@@ -257,14 +261,26 @@ export const ownerMethods = {
   },
 
   async createMemoryIfAbsent(this: SqliteStorage, record: MemoryRecord): Promise<MemoryRecord | null> {
-    // ON CONFLICT DO NOTHING makes the create a compare-and-swap against "the key does not exist".
+    // The conflict clause makes the create a compare-and-swap against "the key does not exist".
     // changes === 0 means another writer got there first, and the caller re-reads and merges rather
     // than overwriting a subtree it never saw.
+    //
+    // A ROW IN THE BIN IS ABSENT: it has left every read, so the caller saw nothing there, and a
+    // DO NOTHING against it answered null on every retry (the workspace append lost six times in a
+    // row on a document whose draft a publish had just binned). The conflict takes such a row over
+    // with the new value and a clean tombstone, as setMemory does; a live row still wins.
     const valueStr = JSON.stringify(record.value);
     const result = this.db.prepare(
       `INSERT INTO memory (ownerGaii, key, value, visibility, groupId, workspaceRef, tags, ttlHours, version, createdAt, updatedAt, flagCount, allowedOrigins, trackable, byteSize, aiProvenanceId)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(ownerGaii, key) DO NOTHING`
+       ON CONFLICT(ownerGaii, key) DO UPDATE SET
+         value = excluded.value, visibility = excluded.visibility, groupId = excluded.groupId,
+         workspaceRef = excluded.workspaceRef, tags = excluded.tags, ttlHours = excluded.ttlHours,
+         version = excluded.version, createdAt = excluded.createdAt, updatedAt = excluded.updatedAt,
+         flagCount = excluded.flagCount, allowedOrigins = excluded.allowedOrigins, trackable = excluded.trackable,
+         byteSize = excluded.byteSize, aiProvenanceId = excluded.aiProvenanceId,
+         deletedAt = NULL, deletedBy = NULL
+       WHERE memory.deletedAt IS NOT NULL`
     ).run(
       record.ownerGaii, record.key,
       valueStr, record.visibility, resolveGroupId(record, null), record.workspaceRef ?? null,
