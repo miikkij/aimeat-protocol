@@ -84,6 +84,7 @@
  *     wrap-wide-content, verify scrollWidth===clientWidth) + viewport meta gains viewport-fit=cover
  *     + interactive-widget=resizes-content. Prevention baked into the paved path.
  *   2026-07-19 — Research-first flow (AppDev KB Phase 7): Step 0 + tier decision tree + finish checklist / appdev-flow prompt / handbook module
+ *   v1.6.0 — 2026-09-03 — A paragraph on pinned addresses (name@version) and GET /v1/dependencies.
  *   v1.5.0 — 2026-07-19 — MCP-agent section: load node:aimeat-app-builder first + curated
  *     pitfall registry pointer (/v1/appdev/pitfalls) (AppDev KB Phase 2)
  *   v1.4.0 — 2026-07-16 — Auth Pattern path 3: AIMEAT.auth.on('login'/'logout') — async logins
@@ -674,6 +675,7 @@ function composeAppPrompt(
   if (isImprove) {
     body += '### Library packs in the app you are improving\n';
     body += 'If the app loads a capability pack (a /lib/ or /v1/cortex/ script from the list above), fetch that pack\'s detail first: GET ' + nodeUrl + '/v1/library-packs/<id> — read `ai_doc` (current usage) and `changelog`. If the changelog shows changes since the app was built, EXPLAIN them to the user (what changed and what it means for this app) and upgrade the app\'s usage only with their consent — never silently rewrite working library code to a newer idiom. Major versions ship as NEW files (e.g. chartjs@4.js stays forever when chartjs@5.js appears), so an app that keeps its current include lines keeps working.\n\n';
+    body += 'Cortexes and server extensions on this node keep every version they publish, and an address can pin one: `' + nodeUrl + '/v1/cortex/<name>@<version>/libs/<file>` and `/v1/ext/<name>@<version>/<action>` keep serving that version after the cortex or extension moves on; the bare address serves the latest. Pin the version you built against unless the user asks for the latest. Before adding a library or an extension, read GET ' + nodeUrl + '/v1/dependencies: it lists every cortex and extension here and which apps use them (read from the published source, never written by hand), so you reuse what exists instead of building it again; GET /v1/cortex/<name>/versions and GET /v1/extensions/<name>/versions list the kept versions.\n\n';
   }
 
   // Agentic-coder note: MCP-connected agents publish directly instead of the human paste flow.

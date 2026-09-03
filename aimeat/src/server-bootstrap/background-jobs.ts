@@ -22,6 +22,7 @@
  *                         pushService, emailService });
  * @version-history
  *   v1.0.0 — 2026-08-22 — Pure extraction from routes-loader.ts (which was at the line ceiling).
+ *   v1.1.0 — 2026-09-03 — Boot backfills the dependency map and the kept component versions.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -41,6 +42,8 @@ import { rebuildTrackRegistry, isTracked } from '../services/track-registry.js';
 import { onMemoryWrittenEvent } from '../services/event-bus.js';
 import { seedCoreScheduledJobs } from '../services/job-seeding.js';
 import { backfillExtensionJobOwnerScope } from '../services/extension-schedules.js';
+import { backfillDependencyMap } from '../services/dependency-map.js';
+import { backfillComponentVersions } from '../services/component-versions.js';
 
 export interface BackgroundJobDeps {
   config: AimeatConfig;
@@ -81,6 +84,16 @@ export function startBackgroundJobs(deps: BackgroundJobDeps): void {
     .catch(err => logger.error('Extension job owner-scope backfill failed', { error: String(err) }))
     .then(() => scheduler.start())
     .catch(err => logger.error('Scheduler start failed', { error: String(err) }));
+
+  // The dependency map: scan every app and cortex the map has never seen. Once per source, so a
+  // steady node does nothing here; a node that predates the map reads its apps once, in the
+  // background, and the lists say "used by" from then on.
+  backfillDependencyMap(storage)
+    .catch(err => logger.error('Dependency map backfill failed', { error: String(err) }));
+  // Kept versions the same way: an extension or cortex installed before versions were kept gets
+  // its current version snapshotted once, so a pinned address answers for everything on the node.
+  backfillComponentVersions(storage)
+    .catch(err => logger.error('Component version backfill failed', { error: String(err) }));
 
   // Genesis Sync Scheduler (Phase 3.4)
   const genesisSyncService = createGenesisSyncService(config, storage);

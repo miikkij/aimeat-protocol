@@ -7,6 +7,7 @@
  *   Extracted from extensions-tab.js to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from extensions-tab.js (max-file-lines)
+ *   v1.1.0 — 2026-09-03 — fetchCortexPrompt: the canonical build-cortex prompt from the node, the browser text as fallback.
  */
 import { getNodeUrl } from '/js/services/auth.js';
 
@@ -167,6 +168,25 @@ export async function fetchServerExtensionPrompt(sess) {
     // eslint-disable-next-line aimeat/no-silent-catch -- see the two lines above
   } catch { /* fall through to the bundled copy */ }
   return buildServerExtensionPrompt(sess || {});
+}
+
+/**
+ * The canonical cortex prompt, from the node (GET /v1/prompts/build-cortex): the manifest, the
+ * library, install and update, versions and pinning, the dependency map. buildCortexPrompt above
+ * is the OFFLINE FALLBACK only; improve the guidance in the node service, never here.
+ */
+export async function fetchCortexPrompt(sess) {
+  const owner = sess?.owner || '';
+  try {
+    const res = await fetch(`${getNodeUrl()}/v1/prompts/build-cortex?format=txt`
+      + (owner ? `&owner=${encodeURIComponent(owner)}` : ''));
+    if (res.ok) {
+      const text = await res.text();
+      if (text && text.length > 400) return text;
+    }
+    // eslint-disable-next-line aimeat/no-silent-catch -- offline or an older node still gets a prompt
+  } catch { /* fall through to the bundled copy */ }
+  return buildCortexPrompt(sess || {});
 }
 
 export function buildServerExtensionPrompt(sess) {

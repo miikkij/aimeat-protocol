@@ -6,6 +6,7 @@
  *   domain and the outbound door). Split from schema-tables-3.ts at the max-file-lines
  *   boundary; idempotent (IF NOT EXISTS), applied after part 3.
  * @version-history
+ *   v1.5.0 — 2026-09-03 — dependency_edges and component_versions tables.
  *   v1.4.0 — 2026-08-26 — Workspace row spaces: rows a group accumulates, as a table rather than as
  *     memory keys, with the three declared index columns and the three times. Mirrors Postgres 0052.
  *   v1.3.0 — 2026-08-24 — The memory write tally: who has had their hands on a key, and how
@@ -544,6 +545,36 @@ export function applySchemaTables4(db: Database.Database): void {
       ON workspace_rows(organismId, wsId, namespace, k3, occurredAt DESC) WHERE k3 <> '';
     -- The quota gate's read: COUNT(*) and SUM(bytes) per organism, or per workspace inside it.
     CREATE INDEX IF NOT EXISTS idx_wsrows_org_ws ON workspace_rows(organismId, wsId);
+
+    -- ── The dependency map (services/dependency-map.ts; mirrors Postgres 0065) ──
+    -- Which app loads which cortex and calls which extension, and which cortex library calls
+    -- which extension, read from the served bytes at publish and install time. A toKind 'none'
+    -- row with an empty toName marks a source that was scanned and uses nothing.
+    CREATE TABLE IF NOT EXISTS dependency_edges (
+      fromKind    TEXT NOT NULL,
+      fromRef     TEXT NOT NULL,
+      fromVersion TEXT NOT NULL,
+      toKind      TEXT NOT NULL,
+      toName      TEXT NOT NULL,
+      toVersion   TEXT,
+      via         TEXT NOT NULL,
+      updatedAt   TEXT NOT NULL,
+      PRIMARY KEY (fromKind, fromRef, toKind, toName)
+    );
+    CREATE INDEX IF NOT EXISTS idx_depedge_to ON dependency_edges(toKind, toName);
+
+    -- ── Kept extension and cortex versions (services/component-versions.ts; mirrors Postgres 0066) ──
+    -- Every install and update stores a snapshot; name@1.2.0 in an address is served from it.
+    CREATE TABLE IF NOT EXISTS component_versions (
+      kind      TEXT NOT NULL,
+      name      TEXT NOT NULL,
+      version   TEXT NOT NULL,
+      snapshot  TEXT NOT NULL,
+      bytes     INTEGER NOT NULL DEFAULT 0,
+      createdAt TEXT NOT NULL,
+      createdBy TEXT NOT NULL,
+      PRIMARY KEY (kind, name, version)
+    );
 
   `);
 }

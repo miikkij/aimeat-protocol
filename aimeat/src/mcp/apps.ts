@@ -11,6 +11,7 @@
  *   import { registerAppsTools } from './apps.js';
  *   registerAppsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.15.0 — 2026-09-03 — app_get carries `requires` (the dependency map).
  *   v1.14.0 — 2026-08-24 — Both publish tools return `data_map` / `data_map_hints`, so an agent
  *     publishing an app is told where the node believes that app puts things.
  *   v1.13.0 — 2026-08-11 — August 2026 audit step 8: the draft save, the draft promotion and the
@@ -84,6 +85,7 @@ import { generateUploadToken, buildUploadMeta } from '../services/upload-token.j
 import { generateDraftToken } from '../services/draft-token.js';
 import { validateCortexAgents } from '../models/crew-def-schemas.js';
 import { annotationsFor } from './annotations.js';
+import { requirementsOf, appRef as depAppRef } from '../services/dependency-map.js';
 import { descriptionFor } from './catalog/shape.js';
 import { publishApp } from '../services/app-publish.js';
 import {
@@ -596,6 +598,8 @@ export function registerAppsTools(
                         created_at: app.createdAt,
                         ai_provenance: prov?.record ?? null,
                         ai_provenance_url: prov?.recordUrl ?? null,
+                        // What the app loads and calls, read from its bytes at publish (the dependency map).
+                        requires: await requirementsOf(storage, 'app', depAppRef(app.ownerName, app.filename)),
                     }, null, 2),
                 }],
             };

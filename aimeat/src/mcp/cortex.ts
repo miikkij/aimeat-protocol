@@ -23,6 +23,7 @@
  *     activate flipped the status without materialising the cortex's components, deactivate
  *     without tearing them down, delete without removing the seed-data memory. What stays here is
  *     the upload-mode branch, the text rendering and the resource notification.
+ *   v1.5.0 -- 2026-09-03 -- cortex_list carries `used_by` (the dependency map).
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -36,6 +37,7 @@ import {
     type CortexCaller, type CortexRefusal,
 } from '../services/cortex-lifecycle.js';
 import { annotationsFor } from './annotations.js';
+import { dependencyIndex, visibleAppRefs, usedBySummary } from '../services/dependency-map.js';
 import { descriptionFor } from './catalog/shape.js';
 
 export function registerCortexTools(
@@ -92,6 +94,10 @@ export function registerCortexTools(
         annotationsFor('aimeat_cortex_list'),
         async () => {
             const extensions = await storage.listCortexExtensions({});
+            // Who loads each cortex, from the dependency map (the rows GET /v1/cortex carries too).
+            const deps = await dependencyIndex(storage);
+            const viewerOwner = parseGAII(getAgentGaii())?.owner;
+            const { visible } = await visibleAppRefs(storage, viewerOwner ? `${viewerOwner}@${config.nodeId}` : undefined);
             return {
                 content: [{
                     type: 'text' as const,
@@ -100,6 +106,7 @@ export function registerCortexTools(
                         version: ext.version,
                         description: ext.description,
                         status: ext.status,
+                        used_by: usedBySummary(deps.byCortex.get(ext.name), visible),
                         visibility: ext.visibility,
                         tags: ext.tags,
                         namespace: ext.namespace,

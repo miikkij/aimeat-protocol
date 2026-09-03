@@ -39,6 +39,7 @@
  *     { existing, ownerName, actor, isOperator });
  *   if (!out.ok) return refuse(out.code, out.message);
  * @version-history
+ *   v1.2.0 — 2026-09-03 — writeExtensionRecord snapshots each version; uninstall forgets the kept versions.
  *   v1.1.0 — 2026-08-16 — Schedule registration moved to services/extension-schedules.ts, shared with
  *     the redeploy and the two install routes. The copy here stamped no `ownerScope`, and since
  *     2026-08-15 the executor reads the owner off the job.
@@ -58,6 +59,7 @@ import { getEncryptionKey } from './encryption.js';
 import { emitChange } from './event-bus.js';
 import { stableStringify } from '../utils/stable-json.js';
 import { logger } from '../utils/logger.js';
+import { snapshotExtensionVersion, forgetVersions } from './component-versions.js';
 
 export interface ExtensionLifecycleDeps {
     storage: Storage;
@@ -139,6 +141,9 @@ export async function writeExtensionRecord(
         record.config = prepared;
 
         const created = await storage.createExtension(record);
+        // Every version is kept: this one too, so `name@<version>` keeps serving it after an update.
+        await snapshotExtensionVersion(storage, created, ctx.actor)
+            .catch(err => logger.warn('writeExtensionRecord: version not kept', { name, version: created.version, error: String(err) }));
         // TARGET-050: an action flagged `commercial.exchange` is projected onto the market from here.
         await reconcileAfterExtensionWrite(storage, listingOwner, config.nodeId, created.name);
         emitChange('extensions');
@@ -181,6 +186,9 @@ export async function writeExtensionRecord(
             message: `Extension "${name}" was NOT updated — the storage write did not apply, and the installed version is unchanged. Nothing was deployed.`,
         };
     }
+    // The version just deployed joins the kept ones; apps pinned to the previous one keep running it.
+    await snapshotExtensionVersion(storage, upserted.record, ctx.actor)
+        .catch(err => logger.warn('writeExtensionRecord: version not kept', { name, version: upserted.record?.version, error: String(err) }));
     emitChange('extensions');
     return { ok: true, record: upserted.record, action: 'updated', reinitialized: upserted.reinitialized };
 }
@@ -276,6 +284,8 @@ export async function uninstallExtension(
     }
 
     const deleted = await storage.deleteExtension(name);
+    await forgetVersions(storage, 'extension', name)
+        .catch(err => logger.warn('uninstallExtension: kept versions not dropped', { name, error: String(err) }));
     emitChange('extensions');
     return deleted;
 }

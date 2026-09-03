@@ -9,6 +9,7 @@
  * @structure cortexRouter() — all /v1/cortex* routes; activateExtension()/deactivateExtension() — init helpers.
  * @usage app.use(cortexRouter(config, storage)) in server.ts
  * @version-history
+ *   v1.4.0 — 2026-09-03 — used_by on the list, versions on the detail and GET /:name/versions; a lib address may pin a version (name@version, served immutably); PUT refreshes the dependency map and snapshots the version.
  *   v1.3.0 — 2026-08-11 — Install, activate, deactivate and uninstall call
  *     services/cortex-lifecycle.ts, which the MCP tools call too. Each of the four had a second
  *     copy in mcp/cortex.ts doing something different; the service header says what. What stays
@@ -24,7 +25,7 @@
 import { Router, type Request } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, CortexExtensionRecord } from '../storage/interface.js';
-import { requireAuth, requireScope } from '../auth/middleware.js';
+import { requireAuth, requireScope, requireAnyScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { parseCortexManifest, validateNamespaceOwnership } from '../services/cortex-manifest.js';
@@ -33,6 +34,9 @@ import {
   installCortex, activateCortex, deactivateCortex, deleteCortex, type CortexCaller,
 } from '../services/cortex-lifecycle.js';
 import { activateExtension, deactivateExtension } from './cortex/activation.js';
+import { refreshCortexDependencies, dependencyIndex, visibleAppRefs, usedBySummary } from '../services/dependency-map.js';
+import { snapshotCortexVersion, resolveCortexLib, listVersions } from '../services/component-versions.js';
+import { logger } from '../utils/logger.js';
 
 // Re-exported so existing consumers (e.g. services/generator-registration.ts) keep importing
 // `activateExtension` from '../routes/cortex.js' unchanged after the activation logic moved out.
@@ -62,9 +66,13 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
       namespace: namespace || undefined,
       visibility: visibility || undefined,
     });
+    // Who loads each cortex, from the dependency map: one read for the whole list.
+    const deps = await dependencyIndex(storage);
+    const { visible } = await visibleAppRefs(storage, `${req.auth!.owner}@${config.nodeId}`);
 
     res.json(success(config.nodeId, {
       extensions: extensions.map(e => ({
+        used_by: usedBySummary(deps.byCortex.get(e.name), visible),
         name: e.name,
         namespace: e.namespace,
         short_name: e.shortName,
@@ -315,6 +323,23 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
       }
     }
 
+    // 5) The dependency map follows the served set: read the libraries as they now are (a component
+    //    kept without new bytes keeps its old ones) and replace this cortex's edges.
+    const servedLibs: Record<string, string> = {};
+    for (const comp of parsed.components) {
+      if (comp.type !== 'lib') continue;
+      const content = await storage.getCortexLibFile(name, comp.filename);
+      if (content !== null) servedLibs[comp.filename] = content;
+    }
+    await refreshCortexDependencies(storage, name, parsed.version, servedLibs)
+      .catch(err => logger.warn('PUT /v1/cortex/:name: dependency map not refreshed', { name, error: String(err) }));
+    // 6) The version just deployed joins the kept ones; apps pinned to the previous one keep loading it.
+    const nowStored = await storage.getCortexExtension(name);
+    if (nowStored) {
+      await snapshotCortexVersion(storage, nowStored, servedLibs, req.auth!.owner)
+        .catch(err => logger.warn('PUT /v1/cortex/:name: version not kept', { name, version: parsed.version, error: String(err) }));
+    }
+
     res.json(success(config.nodeId, {
       name: parsed.name,
       namespace: parsed.namespace,
@@ -357,6 +382,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
       installed_at: ext.installedAt,
       activated_at: ext.activatedAt,
       installed_by: ext.installedBy,
+      versions: (await listVersions(storage, 'cortex', name)).map(v => ({ version: v.version, created_at: v.createdAt })),
       components: ext.components.map(c => {
         const base: Record<string, unknown> = { type: c.type };
         if ('name' in c) base.name = c.name;
@@ -600,26 +626,43 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
   // ── GET /v1/cortex/:name/libs/:libName.js — serve JS lib file (public, no-cache) ──
   // The address carries no version, and PUT /v1/cortex/:name swaps libs in place at that same
   // address, so anything cacheable here would serve yesterday's code after a redeploy.
+  // `:name` may carry a pinned version (`name@1.5.0`): then the bytes come from the kept snapshot
+  // of that version, while the bare name keeps serving the latest. An app built against one version
+  // keeps loading it after the cortex moves on.
   router.get('/v1/cortex/:name/libs/:libFile', async (req, res) => {
-    const name = decodeURIComponent(req.params.name as string);
+    const raw = decodeURIComponent(req.params.name as string);
     const libFile = req.params.libFile as string;
 
-    // Only serve libs from active extensions
-    const ext = await storage.getCortexExtension(name);
-    if (!ext || ext.status !== 'active') {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found or not active`));
-      return;
-    }
-
-    const content = await storage.getCortexLibFile(name, libFile);
-    if (!content) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Lib file "${libFile}" not found for extension "${name}"`));
+    const found = await resolveCortexLib(storage, raw, libFile);
+    if (!found.ok) {
+      const msg = found.reason === 'version' ? `Version "${raw}" of cortex "${found.name}" is not kept on this node`
+        : found.reason === 'file' ? `Lib file "${libFile}" not found for extension "${raw}"`
+        : `Extension "${found.name}" not found or not active`;
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', msg));
       return;
     }
 
     res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.send(content);
+    // A pinned version never changes, so it may be cached; the bare address is swapped in place by
+    // PUT and must not be.
+    res.setHeader('Cache-Control', found.pinned ? 'public, max-age=31536000, immutable' : 'no-cache');
+    res.send(found.content);
+  });
+
+  // ── GET /v1/cortex/:name/versions — the kept versions, newest first ──
+  router.get('/v1/cortex/:name/versions', requireAuth(), requireAnyScope('memory:read', 'app:write', 'cortex:write'), async (req, res) => {
+    const name = decodeURIComponent(req.params.name as string);
+    const ext = await storage.getCortexExtension(name);
+    if (!ext) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Cortex extension not found: ${name}`));
+      return;
+    }
+    const versions = await listVersions(storage, 'cortex', name);
+    res.json(success(config.nodeId, {
+      name, current: ext.version,
+      versions: versions.map(v => ({ version: v.version, created_at: v.createdAt, created_by: v.createdBy, bytes: v.bytes, lib_url: `/v1/cortex/${encodeURIComponent(name)}@${v.version}/libs/{file}` })),
+      total: versions.length,
+    }));
   });
 
   return router;

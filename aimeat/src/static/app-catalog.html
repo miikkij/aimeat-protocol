@@ -2458,6 +2458,7 @@
       form, the dashed aside, the "what the node sees" list and the log.
     v1.5.0 — 2026-08-29 — The "Legal pages" section (.lg-*): one row per kind with the editor inside
       the row, a sun rule on the recommended ones; the audit log reuses .mk-log.
+    v1.6.0 — 2026-09-03 — The Needs section's chips (.dtl-chips / .dtl-chip): one per cortex or extension.
 */
 
 /* ── Tokens the poster needs on top of the catalog's own ─────────────────────────────────── */
@@ -2726,6 +2727,9 @@ footer .footer-brand { grid-column: 1 / -1; font-family: var(--font-poster); fon
 #detail-body { counter-reset: dtl-chapter; }
 .dtl-section { background: transparent; border: 0; border-radius: 0; padding: 0; margin: 112px 0 0; counter-increment: dtl-chapter; }
 .dtl-band + .dtl-section { margin-top: 72px; }
+/* What the app needs: the cortexes it loads and the extensions it calls, one chip each. */
+.dtl-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.dtl-chip { font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px; padding: 2px 8px; border: 1px solid var(--text, #111); color: var(--text, #111); background: var(--card-bg, transparent); }
 .dtl-section > h3 {
   display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 12px;
   font-family: var(--font-poster-section); font-weight: var(--font-poster-section-weight); text-transform: uppercase; font-size: 1.9rem; line-height: .95; letter-spacing: -.03em;
@@ -4269,6 +4273,9 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "detail.sourceLabel": "Source",
       "detail.openModeLabel": "Open mode",
       "detail.versions": "Versions",
+      "detail.requires": "Needs",
+      "detail.requiresHint": "The cortexes this app loads and the extensions it calls, read from its published source. A version after @ is the one the app pinned.",
+      "detail.requiresNone": "Nothing beyond the platform itself.",
       "detail.loadingVersions": "Loading versions…",
       "detail.noVersions": "No published versions yet.",
       "detail.skills": "Skills for this app",
@@ -5262,6 +5269,9 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "detail.sourceLabel": "Lähde",
       "detail.openModeLabel": "Avaustapa",
       "detail.versions": "Versiot",
+      "detail.requires": "Tarvitsee",
+      "detail.requiresHint": "Cortexit, jotka sovellus lataa, ja laajennukset, joita se kutsuu, luettuna julkaistusta lähteestä. @-merkin jälkeinen versio on se, johon sovellus on kiinnittynyt.",
+      "detail.requiresNone": "Ei mitään alustan itsensä lisäksi.",
       "detail.loadingVersions": "Ladataan versioita…",
       "detail.noVersions": "Ei vielä julkaistuja versioita.",
       "detail.skills": "Sovelluksen taidot",
@@ -8963,8 +8973,9 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
   var setIframeUrl;
   var isOperatorSession;
   var deleteServerApp;
+  var getServerAppRow;
   function initDetail(deps) {
-    ({ refreshAll, loadPublishedApps, renderApps, updateModeToggle, getCortexOwnerToken: getCortexOwnerToken2, launchApp, viewPublished, viewSource, generateId: generateId2, generateSharePrompt, openPromptBuilder: openPromptBuilder2, showPublishModal, getMainApps, getServerState, getServerManifests: getServerManifests2, getOwnProtection, setIframeUrl, isOperatorSession, deleteServerApp } = deps);
+    ({ refreshAll, loadPublishedApps, renderApps, updateModeToggle, getCortexOwnerToken: getCortexOwnerToken2, launchApp, viewPublished, viewSource, generateId: generateId2, generateSharePrompt, openPromptBuilder: openPromptBuilder2, showPublishModal, getMainApps, getServerState, getServerManifests: getServerManifests2, getOwnProtection, setIframeUrl, isOperatorSession, deleteServerApp, getServerAppRow } = deps);
   }
   var detailAppId = null;
   var detailDraftBlob = null;
@@ -9226,6 +9237,23 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     if (!isUrlApp && app.published) {
       historyHtml = '<div class="dtl-section"><h3>' + t("wc.history") + '</h3><p class="dtl-desc">' + t("wc.historyHint") + '</p><div id="detail-checkpoints">' + (detailCheckpointsHtml !== null ? detailCheckpointsHtml : '<span class="wc-muted">…</span>') + "</div></div>";
     }
+    var requiresHtml = "";
+    if (hasServer && app.published && typeof getServerAppRow === "function") {
+      var srvRow = getServerAppRow(detailServerOwner(app), app.publishedFilename || app.filename);
+      var req = srvRow && srvRow.requires ? srvRow.requires : null;
+      var reqNames = [];
+      if (req) {
+        (req.cortex || []).forEach(function(d) {
+          reqNames.push(escapeHtml(d.pinned ? d.name + "@" + d.pinned : d.name));
+        });
+        (req.extensions || []).forEach(function(d) {
+          reqNames.push(escapeHtml(d.pinned ? d.name + "@" + d.pinned : d.name));
+        });
+      }
+      requiresHtml = '<div class="dtl-section"><h3>' + t("detail.requires") + '</h3><p class="dtl-desc">' + t("detail.requiresHint") + "</p>" + (reqNames.length ? '<div class="dtl-chips">' + reqNames.map(function(n) {
+        return '<span class="dtl-chip">' + n + "</span>";
+      }).join("") + "</div>" : '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.requiresNone") + "</span>") + "</div>";
+    }
     var versionsHtml = '<div class="dtl-section"><h3>' + t("detail.versions") + '</h3><p class="dtl-desc">' + t("versions.publishedHint") + '</p><div id="detail-versions-list">' + (detailVersionsHtml !== null ? detailVersionsHtml : !hasServer ? '<span class="dtl-sync none">' + t("detail.needServerVersions") + "</span>" : app.published ? '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.loadingVersions") + "</span>" : '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.noVersions") + "</span>") + "</div></div>";
     var publishLabel = app.published && app.publishedVersionNumber ? t("detail.publishAs") + " v" + (app.publishedVersionNumber + 1) : t("detail.publish");
     var actionsHtml = '<div class="dtl-section"><h3>' + t("detail.actions") + '</h3><div class="dtl-btn-row">' + (isUrlApp ? "" : dtlBtn(t("ctx.viewSource"), "window._launcher.detailEditSource()")) + (isUrlApp ? "" : dtlBtn(t("ctx.improveAi"), "window._launcher.detailImproveExternal()")) + dtlBtn(t("ctx.sharePrompt"), "window._launcher.detailSharePrompt()") + (isUrlApp ? "" : dtlBtn(escapeHtml(publishLabel), "window._launcher.detailPublish()", { variant: "primary" })) + (app.published && !isUrlApp ? dtlBtn(t("detail.setScreenshot"), "window._launcher.detailSetScreenshot()", { title: "Upload a custom thumbnail for this app" }) : "") + (app.published && !isUrlApp ? dtlBtn(t("detail.refreshScreenshot"), "window._launcher.detailRefreshScreenshot()", { title: "Clear the screenshot; the node re-takes it on its next scheduled run" }) : "") + // Offered only where it can do something: our own published app (deleted on the node) or a
@@ -9296,7 +9324,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     }
     var bandHtml = bandItems ? '<div class="cat-band dtl-band"><div class="cat-band-in">' + bandItems + "</div></div>" : "";
     var bodyEl = document.getElementById("detail-body");
-    bodyEl.innerHTML = heroHtml + bandHtml + statusHtml + aiHtml + aboutHtml + dataMapHtml + historyHtml + versionsHtml + mgmtHtml + skillsHtml + seoHtml + marksHtml + legalHtml + promoteHtml + odpsHtml + monetizeHtml + costHtml + agentsHtml + actionsHtml;
+    bodyEl.innerHTML = heroHtml + bandHtml + statusHtml + aiHtml + aboutHtml + dataMapHtml + requiresHtml + historyHtml + versionsHtml + mgmtHtml + skillsHtml + seoHtml + marksHtml + legalHtml + promoteHtml + odpsHtml + monetizeHtml + costHtml + agentsHtml + actionsHtml;
     var chapters = bodyEl.querySelectorAll(".dtl-section").length;
     bodyEl.style.setProperty("--dtl-chapters", '"' + (chapters < 10 ? "0" : "") + chapters + '"');
     var dmOwner = detailServerOwner(app);
@@ -11368,6 +11396,13 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     ({ getMainApps: getMainApps3, getServerState: getServerState2, getServerManifests: getServerManifests3, setServerManifests, getOwnServerApps, setOwnServerApps, getActiveTag, getSearchQuery, getSortMode, generateId: generateId4, renderApps: renderApps3, refreshAll: refreshAll2, setListingLoaded, isListingLoaded, setBoundSkillApps } = deps);
   }
   var lastAllServerApps = [];
+  function getServerAppRow2(owner, filename) {
+    for (var i = 0; i < (lastAllServerApps || []).length; i++) {
+      var sa = lastAllServerApps[i];
+      if (sameOwner(sa.owner, owner) && sa.filename === filename) return sa;
+    }
+    return null;
+  }
   var lastCommunityApps = [];
   var lastAimeatUrl = "";
   function getCommunityApps() {
@@ -13355,7 +13390,8 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       },
       setIframeUrl: setIframeUrl2,
       isOperatorSession: isOperatorSession2,
-      deleteServerApp: deleteServerApp2
+      deleteServerApp: deleteServerApp2,
+      getServerAppRow: getServerAppRow2
     });
     initAppAgents({ getServerManifests: function() {
       return serverAppManifests;

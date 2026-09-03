@@ -10,6 +10,7 @@
  *   NOTE: this file must be linked in spa.html.
  * @version-history
  *   v1.0.0 — 2026-09-02 — Initial.
+ *   v1.1.0 — 2026-09-03 — The "needs: …" line under a newest row (.ap-req), from the dependency map.
  */
 
 .og-apps .og-chip--coral { border-color: var(--accent); color: var(--accent); }
@@ -59,6 +60,7 @@
 .ap-nm small { display: block; font-family: var(--font-mono); font-size: .7rem; font-weight: 400; color: var(--text-dim); margin-top: .1rem; overflow-wrap: anywhere; }
 /* Both override the grid the row cells share: the description clamps to three lines, the doors sit side by side. */
 .ap-list > .ap-ds { font-size: .82rem; line-height: 1.45; color: var(--text-dim); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; align-self: center; }
+.ap-req { display: block; margin-top: .2rem; font-family: var(--font-mono); font-size: .68rem; color: var(--text-dim); overflow-wrap: anywhere; }
 .ap-st { font-family: var(--font-mono); font-size: .72rem; line-height: 1.4; color: var(--text-dim); }
 .ap-op { font-weight: 800; font-size: .95rem; text-align: right; white-space: nowrap; color: var(--text); }
 .ap-list > .ap-go { display: flex; gap: .9rem; align-items: center; justify-content: flex-end; white-space: nowrap; }

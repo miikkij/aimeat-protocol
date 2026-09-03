@@ -18,6 +18,7 @@
  * @usage import { buildExtensionPrompt } from '../services/build-extension-prompt.js';
  *   const { full, body } = buildExtensionPrompt(config, { lang: 'en', owner: 'alice' });
  * @version-history
+ *   v1.2.0 — 2026-09-03 — versionsSection: kept versions, pinned addresses and the dependency map.
  *   v1.1.0 — 2026-07-30 — Beneficiary splitting: how to route part of what you earn to other
  *     accounts, and the `_revenue` key an action returns to name a destination PER CALL. The
  *     capability shipped with no way for an author to discover it, so nobody but its implementer
@@ -316,6 +317,32 @@ function installSection(url: string): string {
   ].join('\n');
 }
 
+/**
+ * Versions and the dependency map. Every install and update keeps a version; an app pins the one
+ * it was built against in the address; the map, read from the served bytes, says who uses what.
+ */
+function versionsSection(url: string): string {
+  return [
+    '## Versions, pinning and who uses what',
+    '',
+    'Every install and `PUT` keeps a snapshot under the manifest\'s `metadata.version`. The bare address',
+    '`POST /v1/ext/{name}/{actionId}` runs the latest; `POST /v1/ext/{name}@{version}/{actionId}` runs that',
+    'kept version\'s code with the live settings. An app or a cortex built against one version keeps',
+    `running it after the extension moves on. \`GET ${url}/v1/extensions/{name}/versions\` lists them.`,
+    '',
+    'The rule, the same as for apps: a fix that changes no input or output keeps the version; a change',
+    'that would break a caller is a NEW version, and the caller decides when to move. When you write',
+    'code that calls an extension, pin the version you tested against (`@1.2.0`) unless the owner asks',
+    'for the latest.',
+    '',
+    `Before building, read \`GET ${url}/v1/dependencies\`: which extensions and cortexes exist here and`,
+    'who uses them (the map is read from the served source at publish and install, never written by',
+    'hand). Reuse what exists; extend it with a new version rather than a copy. `GET /v1/extensions`',
+    'carries the same as `used_by` on every row, and `GET /v1/apps` carries `requires` on every app.',
+    '',
+  ].join('\n');
+}
+
 /** The finish line, in the same spirit as the app prompt's "before you call it done". */
 function verifySection(url: string): string {
   return [
@@ -361,6 +388,7 @@ export function buildExtensionPrompt(
     filesSection(),
     commerceSection(url),
     installSection(url),
+    versionsSection(url),
     verifySection(url),
   ].join('\n');
 

@@ -43,6 +43,7 @@
  *   const out = await installCortex({ storage, config }, caller, { manifest, libs });
  *   if (!out.ok) { res.status(out.refusal.status).json(error(nodeId, out.refusal.code, out.refusal.message)); return; }
  * @version-history
+ *   v1.2.0 — 2026-09-03 — installCortex refreshes the dependency map and snapshots the version; deleteCortex forgets both.
  *   v1.1.0 — 2026-08-12 — install creates the record before writing lib bytes. The owner check
  *     reads a name that boot seeding may be writing at that same moment, and on that interleaving
  *     the caller's JavaScript was already served under a bundled pack's name by the time the
@@ -56,6 +57,9 @@ import { parseCortexManifest, validateNamespaceOwnership } from './cortex-manife
 import { cortexInstallRefusal } from './install-quotas.js';
 import { emitChange } from './event-bus.js';
 import { activateExtension, deactivateExtension } from '../routes/cortex/activation.js';
+import { refreshCortexDependencies, forgetDependencies } from './dependency-map.js';
+import { snapshotCortexVersion, forgetVersions } from './component-versions.js';
+import { logger } from '../utils/logger.js';
 
 export interface CortexDeps {
     storage: Storage;
@@ -213,6 +217,13 @@ export async function installCortex(
         await storage.setCortexLibFile(ext.name, filename, content);
     }
 
+    // Every version is kept, this first one too, so `name@<version>` keeps serving it after an update.
+    await snapshotCortexVersion(storage, record, libs, caller.ownerName)
+        .catch(err => logger.warn('installCortex: version not kept', { name: ext.name, version: ext.version, error: String(err) }));
+    // What the libraries call (extensions) goes into the dependency map from the bytes just stored.
+    await refreshCortexDependencies(storage, ext.name, ext.version, libs)
+        .catch(err => logger.warn('installCortex: dependency map not refreshed', { name: ext.name, error: String(err) }));
+
     emitChange('cortex');
     return { ok: true, value: { record, warnings: result.warnings } };
 }
@@ -331,6 +342,10 @@ export async function deleteCortex(
     }
 
     await storage.deleteCortexExtension(name);
+    await forgetDependencies(storage, 'cortex', name)
+        .catch(err => logger.warn('deleteCortex: dependency map not cleared', { name, error: String(err) }));
+    await forgetVersions(storage, 'cortex', name)
+        .catch(err => logger.warn('deleteCortex: kept versions not dropped', { name, error: String(err) }));
 
     emitChange('cortex');
     return { ok: true, value: { name } };

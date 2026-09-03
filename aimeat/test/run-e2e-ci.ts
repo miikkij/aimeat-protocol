@@ -329,6 +329,8 @@ const ALL_SUITES = [
     'test/e2e-library-packs.ts',
     'test/e2e-appdev-pitfalls.ts',
     'test/e2e-appdev-overview.ts',
+    'test/e2e-dependency-map.ts',
+    'test/e2e-component-versions.ts',
     'test/e2e-appdev-flow.ts',
     'test/e2e-mcp.ts',
     'test/e2e-mcp-scopes.ts',
