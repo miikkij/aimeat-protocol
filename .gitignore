@@ -225,3 +225,4 @@ secaudit/
 sbom.cdx.json
 security-report.md
 security-report.json
+/pnpm-lock.yaml
