@@ -17,9 +17,9 @@
  *   - PresencePill + PresenceDialog — header status pill that opens the availability settings dialog
  *   - LandingPage — main orchestrator (default export)
  * @version-history
- *   v3.16.0 — 2026-09-03 — The AI page's route id is 'ai'; 'generator' (its old name, still in
- *     the chat's link and two account-event links) resolves to it from the URL and from a
- *     remembered session.
+ *   v3.16.0 — 2026-09-03 — The AI page's route id is 'ai'; 'generator' (its old name, which an
+ *     app or a bookmark may still carry) resolves to it from the URL, from a remembered session,
+ *     from open() and from the aimeat-open-tab event, and the URL is rewritten to ?tab=ai on load.
  *   v3.15.0 — 2026-09-03 — The hand-placed /v1/fleet link is gone from above the menu. It is a
  *     section of Settings & Controls now and comes through the menu like everything else; a
  *     capability a person has to be told the address of is not finished.
@@ -241,7 +241,10 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
   /* Open a tab inline below a specific slot. Toggle if same tab clicked again. */
   const isOperator = (session?.roles || []).includes('operator');
 
-  const open = useCallback((tabId, slot) => {
+  const open = useCallback((rawTabId, slot) => {
+    // An old id (a link an app still carries, an event from an older component) opens the tab it
+    // became, and the URL below is written with the current id.
+    const tabId = canonicalTab(rawTabId);
     // Infrastructure tabs are operator-only — refuse them here too so deep links
     // (sessionStorage restore, aimeat-open-tab events) can't open the views.
     // The underlying APIs enforce the role server-side regardless.
@@ -322,7 +325,9 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
   }, [isOperator]);
 
   /* On first mount, reflect a sessionStorage/?tab=-restored tab in the URL via
-   * replaceState so there is a consistent /v1/profile?tab= entry for Back to return to. */
+   * replaceState so there is a consistent /v1/profile?tab= entry for Back to return to. The id
+   * written is the canonical one, so a page loaded from an old link (?tab=generator) shows the
+   * current address (?tab=ai) without a click. */
   useEffect(() => {
     if (openViewRef.current?.tabId) syncTabHistory(openViewRef.current.tabId, true);
   }, []);
@@ -332,7 +337,7 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
    * profile tab inline (e.g. an organism's Board tab → the Boards view). */
   useEffect(() => {
     const handler = (e) => {
-      const tabId = e.detail?.tabId;
+      const tabId = canonicalTab(e.detail?.tabId);
       if (!tabId) return;
       // Force-OPEN semantics (never toggle): a deep-link/cross-nav must land ON the tab. open()
       // toggles, so calling it when that tab is already active would CLOSE it back to Home — the
