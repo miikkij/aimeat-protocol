@@ -97,6 +97,13 @@ function openAgent(e, name, embedded) {
 /** The order the groups read in: what needs doing first, what is fine last. */
 const STATE_ORDER = ['dead', 'unreadable', 'never', 'expiring', 'ok', 'unknown'];
 
+/** Which group a row belongs to. One spelling, because the grouping below and the "where was this
+ *  pressed" lookup have to agree or an outcome renders under a heading it is not about. */
+function groupKeyOf(a) {
+  const kind = a?.credential?.kind === 'key-and-card' ? 'key-and-card' : 'device-token';
+  return `${a?.credential?.state || 'unknown'}-${kind}`;
+}
+
 /**
  * The sentence for a whole group, in the plural.
  *
@@ -226,11 +233,14 @@ export default function FleetView({ embedded = false, starter = null } = {}) {
    */
   async function migrate(only) {
     if (migrating) return;
+    // Which GROUP the press happened in, captured BEFORE the list reloads: a successful move
+    // takes the agent out of this group, and the answer has to stay where the person pressed.
+    const onlyGroup = only ? groupKeyOf(agents.find(a => a.name === only)) : null;
     setMigrating(only ?? '*');
     // The answer goes where the press was. A row's press answers on its row; the banner's answers
     // under the banner.
     const say = only
-      ? (ok, text) => { setRowOutcome({ name: only, ok, text }); }
+      ? (ok, text) => { setRowOutcome({ name: only, group: onlyGroup, ok, text }); }
       : (ok, text) => { setOutcome({ ok, text }); };
     if (only) setRowOutcome(null); else setOutcome(null);
     try {
@@ -340,8 +350,9 @@ export default function FleetView({ embedded = false, starter = null } = {}) {
   const groups = [];
   for (const state of STATE_ORDER) {
     for (const kind of ['device-token', 'key-and-card']) {
-      const rows = shown.filter(a => (a.credential?.state || 'unknown') === state
-        && (a.credential?.kind === 'key-and-card' ? 'key-and-card' : 'device-token') === kind);
+      // groupKeyOf is the one spelling of this: the outcome lookup asks the same question, and two
+      // spellings would eventually disagree and render an answer under a heading it is not about.
+      const rows = shown.filter(a => groupKeyOf(a) === `${state}-${kind}`);
       if (rows.length > 0) groups.push({ state, kind, rows });
     }
   }
@@ -462,12 +473,20 @@ export default function FleetView({ embedded = false, starter = null } = {}) {
                           button — so a person pressed, watched every button flicker, and got their
                           answer somewhere they were not looking. The row's own comment about the
                           banner said this already: a state belongs where the person is reading. */''}
-                    ${rowOutcome?.name === a.name && html`
-                      <p class="flt-row-said ${rowOutcome.ok ? 'is-ok' : 'is-bad'}">${rowOutcome.text}</p>
-                    `}
                   </li>
                 `)}
               </ul>
+              ${/* THE ANSWER STAYS WHERE THE PRESS WAS, which is the GROUP and not the row. On the
+                    row it travelled with the row: a successful move takes the agent out of "cannot
+                    sign in" and into the healthy group hundreds of pixels down, so the confirmation
+                    left the screen at the moment it was earned and the person watched a row vanish
+                    with nothing said. Measured against a live connector on 2026-09-03. It names the
+                    agent, because the row it is about may no longer be above it. */''}
+              ${rowOutcome?.group === `${g.state}-${g.kind}` && html`
+                <p class="flt-row-said ${rowOutcome.ok ? 'is-ok' : 'is-bad'}">
+                  <strong>${rowOutcome.name}</strong> ${rowOutcome.text}
+                </p>
+              `}
             </section>
           `)}
         `}
