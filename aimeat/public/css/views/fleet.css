@@ -257,6 +257,20 @@
   cursor: not-allowed;
 }
 
+/* The answer to this row's press, on this row. It is the only place a person is looking after
+   pressing a button that is a thousand pixels below the banner. */
+.flt-row-said {
+  margin: 0.4rem 0 0;
+  padding-left: 0.7rem;
+  border-left: 3px solid var(--text);
+  font-size: 0.85rem;
+  line-height: 1.45;
+  max-width: 70ch;
+}
+
+.flt-row-said.is-ok { border-left-color: var(--success); color: var(--success-fg); }
+.flt-row-said.is-bad { border-left-color: var(--accent); color: var(--accent); }
+
 /* The countdown, the one thing a row has that its neighbours do not. */
 .flt-days {
   font-family: var(--font-mono);
