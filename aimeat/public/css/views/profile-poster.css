@@ -19,6 +19,8 @@
  *   renders in a sandboxed frame with its own stylesheet.
  * @usage Linked from public/spa.html after every other stylesheet.
  * @version-history
+ *   v1.4.1 — 2026-09-04 — The fnd-cal- selectors go: the calibrator wears its own poster face
+ *     (calibrator-poster.css) and the classes they quieted no longer exist.
  *   v1.4.0 — 2026-09-03 — The starter card (.pf-agd-basic, September's "begin with two agents")
  *     wears the ink box and the square chips. It was built in the classic shell after this skin
  *     shipped and named nothing this file reached, so it was the one 16px radius on two poster
@@ -338,7 +340,6 @@
 .pf .sch-form, .pf .sch-cal-freq, .pf .of-mapwrap, .pf .of-empty-need, .pf .pf-nb-suggest, .pf .pf-nb-enrich, .pf .pf-nb-plan-step,
 .pf .wf-form-section, .pf .cap-info-section, .pf .pf-ld-pending, .pf .pf-ld-charter-box, .pf .pf-ld-editor, .pf .pf-ld-chart,
 .pf .pf-agd-crew-live, .pf .pf-agd-crew-problems, .pf .pf-agd-crew-tools-group, .pf .mbr-yours,
-.pf .fnd-cal-section, .pf .fnd-cal-run, .pf .fnd-cal-batch, .pf .fnd-cal-step, .pf .fnd-cal-proposal-card, .pf .fnd-cal-option, .pf .fnd-cal-reflection-col, .pf .fnd-cal-chart,
 .pf .wallet-request, .pf .mem-tools-section, .pf .mem-detail, .pf .mem-browse-panel, .pf .mem-bulkbar, .pf .pn-card, .pf .pn-setup, .pf .agent-cta, .pf .create-form,
 .pf .ext-detail-section, .pf .platform-content, .pf .pf-agd-governance-section, .pf .agd-governance-section, .pf .pf-agd-services-info, .pf .agd-services-info,
 .pf .pf-agd-create-form, .pf .agd-create-form, .pf .pf-agd-builder, .pf .agd-builder, .pf .pf-agd-cgroup-empty, .pf .pf-agd-msg-proposed-task, .pf .agd-msg-proposed-task,
@@ -350,7 +351,7 @@
 .pf .sch-card, .pf .of-card, .pf .wf-card, .pf .cap-item, .pf .pf-nb-note, .pf .pf-nb-hit, .pf .mem-browse-item, .pf .mem-discover-item,
 .pf .app-card, .pf .file-card, .pf .post-card, .pf .ext-card, .pf .ext-bundled-card, .pf .pf-agd-task-item, .pf .agd-task-item,
 .pf .pf-agd-log-entry, .pf .agd-log-entry, .pf .pf-agd-todo-item, .pf .agd-todo-item, .pf .pf-agd-service-card, .pf .agd-service-card,
-.pf .pf-agd-crew-template, .pf .pf-agd-crew-card, .pf .mbr-card, .pf .fnd-cal-card, .pf .pf-agd-config-item, .pf .pf-agd-quality-review-row,
+.pf .pf-agd-crew-template, .pf .pf-agd-crew-card, .pf .mbr-card, .pf .pf-agd-config-item, .pf .pf-agd-quality-review-row,
 .pf .pf-agd-step, .pf .pf-ld-card, .pf .lib-proof-row {
   background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0; box-shadow: none; padding: 0.9rem 0;
 }
@@ -362,7 +363,7 @@
 .pf .sch-card-title, .pf .wf-card-title, .pf .of-card-title, .pf .of-offer-title, .pf .cap-item-name, .pf .pf-agd-crew-template-name, .pf .mbr-card-name { font-weight: var(--font-poster-strong-weight); font-size: 1.02rem; }
 /* Boxes: the ink frame for a thing that must read as one object (a preview, a sample, a schema) */
 .pf .of-req, .pf .of-conseq, .pf .of-sample, .pf .of-result, .pf .of-md, .pf .of-prereq, .pf .pf-nb-enrich-preview-body, .pf .pf-agd-memory-preview,
-.pf .pf-agd-rule-source, .pf .agd-rule-source, .pf .cap-schema-pre, .pf .pf-agd-crew-try-output, .pf .pf-agd-config-preview, .pf .fnd-cal-template-details, .pf .sch-card-dispatch {
+.pf .pf-agd-rule-source, .pf .agd-rule-source, .pf .cap-schema-pre, .pf .pf-agd-crew-try-output, .pf .pf-agd-config-preview, .pf .sch-card-dispatch {
   border: 2px solid var(--text); border-radius: 0; background: var(--bg-dim); box-shadow: none;
 }
 .pf .of-conseq--warn, .pf .of-prereq--warn { border-color: var(--warn); }
@@ -438,7 +439,7 @@
 .pf .ext-card-actions button:hover{ background: none; color: var(--accent); border-color: var(--accent); }
 .pf .ext-card-actions button.danger { color: var(--accent); border-color: var(--accent); }
 /* Search fields the older tabs draw as boxes */
-.pf .dsc-search, .pf .cap-search-input, .pf .lib-search, .pf .pf-or-msearch, .pf .fnd-cal-create-input {
+.pf .dsc-search, .pf .cap-search-input, .pf .lib-search, .pf .pf-or-msearch {
   background: transparent; border: 0; border-bottom: 3px solid var(--text); border-radius: 0; padding: 8px 0;
   font-family: var(--font-showroom-body); font-weight: var(--font-poster-text-weight); color: var(--text); box-shadow: none;
 }

@@ -44,6 +44,7 @@ import { connectedDaemons } from '../../services/basic-agents.js';
 import { getActiveConnectTunnelManager } from '../../services/connect-tunnel.js';
 import { emitChange } from '../../services/event-bus.js';
 import { ENROL_CAPABILITY } from './basic-agents.js';
+import { MAX_CARDS_PER_SUBMIT } from './enrolment.js';
 import { cardUri, jwksUri } from './card.js';
 import { logger } from '../../utils/logger.js';
 
@@ -58,6 +59,32 @@ const ENROL_INVOKE_TIMEOUT_MS = 45_000;
  * movable agents got TOO_MANY and nothing else, while the per-row button worked 51 times. The cap
  * stays, and the PRESS chunks itself against it — see the `next_batch` field on the response.
  */
+
+/**
+ * The codes the CONNECTOR raises about itself, as opposed to the node's own refusal passed through.
+ *
+ * cli/connect/enrolment.ts answers with one of these when the fault is on its side, and with the
+ * NODE's code and message when this node said no. Without that distinction every refusal read as
+ * "your connector refused", which on 2026-09-04 sent an owner to inspect a daemon for a card limit
+ * that lives here.
+ */
+const CONNECTOR_SIDE_REFUSALS = new Set(['BAD_OFFER', 'CARD_BUILD_FAILED', 'SUBMIT_FAILED']);
+
+/**
+ * How many agents one press may actually carry.
+ *
+ * TWO CAPS SAT ON THIS JOURNEY AND DID NOT KNOW ABOUT EACH OTHER. The press batched to
+ * `agentMigrateMaxPerPress` (50) and the enrol route refuses above `MAX_CARDS_PER_SUBMIT` (20), so
+ * a fleet of fifty-one could not be moved by the button that exists to move it — refused in nought
+ * seconds, reported as the connector's fault, and working perfectly at ten a time the whole while.
+ *
+ * A function rather than an expression inline in the handler, so the relationship can be asserted:
+ * an invariant that lives in one line of a route has no seam, and this one is the reconciliation of
+ * two numbers that will otherwise drift the day either moves.
+ */
+export function migrateBatchSize(configuredMaxPerPress: number): number {
+  return Math.max(1, Math.min(configuredMaxPerPress, MAX_CARDS_PER_SUBMIT));
+}
 
 /**
  * Which of this owner's agents would move, and why.
@@ -181,7 +208,14 @@ export function registerAgentV2MigrateRoutes(router: Router, config: AimeatConfi
     // thousand agents itself and wrong for a person who simply has a fleet, and only the second one
     // ever happens through the button. Named agents are honoured in the order given, so a caller
     // driving this itself gets a deterministic sequence rather than a shuffled one.
-    const cap = Math.max(1, config.agentMigrateMaxPerPress);
+    // AND THE BATCH CANNOT EXCEED WHAT THE OTHER END TAKES. `MAX_CARDS_PER_SUBMIT` is the enrol
+    // route's own bound, and until 2026-09-04 nothing here knew about it: this batched to fifty, the
+    // connector built fifty cards, and the enrol route refused them in nought seconds. The owner was
+    // told "your connector refused the move" — the wrong party for a refusal made on this node — and
+    // fifty-one agents could not be moved by the button that exists to move them, while ten at a
+    // time worked throughout. Read rather than kept in step: two numbers a person has to reconcile
+    // are two numbers that disagree the day one of them changes.
+    const cap = migrateBatchSize(config.agentMigrateMaxPerPress);
     const total = movable.length;
     const batch = movable.slice(0, cap);
     const deferred = movable.slice(cap).map(a => a.name);
@@ -254,9 +288,16 @@ export function registerAgentV2MigrateRoutes(router: Router, config: AimeatConfi
     }
 
     if (!enrolResult.ok) {
-      logger.warn('migrate: the daemon refused', { owner, grantId, result: enrolResult.result });
+      logger.warn('migrate: the enrolment was refused', { owner, grantId, result: enrolResult.result });
+      // NAME THE PARTY THAT ACTUALLY REFUSED. This said "your connector refused the move" whatever
+      // came back, and the refusal a real owner hit had been made HERE — the enrol route's own card
+      // limit — so the sentence sent them to look at a daemon that had done nothing wrong.
+      const refusal = enrolResult.result as { code?: string; message?: string } | null;
+      const fromThisNode = !!refusal?.code && !CONNECTOR_SIDE_REFUSALS.has(refusal.code);
       res.status(502).json(error(config.nodeId, 'ENROL_REFUSED',
-        'Your connector refused the move. Nothing changed: the agents are exactly as they were.',
+        fromThisNode
+          ? `This node would not accept the cards your connector sent${refusal?.message ? `: ${refusal.message}` : '.'} Nothing changed: the agents are exactly as they were.`
+          : 'Your connector refused the move. Nothing changed: the agents are exactly as they were.',
         undefined, { detail: enrolResult.result, would_move: batch.map(a => a.name) }));
       return;
     }

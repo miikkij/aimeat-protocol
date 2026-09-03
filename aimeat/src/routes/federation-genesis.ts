@@ -14,6 +14,12 @@
  *   - subscriptions + network-stats + /v1/organisms/:id/reputation
  *
  * @version-history
+ *   v1.2.0 — 2026-09-04 — The genesis memory cache is one module, services/genesis-memory-cache.ts,
+ *     because the two halves written out here disagreed: the write filed keys under
+ *     `genesis-cache:` and the lookup listed the prefix `genesis:`, which a LIKE search does not
+ *     match. The cache was written on every request and read on none, so `genesisMemoryCache` cost a
+ *     storage write per result and saved nothing, in silence. `genesis:` is the surviving prefix
+ *     because the GET below refuses to re-export keys under it.
  *   v1.1.0 — 2026-08-10 — Security audit: genesis catalogue ingest refuses a missing signature. The gate
  *     read `if (signature && ...)`, so omitting it wrote straight into the publicly served catalogue.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
@@ -32,6 +38,7 @@ import { emitChange } from '../services/event-bus.js';
 import { createGenesisPeeringService } from '../services/genesis-peering.js';
 import { createOrganismReputationService } from '../services/organism-reputation.js';
 import { matchesKeyword, matchesActionKeyword, matchesGenesisKeyword, matchesLocation } from '../services/federation-helpers.js';
+import { cacheGenesisResults, findCachedGenesis } from '../services/genesis-memory-cache.js';
 import { logger } from '../utils/logger.js';
 
 export function federationGenesisRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>, networkDirectory?: Map<string, ServiceSummary>): Router {
@@ -405,14 +412,8 @@ export function federationGenesisRouter(config: AimeatConfig, storage: Storage, 
             // Check local genesis cache first (if enabled)
             if (config.genesisMemoryCache && key) {
                 try {
-                    const cachePrefix = 'genesis:';
-                    const cachedEntries = await storage.listMemory('__genesis__', { prefix: cachePrefix });
-                    const cached = cachedEntries.find(m => {
-                        const val = m.value as Record<string, unknown>;
-                        return val.key === key && (!target_gaii || val.gaii === target_gaii);
-                    });
-                    if (cached) {
-                        const val = cached.value as Record<string, unknown>;
+                    const val = await findCachedGenesis(storage, key, target_gaii);
+                    if (val) {
                         res.json(success(config.nodeId, {
                             results: [{
                                 key: val.key,
@@ -480,28 +481,13 @@ export function federationGenesisRouter(config: AimeatConfig, storage: Storage, 
 
             await Promise.allSettled(peerPromises);
 
-            // Optionally cache results
+            // Optionally cache results. The key and the prefix live in services/genesis-memory-cache.ts
+            // with the lookup above, because they were written out separately here once and disagreed.
             if (config.genesisMemoryCache && results.length > 0) {
-                const now = new Date().toISOString();
-                for (const result of results) {
-                    try {
-                        const cacheKey = `genesis-cache:${result.source_genesis}:${result.key ?? 'unknown'}`;
-                        await storage.setMemory({
-                            key: cacheKey,
-                            ownerGaii: '__genesis__',
-                            value: result,
-                            visibility: 'public',
-                            tags: ['genesis-cache'],
-                            ttlHours: config.genesisMemoryCacheTtlHours,
-                            version: 1,
-                            createdAt: now,
-                            updatedAt: now,
-                        });
-                    } catch (err) {
-                        // Cache write failure is non-critical
-                      logger.warn('POST /v1/federation/genesis-memory-read: continuing after a suppressed failure', { error: String(err) });
-                    }
-                }
+                await cacheGenesisResults(storage, results, config.genesisMemoryCacheTtlHours, (cacheKey, err) => {
+                    // A cache write failure is not an answer failure: the caller already has its data.
+                    logger.warn('POST /v1/federation/genesis-memory-read: continuing after a suppressed failure', { key: cacheKey, error: String(err) });
+                });
             }
 
             res.json(success(config.nodeId, {

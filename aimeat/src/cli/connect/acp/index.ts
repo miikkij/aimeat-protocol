@@ -70,7 +70,16 @@ export async function runAcp(flags: Record<string, string>): Promise<void> {
     // read below answered 401 with "is the credential still good?" about a credential that was fine.
     // Found on 2026-09-03, the first time this door was opened for a migrated agent. Same shape as
     // the enrolment invoke a few hours earlier: a path written before v2 existed and never told.
-    const token = await resolveToken(loaded.agent, loaded.owner, nodeUrl);
+    // The two failures are told apart, because the remedies are opposite: one needs the person to
+    // go and look, the other needs them to wait. Saying "run aimeat connect status" to somebody
+    // whose key is fine and whose node is merely busy sends them to inspect a healthy agent.
+    let token: string | null;
+    try {
+      token = await resolveToken(loaded.agent, loaded.owner, nodeUrl);
+    } catch (err) {
+      note(`Could not get a credential for "${loaded.agent}" just now (${String(err)}). The key is fine — try again shortly.`);
+      process.exit(1);
+    }
     if (!token) {
       note(`No usable credential for "${loaded.agent}" here. Run: aimeat connect status`);
       process.exit(1);

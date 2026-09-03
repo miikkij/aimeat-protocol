@@ -246,4 +246,59 @@ describe('a new-layout install', () => {
         const written = yamlParse(readFileSync(newPath('concierge', 'alice'), 'utf-8')) as Record<string, unknown>;
         expect(Object.keys(written)).toEqual(['node_url']);
     });
+
+    it('...but it DOES keep the four that belong to the connector', async () => {
+        // `primary`, `runner`, `wake` and `poll_interval` belong to the connector, not the node, and
+        // a save that dropped them would take a fleet's default agent with it. The mirrored three
+        // above are the node's and are dropped on purpose; these four are not the same question.
+        mkdirSync(join(home, 'tokens'), { recursive: true });
+        const { savePerAgentConfig } = await loadModule();
+        savePerAgentConfig('concierge', 'alice', {
+            node_url: 'http://x:1', primary: true, poll_interval: 30,
+            wake: { command: 'wake.sh' }, runner: { command: 'run.sh' },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any);
+        const written = yamlParse(readFileSync(newPath('concierge', 'alice'), 'utf-8')) as Record<string, unknown>;
+        expect(written.primary).toBe(true);
+        expect(written.poll_interval).toBe(30);
+        expect(written.runner).toEqual({ command: 'run.sh' });
+        expect(written.wake).toEqual({ command: 'wake.sh' });
+    });
+
+    it('a re-enrolment keeps what the agent already had', async () => {
+        // THE DEFECT THIS PINS, measured on a real fleet 2026-09-04: enrolment built a fresh
+        // `{ node_url }` and wrote it over the existing file, so 52 of 76 agents lost `primary` the
+        // day they migrated onto keys, and the daemon was left with no default at all across 66
+        // identities. Harmless for a NEW agent, which has nothing to lose; destructive for a
+        // migration, which is an existing agent being enrolled again.
+        //
+        // IT CALLS THE REAL HANDLER. A first cut of this test rebuilt what enrolment does — read,
+        // then write — and passed with the defect still in place, because a test that imitates the
+        // path it is meant to guard asserts a rule that path never has to obey. `handleEnrolOffer`
+        // is driven here against a fake node instead, so the assertion is about the code that runs.
+        mkdirSync(join(home, 'tokens'), { recursive: true });
+        mkdirSync(join(home, 'keys'), { recursive: true });
+        const { savePerAgentConfig } = await loadModule();
+        savePerAgentConfig('concierge', 'alice', { node_url: 'http://old:1', primary: true, runner: { command: 'run.sh' } });
+
+        process.env.AIMEAT_HOME = home;
+        vi.resetModules();
+        const { handleEnrolOffer } = await import('../../src/cli/connect/enrolment.js');
+        const gaii = 'concierge#alice@test-node';
+        const out = await handleEnrolOffer({
+            grant_id: 'g1', owner: 'alice', node_id: 'test-node', node_url: 'http://new:2',
+            agents: [{ name: 'concierge', gaii, scopes: [] }],
+        }, {
+            // The node accepts the card and hands back the identity, which is all this path reads.
+            forward: async () => ({ status: 200, body: { ok: true, data: { enrolled: [{ name: 'concierge', gaii }] } } }),
+            attach: async () => { /* the registry is not what this test is about */ },
+            version: 'test',
+        });
+        expect(out.ok).toBe(true);
+
+        const after = yamlParse(readFileSync(newPath('concierge', 'alice'), 'utf-8')) as Record<string, unknown>;
+        expect(after.node_url).toBe('http://new:2');
+        expect(after.primary).toBe(true);
+        expect(after.runner).toEqual({ command: 'run.sh' });
+    });
 });

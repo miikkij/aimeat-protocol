@@ -14,6 +14,9 @@
  *   - POST /v1/openrouter/test — test API key validity
  *   - POST /v1/openrouter/complete — run AI completion for generator step
  * @version-history
+ *   v1.10.0 — 2026-09-04 — POST /complete spends under `calibrator:<projectId>` for a calibration
+ *     project, so the usage table says which calibration cost what; a generator project keeps
+ *     `openrouter:complete`.
  *   v1.9.0 — 2026-08-16 — `imageModel` persists beside the other roles, for POST /v1/ai/image. It is
  *     read through services/ai-model-defaults.ts like the rest, so an owner who sets nothing gets
  *     the node's default and a node that sets nothing refuses by name rather than handing an image
@@ -417,12 +420,15 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
         return res.status(400).json(error(config.nodeId, 'INVALID_BODY', 'prompt is required.'));
       }
 
-      // Verify project ownership (check generator and calibrator namespaces)
-      const projectRecord = await storage.getMemory(gaii, `generator.${projectId}.project`)
-        || await storage.getMemory(gaii, `calibrator.${projectId}.project`);
-      if (!projectRecord) {
+      // Verify project ownership (check generator and calibrator namespaces). A calibration spends
+      // under its own name, so the usage table says which calibration cost what; the generator
+      // keeps the route's shared name.
+      const generatorRecord = await storage.getMemory(gaii, `generator.${projectId}.project`);
+      const calibratorRecord = generatorRecord ? null : await storage.getMemory(gaii, `calibrator.${projectId}.project`);
+      if (!generatorRecord && !calibratorRecord) {
         return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Project not found or not owned by you.'));
       }
+      const appId = calibratorRecord ? `calibrator:${projectId}` : COMPLETE_APP_ID;
 
       try {
         // Model selection, the key, the provider host allowlist, the budget and the usage record all
@@ -430,7 +436,7 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
         // explicit override still wins and a role still picks the role's model.
         const r = await completeForOwner(storage, config, gaii, {
           prompt, systemPrompt, model: modelOverride, modelRole,
-          temperature, topP: top_p, maxTokens: max_tokens, appId: COMPLETE_APP_ID,
+          temperature, topP: top_p, maxTokens: max_tokens, appId,
         });
 
         // TARGET-058: the provenance of the bytes about to be handed back, on the ONE envelope

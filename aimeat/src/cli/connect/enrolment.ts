@@ -35,7 +35,7 @@
  * @version-history
  *   v1.0.0 — 2026-08-31 — Initial (Agent v2, V1).
  */
-import { savePerAgentConfig, type AimeatPerAgentConfig } from './config.js';
+import { savePerAgentConfig, loadPerAgentConfig, type AimeatPerAgentConfig } from './config.js';
 import { generateAgentKey, signCompact, storeAgentKey, cacheToken, type AgentKey } from './agent-key.js';
 import { logger } from '../../utils/logger.js';
 
@@ -177,10 +177,19 @@ export async function handleEnrolOffer(offer: unknown, deps: EnrolDeps): Promise
     try {
       await storeAgentKey(e.name, offer.owner, { ...prep.key, gaii: e.gaii, nodeId: offer.node_id });
       if (e.access_token) cacheToken(e.name, offer.owner, e.access_token, e.expires_in ?? 3600);
-      // Only what the connector needs to reach the node. The agent, the owner and the mode are the
-      // NODE's: identity comes from the credential written just above, and the mode is served by
-      // GET /v1/agents.
-      const perAgent: AimeatPerAgentConfig = { node_url: offer.node_url };
+      // WHAT THIS AGENT ALREADY HAD SURVIVES. The agent, the owner and the mode are the NODE's --
+      // identity comes from the credential written just above, and the mode is served by
+      // GET /v1/agents -- but `primary`, `runner`, `wake` and `poll_interval` are the CONNECTOR's,
+      // and this used to write a fresh `{ node_url }` over them.
+      //
+      // Harmless for a new agent, which has nothing to lose. Destructive for a MIGRATION, which is
+      // an existing agent being re-enrolled: 52 of one fleet's 76 configs lost `primary` the day
+      // they moved onto keys, and the daemon was left with no default at all -- so a call that
+      // names no agent had nobody to answer it, across 66 identities. Measured on disk, not
+      // inferred: the write below carries these four, and it never saw them because the object
+      // handed to it was built empty.
+      const existing = loadPerAgentConfig(e.name, offer.owner) ?? {};
+      const perAgent: AimeatPerAgentConfig = { ...existing, node_url: offer.node_url };
       savePerAgentConfig(e.name, offer.owner, perAgent);
       // The identity the node just confirmed, carried straight through: the registry keys by it
       // and must never have to assemble one from a name.

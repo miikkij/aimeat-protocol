@@ -30,6 +30,13 @@
  *   if (outcome === 'online') { const { status, body } = await client.forward('GET', '/v1/memory'); }
  *   await client.close();
  * @version-history
+ *   2026-09-04 — "No stored token" is no longer said about an agent whose key is fine. A credential
+ *     that could not be MINTED right now throws (agent-key.ts `MintFailedError`) where a missing
+ *     one still answers null, so a busy node degrades an agent to direct HTTP and retries instead
+ *     of stopping it for good with a remedy that would re-enrol a healthy agent. Measured on a
+ *     live 62-identity fleet: the mint budget ran out during the joining burst, twenty-two agents
+ *     printed the wrong cause, and none came back without a restart. Types and constants moved to
+ *     tunnel-client-types.ts in the same commit (pure extraction, 800-line limit), re-exported here.
  *   2026-09-03 — A refused `attach` is an ANSWER. The `error` frame carrying it resolves the
  *     promise waiting on its id instead of letting it sit out the request timeout, and the identity
  *     comes off a socket it never got on. Found on a real 50-agent fleet: sixteen expired
@@ -59,157 +66,20 @@ import { randomUUID } from 'node:crypto';
 import { logger } from '../../utils/logger.js';
 import { getInstallId } from './install-id.js';
 
-/** Result of a forwarded API call — HTTP status + parsed (envelope) body. */
-export interface ForwardResult {
-  status: number;
-  body: unknown;
-}
+import type {
+  ConnectTunnelClientOptions, ForwardOptions, ForwardResult, PendingForward,
+  TunnelFrame, TunnelIdentity, TunnelStartOutcome, TunnelStatus,
+} from './tunnel-client-types.js';
+import {
+  ATTACH_REFUSAL_CODES, MAX_TIMER_CHUNK_MS, RE_AUTH_GUIDANCE, TOKEN_DEAD_CODES, wsUrl,
+} from './tunnel-client-types.js';
 
-export interface ForwardOptions {
-  body?: unknown;
-  query?: Record<string, string>;
-  headers?: Record<string, string>;
-}
-
-export type TunnelStatus = 'idle' | 'connecting' | 'online' | 'offline' | 'stopped';
-
-/**
- * Outcome of the FIRST connection attempt (`start()`):
- * - 'online'      — tunnel established; the client now auto-reconnects on drops.
- * - 'unsupported' — node has the tunnel disabled or is too old (upgrade 404 /
- *                   no handler). Caller should degrade to direct fetch + poll.
- * - 'auth_failed' — upgrade rejected 401/403. Caller should surface re-auth
- *                   guidance; the client is stopped (no retry loop).
- * - 'unreachable' — network-level failure. Caller should degrade; the client
- *                   is stopped.
- */
-export type TunnelStartOutcome = 'online' | 'unsupported' | 'auth_failed' | 'unreachable';
-
-export interface ConnectTunnelClientOptions {
-  /** Base HTTP(S) URL of the AIMEAT node (e.g. https://aimeat.io). */
-  nodeUrl: string;
-  /**
-   * Full WebSocket endpoint to dial (connector profile §6). When set, it is used verbatim instead of
-   * deriving `{nodeUrl}/v1/connect/tunnel` — lets the same client target a non-AIMEAT, ecosystem-hosted
-   * tunnel endpoint (the AIMEAT→ecosystem initiation direction). Default: derive from `nodeUrl`.
-   */
-  wsUrl?: string;
-  /**
-   * Returns the current agent JWT. Called on EVERY (re)connect so a token
-   * refreshed via `aimeat connect` is picked up without restarting serve.
-   */
-  getToken: () => Promise<string | null>;
-  /** Log label, e.g. "tunnel:claude". Defaults to "tunnel". */
-  label?: string;
-  /** Realtime reverse delivery (the client acks automatically). */
-  onDeliver?: (kind: string, payload: unknown, id: string) => void;
-  /**
-   * A server-initiated `invoke` (the node asks THIS principal to run a capability and waits for
-   * `invoke_result`). The handler answers through `replyInvoke(id, ok, result)`, now or later. With
-   * no handler the frame is refused at once as `ok:false, result.code = UNSUPPORTED`, so the node
-   * does not sit on its timeout for a client that cannot answer.
-   */
-  onInvoke?: (frame: { id: string; capability: string; input: unknown; caller?: string; timeout_ms?: number }) => void;
-  /** On-connect snapshot of queued tasks + pending messages. */
-  onBacklog?: (payload: { tasks: unknown[]; messages: unknown[] }) => void;
-  /**
-   * Fired after each (re)connect is welcomed — used to RE-SEND subscriptions (which die with the
-   * old socket) and to drive a catch-up read on the consumer. `connectCount` is 1 on first connect,
-   * incrementing per reconnect.
-   */
-  onConnect?: (connectCount: number) => void;
-  /** Fired once when the client stops due to an auth failure. */
-  onAuthFailure?: (message: string) => void;
-  onStatusChange?: (status: TunnelStatus) => void;
-  /** Defaults below are pre-welcome fallbacks; the server `welcome` overrides them. */
-  heartbeatIntervalMs?: number;
-  requestTimeoutMs?: number;
-  reconnectBaseMs?: number;
-  reconnectMaxMs?: number;
-  reconnectJitter?: boolean;
-  /** Reconnect this long before the advertised `token_expires_at`. Default 60s. */
-  tokenRefreshLeadMs?: number;
-}
-
-interface PendingForward {
-  resolve: (r: ForwardResult) => void;
-  timer: ReturnType<typeof setTimeout>;
-}
-
-/**
- * ONE MORE IDENTITY ON THIS SOCKET.
- *
- * The client used to be one-agent-one-socket, which is how 38 agents became 38 TCP connections to
- * one node from one machine. The socket is now the connector's connection to a NODE, and each
- * agent is an identity riding it with its own credential and its own handlers.
- *
- * The handlers are per identity because the work is: a deliver for `concierge#alice` must reach
- * alice's channel and not bob's, and a dead credential must stop that one agent and leave the
- * other eleven running.
- */
-export interface TunnelIdentity {
-  gaii: string;
-  getToken: () => Promise<string | null>;
-  onDeliver?: (kind: string, payload: unknown, id: string) => void;
-  onInvoke?: (frame: { id: string; capability: string; input: unknown; caller?: string; timeout_ms?: number }) => void;
-  onBacklog?: (payload: { tasks: unknown[]; messages: unknown[] }) => void;
-  onConnect?: (connectCount: number) => void;
-  onAuthFailure?: (message: string) => void;
-}
-
-interface TunnelFrame {
-  type: string;
-  id?: string;
-  /** Which identity this frame belongs to on a shared socket. Absent = the socket's own. */
-  agent?: string;
-  method?: string;
-  path?: string;
-  query?: Record<string, string>;
-  headers?: Record<string, string>;
-  body?: unknown;
-  status?: number;
-  kind?: string;
-  payload?: unknown;
-  code?: string;
-  message?: string;
-  timestamp?: string;
-  // ── invoke (S→C) / invoke_result (C→S) ──
-  capability?: string;
-  input?: unknown;
-  caller?: string;
-  timeout_ms?: number;
-  ok?: boolean;
-  result?: unknown;
-}
-
-/**
- * Forwarded-response auth codes that mean the pinned bearer itself is dead
- * (stop the client, surface re-auth guidance). Deliberately NARROWER than the
- * poller's AUTH_ERROR_CODES: FORBIDDEN/SCOPE_DENIED on a forwarded call is a
- * per-route scope denial, not token death — killing the whole tunnel for one
- * scope-denied tool call would be wrong.
- */
-const TOKEN_DEAD_CODES = new Set(['UNAUTHORIZED', 'INVALID_TOKEN', 'TOKEN_EXPIRED']);
-
-/**
- * The node's answers to `attach` that are a VERDICT ON THE CREDENTIAL rather than a hiccup: it did
- * not verify, it was revoked, it is not an agent, it names someone else. Each one means retrying
- * with the same credential will be refused again for the same reason, so the identity comes off
- * this socket and its owner is told.
- *
- * ATTACH_FAILED is deliberately NOT here. It is what the node sends when the socket went away
- * underneath the frame or the attach threw — a transient, and evicting on it would take an agent
- * off a working fleet for a blip.
- */
-const ATTACH_REFUSAL_CODES = new Set(['ATTACH_UNAUTHORIZED', 'ATTACH_FORBIDDEN']);
-
-const RE_AUTH_GUIDANCE = 'Run: aimeat connect';
-/** Cap a single token-refresh timer chunk; the chain re-evaluates each firing. */
-const MAX_TIMER_CHUNK_MS = 24 * 60 * 60 * 1000;
-
-function wsUrl(nodeUrl: string): string {
-  return nodeUrl.replace(/\/+$/, '').replace(/^http/, 'ws') + '/v1/connect/tunnel';
-}
+// Re-exported, not relocated. Every one of these was imported FROM this file before the split, so
+// carrying the names here is what makes the extraction a move rather than a change to N callers.
+export type {
+  ConnectTunnelClientOptions, ForwardOptions, ForwardResult,
+  TunnelIdentity, TunnelStartOutcome, TunnelStatus,
+};
 
 export class ConnectTunnelClient {
   private readonly opts: Required<Pick<ConnectTunnelClientOptions,
@@ -307,7 +177,17 @@ export class ConnectTunnelClient {
 
   private async sendAttach(identity: TunnelIdentity): Promise<boolean> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN || !this.multiplex) return false;
-    const token = await identity.getToken();
+    // THIS IS WHERE THE BUDGET ACTUALLY RUNS OUT. Sixty-two identities joining one socket is
+    // sixty-two mints inside a few seconds, so the node's per-minute limit is reached here before
+    // it is reached anywhere else. Answering false leaves this identity off the shared socket and
+    // the caller opens it a private one, which retries with backoff instead of stopping.
+    let token: string | null;
+    try {
+      token = await identity.getToken();
+    } catch (err) {
+      console.error(`[${this.label}] ${identity.gaii}: no credential right now (${String(err)}) — not joining the shared socket yet`);
+      return false;
+    }
     if (!token) return false;
     const id = randomUUID();
     return new Promise<boolean>((resolve) => {
@@ -456,7 +336,24 @@ export class ConnectTunnelClient {
     if (this.stopped) return this.authFailed ? 'auth_failed' : 'unreachable';
     this.setStatus('connecting');
 
-    const token = await this.opts.getToken();
+    // TWO WAYS TO HAVE NO TOKEN IN HAND, AND ONLY ONE OF THEM IS THIS AGENT'S FAULT. A key-holder
+    // that could not mint right now throws; there is nothing wrong with it and the next attempt
+    // will very likely work, so this is the same case as a node that did not answer. Answering
+    // null means there is genuinely no credential, which no amount of retrying fixes.
+    //
+    // They were one value until 2026-09-04, and the cost was measured on a live fleet: the node's
+    // mint budget ran out, twenty-two agents printed "Stopped: No stored token. Run: aimeat
+    // connect" while holding perfectly good keys, and not one of them tried again — the message
+    // named the wrong cause AND the wrong remedy, and `authFailure` is terminal by design.
+    let token: string | null;
+    try {
+      token = await this.opts.getToken();
+    } catch (err) {
+      // Not `authFailure`: that one stops for good, and this is a wait.
+      console.error(`[${this.label}] No credential right now (${String(err)}). Retrying.`);
+      this.setStatus('offline');
+      return 'unreachable';
+    }
     if (!token) {
       this.authFailure('No stored token');
       return 'auth_failed';
