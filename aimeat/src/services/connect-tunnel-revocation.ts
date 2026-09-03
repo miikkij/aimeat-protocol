@@ -24,6 +24,10 @@
  *   import { revokeByGaii } from './connect-tunnel-revocation.js';
  *   revokeByGaii(this.connections, (ws, f) => this.send(ws, f), gaii);
  * @version-history
+ *   2026-09-03 — These detach ONE identity instead of closing a socket. Closing was right while a
+ *     socket carried exactly one identity and catastrophic the moment it carried twelve: one dead
+ *     credential would have dropped eleven good ones. The socket closes only when the manager's
+ *     detach finds nobody left on it.
  *   v1.0.0 — 2026-09-02 — Extracted from connect-tunnel.ts (max-file-lines), together with the new
  *     by-GAII close that deleting an agent needs.
  */
@@ -33,7 +37,9 @@ import { logger } from '../utils/logger.js';
 
 /** Just enough of a connection for these three to do their work. */
 interface Closable {
+  principal: string;
   ws: WebSocket;
+  socketId: string;
   rawToken: string;
   identity: { owner: string };
 }
@@ -41,9 +47,24 @@ interface Closable {
 /** How the manager writes a frame — passed in so this module owns no socket policy of its own. */
 type Send = (ws: WebSocket, frame: ConnectFrame) => void;
 
-function cut(send: Send, conn: Closable, message: string, where: string): void {
-  send(conn.ws, { type: 'auth_revoked', message, timestamp: new Date().toISOString() });
-  try { conn.ws.close(1000, 'auth_revoked'); } catch (err) { logger.warn(`${where}: ignore`, { error: String(err) }); }
+/**
+ * Remove ONE identity from wherever it is. The manager's own detach, passed in, because deciding
+ * when a socket may actually close is its bookkeeping and not this module's.
+ */
+type Detach = (socketId: string, principal: string, reason: string) => void;
+
+/**
+ * THE FENCE, AND IT IS ONE LINE OF POLICY: tell that identity, then detach that identity.
+ *
+ * This used to close the socket. That was right when a socket carried exactly one identity and
+ * catastrophic the moment it carried twelve — one agent's dead credential would have dropped the
+ * other eleven, whose credentials are all perfectly good. The `auth_revoked` frame is stamped with
+ * whose it is so a shared client stops the right one, and the socket closes only if the manager's
+ * detach finds nobody left on it.
+ */
+function cut(send: Send, detach: Detach, conn: Closable, message: string, where: string): void {
+  send(conn.ws, { type: 'auth_revoked', agent: conn.principal, message, timestamp: new Date().toISOString() });
+  try { detach(conn.socketId, conn.principal, where); } catch (err) { logger.warn(`${where}: ignore`, { error: String(err) }); }
 }
 
 /**
@@ -52,11 +73,11 @@ function cut(send: Send, conn: Closable, message: string, where: string): void {
  * call (silent breakage); pushing `auth_revoked` lets the client surface re-auth guidance at once
  * and removes the client's periodic auth-liveness probe. Matched by the pinned rawToken.
  */
-export function revokeByToken(connections: Map<string, Closable>, send: Send, rawToken: string): void {
+export function revokeByToken(connections: Map<string, Closable>, send: Send, detach: Detach, rawToken: string): void {
   for (const conn of connections.values()) {
     if (conn.rawToken !== rawToken) continue;
-    cut(send, conn, 'Token revoked', 'onTokenRevoked');
-    break;  // single-socket-per-principal — at most one match
+    cut(send, detach, conn, 'Token revoked', 'onTokenRevoked');
+    break;  // one live session per identity — at most one match
   }
 }
 
@@ -77,10 +98,10 @@ export function revokeByToken(connections: Map<string, Closable>, send: Send, ra
  * five agents sharing the daemon. Same mechanism as both, with the predicate this case needs —
  * and `connections` is keyed by the GAII, so it is one lookup rather than a scan.
  */
-export function revokeByGaii(connections: Map<string, Closable>, send: Send, gaii: string): void {
+export function revokeByGaii(connections: Map<string, Closable>, send: Send, detach: Detach, gaii: string): void {
   const conn = connections.get(gaii);
   if (!conn) return;
-  cut(send, conn, 'Agent deleted', 'closeForGaii');
+  cut(send, detach, conn, 'Agent deleted', 'closeForGaii');
 }
 
 /**
@@ -90,9 +111,11 @@ export function revokeByGaii(connections: Map<string, Closable>, send: Send, gai
  * Matched on the verified token's `owner` claim, which is the bare owner name on every
  * principal family this tunnel accepts (agents and ecosystem apps).
  */
-export function revokeByOwner(connections: Map<string, Closable>, send: Send, owner: string): void {
-  for (const conn of connections.values()) {
+export function revokeByOwner(connections: Map<string, Closable>, send: Send, detach: Detach, owner: string): void {
+  // Snapshot first: detach deletes from the very map this walks, and a shared socket means several
+  // of this owner's identities are in it at once.
+  for (const conn of [...connections.values()]) {
     if (conn.identity.owner !== owner) continue;
-    cut(send, conn, 'Account deactivated', 'closeForOwner');
+    cut(send, detach, conn, 'Account deactivated', 'closeForOwner');
   }
 }

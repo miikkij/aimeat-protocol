@@ -33,10 +33,28 @@ export interface ConnectFrame {
     | 'subscribed'     // S→C: subscribe ack — which space refs were accepted vs rejected
     | 'auth_revoked'   // S→C: the connected principal's bearer was revoked — stop + re-auth
     | 'backlog'        // S→C: on-connect snapshot of queued+active tasks + pending messages
+    | 'attach'         // C→S: prove one more identity's credential on THIS socket
+    | 'attached'       // S→C: attach accepted — that identity now rides this socket
+    | 'detach'         // C→S: this socket stops carrying that identity
     | 'disconnect'
     | 'error';
   /** Correlation id (request↔response, heartbeat↔ack, deliver↔ack, invoke↔invoke_result, subscribe↔subscribed). */
   id?: string;
+  /**
+   * WHICH IDENTITY THIS FRAME BELONGS TO, on a socket carrying several.
+   *
+   * The full GAII or GEAI, never a bare name — two owners with an agent called `concierge` are two
+   * identities and a bare name cannot tell them apart. Absent means the socket's upgrade identity,
+   * which is what makes a client older than 2026-09-03 work unchanged: it opens one socket per
+   * agent and names none.
+   *
+   * A frame naming an identity the socket has not proved is REFUSED. The field routes; it never
+   * grants. The credential behind each identity was presented on this same socket, and the forward
+   * call still runs with that identity's own bearer.
+   */
+  agent?: string;
+  /** attach (C→S): the credential for `agent`, verified exactly as the upgrade verifies its own. */
+  token?: string;
   // ── request (C→S) ──
   method?: string;
   path?: string;
