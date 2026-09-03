@@ -21,6 +21,10 @@ import { randomUUID } from 'node:crypto';
 export interface TunnelFrame {
   type: string;
   id?: string;
+  /** Which identity this frame belongs to on a socket carrying several. */
+  agent?: string;
+  /** attach only: that identity's own credential. */
+  token?: string;
   method?: string;
   path?: string;
   query?: Record<string, string>;
@@ -63,6 +67,8 @@ export class TunnelClient {
   readonly authRevokeds: TunnelFrame[] = [];
   /** All inbound error frames, in arrival order. */
   readonly errors: TunnelFrame[] = [];
+  /** All inbound `attached` acks, in arrival order — one per identity put on this socket. */
+  readonly attacheds: TunnelFrame[] = [];
   welcome: TunnelFrame | null = null;
   /** When set, every inbound `invoke` is auto-answered with this function's `{ok, result}`. */
   private autoInvokeReply?: (f: TunnelFrame) => { ok: boolean; result: unknown };
@@ -107,8 +113,18 @@ export class TunnelClient {
             break;
           case 'backlog': this.backlogs.push(frame); break;
           case 'subscribed': this.subscribeds.push(frame); break;
+          case 'attached': {
+            this.attacheds.push(frame);
+            if (frame.id && this.pending.has(frame.id)) { this.pending.get(frame.id)!(frame); this.pending.delete(frame.id); }
+            break;
+          }
           case 'auth_revoked': this.authRevokeds.push(frame); break;
-          case 'error': this.errors.push(frame); break;
+          case 'error':
+            this.errors.push(frame);
+            // A refused attach is an `error` carrying its correlation id. Resolving it here is what
+            // lets a test assert the refusal instead of waiting out a timeout.
+            if (frame.id && this.pending.has(frame.id)) { this.pending.get(frame.id)!(frame); this.pending.delete(frame.id); }
+            break;
           default: break;
         }
       });
@@ -118,9 +134,9 @@ export class TunnelClient {
   }
 
   /** Send a forward request and resolve with the correlated response. */
-  request(method: string, path: string, opts: { body?: unknown; query?: Record<string, string>; headers?: Record<string, string>; timeoutMs?: number } = {}): Promise<ForwardResponse> {
+  request(method: string, path: string, opts: { body?: unknown; query?: Record<string, string>; headers?: Record<string, string>; timeoutMs?: number; agent?: string } = {}): Promise<ForwardResponse> {
     const id = randomUUID();
-    const frame: TunnelFrame = { type: 'request', id, method, path, query: opts.query, headers: opts.headers, body: opts.body };
+    const frame: TunnelFrame = { type: 'request', id, agent: opts.agent, method, path, query: opts.query, headers: opts.headers, body: opts.body };
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => { this.pending.delete(id); reject(new Error(`request ${method} ${path} timed out`)); }, opts.timeoutMs ?? 5000);
       this.pending.set(id, (f) => { clearTimeout(timer); resolve({ status: f.status ?? 0, body: f.body }); });
@@ -142,12 +158,35 @@ export class TunnelClient {
   sendRaw(text: string): void { this.ws.send(text); }
 
   /** Send an ack for a delivered item. */
-  ack(id: string): void { this.ws.send(JSON.stringify({ type: 'ack', id })); }
+  ack(id: string, agent?: string): void { this.ws.send(JSON.stringify({ type: 'ack', id, agent })); }
 
   /** Subscribe to workspace record push for the given (organism_id, ws, space) tuples. */
-  subscribe(spaces: Array<{ organism_id: string; ws: string; space: string }>): void {
-    this.ws.send(JSON.stringify({ type: 'subscribe', id: randomUUID(), spaces }));
+  subscribe(spaces: Array<{ organism_id: string; ws: string; space: string }>, agent?: string): void {
+    this.ws.send(JSON.stringify({ type: 'subscribe', id: randomUUID(), agent, spaces }));
   }
+
+  /**
+   * Put one more identity on THIS socket, with its own credential.
+   *
+   * The whole point of the change under test: six agents across two owners ride one connection.
+   * Resolves the node's reply frame, `attached` on success and `error` on refusal, so a test can
+   * assert either without waiting out a timeout.
+   */
+  attach(agent: string, token: string, timeoutMs = 5000): Promise<TunnelFrame> {
+    const id = randomUUID();
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => { this.pending.delete(id); reject(new Error(`attach ${agent} timed out`)); }, timeoutMs);
+      this.pending.set(id, (f) => { clearTimeout(timer); resolve(f); });
+      this.ws.send(JSON.stringify({ type: 'attach', id, agent, token }));
+    });
+  }
+
+  /** Take one identity off this socket, leaving the others on it. */
+  detach(agent: string): void { this.ws.send(JSON.stringify({ type: 'detach', agent })); }
+
+  /** Is the socket itself still open? The fence's assertion: one identity's revocation must not
+   *  answer this false for the other eleven. */
+  get isOpen(): boolean { return this.ws.readyState === WebSocket.OPEN; }
 
   /** Auto-answer every server-initiated `invoke` frame with the given handler's result. */
   onInvoke(fn: (f: TunnelFrame) => { ok: boolean; result: unknown }): void { this.autoInvokeReply = fn; }

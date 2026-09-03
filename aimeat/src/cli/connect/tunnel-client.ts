@@ -30,6 +30,11 @@
  *   if (outcome === 'online') { const { status, body } = await client.forward('GET', '/v1/memory'); }
  *   await client.close();
  * @version-history
+ *   2026-09-03 — Carries several identities on one socket: `attachIdentity` proves each one's own
+ *     credential, inbound frames route on `agent`, and a 401 or `auth_revoked` for an attached
+ *     identity stops that one rather than the connection eleven others use. Attachments are
+ *     re-sent after a reconnect, like subscriptions. Falls back to one socket per agent against a
+ *     node whose `welcome` does not say `multiplex`.
  *   v1.0.0 — 2026-06-10 — Phase 3: initial tunnel client (forward correlation,
  *     heartbeat + dead-conn detection, reconnect backoff, deliver/backlog,
  *     proactive pre-expiry token reconnect, auth-failure stop).
@@ -125,9 +130,32 @@ interface PendingForward {
   timer: ReturnType<typeof setTimeout>;
 }
 
+/**
+ * ONE MORE IDENTITY ON THIS SOCKET.
+ *
+ * The client used to be one-agent-one-socket, which is how 38 agents became 38 TCP connections to
+ * one node from one machine. The socket is now the connector's connection to a NODE, and each
+ * agent is an identity riding it with its own credential and its own handlers.
+ *
+ * The handlers are per identity because the work is: a deliver for `concierge#alice` must reach
+ * alice's channel and not bob's, and a dead credential must stop that one agent and leave the
+ * other eleven running.
+ */
+export interface TunnelIdentity {
+  gaii: string;
+  getToken: () => Promise<string | null>;
+  onDeliver?: (kind: string, payload: unknown, id: string) => void;
+  onInvoke?: (frame: { id: string; capability: string; input: unknown; caller?: string; timeout_ms?: number }) => void;
+  onBacklog?: (payload: { tasks: unknown[]; messages: unknown[] }) => void;
+  onConnect?: (connectCount: number) => void;
+  onAuthFailure?: (message: string) => void;
+}
+
 interface TunnelFrame {
   type: string;
   id?: string;
+  /** Which identity this frame belongs to on a shared socket. Absent = the socket's own. */
+  agent?: string;
   method?: string;
   path?: string;
   query?: Record<string, string>;
@@ -177,6 +205,20 @@ export class ConnectTunnelClient {
   private welcomed = false;
 
   private pending = new Map<string, PendingForward>();
+  /**
+   * The identities attached to this socket, beyond the one that opened it.
+   *
+   * Keyed by GAII, which is the only thing that tells two owners' `concierge` apart. The socket's
+   * OWN identity is not in here: its handlers are `this.opts`, and a frame with no `agent` field
+   * belongs to it — which is exactly how a node older than 2026-09-03 keeps working, since it
+   * never stamps one.
+   */
+  private identities = new Map<string, TunnelIdentity>();
+  /** In-flight `attach` frames, correlated by id like everything else on this wire. */
+  private pendingAttach = new Map<string, { resolve: (ok: boolean) => void; timer: ReturnType<typeof setTimeout> }>();
+  /** Does this node speak `attach`? Read from the `welcome` frame; false means one socket per agent,
+   *  as before, and the hub falls back to that without anyone asking. */
+  private multiplex = false;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private tokenTimer: ReturnType<typeof setTimeout> | null = null;
@@ -218,18 +260,67 @@ export class ConnectTunnelClient {
     return outcome;
   }
 
+  /** Does this node carry several identities on one socket? False against a node older than
+   *  2026-09-03, and the hub then opens one socket per agent exactly as before. */
+  supportsMultiplex(): boolean { return this.multiplex; }
+
+  /**
+   * Put one more identity on this socket.
+   *
+   * Sends `attach` with that identity's OWN credential — the node verifies it exactly as it
+   * verifies an upgrade, so riding a socket someone else opened grants nothing. Resolves true when
+   * the node accepts. Called again after every reconnect, because a socket's attachments die with
+   * the socket.
+   */
+  async attachIdentity(identity: TunnelIdentity): Promise<boolean> {
+    this.identities.set(identity.gaii, identity);
+    return this.sendAttach(identity);
+  }
+
+  private async sendAttach(identity: TunnelIdentity): Promise<boolean> {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN || !this.multiplex) return false;
+    const token = await identity.getToken();
+    if (!token) return false;
+    const id = randomUUID();
+    return new Promise<boolean>((resolve) => {
+      const timer = setTimeout(() => { this.pendingAttach.delete(id); resolve(false); }, this.opts.requestTimeoutMs);
+      this.pendingAttach.set(id, { resolve, timer });
+      try { this.ws!.send(JSON.stringify({ type: 'attach', id, agent: identity.gaii, token })); }
+      catch (err) {
+        console.error(`[${this.label}] ${identity.gaii}: attach send failed: ${(err as Error).message}`);
+        clearTimeout(timer); this.pendingAttach.delete(id); resolve(false);
+      }
+    });
+  }
+
+  /**
+   * Take one identity off this socket. The socket stays up for everyone else — which is the whole
+   * point of the fence, and is also what makes replacing a refused credential a local event.
+   */
+  detachIdentity(gaii: string): void {
+    this.identities.delete(gaii);
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    try { this.ws.send(JSON.stringify({ type: 'detach', agent: gaii })); }
+    catch (err) { console.error(`[${this.label}] detach send failed: ${(err as Error).message}`); }
+  }
+
+  /** How many identities ride this socket, the socket's own included. For /local/status. */
+  identityCount(): number { return this.identities.size + 1; }
+
   /**
    * Send a forward `request` frame and resolve on the correlated `response`.
    * Resolves a synthetic 504 envelope if no response arrives within the
    * (welcome-advertised) request timeout. Rejects only when the tunnel is not
    * connected at call time.
    */
-  forward(method: string, path: string, opts: ForwardOptions = {}): Promise<ForwardResult> {
+  forward(method: string, path: string, opts: ForwardOptions = {}, agent?: string): Promise<ForwardResult> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN || this.status !== 'online') {
       return Promise.reject(new Error('Tunnel not connected'));
     }
     const id = randomUUID();
-    const frame: TunnelFrame = { type: 'request', id, method, path, query: opts.query, headers: opts.headers, body: opts.body };
+    // `agent` names WHOSE call this is. Omitted for the socket's own identity, which is every call
+    // a single-agent client makes and every call against a node that does not multiplex.
+    const frame: TunnelFrame = { type: 'request', id, agent, method, path, query: opts.query, headers: opts.headers, body: opts.body };
     return new Promise<ForwardResult>((resolve) => {
       // Small grace over the server timeout so the server's own synthetic 504
       // (same id) normally wins; this local timer is the dead-socket fallback.
@@ -251,10 +342,10 @@ export class ConnectTunnelClient {
    * `subscribed` frame surfaced via onDeliver-adjacent logging). No-op if the socket is not open —
    * the caller re-subscribes on the next `onConnect`. `spaces` are (organism_id, ws, space) tuples.
    */
-  subscribe(spaces: Array<{ organism_id: string; ws: string; space: string }>): void {
+  subscribe(spaces: Array<{ organism_id: string; ws: string; space: string }>, agent?: string): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN || this.status !== 'online') return;
     if (!spaces.length) return;
-    try { this.ws.send(JSON.stringify({ type: 'subscribe', id: randomUUID(), spaces })); }
+    try { this.ws.send(JSON.stringify({ type: 'subscribe', id: randomUUID(), agent, spaces })); }
     catch (err) { console.error(`[${this.label}] subscribe send failed: ${(err as Error).message}`); }
   }
 
@@ -262,9 +353,9 @@ export class ConnectTunnelClient {
    * Answer a server-initiated `invoke` by correlation id. Best-effort: with the socket gone the
    * node has already timed the call out on its side, so there is nothing left to tell it.
    */
-  replyInvoke(id: string, ok: boolean, result: unknown): void {
+  replyInvoke(id: string, ok: boolean, result: unknown, agent?: string): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
-    try { this.ws.send(JSON.stringify({ type: 'invoke_result', id, ok, result })); }
+    try { this.ws.send(JSON.stringify({ type: 'invoke_result', id, agent, ok, result })); }
     catch (err) { console.error(`[${this.label}] invoke_result send failed: ${(err as Error).message}`); }
   }
 
@@ -431,6 +522,9 @@ export class ConnectTunnelClient {
       if (typeof hint.jitter === 'boolean') this.opts.reconnectJitter = hint.jitter;
     }
     this.tokenExpiresAt = typeof p.token_expires_at === 'number' ? p.token_expires_at : null;
+    // Does this node carry several identities on one socket? Absent on a node older than
+    // 2026-09-03, which is exactly the fallback signal: the hub then opens one socket per agent.
+    this.multiplex = p.multiplex === true;
 
     this.connectCount++;
     this.reconnectAttempts = 0;
@@ -440,10 +534,39 @@ export class ConnectTunnelClient {
     this.scheduleTokenRefresh();
     // Subscriptions are per-socket on the server — re-send them now, then let the consumer catch up.
     try { this.opts.onConnect?.(this.connectCount); } catch (err) { console.error(`[${this.label}] onConnect handler error: ${(err as Error).message}`); }
+
+    // ATTACHMENTS DIE WITH THE SOCKET, like subscriptions, and for the same reason: the node holds
+    // them against a connection. Re-sent here so a reconnect restores every identity without the
+    // hub having to watch for one — each with its own freshly resolved credential.
+    for (const identity of [...this.identities.values()]) {
+      void this.sendAttach(identity).then(ok => {
+        if (!ok) { console.error(`[${this.label}] ${identity.gaii}: could not re-attach after reconnect`); return; }
+        try { identity.onConnect?.(this.connectCount); }
+        catch (err) { console.error(`[${this.label}] onConnect handler error: ${(err as Error).message}`); }
+      });
+    }
+  }
+
+  /**
+   * Whose handlers a frame belongs to.
+   *
+   * `agent` names the identity on a shared socket; absent — or naming the socket's own identity —
+   * means this client's own `opts`. A node older than 2026-09-03 stamps nothing, so every frame
+   * lands on `opts` and the multiplex path is simply never taken.
+   */
+  private handlersFor(frame: TunnelFrame): Pick<ConnectTunnelClientOptions, 'onDeliver' | 'onInvoke' | 'onBacklog' | 'onAuthFailure'> {
+    const gaii = typeof frame.agent === 'string' ? frame.agent : '';
+    return (gaii && this.identities.get(gaii)) || this.opts;
   }
 
   private handleFrame(frame: TunnelFrame): void {
+    const h = this.handlersFor(frame);
     switch (frame.type) {
+      case 'attached': {
+        const p = frame.id ? this.pendingAttach.get(frame.id) : undefined;
+        if (p && frame.id) { clearTimeout(p.timer); this.pendingAttach.delete(frame.id); p.resolve(true); }
+        break;
+      }
       case 'heartbeat_ack': {
         this.lastHeartbeatAck = Date.now();
         break;
@@ -459,16 +582,26 @@ export class ConnectTunnelClient {
         // call would 401 too while the socket sits open (silent breakage).
         const errCode = ((frame.body as { error?: { code?: string } } | null)?.error?.code) ?? '';
         if (frame.status === 401 || TOKEN_DEAD_CODES.has(errCode)) {
-          this.authFailure(`Forwarded request returned ${frame.status} ${errCode || 'UNAUTHORIZED'}`);
+          // Same fence as auth_revoked: a 401 is a verdict on ONE identity's credential, so on a
+          // shared socket it stops that identity rather than the connection eleven others use.
+          const who = typeof frame.agent === 'string' ? frame.agent : '';
+          const att = who ? this.identities.get(who) : undefined;
+          const msg = `Forwarded request returned ${frame.status} ${errCode || 'UNAUTHORIZED'}`;
+          if (att) {
+            this.identities.delete(who);
+            try { att.onAuthFailure?.(msg); } catch (err) { console.error(`[${this.label}] onAuthFailure handler error: ${(err as Error).message}`); }
+          } else {
+            this.authFailure(msg);
+          }
         }
         break;
       }
       case 'deliver': {
         const id = frame.id ?? '';
-        try { this.opts.onDeliver?.(frame.kind ?? '', frame.payload, id); }
+        try { h.onDeliver?.(frame.kind ?? '', frame.payload, id); }
         catch (err) { console.error(`[${this.label}] onDeliver handler error: ${(err as Error).message}`); }
         if (id && this.ws && this.ws.readyState === WebSocket.OPEN) {
-          this.ws.send(JSON.stringify({ type: 'ack', id }));
+          this.ws.send(JSON.stringify({ type: 'ack', id, agent: frame.agent }));
         }
         break;
       }
@@ -476,11 +609,11 @@ export class ConnectTunnelClient {
         const id = frame.id ?? '';
         const capability = frame.capability ?? '';
         if (!id) break;
-        if (!this.opts.onInvoke) {
+        if (!h.onInvoke) {
           this.replyInvoke(id, false, { code: 'UNSUPPORTED', message: `This client does not answer "${capability}" calls.` });
           break;
         }
-        try { this.opts.onInvoke({ id, capability, input: frame.input, caller: frame.caller, timeout_ms: frame.timeout_ms }); }
+        try { h.onInvoke({ id, capability, input: frame.input, caller: frame.caller, timeout_ms: frame.timeout_ms }); }
         catch (err) {
           console.error(`[${this.label}] onInvoke handler error: ${(err as Error).message}`);
           this.replyInvoke(id, false, { code: 'HANDLER_ERROR', message: (err as Error).message });
@@ -489,7 +622,7 @@ export class ConnectTunnelClient {
       }
       case 'backlog': {
         const p = (frame.payload ?? {}) as { tasks?: unknown[]; messages?: unknown[] };
-        try { this.opts.onBacklog?.({ tasks: p.tasks ?? [], messages: p.messages ?? [] }); }
+        try { h.onBacklog?.({ tasks: p.tasks ?? [], messages: p.messages ?? [] }); }
         catch (err) { console.error(`[${this.label}] onBacklog handler error: ${(err as Error).message}`); }
         break;
       }
@@ -501,6 +634,19 @@ export class ConnectTunnelClient {
         break;
       }
       case 'auth_revoked': {
+        // THE FENCE, CLIENT SIDE. On a socket carrying twelve identities, one revoked credential
+        // must stop that one and leave the other eleven running. `agent` says whose: an attached
+        // identity is dropped on its own, and only a revocation of the socket's OWN credential
+        // stops the whole client — which is what it always did, and is still right, because that
+        // is the credential the connection itself stands on.
+        const revoked = typeof frame.agent === 'string' ? frame.agent : '';
+        const attached = revoked ? this.identities.get(revoked) : undefined;
+        if (attached) {
+          this.identities.delete(revoked);
+          try { attached.onAuthFailure?.(frame.message ?? 'Token revoked by server'); }
+          catch (err) { console.error(`[${this.label}] onAuthFailure handler error: ${(err as Error).message}`); }
+          break;
+        }
         // Server revoked the pinned bearer — stop + surface re-auth guidance (same path as a
         // forwarded 401). Removes the client's periodic auth-liveness probe.
         this.authFailure(frame.message ?? 'Token revoked by server');
