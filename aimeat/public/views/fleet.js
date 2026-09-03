@@ -30,6 +30,11 @@
  * @usage routed at /v1/fleet by spa.html and routes/portal.ts, and embedded as the "Your agents"
  *   section of Settings & Controls via views/profile/fleet-tab.js, which passes `embedded`.
  * @version-history
+ *   v1.3.0 — 2026-09-03 — A row opens the agent. The href is an address and was never an
+ *     instruction: embedded in Settings & Controls it pushed a query onto the URL the profile had
+ *     already read, so the location bar changed and nothing else did. It primes the name and asks
+ *     the mounted profile to open the tab, which is the road the home dashboard's card has used
+ *     since June. The sheet wears the poster face rather than the classic shell (fleet.css v2).
  *   v1.2.0 — 2026-09-03 — A design review's findings, measured: the alarm sits above the starter
  *     card (at 1280x460 the first screen was an invitation to make MORE agents while eighteen were
  *     locked out); the banner is titled by what the press DOES, because "18 cannot sign in" was
@@ -58,6 +63,31 @@ import { swallowed } from '/js/swallowed.js';
 
 /** The states that mean a person has something to do. The heading counts these. */
 const NEEDS_ATTENTION = new Set(['dead', 'expiring', 'never', 'unreadable']);
+
+/**
+ * Open one agent's card, from a row.
+ *
+ * THE HREF ALONE DID NOTHING WHEN THIS IS EMBEDDED. Every row pointed at
+ * `/v1/profile?tab=agents&agent=<name>`, which is the right ADDRESS and the wrong instruction:
+ * inside Settings & Controls the person is already on `/v1/profile`, the SPA pushes the new query
+ * and stops, and the profile reads `?tab=` once on mount (`useEffect(..., [])` in views/profile.js).
+ * So the location bar changed and the page did not, sixty-eight times.
+ *
+ * The in-app way in already existed and is what the home dashboard's Agents card uses: prime the
+ * name in sessionStorage, then ask the mounted profile to open the tab. agents-tab.js reads both
+ * on mount, expands that agent and scrolls it into view.
+ *
+ * The link keeps its `href` so it is still an address — middle-click, open-in-new-tab and the
+ * standalone /v1/fleet page all need a real one, and on that page nothing is listening for the
+ * event, so the navigation is the correct behaviour rather than a fallback.
+ */
+function openAgent(e, name, embedded) {
+  if (!embedded) return;                                  // standalone page: let the link navigate
+  if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;   // a new tab is not our call
+  e.preventDefault();
+  try { sessionStorage.setItem('aimeat.agents.open', name); } catch (err) { swallowed('fleet: prime agent', err); }
+  window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'agents' } }));
+}
 
 /* The 8x8 grey dot that used to sit after every name is gone. Unlabelled, the same grey on all 19
    rows including the healthy one, and its meaning was in a `title` — so it said nothing at all on a
@@ -343,7 +373,8 @@ export default function FleetView({ embedded = false, starter = null } = {}) {
                       ${/* The GAII lives here, on the name it belongs to. As a column it was the
                             agent's name followed by an owner and node identical on all 68 rows. */''}
                       <a class="flt-name" title=${a.gaii}
-                         href=${`/v1/profile?tab=agents&agent=${encodeURIComponent(a.name)}`}>
+                         href=${`/v1/profile?tab=agents&agent=${encodeURIComponent(a.name)}`}
+                         onClick=${(e) => openAgent(e, a.name, embedded)}>
                         ${a.display_name || a.name}
                       </a>
                       ${a.credential?.connected && html`<span class="flt-live">${t('fleet.connectedNow')}</span>`}

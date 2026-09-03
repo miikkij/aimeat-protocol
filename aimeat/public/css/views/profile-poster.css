@@ -19,6 +19,11 @@
  *   renders in a sandboxed frame with its own stylesheet.
  * @usage Linked from public/spa.html after every other stylesheet.
  * @version-history
+ *   v1.4.0 — 2026-09-03 — The starter card (.pf-agd-basic, September's "begin with two agents")
+ *     wears the ink box and the square chips. It was built in the classic shell after this skin
+ *     shipped and named nothing this file reached, so it was the one 16px radius on two poster
+ *     pages. A new surface that invents its own prefix has to be added here or carry the face
+ *     itself; the fleet took the second road (fleet.css v2).
  *   v1.3.2 — 2026-08-31 — The pf-co selectors leave: the Companies tab wears the poster face
  *     (companies-poster.css, co- prefix), so there is no old-shape companies surface to skin.
  *   v1.3.1 — 2026-08-29 — Every headline reads --font-poster-tracking / --font-poster-leading (theme.css)
@@ -439,6 +444,46 @@
 }
 .pf .dsc-search:focus, .pf .cap-search-input:focus, .pf .lib-search:focus, .pf .pf-or-msearch:focus { border-color: var(--accent); outline: none; box-shadow: none; }
 .pf .pkg-filters select, .pf .cap-filter-select, .pf .pf-or-select { border: 2px solid var(--text); border-radius: 0; background: var(--bg); }
+
+/* ── The starter card: "begin with two agents" ──────────────────────────────────────────────
+   It was written in the classic shell in September, after this skin, and named nothing this file
+   already reached: a 16px radius on --card, a pill for the warning, a rounded chip strip. It sits
+   on the Agents tab and in the Agents section, so it was the one rounded object on two poster
+   pages. Shape 2, the box for a thing that must read as one object, and shape 4 for its chips. */
+.pf .pf-agd-basic {
+  border: 2px solid var(--text); border-radius: 0; background: var(--bg-dim);
+  padding: 1.1rem 1.2rem; margin-bottom: 1.6rem; box-shadow: none;
+}
+.pf .pf-agd-basic-title {
+  font-family: var(--font-poster); font-weight: var(--font-poster-weight);
+  font-size: 1.25rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking);
+  text-transform: uppercase; color: var(--text);
+}
+.pf .pf-agd-basic-desc, .pf .pf-agd-basic-item-desc, .pf .pf-agd-basic-hint,
+.pf .pf-agd-basic-item-gets { font-weight: var(--font-poster-text-weight); color: var(--text-dim); font-family: var(--font-showroom-body); }
+.pf .pf-agd-basic-name { font-weight: var(--font-poster-strong-weight); font-size: 0.95rem; }
+/* Mono NAMES A MACHINE THING and nothing else. The first cut of this block put the hint and the
+   reaches line in it too, and turned two ordinary sentences — "these agents run on your own
+   machine", "your saved data, your messages" — into something that reads as a config dump. What
+   is left is the three status labels, which do name a state the software is in. */
+.pf .pf-agd-basic-state, .pf .pf-agd-basic-status, .pf .pf-agd-basic-have {
+  font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0;
+}
+.pf .pf-agd-basic-gets-label { font-weight: var(--font-poster-strong-weight); color: var(--text); }
+.pf .pf-agd-basic-have, .pf .pf-agd-basic-status.is-connected { color: var(--success-fg); }
+.pf .pf-agd-basic-status.is-offline { color: var(--accent); }
+/* The pill that says an agent starts work without being asked. It is the one thing in this card a
+   person is agreeing to, so it is a square framed chip in the accent rather than a rounded aside. */
+.pf .pf-agd-basic-alone {
+  border-radius: 0; border: 2px solid var(--accent); color: var(--accent);
+  font-family: var(--font-mono); font-size: 0.66rem; padding: 1px 7px;
+}
+.pf .pf-agd-basic-notice {
+  border-left: 6px solid var(--sun); background: none; color: var(--text-dim);
+  font-weight: var(--font-poster-text-weight); font-size: 0.85rem;
+}
+.pf .pf-agd-basic-list { gap: 0; border-top: 2px solid var(--text); margin-top: 0.8rem; }
+.pf .pf-agd-basic-item { border-bottom: 1px solid var(--border); padding: 0.7rem 0; }
 
 @media (max-width: 700px) {
   .pf .pf-content-body > .section-title:first-child, .pf .pf-content-body > *:first-child > .section-title:first-child,
