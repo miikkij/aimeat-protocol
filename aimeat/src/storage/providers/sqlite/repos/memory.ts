@@ -37,8 +37,19 @@ import type { MemoryTextHit, MemoryTextSearchOpts } from '../../../repositories/
  *  whole reason this function exists — every bulk read already passes through it, so the bin is
  *  invisible by construction rather than by eight people remembering. The sweeper and the restore
  *  path read the bin with their own queries, which name `deletedAt` explicitly. */
+/**
+ * The bin clause on its own, for a read that filters by key rather than by archive state.
+ *
+ * Exported because the claim above — "every bulk read already passes through it" — was not true:
+ * getMemoryByKeys and getMemoryByKeysAnyOwner select by `key IN (…)` and never call archivedSql, so
+ * they returned rows that getMemory answers 404 for. A chokepoint reachable only through one of two
+ * shapes is a chokepoint two people have to remember, which is the thing this file set out not to
+ * have.
+ */
+export const NOT_DELETED_SQL = ' AND deletedAt IS NULL';
+
 export function archivedSql(archived?: ArchiveFilter): string {
-  const notDeleted = ' AND deletedAt IS NULL';
+  const notDeleted = NOT_DELETED_SQL;
   if (archived === 'include') return notDeleted;
   if (archived === 'only') return ' AND archived = 1' + notDeleted;
   return ' AND archived = 0' + notDeleted;
