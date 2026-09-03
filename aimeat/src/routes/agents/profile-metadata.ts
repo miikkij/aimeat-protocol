@@ -34,7 +34,10 @@ import { calculateTrustScore } from '../../services/trust.js';
 import { emitChange } from '../../services/event-bus.js';
 import { markAgentSeen } from '../../services/telemetry-buffer.js';
 import { listByAgent as listEngagementsByAgent } from '../../services/workspace-engagements.js';
-import { setAgentTags, setAgentMode, setAgentConsoleUrl, type AgentWriteRefusal , setAgentRunMode, setAgentRuntimeSource } from '../../services/agent-profile-write.js';
+import {
+  setAgentTags, setAgentMode, setAgentConsoleUrl, setAgentRunMode, setAgentRuntimeSource, setAgentDescription,
+  type AgentWriteRefusal,
+} from '../../services/agent-profile-write.js';
 import { logger } from '../../utils/logger.js';
 import { computeAgentHealthMany } from '../../services/agent-health.js';
 import type { AgentOnboardingRecord } from '../../storage/types/agents-messaging.js';
@@ -381,6 +384,32 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
   // none, so only a human with an owner session over HTTP could set it. The mode belongs to the
   // NODE, not to a definition: `agent-task-rules.ts` auto-activates a queued task only for
   // `task-runner`, and a switch the node acts on cannot live on a file the node never reads.
+  /**
+   * PATCH /v1/agents/:name/description — what this agent is, in a sentence.
+   *
+   * The A2A card's `description` and the sentence on the agent's own page. Write-once until
+   * 2026-09-03: registration set it and no door changed it, so an agent whose job changed went on
+   * describing its old one to every stranger that read its card.
+   *
+   * The NAME stays immutable and is not editable here or anywhere: it is part of the GAII, and
+   * changing it would change the identity every credential, task and pinned peer record is filed
+   * under. A description carries no identity.
+   *
+   * Same gate as run-mode beside it: `agent:write` and same-owner, so an owner or the agent itself
+   * may write it. An agent describing itself is the case this exists for.
+   */
+  router.patch('/v1/agents/:name/description', requireAuth(), requireScope('agent:write'), async (req, res) => {
+    const outcome = await setAgentDescription({ storage, config }, req.auth!.owner as string,
+      decodeURIComponent(req.params.name as string), req.body?.description);
+    if (!outcome.ok) {
+      res.status(agentWriteStatus(outcome.code)).json(error(config.nodeId, outcome.code, outcome.message));
+      return;
+    }
+    res.json(success(config.nodeId, {
+      gaii: outcome.agent.gaii, name: outcome.agent.name, description: outcome.agent.description ?? '',
+    }));
+  });
+
   router.patch('/v1/agents/:name/run-mode', requireAuth(), requireScope('agent:write'), async (req, res) => {
     const outcome = await setAgentRunMode({ storage, config }, req.auth!.owner as string,
       decodeURIComponent(req.params.name as string), req.body?.run_mode);

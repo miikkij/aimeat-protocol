@@ -151,6 +151,51 @@ await test('9. The per-agent card still answers at its own address', async () =>
   assert(typeof r.body.name === 'string', 'it is a card');
 });
 
+await test('9b. The description is editable, and it reaches the A2A card', async () => {
+  // The one line a stranger reads. Write-once until 2026-09-03: an agent whose job moved described
+  // its old one for ever, on a card that was otherwise perfect.
+  const set = await json('/v1/agents/webresearcher/description', {
+    method: 'PATCH', headers: { Authorization: `Bearer ${tokA}` },
+    body: JSON.stringify({ description: 'Reads the open web and comes back with sourced answers.' }),
+  });
+  assert(set.status === 200, `set: ${set.status} ${JSON.stringify(set.body?.error)}`);
+  const card = await json(`/v1/a2a/${encodeURIComponent(ownerA)}/webresearcher/agent-card.json`);
+  assert(card.body.description === 'Reads the open web and comes back with sourced answers.',
+    `the card carries it: ${card.body.description}`);
+});
+
+await test('9c. The agent may describe itself, and an empty string clears it', async () => {
+  const self = await json('/v1/agents/webresearcher/description', {
+    method: 'PATCH', headers: { Authorization: `Bearer ${agentTokA}` },
+    body: JSON.stringify({ description: 'I read the web.' }),
+  });
+  assert(self.status === 200, `agent self-describe: ${self.status}`);
+  const cleared = await json('/v1/agents/webresearcher/description', {
+    method: 'PATCH', headers: { Authorization: `Bearer ${tokA}` },
+    body: JSON.stringify({ description: '' }),
+  });
+  assert(cleared.status === 200 && cleared.body.data.description === '', `cleared: ${JSON.stringify(cleared.body.data)}`);
+});
+
+await test('9d. The NAME is not editable, because it is part of the identity', async () => {
+  // There is no route for it and there must not be: changing it would change the GAII every
+  // credential, task and pinned peer record is filed under.
+  const r = await json('/v1/agents/webresearcher/name', {
+    method: 'PATCH', headers: { Authorization: `Bearer ${tokA}` },
+    body: JSON.stringify({ name: 'somethingelse' }),
+  });
+  assert(r.status === 404, `no such door, got ${r.status}`);
+});
+
+await test('9e. And another owner cannot describe your agent', async () => {
+  const r = await json(`/v1/agents/${encodeURIComponent(gaiiA)}/description`, {
+    method: 'PATCH', headers: { Authorization: `Bearer ${tokB}` },
+    body: JSON.stringify({ description: 'not yours to say' }),
+  });
+  assert(r.status === 403 || r.status === 404, `expected a refusal, got ${r.status}`);
+});
+
+
 console.log('\nRe-issuing a card');
 
 await test('10. An agent with no card is told to enrol rather than given one', async () => {

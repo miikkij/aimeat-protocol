@@ -8931,6 +8931,53 @@ paths:
         '404':
           description: No published card for that agent
 
+  /v1/agents/{name}/description:
+    patch:
+      operationId: setAgentDescription
+      summary: What this agent is, in a sentence
+      description: |
+        The `description` on the agent's A2A card and on its page here — the one line a stranger
+        reads before deciding whether to knock.
+
+        It was write-once until 2026-09-03: registration set it and no door changed it, so an agent
+        whose job moved went on describing its old one for ever.
+
+        **The agent's NAME is not editable, here or anywhere.** It is a component of the GAII, so
+        changing it would change the identity every credential, task, memory key and pinned peer
+        record is filed under. A description carries no identity, which is why it can move.
+
+        Up to 2000 characters; an empty string clears it, and the card then falls back to its own
+        sentence about this node. Same-owner gated with `agent:write`, so an owner or the agent
+        itself may write it — an agent describing itself is the case this exists for.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+          description: The agent's name, or its full identity url-encoded.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [description]
+              properties:
+                description:
+                  type: string
+                  maxLength: 2000
+      responses:
+        '200':
+          description: The stored description
+        '400':
+          description: Not a string
+        '403':
+          description: Not your agent
+        '404':
+          description: No such agent
   /v1/agents/{name}/run-mode:
     patch:
       operationId: setAgentRunMode

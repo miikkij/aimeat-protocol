@@ -399,6 +399,42 @@ export async function setAgentProfile(
  * An absent field is NOT a clear. `{}` means "change nothing" and `{ run_mode: null }` means "take
  * it back to nobody has said" — a caller that forgot the key must not silently wipe the setting.
  */
+/**
+ * What this agent is, in a sentence, for whoever reads it.
+ *
+ * IT IS THE ONE FIELD ON THE A2A CARD A STRANGER ACTUALLY READS, and until 2026-09-03 it was
+ * write-once: set at registration and editable by nobody, through any door. An agent whose job
+ * changed described its old job for ever, and the card was technically perfect and told a stranger
+ * the wrong thing.
+ *
+ * THE NAME IS NOT EDITABLE AND MUST NOT BECOME SO. It is a component of the GAII, so changing it
+ * would change the identity every credential, task, memory key and pinned peer record is filed
+ * under. The description carries no identity, which is exactly why it can move.
+ *
+ * Bounded at 2000 characters, and an empty string clears it — a description nobody has written is
+ * better than one that is no longer true, and the card falls back to its own sentence about the
+ * node when this is absent.
+ */
+export async function setAgentDescription(
+    deps: AgentWriteDeps,
+    callerOwner: string,
+    identifier: string,
+    raw: unknown,
+): Promise<AgentWriteOutcome> {
+    const target = await loadSameOwnerAgent(deps, callerOwner, identifier,
+        'You can only change the description of agents owned by the same owner');
+    if (!target.ok) return target;
+
+    if (typeof raw !== 'string') {
+        return { ok: false, code: 'INVALID_INPUT', message: 'description must be a string. Send an empty one to clear it.' };
+    }
+    const description = raw.trim().slice(0, 2000);
+    const updated = await deps.storage.updateAgent(target.gaii, { description });
+    if (!updated) return { ok: false, code: 'AGENT_NOT_FOUND', message: `Agent not found: ${identifier}` };
+    emitChange('agents');
+    return { ok: true, agent: updated };
+}
+
 export async function setAgentRunMode(
     deps: AgentWriteDeps,
     callerOwner: string,

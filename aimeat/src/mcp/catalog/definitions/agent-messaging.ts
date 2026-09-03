@@ -151,6 +151,16 @@ export const agentMessagingTools: AimeatToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_agent_description_set',
+        description: "Say what one of your agents IS, in a sentence — the line a stranger reads on its A2A card and the one on its page here. Set it when what the agent does changes: it was fixed at registration and editable by nobody until 2026-09-03, so an agent whose job moved went on describing its old one. Send an empty string to clear it. The agent's NAME cannot be changed here or anywhere, because it is part of its identity; a description carries none.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            target_agent_name: { type: 'string', required: true, description: 'Agent whose description to set (same owner as the caller). Pass your own name to describe yourself.' },
+            description: { type: 'string', required: true, description: 'What this agent is, in a sentence or two. Up to 2000 characters; empty clears it.' },
+        },
+    },
+    {
         name: 'aimeat_agent_run_mode_set',
         description: "Set how one of your agents is meant to be RUN: 'spawn' (the agent is data on the node until work arrives, and its runtime starts a worker for the job which then unwinds) or 'resident' (the runtime keeps it up). Works on ANY agent you own, whatever runs it — an agent whose behaviour lives in code rather than in a definition on this node is not a lesser agent, and this is the switch that puts it on a spawner's roster (GET /v1/agents?run_mode=spawn). The node records it and the runtime honours it; the node never enforces it, exactly as with mode and max concurrent tasks.",
         caller: 'agent',

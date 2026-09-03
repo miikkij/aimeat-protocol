@@ -138,6 +138,18 @@ export const agentTools: ConnectCliToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_agent_description_set',
+        description: "Say what one of your agents IS, in a sentence — the line a stranger reads on its A2A card. Send an empty string to clear it. The agent's NAME cannot be changed, because it is part of its identity.",
+        input: {
+            target_agent_name: { type: 'string', required: true, description: 'Agent whose description to set.' },
+            description: { type: 'string', required: true, description: 'What this agent is. Up to 2000 characters; empty clears it.' },
+        },
+        handler: ({ client }, input) => client.patch(
+            `/v1/agents/${encodeURIComponent(requiredString(input, 'target_agent_name'))}/description`,
+            { description: optionalString(input, 'description') ?? '' },
+        ),
+    },
+    {
         name: 'aimeat_agent_run_mode_set',
         description: "Set how one of your agents is RUN: 'spawn' (data on the node until work arrives; a worker starts per job and unwinds after), 'resident' (kept up), or null to take it back to nobody-has-said so a spawner leaves it alone. Works on ANY agent you own, whatever runs it — an agent whose behaviour lives in code is not a lesser agent. Recorded here and honoured by the runtime; the node never enforces it.",
         input: {

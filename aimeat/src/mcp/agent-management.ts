@@ -40,7 +40,7 @@ import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
-import { setAgentTags, setAgentMode, setAgentRunMode, setAgentRuntimeSource, setAgentConsoleUrl } from '../services/agent-profile-write.js';
+import { setAgentTags, setAgentMode, setAgentRunMode, setAgentRuntimeSource, setAgentDescription, setAgentConsoleUrl } from '../services/agent-profile-write.js';
 import { describeBasicAgents, requestBasicAgents } from '../services/basic-agents.js';
 import { VALID_MODES } from '../routes/agents/constants.js';
 import { annotationsFor } from './annotations.js';
@@ -88,6 +88,26 @@ export function registerAgentManagementTools(
                     }, null, 2),
                 }],
             };
+        },
+    );
+
+    // ── Tool: aimeat_agent_description_set ──
+    // The sentence a stranger reads on the A2A card. Write-once until 2026-09-03; the NAME stays
+    // immutable because it is part of the GAII, and a description carries no identity.
+    mcp.tool(
+        'aimeat_agent_description_set',
+        descriptionFor('aimeat_agent_description_set'),
+        {
+            target_agent_name: z.string().describe('Agent whose description to set (same owner as the caller).'),
+            description: z.string().describe('What this agent is, in a sentence or two. Empty clears it.'),
+        },
+        annotationsFor('aimeat_agent_description_set'),
+        async ({ target_agent_name, description }) => {
+            const callerParsed = parseGAII(agentGaii);
+            if (!callerParsed) return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
+            const outcome = await setAgentDescription({ storage, config }, callerParsed.owner, target_agent_name, description);
+            if (!outcome.ok) return { content: [{ type: 'text' as const, text: outcome.message }], isError: true };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ gaii: outcome.agent.gaii, name: outcome.agent.name, description: outcome.agent.description ?? '' }, null, 2) }] };
         },
     );
 
