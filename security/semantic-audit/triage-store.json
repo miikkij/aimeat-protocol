@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lastInvariantReviewCommit": "cd95d3ed",
+  "lastInvariantReviewCommit": "94f58c5af",
   "entries": [
     {
       "fingerprint": "63fd23f9d95d1917",
@@ -2778,6 +2778,34 @@
       "decidedBy": "human",
       "date": "2026-08-23",
       "commit": "cd95d3ed"
+    },
+    {
+      "fingerprint": "97b872933937ddf0",
+      "ruleId": "js/polynomial-redos",
+      "file": "aimeat/src/services/workspace-doc-markdown.ts",
+      "line": 160,
+      "source": "codeql",
+      "alertNumber": 1601,
+      "severity": "high",
+      "verdict": "legit",
+      "reason": "Korjattu commitissa 225c6784 — tekstiluokka on `[^]` eikä `.`, joten loppuosa ei voi epäonnistua eikä peruutettavaa ole. Triagen havainto oli oikea ja tarkistettiin mittaamalla: 76.2 ms kahdeksallatuhannella sarkaimella ja `\\r`:llä ennen, 0.014 ms jälkeen. Molemmat kutsukohdat ottavat tekstin jonka joku on kirjoittanut.",
+      "decidedBy": "human",
+      "date": "2026-09-03",
+      "commit": "94f58c5af"
+    },
+    {
+      "fingerprint": "8ee04a7a915448fd",
+      "ruleId": "js/resource-exhaustion",
+      "file": "aimeat/src/cli/connect/mcp/local-poll-guard.ts",
+      "line": 65,
+      "source": "codeql",
+      "alertNumber": 1600,
+      "severity": "high",
+      "verdict": "legit",
+      "reason": "Odotusaika ei tule pyynnöstä sellaisenaan vaan on `Math.max(0, Math.min(REFUSAL_FLOOR_MS, waitMs))`, eli enintään yksi sekunti (ja `pollWaitMs` rajaa syötteen jo valmiiksi välille 0–120 s), joten yksikään kutsuja ei voi kasvattaa pitoa eikä varata palvelinta pidemmäksi aikaa.",
+      "decidedBy": "ai",
+      "date": "2026-09-02",
+      "commit": "94f58c5af"
     }
   ],
   "invariantFindings": [
