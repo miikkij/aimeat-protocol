@@ -34,6 +34,7 @@ export const SURFACE_INTROS: Record<SurfaceRole, string> = {
     admin: 'This surface is for governance: operator settings, flags, groups, consent and agent management.',
     commerce: 'This surface is for selling and getting paid: credentials, priced manifests, checkout and receipts.',
     primitives: 'This surface is twelve tools, and everything else is data: search what this node can do with aimeat_discover (type="capability"), then run what you found with aimeat_invoke. It runs as you, so it can do what you can do and nothing more.',
+    full: 'This surface carries everything the node offers, so nothing here is narrowed to one kind of work. If your work does have a shape — building apps, running the owner\'s own agent, offering a service, governing the node, selling — the surface named after it is smaller to hold and harder to misfire from. Start with aimeat_handbook_get either way.',
 };
 
 const BASE = `You are connected to an AIMEAT node, the personal knowledge and action store of the person who authorised this connection. They own everything here, and your work lands under their identity in surfaces they can see.

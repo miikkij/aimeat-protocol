@@ -29,6 +29,7 @@ import { calculateTrustScore } from '../../services/trust.js';
 import { fireHook } from '../../utils/fire-hook.js';
 import { emitChange } from '../../services/event-bus.js';
 import { evictAgentTelemetry } from '../../services/telemetry-buffer.js';
+import { emitToolListChanged } from '../../mcp/index.js';
 import { getActiveConnectTunnelManager } from '../../services/connect-tunnel.js';
 import { logger } from '../../utils/logger.js';
 
@@ -350,6 +351,11 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
       res.status(500).json(error(config.nodeId, 'INTERNAL', 'This one is on us — the permissions could not be saved. It is already reported; try again in a moment.'));
       return;
     }
+
+    // The agent's open MCP sessions registered the tools THESE scopes allowed, so the list they
+    // hold is now wrong. Saying so is the difference between the person reconnecting the connector
+    // by hand after every permission change and not having to think about it at all.
+    emitToolListChanged(updated.gaii);
 
     res.json(success(config.nodeId, {
       gaii: updated.gaii,

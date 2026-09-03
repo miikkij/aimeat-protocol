@@ -8,6 +8,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { MCP_SURFACES, toolsForSurface, validateSurfaces, V2_EXCLUDED, V2_ROLES, isV2Role } from '../../src/mcp/catalog/surfaces.js';
+import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../../src/mcp/catalog/definitions.js';
 
 describe('v2 MCP surfaces', () => {
     it('every surface tool exists in the catalog and every catalog tool is placed or excluded', () => {
@@ -107,6 +108,31 @@ describe('v2 MCP surfaces', () => {
     it('isV2Role guards unknown roles', () => {
         expect(isV2Role('agent')).toBe(true);
         expect(isV2Role('nonsense')).toBe(false);
+    });
+
+    it('full is the catalog minus the exclusions, and is computed rather than listed', () => {
+        const catalog = CLI_FALLBACK_TOOL_DEFINITIONS.map(d => d.name);
+        const expected = catalog.filter(n => !V2_EXCLUDED.includes(n));
+        expect(MCP_SURFACES.full).toEqual(expected);
+        // The property that makes it computed: nothing in the catalog can be missing from it by
+        // accident, because the only filter is the exclusion list.
+        expect(MCP_SURFACES.full.length).toBe(catalog.length - V2_EXCLUDED.length);
+    });
+
+    it('full carries every other surface, so it can never be the smaller answer', () => {
+        const full = toolsForSurface('full');
+        for (const role of V2_ROLES) {
+            if (role === 'full') continue;
+            const missing = MCP_SURFACES[role].filter(t => !full.has(t));
+            expect({ role, missing }).toEqual({ role, missing: [] });
+        }
+    });
+
+    it('an excluded tool stays off full — the exclusion list is the only way off it', () => {
+        const full = toolsForSurface('full');
+        for (const name of V2_EXCLUDED) expect(full.has(name)).toBe(false);
+        expect(V2_EXCLUDED.length).toBeGreaterThan(0);
+        expect(isV2Role('full')).toBe(true);
     });
 
     it('surface sizes are in the expected ballpark', () => {

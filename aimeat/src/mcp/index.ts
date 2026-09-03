@@ -163,14 +163,15 @@ import { markAgentMcpUse } from '../services/agent-mcp-touch.js';
 // Allows REST routes and MCP tools to emit resource change events
 // that get forwarded to subscribed MCP sessions via SSE.
 export const resourceEvents = new EventEmitter();
-// Each concurrent MCP session adds 2 listeners here (resource:updated +
-// resource:listChanged) and removes them on session close (see core.ts onclose).
-// This is intentional per-session fan-out, not a leak, so the number of listeners
-// scales with concurrent agents — Node's default cap of 10 trips a spurious
-// MaxListenersExceededWarning once ~6 agents connect at once. 256 = headroom for
-// 128 concurrent agents (2 listeners each), while still flagging a genuine leak
-// (e.g. broken onclose cleanup) instead of disabling the detector entirely (0).
-resourceEvents.setMaxListeners(256);
+// Each concurrent MCP session adds 3 listeners here (resource:updated,
+// resource:listChanged and tool:listChanged) and removes them on session close
+// (see core.ts onclose). This is intentional per-session fan-out, not a leak, so
+// the number of listeners scales with concurrent agents — Node's default cap of 10
+// trips a spurious MaxListenersExceededWarning once ~4 agents connect at once.
+// 384 = the same headroom for 128 concurrent agents the 256 gave when a session
+// took two listeners, while still flagging a genuine leak (e.g. broken onclose
+// cleanup) instead of disabling the detector entirely (0).
+resourceEvents.setMaxListeners(384);
 
 export interface ResourceChangeEvent {
     agentGaii: string;
@@ -183,6 +184,23 @@ export function emitResourceUpdated(agentGaii: string, uri: string): void {
 
 export function emitResourceListChanged(agentGaii: string): void {
     resourceEvents.emit('resource:listChanged', { agentGaii } as { agentGaii: string });
+}
+
+/**
+ * Tell this agent's open MCP sessions that its tool list is no longer what they hold.
+ *
+ * WHY IT EXISTS. /v1/mcp registers the tools the agent's scopes allow, so the owner narrowing or
+ * widening those scopes changes the list — and until now nothing said so. The client kept the set
+ * it read at connect, and the person had to reconnect the connector by hand after every permission
+ * change. That is what `notifications/tools/list_changed` is for, and Claude Code, Grok and the
+ * other clients that follow the current spec re-read the list when it arrives; a client that
+ * ignores it is no worse off than before, because it already held the stale list.
+ *
+ * Same bus and same shape as the resource notification above, deliberately: one fan-out, one
+ * cleanup path in core.ts, and no second way for a session to learn that something changed.
+ */
+export function emitToolListChanged(agentGaii: string): void {
+    resourceEvents.emit('tool:listChanged', { agentGaii } as { agentGaii: string });
 }
 
 export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
@@ -258,7 +276,10 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         const mcp = new McpServer(
             { name: `AIMEAT Node ${config.nodeId}`, version: '1.2.0' },
             {
-                capabilities: { tools: {}, resources: { subscribe: true, listChanged: true } },
+                // tools.listChanged is the half that was missing: the agent's scopes decide which
+                // tools this session registered, so a permission change makes the client's list
+                // wrong, and without the declaration no client would ever ask again.
+                capabilities: { tools: { listChanged: true }, resources: { subscribe: true, listChanged: true } },
                 // The orientation an agent reads before it has called anything. Without it a client
                 // meets a few hundred tool descriptions and no indication of where to start, so the
                 // handbook this text points at was reachable only by guessing it existed.

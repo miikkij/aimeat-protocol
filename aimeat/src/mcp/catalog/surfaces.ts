@@ -10,6 +10,7 @@
  *     - service  : marketplace/provider (board/work/action/wallet/capabilities/organism)
  *     - admin    : operator + owner governance (admin/flag/group/consent/agent-mgmt)
  *     - commerce : selling and getting paid (credentials, priced manifests, checkout, receipts)
+ *     - full     : everything v2 may carry, computed as catalog minus V2_EXCLUDED
  *   v1/mcp stays full and frozen; these are opt-in. Surfaces are ALLOWLISTS over the same catalog —
  *   no forked handlers. instance_* is intentionally absent from v2 (auto-created session meta).
  * @structure
@@ -21,6 +22,9 @@
  *   import { toolsForSurface } from '../catalog/surfaces.js';
  *   const allowed = toolsForSurface('agent'); // register only these on /v2/mcp/agent
  * @version-history
+ *   2026-09-03 — A seventh surface, `full`, computed rather than listed: the catalog minus
+ *     V2_EXCLUDED, so it cannot fall behind a new tool and the only way to keep one off it is to
+ *     say so where the reasons already live. The other six are unchanged.
  *   2026-09-01 — A sixth surface, `primitives` (Agent v2 V2): twelve tools, and everything else
  *     reached through aimeat_discover + aimeat_invoke. The other five are unchanged, and so is
  *     /v1/mcp — this is one more door, not a replacement for any of them.
@@ -55,8 +59,8 @@
  */
 import { CLI_FALLBACK_TOOL_DEFINITIONS } from './definitions.js';
 
-export type SurfaceRole = 'appdev' | 'agent' | 'service' | 'admin' | 'commerce' | 'primitives';
-export const V2_ROLES: readonly SurfaceRole[] = ['appdev', 'agent', 'service', 'admin', 'commerce', 'primitives'];
+export type SurfaceRole = 'appdev' | 'agent' | 'service' | 'admin' | 'commerce' | 'primitives' | 'full';
+export const V2_ROLES: readonly SurfaceRole[] = ['appdev', 'agent', 'service', 'admin', 'commerce', 'primitives', 'full'];
 
 /**
  * Catalog tools intentionally NOT exposed on any v2 server surface:
@@ -297,6 +301,24 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_discover',
         'aimeat_handbook_get',
     ],
+
+    /**
+     * The FULL surface (/v2/mcp/full) — everything v2 may carry, and NOT a hand-kept list.
+     *
+     * It is the catalog minus V2_EXCLUDED, computed at load. That is the whole point: a `full`
+     * written out by hand would be the first list to go stale, and it would go stale silently,
+     * because nothing downstream can tell an omission from a decision. Computed, a new tool is on
+     * it the moment it exists, and the only way to keep one off is to say so in V2_EXCLUDED, where
+     * every entry already carries its reason.
+     *
+     * WHO IT IS FOR. A client that wants what /v1/mcp gives but addressed the v2 way, and the
+     * honest answer for an agent whose work does not fit one of the focused surfaces. It is not
+     * the default: a focused surface is smaller context and fewer ways to misfire, and that is the
+     * reason the other surfaces exist at all.
+     */
+    full: CLI_FALLBACK_TOOL_DEFINITIONS
+        .map(d => d.name)
+        .filter(name => !V2_EXCLUDED.includes(name)),
 };
 
 const _surfaceSets: Record<SurfaceRole, Set<string>> = {
@@ -306,6 +328,7 @@ const _surfaceSets: Record<SurfaceRole, Set<string>> = {
     service: new Set(MCP_SURFACES.service),
     admin: new Set(MCP_SURFACES.admin),
     commerce: new Set(MCP_SURFACES.commerce),
+    full: new Set(MCP_SURFACES.full),
 };
 
 /** The set of tool names exposed on a given v2 surface. */

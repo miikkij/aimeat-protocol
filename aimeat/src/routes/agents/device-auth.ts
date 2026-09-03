@@ -75,6 +75,7 @@ import { verifyJWT, issueJWT, generateSessionId } from '../../auth/jwt.js';
 import { optionalAuth } from '../../auth/middleware.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { emitChange } from '../../services/event-bus.js';
+import { emitToolListChanged } from '../../mcp/index.js';
 import { createDefaultSteps } from '../../models/agent-onboarding-schemas.js';
 import { createOnboardingTestTask } from '../../services/onboarding-test-task.js';
 import { detectPlatform } from '../../services/platform-detector.js';
@@ -169,6 +170,9 @@ async function approveDeviceAuth(
       defaultScopes: grantedScopes,
       lastSeen: now,
     });
+    // Re-approval is the other door that changes what an agent may do, and an agent being
+    // re-approved is exactly the one likely to have a session open.
+    emitToolListChanged(gaii);
   } else {
     // New agent: create from scratch
     keyPair = await generateKeyPair();
