@@ -2,9 +2,25 @@
  * @file fleet.css
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The Agents section (/v1/fleet): one row per agent, with the credential state as the
- *   thing the eye lands on. Prefix `flt-`.
+ * @description The Agents section (/v1/fleet and the "Your agents" tab): one row per agent, with
+ *   the credential state as the thing the eye lands on. Prefix `flt-`.
+ *
+ *   IT IS WRITTEN IN THE POSTER SHAPES, not skinned into them. profile-poster.css restyles the
+ *   SHARED primitives — .card, .btn-*, .badge, the list rows — and it can only reach a class it
+ *   names. This view arrived with a private vocabulary (.flt-row, .flt-chip, .flt-migrate) built
+ *   on --radius and --card, so the skin passed it by and it rendered in the classic shell beside
+ *   a poster page. A new surface either uses the shared shapes or carries the poster face itself;
+ *   inventing a third is what put a rounded card next to a Fjalla One headline.
+ *
+ *   THE FOUR SHAPES IT USES (skill aimeat-design-language): a section under a 3px ink rule with
+ *   its rows on hairlines; the dashed coral box for the aside that has to be said out loud; the
+ *   square mono chip, 2px framed, selected on the sun; and the ink slab, which comes from
+ *   .btn-primary rather than from here.
  * @version-history
+ *   v2.0.0 — 2026-09-03 — The poster face. No radius, no --card fill, no bespoke chip: square mono
+ *     chips, groups under an ink rule, headline face on the group heads, the migration alarm as
+ *     the dashed coral box. Colours through --accent / --sun / --success-fg / --warn-fg, which is
+ *     where the machine room's meaning colours live.
  *   v1.2.0 — 2026-09-03 — .flt-live, .flt-hidden and a readable group heading; .flt-dot is gone.
  *   v1.1.0 — 2026-09-03 — The rows group by state, so the sentence is styled once instead of
  *     fifty-two times, and the monospace identity column is gone. The migration banner is a
@@ -16,79 +32,169 @@
   max-width: 1000px;
   margin: 0 auto;
   padding: 2rem 1rem 4rem;
+  font-family: var(--font-body);
+}
+
+/* Embedded in Settings & Controls the tab already owns the column and the padding, so the
+   standalone page's centring would inset the section inside an inset. */
+.pf-fleet-tab .flt {
+  max-width: none;
+  margin: 0;
+  padding: 0;
 }
 
 .flt-title {
-  font-size: 1.6rem;
-  margin: 0 0 0.25rem;
+  font-family: var(--font-poster);
+  font-weight: var(--font-poster-weight);
+  font-size: 2.8rem;
+  line-height: var(--font-poster-leading);
+  letter-spacing: var(--font-poster-tracking);
+  text-transform: uppercase;
+  margin: 0 0 0.4rem;
+  color: var(--text);
 }
 
 .flt-desc {
-  color: var(--text-muted);
+  color: var(--text-dim);
+  font-weight: 600;
   margin: 0 0 1.5rem;
-  font-size: 0.9rem;
+  font-size: 0.92rem;
 }
+
+/* ── The count and the filter ───────────────────────────────────────────────────────────── */
 
 .flt-summary {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   flex-wrap: wrap;
-  margin-bottom: 1rem;
+  margin-bottom: 1.2rem;
 }
 
 .flt-count {
-  font-weight: 600;
-  font-size: 0.9rem;
+  font-weight: var(--font-poster-strong-weight);
+  font-size: 0.95rem;
+  color: var(--text);
 }
 
+/* Shape 4: square, mono, a 2px frame in the current colour. */
 .flt-chip {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--card);
+  border: 2px solid var(--text);
+  border-radius: 0;
+  background: transparent;
   color: var(--text);
-  padding: 0.25rem 0.6rem;
-  font-size: 0.8rem;
-  font-family: inherit;
+  padding: 0.15rem 0.55rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0;
   cursor: pointer;
 }
 
 .flt-chip--warn {
-  border-color: var(--warn, #F59E0B);
-  color: var(--warn, #F59E0B);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
+/* The selected chip sits on the sun with ink words, which is how every selection reads inside. */
 .flt-chip--warn.is-on {
-  background: var(--warn, #F59E0B);
-  color: var(--bg);
+  background: var(--sun);
+  border-color: var(--text);
+  color: var(--on-sun);
 }
 
 .flt-chip--ok {
-  border-color: var(--success, #10b981);
-  color: var(--success, #10b981);
+  border-color: var(--success);
+  color: var(--success-fg);
   cursor: default;
 }
 
+/* What the filter took away, said where the filter is, because on an account whose healthy agents
+   are all below the fold pressing it changed nothing a person could see. */
+.flt-hidden {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+
+/* ── One state, one sentence, then its rows ──
+   The note used to be per row. On this developer's own account that rendered the identical three
+   lines fifty-two times, which is one fact typeset as a wall. It belongs to the STATE, so it sits
+   on the group and the rows under it carry only what differs. */
+.flt-group {
+  margin-bottom: 2rem;
+}
+
+/* The group head is a headline, so it is set in the headline face. The state word carries the
+   colour: a headline whose second half is coral when that half is the point. */
+.flt-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin: 0 0 0.2rem;
+  font-family: var(--font-poster);
+  font-weight: var(--font-poster-weight);
+  font-size: 1.25rem;
+  line-height: var(--font-poster-leading);
+  letter-spacing: var(--font-poster-tracking);
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.flt-group-kind,
+.flt-group-count {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-dim);
+}
+
+/* The state is the thing the eye should land on. --text-dim is not used at heading size: measured
+   in a design review, it made "Never connected" the palest text on the page above six agents'
+   worth of rows, so the two states whose meaning colour IS the quiet grey read as ink instead. */
+.flt-group-state.flt-state--ok { color: var(--success-fg); }
+.flt-group-state.flt-state--expiring { color: var(--warn-fg); }
+.flt-group-state.flt-state--dead { color: var(--accent); }
+.flt-group-state.flt-state--unreadable { color: var(--accent); }
+.flt-group-state.flt-state--never { color: var(--text); }
+.flt-group-state.flt-state--unknown { color: var(--text); }
+
+.flt-group-note {
+  margin: 0 0 0.8rem;
+  max-width: 60ch;
+  font-size: 0.88rem;
+  font-weight: var(--font-poster-text-weight);
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
+/* Shape 1: a section under a 3px ink rule, its rows on hairlines, the page showing through. */
 .flt-list {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
+  border-top: 3px solid var(--text);
 }
 
 .flt-row {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--card);
-  padding: 0.75rem 0.9rem;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  padding: 0.75rem 0;
+}
+
+.flt-row:hover .flt-name {
+  color: var(--accent);
 }
 
 .flt-row-main {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.6rem;
   flex-wrap: wrap;
   /* A flex item's automatic min-width is its content, which is what holds a page open on a phone.
      docs/pitfalls.md §30. */
@@ -96,161 +202,97 @@
 }
 
 .flt-name {
-  font-weight: 600;
+  font-weight: var(--font-poster-strong-weight);
+  font-size: 1.02rem;
   color: var(--text);
   text-decoration: none;
   min-width: 0;
   overflow-wrap: anywhere;
+  cursor: pointer;
 }
 
 .flt-name:hover {
-  text-decoration: underline;
+  color: var(--accent);
 }
 
 .flt-badge {
-  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 500;
+  letter-spacing: 0;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-weight: 600;
-  padding: 0.1rem 0.4rem;
-  border-radius: var(--radius-sm, 4px);
-  background: var(--bg-dim);
-  color: var(--text-muted);
-}
-
-.flt-badge--run,
-.flt-badge--kind {
+  padding: 1px 7px;
+  border: 2px solid var(--border);
+  border-radius: 0;
   background: transparent;
-  border: 1px solid var(--border);
+  color: var(--text-dim);
 }
 
-/* The state is the thing the eye should land on, so it is the only coloured word in the row. */
-.flt-state {
-  margin-left: auto;
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-weight: 700;
-}
-
-.flt-state--ok { color: var(--success, #10b981); }
-.flt-state--expiring { color: var(--warn, #F59E0B); }
-.flt-state--dead { color: var(--danger, #E8564A); }
-.flt-state--never { color: var(--text-muted); }
-.flt-state--unreadable { color: var(--danger, #E8564A); }
-.flt-state--unknown { color: var(--text-muted); }
-
-/* ── One state, one sentence, then its rows ──
-   The note used to be per row. On this developer's own account that rendered the identical three
-   lines fifty-two times, which is one fact typeset as a wall. It belongs to the STATE, so it sits
-   on the group and the rows under it carry only what differs. */
-.flt-group {
-  margin-bottom: 1.4rem;
-}
-
-.flt-group-head {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  margin: 0 0 0.15rem;
-  font-size: 0.95rem;
-  font-weight: 600;
-}
-
-.flt-group-kind,
-.flt-group-count {
-  font-size: 0.8rem;
-  font-weight: 400;
-  color: var(--text-muted);
-}
-
-/* The state word carries the colour; the heading does not. As a heading colour, --text-muted made
-   "Never connected" the palest text on the page, above six agents' worth of rows. */
-.flt-group-head { color: var(--text); }
-
-/* ...and the two states whose colour IS the muted grey do not get it at heading size. --text-muted
-   on the page ground is about 2.3:1, which is fine for an inline aside and not for the word six
-   agents are filed under. Measured in a design review: "Never connected" disappeared while the rows
-   beneath it stayed crisp, so the group read as loose cards with no owner. */
-.flt-group-head .flt-state--never,
-.flt-group-head .flt-state--unknown { color: var(--text); }
-
-/* What the filter took away, said where the filter is, because on an account whose healthy agents
-   are all below the fold pressing it changed nothing a person could see. */
-.flt-hidden {
-  font-size: 0.8rem;
-  color: var(--text-muted);
+.flt-badge--run {
+  border-color: var(--text);
+  color: var(--text);
 }
 
 /* Replaces the unlabelled 8x8 dot. Only on the rows where it is true, so it is a difference. */
 .flt-live {
-  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--success, #10b981);
+  letter-spacing: 0;
+  color: var(--success-fg);
   white-space: nowrap;
 }
 
 /* The countdown, the one thing a row has that its neighbours do not. */
 .flt-days {
-  font-size: 0.75rem;
-  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-dim);
   white-space: nowrap;
-}
-
-.flt-group-note {
-  margin: 0 0 0.6rem;
-  max-width: 60ch;
-  font-size: 0.85rem;
-  color: var(--text-muted);
 }
 
 .flt-row-meta {
   display: flex;
-  gap: 0.75rem;
+  gap: 1rem;
   flex-wrap: wrap;
-  margin-top: 0.4rem;
-  font-size: 0.75rem;
-  color: var(--text-muted);
+  margin-top: 0.3rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-dim);
 }
 
 /* .flt-gaii is gone with the column it styled. The full identity was the agent's name followed by
    an owner and node identical on every row, set in monospace so the repetition was the loudest
    thing on the page. It is the name link's tooltip now. */
 
-@media (max-width: 600px) {
-  /* On a phone the state belongs under the name rather than pushed to a right edge that is not
-     there: `margin-left: auto` on a wrapped row leaves it stranded on a line of its own. */
-  .flt-state {
-    margin-left: 0;
-  }
-}
-
 /* ── The stuck fleet, and the one press that moves it ──
    Above the list rather than inside it: it is about several agents at once, and a control repeated
-   per row would ask the person to do one at a time the thing they want done to all of them. */
+   per row would ask the person to do one at a time the thing they want done to all of them.
+
+   Shape 2, the dashed coral box: the aside that has to be said out loud. A COLUMN, NOT A ROW —
+   it was a flex row, which is the shape for one sentence, and it says four things in the order a
+   person needs them: what is wrong, what the press does, what it costs, what it needs. */
 .flt-migrate {
-  /* A COLUMN, NOT A ROW. It was a flex row: one sentence beside a button, which is the shape for
-     one sentence. It now says four things in the order a person needs them — what is wrong, what
-     the press does, what it costs, what it needs — and four sentences competing for a row's width
-     are read in no order at all. */
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.4rem;
-  border: 1px solid var(--warn, #F59E0B);
-  border-radius: var(--radius);
-  background: var(--card);
-  padding: 0.9rem 1rem;
-  margin-bottom: 1rem;
+  gap: 0.45rem;
+  border: 3px dashed var(--accent);
+  border-radius: 0;
+  background: var(--card-bg);
+  padding: 1.1rem 1.2rem;
+  margin-bottom: 1.6rem;
   min-width: 0;
 }
 
 .flt-migrate-head {
   margin: 0;
-  font-size: 1rem;
-  font-weight: 600;
+  font-family: var(--font-poster);
+  font-weight: var(--font-poster-weight);
+  font-size: 1.35rem;
+  line-height: var(--font-poster-leading);
+  letter-spacing: var(--font-poster-tracking);
+  text-transform: uppercase;
   color: var(--text);
 }
 
@@ -258,38 +300,48 @@
   margin: 0;
   min-width: 0;
   max-width: 60ch;
-  font-size: 0.9rem;
-  line-height: 1.45;
+  font-size: 0.92rem;
+  font-weight: var(--font-poster-text-weight);
+  line-height: 1.5;
+  color: var(--text);
 }
 
 /* What it needs, or that it has it. The one line whose answer changes what the person does next,
    so it is not the same grey as the two above it. */
-.flt-migrate-line.is-blocked { color: var(--warn, #F59E0B); }
-.flt-migrate-line.is-ready { color: var(--success, #10b981); }
+.flt-migrate-line.is-blocked { color: var(--accent); font-weight: var(--font-poster-strong-weight); }
+.flt-migrate-line.is-ready { color: var(--success-fg); font-weight: var(--font-poster-strong-weight); }
 
-/* Full size, not btn-sm: this is the one thing on the page that acts. */
-.flt-migrate button { margin-top: 0.5rem; }
+/* Full size, not btn-sm: this is the one thing on the page that acts. The slab itself is
+   .btn-primary — the shared shape, so it is the ink slab with the sun shadow wherever the poster
+   skin reaches, and this file does not draw a second one. */
+.flt-migrate button { margin-top: 0.6rem; }
 
 /* The reassurance. True and worth saying, but it is not the problem or the action, so it does not
    compete with either. */
-.flt-migrate-keeps { color: var(--text-muted); font-size: 0.85rem; }
+.flt-migrate-keeps { color: var(--text-dim); font-size: 0.88rem; }
 
 /* A DISABLED BUTTON HAS TO LOOK DISABLED. Measured on the real page: with no connector running
    the button is correctly `disabled`, and it rendered at full opacity with a pointer cursor — so
    the sentence beside it said "start your connector" while the control next to it invited a press
    that would do nothing. The state is spelled out rather than assumed to be inherited. */
 .flt-migrate button:disabled {
-  opacity: 0.55;
+  opacity: 0.45;
   cursor: not-allowed;
+  transform: none;
 }
 
 /* The answer stays where the person is looking. Full width so it never squeezes the button. */
 .flt-migrate-outcome {
-  margin: 0.2rem 0 0;
-  font-size: 0.85rem;
-  color: var(--text-muted);
+  margin: 0.3rem 0 0;
+  font-size: 0.88rem;
+  color: var(--text-dim);
 }
 
 .flt-migrate-outcome.is-bad {
-  color: var(--danger, #E8564A);
+  color: var(--accent);
+}
+
+@media (max-width: 600px) {
+  .flt-group-head { font-size: 1.05rem; }
+  .flt-title { font-size: 2rem; }
 }
