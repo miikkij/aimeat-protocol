@@ -15,9 +15,11 @@
  *   ...guards, handler)`, `mcp.tool(name, ...)`, and a literal table for the CLI dispatch. A
  *   codebase that registered routes dynamically could not be enumerated this way, and the audit
  *   would need a different instrument.
- * @structure collectRestRoutes · collectMcpTools · collectCliDispatch · EntryPoint
+ * @structure collectRestRoutes · collectMcpTools · collectCliDispatch · callsInside · EntryPoint
  * @usage const entries = [...collectRestRoutes(program), ...collectMcpTools(program)];
  * @version-history
+ *   v1.1.0 — 2026-09-04 — callsInside() lives here now. Two gates written the same day each carried
+ *     their own copy of it, which is the shape check:copied-logic exists to refuse.
  *   v1.0.0 — 2026-09-03 — Initial (wish-invarianttiauditointi, phase 1).
  */
 import ts from 'typescript';
@@ -38,6 +40,27 @@ export interface EntryPoint {
 }
 
 const VERBS = new Set(['get', 'post', 'put', 'patch', 'delete', 'all']);
+
+/**
+ * Every function called anywhere inside a node, by name, however deeply nested.
+ *
+ * Used to answer "does this handler do X somewhere in its body" — verify a peer signature, resolve
+ * the caller's identity — without following the call any further. One hop, deliberately: what a
+ * callee does in turn is a question for a call graph, and this walk must not be read as one.
+ */
+export function callsInside(node: ts.Node): Set<string> {
+    const names = new Set<string>();
+    const visit = (n: ts.Node): void => {
+        if (ts.isCallExpression(n)) {
+            const callee = n.expression;
+            if (ts.isIdentifier(callee)) names.add(callee.text);
+            else if (ts.isPropertyAccessExpression(callee)) names.add(callee.name.text);
+        }
+        ts.forEachChild(n, visit);
+    };
+    visit(node);
+    return names;
+}
 
 function lineOf(node: ts.Node, source: ts.SourceFile): number {
     return source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;

@@ -47,7 +47,7 @@ const EXEMPTIONS = join(ROOT, 'security', 'route-scope-exemptions.json');
  *  answers "is anyone there", never "may this principal do this". `requireOwnerPrincipal` is one:
  *  it answers "is this the account holder, or something acting for them", which is the decision the
  *  account-security doors need and the one no scope word can express. */
-const GATES = ['requireScope', 'requireAnyScope', 'requireRole', 'requireRoleOrScope', 'requireOperator',
+export const GATES = ['requireScope', 'requireAnyScope', 'requireRole', 'requireRoleOrScope', 'requireOperator',
     'requireOwnerPrincipal', 'requireScimConnection'];
 
 export interface Finding {
@@ -234,4 +234,9 @@ function main(): void {
     console.log(fresh.length ? '  (report only — pass --strict to gate)' : '  ✓ no new ungated handlers');
 }
 
-main();
+// Only when run as the command. `GATES` and `collectRoutes` are imported by other gates —
+// check-federation-signatures.ts asks the same question about the routes this one skips by design —
+// and an import must not print this script's report on their behalf. Same guard as build-sdk-libs.ts.
+if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith('check-route-scopes.ts')) {
+    main();
+}
