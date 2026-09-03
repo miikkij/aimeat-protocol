@@ -62,7 +62,7 @@ import type { Storage } from '../storage/interface.js';
 import { LIVE_TASK_STATUSES } from '../storage/types/agents-messaging.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole, requireScope, agentNotFoundResponse } from '../auth/middleware.js';
-import { buildGAII } from '../utils/gaii.js';
+import { agentGaiiFromIdentifier } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
 import { createDefaultSteps } from '../models/agent-onboarding-schemas.js';
@@ -130,7 +130,7 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
 
   function resolveAgentGaii(req: Express.Request, agentName: string): string {
     const owner = req.auth!.owner as string;
-    return buildGAII(agentName, owner, config.nodeId);
+    return agentGaiiFromIdentifier(agentName, owner, config.nodeId);
   }
 
   function canAccessAgent(req: Express.Request, agentName: string): boolean {

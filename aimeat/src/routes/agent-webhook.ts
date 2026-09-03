@@ -25,7 +25,7 @@ import type { Storage, AgentRecord } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { refuseNotYours } from '../middleware/refusals.js';
 import { requireAuth } from '../auth/middleware.js';
-import { buildGAII } from '../utils/gaii.js';
+import { agentGaiiFromIdentifier } from '../utils/gaii.js';
 import { validateOutboundUrl, safeFetch } from '../utils/url-validator.js';
 import { emitChange } from '../services/event-bus.js';
 import { createAgentIntegrationOverviewService } from '../services/db/agent-integration-overview-db-service.js';
@@ -43,7 +43,7 @@ export function agentWebhookRouter(config: AimeatConfig, storage: Storage): Rout
   /** Build GAII for the named agent under the authenticated owner */
   function resolveAgentGaii(req: Express.Request, agentName: string): string {
     const owner = req.auth!.owner as string;
-    return buildGAII(agentName, owner, config.nodeId);
+    return agentGaiiFromIdentifier(agentName, owner, config.nodeId);
   }
 
   /** Check if current session can access an agent's webhook */

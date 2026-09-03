@@ -53,7 +53,7 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentTaskRecord } from '../storage/interface.js';
-import { resolveIdentity, buildGAII } from '../utils/gaii.js';
+import { resolveIdentity, agentGaiiFromIdentifier } from '../utils/gaii.js';
 import type { WebhookDispatcher, TaskBucket, TaskRouteHelpers } from './agent-tasks/helpers.js';
 import { registerTaskCreateReadRoutes } from './agent-tasks/create-read.js';
 import { registerTaskLifecycleRoutes } from './agent-tasks/lifecycle.js';
@@ -87,7 +87,7 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
   /** Build GAII for the named agent under the authenticated owner */
   function resolveAgentGaii(req: Express.Request, agentName: string): string {
     const owner = req.auth!.owner as string;
-    return buildGAII(agentName, owner, config.nodeId);
+    return agentGaiiFromIdentifier(agentName, owner, config.nodeId);
   }
 
   /** Wildcard-aware scope check for the current token (mirrors auth/middleware.ts requireScope). */

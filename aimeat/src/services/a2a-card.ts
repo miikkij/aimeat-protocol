@@ -53,7 +53,18 @@ export const A2A_SURFACE = {
  * is a weaker claim than a real skill list and a truer one than silence.
  */
 function skillsFor(agent: AgentRecord): AgentCard['skills'] {
-  const declared = (agent.capabilities ?? []).filter(c => typeof c === 'string' && c.trim() !== '');
+  // WHAT THE AGENT ITSELF SAID COMES FIRST. `capabilities` is the coarse list given at creation
+  // ('memory'), and `technicalCapabilities` is what the agent reported about itself through
+  // aimeat_agent_capabilities_report — a real list of what it can do, with names a person wrote.
+  // The card read only the first, so an agent that reported its capabilities saw its card go on
+  // saying 'memory', and the tool for saying what you can do could not reach the surface a stranger
+  // reads. Measured 2026-09-03: declare two skills, card unchanged.
+  const reported = (agent.technicalCapabilities ?? [])
+    .map(c => (typeof c === 'string' ? c : c?.name))
+    .filter((c): c is string => typeof c === 'string' && c.trim() !== '');
+  const declared = reported.length > 0
+    ? reported
+    : (agent.capabilities ?? []).filter(c => typeof c === 'string' && c.trim() !== '');
   if (declared.length === 0) {
     return [{
       id: agent.name,
