@@ -47,9 +47,11 @@ import type { Storage, AgentRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
 import { isValidGAII } from '../../utils/gaii.js';
 import {
-  readCardJws, publicCardProjection, signWithNodeKey, jwkThumbprint, base64KeyToJwkX,
+  readCardJws, verifyCardJws, publicCardProjection, signWithNodeKey, jwkThumbprint, base64KeyToJwkX,
   type PublicAgentCard,
 } from '../../services/agent-card.js';
+import { requireAuth, requireScope } from '../../auth/middleware.js';
+import { emitChange } from '../../services/event-bus.js';
 import { getNodeCryptoKeys } from '../../auth/jwt.js';
 import type { AgentCard } from '../../models/agent-card.js';
 import { logger } from '../../utils/logger.js';
@@ -125,6 +127,98 @@ export function registerAgentCardRoutes(router: Router, config: AimeatConfig, st
   }
 
   // ── GET /v1/agents/:gaii/card — the PUBLIC card ──
+  /**
+   * POST /v1/agents/:gaii/card — the agent re-issues its OWN card.
+   *
+   * WHY THIS HAD TO EXIST. `cardJws` was written in exactly one place, the enrolment route, and
+   * never again. The connector signs `skills: []` at enrolment with a comment saying the runtime
+   * declares them later — and nothing ever did, so `aimeat_agent_capabilities_report` updated the
+   * agent record while the signed card went on asserting nothing, for ever. A card that cannot
+   * follow what it describes is a card that stops being true and never says so.
+   *
+   * WHO RE-SIGNS, AND WHY IT IS THE CONNECTOR. The card is signed by the AGENT's key, which lives
+   * on the connector; the node cannot re-issue alone. The alternative considered and rejected was a
+   * card carrying a pointer with the mutable half read live — that breaks the one property the card
+   * exists for, which is that a stranger can verify it against the published JWKS WITHOUT asking
+   * this node. A pointer makes the interesting half unverifiable and leaves the signature asserting
+   * only the boring half.
+   *
+   * IT IS A RE-ISSUE, NOT AN ENROLMENT, and that is the whole security argument. No grant is
+   * needed because nothing new is being admitted: the caller is already authenticated as this
+   * agent, and the card must be signed by the key ALREADY ON RECORD. A card carrying a different
+   * key is refused and pointed at enrolment, so this door can change what an agent SAYS and never
+   * who it IS.
+   *
+   * `issuedAt` moves, deliberately. Nothing pins the card — the A2A trust-on-first-use pin holds
+   * `keyX` and `kid`, and `cardUri` is re-read on every sighting (services/a2a-foreign.ts) — so a
+   * re-issue under the same key is invisible to a peer that has met this agent before. Checked
+   * against that code rather than assumed.
+   */
+  router.post('/v1/agents/:gaii/card', requireAuth(), requireScope('agent:write'), async (req, res) => {
+    const gaii = decodeURIComponent(req.params.gaii as string);
+    const agent = await storage.getAgent(gaii);
+    if (!agent) {
+      res.status(404).json(error(config.nodeId, 'AGENT_NOT_FOUND', `Agent not found: ${gaii}`));
+      return;
+    }
+    // SELF ONLY. An owner cannot re-issue on an agent's behalf either: they do not hold the key, so
+    // a card they submitted would have to be signed by something else, and then it is not this
+    // agent's card. Same-owner is not enough here; it has to be the agent itself.
+    if (req.auth!.sub !== agent.gaii) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED',
+        'An agent re-issues its own card. Nobody else holds the key it is signed with.'));
+      return;
+    }
+    if (!agent.cardJws || !agent.publicKey) {
+      res.status(409).json(error(config.nodeId, 'NOT_ENROLLED',
+        'This agent has no card yet. Enrol it first — that is where a key is admitted, and this door only replaces what a card says.',
+        undefined, undefined,
+        [{ description: 'Enrol this agent, which admits its key', method: 'POST', url: '/v1/agents/v2/enrol' }]));
+      return;
+    }
+
+    const read = readCardJws(req.body?.card);
+    if (!read.ok) {
+      res.status(422).json(error(config.nodeId, 'CARD_REJECTED',
+        'That card could not be read. The details say which part.', undefined, { defects: read.defects },
+        [{ description: 'The card this agent is serving now, for comparison', method: 'GET', url: `/v1/agents/${encodeURIComponent(gaii)}/card` }]));
+      return;
+    }
+    const card = read.card!;
+    if (card.gaii !== agent.gaii) {
+      res.status(422).json(error(config.nodeId, 'CARD_REJECTED',
+        'That card names a different agent than the one it was sent for. Send it to that agent instead.', undefined,
+        { card_names: card.gaii, sent_for: agent.gaii },
+        [{ description: 'Read the card this agent is serving now', method: 'GET', url: `/v1/agents/${encodeURIComponent(agent.gaii)}/card` }]));
+      return;
+    }
+    // THE KEY MAY NOT CHANGE HERE. Enrolment is where a key is admitted, and it is grant-gated for
+    // exactly that reason; letting this door take a new one would make it a second, ungated way to
+    // become somebody else.
+    const onRecord = Buffer.from(agent.publicKey, 'base64').toString('base64url');
+    if (card.publicKey.x !== onRecord) {
+      res.status(409).json(error(config.nodeId, 'KEY_CHANGED',
+        'That card carries a different key. A new key is a new identity: re-enrol instead of re-issuing.'));
+      return;
+    }
+    if (!await verifyCardJws(req.body.card as string, card.publicKey)) {
+      res.status(422).json(error(config.nodeId, 'CARD_UNSIGNED',
+        'That card is not signed by the key it carries. Sign it with the same key the card names, then send it again.',
+        undefined, undefined,
+        [{ description: 'The key this node holds for you', method: 'GET', url: `/v1/agents/${encodeURIComponent(agent.gaii)}/jwks.json` }]));
+      return;
+    }
+
+    const issuedAt = new Date().toISOString();
+    await storage.updateAgent(agent.gaii, { cardJws: req.body.card as string, cardIssuedAt: issuedAt });
+    emitChange('agents');
+    res.json(success(config.nodeId, {
+      gaii: agent.gaii,
+      card_issued_at: issuedAt,
+      skills: Array.isArray(card.skills) ? card.skills.length : 0,
+    }));
+  });
+
   router.get('/v1/agents/:gaii/card', async (req, res) => {
     const found = await loadCarded(req, res);
     if (!found) return;

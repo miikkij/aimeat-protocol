@@ -20,7 +20,7 @@ import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { refuseNotYours } from '../middleware/refusals.js';
 import { requireAuth } from '../auth/middleware.js';
-import { buildGAII } from '../utils/gaii.js';
+import { agentGaiiFromIdentifier } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 
 /* ── Cursor helpers for inbox pagination ── */
@@ -54,7 +54,7 @@ export function agentIntegrationRouter(config: AimeatConfig, storage: Storage): 
   /** Build GAII for the named agent under the authenticated owner */
   function resolveAgentGaii(req: Express.Request, agentName: string): string {
     const owner = req.auth!.owner as string;
-    return buildGAII(agentName, owner, config.nodeId);
+    return agentGaiiFromIdentifier(agentName, owner, config.nodeId);
   }
 
   /** Check if the caller is allowed to access this agent's data */

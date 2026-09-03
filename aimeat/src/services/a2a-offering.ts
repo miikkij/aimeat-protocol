@@ -30,6 +30,7 @@ import {
   filterOfferings, resolveOfferingPricing, agentWorkCoordinate, type Offering,
 } from './exchange-market.js';
 import { isMoneyCurrency } from '../commerce/money.js';
+import { buildGAII } from '../utils/gaii.js';
 import {
   getX402Network, getX402Asset, buildExactRequirements, extractPayTo,
 } from '../commerce/x402-facilitator.js';
@@ -49,6 +50,44 @@ export const A2A_X402_EXTENSION = 'https://github.com/google-a2a/a2a-x402/v0.1';
  * an offering to an agent: `agentwork:{owner}/{agentName}`. Going any other way would be a second
  * opinion about what "this agent's offerings" means.
  */
+/**
+ * Every agent on this node that a stranger may find, with the offerings that make it findable.
+ *
+ * THE RULE IS NOT A FILTER BOLTED ON. It is the consent model this node already uses for
+ * strangers: a foreign caller may reach an agent because its owner PUBLISHED AN OFFERING, and
+ * nothing else opens that door. So the listing obeys the same sentence — an agent with no offering
+ * is not hidden, it is not for sale, and the two are different things.
+ *
+ * One pass over the offerings rather than one query per agent: the coordinate carries the owner and
+ * the agent name, so the whole index can be grouped in memory and the agents fetched once.
+ */
+export async function publishedAgentOfferings(
+  storage: Storage, config: AimeatConfig,
+): Promise<Array<{ agent: AgentRecord; offerings: Offering[] }>> {
+  const all = await filterOfferings(storage, {});
+  const sellable = all.filter(o => o.state === 'listed' && o.kind === 'agent-work' && o.surface?.kind === 'agent-work');
+  // `ext` is `agentwork:{owner}/{agentName}` — the same coordinate offeringsForAgent matches on, so
+  // this cannot drift from what the per-agent card believes about the same offering.
+  const byAgent = new Map<string, Offering[]>();
+  for (const o of sellable) {
+    if (!o.ext) continue;
+    const list = byAgent.get(o.ext);
+    if (list) list.push(o); else byAgent.set(o.ext, [o]);
+  }
+  const out: Array<{ agent: AgentRecord; offerings: Offering[] }> = [];
+  for (const [ext, offerings] of byAgent) {
+    const coord = ext.startsWith('agentwork:') ? ext.slice('agentwork:'.length) : '';
+    const slash = coord.indexOf('/');
+    if (slash <= 0) continue;
+    const owner = coord.slice(0, slash);
+    const name = coord.slice(slash + 1);
+    if (!owner || !name) continue;
+    const agent = await storage.getAgent(buildGAII(name, owner, config.nodeId));
+    if (agent) out.push({ agent, offerings });
+  }
+  return out;
+}
+
 export async function offeringsForAgent(storage: Storage, agent: AgentRecord): Promise<Offering[]> {
   const { ext } = agentWorkCoordinate(agent.owner, agent.name, '');
   const found = await filterOfferings(storage, { ext });

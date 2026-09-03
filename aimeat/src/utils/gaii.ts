@@ -173,6 +173,26 @@ export function isValidGHII(id: string): boolean {
  * This MUST be used everywhere data is stored/retrieved by identity (memory, files,
  * consent, knowledge, etc.) to ensure owner sessions use GHII and agents/ecosystem apps use their sub.
  */
+/**
+ * An agent identifier from a URL, as the identity it names.
+ *
+ * A `:name` path segment may be a BARE NAME (`concierge`, which needs the caller's owner and this
+ * node to mean anything) or an identity already whole (`concierge#alice@node`). Nine route files
+ * each had their own `resolveAgentGaii` that called `buildGAII` unconditionally, so handing one a
+ * GAII produced `concierge#alice@node#alice@node` — an identity that names nobody, and a 403 or a
+ * 404 with a message about ownership that was not the problem.
+ *
+ * That is the same defect as the `/v1/agents/me` rewrite this was found through: taking an identity
+ * apart to put it back together, when it was already there. An identifier that carries a `#` is
+ * already an identity; nothing needs assembling.
+ *
+ * It does NOT check that the identity belongs to the caller. That is each route's own check, and
+ * each route has one — which is why the broken cases refused rather than leaked.
+ */
+export function agentGaiiFromIdentifier(identifier: string, owner: string, nodeId: string): string {
+    return identifier.includes('#') ? identifier : buildGAII(identifier, owner, nodeId);
+}
+
 export function resolveIdentity(auth: { sub: string; owner: string; roles: string[] }, nodeId: string): string {
   const isOwnerSession = auth.roles.includes('owner') &&
     !auth.roles.includes('agent') && !auth.roles.includes('ecosystem');
