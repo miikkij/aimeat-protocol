@@ -161,6 +161,7 @@
     "check:sse-parity": "tsx scripts/check-sse-parity.ts --strict",
     "check:copied-logic": "tsx scripts/check-copied-logic.ts --strict",
     "check:doc-counts": "tsx scripts/check-doc-counts.ts",
+    "debt": "tsx scripts/debt.ts",
     "check:liaison-surface": "tsx scripts/check-liaison-surface.ts --strict",
     "check:storage-parity": "tsx scripts/check-storage-parity.ts --strict",
     "check:audit-gates": "pnpm check:route-scopes && pnpm check:denial-coverage && pnpm check:outbound-fetch && pnpm check:trusted-keys && pnpm check:storage-parity && pnpm check:ext-entrypoints && pnpm check:shared-impl && pnpm check:surface-focus && pnpm check:runtime-read-targets && pnpm check:sse-parity && pnpm check:copied-logic && pnpm check:liaison-surface",
