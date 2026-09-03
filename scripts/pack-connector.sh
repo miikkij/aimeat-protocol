@@ -63,9 +63,15 @@ if [ "${1:-}" = "--verify" ]; then
   [ "$MISSING" = 0 ] || { echo "[pack] the package is incomplete -- do not hand this to anyone" >&2; exit 1; }
 fi
 
+# THE PATH HAS TO BE ONE npm CAN OPEN. Git Bash's `pwd` gives `/e/dev/...`, which is its own mount
+# and means nothing to npm, node or PowerShell — so the line this script printed for someone to
+# paste was a line that could not work. `cygpath -m` gives `E:/dev/...`; elsewhere the path already
+# is the native one.
+if command -v cygpath >/dev/null 2>&1; then NATIVE="$(cygpath -m "$TARBALL")"; else NATIVE="$TARBALL"; fi
+
 echo
-echo "[pack] $TARBALL"
+echo "[pack] $NATIVE"
 echo "[pack] install it on the fleet machine with:"
-echo "         npm i \"$TARBALL\""
+echo "         npm i \"$NATIVE\""
 echo "[pack] and confirm what landed, which is the check that matters:"
 echo "         ls node_modules/aimeat/dist/src/cli/connect/agent-key.js"
