@@ -133,6 +133,23 @@ export function registerAgentV2MigrateRoutes(router: Router, config: AimeatConfi
       ? (req.body.agents as unknown[]).filter((x): x is string => typeof x === 'string' && x.trim() !== '')
       : null;
 
+    // AN EMPTY `agents` IS A CALLER'S MISTAKE, NOT A REQUEST. It cannot mean "move nothing" —
+    // nobody presses a button for that — and it must not silently mean "move everything", which is
+    // the opposite of what a caller naming a subset asked for. It arrives when a list was built
+    // wrong: the fleet page passed its click handler straight through and sent the MouseEvent as
+    // the name, which filtered away to nothing here and came back as NOTHING_TO_MIGRATE — a
+    // sentence about the agents that is really about the request. Say which it is.
+    if (named && named.length === 0) {
+      logger.info('migrate: refused before asking a daemon', {
+        event: 'migrate.refused', owner, code: 'NO_AGENTS_NAMED',
+        rawAgents: Array.isArray(req.body?.agents) ? (req.body.agents as unknown[]).length : 0,
+      });
+      res.status(400).json(error(config.nodeId, 'NO_AGENTS_NAMED',
+        'This asked to move a list of agents, and the list was empty. Name at least one agent, or ask for no list at all to move every agent that cannot sign in.',
+        undefined, { field: 'agents', received: [] }));
+      return;
+    }
+
     const { movable, skipped } = await candidates(storage, config, owner, named);
     // A REFUSAL THE OWNER SEES LEAVES A TRACE. Only the two enrolment failures were logged, so the
     // three refusals BEFORE the daemon is even asked happened in silence: a person pressed, read a
