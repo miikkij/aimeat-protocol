@@ -13,12 +13,17 @@
  *   import type { CapabilityRecord } from '../storage/interface.js';
  * @version-history
  *   v1.0.0 — 2026-08-01 — Extracted from types/agents-messaging.ts (max-file-lines).
+ *   v1.1.0 — 2026-09-03 — Source types 'app-tool' and 'offering': the registry is a projection of
+ *     every source an agent can find by name here (wish-kyvykkyydet-rekisteri-ja-sivu).
  */
 // ── Capability Layer ────────────────────────────────────────────────
 
 export interface CapabilitySource {
   // 'ecosystem' = invocation routed over the connect-tunnel to a bound GEAI; ref = 'eco:{app}:{capId}'.
-  type: 'extension' | 'action' | 'cortex' | 'app' | 'manual' | 'ecosystem';
+  // 'app-tool' = a sellable tool from an app's `apps.{appId}.tools` manifest; ref = 'app-tool:{owner}/{appId}:{tool}'.
+  // 'offering' = an agent's published offer from `agents.{agent}.offers`; ref = 'offering:{owner}/{agent}:{offerId}'.
+  // Both are discovery entries (callable: false): the call goes through the contract door their usage names.
+  type: 'extension' | 'action' | 'cortex' | 'app' | 'manual' | 'ecosystem' | 'app-tool' | 'offering';
   ref: string;
   version: string;
 }

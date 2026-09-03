@@ -7,6 +7,8 @@
  *   consent/trust/notify/email) and runs the action script. Extracted from src/routes/extensions.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.9.0 — 2026-09-03 — A direct call counts into the capability registry's stats when the node
+ *     has switched counting on (AIMEAT_CAPABILITY_CALL_COUNTING); proxy calls always counted.
  *   v1.8.0 — 2026-09-03 — An action address may pin a version (name@version) through resolveExtensionForCall; an unknown version is a 404 that says so.
  *   v1.7.0 — 2026-08-10 — Both handlers resolve the gated app through resolveGatedApp instead of
  *     reading config.app directly.
@@ -53,6 +55,7 @@ import { resolveGatedApp } from './permissions.js';
 import { buildExtensionCtx, buildExtensionWallet, buildExtensionNotify, buildExtensionEmail, sandboxLimits } from '../../services/extension-ctx.js';
 import { takeDesignations } from '../../commerce/beneficiary-designation.js';
 import { recordCallDuration } from '../../services/call-timing.js';
+import { countCapabilityCall } from '../../services/capability-record.js';
 import { getEncryptionKey } from '../../services/encryption.js';
 import { getExtSecretKeys, getInstanceSecretKeys, decryptSecretFields } from '../../services/extension-secrets.js';
 import type { EmailService } from '../../services/email.js';
@@ -217,6 +220,8 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
         throw execErr;
       }
       recordCallDuration(storage, `${ext.installedBy}@${config.nodeId}`, ext.name, action.id, Date.now() - startedAt);
+      // The capability registry's call count, when the node counts direct calls (off by default).
+      if (config.capabilityCallCounting) void countCapabilityCall(storage, `ext:${ext.name}:${action.id}`, true, Date.now() - startedAt);
 
       // The call delivered, so whoever the provider owes a share of it is booked — out of the
       // provider's own cut, never the consumer's charge. The designation key is the capability's own
@@ -373,6 +378,8 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
         throw execErr;
       }
       recordCallDuration(storage, `${ext.installedBy}@${config.nodeId}`, ext.name, action.id, Date.now() - startedAt);
+      // The capability registry's call count, when the node counts direct calls (off by default).
+      if (config.capabilityCallCounting) void countCapabilityCall(storage, `ext:${ext.name}:${action.id}`, true, Date.now() - startedAt);
 
       // The call delivered, so whoever the provider owes a share of it is booked — out of the
       // provider's own cut, never the consumer's charge. The designation key is the capability's own

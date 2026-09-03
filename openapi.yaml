@@ -37895,7 +37895,7 @@ paths:
           schema: { type: string, enum: [none, anonymous, registered] }
         - name: source_type
           in: query
-          schema: { type: string, enum: [extension, action, cortex, manual] }
+          schema: { type: string, enum: [extension, action, cortex, manual, app-tool, offering, ecosystem] }
         - name: page
           in: query
           schema: { type: integer, default: 1 }

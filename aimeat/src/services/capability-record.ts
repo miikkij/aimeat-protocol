@@ -408,6 +408,26 @@ function redactInput(input: Record<string, unknown>, redactedFields: string[]): 
  *
  * Never throws: the call already happened and its answer is owed to the caller either way.
  */
+/**
+ * Count a DIRECT call (an app or agent calling the extension action itself, not the proxy) into the
+ * capability's stats, when the node has switched counting on (config.capabilityCallCounting). No
+ * call log: the log is the proxy's, with the owner's redaction rules; this is one counter per call.
+ * Never throws and never awaited on the hot path.
+ */
+export async function countCapabilityCall(
+    storage: Storage, sourceRef: string, ok: boolean, durationMs: number,
+): Promise<void> {
+    try {
+        const cap = await storage.getCapabilityBySourceRef(sourceRef);
+        if (!cap) return;
+        await storage.incrementCapabilityStats(cap.id, ok
+            ? { success: 1, error: 0, totalMs: durationMs }
+            : { success: 0, error: 1, totalMs: 0 });
+    } catch (err) {
+        logger.warn('capability direct call not counted', { sourceRef, error: String(err) });
+    }
+}
+
 export async function recordCapabilityInvocation(
     deps: { storage: Storage },
     cap: CapabilityRecord,

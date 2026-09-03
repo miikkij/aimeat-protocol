@@ -466,6 +466,20 @@ spec:
     });
 });
 
+// An app tool manifest is a capability source too: one discovery entry per tool, callable through
+// the contract door rather than here.
+const CAP_APP = 'e2e-cap-app-' + Math.random().toString(36).slice(2, 8);
+await test('An app tool manifest is written', async () => {
+    const { status, body } = await json('/v1/memory', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${ownerToken}` },
+        body: JSON.stringify({ key: `apps.${CAP_APP}.tools`, visibility: 'public', value: { version: 1, tools: [
+            { name: 'lookup', description: 'Looks a thing up for the caller.', inputSchema: { type: 'object', properties: { q: { type: 'string' } } }, outputSchema: { type: 'object' }, price: { morsels: 2 } },
+        ] } }),
+    });
+    assert(status === 200 || status === 201, `manifest write ${status}: ${JSON.stringify(body).slice(0, 200)}`);
+});
+
 // Trigger aggregator manually by importing and running it
 await test('Trigger aggregator via admin endpoint', async () => {
     const { status, body } = await json('/v1/admin/capabilities/aggregate', {
@@ -486,7 +500,8 @@ await test('Cortex capability has correct metadata', async () => {
     assert(status === 200, `status ${status}`);
     const cap = body.data;
     assert(cap.source.type === 'cortex', `source type: ${cap.source.type}`);
-    assert(cap.callable === true, 'cortex should be callable');
+    // A cortex is a library the app loads; the server never runs it, so the registry says so.
+    assert(cap.callable === false, 'cortex must not be callable: nothing on the server runs it');
     assert(cap.status === 'active', `status: ${cap.status}`);
     assert(cap.usage.includes('loadScript'), `usage should contain loadScript: ${cap.usage}`);
     // Verify exports were populated from cortex manifest
@@ -538,6 +553,22 @@ await test('Manifest update refreshes the aggregated capability', async () => {
     assert(cap.usage.includes('resetAll'), `usage should carry the new api_surface line: ${cap.usage.slice(0, 200)}`);
     const exportNames = (cap.exports ?? []).map((e: any) => e.name);
     assert(exportNames.includes('resetAll'), `exports should include resetAll, got: ${exportNames}`);
+});
+
+await test('The app tool is a discovery entry: app-tool source, not callable, usage names the contract door, cost carried', async () => {
+    const id = `app-tool:${ownerName}/${CAP_APP}:lookup`;
+    const { status, body } = await json(`/v1/capabilities/${encodeURIComponent(id)}`);
+    assert(status === 200, `status ${status}: ${JSON.stringify(body).slice(0, 200)}`);
+    const cap = body.data;
+    assert(cap.source.type === 'app-tool' && cap.callable === false, `source/callable: ${cap.source.type}/${cap.callable}`);
+    assert(/aimeat_app_tool_invoke/.test(cap.usage), `usage should name the tool door: ${cap.usage}`);
+    assert(cap.cost && cap.cost.morsels === 2, `cost: ${JSON.stringify(cap.cost)}`);
+    assert(cap.summary === 'Looks a thing up for the caller.', `summary: ${cap.summary}`);
+    const { body: list } = await json('/v1/capabilities?source_type=app-tool');
+    assert(list.data.capabilities.some((c: any) => c.id === id), 'app-tool filter does not list it');
+    const { body: callable } = await json('/v1/capabilities?callable=true&per_page=500');
+    assert(!callable.data.capabilities.some((c: any) => c.id === id || c.id === `cortex:${testCortexName}`), 'a discovery entry leaked into callable=true');
+    await json(`/v1/memory/${encodeURIComponent(`apps.${CAP_APP}.tools`)}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${ownerToken}` } });
 });
 
 await test('Cortex invoke from API returns BROWSER_ONLY', async () => {
@@ -660,6 +691,28 @@ await test('Extension capability exists and is callable', async () => {
     assert(body.data.callable === true, 'should be callable');
     assert(body.data.source.type === 'extension', 'source type');
     assert(body.data.inputSchema?.message?.type === 'string', `inputSchema: ${JSON.stringify(body.data.inputSchema)}`);
+});
+
+// Asserted the hole it closes (2026-09-03): the aggregator stored the extension's bare installer
+// name as ownerGhii, so the owner's own PUT was refused (ownerGhii !== resolveIdentity) — 315 of
+// 322 extension rows on aimeat.io carried the bare name, and "Hide from agents" was a 403.
+await test('Extension capability is owned by the installer\'s GHII, so the owner can change its visibility', async () => {
+    const capId = `ext:${testExtName}:echo`;
+    const { body } = await json(`/v1/capabilities/${capId}`);
+    assert(body.data.ownerGhii === `${ownerName}@${NODE_ID}`, `ownerGhii: ${body.data.ownerGhii}`);
+    const hide = await json(`/v1/capabilities/${capId}`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${ownerToken}` },
+        body: JSON.stringify({ visibility: 'private' }),
+    });
+    assert(hide.status === 200, `owner PUT status ${hide.status}: ${JSON.stringify(hide.body).slice(0, 200)}`);
+    assert(hide.body.data.visibility === 'private', `visibility after PUT: ${hide.body.data.visibility}`);
+    const show = await json(`/v1/capabilities/${capId}`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${ownerToken}` },
+        body: JSON.stringify({ visibility: 'public' }),
+    });
+    assert(show.status === 200 && show.body.data.visibility === 'public', `restore status ${show.status}`);
 });
 
 await test('Invoke extension via capability proxy', async () => {

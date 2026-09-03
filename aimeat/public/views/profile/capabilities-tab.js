@@ -2,265 +2,183 @@
  * @file capabilities-tab.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Profile tab showing all node capabilities (auto-aggregated from extensions,
- *   cortex, actions) plus capability policy settings and optional manual creation.
+ * @description Profile tab: the agent's view of this node. Everything an agent can find here by name
+ *   and call or commission, from GET /v1/capabilities, grouped by whoever provides it: an extension
+ *   with its actions, an app with its tools, an agent with its offers, a hand-added webhook. This
+ *   file is the state and the handlers (open a provider, try an action through the invoke proxy,
+ *   copy the agent's text, vouch, hide from agents, add or remove a hand-added one); the render is
+ *   capabilities/page.js and capabilities/rows.js.
+ * @structure CapabilitiesTab() — state (caps, policy, details, filters, queries, expanded, test, form) + handlers → renderPage(ctx)
+ * @usage registered in profile.js TABS as id 'capabilities'.
  * @version-history
- *   v1.0.0 — 2026-05-02 — Initial capability tab (CRUD form)
- *   v2.0.0 — 2026-05-02 — Redesigned: node capabilities listing, policy display, source filter
+ *   v3.0.0 — 2026-09-03 — Poster face (design canvas "AIMEAT Kyvykkyydet-sivu", direction A):
+ *     rows grouped by provider instead of one flat list of every action; app tools and agent offers
+ *     now in the registry; cortexes left to the Libraries page; the try, vouch, hide and remove doors
+ *     the API had and the page lacked; the policy said in sentences; the agent's rule copied.
  *   v2.1.0 — 2026-07-17 — Replace the native alert()/confirm() with the themed useToast +
- *     useConfirm (delete now a proper danger dialog, errors a toast); the inline-styled
- *     delete button becomes .btn-danger.btn-sm.cap-delete-btn (no inline style).
+ *     useConfirm (delete now a proper danger dialog, errors a toast).
+ *   v2.0.0 — 2026-05-02 — Redesigned: node capabilities listing, policy display, source filter
+ *   v1.0.0 — 2026-05-02 — Initial capability tab (CRUD form)
  */
-import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
-import htm from 'htm';
-import { EmptyState } from '/components/EmptyState.js';
-import { useToast } from '/components/Toast.js';
-import { useConfirm } from '/components/Modal.js';
-const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
-import { Spinner } from './shared.js';
-import { getSession } from '/js/services/auth.js';
+import { useConfirm } from '/components/Modal.js';
+import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
+import { getNodeUrl, getNodeId, getSession } from '/js/services/auth.js';
+import { copyToClipboard } from '/js/utils.js';
+import { onLiveUpdate } from '/lib/live-updates.js';
 import { swallowed } from '/js/swallowed.js';
+import { renderPage } from './capabilities/page.js';
+import { x, groupCapabilities, agentTextFor, schemaProps } from './capabilities/frame.js';
 
-const SOURCE_ICONS = { extension: '\u{1F50C}', cortex: '\u{1F9E0}', action: '\u{1F6E0}️', manual: '✍️', app: '\u{1F4F1}' };
-const POLICY_LABELS = {
-  publishing: { disabled: 'policyDisabled', self_only: 'policySelfOnly', moderated: 'policyModerated', open: 'policyOpen' },
-  publishers: { all_users: 'policyAllUsers', trusted_only: 'policyTrustedOnly', allowlist: 'policyAllowlist' },
-  webhooks: { disabled: 'policyDisabled', allowlist_only: 'policyAllowlistOnly', open: 'policyOpen' },
-};
+const emptyFilter = () => ({ who: '', use: '', priced: false, vouched: false });
+const emptyForm = () => ({ open: false, name: '', summary: '', webhookUrl: '', tags: '', visibility: 'public' });
 
-export default function CapabilitiesTab() {
-  const { showToast, ToastContainer } = useToast();
+export default function CapabilitiesTab({ session, showToast }) {
+  const sess = session || getSession();
   const { confirm, ConfirmUI } = useConfirm();
-  const [caps, setCaps] = useState([]);
+  const [caps, setCaps] = useState(null);
   const [policy, setPolicy] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('all');
-  const [search, setSearch] = useState('');
-  const [showCreate, setShowCreate] = useState(false);
-  const [newCap, setNewCap] = useState({ id: '', name: '', summary: '', callable: false, visibility: 'private', tags: '' });
-  const [detail, setDetail] = useState(null);
+  const [details, setDetails] = useState({});
+  const [expanded, setExpanded] = useState(null);
+  const [test, setTest] = useState(null);
+  const [vouched, setVouched] = useState({});
+  const [busy, setBusy] = useState(null);
+  const [filters, setFilters] = useState({ ext: emptyFilter(), app: emptyFilter(), agent: emptyFilter() });
+  const [queries, setQueries] = useState({ ext: '', app: '', agent: '' });
+  const [shown, setShownState] = useState({ ext: 20, app: 20, agent: 20 });
+  const [form, setFormState] = useState(emptyForm());
 
-  const loadCaps = useCallback(async () => {
-    const session = getSession();
-    if (!session) return;
+  const fail = (e, fallback) => showToast?.(e?.error?.message || e?.response?.error?.message || e?.message || fallback || t('profile.error'), true);
+  // The session's own GHII, or the owner name on this node's id when the session carries none.
+  const ownerGhii = sess?.ghii || (sess?.owner ? `${sess.owner}@${getNodeId()}` : '');
+
+  const load = useCallback(async () => {
     try {
-      const res = await session.fetch('/v1/capabilities?per_page=100');
-      setCaps(res.data?.capabilities || []);
-      if (res.data?.policy) setPolicy(res.data.policy);
-    } catch (err) { swallowed('capabilities-tab', err); setCaps([]); }
-    setLoading(false);
+      // Every page at once: the registry is a few hundred rows of a kilobyte each, and the grouping
+      // by provider needs all of them to count right.
+      const first = await apiGet('/v1/capabilities?per_page=500');
+      let rows = first?.data?.capabilities || [];
+      const total = first?.data?.total || rows.length;
+      for (let page = 2; rows.length < total && page < 20; page++) {
+        const more = await apiGet(`/v1/capabilities?per_page=500&page=${page}`);
+        const batch = more?.data?.capabilities || [];
+        if (!batch.length) break;
+        rows = rows.concat(batch);
+      }
+      setCaps(rows);
+      if (first?.data?.policy) setPolicy(first.data.policy);
+    } catch (e) { swallowed('capabilities: list', e); setCaps([]); }
   }, []);
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => onLiveUpdate(null, load), [load]);
 
-  useEffect(() => { loadCaps(); }, [loadCaps]);
-
-  useEffect(() => {
-    const handler = () => loadCaps();
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
-  }, [loadCaps]);
-
-  const handleCreate = async () => {
-    const session = getSession();
-    if (!session) return;
+  const loadDetail = async (c) => {
     try {
-      await session.fetch('/v1/capabilities', {
-        method: 'POST',
-        body: JSON.stringify({
-          id: newCap.id || undefined,
-          name: newCap.name,
-          summary: newCap.summary,
-          callable: newCap.callable,
-          visibility: newCap.visibility,
-          source: { type: 'manual', ref: 'manual', version: '1.0.0' },
-          tags: newCap.tags ? newCap.tags.split(',').map(s => s.trim()).filter(Boolean) : [],
-        }),
-      });
-      setShowCreate(false);
-      setNewCap({ id: '', name: '', summary: '', callable: false, visibility: 'private', tags: '' });
-      loadCaps();
+      const r = await apiGet(`/v1/capabilities/${encodeURIComponent(c.id)}`);
+      const d = r?.data;
+      if (d) setDetails((m) => ({ ...m, [c.id]: d }));
+      return d || null;
+    } catch (e) { swallowed('capabilities: detail', e); return null; }
+  };
+  const toggle = (g) => {
+    if (expanded === g.key) { setExpanded(null); setTest(null); return; }
+    setExpanded(g.key); setTest(null);
+    for (const c of g.members) if (!details[c.id]) loadDetail(c);
+  };
+
+  /* ── The try panel: one member through the invoke proxy, in the owner's own name ─────────── */
+  const toggleTest = (g, c) => {
+    if (test && test.id === c.id) { setTest(null); return; }
+    const { props } = schemaProps(details[c.id]?.inputSchema || c.inputSchema);
+    const sample = {};
+    for (const [k, v] of Object.entries(props)) sample[k] = v?.type === 'number' || v?.type === 'integer' ? 0 : v?.type === 'boolean' ? false : v?.type === 'array' ? [] : v?.type === 'object' ? {} : '';
+    setTest({ key: g.key, id: c.id, input: JSON.stringify(sample, null, 2), running: false, result: null, elapsed: 0 });
+  };
+  const setTestInput = (input) => setTest((s) => (s ? { ...s, input } : s));
+  const runTest = async () => {
+    if (!test) return;
+    let input;
+    try { input = test.input.trim() ? JSON.parse(test.input) : {}; } catch { showToast?.(x('tryBadJson'), true); return; }
+    setTest((s) => ({ ...s, running: true, result: null }));
+    const t0 = performance.now();
+    try {
+      const r = await apiPost(`/v1/capabilities/${encodeURIComponent(test.id)}/invoke`, { input });
+      setTest((s) => ({ ...s, running: false, elapsed: Math.round(performance.now() - t0), result: { ok: r?.ok !== false, text: JSON.stringify(r?.data ?? r?.error ?? r, null, 2) } }));
+      load();
     } catch (e) {
-      showToast(e.message || 'Failed to create', true);
+      setTest((s) => ({ ...s, running: false, elapsed: Math.round(performance.now() - t0), result: { ok: false, text: e?.response?.error?.message || e?.message || String(e) } }));
     }
   };
 
-  const handleDelete = (id) => {
-    confirm(t('capabilities.deleteConfirm'), async () => {
-      const session = getSession();
-      if (!session) return;
-      try {
-        await session.fetch('/v1/capabilities/' + encodeURIComponent(id), { method: 'DELETE' });
-        loadCaps();
-      } catch (e) {
-        showToast(e.message || 'Failed to delete', true);
+  /* ── Doors ───────────────────────────────────────────────────────────────────────────────── */
+  const copyForAgent = async (g) => {
+    for (const c of g.members) if (!details[c.id]) await loadDetail(c);
+    const ok = await copyToClipboard(agentTextFor(g, details));
+    showToast?.(ok === false ? x('copyFailed') : x('copiedToast', { name: g.name }), ok === false);
+  };
+  const vouch = async (g) => {
+    const already = g.members.some((c) => vouched[c.id]);
+    setBusy(g.key);
+    try {
+      for (const c of g.members) {
+        const r = already ? await apiDelete(`/v1/capabilities/${encodeURIComponent(c.id)}/vouch`) : await apiPost(`/v1/capabilities/${encodeURIComponent(c.id)}/vouch`, {});
+        if (r && r.ok === false) { fail(r); return; }
+        setVouched((m) => ({ ...m, [c.id]: !already }));
       }
-    }, { danger: true });
+      showToast?.(already ? x('unvouchedToast', { name: g.name }) : x('vouchedToast', { name: g.name }));
+      load();
+    } catch (e) { fail(e); } finally { setBusy(null); }
+  };
+  const setVisibility = async (g, visibility) => {
+    setBusy(g.key);
+    try {
+      for (const c of g.members) {
+        const r = await apiPut(`/v1/capabilities/${encodeURIComponent(c.id)}`, { visibility });
+        if (r && r.ok === false) { fail(r); return; }
+      }
+      showToast?.(visibility === 'public' ? x('shownToast', { name: g.name }) : x('hiddenToast', { name: g.name }));
+      load();
+    } catch (e) { fail(e); } finally { setBusy(null); }
+  };
+  const remove = async (g) => {
+    if (!await confirm(x('confirmRemove', { name: g.name }), { title: x('remove'), danger: true })) return;
+    setBusy(g.key);
+    try {
+      for (const c of g.members) {
+        const r = await apiDelete(`/v1/capabilities/${encodeURIComponent(c.id)}`);
+        if (r && r.ok === false) { fail(r); return; }
+      }
+      setExpanded(null);
+      showToast?.(x('removedToast', { name: g.name }));
+      load();
+    } catch (e) { fail(e); } finally { setBusy(null); }
+  };
+  const setForm = (patch) => setFormState((f) => ({ ...f, ...patch }));
+  const createManual = async () => {
+    setBusy('create');
+    try {
+      const r = await apiPost('/v1/capabilities', {
+        name: form.name.trim(), summary: form.summary.trim(), callable: !!form.webhookUrl.trim(),
+        visibility: form.visibility, webhookUrl: form.webhookUrl.trim() || undefined,
+        source: { type: 'manual', ref: 'manual', version: '1.0.0' },
+        tags: form.tags.split(',').map((s) => s.trim()).filter(Boolean),
+      });
+      if (r && r.ok === false) { fail(r); return; }
+      showToast?.(x('createdToast', { name: form.name.trim() }));
+      setFormState(emptyForm());
+      load();
+    } catch (e) { fail(e); } finally { setBusy(null); }
   };
 
-  if (loading) return html`<${Spinner} />`;
-
-  const filtered = caps.filter(c => {
-    if (filter !== 'all' && c.source?.type !== filter) return false;
-    if (search && !c.name.toLowerCase().includes(search.toLowerCase()) && !c.summary?.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
-  });
-
-  const sourceCounts = {};
-  for (const c of caps) {
-    const st = c.source?.type || 'manual';
-    sourceCounts[st] = (sourceCounts[st] || 0) + 1;
-  }
-
-  const canCreate = policy && policy.publishing !== 'disabled';
-
-  return html`
-    <div class="pf-section">
-      <div class="section-title">${t('capabilities.nodeCapabilities')}</div>
-      <div class="section-desc">${t('capabilities.nodeCapabilitiesDesc')}</div>
-
-      <!-- Filter bar -->
-      <div class="cap-filter-bar">
-        <input
-          type="text"
-          class="cap-search-input"
-          placeholder="${t('common.search') || 'Search...'}"
-          value=${search}
-          onInput=${e => setSearch(e.target.value)}
-        />
-        <select class="cap-filter-select" value=${filter} onChange=${e => setFilter(e.target.value)}>
-          <option value="all">${t('capabilities.allTypes')} (${caps.length})</option>
-          ${Object.entries(sourceCounts).map(([type, count]) => html`
-            <option value=${type}>${SOURCE_ICONS[type] || ''} ${t('capabilities.' + type) || type} (${count})</option>
-          `)}
-        </select>
-      </div>
-
-      <!-- Capability list -->
-      ${!filtered.length ? html`<${EmptyState} text=${t('capabilities.noCapabilities')} />` : ''}
-
-      ${filtered.map(c => {
-        const s = c.stats || {};
-        const srcType = c.source?.type || 'manual';
-        const icon = SOURCE_ICONS[srcType] || '';
-        const isSelected = detail?.id === c.id;
-        return html`
-          <div class="cap-item ${isSelected ? 'cap-item-selected' : ''}" onClick=${() => setDetail(isSelected ? null : c)}>
-            <div class="cap-item-header">
-              <div class="cap-item-name">
-                <span class="cap-source-icon">${icon}</span>
-                <strong>${escHtml(c.name)}</strong>
-                ${c.callable ? html`<span class="cap-badge cap-badge-callable">${t('capabilities.callable')}</span>` : ''}
-                ${srcType === 'cortex' ? html`<span class="cap-badge cap-badge-browser">${t('capabilities.browserOnly')}</span>` : ''}
-                ${c.status !== 'active' ? html`<span class="cap-badge cap-badge-status">${c.status}</span>` : ''}
-              </div>
-              <div class="cap-item-stats">
-                ${s.totalInvocations ? html`<span>${s.totalInvocations} ${t('capabilities.invocations').toLowerCase()}</span>` : ''}
-                ${c.trust?.vouchCount ? html`<span>${c.trust.vouchCount} ${t('capabilities.vouchCount').toLowerCase()}</span>` : ''}
-              </div>
-            </div>
-            ${c.summary ? html`<div class="cap-item-summary">${escHtml(c.summary)}</div>` : ''}
-            ${(c.tags || []).length ? html`
-              <div class="cap-item-tags">
-                ${c.tags.map(tag => html`<span class="cap-tag">${escHtml(tag)}</span>`)}
-              </div>
-            ` : ''}
-
-            ${isSelected ? html`
-              <div class="cap-detail" onClick=${e => e.stopPropagation()}>
-                <div class="cap-detail-row"><span class="cap-detail-label">ID:</span> <code class="cap-detail-code">${c.id}</code></div>
-                <div class="cap-detail-row"><span class="cap-detail-label">${t('capabilities.source')}:</span> ${srcType} ${c.source?.ref ? html` — <code class="cap-detail-code">${c.source.ref}</code>` : ''}</div>
-                <div class="cap-detail-row"><span class="cap-detail-label">${t('capabilities.visibility')}:</span> ${c.visibility === 'public' ? '\u{1F310} Public' : '\u{1F512} Private'}</div>
-                <div class="cap-detail-row"><span class="cap-detail-label">${t('capabilities.authRequired')}:</span> ${c.authRequired || 'registered'}</div>
-                ${c.usage ? html`<div class="cap-detail-row"><span class="cap-detail-label">Usage:</span> <code class="cap-detail-code">${c.usage}</code></div>` : ''}
-                ${c.whenToUse ? html`<div class="cap-detail-row"><span class="cap-detail-label">When to use:</span> ${escHtml(c.whenToUse)}</div>` : ''}
-                ${s.totalInvocations ? html`
-                  <div class="cap-detail-row">
-                    <span class="cap-detail-label">Stats:</span>
-                    ${s.totalInvocations} calls, ${s.successCount} ok, ${s.errorCount} errors
-                    ${s.avgResponseMs ? html` — avg ${Math.round(s.avgResponseMs)}ms` : ''}
-                  </div>
-                ` : ''}
-                ${c.inputSchema && Object.keys(c.inputSchema).length > 1 ? html`
-                  <details class="cap-schema-details">
-                    <summary>Input Schema</summary>
-                    <pre class="cap-schema-pre">${JSON.stringify(c.inputSchema, null, 2)}</pre>
-                  </details>
-                ` : ''}
-                ${c.outputSchema && Object.keys(c.outputSchema).length > 1 ? html`
-                  <details class="cap-schema-details">
-                    <summary>Output Schema</summary>
-                    <pre class="cap-schema-pre">${JSON.stringify(c.outputSchema, null, 2)}</pre>
-                  </details>
-                ` : ''}
-                ${c.source?.type === 'manual' ? html`
-                  <button class="btn-danger btn-sm cap-delete-btn" onClick=${() => handleDelete(c.id)}>
-                    ${t('capabilities.delete')}
-                  </button>
-                ` : ''}
-              </div>
-            ` : ''}
-          </div>
-        `;
-      })}
-
-      <!-- How capabilities are created -->
-      <div class="cap-info-section">
-        <div class="cap-info-title">${t('capabilities.howCreated')}</div>
-        <div class="cap-info-desc">${t('capabilities.howCreatedDesc')}</div>
-      </div>
-
-      <!-- Policy settings -->
-      ${policy ? html`
-        <div class="cap-info-section">
-          <div class="cap-info-title">${t('capabilities.policyTitle')}</div>
-          <div class="cap-policy-grid">
-            <div class="cap-policy-item">
-              <span class="cap-policy-label">${t('capabilities.policyPublishing')}</span>
-              <span class="cap-policy-value">${t('capabilities.' + (POLICY_LABELS.publishing[policy.publishing] || 'policyDisabled'))}</span>
-            </div>
-            <div class="cap-policy-item">
-              <span class="cap-policy-label">${t('capabilities.policyPublishers')}</span>
-              <span class="cap-policy-value">${t('capabilities.' + (POLICY_LABELS.publishers[policy.publishers] || 'policyAllUsers'))}</span>
-            </div>
-            <div class="cap-policy-item">
-              <span class="cap-policy-label">${t('capabilities.policyWebhooks')}</span>
-              <span class="cap-policy-value">${t('capabilities.' + (POLICY_LABELS.webhooks[policy.webhooks] || 'policyDisabled'))}</span>
-            </div>
-          </div>
-        </div>
-      ` : ''}
-
-      <!-- Create manual capability (if allowed) -->
-      ${canCreate ? html`
-        <div class="cap-create-section">
-          <button class="btn-outline" onClick=${() => setShowCreate(!showCreate)}>
-            ${showCreate ? t('common.cancel') : t('capabilities.create')}
-          </button>
-          ${showCreate ? html`
-            <div class="cap-create-form">
-              <input class="cap-form-input" placeholder="ID (optional)" value=${newCap.id} onInput=${e => setNewCap({ ...newCap, id: e.target.value })} />
-              <input class="cap-form-input" placeholder=${t('capabilities.name')} value=${newCap.name} onInput=${e => setNewCap({ ...newCap, name: e.target.value })} />
-              <textarea class="cap-form-input" placeholder=${t('capabilities.summary')} value=${newCap.summary} onInput=${e => setNewCap({ ...newCap, summary: e.target.value })} rows="2" />
-              <input class="cap-form-input" placeholder="Tags (comma-separated)" value=${newCap.tags} onInput=${e => setNewCap({ ...newCap, tags: e.target.value })} />
-              <label class="cap-form-checkbox">
-                <input type="checkbox" checked=${newCap.callable} onChange=${e => setNewCap({ ...newCap, callable: e.target.checked })} />
-                ${t('capabilities.callable')}
-              </label>
-              <select class="cap-form-input" value=${newCap.visibility} onChange=${e => setNewCap({ ...newCap, visibility: e.target.value })}>
-                <option value="private">Private</option>
-                <option value="public">Public</option>
-              </select>
-              <button class="btn-primary" onClick=${handleCreate} disabled=${!newCap.name}>
-                ${t('capabilities.create')}
-              </button>
-            </div>
-          ` : ''}
-        </div>
-      ` : ''}
-      <${ToastContainer} />
-      <${ConfirmUI} />
-    </div>
-  `;
+  const groups = caps ? groupCapabilities(caps, ownerGhii) : null;
+  const ctx = {
+    nodeUrl: getNodeUrl(), showToast, ConfirmUI,
+    groups, policy, details, expanded, test, vouched, busy, filters, queries, shown, form,
+    setFilter: (key, patch) => { setFilters((f) => ({ ...f, [key]: { ...f[key], ...patch } })); setShownState((s) => ({ ...s, [key]: 20 })); },
+    setQuery: (key, q) => { setQueries((m) => ({ ...m, [key]: q })); setShownState((s) => ({ ...s, [key]: 20 })); },
+    setShown: (key, n) => setShownState((s) => ({ ...s, [key]: n })),
+    toggle, toggleTest, setTestInput, runTest, copyForAgent, vouch, setVisibility, remove, setForm, createManual,
+  };
+  return renderPage(ctx);
 }

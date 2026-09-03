@@ -667,6 +667,10 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     capabilityWebhooks: (process.env.AIMEAT_CAPABILITY_WEBHOOKS ?? 'disabled') as 'disabled' | 'allowlist_only' | 'open',
     capabilityWebhookDomainAllowlist: (process.env.AIMEAT_CAPABILITY_WEBHOOK_DOMAIN_ALLOWLIST ?? '').split(',').map(s => s.trim()).filter(Boolean),
     capabilityLogRetentionDays: parseInt(process.env.AIMEAT_CAPABILITY_LOG_RETENTION_DAYS ?? '30', 10),
+    // Count a capability's DIRECT calls (an app or agent calling POST /v1/ext/<name>/<action>) into its
+    // stats as well as the proxy calls, which are always counted. Off by default: it is one write per
+    // call on the node's hottest path, and a node that does not read the numbers should not pay for them.
+    capabilityCallCounting: process.env.AIMEAT_CAPABILITY_CALL_COUNTING === 'true',
 
     // Agent Tasks (Phase 1)
     // Default 2h: orchestrated/multi-agent tasks (e.g. aimeat-app-conductor running

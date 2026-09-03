@@ -1,0 +1,113 @@
+/**
+ * @file capabilities-poster.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The Capabilities page in the poster face (cp- prefix; design canvas "AIMEAT
+ *   Kyvykkyydet-sivu", direction A). The shared parts come from organism.css's og- rules; this file
+ *   carries what the page adds: the shelves as rows grouped by provider (a status dot, the name, what
+ *   it gives with the member ids, the id form an agent uses, the doors), the panel that opens under a
+ *   row with its member table and try panel, the facts grid, the filter chips and the search line,
+ *   the hand-added form and the AI rule box.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-03 — Initial (replaces capabilities.css, the flat list's styles).
+ */
+
+.og-caps .og-door:disabled { opacity: .5; cursor: default; }
+.cp-hint { margin: .7rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--text-dim); }
+.cp-para { margin: 0 0 .6rem; font-size: .95rem; line-height: 1.55; color: var(--text); }
+.cp-empty { margin: 0; padding: .3rem 0 .6rem; font-size: .95rem; line-height: 1.55; font-weight: 600; color: var(--text-dim); }
+.cp-linkbtn { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; }
+.cp-dim { color: var(--text-dim); font-style: italic; }
+
+/* ── The status dot: green for an active provider, grey for one that is disabled or deprecated ── */
+.cp-dot { display: inline-block; width: .55rem; height: .55rem; border-radius: 50%; background: var(--text-dim); margin-right: .45rem; vertical-align: middle; }
+.cp-dot.is-on { background: var(--success-fg); }
+
+/* ── Filters and the search line ───────────────────────────────────────────────────────────── */
+.cp-facets { display: flex; flex-wrap: wrap; gap: .45rem; margin: .6rem 0 .3rem; }
+.cp-facet { font-family: var(--font-mono); font-size: .72rem; padding: .15rem .55rem; border: 1px solid var(--text); background: var(--card-bg); color: var(--text); cursor: pointer; line-height: 1.5; }
+.cp-facet em { font-style: normal; color: var(--text-dim); margin-left: .35rem; }
+.cp-facet.is-on { background: var(--sun); border-color: var(--sun); color: var(--on-sun); }
+.cp-facet.is-on em { color: var(--on-sun); opacity: .75; }
+.cp-search { display: flex; align-items: center; gap: 1rem; margin: .8rem 0 .6rem; }
+.cp-search .og-input { flex: 1 1 auto; min-width: 0; }
+.cp-search small { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); white-space: nowrap; }
+
+/* ── The shelves: provider, what it gives, for the agent, the doors; a panel under one row ──── */
+.cp-pl { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) minmax(10rem, .95fr) auto; gap: 0 .9rem; align-items: stretch; }
+.cp-p { display: contents; }
+.cp-p > div { padding: .7rem 0; border-bottom: 1px solid var(--border); min-width: 0; display: grid; align-content: center; }
+.cp-p--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.cp-p.is-open > div { border-bottom: 0; }
+.cp-p > .cp-nm { display: block; align-self: center; font-size: .95rem; font-weight: 800; color: var(--text); overflow-wrap: anywhere; }
+.cp-nm small { display: block; margin-top: .15rem; font-family: var(--font-mono); font-size: .7rem; font-weight: 400; color: var(--text-dim); }
+.cp-tag { display: inline-block; margin-left: .45rem; padding: .05rem .4rem; border: 1px solid var(--border); font-family: var(--font-mono); font-size: .66rem; font-weight: 500; color: var(--text-dim); vertical-align: middle; }
+.cp-p > .cp-ds { display: block; align-self: center; font-size: .85rem; line-height: 1.5; color: var(--text-dim); }
+.cp-acts { display: block; margin-top: .2rem; font-family: var(--font-mono); font-size: .7rem; color: var(--text); overflow-wrap: anywhere; }
+.cp-p > .cp-me { display: block; align-self: center; font-family: var(--font-mono); font-size: .72rem; line-height: 1.5; color: var(--text); overflow-wrap: anywhere; }
+.cp-me small { display: block; color: var(--text-dim); }
+.cp-p > .cp-go { display: flex; justify-content: flex-end; align-items: center; gap: .8rem; white-space: nowrap; }
+.cp-go .og-door { font-size: .72rem; }
+.cp-p > .cp-open { grid-column: 1 / -1; display: block; margin: 0 0 .4rem; padding: 1rem 1.2rem 1.1rem; border: 3px solid var(--text); box-shadow: 8px 8px 0 var(--sun); background: var(--card-bg); font-size: .9rem; line-height: 1.55; color: var(--text); }
+.cp-lead { margin: 0 0 .5rem; font-size: .95rem; line-height: 1.55; }
+.cp-open code { display: inline-block; max-width: 100%; margin: .1rem 0; font-family: var(--font-mono); font-size: .74rem; background: var(--bg-dim); padding: .1rem .35rem; overflow-wrap: anywhere; }
+.cp-open-doors { margin-top: 1rem; }
+
+/* ── The members of an opened provider: id, what it does, calls, the try door ──────────────── */
+.cp-act { display: grid; grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr) 6rem auto; gap: 0 .9rem; margin: .3rem 0 .2rem; font-size: .85rem; line-height: 1.5; }
+.cp-act > div { padding: .4rem 0; border-bottom: 1px solid var(--border); min-width: 0; overflow-wrap: anywhere; }
+.cp-act > div small { display: block; font-size: .76rem; line-height: 1.45; color: var(--text-dim); }
+.cp-act > .cp-n { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); white-space: nowrap; }
+.cp-act .og-door { font-size: .72rem; }
+.cp-test { margin: .8rem 0 .2rem; padding: .7rem .9rem; border: 2px solid var(--text); background: var(--bg-dim); }
+.cp-test .og-label { display: block; margin-bottom: .3rem; }
+.cp-test-in { width: 100%; box-sizing: border-box; font-family: var(--font-mono); font-size: .76rem; margin-bottom: .5rem; }
+.cp-test .og-doors { align-items: center; }
+.cp-out { margin: .5rem 0 0; padding: .6rem .8rem; border: 2px solid var(--text); background: var(--card-bg); font-family: var(--font-mono); font-size: .72rem; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 22rem; overflow: auto; color: var(--text); }
+
+/* ── The facts under an opened row, and the policy in words ────────────────────────────────── */
+.cp-kv { display: grid; grid-template-columns: minmax(7rem, 10rem) minmax(0, 1fr); gap: .7rem 1.2rem; align-items: start; margin-top: .8rem; }
+.cp-kv--wide { grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr); margin-top: 1rem; }
+.cp-k { font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); padding-top: .25rem; }
+.cp-v { font-size: .9rem; line-height: 1.5; color: var(--text); min-width: 0; overflow-wrap: anywhere; }
+.cp-v small { display: block; margin-top: .15rem; font-size: .8rem; line-height: 1.45; color: var(--text-dim); }
+.cp-v .og-crumb-link { font-size: inherit; }
+.cp-more { display: flex; align-items: center; gap: 1rem; margin-top: .8rem; }
+.cp-more small { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
+
+/* ── The hand-added form behind a fold ─────────────────────────────────────────────────────── */
+.cp-fold { display: flex; align-items: center; gap: .6rem; width: 100%; margin-top: 1rem; padding: .6rem 0; border: 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); background: none; font: inherit; font-size: .9rem; font-weight: 800; color: var(--text); text-align: left; cursor: pointer; }
+.cp-fold i { font-style: normal; font-family: var(--font-mono); color: var(--accent); }
+.cp-fold-r { margin-left: auto; font-family: var(--font-mono); font-size: .7rem; font-weight: 400; color: var(--text-dim); }
+.cp-form { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem 1.2rem; padding: 1rem 0 .4rem; }
+.cp-field { display: block; min-width: 0; }
+.cp-field .og-label { display: block; margin-bottom: .25rem; }
+.cp-field .og-input, .cp-field .og-textarea { width: 100%; box-sizing: border-box; }
+.cp-field--wide { grid-column: 1 / -1; }
+.cp-check { display: flex; align-items: center; gap: .5rem; font-size: .9rem; align-self: end; }
+.cp-form-doors { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.cp-form-doors .cp-hint { margin: 0; }
+
+/* ── The rule an AI gets ───────────────────────────────────────────────────────────────────── */
+.cp-rule { margin: .6rem 0 .2rem; padding: .9rem 1.1rem; border: 3px solid var(--text); background: var(--card-bg); }
+.cp-rule .og-label { display: block; margin-bottom: .3rem; }
+.cp-rule .cp-para { margin-bottom: .6rem; }
+
+/* ── Phone ─────────────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 860px) {
+  .cp-search { flex-wrap: wrap; }
+  .cp-pl { grid-template-columns: minmax(0, 1fr); }
+  .cp-p--head > div { display: none; }
+  .cp-p > .cp-nm, .cp-p > .cp-ds, .cp-p > .cp-me { border-bottom: 0; padding-bottom: .15rem; }
+  .cp-p > .cp-ds, .cp-p > .cp-me { padding-top: 0; }
+  .cp-p > .cp-go { justify-content: flex-start; padding-top: .1rem; flex-wrap: wrap; }
+  .cp-kv, .cp-kv--wide { grid-template-columns: 1fr; gap: .3rem 0; }
+  .cp-k { padding-top: .6rem; }
+  .cp-act { grid-template-columns: minmax(0, 1fr); }
+  .cp-act > div { border-bottom: 0; padding: .1rem 0; }
+  .cp-act > div:nth-child(4n) { border-bottom: 1px solid var(--border); padding-bottom: .5rem; margin-bottom: .2rem; }
+  .cp-form { grid-template-columns: 1fr; }
+  .cp-form-doors { flex-wrap: wrap; }
+  .cp-fold-r { display: none; }
+}
