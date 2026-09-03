@@ -1,0 +1,99 @@
+/**
+ * @file libraries-poster.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The Libraries page in the poster face (lb- prefix; design canvas "AIMEAT
+ *   Kirjastot-sivu", direction A). The shared parts come from organism.css's og- rules; this file
+ *   carries what the page adds: the three shelves as rows (a status dot, the name, what it gives,
+ *   the name the code calls it by, the doors), the panel that opens under a row with its proof
+ *   ledger and changelog, the filter chips and the search line, and the AI rule box.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-03 — Initial.
+ */
+
+.og-libs .og-door:disabled { opacity: .5; cursor: default; }
+.og-libs .og-mast-actions .og-slab { text-decoration: none; }
+.og-libs .og-doors > a { text-decoration: none; }
+.lb-hint { margin: .7rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--text-dim); }
+.lb-para { margin: 0 0 .6rem; font-size: .95rem; line-height: 1.55; color: var(--text); }
+.lb-empty { margin: 0; padding: .3rem 0 .6rem; font-size: .95rem; line-height: 1.55; font-weight: 600; color: var(--text-dim); }
+.lb-linkbtn { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; }
+.is-warn { color: var(--accent); }
+
+/* ── The status dot: green for a library that is served, grey for a deprecated one ────────── */
+.lb-dot { display: inline-block; width: .55rem; height: .55rem; border-radius: 50%; background: var(--text-dim); margin-right: .45rem; vertical-align: middle; }
+.lb-dot.is-on { background: var(--success-fg); }
+
+/* ── Filters and the search line ───────────────────────────────────────────────────────────── */
+.lb-facets { display: flex; flex-wrap: wrap; gap: .45rem; margin: .6rem 0 .3rem; }
+.lb-facet { font-family: var(--font-mono); font-size: .72rem; padding: .15rem .55rem; border: 1px solid var(--text); background: var(--card-bg); color: var(--text); cursor: pointer; line-height: 1.5; }
+.lb-facet em { font-style: normal; color: var(--text-dim); margin-left: .35rem; }
+.lb-facet.is-on { background: var(--sun); border-color: var(--sun); color: var(--on-sun); }
+.lb-facet.is-on em { color: var(--on-sun); opacity: .75; }
+.lb-search { display: flex; align-items: center; gap: 1rem; margin: .8rem 0 .6rem; }
+.lb-search .og-input { flex: 1 1 auto; min-width: 0; }
+.lb-search small { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); white-space: nowrap; }
+
+/* ── The shelves: name, what it gives, in the app, the doors; a panel under one row ─────────── */
+.lb-pl { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.35fr) minmax(9rem, .9fr) auto; gap: 0 .9rem; align-items: stretch; }
+.lb-p { display: contents; }
+.lb-p > div { padding: .7rem 0; border-bottom: 1px solid var(--border); min-width: 0; display: grid; align-content: center; }
+.lb-p--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.lb-p.is-open > div { border-bottom: 0; }
+.lb-p > .lb-nm { display: block; align-self: center; font-size: .95rem; font-weight: 800; color: var(--text); overflow-wrap: anywhere; }
+.lb-nm small { display: block; margin-top: .15rem; font-family: var(--font-mono); font-size: .7rem; font-weight: 400; color: var(--text-dim); }
+.lb-nm small.is-warn { color: var(--accent); }
+.lb-tag { display: inline-block; margin-left: .45rem; padding: .05rem .4rem; border: 1px solid var(--border); font-family: var(--font-mono); font-size: .66rem; font-weight: 500; color: var(--text-dim); vertical-align: middle; }
+.lb-p > .lb-ds { display: block; align-self: center; font-size: .85rem; line-height: 1.5; color: var(--text-dim); }
+.lb-p > .lb-me { display: block; align-self: center; font-family: var(--font-mono); font-size: .72rem; line-height: 1.5; color: var(--text); overflow-wrap: anywhere; }
+.lb-me small { display: block; color: var(--text-dim); }
+.lb-me small.is-dim { font-style: italic; }
+.lb-p > .lb-go { display: flex; justify-content: flex-end; align-items: center; gap: .8rem; white-space: nowrap; }
+.lb-go .og-door { font-size: .72rem; text-decoration: none; }
+.lb-p > .lb-open { grid-column: 1 / -1; display: block; margin: 0 0 .4rem; padding: 1rem 1.2rem 1.1rem; border: 3px solid var(--text); box-shadow: 8px 8px 0 var(--sun); background: var(--card-bg); font-size: .9rem; line-height: 1.55; color: var(--text); }
+.lb-lead { margin: 0 0 .4rem; font-size: .95rem; line-height: 1.55; }
+.lb-open code { display: block; width: fit-content; max-width: 100%; margin: .1rem 0; font-family: var(--font-mono); font-size: .74rem; background: var(--bg-dim); padding: .1rem .35rem; overflow-wrap: anywhere; }
+.lb-open .lb-v > code { display: inline-block; }
+.lb-open-doors { margin-top: 1rem; }
+.lb-out { margin: .5rem 0 0; padding: .6rem .8rem; border: 2px solid var(--text); background: var(--bg-dim); font-family: var(--font-mono); font-size: .72rem; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 22rem; overflow: auto; color: var(--text); }
+.lb-warnbox { margin-top: .5rem; padding: .5rem .8rem; border-left: 3px solid var(--accent); background: var(--warning-bg, var(--bg-dim)); font-size: .85rem; line-height: 1.5; color: var(--text); }
+
+/* ── The facts under an opened row ─────────────────────────────────────────────────────────── */
+.lb-kv { display: grid; grid-template-columns: minmax(7rem, 10rem) minmax(0, 1fr); gap: .7rem 1.2rem; align-items: start; margin-top: .8rem; }
+.lb-kv--wide { grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr); margin-top: 1rem; }
+.lb-k { font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); padding-top: .25rem; }
+.lb-v { font-size: .9rem; line-height: 1.5; color: var(--text); min-width: 0; overflow-wrap: anywhere; }
+.lb-v small { display: block; margin-top: .15rem; font-size: .8rem; line-height: 1.45; color: var(--text-dim); }
+.lb-v .og-crumb-link { font-size: inherit; }
+.lb-proof { display: grid; grid-template-columns: minmax(8rem, 11rem) 5rem 6rem 6.5rem minmax(0, 1fr); gap: 0 .8rem; font-family: var(--font-mono); font-size: .74rem; line-height: 1.5; margin-top: .2rem; }
+.lb-proof > div { padding: .3rem 0; border-bottom: 1px solid var(--border); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb-proof .ok { color: var(--success-fg); font-weight: 700; }
+.lb-proof .no { color: var(--accent); font-weight: 700; }
+.lb-cl { display: grid; grid-template-columns: minmax(6rem, 10rem) 6.5rem minmax(0, 1fr); gap: 0 .8rem; font-size: .85rem; line-height: 1.5; }
+.lb-cl > div { padding: .3rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
+.lb-cl .m { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); overflow-wrap: anywhere; }
+.lb-more { display: flex; align-items: center; gap: 1rem; margin-top: .8rem; }
+.lb-more small { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
+
+/* ── The rule an AI gets ───────────────────────────────────────────────────────────────────── */
+.lb-rule { margin: .6rem 0 .2rem; padding: .9rem 1.1rem; border: 3px solid var(--text); background: var(--card-bg); }
+.lb-rule .og-label { display: block; margin-bottom: .3rem; }
+.lb-rule .lb-para { margin-bottom: .6rem; }
+
+/* ── Phone ─────────────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 860px) {
+  .lb-search { flex-wrap: wrap; }
+  .lb-pl { grid-template-columns: minmax(0, 1fr); }
+  .lb-p--head > div { display: none; }
+  .lb-p > .lb-nm, .lb-p > .lb-ds, .lb-p > .lb-me { border-bottom: 0; padding-bottom: .15rem; }
+  .lb-p > .lb-ds, .lb-p > .lb-me { padding-top: 0; }
+  .lb-p > .lb-go { justify-content: flex-start; padding-top: .1rem; flex-wrap: wrap; }
+  .lb-kv, .lb-kv--wide { grid-template-columns: 1fr; gap: .3rem 0; }
+  .lb-k { padding-top: .6rem; }
+  .lb-proof { grid-template-columns: minmax(0, 1fr) 4rem; }
+  .lb-proof > div:nth-child(5n+3), .lb-proof > div:nth-child(5n+4), .lb-proof > div:nth-child(5n+5) { display: none; }
+  .lb-cl { grid-template-columns: 1fr; }
+  .lb-cl > div { border-bottom: 0; padding: .1rem 0; }
+  .lb-cl > div:nth-child(3n) { border-bottom: 1px solid var(--border); padding-bottom: .4rem; }
+}

@@ -9,6 +9,7 @@
  * @structure CREATIVE_PACKS: LibraryPack[]
  * @usage Imported by ./vendored.ts only. Do not import directly.
  * @version-history
+ *   v1.2.0 — 2026-09-03 — showcaseUrl on phaser4: the Design Book's Phaser page.
  *   v1.1.0 — 2026-09-02 — phaser4 points at aimeat-phaser as the paved path (wish-phaser4-design-
  *     book-page).
  *   v1.0.0 — 2026-08-29 — Extracted from vendored.ts when the leaflet pack pushed it past
@@ -288,6 +289,7 @@ export const CREATIVE_PACKS: LibraryPack[] = [
   },
   {
     id: 'phaser4',
+    showcaseUrl: 'https://design-book.apps.aimeat.io/',
     kind: 'vendored',
     category: 'game',
     title: 'Phaser 4 (game engine)',

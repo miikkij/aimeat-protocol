@@ -21,14 +21,46 @@
  *   const { apps, cortexes } = await dependentsOf(storage, 'extension', 'prh-api');
  * @version-history
  *   v1.0.0 — 2026-09-03 — Initial (dependency map, slice 1; brief doc-mtkr34qa1dg1).
+ *   v1.1.0 — 2026-09-03 — Library packs join the map: an app carrying a pack's include path
+ *     (`/v1/libs/aimeat-auth.js`, `/lib/phaser@4.min.js`) gets a 'pack' edge, the marker row carries
+ *     the scan generation, and the boot backfill re-reads sources scanned by an older generation
+ *     once. For the Libraries page's "who uses it" (design canvas "AIMEAT Kirjastot-sivu").
  */
 import type { Storage } from '../storage/interface.js';
 import type { AppManifest } from '../storage/interface.js';
 import type { DependencyEdge, DependencyFromKind, DependencyToKind } from '../storage/types/dependencies.js';
 import { logger } from '../utils/logger.js';
+import { getLibraryPacks } from '../data/library-packs.js';
 
 export interface Dep { name: string; version: string | null; via: 'source' | 'manifest' }
-export interface ExtractedDependencies { cortex: Dep[]; extensions: Dep[] }
+export interface ExtractedDependencies { cortex: Dep[]; extensions: Dep[]; packs: Dep[] }
+
+/**
+ * The scan generation. Bumped when the scan learns to see something new (2: library packs), so the
+ * boot backfill re-reads every source scanned by an older generation exactly once.
+ */
+export const SCAN_MARKER = 'scan:2';
+
+/**
+ * A library pack is recognised by the path of its include line with the origin stripped:
+ * `/v1/libs/aimeat-auth.js`, `/lib/phaser@4.min.js`, `/lib/daisyui@5.css`. Cortex-kind packs are
+ * left out here because the cortex address form already records them as cortex edges. Computed
+ * once; the registry is static.
+ */
+let packNeedles: Array<{ id: string; paths: string[] }> | null = null;
+function packNeedlesOnce(): Array<{ id: string; paths: string[] }> {
+  if (packNeedles) return packNeedles;
+  packNeedles = getLibraryPacks()
+    .filter(p => p.kind !== 'cortex')
+    .map(p => ({
+      id: p.id,
+      paths: p.include
+        .map(line => (line.match(/(?:src|href)="(?:\{\{BASE_URL\}\}|https?:\/\/[^/"]+)?(\/[^"]+)"/) ?? [])[1])
+        .filter((path): path is string => typeof path === 'string' && path.length > 1),
+    }))
+    .filter(p => p.paths.length > 0);
+  return packNeedles;
+}
 
 // A cortex name may carry one slash ("owner/name"), an extension name never does. The version,
 // when pinned, follows an @ and runs to the next slash or quote. `%2F` is a slash a caller encoded.
@@ -56,7 +88,13 @@ export function extractDependencies(text: string, declaredCortex: string[] = [])
   for (const name of declaredCortex) {
     if (typeof name === 'string' && /^[A-Za-z0-9._/-]+$/.test(name)) keep(cortex, name, null, 'manifest');
   }
-  return { cortex: [...cortex.values()], extensions: [...extensions.values()] };
+  // Library packs: a source that carries any of the pack's include paths uses the pack. The path
+  // is exact, so `/lib/phaser@3.min.js` and `/lib/phaser@4.min.js` are two different packs.
+  const packs: Dep[] = [];
+  for (const p of packNeedlesOnce()) {
+    if (p.paths.some(path => text.includes(path))) packs.push({ name: p.id, version: null, via: 'source' });
+  }
+  return { cortex: [...cortex.values()], extensions: [...extensions.values()], packs };
 }
 
 function edgesOf(fromKind: DependencyFromKind, fromRef: string, fromVersion: string, found: ExtractedDependencies): DependencyEdge[] {
@@ -64,9 +102,11 @@ function edgesOf(fromKind: DependencyFromKind, fromRef: string, fromVersion: str
   const edges: DependencyEdge[] = [
     ...found.cortex.map(d => ({ fromKind, fromRef, fromVersion, toKind: 'cortex' as DependencyToKind, toName: d.name, toVersion: d.version, via: d.via, updatedAt: now })),
     ...found.extensions.map(d => ({ fromKind, fromRef, fromVersion, toKind: 'extension' as DependencyToKind, toName: d.name, toVersion: d.version, via: d.via, updatedAt: now })),
+    ...found.packs.map(d => ({ fromKind, fromRef, fromVersion, toKind: 'pack' as DependencyToKind, toName: d.name, toVersion: d.version, via: d.via, updatedAt: now })),
   ];
-  // The marker: scanned, found nothing. Without it the backfill would scan this source on every boot.
-  if (!edges.length) edges.push({ fromKind, fromRef, fromVersion, toKind: 'none', toName: '', toVersion: null, via: 'source', updatedAt: now });
+  // The marker: scanned by THIS generation of the scan. Without it the backfill would read this
+  // source on every boot; with an older generation's marker it is read once more, then not again.
+  edges.push({ fromKind, fromRef, fromVersion, toKind: 'none', toName: SCAN_MARKER, toVersion: null, via: 'source', updatedAt: now });
   return edges;
 }
 
@@ -87,6 +127,7 @@ export async function refreshAppDependencies(storage: Storage, app: {
 export async function refreshCortexDependencies(storage: Storage, name: string, version: string, libs: Record<string, string>): Promise<ExtractedDependencies> {
   const found = extractDependencies(Object.values(libs).join('\n'));
   found.cortex = [];   // a cortex loading another cortex is not a thing the address form expresses
+  found.packs = [];    // a library file mentioning a pack path is documentation, not a load
   await storage.replaceDependencyEdges('cortex', name, edgesOf('cortex', name, version, found));
   return found;
 }
@@ -97,12 +138,13 @@ export async function forgetDependencies(storage: Storage, fromKind: DependencyF
 }
 
 /**
- * Scan every app and cortex the map has never seen. Runs at boot, in the background, once per
- * source: a source with rows (even the 'none' marker) is skipped, so a steady node does no work
- * here. A new node with 147 apps reads them once.
+ * Scan every app and cortex the CURRENT scan generation has never seen. Runs at boot, in the
+ * background, once per source: a source carrying this generation's marker is skipped, so a steady
+ * node does no work here. A new node with 147 apps reads them once; a node scanned by an older
+ * generation (before the scan saw library packs) reads them once more.
  */
 export async function backfillDependencyMap(storage: Storage): Promise<{ apps: number; cortexes: number }> {
-  const seen = new Set((await storage.listDependencyEdges()).map(e => `${e.fromKind}:${e.fromRef}`));
+  const seen = new Set((await storage.listDependencyEdges({ toKind: 'none', toName: SCAN_MARKER })).map(e => `${e.fromKind}:${e.fromRef}`));
   let apps = 0;
   let cortexes = 0;
   const { apps: list } = await storage.listApps({ limit: 10000, offset: 0 });
@@ -139,8 +181,8 @@ function splitAppRef(ref: string): { owner: string; filename: string } {
   return { owner: ref.slice(0, i), filename: ref.slice(i + 1) };
 }
 
-/** Who uses one cortex or extension. */
-export async function dependentsOf(storage: Storage, toKind: 'cortex' | 'extension', toName: string): Promise<Dependants> {
+/** Who uses one cortex, extension or library pack. */
+export async function dependentsOf(storage: Storage, toKind: 'cortex' | 'extension' | 'pack', toName: string): Promise<Dependants> {
   const edges = await storage.listDependencyEdges({ toKind, toName });
   return groupDependants(edges);
 }
@@ -155,7 +197,12 @@ function groupDependants(edges: DependencyEdge[]): Dependants {
   return { apps, cortexes };
 }
 
-export interface Requirements { cortex: Array<{ name: string; pinned: string | null; via: 'source' | 'manifest' }>; extensions: Array<{ name: string; pinned: string | null }> }
+export interface Requirements {
+  cortex: Array<{ name: string; pinned: string | null; via: 'source' | 'manifest' }>;
+  extensions: Array<{ name: string; pinned: string | null }>;
+  /** Library packs (SDK, vendored, bundle) the source includes; cortex-kind packs are under `cortex`. */
+  packs: Array<{ name: string }>;
+}
 
 /** What one app (or one cortex) needs. */
 export async function requirementsOf(storage: Storage, fromKind: DependencyFromKind, fromRef: string): Promise<Requirements> {
@@ -163,6 +210,7 @@ export async function requirementsOf(storage: Storage, fromKind: DependencyFromK
   return {
     cortex: edges.filter(e => e.toKind === 'cortex').map(e => ({ name: e.toName, pinned: e.toVersion, via: e.via })),
     extensions: edges.filter(e => e.toKind === 'extension').map(e => ({ name: e.toName, pinned: e.toVersion })),
+    packs: edges.filter(e => e.toKind === 'pack').map(e => ({ name: e.toName })),
   };
 }
 
@@ -171,24 +219,27 @@ export async function requirementsOf(storage: Storage, fromKind: DependencyFromK
  * name and by extension name, and requirements by app ref. One query, then maps.
  */
 export async function dependencyIndex(storage: Storage): Promise<{
-  byCortex: Map<string, Dependants>; byExtension: Map<string, Dependants>; byApp: Map<string, Requirements>;
+  byCortex: Map<string, Dependants>; byExtension: Map<string, Dependants>; byPack: Map<string, Dependants>; byApp: Map<string, Requirements>;
 }> {
   const edges = await storage.listDependencyEdges();
   const byCortex = new Map<string, DependencyEdge[]>();
   const byExtension = new Map<string, DependencyEdge[]>();
+  const byPack = new Map<string, DependencyEdge[]>();
   const byApp = new Map<string, Requirements>();
   for (const e of edges) {
     if (e.toKind === 'cortex') (byCortex.get(e.toName) ?? byCortex.set(e.toName, []).get(e.toName)!).push(e);
     else if (e.toKind === 'extension') (byExtension.get(e.toName) ?? byExtension.set(e.toName, []).get(e.toName)!).push(e);
+    else if (e.toKind === 'pack') (byPack.get(e.toName) ?? byPack.set(e.toName, []).get(e.toName)!).push(e);
     if (e.fromKind === 'app') {
-      const r = byApp.get(e.fromRef) ?? { cortex: [], extensions: [] };
+      const r = byApp.get(e.fromRef) ?? { cortex: [], extensions: [], packs: [] };
       if (e.toKind === 'cortex') r.cortex.push({ name: e.toName, pinned: e.toVersion, via: e.via });
       else if (e.toKind === 'extension') r.extensions.push({ name: e.toName, pinned: e.toVersion });
+      else if (e.toKind === 'pack') r.packs.push({ name: e.toName });
       byApp.set(e.fromRef, r);
     }
   }
   const group = (m: Map<string, DependencyEdge[]>) => new Map([...m].map(([k, v]) => [k, groupDependants(v)]));
-  return { byCortex: group(byCortex), byExtension: group(byExtension), byApp };
+  return { byCortex: group(byCortex), byExtension: group(byExtension), byPack: group(byPack), byApp };
 }
 
 /**

@@ -10,12 +10,19 @@
  * @structure DependencyEdge · DependencyFromKind · DependencyToKind · DependencyEdgeFilter
  * @version-history
  *   v1.0.0 — 2026-09-03 — Initial (dependency map, slice 1).
+ *   v1.1.0 — 2026-09-03 — 'pack' edges (library packs matched by include path) and the scan
+ *     generation on the marker row, so the Libraries page can say who uses a library.
  */
 
 /** Who depends: an app (fromRef "owner/filename") or a cortex (fromRef its name). */
 export type DependencyFromKind = 'app' | 'cortex';
-/** What is depended on; 'none' marks a scanned source with no dependencies. */
-export type DependencyToKind = 'cortex' | 'extension' | 'none';
+/**
+ * What is depended on: a cortex, a server extension, or a library pack (an SDK, vendored or bundle
+ * pack from the registry, matched by its include path); 'none' marks a scanned source with no
+ * dependencies, and its toName carries the scan generation ('scan:2') so a later, wider scan can
+ * tell an old scan from a current one.
+ */
+export type DependencyToKind = 'cortex' | 'extension' | 'pack' | 'none';
 
 export interface DependencyEdge {
   fromKind: DependencyFromKind;

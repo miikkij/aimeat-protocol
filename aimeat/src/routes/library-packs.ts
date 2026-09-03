@@ -18,6 +18,9 @@
  *   communityPackDetail() · libraryPackIds()
  * @usage app.use(libraryPacksRouter(config, storage)) from routes-loader.
  * @version-history
+ *   v1.3.0 — 2026-09-03 — Every pack carries `used_by` from the dependency map (apps that include
+ *     it, read from their source), and the index carries supersededBy and showcaseUrl. For the
+ *     Libraries page (design canvas "AIMEAT Kirjastot-sivu").
  *   v1.2.0 — 2026-08-15 — A community pack's proof ledger is read by KEY and by WRITER, not by the
  *     packId inside the value. `libpack.proofs.*` is an ordinary public memory prefix, so any owner
  *     could publish a record naming somebody else's pack and see their forged `proven_models`
@@ -37,6 +40,7 @@ import type { Storage, CortexExtensionRecord } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { getLibraryPacks, getLibraryPackIndex, getLibraryPack, renderPackText } from '../data/library-packs.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
+import { dependencyIndex, visibleAppRefs, usedBySummary } from '../services/dependency-map.js';
 import { logger } from '../utils/logger.js';
 
 /** The public memory prefix the proof ledger lives under — packProofsKey() in
@@ -165,7 +169,12 @@ export function libraryPacksRouter(config: AimeatConfig, storage: Storage): Rout
       community = exts.map(e => withCommunityProofs(communityIndexEntry(e, config.baseUrl), proofsByPack));
     } catch (err) { logger.warn('GET /v1/library-packs: community listing is best-effort — the curated index always serves', { error: String(err) }); }
 
-    let packs: Array<Record<string, unknown>> = [...staticIndex, ...community];
+    // Who uses each pack, from the dependency map: cortex-kind packs (node and community) are
+    // reached through the cortex address, every other kind through its include path. Counts cover
+    // everyone; names only what is listed to the public, since this door has no viewer.
+    const [idx, { visible }] = await Promise.all([dependencyIndex(storage), visibleAppRefs(storage)]);
+    const usedBy = (p: { id: string; kind: string }) => usedBySummary(p.kind === 'cortex' ? idx.byCortex.get(p.id) : idx.byPack.get(p.id), visible);
+    let packs: Array<Record<string, unknown>> = [...staticIndex, ...community].map(p => ({ ...p, used_by: usedBy(p as { id: string; kind: string }) }));
     if (kind) packs = packs.filter(p => p.kind === kind);
     if (category) packs = packs.filter(p => p.category === category);
     if (status) packs = packs.filter(p => p.status === status);
@@ -202,12 +211,14 @@ export function libraryPacksRouter(config: AimeatConfig, storage: Storage): Rout
     delete rest.promptLine;
     delete rest.promptGroup;
     delete rest.aiDoc;
+    const [idx, { visible }] = await Promise.all([dependencyIndex(storage), visibleAppRefs(storage)]);
     res.json(success(config.nodeId, {
       pack: {
         ...rest,
         scope: 'node',
         include: pack.include.map(l => renderPackText(l, config.baseUrl)),
         ai_doc: renderPackText(pack.aiDoc, config.baseUrl),
+        used_by: usedBySummary(pack.kind === 'cortex' ? idx.byCortex.get(pack.id) : idx.byPack.get(pack.id), visible),
       },
     }));
   });
