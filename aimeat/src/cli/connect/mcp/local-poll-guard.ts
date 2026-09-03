@@ -34,6 +34,8 @@
  *   try { entry = resolveAgent(req); }
  *   catch (err) { await refuseUnknownAgent(res, err, waitMs); return; }
  * @version-history
+ *   v1.0.1 — 2026-09-03 — The refusal hold is the floor or nothing, never the caller's own number.
+ *     Same promise, one fewer thing to reconstruct, and `?wait=` no longer reaches a timer.
  *   v1.0.0 — 2026-09-02 — Added after crewaimeat's 14,627 abandoned polls, when the same shape
  *     turned out to sit on all five of our loopback long-polls.
  */
@@ -57,11 +59,19 @@ export const REFUSAL_FLOOR_MS = 1_000;
 /**
  * Refuse a long-poll that could not name its agent, after a pause.
  *
- * `waitMs` is what the caller asked to wait: a caller that wanted less than the floor gets its own
- * (shorter) wait, because holding a request longer than it asked is its own kind of wrong.
+ * The hold is one of two durations and neither is the caller's number: the floor, or nothing at
+ * all. A caller that asked for less than the floor is refused immediately — it asked for a fast
+ * answer and a refusal IS the fast answer, with `Retry-After` saying when to come back. That is
+ * inside the old promise rather than a change to it: the rule was never to hold a request LONGER
+ * than it asked, and answering sooner has always been allowed.
+ *
+ * Saying it this way also keeps `?wait=` out of the timer entirely. It was bounded before, by a
+ * Math.min against the floor, but bounded-after-the-fact is a property a reader has to reconstruct
+ * and a scanner reports either way (CodeQL js/resource-exhaustion 1600); a duration that can only
+ * ever be one of two constants needs no reconstructing.
  */
 export async function refuseUnknownAgent(res: Response, err: unknown, waitMs: number): Promise<void> {
-    const hold = Math.max(0, Math.min(REFUSAL_FLOOR_MS, waitMs));
+    const hold = waitMs >= REFUSAL_FLOOR_MS ? REFUSAL_FLOOR_MS : 0;
     if (hold > 0) await new Promise(resolve => setTimeout(resolve, hold));
     // The socket may be gone: a caller that gave up during the hold is the normal case, not an error.
     if (res.writableEnded) return;

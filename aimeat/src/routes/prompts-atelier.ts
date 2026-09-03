@@ -18,6 +18,7 @@
 import type { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import { success } from '../middleware/envelope.js';
+import { sendPlainText } from '../middleware/plain-text.js';
 import { buildAtelierPrompt, buildAtelierSpecToken } from '../services/build-atelier-prompt.js';
 
 /**
@@ -31,7 +32,7 @@ export function registerAtelierPrompt(router: Router, config: AimeatConfig): voi
     const idea = typeof req.query.idea === 'string' ? req.query.idea : '';
     const { full, body } = buildAtelierPrompt(config, { lang, mode, idea });
     if (req.query.format === 'txt') {
-      res.type('text/plain; charset=utf-8').send(full);
+      sendPlainText(res, full);
       return;
     }
     res.json(success(config.nodeId, {
