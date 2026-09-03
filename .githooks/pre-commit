@@ -33,6 +33,9 @@
 #  17. One capability one impl       — pnpm check:shared-impl
 #  18. Run-time-chosen read targets  — pnpm check:runtime-read-targets
 #  19. v2 surfaces stay projections  — pnpm check:surface-focus
+#  19b. Caller resolved, not sub raw  — pnpm check:identity-resolution
+#  19c. Federation writes are signed  — pnpm check:federation-signatures
+#  19d. No new cycle or inversion    — pnpm check:deps
 #  20. An agent writes, page hears it — pnpm check:sse-parity
 #  21. No decision written out twice  — pnpm check:copied-logic
 #  21b. Stated counts match the code  — pnpm check:doc-counts
@@ -173,6 +176,28 @@ pnpm -s check:runtime-read-targets
 
 echo "[pre-commit] The v2 surfaces are still projections (check:surface-focus)…"
 pnpm -s check:surface-focus
+
+# The identity rule had been written in CLAUDE.md for months with nothing reading the places it
+# applies to, which is worse than an unwritten rule: it is read as if something enforced it. On an
+# agent token `sub` and the resolved identity are the same string, so the mistake passes every test
+# that uses an agent, and shows only on an owner session — where data filed under `alice` instead of
+# `alice@node-id` is not found again by list, search or update.
+echo "[pre-commit] A route resolves the caller rather than reading sub raw (check:identity-resolution)…"
+pnpm -s check:identity-resolution
+
+# check:route-scopes skips /v1/federation/* on purpose — a scope word is meaningless for a peer node —
+# and that correct decision left the largest unauthenticated WRITE surface here with no gate at all.
+# Each of these doors is either the owner's own action or a peer's signed one; neither is not allowed.
+echo "[pre-commit] Federation write doors are owner-gated or peer-signed (check:federation-signatures)…"
+pnpm -s check:federation-signatures
+
+# dependency-cruiser, bought rather than built: layer direction across the whole tree, import cycles
+# and modules nothing reaches — the last two of which nothing here has ever checked. Its baseline
+# (.dependency-cruiser-known-violations.json) holds the 335 that existed on 2026-09-04, so this gate
+# fails on a NEW one only. Regenerating that file with `pnpm deps:baseline` forgives the backlog and
+# is a decision, not maintenance.
+echo "[pre-commit] No new import cycle or layer inversion (check:deps)…"
+pnpm -s check:deps
 
 echo "[pre-commit] An agent writes, and the open page hears about it (check:sse-parity)…"
 pnpm -s check:sse-parity

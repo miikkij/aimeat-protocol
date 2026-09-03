@@ -29,6 +29,10 @@
  *   const jws = await signCompact(card, key.privateKey, key.kid);
  *   const token = await resolveToken(agent, owner, nodeUrl);
  * @version-history
+ *   v1.1.0 — 2026-09-04 — `resolveToken` tells a failed mint apart from a missing credential:
+ *     `MintFailedError` instead of the same null. They were one value, and on a live 62-identity
+ *     fleet the node's mint budget ran out during the joining burst and twenty-two agents holding
+ *     good keys were told "No stored token. Run: aimeat connect" and stopped for good.
  *   v1.0.0 — 2026-08-31 — Initial (Agent v2, V1).
  */
 import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync, readdirSync } from 'node:fs';
@@ -197,11 +201,31 @@ export async function mintAgentToken(
 }
 
 /**
+ * A credential could not be minted right now, and the key is fine.
+ *
+ * Its own type because the caller's next move depends on the difference: no credential at all is
+ * terminal and needs a person, while a mint that failed is transient and needs another attempt.
+ * Collapsing the two into `null` is what left twenty-two agents down holding good keys.
+ */
+export class MintFailedError extends Error {
+  constructor(public readonly agent: string, public readonly cause: unknown) {
+    super(`Could not mint a credential for ${agent} right now.`);
+    this.name = 'MintFailedError';
+  }
+}
+
+/**
  * The token to use for this agent right now.
  *
  * A v2 agent (one with a key on disk) mints, and holds the result in memory until shortly before it
  * expires. A v1 agent reads its stored bearer, exactly as before. Every caller in the daemon goes
  * through here so neither has to know which kind it is holding.
+ *
+ * TWO WAYS TO COME BACK EMPTY, AND THEY ARE NOT THE SAME NEWS. Null means there is no credential:
+ * no key, no stored bearer, and no amount of waiting will produce one. A throw means there IS a
+ * credential and it could not be used this second — the node was busy, the network blinked. Callers
+ * must keep them apart, because the remedy for the first is a person and the remedy for the second
+ * is a few seconds.
  */
 export async function resolveToken(agent: string, owner: string, nodeUrl: string): Promise<string | null> {
   const key = await getAgentKey(agent, owner);
@@ -216,8 +240,15 @@ export async function resolveToken(agent: string, owner: string, nodeUrl: string
     tokenCache.set(cacheKey, { token: minted.token, expiresAtMs: Date.now() + minted.expiresInSeconds * 1000 });
     return minted.token;
   } catch (err) {
+    // THROWN, NOT NULL. A key-holder that could not mint right now is not an agent with no
+    // credential, and returning the same value for both told the tunnel client the wrong story: it
+    // stopped for good with "No stored token. Run: aimeat connect" while the key on disk was
+    // perfectly good, and it never tried again. Measured on a real fleet on 2026-09-04 — the node's
+    // per-minute mint budget was spent by other traffic, 22 agents went down, and none came back
+    // without a restart. The one call that legitimately answers null is the v1 path above, where
+    // there genuinely is no file.
     logger.warn('agent-key: could not mint a credential', { agent, error: String(err) });
-    return null;
+    throw new MintFailedError(agent, err);
   }
 }
 
