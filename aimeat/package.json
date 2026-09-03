@@ -167,6 +167,7 @@
     "audit:report": "node ../security/semantic-audit/generate-report.mjs",
     "audit:triage": "node ../security/semantic-audit/ai-triage.mjs",
     "audit:full": "pnpm audit:triage && pnpm audit:report",
+    "audit:inventory": "tsx scripts/inventory/build-inventory.ts --json-only && tsx scripts/inventory/build-read-paths.ts && tsx scripts/inventory/build-field-reach.ts && tsx scripts/inventory/build-binding-time.ts",
     "audit:security": "tsx scripts/security-report.ts",
     "outdated:libs": "tsx scripts/check-lib-freshness.ts",
     "libs:usage": "tsx scripts/check-lib-usage.ts",
