@@ -90,6 +90,7 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_skill_publish: { title: 'Publish Skill', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     aimeat_skill_link: { title: 'Link Skill to Agent', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_skill_unlink: { title: 'Unlink Skill from Agent', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    aimeat_skill_update: { title: 'Change Skill Visibility', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 
     // ── Operator config enactment ──
     aimeat_operator_agent_configure: { title: 'Configure Agent (Propose-then-Confirm)', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },

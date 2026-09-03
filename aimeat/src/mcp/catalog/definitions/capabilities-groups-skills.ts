@@ -5,6 +5,7 @@
  * @description Capabilities, catalogue directories, consent, flags, sharing groups, chat instances, knowledge packages, skills registry, and operator propose-then-confirm tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.3.0 — 2026-09-03 — aimeat_skill_update: visibility without a republish (the PATCH door).
  *   2026-07-19 — AppDev pitfall KB (Phase 4): reserved-package guard + optional model tag on contribute; register pitfall tools
  *   v1.2.0 — 2026-08-11 — Remove aimeat_feedback_send/inbox. Reaching the operators is now an
  *     ordinary message to support@operators via aimeat_dm_send, answered in Messages.
@@ -467,6 +468,17 @@ export const capabilitiesGroupsSkillsTools: AimeatToolDefinition[] = [
         input: {
             ref: { type: 'string', required: true, description: 'Skill ref to detach.' },
             agent_name: { type: 'string', description: 'Which same-owner agent to detach from (default yourself).' },
+        },
+    },
+    {
+        name: 'aimeat_skill_update',
+        description: 'Change who may read a skill without publishing it again: owner (you and your agents), members (every signed-in identity on this node) or public (readable from other nodes too, and listed in the public skill index). The registry version stays as it is and nothing is snapshotted. Your owner\'s own user-scope skills; node scope is for operators. A workspace skill is always workspace-visible and is refused here.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            name: { type: 'string', required: true, description: 'The skill name (the bare name from its frontmatter).' },
+            visibility: { type: 'string', required: true, enum: ['owner', 'members', 'public'], description: 'Who may read it from now on.' },
+            scope: { type: 'string', enum: ['user', 'node'], description: 'Which registry the skill is in (default user, your owner\'s own).' },
         },
     },
     {

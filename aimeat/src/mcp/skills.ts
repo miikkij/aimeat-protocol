@@ -14,6 +14,8 @@
  *   import { registerSkillsTools } from './skills.js';
  *   registerSkillsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.1.0 -- 2026-09-03 -- aimeat_skill_update: visibility without a republish, the same door as
+ *     PATCH /v1/skills/:name.
  *   v1.0.0 -- 2026-07-05 -- Initial: Phase 2a registry tools (node + user scopes).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -27,7 +29,7 @@ import { emitChange } from '../services/event-bus.js';
 import { generateUploadToken } from '../services/upload-token.js';
 import {
   publishSkill, listSkills, listSkillLibrary, resolveSkillRef,
-  getAgentSkillLinks, linkSkillToAgent, unlinkSkillFromAgent,
+  getAgentSkillLinks, linkSkillToAgent, unlinkSkillFromAgent, setSkillVisibility,
   listSkillsByBinding, type SkillAccessor, type SkillScope,
 } from '../services/skills.js';
 
@@ -241,6 +243,30 @@ export function registerSkillsTools(
             emitChange('skills');
             emitResourceListChanged(agentGaii);
             return ok({ agent: agentName, links });
+        },
+    );
+
+    // ── aimeat_skill_update: visibility without a republish (the same door as PATCH /v1/skills/:name) ──
+    mcp.tool(
+        'aimeat_skill_update',
+        descriptionFor('aimeat_skill_update'),
+        {
+            name: z.string().describe('The skill name (the bare name from its frontmatter).'),
+            visibility: z.enum(['owner', 'members', 'public']).describe('Who may read it from now on.'),
+            scope: z.enum(['user', 'node']).optional().describe('Which registry the skill is in (default user, your owner\'s own).'),
+        },
+        annotationsFor('aimeat_skill_update'),
+        async ({ name, visibility, scope }) => {
+            if (!ownerName) return err('Could not resolve the calling agent\'s owner');
+            const acc = await accessor();
+            const targetScope = scope === 'node' ? 'node' : 'user';
+            if (targetScope === 'node' && !acc.isOperator) {
+                return err('Node-scope skills are operator-managed — your owner is not an operator on this node');
+            }
+            const summary = await setSkillVisibility(storage, config, targetScope, name, visibility, targetScope === 'user' ? ownerName : undefined);
+            if (!summary) return err(`Skill not found: ${name}`);
+            emitChange('skills');
+            return ok({ updated: true, skill: summary });
         },
     );
 }

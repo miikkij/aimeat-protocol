@@ -10,6 +10,8 @@
  * @usage
  *   import { coreTools } from './tool-call-defs-core.js';
  * @version-history
+ *   v1.4.0 -- 2026-09-03 -- The six skill entries moved to tool-call-defs-skills.ts unchanged (this
+ *     file crossed 800 lines when aimeat_skill_update joined them).
  *   v1.3.0 -- 2026-08-15 -- aimeat_storage_delete: DELETE /v1/storage/<key>, own namespace only.
  *   v1.2.0 -- 2026-08-11 -- aimeat_knowledge_contribute stops posting {entry_key, content} to
  *     POST /v1/knowledge/:id/contribute. That route shares a package with an organism and answered
@@ -728,66 +730,5 @@ export const coreTools: ConnectCliToolDefinition[] = [
     {
         name: 'aimeat_knowledge_links',
         handler: ({ client }, input) => client.get(`/v1/knowledge/${encodeURIComponent(requiredString(input, 'id'))}/links`),
-    },
-    {
-        name: 'aimeat_skill_publish',
-        handler: ({ client }, input) => client.post('/v1/skills', {
-            skill_md: requiredString(input, 'skill_md'),
-            files: input.files,
-            scope: optionalString(input, 'scope'),
-            visibility: optionalString(input, 'visibility'),
-            organism: optionalString(input, 'organism_id'),
-            ws: optionalString(input, 'workspace_id'),
-        }),
-    },
-    {
-        name: 'aimeat_skill_list',
-        handler: ({ client, agentPath }, input) => {
-            const view = optionalString(input, 'view') ?? 'library';
-            if (view === 'linked') return client.get(`/v1/agents/${agentPath}/skills/links`);
-            // `view=workspace` is published in the catalog and was not implemented on either
-            // connector door: it fell through to the library listing, so asking for one workspace's
-            // skills answered with the whole node's and looked like the workspace had none. The
-            // route spells its parameters `organism` and `ws`, not organism_id / workspace_id.
-            if (view === 'workspace') {
-                return client.get(`/v1/skills${query({
-                    scope: 'workspace',
-                    organism: optionalString(input, 'organism_id'),
-                    ws: optionalString(input, 'workspace_id'),
-                    binding: optionalString(input, 'binding'),
-                })}`);
-            }
-            return client.get(`/v1/skills${query({
-                scope: view === 'mine' ? 'user' : 'library',
-                binding: optionalString(input, 'binding'),
-            })}`);
-        },
-    },
-    {
-        name: 'aimeat_skill_get',
-        handler: ({ client }, input) => {
-            const ref = optionalString(input, 'ref');
-            const manifestOnly = optionalBoolean(input, 'manifest_only') ? '&manifest_only=true' : '';
-            if (ref) {
-                const node = ref.match(/^node:([a-z0-9-]+)$/);
-                if (node) return client.get(`/v1/skills/${encodeURIComponent(node[1])}?scope=node${manifestOnly}`);
-                const user = ref.match(/^user:([a-z0-9_-]+)\/([a-z0-9-]+)$/);
-                if (user) return client.get(`/v1/skills/${encodeURIComponent(user[2])}?scope=user&owner=${encodeURIComponent(user[1])}${manifestOnly}`);
-                const ws = ref.match(/^ws:([A-Za-z0-9-]+)\/([A-Za-z0-9-]+)\/([a-z0-9-]+)$/);
-                if (ws) return client.get(`/v1/skills/${encodeURIComponent(ws[3])}?scope=workspace&organism=${encodeURIComponent(ws[1])}&ws=${encodeURIComponent(ws[2])}${manifestOnly}`);
-                throw new Error(`Not a valid skill ref: ${ref}`);
-            }
-            return client.get(`/v1/skills/${encodeURIComponent(requiredString(input, 'name'))}?${manifestOnly.replace('&', '')}`);
-        },
-    },
-    {
-        name: 'aimeat_skill_link',
-        handler: ({ client, agentPath }, input) => client.post(`/v1/agents/${agentPath}/skills`, {
-            ref: requiredString(input, 'ref'),
-        }),
-    },
-    {
-        name: 'aimeat_skill_unlink',
-        handler: ({ client, agentPath }, input) => client.delete(`/v1/agents/${agentPath}/skills?ref=${encodeURIComponent(requiredString(input, 'ref'))}`),
     },
 ];

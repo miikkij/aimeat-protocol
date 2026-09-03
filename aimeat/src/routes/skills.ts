@@ -19,6 +19,9 @@
  *   import { skillsRouter } from '../routes/skills.js';
  *   app.use(skillsRouter(config, storage));
  * @version-history
+ *   v1.2.0 -- 2026-09-03 -- PATCH /v1/skills/:name changes visibility without a republish (own user
+ *     skill; node scope for operators); GET /v1/skills?include=links adds each library skill's
+ *     `linkedBy` (the caller's agents holding the ref). Design canvas "AIMEAT Taidot-sivu".
  *   v1.1.0 -- 2026-07-06 -- GET /v1/skills/:name/zip — upload-ready skill ZIP ({name}/SKILL.md …)
  *     for claude.ai skill uploads and manual installs into ~/.claude/skills; supports @semver pins.
  *   v1.0.0 -- 2026-07-05 -- Initial: Phase 2a registry REST surface (node + user scopes).
@@ -27,7 +30,7 @@ import { Router, type Response } from 'express';
 import { ZipArchive } from 'archiver';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth } from '../auth/middleware.js';
+import { requireAuth, requireScope } from '../auth/middleware.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
@@ -36,7 +39,7 @@ import { SkillValidationError } from '../services/skill-md.js';
 import {
   publishSkill, deleteSkill, listSkills, listSkillLibrary, resolveSkillRef,
   getAgentSkillLinks, linkSkillToAgent, unlinkSkillFromAgent, resolveAgentSkills,
-  listSkillsByBinding, SkillAccessError, type SkillAccessor, type SkillScope,
+  listSkillsByBinding, setSkillVisibility, SkillAccessError, type SkillAccessor, type SkillScope,
 } from '../services/skills.js';
 
 export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
@@ -86,7 +89,8 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
       }
       const scope = (req.query.scope as string) ?? 'library';
       if (scope === 'library') {
-        const library = await listSkillLibrary(storage, config, accessor);
+        // ?include=links: each skill also says which of the caller's agents hold a ref to it.
+        const library = await listSkillLibrary(storage, config, accessor, { links: req.query.include === 'links' });
         res.json(success(config.nodeId, { library }));
         return;
       }
@@ -261,6 +265,45 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
         archive.append(content, { name: `${bareName}/${path}` });
       }
       await archive.finalize();
+    } catch (err) {
+      sendSkillError(res, err);
+    }
+  });
+
+  /* ── PATCH /v1/skills/:name — visibility without a republish. Body: { visibility }. Own user
+   *    skill, or node scope for operators; a workspace skill is always workspace-visible. ── */
+  router.patch('/v1/skills/:name', requireAuth(), requireScope('memory:write'), async (req, res) => {
+    try {
+      const name = req.params.name as string;
+      const accessor = accessorOf(req);
+      if (!accessor.ownerName) {
+        res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Authentication required'));
+        return;
+      }
+      const visibility = req.body?.visibility;
+      if (!['owner', 'members', 'public'].includes(visibility)) {
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'visibility must be owner, members, or public'));
+        return;
+      }
+      const scopeQ = req.query.scope;
+      if (scopeQ !== undefined && scopeQ !== 'user' && scopeQ !== 'node') {
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'scope must be user or node; a workspace skill is always visible to its workspace'));
+        return;
+      }
+      const scope: 'node' | 'user' = scopeQ === 'node' ? 'node' : 'user';
+      if (scope === 'node' && !accessor.isOperator) {
+        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Skills shared with the whole node are looked after by whoever runs it. Ask them, or publish this one under your own name instead.'));
+        return;
+      }
+      // The owner comes from the session, never from the request: a user-scope skill under
+      // another name is not this principal's to change, whatever the query says.
+      const summary = await setSkillVisibility(storage, config, scope, name, visibility, scope === 'user' ? accessor.ownerName : undefined);
+      if (!summary) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Skill not found: ${name}`));
+        return;
+      }
+      emitChange('skills');
+      res.json(success(config.nodeId, { skill: summary }));
     } catch (err) {
       sendSkillError(res, err);
     }

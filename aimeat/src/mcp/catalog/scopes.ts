@@ -260,6 +260,7 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_skill_link:                        'memory:write',
     aimeat_skill_publish:                     'memory:write',
     aimeat_skill_unlink:                      'memory:write',
+    aimeat_skill_update:                      'memory:write',
     aimeat_workspace_publish:                 'memory:write',
     aimeat_workspace_revert_to_draft:         'memory:write',
     aimeat_workspace_write:                   'memory:write',

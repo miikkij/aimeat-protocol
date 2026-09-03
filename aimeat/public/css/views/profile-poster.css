@@ -400,13 +400,13 @@
 /* ── The second tour (every remaining index page): discover, ecosystem, skills, capabilities,
    libraries, extensions, packages, the AI provider settings, boards ─────────────────────── */
 /* Rows */
-.pf .dsc-item, .pf .pf-eco-card, .pf .pf-skl-row, .pf .pf-or-mrow, .pf .pf-eco-adv-item, .pf .pf-eco-auto-job, .pf .pj-app-card, .pf .pf-skl-file-row {
+.pf .dsc-item, .pf .pf-eco-card, .pf .pf-or-mrow, .pf .pf-eco-adv-item, .pf .pf-eco-auto-job, .pf .pj-app-card {
   background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0; box-shadow: none; padding: 0.9rem 0; margin-bottom: 0;
 }
-.pf .dsc-item:hover, .pf .pf-eco-card:hover, .pf .pf-skl-row:hover, .pf .pf-or-mrow:hover { border-color: var(--accent); background: none; box-shadow: none; transform: none; }
+.pf .dsc-item:hover, .pf .pf-eco-card:hover, .pf .pf-or-mrow:hover { border-color: var(--accent); background: none; box-shadow: none; transform: none; }
 .pf .pf-or-mrow { border-bottom-width: 1px; border-bottom-color: var(--border); padding: 0.5rem 0; }
 .pf .pf-or-mrow--on { background: var(--sun); color: var(--on-sun); padding-left: 0.5rem; }
-.pf .dsc-item-title, .pf .pf-eco-name, .pf .pf-skl-name { font-weight: var(--font-poster-strong-weight); }
+.pf .dsc-item-title, .pf .pf-eco-name { font-weight: var(--font-poster-strong-weight); }
 /* Sections and panels */
 .pf .pf-or-wrapper, .pf .pf-or-section, .pf .pf-eco-section, .pf .pf-skl-section, .pf .pkg-section, .pf .cap-create-section, .pf .pf-eco-auto-flow-card, .pf .pf-eco-mcp, .pf .pf-eco-recipe {
   background: none; border: 0; border-top: 3px solid var(--text); border-radius: 0; box-shadow: none; padding: 1rem 0 1.25rem;
@@ -431,11 +431,11 @@
 .pf .dsc-facet:hover, .pf .dsc-scope-btn:hover, .pf .pkg-nav button:hover:not(.active), .pf .lib-tier-btn:hover { background: none; border-color: var(--accent); color: var(--accent); }
 .pf .pkg-nav button, .pf .dsc-scope-btn, .pf .lib-tier-btn { font-family: var(--font-showroom-body); font-weight: var(--font-poster-text-weight); font-size: 0.8rem; padding: 4px 10px; }
 /* The quiet actions the older tabs draw as small framed buttons */
-.pf .ext-card-actions button, .pf .pf-skl-actions button, .pf .pkg-card-actions button:not(.btn-primary), .pf .pf-eco-adv-actions button {
+.pf .ext-card-actions button, .pf .pkg-card-actions button:not(.btn-primary), .pf .pf-eco-adv-actions button {
   background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0; box-shadow: none; padding: 0 0 1px;
   font-family: var(--font-showroom-body); font-weight: var(--font-poster-strong-weight); font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text);
 }
-.pf .ext-card-actions button:hover, .pf .pf-skl-actions button:hover, .pf .pkg-card-actions button:not(.btn-primary):hover { background: none; color: var(--accent); border-color: var(--accent); }
+.pf .ext-card-actions button:hover, .pf .pkg-card-actions button:not(.btn-primary):hover { background: none; color: var(--accent); border-color: var(--accent); }
 .pf .ext-card-actions button.danger { color: var(--accent); border-color: var(--accent); }
 /* Search fields the older tabs draw as boxes */
 .pf .dsc-search, .pf .cap-search-input, .pf .lib-search, .pf .pf-or-msearch, .pf .pkg-filters input, .pf .fnd-cal-create-input {

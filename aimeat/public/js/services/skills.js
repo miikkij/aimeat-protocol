@@ -9,15 +9,24 @@
  * @usage
  *   import * as skillsService from '/js/services/skills.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-03 -- getLibrary({ links }) asks for each skill's linkedBy; setSkillVisibility()
+ *     is the PATCH door (visibility without a republish).
  *   v1.0.0 -- 2026-07-05 -- Initial creation (Skills feature Phase 2b)
  */
-import { apiGet, apiPost, apiDelete } from '/js/api.js';
+import { apiGet, apiPost, apiPatch, apiDelete } from '/js/api.js';
 import { authHeaders } from '/js/services/auth.js';
 
 /** The library: everything the caller can load, grouped by scope { node, user }. */
-export async function getLibrary() {
-  const res = await apiGet('/v1/skills?scope=library');
-  return res?.data?.library ?? { node: [], user: [] };
+export async function getLibrary({ links = false } = {}) {
+  // links: each skill also says which of the owner's agents hold a ref to it (linkedBy).
+  const res = await apiGet(`/v1/skills?scope=library${links ? '&include=links' : ''}`);
+  return res?.data?.library ?? { node: [], user: [], workspace: [] };
+}
+
+/** Change who may read a node- or user-scope skill without a republish (PATCH; the version stays). */
+export async function setSkillVisibility(name, scope, visibility) {
+  const res = await apiPatch(`/v1/skills/${encodeURIComponent(name)}?scope=${encodeURIComponent(scope || 'user')}`, { visibility });
+  return res?.data?.skill ?? res;
 }
 
 /** One scope's listing (manifests only). */

@@ -42,6 +42,7 @@ import { loadConfig, loadAgentByName, type AimeatConnectConfig } from './config.
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
 import { agentTools } from './tool-call-defs-agent.js';
 import { coreTools } from './tool-call-defs-core.js';
+import { skillTools } from './tool-call-defs-skills.js';
 import { organismTools } from './tool-call-defs-organism.js';
 import { appTools } from './tool-call-defs-apps.js';
 import { commerceCliTools } from './tool-call-defs-commerce.js';
@@ -62,6 +63,7 @@ import { withProvenanceCarrying } from './ai-provenance-carry.js';
 export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     ...agentTools,
     ...coreTools,
+    ...skillTools,
     ...organismTools,
     ...appTools,
     ...commerceCliTools,
