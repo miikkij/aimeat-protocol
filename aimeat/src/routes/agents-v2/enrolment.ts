@@ -50,8 +50,19 @@ import { emitChange } from '../../services/event-bus.js';
 import { cardUri, jwksUri } from './card.js';
 import { logger } from '../../utils/logger.js';
 
-/** More cards than any grant can legitimately carry. A bound, not a policy. */
-const MAX_CARDS_PER_SUBMIT = 20;
+/**
+ * More cards than any grant can legitimately carry. A bound, not a policy.
+ *
+ * EXPORTED, because a second cap sat on the same journey and did not know about this one. The
+ * migration press batched to `agentMigrateMaxPerPress` (50), the connector built fifty cards, and
+ * this line refused them in nought seconds — reported to the owner as "your connector refused the
+ * move", which named the wrong party for a refusal made here. Fifty-one agents could not be moved
+ * by the button that exists to move them, and ten at a time worked the whole time.
+ *
+ * The press reads this rather than being kept in step with it: two numbers a person has to
+ * reconcile are two numbers that will disagree the day one of them changes.
+ */
+export const MAX_CARDS_PER_SUBMIT = 20;
 
 /** One card that did not pass, in the shape the caller can act on. */
 interface RejectedCard {
