@@ -34,6 +34,9 @@
  *     discovery-file lifecycle, signal handling.
  * @usage Called by mcp/server.ts `runServe()` when `--http`/`--daemon` is set.
  * @version-history
+ *   2026-09-03 — One tunnel client per NODE, not per agent (./tunnel-hub.ts). /local/status reports
+ *     each identity's own status rather than its socket's, which on a shared socket is not the
+ *     same thing — a deleted agent read `online` until this.
  *   v1.10.0 — 2026-09-02 — An MCP session carries an IDENTITY. The 28 tool modules resolve an agent
  *     once, at registration time, with no identifier; with two owners each holding a default agent
  *     that resolve refuses, and the refusal arrived as an unhandled throw inside a tool module's
@@ -108,7 +111,8 @@ import { join } from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { ConnectTunnelClient } from '../tunnel-client.js';
+import { ConnectTunnelClient, type TunnelIdentity } from '../tunnel-client.js';
+import { TunnelHub, statusOfIdentity, principalRow } from './tunnel-hub.js';
 import { resolveToken } from '../agent-key.js';
 import { getConfigDir, type AimeatPerAgentConfig } from '../config.js';
 import { AimeatClient } from '../api-client.js';
@@ -234,20 +238,26 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
    * else has to be restarted or rebuilt. That is the whole point of the extraction — adding an
    * agent used to mean a restart, and a restart drops every other agent's socket.
    */
+  /** One socket per node, shared by every identity on it. See ./tunnel-hub.ts. */
+  const hubs = new TunnelHub();
   async function attachRegistered(entry: RegisteredAgent): Promise<void> {
     const ch = new AgentChannel(entry);
     channels.set(entry.gaii, ch);
     // Server-initiated invokes (Crew tab validate/try) queue here and are answered back over the
     // same socket. `tunnel` is assigned just below; the reply closure only runs after it exists.
-    const inv = new InvokeChannel((id, ok, result) => tunnel.replyInvoke(id, ok, result));
+    // Answered on whichever socket this identity ended up on, named so a shared one routes it.
+    const inv = new InvokeChannel((id, ok, result) => ch.tunnel?.replyInvoke(id, ok, result, entry.gaii));
     invokeChannels.set(entry.gaii, inv);
 
-    const tunnel = new ConnectTunnelClient({
-      nodeUrl: entry.config.node_url,
+    // What this identity needs from a socket, whichever socket it turns out to be. Built once and
+    // handed either to the shared hub (as an attachment) or to a private client (as its options) —
+    // the handlers are the same either way, which is the point: nothing below this line knows or
+    // cares how many identities share the wire.
+    const identity: TunnelIdentity = {
+      gaii: entry.gaii,
       // Not getToken(): a v2 agent has no stored bearer, it has a key and mints a credential per
       // use. resolveToken answers for both kinds, so this line does not have to know which it is.
       getToken: () => resolveToken(entry.agent, entry.owner, entry.config.node_url),
-      label: `tunnel:${displayName(entry)}`,
       onInvoke: (frame) => {
         // The one capability the DAEMON answers itself rather than offering to a crew runtime:
         // taking on new agents. A crew cannot do it — it has no access to the keychain and no way
@@ -258,7 +268,7 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
             forward: (m, p, o) => tunnel.forward(m, p, o),
             attach: (a) => attachNewAgent(a),
             version: freshness.stamp?.version ?? undefined,
-          }).then(r => { if (id) tunnel.replyInvoke(id, r.ok, r.result); });
+          }).then(r => { if (id) ch.tunnel?.replyInvoke(id, r.ok, r.result, entry.gaii); });
           return;
         }
         inv.handleInvoke(frame);
@@ -279,7 +289,7 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
         // Per-socket subscriptions die with the old socket — re-send them after every (re)connect.
         ch.reconnects = connectCount;
         const subs = ch.getSubscriptions();
-        if (subs.length) tunnel.subscribe(subs);
+        if (subs.length) ch.tunnel?.subscribe(subs, entry.gaii);
       },
       onAuthFailure: () => {
         // Token died mid-session: fall back to direct fetch so already-running
@@ -288,6 +298,32 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
         ch.transportMode = 'auth_failed';
         entry.client.setTransport(null);
       },
+    };
+
+    // THE SHARED SOCKET FIRST. `attach` costs one frame on a connection that already exists, and
+    // on the way it removes the restart: the tunnel set used to be built from the registry at
+    // startup, so taking on a new agent meant restarting the daemon and briefly dropping every
+    // other agent it served (measured 2026-08-31, 49 of them).
+    const joined = await hubs.join(entry, identity);
+    if (joined) {
+      ch.tunnel = joined.client;
+      ch.transportMode = 'tunnel';
+      entry.client.setTransport({ request: (m, pth, o) => joined.client.forward(m, pth, o ?? {}, joined.who) });
+      console.error(`[serve] ${entry.agent}@${entry.owner}: on the shared tunnel to ${entry.config.node_url} (${joined.client.identityCount()} identities, 1 socket)`);
+      return;
+    }
+
+    // NO SHARED SOCKET: an older node, or an attach the node refused. One socket for this identity,
+    // exactly as before this change — the degradation is per agent and nobody else notices.
+    const tunnel = new ConnectTunnelClient({
+      nodeUrl: entry.config.node_url,
+      getToken: identity.getToken,
+      label: `tunnel:${displayName(entry)}`,
+      onInvoke: identity.onInvoke,
+      onDeliver: identity.onDeliver,
+      onBacklog: identity.onBacklog,
+      onConnect: identity.onConnect,
+      onAuthFailure: identity.onAuthFailure,
     });
 
     const outcome = await tunnel.start();
@@ -321,7 +357,7 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
    * new one. Deliberately narrow — it touches nothing belonging to any other agent on this daemon.
    */
   function detachAgent(gaii: string): void {
-    void channels.get(gaii)?.tunnel?.close().catch((err: unknown) => logger.warn('detachAgent: close — ignore', { error: String(err) }));
+    hubs.release(channels.get(gaii)?.tunnel, gaii);
     channels.delete(gaii);
     invokeChannels.delete(gaii);
     registry.remove(gaii);
@@ -620,21 +656,14 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
         // The SAME projection serve.json carries, and it has to stay the same: this is a second
         // copy of one shape, and when serve.json's `id` became the GAII it was documented to be,
         // this copy was missed and kept the bare name. Two owners' `concierge` were one id here.
-        principals: registry.list().map(e => ({
-          type: e.agent.startsWith('eco:') ? 'ecosystem' : 'agent',
-          id: e.gaii,
-          owner: e.owner,
-          node_url: e.config.node_url,
-          transport: channels.get(e.gaii)!.transportMode,
-          tunnel_status: channels.get(e.gaii)!.tunnel?.getStatus() ?? null,
-        })),
+        principals: registry.list().map(e => principalRow(e, channels.get(e.gaii))),
         agents: registry.list().map(e => ({
           agent: e.agent,
           gaii: e.gaii,
           owner: e.owner,
           node_url: e.config.node_url,
           transport: channels.get(e.gaii)!.transportMode,
-          tunnel_status: channels.get(e.gaii)!.tunnel?.getStatus() ?? null,
+          tunnel_status: statusOfIdentity(channels.get(e.gaii)),
           // Record-push: how many spaces the agent subscribed to, and the (re)connect count. A consumer
           // that sees `reconnects` increase between cycles does its one catch-up read (per-socket subs).
           subscriptions: channels.get(e.gaii)!.getSubscriptions().length,

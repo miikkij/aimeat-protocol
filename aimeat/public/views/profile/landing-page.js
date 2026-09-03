@@ -17,6 +17,9 @@
  *   - PresencePill + PresenceDialog — header status pill that opens the availability settings dialog
  *   - LandingPage — main orchestrator (default export)
  * @version-history
+ *   v3.15.0 — 2026-09-03 — The hand-placed /v1/fleet link is gone from above the menu. It is a
+ *     section of Settings & Controls now and comes through the menu like everything else; a
+ *     capability a person has to be told the address of is not finished.
  *   v3.14.0 — 2026-08-29 — The sidebar's nameplate (avatar + name) is gone: the top bar's pill and the
  *     overview's masthead already carry the name, and three copies on one screen read as a tic.
  *   v3.13.0 — 2026-08-27 — This page is "Settings & Controls" in the header now, with the home in
@@ -364,12 +367,11 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
         <a class="pf-side-item pf-side-home" href="/v1/home">
           <span class="pf-side-label">← ${t('nav.home')}</span>
         </a>
-        ${/* The Agents section (Agent v2 V3): the fleet and whether each agent can still sign in.
-              A LINK, not a tab: it is its own page, and the Agents tab below stays exactly where it
-              is and shows exactly what it always did. */''}
-        <a class="pf-side-item pf-side-fleet" href="/v1/fleet">
-          <span class="pf-side-label">${t('fleet.navLabel')}</span>
-        </a>
+        ${/* The Agents v2 section used to hang here as a LINK to /v1/fleet, above the menu rather
+              than in it, so a person had to be told the address. It is a section of Settings &
+              Controls now — "Your agents", first in Automation — and comes through the same menu as
+              everything else. The old Agents tab still sits below it, unchanged. /v1/fleet still
+              resolves for anyone who bookmarked it. */''}
         ${/* No nameplate here: the pill in the top bar already says who is signed in and the
               overview's masthead is the name at full size, so a third copy in the index was the
               one Jouni counted out loud (2026-08-29). */''}

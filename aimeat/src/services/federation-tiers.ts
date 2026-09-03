@@ -52,6 +52,8 @@
  *     with no word cannot be refused. tierRank() so a trust advisory demoting to 'visiting' cannot
  *     silently PROMOTE a contact peer. clampFlagsToTier() replaces the hand-written elevation guard
  *     in federation-peer/peers.ts, which carried the ceiling rules as five inline conditions.
+ *   v1.2.0 — 2026-09-03 — `allowRouting` says which way it points. Its neighbours all ask "may this
+ *     peer do X here"; it alone says this node forwards TO the peer, and no comment said so.
  */
 
 export type PeerTier = 'genesis' | 'member' | 'visiting' | 'contact';
@@ -60,6 +62,9 @@ export type PeerTier = 'genesis' | 'member' | 'visiting' | 'contact';
 export interface TierFlags {
   shareCatalogue: boolean;
   replicateMemory: boolean;
+  /** THE ONE FLAG THAT POINTS OUTWARD. Its neighbours all ask "may this peer do X here"; this one
+   *  says this node may forward traffic TO this peer, as a destination or as a relay hop. It does
+   *  not stop the peer from sending here, which that peer decides on its own side. */
   allowRouting: boolean;
   /** May this peer deliver direct messages, read receipts and attachment grants here? */
   allowMessaging: boolean;

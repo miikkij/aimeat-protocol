@@ -4187,7 +4187,8 @@
     "fedDepeeringGrace": "Armonaika päättyy",
     "fedShareCatalogue": "Jaa katalogi",
     "fedReplicateMemory": "Replikoi muisti",
-    "fedAllowRouting": "Salli reititys",
+    "fedAllowRouting": "Välitä tälle vertaiselle",
+    "fedAllowRoutingHint": "Liikennettä välitetään täältä tälle vertaiselle, joko perille asti tai välietappina; se ei estä vertaista lähettämästä tänne, sen vertainen päättää omassa päässään.",
     "fedAllowAuth": "Salli federaatiokirjautuminen",
     "fedAuthPolicyTitle": "Federaation todennuspolitiikka",
     "fedAuthPolicyDesc": "Hallitse voivatko muiden solmujen käyttäjät kirjautua tänne ja mitä he voivat tehdä.",
@@ -4967,21 +4968,6 @@
     "openWork": "{n} työn alla",
     "messages": "{n} viestiä",
     "messagesOne": "1 viesti",
-    "note": {
-      "never": "Ei ole koskaan yhdistänyt. Aja yhdistäminen niin se pääsee sisään.",
-      "dead": "Kirjautuminen on umpeutunut, eikä se pääse enää sisään. Yhdistä se uudelleen.",
-      "expiringToday": "Kirjautuminen umpeutuu tänään. Yhdistä se uudelleen nyt.",
-      "expiring": "Kirjautuminen umpeutuu noin {n} päivän päästä. Yhdistä se uudelleen ennen sitä.",
-      "expiringOne": "Kirjautuminen umpeutuu noin päivän päästä. Yhdistä se uudelleen ennen sitä.",
-      "okToday": "Sisällä, ja umpeutuu tänään.",
-      "ok": "Sisällä, riittää vielä noin {n} päiväksi.",
-      "okOne": "Sisällä, riittää vielä noin päivän.",
-      "keyNever": "Luotu, eikä sen konnektori ole vielä ottanut sitä käyttöön.",
-      "keyDead": "Avain puuttuu, joten se ei pääse sisään. Luo se uudelleen.",
-      "keyUnreadable": "Sen korttia ei saa luettua. Pyydä apua ylläpidolta.",
-      "keyConnected": "Kirjaa itsensä sisään omalla avaimellaan, ja on nyt kiinni.",
-      "keyOk": "Kirjaa itsensä sisään omalla avaimellaan aina kun tarvitsee."
-    },
     "state": {
       "ok": "Kunnossa",
       "expiring": "Loppumassa",
@@ -4991,11 +4977,39 @@
       "unknown": "Ei tiedossa"
     },
     "migrate": {
-      "action": "Siirrä {n} omalle avaimelle",
-      "working": "Siirretään…",
-      "done": "Valmis.",
+      "head": "Anna {n} agentille kirjautuminen, joka ei vanhene",
+      "headOne": "Anna tälle agentille kirjautuminen, joka ei vanhene",
+      "what": "{n} agenttiasi ei pääse itse sisään: osalta kirjautuminen vanheni, osa ei ole koskaan yhdistänyt.",
+      "whatOne": "Yksi agenteistasi ei pääse itse sisään.",
+      "keeps": "Muuten mikään ei muutu. Sama nimi, samat oikeudet, samat kesken olevat työt.",
+      "needConnector": "Tämä onnistuu vain jos konnektori on käynnissä sillä koneella, jolla nämä agentit asuvat. Käynnistä se siellä ja palaa painamaan.",
+      "ready": "Konnektori on käynnissä, joten tämän voi tehdä nyt.",
+      "action": "Anna {n} agentille uusi kirjautuminen",
+      "actionOne": "Anna sille uusi kirjautuminen",
+      "working": "Tehdään…",
+      "doneAll": "Valmis. Ne pääsevät taas sisään, eikä niissä muuttunut mitään muuta.",
+      "donePartial": "{n} pääsee taas sisään. {stuck} jäi tavoittamatta, ja ne ovat tasan ennallaan — paina uudestaan tai katso konnektori niiden koneella.",
       "failed": "Ei onnistunut. Mikään ei muuttunut."
-    }
+    },
+    "groupCount": "{n} agenttia",
+    "groupCountOne": "1 agentti",
+    "group": {
+      "dead": "Niiden kirjautuminen on vanhentunut, joten ne eivät enää pääse sisään.",
+      "never": "Nämä eivät ole koskaan yhdistäneet. Tee liitäntävaihe, niin ne pääsevät mukaan.",
+      "expiring": "Nämä ovat vielä sisällä, mutta eivät enää kauaa. Jokainen kertoo, kuinka kauan sillä on aikaa.",
+      "ok": "Nämä ovat sisällä. Jokainen kertoo, kuinka kauan sillä on aikaa jäljellä.",
+      "unreadable": "Näitä ei saada luettua. Pyydä apua siltä, joka ylläpitää tätä.",
+      "unknown": "Näiden kirjautumisesta ei tiedetä mitään.",
+      "keyDead": "Niiden avain puuttuu, joten ne eivät pääse sisään. Luo ne uudestaan.",
+      "keyNever": "Luotu, eikä niiden konnektori ole vielä ottanut niitä käyttöön.",
+      "keyUnreadable": "Niiden korttia ei saada luettua. Pyydä apua siltä, joka ylläpitää tätä.",
+      "keyOk": "Nämä kirjaavat itse itsensä sisään omalla avaimellaan aina kun tarvitsevat, eikä se vanhene."
+    },
+    "days": "{n} päivää jäljellä",
+    "daysOne": "1 päivä jäljellä",
+    "daysToday": "vanhenee tänään",
+    "hidden": "{n} kunnossa olevaa agenttia piilotettu",
+    "hiddenOne": "1 kunnossa oleva agentti piilotettu"
   },
   "footer": {
     "ownNode": "Aja oma node",
@@ -7873,7 +7887,8 @@
       "appDev": "AppDev",
       "pnl": "Tulos",
       "usage": "Käyttö",
-      "companies": "Yritykset"
+      "companies": "Yritykset",
+      "fleet": "Omat agentit"
     },
     "offers": {
       "title": "Mitä voin tehdä?",
@@ -8554,7 +8569,8 @@
         "connected": "Yhdistimesi on käynnissä, joten ne pääsevät heti töihin",
         "notConnected": "Yhdistimesi ei ole käynnissä",
         "notConnectedHint": "Nämä agentit pyörivät omalla koneellasi. Käynnistä yhdistin komennolla \"aimeat connect serve\", niin tämä nappi toimii.",
-        "whatYouGet": "Mitä saat"
+        "whatYouGet": "Mitä saat",
+        "actsAloneNoticeOne": "{names} aloittaa työn heti kun sitä tulee, kysymättä sinulta joka kerta. Voit muuttaa tämän myöhemmin kenelle tahansa agentille."
       },
       "taskRunner": {
         "title": "Yhdistä CrewAI-crew (Liaison Agent -patterni)",

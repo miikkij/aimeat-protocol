@@ -4191,7 +4191,8 @@
     "fedDepeeringGrace": "Grace ends",
     "fedShareCatalogue": "Share Catalogue",
     "fedReplicateMemory": "Replicate Memory",
-    "fedAllowRouting": "Allow Routing",
+    "fedAllowRouting": "Relay to this peer",
+    "fedAllowRoutingHint": "Traffic is forwarded from here to this peer, as a destination or as a relay hop; it does not stop that peer from sending here, which they decide on their own side.",
     "fedAllowAuth": "Allow Federated Login",
     "fedAllowMessaging": "Deliver messages here",
     "fedAllowBroadcast": "Announce to everyone here",
@@ -4982,21 +4983,6 @@
     "openWork": "{n} working",
     "messages": "{n} messages",
     "messagesOne": "1 message",
-    "note": {
-      "never": "Never connected. Run the connect step to bring it in.",
-      "dead": "Its sign-in has run out, so it cannot get in any more. Connect it again.",
-      "expiringToday": "Its sign-in runs out today. Connect it again now.",
-      "expiring": "Its sign-in runs out in about {n} days. Connect it again before then.",
-      "expiringOne": "Its sign-in runs out in about a day. Connect it again before then.",
-      "okToday": "Signed in, and it runs out today.",
-      "ok": "Signed in, good for about {n} more days.",
-      "okOne": "Signed in, good for about one more day.",
-      "keyNever": "Created, and its connector has not taken it on yet.",
-      "keyDead": "Its key is missing, so it cannot sign in. Create it again.",
-      "keyUnreadable": "Its card cannot be read. Ask whoever runs this for help.",
-      "keyConnected": "Signs itself in with its own key, and is connected now.",
-      "keyOk": "Signs itself in with its own key whenever it needs to."
-    },
     "state": {
       "ok": "Fine",
       "expiring": "Running out",
@@ -5006,11 +4992,39 @@
       "unknown": "Unknown"
     },
     "migrate": {
-      "action": "Move {n} to their own key",
-      "working": "Moving them…",
-      "done": "Done.",
+      "head": "Give {n} agents a sign-in that does not run out",
+      "headOne": "Give this agent a sign-in that does not run out",
+      "what": "{n} of your agents cannot get in on their own: some ran out, some never connected.",
+      "whatOne": "One of your agents cannot get in on its own.",
+      "keeps": "Nothing else about them changes. Same name, same permissions, same work in progress.",
+      "needConnector": "For this to work, the connector has to be running on the machine these agents live on. Start it there, then come back and press.",
+      "ready": "The connector is running, so this can go ahead now.",
+      "action": "Give {n} agents a new sign-in",
+      "actionOne": "Give it a new sign-in",
+      "working": "Working…",
+      "doneAll": "Done. They can all sign in again, and nothing else about them changed.",
+      "donePartial": "{n} can sign in again. {stuck} could not be reached and are exactly as they were — press again, or check the connector on their machine.",
       "failed": "That did not work. Nothing changed."
-    }
+    },
+    "groupCount": "{n} agents",
+    "groupCountOne": "1 agent",
+    "group": {
+      "dead": "Their sign-in has run out, so they cannot get in any more.",
+      "never": "These have never connected. Run the connect step to bring them in.",
+      "expiring": "These are still signed in, but not for much longer. Each one says how long it has.",
+      "ok": "These are signed in. Each one says how long it has left.",
+      "unreadable": "These cannot be read. Ask whoever runs this for help.",
+      "unknown": "Nothing is known about how these sign in.",
+      "keyDead": "Their key is missing, so they cannot sign in. Create them again.",
+      "keyNever": "Created, and their connector has not taken them on yet.",
+      "keyUnreadable": "Their card cannot be read. Ask whoever runs this for help.",
+      "keyOk": "These sign themselves in with their own key whenever they need to, and it does not run out."
+    },
+    "days": "{n} days left",
+    "daysOne": "1 day left",
+    "daysToday": "runs out today",
+    "hidden": "{n} healthy agents hidden",
+    "hiddenOne": "1 healthy agent hidden"
   },
   "footer": {
     "ownNode": "Run your own node",
@@ -7888,7 +7902,8 @@
       "appDev": "AppDev",
       "pnl": "P&L",
       "usage": "Usage",
-      "companies": "Companies"
+      "companies": "Companies",
+      "fleet": "Your agents"
     },
     "offers": {
       "title": "What can I do?",
@@ -8573,7 +8588,8 @@
         "reaches": "Reaches:",
         "actsAlone": "starts on its own",
         "actsAloneWhy": "Work sent to this agent starts without asking you first.",
-        "actsAloneNotice": "{names} start work as soon as it arrives, without asking you each time. You can change that for any agent later."
+        "actsAloneNotice": "{names} start work as soon as it arrives, without asking you each time. You can change that for any agent later.",
+        "actsAloneNoticeOne": "{names} starts work as soon as it arrives, without asking you each time. You can change that for any agent later."
       },
       "taskRunner": {
         "title": "Connect a CrewAI crew (Liaison Agent pattern)",

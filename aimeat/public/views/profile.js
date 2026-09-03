@@ -10,6 +10,8 @@
  *   updateStats, navigate, renderTab) rendering LandingPage + a toast pill.
  * @usage Lazy-loaded route component for /v1/profile.
  * @version-history
+ *   2026-09-03 — A `fleet` tab: "Your agents", the Agents v2 section, which was a page reached by a
+ *     sidebar link above the menu rather than through it. The Agents tab below it is untouched.
  *   2026-08-29 — A signed-out ?tab=mcp goes to the connect story (/v1/connect-your-ai) instead of the
  *     sign-in wall, and the wall's heading lost its emoji.
  *   2026-07-19 — AppDev tab (KB UI): learned-pitfall + template management surface, start-prompt copy, model badge
@@ -45,6 +47,7 @@ import LandingPage, { computeTier } from './profile/landing-page.js';
 // === Tab modules (lazy-loaded on first visit, stay mounted) ===
 import PortfolioTab from './profile/portfolio-tab.js';
 import AgentsTab from './profile/agents-tab.js';
+import FleetTab from './profile/fleet-tab.js';
 import EcosystemTab from './profile/ecosystem-tab.js';
 import ChatSessionsTab from './profile/chat-sessions-tab.js';
 import McpTab from './profile/mcp-tab.js';
@@ -106,6 +109,7 @@ const TABS = [
   { id: 'contacts',      key: 'contacts.tabLabel',           component: ContactsTab,       minTier: 'new' },
   { id: 'discover',      key: 'discover.tabLabel',           component: DiscoverTab,       minTier: 'new' },
   { id: 'portfolio',     key: 'portfolio.tabLabel',          component: PortfolioTab,      minTier: 'active' },
+  { id: 'fleet',         key: 'profile.tabs.fleet',          component: FleetTab,          minTier: 'active' },
   { id: 'agents',        key: 'profile.tabs.agents',         component: AgentsTab,         minTier: 'active' },
   { id: 'ecosystem',     key: 'profile.tabs.ecosystem',      component: EcosystemTab,      minTier: 'active' },
   { id: 'offers',        key: 'profile.tabs.offers',         component: OffersTab,         minTier: 'active' },

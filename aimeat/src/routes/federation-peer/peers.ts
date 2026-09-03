@@ -441,6 +441,11 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
         // was added; clampFlagsToTier owns them now and is tested on its own.
         if (typeof share_catalogue === 'boolean') next.shareCatalogue = share_catalogue;
         if (typeof replicate_memory === 'boolean') next.replicateMemory = replicate_memory;
+        // allow_routing: this node may forward traffic to this peer, as a destination or as a relay
+        // hop; it does not stop the peer from sending here, which that peer decides on its own side.
+        // The name reads like an inbound permission and is not one — measured 2026-09-02, demoting a
+        // peer here did not stop it relaying in, and only its own record of us did. Do not rename it:
+        // it is in openapi.yaml, both storage providers, the admin surface and every peer record.
         if (typeof allow_routing === 'boolean') next.allowRouting = allow_routing;
         if (typeof allow_messaging === 'boolean') next.allowMessaging = allow_messaging;
         if (typeof allow_broadcast === 'boolean') next.allowBroadcast = allow_broadcast;

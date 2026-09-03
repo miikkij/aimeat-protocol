@@ -408,6 +408,14 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     connectTunnelHeartbeatIntervalMs: parseInt(process.env.AIMEAT_CONNECT_TUNNEL_HEARTBEAT_MS ?? '30000', 10),
     connectTunnelOfflineThresholdMs: parseInt(process.env.AIMEAT_CONNECT_TUNNEL_OFFLINE_MS ?? '90000', 10),
     connectTunnelRequestTimeoutMs: parseInt(process.env.AIMEAT_CONNECT_TUNNEL_REQUEST_TIMEOUT_MS ?? '30000', 10),
+    // 32 concurrent calls is far past anything measured (38 agents sending occasional JSON, the
+    // daemon at 1.09% of a core idle) and far short of a runaway — the crew side has one on record
+    // that made the same call 347 times.
+    connectTunnelMaxInflightPerIdentity: parseInt(process.env.AIMEAT_CONNECT_TUNNEL_MAX_INFLIGHT ?? '32', 10),
+    // The largest answer one identity may put on a wire eleven others are waiting on. Defaults to
+    // the same ceiling that already bounded a whole socket, so nothing that worked stops working.
+    connectTunnelMaxResponseBytes: parseInt(process.env.AIMEAT_CONNECT_TUNNEL_MAX_RESPONSE_BYTES
+      ?? String((parseInt(process.env.AIMEAT_JSON_BODY_LIMIT_LARGE_MB ?? '25', 10)) * 1024 * 1024), 10),
     crewTryTimeoutMs: parseInt(process.env.AIMEAT_CREW_TRY_TIMEOUT_MS ?? '300000', 10),
     smtpHost: process.env.AIMEAT_SMTP_HOST || null,
     smtpPort: parseInt(process.env.AIMEAT_SMTP_PORT ?? '587', 10),
