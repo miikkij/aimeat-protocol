@@ -37983,7 +37983,8 @@ paths:
 
         Runs on the shared completion path, so the owner's daily AI budget, the node's provider-host
         allowlist and the 200k prompt bound all apply, the call lands in `GET /v1/ai/usage` under the
-        app id `openrouter:complete`, and the response carries the minted AI-provenance record in
+        app id `calibrator:<projectId>` for a calibration project and `openrouter:complete` for a
+        generator project, and the response carries the minted AI-provenance record in
         `meta.provenance` plus the `AI-Disclosure` and `Link: rel="ai-provenance"` headers
         (TARGET-058). The `data` shape is unchanged.
       tags: [OpenRouter]
@@ -46695,8 +46696,9 @@ paths:
       tags: [Calibrator]
       summary: List calibration projects
       description: |
-        Lists the owner's calibration projects (newest first), each augmented with `batchCount`
-        and `latestAvgScore` (mean of the latest batch's per-model overall scores). Owner-only.
+        Lists the owner's calibration projects (newest first), each augmented with `batchCount`,
+        `latestAvgScore` (mean of the latest batch's per-model overall scores) and `modelCount`
+        (candidate models that name a model). Owner-only.
       security:
         - BearerAuth: []
       responses:
@@ -46724,6 +46726,7 @@ paths:
                                 currentVersion: { type: integer }
                                 batchCount: { type: integer }
                                 latestAvgScore: { type: number, nullable: true }
+                                modelCount: { type: integer }
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':

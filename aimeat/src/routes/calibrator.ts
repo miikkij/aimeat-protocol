@@ -24,6 +24,9 @@
  *   v2.0.0 — 2026-03-29 — V2 redesign: batch-based 4-step flow
  *   v2.1.0 — 2026-07-16 — GET /:id/detail composite (project + dimensions + versions + current version +
  *     batches from one prefix scan) — folds the detail-view mount's 4-request waterfall.
+ *   v2.2.0 — 2026-09-04 — The list carries `modelCount` (candidate models with a model id); the list
+ *     page had printed "0 models" for a project with three. `latestAvgScore` is the newest batch
+ *     that has a score, so an empty batch created after a finished one no longer hides the result.
  */
 
 import { Router } from 'express';
@@ -280,21 +283,26 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
         let latestAvgScore: number | null = null;
 
         if (batchCount > 0) {
-          // Find latest batch by createdAt
+          // The latest batch THAT HAS A SCORE, newest first: a batch created and never started
+          // carries no score and must not hide the last real result behind a null.
           const batches = batchMemory
             .map(bm => bm.value as Record<string, unknown>)
             .sort((a, b) => new Date(b.createdAt as string).getTime() - new Date(a.createdAt as string).getTime());
-          const latestBatch = batches[0];
-          const models = (latestBatch.models as CalibratorBatchModel[]) || [];
-          const scores = models
-            .map(m => m.step2_analysis?.overallScore)
-            .filter((s): s is number => s != null);
-          if (scores.length > 0) {
-            latestAvgScore = scores.reduce((sum, s) => sum + s, 0) / scores.length;
+          for (const batch of batches) {
+            const models = (batch.models as CalibratorBatchModel[]) || [];
+            const scores = models
+              .map(m => m.step2_analysis?.overallScore)
+              .filter((s): s is number => s != null);
+            if (scores.length > 0) {
+              latestAvgScore = scores.reduce((sum, s) => sum + s, 0) / scores.length;
+              break;
+            }
           }
         }
 
-        projects.push({ ...project, batchCount, latestAvgScore });
+        // How many models are under test, so the list can say it without opening the project.
+        const modelCount = ((project.candidateModels as CalibratorCandidateModel[]) || []).filter(m => m && (m as { modelId?: string }).modelId).length;
+        projects.push({ ...project, batchCount, latestAvgScore, modelCount });
       }
 
       res.json(success(config.nodeId, { projects }));

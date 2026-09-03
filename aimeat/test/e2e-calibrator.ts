@@ -8,6 +8,10 @@
  * @version-history
  *   v1.0.0 — 2026-03-29 — Initial tests (V1 runs-based)
  *   v2.0.0 — 2026-03-29 — Rewrite for V2 batch CRUD with 4-step data
+ *   v2.1.0 — 2026-09-04 — The list carries modelCount; a completion on a calibration is billed under
+ *     calibrator:<projectId> (read back from /v1/ai/usage through a local stub provider), and a
+ *     project the caller does not own is refused before anything is billed. The denial cases: no
+ *     token → 401, another owner → 404 on read, update, batch and completion.
  */
 
 // Run: cd aimeat && pnpm exec tsx test/e2e-calibrator.ts
@@ -188,6 +192,7 @@ await test('List projects shows batchCount=0, latestAvgScore=null', async () => 
   assert(our, 'our project should appear in list');
   assert(our.batchCount === 0, `batchCount should be 0, got ${our.batchCount}`);
   assert(our.latestAvgScore === null, `latestAvgScore should be null, got ${our.latestAvgScore}`);
+  assert(our.modelCount === 0, `modelCount should be 0 before any model is added, got ${our.modelCount}`);
 });
 
 // ── 6. Update project ──
@@ -446,6 +451,9 @@ await test('List projects shows batchCount=1 and latestAvgScore=50', async () =>
   assert(our, 'our project should appear');
   assert(our.batchCount === 1, `batchCount should be 1, got ${our.batchCount}`);
   assert(our.latestAvgScore === 50, `latestAvgScore should be 50, got ${our.latestAvgScore}`);
+  // The list page says how many models are under test; it printed "0 models" for a project with
+  // three until the list carried the count (2026-09-04).
+  assert(our.modelCount === candidateModels.length, `modelCount should be ${candidateModels.length}, got ${our.modelCount}`);
 });
 
 // ── 19b. Composite detail endpoint == sum of parts ──
@@ -489,6 +497,101 @@ await test('Old run endpoints return 404', async () => {
   });
   assert(status === 404, `POST /runs should return 404, got ${status}`);
 });
+
+// ── 20a. What a second principal gets ──
+//
+// Every calibrator route resolves the caller's own identity and reads under it, so another owner
+// does not get a refusal about THIS project: they get "no such project", which is the same answer
+// as for a project that never existed. Without a token the door itself refuses.
+
+await test('Without a token the calibrator routes refuse → 401', async () => {
+  const list = await json('/v1/calibrator');
+  assert(list.status === 401, `list without a token: expected 401, got ${list.status}`);
+  const one = await json(`/v1/calibrator/${projectId}`);
+  assert(one.status === 401, `read without a token: expected 401, got ${one.status}`);
+});
+
+await test('Another owner cannot read, change or run this calibration → 404, and the list stays theirs', async () => {
+  const other = `calother${Date.now()}`;
+  const reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: other, display_name: 'Cal Other', password }) });
+  assert(reg.body.ok === true, `second owner registration failed: ${JSON.stringify(reg.body.error)}`);
+  const login = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: other, password }) });
+  const otherAuth = { Authorization: `Bearer ${login.body.data.token}` };
+
+  const read = await json(`/v1/calibrator/${projectId}`, { headers: otherAuth });
+  assert(read.status === 404, `read by another owner: expected 404, got ${read.status}`);
+  const detail = await json(`/v1/calibrator/${projectId}/detail`, { headers: otherAuth });
+  assert(detail.status === 404, `detail by another owner: expected 404, got ${detail.status}`);
+  const put = await json(`/v1/calibrator/${projectId}`, { method: 'PUT', headers: otherAuth, body: JSON.stringify({ name: 'taken over' }) });
+  assert(put.status === 404, `update by another owner: expected 404, got ${put.status}`);
+  const batch = await json(`/v1/calibrator/${projectId}/batches/${batchId}`, { headers: otherAuth });
+  assert(batch.status === 404, `batch by another owner: expected 404, got ${batch.status}`);
+  const run = await json('/v1/openrouter/complete', { method: 'POST', headers: otherAuth, body: JSON.stringify({ projectId, prompt: 'Hello' }) });
+  assert(run.status === 404, `completion on another owner's project: expected 404, got ${run.status}`);
+
+  const list = await json('/v1/calibrator', { headers: otherAuth });
+  assert(list.status === 200 && !list.body.data.projects.some((p: any) => p.projectId === projectId), 'the other owner\'s list must not carry this project');
+  const mine = await json(`/v1/calibrator/${projectId}`, { headers: auth() });
+  assert(mine.status === 200 && mine.body.data.project.name !== 'taken over', 'the owner\'s project is untouched');
+});
+
+// ── 20b. A calibration's completions spend under the calibration's own name ──
+//
+// The calibrator page's runs go through POST /v1/openrouter/complete. Until 2026-09-04 every call
+// landed in the usage table as `openrouter:complete`, so the AI page could not say which
+// calibration cost what. A local OpenAI-compatible stub stands in for the provider (as in
+// e2e-ai-provenance.ts); nothing inside the node is mocked, and the charge is read back from
+// /v1/ai/usage rather than inferred from the code.
+
+const STUB_PORT = parseInt(process.env.E2E_AI_STUB_PORT_CAL ?? '40319', 10);
+const STUB_MODEL = 'stub/calibrator-test-model';
+const { createServer } = await import('node:http');
+const stub = createServer((req, res) => {
+  let body = '';
+  req.on('data', (c) => { body += c; });
+  req.on('end', () => {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      model: STUB_MODEL,
+      choices: [{ message: { content: '{"architecture": "cortex-modular", "features": 6}' }, finish_reason: 'stop' }],
+      usage: { prompt_tokens: 10, completion_tokens: 12, total_tokens: 22, cost: 0.0001 },
+    }));
+  });
+});
+await new Promise<void>((resolve) => stub.listen(STUB_PORT, '127.0.0.1', () => resolve()));
+
+await test('POST /v1/openrouter/complete on a calibration is billed as calibrator:<projectId>', async () => {
+  const settings = await json('/v1/memory', {
+    method: 'POST', headers: auth(),
+    body: JSON.stringify({ key: 'openrouter.settings', visibility: 'private', value: { provider: 'custom', baseUrl: `http://127.0.0.1:${STUB_PORT}/v1`, model: STUB_MODEL, daily_budget_usd: 5 } }),
+  });
+  assert(settings.status === 200 || settings.status === 201, `settings ${settings.status}: ${JSON.stringify(settings.body?.error)}`);
+
+  const r = await json('/v1/openrouter/complete', {
+    method: 'POST', headers: auth(),
+    body: JSON.stringify({ projectId, prompt: 'Generate a blueprint for a test.', model: STUB_MODEL }),
+  });
+  assert(r.status === 200, `complete ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  assert(typeof r.body.data.content === 'string' && r.body.data.content.length > 0, 'data.content is the stub answer');
+
+  const usage = await json('/v1/ai/usage', { headers: auth() });
+  assert(usage.status === 200, `usage ${usage.status}`);
+  const perApp = usage.body.data.per_app || {};
+  assert(!!perApp[`calibrator:${projectId}`], `no per-app bucket for the calibration: ${JSON.stringify(Object.keys(perApp))}`);
+  assert(!perApp['openrouter:complete'], 'a calibration must not spend under the route\'s shared name');
+});
+
+await test('POST /v1/openrouter/complete on a calibration the caller does not own → 404, nothing billed', async () => {
+  const r = await json('/v1/openrouter/complete', {
+    method: 'POST', headers: auth(),
+    body: JSON.stringify({ projectId: 'cal-nobody-owns-this', prompt: 'Hello', model: STUB_MODEL }),
+  });
+  assert(r.status === 404, `expected 404, got ${r.status}`);
+  const usage = await json('/v1/ai/usage', { headers: auth() });
+  assert(!usage.body.data.per_app?.['calibrator:cal-nobody-owns-this'], 'a refused call must not leave a bucket');
+});
+
+stub.close();
 
 // ── 21. Delete batch ──
 
