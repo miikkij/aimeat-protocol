@@ -605,7 +605,13 @@ async function run(): Promise<void> {
         const forHire = (card.skills as any[]).find(s => s.id === offeringId);
         assert(!!forHire, `the offering is a skill on the card, got ${JSON.stringify((card.skills as any[]).map(s => s.id))}`);
         assert((forHire.tags as string[]).includes('for-hire'), 'tagged so a client can tell it from a declared capability');
-        assert(String(forHire.description).includes('2500000 USD'), `with the price on it, got ${forHire.description}`);
+        // IT ASSERTED THE DEFECT. `basePrice` is MICROS on the money rail, so this line pinned
+        // "2500000 USD" — the price a stranger would have read, a million times the real one —
+        // and passed for as long as it was wrong. Corrected 2026-09-04 with the sentence itself:
+        // the amount as money, and `per task`, because `unit` is the RAIL and never the billing
+        // unit it used to be printed as.
+        assert(String(forHire.description).includes('2.50 USD per task'), `with the price on it, got ${forHire.description}`);
+        assert(!String(forHire.description).includes('2500000'), 'and never the raw micros');
         assert((card.capabilities.extensions as any[]).some(e => String(e.uri).includes('x402')),
             'and the payment extension is declared');
         assert(!!card.securitySchemes?.foreignCard, 'and the stranger\'s way in is a declared scheme');

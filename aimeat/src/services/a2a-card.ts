@@ -97,11 +97,50 @@ function skillsFor(agent: AgentRecord): AgentCard['skills'] {
  * window-shop. The id is the offering id, which is exactly what `metadata.offeringId` takes, so the
  * card names the thing the request needs rather than something a client has to translate.
  */
+/**
+ * What one offering costs, in a sentence a buyer can act on.
+ *
+ * `unit` IS THE RAIL, NOT THE BILLING UNIT. It is `'money' | 'morsels'` — what the price is paid
+ * IN — and the card used to print it as "per what", so a morsel offering read "8 morsel per
+ * morsels". A buyer reading that cannot tell whether it is per document, per page or per hour.
+ *
+ * AND `basePrice` IS MICROS WHEN THE RAIL IS MONEY. The same line printed it raw, so a EUR 1.50
+ * offering advertised itself to strangers as "1500000 EUR per money" — the one number a buyer
+ * decides on, wrong by a factor of a million, on the surface built for them to decide on. Nobody
+ * had seen it because no money-priced offering has ever been published; it was waiting.
+ *
+ * `basePrice` is per call or per task either way, so that is what the sentence says.
+ */
+function priceLine(o: Offering): string {
+  if (o.unit === 'money') {
+    const amount = (o.basePrice / 1_000_000).toFixed(2).replace(/\.00$/, '');
+    return `${amount} ${o.currency ?? 'EUR'} per task`;
+  }
+  return `${o.basePrice} ${o.basePrice === 1 ? 'morsel' : 'morsels'} per task`;
+}
+
+/**
+ * The one line a stranger reads in the directory before deciding which card to fetch.
+ *
+ * An agent's own description when it has one, and otherwise WHAT IT SELLS — the titles of its
+ * offerings, joined. Both agents listed on the day the directory shipped had an empty description,
+ * and an empty index is a directory that makes everybody read everything, which is the opposite of
+ * what a directory is for. The titles are already in hand where this is called, they are what the
+ * agent is actually offering, and unlike a typed sentence they cannot go stale.
+ *
+ * Exported so it can be pinned by value: a rule that lives inline in a route has no seam, and this
+ * one is read by people who have never signed up here and cannot be told it was a display bug.
+ */
+export function directoryDescriptionFor(description: string | null | undefined, offerings: Offering[]): string {
+  if (description) return description;
+  return offerings.map(o => o.title).filter(Boolean).join(' · ');
+}
+
 function offeringSkills(offerings: Offering[]): AgentCard['skills'] {
   return offerings.map(o => ({
     id: o.offeringId,
     name: o.title,
-    description: `${o.description || o.title} — ${o.basePrice} ${o.currency ?? 'morsel'} per ${o.unit}. Send this offeringId in message metadata; payment is settled with the x402 extension before the work starts.`,
+    description: `${o.description || o.title} — ${priceLine(o)}. Send this offeringId in message metadata; payment is settled with the x402 extension before the work starts.`,
     tags: ['for-hire', o.surface?.kind === 'agent-work' ? o.surface.taskType : o.action],
     examples: [],
     inputModes: ['text/plain', 'application/json'],
