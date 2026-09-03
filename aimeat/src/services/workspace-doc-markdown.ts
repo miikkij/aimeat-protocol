@@ -31,6 +31,10 @@
  *   if ('error' in found) return refuse(found);
  *   const next = replaceRange(markdown, found.section.start, found.section.end, block);
  * @version-history
+ *   v1.0.1 — 2026-09-03 — The heading pattern's text class takes `[^]` rather than `.`, so a tab
+ *     run followed by a carriage return can no longer make it backtrack quadratically. One
+ *     document was enough to hold the event loop for minutes, and every document here is written
+ *     by a member or an agent.
  *   v1.0.0 — 2026-09-02 — Initial: append and section replace for workspace documents
  *     (wish-workspace-append-ja-osiomuokkaus).
  */
@@ -51,8 +55,21 @@ export interface DocSection {
     end: number;
 }
 
-/** An ATX heading: up to three spaces of indent, 1-6 `#`, then the text (or nothing). */
-const HEADING = /^ {0,3}(#{1,6})(?:[ \t]+(.*))?$/;
+/**
+ * An ATX heading: up to three spaces of indent, 1-6 `#`, then the text (or nothing).
+ *
+ * The text class is `[^]` — every character — and not `.`, which is the whole of the difference
+ * between this running in microseconds and hanging the node. `.` does not match a carriage return.
+ * With `(.*)$` the tail can FAIL, and because `[ \t]+` and the text class both accept spaces and
+ * tabs, the engine then retries every way of splitting the run: one line of `#` + a tab run + a
+ * bare `\r` costs O(n²). Measured on the real pattern: 1.0 ms at 1000 tabs, 5.1 at 2000, 18.4 at
+ * 4000, 76.2 at 8000 — four times the work for twice the input, which at the 1024 kB a memory
+ * value may hold extrapolates to about twenty minutes of blocked event loop, and Node has one.
+ * `[^]*` cannot fail, so the first split wins and there is nothing to backtrack: 0.005 ms at every
+ * size above. Both call sites take text a person or an agent wrote (CodeQL js/polynomial-redos,
+ * alert 1601).
+ */
+const HEADING = /^ {0,3}(#{1,6})(?:[ \t]+([^]*))?$/;
 /** A fence line: up to three spaces of indent, then three or more backticks or tildes. */
 const FENCE = /^ {0,3}(`{3,}|~{3,})/;
 
