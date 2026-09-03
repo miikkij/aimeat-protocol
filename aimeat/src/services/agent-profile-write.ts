@@ -381,6 +381,17 @@ export async function setAgentProfile(
  *
  * Recorded here and honoured by the runtime. The node never enforces it: it does not start the
  * process, and a server-side check about a process the server does not run is a second opinion.
+ *
+ * THREE STATES, AND EVERY ONE OF THEM REACHABLE FROM EVERY OTHER. `null` is not the absence of a
+ * setting, it is a setting: nobody has said, so a spawner leaves the agent alone. That is exactly
+ * why 302 agents were not backfilled to `spawn` — turning "nobody has said" into "start workers for
+ * this" would be the node deciding on the owner's behalf. A value you can enter and not leave makes
+ * that argument one-way: a mistaken `spawn` was permanent, and the roster would then carry an agent
+ * nobody had ever meant to put there. `null` clears it, the same way it clears a runtime source in
+ * the function below, and for the same reason: a claim nobody stands behind is worse than none.
+ *
+ * An absent field is NOT a clear. `{}` means "change nothing" and `{ run_mode: null }` means "take
+ * it back to nobody has said" — a caller that forgot the key must not silently wipe the setting.
  */
 export async function setAgentRunMode(
     deps: AgentWriteDeps,
@@ -392,10 +403,13 @@ export async function setAgentRunMode(
         'You can only set the run mode of agents owned by the same owner');
     if (!target.ok) return target;
 
-    if (rawRunMode !== 'spawn' && rawRunMode !== 'resident') {
-        return { ok: false, code: 'INVALID_INPUT', message: "run_mode must be 'spawn' or 'resident'" };
+    // `null` clears. `undefined` does not: it is a caller that sent no field, and wiping a setting
+    // because a key was missing is the kind of write nobody can see coming.
+    const clearing = rawRunMode === null;
+    if (!clearing && rawRunMode !== 'spawn' && rawRunMode !== 'resident') {
+        return { ok: false, code: 'INVALID_INPUT', message: "run_mode must be 'spawn', 'resident', or null to leave it unset" };
     }
-    const updated = await deps.storage.updateAgent(target.gaii, { runMode: rawRunMode });
+    const updated = await deps.storage.updateAgent(target.gaii, { runMode: clearing ? null : rawRunMode });
     if (!updated) return { ok: false, code: 'AGENT_NOT_FOUND', message: `Agent not found: ${identifier}` };
     emitChange('agents');
     return { ok: true, agent: updated };

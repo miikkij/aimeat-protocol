@@ -157,7 +157,7 @@ export const agentMessagingTools: AimeatToolDefinition[] = [
         visibility: agentEverywhere,
         input: {
             target_agent_name: { type: 'string', required: true, description: 'Agent whose run mode to set (must be owned by the same owner as the caller). Pass your own name to set your own.' },
-            run_mode: { type: 'string', required: true, enum: ['spawn', 'resident'], description: "'spawn' = started per job and unwound after; 'resident' = kept running." },
+            run_mode: { type: 'string', required: true, enum: ['spawn', 'resident'], description: "'spawn' = started per job and unwound after; 'resident' = kept running; null takes it back to nobody-has-said, so a spawner leaves the agent alone." },
         },
     },
     {

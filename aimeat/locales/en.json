@@ -5121,7 +5121,8 @@
       "working": "Working…",
       "doneAll": "Done. They can all sign in again, and nothing else about them changed.",
       "donePartial": "{n} can sign in again. {stuck} could not be reached and are exactly as they were — press again, or check the connector on their machine.",
-      "failed": "That did not work. Nothing changed."
+      "failed": "That did not work. Nothing changed.",
+      "actionRow": "New sign-in"
     },
     "groupCount": "{n} agents",
     "groupCountOne": "1 agent",
@@ -8651,10 +8652,12 @@
       "runMode": {
         "spawn": "On demand",
         "resident": "Always on",
-        "tooltip": "How this agent is run. On demand: it waits here and starts up when work arrives. Always on: your connector keeps it running.",
+        "tooltip": "How this agent is run. On demand: it waits here and starts up when work arrives. Always on: your connector keeps it running. Not decided: nobody has said, so nothing starts it on its own. You can move between all three at any time.",
         "label": "How it runs",
         "saved": "Set to {mode}.",
-        "failed": "That could not be saved. Try again."
+        "failed": "That could not be saved. Try again.",
+        "unset": "Not decided",
+        "cleared": "Left undecided. Nothing will start it on its own."
       },
       "basic": {
         "title": "Start with two agents",

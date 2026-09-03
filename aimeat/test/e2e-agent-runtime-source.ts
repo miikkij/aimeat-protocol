@@ -132,6 +132,44 @@ await test('5. A value that is neither is refused', async () => {
   assert(bad.status === 400, `expected 400, got ${bad.status}`);
 });
 
+// A DOOR YOU CAN ENTER AND NOT LEAVE. crewaimeat-dev set `spawn` on a test agent on 2026-09-03 and
+// could not undo it: the enum was the two values, so "nobody has said" was reachable only by never
+// having said anything. That makes a mistaken `spawn` permanent, and the spawner's roster then
+// carries an agent nobody meant to put there — on an account where 302 of 312 were deliberately
+// left null precisely so a spawner would leave them alone.
+await test('5b. null takes it back to nobody-has-said, and off the roster', async () => {
+  const cleared = await json(`/v1/agents/webresearcher/run-mode`, {
+    method: 'PATCH', headers: { Authorization: `Bearer ${tokA}` }, body: JSON.stringify({ run_mode: null }),
+  });
+  assert(cleared.status === 200, `clearing: ${cleared.status} ${JSON.stringify(cleared.body)}`);
+  assert(cleared.body.data.run_mode === null, `echoed: ${JSON.stringify(cleared.body.data.run_mode)}`);
+
+  // The roster is the thing that matters: cleared means a spawner stops seeing it.
+  const roster = await json('/v1/agents?run_mode=spawn', { headers: { Authorization: `Bearer ${tokA}` } });
+  const names = (roster.body.data.agents ?? []).map((x: { name: string }) => x.name);
+  assert(!names.includes('webresearcher'), `a cleared agent is off the roster, got ${JSON.stringify(names)}`);
+
+  // ...and it is reachable again, so all three states connect to all three.
+  const back = await json(`/v1/agents/webresearcher/run-mode`, {
+    method: 'PATCH', headers: { Authorization: `Bearer ${tokA}` }, body: JSON.stringify({ run_mode: 'spawn' }),
+  });
+  assert(back.body.data.run_mode === 'spawn', `back to spawn: ${JSON.stringify(back.body.data.run_mode)}`);
+});
+
+// AN ABSENT FIELD IS NOT A CLEAR. `{}` is a caller that forgot the key, and wiping a setting for
+// that reason is a write nobody can see coming — the distinction the service makes between `null`
+// and `undefined`, asserted rather than assumed.
+await test('5c. An empty body changes nothing', async () => {
+  const empty = await json(`/v1/agents/webresearcher/run-mode`, {
+    method: 'PATCH', headers: { Authorization: `Bearer ${tokA}` }, body: JSON.stringify({}),
+  });
+  assert(empty.status === 400, `an absent run_mode is refused, not treated as a clear; got ${empty.status}`);
+
+  const still = await json('/v1/agents?include=stats', { headers: { Authorization: `Bearer ${tokA}` } });
+  const row = (still.body.data.agents ?? []).find((x: { name: string }) => x.name === 'webresearcher');
+  assert(row.run_mode === 'spawn', `the value stands after an empty body, got ${JSON.stringify(row.run_mode)}`);
+});
+
 console.log('\nWhat was running when this ran');
 
 await test('6. A Python crew can say what backs it, in the shape crewaimeat proposed', async () => {

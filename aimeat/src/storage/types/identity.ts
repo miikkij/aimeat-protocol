@@ -170,8 +170,16 @@ export interface AgentRecord {
    * `maxConcurrentTasks`: the runtime is the only party that can honour either, and a server-side
    * check would be a second opinion about a process the server does not run. Absent = the agent
    * predates the field and nobody has said, which is not the same as `spawn`.
+   *
+   * `null` IS ALLOWED ON AN UPDATE, and it is how a value goes back to nobody-has-said. It is not
+   * decoration: a field you can enter and not leave makes "nobody has said" a one-way door, and a
+   * mistaken `spawn` would then sit on the spawner's roster for good. `undefined` cannot serve —
+   * the two providers disagree about it. sqlite rebuilds the whole row from `{...existing,
+   * ...updates}`, so an explicit `undefined` clears; postgres builds its SET map from present keys
+   * and skips `undefined` outright, so the same call is a no-op there. Null is the one value both
+   * read as "write nothing here". → docs/coding-guidelines/storage-sync.md
    */
-  runMode?: 'spawn' | 'resident';
+  runMode?: 'spawn' | 'resident' | null;
   /**
    * WHAT WAS RUNNING WHEN THIS AGENT RAN — the runtime's own answer, in its own words.
    *
