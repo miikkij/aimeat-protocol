@@ -7,6 +7,12 @@
  *   process/port waiting, server start and stop.
  * @usage Imported by test/run-e2e-ci.ts. Not a suite; it runs nothing on its own.
  * @version-history
+ *   v1.1.0 -- 2026-09-04 -- A Postgres cleanup failure throws instead of warning. The SQLite branch
+ *            already threw for the identical situation, and said why: continuing hands the next
+ *            suite the previous suite's data, which arrives later as unexplained 403s. The softer
+ *            answer sat on the PRODUCTION backend, where two guard suites that mutate node config
+ *            (saml-login, scim-users) turn inherited state into eleven confusing assertion failures
+ *            rather than one honest one.
  *   v1.0.0 -- 2026-08-14 -- Pure extraction from run-e2e-ci.ts (789 lines, cap 800) carrying the
  *            three August 2026 audit fixes to the runner itself: empty the database before the
  *            FIRST suite and not only between suites, wait for the old server to actually be gone
@@ -371,18 +377,33 @@ function commandOutputText(value: unknown): string {
     return typeof value === 'string' ? value : '';
 }
 
-function warnPostgresCleanupFailure(error: unknown): void {
+/**
+ * A Postgres cleanup failure, as an error rather than a warning.
+ *
+ * It used to print "Tests may fail if stale data exists" and continue, while the SQLite branch a few
+ * lines up threw for the identical situation and said why: continuing hands the next suite the
+ * previous suite's data, and that arrives later as unexplained 403s rather than as the cleanup
+ * failure it is. Two backends, one hazard, and the backend that is production had the softer answer.
+ *
+ * The detail the warning carried is worth keeping, so it goes into the message: exit status, signal
+ * and both streams, credentials redacted.
+ */
+function postgresCleanupFailure(error: unknown): Error {
     const commandError = error as SyncCommandError;
-    const message = redactDbCredentials(commandError.message ?? String(error));
+    const parts = [redactDbCredentials(commandError.message ?? String(error))];
+    if (commandError.status !== undefined && commandError.status !== null) parts.push(`exit status ${commandError.status}`);
+    if (commandError.signal) parts.push(`signal ${commandError.signal}`);
     const stderr = redactDbCredentials(commandOutputText(commandError.stderr).trim());
     const stdout = redactDbCredentials(commandOutputText(commandError.stdout).trim());
+    if (stderr) parts.push(`pg stderr:\n${stderr}`);
+    if (stdout) parts.push(`pg stdout:\n${stdout}`);
 
-    console.warn('Could not reset PostgreSQL test database. Tests may fail if stale data exists.');
-    console.warn(`PostgreSQL cleanup error: ${message}`);
-    if (commandError.status !== undefined && commandError.status !== null) console.warn(`PostgreSQL cleanup exit status: ${commandError.status}`);
-    if (commandError.signal) console.warn(`PostgreSQL cleanup signal: ${commandError.signal}`);
-    if (stderr) console.warn(`pg stderr:\n${stderr}`);
-    if (stdout) console.warn(`pg stdout:\n${stdout}`);
+    return new Error(
+        `Could not reset the PostgreSQL test database, so the next suite would run against the previous `
+        + `suite's data and every result after this point would be measuring something else. `
+        + parts.join(' — '),
+        { cause: error },
+    );
 }
 
 /** Empty every table for the Postgres+Kysely backend EXCEPT `_kysely_migrations` — so the schema and the
@@ -432,7 +453,7 @@ export async function cleanDatabase(target: RunnerTarget): Promise<void> {
         try {
             await resetKyselyPgTables(target.dbUrl);
         } catch (error) {
-            warnPostgresCleanupFailure(error);
+            throw postgresCleanupFailure(error);
         }
     }
 }
