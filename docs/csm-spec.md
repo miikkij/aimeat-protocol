@@ -8,7 +8,7 @@
 
 A **Community Service Manifest** (CSM) is a declarative YAML document that defines a community service on an AIMEAT node. Each CSM describes the data schema, consent rules, moderation policy, and UI rendering hints for a single service instance. Nodes use the parsed CSM to generate JSON Schema for input validation (via Schema Locking), enforce consent and moderation at runtime, and provide layout guidance to rendering agents.
 
-CSM governs **internal community data** (profiles, listings, posts, bids). It is separate from MSM (MEAT Service Manifest), which governs external API integrations.
+CSM governs **internal community data** (profiles, listings, posts, bids). It is separate from MSM (Machine Service Manifest), which governs external API integrations.
 
 ### Design Goals
 

@@ -4,19 +4,25 @@ How to create, install, and manage service extensions on an AIMEAT node.
 
 ## What is a Service Extension?
 
-A Service Extension is a JavaScript module that runs inside a V8 sandbox on an AIMEAT node. It adds domain-specific behavior — such as purchase workflows, membership management, or matching logic — on top of the core AIMEAT platform.
+A Service Extension is a JavaScript module that runs inside a QuickJS-WASM sandbox on an AIMEAT node. It adds domain-specific behavior — such as purchase workflows, membership management, or matching logic — on top of the core AIMEAT platform.
 
 Extensions do NOT replace core functionality. They orchestrate it. The core platform provides storage (Memory API), payments (Wallet API), access control (Consent API), reputation (Trust API), identity (Auth), content moderation (Flags), and discovery (Catalogue). An extension provides the business rules that tie these together for a specific use case.
 
-### Why V8 Sandbox?
+### Why a sandbox?
 
-Extensions are shared as plain JavaScript files — via GitHub, package registries, or direct transfer. When you install code written by someone else, it is untrusted by definition. The V8 sandbox (powered by `isolated-vm`) ensures that extension code:
+Extensions are shared as plain JavaScript files — via GitHub, package registries, or direct transfer. When you install code written by someone else, it is untrusted by definition. The sandbox is **QuickJS compiled to WASM** (`quickjs-emscripten`), which replaced the earlier V8 `isolated-vm` runtime on 29 April 2026 so that installing a node needs no C++ build tools. It ensures that extension code:
 
 - Cannot access Node.js globals (`process`, `require`, `fs`, `fetch`)
 - Cannot use timers (`setTimeout`, `setInterval`)
 - Cannot use `eval()` or dynamic code execution
 - Is constrained by memory limits, CPU timeouts, and API call caps
 - Can only interact with the node through a controlled `ctx` API proxy
+
+Two consequences of QuickJS worth knowing before you write anything. There is **no `crypto.subtle`**,
+so the sandbox gives you `ctx.hash(s)`, an FNV-1a 64-bit hash published as `EXT_HASH_REFERENCE_JS` so
+a browser app can compute the same value; an app and an extension that hash differently will silently
+recompute and re-charge everything. And time is fixed: `ctx.now()` returns the run's start timestamp
+for the whole action, so a multi-record write stays consistent. Neither costs an API call.
 
 The node operator decides which extensions to install and activate. The sandbox ensures those extensions cannot compromise the node even if the code contains bugs or malicious intent.
 
@@ -41,10 +47,10 @@ The node operator decides which extensions to install and activate. The sandbox 
 |  | Instance: "Co. Exch" |  | Instance: "Club B"   |    |
 |  +--------------------+  +---------------------+    |
 |                                                      |
-|  V8 Sandbox Runtime                                  |
+|  QuickJS-WASM Sandbox Runtime                        |
 |  - Isolated memory (64 MB default)                   |
 |  - CPU timeout (5000 ms default)                     |
-|  - API call limit (50 per action default)            |
+|  - API call limit (500 per action default)           |
 +-----------------------------------------------------+
 ```
 
@@ -463,11 +469,11 @@ Each extension declares resource limits in its manifest. The node enforces these
 |-------|---------------|---------|-----------------|
 | Memory | `limits.memory_mb` | 64 MB | `AIMEAT_EXT_MAX_MEMORY_MB` |
 | CPU timeout | `limits.timeout_ms` | 5000 ms | `AIMEAT_EXT_TIMEOUT_MS` |
-| API calls per action | `limits.max_api_calls` | 50 | `AIMEAT_EXT_MAX_API_CALLS` |
+| API calls per action | `limits.max_api_calls` | 500 on the node, and what a manifest asks for is capped by it | `AIMEAT_EXT_MAX_API_CALLS` |
 | Script size | N/A | N/A | `AIMEAT_EXT_MAX_CODE_SIZE_KB` (256 KB) |
 | Max extensions | N/A | N/A | `AIMEAT_EXT_MAX_INSTALLED` (20) |
 
-If an action exceeds its timeout, the V8 isolate is terminated and an `EXTENSION_TIMEOUT` error is returned. If an action exceeds its API call limit, further API calls return errors.
+If an action exceeds its timeout, the sandbox is terminated and an `EXTENSION_TIMEOUT` error is returned. If an action exceeds its API call limit, further API calls return errors.
 
 ## Federation
 
@@ -612,7 +618,7 @@ Each action should do one thing. A marketplace needs `create-listing`, `purchase
 
 ### Use Memory for All State
 
-Do not try to maintain state inside the extension code. The V8 isolate is created fresh for each action invocation. All state must be stored in and read from memory.
+Do not try to maintain state inside the extension code. The sandbox is created fresh for each action invocation. All state must be stored in and read from memory.
 
 ```javascript
 // WRONG — state is lost between invocations

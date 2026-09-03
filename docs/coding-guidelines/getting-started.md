@@ -139,12 +139,12 @@ aimeat-protocol/
 
 | Document | Location | Purpose |
 |----------|----------|---------|
-| API Specification | `openapi.yaml` | Canonical API contract (75 paths) |
-| RFC Core | `docs/01-core.md` | Protocol overview, concepts, pillars |
+| API Specification | `openapi.yaml` | Canonical API contract (1077 paths) |
+| RFC Core | `docs/AIMEAT-RFC-v4.0-Core-full.md` | The generic, federatable protocol |
+| RFC Platform | `docs/AIMEAT-RFC-v4.0-Platform-full.md` | What aimeat.io builds on the Core |
 | Endpoint Reference | `docs/a-endpoints.md` | Quick endpoint lookup |
-| Config Reference | `docs/b-config.md` | All configuration options |
+| Config Reference | `docs/b-config.md` | Every setting the node reads |
 | Platform Notes | `docs/c-platform-notes.md` | AI platform compatibility |
-| Implementation Guide | `docs/aimeat-implementation-prompt.md` | Detailed implementation guidance |
 | Frontend Guide | `docs/frontend-development-guide.md` | Frontend architecture & conventions |
 
 ---

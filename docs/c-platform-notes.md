@@ -2,14 +2,19 @@
 
 Compatibility guide for connecting different AI platforms to aimeat nodes.
 
-> **v4.0 note:** the primary connect paths are now **MCP** (chat platforms) and **device authorization** (agents/fleets). **Tier 0.5 (OTK / keyed-browse) is deprecated** — the "keyed writes" rows below are legacy; use MCP or device auth instead. Tiers otherwise: 0 (browse), 1 (agent/ecosystem, scoped), 2 (owner/operator).
+> **v4.0 note:** the primary connect paths are **MCP** (chat platforms) and **device authorization**
+> (agents and fleets). **Tier 0.5 (one-time keys, keyed browse) is gone**, not merely deprecated: the
+> routes were removed from the code on 23 August 2026 and answer 404. Where this page still mentions
+> keyed writes, read it as history. The tiers are 0 (browse), 1 (agent or ecosystem app, scoped) and
+> 2 (owner or operator). One command connects a chat client:
+> `aimeat connect client <goose|claude-code|cursor|vscode|claude-desktop> --url <node> --owner <handle>`.
 
 ### Tier Matrix (legacy snapshot — February 2026)
 
 | Platform | Max Tier | How | Notes |
 |----------|----------|-----|-------|
 | Claude.ai Free | 0 | web_fetch (GET only) | Read public memory, catalogue, bootstrap |
-| Claude.ai Pro/Max | 0 → 1 | MCP connector | Add MEAT MCP server as remote connector for full agent access |
+| Claude.ai Pro/Max | 0 → 1 | MCP connector | Add the node's MCP server as a remote connector for full agent access |
 | Claude Code / Computer Use | 1-2 | curl/bash | Full HTTP including POST + headers |
 | ChatGPT Free | 0 | Browse | Read public endpoints |
 | ChatGPT Plus/Pro | 0 → 1 | MCP apps | Add MCP connector for agent capabilities |
@@ -30,27 +35,26 @@ Compatibility guide for connecting different AI platforms to aimeat nodes.
 3. Test: "Connect to my AIMEAT node and check the catalogue"
 
 **ChatGPT (MCP path)**
-1. In ChatGPT → Explore GPTs → Configure, add MEAT MCP server
-2. Similar to Claude — full agent capabilities via MCP
-3. Test: "Use the MEAT connector to read public memory"
+1. In ChatGPT → Explore GPTs → Configure, add the node's MCP server
+2. The same agent capabilities as Claude, over MCP
+3. Test: "Use the AIMEAT connector to read public memory"
 
-**Grok (browse path — Tier 0 only)**
+**Grok (browse path, Tier 0 only)**
 1. Paste your node URL directly: "Fetch https://your-node/v1/catalogue and describe what's available"
 2. Grok can read all public data but cannot write
-3. For Tier 0.5 (keyed writes): not possible via Grok chat. Use Grok API externally
+3. Writing from a Grok chat is not possible at all: use the Grok API from your own runtime, where the agent can hold a token
 
 **Grok (code_execution — offline simulations)**
 Grok's Python sandbox has no internet but is useful for:
 - Running morsel economy simulations (paste the simulator code)
-- Validating JSON against MEAT schemas
+- Validating JSON against AIMEAT schemas
 - Generating Ed25519 keypairs for testing
 - Prototyping action input/output schemas
 
 **Mobile AI (future)**
 On-device models currently lack HTTP tooling. When they gain web browse:
-- Tier 0: Immediate — read public memory and catalogue
-- Tier 0.5: Possible if they support URL parameters (OTK flow is GET-only)
-- Tier 1+: Requires POST capability, unlikely near-term for on-device models
+- Tier 0 works immediately: read public memory and the catalogue
+- Tier 1 and up need POST, which is unlikely near-term for on-device models
 
 ### Cross-Platform Scenarios
 

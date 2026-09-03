@@ -1,140 +1,168 @@
-# Service Owner Manual — Node Extension & Plugin Guide
+# Service Owner Manual
 
-*AIMEAT Protocol — Developer & Operator Guide*
+*How to extend an AIMEAT node: manifests, extensions and hooks.*
 
----
-
-## 1. What is a Service Owner?
-
-A **Service Owner** is anyone who runs an aimeat node. You might operate a community marketplace, a neighborhood hobby directory, or a multi-tenant federation hub. Regardless of scale, your node is yours to extend.
-
-aimeat nodes are designed around a single principle: **plugins attach to nodes, they never rebuild them.** The core node handles identity, memory, federation, the morsel economy, and all protocol-level concerns. You extend it by attaching behavior on top.
-
-There are three levels of extension. Pick the depth that matches your needs:
-
-| Level | Name | Analogy | Who it's for |
-|-------|------|---------|--------------|
-| **1** | YAML Plugin | Installing an app from a store | Non-technical service owners. No code, just configuration. |
-| **2** | JavaScript Sandbox | Writing a spreadsheet macro | Developers who need custom logic but want safety guarantees. |
-| **3** | Webhook Plugin | Running your own backend service | Teams with existing services, any language, full control. |
-
-All three levels share the same packaging format: a `.plugin.yaml` manifest that declares what the plugin provides, what it needs, and how it hooks into the node.
-
-**Cross-reference:** Plugins bundle CSM definitions (see [CSM Manual](./csm-manual.md)) for community-facing services and MSM definitions (see [MSM Manual](./msm-manual.md)) for external API integrations. This manual covers how to package and deploy them together.
+Rewritten 3 September 2026 against the running code. The previous version described a three-level
+`.plugin.yaml` system that was never built; if you are looking for it, see [what changed](#9-what-this-manual-used-to-say) at the end.
 
 ---
 
-## 2. Level 1: YAML Plugins (No Code)
+## 1. What a service owner attaches to a node
 
-The simplest way to extend a node. A YAML plugin bundles one or more CSM and MSM files together with configuration defaults. No code runs. The node loads the manifests and applies the config.
+A **service owner** is anyone who runs an AIMEAT node: a community marketplace, a hobby directory, a
+company's internal hub, a federation relay. The core handles identity, memory, consent, federation
+and the morsel pacing. You attach behaviour on top of it, and there are four ways to do that.
 
-### How it works
+| You want to | Attach | It runs | Who installs |
+|---|---|---|---|
+| Fix the **shape** of your service's data, so bad records are refused | **CSM** manifest | Nothing. It becomes a schema lock the memory API enforces | Owner |
+| Describe an **outside API** so an AI can build against it | **MSM** manifest | Nothing. It is a description an AI reads | Owner, or operator if the node says so |
+| Run **code on the node**: an outbound call with a credential, work that outlives a browser tab, a capability you sell | **Extension** | In a QuickJS-WASM sandbox, in the owner's name | Owner, or a principal holding `ext:write` |
+| Be **asked before** something happens on the node: a registration, a work request, a board post, a peering | **Hook** | Your own webhook, anywhere, in any language | Operator |
 
-1. You write (or generate) a `.plugin.yaml` file.
-2. It references CSM files (community services) and MSM files (API integrations).
-3. You drop the plugin folder into your node's `plugins/` directory.
-4. The node loads it on startup.
+Three things you do **not** attach here, because they have their own paths: **apps** (single HTML
+files, published with `aimeat_app_publish`), **cortex libraries** (browser-side code, see
+`/v1/prompts/build-cortex`), and **skills** (how an agent is told to operate something, see
+`docs/skills-registry.md`).
 
-### Complete example: Espoon Kirpputori
+---
 
-A Finnish flea market plugin that combines a marketplace CSM, MobilePay payment MSM, and Finnish locale defaults.
+## 2. CSM: the shape of your service's data
 
-**Directory structure:**
+A **Community Service Manifest** is a YAML document that says what a record in your service looks
+like, who may see it, and how it is moderated. Registering one is not decoration: the node compiles
+`data_schema` into JSON Schema and installs it as a **schema lock** on the memory key prefix
+`csm.<service-name>`. From then on, every write to that prefix is validated by the generic memory
+API, and a record that does not fit is refused. There are no per-service endpoints and no per-service
+code.
 
-```
-espoon-kirpputori/
-  plugin.yaml
-  marketplace.csm.yaml
-  mobilepay.msm.yaml
-```
+### What registering does, step by step
 
-**plugin.yaml:**
+1. `POST /v1/csm` with the YAML (`Content-Type: text/yaml`) or with JSON carrying a `yaml` field.
+2. The parser reads six blocks and ignores everything else: `service`, `schema_mode`, `data_schema`,
+   `consent_requirements`, `moderation`, `ui_hints`.
+3. Validation. A failure answers `400 VALIDATION_ERROR` and names what is wrong.
+4. A name already in use answers `409 CSM_NAME_TAKEN`. Names are node-wide.
+5. `data_schema` becomes JSON Schema, stored as a schema lock on `csm.<name>` with `applyTo: prefix`
+   and this manifest's `schema_mode`.
+6. The CSM record is stored, with `service.semantic` carried into the schema lock as its semantic
+   context, and `federate: true` (if you asked for it) distributing the manifest to peers.
 
-```yaml
-plugin: "1.0"
-name: "Espoon Kirpputori"
-description: "Kirpputori Espoon alueen asukkaille — osta, myy ja vaihda"
-author: "espoo-community"
-version: "1.0.0"
-license: "MIT"
+`schema_mode: "open"` accepts extra fields beyond the schema; `"strict"` refuses them. Open is the
+right default for a service other people will extend; strict is right when a downstream reader must
+be able to assume the shape.
 
-includes:
-  csm:
-    - marketplace.csm.yaml
-  msm:
-    - mobilepay.msm.yaml
+### The endpoints
 
-config:
-  AIMEAT_MARKETPLACE_ENABLED: "true"
-  AIMEAT_MARKETPLACE_LISTING_FEE: "2"
-  AIMEAT_MARKETPLACE_ESCROW: "true"
-  AIMEAT_MATCH_MAX_DISTANCE_KM: "30"
-```
+| Method | Path | Who |
+|---|---|---|
+| POST | `/v1/csm` | Owner |
+| GET | `/v1/csm` | Anyone (`?type=` filters by service type) |
+| GET | `/v1/csm/templates` | Anyone. Eight built-in templates: marketplace, auction, hobby-directory, dating-directory, news-feed, opinion-board, video-directory, organism |
+| GET | `/v1/csm/templates/{type}` | Anyone. The template's raw YAML, to start from |
+| GET | `/v1/csm/{name}` | Anyone |
+| DELETE | `/v1/csm/{name}` | Owner |
 
-**marketplace.csm.yaml** (the bundled CSM):
+### A worked example
+
+A Finnish flea market. Ten lines decide what a listing is, and the node enforces it from then on.
 
 ```yaml
 csm: "1.0"
 service:
   name: "kirpputori"
   type: "marketplace"
-  description: "Espoon alueen kirpputori — myy ja osta käytettyjä tavaroita"
+  description: "Espoon alueen kirpputori"
   locale: "fi"
 
 schema_mode: "open"
 
 data_schema:
   required:
-    title:
-      type: string
-      minLength: 3
-      maxLength: 200
+    title:      { type: string, minLength: 3, maxLength: 200 }
     price:
       type: object
       properties:
-        amount: { type: number, minimum: 0 }
+        amount:   { type: number, minimum: 0 }
         currency: { type: string, default: "EUR" }
       required: [amount]
-    category:
-      type: string
-      enum: ["elektroniikka", "vaatteet", "koti", "ajoneuvot", "palvelut", "muu"]
-    seller_gaii:
-      type: string
+    category:   { type: string, enum: ["elektroniikka", "vaatteet", "koti", "ajoneuvot", "palvelut", "muu"] }
+    seller_gaii: { type: string }
   optional:
     description: { type: string, maxLength: 2000 }
-    images: { type: array, items: { type: string }, maxItems: 10 }
-    condition: { type: string, enum: ["uusi", "erinomainen", "hyva", "kohtalainen", "heikko"] }
-    location:
-      type: object
-      properties:
-        city: { type: string, default: "Espoo" }
-        country: { type: string, default: "FI" }
-    tags: { type: array, items: { type: string }, maxItems: 10 }
+    images:      { type: array, items: { type: string }, maxItems: 10 }
+    condition:   { type: string, enum: ["uusi", "erinomainen", "hyva", "kohtalainen", "heikko"] }
 
 consent_requirements:
   visibility_default: "federation"
   requires_consent: true
   consent_purpose: "kirpputori-listing"
 
-economy:
-  listing_fee_morsels: 2
-  escrow_enabled: true
-  escrow_release_on: "buyer_confirmation"
+moderation:
+  flags_enabled: true
+  auto_hide_threshold: 5
+  appeals_enabled: true
 
 ui_hints:
   list_view: ["title", "price.amount", "category", "condition"]
-  detail_view: ["title", "description", "price", "category", "condition", "images", "location"]
-  search_fields: ["title", "category", "tags", "location.city"]
+  detail_view: ["title", "description", "price", "category", "condition", "images"]
+  search_fields: ["title", "category", "location.city"]
 ```
 
-**mobilepay.msm.yaml** (the bundled MSM, trimmed for brevity):
+Register it, then write a listing through the ordinary memory API:
+
+```bash
+curl -X POST https://your-node/v1/csm \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: text/yaml" \
+  --data-binary @kirpputori.csm.yaml
+
+curl -X POST https://your-node/v1/memory \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"key":"csm.kirpputori.item-001","value":{"title":"Vanha Nokia 3310","price":{"amount":15},"category":"elektroniikka","seller_gaii":"alice@node"},"visibility":"public"}'
+```
+
+Leave out `category` and the write is refused. That is the whole point of the manifest.
+
+### Where CSM is used today
+
+Beyond standalone services, CSM is how an **organism workspace** gets its object types: the manifest
+at `organism.{id}.meta.manifest` orchestrates, and it references one CSM per object kind, which is
+what validates every record written into that workspace. The node ships a prompt that interviews the
+owner and generates both (the **Manifest Architect**, in the admin System Prompts list under
+`builders`). The vocabulary is open: a Finnish research study using *tavoite* and *löydös* runs on
+the same engine as a project using *goal* and *deliverable*.
+
+Fuller reference: **[CSM Manual](./csm-manual.md)** for authoring, **[csm-spec.md](../csm-spec.md)** for the specification.
+
+---
+
+## 3. MSM: how an outside API is described
+
+A **Machine Service Manifest** describes an external API so an AI can understand it, call it, and
+build an integration around it: base URL, authentication, each action's inputs and outputs, rate
+limits, and what a call should cost.
+
+**The node does not call the API for you.** Registering an MSM validates it and stores it, and that
+is all it does. The value is the description: an AI reads it once, builds the integration, and the
+integration runs afterwards without the AI in the loop. In practice that integration usually lands as
+an **extension** (§4), which is where the credential can live safely.
+
+| Method | Path | Who |
+|---|---|---|
+| POST | `/v1/msm` | The role in `msm.install_role` (`AIMEAT_MSM_INSTALL_ROLE`, default `owner`) |
+| GET | `/v1/msm` | Anyone (`?category=` filters) |
+| GET | `/v1/msm/templates` | Anyone. Ten built-in examples: MobilePay payment, Stripe marketplace, Coinbase transfer, Posti shipping, Wolt restaurant, Nuki smartlock, weather pricing, price estimation, product image analysis, AI logo design |
+| GET | `/v1/msm/templates/{type}` | Anyone. Raw YAML |
+| GET | `/v1/msm/{name}` | Anyone |
+| DELETE | `/v1/msm/{name}` | Owner |
+
+A trimmed manifest, enough to see the shape:
 
 ```yaml
 msm: "1.0"
 service:
   name: "MobilePay Maksut"
-  description: "MobilePay-maksut kirpputorin ostajille ja myyjille"
-  homepage: "https://developer.mobilepay.dk"
+  description: "MobilePay payments for the flea market"
   category: "utility"
   tags: ["payment", "mobilepay", "finland"]
 
@@ -147,725 +175,261 @@ auth:
 actions:
   - id: "create-payment"
     display_name: "Luo MobilePay-maksu"
-    description: "Luo maksupyynto ostajalle"
     endpoint:
       method: POST
       url: "https://api.mobilepay.dk/v1/payments"
       content_type: "application/json"
     input:
-      amount: { type: number, required: true }
-      currency: { type: string, required: false, enum: ["EUR", "DKK"] }
+      amount:      { type: number, required: true }
       description: { type: string, required: true }
-      reference: { type: string, required: true }
+      reference:   { type: string, required: true }
     output:
       payment_id: { type: string, from: "paymentId" }
-      state: { type: string, from: "state" }
+      state:      { type: string, from: "state" }
     pricing:
       base_morsels: 3
 ```
 
-### Installing a YAML plugin
+`pricing` is carried with the manifest and enforced by nothing on its own. What actually charges is
+the extension or EXCHANGE listing built from it.
 
-Copy the plugin folder into your node's plugins directory and restart:
-
-```bash
-cp -r espoon-kirpputori/ /path/to/aimeat/plugins/
-# Restart the node
-pnpm dev
-```
-
-### Sharing a YAML plugin
-
-Zip the folder and send it to another node operator. They drop it in their `plugins/` directory:
-
-```bash
-zip -r espoon-kirpputori.zip espoon-kirpputori/
-# Share the zip — email, federation catalogue, or direct transfer
-```
+Fuller reference: **[MSM Manual](./msm-manual.md)**.
 
 ---
 
-## 3. Level 2: JavaScript Sandboxed Plugins
+## 4. Extensions: code that runs on the node
 
-When YAML configuration is not enough and you need custom logic, write a JavaScript plugin. These run in an **isolated V8 sandbox** (via `isolated-vm`), meaning your code executes with strict safety boundaries.
+An extension is the answer whenever something cannot live in a browser: an outbound call that needs a
+credential, work that must survive the tab closing, a rule that must be *enforced* rather than
+displayed, or a capability you intend to sell. An app calls an extension; it never becomes one.
 
-### Sandbox rules
+Extension code runs in a **QuickJS-WASM sandbox** (`quickjs-emscripten`), which replaced the earlier
+V8 `isolated-vm` runtime on 29 April 2026 so that running a node needs no C++ build tools. The
+sandbox has no Node globals, no timers, no `eval`, and no network except through `ctx`.
 
-**CAN do:**
-- Read and write memory keys via the sandbox API
-- Call registered actions and return results
-- Perform calculations and data transformations
-- Log messages (available in node logs)
-- Return structured data to the caller
+### What an extension is made of
 
-**CANNOT do:**
-- Access the filesystem (`fs`, `path` — unavailable)
-- Make network requests (`fetch`, `http` — unavailable)
-- Access `process`, `child_process`, or environment variables
-- Import Node.js modules
-- Modify global state outside the sandbox
-- Exceed resource limits
+A YAML manifest plus one script per action. The manifest names the actions, their HTTP paths, their
+input and output schemas, the config the extension needs, its resource limits, and (optionally) its
+price. Each action script exports a default function that receives `ctx`:
 
-### Resource limits
+| `ctx` | What it gives |
+|---|---|
+| `ctx.memory.get / set / delete / search / getVersioned` | The extension's own `ext:{name}` namespace |
+| `ctx.memory.getPublic(gaii, key)` | A public record in someone else's namespace, the caller's included |
+| `ctx.fetch(url, opts)` | Outbound HTTP, SSRF-guarded. Returns text and a status; it does not parse JSON for you |
+| `ctx.config` | The manifest's config, with `type: secret` fields decrypted only here |
+| `ctx.caller` | Who is calling: GAII, owner, roles. Absent on a scheduled run |
+| `ctx.instance` | This instance's id and per-instance config, when the extension supports instances |
+| `ctx.wallet.getBalance / consume` | Read and spend the caller's morsels |
+| `ctx.consent.check / require` | Whether the caller granted what this action needs |
+| `ctx.trust.getScore` | The caller's trust score |
+| `ctx.files` | Read and write stored files |
+| `ctx.notify`, `ctx.email` | Tell a person something happened. Check they exist first |
+| `ctx.buy`, `ctx.datapackage` | Buy a capability from EXCHANGE; publish a data package |
+| `ctx.hash(s)`, `ctx.now()` | FNV-1a 64-bit hash (there is no `crypto.subtle` in QuickJS) and the run's fixed start time |
+| `ctx.log.info / warn / error` | The node's log |
 
-| Resource | Limit |
-|----------|-------|
-| CPU time per invocation | 100 ms |
-| Memory | 16 MB |
-| Stack depth | Default V8 limit |
+### Lifecycle
 
-If a plugin exceeds these limits, the invocation is terminated and an error is logged.
+| Method | Path | What it does |
+|---|---|---|
+| POST | `/v1/extensions` | Install. MCP: `aimeat_extension_install` |
+| PUT | `/v1/extensions/{name}` | Redeploy in place, keeping `ext:{name}` memory and instances |
+| PATCH | `/v1/extensions/{name}/actions/{actionId}` | Replace one action's script |
+| POST | `/v1/extensions/{name}/activate` / `/deactivate` | An installed extension that was never activated runs nothing |
+| GET | `/v1/extensions`, `/v1/extensions/{name}`, `/{name}/versions` | Inspect |
+| DELETE | `/v1/extensions/{name}` | Uninstall |
+| POST | `/v1/ext/{name}/{actionId}` | Call an action |
+| POST | `/v1/ext/{name}/{instanceId}/{actionId}` | Call an action on one instance |
 
-### Hook functions
+**Instances** let one extension serve several communities: `instances.supported: true` in the
+manifest plus a `config_per_instance` schema, then `POST /v1/extensions/{name}/instances` per
+community, each with its own config, visibility (public, password, invite) and memory.
 
-Sandboxed plugins export named functions that the node calls at specific trigger points:
+**Secrets.** A config field marked `type: secret` is encrypted at rest with the node key, decrypted
+only on its way into the sandbox, and masked in every API response. A credential belongs nowhere
+else: not in the script, not in a return value. A buyer gets your action's result and never your key.
 
-| Export | Trigger | Arguments |
-|--------|---------|-----------|
-| `exports.onListing` | A new marketplace listing is created | `{ listing, owner, node }` |
-| `exports.onPurchase` | A marketplace purchase is initiated | `{ purchase, buyer, seller, node }` |
-| `exports.onMatch` | The matching engine produces a match | `{ match, profiles, node }` |
-| `exports.onSchedule` | Periodic timer fires (configurable interval) | `{ timestamp, node }` |
-| `exports.onBoardPost` | A new board post is submitted | `{ post, board, author, node }` |
-| `exports.onFlagCreated` | A content flag is raised | `{ flag, target, reporter, node }` |
+**Limits**, all operator-configurable: 64 MB memory, 5000 ms CPU, 500 API calls per action, 256 kB of
+script per action, 20 extensions installed. A manifest may ask for less, never more.
 
-### Complete example: price-checker.js
+**Who may install:** the owner role, or a principal holding `ext:write`. An app running under an app
+grant cannot: `ext:write` is deliberately outside the grantable scope vocabulary, because an
+extension outlives the grant that created it and can charge money in the owner's name. An app may
+*write* a manifest and hand it over; a human or an authorised agent installs it.
 
-A plugin that warns sellers when a listing price seems unusually high compared to similar items:
+**Selling it.** An action's `commercial` block prices it (`payMorsels`, and `payMoney` in six-decimal
+micro-units, so `50000` is 0.05 EUR) and `exchange: true` lists it. The manifest is the listing;
+there is no separate call. Both input and output schemas are required, or the listing is skipped.
 
-```javascript
-// price-checker.js
-// Sandboxed plugin — warns about overpriced listings
+Before writing any of it, fetch the canonical spec, which is always current and does change:
 
-exports.onListing = function(ctx) {
-  var listing = ctx.listing;
-  var category = listing.category;
-  var price = listing.priceMorsels;
-
-  // Category average thresholds (morsels)
-  var thresholds = {
-    electronics: 500,
-    clothing: 100,
-    home: 200,
-    vehicles: 2000,
-    services: 300,
-    other: 150
-  };
-
-  var threshold = thresholds[category] || 200;
-
-  if (price > threshold * 3) {
-    return {
-      action: "warn",
-      message: "Hinta on huomattavasti keskiarvon ylapuolella kategoriassa '" + category + "'. "
-        + "Keskimaarainen hinta: " + threshold + " morselia, sinun hintasi: " + price + " morselia.",
-      severity: "info"
-    };
-  }
-
-  if (price > threshold * 5) {
-    return {
-      action: "flag",
-      message: "Hinta vaikuttaa epatyypilliselta. Tarkista ennen julkaisua.",
-      severity: "warning"
-    };
-  }
-
-  return { action: "allow" };
-};
-
-exports.onSchedule = function(ctx) {
-  // Could periodically recalculate average prices from memory
-  log("Price checker heartbeat: " + ctx.timestamp);
-  return { action: "ok" };
-};
+```
+GET /v1/prompts/build-extension
 ```
 
-### Plugin manifest with hooks
-
-To wire the sandbox plugin into your node, reference it from `plugin.yaml`:
-
-```yaml
-plugin: "1.0"
-name: "Price Checker"
-description: "Warns sellers about unusually high listing prices"
-author: "marketplace-tools"
-version: "1.0.0"
-license: "MIT"
-
-hooks:
-  sandbox: "price-checker.js"
-  triggers:
-    - onListing
-    - onSchedule
-  schedule_interval_minutes: 60
-```
-
-The `triggers` array tells the node which exported functions to call. The `schedule_interval_minutes` field controls how often `onSchedule` fires.
+Fuller reference: **[Service Extensions Manual](./service-extensions-manual.md)**, the layering rules
+in **[extension-memory-architecture.md](../coding-guidelines/extension-memory-architecture.md)**, and
+the agent-facing skill `node:aimeat-extension-builder`.
 
 ---
 
-## 4. Level 3: Webhook Plugins
+## 5. Hooks: being asked before something happens
 
-For maximum flexibility, run your own external process and let the node call it via HTTP. Webhook plugins can be written in any language, run in Docker, and access databases, ML models, or third-party APIs.
+A hook is the node stopping to ask an outside service whether an action is allowed, or telling it
+that one happened. This is where "your own backend, in any language" belongs.
 
-### How it works
+There are eleven hook points, and they divide into two kinds:
 
-1. You run an HTTP service (Flask, Express, FastAPI, or anything that speaks HTTP).
-2. Your `plugin.yaml` declares the webhook URL and which trigger points to call.
-3. The node sends a POST request to your service at each trigger point.
-4. Your service responds with a JSON result (allow, deny, or custom data).
+**Blocking.** The node waits for the answer and abandons the operation if any attached action says no.
 
-### Trigger points
+| Hook | Fires when | Context it sends |
+|---|---|---|
+| `pre_owner_registration` | Somebody tries to create an account | `name`, `display_name` |
+| `pre_agent_registration` | An agent tries to register, including through device authorization | `name`, `owner`, `display_name` |
+| `pre_work_request` | Work is about to be posted | The work request |
+| `pre_board_post` | A post is about to be written | `board_id`, `author_gaii` |
+| `pre_federation_peer` | This node is about to peer with another | `target_url`, `target_node_id` |
 
-These correspond to the node's extension hooks defined in the configuration:
+**Fire and forget.** The node tells you and carries on; a failure is logged, never propagated.
 
-| Hook | When it fires | Pre/Post |
-|------|--------------|----------|
-| `pre_owner_registration` | Before a new owner is registered | Pre (can block) |
-| `post_owner_registration` | After a new owner is registered | Post (informational) |
-| `pre_work_request` | Before a work queue item is created | Pre (can block) |
-| `post_work_delivery` | After work is delivered | Post (informational) |
-| `post_settlement` | After a morsel settlement completes | Post (informational) |
-| `pre_board_post` | Before a board post is published | Pre (can block) |
-| `pre_federation_peer` | Before a peering request is accepted | Pre (can block) |
+`post_owner_registration` · `post_agent_registration` · `owner_recovery` · `agent_rekey` ·
+`post_work_delivery` · `post_settlement`
 
-**Pre-hooks** can block the operation by returning `{ "allowed": false, "reason": "..." }`. If a pre-hook fails to respond (timeout or error), the operation is blocked (fail-closed).
+### How a hook runs
 
-**Post-hooks** are informational. If they fail, the failure is logged but the operation is not rolled back.
-
-### Request format
-
-The node sends a POST with this JSON body:
+Each hook holds a list of **action references**, and each action carries a webhook URL. For every
+attached action, in order, the node POSTs JSON to that URL:
 
 ```json
 {
-  "hook": "pre_board_post",
-  "action_ref": "content-filter#operator@my-node",
-  "context": {
-    "post": { "title": "Myydaan polkupyora", "body": "..." },
-    "board": "marketplace",
-    "author": "agent-abc123"
-  },
-  "node_id": "aimeat-local-001-dev",
-  "timestamp": "2026-03-01T12:00:00.000Z"
+  "hook": "pre_owner_registration",
+  "action_ref": "spam-check",
+  "context": { "name": "alice", "display_name": "Alice" },
+  "node_id": "aimeat-finland-001-genesis",
+  "timestamp": "2026-09-03T18:00:00.000Z"
 }
 ```
 
-### Response format
+Two ways to refuse: answer with a non-2xx status, or answer `200` with `{"allowed": false, "reason":
+"..."}`. Anything else lets the flow continue. Outbound calls are SSRF-guarded (a webhook pointing at
+a private address is skipped with a log line) and time out after 10 seconds. An action reference that
+does not resolve is skipped with a warning, so a deleted action fails open rather than locking
+registration.
 
-Return HTTP 200 with:
+### Attaching one
 
-```json
-{
-  "allowed": true
-}
+From the admin dashboard's **Hooks** tab, or directly:
+
+```bash
+curl -X PUT https://your-node/v1/admin/hooks/pre_owner_registration \
+  -H "Authorization: Bearer $OPERATOR_TOKEN" -H "Content-Type: application/json" \
+  -d '{"actions": ["spam-check"]}'
+
+curl https://your-node/v1/admin/hooks -H "Authorization: Bearer $OPERATOR_TOKEN"
 ```
 
-Or to block:
+An action reference is either the action's id, or `id#providerGaii` when two providers publish the
+same id.
 
-```json
-{
-  "allowed": false,
-  "reason": "Content contains prohibited terms"
-}
-```
-
-### Complete example: Python recommendation engine
-
-A Flask service that analyzes new marketplace listings and suggests related items to buyers:
+### A worked example: refuse throwaway domains
 
 ```python
-# recommendation_webhook.py
-# External webhook plugin — listing recommendation engine
-
+# spam_check.py: the webhook behind a pre_owner_registration hook
 from flask import Flask, request, jsonify
-import json
 
+BLOCKED = {"mailinator.com", "guerrillamail.com"}
 app = Flask(__name__)
 
-# In-memory store of recent listings for similarity matching
-recent_listings = []
+@app.post("/hook")
+def hook():
+    body = request.get_json(force=True)
+    if body.get("hook") != "pre_owner_registration":
+        return jsonify(allowed=True)
 
-@app.route("/hook", methods=["POST"])
-def handle_hook():
-    payload = request.get_json()
-    hook = payload.get("hook")
-    context = payload.get("context", {})
-
-    if hook == "post_owner_registration":
-        # Log new registrations for analytics
-        owner = context.get("owner_name", "unknown")
-        app.logger.info(f"New owner registered: {owner}")
-        return jsonify({"allowed": True})
-
-    if hook == "pre_board_post":
-        # Simple content filter
-        post = context.get("post", {})
-        body = post.get("body", "").lower()
-        blocked_terms = ["spam", "scam", "phishing"]
-        for term in blocked_terms:
-            if term in body:
-                return jsonify({
-                    "allowed": False,
-                    "reason": f"Sisalto sisaltaa estetyn termin: '{term}'"
-                })
-        return jsonify({"allowed": True})
-
-    if hook == "post_work_delivery":
-        # Track completed work for recommendation scoring
-        work = context.get("work", {})
-        recent_listings.append({
-            "type": work.get("action"),
-            "tags": work.get("tags", []),
-            "timestamp": payload.get("timestamp")
-        })
-        # Keep only last 1000 entries
-        if len(recent_listings) > 1000:
-            recent_listings.pop(0)
-        return jsonify({"allowed": True})
-
-    # Default: allow everything else
-    return jsonify({"allowed": True})
-
-
-@app.route("/health", methods=["GET"])
-def health():
-    return jsonify({"status": "ok", "listings_tracked": len(recent_listings)})
-
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=9100)
+    name = (body.get("context") or {}).get("name", "")
+    domain = name.split("@")[-1].lower() if "@" in name else ""
+    if domain in BLOCKED:
+        return jsonify(allowed=False, reason="Throwaway email domains are not accepted here.")
+    return jsonify(allowed=True)
 ```
 
-### Plugin manifest with webhooks
-
-```yaml
-plugin: "1.0"
-name: "Recommendation Engine"
-description: "Content filtering and listing recommendations via external Python service"
-author: "analytics-team"
-version: "2.1.0"
-license: "Apache-2.0"
-
-webhooks:
-  url: "http://localhost:9100/hook"
-  timeout_ms: 5000
-  triggers:
-    - post_owner_registration
-    - pre_board_post
-    - post_work_delivery
-```
-
-### Running with Docker
-
-```dockerfile
-FROM python:3.12-slim
-WORKDIR /app
-COPY recommendation_webhook.py .
-RUN pip install flask
-EXPOSE 9100
-CMD ["python", "recommendation_webhook.py"]
-```
-
-```bash
-docker build -t aimeat-recommendations .
-docker run -d -p 9100:9100 --name recommendations aimeat-recommendations
-```
-
-The node will POST to `http://localhost:9100/hook` at each configured trigger point. If the webhook does not respond within `timeout_ms`, pre-hooks block the operation and post-hooks log the failure.
-
-The node retries failed webhook deliveries up to `AIMEAT_WEBHOOK_MAX_RETRIES` times (default: 5).
+Run it anywhere reachable over HTTPS, register it as an action with that webhook URL, and attach the
+action to the hook. The reason string reaches the person who tried to register, so write it for them.
 
 ---
 
-## 5. Node Configuration Reference
+## 6. Node configuration
 
-All configuration is via environment variables. Set them in your `.env` file or pass them directly. The node reads them on startup via `loadConfig()` in `src/config.ts`.
+Every setting has a dot path (`morsel_policy.daily_allowance`) and an environment variable
+(`AIMEAT_DAILY_ALLOWANCE`). There are about 300 of them, `aimeat/.env.example` documents them all
+with safe defaults, and `aimeat config` prints what your node is actually running with.
 
-### Identity
+The ones a service owner changes first:
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `AIMEAT_NODE_ID` | `aimeat-local-001-dev` | Unique node identifier |
-| `AIMEAT_PORT` | `40050` | HTTP listen port |
-| `AIMEAT_NODE_TYPE` | `full` | Node type: `full`, `relay`, `mirror`, or `personal` |
-| `AIMEAT_BASE_URL` | `http://localhost:{port}` | Public URL of the node |
-| `AIMEAT_ADMIN_PASSWORD` | *(auto-generated)* | Operator admin password. Printed to console if not set |
+| Setting | Environment variable | Default |
+|---|---|---|
+| Storage backend | `AIMEAT_STORAGE` | `memory`. Use `sqlite` or `postgres-kysely` for anything real |
+| Public address | `AIMEAT_BASE_URL` | `http://localhost:$PORT` |
+| Who may register | `AIMEAT_REGISTRATION_MODE` | `open`, or `oauth` / `invite` / `closed` |
+| Welcome morsels | `AIMEAT_WELCOME_BONUS` | `100` |
+| Daily accrual, and its ceiling | `AIMEAT_DAILY_ALLOWANCE`, `AIMEAT_DAILY_ALLOWANCE_CAP` | `50`, `500` |
+| Memory per owner, keys per principal | `AIMEAT_MEMORY_QUOTA_MB`, `AIMEAT_MEMORY_MAX_KEYS` | `10`, `1000` |
+| Files per owner, largest file | `AIMEAT_STORAGE_QUOTA_MB`, `AIMEAT_STORAGE_MAX_FILE_SIZE_MB` | `100`, `10` |
+| Who may install an MSM | `AIMEAT_MSM_INSTALL_ROLE` | `owner` |
+| Who may install an extension | `AIMEAT_EXT_INSTALL_ROLE` | `operator` |
+| Extension sandbox limits | `AIMEAT_EXT_MAX_MEMORY_MB`, `AIMEAT_EXT_TIMEOUT_MS`, `AIMEAT_EXT_MAX_API_CALLS` | `64`, `5000`, `500` |
 
-### Modes
+The operator block (`operator.*`) has no default on purpose: a node that has not said who runs it
+answers 503 on `/v1/privacy` rather than naming somebody else as the data controller.
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `AIMEAT_DEV_MODE` | `false` | Development mode — relaxes auth validation for local development |
-| `AIMEAT_ANONYMOUS` | `false` | Anonymous mode — no auth required, creates shared agent on startup |
-
-### Auth & Tokens
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `AIMEAT_JWT_TTL` | `3600` | JWT lifetime in seconds |
-| `AIMEAT_OTK_TTL_MS` | `300000` | One-time key expiry in milliseconds (5 min) — **deprecated (v4.0)**, off by default; agent auth is device authorization (RFC 8628) |
-| `AIMEAT_OTK_GRACE_MS` | `60000` | OTK grace period in milliseconds (1 min) — **deprecated (v4.0)**, off by default; agent auth is device authorization (RFC 8628) |
-
-### Storage
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DATABASE_URL` | *(empty — in-memory)* | PostgreSQL connection string (when `AIMEAT_STORAGE=postgres-kysely`). Leave empty for in-memory storage |
-
-### Features
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `AIMEAT_KEYED_BROWSE` | `true` | Enable keyed browse (Tier 0.5) — **deprecated (v4.0)**, off by default |
-| `AIMEAT_EXTENDED_FEATURES` | `true` | Enable boards, federation, storage, validate |
-
-### Quotas
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `AIMEAT_MEMORY_QUOTA_MB` | `10` | Default memory quota per owner in MB |
-| `AIMEAT_STORAGE_QUOTA_MB` | `100` | Default file storage quota per owner in MB |
-| `AIMEAT_MICRO_MEMORY_QUOTA_KB` | `500` | Micro-memory quota per agent in KB — **deprecated (v4.0)**, off by default |
-| `AIMEAT_MEMORY_OVERAGE_MORSELS` | `10` | Extra memory cost: morsels per MB per month |
-| `AIMEAT_STORAGE_OVERAGE_MORSELS` | `100` | Extra storage cost: morsels per GB per month |
-| `AIMEAT_MAX_URL_LENGTH` | `8192` | Maximum URL length accepted |
-
-### Economy
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `AIMEAT_WELCOME_BONUS` | `100` | Morsels granted on registration |
-| `AIMEAT_DAILY_ALLOWANCE` | `50` | Daily morsel allowance |
-| `AIMEAT_DAILY_ALLOWANCE_CAP` | `500` | Maximum morsel balance from daily allowance |
-| `AIMEAT_BURN_RATE` | `0.10` | Network fee burn rate (10%) |
-| `AIMEAT_MAX_OPERATOR_MINT_PER_DAY` | `10000` | Maximum morsels operator can mint per day |
-| `AIMEAT_BOARD_POST_BASE_COST` | `5` | Base cost to post on a board (morsels) |
-| `AIMEAT_BOARD_POST_COST_PER_KB` | `2` | Additional cost per KB of post content |
-
-### Federation
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `AIMEAT_FEDERATION_ROLE` | `standalone` | Federation role: `operator`, `contributor`, `standalone` |
-| `AIMEAT_GENESIS_URL` | *(empty)* | Genesis node URL (for contributor role) |
-| `AIMEAT_MAX_RELAY_HOPS` | `3` | Maximum relay hops for federated requests |
-| `AIMEAT_DEPEERING_GRACE_HOURS` | `72` | Hours before a silent peer is de-peered |
-| `AIMEAT_KEY_CACHE_REFRESH_MINUTES` | `5` | How often to refresh peer key caches |
-
-### Work Queue
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `AIMEAT_WEBHOOK_MAX_RETRIES` | `5` | Maximum webhook delivery retries |
-| `AIMEAT_WORK_QUEUE_MAX_PENDING` | `10` | Maximum pending work items per agent |
-
-### Rate Limits
-
-All values are requests per second. Role multipliers apply on top: operator 10x, owner 2x, agent 1x, anonymous 0.5x.
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `AIMEAT_RL_GLOBAL` | `300` | Global rate limit |
-| `AIMEAT_RL_AUTH` | `20` | Auth endpoint rate limit |
-| `AIMEAT_RL_WORK` | `60` | Work queue rate limit |
-| `AIMEAT_RL_MEMORY` | `120` | Memory endpoint rate limit |
-| `AIMEAT_RL_BOARDS` | `60` | Boards endpoint rate limit |
-
-### Consent Layer
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `AIMEAT_CONSENT_ENABLED` | `true` | Enable consent tracking |
-| `AIMEAT_CONSENT_AUDIT_RETENTION_DAYS` | `365` | Days to retain consent audit logs |
-| `AIMEAT_CONSENT_MAX_PER_USER` | `100` | Maximum consent grants per user |
-
-### TOTP / 2FA
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `AIMEAT_TOTP_ENABLED` | `true` | Enable TOTP two-factor authentication |
-| `AIMEAT_TOTP_ISSUER` | `AIMEAT` | Issuer name shown in authenticator apps |
-| `AIMEAT_TOTP_PERIOD` | `30` | TOTP code period in seconds |
-| `AIMEAT_TOTP_WINDOW` | `1` | Acceptable time drift window |
-| `AIMEAT_TOTP_BACKUP_CODE_COUNT` | `10` | Number of backup codes generated |
-| `AIMEAT_TOTP_ENCRYPTION_KEY` | *(empty)* | AES key for encrypting TOTP secrets. Generate: `openssl rand -hex 32` |
-| `AIMEAT_TOTP_MAX_FAILED` | `5` | Max failed attempts before lockout |
-| `AIMEAT_TOTP_LOCKOUT_SECONDS` | `300` | Lockout duration in seconds (5 min) |
-
-### Personal Nodes
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `AIMEAT_PERSONAL_NODES_ENABLED` | `true` | Enable personal node hosting |
-| `AIMEAT_PERSONAL_NODE_MAX_SLOTS` | `100` | Maximum personal node slots |
-| `AIMEAT_PERSONAL_MAILBOX_QUOTA_MB` | `50` | Mailbox quota per personal node in MB |
-| `AIMEAT_PERSONAL_MAILBOX_RETENTION_DAYS` | `7` | Mailbox message retention in days |
-| `AIMEAT_PERSONAL_HEARTBEAT_MS` | `30000` | Heartbeat interval in milliseconds (30 s) |
-| `AIMEAT_PERSONAL_OFFLINE_MS` | `300000` | Offline threshold in milliseconds (5 min) |
-
-### Email / SMTP
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `AIMEAT_SMTP_HOST` | *(empty)* | SMTP server hostname. Email is enabled when this is set |
-| `AIMEAT_SMTP_PORT` | `587` | SMTP port |
-| `AIMEAT_SMTP_USER` | *(empty)* | SMTP username |
-| `AIMEAT_SMTP_PASS` | *(empty)* | SMTP password |
-| `AIMEAT_SMTP_FROM` | `AIMEAT <noreply@localhost>` | From address for outgoing emails |
-| `AIMEAT_SMTP_SECURE` | `false` | Use TLS for SMTP |
-| `AIMEAT_EMAIL_CONFIRMATION_REQUIRED` | `false` | Require email confirmation on registration |
-
-### Match Notifications
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `AIMEAT_MATCH_NOTIFICATION_ENABLED` | `true` | Enable match notification emails |
-| `AIMEAT_MATCH_NOTIFICATION_INTERVAL_HOURS` | `24` | Hours between notification checks |
-
-### AI Matching
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `AIMEAT_MATCHING_ENABLED` | `true` | Enable the AI matching engine |
-| `AIMEAT_MATCH_INTERVAL_HOURS` | `24` | Hours between matching rounds |
-| `AIMEAT_MATCH_THRESHOLD` | `0.5` | Minimum match score (0.0 - 1.0) |
-| `AIMEAT_MATCH_MAX_SUGGESTIONS` | `5` | Max suggestions per user per round |
-| `AIMEAT_MATCH_MAX_DISTANCE_KM` | `100` | Maximum distance for matching in km |
-| `AIMEAT_MATCH_COOLDOWN_DAYS` | `7` | Days before same pair is re-suggested |
-
-### Marketplace
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `AIMEAT_MARKETPLACE_ENABLED` | `true` | Enable the marketplace feature |
-| `AIMEAT_MARKETPLACE_LISTING_FEE` | `2` | Listing fee in morsels |
-| `AIMEAT_MARKETPLACE_TX_FEE_PERCENT` | `5` | Transaction fee percentage (buyer pays) |
-| `AIMEAT_MARKETPLACE_ESCROW` | `true` | Enable escrow for purchases |
-
-### Push Notifications / PWA
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `AIMEAT_PUSH_ENABLED` | `true` | Enable push notifications |
-| `AIMEAT_VAPID_PUBLIC_KEY` | *(empty)* | VAPID public key. Generate: `npx web-push generate-vapid-keys` |
-| `AIMEAT_VAPID_PRIVATE_KEY` | *(empty)* | VAPID private key |
-| `AIMEAT_VAPID_SUBJECT` | `mailto:admin@aimeat.example.com` | VAPID subject (email or URL) |
-
-### EUDIW / Identity Verification
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `AIMEAT_EUDIW_ENABLED` | `false` | Enable EU Digital Identity Wallet verification |
-| `AIMEAT_EUDIW_CLIENT_ID` | `aimeat-verifier-001` | EUDIW client identifier |
-| `AIMEAT_EUDIW_REDIRECT_URI` | *(empty)* | OAuth callback URI for EUDIW |
-| `AIMEAT_FTN_ENABLED` | `false` | Enable Finnish Trust Network (Suomi.fi tunnistautuminen) |
-| `AIMEAT_FTN_PROVIDER_URL` | `https://tunnistautuminen.suomi.fi` | FTN provider URL |
-| `AIMEAT_VC_ISSUER_DID` | *(empty)* | Verifiable Credential issuer DID |
-
-### Cross-Federation
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `AIMEAT_CROSS_FEDERATION_ENABLED` | `true` | Enable cross-federation between genesis nodes |
-| `AIMEAT_MAX_GENESIS_PEERS` | `10` | Maximum number of genesis peers |
-| `AIMEAT_GENESIS_SYNC_INTERVAL_HOURS` | `6` | Hours between genesis sync rounds |
-
-### Search Indexing
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `AIMEAT_INDEXNOW_KEY` | *(empty)* | IndexNow API key for Bing/Yandex indexing. Generate: `openssl rand -hex 16` |
+Full reference, including where a value comes from and what a running node will let you change:
+**[b-config.md](../b-config.md)**.
 
 ---
 
-## 6. Plugin Manifest Reference
+## 7. Choosing between the four
 
-Every plugin is described by a `plugin.yaml` file. This section documents every field.
+| The thing you want | Use |
+|---|---|
+| "A listing must always have a price and a category" | CSM |
+| "Records in this workspace must all look the same" | CSM, referenced from the organism manifest |
+| "Here is how our shipping provider's API works" | MSM |
+| "Call that shipping API with our key when a sale completes" | Extension |
+| "This pricing formula is the product; nobody may copy it" | Extension |
+| "Sell this capability to other people's agents" | Extension with a `commercial` block |
+| "Check every new account against our CRM before it exists" | Hook (`pre_owner_registration`) |
+| "Tell our Slack when work settles" | Hook (`post_settlement`) |
+| "A page people can use" | An app, not any of these. `aimeat_app_publish` |
 
-### Full annotated example
-
-```yaml
-# ── Plugin Identity ──────────────────────────────────────────
-plugin: "1.0"                    # Plugin manifest version (required)
-name: "Espoon Kirpputori"       # Human-readable name (required)
-description: >                   # What the plugin does (required)
-  Kirpputori Espoon alueen asukkaille.
-  Sisaltaa marketplace-palvelun, MobilePay-maksut
-  ja suomenkielisen lokalisoinnin.
-author: "espoo-community"        # Author identifier (required)
-version: "1.2.0"                 # Semantic version (required)
-license: "MIT"                   # SPDX license identifier (optional)
-
-# ── Included Manifests ───────────────────────────────────────
-# List of CSM and MSM files bundled with this plugin.
-# Paths are relative to the plugin directory.
-includes:
-  csm:
-    - marketplace.csm.yaml       # Community service definition
-    - hobby-directory.csm.yaml   # Can include multiple CSMs
-  msm:
-    - mobilepay.msm.yaml         # Market service (API integration)
-    - posti-shipping.msm.yaml    # Can include multiple MSMs
-
-# ── JavaScript Sandbox Hooks (Level 2) ───────────────────────
-# Optional. Only needed if you have custom logic.
-hooks:
-  sandbox: "price-checker.js"    # Path to sandboxed JS file
-  triggers:                      # Which exports to call
-    - onListing
-    - onPurchase
-    - onSchedule
-  schedule_interval_minutes: 60  # For onSchedule hook (optional)
-
-# ── Webhook Integration (Level 3) ────────────────────────────
-# Optional. Only needed if you have an external service.
-webhooks:
-  url: "http://localhost:9100/hook"   # Your service endpoint
-  timeout_ms: 5000                     # Request timeout (default: 10000)
-  triggers:                            # Which extension hooks to call
-    - pre_board_post
-    - post_owner_registration
-    - post_work_delivery
-
-# ── Config Overrides ─────────────────────────────────────────
-# Environment variable defaults that this plugin recommends.
-# These are applied as defaults — the node operator can override.
-config:
-  AIMEAT_MARKETPLACE_ENABLED: "true"
-  AIMEAT_MARKETPLACE_LISTING_FEE: "2"
-  AIMEAT_MARKETPLACE_ESCROW: "true"
-  AIMEAT_MATCH_MAX_DISTANCE_KM: "30"
-  AIMEAT_BOARD_POST_BASE_COST: "3"
-```
-
-### Field reference
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `plugin` | string | Yes | Manifest version. Currently `"1.0"` |
-| `name` | string | Yes | Human-readable plugin name |
-| `description` | string | Yes | What the plugin does |
-| `author` | string | Yes | Author or organization identifier |
-| `version` | string | Yes | Semantic version (e.g., `"1.2.0"`) |
-| `license` | string | No | SPDX license identifier |
-| `includes.csm` | string[] | No | List of CSM YAML files to load |
-| `includes.msm` | string[] | No | List of MSM YAML files to load |
-| `hooks.sandbox` | string | No | Path to sandboxed JavaScript file |
-| `hooks.triggers` | string[] | No | Exported functions to call |
-| `hooks.schedule_interval_minutes` | number | No | Interval for `onSchedule` calls |
-| `webhooks.url` | string | No | External service HTTP endpoint |
-| `webhooks.timeout_ms` | number | No | Request timeout (default: 10000) |
-| `webhooks.triggers` | string[] | No | Extension hook names to call |
-| `config` | map | No | Environment variable defaults |
-
-### Combining levels
-
-A single plugin can use all three levels simultaneously. For example, a marketplace plugin might:
-
-1. Bundle CSM + MSM files (Level 1) for the service definitions
-2. Include a sandbox script (Level 2) for price validation logic
-3. Connect a webhook (Level 3) for ML-based fraud detection
-
-The node processes them in order: config defaults are applied first, then CSM/MSM files are loaded, then sandbox hooks are registered, then webhook triggers are wired.
+A rule of thumb: a **manifest** describes, an **extension** does, and a **hook** is somebody else
+being asked. If your answer needs a secret, it is an extension. If it needs to say no, it is a hook or
+a schema.
 
 ---
 
-## 7. Sharing Plugins
+## 8. Sharing what you built
 
-### Package structure
-
-A shareable plugin is a folder (or zip of a folder) with this layout:
-
-```
-my-plugin/
-  plugin.yaml          # Required: the manifest
-  service.csm.yaml     # Optional: CSM files
-  api.msm.yaml         # Optional: MSM files
-  logic.js             # Optional: sandbox script
-  README.md            # Optional: human-readable docs
-```
-
-### Distribution methods
-
-**Direct sharing:** Zip the folder and send it. The recipient drops it into their `plugins/` directory.
-
-```bash
-zip -r my-plugin-v1.0.0.zip my-plugin/
-```
-
-**Federation catalogue:** Nodes with `AIMEAT_EXTENDED_FEATURES=true` expose a catalogue at `/v1/catalogue`. Plugins can register themselves in the catalogue, making them discoverable by peer nodes.
-
-**Version pinning:** Use semantic versioning in your `version` field. When updating a plugin, bump the version. Node operators can choose when to upgrade by replacing the plugin folder.
-
-### Best practices
-
-- Keep plugin folders self-contained. All referenced files (CSM, MSM, JS) should be inside the folder.
-- Document required environment variables in your README if your plugin needs API keys (e.g., MobilePay credentials).
-- Test your plugin on a local node with `AIMEAT_DEV_MODE=true` before distributing.
-- If your plugin includes webhooks, document the external service setup (Docker image, port, dependencies).
+- **A CSM or MSM** is one YAML file. Send it, publish it, or set `federate: true` on a CSM and let
+  peers pick it up.
+- **An extension** exports as a manifest plus scripts and installs on any node with one call.
+- **Everything together** goes into a package: apps, extensions, cortex, translations and manifests
+  in one installable unit, published to the template gallery. See
+  **[local-first-package-workflow.md](../guides/local-first-package-workflow.md)** for the
+  local-directory-as-source-of-truth pattern.
 
 ---
 
-## 8. Creating Plugins with AI
+## 9. What this manual used to say
 
-AI assistants (Claude, GPT, or any AIMEAT-connected agent) can generate plugins at all three levels from natural language prompts. The key is to describe what you want, not how to build it.
+Until 3 September 2026 this manual described a three-level plugin system built around a
+`.plugin.yaml` manifest that you unzipped into a `plugins/` directory and restarted into. **Level 1
+never existed**: nothing in the node reads that manifest, and there is no `plugins/` directory.
+Level 2 existed but on a different engine and in a different shape (actions in a QuickJS-WASM
+sandbox, not hook functions in a V8 isolate). Level 3, webhooks, was real all along, and it is §5
+above.
 
-### Level 1 prompt: YAML-only plugin
-
-**Prompt:**
-
-> Create an AIMEAT plugin for a book club directory with Finnish locale. Members can list books they want to discuss, with fields for title, author, genre, and meeting preference (online/in-person). Include a CSM with open schema mode and location defaults for Helsinki.
-
-**What the AI generates:** A `plugin.yaml` with a bundled `book-club.csm.yaml`, Finnish field names in the CSM description, Helsinki as the default location, and recommended config overrides for matching distance.
-
-### Level 2 prompt: Sandbox plugin
-
-**Prompt:**
-
-> Write an AIMEAT sandboxed plugin that checks marketplace listings for overpricing. Compare the listing price against category averages. If a price exceeds 3x the category average, return a warning. If it exceeds 5x, flag the listing for review. Use Finnish in the warning messages.
-
-**What the AI generates:** A `plugin.yaml` with a `hooks` section pointing to a `price-checker.js` file. The JS file exports `onListing` with the threshold logic and Finnish messages. The manifest lists `onListing` in its triggers.
-
-### Level 3 prompt: Webhook plugin
-
-**Prompt:**
-
-> Connect my Python image analysis service as a webhook plugin for AIMEAT. The service runs on port 9200 and accepts POST requests at /analyze. It should be called after work delivery to analyze uploaded images, and before board posts to check for prohibited image content. Include a Dockerfile.
-
-**What the AI generates:** A `plugin.yaml` with a `webhooks` section pointing to `http://localhost:9200/analyze`, triggers for `post_work_delivery` and `pre_board_post`, and a timeout of 10 seconds (image analysis is slow). It also generates a `Dockerfile` and a Python Flask skeleton with the two hook handlers.
-
-### Tips for effective prompts
-
-1. **State the service type clearly.** "Marketplace", "hobby directory", "dating directory", "news feed" — the AI maps these to known CSM templates.
-2. **Mention the locale.** "Finnish locale" or "suomeksi" tells the AI to use Finnish field names and descriptions.
-3. **Describe the data fields.** The more specific you are about what users enter, the better the generated schema.
-4. **Specify the extension level.** Say "YAML only", "with sandbox logic", or "with an external webhook" to guide which level gets generated.
-5. **Include constraints.** "Maximum 5 images per listing", "price must be in EUR", "only available in Espoo area" — these become schema validations and config overrides.
-
-### Example: full plugin from a single prompt
-
-**Prompt:**
-
-> Create a complete AIMEAT plugin called "Espoon Lautapelikerho" (Espoo Board Game Club). It should have:
-> - A CSM for a hobby directory where members list board games they own and want to play
-> - Fields: game name, player count (min/max), estimated play time, complexity (easy/medium/hard), language
-> - Finnish locale, location default Espoo
-> - A sandbox hook that validates game entries: warn if play time exceeds 480 minutes
-> - Recommended config: matching enabled, 20km radius, weekly match rounds
-
-**What the AI produces:**
-
-```
-espoon-lautapelikerho/
-  plugin.yaml
-  lautapelikerho.csm.yaml
-  game-validator.js
-```
-
-The `plugin.yaml` bundles the CSM, references the sandbox script with `onListing` trigger, and sets config overrides for `AIMEAT_MATCHING_ENABLED`, `AIMEAT_MATCH_MAX_DISTANCE_KM=20`, and `AIMEAT_MATCH_INTERVAL_HOURS=168`.
-
----
-
-*See also: [CSM Manual](./csm-manual.md) for community service definitions, [MSM Manual](./msm-manual.md) for API integration manifests.*
+The parts of the idea that survived are CSM and MSM, which do exactly what the YAML level promised:
+declare a service without writing code. They install through the API rather than through the
+filesystem.

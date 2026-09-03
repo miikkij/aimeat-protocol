@@ -2,7 +2,7 @@
  * @file src/routes/msm.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Routes for MSM (Merchant Service Model) integration definitions — the
+ * @description Routes for MSM (Machine Service Manifest) integration definitions — the
  *   YAML/JSON descriptors for external service integrations. Registers/validates MSMs
  *   and serves built-in MSM templates loaded from docs/msm-examples at startup. Install
  *   role is configurable via config.msmInstallRole.
