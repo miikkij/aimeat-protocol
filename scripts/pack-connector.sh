@@ -102,9 +102,15 @@ fi
 # is the native one.
 if command -v cygpath >/dev/null 2>&1; then NATIVE="$(cygpath -m "$TARBALL")"; else NATIVE="$TARBALL"; fi
 
+# BOTH FORMS, LABELLED, because one path cannot serve both tools and printing only one sent
+# somebody down the wrong road. npm, node and PowerShell need `E:/...`; Git Bash's own `tar` reads
+# `E:` as a REMOTE HOST and answers "Cannot connect to E: resolve failed" — an empty listing that
+# reads as a broken tarball rather than as a bad argument. It needs `/e/...`.
 echo
 echo "[pack] $NATIVE"
-echo "[pack] install it on the fleet machine with:"
+echo "[pack] install it on the fleet machine (npm reads the Windows path):"
 echo "         npm i \"$NATIVE\""
-echo "[pack] and confirm what landed, which is the check that matters:"
-echo "         ls node_modules/aimeat/dist/src/cli/connect/agent-key.js"
+echo "[pack] look inside it from THIS shell (tar reads the POSIX path; E: is a host to it):"
+echo "         tar -tzf \"$TARBALL\" | grep cli/connect"
+echo "[pack] and after installing, the check that actually matters — which build is it:"
+echo "         cat node_modules/aimeat/dist/build-stamp.json"
