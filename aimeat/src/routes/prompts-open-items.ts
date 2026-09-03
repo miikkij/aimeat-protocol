@@ -30,6 +30,7 @@
 import type { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import { success } from '../middleware/envelope.js';
+import { sendPlainText } from '../middleware/plain-text.js';
 import { optionalAuth } from '../auth/middleware.js';
 import { buildOpenItemsPrompt, OPEN_ITEMS_SKILL } from '../services/open-items-prompt.js';
 import { buildWelcomeMatPrompt } from '../services/welcome-mat-prompt.js';
@@ -50,7 +51,7 @@ export function registerOpenItemsPrompt(
     const lang = typeof req.query.lang === 'string' ? req.query.lang : 'en';
     const prompt = buildOpenItemsPrompt(config, { lang });
     if (req.query.format === 'txt') {
-      res.type('text/plain; charset=utf-8').send(prompt);
+      sendPlainText(res, prompt);
       return;
     }
     res.json(success(config.nodeId, {
@@ -86,7 +87,7 @@ export function registerOpenItemsPrompt(
     }
     const prompt = buildWelcomeMatPrompt(config, { lang, variant, displayName });
     if (req.query.format === 'txt') {
-      res.type('text/plain; charset=utf-8').send(prompt);
+      sendPlainText(res, prompt);
       return;
     }
     res.json(success(config.nodeId, {
@@ -132,7 +133,7 @@ export function registerOpenItemsPrompt(
     const blocks = buildInstructionBlocks(config,
       { orgId: org.id, orgName: org.name || org.id, workspaces }, { lang });
     if (req.query.format === 'txt') {
-      res.type('text/plain; charset=utf-8').send(blocks.chatInstructions);
+      sendPlainText(res, blocks.chatInstructions);
       return;
     }
     res.json(success(config.nodeId, {

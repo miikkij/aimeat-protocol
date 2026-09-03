@@ -12,6 +12,7 @@
 import type { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import { success } from '../middleware/envelope.js';
+import { sendPlainText } from '../middleware/plain-text.js';
 import { buildIntentPoolPrompt } from '../services/intent-pool-prompt.js';
 
 export function registerIntentPoolPrompt(router: Router, config: AimeatConfig): void {
@@ -22,7 +23,7 @@ export function registerIntentPoolPrompt(router: Router, config: AimeatConfig): 
   router.get('/v1/prompts/intent-pool', (req, res) => {
     const { full, body } = buildIntentPoolPrompt(config);
     if (req.query.format === 'txt') {
-      res.type('text/plain; charset=utf-8').send(full);
+      sendPlainText(res, full);
       return;
     }
     res.json(success(config.nodeId, {

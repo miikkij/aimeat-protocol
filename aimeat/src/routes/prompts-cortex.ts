@@ -16,6 +16,7 @@
 import type { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import { success } from '../middleware/envelope.js';
+import { sendPlainText } from '../middleware/plain-text.js';
 import { buildCortexPrompt } from '../services/build-cortex-prompt.js';
 
 export function registerBuildCortexPrompt(router: Router, config: AimeatConfig): void {
@@ -26,7 +27,7 @@ export function registerBuildCortexPrompt(router: Router, config: AimeatConfig):
     const idea = typeof req.query.idea === 'string' ? req.query.idea : '';
     const { full, body } = buildCortexPrompt(config, { lang, owner, idea });
     if (req.query.format === 'txt') {
-      res.type('text/plain; charset=utf-8').send(full);
+      sendPlainText(res, full);
       return;
     }
     res.json(success(config.nodeId, {

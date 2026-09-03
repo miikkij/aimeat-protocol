@@ -32,6 +32,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, optionalAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { sendPlainText } from '../middleware/plain-text.js';
 import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { handbookForRole } from '../services/handbooks/index.js';
@@ -263,7 +264,7 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
     const idea = typeof req.query.idea === 'string' ? req.query.idea : '';
     const { full, body } = buildAppPrompt(config, { lang, mode, idea });
     if (req.query.format === 'txt') {
-      res.type('text/plain; charset=utf-8').send(full);
+      sendPlainText(res, full);
       return;
     }
     res.json(success(config.nodeId, {
@@ -301,7 +302,7 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
     const idea = typeof req.query.idea === 'string' ? req.query.idea : '';
     const { full, body } = buildExtensionPrompt(config, { lang, owner, idea });
     if (req.query.format === 'txt') {
-      res.type('text/plain; charset=utf-8').send(full);
+      sendPlainText(res, full);
       return;
     }
     res.json(success(config.nodeId, {
@@ -330,7 +331,7 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
   router.get('/v1/prompts/appdev-flow', (req, res) => {
     const prompt = buildAppdevFlowPrompt(config);
     if (req.query.format === 'txt') {
-      res.type('text/plain; charset=utf-8').send(prompt);
+      sendPlainText(res, prompt);
       return;
     }
     res.json(success(config.nodeId, {
@@ -352,7 +353,7 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
     const lang = typeof req.query.lang === 'string' ? req.query.lang : 'en';
     const prompt = buildAgentOnboardPrompt(config, { lang });
     if (req.query.format === 'txt') {
-      res.type('text/plain; charset=utf-8').send(prompt);
+      sendPlainText(res, prompt);
       return;
     }
     res.json(success(config.nodeId, {
@@ -381,7 +382,7 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
     const opts = { lang, owner: req.auth!.owner, agentName };
     const prompt = buildAgentConnectPrompt(config, opts);
     if (req.query.format === 'txt') {
-      res.type('text/plain; charset=utf-8').send(prompt);
+      sendPlainText(res, prompt);
       return;
     }
     res.json(success(config.nodeId, {
@@ -417,7 +418,7 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
       resolvePromptContent(record, req.headers['accept-language'] as string),
       { node_url: config.baseUrl, node_id: config.nodeId },
     );
-    if (req.query.format === 'txt') { res.type('text/plain; charset=utf-8').send(content); return; }
+    if (req.query.format === 'txt') { sendPlainText(res, content); return; }
     res.json(success(config.nodeId, { id, prompt: content, name: record.name, description: record.description }));
   });
 
@@ -438,7 +439,7 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
         .catch(err => logger.warn('hello-mcp: funnel marker failed', { error: String(err) }));
     }
     if (req.query.format === 'txt') {
-      res.type('text/plain; charset=utf-8').send(prompt);
+      sendPlainText(res, prompt);
       return;
     }
     res.json(success(config.nodeId, {
@@ -465,7 +466,7 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
     const purpose = typeof req.query.purpose === 'string' ? req.query.purpose : '';
     const prompt = buildOrganismSetupPrompt(config, { lang, purpose });
     if (req.query.format === 'txt') {
-      res.type('text/plain; charset=utf-8').send(prompt);
+      sendPlainText(res, prompt);
       return;
     }
     res.json(success(config.nodeId, {
