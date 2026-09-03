@@ -388,6 +388,9 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // ── Quotas (mutable, additional) ──
   { key: 'memoryMaxValueSizeKb', dotPath: 'quota.memory_max_value_size_kb', envVar: 'AIMEAT_MEMORY_MAX_VALUE_SIZE_KB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max memory value size in KB', range: '1-10240' },
   { key: 'memoryMaxKeysPerAgent', dotPath: 'quota.memory_max_keys_per_agent', envVar: 'AIMEAT_MEMORY_MAX_KEYS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max memory keys per agent', range: '1-100000' },
+  // How long a deleted memory record can still be taken back. 0 makes a delete immediate and
+  // final, which is a legitimate choice an operator should have to make rather than inherit.
+  { key: 'memoryDeleteGraceDays', dotPath: 'quota.memory_delete_grace_days', envVar: 'AIMEAT_MEMORY_DELETE_GRACE_DAYS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Days a deleted memory record stays takeable back before it is removed for good', range: '0-365' },
   // ── Outbound connections (aimeat-connect) ──
   // The applications this node registers AS, so a person can connect their own account elsewhere.
   // Deliberately NOT the sign-in credentials: signing in here and acting in somebody's mailbox

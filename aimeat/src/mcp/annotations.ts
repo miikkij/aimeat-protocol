@@ -83,6 +83,12 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_memory_search: { title: 'Search Memory', readOnlyHint: true },
     aimeat_memory_read_public: { title: 'Read Public Memory', readOnlyHint: true },
     aimeat_memory_write: { title: 'Write Memory Entry', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    // destructiveHint TRUE even though a delete is takeable back for the grace window: the client
+    // showing this hint is asking whether to warn a person, and "it can be undone for a few days"
+    // is not the same promise as "nothing is lost". Restore is the opposite — it only ever puts
+    // something back — and repeating it changes nothing, so it is idempotent.
+    aimeat_memory_delete: { title: 'Delete Memory Entry', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    aimeat_memory_restore: { title: 'Restore Deleted Memory Entry', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 
     // ── Skills registry ──
     aimeat_skill_list: { title: 'Browse Skills Registry', readOnlyHint: true },

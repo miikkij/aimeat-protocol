@@ -68,6 +68,29 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     return jsonContent(shapeResponse('aimeat_memory_read', response_format, readPayloadWithProvenance(resp)));
   });
 
+  // The bin, on the connector's door. Both are thin proxies onto the same route the CLI dispatch
+  // and the node MCP reach, so who may remove what is decided in one place.
+  mcp.tool('aimeat_memory_delete', descriptionFor('aimeat_memory_delete'), {
+    agent_name: agentNameSchema,
+    key: z.string().describe('Memory entry key to delete'),
+    owner_scope: z.boolean().optional().describe("Also reach the OWNER's namespace and your sibling agents', not only your own."),
+  }, annotationsFor('aimeat_memory_delete'), async ({ agent_name, key, owner_scope }) => {
+    const { client } = pickAgent(registry, agent_name);
+    const q = owner_scope ? '?owner_scope=true' : '';
+    const resp = await client.delete(`/v1/memory/${encodeURIComponent(key)}${q}`);
+    return jsonContent(resp);
+  });
+
+  mcp.tool('aimeat_memory_restore', descriptionFor('aimeat_memory_restore'), {
+    agent_name: agentNameSchema,
+    key: z.string().describe('Memory entry key to put back'),
+    owner_scope: z.boolean().optional().describe("Also reach the OWNER's namespace and your sibling agents'."),
+  }, annotationsFor('aimeat_memory_restore'), async ({ agent_name, key }) => {
+    const { client } = pickAgent(registry, agent_name);
+    const resp = await client.post(`/v1/memory/${encodeURIComponent(key)}/restore`, {});
+    return jsonContent(resp);
+  });
+
   mcp.tool('aimeat_memory_write', descriptionFor('aimeat_memory_write'), {
     agent_name: agentNameSchema,
     key: z.string().describe('Memory entry key'),

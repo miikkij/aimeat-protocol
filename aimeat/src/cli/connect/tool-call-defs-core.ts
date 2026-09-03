@@ -96,6 +96,24 @@ export const coreTools: ConnectCliToolDefinition[] = [
         })}`),
     },
     {
+        name: 'aimeat_memory_delete',
+        // A THIN PROXY, deliberately. Who may remove what is decided once, in
+        // services/memory-bin.ts behind DELETE /v1/memory/:key, and this door brings parameters
+        // rather than a second opinion. `owner_scope` reaches the owner's other principals exactly
+        // as it does on the read and write doors beside it.
+        handler: ({ client }, input) => client.delete(
+            `/v1/memory/${encodeURIComponent(requiredString(input, 'key'))}`
+            + query({ owner_scope: optionalBoolean(input, 'owner_scope') ? 'true' : undefined }),
+        ),
+    },
+    {
+        name: 'aimeat_memory_restore',
+        handler: ({ client }, input) => client.post(
+            `/v1/memory/${encodeURIComponent(requiredString(input, 'key'))}/restore`
+            + query({ owner_scope: optionalBoolean(input, 'owner_scope') ? 'true' : undefined }), {},
+        ),
+    },
+    {
         name: 'aimeat_memory_write',
         handler: ({ client }, input) => {
             const body: JsonObject = { key: requiredString(input, 'key'), value: requiredValue(input, 'value') };

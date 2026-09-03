@@ -1,0 +1,117 @@
+/**
+ * @file packages-poster.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The Packages page in the poster face (pk- prefix; design canvas "AIMEAT
+ *   Paketit-sivu", direction A). The shared parts come from organism.css's og- rules; this file
+ *   carries what the page adds: the rows (a status dot, the name, what it brought or does with the
+ *   part chips, the source or the install column, the doors), the panel that opens under a row with
+ *   its part table, facts and install field, the filter chips and the search line, the two roads to
+ *   a new package, and the AI rule box.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-03 — Initial (replaces the .pkg-* rules in profile.css).
+ */
+
+.og-packages .og-door:disabled, .og-packages .og-slab:disabled { opacity: .5; cursor: default; }
+.og-packages .og-door.is-on { background: var(--sun); border-color: var(--sun); color: var(--on-sun); }
+.og-packages .og-doors > a { text-decoration: none; }
+.pk-hint { margin: .7rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--text-dim); }
+.pk-para { margin: 0 0 .6rem; font-size: .95rem; line-height: 1.55; color: var(--text); }
+.pk-empty { margin: 0; padding: .3rem 0 .6rem; font-size: .95rem; line-height: 1.55; font-weight: 600; color: var(--text-dim); }
+.pk-empty b { color: var(--text); font-weight: 800; }
+.pk-linkbtn { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; }
+.pk-danger { color: var(--accent); border-color: var(--accent); }
+.pk-file { display: none; }
+.is-warn { color: var(--accent); }
+
+/* ── The status dot: green for an installed package that runs ──────────────────────────────── */
+.pk-dot { display: inline-block; width: .55rem; height: .55rem; border-radius: 50%; background: var(--text-dim); margin-right: .45rem; vertical-align: middle; }
+.pk-dot.is-on { background: var(--success-fg); }
+
+/* ── Filters and the search line ───────────────────────────────────────────────────────────── */
+.pk-facets { display: flex; flex-wrap: wrap; gap: .45rem; margin: .6rem 0 .3rem; }
+.pk-facet { font-family: var(--font-mono); font-size: .72rem; padding: .15rem .55rem; border: 1px solid var(--text); background: var(--card-bg); color: var(--text); cursor: pointer; line-height: 1.5; }
+.pk-facet em { font-style: normal; color: var(--text-dim); margin-left: .35rem; }
+.pk-facet.is-on { background: var(--sun); border-color: var(--sun); color: var(--on-sun); }
+.pk-facet.is-on em { color: var(--on-sun); opacity: .75; }
+.pk-search { display: flex; align-items: center; gap: 1rem; margin: .8rem 0 .6rem; }
+.pk-search .og-input { flex: 1 1 auto; min-width: 0; }
+.pk-search small { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); white-space: nowrap; }
+
+/* ── The rows: package, what it brought or does, where from or the install, the doors ───────── */
+.pk-pl { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr) minmax(9rem, .95fr) auto; gap: 0 .9rem; align-items: stretch; }
+.pk-p { display: contents; }
+.pk-p > div { padding: .7rem 0; border-bottom: 1px solid var(--border); min-width: 0; display: grid; align-content: center; }
+.pk-p--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.pk-p.is-open > div { border-bottom: 0; }
+.pk-p > .pk-nm { display: block; align-self: center; font-size: .95rem; font-weight: 800; color: var(--text); overflow-wrap: anywhere; }
+.pk-nm small { display: block; margin-top: .15rem; font-family: var(--font-mono); font-size: .7rem; font-weight: 400; color: var(--text-dim); }
+.pk-tag { display: inline-block; margin-left: .45rem; padding: .05rem .4rem; border: 1px solid var(--border); font-family: var(--font-mono); font-size: .66rem; font-weight: 500; color: var(--text-dim); vertical-align: middle; }
+.pk-p > .pk-ds { display: block; align-self: center; font-size: .85rem; line-height: 1.5; color: var(--text-dim); }
+/* A package description runs to a paragraph; the row shows four lines and the opened panel the rest. */
+.pk-desc { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.pk-parts { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .35rem; }
+.pk-part { display: inline-block; padding: 0 .45rem; border: 1px solid var(--text); font-family: var(--font-mono); font-size: .66rem; line-height: 1.7; color: var(--text); background: var(--card-bg); }
+.pk-p > .pk-me { display: block; align-self: center; font-size: .85rem; font-weight: 600; line-height: 1.5; color: var(--text); overflow-wrap: anywhere; }
+.pk-me small { display: block; font-family: var(--font-mono); font-size: .7rem; font-weight: 400; color: var(--text-dim); }
+.pk-me .og-crumb-link { font-size: inherit; font-weight: 600; }
+.pk-p > .pk-go { display: flex; justify-content: flex-end; align-items: center; gap: .8rem; white-space: nowrap; }
+.pk-go .og-door { font-size: .72rem; text-decoration: none; }
+.pk-p > .pk-open { grid-column: 1 / -1; display: block; margin: 0 0 .4rem; padding: 1rem 1.2rem 1.1rem; border: 3px solid var(--text); box-shadow: 8px 8px 0 var(--sun); background: var(--card-bg); font-size: .9rem; line-height: 1.55; color: var(--text); }
+.pk-lead { margin: 0 0 .5rem; font-size: .95rem; line-height: 1.55; }
+.pk-open code { display: inline-block; max-width: 100%; margin: .1rem 0; font-family: var(--font-mono); font-size: .74rem; background: var(--bg-dim); padding: .1rem .35rem; overflow-wrap: anywhere; }
+.pk-open-doors { margin-top: 1rem; }
+
+/* ── The parts under an opened row ─────────────────────────────────────────────────────────── */
+.pk-comp { display: grid; grid-template-columns: 7rem minmax(0, 1fr) minmax(0, 1.2fr) auto; gap: 0 .9rem; margin: .3rem 0 .2rem; font-size: .85rem; line-height: 1.5; }
+.pk-comp--offer { grid-template-columns: 7rem minmax(0, 1fr) minmax(0, 1.2fr); }
+.pk-comp > div { padding: .4rem 0; border-bottom: 1px solid var(--border); min-width: 0; overflow-wrap: anywhere; }
+.pk-comp > div small { display: block; font-family: var(--font-mono); font-size: .68rem; line-height: 1.45; color: var(--text-dim); }
+.pk-comp .og-door { font-size: .72rem; text-decoration: none; }
+
+/* ── The facts under an opened row, and the install field ──────────────────────────────────── */
+.pk-kv { display: grid; grid-template-columns: minmax(7rem, 10rem) minmax(0, 1fr); gap: .7rem 1.2rem; align-items: start; margin-top: .8rem; }
+.pk-kv--wide { grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr); margin-top: 1rem; }
+.pk-k { font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); padding-top: .25rem; }
+.pk-v { font-size: .9rem; line-height: 1.5; color: var(--text); min-width: 0; overflow-wrap: anywhere; }
+.pk-v small { display: block; margin-top: .15rem; font-size: .8rem; line-height: 1.45; color: var(--text-dim); }
+.pk-v .og-crumb-link { font-size: inherit; }
+.pk-vis { margin-top: .4rem; }
+.pk-vis .og-door { font-size: .72rem; }
+.pk-inst { display: flex; align-items: center; gap: .8rem; padding: .5rem .7rem; border: 1px dashed var(--text); background: var(--bg-dim); }
+.pk-inst .og-input { flex: 1 1 auto; min-width: 0; }
+.pk-more { display: flex; align-items: center; gap: 1rem; margin-top: .8rem; flex-wrap: wrap; }
+.pk-more small { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
+
+/* ── The two roads to a new package ────────────────────────────────────────────────────────── */
+.pk-roads { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; margin-top: .6rem; }
+.pk-road { padding: .9rem 1rem 1rem; border: 2px solid var(--text); background: var(--card-bg); min-width: 0; }
+.pk-road--lead { border-width: 3px; box-shadow: 6px 6px 0 var(--sun); }
+.pk-road-t { display: block; margin-bottom: .4rem; font-family: var(--font-display, var(--font-heading)); font-size: 1.05rem; text-transform: uppercase; letter-spacing: .02em; color: var(--text); }
+.pk-road .og-doors { align-items: center; }
+.pk-road .pk-hint { margin: 0; }
+
+/* ── The rule an AI gets ───────────────────────────────────────────────────────────────────── */
+.pk-rule { margin: .6rem 0 .2rem; padding: .9rem 1.1rem; border: 3px solid var(--text); background: var(--card-bg); }
+.pk-rule .og-label { display: block; margin-bottom: .3rem; }
+.pk-rule .pk-para { margin-bottom: .6rem; }
+
+/* ── Phone ─────────────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 860px) {
+  .pk-search { flex-wrap: wrap; }
+  .pk-pl { grid-template-columns: minmax(0, 1fr); }
+  .pk-p--head > div { display: none; }
+  .pk-p > .pk-nm, .pk-p > .pk-ds, .pk-p > .pk-me { border-bottom: 0; padding-bottom: .15rem; }
+  .pk-p > .pk-ds, .pk-p > .pk-me { padding-top: 0; }
+  .pk-p > .pk-go { justify-content: flex-start; padding-top: .1rem; flex-wrap: wrap; }
+  .pk-kv, .pk-kv--wide { grid-template-columns: 1fr; gap: .3rem 0; }
+  .pk-k { padding-top: .6rem; }
+  .pk-comp, .pk-comp--offer { grid-template-columns: minmax(0, 1fr); }
+  .pk-comp > div { border-bottom: 0; padding: .1rem 0; }
+  .pk-comp > div:nth-child(4n) { border-bottom: 1px solid var(--border); padding-bottom: .5rem; margin-bottom: .2rem; }
+  .pk-comp--offer > div:nth-child(4n) { border-bottom: 0; }
+  .pk-comp--offer > div:nth-child(3n) { border-bottom: 1px solid var(--border); padding-bottom: .5rem; margin-bottom: .2rem; }
+  .pk-roads { grid-template-columns: 1fr; }
+  .pk-inst { flex-wrap: wrap; }
+}

@@ -158,6 +158,11 @@ export function initializeSchema(db: Database.Database): void {
   safeAddColumn('memory', 'archivedAt', 'TEXT');
   safeAddColumn('memory', 'archivedBy', 'TEXT');
   safeAddColumn('memory', 'archivedRoot', 'TEXT');
+  // The bin. A deleted record keeps its row until the grace window passes, so a delete made by
+  // mistake can be taken back; the sweeper is what finally removes it. Deliberately NOT the archive
+  // columns above — archived means kept and out of the way, deleted means on its way out.
+  safeAddColumn('memory', 'deletedAt', 'TEXT');
+  safeAddColumn('memory', 'deletedBy', 'TEXT');
   safeAddColumn('organisms', 'archived', 'INTEGER NOT NULL DEFAULT 0');
   safeAddColumn('organisms', 'archivedAt', 'TEXT');
   safeAddColumn('organisms', 'archivedBy', 'TEXT');
@@ -306,6 +311,9 @@ export function initializeSchema(db: Database.Database): void {
   // scans (the AI-material reads) physically small as archived rows accumulate. Created AFTER the
   // safeAddColumn('memory','archived') ALTER above, or upgraded DBs crash with "no such column".
   db.exec('CREATE INDEX IF NOT EXISTS idx_memory_active ON memory(ownerGaii, key) WHERE archived = 0');
+  // The sweeper asks one question — which rows have been in the bin longer than the window — and it
+  // asks it across every owner. Without this it is a full scan of the memory table on a timer.
+  db.exec('CREATE INDEX IF NOT EXISTS idx_memory_deleted ON memory(deletedAt) WHERE deletedAt IS NOT NULL');
   db.exec('CREATE INDEX IF NOT EXISTS idx_memory_archived_root ON memory(archivedRoot) WHERE archived = 1');
   // Owner-AGNOSTIC key-prefix lookups (listAllMemory: workspace-access, write-guards, publish, catalogue)
   // filter by `key LIKE 'prefix%'` with no ownerGaii, so the (ownerGaii,key) index above can't serve them.

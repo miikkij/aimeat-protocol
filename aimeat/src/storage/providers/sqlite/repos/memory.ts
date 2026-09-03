@@ -29,11 +29,19 @@ import type { MemoryTextHit, MemoryTextSearchOpts } from '../../../repositories/
 
 /** SQL fragment (with leading ` AND`) restricting the `memory.archived` column by filter. Default
  *  `exclude` → active rows only. Shared by every bulk read so archived content stays out of the
- *  working set unless a caller explicitly asks for `include`/`only`. */
+ *  working set unless a caller explicitly asks for `include`/`only`.
+ *
+ *  IT ALSO HIDES THE BIN, ON EVERY BRANCH INCLUDING `include` AND `only`. A deleted record is not
+ *  an archived one and must not surface in an archive search either: archived means kept and out of
+ *  the way, deleted means on its way out. Putting it here rather than in eight call sites is the
+ *  whole reason this function exists — every bulk read already passes through it, so the bin is
+ *  invisible by construction rather than by eight people remembering. The sweeper and the restore
+ *  path read the bin with their own queries, which name `deletedAt` explicitly. */
 export function archivedSql(archived?: ArchiveFilter): string {
-  if (archived === 'include') return '';
-  if (archived === 'only') return ' AND archived = 1';
-  return ' AND archived = 0';
+  const notDeleted = ' AND deletedAt IS NULL';
+  if (archived === 'include') return notDeleted;
+  if (archived === 'only') return ' AND archived = 1' + notDeleted;
+  return ' AND archived = 0' + notDeleted;
 }
 
 /**
@@ -69,6 +77,7 @@ function deserializeMemory(row: Record<string, unknown>): MemoryRecord {
   if (row.archivedAt) record.archivedAt = row.archivedAt as string;
   if (row.archivedBy) record.archivedBy = row.archivedBy as string;
   if (row.archivedRoot) record.archivedRoot = row.archivedRoot as string;
+  if (row.deletedAt) { record.deletedAt = row.deletedAt as string; record.deletedBy = (row.deletedBy as string) ?? null; }
   if (row.aiProvenanceId) record.aiProvenanceId = row.aiProvenanceId as string;
   return record;
 }
@@ -112,7 +121,11 @@ export function countMemory(db: Database.Database, ownerGaiis: string[], opts?: 
 /** One FTS branch: search a single `*_fts` table joined back to memory. Default `exclude` runs over
  *  `memory_fts` (active rows only); `only` over `memory_archive_fts`. Returns raw rows + bm25 rank. */
 function searchOneFts(db: Database.Database, ftsTable: string, match: string, opts?: MemoryTextSearchOpts): Record<string, unknown>[] {
-  const where: string[] = [`${ftsTable} MATCH ?`];
+  // THE BIN IS NOT IN archivedSql's REACH HERE. This path routes by CHOOSING an index rather than by
+  // adding a predicate, so the shared fragment never runs — and a deleted row keeps `archived = 0`,
+  // stays in `memory_fts`, and would come back from a text search after answering 404 by key. Said
+  // here because it is the one memory read that does not pass through the choke point.
+  const where: string[] = [`${ftsTable} MATCH ?`, 'm.deletedAt IS NULL'];
   const params: unknown[] = [match];
 
   if (opts?.ownerGaiis?.length) {

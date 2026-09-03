@@ -259,6 +259,26 @@ export const schedulesTasksMemoryTools: AimeatToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_memory_delete',
+        description: 'Delete one of your memory entries. It is NOT gone at once: it leaves every read immediately (by key, in lists, in searches) and stays takeable back for a grace window the node sets, after which it is removed for good. The answer tells you the moment that window closes. Use aimeat_memory_restore to change your mind. This node deliberately had no delete for a long time - a value could be emptied but never removed - and the window is how that caution survives.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            key: { type: 'string', required: true, description: 'Exact memory entry key to delete.' },
+            owner_scope: { type: 'boolean', description: "Also reach the OWNER's namespace and your sibling agents', not only your own." },
+        },
+    },
+    {
+        name: 'aimeat_memory_restore',
+        description: 'Put back a memory entry you deleted, whole, as long as the grace window has not closed. Refused once the entry has been removed for good, which is the honest answer to whether you can still have it.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            key: { type: 'string', required: true, description: 'Exact memory entry key to put back.' },
+            owner_scope: { type: 'boolean', description: "Also reach the OWNER's namespace and your sibling agents'." },
+        },
+    },
+    {
         name: 'aimeat_memory_list',
         description: 'List memory entries for the calling agent (metadata only, not full values — use aimeat_memory_read for a value). Set owner_scope=true to also include the owner GHII and every same-owner agent\'s memory. Filter with prefix (key prefix), visibility, and tags. Always pass limit on large stores. response_format=concise drops owner_gaii/version noise.',
         caller: 'agent',

@@ -51,6 +51,7 @@ import { enqueueCatalogueSync } from '../services/catalogue-sync.js';
 import { initializeNode } from '../auth/node-keys.js';
 import { logger } from '../utils/logger.js';
 import { sweepLapsedMemberships } from '../services/app-member-sweep.js';
+import { sweepMemoryBin } from '../services/memory-bin-sweep.js';
 import { sweepUndisclosedPublicContent } from '../services/ai-disclosure-sweep.js';
 import { sweepHeldPushes, sweepNotificationDigests } from '../services/notification-sweeps.js';
 import { getNotifyPushService } from '../services/notify.js';
@@ -277,6 +278,17 @@ export async function initializeServices(
   // withdrawn by something, and until they are, somebody the provider stopped selling to is still
   // calling on the provider's money. Hourly is fine: the money leak is bounded by the interval, and
   // the access leak does not exist.
+  // The bin. A deleted memory record is undoable for `memoryDeleteGraceDays` and then genuinely
+  // gone, and this is the half that makes the second clause true. Hourly is right for a window
+  // measured in days: nothing is kept meaningfully longer than promised, and the query is one
+  // indexed range scan over the small set that is in the bin at all.
+  {
+    const BIN_SWEEP_MS = 3_600_000;
+    const binSweep = () => { void sweepMemoryBin(storage, config); };
+    setTimeout(binSweep, 60_000);   // once after boot, so a restart closes anything overdue
+    setInterval(binSweep, BIN_SWEEP_MS);
+  }
+
   {
     const SWEEP_INTERVAL_MS = 3_600_000;
     const sweep = () => {

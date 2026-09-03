@@ -306,6 +306,15 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   memoryQuotaMb: number;
   memoryMaxValueSizeKb: number;
   memoryMaxKeysPerAgent: number;
+  /**
+   * How long a deleted memory record stays takeable-back before the sweeper removes it for good.
+   *
+   * THE NODE USED TO HAVE NO DELETE AT ALL, on purpose: a value could be emptied but never
+   * removed, so nothing could be lost by accident. This is what replaced that principle without
+   * abandoning it. Set it to 0 and a delete is immediate and final, which is a decision an
+   * operator may legitimately make and should have to make deliberately.
+   */
+  memoryDeleteGraceDays: number;
   /** Max retained gate-audit (`meta.decisions.*`) entries per organism; oldest pruned on write. 0 = unlimited. */
   organismDecisionLogCap: number;
   /** Max retained `.version.N` history snapshots per workspace record; older pruned on publish (a

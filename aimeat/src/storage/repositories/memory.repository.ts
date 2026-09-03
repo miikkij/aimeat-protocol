@@ -183,7 +183,26 @@ export interface MemoryRepository {
    * {@link sumMemoryBytes} once per identity (an owner with ~100 agents = ~100 serial round-trips).
    */
   sumMemoryBytesForOwners(ownerGaiis: string[]): Promise<number>;
-  deleteMemory(ownerGaii: string, key: string): Promise<boolean>;
+  /**
+   * INTO THE BIN, NOT OUT OF THE DATABASE. This node had no delete at all until 2026-09-03, on
+   * purpose: a value could be emptied but never removed. That principle cost something real — an
+   * agent could write memory through a tool and never clean up after itself — so the delete exists
+   * now and keeps the principle by being undoable for `memoryDeleteGraceDays`.
+   *
+   * Every caller gets the undo for free, which is the point: a delete is a delete wherever it is
+   * pressed. A key already in the bin answers false rather than being re-stamped, so deleting twice
+   * cannot restart the clock.
+   */
+  deleteMemory(ownerGaii: string, key: string, deletedBy?: string): Promise<boolean>;
+  /** Out of the bin, whole. False when nothing of that key is in it — including after the sweeper
+   *  has been past, which is the honest answer to "can I have it back". */
+  restoreMemory(ownerGaii: string, key: string): Promise<boolean>;
+  /** What is in this owner's bin, newest first. The one read allowed to see it: every other memory
+   *  read hides deleted rows, by key and in bulk alike. */
+  listDeletedMemory(ownerGaii: string): Promise<MemoryRecord[]>;
+  /** The sweeper's hand — everything deleted before `cutoffIso` goes for good. The one call in the
+   *  memory path that destroys anything, and what makes "delete" mean delete. */
+  purgeDeletedMemory(cutoffIso: string): Promise<number>;
   deleteAllMemory(ownerGaii: string): Promise<number>;
   incrementMemoryFlagCount(ownerGaii: string, key: string): Promise<void>;
   searchMemory(ownerGaii: string, query: string, opts?: { visibility?: string; maxFlags?: number; prefix?: string; archived?: ArchiveFilter; limit?: number }): Promise<MemoryRecord[]>;

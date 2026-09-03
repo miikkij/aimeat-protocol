@@ -290,6 +290,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     memoryQuotaMb: parseInt(process.env.AIMEAT_MEMORY_QUOTA_MB ?? '10', 10),
     memoryMaxValueSizeKb: parseInt(process.env.AIMEAT_MEMORY_MAX_VALUE_SIZE_KB ?? '1024', 10),
     memoryMaxKeysPerAgent: parseInt(process.env.AIMEAT_MEMORY_MAX_KEYS ?? '1000', 10),
+    memoryDeleteGraceDays: parseInt(process.env.AIMEAT_MEMORY_DELETE_GRACE_DAYS ?? '7', 10),
     organismDecisionLogCap: parseInt(process.env.AIMEAT_ORGANISM_DECISION_LOG_CAP ?? '500', 10),
     workspaceMaxVersions: parseInt(process.env.AIMEAT_WS_MAX_VERSIONS ?? '20', 10),
     wsRowsMaxPerWorkspace: parseInt(process.env.AIMEAT_WS_ROWS_MAX_PER_WORKSPACE ?? '50000', 10),
