@@ -99,13 +99,30 @@ export function tdzClosures(files: readonly ts.SourceFile[], root: string): TdzC
             if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) {
                 const scope = enclosingScope(node);
                 if (scope) {
-                    // Every const/let in that scope, with the line it is bound on.
-                    const declared = new Map<string, number>();
+                    /**
+                     * Every const/let in that scope, with the line it is bound on AND the block it
+                     * is bound in.
+                     *
+                     * The block matters because `const` is block-scoped, and two sibling blocks may
+                     * each declare the same name without ever meeting. `for (const id of want)`
+                     * followed later by another loop's own `const id` is two variables, and reading
+                     * the function as one flat scope makes the first look like a dead-zone read of
+                     * the second. A declaration only counts against a closure when its block
+                     * CONTAINS that closure.
+                     */
+                    const declared = new Map<string, Array<{ line: number; block: ts.Node }>>();
+                    const blockOf = (n: ts.Node): ts.Node => {
+                        for (let p: ts.Node | undefined = n.parent; p; p = p.parent) {
+                            if (ts.isBlock(p) || ts.isSourceFile(p) || ts.isCaseClause(p) || ts.isForStatement(p)
+                                || ts.isForOfStatement(p) || ts.isForInStatement(p)) return p;
+                        }
+                        return scope;
+                    };
                     const collectDecls = (n: ts.Node): void => {
                         if (ts.isVariableStatement(n)
                             && (n.declarationList.flags & (ts.NodeFlags.Const | ts.NodeFlags.Let)) !== 0) {
                             for (const d of n.declarationList.declarations) {
-                                if (ts.isIdentifier(d.name)) declared.set(d.name.text, at(d));
+                                if (ts.isIdentifier(d.name)) declared.set(d.name.text, [...(declared.get(d.name.text) ?? []), { line: at(d), block: blockOf(d) }]);
                             }
                         }
                         // Do not descend into nested functions: their consts are a different scope.
@@ -132,10 +149,43 @@ export function tdzClosures(files: readonly ts.SourceFile[], root: string): TdzC
                     };
                     collectShadows(node);
 
+                    /**
+                     * An identifier that is the part AFTER a dot, or a key in an object literal, is
+                     * not a read of any variable. `req.query.type` does not read a variable called
+                     * `query`, and `w.createdBy` does not read one called `createdBy` — but both were
+                     * reported as dead-zone reads, which made two route handlers look broken when
+                     * neither names the outer variable at all.
+                     *
+                     * This is the same mistake as counting a column name inside a comment: a token
+                     * that spells the name is not a use of the thing. It was the largest single
+                     * source of noise in this detector.
+                     */
+                    const isPropertyName = (n: ts.Identifier): boolean => {
+                        const p = n.parent;
+                        if (!p) return false;
+                        if (ts.isPropertyAccessExpression(p) && p.name === n) return true;
+                        if (ts.isPropertyAssignment(p) && p.name === n) return true;
+                        if (ts.isPropertySignature(p) && p.name === n) return true;
+                        if (ts.isBindingElement(p) && p.propertyName === n) return true;
+                        return false;
+                    };
+
                     const seen = new Set<string>();
                     const readIdentifiers = (n: ts.Node): void => {
-                        if (ts.isIdentifier(n) && declared.has(n.text) && !seen.has(n.text) && !shadowed.has(n.text)) {
-                            const declaredLine = declared.get(n.text) as number;
+                        if (ts.isIdentifier(n) && !isPropertyName(n)
+                            && declared.has(n.text) && !seen.has(n.text) && !shadowed.has(n.text)) {
+                            // The NEAREST declaration whose block contains the closure — that is the
+                            // one the name actually resolves to. Keeping only the last one seen made
+                            // an inner `const` look like a dead-zone read of a later outer one that
+                            // it shadows and never touches.
+                            const chain: ts.Node[] = [];
+                            for (let p: ts.Node | undefined = node; p; p = p.parent) chain.push(p);
+                            const decl = (declared.get(n.text) ?? [])
+                                .map(c => ({ ...c, depth: chain.indexOf(c.block) }))
+                                .filter(c => c.depth >= 0)
+                                .sort((a, b) => a.depth - b.depth)[0];
+                            if (!decl) { ts.forEachChild(n, readIdentifiers); return; }
+                            const declaredLine = decl.line;
                             const isOwnDeclaration = n.parent && ts.isVariableDeclaration(n.parent) && n.parent.name === n;
                             if (!isOwnDeclaration && declaredLine > closureLine) {
                                 seen.add(n.text);
