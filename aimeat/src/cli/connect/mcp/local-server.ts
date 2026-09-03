@@ -107,7 +107,6 @@ import express, { type Request, type Response } from 'express';
 import type { Server } from 'node:http';
 import { randomBytes } from 'node:crypto';
 import { writeFileSync, renameSync, existsSync, readFileSync, unlinkSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -131,51 +130,14 @@ export { AgentChannel } from './local-channel.js';
 import { logger } from '../../../utils/logger.js';
 import { checkBuildFreshness, announceBuild, buildIdentity } from '../../../utils/build-stamp.js';
 
-/**
- * 2 since 2026-09-01: `principals[].id` is the GAII it was always documented to be (it carried the
- * bare agent name instead), and every `agents[]` row gained a `gaii`. Two owners with one agent
- * name were one indistinguishable row before that, so the file described a daemon that does not
- * exist.
- */
-export const SERVE_DISCOVERY_SCHEMA_VERSION = 2;
-
-export interface ServeDiscoveryAgent {
-  /** The bare name, kept for sidecars that read it. Not unique across owners — use `gaii`. */
-  agent: string;
-  /** `agent#owner@node`. The identity, and what tells two owners' `concierge` apart. */
-  gaii: string;
-  owner: string;
-  node_url: string;
-  /** How this agent's API calls reach the node right now. */
-  transport: 'tunnel' | 'direct' | 'auth_failed';
-}
-
-/**
- * Neutral principal entry (connector profile §2.1) — covers both agent (GAII) and ecosystem (GEAI)
- * principals. `id` is the full identity (`agent#owner@node` or `eco:{app}#{owner}@{node}`).
- */
-export interface ServeDiscoveryPrincipal {
-  type: 'agent' | 'ecosystem';
-  id: string;
-  owner: string;
-  node_url: string;
-  transport: 'tunnel' | 'direct' | 'auth_failed';
-}
-
-export interface ServeDiscovery {
-  schema_version: number;
-  port: number;
-  pid: number;
-  /** Neutral principal list (agents + ecosystem apps). Prefer this over `agents`. */
-  principals: ServeDiscoveryPrincipal[];
-  /** Transitional alias of the agent-typed principals — kept so existing sidecars keep working. */
-  agents: ServeDiscoveryAgent[];
-  started_at: string;
-}
-
-export function serveDiscoveryPath(): string {
-  return join(getConfigDir(), 'serve.json');
-}
+// The `serve.json` contract -- schema version, its two row shapes, where the file lives and
+// whether the pid in an existing one is still alive -- is its own unit in ./local-discovery.ts:
+// other processes read that file without importing this daemon. Re-exported so no importer moved.
+export {
+  SERVE_DISCOVERY_SCHEMA_VERSION, serveDiscoveryPath,
+  type ServeDiscovery, type ServeDiscoveryAgent, type ServeDiscoveryPrincipal,
+} from './local-discovery.js';
+import { SERVE_DISCOVERY_SCHEMA_VERSION, serveDiscoveryPath, pidAlive, type ServeDiscovery } from './local-discovery.js';
 
 export interface ServeDaemonOptions {
   registry: AgentRegistry;
@@ -193,12 +155,6 @@ export interface ServeDaemonOptions {
    * of asking 28 modules to answer "as whom" on every call.
    */
   buildMcp: (sessionRegistry: AgentRegistry) => McpServer;
-}
-
-/** Is the pid recorded in an existing discovery file still alive? */
-function pidAlive(pid: number): boolean {
-  try { process.kill(pid, 0); return true; }
-  catch (err) { return (err as NodeJS.ErrnoException).code === 'EPERM'; }
 }
 
 export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
@@ -249,6 +205,15 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
     const inv = new InvokeChannel((id, ok, result) => ch.tunnel?.replyInvoke(id, ok, result, entry.gaii));
     invokeChannels.set(entry.gaii, inv);
 
+    // THE WIRE THIS IDENTITY ENDS UP ON — a `let` both branches fill in, never a closure over one
+    // branch's `const`. `identity.onInvoke` used to call the `tunnel` declared inside the NO-shared-
+    // socket branch, which the shared path returns before reaching: the binding stayed in its
+    // temporal dead zone for the daemon's life and every invoke threw `Cannot access 'tunnel'
+    // before initialization`. Enrolment is an invoke, so the migration button failed for every
+    // agent on a shared socket — all of them, since one-socket-per-node. Reproduced against a live
+    // connector on 2026-09-03; it is why no real agent had ever moved to a key. → pitfalls §40
+    let wire: ((method: string, path: string, opts: { body?: unknown }) => Promise<{ status: number; body: unknown }>) | null = null;
+
     // What this identity needs from a socket, whichever socket it turns out to be. Built once and
     // handed either to the shared hub (as an attachment) or to a private client (as its options) —
     // the handlers are the same either way, which is the point: nothing below this line knows or
@@ -265,7 +230,12 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
         if (frame.capability === ENROL_CAPABILITY) {
           const id = frame.id;
           void handleEnrolOffer(frame.input, {
-            forward: (m, p, o) => tunnel.forward(m, p, o),
+            // Never `tunnel` directly: see the `wire` note above. A refusal naming the missing wire
+            // beats a TDZ ReferenceError, which reaches the owner's button as a stack-trace phrase.
+            forward: (m, p, o) => {
+              if (!wire) throw new Error('This agent has no connection to the node yet.');
+              return wire(m, p, o ?? {});
+            },
             attach: (a) => attachNewAgent(a),
             version: freshness.stamp?.version ?? undefined,
           }).then(r => { if (id) ch.tunnel?.replyInvoke(id, r.ok, r.result, entry.gaii); });
@@ -308,6 +278,10 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
     if (joined) {
       ch.tunnel = joined.client;
       ch.transportMode = 'tunnel';
+      // `joined.who` is what routes a frame to this identity on a socket someone else opened, and
+      // it is undefined for the identity that opened it. The enrolment forward needs the same
+      // stamp, which is the second reason this cannot be a bare `tunnel.forward`.
+      wire = (m, pth, o) => joined.client.forward(m, pth, o ?? {}, joined.who);
       entry.client.setTransport({ request: (m, pth, o) => joined.client.forward(m, pth, o ?? {}, joined.who) });
       console.error(`[serve] ${entry.agent}@${entry.owner}: on the shared tunnel to ${entry.config.node_url} (${joined.client.identityCount()} identities, 1 socket)`);
       return;
@@ -330,6 +304,7 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
     if (outcome === 'online') {
       ch.tunnel = tunnel;
       ch.transportMode = 'tunnel';
+      wire = (m, p, o) => tunnel.forward(m, p, o ?? {});
       entry.client.setTransport({ request: (m, p, o) => tunnel.forward(m, p, o ?? {}) });
       console.error(`[serve] ${entry.agent}@${entry.owner}: tunnel online — API + realtime delivery over one WS (no upstream polling)`);
     } else if (outcome === 'auth_failed') {
