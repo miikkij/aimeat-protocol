@@ -134,15 +134,28 @@ export function registerAgentV2MigrateRoutes(router: Router, config: AimeatConfi
       : null;
 
     const { movable, skipped } = await candidates(storage, config, owner, named);
+    // A REFUSAL THE OWNER SEES LEAVES A TRACE. Only the two enrolment failures were logged, so the
+    // three refusals BEFORE the daemon is even asked happened in silence: a person pressed, read a
+    // sentence, and there was nothing on the node to say which of the three it had been or what it
+    // had counted. One of those was hit on 2026-09-03 against a live connector with sixteen movable
+    // agents and could not be explained afterwards, because nothing had written down what the route
+    // saw. `named` and the counts are the whole diagnosis.
+    const refuse = (code: string, message: string, extra?: Record<string, unknown>) => {
+      logger.info('migrate: refused before asking a daemon', {
+        event: 'migrate.refused', owner, code,
+        named: named ?? 'all-stuck', movable: movable.length, skipped: skipped.length, ...extra,
+      });
+      return message;
+    };
     if (movable.length === 0) {
       res.status(409).json(error(config.nodeId, 'NOTHING_TO_MIGRATE',
-        'None of those agents needs moving. Open the Agents page to see which ones would.',
+        refuse('NOTHING_TO_MIGRATE', 'None of those agents needs moving. Open the Agents page to see which ones would.'),
         undefined, { skipped }));
       return;
     }
     if (movable.length > MAX_PER_PRESS) {
       res.status(400).json(error(config.nodeId, 'TOO_MANY',
-        `Move at most ${MAX_PER_PRESS} at a time. Name a subset in \`agents\`.`));
+        refuse('TOO_MANY', `Move at most ${MAX_PER_PRESS} at a time. Name a subset in \`agents\`.`)));
       return;
     }
 
@@ -153,9 +166,10 @@ export function registerAgentV2MigrateRoutes(router: Router, config: AimeatConfi
     const chosen = askedFor ? daemons.find(d => d.installId === askedFor) : daemons[0];
     if (!chosen) {
       res.status(409).json(error(config.nodeId, 'NO_DAEMON',
-        askedFor
+        refuse('NO_DAEMON', askedFor
           ? 'That connector is not connected right now. Start it, or leave install_id out to use whichever one is.'
           : 'Your connector is not running, so there is nothing here to hold the new keys. Start it with `aimeat connect serve` and press again.',
+        { daemons: daemons.length, askedFor: askedFor || null }),
         undefined, { would_move: movable.map(a => a.name) }));
       return;
     }
