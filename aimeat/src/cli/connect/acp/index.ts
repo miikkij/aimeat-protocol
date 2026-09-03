@@ -25,6 +25,8 @@
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V6b).
  */
 import { Readable, Writable } from 'node:stream';
+import { resolveToken } from '../agent-key.js';
+import { getConfigDir } from '../config.js';
 import { ndJsonStream } from '@agentclientprotocol/sdk';
 import { AimeatClient } from '../api-client.js';
 import { loadConfig, loadAgentByName } from '../config.js';
@@ -44,7 +46,12 @@ export async function runAcp(flags: Record<string, string>): Promise<void> {
   if (flags.agent) {
     const loaded = await loadAgentByName(flags.agent, flags.owner || undefined);
     if (!loaded) {
-      note(`Agent "${flags.agent}" is not connected here. Run: aimeat connect list`);
+      // "here" is a DIRECTORY, and saying so is the whole difference. The connector home is
+      // <cwd>/.aimeat, so this fires when somebody runs the command from the wrong checkout —
+      // which is what happened the first time it was tried, with fifty agents one directory away.
+      note(`Agent "${flags.agent}" is not in the connector home at ${getConfigDir()}.`);
+      note('Agents live in <this directory>/.aimeat. Change to the directory they were enrolled in,');
+      note('or set AIMEAT_HOME to it. `aimeat connect list` there shows what is available.');
       process.exit(1);
     }
     agentName = loaded.agent;
@@ -58,7 +65,17 @@ export async function runAcp(flags: Record<string, string>): Promise<void> {
     // same file, so two owners on DIFFERENT nodes would both be sent to whichever enrolled last;
     // that is the config-directory problem, scoped in the spec rather than papered over here.
     nodeUrl = loaded.config.node_url;
-    client = new AimeatClient(nodeUrl, loaded.token);
+    // resolveToken, NOT `loaded.token`. A v2 agent has no stored bearer at all — it holds a key and
+    // mints a credential per use — so reading the stored one gave an empty string, and the identity
+    // read below answered 401 with "is the credential still good?" about a credential that was fine.
+    // Found on 2026-09-03, the first time this door was opened for a migrated agent. Same shape as
+    // the enrolment invoke a few hours earlier: a path written before v2 existed and never told.
+    const token = await resolveToken(loaded.agent, loaded.owner, nodeUrl);
+    if (!token) {
+      note(`No usable credential for "${loaded.agent}" here. Run: aimeat connect status`);
+      process.exit(1);
+    }
+    client = new AimeatClient(nodeUrl, token);
   } else {
     const cfg = loadConfig();
     if (!cfg) {
