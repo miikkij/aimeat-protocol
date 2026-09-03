@@ -8,6 +8,7 @@
  */
 
 import { CONNECT_HELP_TEXT } from './index-help.js';
+import { getConfigDir } from './cli/connect/config.js';
 import { logger } from './utils/logger.js';
 
 /**
@@ -123,7 +124,18 @@ export async function runConnectCli(positionals: string[]): Promise<void> {
     const { listAllTokens } = await import('./cli/connect/keychain.js');
     const { AimeatClient: ListClient } = await import('./cli/connect/api-client.js');
     const loaded = await loadAllAgents();
-    if (loaded.length === 0) { console.log('No agents connected. Run: aimeat connect'); }
+    if (loaded.length === 0) {
+      // NAME THE HOME IT LOOKED IN. The connector home is <cwd>/.aimeat, so running this from the
+      // wrong directory finds an empty one and the old message — "Run: aimeat connect" — told the
+      // person to enrol a NEW agent when their fifty were one directory away. Measured on
+      // 2026-09-03: `aimeat connect list` in the protocol checkout said none, and the same command
+      // in the crew checkout said fifty.
+      console.log(`No agents connected in ${getConfigDir()}`);
+      console.log('The connector home is <this directory>/.aimeat, so agents enrolled elsewhere are');
+      console.log('not visible from here. Either change to that directory, or point AIMEAT_HOME at it:');
+      console.log('  AIMEAT_HOME=/path/to/project/.aimeat aimeat connect list');
+      console.log('To enrol a new agent instead: aimeat connect');
+    }
     else {
       // MODE COMES FROM THE NODE, which holds AgentRecord.mode and serves it with run_mode,
       // identity_version and card_enrolled in one listing. The local mirror is gone: it was a
