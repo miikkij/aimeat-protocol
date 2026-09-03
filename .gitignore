@@ -226,3 +226,7 @@ sbom.cdx.json
 security-report.md
 security-report.json
 /pnpm-lock.yaml
+
+# Connector tarballs from scripts/pack-connector.sh: the artifact npm would publish, built
+# locally so a fix can be proven on the real fleet before a version number is spent on it.
+dist-pack/
