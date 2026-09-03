@@ -9,13 +9,14 @@
  * @structure ScoreChart
  * @usage import { ScoreChart } from './chart.js';
  * @version-history
+ *   v1.0.1 — 2026-09-04 — Legend labels through labelWords.
  *   v1.0.0 — 2026-09-04 — Initial (replaces calibrator-chart.js v3.0.0 in the poster face).
  */
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { colorForIndex } from '/components/UsageChart.js';
-import { x } from './frame.js';
+import { x, labelWords } from './frame.js';
 
 const INK = ['var(--text)', 'var(--accent)', 'var(--sun)'];
 const colorAt = (i) => (i < INK.length ? INK[i] : colorForIndex(i - INK.length));
@@ -28,7 +29,7 @@ export function ScoreChart({ runs }) {
   const scored = (runs || []).filter((r) => (r.scores || []).some((s) => s.overallScore != null));
   if (!scored.length) return null;
   const labels = new Map();
-  for (const r of scored) for (const s of r.scores || []) if (s.modelId && !labels.has(s.modelId)) labels.set(s.modelId, s.modelLabel || s.modelId);
+  for (const r of scored) for (const s of r.scores || []) if (s.modelId && !labels.has(s.modelId)) labels.set(s.modelId, labelWords(s.modelLabel) || s.modelId);
   const ids = [...labels.keys()];
   if (!ids.length) return null;
 

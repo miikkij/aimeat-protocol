@@ -12,13 +12,14 @@
  *   stepSynthesize · pasteBox · pre · proposalList
  * @usage import { runRow, emptiesRow } from './run.js';
  * @version-history
+ *   v1.0.1 — 2026-09-04 — Model labels through labelWords: the stored ones carry a maker prefix and a price.
  *   v1.0.0 — 2026-09-04 — Initial (replaces calibrator-batch.js v1.1.0 and calibrator-batch.step4.js).
  */
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { CopyButton } from '/components/CopyButton.js';
-import { x, STEPS, dateWord, timeWord, durationWords, runAverage, failedWords, stepsDone } from './frame.js';
+import { x, STEPS, dateWord, timeWord, durationWords, runAverage, failedWords, stepsDone, labelWords } from './frame.js';
 import { stepPrompts, optionProposals } from './engine.js';
 
 const scoreClass = (v) => (v == null ? 'is-dim' : v >= 80 ? 'is-good' : v >= 50 ? 'is-mid' : 'is-low');
@@ -37,11 +38,11 @@ export function runRow(ctx, run) {
   const state = running ? ctx.progress[id] || x('stateRunning')
     : done ? (done.synthesize ? x('stateDone') : x('stateAt', { step: x('stepShort.' + (done.reflect ? 'reflect' : done.analyze ? 'analyze' : done.generate ? 'generate' : 'none')) }))
       : run.status === 'synthesized' ? x('stateDone') : x('stateAt', { step: x('stepShort.' + statusStep(run.status)) });
-  const fails = detail ? (detail.models || []).map((m) => ({ label: m.modelLabel, words: failedWords(m) })).filter((f) => f.words.length) : [];
+  const fails = detail ? (detail.models || []).map((m) => ({ label: labelWords(m.modelLabel), words: failedWords(m) })).filter((f) => f.words.length) : [];
   return html`
     <div class=${`cal-row cal-run ${open ? 'is-open' : ''}`} key=${id} id=${'cal-run-' + id}>
       <div class="cal-nm"><button type="button" class="og-tbl-name" onClick=${() => ctx.toggleRun(id)}>${x('runN', { n: run.number })}</button><small>v${run.promptVersion} · ${dateWord(run.createdAt)} ${timeWord(run.createdAt)} · ${state}</small></div>
-      <div class="cal-sc cal-sc--many">${(run.scores || []).map((s) => html`<span key=${s.modelId}><b class=${scoreClass(s.overallScore)}>${s.overallScore != null ? s.overallScore + ' %' : '·'}</b><small>${s.modelLabel}</small></span>`)}</div>
+      <div class="cal-sc cal-sc--many">${(run.scores || []).map((s) => html`<span key=${s.modelId}><b class=${scoreClass(s.overallScore)}>${s.overallScore != null ? s.overallScore + ' %' : '·'}</b><small title=${s.modelLabel}>${labelWords(s.modelLabel)}</small></span>`)}</div>
       <div class="cal-w">${avg != null ? html`<b>${x('averageN', { n: avg })}</b> ` : null}${fails.length ? fails.map((f) => `${f.label}: ${f.words.join(', ')}`).join(' · ') : (detail && avg != null ? x('allPassed') : '')}</div>
       <div class="cal-go"><button type="button" class="og-door" onClick=${() => ctx.toggleRun(id)}>${open ? x('close') : x('open')}</button></div>
       ${open ? html`<div class="cal-open">${detail ? runBody(ctx, run, detail) : html`<p class="cal-empty">${x('loading')}</p>`}</div>` : null}
@@ -126,7 +127,7 @@ function stepGenerate(ctx, run, detail) {
     const g = m.step1_generation || {};
     return html`
       <div class="cal-m" key=${m.modelId}>
-        <div class="cal-m-h"><b>${m.modelLabel}</b><small>${g.status === 'done' ? (durationWords(g.durationMs) || x('pasted')) : g.status === 'error' ? html`<span class="is-err">${g.error}</span>` : x('stepRightPending')}</small></div>
+        <div class="cal-m-h"><b>${labelWords(m.modelLabel)}</b><small>${g.status === 'done' ? (durationWords(g.durationMs) || x('pasted')) : g.status === 'error' ? html`<span class="is-err">${g.error}</span>` : x('stepRightPending')}</small></div>
         ${g.output ? pre(x('viewOutput'), g.output) : null}
         <div class="og-doors">
           ${g.output ? html`<${CopyButton} className="og-door og-door--quiet" text=${g.output} label=${x('copyOutput')} />` : null}
@@ -148,7 +149,7 @@ function stepAnalyze(ctx, run, detail) {
     const dims = a.dimensions || [];
     return html`
       <div class="cal-m" key=${m.modelId}>
-        <div class="cal-m-h"><b>${m.modelLabel}</b>${a.overallScore != null ? html`<b class=${'cal-pct ' + scoreClass(a.overallScore)}>${a.overallScore} %</b>` : null}<small>${a.status === 'error' ? html`<span class="is-err">${a.error}</span>` : a.status === 'done' ? x('checkpointsN', { n: dims.length, ok: dims.filter((d) => d.pass).length }) : x('stepRightPending')}</small></div>
+        <div class="cal-m-h"><b>${labelWords(m.modelLabel)}</b>${a.overallScore != null ? html`<b class=${'cal-pct ' + scoreClass(a.overallScore)}>${a.overallScore} %</b>` : null}<small>${a.status === 'error' ? html`<span class="is-err">${a.error}</span>` : a.status === 'done' ? x('checkpointsN', { n: dims.length, ok: dims.filter((d) => d.pass).length }) : x('stepRightPending')}</small></div>
         ${dims.length ? html`
           <div class="cal-dims">
             <div class="cal-dh"></div><div class="cal-dh">${x('colCheckpoint')}</div><div class="cal-dh">${x('colExpected')}</div><div class="cal-dh">${x('colActual')}</div><div class="cal-dh">${x('colWeight')}</div>
@@ -179,10 +180,10 @@ function stepReflect(ctx, run, detail) {
     const r = m.step3_reflection || {};
     return html`
       <div class="cal-m" key=${m.modelId}>
-        <div class="cal-m-h"><b>${m.modelLabel}</b><small>${r.status === 'done' ? x('proposalsN', { n: (r.judgeProposals?.proposals?.length || 0) + (r.selfProposals?.proposals?.length || 0) }) : x('stepRightPending')}</small></div>
+        <div class="cal-m-h"><b>${labelWords(m.modelLabel)}</b><small>${r.status === 'done' ? x('proposalsN', { n: (r.judgeProposals?.proposals?.length || 0) + (r.selfProposals?.proposals?.length || 0) }) : x('stepRightPending')}</small></div>
         <div class="cal-cols">
           ${proposalList(ctx, run, i, 'judge', x('judgeProposals'), r.judgeProposals)}
-          ${proposalList(ctx, run, i, 'self', x('selfProposals', { model: m.modelLabel }), r.selfProposals)}
+          ${proposalList(ctx, run, i, 'self', x('selfProposals', { model: labelWords(m.modelLabel) }), r.selfProposals)}
         </div>
       </div>`;
   })}`;
