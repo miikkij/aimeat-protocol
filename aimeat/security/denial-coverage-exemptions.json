@@ -41,10 +41,6 @@
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
       "sha": "24594cc6df6f6d57"
     },
-    "test/e2e-extension-secrets.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "d2b0d7c7c65afbfd"
-    },
     "test/e2e-iam-extension.ts": {
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
       "sha": "4d37d4f8f13b0d78"
@@ -74,7 +70,7 @@
       "sha": "e3dca6fe2c37cc12"
     },
     "test/e2e-x402-testnet.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "reason": "REVIEWED 2026-09-04. This suite never runs in CI and has no refusal to add. Its first twelve lines are a skip guard: it exits 0 unless AIMEAT_X402_ENABLED=true AND the REAL x402.org facilitator is in use, because Phase B signs an EIP-3009 authorization with a throwaway key and settles ~0.10 USDC on Base Sepolia. It is a manual on-chain acceptance harness a person runs after funding an address, not a suite. Adding a cross-owner case here would write a test that never executes, which is worse than the gap: it reads as coverage. The refusals on the same surface that DO run belong in e2e-money-audit, which is in the guard tier. If this suite is ever made to run unattended, this line expires with its sha.",
       "sha": "63a20107e5207f5e"
     },
     "test/e2e-organism-member-visibility.ts": {
@@ -89,10 +85,6 @@
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
       "sha": "6bb6ee5195ac41dc"
     },
-    "test/e2e-workspace-publish-guard.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "c9d466047db413a4"
-    },
     "test/e2e-connect-tunnel-delivery.ts": {
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
       "sha": "374ff3925654ca54"
@@ -100,14 +92,6 @@
     "test/e2e-connect-tunnel-records.ts": {
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
       "sha": "cbfc438922d7864c"
-    },
-    "test/e2e-memory-file-presigned.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "6ee449518f5be4ee"
-    },
-    "test/e2e-capability-trust-guard.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "a0094d954e9bf230"
     },
     "test/e2e-audio-speech.ts": {
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
@@ -128,10 +112,6 @@
     "test/e2e-attachment-sweep.ts": {
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
       "sha": "3026905962578080"
-    },
-    "test/e2e-inbox-cursor.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "3d71cf560b1be0cc"
     },
     "test/e2e-agent-telemetry.ts": {
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",

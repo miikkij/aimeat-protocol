@@ -251,6 +251,70 @@ await test('PUT identical manifest — reports unchanged despite encrypted confi
   assert(body.data?.action === 'unchanged', `expected unchanged, got ${body.data?.action}`);
 });
 
+// ─── Phase 7: Who else reaches the secret, and the extension holding it ───
+//
+// Everything above drives ONE owner, so it proves the secret is masked and encrypted and says
+// nothing about whose eyes the mask is for. The class this asks about is not hypothetical: until
+// 2026-08-10 any agent holding ext:write could uninstall ANOTHER owner's extension (5befb1ba), and
+// the suites of the day were green throughout because none of them had a second principal in it.
+console.log('Phase 7 — A second owner, and no owner at all');
+
+const strangerName = `secstranger${Date.now()}`;
+let strangerToken = '';
+
+await test('register a second owner — a PLAIN one, not another operator', async () => {
+  // POST /v1/owners, NOT /v1/admin/setup/register. The setup route is how the owner at the top of
+  // this file was made, and its test name says "(operator)" for a reason: it grants the operator
+  // role. canManageInstalledExt allows an operator to manage anyone's extension BY DESIGN, so a
+  // second principal made the same way passes every gate below and reads like a cross-owner hole.
+  // The first draft of this block did exactly that and reported a 200 where it expected a refusal.
+  const reg = await json('/v1/owners', {
+    method: 'POST', body: JSON.stringify({ name: strangerName, public_key: 'placeholder' }),
+  });
+  assert(reg.status === 201, `status ${reg.status}: ${JSON.stringify(reg.body)}`);
+  const timestamp = new Date().toISOString();
+  const signature = await signMsg(reg.body.data.private_key, strangerName + NODE_ID + timestamp);
+  const { body } = await json('/v1/auth/token', {
+    method: 'POST',
+    body: JSON.stringify({ owner: strangerName, timestamp, signature }),
+  });
+  assert(body.ok === true, `stranger token: ${JSON.stringify(body.error)}`);
+  strangerToken = body.data?.token;
+  assert(!(body.data?.roles ?? []).includes('operator'), 'the second owner must not be an operator');
+});
+
+await test('an unauthenticated caller cannot read the instance', async () => {
+  const { status } = await json('/v1/extensions/rest-connector/instances/acme');
+  assert(status === 401, `expected 401, got ${status}`);
+});
+
+await test('a second owner cannot read the instance, masked or otherwise', async () => {
+  const { status, body } = await json('/v1/extensions/rest-connector/instances/acme', {
+    headers: { Authorization: `Bearer ${strangerToken}` },
+  });
+  assert(status === 403 || status === 404, `expected 403 or 404, got ${status}: ${JSON.stringify(body)}`);
+  // Belt and braces: whatever the status, the plaintext must not be in the body. A refusal that
+  // still echoes the config would be the same defect wearing a 403.
+  assert(JSON.stringify(body).indexOf(SECRET) === -1, 'plaintext secret leaked in the refusal');
+});
+
+await test('a second owner cannot delete the extension', async () => {
+  const { status } = await json('/v1/extensions/rest-connector', {
+    method: 'DELETE', headers: { Authorization: `Bearer ${strangerToken}` },
+  });
+  assert(status === 403 || status === 404, `expected 403 or 404, got ${status}`);
+});
+
+await test('POSITIVE CONTROL: the extension is still there and still the owner\'s', async () => {
+  // Without this the three refusals above would pass against a node that had deleted the extension
+  // in the previous test, which is the exact failure a denial-only block hides.
+  const { status, body } = await json('/v1/extensions/rest-connector/instances/acme', {
+    headers: { Authorization: `Bearer ${ownerToken}` },
+  });
+  assert(status === 200, `owner GET ${status}`);
+  assert(body.data?.instance?.config?.apiKey === MASK, 'owner still sees the masked secret');
+});
+
 // ─── Cleanup ───
 console.log('Cleanup');
 await test('DELETE rest-connector', async () => {

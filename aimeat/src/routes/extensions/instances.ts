@@ -20,7 +20,7 @@ import { getEncryptionKey } from '../../services/encryption.js';
 import {
   getInstanceSecretKeys, encryptSecretFields, maskSecretFields, preserveMaskedSecrets, stripClientEncryptedValues,
 } from '../../services/extension-secrets.js';
-import { canManageInstalledExt } from './permissions.js';
+import { canManageInstalledExt, canSeeExtensionInstance } from './permissions.js';
 
 export function registerExtensionInstanceRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   // ── POST /v1/extensions/:name/instances — Create instance ──────────
@@ -123,11 +123,16 @@ export function registerExtensionInstanceRoutes(router: Router, config: AimeatCo
         return;
       }
 
-      const instances = await storage.listExtensionInstances(name);
+      // FILTERED, not refused. One extension can carry instances belonging to several owners, so
+      // the answer to "list the instances" is "the ones that are yours" rather than 403 — an owner
+      // with no instance of a shared extension gets an empty list, which is the truth. Until
+      // 2026-09-04 this returned everyone's, including another owner's name in createdBy.
+      const mine = (await storage.listExtensionInstances(name))
+        .filter(i => canSeeExtensionInstance(req, i.createdBy));
       const instSecretKeys = getInstanceSecretKeys(ext);
       res.json(success(config.nodeId, {
-        instances: instances.map(i => ({ ...i, config: maskSecretFields(i.config, instSecretKeys) })),
-        total: instances.length,
+        instances: mine.map(i => ({ ...i, config: maskSecretFields(i.config, instSecretKeys) })),
+        total: mine.length,
       }, [
         { description: 'Create instance', method: 'POST', url: `/v1/extensions/${name}/instances` },
         { description: 'View extension', method: 'GET', url: `/v1/extensions/${name}` },
@@ -150,7 +155,11 @@ export function registerExtensionInstanceRoutes(router: Router, config: AimeatCo
       }
 
       const instance = await storage.getExtensionInstance(name, instanceId);
-      if (!instance) {
+      // 404 for "not there" and 404 for "not yours", the same answer, on purpose: the id is the
+      // caller's guess and confirming that somebody else's instance exists answers a question they
+      // did not get to ask. The write doors below say 403 because the caller already had to name a
+      // row they could see. Open until 2026-09-04, when requireAuth() was the whole gate here.
+      if (!instance || !canSeeExtensionInstance(req, instance.createdBy)) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND',
           `Instance "${instanceId}" not found for extension "${name}"`));
         return;
