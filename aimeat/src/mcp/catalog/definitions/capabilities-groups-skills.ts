@@ -26,7 +26,7 @@ export const capabilitiesGroupsSkillsTools: AimeatToolDefinition[] = [
             tags: { type: 'array', description: 'Filter by tags.' },
             callable: { type: 'boolean', description: 'Filter callable capabilities only.' },
             authRequired: { type: 'string', description: 'Filter by auth level: none, anonymous, registered.' },
-            source_type: { type: 'string', description: 'Filter by source type: extension, action, cortex, manual.' },
+            source_type: { type: 'string', description: 'Filter by source type: extension (a server extension action, callable), app-tool (a sellable tool from an app manifest, called under a contract), offering (an agent\'s public offer, commissioned as work), cortex (a browser library the app loads, never callable here), manual (an owner-added webhook), action.' },
         },
     },
     {

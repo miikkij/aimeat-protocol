@@ -10,6 +10,8 @@
  *   - invoke, telemetry, vouch, test
  * @usage Mounted by mountRoutes(); the shared write lives in services/capability-record.ts.
  * @version-history
+ *   v1.1.0 - 2026-09-03 - The list's policy carries call_counting (whether direct extension calls
+ *     are counted into stats); source_type filter accepts app-tool and offering.
  *   v1.0.0 - 2026-05-02 - Initial capability layer endpoints
  *   v1.0.1 - 2026-07-29 - POST /v1/capabilities: normalise `source` per field. A partial source
  *            (e.g. {type:'manual'}) built a record with ref undefined and crashed the insert into a
@@ -217,6 +219,8 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
         publishing: config.capabilityPublishing,
         publishers: config.capabilityPublishers,
         webhooks: config.capabilityWebhooks,
+        // Whether direct extension calls are counted into stats; proxy calls always are.
+        call_counting: config.capabilityCallCounting,
       },
     }));
   });

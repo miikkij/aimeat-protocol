@@ -714,6 +714,8 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   capabilityWebhooks: 'disabled' | 'allowlist_only' | 'open';
   capabilityWebhookDomainAllowlist: string[];
   capabilityLogRetentionDays: number;
+  /** Count direct extension calls into capability stats (proxy calls always count). Default false. */
+  capabilityCallCounting: boolean;
 
   // Agent Tasks (Phase 1)
   taskStallThresholdMinutes: number;

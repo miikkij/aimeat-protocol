@@ -12,6 +12,8 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   v1.9.0 — 2026-09-03 — features.capability_call_counting (AIMEAT_CAPABILITY_CALL_COUNTING): whether
+ *     a direct extension action call counts into the capability registry's statistics.
  *   v1.8.0 — 2026-08-30 — boards.public_per_owner_max (AIMEAT_BOARD_PUBLIC_PER_OWNER_MAX): how many
  *     public notice boards one account may keep, now that opening one is no longer the operator's.
  *   v1.7.0 — 2026-08-29 — The ai.label_public row (AIMEAT_AI_LABEL_PUBLIC), out of the coverage
@@ -200,6 +202,9 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
 
   // ── Features (mutable) ──
   { key: 'extendedFeaturesEnabled', dotPath: 'features.extended_features_enabled', envVar: 'AIMEAT_EXTENDED_FEATURES', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable extended feature set' },
+  // A call that goes through the capability registry's own invoke proxy is always counted; this
+  // decides whether a direct extension call (the door most agents use) counts too.
+  { key: 'capabilityCallCounting', dotPath: 'features.capability_call_counting', envVar: 'AIMEAT_CAPABILITY_CALL_COUNTING', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Count direct extension action calls into the capability registry\'s call statistics (calls through the registry always count)' },
 
   // ── Work (mutable) ──
   { key: 'workQueueMaxPending', dotPath: 'work.queue_max_pending', envVar: 'AIMEAT_WORK_QUEUE_MAX_PENDING', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max pending work items per provider', range: '1-1000' },
