@@ -18,7 +18,8 @@
  *   v1.0.0 -- 2026-07-13 -- Extracted from tool-call.ts (max-file-lines)
  */
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
-import { query, optionalString, requiredString, optionalArray, optionalRecord, requiredRecord, optionalNumber, taskTodoPayload } from './tool-call-helpers.js';
+import { agentCrewCliTools } from './tool-call-defs-agent-crew.js';
+import { query, optionalString, requiredString, optionalArray, optionalRecord, optionalNumber, taskTodoPayload } from './tool-call-helpers.js';
 
 export const agentTools: ConnectCliToolDefinition[] = [
     {
@@ -134,6 +135,43 @@ export const agentTools: ConnectCliToolDefinition[] = [
             return client.patch(`/v1/agents/${encodeURIComponent(target)}/tags`, {
                 tags: optionalArray(input, 'tags') ?? [],
             });
+        },
+    },
+    {
+        name: 'aimeat_agent_run_mode_set',
+        description: "Set how one of your agents is RUN: 'spawn' (data on the node until work arrives; a worker starts per job and unwinds after) or 'resident' (kept up). Works on ANY agent you own, whatever runs it — an agent whose behaviour lives in code is not a lesser agent. Recorded here and honoured by the runtime; the node never enforces it.",
+        input: {
+            target_agent_name: { type: 'string', required: true, description: 'Agent whose run mode to set.' },
+            run_mode: { type: 'string', required: true, enum: ['spawn', 'resident'], description: "'spawn' or 'resident'." },
+        },
+        handler: ({ client }, input) => client.patch(
+            `/v1/agents/${encodeURIComponent(requiredString(input, 'target_agent_name'))}/run-mode`,
+            { run_mode: requiredString(input, 'run_mode') },
+        ),
+    },
+    {
+        name: 'aimeat_agent_runtime_report',
+        description: "Say what code runs this agent, so a run can be audited afterwards: the file, its hash, the commit and which runtime read it. A JSON crew is answerable through its definition on the node; a code-backed one has none, and without this nothing can say what ran. Recorded and never checked.",
+        input: {
+            target_agent_name: { type: 'string', required: true, description: 'Agent this is about.' },
+            kind: { type: 'string', required: true, description: "e.g. 'python' or 'crew-def'." },
+            file: { type: 'string', description: 'Path to the file that runs, relative to your own root.' },
+            sha256: { type: 'string', description: "Hash of that file's contents." },
+            commit: { type: 'string', description: 'Commit the file came from.' },
+            runtime: { type: 'string', description: "Which runtime read it, e.g. 'crewaimeat 0.7.0'." },
+            definition_revision: { type: 'number', description: 'For a JSON crew: which definition revision was live.' },
+        },
+        handler: ({ client }, input) => {
+            const src: JsonObject = { kind: requiredString(input, 'kind') };
+            for (const k of ['file', 'sha256', 'commit', 'runtime'] as const) {
+                const v = optionalString(input, k); if (v) src[k] = v;
+            }
+            const rev = optionalNumber(input, 'definition_revision');
+            if (rev !== undefined) src.definition_revision = rev;
+            return client.patch(
+                `/v1/agents/${encodeURIComponent(requiredString(input, 'target_agent_name'))}/runtime-source`,
+                { runtime_source: src },
+            );
         },
     },
     {
@@ -681,94 +719,5 @@ export const agentTools: ConnectCliToolDefinition[] = [
             return { ok: true as const, data: { applied, ...(unsupported.length ? { unsupported, note: 'Model routing has no REST route — set it via the profile UI or the server MCP tool.' } : {}) } };
         },
     },
-    // ── Crew definition: thin proxies onto /v1/agents/:name/crew*, the routes the Crew tab and
-    // both MCP surfaces use. `target_agent_name` is the definition's agent; the call runs as the
-    // registered agent the dispatcher picked.
-    {
-        name: 'aimeat_crew_get',
-        description: "Read an agent's crew definition state: live definition, draft, kept revisions, the runtime's last load report, and whether the agent is connected.",
-        input: { target_agent_name: { type: 'string', description: "The definition's agent (bare name or GAII; same owner as the caller)." } },
-        handler: ({ client }, input) => client.get(`/v1/agents/${encodeURIComponent(requiredString(input, 'target_agent_name'))}/crew`),
-    },
-    {
-        name: 'aimeat_crew_validate',
-        description: "Ask the agent's own runtime to validate a crew definition; the messages come back verbatim.",
-        input: {
-            target_agent_name: { type: 'string', description: "The definition's agent." },
-            doc: { type: 'object', description: 'The whole crew definition to check.' },
-        },
-        handler: ({ client }, input) => client.post(`/v1/agents/${encodeURIComponent(requiredString(input, 'target_agent_name'))}/crew/validate`, { doc: requiredRecord(input, 'doc') }),
-    },
-    {
-        name: 'aimeat_crew_try',
-        description: "Run a crew definition once on the agent's runtime and wait for the output (doc + prompt to start, try_id to keep waiting).",
-        input: {
-            target_agent_name: { type: 'string', description: "The definition's agent." },
-            doc: { type: 'object', description: 'Start a trial: the definition to run once.' },
-            prompt: { type: 'string', description: 'Start a trial: what the crew should do. Required with doc.' },
-            try_id: { type: 'string', description: 'Continue waiting on a trial already started.' },
-            wait_seconds: { type: 'number', description: 'How long to wait before handing back the try_id (default 50, max 120).' },
-        },
-        handler: async ({ client }, input) => {
-            const path = `/v1/agents/${encodeURIComponent(requiredString(input, 'target_agent_name'))}/crew/try`;
-            const doc = optionalRecord(input, 'doc');
-            let id = optionalString(input, 'try_id');
-            if (doc) {
-                const started = await client.post(path, { doc, prompt: optionalString(input, 'prompt') });
-                if (!started.ok) return started;
-                id = (started.data as { try_id?: string } | undefined)?.try_id;
-            }
-            if (!id) throw new Error('Pass doc and prompt to start a trial, or try_id to keep waiting on one.');
-            const deadline = Date.now() + Math.min(120, optionalNumber(input, 'wait_seconds') ?? 50) * 1000;
-            for (;;) {
-                const look = await client.get(`${path}/${encodeURIComponent(id)}`);
-                const status = (look.data as { status?: string } | undefined)?.status;
-                if (!look.ok || status !== 'running' || Date.now() >= deadline) return look;
-                await new Promise(r => setTimeout(r, 1000));
-            }
-        },
-    },
-    {
-        name: 'aimeat_crew_draft',
-        description: "Keep unpublished edits to an agent's crew definition, or discard the saved draft by omitting doc.",
-        input: {
-            target_agent_name: { type: 'string', description: "The definition's agent." },
-            doc: { type: 'object', description: 'The edits to keep. Omit to discard the saved draft.' },
-        },
-        handler: ({ client }, input) => {
-            const path = `/v1/agents/${encodeURIComponent(requiredString(input, 'target_agent_name'))}/crew/draft`;
-            const doc = optionalRecord(input, 'doc');
-            return doc ? client.put(path, { doc }) : client.delete(path);
-        },
-    },
-    {
-        name: 'aimeat_crew_publish',
-        description: "Make a crew definition live after the agent's runtime validates it, or restore a kept revision with `revision`.",
-        input: {
-            target_agent_name: { type: 'string', description: "The definition's agent." },
-            doc: { type: 'object', description: 'The definition to make live.' },
-            revision: { type: 'number', description: 'Instead of doc: the kept revision to republish.' },
-        },
-        handler: ({ client }, input) => {
-            const base = `/v1/agents/${encodeURIComponent(requiredString(input, 'target_agent_name'))}/crew`;
-            const doc = optionalRecord(input, 'doc');
-            if (doc) return client.post(`${base}/publish`, { doc });
-            const revision = optionalNumber(input, 'revision');
-            if (revision === undefined) throw new Error('Pass doc to publish a definition, or revision to restore a kept one.');
-            return client.post(`${base}/restore`, { revision });
-        },
-    },
-    {
-        name: 'aimeat_crew_seed',
-        description: "Give an agent its FIRST crew definition when it has no runtime yet to check one. Refused if it already has a definition.",
-        input: {
-            target_agent_name: { type: 'string', description: "The agent to give a first definition to." },
-            doc: { type: 'object', description: 'The definition.' },
-            validate_with: { type: 'string', description: 'Which connected same-owner agent should check it. Omit and any connected one is used.' },
-        },
-        handler: ({ client }, input) => client.post(
-            `/v1/agents/${encodeURIComponent(requiredString(input, 'target_agent_name'))}/crew/seed`,
-            { doc: requiredRecord(input, 'doc'), validate_with: optionalString(input, 'validate_with') },
-        ),
-    },
+    ...agentCrewCliTools,
 ];

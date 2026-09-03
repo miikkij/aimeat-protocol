@@ -428,6 +428,9 @@ export function initializeSchema(db: Database.Database): void {
   // and shown, never enforced — the runtime is the only party that can honour it, same rule as
   // maxConcurrentTasks. NULL = nobody has said, which is not the same as 'spawn'.
   safeAddColumn('agents', 'runMode', 'TEXT');
+  // What code backs the agent, as its runtime reports it. JSON in a TEXT column, like every
+  // other structured field here: it is read whole and never queried into.
+  safeAddColumn('agents', 'runtimeSource', 'TEXT');
   // 1 (or NULL) = device-authorization agent with a long-lived JWT; 2 = brings its own Ed25519 key,
   // pinned at enrolment, and exchanges a signed assertion for a short-lived token per use.
   safeAddColumn('agents', 'identityVersion', 'INTEGER');

@@ -8900,6 +8900,13 @@ paths:
         `max_concurrent_tasks`: the runtime is the only party that can honour it. Same-owner gated
         rather than owner-role-only, because a fleet runtime that has worked out an agent must stay
         up is the caller this exists for.
+
+        **Works on ANY agent you own, whatever runs it** — including one whose behaviour lives in
+        code rather than in a definition on this node. The mode belongs to the node: a queued task
+        auto-activates only for a `task-runner`, and a spawner's roster is
+        `GET /v1/agents?run_mode=spawn`, so a switch the node acts on cannot live on a file the node
+        never reads. An agent may set its own or a same-owner sibling's
+        (`aimeat_agent_run_mode_set`).
       tags: [Identity]
       security:
         - BearerAuth: []
@@ -8925,6 +8932,76 @@ paths:
           description: The new run mode
         '400':
           description: run_mode is not one of the two values
+        '403':
+          description: Not your agent
+        '404':
+          description: No such agent
+
+  /v1/agents/{name}/runtime-source:
+    patch:
+      operationId: setAgentRuntimeSource
+      summary: What code runs this agent
+      description: |
+        The runtime says what backs this agent, so a run can be audited afterwards.
+
+        A crew whose definition lives on this node is already answerable — the definition is a
+        versioned record here, so "which one ran" has an answer. A CODE-backed crew has no
+        definition here at all, and without this nothing on the node can say what ran. A run nobody
+        can audit is the same as a run that did not happen, once something goes wrong.
+
+        **Recorded, never checked.** Every field but one is the runtime's word about a disk this
+        node cannot read; a server-side opinion about the hash would be a guess with a schema.
+        `reported_at` is the node's own clock, and it is what turns "what was it running around
+        then" into a question with an answer.
+
+        Send `null` to clear it: a runtime that stops being the thing that runs this agent should be
+        able to say so, and a stale claim is worse than none. Same-owner gated; an agent may report
+        its own or a same-owner sibling's (`aimeat_agent_runtime_report`).
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+          description: The agent's name, or its full identity url-encoded.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [runtime_source]
+              properties:
+                runtime_source:
+                  nullable: true
+                  type: object
+                  required: [kind]
+                  properties:
+                    kind:
+                      type: string
+                      description: What kind of thing runs, e.g. `python` or `crew-def`. Open, not an enum — the node does not run these processes and has no business deciding which runtimes may exist.
+                    file:
+                      type: string
+                      description: Path to the file that runs, relative to the runtime's own root.
+                    sha256:
+                      type: string
+                      description: Hash of that file's contents — the only field that changes when the code changes and nothing else does.
+                    commit:
+                      type: string
+                      description: Commit the file came from.
+                    runtime:
+                      type: string
+                      description: Which runtime read it, e.g. `crewaimeat 0.7.0`.
+                    definition_revision:
+                      type: integer
+                      description: 'For a JSON crew: which revision of the definition on this node was live.'
+      responses:
+        '200':
+          description: What the node recorded, with its own `reported_at`
+        '400':
+          description: Not an object with a `kind`, and not null
         '403':
           description: Not your agent
         '404':

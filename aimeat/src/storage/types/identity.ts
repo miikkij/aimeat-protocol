@@ -42,6 +42,29 @@ export interface OwnerRecord {
   managedBy?: string | null;
 }
 
+/**
+ * What code backs an agent, as its runtime describes it. Both families answer one question.
+ *
+ * `kind` is deliberately open rather than a union: the node does not run these processes and has no
+ * business deciding which runtimes may exist. `python` and `crew-def` are what exists today.
+ */
+export interface AgentRuntimeSource {
+  /** What kind of thing runs, e.g. `python` for a code-backed crew, `crew-def` for a JSON one. */
+  kind: string;
+  /** Path to the file that runs, relative to the runtime's own root. */
+  file?: string;
+  /** Hash of that file's contents. The only field that changes when the code changes but nothing else does. */
+  sha256?: string;
+  /** Commit the file came from. */
+  commit?: string;
+  /** Which runtime read it, e.g. `crewaimeat 0.7.0`. */
+  runtime?: string;
+  /** For a JSON crew: which revision of the definition on this node was live. */
+  definitionRevision?: number;
+  /** When the node recorded this. The node's clock, not the runtime's. */
+  reportedAt?: string;
+}
+
 export interface AgentRecord {
   name: string;
   owner: string;
@@ -149,6 +172,26 @@ export interface AgentRecord {
    * predates the field and nobody has said, which is not the same as `spawn`.
    */
   runMode?: 'spawn' | 'resident';
+  /**
+   * WHAT WAS RUNNING WHEN THIS AGENT RAN — the runtime's own answer, in its own words.
+   *
+   * A JSON crew is auditable already: the definition is a versioned record on this node, so "which
+   * one ran" is a revision number. A CODE-BACKED crew has no definition here at all, so nothing on
+   * the node could answer the question, and a run nobody can audit is the same as a run that did
+   * not happen when something goes wrong. crewaimeat proposed this shape and it is the right one:
+   * the file, its hash, the commit, and which runtime version read it.
+   *
+   * DECLARED, NOT ENFORCED, exactly like `runMode` and `maxConcurrentTasks`: the node records what
+   * the runtime says and never checks it, because it does not run the process and a server-side
+   * opinion about someone else's disk is a guess with a schema. `reportedAt` is the node's, so at
+   * least the WHEN is not the runtime's word.
+   *
+   * It is the agent's CURRENT declaration, not a per-run stamp. That answers "what is this agent
+   * running now" and, with the timestamp, "what was it running around then" — which is what the
+   * half-day hunt actually needed. A per-run copy belongs on whatever record a run has, and no run
+   * record on this node carries one yet.
+   */
+  runtimeSource?: AgentRuntimeSource | null;
   /**
    * Which identity mechanics this agent's credential uses. 1 (or absent) is the device-authorization
    * agent whose proof is a long-lived JWT in a keychain; 2 brings its own Ed25519 key, pinned here at
