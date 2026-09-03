@@ -11,6 +11,10 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   v1.22.0 -- 2026-09-03 -- tools.listChanged is declared and emitted, so a client re-reads the
+ *     tool list when the owner changes an agent's scopes instead of the person reconnecting by
+ *     hand. The 56-line registration block moves to register-all.ts, which the schema audit calls
+ *     too: it had been keeping its own copy, and the copy had fallen to half.
  *   v1.21.0 -- 2026-08-29 -- registerAppLegalTools: aimeat_app_legal_set, aimeat_app_audit.
  *   v1.20.0 -- 2026-08-29 -- registerAppMarksTools: aimeat_app_marks_set.
  *   v1.19.0 -- 2026-08-28 -- registerAgentCrewTools: the five aimeat_crew_* tools, which call
@@ -93,63 +97,9 @@ import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import type { PeerInfo } from '../services/federation.js';
 import { resolveSupportRoute } from '../services/message-alias.js';
-import { registerCoreTools } from './core.js';
-import { registerComplianceTools } from './compliance.js';
-import { registerDataMapTools } from './data-map.js';
-import { registerBoardsTools } from './boards.js';
-import { registerOrganismsTools } from './organisms.js';
-import { registerWorkspaceTools } from './workspaces.js';
-import { registerKnowledgeTools } from './knowledge.js';
-import { registerAppdevPitfallTools } from './appdev-pitfalls.js';
-import { registerAppdevResearchTools } from './appdev-research.js';
-import { registerAppTemplateProposalTools } from './app-template-proposals.js';
-import { registerAppdevProofTools } from './appdev-proofs.js';
-import { registerSkillsTools } from './skills.js';
-import { registerOperatorConfigTools } from './operator-config.js';
-import { registerExtensionsTools } from './extensions.js';
-import { registerCatalogueTools } from './catalogue.js';
-import { registerMemoryExtendedTools } from './memory-extended.js';
-import { registerWalletExtendedTools } from './wallet-extended.js';
-import { registerConsentTools } from './consent.js';
-import { registerCommerceTools } from './commerce.js';
-import { registerExchangeTools } from './exchange.js';
-import { registerExchangeRunTools } from './exchange-run.js';
-import { registerChatInstancesTools } from './chat-instances.js';
-import { registerFlagsTools } from './flags.js';
-import { registerPromptsTools } from './prompts.js';
-import { registerCapabilitiesTools } from './capabilities.js';
-import { registerCortexTools } from './cortex.js';
-import { registerSeoTools } from './seo.js';
-import { registerAppMarksTools } from './app-marks.js';
-import { registerAppLegalTools } from './app-legal.js';
-import { registerAppsTools } from './apps.js';
-import { registerAppDraftEditTools } from './apps-draft-edit.js';
-import { registerAppScreenshotTool } from './apps-screenshot.js';
-import { registerAiImageTool } from './ai-image.js';
-import { registerSharingGroupTools } from './sharing-groups.js';
-import { registerAgentTaskTools } from './agent-tasks.js';
-import { registerAgentScheduleTools } from './agent-schedules.js';
-import { registerWorkflowTools } from './workflows.js';
-import { registerAgentCapabilityTools } from './agent-capabilities.js';
-import { registerAgentMessageTools } from './agent-messages.js';
-import { registerAgentV2MessagingTools } from './agent-v2-messaging.js';
-import { registerAgentV2TaskTools } from './agent-v2-tasks.js';
-import { registerDmMessageTools } from './dm-messages.js';
-import { registerNotifyTools } from './notify.js';
-import { registerContactTools } from './contacts.js';
-import { registerCompanyTools } from './companies.js';
-import { registerPackageTools } from './packages.js';
-import { registerPortfolioTools } from './portfolio.js';
-import { registerSurfaceLayoutTools } from './surface-layout.js';
-import { registerAppUiTools } from './app-ui.js';
-import { registerDesignbookTools } from './designbook.js';
-import { registerAgentOnboardingTools } from './agent-onboarding.js';
-import { registerAgentTelemetryTools } from './agent-telemetry.js';
-import { registerAgentManagementTools } from './agent-management.js';
-import { registerInvokeTool } from './invoke.js';
-import { registerAgentCrewTools } from './agent-crew.js';
+// Every tool group, in one list this file no longer keeps: mcp/register-all.ts.
+import { registerAllServerTools } from './register-all.js';
 import { scopeAllowsTool } from './catalog/scopes.js';
-import { registerConnectionTools } from './connections.js';
 import { wrapToolHandler } from './tool-usage-wrap.js';
 import { toolsForSurface, isV2Role, V2_ROLES, type SurfaceRole } from './catalog/surfaces.js';
 import { instructionsFor } from './instructions.js';
@@ -316,67 +266,15 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         patchable.tool = (...args: unknown[]) => gate(args[0] as string) ? measuredTool(...args) : undefined;
         patchable.registerTool = (...args: unknown[]) => gate(args[0] as string) ? measuredRegisterTool(...args) : undefined;
 
-        registerCoreTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers);
-        registerBoardsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
-        registerOrganismsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
-        registerWorkspaceTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
-        registerConnectionTools(mcp, storage, config, () => agentGaii, scopes);
-        registerKnowledgeTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
-        registerAppdevPitfallTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, scopes);
-        registerAppdevResearchTools(mcp, storage, config, () => agentGaii);
-        registerAppTemplateProposalTools(mcp, storage, config, () => agentGaii);
-        registerAppdevProofTools(mcp, storage, config, () => agentGaii, scopes);
-        registerSkillsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
-        registerOperatorConfigTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
-        registerComplianceTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
-        registerDataMapTools(mcp, storage, config, () => agentGaii, () => scopes);
-        registerExtensionsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
-        registerCatalogueTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
-        registerMemoryExtendedTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
-        registerWalletExtendedTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
-        registerConsentTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
-        registerCommerceTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
-        registerExchangeTools(mcp, storage, config, () => agentGaii);
-        registerExchangeRunTools(mcp, storage, config, () => agentGaii, getToken);
-        registerChatInstancesTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
-        registerFlagsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
-        registerPromptsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
-        registerCapabilitiesTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, getToken);
-        // The second primitive, beside aimeat_discover: run what you found. Needs the session's
-        // raw bearer, because the call is dispatched as the caller through the node's own routes.
-        registerInvokeTool(mcp, config, getToken, () => agentGaii);
-        registerCortexTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
-        registerAppsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
-        registerAppDraftEditTools(mcp, storage, config, () => agentGaii);
-        registerAppScreenshotTool(mcp, storage, config, () => agentGaii);
-        registerSeoTools(mcp, storage, config, () => agentGaii);
-        registerAppMarksTools(mcp, storage, config, () => agentGaii);
-        registerAppLegalTools(mcp, storage, config, () => agentGaii);
-        registerAiImageTool(mcp, storage, config, () => agentGaii);
-        registerSharingGroupTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
-        registerAgentTaskTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
-        registerAgentScheduleTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
-        registerWorkflowTools(mcp, storage, config, () => agentGaii);
-        registerAgentCapabilityTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
-        registerAgentMessageTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
-        // The v2 turn, beside the dashboard thread above it and the federated DM below. A session
-        // here authenticates against an agent record, so the ops see roles: ['agent'].
-        registerAgentV2MessagingTools(mcp, storage, config, () => agentGaii, () => owner ?? '');
-        // The v2 task handle, beside the dashboard work item registered above. Both stay.
-        registerAgentV2TaskTools(mcp, storage, config, () => agentGaii, () => owner ?? '');
-        registerDmMessageTools(mcp, storage, config, () => agentGaii, peers);
-        registerNotifyTools(mcp, storage, config, () => agentGaii);
-        registerContactTools(mcp, storage, config, () => agentGaii);
-        registerCompanyTools(mcp, storage, config, () => agentGaii);
-        registerPackageTools(mcp, storage, config, () => agentGaii);
-        registerPortfolioTools(mcp, storage, config, () => agentGaii);
-        registerSurfaceLayoutTools(mcp, storage, config, () => agentGaii);
-        registerAppUiTools(mcp, storage, config, () => agentGaii);
-        registerDesignbookTools(mcp, storage, config, () => agentGaii);
-        registerAgentTelemetryTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
-        registerAgentOnboardingTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
-        registerAgentManagementTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
-        registerAgentCrewTools(mcp, storage, config, () => agentGaii, scopes);
+        // Every tool group, from the one list the schema audit registers against too
+        // (mcp/register-all.ts). It used to stand here and the audit kept its own copy; the copies
+        // drifted to 52 against 26 without either side going quiet about it.
+        registerAllServerTools(mcp, {
+            storage, config, peers, scopes, getToken,
+            agentGaii: () => agentGaii,
+            owner: () => owner ?? '',
+            emitResourceUpdated, emitResourceListChanged,
+        });
 
         // Restore the original methods and report what scope enforcement did this session.
         patchable.tool = originalTool;

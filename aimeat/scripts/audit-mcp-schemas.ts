@@ -17,6 +17,13 @@
  *   pnpm check:mcp-schemas               # pre-commit + CI gate (input drift only)
  *   pnpm audit:mcp-schemas -- --strict   # full report, both axes
  * @version-history
+ *   v1.3.0 -- 2026-09-03 -- Registers through mcp/register-all.ts instead of a hand-kept copy of the
+ *     server's register list. The copy had fallen to 26 groups against the server's 52, so eleven
+ *     families never reached the comparison — and the script printed them as "not server-registered"
+ *     and exited green, which made its own blind spot look like tracked noise. Seventeen real
+ *     server↔connector drifts appeared in the first run after the repair and are baselined below.
+ *     The fake config also turns commerce and portfolio ON: both groups return early when their
+ *     flag is off, and sixteen live tools were being read as missing.
  *   v1.0.0 -- 2026-05-30 -- MCP audit Phase 6 (F10): runtime schema-parity audit
  *   v1.2.0 -- 2026-08-16 -- The CLI dispatch behind /local/call is the THIRD surface and is NOT
  *     audited here. It was, for one afternoon, by reading each handler source for the parameter
@@ -36,31 +43,8 @@ import type { AgentRegistry } from '../src/cli/connect/agent-registry.js';
 import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../src/mcp/catalog/definitions.js';
 import { MCP_SURFACES, V2_ROLES, validateSurfaces } from '../src/mcp/catalog/surfaces.js';
 
-// ── Server register functions (mirror src/mcp/index.ts) ──
-import { registerCoreTools } from '../src/mcp/core.js';
-import { registerAppUiTools } from '../src/mcp/app-ui.js';
-import { registerBoardsTools } from '../src/mcp/boards.js';
-import { registerOrganismsTools } from '../src/mcp/organisms.js';
-import { registerKnowledgeTools } from '../src/mcp/knowledge.js';
-import { registerExtensionsTools } from '../src/mcp/extensions.js';
-import { registerCatalogueTools } from '../src/mcp/catalogue.js';
-import { registerMemoryExtendedTools } from '../src/mcp/memory-extended.js';
-import { registerWalletExtendedTools } from '../src/mcp/wallet-extended.js';
-import { registerConsentTools } from '../src/mcp/consent.js';
-import { registerChatInstancesTools } from '../src/mcp/chat-instances.js';
-import { registerFlagsTools } from '../src/mcp/flags.js';
-import { registerPromptsTools } from '../src/mcp/prompts.js';
-import { registerCapabilitiesTools } from '../src/mcp/capabilities.js';
-import { registerCortexTools } from '../src/mcp/cortex.js';
-import { registerAppsTools } from '../src/mcp/apps.js';
-import { registerSharingGroupTools } from '../src/mcp/sharing-groups.js';
-import { registerAgentTaskTools } from '../src/mcp/agent-tasks.js';
-import { registerAgentCapabilityTools } from '../src/mcp/agent-capabilities.js';
-import { registerAgentMessageTools } from '../src/mcp/agent-messages.js';
-import { registerAgentOnboardingTools } from '../src/mcp/agent-onboarding.js';
-import { registerAgentTelemetryTools } from '../src/mcp/agent-telemetry.js';
-import { registerAgentManagementTools } from '../src/mcp/agent-management.js';
-import { registerComplianceTools } from '../src/mcp/compliance.js';
+// ── The server's own registration, not a copy of it ──
+import { registerAllServerTools } from '../src/mcp/register-all.js';
 
 // ── Connector register entrypoint ──
 import { registerAllTools } from '../src/cli/connect/mcp/tools/index.js';
@@ -105,26 +89,39 @@ function makeFakeMcp(sink: Map<string, CapturedTool>) {
     });
 }
 
+/**
+ * Register what the SERVER registers — through mcp/register-all.ts, the same call /v1/mcp makes.
+ *
+ * This used to be a hand-kept list of register functions here, and it fell behind: on 2026-09-03 it
+ * loaded 26 groups while the server called 52. The audit did not go silent about it — it printed
+ * twenty-seven whole families as "not server-registered" and still exited green, because they were
+ * tracked as known. A blind spot with a plausible explanation for its own noise is worse than a
+ * blind spot, because a real drift inside those families would have printed as one more line in a
+ * list nobody could read. There is nothing to keep in step now: one list, both callers.
+ */
 function captureServer(): Map<string, CapturedTool> {
     const sink = new Map<string, CapturedTool>();
     const mcp = makeFakeMcp(sink) as never;
-    const storage = {} as Storage;
-    const config = { nodeId: 'audit-node', baseUrl: 'http://localhost', mcpEnforceScopes: true } as unknown as AimeatConfig;
-    const gaii = () => 'auditor#owner@audit-node';
     const noop = () => { };
-    const reg = [
-        registerCoreTools, registerBoardsTools, registerOrganismsTools, registerKnowledgeTools,
-        registerExtensionsTools, registerCatalogueTools, registerMemoryExtendedTools, registerWalletExtendedTools,
-        registerConsentTools, registerChatInstancesTools, registerFlagsTools, registerPromptsTools,
-        registerCapabilitiesTools, registerCortexTools, registerAppsTools, registerSharingGroupTools,
-        registerAgentTaskTools, registerAgentCapabilityTools, registerAgentMessageTools,
-        registerAgentTelemetryTools, registerAgentOnboardingTools, registerAgentManagementTools,
-        registerComplianceTools,
-        // TARGET-074: the app-ui pair joins the gate on arrival — the measurement found the
-        // surface-layout pair had been left outside it, and outside the gate is where drift lives.
-        registerAppUiTools,
-    ];
-    for (const fn of reg) fn(mcp, storage, config, gaii, noop, noop);
+    registerAllServerTools(mcp, {
+        storage: {} as Storage,
+        // Every optional feature ON, for the same reason the scopes below are '*': this asks what
+        // the surface CAN register, not what one node has turned on. commerce and portfolio each
+        // return early from their whole group when their flag is off, and with the flags absent the
+        // audit read sixteen live tools as missing.
+        config: {
+            nodeId: 'audit-node', baseUrl: 'http://localhost', mcpEnforceScopes: true,
+            commerceEnabled: true, portfolioEnabled: true,
+        } as unknown as AimeatConfig,
+        agentGaii: () => 'auditor#owner@audit-node',
+        owner: () => 'owner',
+        // Every scope, because this asks what the surface CAN register, not what one agent holds.
+        scopes: ['*'],
+        peers: new Map(),
+        getToken: () => undefined,
+        emitResourceUpdated: noop,
+        emitResourceListChanged: noop,
+    });
     return sink;
 }
 
@@ -197,6 +194,34 @@ const KNOWN_INPUT_DRIFT = new Set<string>([
     'aimeat_capabilities_update',  // status
     'aimeat_app_draft_publish',  // spec_ack, spec_token — belongs to the app_* two-backends debt above
     'aimeat_app_draft_save',     // content_base64 vs content — same app_* debt
+
+    // ── Seventeen the audit could not see until 2026-09-03. ──
+    //
+    // Not new drift: newly VISIBLE drift. This script kept its own list of register functions and it
+    // had fallen to 26 of the server's 52, so eleven whole families never reached the comparison at
+    // all. It registers through mcp/register-all.ts now, the same call /v1/mcp makes, and these
+    // seventeen appeared in the first run. They are recorded rather than fixed in this pass for the
+    // reason the nine above were: each needs verifying against the REST door its connector half
+    // forwards to, and that is a decision per tool, not a sweep.
+    //
+    // Same debt register, same rule: each line names what a connector caller cannot reach.
+    'aimeat_workspace_publish',        // expected_version — the optimistic lock, so a connector publish cannot refuse to overwrite an edit made in between
+    'aimeat_workspace_update',         // apps
+    'aimeat_organism_overview',        // include_archived
+    'aimeat_skill_list',               // binding, organism_id, workspace_id — a connector caller cannot filter the registry, only list it
+    'aimeat_skill_link',               // (agent_name only: the connector routes by agent, so this one is probably intentional and needs confirming, not fixing)
+    'aimeat_skill_unlink',             // as skill_link
+    'aimeat_workflow_answer',          // picks, other, workflow_id vs the connector's answer, id — the two doors name the same call differently
+    'aimeat_workflow_save',            // confirm_token, propose — the propose-then-confirm handshake is unreachable from the connector
+    'aimeat_operator_agent_configure', // confirm_token, and agent_name vs target_agent_name
+    'aimeat_operator_ai_config',       // confirm_token
+    'aimeat_app_template_propose',     // composes, derived_from, model_notes, packs, start_mode_rationale
+    'aimeat_appdev_pitfall_list',      // applies_to, category, limit, model, offset, scope, status — the connector can only list, not query
+    'aimeat_app_tools_publish',        // odps, provenance
+    'aimeat_offer_price_set',          // (agent_name only — routing, likely intentional)
+    'aimeat_checkout_list',            // response_format
+    'aimeat_exchange_accept',          // offering_id
+    'aimeat_exchange_need_post',       // usage_intent
 ]);
 
 function diffKeys(serverKeys: string[], connectorKeys: string[]): { onlyServer: string[]; onlyConnector: string[] } {
