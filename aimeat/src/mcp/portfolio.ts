@@ -21,6 +21,11 @@
  * @structure registerPortfolioTools(mcp, storage, config, getAgentGaii)
  * @usage registerPortfolioTools(mcp, storage, config, getAgentGaii);
  * @version-history
+ *   v1.1.0 — 2026-09-03 — The answer names addresses this node serves. It used to hand back
+ *     `/p/{owner}`, which no route has ever answered (404 on aimeat.io, measured 2026-09-03), so the
+ *     one thing the person was told to look at was a dead link. Now `url` is the apex page and
+ *     `standalone_url` the person's own origin when the node has one, the same two the Portfolio
+ *     tab shows.
  *   v1.0.0 — 2026-08-09 — Initial (P23).
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -30,7 +35,7 @@ import type { Storage } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { descriptionFor } from './catalog/shape.js';
 import { annotationsFor } from './annotations.js';
-import { portfolioWriteGaii, writePortfolioHtml } from '../routes/portfolio.js';
+import { portfolioWriteGaii, portfolioStandaloneUrl, writePortfolioHtml } from '../routes/portfolio.js';
 import { emitChange } from '../services/event-bus.js';
 
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
@@ -82,10 +87,13 @@ export function registerPortfolioTools(
             const target = await portfolioWriteGaii(storage, owner, config.nodeId);
             await writePortfolioHtml(storage, target, data);
             emitChange('portfolio');
+            // Both addresses the node actually serves, and none it does not: the person is told
+            // to look, so the link has to open.
             return out({
                 published: true,
                 size_kb: Math.round(data.length / 1024),
-                url: `${config.baseUrl.replace(/\/+$/, '')}/p/${owner}`,
+                url: `${config.baseUrl.replace(/\/+$/, '')}/v1/portfolio/${encodeURIComponent(owner)}`,
+                standalone_url: portfolioStandaloneUrl(config, owner),
                 note: 'Tell the person the address and let them look. A page they have not seen is not finished.',
             });
         },

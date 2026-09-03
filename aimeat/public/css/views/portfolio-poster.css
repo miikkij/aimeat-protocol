@@ -1,0 +1,89 @@
+/**
+ * @file portfolio-poster.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The Portfolio page in the poster face (pf- prefix; design canvas "AIMEAT
+ *   Portfolio-sivu", direction A). The shared parts come from organism.css's og- rules; this file
+ *   carries what the page adds: the address and switch rows (a label, the words, the doors), the
+ *   page row with its thumbnail and the sandboxed preview under it, the facts under a section, the
+ *   three roads to a changed page with the paste field, and the rule box an AI gets.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-03 — Initial.
+ */
+
+.og-portfolio .og-door:disabled, .og-portfolio .og-slab:disabled { opacity: .5; cursor: default; }
+.og-portfolio .og-doors > a { text-decoration: none; }
+.og-portfolio .og-slab--sm { padding: .55rem .9rem; font-size: .74rem; }
+.pf-hint { margin: .7rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--text-dim); }
+.pf-para { margin: 0 0 .6rem; font-size: .95rem; line-height: 1.55; color: var(--text); }
+.pf-empty { margin: 0; padding: .3rem 0 .8rem; font-size: .95rem; line-height: 1.55; font-weight: 600; color: var(--text-dim); }
+.pf-empty b { color: var(--text); font-weight: 800; }
+.pf-file { display: none; }
+.is-warn { color: var(--accent); }
+
+/* ── Address and switch rows: label, words, doors ──────────────────────────────────────────── */
+.pf-adr { display: grid; grid-template-columns: 9.5rem minmax(0, 1fr) auto; gap: 0 1.1rem; align-items: center; }
+.pf-adr > div { padding: .75rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
+.pf-adr > .pf-k { align-self: start; padding-top: .9rem; }
+.pf-k { font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); line-height: 1.8; }
+.pf-u { font-family: var(--font-mono); font-size: .86rem; font-weight: 500; line-height: 1.45; color: var(--text); overflow-wrap: anywhere; }
+.pf-u small, .pf-w small { display: block; margin-top: .2rem; font-family: var(--font-body, inherit); font-size: .8rem; font-weight: 400; line-height: 1.5; color: var(--text-dim); }
+.pf-w { font-size: .92rem; font-weight: 600; line-height: 1.5; color: var(--text); }
+.pf-w b { font-weight: 800; }
+.pf-w b.is-on { color: var(--success-fg); }
+.pf-w b.is-off { color: var(--accent); }
+.pf-go { display: flex; justify-content: flex-end; align-items: center; gap: .9rem; white-space: nowrap; flex-wrap: wrap; }
+.pf-go .og-door { font-size: .72rem; }
+
+/* ── The page row, and the preview under it ────────────────────────────────────────────────── */
+.pf-pg { display: flex; align-items: center; gap: 1rem; padding: .75rem 0; border-bottom: 1px solid var(--border); }
+.pf-thumb { width: 5.6rem; height: 3.6rem; flex: none; border: 2px solid var(--text); background: var(--text); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .25rem; }
+.pf-thumb i { display: block; width: 3.6rem; height: .3rem; background: var(--accent); }
+.pf-thumb i + i { width: 2.4rem; background: var(--sun); }
+.pf-pg-words { min-width: 0; }
+.pf-pg-words b { display: block; font-size: .95rem; font-weight: 800; line-height: 1.3; color: var(--text); overflow-wrap: anywhere; }
+.pf-pg-words small { display: block; margin-top: .15rem; font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
+.pf-pg-go { margin-left: auto; display: flex; gap: .9rem; white-space: nowrap; }
+.pf-pg-go .og-door { font-size: .72rem; }
+.pf-prev { margin: .8rem 0 .4rem; border: 3px solid var(--text); box-shadow: 8px 8px 0 var(--sun); background: var(--card-bg); }
+.pf-prev-frame { display: block; width: 100%; height: 34rem; border: 0; background: var(--card-bg); }
+.pf-prev-doors { margin-top: .6rem; }
+
+/* ── Facts under a section ─────────────────────────────────────────────────────────────────── */
+.pf-kv { display: grid; grid-template-columns: minmax(7rem, 10rem) minmax(0, 1fr); gap: .7rem 1.2rem; align-items: start; margin-top: .9rem; }
+.pf-kv .pf-k { padding-top: .25rem; }
+.pf-v { font-size: .9rem; line-height: 1.5; color: var(--text); min-width: 0; overflow-wrap: anywhere; }
+.pf-v small { display: block; margin-top: .15rem; font-size: .8rem; line-height: 1.45; color: var(--text-dim); }
+.pf-v code, .pf-rule code { display: inline-block; max-width: 100%; margin: .1rem 0; font-family: var(--font-mono); font-size: .74rem; background: var(--bg-dim); padding: .1rem .35rem; overflow-wrap: anywhere; }
+
+/* ── The three roads to a changed page ─────────────────────────────────────────────────────── */
+.pf-roads { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 1.2rem; margin-top: .6rem; }
+.pf-road { padding: .9rem 1rem 1rem; border: 2px solid var(--text); background: var(--card-bg); min-width: 0; font-size: .88rem; line-height: 1.55; color: var(--text); display: flex; flex-direction: column; }
+.pf-road p { margin: 0 0 .6rem; }
+.pf-road--lead { border-width: 3px; box-shadow: 6px 6px 0 var(--sun); }
+.pf-road-t { display: block; margin-bottom: .4rem; font-family: var(--font-display, var(--font-heading)); font-size: 1.05rem; text-transform: uppercase; letter-spacing: .02em; color: var(--text); }
+.pf-road .og-doors { margin-top: auto; padding-top: .6rem; align-items: center; }
+.pf-req { margin: 0 0 .6rem; padding: .6rem .75rem; background: var(--bg-dim); font-family: var(--font-mono); font-size: .72rem; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text); }
+.pf-paste { width: 100%; box-sizing: border-box; min-height: 6rem; margin: 0 0 .3rem; font-family: var(--font-mono); font-size: .74rem; line-height: 1.5; resize: vertical; }
+.pf-paste-meta { display: block; margin-bottom: .3rem; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); }
+
+/* ── The rule an AI gets ───────────────────────────────────────────────────────────────────── */
+.pf-rule { margin: .6rem 0 .2rem; padding: .9rem 1.1rem; border: 3px solid var(--text); background: var(--card-bg); font-size: .9rem; line-height: 1.6; }
+.pf-rule .og-label { display: block; margin-bottom: .3rem; }
+.pf-rule .pf-para { margin-bottom: .5rem; }
+.pf-rule .og-doors { margin-top: .7rem; }
+
+/* ── Phone ─────────────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 860px) {
+  .pf-adr { grid-template-columns: minmax(0, 1fr); }
+  .pf-adr > .pf-k { padding: .6rem 0 0; border-bottom: 0; }
+  .pf-adr > .pf-u, .pf-adr > .pf-w { padding: .15rem 0; border-bottom: 0; }
+  .pf-go { justify-content: flex-start; padding-top: .2rem; }
+  .pf-pg { flex-wrap: wrap; }
+  .pf-pg-go { margin-left: 0; width: 100%; }
+  .pf-prev-frame { height: 24rem; }
+  .pf-kv { grid-template-columns: 1fr; gap: .3rem 0; }
+  .pf-kv .pf-k { padding-top: .6rem; }
+  .pf-roads { grid-template-columns: 1fr; }
+}
