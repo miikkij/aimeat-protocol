@@ -8,6 +8,9 @@
  *   classification, forwarded-401 stop, proactive pre-expiry token reconnect,
  *   and the no-hot-loop guarantee on auth failure.
  * @version-history
+ *   v1.2.0 — 2026-09-04 — A mint that failed is a wait, not a dead agent: `start()` degrades rather
+ *     than stopping, nobody is told to re-run `aimeat connect` about a key that is fine, and one
+ *     refused mint keeps its identity off the shared socket without taking the socket down.
  *   v1.1.0 — 2026-09-03 — A refused `attach`: it answers rather than sitting out the request
  *     timeout, the identity does not stay on a socket it never got on, and the refusal reaches
  *     that one identity while the socket carries on.
@@ -432,5 +435,64 @@ describe('ConnectTunnelClient', () => {
     expect(client.isOnline()).toBe(true);
     const res = await client.forward('GET', '/v1/memory', {}, 'live#alice@node');
     expect(res.status).toBe(200);
+  });
+});
+
+/**
+ * TWO WAYS TO ARRIVE WITHOUT A TOKEN, AND THEY NEED OPPOSITE ANSWERS.
+ *
+ * They were one value until 2026-09-04, and a live 62-identity fleet paid for it: the node's mint
+ * budget ran out during the joining burst, and twenty-two agents holding perfectly good keys
+ * printed "Stopped: No stored token. Run: aimeat connect" and never tried again. The message named
+ * the wrong cause, prescribed a remedy that would re-enrol a healthy agent, and `authFailure` is
+ * terminal by design, so nothing recovered without a restart.
+ *
+ * The distinction is now the throw: null means there is no credential and a person must act;
+ * throwing means one could not be obtained THIS SECOND and waiting is the whole fix.
+ */
+describe('a credential that could not be minted, versus one that does not exist', () => {
+  it('treats a mint that failed as a wait, not as a dead agent', async () => {
+    const server = await startServer();
+    const failures: string[] = [];
+    const { client } = makeClient(server, {
+      getToken: async () => { throw new Error('MINT_RATE_LIMITED'); },
+      onAuthFailure: (msg: string) => failures.push(msg),
+    });
+
+    const outcome = await client.start();
+
+    // 'unreachable' is the degrade signal: the caller drops to direct HTTP and keeps trying.
+    // 'auth_failed' is what it answered before, and it is what makes serve give up on the agent.
+    expect(outcome).toBe('unreachable');
+    // Nobody is told to go and re-run `aimeat connect` about a key that is fine.
+    expect(failures).toHaveLength(0);
+  });
+
+  it('still stops when there genuinely is no credential, because retrying cannot fix that', async () => {
+    const server = await startServer();
+    const failures: string[] = [];
+    const { client } = makeClient(server, {
+      getToken: async () => null,
+      onAuthFailure: (msg: string) => failures.push(msg),
+    });
+
+    expect(await client.start()).toBe('auth_failed');
+    expect(failures).toEqual(['No stored token']);
+  });
+
+  it('leaves an identity off the shared socket without killing the socket others are on', async () => {
+    // This is where the budget actually runs out: sixty-two joins is sixty-two mints in seconds.
+    const server = await startServer({ welcome: { multiplex: true } });
+    const { client } = makeClient(server);
+    await client.start();
+
+    const joined = await client.attachIdentity({
+      gaii: 'unlucky#alice@node',
+      getToken: async () => { throw new Error('MINT_RATE_LIMITED'); },
+    });
+
+    expect(joined).toBe(false);
+    // The socket forty-eight other agents are riding does not go down because one mint was refused.
+    expect(client.isOnline()).toBe(true);
   });
 });
