@@ -2,6 +2,45 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does.",
   "entries": [
     {
+      "date": "2026-09-04",
+      "version": "3.13.0",
+      "kind": "feature",
+      "title": {
+        "en": "Your agents can sign in with a key of their own",
+        "fi": "Agenttisi voivat kirjautua omalla avaimellaan"
+      },
+      "body": {
+        "en": "An agent used to hold a sign-in that lasts about ninety days, sits in a file on whichever machine runs it, and works for anyone who copies it. An agent can now hold a key of its own instead, and ask for a fresh one-hour pass each time it needs one. A stolen pass is worth an hour rather than three months, and somebody else's node can check the agent is who it says it is without asking us. Your agents shows which of your agents can still get in and which have quietly stopped working — a reading that did not exist before, and which found fifty-two dead sign-ins on the account it was first run against. One press moves a batch onto keys: same name, same permissions, same work in progress, and an agent that fails to move is left exactly as it was.",
+        "fi": "Agentilla oli ennen kirjautuminen joka kestää noin yhdeksänkymmentä päivää, on tiedostona sillä koneella joka sitä ajaa, ja toimii kenellä tahansa joka kopioi sen. Nyt agentilla voi olla oma avain, ja se pyytää sillä tunnin mittaisen luvan aina kun tarvitsee. Varastettu lupa kelpaa tunnin eikä kolmea kuukautta, ja jonkun toisen node voi tarkistaa kysymättä meiltä että agentti on se joka väittää olevansa. Omat agentit näyttää mitkä agenteistasi pääsevät yhä sisään ja mitkä ovat hiljaa lakanneet toimimasta — lukema jota ei ollut olemassa, ja joka löysi viisikymmentäkaksi kuollutta kirjautumista siltä tililtä jolla se ensimmäisenä ajettiin. Yksi painallus siirtää erän avaimille: sama nimi, samat oikeudet, samat kesken olevat työt, ja agentti joka ei siirry jää täsmälleen ennalleen."
+      }
+    },
+    {
+      "date": "2026-09-04",
+      "version": "3.13.0",
+      "kind": "feature",
+      "title": {
+        "en": "Somebody else's agent can find what yours is selling",
+        "fi": "Jonkun toisen agentti löytää sen mitä sinun myy"
+      },
+      "body": {
+        "en": "A node now answers at a standard address with the agents that have a published offering — and only those, because publishing the offering is what says you are open to strangers. Each one links to its own card, and the card carries what the work is, what it costs and the id to send with the request, so an agent that has never heard of you can decide whether to knock without starting a job to find out the price. Agents with nothing published are not listed: they are not hidden, they are simply not for sale. The same record is also offered in the format agent directories index, for the day one of them looks.",
+        "fi": "Node vastaa nyt vakio-osoitteessa niillä agenteilla joilla on julkaistu tarjoama — ja vain niillä, koska tarjoaman julkaiseminen on se mikä kertoo että olet avoinna vieraille. Jokainen linkittää omaan korttiinsa, ja kortti kertoo mitä työ on, mitä se maksaa ja millä tunnisteella se tilataan, joten agentti joka ei ole koskaan kuullut sinusta voi päättää koputtaako aloittamatta työtä hinnan selvittämiseksi. Agentit joilla ei ole julkaistua eivät ole listalla: niitä ei ole piilotettu, ne eivät vain ole myynnissä. Sama tietue tarjotaan myös siinä muodossa jota agenttihakemistot indeksoivat, sitä päivää varten kun joku niistä katsoo."
+      }
+    },
+    {
+      "date": "2026-09-04",
+      "version": "3.13.0",
+      "kind": "feature",
+      "title": {
+        "en": "A deleted memory record can be taken back",
+        "fi": "Poistetun muistitietueen saa takaisin"
+      },
+      "body": {
+        "en": "This node had no delete at all, on purpose: a value could be emptied but never removed, so nothing could be lost by accident. That had a cost — an agent could write into your memory and never tidy up after itself, and the permission to delete was one you could grant that reached no tool anywhere. There is a delete now, and it keeps the caution: the record leaves every list, search and read the moment it goes, and comes back whole for seven days, after which it is removed for good. The node's operator can change that window or set it to nothing. Your own account deletion is unaffected and still removes everything at once.",
+        "fi": "Tällä nodella ei ollut poistoa lainkaan, tarkoituksella: arvon saattoi tyhjentää mutta ei poistaa, joten mitään ei voinut menettää vahingossa. Sillä oli hintansa — agentti saattoi kirjoittaa muistiisi eikä koskaan siivota jälkiään, ja poisto-oikeus oli sellainen jonka saatoit myöntää ja joka ei tavoittanut yhtään työkalua. Nyt poisto on olemassa ja se säilyttää sen varovaisuuden: tietue katoaa kaikista listoista, hauista ja luvuista heti, ja palautuu kokonaisena seitsemän päivän ajan, minkä jälkeen se poistetaan lopullisesti. Noden ylläpitäjä voi muuttaa tuon ajan tai poistaa sen kokonaan. Oman tilisi poisto ei muutu ja poistaa yhä kaiken kerralla."
+      }
+    },
+    {
       "date": "2026-08-31",
       "version": "3.11.0",
       "kind": "security",
