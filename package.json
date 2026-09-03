@@ -93,6 +93,8 @@
     "check:trusted-keys": "cd aimeat && pnpm check:trusted-keys",
     "check:ext-entrypoints": "cd aimeat && pnpm check:ext-entrypoints",
     "check:shared-impl": "cd aimeat && pnpm check:shared-impl",
+    "check:runtime-read-targets": "cd aimeat && pnpm check:runtime-read-targets",
+    "check:surface-focus": "cd aimeat && pnpm check:surface-focus",
     "check:sse-parity": "cd aimeat && pnpm check:sse-parity",
     "check:copied-logic": "cd aimeat && pnpm check:copied-logic",
     "check:liaison-surface": "cd aimeat && pnpm check:liaison-surface",
