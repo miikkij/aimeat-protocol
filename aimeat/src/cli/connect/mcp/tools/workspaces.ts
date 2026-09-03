@@ -9,6 +9,10 @@
  *   Tool names/descriptions/annotations come from the shared catalog, so they stay in lockstep with
  *   the server and the v2 surface allowlists (appdev/agent/service).
  * @version-history
+ *   v1.7.0 -- 2026-09-03 -- _read passes the REST answer's `schemas` (the locked JSON Schemas, keyed
+ *     by namespace) through onto the index. This door RESHAPES the REST response rather than
+ *     forwarding it, so a field the shaping does not name is one the agent here never sees — which
+ *     is how the same tool comes to mean two different things on two doors.
  *   v1.6.0 -- 2026-08-01 -- TARGET-058 Phase 11: aimeat_workspace_write carries `ai_provenance`.
  *     NOT recorded, and the echo says why: the tool writes a BATCH of records through
  *     POST /v1/memory, and one declaration cannot honestly describe N separately-authored ones.
@@ -87,7 +91,7 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
       // server's src/mcp/workspaces.ts). Version history (.version.N) never reaches this path (REST omits it).
       const resp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/workspace?ws=${encodeURIComponent(ws)}${include_archived ? '&archived=include' : ''}`);
       if (resp.ok === false) return text(resp.error ?? resp, true);
-      const data = (resp.data ?? resp) as { manifest?: { objectTypes?: { name: string; namespace?: string }[] }; objects?: Record<string, Record<string, unknown>[]>; drafts?: Record<string, Record<string, unknown>[]>; apps?: unknown[] };
+      const data = (resp.data ?? resp) as { manifest?: { objectTypes?: { name: string; namespace?: string }[] }; objects?: Record<string, Record<string, unknown>[]>; drafts?: Record<string, Record<string, unknown>[]>; apps?: unknown[]; schemas?: Record<string, unknown> };
       const manifest = data.manifest ?? null;
       const objects = data.objects ?? {};
       const drafts = data.drafts ?? {};
@@ -141,8 +145,14 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
         index[name] = entries;
         counts[name] = entries.length;
       }
+      // The locked schemas ride through from REST untouched. This surface RESHAPES the REST answer
+      // rather than forwarding it, so a field the shaping does not name is a field the agent on this
+      // door never sees — which is how the same tool comes to mean two different things.
+      const schemas = data.schemas ?? {};
       return text({ organism_id, ws, mode: 'index', manifest, apps: data.apps ?? [], counts, index,
-        hint: 'Titles only. Open the ones you need with aimeat_workspace_read(ids:["<id>", ...]) to get their full values.' });
+        ...(Object.keys(schemas).length ? { schemas } : {}),
+        hint: 'Titles only. Open the ones you need with aimeat_workspace_read(ids:["<id>", ...]) to get their full values.'
+          + (Object.keys(schemas).length ? ' `schemas` is what is locked on each records space now — edit that map and send it back through aimeat_workspace_update, which REPLACES it.' : '') });
     });
 
   mcp.tool('aimeat_workspace_overview', descriptionFor('aimeat_workspace_overview'),
@@ -224,7 +234,7 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
       readme: z.string().optional().describe('New markdown readme/intro (replaces the current one)'),
       add_spaces: z.any().optional().describe('ADDITIVE (safe): an ARRAY of objectTypes to UNION into the manifest — the server keeps everything else and skips any whose name/namespace already exists. Pass just { name, namespace, mode } (+ a schema in `schemas`); defaults are filled. Prefer this over `manifest` to add spaces. Cannot remove/rename.'),
       manifest: z.any().optional().describe('FULL replacement manifest (objectTypes + policy/gate + settings) as a JSON OBJECT. For genuine restructuring (rename/remove a space, change policy.alwaysGate). Read the workspace first; the id is preserved.'),
-      schemas: z.any().optional().describe('Map of namespace → JSON Schema (object) to lock (strict) for a records space. REPLACES the locked schema rather than merging into it, so read the current one first: GET /v1/memory/{key}/schema, keyed on a full RECORD key (organism.<org>.w.<ws>.<namespace>.<id>.draft), not on the space root. Do not invent a maxLength — the real ceiling is the memory value budget the node enforces on the whole record.'),
+      schemas: z.any().optional().describe('Map of namespace → JSON Schema (object) to lock (strict) for a records space. REPLACES the locked schema rather than merging into it, so read the current ones first: aimeat_workspace_read (the default index call) returns them as `schemas`, keyed by namespace, in exactly this shape — read, edit the one entry, send the map back. Do not invent a maxLength — the real ceiling is the memory value budget the node enforces on the whole record.'),
     },
     annotationsFor('aimeat_workspace_update'),
     async ({ organism_id, ws, name, readme, add_spaces, manifest, schemas }) => {

@@ -19,6 +19,10 @@
  *   v1.5.0 — 2026-08-11 — Tests 42–43 (August 2026 audit step 8): a publish over MCP appends the same
  *     organism decision-log entry the web publish appends, and workspace_create refuses a blank name
  *     the way POST /v1/organisms/:id/workspaces always has.
+ *   v1.6.0 — 2026-09-03 — Tests 13b–13c: the index read returns the LOCKED schemas keyed by
+ *     namespace and _update accepts that same map back (the round-trip that was impossible while the
+ *     only reader was a REST call), and the batch-open branch does not repeat them. 13b fails on the
+ *     tree before the fix.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-workspaces
 
@@ -442,6 +446,36 @@ await test('13. created workspace is listed + readable', async () => {
     assert(JSON.parse(l.result.content[0].text).workspaces.some((w: any) => w.id === bootWs.id), 'in registry');
     const r = await A.client.call('aimeat_workspace_read', { organism_id: bootOrgId, ws: bootWs.id }, 1131);
     assert((JSON.parse(r.result.content[0].text).manifest.objectTypes || []).some((o: any) => o.name === 'item'), 'manifest has item type');
+});
+
+await test('13b. read returns the LOCKED schemas, keyed by namespace, and update takes that map back', async () => {
+    // The gap this closes: an agent could REPLACE a workspace's schemas but had no way to read them.
+    // `schemas` replaces rather than merges, and the only reader was GET /v1/memory/{key}/schema,
+    // which an MCP-only client cannot call — so a safe edit was impossible and an update silently
+    // dropped whatever the previous schema said.
+    const r = await A.client.call('aimeat_workspace_read', { organism_id: bootOrgId, ws: bootWs.id }, 1132);
+    const data = JSON.parse(r.result.content[0].text);
+    assert(data.schemas && typeof data.schemas === 'object', 'the index carries `schemas`');
+    // Keyed by NAMESPACE ("shared.items"), not by the space NAME ("item") — the map goes straight
+    // back into aimeat_workspace_update, which addresses spaces by namespace.
+    const locked = data.schemas['shared.items'];
+    assert(locked && typeof locked === 'object', `keyed by namespace: got ${Object.keys(data.schemas).join(', ')}`);
+    assert(Array.isArray(locked.required) && locked.required.includes('title'), 'the schema is the one locked at create');
+    assert(data.schemas.item === undefined, 'not keyed by space name');
+
+    // Round-trip: send back exactly what was read. The lock must survive unchanged, which is what
+    // makes "read, edit one entry, send the map back" safe.
+    const u = await A.client.call('aimeat_workspace_update', { organism_id: bootOrgId, ws: bootWs.id, schemas: data.schemas }, 1133);
+    assert(u.result.isError !== true, `resending the read map must be accepted: ${u.result.content?.[0]?.text}`);
+    const again = JSON.parse((await A.client.call('aimeat_workspace_read', { organism_id: bootOrgId, ws: bootWs.id }, 1134)).result.content[0].text);
+    assert(JSON.stringify(again.schemas['shared.items']) === JSON.stringify(locked), 'the lock survives the round-trip unchanged');
+});
+
+await test('13c. the batch-open branch does NOT carry schemas (they belong with the manifest)', async () => {
+    const r = await A.client.call('aimeat_workspace_read', { organism_id: bootOrgId, ws: bootWs.id, ids: ['nope'] }, 1135);
+    const data = JSON.parse(r.result.content[0].text);
+    assert(data.mode === 'content', 'batch-open branch');
+    assert(data.schemas === undefined, 'schemas are an index concern, not repeated on every content read');
 });
 
 await test('14. the locked schema validates new drafts (valid passes, invalid rejected)', async () => {
