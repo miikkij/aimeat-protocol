@@ -92,6 +92,41 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
   );
 
   mcp.tool(
+    'aimeat_agent_run_mode_set',
+    descriptionFor('aimeat_agent_run_mode_set'),
+    {
+      agent_name: agentNameSchema,
+      target_agent_name: z.string().describe("Agent whose run mode to set (same owner; pass the caller's own name to self-set)."),
+      run_mode: z.enum(['spawn', 'resident']).describe("'spawn' = started per job; 'resident' = kept running."),
+    },
+    async ({ agent_name, target_agent_name, run_mode }) => {
+      const { client } = pickAgent(registry, agent_name);
+      const resp = await client.patch(`/v1/agents/${encodeURIComponent(target_agent_name)}/run-mode`, { run_mode });
+      return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    },
+  );
+
+  mcp.tool(
+    'aimeat_agent_runtime_report',
+    descriptionFor('aimeat_agent_runtime_report'),
+    {
+      agent_name: agentNameSchema,
+      target_agent_name: z.string().describe("Agent this is about (same owner; pass the caller's own name to report your own)."),
+      kind: z.string().describe("What kind of thing runs, e.g. 'python' or 'crew-def'."),
+      file: z.string().optional().describe('Path to the file that runs, relative to your own root.'),
+      sha256: z.string().optional().describe("Hash of that file's contents."),
+      commit: z.string().optional().describe('Commit the file came from.'),
+      runtime: z.string().optional().describe("Which runtime read it, e.g. 'crewaimeat 0.7.0'."),
+      definition_revision: z.number().optional().describe('For a JSON crew: which definition revision was live.'),
+    },
+    async ({ agent_name, target_agent_name, ...src }) => {
+      const { client } = pickAgent(registry, agent_name);
+      const resp = await client.patch(`/v1/agents/${encodeURIComponent(target_agent_name)}/runtime-source`, { runtime_source: src });
+      return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    },
+  );
+
+  mcp.tool(
     'aimeat_agent_console_set',
     descriptionFor('aimeat_agent_console_set'),
     {

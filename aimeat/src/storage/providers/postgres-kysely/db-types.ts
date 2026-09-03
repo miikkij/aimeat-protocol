@@ -75,6 +75,8 @@ export interface Agent {
   modelDetectedBy: string | null;
   publicKey: string;
   runMode: string | null;
+  /** What code backs this agent, as its runtime reports it (AgentRuntimeSource). */
+  runtimeSource: unknown | null;
   identityVersion: number | null;
   cardJws: string | null;
   cardIssuedAt: string | null;

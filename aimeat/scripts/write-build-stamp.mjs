@@ -93,6 +93,7 @@ function main() {
   writeFileSync(join(distDir, 'build-stamp.json'), `${JSON.stringify(stamp, null, 2)}\n`, 'utf-8');
   const short = commit ? commit.slice(0, 8) + (dirty ? '-dirty' : '') : 'no-git';
   console.log(`[build-stamp] v${version} ${short} — dist/build-stamp.json written`);
+  console.log(`[build-stamp] run \`pnpm check:version-drift\` if you are unsure whether v${version} already means something else on the registry`);
 }
 
 main();

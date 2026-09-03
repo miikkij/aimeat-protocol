@@ -151,6 +151,31 @@ export const agentMessagingTools: AimeatToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_agent_run_mode_set',
+        description: "Set how one of your agents is meant to be RUN: 'spawn' (the agent is data on the node until work arrives, and its runtime starts a worker for the job which then unwinds) or 'resident' (the runtime keeps it up). Works on ANY agent you own, whatever runs it — an agent whose behaviour lives in code rather than in a definition on this node is not a lesser agent, and this is the switch that puts it on a spawner's roster (GET /v1/agents?run_mode=spawn). The node records it and the runtime honours it; the node never enforces it, exactly as with mode and max concurrent tasks.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            target_agent_name: { type: 'string', required: true, description: 'Agent whose run mode to set (must be owned by the same owner as the caller). Pass your own name to set your own.' },
+            run_mode: { type: 'string', required: true, enum: ['spawn', 'resident'], description: "'spawn' = started per job and unwound after; 'resident' = kept running." },
+        },
+    },
+    {
+        name: 'aimeat_agent_runtime_report',
+        description: "Say what code is running this agent, so a run can be audited afterwards. A crew whose definition lives on this node is already answerable — the definition is versioned here — but a code-backed crew has none, and then nothing can say what ran. Send the file, its hash, the commit it came from and which runtime read it; send null to clear. The node records the claim and stamps its own time on it, and never checks it: it does not run the process and cannot read the disk.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            target_agent_name: { type: 'string', required: true, description: 'Agent this is about (same owner as the caller). Pass your own name to report your own.' },
+            kind: { type: 'string', required: true, description: "What kind of thing runs, e.g. 'python' for a code-backed crew or 'crew-def' for a JSON one." },
+            file: { type: 'string', description: "Path to the file that runs, relative to your own root, e.g. 'crews/web_researcher_crew.py'." },
+            sha256: { type: 'string', description: "Hash of that file's contents — the only field that changes when the code changes and nothing else does." },
+            commit: { type: 'string', description: 'Commit the file came from.' },
+            runtime: { type: 'string', description: "Which runtime read it, e.g. 'crewaimeat 0.7.0'." },
+            definition_revision: { type: 'number', description: 'For a JSON crew: which revision of the definition on this node was live.' },
+        },
+    },
+    {
         name: 'aimeat_agent_console_set',
         description: "Record where an agent is managed by whatever HOSTS it: its settings or brain page in the fleet runtime it runs in. Call this after creating and starting an agent somewhere the node cannot see — an agent hatchery instance, a cockpit, your own daemon's UI — so the owner's profile can link straight to it. Without it the person is told their agent is running and has nowhere to go and look at it. Must be an absolute http(s) URL; send an empty string to clear it. Display only: the node links this address and never fetches it.",
         caller: 'agent',

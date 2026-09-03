@@ -40,7 +40,7 @@ import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
-import { setAgentTags, setAgentMode, setAgentConsoleUrl } from '../services/agent-profile-write.js';
+import { setAgentTags, setAgentMode, setAgentRunMode, setAgentRuntimeSource, setAgentConsoleUrl } from '../services/agent-profile-write.js';
 import { describeBasicAgents, requestBasicAgents } from '../services/basic-agents.js';
 import { VALID_MODES } from '../routes/agents/constants.js';
 import { annotationsFor } from './annotations.js';
@@ -88,6 +88,53 @@ export function registerAgentManagementTools(
                     }, null, 2),
                 }],
             };
+        },
+    );
+
+    // ── Tool: aimeat_agent_run_mode_set ──
+    // How the agent is meant to be RUN, which is the NODE's switch and not a definition's: a queued
+    // task auto-activates only for a task-runner (agent-task-rules.ts), and a spawner's roster is
+    // GET /v1/agents?run_mode=spawn. Works on any agent the owner has, whatever runs it — a crew
+    // whose behaviour lives in Python was locked out of that whole path while this had no tool, and
+    // an owner with a browser was the only party who could set it.
+    mcp.tool(
+        'aimeat_agent_run_mode_set',
+        descriptionFor('aimeat_agent_run_mode_set'),
+        {
+            target_agent_name: z.string().describe('Agent whose run mode to set (same owner as the caller).'),
+            run_mode: z.enum(['spawn', 'resident']).describe("'spawn' = started per job; 'resident' = kept running."),
+        },
+        annotationsFor('aimeat_agent_run_mode_set'),
+        async ({ target_agent_name, run_mode }) => {
+            const callerParsed = parseGAII(agentGaii);
+            if (!callerParsed) return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
+            const outcome = await setAgentRunMode({ storage, config }, callerParsed.owner, target_agent_name, run_mode);
+            if (!outcome.ok) return { content: [{ type: 'text' as const, text: outcome.message }], isError: true };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ gaii: outcome.agent.gaii, name: outcome.agent.name, run_mode: outcome.agent.runMode ?? null }, null, 2) }] };
+        },
+    );
+
+    // ── Tool: aimeat_agent_runtime_report ──
+    // What code backs the agent. Recorded, never checked — the node does not run the process.
+    mcp.tool(
+        'aimeat_agent_runtime_report',
+        descriptionFor('aimeat_agent_runtime_report'),
+        {
+            target_agent_name: z.string().describe('Agent this is about (same owner as the caller).'),
+            kind: z.string().describe("What kind of thing runs, e.g. 'python' or 'crew-def'."),
+            file: z.string().optional().describe('Path to the file that runs, relative to your own root.'),
+            sha256: z.string().optional().describe("Hash of that file's contents."),
+            commit: z.string().optional().describe('Commit the file came from.'),
+            runtime: z.string().optional().describe("Which runtime read it, e.g. 'crewaimeat 0.7.0'."),
+            definition_revision: z.number().optional().describe('For a JSON crew: which definition revision was live.'),
+        },
+        annotationsFor('aimeat_agent_runtime_report'),
+        async ({ target_agent_name, ...src }) => {
+            const callerParsed = parseGAII(agentGaii);
+            if (!callerParsed) return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
+            const outcome = await setAgentRuntimeSource({ storage, config }, callerParsed.owner, target_agent_name, src);
+            if (!outcome.ok) return { content: [{ type: 'text' as const, text: outcome.message }], isError: true };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ gaii: outcome.agent.gaii, name: outcome.agent.name, runtime_source: outcome.agent.runtimeSource ?? null }, null, 2) }] };
         },
     );
 
