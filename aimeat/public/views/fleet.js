@@ -371,7 +371,18 @@ export default function FleetView({ embedded = false, starter = null } = {}) {
                 is broken there is no banner and the starter card is the top card, which is the
                 right order for that case and the reason this is a slot rather than a fixed spot. */''}
           ${migration && (migration.would_move ?? []).length > 0 && html`
-            <${MigrateBanner} migration=${migration} migrating=${migrating} outcome=${outcome} onPress=${migrate} />
+            ${/* `() => migrate()` AND NOT `migrate`. The banner hands its button's onClick straight
+                  to this prop, so passing the function itself makes the click EVENT the first
+                  argument — and the first argument is now `only`, the agent to move. A MouseEvent
+                  is truthy, so the call became `{ agents: [<MouseEvent>] }`; the route drops
+                  non-strings and is left with an empty list, which reads as "move these named
+                  agents, of which there are none" and answers NOTHING_TO_MIGRATE. The bulk button
+                  therefore did nothing, on a page that had just said sixteen agents would move.
+                  Harmless until `migrate` grew a parameter on 2026-09-03, which is what makes it
+                  worth a comment rather than a silent fix: the next parameter added here brings it
+                  straight back. Found by the refusal log added the same day — `named: []` was the
+                  whole diagnosis, in one line. */''}
+            <${MigrateBanner} migration=${migration} migrating=${migrating} outcome=${outcome} onPress=${() => migrate()} />
           `}
           ${starter}
           ${!(migration && (migration.would_move ?? []).length > 0) && outcome && html`
