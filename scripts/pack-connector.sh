@@ -14,12 +14,16 @@
 # same `files` list npm publishes through, so what the fleet installs is what npm would have given
 # it, minus the irreversible part.
 #
-# It runs the real prepublishOnly chain (licences, notices, build), because that chain is where the
-# 3.11.0 hole was.
+# IT BUILDS EXPLICITLY, because the first version of this script did not and shipped the bug it was
+# written to prevent. `prepublishOnly` runs on `npm publish` and NOT on `pack` — pack's hook is
+# `prepack`, which this package does not have — so the tarball was whatever happened to be in dist/.
+# It carried package.json 3.12.1 with 3.12.0 code from a commit two fixes old, and was handed to the
+# fleet as the fix. That is the 3.11.0 defect exactly, reproduced by its own countermeasure.
+# Never trust a lifecycle hook to have run: run it, then read the artifact.
 #
 # Usage:
 #   bash scripts/pack-connector.sh              # build + pack, print the path
-#   bash scripts/pack-connector.sh --verify     # ...and prove the v2 identity path is inside it
+#   bash scripts/pack-connector.sh --verify     # ...and prove what is inside it
 #
 set -euo pipefail
 
@@ -30,7 +34,12 @@ VERSION="$(node -p "require('./package.json').version")"
 OUT="$ROOT/dist-pack"
 mkdir -p "$OUT"
 
-echo "[pack] aimeat $VERSION -> $OUT"
+HEAD_SHA="$(git rev-parse HEAD)"
+echo "[pack] aimeat $VERSION at ${HEAD_SHA:0:12} -> $OUT"
+
+echo "[pack] building..."
+pnpm build >/dev/null
+
 pnpm pack --pack-destination "$OUT" >/dev/null
 
 TARBALL="$OUT/aimeat-$VERSION.tgz"
@@ -48,6 +57,30 @@ if [ "${1:-}" = "--verify" ]; then
   LIST="$OUT/.contents-$VERSION.txt"
   tar -tzf "$TARBALL" > "$LIST"
   MISSING=0
+
+  # WHICH CODE IS IN THERE, asked of the artifact and not of the tree. The tarball carries
+  # dist/build-stamp.json, which names the commit and version the build came from, so the one
+  # question that matters — is this the code I just wrote — has an answer that cannot be fooled by
+  # a stale dist/ or a hook that did not run. This is the check whose absence let a tarball
+  # labelled 3.12.1 leave with 3.12.0 code inside it.
+  tar -xzf "$TARBALL" -O package/dist/build-stamp.json > "$OUT/.stamp-$VERSION.json" 2>/dev/null || true
+  if [ -s "$OUT/.stamp-$VERSION.json" ]; then
+    # Read with sed, not `node -p require(...)`: this script's path is Git Bash's `/e/dev/...`
+    # mount, which node cannot resolve, and the failure came back as "?" rather than as an error.
+    # That is twice now that a POSIX path was handed to a Windows-native tool in this one file.
+    STAMP_COMMIT="$(sed -n 's/.*"commit"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$OUT/.stamp-$VERSION.json")"
+    STAMP_VERSION="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$OUT/.stamp-$VERSION.json")"
+    if [ "$STAMP_COMMIT" = "$HEAD_SHA" ] && [ "$STAMP_VERSION" = "$VERSION" ]; then
+      echo "  ok      built from HEAD, $STAMP_VERSION @ ${STAMP_COMMIT:0:12}"
+    else
+      echo "  WRONG   the package holds $STAMP_VERSION @ ${STAMP_COMMIT:0:12}, not $VERSION @ ${HEAD_SHA:0:12}"
+      MISSING=1
+    fi
+  else
+    echo "  WRONG   no dist/build-stamp.json in the package — cannot tell what code this is"
+    MISSING=1
+  fi
+
   for f in dist/src/cli/connect/agent-key.js \
            dist/src/cli/connect/enrolment.js \
            dist/src/cli/connect/tunnel-client.js \
