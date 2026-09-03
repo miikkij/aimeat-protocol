@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Profile home dashboard cards, home sub-components, and the sidebar group model. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   2026-09-03 — "Your agents" heads the Automation group, above the Agents tab it feeds into.
  *   2026-08-28 — The poster overview: a stat is icon, numeral and label in three spans, so the
  *     stylesheet can set the numeral big on the band and drop the emoji.
  *   2026-08-24 — Live update listens on 'scheduler'; 'schedules' is emitted by nobody, so the next-job
@@ -678,6 +679,7 @@ export const SIDEBAR_GROUPS = [
     { id: 'boards', labelKey: 'profile.tabs.boards' },
   ] },
   { titleKey: 'profile.landing.menuAutomation', items: [    // agents + their infrastructure
+    { id: 'fleet', labelKey: 'profile.tabs.fleet' },
     { id: 'agents', labelKey: 'profile.tabs.agents' },
     { id: 'ecosystem', labelKey: 'profile.tabs.ecosystem' },
     { id: 'offers', labelKey: 'profile.tabs.offers' },

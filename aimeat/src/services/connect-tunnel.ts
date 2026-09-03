@@ -25,6 +25,16 @@
  *   mgr.startHeartbeatMonitor();
  *   mgr.handleConnection(ws, verifiedToken, rawToken);
  * @version-history
+ *   v2.0.0 -- 2026-09-03 -- ONE SOCKET, MANY IDENTITIES. A connector held one socket per agent:
+ *     38 TCP connections to one node from one machine, growing with the number of AGENTS rather
+ *     than of nodes. `connections` is still keyed by principal, so every lookup here is unchanged;
+ *     what is new is that several entries may share one `ws`. An `attach` frame proves one more
+ *     identity's OWN credential on an open socket, verified exactly as the upgrade verifies its
+ *     own, and a frame naming an identity the socket has not proved is refused. The fence: a
+ *     revoked credential detaches THAT identity and the socket stays up for the others. Fairness
+ *     is a per-identity in-flight cap and response-size cap, because a private socket per agent
+ *     was isolation and a shared one is not. Same change removes the daemon restart a new agent
+ *     used to need. -> connect-tunnel-multiplex.ts, and wish-tunnel-one-socket-many-agents.
  *   v1.14.0 -- 2026-09-02 -- closeForGaii(): the node stopped honouring ONE principal's
  *     credential, so its socket goes. Deleting an agent revoked its sessions and told the tunnel
  *     nothing, leaving a live socket that read `online` for a dead credential until some call
@@ -77,6 +87,9 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { setTokenRevokedHook, type VerifiedToken } from '../auth/jwt.js';
+import { SocketIndex, Fairness } from './connect-tunnel-multiplex.js';
+import { forwardRequest } from './connect-tunnel-forward.js';
+import { sendBacklog, pushTaskCancellations, onMemoryWrite } from './connect-tunnel-push.js';
 import { logger } from '../utils/logger.js';
 import {
   principalsForOwner as rosterPrincipalsForOwner,
@@ -96,13 +109,21 @@ export const CONNECT_TUNNEL_PATH = '/v1/connect/tunnel';
 // and are re-exported here, so every existing importer of this file is untouched.
 export type { ConnectFrame, WorkspaceSpaceRef, ConnectTunnelStats } from './connect-tunnel-wire.js';
 import type { ConnectFrame, WorkspaceSpaceRef, ConnectTunnelStats } from './connect-tunnel-wire.js';
-import { parseWorkspaceRecordKey, spaceKeyOf, coerceSpaceRef } from './connect-tunnel-wire.js';
+import { spaceKeyOf, coerceSpaceRef } from './connect-tunnel-wire.js';
 import { revokeByToken, revokeByGaii, revokeByOwner } from './connect-tunnel-revocation.js';
 
 
 interface ConnectConnection {
   principal: string;
   ws: WebSocket;
+  /**
+   * Which physical socket this identity rides.
+   *
+   * `connections` is still keyed by principal, so every lookup in this file is unchanged — what is
+   * new is that several entries may now share one `ws`. This id is how the close path finds the
+   * others, and how a frame is checked against the identities its socket actually proved.
+   */
+  socketId: string;
   identity: VerifiedToken;
   /**
    * Which INSTALLATION this socket belongs to, or null from a connector that does not say.
@@ -119,17 +140,6 @@ interface ConnectConnection {
   lastHeartbeat: number;
 }
 
-
-/**
- * Only these client-supplied request headers are forwarded on the loopback
- * call. Authorization/Host/Cookie are deliberately excluded — the pinned agent
- * JWT is the sole credential, so the tunnel can never be used to escalate past
- * the identity established at upgrade.
- */
-const FORWARDABLE_HEADERS = new Set(['content-type', 'accept', 'idempotency-key', 'x-request-id']);
-
-/** Forward dispatch only accepts these HTTP methods. */
-const FORWARDABLE_METHODS = new Set(['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE']);
 
 /**
  * How many recent delivery ids ONE live socket remembers for in-session dedup.
@@ -149,6 +159,10 @@ const ACK_DEDUP_WINDOW = 500;
 
 export class ConnectTunnelManager {
   private connections = new Map<string, ConnectConnection>();
+  /** Which identities ride which socket. See ./connect-tunnel-multiplex.ts. */
+  private sockets = new SocketIndex();
+  /** Per-identity in-flight cap and response-size cap — a shared wire needs what a private one did not. */
+  private fairness: Fairness;
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
   private readonly loopbackBase: string;
   /** Per-agent set of RECENT deliver ids the agent has acked (in-session dedup only, capped at
@@ -183,6 +197,10 @@ export class ConnectTunnelManager {
     // through the real Express stack. NOT the public base URL — that would add a
     // public-internet hop, which is exactly what the tunnel eliminates.
     this.loopbackBase = `http://127.0.0.1:${config.port}`;
+    this.fairness = new Fairness(
+      config.connectTunnelMaxInflightPerIdentity,
+      config.connectTunnelMaxResponseBytes,
+    );
 
     // Realtime reverse delivery: fan a targeted delivery event out to the
     // matching agent's socket if connected. If offline, the durable store
@@ -213,7 +231,7 @@ export class ConnectTunnelManager {
     if (!conn || conn.ws.readyState !== WebSocket.OPEN) return;          // offline → backlog handles it
     if (this.ackedDeliveries.get(evt.target)?.has(evt.id)) return;       // already acked — skip
     this.stats.deliveriesTotal++;
-    this.send(conn.ws, { type: 'deliver', id: evt.id, kind: evt.kind, payload: evt.payload });
+    this.sendTo(conn, { type: 'deliver', id: evt.id, kind: evt.kind, payload: evt.payload });
   }
 
   /**
@@ -226,20 +244,11 @@ export class ConnectTunnelManager {
    */
   handleConnection(ws: WebSocket, identity: VerifiedToken, rawToken: string, installId?: string | null): void {
     const principal = identity.sub;
-
-    const existing = this.connections.get(principal);
-    if (existing) {
-      try { existing.ws.close(1000, 'replaced'); } catch (err) { logger.warn('handleConnection: ignore', { error: String(err) }); }
-      this.connections.delete(principal);
-    }
-    // Fresh session → fresh in-session dedup state (the replaced socket's close
-    // handler won't clear it, since the registered ws is now the new one).
-    this.ackedDeliveries.delete(principal);
-    // Subscriptions are per-socket — drop the replaced session's; the new socket re-subscribes.
-    this.clearSubscriptions(principal);
+    const socketId = this.sockets.open(ws, principal);
+    this.replaceIdentity(principal);
 
     const conn: ConnectConnection = {
-      principal, ws, identity, rawToken, lastHeartbeat: Date.now(),
+      principal, ws, socketId, identity, rawToken, lastHeartbeat: Date.now(),
       installId: installId && installId.trim() !== '' ? installId.trim().slice(0, 64) : null,
     };
     this.connections.set(principal, conn);
@@ -253,6 +262,11 @@ export class ConnectTunnelManager {
       id: randomUUID(),
       payload: {
         protocol_version: CONNECT_TUNNEL_PROTOCOL_VERSION,
+        // THE NEGOTIATION, AND IT IS ONE FIELD. A client that sees this may `attach` further
+        // identities to this socket; one that does not see it opens a socket per agent exactly as
+        // before, so an older connector against a newer node and a newer connector against an
+        // older node both work without anyone choosing a version.
+        multiplex: true,
         heartbeat_interval_ms: this.config.connectTunnelHeartbeatIntervalMs,
         offline_threshold_ms: this.config.connectTunnelOfflineThresholdMs,
         request_timeout_ms: this.config.connectTunnelRequestTimeoutMs,
@@ -279,24 +293,151 @@ export class ConnectTunnelManager {
         this.send(ws, { type: 'error', code: 'BAD_FRAME', message: 'Frame is not valid JSON' });
         return;
       }
-      this.handleFrame(principal, frame);
+      // WHICH IDENTITY SENT THIS. `agent` names it on a shared socket; absent means the socket's
+      // upgrade identity, which is every frame a pre-2026-09-03 client sends. Naming an identity
+      // this socket has not proved is refused rather than served — the field routes, it never
+      // grants, so a daemon can drive only the credentials it presented on this very socket.
+      if (frame.type === 'attach') { void this.handleAttach(socketId, ws, frame); return; }
+      const target = typeof frame.agent === 'string' && frame.agent ? frame.agent : principal;
+      if (!this.sockets.holds(socketId, target)) {
+        this.stats.malformedFramesTotal++;
+        this.send(ws, { type: 'error', id: frame.id, agent: target, code: 'UNKNOWN_IDENTITY',
+          message: 'This connection does not carry that identity. Attach it first.' });
+        return;
+      }
+      if (frame.type === 'detach') { this.detachIdentity(socketId, target, 'detach'); return; }
+      this.handleFrame(target, frame);
     });
 
     ws.on('close', () => {
-      // Only forget this socket if it is still the registered one (a replacement
-      // may have already taken its place).
-      if (this.connections.get(principal)?.ws === ws) {
-        this.connections.delete(principal);
-        this.ackedDeliveries.delete(principal);  // in-session dedup set — bounded, never persisted
-        this.clearSubscriptions(principal);      // per-socket subscriptions die with the socket
-        this.stats.activeConnections = this.connections.size;
+      // EVERY identity on this socket goes, not just the one that opened it. A shared socket can
+      // carry twelve, and forgetting only the primary would leave eleven entries pointing at a
+      // closed WebSocket — read as `online` by presence, and silently dropping every deliver.
+      for (const p of this.sockets.principalsOn(socketId)) {
+        if (this.connections.get(p)?.socketId !== socketId) continue;
+        this.connections.delete(p);
+        this.ackedDeliveries.delete(p);   // in-session dedup set — bounded, never persisted
+        this.clearSubscriptions(p);       // per-socket subscriptions die with the socket
+        this.fairness.forget(p);
       }
-      logger.info('Connect tunnel disconnected', { event: 'connect_tunnel.disconnect', principal, active: this.connections.size });
+      this.sockets.close(socketId);
+      this.stats.activeConnections = this.connections.size;
+      logger.info('Connect tunnel disconnected', { event: 'connect_tunnel.disconnect', principal, active: this.connections.size, sockets: this.sockets.socketCount });
     });
 
     ws.on('error', (err) => {
       logger.error('Connect tunnel WebSocket error', { event: 'connect_tunnel.error', principal, error: err.message });
     });
+  }
+
+  /**
+   * Drop whatever an identity had on a PREVIOUS socket, because it is arriving on a new one.
+   *
+   * Was inline in handleConnection when a socket held exactly one identity. `attach` needs the same
+   * three lines, and the rule it enforces — one live session per identity — is the same rule: the
+   * second connection replaces the first. What changed is the blast radius. Closing the old socket
+   * outright would take out every OTHER identity riding it, so the old session is detached and the
+   * socket closes only if that identity was the last one on it.
+   */
+  private replaceIdentity(principal: string): void {
+    const existing = this.connections.get(principal);
+    if (existing) {
+      this.connections.delete(principal);
+      const { remaining } = this.sockets.detach(existing.socketId, principal);
+      if (remaining === 0) {
+        try { existing.ws.close(1000, 'replaced'); } catch (err) { logger.warn('replaceIdentity: ignore', { error: String(err) }); }
+        this.sockets.close(existing.socketId);
+      }
+    }
+    this.ackedDeliveries.delete(principal);
+    this.clearSubscriptions(principal);
+    this.fairness.forget(principal);
+  }
+
+  /**
+   * One more identity on a socket that is already up.
+   *
+   * VERIFIED EXACTLY AS THE UPGRADE VERIFIES ITS OWN — same JWT check, same revocation check, same
+   * role gate — because a second implementation of that is the drift this codebase keeps paying
+   * for. What the socket has proved already buys nothing here: `attach` presents a credential and
+   * is judged on it alone, so a daemon can only ever drive identities whose credentials it holds.
+   *
+   * This is also what ends the restart. The tunnel set used to be built from the registry at
+   * startup, so taking on a new agent meant restarting the daemon and briefly dropping all 49
+   * others (measured 2026-08-31). Now it is a frame.
+   */
+  private async handleAttach(socketId: string, ws: WebSocket, frame: ConnectFrame): Promise<void> {
+    const agent = typeof frame.agent === 'string' ? frame.agent : '';
+    const token = typeof frame.token === 'string' ? frame.token : '';
+    if (!agent || !token) {
+      this.stats.malformedFramesTotal++;
+      this.send(ws, { type: 'error', id: frame.id, code: 'BAD_ATTACH_FRAME', message: 'attach requires agent and token' });
+      return;
+    }
+    const refuse = (code: string, message: string) => {
+      this.send(ws, { type: 'error', id: frame.id, agent, code, message });
+    };
+    try {
+      const { verifyJWT } = await import('../auth/jwt.js');
+      const { credentialRevoked } = await import('../auth/middleware.js');
+      const payload = await verifyJWT(token);
+      if (!payload?.sub) { refuse('ATTACH_UNAUTHORIZED', 'That credential did not verify.'); return; }
+      if (await credentialRevoked(token, payload)) { refuse('ATTACH_UNAUTHORIZED', 'That credential has been revoked.'); return; }
+      if (!payload.roles?.includes('agent') && !payload.roles?.includes('ecosystem')) {
+        refuse('ATTACH_FORBIDDEN', 'Only an agent or an ecosystem app may ride this connection.');
+        return;
+      }
+      // THE NAME MUST BE THE CREDENTIAL'S OWN. Trusting `frame.agent` over the verified `sub` would
+      // let a daemon file one agent's proven credential under another agent's name and then act as
+      // that one — the gate reads the normalized value, never the raw request (invariant 13).
+      if (payload.sub !== agent) { refuse('ATTACH_FORBIDDEN', 'That credential belongs to a different identity.'); return; }
+
+      const rec = this.sockets.get(socketId);
+      if (!rec) { refuse('ATTACH_FAILED', 'This connection is no longer open.'); return; }
+      this.replaceIdentity(payload.sub);
+      this.sockets.attach(socketId, payload.sub);
+      const conn: ConnectConnection = {
+        principal: payload.sub, ws, socketId, identity: payload, rawToken: token,
+        lastHeartbeat: Date.now(),
+        // The installation is the SOCKET's property, so an attached identity inherits the one the
+        // upgrade declared. It answers "which of this owner's machines", and the machine is the
+        // same machine for every identity on one socket.
+        installId: this.connections.get(rec.primary)?.installId ?? null,
+      };
+      this.connections.set(payload.sub, conn);
+      this.stats.activeConnections = this.connections.size;
+      logger.info('Connect tunnel identity attached', {
+        event: 'connect_tunnel.attach', principal: payload.sub,
+        onSocketWith: rec.principals.size, active: this.connections.size, sockets: this.sockets.socketCount,
+      });
+      this.send(ws, { type: 'attached', id: frame.id, agent: payload.sub, timestamp: new Date().toISOString() });
+      void this.sendBacklog(conn);
+    } catch (err) {
+      logger.warn('Connect tunnel attach failed', { event: 'connect_tunnel.error', agent, error: String(err) });
+      refuse('ATTACH_FAILED', 'That identity could not be attached.');
+    }
+  }
+
+  /**
+   * One identity leaves; the socket stays up for everyone else.
+   *
+   * THIS IS THE FENCE. A revoked credential, a deleted agent or a client's own `detach` all land
+   * here, and none of them may drop the other eleven identities riding the same wire. The socket
+   * closes only when this was the last one on it.
+   */
+  private detachIdentity(socketId: string, principal: string, reason: string): void {
+    this.connections.delete(principal);
+    this.ackedDeliveries.delete(principal);
+    this.clearSubscriptions(principal);
+    this.fairness.forget(principal);
+    const { remaining } = this.sockets.detach(socketId, principal);
+    this.stats.activeConnections = this.connections.size;
+    logger.info('Connect tunnel identity detached', { event: 'connect_tunnel.detach', principal, reason, remaining });
+    if (remaining === 0) {
+      const rec = this.sockets.get(socketId);
+      try { rec?.ws.close(1000, reason); } catch (err) { logger.warn('detachIdentity: ignore', { error: String(err) }); }
+      this.sockets.close(socketId);
+    }
   }
 
   private handleFrame(principal: string, frame: ConnectFrame): void {
@@ -306,7 +447,7 @@ export class ConnectTunnelManager {
     switch (frame.type) {
       case 'heartbeat': {
         conn.lastHeartbeat = Date.now();
-        this.send(conn.ws, { type: 'heartbeat_ack', id: frame.id, timestamp: new Date().toISOString() });
+        this.sendTo(conn, { type: 'heartbeat_ack', id: frame.id, timestamp: new Date().toISOString() });
         break;
       }
       case 'request': {
@@ -331,100 +472,24 @@ export class ConnectTunnelManager {
       }
       default: {
         this.stats.malformedFramesTotal++;
-        this.send(conn.ws, { type: 'error', id: frame.id, code: 'BAD_FRAME', message: `Unsupported or invalid frame type: ${String(frame.type)}` });
+        this.sendTo(conn, { type: 'error', id: frame.id, code: 'BAD_FRAME', message: `Unsupported or invalid frame type: ${String(frame.type)}` });
       }
     }
   }
 
   /**
-   * Forward a tunneled `request` through the real Express stack (loopback
-   * self-fetch with the pinned agent bearer) and return the correlated
-   * `response`. Scope enforcement + the AIMEAT envelope hold by construction.
+   * Forward a tunneled `request`. The body lives in ./connect-tunnel-forward.ts, where the loopback
+   * replay and its two guards — the origin pin and the header allowlist — sit together, because
+   * that pair IS the reason scope enforcement holds through the tunnel by construction.
    */
   private async handleRequest(conn: ConnectConnection, frame: ConnectFrame): Promise<void> {
-    const { id } = frame;
-    if (!id || typeof frame.method !== 'string' || typeof frame.path !== 'string' || !frame.path.startsWith('/')) {
-      this.stats.malformedFramesTotal++;
-      this.send(conn.ws, { type: 'error', id, code: 'BAD_REQUEST_FRAME', message: 'request requires id, method, and an absolute path' });
-      return;
-    }
-    if (!FORWARDABLE_METHODS.has(frame.method.toUpperCase())) {
-      this.stats.malformedFramesTotal++;
-      this.send(conn.ws, { type: 'error', id, code: 'BAD_REQUEST_FRAME', message: `Unsupported method: ${frame.method}` });
-      return;
-    }
-
-    // SSRF guard: `path.startsWith('/')` is NOT enough — a protocol-relative path
-    // like `//evil.com/x` (or a backslash variant) resolves against the loopback
-    // scheme to an off-host origin, which would make the server fetch an arbitrary
-    // host AND ship the agent's bearer to it. Pin the resolved origin to loopback.
-    let url: URL;
-    try {
-      url = new URL(frame.path, this.loopbackBase);
-    } catch {
-      this.stats.malformedFramesTotal++;
-      this.send(conn.ws, { type: 'error', id, code: 'BAD_REQUEST_FRAME', message: 'Invalid request path' });
-      return;
-    }
-    if (url.origin !== this.loopbackBase) {
-      this.stats.malformedFramesTotal++;
-      logger.warn('Connect tunnel rejected off-host forward path', { event: 'connect_tunnel.ssrf_block', principal: conn.principal, path: frame.path, resolvedOrigin: url.origin });
-      this.send(conn.ws, { type: 'error', id, code: 'BAD_REQUEST_FRAME', message: 'request path must stay on this node (loopback)' });
-      return;
-    }
-
-    this.stats.forwardRequestsTotal++;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), this.config.connectTunnelRequestTimeoutMs);
-
-    try {
-      if (frame.query) {
-        for (const [k, v] of Object.entries(frame.query)) url.searchParams.set(k, String(v));
-      }
-
-      const headers: Record<string, string> = { Authorization: `Bearer ${conn.rawToken}` };
-      if (frame.headers) {
-        for (const [k, v] of Object.entries(frame.headers)) {
-          if (FORWARDABLE_HEADERS.has(k.toLowerCase())) headers[k] = String(v);
-        }
-      }
-      const hasBody = frame.body !== undefined && frame.body !== null && frame.method.toUpperCase() !== 'GET' && frame.method.toUpperCase() !== 'HEAD';
-      if (hasBody && !Object.keys(headers).some(h => h.toLowerCase() === 'content-type')) {
-        headers['Content-Type'] = 'application/json';
-      }
-
-      const res = await fetch(url, {
-        method: frame.method,
-        headers,
-        body: hasBody ? JSON.stringify(frame.body) : undefined,
-        signal: controller.signal,
-      });
-
-      const text = await res.text();
-      let body: unknown;
-      // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
-      try { body = text ? JSON.parse(text) : null; } catch { body = text; }
-
-      this.send(conn.ws, { type: 'response', id, status: res.status, body });
-    } catch (err) {
-      this.stats.forwardErrorsTotal++;
-      const aborted = err instanceof Error && err.name === 'AbortError';
-      logger.warn('Connect tunnel forward dispatch failed', { event: 'connect_tunnel.error', principal: conn.principal, path: frame.path, error: err instanceof Error ? err.message : String(err) });
-      this.send(conn.ws, {
-        type: 'response',
-        id,
-        status: aborted ? 504 : 502,
-        body: {
-          ok: false,
-          protocol: 'aimeat',
-          version: 'v1',
-          node: this.config.nodeId,
-          error: { code: aborted ? 'TUNNEL_TIMEOUT' : 'TUNNEL_DISPATCH_ERROR', message: aborted ? 'Forward request timed out' : 'Forward dispatch failed' },
-        },
-      });
-    } finally {
-      clearTimeout(timer);
-    }
+    await forwardRequest({
+      config: this.config,
+      stats: this.stats,
+      fairness: this.fairness,
+      loopbackBase: this.loopbackBase,
+      sendTo: (c, f) => this.sendTo(c as ConnectConnection, f),
+    }, conn, frame);
   }
 
   /**
@@ -480,7 +545,7 @@ export class ConnectTunnelManager {
         reject,
         timer,
       });
-      this.send(conn.ws, { type: 'invoke', id, capability: payload.capability, input: payload.input, caller: payload.caller, timeout_ms: ttl });
+      this.sendTo(conn, { type: 'invoke', id, capability: payload.capability, input: payload.input, caller: payload.caller, timeout_ms: ttl });
     });
   }
 
@@ -517,7 +582,7 @@ export class ConnectTunnelManager {
       event: 'connect_tunnel.subscribe', principal: conn.principal,
       accepted: accepted.length, rejected: rejected.length,
     });
-    this.send(conn.ws, { type: 'subscribed', id: frame.id, payload: { accepted, rejected }, timestamp: new Date().toISOString() });
+    this.sendTo(conn, { type: 'subscribed', id: frame.id, payload: { accepted, rejected }, timestamp: new Date().toISOString() });
   }
 
   /** Does this principal pass the workspace READ gate for (organism, ws)? Same gate as the REST read. */
@@ -559,91 +624,21 @@ export class ConnectTunnelManager {
     if (subs.size === 0) this.spaceSubscribers.delete(sk);
   }
 
-  /**
-   * Fan a memory write out as a `workspace.record` wake to every online subscriber of its space.
-   * Only published/committed state triggers a contract agent: a bare write or `.latest` (drafts are
-   * working copies, `.version.N` is history — neither is a contract trigger). The payload is a
-   * lightweight envelope (coordinates + op + ts, NO record value): the agent does its own authorized
-   * read for content. Access is RE-validated here so a mid-session consent revocation stops delivery
-   * immediately (a stale subscription is dropped on the spot). The deliver `id` is unique per write so
-   * each update is its own wake (never suppressed by the in-session ack dedup).
-   */
+  /** Fan a memory write out as a `workspace.record` wake to its space's online subscribers. Body in
+   *  ./connect-tunnel-push.ts. */
   private async onMemoryWrite(evt: MemoryWriteEvent): Promise<void> {
-    // P3: a cancel marker write (`agents.cancel.task.<id>` / `agents.cancel.run.<run>`, value = task
-    // id list) → push `task.cancelled` to each affected agent's socket, so daemons stop polling the
-    // owner-scoped `agents.cancel.*` memory before every dispatch. Handled before the subscriber gate.
-    if (evt.key.startsWith('agents.cancel.')) { await this.pushTaskCancellations(evt.ownerGaii, evt.key); return; }
-
-    if (this.spaceSubscribers.size === 0) return;  // no subscribers anywhere — cheapest exit
-    const parsed = parseWorkspaceRecordKey(evt.key);
-    if (!parsed) return;
-    const op = evt.op ?? 'updated';
-    const ts = new Date(evt.timestamp).toISOString();
-    // The space (namespace) can be multi-segment, so match by prefix against each subscription in
-    // this (organism, ws) rather than positional split. Subscriptions are few, so this stays cheap.
-    const wsPrefix = `${spaceKeyOf(parsed.organismId, parsed.ws, '')}`;  // "orgId|ws|"
-    for (const [sk, subs] of this.spaceSubscribers) {
-      if (!sk.startsWith(wsPrefix) || subs.size === 0) continue;
-      const namespace = sk.slice(wsPrefix.length);
-      if (!(parsed.rest === namespace || parsed.rest.startsWith(`${namespace}.`))) continue;
-      const tail = parsed.rest === namespace ? '' : parsed.rest.slice(namespace.length + 1);
-      if (tail === '') continue;  // a write to the space root itself — no instance, not a record
-      const parts = tail.split('.');
-      const instanceId = parts[0];
-      const role = parts.slice(1).join('.');
-      if (role !== '' && role !== 'latest') continue;  // skip drafts + version history
-      for (const principal of [...subs]) {
-        const conn = this.connections.get(principal);
-        if (!conn || conn.ws.readyState !== WebSocket.OPEN) continue;
-        const allowed = await this.canPrincipalReadSpace(conn, parsed.organismId, parsed.ws);
-        if (!allowed) { this.clearSubscriptionFor(principal, sk); continue; }
-        this.stats.deliveriesTotal++;
-        this.send(conn.ws, {
-          type: 'deliver',
-          id: `${sk}/${instanceId}#${evt.timestamp}`,
-          kind: 'workspace.record',
-          payload: {
-            type: 'workspace.record',
-            organism_id: parsed.organismId, ws: parsed.ws, space: namespace,
-            id: instanceId, op, ts,
-          },
-        });
-      }
-    }
+    await onMemoryWrite({
+      stats: this.stats, connections: this.connections, spaceSubscribers: this.spaceSubscribers,
+      sendTo: (c, f) => this.sendTo(c as ConnectConnection, f),
+      canPrincipalReadSpace: (c, o, w) => this.canPrincipalReadSpace(c as ConnectConnection, o, w),
+      clearSubscriptionFor: (pr, sk) => this.clearSubscriptionFor(pr, sk),
+      pushTaskCancellations: (o, k) => this.pushTaskCancellations(o, k),
+    }, evt);
   }
-
-  /**
-   * On connect, send a snapshot of everything outstanding for this agent —
-   * queued + active tasks and pending messages — straight from storage (the
-   * source of truth), so nothing is lost across a disconnect (mirrors
-   * TunnelManager.sendMailboxSummary). A task leaves the backlog only when its
-   * status changes (done/failed/etc.), never because of an ack. After this the
-   * manager live-pushes via `deliver`.
-   */
+  /** On-connect snapshot from storage, so nothing is lost across a disconnect. Body in
+   *  ./connect-tunnel-push.ts. */
   private async sendBacklog(conn: ConnectConnection): Promise<void> {
-    try {
-      const principal = conn.principal;
-      const [queued, active, pendingMessages] = await Promise.all([
-        this.storage.listAgentTasks(principal, { status: 'queued' }),
-        this.storage.listAgentTasks(principal, { status: 'active' }),
-        this.storage.listPendingMessages(principal).catch(err => { logger.warn('resolve: continuing after a suppressed failure', { error: String(err) }); return []; }),
-      ]);
-      // Dedup tasks by id (a task can't be both queued and active, but guard).
-      const taskById = new Map<string, unknown>();
-      for (const t of [...queued.tasks, ...active.tasks]) taskById.set(t.id, t);
-      const tasks = [...taskById.values()];
-      const messages = pendingMessages;
-
-      if (conn.ws.readyState !== WebSocket.OPEN) return;
-      this.send(conn.ws, {
-        type: 'backlog',
-        id: randomUUID(),
-        payload: { tasks, messages },
-        timestamp: new Date().toISOString(),
-      });
-    } catch (err) {
-      logger.error('Connect tunnel backlog failed', { event: 'connect_tunnel.error', principal: conn.principal, error: err instanceof Error ? err.message : String(err) });
-    }
+    await sendBacklog(this.pushCtx(), conn);
   }
 
   /**
@@ -651,35 +646,25 @@ export class ConnectTunnelManager {
    * in ./connect-tunnel-revocation.ts, where the three predicates sit side by side — the next time
    * something needs a socket closed, the question is which of these already reaches it.
    */
-  onTokenRevoked(rawToken: string): void { revokeByToken(this.connections, (ws, f) => this.send(ws, f), rawToken); }
+  onTokenRevoked(rawToken: string): void { revokeByToken(this.connections, (ws, f) => this.send(ws, f), (s, p, r) => this.detachIdentity(s, p, r), rawToken); }
 
   /** Deleting ONE agent: its socket goes, and nothing else on that daemon is touched. */
-  closeForGaii(gaii: string): void { revokeByGaii(this.connections, (ws, f) => this.send(ws, f), gaii); }
+  closeForGaii(gaii: string): void { revokeByGaii(this.connections, (ws, f) => this.send(ws, f), (s, p, r) => this.detachIdentity(s, p, r), gaii); }
 
   /** Deactivating an account: every principal acting for that owner. */
-  closeForOwner(owner: string): void { revokeByOwner(this.connections, (ws, f) => this.send(ws, f), owner); }
-
-  /**
-   * P3: resolve a cancel marker (its value is a list of task ids) to the owning agents and push a
-   * `task.cancelled` wake to each online one. The agent records it locally and skips dispatch — no
-   * more per-dispatch `agents.cancel.*` memory scan. Best-effort; a missed push is caught by the
-   * agent's cheap single-task status re-check.
-   */
+  closeForOwner(owner: string): void { revokeByOwner(this.connections, (ws, f) => this.send(ws, f), (s, p, r) => this.detachIdentity(s, p, r), owner); }
+  /** A cancel marker resolved to its agents and pushed. Body in ./connect-tunnel-push.ts. */
   private async pushTaskCancellations(ownerGaii: string, key: string): Promise<void> {
-    try {
-      const rec = await this.storage.getMemory(ownerGaii, key);
-      const ids = Array.isArray(rec?.value) ? (rec!.value as unknown[]).map(String) : [];
-      for (const taskId of ids) {
-        const task = await this.storage.getAgentTask(taskId);
-        if (!task) continue;
-        const conn = this.connections.get(task.agentGaii);
-        if (!conn || conn.ws.readyState !== WebSocket.OPEN) continue;
-        this.stats.deliveriesTotal++;
-        this.send(conn.ws, { type: 'deliver', id: `cancel/${taskId}`, kind: 'task.cancelled', payload: { type: 'task.cancelled', id: taskId } });
-      }
-    } catch (err) {
-      logger.warn('Connect tunnel cancel push failed', { event: 'connect_tunnel.error', key, error: err instanceof Error ? err.message : String(err) });
-    }
+    await pushTaskCancellations(this.pushCtx(), ownerGaii, key);
+  }
+
+  /** What the two storage-reading pushes borrow. Built per call: they run rarely, and the maps they
+   *  read are the live ones either way. */
+  private pushCtx() {
+    return {
+      storage: this.storage, stats: this.stats, connections: this.connections,
+      sendTo: (c: { principal: string; ws: WebSocket }, f: ConnectFrame) => this.sendTo(c as ConnectConnection, f),
+    };
   }
 
   /**
@@ -710,6 +695,18 @@ export class ConnectTunnelManager {
     let subscriptionEntries = 0;
     for (const set of this.subscriptions.values()) subscriptionEntries += set.size;
     return { ...this.stats, activeConnections: this.connections.size, ackDedupEntries, subscriptionEntries };
+  }
+
+  /**
+   * A frame addressed to ONE identity, stamped with which.
+   *
+   * A shared socket carries twelve conversations, so a reply that does not say whose it is cannot
+   * be routed by the client. Stamped unconditionally, including on a socket carrying a single
+   * identity: an older client ignores the extra field, and a rule with no exceptions is one nobody
+   * has to remember.
+   */
+  private sendTo(conn: ConnectConnection, frame: ConnectFrame): void {
+    this.send(conn.ws, { ...frame, agent: conn.principal });
   }
 
   private send(ws: WebSocket, frame: ConnectFrame): void {

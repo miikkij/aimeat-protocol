@@ -4187,7 +4187,8 @@
     "fedDepeeringGrace": "La gracia termina",
     "fedShareCatalogue": "Compartir el catálogo",
     "fedReplicateMemory": "Replicar la memoria",
-    "fedAllowRouting": "Permitir el enrutado",
+    "fedAllowRouting": "Retransmitir a este par",
+    "fedAllowRoutingHint": "El tráfico se reenvía desde aquí a este par, como destino o como salto intermedio; no impide que ese par envíe aquí, eso lo decide él por su lado.",
     "fedAllowAuth": "Permitir entrar desde la federación",
     "fedAuthPolicyTitle": "Política de entrada desde la federación",
     "fedAuthPolicyDesc": "Controla si las personas de otros nodos pueden entrar aquí y qué pueden hacer.",
@@ -4838,21 +4839,6 @@
     "openWork": "{n} trabajando",
     "messages": "{n} mensajes",
     "messagesOne": "1 mensaje",
-    "note": {
-      "never": "Nunca se ha conectado. Ejecuta el paso de conexión para que entre.",
-      "dead": "Su acceso ha caducado y ya no puede entrar. Vuelve a conectarlo.",
-      "expiringToday": "Su acceso caduca hoy. Vuelve a conectarlo ahora.",
-      "expiring": "Su acceso caduca dentro de unos {n} días. Vuelve a conectarlo antes.",
-      "expiringOne": "Su acceso caduca dentro de un día. Vuelve a conectarlo antes.",
-      "okToday": "Dentro, y caduca hoy.",
-      "ok": "Dentro, le quedan unos {n} días.",
-      "okOne": "Dentro, le queda un día.",
-      "keyNever": "Creado, y su conector todavía no lo ha recogido.",
-      "keyDead": "Le falta la clave, así que no puede entrar. Vuelve a crearlo.",
-      "keyUnreadable": "No se puede leer su tarjeta. Pide ayuda a quien lo lleva.",
-      "keyConnected": "Entra solo con su propia clave, y está conectado ahora.",
-      "keyOk": "Entra solo con su propia clave siempre que lo necesita."
-    },
     "state": {
       "ok": "Bien",
       "expiring": "A punto de caducar",
@@ -4862,11 +4848,39 @@
       "unknown": "Se desconoce"
     },
     "migrate": {
-      "action": "Pasar {n} a su propia clave",
-      "working": "Pasándolos…",
-      "done": "Listo.",
-      "failed": "No ha funcionado. No ha cambiado nada."
-    }
+      "head": "Dar a {n} agentes un acceso que no caduca",
+      "headOne": "Dar a este agente un acceso que no caduca",
+      "what": "{n} de tus agentes no pueden entrar por su cuenta: a unos les caducó el acceso, otros no se han conectado nunca.",
+      "whatOne": "Uno de tus agentes no puede entrar por su cuenta.",
+      "keeps": "Nada más cambia. El mismo nombre, los mismos permisos, el mismo trabajo en curso.",
+      "needConnector": "Para esto hace falta que el conector esté funcionando en la máquina donde viven estos agentes. Arráncalo allí y vuelve a pulsar.",
+      "ready": "El conector está funcionando, así que esto puede hacerse ya.",
+      "action": "Dar acceso nuevo a {n} agentes",
+      "actionOne": "Darle acceso nuevo",
+      "working": "En ello…",
+      "doneAll": "Listo. Ya pueden entrar otra vez, y no cambió nada más en ellos.",
+      "donePartial": "{n} ya pueden entrar. A {stuck} no se les alcanzó y están exactamente igual: vuelve a pulsar o revisa el conector en su máquina.",
+      "failed": "No funcionó. Nada cambió."
+    },
+    "groupCount": "{n} agentes",
+    "groupCountOne": "1 agente",
+    "group": {
+      "dead": "Su acceso ha caducado, así que ya no pueden entrar.",
+      "never": "Estos no se han conectado nunca. Haz el paso de conexión para incorporarlos.",
+      "expiring": "Estos siguen dentro, pero no por mucho. Cada uno dice cuánto le queda.",
+      "ok": "Estos están dentro. Cada uno dice cuánto le queda.",
+      "unreadable": "Estos no se pueden leer. Pide ayuda a quien lleva esto.",
+      "unknown": "No se sabe nada de cómo entran estos.",
+      "keyDead": "Les falta la clave, así que no pueden entrar. Vuelve a crearlos.",
+      "keyNever": "Creados, y su conector aún no los ha tomado.",
+      "keyUnreadable": "Su tarjeta no se puede leer. Pide ayuda a quien lleva esto.",
+      "keyOk": "Estos entran solos con su propia clave siempre que lo necesitan, y no caduca."
+    },
+    "days": "quedan {n} días",
+    "daysOne": "queda 1 día",
+    "daysToday": "caduca hoy",
+    "hidden": "{n} agentes sanos ocultos",
+    "hiddenOne": "1 agente sano oculto"
   },
   "footer": {
     "ownNode": "Monta tu propio nodo",
@@ -7652,7 +7666,8 @@
       "appDev": "AppDev",
       "pnl": "Resultados",
       "usage": "Uso",
-      "companies": "Empresas"
+      "companies": "Empresas",
+      "fleet": "Tus agentes"
     },
     "offers": {
       "title": "¿Qué puedo hacer?",
@@ -8333,7 +8348,8 @@
         "connected": "Tu conector está en marcha, así que pueden ponerse a trabajar enseguida",
         "notConnected": "Tu conector no está en marcha",
         "notConnectedHint": "Estos agentes se ejecutan en tu propio ordenador. Arranca el conector con \"aimeat connect serve\" y este botón funcionará.",
-        "whatYouGet": "Lo que recibes"
+        "whatYouGet": "Lo que recibes",
+        "actsAloneNoticeOne": "{names} empieza a trabajar en cuanto llega algo, sin preguntarte cada vez. Puedes cambiarlo para cualquier agente más adelante."
       },
       "taskRunner": {
         "title": "Conectar un equipo de CrewAI (patrón del agente enlace)",

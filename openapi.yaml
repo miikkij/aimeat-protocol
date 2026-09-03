@@ -1929,7 +1929,9 @@ components:
         allow_routing:
           type: boolean
           default: true
-          description: Whether to accept routed requests from this peer
+          description: >-
+            Traffic is forwarded from here to this peer, as a destination or as a relay hop; it does
+            not stop that peer from sending here, which they decide on their own side.
         allow_messaging:
           type: boolean
           default: true
@@ -5337,10 +5339,12 @@ paths:
       summary: Open the connector forward tunnel (WebSocket upgrade)
       description: |
         **WebSocket endpoint** (HTTP `101 Switching Protocols`), not a normal
-        REST call. A connector opens **one** persistent WS per agent identity and
-        multiplexes id-correlated forward API calls (agent→server) over it while
-        receiving realtime reverse delivery (server→agent push) on the same
-        socket — so the connector never polls.
+        REST call. A connector opens **one** persistent WS per NODE and carries
+        every identity that node serves over it, multiplexing id-correlated
+        forward API calls (agent→server) while receiving realtime reverse
+        delivery (server→agent push) on the same socket — so the connector never
+        polls, and a machine serving 200 agents holds one connection rather than
+        200.
 
         Authenticate by passing the agent JWT (roles must include `agent`) as
         `?token=<jwt>` or an `Authorization: Bearer <jwt>` header at upgrade.
@@ -5348,12 +5352,34 @@ paths:
         The verified identity is pinned to the socket and reused as the bearer for
         every forwarded request, so existing scope enforcement applies unchanged.
 
+        **More identities on the same socket.** `welcome` carries
+        `multiplex: true` on a node that supports it. A client may then send
+        `attach` (C→S: `{id, agent, token}`) with that identity's OWN credential,
+        verified exactly as the upgrade verifies its own — riding a socket
+        someone else opened grants nothing — and receives `attached`
+        (S→C: `{id, agent}`) plus that identity's own `backlog`. `detach`
+        (C→S: `{agent}`) removes one. Every other frame carries an optional
+        `agent` field naming which identity it belongs to; **absent means the
+        socket's upgrade identity**, so a client written before this works
+        unchanged, and a frame naming an identity the socket has not proved is
+        refused with `UNKNOWN_IDENTITY`. One identity's revoked credential
+        detaches that identity and leaves the socket up for the others
+        (`auth_revoked` carries `agent`).
+
+        **Per-identity limits**, because a shared socket has no natural
+        isolation: a cap on concurrent forwarded calls
+        (`TUNNEL_TOO_MANY_IN_FLIGHT`, HTTP 429 in the response envelope) and a
+        cap on one response's size (`TUNNEL_RESPONSE_TOO_LARGE`). Both apply per
+        identity, so a noisy agent is refused and its neighbours are unaffected.
+
         Frames are JSON objects with a `type`: `welcome` (S→C handshake),
-        `heartbeat`/`heartbeat_ack`, `request` (C→S: `{id, method, path, query?,
-        headers?, body?}`), `response` (S→C: `{id, status, body}` — AIMEAT
-        envelope), `deliver` (S→C: `{id, kind, payload}` full object),
-        `ack` (C→S: `{id}`), `backlog` (S→C on-connect snapshot of queued tasks +
-        pending messages), `disconnect`, and `error`.
+        `heartbeat`/`heartbeat_ack`, `request` (C→S: `{id, agent?, method, path,
+        query?, headers?, body?}`), `response` (S→C: `{id, agent?, status, body}`
+        — AIMEAT envelope), `deliver` (S→C: `{id, agent?, kind, payload}` full
+        object), `ack` (C→S: `{id, agent?}`), `backlog` (S→C on-connect snapshot
+        of queued tasks + pending messages), `attach`/`attached`/`detach`,
+        `subscribe`/`subscribed`, `invoke`/`invoke_result`, `auth_revoked`,
+        `disconnect`, and `error`.
       tags: [Connector Tunnel]
       parameters:
         - name: token
@@ -20146,7 +20172,10 @@ paths:
                   description: Whether to replicate memory entries to this peer
                 allow_routing:
                   type: boolean
-                  description: Whether to accept routed requests from this peer
+                  description: >-
+                    Traffic is forwarded from here to this peer, as a destination or as a relay hop;
+                    it does not stop that peer from sending here, which they decide on their own
+                    side.
                 allow_messaging:
                   type: boolean
                   description: Whether this peer may deliver messages, receipts and attachment grants here

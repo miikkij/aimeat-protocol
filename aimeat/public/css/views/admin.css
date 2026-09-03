@@ -8,6 +8,8 @@
  *   selected item, group labels wear the sun, the node id sits on top in mono. Content surfaces
  *   map to global theme.css tokens so they flip with dark/light mode.
  * @version-history
+ *   v2.2.0 — 2026-09-03 — .adm-peer-policy-hint: the one federation switch whose direction is not
+ *     obvious from its label carries a sentence under it.
  *   v2.1.0 — 2026-08-31 — The frame stops scrolling away: .adm-main gives up its inert
  *     overflow:auto (it was the nearest scrollport and swallowed every position:sticky inside
  *     it while .page-content did the actual scrolling), the topbar and the Config tab's
@@ -1111,6 +1113,9 @@
 .adm-peer-policy { display: flex; flex-direction: column; gap: 0.15rem; width: 13rem; }
 .adm-peer-policy-note { color: var(--muted); font-size: 0.75rem; margin: 0.3rem 0 0; }
 .adm-peer-policy-row { display: flex; align-items: center; gap: 0.35rem; }
+/* The one switch whose direction is not obvious from its label carries a sentence under it. Indented
+   to the checkbox's text so it reads as belonging to that row and not to the next one. */
+.adm-peer-policy-hint { color: var(--muted); font-size: 0.7rem; line-height: 1.35; margin: 0.1rem 0 0.25rem 1.35rem; }
 .adm-peer-policy-row input[disabled] { cursor: not-allowed; }
 .adm-peer-policy-locked { font-size: 0.7rem; opacity: 0.55; cursor: help; }
 .adm-peer-policy-mode { font-size: 0.75rem; padding: 2px 4px; margin-top: 0.25rem; max-width: 12rem; }

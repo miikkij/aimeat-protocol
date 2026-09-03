@@ -440,6 +440,7 @@ const ALL_SUITES = [
     'test/e2e-company-brain.ts',
     'test/e2e-personal-node.ts',
     'test/e2e-connect-tunnel.ts',
+    'test/e2e-connect-tunnel-multiplex.ts',
     'test/e2e-connect-tunnel-delivery.ts',
     'test/e2e-connect-tunnel-records.ts',
     'test/e2e-agent-crew.ts',

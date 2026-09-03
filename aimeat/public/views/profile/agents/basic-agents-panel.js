@@ -17,6 +17,8 @@
  * @structure BasicAgentsPanel({ session, showToast, onCreated })
  * @usage <${BasicAgentsPanel} session=${session} showToast=${showToast} onCreated=${loadData} />
  * @version-history
+ *   2026-09-03 — An `emphasis` prop so the Agents section can render the button as an outline, and
+ *     the acts-alone notice agrees with itself when there is one name. Default unchanged.
  *   v1.0.0 — 2026-08-31 — Initial (Agent v2, V1).
  */
 import { h } from 'preact';
@@ -31,7 +33,11 @@ import { areaLine } from '/js/consent-vocab.js';
 /** The plug icon: what "your connector is connected" looks like without a word for it. */
 const PlugIcon = html`<svg class="pf-agd-basic-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 2v6"></path><path d="M15 2v6"></path><path d="M6 8h12v4a6 6 0 0 1-12 0z"></path><path d="M12 18v4"></path></svg>`;
 
-export default function BasicAgentsPanel({ session, showToast, onCreated }) {
+/** `emphasis`: 'secondary' renders the create button as an outline. The Agents section shows this
+ *  card beside a warning whose button is the page's one live action, and two primary buttons —
+ *  both disabled while the connector is down — made the two loudest controls the two that do
+ *  nothing. Omitted everywhere else, so the Agents tab is unchanged. */
+export default function BasicAgentsPanel({ session, showToast, onCreated, emphasis }) {
   const [state, setState] = useState(null);
   const [busy, setBusy] = useState(false);
   // Open while there is still something to press. What each agent gets, and which of them start
@@ -102,7 +108,7 @@ export default function BasicAgentsPanel({ session, showToast, onCreated }) {
         </div>
         ${allThere
           ? html`<span class="pf-agd-basic-state">${t('profile.agents.basic.allThere')}</span>`
-          : html`<button class="btn-primary btn-sm" disabled=${!connected || busy} onClick=${create}>
+          : html`<button class="${emphasis === 'secondary' ? 'btn-outline' : 'btn-primary'} btn-sm" disabled=${!connected || busy} onClick=${create}>
               ${busy ? t('profile.agents.basic.working') : t('profile.agents.basic.button')}
             </button>`}
       </div>
@@ -143,7 +149,10 @@ export default function BasicAgentsPanel({ session, showToast, onCreated }) {
         </ul>
         ${actsAlone.length > 0 && html`
           <div class="pf-agd-basic-notice">
-            ${t('profile.agents.basic.actsAloneNotice').replace('{names}', actsAlone.map(a => a.display_name || a.name).join(', '))}
+            ${/* One name took the plural verb: "Workflow manager start work as soon as it
+                  arrives". The template was written for a list and there is usually one. */''}
+            ${t(actsAlone.length === 1 ? 'profile.agents.basic.actsAloneNoticeOne' : 'profile.agents.basic.actsAloneNotice')
+              .replace('{names}', actsAlone.map(a => a.display_name || a.name).join(', '))}
           </div>`}
       `}
     </div>

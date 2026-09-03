@@ -492,6 +492,13 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   connectTunnelHeartbeatIntervalMs: number;
   connectTunnelOfflineThresholdMs: number;
   connectTunnelRequestTimeoutMs: number;
+  /**
+   * FAIRNESS ON A SHARED WIRE. One socket now carries every agent a connector serves, so the
+   * isolation a private socket per agent gave away for free has to be a rule instead. Both caps are
+   * per IDENTITY: the noisy agent is the one refused, and its neighbours never notice.
+   */
+  connectTunnelMaxInflightPerIdentity: number;
+  connectTunnelMaxResponseBytes: number;
   /** How long the Crew tab's "Try" waits for a running crew to finish one trial run (invoke over the tunnel). */
   crewTryTimeoutMs: number;
 

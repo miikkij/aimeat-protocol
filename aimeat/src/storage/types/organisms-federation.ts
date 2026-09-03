@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Organism, federation/peering, notification, extension, scheduler, cortex, and knowledge record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 — 2026-09-03 — `allowRouting` on the peer record says which way it points: this node
+ *     forwards TO the peer; it does not decide what the peer may send here.
  *   v1.3.0 — 2026-08-29 — OrganismRecord.type is a string: the owner's own word, with five presets the
  *     settings translate; it was a five-value union.
  *   v1.2.0 — 2026-08-01 — KnowledgeSynthesisLevel now aliases AiProvenanceLevel rather than
@@ -215,6 +217,9 @@ export interface FederationPeerRecord {
   lastSeen: string;
   shareCatalogue: boolean;
   replicateMemory: boolean;
+  /** THE ONE FLAG THAT POINTS OUTWARD. Its neighbours all ask "may this peer do X here"; this one
+   *  says this node may forward traffic TO this peer, as a destination or as a relay hop. It does
+   *  not stop the peer from sending here, which that peer decides on its own side. */
   allowRouting: boolean;
   /** May this peer deliver direct messages, read receipts and attachment grants here?
    *  Legacy rows default TRUE: every peer that exists today keeps messaging exactly as it does. */
