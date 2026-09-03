@@ -1,0 +1,129 @@
+/**
+ * @file wallet-poster.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The wallet page in the poster face (wal- prefix; design canvas "AIMEAT
+ *   Lompakko-sivu", direction A). The shared parts come from organism.css's og- rules; this file
+ *   carries what the page adds: the two columns of where the morsels came from and went to, the pace
+ *   bar, the grid of what morsels buy, the ledger rows (words, when, amount, door) and the opened
+ *   row, the share figures, the rail rows and the field that opens under one, the two roads. Every
+ *   column is bounded so a long tracking code or label wraps inside its cell. NOTE: this file must
+ *   be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-04 — Initial.
+ */
+
+.og-wal .og-door:disabled, .og-wal .og-slab:disabled { opacity: .5; cursor: default; }
+.og-wal .og-doors > a { text-decoration: none; }
+.og-wal .og-strip b.is-dim { color: var(--text-dim); }
+.og-wal .og-strip b .is-good, .is-good { color: var(--success-fg); }
+.og-wal .og-strip b .is-low, .is-low { color: var(--accent); }
+.is-dim { color: var(--text-dim); }
+.wal-hint { margin: .7rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--text-dim); }
+.wal-para { margin: 0 0 .6rem; font-size: .95rem; line-height: 1.55; color: var(--text); }
+.wal-lead { margin: 0 0 .7rem; font-size: .95rem; line-height: 1.55; }
+.wal-empty { margin: 0; padding: .3rem 0 .8rem; font-size: .95rem; line-height: 1.55; font-weight: 600; color: var(--text-dim); }
+.wal-empty b { color: var(--text); font-weight: 800; }
+.wal-msg { display: block; margin: .4rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--success-fg); }
+.wal-msg.is-err { color: var(--accent); }
+.wal-slab-hint { display: block; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); max-width: 18rem; text-align: right; }
+.wal-label { display: block; margin: 1rem 0 .4rem; }
+.wal-box { margin-top: 1.4rem; }
+
+/* ── 01: two columns, the pace, what morsels buy ───────────────────────────────────────────── */
+.wal-flow { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.2rem; margin-top: .4rem; }
+.wal-col { border: 2px solid var(--text); background: var(--card-bg); padding: .8rem 1rem; min-width: 0; }
+.wal-col-h { display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; font-size: .9rem; font-weight: 800; margin-bottom: .5rem; }
+.wal-col-h b { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.9rem; line-height: 1; }
+.wal-col-h small { margin-left: auto; font-family: var(--font-mono); font-size: .7rem; font-weight: 400; color: var(--text-dim); }
+.wal-src { display: flex; justify-content: space-between; gap: .8rem; padding: .4rem 0; border-bottom: 1px solid var(--border); font-size: .86rem; line-height: 1.45; }
+.wal-src:last-child { border-bottom: 0; }
+.wal-src span { min-width: 0; overflow-wrap: anywhere; }
+.wal-src small { display: block; font-family: var(--font-mono); font-size: .68rem; color: var(--text-dim); }
+.wal-src b { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.15rem; white-space: nowrap; }
+.wal-pace { display: flex; align-items: center; gap: 1.2rem; margin-top: .9rem; padding: .8rem 1rem; border: 3px solid var(--text); background: var(--card-bg); font-size: .9rem; line-height: 1.55; }
+.wal-pace b { font-weight: 800; }
+.wal-bar { position: relative; flex: 0 0 15rem; height: 1.5rem; border: 2px solid var(--text); background: var(--bg); overflow: hidden; }
+.wal-bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--sun); }
+.wal-bar span { position: absolute; left: .5rem; top: 0; line-height: 1.3rem; font-family: var(--font-mono); font-size: .72rem; color: var(--text); }
+.wal-uses { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .4rem 1.2rem; font-size: .84rem; line-height: 1.5; }
+.wal-uses > div { padding: .4rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
+.wal-uses b { display: block; font-weight: 800; color: var(--text); }
+.wal-uses small { display: block; margin-top: .1rem; font-family: var(--font-mono); font-size: .68rem; color: var(--text-dim); }
+
+/* ── The rows: ledger, shares, money, rails ────────────────────────────────────────────────── */
+.wal-filters { display: flex; flex-wrap: wrap; gap: .5rem; margin: .2rem 0 .8rem; }
+.wal-filters .og-chip { cursor: pointer; background: transparent; }
+.wal-filters .og-chip.og-chip--sun { background: var(--sun); }
+.wal-rows { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, .9fr) 6.5rem auto; gap: 0 1rem; align-items: stretch; }
+.wal-rows--rails { grid-template-columns: 8rem minmax(0, 1.5fr) minmax(0, 1fr) auto; }
+.wal-row { display: contents; }
+.wal-row > div { padding: .65rem 0; border-bottom: 1px solid var(--border); min-width: 0; display: grid; align-content: center; }
+.wal-row--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.wal-row.is-open > div { border-bottom: 0; }
+.wal-row > .wal-nm { font-size: .9rem; font-weight: 800; color: var(--text); overflow-wrap: anywhere; }
+.wal-nm .og-tbl-name { font-size: .9rem; }
+.wal-nm small { display: block; margin-top: .15rem; font-family: var(--font-mono); font-size: .68rem; font-weight: 400; color: var(--text-dim); overflow-wrap: anywhere; }
+.wal-row > .wal-w { font-size: .85rem; line-height: 1.5; color: var(--text-dim); overflow-wrap: anywhere; }
+.wal-w b { color: var(--text); font-weight: 800; }
+.wal-w small { display: block; font-family: var(--font-mono); font-size: .68rem; }
+.wal-row > .wal-cur { font-family: var(--font-mono); font-size: .74rem; color: var(--text-dim); overflow-wrap: anywhere; }
+.wal-row > .wal-amt { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.35rem; line-height: 1; color: var(--text); text-align: right; white-space: nowrap; }
+.wal-row > .wal-amt.is-in { color: var(--success-fg); }
+.wal-row > .wal-amt.is-out { color: var(--accent); }
+.wal-row > .wal-amt.is-dim { color: var(--text-dim); }
+.wal-amt small { display: block; margin-top: .15rem; font-family: var(--font-mono); font-size: .66rem; font-weight: 400; color: var(--text-dim); }
+.wal-row--head > .wal-amt { font-family: inherit; font-size: .66rem; }
+.wal-row > .wal-go { display: flex; justify-content: flex-end; align-items: center; gap: .8rem; white-space: nowrap; }
+.wal-go .og-door { font-size: .72rem; }
+.wal-row > .wal-open { grid-column: 1 / -1; display: block; margin: 0 0 .6rem; padding: 1rem 1.2rem 1.1rem; border: 3px solid var(--text); box-shadow: 8px 8px 0 var(--sun); background: var(--card-bg); font-size: .9rem; line-height: 1.55; color: var(--text); }
+.wal-open .og-doors { margin-top: .9rem; }
+.wal-kv { display: grid; grid-template-columns: minmax(7rem, 10rem) minmax(0, 1fr); gap: .5rem 1.2rem; align-items: start; }
+.wal-k { font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); line-height: 1.8; padding-top: .2rem; }
+.wal-v { font-size: .9rem; line-height: 1.5; min-width: 0; overflow-wrap: anywhere; }
+.wal-v code, .wal-open code { display: inline-block; max-width: 100%; font-family: var(--font-mono); font-size: .72rem; background: var(--bg-dim); padding: .05rem .35rem; overflow-wrap: anywhere; }
+.wal-v small { display: block; font-size: .78rem; color: var(--text-dim); }
+.wal-more { margin-top: .8rem; }
+.wal-more small { font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); }
+.wal-field { display: flex; align-items: center; gap: .8rem; padding: .5rem .7rem; border: 1px dashed var(--text); background: var(--bg-dim); margin-top: .4rem; }
+.wal-field .og-input { flex: 1 1 auto; min-width: 0; }
+.wal-field .og-door { font-size: .72rem; flex: none; white-space: nowrap; }
+.wal-steps { margin: .3rem 0 0; padding-left: 1.3rem; font-size: .86rem; line-height: 1.55; }
+.wal-steps li + li { margin-top: .25rem; }
+.wal-steps a { color: var(--accent); }
+
+/* ── 03: the share figures ─────────────────────────────────────────────────────────────────── */
+.wal-share { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 2px solid var(--text); background: var(--card-bg); margin: .4rem 0 1rem; }
+.wal-share > div { padding: .8rem 1rem; border-right: 1px solid var(--border); min-width: 0; }
+.wal-share > div:last-child { border-right: 0; }
+.wal-share b { display: block; font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.7rem; line-height: 1; color: var(--text); }
+.wal-share b.wal-share-word { font-size: 1.1rem; padding-top: .3rem; }
+.wal-share span { display: block; margin-top: .25rem; font-size: .8rem; font-weight: 800; }
+.wal-share small { display: block; font-family: var(--font-mono); font-size: .68rem; color: var(--text-dim); overflow-wrap: anywhere; }
+.wal-rows--money { margin-top: .6rem; }
+
+/* ── 05: the two roads ─────────────────────────────────────────────────────────────────────── */
+.wal-roads { display: grid; grid-template-columns: 1.2fr 1fr; gap: 1.2rem; }
+.wal-road { display: flex; flex-direction: column; gap: .5rem; padding: .9rem 1.1rem; border: 2px solid var(--text); background: var(--card-bg); font-size: .9rem; line-height: 1.55; }
+.wal-road.is-lead { border-width: 3px; box-shadow: 8px 8px 0 var(--sun); }
+.wal-road p { margin: 0; }
+.wal-road small { font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); }
+.wal-road pre { margin: 0; padding: .6rem .7rem; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-mono); font-size: .74rem; line-height: 1.5; background: var(--bg-dim); border-left: 3px solid var(--text); }
+
+/* ── Phone ─────────────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 860px) {
+  .wal-flow, .wal-uses, .wal-roads { grid-template-columns: minmax(0, 1fr); }
+  .wal-share { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .wal-share > div { border-bottom: 1px solid var(--border); }
+  .wal-pace { flex-direction: column; align-items: stretch; }
+  .wal-bar { flex-basis: auto; }
+  .wal-rows, .wal-rows--rails { grid-template-columns: minmax(0, 1fr) 6rem; }
+  .wal-row--head { display: none; }
+  .wal-row > .wal-w, .wal-row > .wal-cur { grid-column: 1 / -1; padding-top: 0; border-bottom: 0; }
+  .wal-row > .wal-nm { border-bottom: 0; padding-bottom: .1rem; }
+  .wal-row > .wal-go { grid-column: 1 / -1; justify-content: flex-start; padding-top: .1rem; }
+  .wal-row > .wal-open { padding: .8rem .8rem .9rem; }
+  .wal-kv { grid-template-columns: 1fr; gap: .2rem 0; }
+  .wal-field { flex-wrap: wrap; }
+  .wal-slab-hint { text-align: left; }
+}
