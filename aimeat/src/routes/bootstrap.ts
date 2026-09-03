@@ -513,6 +513,9 @@ export function bootstrapRouter(
                 appdev: `${base}/v2/mcp/appdev — build & publish apps, extensions, cortex`,
                 service: `${base}/v2/mcp/service — provide a service / marketplace: boards, work, wallet, capabilities, organisms`,
                 admin: `${base}/v2/mcp/admin — operator/owner governance: node admin, moderation, groups, consent`,
+                commerce: `${base}/v2/mcp/commerce — selling and getting paid: priced manifests, checkout, receipts, beneficiary splits`,
+                primitives: `${base}/v2/mcp/primitives — twelve tools; everything else found with aimeat_discover and run with aimeat_invoke`,
+                full: `${base}/v2/mcp/full — everything this node offers, for work that does not fit one of the focused surfaces`,
               },
             },
             rest_api_without_mcp: {

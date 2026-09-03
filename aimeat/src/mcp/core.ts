@@ -219,13 +219,24 @@ export function registerCoreTools(
             mcp.server.sendResourceListChanged().catch(err => { logger.warn('onResourceListChanged: continuing after a suppressed failure', { error: String(err) }); });
         }
     };
+    // The owner changed what this agent may do, so the tool list it holds is stale. A client that
+    // honours the notification re-reads it and the person changes nothing by hand; one that ignores
+    // it is exactly where it was. Suppressed failure is right here for the same reason as above: a
+    // session that has gone away must not turn a permission change into an error.
+    const onToolListChanged = (evt: { agentGaii: string }) => {
+        if (evt.agentGaii === agentGaii) {
+            mcp.server.sendToolListChanged().catch(err => { logger.warn('onToolListChanged: continuing after a suppressed failure', { error: String(err) }); });
+        }
+    };
     resourceEvents.on('resource:updated', onResourceUpdated);
     resourceEvents.on('resource:listChanged', onResourceListChanged);
+    resourceEvents.on('tool:listChanged', onToolListChanged);
 
     // Clean up listeners when the MCP server closes
     mcp.server.onclose = () => {
         resourceEvents.off('resource:updated', onResourceUpdated);
         resourceEvents.off('resource:listChanged', onResourceListChanged);
+        resourceEvents.off('tool:listChanged', onToolListChanged);
     };
 
     // ── Tool 1: aimeat_catalogue_search ──

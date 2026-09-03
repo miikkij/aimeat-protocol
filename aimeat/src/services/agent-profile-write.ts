@@ -55,6 +55,7 @@ import type { AimeatConfig } from '../config.js';
 import type { AgentRecord, AgentTechnicalCapability, Storage } from '../storage/interface.js';
 import { buildGAII } from '../utils/gaii.js';
 import { emitChange } from './event-bus.js';
+import { emitToolListChanged } from '../mcp/index.js';
 import { deriveStepsForMode } from '../models/agent-onboarding-schemas.js';
 import { AgentCapabilitiesUpdateSchema } from '../models/agent-capabilities-schemas.js';
 import { inferModeFromPlatform } from './platform-detector.js';
@@ -356,6 +357,11 @@ export async function setAgentProfile(
 
     // A mode change owes the step-list re-derive whether it arrived alone or alongside a rename.
     if (normalised.updates.mode) await syncOnboardingFlowToMode(deps.storage, target.gaii, normalised.updates.mode);
+
+    // A scope change makes every open MCP session's tool list wrong, because the scopes decided
+    // which tools it registered. Said here rather than at the caller: this is the shared write, and
+    // a notification that lives at one of two doors is the half-working kind.
+    if (normalised.updates.defaultScopes) emitToolListChanged(target.gaii);
 
     emitChange('agents');
     return { ok: true, agent: updated };

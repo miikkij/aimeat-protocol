@@ -43,6 +43,7 @@ import { generateKeyPair } from '../auth/keypair.js';
 import { issueJWT } from '../auth/jwt.js';
 import { scopesForProfile } from '../mcp/catalog/scopes.js';
 import { emitChange } from './event-bus.js';
+import { emitToolListChanged } from '../mcp/index.js';
 import { logger } from '../utils/logger.js';
 
 /** The agent's name component. One place, because it appears in a GAII, a UI and a log line. */
@@ -168,6 +169,7 @@ async function repairChatScopes(
         logger.warn(`[chat] could not widen ${agent.gaii} past the old fallback scopes`);
         return held;
     }
+    emitToolListChanged(agent.gaii);
     emitChange('agents', `${agent.owner}@${config.nodeId}`);
     logger.info(`[chat] ${agent.gaii} widened from the pre-${SCOPE_FIX_DATE} fallback to ${wanted.join(', ')}`);
     return wanted;
