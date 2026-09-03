@@ -59,7 +59,8 @@ function toRecord(r: Selectable<AiProvenanceRow>): AiProvenanceRecordRow {
  * the visibility lives one table up, which is why this clause is the only one that joins.
  */
 const publiclyLinked = (idColumn: string) => sql<boolean>`(
-  EXISTS (SELECT 1 FROM "Memory" m WHERE m."aiProvenanceId" = ${sql.raw(idColumn)} AND m."visibility" = 'public')
+  EXISTS (SELECT 1 FROM "Memory" m WHERE m."aiProvenanceId" = ${sql.raw(idColumn)} AND m."visibility" = 'public'
+          AND m."deletedAt" IS NULL)
   OR EXISTS (SELECT 1 FROM "App" a WHERE a."aiProvenanceId" = ${sql.raw(idColumn)}
              AND a."parked" = false AND a."operatorHidden" = false AND a."accessCode" IS NULL)
   OR EXISTS (SELECT 1 FROM "BoardPost" bp JOIN "Board" b ON b."boardId" = bp."boardId"

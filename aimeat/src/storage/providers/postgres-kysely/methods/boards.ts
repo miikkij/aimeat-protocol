@@ -94,8 +94,19 @@ export const boardMethods = {
     } as any).returningAll().execute();
     return toPost(row);
   },
+  /**
+   * One post by id, and an expired one is gone here too — the same clause listPosts carries below.
+   *
+   * Without it a post whose lifetime had run out was gone from the board and still readable at its
+   * own address, which is ending only in the list. Filtered rather than deleted, because that is
+   * what this provider's listPosts does; the SQLite one removes the row on the read that notices,
+   * and each keeps its own habit.
+   */
   async getPost(this: PostgresKyselyStorage, boardId: string, postId: string): Promise<BoardPostRecord | null> {
-    const r = await this.db.selectFrom('BoardPost').selectAll().where('boardId', '=', boardId).where('postId', '=', postId).executeTakeFirst();
+    const r = await this.db.selectFrom('BoardPost').selectAll()
+      .where('boardId', '=', boardId).where('postId', '=', postId)
+      .where(eb => eb.or([eb('ttlExpiresAt', 'is', null), eb('ttlExpiresAt', '>', new Date())]))
+      .executeTakeFirst();
     return r ? toPost(r) : null;
   },
   async listPosts(this: PostgresKyselyStorage, boardId: string, opts?: { category?: string; cursor?: string; limit?: number }): Promise<BoardPostRecord[]> {

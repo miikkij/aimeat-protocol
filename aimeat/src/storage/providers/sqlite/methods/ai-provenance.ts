@@ -55,9 +55,14 @@ function deserialize(row: Record<string, unknown>): AiProvenanceRecordRow {
  * (all memory-backed). An app counts when it is actually served to anyone who asks: not parked, not
  * operator-hidden, and not behind an access code. A board post counts when its BOARD is public —
  * the visibility lives one table up, which is why this clause is the only one that joins.
+ *
+ * A DELETED memory record is not readable by anyone, so it cannot keep a provenance record public.
+ * The clause said `visibility = 'public'` and nothing else until 2026-09-04, so deleting the public
+ * thing left its provenance answering "yes, somebody can read this" about a row that had gone.
  */
 const PUBLICLY_LINKED = `(
-  EXISTS (SELECT 1 FROM memory m WHERE m.aiProvenanceId = p.id AND m.visibility = 'public')
+  EXISTS (SELECT 1 FROM memory m WHERE m.aiProvenanceId = p.id AND m.visibility = 'public'
+          AND m.deletedAt IS NULL)
   OR EXISTS (SELECT 1 FROM apps a WHERE a.aiProvenanceId = p.id
              AND a.parked = 0 AND a.operatorHidden = 0 AND a.accessCode IS NULL)
   OR EXISTS (SELECT 1 FROM board_posts bp JOIN boards b ON b.id = bp.boardId

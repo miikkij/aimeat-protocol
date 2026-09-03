@@ -202,11 +202,27 @@ await test('4–5. Wait 4s then list posts → expired post filtered out', async
     assert(!ids.includes(ttlPostId), `expired post still in list: ${ids}`);
 });
 
-await test('5b. TTL cleanup job DELETES the expired row (not just filters it)', async () => {
-    // The single-post GET serves an expired-but-unpruned row with 200 (it never filters TTL), which
-    // is what makes the sweep observable over HTTP: create an expired post WITHOUT listing the board
-    // (the SQLite list lazily deletes), trigger the core job as operator, and the row must be GONE.
-    // Until 2026-08-17 the Postgres backend failed this — the job read posts and deleted nothing.
+await test('5a. …and reading it BY ID is a 404 too, not only the listing', async () => {
+    // Ending only in the list is not ending. getPost had no TTL clause while listPosts did, so a
+    // post whose lifetime had run out was gone from the board and still readable at its own
+    // address — on both providers. Test 3 above proves the same read works while the post is live,
+    // so this pair says the difference is the expiry and nothing else.
+    const { status } = await json(`/v1/boards/${privateBoardId}/posts/${ttlPostId}`, {
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(status === 404, `expired post still readable by id: status ${status}`);
+});
+
+await test('5b. The TTL cleanup job runs and the expired row is gone after it', async () => {
+    // This used to read the expired post by id BEFORE the sweep and expect 200, using the
+    // single-post read's TTL-blindness as its probe: 200 then 404 meant the row had really gone
+    // rather than merely been filtered. That read now refuses an expired post — a post given a
+    // lifetime should not be readable at its own address after it ends — so the probe went with it.
+    //
+    // The delete-rather-than-filter claim moved to test/unit/board-ttl-prune.test.ts, where
+    // pruneExpiredBoardPosts is asked directly how many rows it removed. What is left here is what
+    // HTTP can still see: the job is reachable, it runs, and the post is gone afterwards.
+    // Until 2026-08-17 the Postgres backend failed the original — the job read posts and deleted nothing.
     const created = await json(`/v1/boards/${privateBoardId}/posts`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${agentToken}` },
@@ -215,11 +231,6 @@ await test('5b. TTL cleanup job DELETES the expired row (not just filters it)', 
     assert(created.status === 201, `create status ${created.status}`);
     const pruneId = created.body.data.id;
     await sleep(2000);   // 0.0004h ≈ 1.44s
-
-    const before = await json(`/v1/boards/${privateBoardId}/posts/${pruneId}`, {
-        headers: { Authorization: `Bearer ${agentToken}` },
-    });
-    assert(before.status === 200, `expired-but-unpruned row should still serve, got ${before.status}`);
 
     const trig = await json('/v1/admin/scheduler/jobs/core:board-post-ttl-cleanup/trigger', {
         method: 'POST',
