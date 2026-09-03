@@ -157,6 +157,12 @@ jobs:
         working-directory: aimeat
         run: pnpm check:audit-gates
 
+      # The numbers this repo states about itself. Cheap, and it is here because the guard-tier size
+      # was written in three places and wrong in all three for three weeks.
+      - name: Stated counts match the code (check:doc-counts)
+        working-directory: aimeat
+        run: pnpm check:doc-counts -- --strict
+
       - name: Unit tests (vitest)
         working-directory: aimeat
         run: pnpm test
@@ -171,10 +177,11 @@ jobs:
           cp .env.test.sqlite.example .env.test.sqlite
           cp .env.test.postgres-kysely.example .env.test.postgres-kysely
 
-      # THE GUARD TIER BLOCKS. Twelve suites, chosen on one question: does a failure here mean a
+      # THE GUARD TIER BLOCKS. 20 suites, chosen on one question: does a failure here mean a
       # principal can reach money, an identity, or another account's data that they must not? The
-      # list and the reason for each entry are in test/run-e2e-ci.ts (GUARD_SUITES). 323 assertions,
-      # under half a minute per backend, no continue-on-error — a red run here is a hole, and merging
+      # list and the reason for each entry are in test/run-e2e-ci.ts (GUARD_SUITES). The runner
+      # prints the assertion total (529 on 2026-09-04) and takes well under a minute per backend.
+      # No continue-on-error — a red run here is a hole, and merging
       # on top of it is the thing this repo spent August discovering it had been doing.
       - name: E2E guard tier (SQLite) — blocking
         working-directory: aimeat

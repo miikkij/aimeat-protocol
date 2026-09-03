@@ -35,6 +35,7 @@
 #  19. v2 surfaces stay projections  — pnpm check:surface-focus
 #  20. An agent writes, page hears it — pnpm check:sse-parity
 #  21. No decision written out twice  — pnpm check:copied-logic
+#  21b. Stated counts match the code  — pnpm check:doc-counts
 #  22. Published surfaces + release   — pnpm check:liaison-surface
 #  23. The vitest unit suite          — pnpm test
 #
@@ -178,6 +179,9 @@ pnpm -s check:sse-parity
 
 echo "[pre-commit] No decision is written out on two sides (check:copied-logic)…"
 pnpm -s check:copied-logic
+
+echo "[pre-commit] The counts this project states about itself (check:doc-counts)…"
+pnpm -s check:doc-counts -- --strict
 
 echo "[pre-commit] Published surfaces match, and neither needs a release (check:liaison-surface)…"
 pnpm -s check:liaison-surface
