@@ -8,6 +8,9 @@
  *   classification, forwarded-401 stop, proactive pre-expiry token reconnect,
  *   and the no-hot-loop guarantee on auth failure.
  * @version-history
+ *   v1.1.0 — 2026-09-03 — A refused `attach`: it answers rather than sitting out the request
+ *     timeout, the identity does not stay on a socket it never got on, and the refusal reaches
+ *     that one identity while the socket carries on.
  *   v1.0.0 — 2026-06-10 — Phase 3: initial coverage.
  */
 import { describe, it, expect, afterEach } from 'vitest';
@@ -40,6 +43,11 @@ interface MockServerOptions {
   closeAfterWelcome?: boolean;
   /** Custom handler for request frames; default echoes a 200. */
   onRequest?: (frame: MockFrame, ws: ServerWebSocket) => void;
+  /**
+   * How the node answers `attach`. Default accepts. Return a code to refuse with, exactly as
+   * services/connect-tunnel.ts does: an `error` frame carrying the id and the agent it refuses.
+   */
+  refuseAttach?: (frame: MockFrame) => string | null;
 }
 
 class MockTunnelServer {
@@ -107,6 +115,11 @@ class MockTunnelServer {
       if (frame.type === 'request') {
         if (this.opts.onRequest) this.opts.onRequest(frame, ws);
         else ws.send(JSON.stringify({ type: 'response', id: frame.id, status: 200, body: { ok: true, echo: frame.path } }));
+      }
+      if (frame.type === 'attach') {
+        const code = this.opts.refuseAttach?.(frame) ?? null;
+        if (code) ws.send(JSON.stringify({ type: 'error', id: frame.id, agent: frame.agent, code, message: 'That credential did not verify.' }));
+        else ws.send(JSON.stringify({ type: 'attached', id: frame.id, agent: frame.agent }));
       }
     });
   }
@@ -360,5 +373,64 @@ describe('ConnectTunnelClient', () => {
     await client.start();
     await client.close();
     await expect(client.forward('GET', '/v1/memory')).rejects.toThrow(/not connected/i);
+  });
+
+  /* ── A refused passenger ──
+     Measured on a real fleet on 2026-09-03: sixteen expired credentials on one daemon. Each was
+     recorded as riding the shared socket before the node had judged it, and nothing took it back
+     off, so every reconnect re-attempted all sixteen and logged them as agents that "could not
+     re-attach" — naming agents that were up. Nothing was knocked off, the fence held; the log
+     accused the wrong thing and that cost an afternoon. These three pin the three parts. */
+
+  it('does not wait out the request timeout when the node refuses an attach', async () => {
+    // The refusal arrives as an `error` frame, and `error` used to log and walk away — so the
+    // promise waiting on that id sat for the full 30s request_timeout_ms, once per dead
+    // credential, on every reconnect. Sixteen of them at a time on the fleet this was found on.
+    const server = await startServer({ welcome: { multiplex: true }, refuseAttach: () => 'ATTACH_UNAUTHORIZED' });
+    const { client } = makeClient(server);
+    await client.start();
+    const began = Date.now();
+    const ok = await client.attachIdentity({ gaii: 'ghost#alice@node', getToken: async () => 'dead' });
+    expect(ok).toBe(false);
+    expect(Date.now() - began).toBeLessThan(1_500);   // request_timeout_ms is 30_000
+  });
+
+  it('a refused identity is not left riding the socket, so a reconnect does not retry it', async () => {
+    const server = await startServer({ welcome: { multiplex: true }, refuseAttach: (f) => (f.agent === 'ghost#alice@node' ? 'ATTACH_UNAUTHORIZED' : null) });
+    const { client } = makeClient(server);
+    await client.start();
+    expect(await client.attachIdentity({ gaii: 'live#alice@node', getToken: async () => 'good' })).toBe(true);
+    expect(await client.attachIdentity({ gaii: 'ghost#alice@node', getToken: async () => 'dead' })).toBe(false);
+    // identityCount() counts the socket's own identity plus its passengers. The refused one is
+    // not a passenger: it never got on.
+    expect(client.identityCount()).toBe(2);
+
+    const before = server.framesOfType('attach').length;
+    server.sockets[server.sockets.length - 1].terminate();   // an abrupt drop, not a graceful close
+    await waitFor(() => client.getConnectCount() >= 2, 4_000);
+    await waitFor(() => server.framesOfType('attach').length > before, 4_000);
+    await sleep(120);
+    const reattached = server.framesOfType('attach').slice(before).map(f => f.agent);
+    expect(reattached).toContain('live#alice@node');
+    expect(reattached).not.toContain('ghost#alice@node');
+  });
+
+  it('a refusal reaches that identity alone, and the socket carries on', async () => {
+    const failures: string[] = [];
+    const server = await startServer({ welcome: { multiplex: true }, refuseAttach: (f) => (f.agent === 'ghost#alice@node' ? 'ATTACH_UNAUTHORIZED' : null) });
+    const { client } = makeClient(server);
+    await client.start();
+    await client.attachIdentity({ gaii: 'live#alice@node', getToken: async () => 'good' });
+    await client.attachIdentity({
+      gaii: 'ghost#alice@node',
+      getToken: async () => 'dead',
+      onAuthFailure: (msg: string) => failures.push(msg),
+    });
+    expect(failures).toHaveLength(1);
+    expect(failures[0]).toMatch(/ATTACH_UNAUTHORIZED/);
+    // The whole point of the fence: one dead credential is not the other forty-eight's problem.
+    expect(client.isOnline()).toBe(true);
+    const res = await client.forward('GET', '/v1/memory', {}, 'live#alice@node');
+    expect(res.status).toBe(200);
   });
 });
