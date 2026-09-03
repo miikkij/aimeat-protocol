@@ -1,0 +1,113 @@
+/**
+ * @file skills-poster.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The Skills page in the poster face (sk- prefix; design canvas "AIMEAT Taidot-sivu",
+ *   direction A). The shared parts come from organism.css's og- rules; this file carries what the
+ *   page adds: the three shelves as rows (name, what it teaches, whom it serves, the doors), the
+ *   panel that opens under a row with its facts, the agent picker, the visibility doors, the file
+ *   list and the SKILL.md fold, the filter chips and the search line, the two roads to a new skill
+ *   with the editor, and the AI rule box.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-03 — Initial (replaces the .pf-skl-* rules in profile.css).
+ */
+
+.og-skills .og-door:disabled { opacity: .5; cursor: default; }
+.og-skills .og-door.is-on { background: var(--sun); border-color: var(--sun); color: var(--on-sun); }
+.og-skills .og-strip b.is-coral { color: var(--accent); }
+.sk-hint { margin: .7rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--text-dim); }
+.sk-para { margin: 0 0 .6rem; font-size: .95rem; line-height: 1.55; color: var(--text); }
+.sk-empty { margin: 0; padding: .3rem 0 .6rem; font-size: .95rem; line-height: 1.55; font-weight: 600; color: var(--text-dim); }
+.sk-empty b { color: var(--text); font-weight: 800; }
+.sk-linkbtn { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; }
+.sk-dim { color: var(--text-dim); font-size: .8em; }
+.sk-danger { color: var(--accent); border-color: var(--accent); }
+.is-warn { color: var(--accent); }
+
+/* ── Filters and the search line ───────────────────────────────────────────────────────────── */
+.sk-facets { display: flex; flex-wrap: wrap; gap: .45rem; margin: .6rem 0 .3rem; }
+.sk-facet { font-family: var(--font-mono); font-size: .72rem; padding: .15rem .55rem; border: 1px solid var(--text); background: var(--card-bg); color: var(--text); cursor: pointer; line-height: 1.5; }
+.sk-facet em { font-style: normal; color: var(--text-dim); margin-left: .35rem; }
+.sk-facet.is-on { background: var(--sun); border-color: var(--sun); color: var(--on-sun); }
+.sk-facet.is-on em { color: var(--on-sun); opacity: .75; }
+.sk-search { display: flex; align-items: center; gap: 1rem; margin: .8rem 0 .6rem; }
+.sk-search .og-input { flex: 1 1 auto; min-width: 0; }
+.sk-search small { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); white-space: nowrap; }
+
+/* ── The shelves: skill, what it teaches, whom it serves, the doors; a panel under one row ──── */
+.sk-pl { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr) minmax(9rem, .9fr) auto; gap: 0 .9rem; align-items: stretch; }
+.sk-p { display: contents; }
+.sk-p > div { padding: .7rem 0; border-bottom: 1px solid var(--border); min-width: 0; display: grid; align-content: center; }
+.sk-p--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.sk-p.is-open > div { border-bottom: 0; }
+.sk-p > .sk-nm { display: block; align-self: center; font-size: .95rem; font-weight: 800; color: var(--text); overflow-wrap: anywhere; }
+.sk-nm small { display: block; margin-top: .15rem; font-family: var(--font-mono); font-size: .7rem; font-weight: 400; color: var(--text-dim); }
+.sk-nm small.is-warn { color: var(--accent); }
+.sk-tag { display: inline-block; margin-left: .45rem; padding: .05rem .4rem; border: 1px solid var(--border); font-family: var(--font-mono); font-size: .66rem; font-weight: 500; color: var(--text-dim); vertical-align: middle; }
+.sk-p > .sk-ds { display: block; align-self: center; font-size: .85rem; line-height: 1.5; color: var(--text-dim); }
+.sk-p > .sk-me { display: block; align-self: center; font-size: .85rem; font-weight: 600; line-height: 1.5; color: var(--text); overflow-wrap: anywhere; }
+.sk-me small { display: block; font-family: var(--font-mono); font-size: .7rem; font-weight: 400; color: var(--text-dim); }
+.sk-me .og-crumb-link { font-size: inherit; font-weight: 600; }
+.sk-p > .sk-go { display: flex; justify-content: flex-end; align-items: center; gap: .8rem; white-space: nowrap; }
+.sk-go .og-door { font-size: .72rem; }
+.sk-p > .sk-open { grid-column: 1 / -1; display: block; margin: 0 0 .4rem; padding: 1rem 1.2rem 1.1rem; border: 3px solid var(--text); box-shadow: 8px 8px 0 var(--sun); background: var(--card-bg); font-size: .9rem; line-height: 1.55; color: var(--text); }
+.sk-lead { margin: 0 0 .5rem; font-size: .95rem; line-height: 1.55; }
+.sk-open code { display: inline-block; max-width: 100%; margin: .1rem 0; font-family: var(--font-mono); font-size: .74rem; background: var(--bg-dim); padding: .1rem .35rem; overflow-wrap: anywhere; }
+.sk-open-doors { margin-top: 1rem; }
+.sk-mdlabel { display: block; margin-top: .9rem; }
+
+/* ── The facts under an opened row ─────────────────────────────────────────────────────────── */
+.sk-kv { display: grid; grid-template-columns: minmax(7rem, 10rem) minmax(0, 1fr); gap: .7rem 1.2rem; align-items: start; margin-top: .8rem; }
+.sk-kv--wide { grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr); margin-top: 1rem; }
+.sk-k { font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); padding-top: .25rem; }
+.sk-v { font-size: .9rem; line-height: 1.5; color: var(--text); min-width: 0; overflow-wrap: anywhere; }
+.sk-v small { display: block; margin-top: .15rem; font-size: .8rem; line-height: 1.45; color: var(--text-dim); }
+.sk-v .og-crumb-link { font-size: inherit; }
+.sk-vis { margin-top: .4rem; align-items: center; }
+.sk-vis .og-door { font-size: .72rem; }
+.sk-vis .sk-hint { margin: 0; }
+.sk-picker { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; margin-top: .5rem; }
+.sk-picker .og-input { max-width: 18rem; }
+.sk-check { display: inline-flex; align-items: center; gap: .4rem; font-size: .85rem; }
+.sk-files { display: grid; grid-template-columns: minmax(0, 1fr) 6rem; gap: 0 .8rem; font-family: var(--font-mono); font-size: .74rem; line-height: 1.5; }
+.sk-files > div { padding: .2rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
+.sk-files .sk-r { text-align: right; color: var(--text-dim); }
+.sk-more { display: flex; align-items: center; gap: 1rem; margin-top: .8rem; }
+.sk-more small { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
+
+/* ── The SKILL.md with a fold ──────────────────────────────────────────────────────────────── */
+.sk-md { position: relative; margin-top: .4rem; padding: .8rem 1rem; border: 2px solid var(--border); background: var(--card-bg); max-height: 22rem; overflow: hidden; font-size: .9rem; line-height: 1.6; }
+.sk-md.is-full { max-height: none; }
+.sk-fade { position: absolute; left: 0; right: 0; bottom: 0; height: 6rem; background: linear-gradient(to bottom, transparent, var(--card-bg) 70%); }
+.sk-fade .og-door { position: absolute; left: 1rem; bottom: .8rem; }
+
+/* ── The two roads to a new skill ──────────────────────────────────────────────────────────── */
+.sk-roads { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; margin-top: .6rem; }
+.sk-road { padding: .9rem 1rem 1rem; border: 2px solid var(--text); background: var(--card-bg); min-width: 0; }
+.sk-road--lead { border-width: 3px; box-shadow: 6px 6px 0 var(--sun); }
+.sk-road-t { display: block; margin-bottom: .4rem; font-family: var(--font-display, var(--font-heading)); font-size: 1.05rem; text-transform: uppercase; letter-spacing: .02em; color: var(--text); }
+.sk-pre { margin: .5rem 0 .7rem; padding: .6rem .8rem; background: var(--bg-dim); font-family: var(--font-mono); font-size: .74rem; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text); }
+.sk-editor { width: 100%; box-sizing: border-box; font-family: var(--font-mono); font-size: .76rem; line-height: 1.5; margin: .3rem 0 .6rem; }
+.sk-editor-doors { align-items: center; }
+.sk-editor-doors .og-door { font-size: .72rem; }
+
+/* ── The rule an AI gets ───────────────────────────────────────────────────────────────────── */
+.sk-rule { margin: .6rem 0 .2rem; padding: .9rem 1.1rem; border: 3px solid var(--text); background: var(--card-bg); }
+.sk-rule .og-label { display: block; margin-bottom: .3rem; }
+.sk-rule .sk-para { margin-bottom: .6rem; }
+.sk-kv--wide code { display: inline-block; margin-top: .3rem; font-family: var(--font-mono); font-size: .74rem; background: var(--bg-dim); padding: .1rem .35rem; }
+
+/* ── Phone ─────────────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 860px) {
+  .sk-search { flex-wrap: wrap; }
+  .sk-pl { grid-template-columns: minmax(0, 1fr); }
+  .sk-p--head > div { display: none; }
+  .sk-p > .sk-nm, .sk-p > .sk-ds, .sk-p > .sk-me { border-bottom: 0; padding-bottom: .15rem; }
+  .sk-p > .sk-ds, .sk-p > .sk-me { padding-top: 0; }
+  .sk-p > .sk-go { justify-content: flex-start; padding-top: .1rem; flex-wrap: wrap; }
+  .sk-kv, .sk-kv--wide { grid-template-columns: 1fr; gap: .3rem 0; }
+  .sk-k { padding-top: .6rem; }
+  .sk-roads { grid-template-columns: 1fr; }
+  .sk-picker .og-input { max-width: none; width: 100%; }
+}

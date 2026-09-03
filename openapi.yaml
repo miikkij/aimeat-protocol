@@ -33906,6 +33906,14 @@ paths:
           in: query
           schema:
             type: string
+        - name: include
+          in: query
+          description: >-
+            `links`: each library skill also carries `linkedBy`, the caller's own agents that
+            hold a ref to it (a pinned ref keeps its `@version`).
+          schema:
+            type: string
+            enum: [links]
         - name: binding
           in: query
           description: Filter to skills bound to one app (app:{owner}/{filename}); overrides scope
@@ -34003,6 +34011,48 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: setSkillVisibility
+      summary: Change a skill's visibility without a republish
+      description: >-
+        Set who may read a node- or user-scope skill (owner, members, public). The manifest and
+        its file records take the new visibility; the registry version stays and no snapshot is
+        written. An owner changes their own user-scope skills; node scope is the operator's.
+        A workspace skill is always workspace-visible and is refused here.
+      tags: [Skills]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: scope
+          in: query
+          schema:
+            type: string
+            enum: [node, user]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [visibility]
+              properties:
+                visibility:
+                  type: string
+                  enum: [owner, members, public]
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':

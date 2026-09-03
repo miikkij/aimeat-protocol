@@ -52,8 +52,19 @@ unretained pin fails loud with "not retained"). Pin registry-linked skills on
 production-critical consumers; leave shared/curated surfaces on latest.
 
 **Agent attachment:** links live at memory key `agents.{name}.skills` as **refs, never
-copies** — owners link in the agent's Data Access tab; agents/operators via
-`aimeat_skill_link`. Consumers resolve fresh content at load time.
+copies** — owners link in the agent's Data Access tab or from the skill's opened row on the
+profile Skills page; agents/operators via `aimeat_skill_link`. Consumers resolve fresh content
+at load time. `GET /v1/skills?include=links` returns each library skill with `linkedBy`, the
+caller's own agents that hold its ref (a pinned ref keeps its `@version`).
+
+**Versions and visibility:** resolving a skill returns `versions`, the retained snapshots a
+pin can name. Visibility changes **without a republish**: `PATCH /v1/skills/{name}?scope=user`
+with `{ visibility }` (node scope for operators; `aimeat_skill_update` over MCP) — the version
+stays and no snapshot is written. Publishing is still the only way to change the text.
+
+**Retiring a skill:** name the successor in the frontmatter, `metadata.superseded_by: user:alice/new-name`
+(a ref or a bare name); the registry mirrors it to `supersededBy`, and the Skills page lists
+the skill as replaced instead of leaving the fact in the description.
 
 ## App-bound skills (`binding`) — how and why
 

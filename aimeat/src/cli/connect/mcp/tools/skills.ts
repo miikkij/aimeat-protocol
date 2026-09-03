@@ -9,6 +9,8 @@
  *   inline-only — the local runtime has the files at hand, so presigned ZIP upload is not
  *   needed (that mode lives on the server MCP surface).
  * @version-history
+ *   v1.1.0 -- 2026-09-03 -- aimeat_skill_update proxies PATCH /v1/skills/:name (visibility without
+ *     a republish).
  *   v1.0.0 -- 2026-07-05 -- Initial: Phase 2a registry tools (node + user scopes).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -96,6 +98,17 @@ export function registerSkillsTools(mcp: McpServer, registry: AgentRegistry): vo
   }, annotationsFor('aimeat_skill_unlink'), async ({ ref, agent_name }) => {
     const { client, agent } = pickAgent(registry, agent_name);
     const resp = await client.delete(`/v1/agents/${encodeURIComponent(agent)}/skills?ref=${encodeURIComponent(ref)}`);
+    return json(resp.data ?? resp);
+  });
+
+  mcp.tool('aimeat_skill_update', descriptionFor('aimeat_skill_update'), {
+    name: z.string().describe('The skill name (the bare name from its frontmatter).'),
+    visibility: z.enum(['owner', 'members', 'public']).describe('Who may read it from now on.'),
+    scope: z.enum(['user', 'node']).optional().describe('Which registry the skill is in (default user, your owner\'s own).'),
+    agent_name: agentNameSchema,
+  }, annotationsFor('aimeat_skill_update'), async ({ name, visibility, scope, agent_name }) => {
+    const { client } = pickAgent(registry, agent_name);
+    const resp = await client.patch(`/v1/skills/${encodeURIComponent(name)}?scope=${scope ?? 'user'}`, { visibility });
     return json(resp.data ?? resp);
   });
 }

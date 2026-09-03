@@ -344,6 +344,17 @@ await test('10. manifest_only skips bodies', async () => {
     assert(Object.keys(body.data.skill.fileContents).length === 0, 'no bodies');
 });
 
+await test('10b. Resolve lists the retained versions a pin can name (two after one republish)', async () => {
+    const { status, body } = await json(`/v1/skills/research-briefs?scope=user&owner=${ownerName}&manifest_only=true`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `status ${status}`);
+    const versions = body.data.skill.versions;
+    assert(Array.isArray(versions), `versions: ${JSON.stringify(versions)}`);
+    assert(versions.map((v: any) => v.version).join(',') === '1.0.0,1.0.1', `versions: ${JSON.stringify(versions)}`);
+    assert(versions.every((v: any) => typeof v.publishedAt === 'string' && v.publishedAt.length > 0), 'each version carries publishedAt');
+});
+
 await test('11. Owner B cannot read A\'s owner-visibility skill', async () => {
     const { status } = await json(`/v1/skills/research-briefs?scope=user&owner=${ownerName}`, {
         headers: { Authorization: `Bearer ${otherOwnerToken}` },
@@ -366,6 +377,85 @@ await test('12. Public skill is readable cross-owner', async () => {
     assert(body.data.skill.ref === `user:${ownerName}/shared-wisdom`, 'ref');
 });
 
+// The visibility door (2026-09-03). Before it, the only way to make a skill readable to others was
+// a republish, which bumped the version and wrote a snapshot for a change that touched no text.
+await test('12b. PATCH changes visibility without a republish: the version stays, and owner B can now read', async () => {
+    const before = await json(`/v1/skills/research-briefs?scope=user&owner=${ownerName}&manifest_only=true`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    const versionBefore = before.body.data.skill.version;
+    const { status, body } = await json('/v1/skills/research-briefs?scope=user', {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ visibility: 'members' }),
+    });
+    assert(status === 200, `patch status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.skill.visibility === 'members', `visibility ${body.data.skill.visibility}`);
+    assert(body.data.skill.version === versionBefore, `version moved: ${versionBefore} -> ${body.data.skill.version}`);
+    const read = await json(`/v1/skills/research-briefs?scope=user&owner=${ownerName}`, {
+        headers: { Authorization: `Bearer ${otherOwnerToken}` },
+    });
+    assert(read.status === 200, `owner B read status ${read.status}`);
+    assert(typeof read.body.data.skill.fileContents?.['SKILL.md'] === 'string', 'the file record took the new visibility too');
+    const after = await json(`/v1/skills/research-briefs?scope=user&owner=${ownerName}&manifest_only=true`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(after.body.data.skill.versions.length === before.body.data.skill.versions.length, 'no snapshot was written');
+    const back = await json('/v1/skills/research-briefs?scope=user', {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ visibility: 'owner' }),
+    });
+    assert(back.status === 200 && back.body.data.skill.visibility === 'owner', 'restored to owner');
+});
+
+await test('12c. Owner B cannot change A\'s skill (404, the owner comes from the session), a workspace scope is refused (400), a bad value is a 400', async () => {
+    const other = await json('/v1/skills/research-briefs?scope=user', {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${otherOwnerToken}` },
+        body: JSON.stringify({ visibility: 'public' }),
+    });
+    assert(other.status === 404, `other owner status ${other.status}`);
+    const still = await json(`/v1/skills/research-briefs?scope=user&owner=${ownerName}`, {
+        headers: { Authorization: `Bearer ${otherOwnerToken}` },
+    });
+    assert(still.status === 403 || still.status === 404, `A's skill is still private: ${still.status}`);
+    const ws = await json('/v1/skills/research-briefs?scope=workspace', {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ visibility: 'public' }),
+    });
+    assert(ws.status === 400, `workspace scope status ${ws.status}`);
+    const bad = await json('/v1/skills/research-briefs?scope=user', {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ visibility: 'everyone' }),
+    });
+    assert(bad.status === 400, `bad value status ${bad.status}`);
+});
+
+await test('12d. metadata.superseded_by is validated and mirrored as supersededBy', async () => {
+    const good = SKILL_MD.replace('research-briefs', 'old-briefs').replace('  tags: research, writing\n', `  tags: research, writing\n  superseded_by: user:${ownerName}/research-briefs\n`);
+    const pub = await json('/v1/skills', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ skill_md: good }),
+    });
+    assert(pub.status === 201, `publish status ${pub.status}: ${JSON.stringify(pub.body)}`);
+    assert(pub.body.data.skill.supersededBy === `user:${ownerName}/research-briefs`, `supersededBy: ${pub.body.data.skill.supersededBy}`);
+    const lib = await json('/v1/skills', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const row = lib.body.data.library.user.find((s: any) => s.name === 'old-briefs');
+    assert(row?.supersededBy === `user:${ownerName}/research-briefs`, 'the listing carries it too');
+    const bad = SKILL_MD.replace('research-briefs', 'old-briefs').replace('  tags: research, writing\n', '  tags: research, writing\n  superseded_by: "not a ref!"\n');
+    const rej = await json('/v1/skills', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ skill_md: bad }),
+    });
+    assert(rej.status === 422, `bad superseded_by status ${rej.status}`);
+    await json('/v1/skills/old-briefs?scope=user', { method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` } });
+});
+
 // ─── Phase 3: Agent linking (the crewaimeat consumer read) ───
 console.log('\nPhase 3 -- Agent linking');
 
@@ -378,6 +468,17 @@ await test('13. Owner links a skill to the agent', async () => {
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.data.links.length === 1, 'one link');
     assert(body.data.links[0].ref === `user:${ownerName}/research-briefs`, 'ref stored');
+});
+
+await test('13b. The library with include=links says which agent holds the ref', async () => {
+    const { status, body } = await json('/v1/skills?include=links', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(status === 200, `status ${status}`);
+    const row = body.data.library.user.find((s: any) => s.name === 'research-briefs');
+    assert(row, 'the skill is in the library');
+    assert(Array.isArray(row.linkedBy) && row.linkedBy.some((l: any) => l.agent === agentName), `linkedBy: ${JSON.stringify(row.linkedBy)}`);
+    const plain = await json('/v1/skills', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const plainRow = plain.body.data.library.user.find((s: any) => s.name === 'research-briefs');
+    assert(plainRow.linkedBy === undefined, 'without include=links the listing stays lean');
 });
 
 await test('14. Linking is idempotent per ref', async () => {
@@ -569,6 +670,17 @@ await test('26. aimeat_skill_link + unlink round-trip', async () => {
     const unlink = await mcpRpc('tools/call', { name: 'aimeat_skill_unlink', arguments: { ref: `user:${ownerName}/zipped-skill` } }, 107);
     const unlinkData = toolText(unlink.body);
     assert(!(unlinkData.links ?? []).some((l: any) => l.ref === `user:${ownerName}/zipped-skill`), 'unlinked');
+});
+
+await test('26c. aimeat_skill_update changes visibility over MCP, and the version stays', async () => {
+    const got = toolText((await mcpRpc('tools/call', { name: 'aimeat_skill_get', arguments: { ref: `user:${ownerName}/zipped-skill`, manifest_only: true } }, 108)).body);
+    const before = got.skill ?? got;
+    const upd = await mcpRpc('tools/call', { name: 'aimeat_skill_update', arguments: { name: 'zipped-skill', visibility: 'members' } }, 109);
+    const data = toolText(upd.body);
+    assert(data.updated === true && data.skill?.visibility === 'members', `update: ${JSON.stringify(data)}`);
+    assert(typeof before.version === 'string' && data.skill.version === before.version, `version moved: ${before.version} -> ${data.skill.version}`);
+    const ws = await mcpRpc('tools/call', { name: 'aimeat_skill_update', arguments: { name: 'no-such-skill-here', visibility: 'public' } }, 110);
+    assert(ws.body?.result?.isError === true, 'an unknown skill is an error, not a silent no-op');
 });
 
 // ─── Phase 5: Node scope (operator-gated) ───

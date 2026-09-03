@@ -32,6 +32,12 @@
  * @usage
  *   import { publishSkill, resolveSkillRef, listSkillLibrary } from '../services/skills.js';
  * @version-history
+ *   v1.3.0 -- 2026-09-03 -- What the Skills page needed the registry to say (design canvas "AIMEAT
+ *     Taidot-sivu"): setSkillVisibility() changes who may read a skill without a republish (no
+ *     version bump, no snapshot); resolve carries `versions`, the retained snapshots a pin can
+ *     name; the library carries `linkedBy` (the owner's agents holding the ref) on request and
+ *     `builtin` on node skills the seeder stamped; frontmatter metadata.superseded_by is validated
+ *     and mirrored to manifest.supersededBy, so a retired skill is a fact and not a sentence.
  *   v1.2.0 -- 2026-07-06 -- @{semver} ref pins (immutable per-version snapshots, newest 10 kept)
  *     + 2d app bindings (frontmatter metadata.binding -> manifest.binding, listSkillsByBinding).
  *   v1.1.0 -- 2026-07-06 -- Phase 2c: workspace scope (ws:{org}/{ws}/{name} refs, membership gate,
@@ -44,104 +50,20 @@ import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { validateSkillFiles, SkillValidationError, SKILL_NAME_RE } from './skill-md.js';
 import { canReadWorkspace } from './workspace-access.js';
 
-// ── Refs & scopes ──
-
-export type SkillScope = 'node' | 'user' | 'workspace';
-
-export interface SkillRef {
-  scope: SkillScope;
-  /** Bare owner name — only for user scope. */
-  owner?: string;
-  /** Organism + workspace ids — only for workspace scope. */
-  org?: string;
-  ws?: string;
-  name: string;
-  /** Version pin (`…@1.2.0`) — resolves the retained snapshot instead of latest. */
-  version?: string;
-}
-
-const USER_REF_RE = /^user:([a-z0-9][a-z0-9_-]*)\/([a-z0-9][a-z0-9-]*)$/;
-const NODE_REF_RE = /^node:([a-z0-9][a-z0-9-]*)$/;
-const WS_REF_RE = /^ws:([A-Za-z0-9-]+)\/([A-Za-z0-9-]+)\/([a-z0-9][a-z0-9-]*)$/;
-const PIN_RE = /^(.+)@(\d+\.\d+\.\d+)$/;
-
-export function parseSkillRef(refStr: string): SkillRef | null {
-  let version: string | undefined;
-  let base = refStr;
-  const pin = refStr.match(PIN_RE);
-  if (pin) { base = pin[1]; version = pin[2]; }
-  let ref: SkillRef | null = null;
-  let m = base.match(NODE_REF_RE);
-  if (m && SKILL_NAME_RE.test(m[1])) ref = { scope: 'node', name: m[1] };
-  if (!ref) {
-    m = base.match(USER_REF_RE);
-    if (m && SKILL_NAME_RE.test(m[2])) ref = { scope: 'user', owner: m[1], name: m[2] };
-  }
-  if (!ref) {
-    m = base.match(WS_REF_RE);
-    if (m && SKILL_NAME_RE.test(m[3])) ref = { scope: 'workspace', org: m[1], ws: m[2], name: m[3] };
-  }
-  if (ref && version) ref.version = version;
-  return ref;
-}
-
-export function formatSkillRef(ref: SkillRef): string {
-  const pin = ref.version ? `@${ref.version}` : '';
-  if (ref.scope === 'node') return `node:${ref.name}${pin}`;
-  if (ref.scope === 'workspace') return `ws:${ref.org}/${ref.ws}/${ref.name}${pin}`;
-  return `user:${ref.owner}/${ref.name}${pin}`;
-}
-
-/** The GHII a scope's records are stored under (node/user; workspace records are member-GHII-owned). */
-export function scopeOwnerGhii(config: AimeatConfig, scope: SkillScope, owner?: string): string {
-  return scope === 'node' ? `system@${config.nodeId}` : `${owner}@${config.nodeId}`;
-}
-
-/**
- * The SKILL.md a node-scope skill currently holds, or null when there is none.
- *
- * Here rather than in the caller because the key convention lives here: skill-seeds.ts has to
- * compare what the node holds against what the repo ships, and a second copy of
- * `skills.{name}.files.SKILL.md` in another file is a second place for that convention to drift.
- */
-export async function readNodeSkillBody(
-  storage: Storage, config: AimeatConfig, name: string,
-): Promise<string | null> {
-  const ownerGaii = scopeOwnerGhii(config, 'node');
-  if (!await storage.getMemory(ownerGaii, manifestKey(name))) return null;
-  const file = await storage.getMemory(ownerGaii, fileKey(name, 'SKILL.md'));
-  return file ? String(file.value) : null;
-}
-
-const manifestKey = (name: string): string => `skills.${name}.manifest`;
-const filePrefix = (name: string): string => `skills.${name}.files.`;
-const fileKey = (name: string, path: string): string => `${filePrefix(name)}${path}`;
-
-// Immutable per-version snapshots ({ manifest, files }) written on every publish so
-// `ref@{semver}` pins resolve exactly what was approved; pruned to the newest N.
-const VERSION_SNAPSHOTS_KEPT = 10;
-const versionPrefix = (name: string): string => `skills.${name}.versions.`;
-const versionKey = (name: string, v: string): string => `${versionPrefix(name)}${v}`;
-const wsVersionPrefix = (org: string, ws: string, name: string): string => `organism.${org}.w.${ws}.skills.${name}.versions.`;
-const wsVersionKey = (org: string, ws: string, name: string, v: string): string => `${wsVersionPrefix(org, ws, name)}${v}`;
+// The addresses (ref grammar, scope owner, key conventions) live in skill-refs.ts since 2026-09-03.
+import {
+  parseSkillRef, formatSkillRef, scopeOwnerGhii,
+  manifestKey, filePrefix, fileKey, VERSION_SNAPSHOTS_KEPT, versionPrefix, versionKey,
+  wsVersionPrefix, wsVersionKey, BINDING_RE, wsManifestKey, wsFilePrefix, wsFileKey,
+  MANIFEST_KEY_RE, WS_MANIFEST_KEY_RE, type SkillScope, type SkillRef,
+} from './skill-refs.js';
+export { parseSkillRef, formatSkillRef, scopeOwnerGhii, readNodeSkillBody, type SkillScope, type SkillRef } from './skill-refs.js';
 
 interface SkillVersionSnapshot {
   manifest: SkillManifestValue;
   files: Record<string, string>;
 }
 
-/** Binding target for 2d app-bound skills: app:{ownerName}/{filename}. */
-const BINDING_RE = /^app:[a-z0-9][a-z0-9_-]*\/[A-Za-z0-9._-]+$/;
-
-// Workspace scope: keys live under the workspace prefix (so they ride workspace
-// export/import/templates), OWNED by the publishing member's GHII (the organism
-// content-ownership invariant: keyed organism.*, owned by member GHII).
-const wsManifestKey = (org: string, ws: string, name: string): string => `organism.${org}.w.${ws}.skills.${name}.manifest`;
-const wsFilePrefix = (org: string, ws: string, name: string): string => `organism.${org}.w.${ws}.skills.${name}.files.`;
-const wsFileKey = (org: string, ws: string, name: string, path: string): string => `${wsFilePrefix(org, ws, name)}${path}`;
-
-const MANIFEST_KEY_RE = /^skills\.([a-z0-9-]+)\.manifest$/;
-const WS_MANIFEST_KEY_RE = /^organism\.([^.]+)\.w\.([^.]+)\.skills\.([a-z0-9-]+)\.manifest$/;
 
 // ── Stored shapes ──
 
@@ -157,6 +79,10 @@ export interface SkillManifestValue {
   /** 2d: the app this skill teaches, `app:{owner}/{filename}` — copied up from
    *  frontmatter metadata.binding for cheap filtering. */
   binding?: string;
+  /** The skill that replaces this one — copied up from frontmatter metadata.superseded_by
+   *  (a ref such as `user:alice/new-name`, or a bare name in the same registry), so the
+   *  registry knows a skill is retired instead of the reader having to spot it in prose. */
+  supersededBy?: string;
   /** File index (paths + sizes) — bodies live in the per-file records, never here. */
   files: Array<{ path: string; size: number }>;
   /** GAII/GHII that performed the (last) publish. */
@@ -181,6 +107,13 @@ export interface SkillSummary {
   metadata?: Record<string, unknown>;
   /** 2d: app binding, when the skill teaches a specific app. */
   binding?: string;
+  /** The skill that replaces this one, when it is retired (frontmatter metadata.superseded_by). */
+  supersededBy?: string;
+  /** Node scope: shipped with this build and kept in step by the seeder (a stamp record exists). */
+  builtin?: boolean;
+  /** Library view with links: the accessor's own agents that link this skill, with the ref they
+   *  hold (a pinned ref keeps its `@version`). */
+  linkedBy?: Array<{ agent: string; ref: string }>;
   visibility: MemoryRecord['visibility'];
   files: Array<{ path: string; size: number }>;
   updatedAt: string;
@@ -189,6 +122,8 @@ export interface SkillSummary {
 export interface ResolvedSkill extends SkillSummary {
   /** path -> content (utf-8). Present when resolve loads bodies. */
   fileContents: Record<string, string>;
+  /** The retained version snapshots, oldest first; a `@version` pin resolves any of these. */
+  versions: Array<{ version: string; publishedAt: string }>;
 }
 
 /** Who is asking — null accessor = anonymous/unauthenticated. */
@@ -230,6 +165,7 @@ function toSummary(record: MemoryRecord, scope: SkillScope, owner: string | null
   if (v.compatibility) summary.compatibility = v.compatibility;
   if (v.metadata) summary.metadata = v.metadata;
   if (v.binding) summary.binding = v.binding;
+  if (v.supersededBy) summary.supersededBy = v.supersededBy;
   return summary;
 }
 
@@ -323,6 +259,14 @@ export async function publishSkill(
       'metadata.binding must be "app:{owner}/{filename}" (lowercase owner, the app file name)');
   }
 
+  // A retired skill names its successor the same way: in its own frontmatter, so the fact travels
+  // with the file. A ref or a bare name; nothing else, since a reader will paste it into a load.
+  const supersededBy = parsed.frontmatter.metadata?.superseded_by;
+  if (supersededBy !== undefined && (typeof supersededBy !== 'string' || !(parseSkillRef(supersededBy) || SKILL_NAME_RE.test(supersededBy)))) {
+    throw new SkillValidationError('BAD_FIELD',
+      'metadata.superseded_by must be a skill ref (node:{name}, user:{owner}/{name}, ws:{org}/{ws}/{name}) or a bare skill name');
+  }
+
   const isWs = opts.scope === 'workspace';
   let org = '', ws = '';
   if (isWs) {
@@ -394,6 +338,7 @@ export async function publishSkill(
   if (parsed.frontmatter.compatibility) manifest.compatibility = parsed.frontmatter.compatibility;
   if (parsed.frontmatter.metadata) manifest.metadata = parsed.frontmatter.metadata;
   if (typeof binding === 'string') manifest.binding = binding;
+  if (typeof supersededBy === 'string') manifest.supersededBy = supersededBy;
 
   const ownExisting = await storage.getMemory(ownerGaii, mKey);
   const record = await storage.setMemory({
@@ -505,10 +450,17 @@ export async function listSkills(
   if (scope === 'user' && !skillOwner) return [];
   const ownerGaii = scopeOwnerGhii(config, scope, skillOwner);
   const records = await storage.listMemory(ownerGaii, { prefix: 'skills.', tags: ['skill'] });
-  return records
+  const summaries = records
     .filter(r => MANIFEST_KEY_RE.test(r.key))
     .filter(r => mayRead(r, scope, skillOwner ?? null, accessor))
     .map(r => toSummary(r, scope, skillOwner ?? null));
+  if (scope === 'node' && summaries.length > 0) {
+    // The seeder leaves a stamp beside every skill it wrote; a stamped skill came with the build.
+    const stamps = await storage.listMemory(ownerGaii, { prefix: 'skills.', tags: ['skill-seed'] });
+    const seeded = new Set(stamps.map(s => s.key.replace(/^skills\.([a-z0-9-]+)\.seeded-from-repo$/, '$1')));
+    for (const s of summaries) if (seeded.has(s.name)) s.builtin = true;
+  }
+  return summaries;
 }
 
 /**
@@ -540,6 +492,29 @@ export async function listSkillsByBinding(
  * agent knows which scopes it is working with and what is available to load.
  */
 export async function listSkillLibrary(
+  storage: Storage, config: AimeatConfig, accessor: SkillAccessor,
+  opts: { links?: boolean } = {},
+): Promise<{ node: SkillSummary[]; user: SkillSummary[]; workspace: SkillSummary[] }> {
+  const library = await listSkillLibraryPlain(storage, config, accessor);
+  if (opts.links && accessor.ownerName) {
+    // Which of the owner's agents hold a ref to each skill. One keyed read per agent; a pinned
+    // ref (`…@1.0.2`) counts for the skill it pins and keeps its pin in the answer.
+    const agents = (await storage.listAgents()).filter(a => a.owner === accessor.ownerName);
+    const byRef = new Map<string, SkillSummary>();
+    for (const s of [...library.node, ...library.user, ...library.workspace]) byRef.set(s.ref, s);
+    for (const agent of agents) {
+      const links = await getAgentSkillLinks(storage, config, accessor.ownerName, agent.name);
+      for (const link of links) {
+        const skill = byRef.get(link.ref.replace(/@\d+\.\d+\.\d+$/, ''));
+        if (!skill) continue;
+        (skill.linkedBy ??= []).push({ agent: agent.name, ref: link.ref });
+      }
+    }
+  }
+  return library;
+}
+
+async function listSkillLibraryPlain(
   storage: Storage, config: AimeatConfig, accessor: SkillAccessor,
 ): Promise<{ node: SkillSummary[]; user: SkillSummary[]; workspace: SkillSummary[] }> {
   const node = await listSkills(storage, config, 'node', accessor);
@@ -602,7 +577,8 @@ export async function resolveSkillRef(
         if (rec) fileContents[f.path] = String(rec.value);
       }
     }
-    return { ...summary, fileContents };
+    const versions = retainedVersions(await listAcrossOwners(storage, wsVersionPrefix(org!, ws!, name)), wsVersionPrefix(org!, ws!, name));
+    return { ...summary, fileContents, versions };
   }
 
   const skillOwner = ref.scope === 'user' ? ref.owner! : null;
@@ -625,7 +601,17 @@ export async function resolveSkillRef(
       if (rec) fileContents[f.path] = String(rec.value);
     }
   }
-  return { ...summary, fileContents };
+  const versions = retainedVersions(await storage.listMemory(ownerGaii, { prefix: versionPrefix(ref.name) }), versionPrefix(ref.name));
+  return { ...summary, fileContents, versions };
+}
+
+/** The retained snapshots under a version prefix as (version, publishedAt), oldest first. */
+function retainedVersions(records: MemoryRecord[], prefix: string): Array<{ version: string; publishedAt: string }> {
+  const semver = (v: string) => v.split('.').map(Number);
+  return records
+    .filter(r => r.key.startsWith(prefix) && /^\d+\.\d+\.\d+$/.test(r.key.slice(prefix.length)))
+    .map(r => ({ version: r.key.slice(prefix.length), publishedAt: String(r.createdAt) }))
+    .sort((a, b) => { const [a1, a2, a3] = semver(a.version); const [b1, b2, b3] = semver(b.version); return (a1 - b1) || (a2 - b2) || (a3 - b3); });
 }
 
 /** Resolve a version pin from its retained snapshot. The live manifest record has already
@@ -645,7 +631,31 @@ async function resolvePinned(
     ref.scope, ref.scope === 'user' ? ref.owner! : null, ref.org, ref.ws,
   );
   summary.ref = formatSkillRef(ref);
-  return { ...summary, fileContents: opts.manifestOnly ? {} : files };
+  const prefix = snapshotKey.slice(0, snapshotKey.length - ref.version!.length);
+  const versions = retainedVersions(await storage.listMemory(liveManifest.ownerGaii, { prefix }), prefix);
+  return { ...summary, fileContents: opts.manifestOnly ? {} : files, versions };
+}
+
+/**
+ * Change a skill's visibility without a republish: the manifest and its file records take the
+ * new visibility, the registry version stays, no snapshot is written. Node and user scopes only;
+ * a workspace skill is always workspace-visible. The caller decides who may (own user skill;
+ * node scope for operators).
+ */
+export async function setSkillVisibility(
+  storage: Storage, config: AimeatConfig, scope: 'node' | 'user', name: string,
+  visibility: 'owner' | 'members' | 'public', owner?: string,
+): Promise<SkillSummary | null> {
+  const ownerGaii = scopeOwnerGhii(config, scope, owner);
+  const manifest = await storage.getMemory(ownerGaii, manifestKey(name));
+  if (!manifest) return null;
+  const now = new Date().toISOString();
+  const files = await storage.listMemory(ownerGaii, { prefix: filePrefix(name) });
+  for (const f of files) {
+    await storage.setMemory({ ...f, visibility, version: f.version + 1, updatedAt: now });
+  }
+  const record = await storage.setMemory({ ...manifest, visibility, version: manifest.version + 1, updatedAt: now });
+  return toSummary(record, scope, scope === 'user' ? (owner ?? null) : null);
 }
 
 // ── Agent attachment (links are refs, never copies) ──

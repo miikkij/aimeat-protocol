@@ -2,36 +2,37 @@
  * @file skills-tab.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Profile Skills tab — manage the owner's user-scope skills registry
- *   (SKILL.md packs: create/edit, visibility, delete) and browse the node-wide
- *   skill library. Skills are a dedicated system, distinct from knowledge packages;
- *   agents consume them by ref via the Agents view / crew runtimes.
- * @structure
- *   - SkillsTab (default export) — loads the library, renders My skills + Node library
- *   - SkillRow — one manifest row with expand-to-view + edit/delete actions
- *   - editor panel — SKILL.md textarea + visibility select -> POST /v1/skills
- * @usage registered in views/profile.js TABS as id 'skills'
+ * @description Profile tab: the owner's shelf of expertise. Every SKILL.md pack the owner can load
+ *   (their own, this server's library, their workspaces') from GET /v1/skills?include=links, each
+ *   row saying whom it serves: the app it is bound to, the agents holding its ref, or nobody in
+ *   particular. This file is the state and the handlers (open a skill, copy its ref, download the
+ *   zip, change visibility in place, attach to or detach from an agent, edit, remove, publish);
+ *   the render is skills/page.js and skills/rows.js. splitSkillMd is re-exported for the admin
+ *   Skills tab and the workspace skills panel, which import it from here.
+ * @structure SkillsTab() — state (library, apps, orgs, details, filters, editor, picker) + handlers → renderPage(ctx)
+ * @usage registered in profile.js TABS as id 'skills'
  * @version-history
+ *   v2.0.0 — 2026-09-03 — Poster face (design canvas "AIMEAT Taidot-sivu", direction A with the
+ *     Kenelle column): three shelves with facets and search instead of three bare lists; the app
+ *     and the agents a skill serves on every row; the opened row with the version-locked ref, the
+ *     versions kept, visibility changed without a republish, attach to an agent, the SKILL.md
+ *     folded; the request to ask your own AI for a skill beside the editor; the agent's rule.
  *   v1.0.0 -- 2026-07-05 -- Initial creation (Skills feature Phase 2b)
  */
-import { h } from 'preact';
-import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
-import htm from 'htm';
-import { onLiveUpdate } from '/lib/live-updates.js';
+import { useState, useEffect, useCallback } from 'preact/hooks';
 import { t } from '/js/i18n.js';
-import { Spinner, VisibilityPill } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
-import { Markdown } from '/components/Markdown.js';
+import { getNodeUrl, getSession } from '/js/services/auth.js';
+import { onLiveUpdate } from '/lib/live-updates.js';
+import { swallowed } from '/js/swallowed.js';
 import * as skillsService from '/js/services/skills.js';
+import { listApps } from '/js/services/apps.js';
+import { listAgents } from '/js/services/agents.js';
+import { listOrganisms } from '/js/services/organisms.js';
+import { renderPage } from './skills/page.js';
+import { x, splitSkillMd, bindingFile } from './skills/frame.js';
 
-import { EmptyState } from '/components/EmptyState.js';
-const html = htm.bind(h);
-
-/** Split a SKILL.md into its YAML frontmatter (shown as code) and markdown body (rendered). */
-export function splitSkillMd(md) {
-  const m = String(md ?? '').match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
-  return m ? { frontmatter: m[1], body: m[2] } : { frontmatter: '', body: String(md ?? '') };
-}
+export { splitSkillMd };
 
 const SKILL_TEMPLATE = `---
 name: my-skill
@@ -43,197 +44,150 @@ description: What this skill does and when an agent should use it.
 Write the expertise here. This markdown body is injected into an agent's prompt on activation.
 `;
 
-export default function SkillsTab({ showToast }) {
+const emptyFilter = () => ({ who: '', vis: '', recent: false, replaced: false, builtin: false });
+const emptyEditor = () => ({ open: false, editing: '', md: SKILL_TEMPLATE, visibility: 'owner', publishing: false });
+
+export default function SkillsTab({ session, showToast }) {
+  const sess = session || getSession();
+  const ownerName = sess?.owner || '';
   const { confirm, ConfirmUI } = useConfirm();
-  const [library, setLibrary] = useState({ node: [], user: [], workspace: [] });
-  const [loading, setLoading] = useState(true);
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [editorMd, setEditorMd] = useState(SKILL_TEMPLATE);
-  const [editorVisibility, setEditorVisibility] = useState('owner');
-  const [publishing, setPublishing] = useState(false);
-  const [expanded, setExpanded] = useState(null);       // ref of the expanded skill
-  const [expandedSkill, setExpandedSkill] = useState(null);
+  const [library, setLibrary] = useState(null);
+  const [apps, setApps] = useState({});
+  const [orgs, setOrgs] = useState({});
+  const [agentCount, setAgentCount] = useState(null);
+  const [details, setDetails] = useState({});
+  const [fullText, setFullText] = useState({});
+  const [expanded, setExpanded] = useState(null);
+  const [picker, setPicker] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [filters, setFilters] = useState({ own: emptyFilter(), node: emptyFilter(), ws: emptyFilter() });
+  const [queries, setQueries] = useState({ own: '', node: '', ws: '' });
+  const [shown, setShownState] = useState({ own: 20, node: 20, ws: 20 });
+  const [editor, setEditorState] = useState(emptyEditor());
 
-  const loadLibrary = useCallback(async ({ showSpinner = true } = {}) => {
-    if (showSpinner) setLoading(true);
+  const fail = (e, fallback) => showToast?.(e?.error?.message || e?.response?.error?.message || e?.message || fallback || t('profile.error'), true);
+
+  const load = useCallback(async () => {
     try {
-      const lib = await skillsService.getLibrary();
-      setLibrary(lib);
-    } catch (err) {
-      showToast(t('skills.loadFailed') + ': ' + err.message, true);
-    } finally {
-      setLoading(false);
-    }
-  }, [showToast]);
+      setLibrary(await skillsService.getLibrary({ links: true }));
+    } catch (e) { swallowed('skills: library', e); setLibrary({ node: [], user: [], workspace: [] }); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => onLiveUpdate(['skills', 'agents'], load), [load]);
 
-  useEffect(() => { loadLibrary(); }, [loadLibrary]);
+  // The names behind the Kenelle column: an app's title for its file name, an organism's name
+  // for its id, and how many agents the owner has. Each is one read, and none blocks the list.
+  useEffect(() => {
+    listApps().then((list) => {
+      const map = {};
+      for (const a of list || []) map[a.filename] = a.title || a.manifest?.name || a.filename;
+      setApps(map);
+    }).catch((e) => swallowed('skills: apps', e));
+    listAgents(ownerName).then((list) => setAgentCount((list || []).length)).catch((e) => swallowed('skills: agents', e));
+    listOrganisms().then((list) => {
+      const map = {};
+      for (const o of list || []) map[o.id] = o.name;
+      setOrgs(map);
+    }).catch((e) => swallowed('skills: organisms', e));
+  }, [ownerName]);
 
-  const loadRef = useRef(loadLibrary);
-  loadRef.current = loadLibrary;
-  useEffect(() => onLiveUpdate(['skills'], () => { loadRef.current({ showSpinner: false }); }), []);
-
-  const handlePublish = async () => {
-    setPublishing(true);
+  const loadDetail = async (s) => {
     try {
-      const skill = await skillsService.publishSkill({ skillMd: editorMd, visibility: editorVisibility });
-      showToast(t('skills.publishOk').replace('{name}', skill?.name ?? ''));
-      setEditorOpen(false);
-      setEditorMd(SKILL_TEMPLATE);
-      await loadLibrary({ showSpinner: false });
-    } catch (err) {
-      showToast(t('skills.publishFailed') + ': ' + err.message, true);
-    } finally {
-      setPublishing(false);
-    }
+      const d = await skillsService.getSkill(s.name, { scope: s.scope, owner: s.owner ?? undefined, organism: s.org, ws: s.ws });
+      if (d) setDetails((m) => ({ ...m, [s.ref]: d }));
+      return d;
+    } catch (e) { swallowed('skills: detail', e); return null; }
+  };
+  const toggle = (s) => {
+    if (expanded === s.ref) { setExpanded(null); setPicker(null); return; }
+    setExpanded(s.ref); setPicker(null);
+    if (!details[s.ref]) loadDetail(s);
+  };
+  const showFull = (s) => setFullText((m) => ({ ...m, [s.ref]: true }));
+
+  /* ── Doors ───────────────────────────────────────────────────────────────────────────────── */
+  const download = async (s) => {
+    try {
+      await skillsService.downloadSkillZip(s.name, { scope: s.scope, owner: s.owner ?? undefined, organism: s.org, ws: s.ws });
+      showToast?.(x('zipToast'));
+    } catch (e) { fail(e); }
+  };
+  const setVisibility = async (s, visibility) => {
+    setBusy(true);
+    try {
+      const r = await skillsService.setSkillVisibility(s.name, s.scope, visibility);
+      if (r && r.ok === false) { fail(r); return; }
+      showToast?.(x('visibilityToast', { name: s.name }));
+      load();
+    } catch (e) { fail(e); } finally { setBusy(false); }
+  };
+  const openPicker = async (s) => {
+    if (picker && picker.ref === s.ref) { setPicker(null); return; }
+    try {
+      const agents = (await listAgents(ownerName)) || [];
+      const holding = new Set((s.linkedBy || []).map((l) => l.agent));
+      setPicker({ ref: s.ref, agents: agents.map((a) => a.name).filter((n) => !holding.has(n)), selected: '', pin: false });
+    } catch (e) { fail(e); }
+  };
+  const pickAgent = (selected) => setPicker((p) => (p ? { ...p, selected } : p));
+  const pickPin = (pin) => setPicker((p) => (p ? { ...p, pin } : p));
+  const link = async (s) => {
+    if (!picker?.selected) return;
+    setBusy(true);
+    try {
+      await skillsService.linkSkill(picker.selected, picker.pin ? `${s.ref}@${s.version}` : s.ref);
+      showToast?.(x('attachedToast', { name: s.name, agent: picker.selected }));
+      setPicker(null);
+      load();
+    } catch (e) { fail(e); } finally { setBusy(false); }
+  };
+  const unlink = async (s, agent, ref) => {
+    setBusy(true);
+    try {
+      await skillsService.unlinkSkill(agent, ref);
+      showToast?.(x('detachedToast', { name: s.name, agent }));
+      load();
+    } catch (e) { fail(e); } finally { setBusy(false); }
+  };
+  const remove = async (s) => {
+    confirm(x('confirmRemove', { name: s.name }), async () => {
+      try {
+        await skillsService.deleteSkill(s.name, s.scope);
+        if (expanded === s.ref) setExpanded(null);
+        showToast?.(x('removedToast', { name: s.name }));
+        load();
+      } catch (e) { fail(e); }
+    }, { title: x('remove'), danger: true });
   };
 
-  const handleEdit = async (skill) => {
+  /* ── The editor: a new skill, or one of the owner's own opened for editing ─────────────── */
+  const setEditor = (patch) => setEditorState((e) => ({ ...e, ...patch }));
+  const openEditor = () => setEditorState({ ...emptyEditor(), open: true });
+  const closeEditor = () => setEditorState(emptyEditor());
+  const edit = async (s) => {
+    const d = details[s.ref] || await loadDetail(s);
+    setEditorState({ open: true, editing: s.name, md: d?.fileContents?.['SKILL.md'] ?? SKILL_TEMPLATE, visibility: s.visibility === 'public' ? 'public' : s.visibility === 'members' ? 'members' : 'owner', publishing: false });
+    document.getElementById('sk-new')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+  const publish = async () => {
+    setEditor({ publishing: true });
     try {
-      const full = await skillsService.getSkill(skill.name, { scope: skill.scope, owner: skill.owner ?? undefined });
-      setEditorMd(full?.fileContents?.['SKILL.md'] ?? SKILL_TEMPLATE);
-      setEditorVisibility(skill.visibility === 'public' ? 'public' : skill.visibility === 'members' ? 'members' : 'owner');
-      setEditorOpen(true);
-      (document.querySelector('.page-content') || window).scrollTo({ top: 0, behavior: 'smooth' });
-    } catch (err) {
-      showToast(t('skills.loadFailed') + ': ' + err.message, true);
-    }
+      const skill = await skillsService.publishSkill({ skillMd: editor.md, visibility: editor.visibility });
+      showToast?.(x('publishedToast', { name: skill?.name ?? '' }));
+      setEditorState(emptyEditor());
+      setDetails((m) => { const n = { ...m }; if (skill?.ref) delete n[skill.ref]; return n; });
+      load();
+    } catch (e) { fail(e); setEditor({ publishing: false }); }
   };
 
-  const handleDelete = (skill) => {
-    confirm(
-      t('skills.deleteConfirmBody').replace('{name}', skill.name),
-      async () => {
-        try {
-          await skillsService.deleteSkill(skill.name, skill.scope);
-          showToast(t('skills.deletedOk').replace('{name}', skill.name));
-          if (expanded === skill.ref) { setExpanded(null); setExpandedSkill(null); }
-          await loadLibrary({ showSpinner: false });
-        } catch (err) {
-          showToast(t('skills.deleteFailed') + ': ' + err.message, true);
-        }
-      },
-      { title: t('skills.deleteConfirmTitle'), danger: true },
-    );
+  const ctx = {
+    nodeUrl: getNodeUrl(), ownerName, showToast, ConfirmUI,
+    library, apps, orgs, agentCount, details, fullText, expanded, picker, busy, filters, queries, shown, editor,
+    setFilter: (key, patch) => { setFilters((f) => ({ ...f, [key]: { ...f[key], ...patch } })); setShownState((s) => ({ ...s, [key]: 20 })); },
+    setQuery: (key, q) => { setQueries((m) => ({ ...m, [key]: q })); setShownState((s) => ({ ...s, [key]: 20 })); },
+    setShown: (key, n) => setShownState((s) => ({ ...s, [key]: n })),
+    toggle, showFull, download, setVisibility, openPicker, pickAgent, pickPin, link, unlink, remove,
+    setEditor, openEditor, closeEditor, edit, publish, bindingFile,
   };
-
-  const handleToggleView = async (skill) => {
-    if (expanded === skill.ref) { setExpanded(null); setExpandedSkill(null); return; }
-    try {
-      const full = await skillsService.getSkill(skill.name, { scope: skill.scope, owner: skill.owner ?? undefined });
-      setExpanded(skill.ref);
-      setExpandedSkill(full);
-    } catch (err) {
-      showToast(t('skills.loadFailed') + ': ' + err.message, true);
-    }
-  };
-
-  const handleDownload = async (skill) => {
-    try {
-      await skillsService.downloadSkillZip(skill.name, { scope: skill.scope, owner: skill.owner ?? undefined, organism: skill.org, ws: skill.ws });
-      showToast(t('skills.zipDownloaded'));
-    } catch (err) {
-      showToast(t('skills.zipFailed') + ': ' + err.message, true);
-    }
-  };
-
-  const renderRow = (skill, { editable }) => html`
-    <div key=${skill.ref} class="pf-skl-row">
-      <div class="pf-skl-row-main">
-        <span class="pf-skl-name">${skill.name}</span>
-        <span class="pf-skl-version">v${skill.version}</span>
-        <${VisibilityPill} visibility=${skill.visibility} />
-        <span class="pf-skl-files">${skill.files?.length ?? 1} ${t('skills.filesLabel')}</span>
-        <span class="pf-skl-actions">
-          <button class="btn-ghost btn-sm" title=${t('skills.zipHint')} onClick=${() => handleDownload(skill)}>${t('skills.zipBtn')}</button>
-          <button class="btn-ghost btn-sm" onClick=${() => handleToggleView(skill)}>
-            ${expanded === skill.ref ? t('skills.hide') : t('skills.view')}
-          </button>
-          ${editable && html`
-            <button class="btn-ghost btn-sm" onClick=${() => handleEdit(skill)}>${t('common.edit') || 'Edit'}</button>
-            <button class="btn-ghost btn-sm pf-skl-danger" onClick=${() => handleDelete(skill)}>${t('common.delete')}</button>
-          `}
-        </span>
-      </div>
-      <div class="pf-skl-desc">${skill.description}</div>
-      ${expanded === skill.ref && expandedSkill && (() => {
-        const { frontmatter, body } = splitSkillMd(expandedSkill.fileContents?.['SKILL.md']);
-        return html`
-          <div class="pf-skl-detail">
-            <div class="pf-skl-detail-ref">${skill.ref}</div>
-            ${frontmatter && html`<pre class="pf-skl-frontmatter">${frontmatter}</pre>`}
-            <div class="pf-skl-body-md"><${Markdown} text=${body} /></div>
-            ${(expandedSkill.files ?? []).filter(f => f.path !== 'SKILL.md').map(f => html`
-              <div key=${f.path} class="pf-skl-file-row">${f.path} · ${f.size} B</div>
-            `)}
-          </div>
-        `;
-      })()}
-    </div>
-  `;
-
-  return html`
-    <div class="pf-skl">
-      <${ConfirmUI} />
-      <div class="section-title">${t('skills.title')}</div>
-      <div class="section-desc">${t('skills.desc')}</div>
-
-      <div class="pf-skl-section">
-        <div class="pf-skl-section-header">
-          <span class="pf-skl-section-title">${t('skills.mySkills')}</span>
-          <button class="btn-primary btn-sm" onClick=${() => { setEditorMd(SKILL_TEMPLATE); setEditorVisibility('owner'); setEditorOpen(!editorOpen); }}>
-            + ${t('skills.newSkill')}
-          </button>
-        </div>
-
-        ${editorOpen && html`
-          <div class="pf-skl-editor">
-            <textarea class="pf-skl-editor-md" rows="22" value=${editorMd}
-                      onInput=${(e) => setEditorMd(e.target.value)}
-                      placeholder=${t('skills.editorPlaceholder')}></textarea>
-            <div class="pf-skl-editor-actions">
-              <label>${t('skills.visibilityLabel')}</label>
-              <select value=${editorVisibility} onChange=${(e) => setEditorVisibility(e.target.value)}>
-                <option value="owner">${t('skills.visibilityOwner')}</option>
-                <option value="members">${t('skills.visibilityMembers')}</option>
-                <option value="public">${t('skills.visibilityPublic')}</option>
-              </select>
-              <button class="btn-primary btn-sm" disabled=${publishing} onClick=${handlePublish}>
-                ${publishing ? t('skills.publishing') : t('skills.publish')}
-              </button>
-              <button class="btn-outline btn-sm" onClick=${() => setEditorOpen(false)}>${t('common.cancel')}</button>
-            </div>
-            <div class="pf-skl-editor-hint">${t('skills.editorHint')}</div>
-          </div>
-        `}
-
-        ${loading ? html`<${Spinner} />` : (
-          library.user.length === 0
-            ? html`<${EmptyState} text=${t('skills.emptyMine')} />`
-            : library.user.map(s => renderRow(s, { editable: true }))
-        )}
-      </div>
-
-      <div class="pf-skl-section">
-        <div class="pf-skl-section-header">
-          <span class="pf-skl-section-title">${t('skills.nodeLibrary')}</span>
-        </div>
-        <div class="pf-skl-section-hint">${t('skills.nodeLibraryHint')}</div>
-        ${loading ? null : (
-          library.node.length === 0
-            ? html`<${EmptyState} text=${t('skills.emptyNode')} />`
-            : library.node.map(s => renderRow(s, { editable: false }))
-        )}
-      </div>
-
-      ${!loading && (library.workspace ?? []).length > 0 && html`
-        <div class="pf-skl-section">
-          <div class="pf-skl-section-header">
-            <span class="pf-skl-section-title">${t('skills.workspaceSkills')}</span>
-          </div>
-          <div class="pf-skl-section-hint">${t('skills.workspaceSkillsHint')}</div>
-          ${library.workspace.map(s => renderRow(s, { editable: false }))}
-        </div>
-      `}
-    </div>
-  `;
+  return renderPage(ctx);
 }
