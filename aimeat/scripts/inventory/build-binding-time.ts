@@ -17,6 +17,7 @@ import { writeFileSync, mkdirSync, readdirSync, statSync, readFileSync } from 'n
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tdzClosures, handlerArity } from './binding-time.js';
+import { srcProgram } from './program.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const AIMEAT = resolve(HERE, '..', '..');
@@ -33,16 +34,8 @@ function browserFiles(dir: string, acc: ts.SourceFile[] = []): ts.SourceFile[] {
     return acc;
 }
 
-function serverFiles(): ts.SourceFile[] {
-    const config = ts.readConfigFile(join(AIMEAT, 'tsconfig.json'), ts.sys.readFile);
-    const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, AIMEAT);
-    const program = ts.createProgram(parsed.fileNames, { ...parsed.options, noEmit: true });
-    program.getTypeChecker(); // sets node.parent
-    return program.getSourceFiles().filter(f => !f.isDeclarationFile && f.fileName.includes('/src/'));
-}
-
 function main(): void {
-    const server = serverFiles();
+    const server = srcProgram().files;
     const browser = [...browserFiles(join(AIMEAT, 'public', 'views')), ...browserFiles(join(AIMEAT, 'public', 'js'))];
     const all = [...server, ...browser];
 
