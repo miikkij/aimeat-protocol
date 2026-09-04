@@ -98,7 +98,7 @@ Components AIMEAT changed rather than copied verbatim: **world-atlas (Natural Ea
 
 ## Production dependencies
 
-The 434 npm packages that travel inside the `aimeat` package. Build and test
+The 437 npm packages that travel inside the `aimeat` package. Build and test
 tools are not listed: they do not ship, so they carry no obligation for you.
 
 | Package | Version | Licence |
@@ -124,8 +124,11 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [@jitl/quickjs-wasmfile-debug-sync](https://github.com/justjake/quickjs-emscripten#readme) | 0.32.0 | MIT |
 | [@jitl/quickjs-wasmfile-release-asyncify](https://github.com/justjake/quickjs-emscripten#readme) | 0.32.0 | MIT |
 | [@jitl/quickjs-wasmfile-release-sync](https://github.com/justjake/quickjs-emscripten#readme) | 0.32.0 | MIT |
+| [@modelcontextprotocol/client](https://modelcontextprotocol.io) | 2.0.0 | MIT |
+| [@modelcontextprotocol/core](https://modelcontextprotocol.io) | 2.0.0 | MIT |
 | [@modelcontextprotocol/ext-apps](https://github.com/modelcontextprotocol/ext-apps) | 1.7.5 | MIT |
 | [@modelcontextprotocol/sdk](https://modelcontextprotocol.io) | 1.30.0 | MIT |
+| [@modelcontextprotocol/server](https://modelcontextprotocol.io) | 2.0.0 | MIT |
 | [@noble/ciphers](https://paulmillr.com/noble/) | 1.3.0 | MIT |
 | [@noble/ed25519](https://paulmillr.com/noble/) | 3.2.0 | MIT |
 | [@noble/hashes](https://paulmillr.com/noble/) | 1.8.0 | MIT |
@@ -1014,7 +1017,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### @modelcontextprotocol/ext-apps 1.7.5
+### @modelcontextprotocol/client 2.0.0, @modelcontextprotocol/core 2.0.0, @modelcontextprotocol/ext-apps 1.7.5, @modelcontextprotocol/server 2.0.0
 
 ```text
 The MCP project is undergoing a licensing transition from the MIT License to the Apache License, Version 2.0 ("Apache-2.0"). All new code and specification contributions to the project are licensed under Apache-2.0. Documentation contributions (excluding specifications) are licensed under CC-BY-4.0.
