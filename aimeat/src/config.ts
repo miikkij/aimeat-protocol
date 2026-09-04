@@ -53,6 +53,7 @@
 import { deriveAppHost, derivePortfolioHost, deriveCoHost } from './config-hosts.js';
 import { parseSiteContacts } from './config-site-contacts.js';
 import { securityDoorDefaults } from './config-security.js';
+import { accountSecurityDefaults } from './config-types-account-security.js';
 import { seoDefaults } from './config-site-presence.js';
 import { loadFileSource } from './services/config-loader.js';
 import { CONFIG_FIELDS, DOT_PATH_TO_ENV } from './services/config-schema.js';
@@ -378,15 +379,9 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     accountEventWindow: parseInt(process.env.AIMEAT_ACCOUNT_EVENT_WINDOW ?? '100', 10),
     executionLogRetentionDays: parseInt(process.env.AIMEAT_EXECUTION_LOG_RETENTION_DAYS ?? '30', 10),
     consentMaxPerUser: parseInt(process.env.AIMEAT_CONSENT_MAX_PER_USER ?? '100', 10),
-    totpEnabled: process.env.AIMEAT_TOTP_ENABLED !== 'false',
-    totpIssuer: process.env.AIMEAT_TOTP_ISSUER ?? 'AIMEAT',
-    totpPeriod: parseInt(process.env.AIMEAT_TOTP_PERIOD ?? '30', 10),
-    totpWindow: parseInt(process.env.AIMEAT_TOTP_WINDOW ?? '1', 10),
-    totpBackupCodeCount: parseInt(process.env.AIMEAT_TOTP_BACKUP_CODE_COUNT ?? '10', 10),
-    totpSecretEncryptionKey: process.env.AIMEAT_TOTP_ENCRYPTION_KEY ?? null,
-    totpMaxFailedAttempts: parseInt(process.env.AIMEAT_TOTP_MAX_FAILED ?? '5', 10),
-    totpLockoutSeconds: parseInt(process.env.AIMEAT_TOTP_LOCKOUT_SECONDS ?? '300', 10),
-    encryptionKey: process.env.AIMEAT_ENCRYPTION_KEY ?? null,
+    // Two-step sign-in, passkeys, and the key that encrypts what they store at rest. The relying
+    // party id is derived from the address this node believes it has, which is why baseUrl goes in.
+    ...accountSecurityDefaults(resolvedBaseUrl, (process.env.AIMEAT_SEO_SITE_NAME ?? 'AIMEAT').trim()),
     msmInstallRole: (process.env.AIMEAT_MSM_INSTALL_ROLE as 'operator' | 'owner') || 'owner',
     extInstallRole: (process.env.AIMEAT_EXT_INSTALL_ROLE as 'operator' | 'owner') || 'owner',
     // TEST ONLY: register a fake EUR/USD payment handler so the priced-raw-call money chain can be

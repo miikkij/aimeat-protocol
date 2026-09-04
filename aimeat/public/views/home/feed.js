@@ -94,6 +94,14 @@ export function line(item) {
       return d.title
         ? tr('home.feed.taskFailedTitled', '{agent} could not finish: {title}').replace('{agent}', d.agent || '').replace('{title}', d.title)
         : tr('home.feed.taskFailed', '{agent} could not finish a task.').replace('{agent}', d.agent || '');
+    case 'passkey_added':
+      return d.label
+        ? tr('home.feed.passkeyAddedNamed', 'You added the passkey {name}.').replace('{name}', d.label)
+        : tr('home.feed.passkeyAdded', 'You added a passkey.');
+    case 'passkey_removed':
+      return d.label
+        ? tr('home.feed.passkeyRemovedNamed', 'You removed the passkey {name}.').replace('{name}', d.label)
+        : tr('home.feed.passkeyRemoved', 'You removed a passkey.');
     case 'two_factor_armed':
       return tr('home.feed.twoFactorArmed', 'You turned on two-step sign-in.');
     case 'two_factor_removed':
@@ -206,7 +214,8 @@ export function kindCategory(kind) {
   if (['payment_received', 'payment_sent', 'checkout_completed', 'app_tool_paid', 'ai_spend_daily',
     'contract_started', 'contract_ended'].includes(k)) return 'money';
   if (['consent_granted', 'consent_revoked', 'app_granted', 'app_revoked', 'organism_joined',
-    'organism_left', 'organism_member_joined', 'two_factor_armed', 'two_factor_removed'].includes(k)) return 'access';
+    'organism_left', 'organism_member_joined', 'two_factor_armed', 'two_factor_removed',
+    'passkey_added', 'passkey_removed'].includes(k)) return 'access';
   return 'system';
 }
 

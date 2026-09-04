@@ -31,6 +31,7 @@
  *   - authHeaders: Authorization header for a raw fetch (empty object when signed out)
  *   - onAuthChange: subscribe to real session changes, returns unsubscribe
  *   - logout/showLoginModal/updateSessionMeta: the lifecycle actions a view may trigger
+ *   - passkeySupported/addPasskey: the passkey ceremony, run by the auth lib
  *   - getProfile/updateProfile/changePassword: the current user's GHII profile
  *
  * @usage
@@ -153,6 +154,32 @@ export function showLoginModal(opts) {
   if (!a || typeof a.showLoginModal !== 'function') return false;
   a.showLoginModal(opts || {});
   return true;
+}
+
+/**
+ * Can this browser do passkeys at all? A view shows the "add this device" control only when it can,
+ * because an offer that cannot be taken is worse than no offer.
+ * @returns {boolean}
+ */
+export function passkeySupported() {
+  const a = lib();
+  return !!(a && typeof a.passkeySupported === 'function' && a.passkeySupported());
+}
+
+/**
+ * Add THIS device to the signed-in account: runs the WebAuthn ceremony in the auth lib, which is
+ * the same code the sign-in modal runs for the other half of the flow, and returns the stored
+ * passkey as the node describes it.
+ *
+ * Throws with code PASSKEY_CANCELLED when the person closed the device prompt, which a caller
+ * should treat as "they changed their mind" rather than as a failure to show in red.
+ * @param {string} [label]
+ * @returns {Promise<object>}
+ */
+export async function addPasskey(label) {
+  const a = lib();
+  if (!a || typeof a.addPasskey !== 'function') throw new Error('Passkeys are not available here');
+  return a.addPasskey(label);
 }
 
 /**

@@ -10,9 +10,11 @@
  *   - getAgentCors / setAgentCors: per-agent CORS allowed origins
  *   - listSessions / revokeSession / revokeAllSessions: active session management
  *   - totpSetup / totpVerify / totpDisable / totpRegenerateBackupCodes: two-step sign-in
+ *   - listPasskeys / renamePasskey / deletePasskey: the devices that can sign in
  *   - loadAll(agents): aggregates GHII CORS + all agents' CORS in one call
  *
  * @version-history
+ *   v1.3.0 — 2026-09-04 — The three passkey calls. The ceremony stays in the auth lib.
  *   v1.2.0 — 2026-09-04 — The four TOTP calls, and two_factor carried through the overview. The
  *     routes had been live since July with nothing in the SPA reaching them.
  *   v1.1.0 — 2026-08-24 — The overview carries managed_by through (BR-04): the field was served
@@ -95,6 +97,29 @@ export async function totpDisable({ code, backupCode }) {
 /** Mint a fresh set of backup codes. The old ones stop working the moment this returns. */
 export async function totpRegenerateBackupCodes(code) {
   return api('/v1/ghii/totp/backup-codes', { method: 'POST', body: JSON.stringify({ code }) });
+}
+
+// ── Passkeys ──
+// The ceremony itself is not here: adding a device goes through AIMEAT.auth.addPasskey(), the same
+// browser code the sign-in modal runs, so the WebAuthn plumbing has one home. What is left is the
+// three plain reads and writes around it.
+
+/** The devices that can sign in as this person, and whether this node offers passkeys at all. */
+export async function listPasskeys() {
+  const data = await apiGet('/v1/ghii/passkeys');
+  return data?.data || { passkeys: [], count: 0, available: false };
+}
+
+/** Rename one. Scoped to the caller's own account by the route. */
+export async function renamePasskey(id, label) {
+  return api('/v1/ghii/passkeys/' + encodeURIComponent(id), {
+    method: 'PATCH', body: JSON.stringify({ label }),
+  });
+}
+
+/** Take a device away. */
+export async function deletePasskey(id) {
+  return api('/v1/ghii/passkeys/' + encodeURIComponent(id), { method: 'DELETE' });
 }
 
 /**

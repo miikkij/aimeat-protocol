@@ -34,7 +34,7 @@
  * Change domain → the scope a RESTRICTED principal must hold to be told about it.
  * Keys are the domain strings passed to `emitChange(domain, …)`. Anything not listed here
  * is invisible to restricted principals (operator/infra domains: config, features, admin-*,
- * federation, disputes, appeals, verification, totp, ghii, owners, consent, flags,
+ * federation, disputes, appeals, verification, totp, passkeys, ghii, owners, consent, flags,
  * instances, extensions, cortex, skills, portfolio, ecosystem-apps, presence, realtime).
  */
 import { scopeIsCovered } from '../utils/scope-coverage.js';

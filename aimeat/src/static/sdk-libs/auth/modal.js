@@ -13,6 +13,9 @@
  *   openEmailCompletion, sendEmailCode, showView, capture/restoreInputs }.
  * @usage import { showLoginModal } from './modal.js';
  * @version-history
+ *   v1.8.0 — 2026-09-04 — The passkey button, first in the sign-in tab (modal-passkey.js). Pressed
+ *     with the name field empty it starts a discoverable ceremony and the person types nothing at
+ *     all; absent on a browser without WebAuthn.
  *   v1.7.0 — 2026-09-04 — The second-factor step (modal-totp.js). An account with two-step sign-in
  *     answered the login with TOTP_REQUIRED, which this modal rendered as a red line with nowhere to
  *     go, so arming TOTP locked the person out of every AIMEAT front end. Now the refusal opens a
@@ -55,6 +58,7 @@ import { NODE_URL, NODE_ID, AUTH_PROVIDERS, PROVIDER_ICONS, EMAIL_REQUIRED } fro
 import { MODAL_CSS } from './modal-styles.js';
 import { totpViewHtml, wireTotpStep } from './modal-totp.js';
 import { recoveryViewsHtml } from './modal-recovery-views.js';
+import { passkeyButtonHtml, wirePasskeyButton } from './modal-passkey.js';
 
 /** An identifier is an email when it carries a dot-bearing domain. A GHII (`alice@node-id`) never
  *  does, so this separates the two without asking the person which one they typed. */
@@ -215,6 +219,10 @@ export function showLoginModal(opts, renderBtn) {
       + '<div id="aimeat-modal-body" class="aimeat-body">'
       // ── Sign-in tab: an identifier the person actually remembers, and a password.
       + '<div id="aimeat-tab-signin"' + (isReg ? ' style="display:none"' : '') + '>'
+      // The passkey offer sits FIRST, because it is the shortest way in and needs nothing typed.
+      // Absent entirely on a browser without WebAuthn: an offer that cannot be taken is worse than
+      // no offer.
+      + passkeyButtonHtml(i)
       + field(i.identifierLabel || 'Username or email',
         '<input id="aimeat-username" class="aimeat-inp" autocomplete="username" placeholder="' + escHtml(i.identifierPlaceholder || 'Username or email') + '">')
       + field(i.passwordLabel || 'Password',
@@ -387,6 +395,14 @@ export function showLoginModal(opts, renderBtn) {
       renderBtn();
       if (opts.onLogin) opts.onLogin(session);
     }
+
+    // The passkey button. Its whole ceremony lives in the auth lib; the modal only says where the
+    // finished session goes, which is the same place every other sign-in ends.
+    wirePasskeyButton({
+      i: i,
+      signIn: function (username) { return auth.signInWithPasskey(username); },
+      onSuccess: finishLogin,
+    });
 
     // The second-factor step. It holds the password for its own call and drops it when it closes.
     var totpStep = wireTotpStep({

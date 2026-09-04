@@ -631,6 +631,179 @@
     return '<div id="aimeat-forgot-pw-view" class="aimeat-body" style="display:none"><div id="aimeat-fpw-step1"><h3 class="aimeat-sub-title">' + escHtml(i.resetPasswordTitle || "Reset Password") + '</h3><p class="aimeat-sub-desc">' + escHtml(i.resetPasswordDesc || "Enter your username to receive a reset code by email.") + "</p>" + field(i.usernameLabel || "Username", '<input id="aimeat-fpw-username" class="aimeat-inp" placeholder="' + escHtml(i.usernamePlaceholder || "Username") + '">') + '<div class="aimeat-actions"><button id="aimeat-fpw-send" class="aimeat-go">' + escHtml(i.sendResetCode || "Send Reset Code") + '</button><button id="aimeat-fpw-back" class="aimeat-cancel">' + escHtml(i.backToLogin || "Back to Login") + '</button></div><p id="aimeat-fpw-msg" class="aimeat-msg"></p><p id="aimeat-fpw-err" class="aimeat-err"></p></div><div id="aimeat-fpw-step2" style="display:none"><h3 class="aimeat-sub-title">' + escHtml(i.enterNewPasswordTitle || "Enter New Password") + '</h3><p class="aimeat-sub-desc">' + escHtml(i.resetCodeSent || "A reset code was sent to your email. Enter it below with your new password.") + "</p>" + field(i.codeLabel || "Reset Code", '<input id="aimeat-fpw-code" class="aimeat-inp" placeholder="123456" maxlength="6">') + field(i.newPasswordLabel || "New Password", '<input id="aimeat-fpw-newpass" type="password" class="aimeat-inp" placeholder="' + escHtml(i.newPasswordPlaceholder || "New password (min 8 chars)") + '">') + '<div class="aimeat-actions"><button id="aimeat-fpw-reset" class="aimeat-go">' + escHtml(i.resetPassword || "Reset Password") + '</button><button id="aimeat-fpw-back2" class="aimeat-cancel">' + escHtml(i.backToLogin || "Back to Login") + '</button></div><p id="aimeat-fpw-msg2" class="aimeat-msg"></p><p id="aimeat-fpw-err2" class="aimeat-err"></p></div></div><div id="aimeat-forgot-user-view" class="aimeat-body" style="display:none"><h3 class="aimeat-sub-title">' + escHtml(i.recoverUsernameTitle || "Recover Username") + '</h3><p class="aimeat-sub-desc">' + escHtml(i.recoverUsernameDesc || "Enter the email address associated with your account.") + "</p>" + field(i.emailLabel || "Email", '<input id="aimeat-fu-email" class="aimeat-inp" type="email" placeholder="you@example.com">') + '<div class="aimeat-actions"><button id="aimeat-fu-send" class="aimeat-go">' + escHtml(i.sendUsername || "Send My Username") + '</button><button id="aimeat-fu-back" class="aimeat-cancel">' + escHtml(i.backToLogin || "Back to Login") + '</button></div><p id="aimeat-fu-msg" class="aimeat-msg"></p></div><div id="aimeat-email-view" class="aimeat-body" style="display:none"><div id="aimeat-em-step1"><h3 class="aimeat-sub-title">' + escHtml(i.completeAccountTitle || "One last step") + '</h3><p class="aimeat-sub-desc">' + escHtml(i.completeAccountDesc || "Add an email to finish setting up your account. We’ll send a verification code to confirm it.") + "</p>" + field(i.emailLabel || "Email", '<input id="aimeat-em-email" class="aimeat-inp" type="email" placeholder="you@example.com">') + '<div class="aimeat-actions"><button id="aimeat-em-send" class="aimeat-go">' + escHtml(i.sendVerificationCode || "Send Verification Code") + '</button><button id="aimeat-em-back" class="aimeat-cancel">' + escHtml(i.backToLogin || "Back to Login") + '</button></div><p id="aimeat-em-err" class="aimeat-err"></p></div><div id="aimeat-em-step2" style="display:none"><h3 class="aimeat-sub-title">' + escHtml(i.enterCodeTitle || "Enter Verification Code") + '</h3><p class="aimeat-sub-desc">' + escHtml(i.enterCodeDesc || "We sent a 6-digit code to your email. Enter it below to finish and sign in.") + "</p>" + field(i.codeLabel || "Verification Code", '<input id="aimeat-em-code" class="aimeat-inp" placeholder="123456" maxlength="6" inputmode="numeric">') + '<div class="aimeat-actions"><button id="aimeat-em-confirm" class="aimeat-go">' + escHtml(i.confirmAndSignIn || "Confirm & Sign In") + '</button><button id="aimeat-em-back2" class="aimeat-cancel">' + escHtml(i.backToLogin || "Back to Login") + '</button></div><p id="aimeat-em-msg2" class="aimeat-msg"></p><p id="aimeat-em-err2" class="aimeat-err"></p></div></div>';
   }
 
+  // src/static/sdk-libs/auth/http.js
+  async function api(path, opts = {}) {
+    const url = NODE_URL + path;
+    const headers = { "Content-Type": "application/json", ...opts.headers };
+    const resp = await fetch(url, { ...opts, headers });
+    const data = await resp.json();
+    if (!data.ok) {
+      const err = (
+        /** @type {Error & { code?: string, details?: unknown }} */
+        new Error(data.error?.message || "API error")
+      );
+      err.code = data.error?.code;
+      err.details = data.error?.details;
+      throw err;
+    }
+    return data;
+  }
+  async function authApi(path, jwt, opts = {}) {
+    return api(path, { ...opts, headers: { ...opts.headers, "Authorization": "Bearer " + jwt } });
+  }
+
+  // src/static/sdk-libs/auth/passkey.js
+  function passkeySupported() {
+    try {
+      return typeof window !== "undefined" && typeof window.PublicKeyCredential === "function" && !!(navigator.credentials && navigator.credentials.create && navigator.credentials.get);
+    } catch {
+      return false;
+    }
+  }
+  function toBuffer(value) {
+    var s = String(value || "").replace(/-/g, "+").replace(/_/g, "/");
+    while (s.length % 4) s += "=";
+    var raw = atob(s);
+    var bytes = new Uint8Array(raw.length);
+    for (var i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+    return bytes.buffer;
+  }
+  function toB64u(buffer) {
+    var bytes = new Uint8Array(buffer);
+    var s = "";
+    for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+    return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function creationOptions(options) {
+    var out = Object.assign({}, options);
+    out.challenge = toBuffer(options.challenge);
+    out.user = Object.assign({}, options.user, { id: toBuffer(options.user.id) });
+    if (Array.isArray(options.excludeCredentials)) {
+      out.excludeCredentials = options.excludeCredentials.map(function(c) {
+        return Object.assign({}, c, { id: toBuffer(c.id) });
+      });
+    }
+    return out;
+  }
+  function requestOptions(options) {
+    var out = Object.assign({}, options);
+    out.challenge = toBuffer(options.challenge);
+    if (Array.isArray(options.allowCredentials)) {
+      out.allowCredentials = options.allowCredentials.map(function(c) {
+        return Object.assign({}, c, { id: toBuffer(c.id) });
+      });
+    }
+    return out;
+  }
+  function isCancellation(err) {
+    var name = err && err.name;
+    return name === "NotAllowedError" || name === "AbortError";
+  }
+  function cancelled() {
+    var e = (
+      /** @type {Error & { code?: string }} */
+      new Error("cancelled")
+    );
+    e.code = "PASSKEY_CANCELLED";
+    return e;
+  }
+  async function passkeySignIn(username) {
+    var started = await api("/v1/ghii/login/passkey/options", {
+      method: "POST",
+      credentials: "include",
+      body: JSON.stringify(username ? { username } : {})
+    });
+    var assertion;
+    try {
+      assertion = await navigator.credentials.get({ publicKey: requestOptions(started.data.options) });
+    } catch (err) {
+      if (isCancellation(err)) throw cancelled();
+      throw err;
+    }
+    if (!assertion) throw cancelled();
+    var response = {
+      id: assertion.id,
+      rawId: toB64u(assertion.rawId),
+      type: assertion.type,
+      clientExtensionResults: assertion.getClientExtensionResults ? assertion.getClientExtensionResults() : {},
+      response: {
+        clientDataJSON: toB64u(assertion.response.clientDataJSON),
+        authenticatorData: toB64u(assertion.response.authenticatorData),
+        signature: toB64u(assertion.response.signature),
+        userHandle: assertion.response.userHandle ? toB64u(assertion.response.userHandle) : void 0
+      }
+    };
+    return api("/v1/ghii/login/passkey/verify", {
+      method: "POST",
+      credentials: "include",
+      body: JSON.stringify({ ceremony_id: started.data.ceremony_id, response })
+    });
+  }
+  async function passkeyAdd(jwt, label) {
+    var started = await authApi("/v1/ghii/passkeys/register/options", jwt, { method: "POST", body: "{}" });
+    var credential;
+    try {
+      credential = await navigator.credentials.create({ publicKey: creationOptions(started.data.options) });
+    } catch (err) {
+      if (isCancellation(err)) throw cancelled();
+      throw err;
+    }
+    if (!credential) throw cancelled();
+    var response = {
+      id: credential.id,
+      rawId: toB64u(credential.rawId),
+      type: credential.type,
+      clientExtensionResults: credential.getClientExtensionResults ? credential.getClientExtensionResults() : {},
+      response: {
+        clientDataJSON: toB64u(credential.response.clientDataJSON),
+        attestationObject: toB64u(credential.response.attestationObject),
+        transports: credential.response.getTransports ? credential.response.getTransports() : []
+      }
+    };
+    return authApi("/v1/ghii/passkeys/register/verify", jwt, {
+      method: "POST",
+      body: JSON.stringify({ ceremony_id: started.data.ceremony_id, response, label: label || "" })
+    });
+  }
+
+  // src/static/sdk-libs/auth/modal-passkey.js
+  var KEY_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="12" r="4"></circle><path d="M12 12h9M18 12v3M15 12v2"></path></svg>';
+  function passkeyButtonHtml(i) {
+    if (!passkeySupported()) return "";
+    return '<button type="button" id="aimeat-passkey-btn" class="aimeat-oauth-btn">' + KEY_SVG + escHtml(i.passkeySignIn || "Sign in with a passkey") + '</button><p id="aimeat-passkey-hint" class="aimeat-hint">' + escHtml(i.passkeyHint || "Your fingerprint, face or screen lock. No password to remember.") + "</p>";
+  }
+  function wirePasskeyButton(ctx) {
+    var i = ctx.i;
+    var btn = (
+      /** @type {any} */
+      document.getElementById("aimeat-passkey-btn")
+    );
+    if (!btn) return;
+    var errEl = document.getElementById("aimeat-error");
+    btn.addEventListener("click", async function() {
+      var label = i.passkeySignIn || "Sign in with a passkey";
+      var nameEl = (
+        /** @type {any} */
+        document.getElementById("aimeat-username")
+      );
+      var typed = nameEl && !/[@]/.test(nameEl.value) ? nameEl.value.trim().toLowerCase() : "";
+      if (errEl) errEl.style.display = "none";
+      btn.textContent = i.working || "Working...";
+      btn.disabled = true;
+      try {
+        var session = await ctx.signIn(typed || void 0);
+        ctx.onSuccess(session);
+      } catch (e) {
+        if (e && e.code !== "PASSKEY_CANCELLED" && errEl) {
+          errEl.textContent = e.code === "PASSKEY_UNKNOWN" ? i.errPasskeyUnknown || "This device is not registered here yet. Sign in another way, then add it under Account security." : e.message;
+          errEl.style.display = "block";
+        }
+        btn.innerHTML = KEY_SVG + escHtml(label);
+        btn.disabled = false;
+      }
+    });
+  }
+
   // src/static/sdk-libs/auth/modal.js
   var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   var OWNER_NAME_RE = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
@@ -734,7 +907,7 @@
       }
       return "<style>" + MODAL_CSS + '</style><div class="aimeat-scrim"><div class="aimeat-dlg' + (anim ? " aimeat-in" : "") + '"><div class="aimeat-head"><div class="aimeat-crumb"><div class="aimeat-brand"><span class="aimeat-mark">AIME' + HEART_SVG + "<b>AT</b></span>" + (NODE_HOST ? '<span class="aimeat-host">' + escHtml(NODE_HOST) + " /</span>" : "") + '</div><div class="aimeat-crumb-right"><div class="aimeat-langsw" role="group" aria-label="' + escHtml(i2.switchLanguage || "Language") + '">' + MODAL_LANGS.map(function(l) {
         return '<button type="button" class="aimeat-lang' + (lang2 === l ? " active" : "") + '" data-lang="' + l + '">' + l.toUpperCase() + "</button>";
-      }).join("") + '</div><button type="button" id="aimeat-close-btn" class="aimeat-close" aria-label="' + escHtml(i2.closeDialog || "Close") + '"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13"></path></svg></button></div></div><h2 class="aimeat-headline">' + escHtml(isReg ? i2.headlineNew || "Welcome in." : i2.headlineReturning || "Welcome back.") + '</h2><p class="aimeat-line">' + escHtml(isReg ? i2.lineNew || "Pick a username and password." : i2.descReturning || "Enter the username or email you signed up with.") + '</p><div class="aimeat-tabs" role="tablist"><button type="button" role="tab" class="aimeat-tab' + (isReg ? "" : " active") + '" data-tab="signin" aria-selected="' + (isReg ? "false" : "true") + '">' + escHtml(i2.tabSignIn || "Sign in") + '</button><button type="button" role="tab" class="aimeat-tab' + (isReg ? " active" : "") + '" data-tab="register" aria-selected="' + (isReg ? "true" : "false") + '">' + escHtml(i2.tabRegister || "Create account") + '</button></div></div><div id="aimeat-modal-body" class="aimeat-body"><div id="aimeat-tab-signin"' + (isReg ? ' style="display:none"' : "") + ">" + field(
+      }).join("") + '</div><button type="button" id="aimeat-close-btn" class="aimeat-close" aria-label="' + escHtml(i2.closeDialog || "Close") + '"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13"></path></svg></button></div></div><h2 class="aimeat-headline">' + escHtml(isReg ? i2.headlineNew || "Welcome in." : i2.headlineReturning || "Welcome back.") + '</h2><p class="aimeat-line">' + escHtml(isReg ? i2.lineNew || "Pick a username and password." : i2.descReturning || "Enter the username or email you signed up with.") + '</p><div class="aimeat-tabs" role="tablist"><button type="button" role="tab" class="aimeat-tab' + (isReg ? "" : " active") + '" data-tab="signin" aria-selected="' + (isReg ? "false" : "true") + '">' + escHtml(i2.tabSignIn || "Sign in") + '</button><button type="button" role="tab" class="aimeat-tab' + (isReg ? " active" : "") + '" data-tab="register" aria-selected="' + (isReg ? "true" : "false") + '">' + escHtml(i2.tabRegister || "Create account") + '</button></div></div><div id="aimeat-modal-body" class="aimeat-body"><div id="aimeat-tab-signin"' + (isReg ? ' style="display:none"' : "") + ">" + passkeyButtonHtml(i2) + field(
         i2.identifierLabel || "Username or email",
         '<input id="aimeat-username" class="aimeat-inp" autocomplete="username" placeholder="' + escHtml(i2.identifierPlaceholder || "Username or email") + '">'
       ) + field(
@@ -855,6 +1028,13 @@
         renderBtn();
         if (opts.onLogin) opts.onLogin(session);
       }
+      wirePasskeyButton({
+        i,
+        signIn: function(username) {
+          return auth.signInWithPasskey(username);
+        },
+        onSuccess: finishLogin
+      });
       var totpStep = wireTotpStep({
         i,
         showView,
@@ -1935,22 +2115,6 @@
   var ownerRefreshInFlight = null;
   var _appOriginLoginInFlight = null;
   var focusRefreshInFlight = null;
-  async function api(path, opts = {}) {
-    const url = NODE_URL + path;
-    const headers = { "Content-Type": "application/json", ...opts.headers };
-    const resp = await fetch(url, { ...opts, headers });
-    const data = await resp.json();
-    if (!data.ok) {
-      const err = (
-        /** @type {Error & { code?: string, details?: unknown }} */
-        new Error(data.error?.message || "API error")
-      );
-      err.code = data.error?.code;
-      err.details = data.error?.details;
-      throw err;
-    }
-    return data;
-  }
   function persistSession(session) {
     save("session", {
       owner: session.owner,
@@ -2212,6 +2376,32 @@
       focusRefreshInFlight = null;
     });
   }
+  async function sessionFromLogin(data) {
+    const d = data.data;
+    let ownerCryptoKey = null;
+    if (d.owner_private_key) {
+      ownerCryptoKey = await importEd25519Key(d.owner_private_key);
+      await storeKey("owner_key", ownerCryptoKey);
+    }
+    const session = createSession({
+      ghii: d.ghii.ghii,
+      owner: d.owner.name,
+      gaii: null,
+      jwt: d.token,
+      _cryptoKey: ownerCryptoKey,
+      publicKey: d.owner_public_key || "",
+      displayName: d.ghii.display_name || "",
+      federated: d.federated || false,
+      homeNode: d.home_node || "",
+      homeUrl: d.home_url || ""
+    });
+    if (d.key_credentials) session._keyCredentials = d.key_credentials;
+    persistSession(session);
+    currentSession = session;
+    scheduleAutoRefresh(session);
+    emit("login", session);
+    return session;
+  }
   var auth = {
     nodeUrl: NODE_URL,
     nodeId: NODE_ID,
@@ -2330,30 +2520,28 @@
         credentials: "include",
         body: JSON.stringify(body)
       });
-      const d = data.data;
-      let ownerCryptoKey = null;
-      if (d.owner_private_key) {
-        ownerCryptoKey = await importEd25519Key(d.owner_private_key);
-        await storeKey("owner_key", ownerCryptoKey);
-      }
-      const session = createSession({
-        ghii: d.ghii.ghii,
-        owner: d.owner.name,
-        gaii: null,
-        jwt: d.token,
-        _cryptoKey: ownerCryptoKey,
-        publicKey: d.owner_public_key || "",
-        displayName: d.ghii.display_name || "",
-        federated: d.federated || false,
-        homeNode: d.home_node || "",
-        homeUrl: d.home_url || ""
-      });
-      if (d.key_credentials) session._keyCredentials = d.key_credentials;
-      persistSession(session);
-      currentSession = session;
-      scheduleAutoRefresh(session);
-      emit("login", session);
-      return session;
+      return sessionFromLogin(data);
+    },
+    /**
+     * Sign in with a passkey. `username` is optional and leaving it out is the better path: the
+     * ceremony is discoverable, the device offers whatever it holds for this domain, and its answer
+     * names the account. Ends in the same session the password path builds, because the server ends
+     * in the same response.
+     *
+     * Throws with code PASSKEY_CANCELLED when the person closed the prompt, which a caller should
+     * treat as "they changed their mind" rather than as a failure to show in red.
+     */
+    async signInWithPasskey(username) {
+      const data = await passkeySignIn(username);
+      return sessionFromLogin(data);
+    },
+    /** Does this browser have WebAuthn? A caller shows the passkey button only when it does. */
+    passkeySupported,
+    /** Add THIS device to the signed-in account. Returns the stored passkey as the node describes it. */
+    async addPasskey(label) {
+      if (!currentSession?.jwt) throw new Error("Sign in first");
+      const data = await passkeyAdd(currentSession.jwt, label);
+      return data.data.passkey;
     },
     /** Get the current session (or null if not logged in) */
     getSession() {

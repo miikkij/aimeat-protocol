@@ -15,6 +15,8 @@
  * @usage
  *   import type { AccountEventInput } from '../storage/interface.js';
  * @version-history
+ *   v1.3.0 — 2026-09-04 — passkey_added and passkey_removed: a device that can sign in as you
+ *     is the same kind of news as a second factor changing.
  *   v1.2.0 — 2026-09-04 — three kinds for two-step sign-in: armed, removed, and reset by an operator.
  *     A change to how the account is entered is the clearest case of "worth interrupting someone
  *     with", and the operator reset needs a trace the person can read without asking anyone.
@@ -97,6 +99,8 @@ export type AccountEventKind =
   | 'two_factor_armed'
   | 'two_factor_removed'
   | 'two_factor_reset_by_operator'
+  | 'passkey_added'
+  | 'passkey_removed'
   // Permissions and limits
   | 'consent_granted'
   | 'consent_revoked'

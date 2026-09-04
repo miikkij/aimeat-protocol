@@ -132,6 +132,7 @@ import { msmRouter } from '../routes/msm.js';
 import { ghiiRouter } from '../routes/ghii.js';
 import { chatInstancesRouter } from '../routes/chat-instances.js';
 import { totpRouter } from '../routes/totp.js';
+import { passkeysRouter } from '../routes/passkeys.js';
 import { libsRouter } from '../routes/libs.js';
 import { appTemplatesRouter } from '../routes/app-templates.js';
 import { appUiRouter } from '../routes/app-ui.js';
@@ -670,6 +671,7 @@ export async function mountRoutes(
   }));
 
   app.use(totpRouter(config, storage));   // Phase 0.5 — MUST be before ghiiRouter (TOTP routes use /v1/ghii/totp/*)
+  app.use(passkeysRouter(config, storage));  // same reason: /v1/ghii/passkeys/* and /v1/ghii/login/passkey/*
   app.use(ghiiRouter(config, storage, emailService, notifyDirectoryChange, peers));
   app.use(chatInstancesRouter(config, storage));
   app.use(libsRouter(config, storage));
