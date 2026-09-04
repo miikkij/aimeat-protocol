@@ -859,6 +859,61 @@ await test('32. Request on closed session → new session', async () => {
         `status ${res.status}: ${JSON.stringify(body)}`);
 });
 
+// ─── A client_id that is a URL ───
+//
+// MCP recommended Client ID Metadata Documents in 2025-11-25 and deprecated Dynamic Client
+// Registration in 2026-07-28. Instead of POSTing itself here to be given an id, a client's
+// `client_id` IS an https URL and the document there says who it is and where it may be sent back.
+//
+// THE SECOND TEST IS THE MECHANISM. A document naming a different client_id is one somebody copied,
+// and honouring it would let whoever can host a file borrow another client's identity. Everything
+// else here is hygiene around that one comparison.
+
+// WHAT THIS SUITE CAN AND CANNOT PROVE, said plainly because the first version of these tests did
+// not. The mechanism — a document naming a different client is refused, a missing redirect list is
+// refused, the owner sees a name — is a decision about BYTES and is covered exactly in
+// test/unit/oauth-client-metadata.test.ts, where it can be asserted without a network.
+//
+// It cannot be covered here. The document must be served over https or the scheme fence refuses it
+// before any of that code runs, and a loopback https server would need a certificate the node under
+// test trusts. The first version of these tests served plain http and passed: every one of them was
+// proving the https fence a second time and the mechanism never. That is the kind of green tick this
+// project has spent the week deleting, so the two things this door really does decide are what is
+// left here.
+await test('36. The authorization server declares that a client may be a URL', async () => {
+    // A client cannot try a mechanism it has no way to learn about, and the only other advertised
+    // road in is the registration endpoint that 2026-07-28 deprecates.
+    const { body } = await json('/.well-known/oauth-authorization-server');
+    assert(body.client_id_metadata_document_supported === true,
+        `client_id_metadata_document_supported should be declared, got ${body.client_id_metadata_document_supported}`);
+});
+
+await test('37. A client_id that is not https is refused, and never fetched', async () => {
+    // THE SSRF FENCE, at the public door where the attack actually arrives. The link-local address
+    // is where this stops being a client lookup and becomes a read of the machine's own credentials;
+    // 127.0.0.1:1 is the same shape pointed inward. Both are refused on the SCHEME, before any
+    // outbound request exists to be blocked later.
+    for (const bad of [
+        'http://169.254.169.254/latest/meta-data/',
+        'http://127.0.0.1:1/client.json',
+        'file:///etc/passwd',
+        'https://client.test/doc.json#frag',
+    ]) {
+        const r = await json(`/v1/mcp/authorize?response_type=code&client_id=${encodeURIComponent(bad)}&redirect_uri=${encodeURIComponent('https://x.test/cb')}`);
+        assert(r.status === 400 && r.body?.error === 'invalid_client',
+            `${bad} must be refused as invalid_client, got ${r.status} ${JSON.stringify(r.body)}`);
+    }
+});
+
+await test('38. An unknown client is told which of the two roads to take', async () => {
+    // The refusal names the mechanism, because "Unknown client_id" alone leaves a client that could
+    // have used a metadata document with no way to find out that it could.
+    const r = await json('/v1/mcp/authorize?response_type=code&client_id=never-registered&redirect_uri=https%3A%2F%2Fx.test%2Fcb');
+    assert(r.status === 400 && r.body?.error === 'invalid_client', `expected invalid_client, got ${r.status}`);
+    assert(/metadata document/i.test(r.body?.error_description ?? ''),
+        `the refusal should name the other road, got ${r.body?.error_description}`);
+});
+
 // ─── What a stranger with no account may learn, and what they may not ───
 //
 // A foreign agent arriving with nothing but the hostname could not learn ONE capability of this

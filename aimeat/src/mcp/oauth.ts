@@ -36,6 +36,7 @@ import { verify } from '../auth/keypair.js';
 import { parseGAII } from '../utils/gaii.js';
 import { buildAgentAuthMetadata } from '../services/auth-md.js';
 import { buildProtectedResourceMetadata, mcpResourceMetadata, MCP_RESOURCE_METADATA_PATH } from '../services/protected-resource.js';
+import { resolveClientIdMetadata, isClientIdUrl } from '../services/oauth-client-metadata.js';
 
 // OAuth 2.1 — authorization codes stay in-memory (short-lived, single-use).
 // Clients, refresh tokens, and approvals are persisted to storage.
@@ -125,13 +126,30 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
             return;
         }
 
+        // A CLIENT MAY BE A URL. MCP recommended Client ID Metadata Documents in 2025-11-25 and
+        // deprecated Dynamic Client Registration in 2026-07-28: instead of POSTing itself here to be
+        // given an id, a client's `client_id` IS an https URL, and the document there says who it is
+        // and where it may be sent back. Nothing is stored, so nothing goes stale, and the
+        // registration endpoint below stops being the only way in.
+        //
+        // A REGISTERED CLIENT STILL WINS. Looked up first, so an id this node minted is never
+        // resolved over the network, and the DCR road keeps working for every client already on it.
         const client = await storage.getOAuthClient(clientId);
-        if (!client) {
-            res.status(400).json({ error: 'invalid_client', error_description: 'Unknown client_id' });
+        const viaUrl = client ? null : await resolveClientIdMetadata(clientId);
+        if (!client && !viaUrl) {
+            res.status(400).json({
+                error: 'invalid_client',
+                error_description: isClientIdUrl(clientId)
+                    // Named, because the three ways this fails are all fixable by the client and
+                    // indistinguishable from "unknown client" without being told.
+                    ? 'That client_id is a URL, but the document there could not be read, is not JSON, does not name itself as that same client_id, or lists no redirect_uris.'
+                    : 'Unknown client_id. Register first, or use a Client ID Metadata Document URL as your client_id.',
+            });
             return;
         }
 
-        if (redirectUri && client.redirectUris.length > 0 && !client.redirectUris.includes(redirectUri)) {
+        const allowedRedirects = client ? client.redirectUris : viaUrl!.redirectUris;
+        if (redirectUri && allowedRedirects.length > 0 && !allowedRedirects.includes(redirectUri)) {
             res.status(400).json({ error: 'invalid_request', error_description: 'redirect_uri not registered' });
             return;
         }
@@ -162,11 +180,11 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
             const authCode: AuthorizationCode = {
                 code,
                 clientId,
-                clientName: client.clientName,
+                clientName: client?.clientName ?? viaUrl!.clientName,
                 gaii,
                 owner: parsed.owner,
                 roles: ['agent'],
-                redirectUri: redirectUri ?? client.redirectUris[0] ?? '',
+                redirectUri: redirectUri ?? allowedRedirects[0] ?? '',
                 codeChallenge,
                 codeChallengeMethod: codeChallenge ? 'S256' : undefined,
                 expiresAt: Date.now() + 600_000,
@@ -188,7 +206,9 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
         // Redirect to consent page where user logs in and selects which agent to authorize
         const consentUrl = new URL('/v1/oauth/consent', `${req.protocol}://${req.get('host')}`);
         consentUrl.searchParams.set('client_id', clientId);
-        consentUrl.searchParams.set('client_name', client.clientName);
+        // The document's name for a URL client, so the approval screen says who is asking
+        // rather than where their metadata lives.
+        consentUrl.searchParams.set('client_name', client?.clientName ?? viaUrl!.clientName);
         if (redirectUri) consentUrl.searchParams.set('redirect_uri', redirectUri);
         if (state) consentUrl.searchParams.set('state', state);
         if (scope) consentUrl.searchParams.set('scope', scope);
@@ -207,11 +227,19 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
         }
 
         const client = await storage.getOAuthClient(client_id);
+        // The document again, for the same reason the authorize step reads it: a URL client has no
+        // row here, and the owner is about to be shown a name and asked to trust it. Without this
+        // the approval screen would say `https://…/client.json` where the client's own name belongs.
+        const viaUrl = client ? null : await resolveClientIdMetadata(client_id);
 
         // If client not found (e.g. server restarted since registration), allow consent
         // to proceed — we still verify owner JWT + agent ownership below.
         // Validate redirect_uri against registered URIs when available.
-        const finalRedirect = redirect_uri ?? client?.redirectUris[0];
+        const finalRedirect = redirect_uri ?? client?.redirectUris[0] ?? viaUrl?.redirectUris[0];
+        if (viaUrl && finalRedirect && !viaUrl.redirectUris.includes(finalRedirect)) {
+            res.status(400).json({ error: 'invalid_request', error_description: 'redirect_uri is not one this client\'s metadata document lists' });
+            return;
+        }
         if (client && finalRedirect && client.redirectUris.length > 0 && !client.redirectUris.includes(finalRedirect)) {
             res.status(400).json({ error: 'invalid_request', error_description: 'redirect_uri not registered' });
             return;
@@ -255,7 +283,7 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
         // Issue authorization code
         const parsed = parseGAII(gaii);
         const code = randomBytes(32).toString('hex');
-        const resolvedClientName = clientNameBody || client?.clientName || client_id;
+        const resolvedClientName = clientNameBody || client?.clientName || viaUrl?.clientName || client_id;
         authCodes.set(code, {
             code,
             clientId: client_id,
@@ -525,6 +553,12 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
             authorization_endpoint: `${baseUrl}/v1/mcp/authorize`,
             token_endpoint: `${baseUrl}/v1/mcp/token`,
             registration_endpoint: `${baseUrl}/v1/mcp/register`,
+            // A client may hand us an https URL as its `client_id` and let the document there say
+            // who it is. Declared, because a client cannot try a mechanism it has no way to learn
+            // about: without this line the only discoverable road in is the registration endpoint
+            // above, which 2026-07-28 deprecates. Both work; this one stores nothing and goes stale
+            // for nobody. → services/oauth-client-metadata.ts
+            client_id_metadata_document_supported: true,
             revocation_endpoint: `${baseUrl}/v1/mcp/token/revoke`,
             response_types_supported: ['code'],
             grant_types_supported: ['authorization_code', 'refresh_token'],
