@@ -58,6 +58,31 @@ const NON_HUMAN: Principal[] = ['agent', 'app', 'ecosystem'];
 const AUTHENTICATED: Principal[] = ['owner', 'operator', ...NON_HUMAN];
 
 /**
+ * The middleware that constitutes an explicit authorization decision — the one answer to "does this
+ * door decide who may act", read by every gate that needs it.
+ *
+ * WHY IT LIVES HERE. Until 2026-09-04 there were two answers. `check-route-scopes.ts` carried seven
+ * names in a local const; this module's GUARD_EFFECTS below knew those and four more, because it was
+ * written later against the whole tree. Two gates in one repo disagreeing about what counts as
+ * authorization is the same defect class they exist to catch, and the disagreement cost exactly one
+ * door — small, and worth removing anyway, because the next reader would have had to work out which
+ * list was right.
+ *
+ * `requireAuth` is deliberately NOT here: it answers "is anyone there", never "may this principal do
+ * this". Nor is `requireLocalSession`, which cuts on federated versus local rather than on what the
+ * caller may do. The four that joined the original seven:
+ *   requireOperatorPrincipal   the operator in person, plus a scope word
+ *   requireExternalPrincipal   owner/operator/agent/ecosystem — the class filter that stops an app grant
+ *   requireOwnerSession        the owner's own browser session, not a token acting for them
+ *   workspaceAccess(Middleware) per-row organism membership, which is authorization by another name
+ */
+export const AUTHORIZATION_GATES = [
+    'requireScope', 'requireAnyScope', 'requireRole', 'requireRoleOrScope', 'requireOperator',
+    'requireOwnerPrincipal', 'requireScimConnection', 'requireOperatorPrincipal',
+    'requireExternalPrincipal', 'requireOwnerSession', 'workspaceAccess', 'workspaceAccessMiddleware',
+];
+
+/**
  * What each guard does to the reachable set: it narrows it to `admits`, and may demand scopes.
  *
  * `rateLimit` and friends narrow nothing — they are listed so an unrecognised name stays meaningful.
