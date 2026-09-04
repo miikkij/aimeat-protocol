@@ -113,6 +113,21 @@ await test('deleteMemory returns true then false', async () => {
   assert((await s.deleteMemory(G, 'note.1')) === false, 'already gone');
 });
 
+// The bin, on the value-free listing. Until 2026-09-04 this method wrote `archived = false` by hand
+// instead of going through applyArchive, so it returned rows every by-key read answers 404 for — the
+// one bulk read outside the chokepoint whose own comment says every bulk read passes through it. The
+// SQLite twin had both clauses from the start, so only production was wrong, and what it showed was a
+// crew's pruned revisions still standing in its version history: e2e-agent-crew's "thirteen publishes
+// keep the last ten" counted thirteen. Asserted here rather than in the SQLite unit test because
+// SQLite was never the one that drifted.
+await test('listMemoryKeysByPrefix hides a deleted row, not only an archived one', async () => {
+  await s.setMemory(rec(G, 'bin.live', { a: 1 }));
+  await s.setMemory(rec(G, 'bin.gone', { a: 2 }));
+  assert((await s.deleteMemory(G, 'bin.gone')) === true, 'binned');
+  const keys = (await s.listMemoryKeysByPrefix!('bin.')).map(r => r.key).sort();
+  assert(keys.length === 1 && keys[0] === 'bin.live', `expected only bin.live, got ${JSON.stringify(keys)}`);
+});
+
 await s.close();
 console.log(`\n${passed} passed, ${failed} failed out of ${passed + failed}`);
 process.exit(failed > 0 ? 1 : 0);
