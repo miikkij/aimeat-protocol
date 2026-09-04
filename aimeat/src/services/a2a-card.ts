@@ -40,7 +40,10 @@ import type { AgentRecord } from '../storage/interface.js';
 
 /** What this door does and does not do. Read by the card and by the handler's refusals. */
 export const A2A_SURFACE = {
-  streaming: false,
+  // On since 2026-09-04. `message/stream` and `SubscribeToTask` yield the whole task on every move
+  // until it settles; services/a2a-stream.ts says why whole tasks rather than deltas, and what
+  // makes the stream end.
+  streaming: true,
   pushNotifications: true,
 } as const;
 

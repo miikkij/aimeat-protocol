@@ -85,6 +85,34 @@ export function offDeliveryEvent(handler: (evt: DeliveryEvent) => void): void {
   bus.off('delivery', handler);
 }
 
+// ── One task moved (nudge only, no payload) ────────────────────────────────
+//
+// A2A streaming needs to know that a task changed, for a caller that may be nobody's connector: the
+// delivery channel above only fires when the target HOLDS A LIVE TUNNEL, because that is what it is
+// for. A stranger's A2A client subscribed to a task has no tunnel and would have heard nothing.
+//
+// IT CARRIES NO DATA ON PURPOSE. The listener re-reads the task through the same op every other
+// reader uses, so the fence that decides who may see a task is applied in exactly one place and a
+// subscriber cannot be handed a task it would have been refused. An event that carried the record
+// would be a second read path with no check on it.
+
+export interface TaskMovedEvent {
+  taskId: string;
+  timestamp: number;
+}
+
+export function emitTaskMoved(taskId: string): void {
+  bus.emit('task-moved', { taskId, timestamp: Date.now() } satisfies TaskMovedEvent);
+}
+
+export function onTaskMoved(handler: (evt: TaskMovedEvent) => void): void {
+  bus.on('task-moved', handler);
+}
+
+export function offTaskMoved(handler: (evt: TaskMovedEvent) => void): void {
+  bus.off('task-moved', handler);
+}
+
 // ── Public activity channel (broadcast, full payload) ───────────────────────
 // The landing page's public activity feed needs the FULL event (category, time,
 // summary, link) pushed to every connected public SSE client — unlike the coarse

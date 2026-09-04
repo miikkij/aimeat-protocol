@@ -278,7 +278,7 @@ async function run(): Promise<void> {
         assert(String(card.supportedInterfaces[0].url).endsWith(`/v1/a2a/${a.owner}/${worker.name}`),
             `pointing at the JSON-RPC door, got ${card.supportedInterfaces[0].url}`);
         // The card and the refusal have to agree: streaming is declared off and the method throws.
-        assert(card.capabilities.streaming === false, 'streaming is declared off');
+        assert(card.capabilities.streaming === true, 'streaming is declared on');
         assert(card.capabilities.pushNotifications === true, 'and push notifications on');
         assert(!!card.securitySchemes?.bearer, 'and it says a bearer is needed before a client tries');
         assert(Array.isArray(card.skills) && card.skills.length >= 1, 'a card with no skills is invisible to a client');
@@ -338,6 +338,87 @@ async function run(): Promise<void> {
             `a started task is working, got ${r.result.status.state}`);
         assert(r.result.status.message?.parts?.[0]?.text === 'On it.',
             'and the status message travels as a message part');
+    });
+
+    // ─── Streaming: the task now, the task on every move, and then the stream ENDS ───
+    //
+    // Both methods refused until 2026-09-04, and the card said so. What the node lacked was an
+    // event when a task moved for a caller who is not somebody's connector: the delivery bus only
+    // fires for a principal holding a live tunnel, which an A2A client is not.
+    //
+    // The assertions are the three properties a stream has to have. It speaks at once, so a client
+    // that attaches to work already finished is not left waiting. It speaks again when the work
+    // moves. And it ENDS when the task settles — an open connection that never closes is the defect
+    // this whole method risks, and it is the one a passing "it streamed something" test would miss.
+    await test('message/stream yields the task, then every move, then closes on its own', async () => {
+        const res = await fetch(`${BASE}/v1/a2a/${encodeURIComponent(a.owner)}/${worker.name}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json', Accept: 'text/event-stream',
+                Authorization: `Bearer ${caller.token}`, 'A2A-Version': '1.0',
+            },
+            body: JSON.stringify({
+                jsonrpc: '2.0', id: 'stream-1', method: 'SendStreamingMessage',
+                params: { message: { messageId: 'stream-msg-1', role: 'ROLE_USER', parts: [{ text: 'Stream this.' }] } },
+            }),
+        });
+        assert(res.status === 200, `stream open ${res.status}`);
+        assert((res.headers.get('content-type') ?? '').includes('event-stream'),
+            `it is an SSE stream, got ${res.headers.get('content-type')}`);
+
+        const frames: any[] = [];
+        let taskId = '';
+        const reader = res.body!.getReader();
+        const dec = new TextDecoder();
+        let buf = '';
+        // The stream closes ITSELF when the task settles. If it does not, this read hangs and the
+        // suite's own timeout is what fails — which is the correct failure for "it never ends".
+        const pump = (async () => {
+            for (;;) {
+                const { done, value } = await reader.read();
+                if (done) return;
+                buf += dec.decode(value, { stream: true });
+                for (const line of buf.split('\n')) {
+                    if (!line.startsWith('data:')) continue;
+                    try {
+                        const frame = JSON.parse(line.slice(5).trim());
+                        const t = frame.result?.payload?.task ?? frame.result?.task;
+                        if (t?.id) { taskId ||= t.id; frames.push(t); }
+                    } catch { /* a partial line; the next chunk completes it */ }
+                }
+                buf = buf.slice(buf.lastIndexOf('\n') + 1);
+            }
+        })();
+
+        // Wait for the first frame, which is what proves it speaks before anything moves.
+        for (let i = 0; i < 40 && frames.length === 0; i++) await new Promise(r => setTimeout(r, 100));
+        assert(frames.length >= 1, 'the stream speaks at once, with the task as it stands');
+        assert(!!taskId, 'and the first frame carries the task id');
+
+        // Move it, twice, and the second move is terminal so the stream must close.
+        await json(`/v1/agents/v2/tasks/${taskId}/status`, {
+            method: 'POST', headers: { Authorization: `Bearer ${worker.token}` },
+            body: JSON.stringify({ status: 'working', statusMessage: 'On it.' }),
+        });
+        await json(`/v1/agents/v2/tasks/${taskId}/status`, {
+            method: 'POST', headers: { Authorization: `Bearer ${worker.token}` },
+            body: JSON.stringify({ status: 'completed', statusMessage: 'Done.', result: [{ kind: 'text', text: 'Streamed.' }] }),
+        });
+
+        await Promise.race([pump, new Promise((_, rej) => setTimeout(() => rej(new Error('the stream did not close after the task settled')), 20_000))]);
+
+        const states = frames.map(f => f.status?.state);
+        assert(states.includes('TASK_STATE_COMPLETED'),
+            `the terminal state was streamed, got ${JSON.stringify(states)}`);
+        assert(frames.length >= 2, `it spoke more than once, got ${frames.length} frames`);
+    });
+
+    await test('SubscribeToTask on somebody else\'s task is refused, not a silent stream', async () => {
+        // An unchecked loop would open a stream and simply never speak, which reads to a client as
+        // "the work has not started" rather than "you may not see this".
+        const other = await setupOwner('sx');
+        const r = await rpc(a.owner, worker.name, other.ownerToken, 'SubscribeToTask', { id: 'does-not-matter' });
+        assert(!!r.error, `expected a refusal, got ${JSON.stringify(r.result)?.slice(0, 120)}`);
     });
 
     // ─── The extended card says whether the work will go through, and never says more ───
@@ -482,13 +563,35 @@ async function run(): Promise<void> {
 
     // ── 3. What the card promises, refused where it says so ───────────────────
 
-    await test('streaming is declared off, and the method says so rather than hanging', async () => {
-        const r = await rpc(a.owner, worker.name, caller.token, 'message/stream', {
-            message: { messageId: 'client-msg-4', role: 'ROLE_USER', parts: [{ text: 'stream me' }] },
+    await test('what the card declares about streaming is what the door does', async () => {
+        // THIS TEST USED TO ASSERT THE OPPOSITE, and it was passing for the wrong reason by the end.
+        // It called `message/stream` — A2A v0.3's method name — and asserted a refusal. Once the v1
+        // door was the one answering, that refusal came from an unrecognised METHOD NAME rather than
+        // from streaming being off, so it would have kept passing whatever streaming did. Its
+        // setup no longer matched production. → CLAUDE.md, "when a test goes green after your
+        // change, say which of three it was"; this is the third.
+        //
+        // What it was protecting is worth keeping, so that is what it asserts now: the card's
+        // declaration and the door's behaviour agree. A card promising a stream from a door that
+        // never sends one leaves a client holding a connection forever, and the reverse hides a
+        // capability nobody will ask for.
+        const cardRes = await json(`/v1/a2a/${encodeURIComponent(a.owner)}/${worker.name}/agent-card.json`);
+        const declared = cardRes.body.capabilities?.streaming === true;
+        const res = await fetch(`${BASE}/v1/a2a/${encodeURIComponent(a.owner)}/${worker.name}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json', Accept: 'text/event-stream',
+                Authorization: `Bearer ${caller.token}`, 'A2A-Version': '1.0',
+            },
+            body: JSON.stringify({
+                jsonrpc: '2.0', id: 'declare-1', method: 'SendStreamingMessage',
+                params: { message: { messageId: 'client-msg-4', role: 'ROLE_USER', parts: [{ text: 'stream me' }] } },
+            }),
         });
-        // A card that said streaming: true and a door that never sent an event would leave a client
-        // holding a connection open forever. Refusing is the honest half of the declaration.
-        assert(!!r.error || r.status >= 400, `expected a refusal, got ${r.status} ${JSON.stringify(r.body).slice(0, 200)}`);
+        const streams = res.status === 200 && (res.headers.get('content-type') ?? '').includes('event-stream');
+        await res.body?.cancel();
+        assert(declared === streams,
+            `the card says streaming=${declared} and the door ${streams ? 'streams' : 'refuses'}`);
     });
 
     await test('a part with inline bytes is refused, because a part here carries a pointer', async () => {
