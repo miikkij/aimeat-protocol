@@ -7,8 +7,13 @@
  *   whisper on a look that stands on the palette page — with the number.
  * @usage cd aimeat && pnpm test -- atelier-ambients
  * @version-history
+ *   v1.1.0 — 2026-09-05 — The kit is pinned to the registry (stage 4): PRESET_IDS, BASE_ALPHA,
+ *     PEAK, FPS, CSS_PRESETS and RENDERERS in ambient-presets.js, the bounds in ambient.js and
+ *     the aurora lobes in ambient.css all read from source and compared, so the renderers can
+ *     never paint what the matrix did not prove.
  *   v1.0.0 — 2026-09-05 — initial (wish-atelier-ambient-visuals, stage 1).
  */
+import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import {
   AMBIENTS, AMBIENT_IDS, AMBIENT_NONE, AMBIENT_BOUNDS, ambientById, isAmbientValue,
@@ -19,6 +24,28 @@ import {
 } from '../../src/services/atelier-contrast.js';
 
 const AMBIENT_TOKENS = ['--ak-ambient', '--ak-ambient-alpha', '--ak-ambient-speed'];
+
+/** A kit source, as text: the browser modules are read, never imported, into this node test. */
+function kitSource(file: string): string {
+  return readFileSync(new URL(`../../src/static/sdk-libs/atelier/${file}`, import.meta.url), 'utf8');
+}
+/** `export const NAME = { a: 1, b: 2 }` → { a: 1, b: 2 } (numbers only). */
+function numberTable(src: string, name: string): Record<string, number> {
+  const m = src.match(new RegExp(`export const ${name} = \\{([^}]*)\\}`));
+  expect(m, `${name} in the kit`).toBeTruthy();
+  const out: Record<string, number> = {};
+  for (const pair of m![1]!.split(',')) {
+    const [k, v] = pair.split(':').map((s) => s.trim());
+    if (k) out[k] = Number(v);
+  }
+  return out;
+}
+/** `export const NAME = { a, b: c }` → ['a', 'b'] (the keys). */
+function keyList(src: string, name: string): string[] {
+  const m = src.match(new RegExp(`export const ${name} = \\{([^}]*)\\}`));
+  expect(m, `${name} in the kit`).toBeTruthy();
+  return m![1]!.split(',').map((s) => s.trim().split(':')[0]!.trim()).filter(Boolean);
+}
 
 describe('atelier-ambients — the registry', () => {
   it('ids are unique, lowercase words, and none is not one of them', () => {
@@ -151,5 +178,62 @@ describe('atelier-ambients — the matrix proves the layer (AK-AMBIENT)', () => 
   it('none is the quiet default: no ambient check runs', () => {
     const results = runMatrix(undefined, { presets: ['vivid'] });
     expect(results.some((r) => r.label.startsWith('AK-AMBIENT'))).toBe(false);
+  });
+});
+
+describe('atelier-ambients — the kit is pinned to the registry', () => {
+  const presets = kitSource('ambient-presets.js');
+
+  it('PRESET_IDS are the registry\'s ids, in order', () => {
+    const m = presets.match(/export const PRESET_IDS = \[([^\]]*)\]/);
+    expect(m).toBeTruthy();
+    const ids = m![1]!.split(',').map((s) => s.trim().replace(/^'|'$/g, '')).filter(Boolean);
+    expect(ids).toEqual([...AMBIENT_IDS]);
+  });
+
+  it('BASE_ALPHA, PEAK and FPS carry the registry\'s numbers', () => {
+    const alpha = numberTable(presets, 'BASE_ALPHA');
+    const peak = numberTable(presets, 'PEAK');
+    const fps = numberTable(presets, 'FPS');
+    for (const a of AMBIENTS) {
+      expect(alpha[a.id], `${a.id} alpha`).toBe(a.defaultAlpha);
+      expect(peak[a.id], `${a.id} peak`).toBe(a.peak);
+      expect(fps[a.id], `${a.id} fps`).toBe(a.fps);
+    }
+  });
+
+  it('every css preset is CSS in the kit and every other one has a renderer', () => {
+    const css = keyList(presets, 'CSS_PRESETS');
+    const renderers = keyList(presets, 'RENDERERS');
+    for (const a of AMBIENTS) {
+      if (a.technique === 'css') {
+        expect(css).toContain(a.id);
+        expect(renderers).not.toContain(a.id);
+      } else {
+        expect(renderers).toContain(a.id);
+        expect(css).not.toContain(a.id);
+      }
+    }
+  });
+
+  it('the layer clamps to the registry\'s bounds', () => {
+    const core = kitSource('ambient.js');
+    const m = core.match(/const BOUNDS = \{ alpha: \[([\d.]+), ([\d.]+)\], speed: \[([\d.]+), ([\d.]+)\] \}/);
+    expect(m).toBeTruthy();
+    expect([Number(m![1]), Number(m![2])]).toEqual([...AMBIENT_BOUNDS.alpha]);
+    expect([Number(m![3]), Number(m![4])]).toEqual([...AMBIENT_BOUNDS.speed]);
+  });
+
+  it('the aurora lobes in ambient.css sit at or under the registry\'s peak', () => {
+    const css = readFileSync(new URL('../../public/lib/aimeat-atelier/ambient.css', import.meta.url), 'utf8');
+    const block = css.match(/\.ak-ambient__drift \{([\s\S]*?)\n\}/);
+    expect(block).toBeTruthy();
+    const lobes = [...block![1]!.matchAll(/color-mix\(in oklab, var\(--ak-[a-z0-9-]+\) (\d+)%/g)].map((x) => Number(x[1]));
+    expect(lobes.length).toBeGreaterThanOrEqual(3);
+    const aurora = ambientById('aurora')!;
+    for (const pct of lobes) expect(pct).toBeLessThanOrEqual(aurora.peak * 100 + 1e-9);
+    // And it is the only infinite animation the sheet adds, tweened on transform.
+    expect(css.match(/infinite/g)?.length).toBe(1);
+    expect(block![1]).toMatch(/will-change: transform/);
   });
 });

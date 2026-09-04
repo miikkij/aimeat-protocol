@@ -31,10 +31,15 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
- *   v0.47.0 — 2026-09-05 — THE AMBIENT (wish-atelier-ambient-visuals): the contract gains
- *     --ak-ambient, --ak-ambient-alpha and --ak-ambient-speed — the one layer allowed to move
- *     at idle, named by the look and proven by the matrix (AK-AMBIENT). The version moves with
- *     the contract; the layer's modules land in this same version line.
+ *   v0.47.0 — 2026-09-05 — THE AMBIENT (wish-atelier-ambient-visuals): the one layer allowed to
+ *     move at idle. The contract gains --ak-ambient, --ak-ambient-alpha and --ak-ambient-speed,
+ *     named by the look and proven by the matrix (AK-AMBIENT); ambient(), ambientStage(),
+ *     weather(), attract(), setWeather() and weatherLevel() join the surface; app() mounts the
+ *     layer behind the frame with the weather switch beside the motion switch; a stored
+ *     arrangement's `ambient` reaches the frame through the mosaic; lounge and dawn are the
+ *     two worlds built for it. The doctrine stays: every component still repaints zero times
+ *     at idle, and the layer pauses on a hidden tab, stills under Less motion and reduced
+ *     motion, and goes quiet under the viewer's weather.
  *   v0.46.0 — 2026-09-02 — ROUND THREE (wish-atelier-motion-round-three): layoutMove, swipeStack
  *     and micro on Motion; morph, draggable, burst and scrub on anime.js; the director learns
  *     snap and sideways chapters, with parallax and readingRail beside it; the transitions reach
@@ -268,6 +273,8 @@ import { morph, draggable, burst, scrub } from './anime-more.js';
 import { layoutMove, swipeStack, micro } from './motion-show.js';
 import { screenTransition, panelTransition, curtain, intro } from './transitions.js';
 import { setMotion } from './dom.js';
+import { ambient, setWeather, weatherLevel } from './ambient.js';
+import { ambientStage, weather, attract } from './ambient-parts.js';
 
 const atelier = {
   /**
@@ -345,6 +352,10 @@ const atelier = {
   morph, draggable, burst, scrub,
   layoutMove, swipeStack, micro,
   screenTransition, panelTransition, curtain, intro, setMotion,
+
+  // ── The ambient: the one layer allowed to move at idle, its stage, the weather switch and
+  //    attract mode (the look decides; the viewer's weather and Less motion always win) ──
+  ambient, ambientStage, weather, attract, setWeather, weatherLevel,
 
   // ── Data ──
   form, table, searchBar,
