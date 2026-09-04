@@ -597,6 +597,54 @@ const GUARD_SUITES = [
     'test/e2e-owner-deactivation.ts',       // deactivating an account ends every credential family, now (BR-04)
     'test/e2e-saml-login.ts',               // the organisation sign-in doors: who signs in, and every refusal (BR-04)
     'test/e2e-scim-users.ts',               // a directory drives accounts; connection isolation and the operator fence (BR-04)
+    // ── Promoted 2026-09-04, each one earned by §18: alone, on a freshly deleted database, three
+    // consecutive identical green runs on BOTH backends. The tier's question is unchanged — does a
+    // failure here mean a principal can reach money, an identity, or another account's data that
+    // they must not? Everything below answers yes.
+    'test/e2e-app-members.ts',              // who is approved into an app, and who is handed free access to what its owner sells
+    'test/e2e-invitations.ts',              // an invitation is a capability: the email binding, and who may spend it
+    'test/e2e-invite-grants.ts',            // what an accepted invitation actually grants, and what it must not
+    'test/e2e-registration-mode.ts',        // open, invite-only, closed: which road into this node is open right now
+    'test/e2e-access-tokens.ts',            // a PAT is a credential the human minted; its scopes, its ceiling, its end
+    'test/e2e-auth-lib.ts',                 // the sign-in library itself: what a wrong credential gets
+    'test/e2e-auth-tarpit.ts',              // repeated failures slow down instead of answering faster
+    'test/e2e-knowledge.ts',                // the operator's moderation record, and whose packages a caller may read
+    'test/e2e-app-store-license.ts',        // buying spends the human's morsels; who may, and what a licence follows
+    'test/e2e-commerce.ts',                 // the checkout rail: who pays, how much, and who is refused
+    'test/e2e-exchange.ts',                 // what a seller sells, what a contract entitles, and what it does not
+    'test/e2e-beneficiary-split.ts',        // where the money goes after a sale, and who may change that
+    'test/e2e-finance.ts',                  // the ledger a person reads about their own money
+    'test/e2e-mcp-commerce.ts',             // the same money doors over MCP, which is a different surface with the same rules
+    'test/e2e-mcp-beneficiary.ts',          // …and the payout half of it
+    'test/e2e-catalogue-identity.ts',       // a published action carries the RESOLVED identity, never the raw sub
+    'test/e2e-app-origin.ts',               // an app's own subdomain is a security boundary, not a convenience
+    'test/e2e-app-fork.ts',                 // forking someone else's app: what comes with it and what must not
+    'test/e2e-subdomains.ts',               // which host serves what, and what a wrong host must not reach
+    'test/e2e-contacts.ts',                 // who may see that a person exists here, and who they know
+    'test/e2e-key-space-shares.ts',         // a share is a key-prefix grant; its edges are the whole of it
+    'test/e2e-organism-membership.ts',      // membership decides every organism read; joining, leaving and being removed
+    'test/e2e-workspace-public-sharing.ts', // what "public" means for a workspace, one object at a time
+    'test/e2e-mcp-workspaces.ts',           // the same workspace fences over MCP
+    'test/e2e-mcp-organism-namespace.ts',   // an organism's namespace stays its own on the tool surface
+    'test/e2e-mcp-knowledge.ts',            // knowledge packages over MCP, including whose a caller may reach
+    'test/e2e-mcp-extensions.ts',           // installing and invoking an extension through the tool surface
+    'test/e2e-mcp-agent-tasks.ts',          // an agent's tasks are its own; the tool surface must agree
+    'test/e2e-agent-tasks.ts',              // …and the HTTP door that says the same thing
+    'test/e2e-agent-v2.ts',                 // the Agent v2 identity: enrolment, run mode, and what each is allowed
+    'test/e2e-agent-v2-tasks.ts',           // v2 task lifecycle across principals
+    'test/e2e-agent-v2-a2a.ts',             // an agent on ANOTHER node, and what a cross-node caller may do here
+    'test/e2e-workflows-human.ts',          // a parked question waits for a person; who may answer it
+    'test/e2e-iam-extension.ts',            // the permission model an app runs on, and the admin surface behind it
+    'test/e2e-skills.ts',                   // a published skill is readable by design; what stays private is the point
+    'test/e2e-designbook.ts',               // proposing and adopting shared design decisions across owners
+    'test/e2e-packages.ts',                 // a package crosses an owner boundary; every edge of that crossing
+    'test/e2e-companies.ts',                // a company record and who may speak for it
+    'test/e2e-connections.ts',              // an outside account connected to this one: tokens, scopes and revocation
+    'test/e2e-compliance-report.ts',        // the report reaches every account, so the word for it is outside the wildcard
+    'test/e2e-admin-features.ts',           // the operator surface, and every non-operator refused at it
+    'test/e2e-ai-provenance.ts',            // what a record claims about who wrote something
+    'test/e2e-ai-provenance-agent-plane.ts',// …as an agent sees it
+    'test/e2e-ai-provenance-surfaces.ts',   // one record read four ways, and the identical 404 that hides the rest
 ];
 
 // Every other .ts file in test/, with the reason it is not a suite. The reason is the point: someone
