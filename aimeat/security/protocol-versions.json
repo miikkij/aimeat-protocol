@@ -1,0 +1,77 @@
+{
+  "note": "Every external protocol this node speaks, the version we DECLARE, the version that is CURRENT, and the day somebody last checked. Seeded 2026-09-04, the day the gate was written, after a capability audit that was wrong three times in one afternoon: it said the MCP v2 SDK did not exist (it does, as a package split rather than a version bump), that four A2A task states were missing (all eight were produced) and that task results carried no artifacts (they did). Every one of those was a guess where a checked date would have been an answer. Two entries are verified. The rest say untriaged, which is a question nobody has answered and not a clearance: an entry leaves that state by somebody reading the spec and writing what they found, never by re-seeding, which would forgive the whole list at once. `weDeclare` is checked against the code on every commit, so the ledger cannot drift from what the node actually says; `verifiedOn` is checked against maxAgeDays, so the ledger cannot go quietly stale.",
+  "maxAgeDays": 90,
+  "verdicts": {
+    "current": "We declare what is current. Nothing to do.",
+    "watch": "A newer revision exists and we have decided not to move yet. The note says why and what would change the answer.",
+    "adopt": "We have decided to move. The note says what is left.",
+    "decline": "A newer revision exists and we will not follow it. The note says what we do instead.",
+    "untriaged": "Nobody has compared what we declare against what is current. Not a clearance."
+  },
+  "protocols": [
+    {
+      "id": "mcp",
+      "name": "Model Context Protocol",
+      "spec": "https://modelcontextprotocol.io/specification/versioning",
+      "weDeclare": "2025-06-18",
+      "declaredIn": [
+        { "file": "src/routes/wellknown.ts", "template": "protocolVersion: '{version}'" },
+        { "file": "src/routes/subdomain-origin-docs.ts", "template": "protocolVersion: '{version}'" }
+      ],
+      "current": "2026-07-28",
+      "verifiedOn": "2026-09-04",
+      "verdict": "watch",
+      "note": "Two revisions behind, and the newer one is a rework rather than an increment: sessions and the initialize handshake are gone, `server/discover` is mandatory, `subscriptions/listen` replaces resources/subscribe, and Roots, Sampling and Logging are deprecated. Measured on branch mcp-v2-prototype against the real catalogue: all 306 published tools register on @modelcontextprotocol/server 2.0.0 unchanged, server/discover answers, a stateless request works, and a client on 2025-06-18 is still served by the same handler. So the move is viable and not urgent. What would change the answer: the SDK settling (maintainers are limiting PRs while v2 beds in), or a client we care about requiring the newer revision. NOTE the two declaration sites — this version is written out twice, and the gate checks both because one of them has been forgotten before."
+    },
+    {
+      "id": "a2a",
+      "name": "Agent2Agent",
+      "spec": "https://a2a-protocol.org/latest/specification/",
+      "weDeclare": "0.3",
+      "declaredIn": [
+        { "file": "src/services/a2a-card.ts", "template": "const A2A_LEGACY_VERSION = '{version}'" }
+      ],
+      "current": "1.0.0",
+      "verifiedOn": "2026-09-04",
+      "verdict": "current",
+      "note": "We serve 1.x through @a2a-js/sdk (A2A_PROTOCOL_VERSION) and declare 0.3 BESIDE it, deliberately: almost every client in the world still speaks 0.3, the SDK ships the compatibility layer, and the card declares both interfaces so a client reading either finds an address. The value tracked here is the legacy one, because it is the one written out by hand. Surface as of 2026-09-04: streaming on, push notifications on, extended agent card on, all eight task states produced, artifacts on the task, x402 extension declared."
+    },
+    {
+      "id": "x402",
+      "name": "x402 machine payments",
+      "spec": "https://x402.org",
+      "weDeclare": "1",
+      "declaredIn": [
+        { "file": "src/routes/agent-conventions.ts", "template": "x402Version: {version}" }
+      ],
+      "current": null,
+      "verifiedOn": null,
+      "verdict": "untriaged",
+      "note": "Nobody has checked whether x402 has moved past version 1. We serve /.well-known/x402.json on base-sepolia with the facilitator at x402.org, non-custodial, per-item 402s."
+    },
+    {
+      "id": "openapi",
+      "name": "OpenAPI",
+      "spec": "https://spec.openapis.org/",
+      "weDeclare": "3.1.0",
+      "declaredIn": [
+        { "file": "../openapi.yaml", "template": "openapi: {version}" }
+      ],
+      "current": null,
+      "verifiedOn": null,
+      "verdict": "untriaged",
+      "note": "3.2 exists. Nobody has read what it would give us. Separately and worth its own look: the served document is 1.6 MB, which is large enough that at least one agent-readiness scanner times out reading it and reports it as invalid JSON."
+    },
+    { "id": "acp", "name": "Agentic Commerce Protocol", "spec": "https://.well-known/acp.json", "weDeclare": null, "declaredIn": [], "current": null, "verifiedOn": null, "verdict": "untriaged", "note": "Served at /.well-known/acp.json. Nobody has compared it against the published spec." },
+    { "id": "ucp", "name": "Universal Commerce Profile", "spec": "https://.well-known/ucp", "weDeclare": null, "declaredIn": [], "current": null, "verifiedOn": null, "verdict": "untriaged", "note": "Served at /.well-known/ucp. Nobody has compared it against the published spec." },
+    { "id": "webmcp", "name": "WebMCP", "spec": "https://github.com/webmachinelearning/webmcp", "weDeclare": null, "declaredIn": [], "current": null, "verifiedOn": null, "verdict": "untriaged", "note": "Manifest at /.well-known/webmcp.json, library at /v1/libs/aimeat-webmcp.js. Form tool annotations are not implemented." },
+    { "id": "web-bot-auth", "name": "Web Bot Auth", "spec": "https://datatracker.ietf.org/doc/draft-meunier-web-bot-auth-architecture/", "weDeclare": null, "declaredIn": [], "current": null, "verifiedOn": null, "verdict": "untriaged", "note": "Signatures directory at /.well-known/http-message-signatures-directory. A draft that moves; nobody has followed it." },
+    { "id": "agent-skills", "name": "Agent Skills", "spec": "https://.well-known/agent-skills/index.json", "weDeclare": null, "declaredIn": [], "current": null, "verifiedOn": null, "verdict": "untriaged", "note": "Index served; skill.md carries YAML frontmatter. Nobody has checked the convention against its source." },
+    { "id": "llms-txt", "name": "llms.txt", "spec": "https://llmstxt.org", "weDeclare": null, "declaredIn": [], "current": null, "verifiedOn": null, "verdict": "untriaged", "note": "Scored 100 on llmstxt.org compliance by an external scanner on 2026-09-04, which is not the same as somebody having read the spec." },
+    { "id": "oasf", "name": "OASF agent records", "spec": "https://github.com/agntcy/oasf", "weDeclare": null, "declaredIn": [], "current": null, "verifiedOn": null, "verdict": "untriaged", "note": "Projection served at /v1/oasf/:owner/:agent. Directory listing was deferred until agents describe what they sell." },
+    { "id": "ard", "name": "Agentic Resource Discovery", "spec": "https://agenticresourcediscovery.org", "weDeclare": null, "declaredIn": [], "current": null, "verifiedOn": null, "verdict": "untriaged", "note": "NOT IMPLEMENTED. /.well-known/ai-catalog.json is 404 and no Agentmap directive, link tag or DNS record points anywhere. A decision, not an oversight: wish-ard-ai-catalog in the wish bucket carries the analysis and the two open questions." },
+    { "id": "rfc9728", "name": "OAuth Protected Resource Metadata (RFC 9728)", "spec": "https://datatracker.ietf.org/doc/html/rfc9728", "weDeclare": null, "declaredIn": [], "current": null, "verifiedOn": null, "verdict": "untriaged", "note": "Two documents served: the origin's at the bare well-known path and the MCP endpoint's at the path-suffixed one, fixed 2026-09-04 after a scanner found the apex naming a resource it was not. The RFC itself has not been re-read since." },
+    { "id": "rfc8628", "name": "OAuth Device Authorization Grant (RFC 8628)", "spec": "https://datatracker.ietf.org/doc/html/rfc8628", "weDeclare": null, "declaredIn": [], "current": null, "verifiedOn": null, "verdict": "untriaged", "note": "How every agent gets an identity here. Stable RFC, but nobody has checked our flow against it since it was written." },
+    { "id": "agents-txt", "name": "agents.txt", "spec": "https://agentstxt.org", "weDeclare": null, "declaredIn": [], "current": null, "verifiedOn": null, "verdict": "untriaged", "note": "Served at /agents.txt. A young convention with no settled owner; nobody has checked whose version we follow." }
+  ]
+}
