@@ -164,8 +164,10 @@ const ADMIN_DOORS: Array<{ method: string; path: string; body?: unknown }> = [
     { method: 'DELETE', path: '/v1/admin/email/templates/nonexistent' },
     { method: 'GET', path: '/v1/admin/directory/stats' },
     { method: 'POST', path: '/v1/admin/directory/rebuild' },
-    { method: 'GET', path: '/v1/admin/matching' },
-    { method: 'POST', path: '/v1/admin/matching/run' },
+    // /v1/admin/matching and /v1/admin/matching/run were here; the engine went on 2026-08-29 and a
+    // route that does not exist answers 404 to everyone, which reads as "did not refuse" to a door
+    // sweep. The sweep is right to say so — a 404 is not a refusal — and the entries were the stale
+    // half.
     { method: 'GET', path: '/v1/admin/marketplace' },
     { method: 'GET', path: '/v1/admin/push' },
     { method: 'PUT', path: '/v1/admin/push/templates/nonexistent/en', body: { title: 'x', body: 'y' } },
@@ -308,24 +310,12 @@ await test('POST /v1/admin/directory/rebuild \u2192 200, has rebuilt field', asy
 // ─── Matching ───
 console.log('\nMatching');
 
-await test('GET /v1/admin/matching \u2192 200, has enabled field', async () => {
-    const { status, body } = await json('/v1/admin/matching', authed());
-    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
-    assert(body.ok === true, 'ok');
-    assert(typeof body.data?.enabled === 'boolean', 'has enabled field');
-    assert(typeof body.data?.interval_hours === 'number', 'has interval_hours');
-    assert(typeof body.data?.threshold === 'number', 'has threshold');
-    assert(typeof body.data?.max_suggestions === 'number', 'has max_suggestions');
-});
-
-await test('POST /v1/admin/matching/run \u2192 200, returns result', async () => {
-    const { status, body } = await json('/v1/admin/matching/run', authed({
-        method: 'POST',
-    }));
-    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
-    assert(body.ok === true, 'ok');
-    assert(body.data !== undefined, 'has data');
-});
+// Two tests stood here until 2026-09-04. The matching ENGINE was removed on 2026-08-29 with the
+// developer's explicit go-ahead, after being shown it could not produce a match at all: it required
+// a consent whose purpose was the exact string 'matching', so every round scanned zero profiles and
+// GET /v1/matches could never return one. Its routes, its scheduler wiring, its email template and
+// its table went with it, and matchmaking between profiles is an application on this platform rather
+// than part of it. These two outlived the feature and answered 404 for six days.
 
 // ─── Marketplace ───
 console.log('\nMarketplace');
@@ -410,7 +400,7 @@ await test('GET /v1/admin/config \u2192 200, schema has expected paths', async (
     // Check for expected config paths
     const schema = body.data.schema;
     assert('email.enabled' in schema, 'schema has email.enabled');
-    assert('matching.enabled' in schema, 'schema has matching.enabled');
+    // matching.enabled left the schema with the engine on 2026-08-29.
     assert('marketplace.enabled' in schema, 'schema has marketplace.enabled');
     assert('push.enabled' in schema, 'schema has push.enabled');
     assert('morsel_policy.welcome_bonus' in schema, 'schema has morsel_policy.welcome_bonus');
@@ -530,10 +520,16 @@ await test('GET /v1/admin/translations?lang=fi \u2192 200, mintMorsels contains 
     assert(body.ok === true, 'ok');
     assert(body.data.locale === 'fi', `locale is fi, got ${body.data.locale}`);
     assert(typeof body.data.translations === 'object', 'has translations');
-    assert(
-        typeof body.data.translations.mintMorsels === 'string' && body.data.translations.mintMorsels.includes('Luo'),
-        `mintMorsels should contain 'Luo', got '${body.data.translations.mintMorsels}'`,
-    );
+    // The question is whether ?lang=fi serves FINNISH, not which Finnish. This used to require the
+    // word 'Luo' and went red when the string was improved from "Luo murusia" to "Myönnä murusia" —
+    // grant, not create, which is what a morsel mint does. A test that freezes one translated word
+    // fails every time somebody makes the translation better, which is the opposite of what it is
+    // for. So: present, non-empty, and not the English.
+    const fi = body.data.translations.mintMorsels;
+    assert(typeof fi === 'string' && fi.length > 0, `mintMorsels present in fi, got '${fi}'`);
+    const en = await json('/v1/admin/translations?lang=en', authed());
+    assert(fi !== en.body.data.translations.mintMorsels,
+        `fi must not be the English string, both are '${fi}'`);
 });
 
 // ─── MSM Templates ───
