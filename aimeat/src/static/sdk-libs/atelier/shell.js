@@ -26,6 +26,12 @@
  * @usage  const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  *         a.main.appendChild(view);   // the main element is yours to fill
  * @version-history
+ *   v0.47.0 — 2026-09-05 — THE AMBIENT behind the frame (wish-atelier-ambient-visuals): app()
+ *     mounts the one layer allowed to move at idle, the look deciding unless `ambient` names a
+ *     preset (a string, or { preset, alpha, speed, fps, gl }) and `ambient: false` opting out;
+ *     set({ ambient }) changes it later. The WEATHER switch (Off, Calm, Full) stands before the
+ *     motion switch while a preset is in force and hides when the look runs none. The handle
+ *     carries both as `ambient` and `weather`.
  *   v0.46.0 — 2026-09-02 — The bar carries the kit's transitions: the theme flip opens as an
  *     IRIS from the mode button's own centre (the click is caught in the bar's capture phase and
  *     replayed inside the transition, because the control flips the root the moment it is let
@@ -47,6 +53,8 @@ import { el, append, clear, resolve, uid, injectStyle, enter, setMotion } from '
 import { t, i18n } from './i18n.js';
 import { emptyState } from './state.js';
 import { screenTransition, curtain } from './transitions.js';
+import { ambient } from './ambient.js';
+import { weather } from './ambient-parts.js';
 
 /** How often the boot poll looks for a session the silent login produced without an event. */
 const BOOT_POLL_MS = 300;
@@ -112,19 +120,44 @@ function motionIsLess() {
  * @property {HTMLElement} el
  * @property {HTMLElement} main
  * @property {(patch: { title?: string, look?: string, density?: 'comfortable'|'compact',
- *   quiet?: boolean }) => void} set
+ *   quiet?: boolean, ambient?: AmbientWish }) => void} set
  * @property {(kind: 'loading'|'ready'|'empty'|'error'|'signin'|'none', opts?: { title?: string, hint?: string, onRetry?: () => void }) => void} status
  * @property {(key: string, vars?: Record<string, any>) => string} t
  * @property {typeof i18n} i18n
+ * @property {import('./ambient.js').AmbientHandle|null} ambient  the layer behind the frame (null after `ambient: false`)
+ * @property {{ el: HTMLElement }|null} weather  the bar's weather switch
  * @property {() => void} destroy
  */
+
+/**
+ * What an app may say about its ambient: a preset id or 'none', false for no layer at all,
+ * null or undefined for "the look decides", or the full wish.
+ * @typedef {string|false|null|undefined|{ preset?: string|null, alpha?: number, speed?: number,
+ *   fps?: number, gl?: boolean }} AmbientWish
+ */
+
+/**
+ * The layer's spec from an app's wish. A string names the preset; an object carries the
+ * numbers; anything else hands the decision to the look.
+ * @param {AmbientWish} want
+ */
+function ambientSpec(want) {
+  if (typeof want === 'string') return { preset: want };
+  if (want && typeof want === 'object') {
+    return {
+      preset: want.preset == null ? null : want.preset,
+      alpha: want.alpha, speed: want.speed, fps: want.fps, gl: want.gl,
+    };
+  }
+  return { preset: null };
+}
 
 /**
  * The app shell.
  * @param {{
  *   target?: string|Element, title: string, tagline?: string, look?: string, footer?: string,
  *   navItems?: Array<{ id: string, label: string, onPick?: (item: any) => void }>,
- *   requireLogin?: boolean,
+ *   requireLogin?: boolean, ambient?: AmbientWish,
  *   onReady?: (session: any) => void, onLogout?: () => void,
  * }} spec
  * @returns {AppHandle}
@@ -214,6 +247,30 @@ export function app(spec) {
   // on this track, because the kit is the only stylesheet).
   const fullFrame = mount === document.body;
   if (fullFrame) document.body.classList.add('ak-body');
+
+  // THE AMBIENT: the one layer allowed to move at idle, behind the frame. The look decides (the
+  // layer reads the look's tokens) unless the spec names a preset, and `ambient: false` opts
+  // the app out. The weather switch stands beside the motion switch only while a preset is in
+  // force, so an app whose look runs none shows no control for it.
+  let sky = null;
+  let weatherCtl = null;
+  function syncWeather() {
+    if (weatherCtl) weatherCtl.el.hidden = !sky || sky.preset() === 'none';
+  }
+  /** @param {AmbientWish} want */
+  function ensureSky(want) {
+    if (!sky) {
+      sky = ambient(Object.assign({ target: root }, ambientSpec(want)));
+      weatherCtl = weather({ kind: 'cycle' });
+      weatherCtl.el.classList.add('ak-app__weather');
+      bar.insertBefore(weatherCtl.el, motionBtn);
+    } else {
+      sky.set(Object.assign({ preset: null, alpha: null, speed: null }, ambientSpec(want)));
+    }
+    syncWeather();
+  }
+  root.addEventListener('ak-ambient-preset', syncWeather);
+  if (spec.ambient !== false) ensureSky(spec.ambient);
 
   /** The current status card, so `status()` swaps rather than stacks. */
   let statusCard = null;
@@ -348,10 +405,16 @@ export function app(spec) {
     main: main,
 
     /** @param {{ title?: string, look?: string, density?: 'comfortable'|'compact',
-     *    quiet?: boolean }} patch */
+     *    quiet?: boolean, ambient?: AmbientWish }} patch */
     set(patch) {
       if (!patch) return;
       if (patch.title != null) { state.title = patch.title; heading.textContent = state.title; }
+      // The ambient follows the same door as the constructor: false switches the layer to
+      // none, a preset or a wish overrides the look, null hands the decision back to it.
+      if ('ambient' in patch) {
+        if (patch.ambient === false) { if (sky) { sky.set({ preset: 'none' }); syncWeather(); } }
+        else ensureSky(patch.ambient);
+      }
       if (patch.look != null && patch.look !== state.look) {
         state.look = patch.look;
         const dress = function () { root.setAttribute('data-ak-look', state.look); };
@@ -375,10 +438,15 @@ export function app(spec) {
     status: status,
     t: t,
     i18n: i18n,
+    get ambient() { return sky; },
+    get weather() { return weatherCtl; },
 
     destroy() {
       stopLang();
       window.removeEventListener('ak-motion', syncMotion);
+      root.removeEventListener('ak-ambient-preset', syncWeather);
+      if (sky) sky.destroy();
+      if (weatherCtl) weatherCtl.destroy();
       bar.removeEventListener('click', onBarClick, true);
       if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
       if (graceTimer) { clearTimeout(graceTimer); graceTimer = null; }
