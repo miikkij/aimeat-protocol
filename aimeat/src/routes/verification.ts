@@ -5,6 +5,15 @@
  * @description Routes for identity verification (EUDIW, FTN), W3C VC issuance,
  *   MyData consent receipts, and trusted issuer management.
  * @version-history
+ *   v2.3.0 — 2026-09-04 — The two doors that OPEN a verification join the two that close it. Each
+ *     mints a nonce stamped with `req.auth!.owner` and hands back a state; the callback that
+ *     consumes that state cannot be authenticated (it is a wallet or bank-ID redirect) and writes
+ *     verificationLevel 3 plus the presented attributes onto the GHII the NONCE names. Fencing only
+ *     the POSTs left each flow half fenced: any principal in the person's name could open the rail,
+ *     and whoever walked through it had their own given name, family name, birthdate and national
+ *     identifier hash stamped on somebody else's account as proved. GET /v1/trusted-issuers is
+ *     gated on catalogue:read in the same pass — a default scope for agents, anonymous sessions and
+ *     federation alike, so it bites an app grant approved for one unrelated word and nothing else.
  *   v1.0.0 — 2026-03-01 — Initial scaffold
  *   v2.0.0 — 2026-05-02 — Nonce validation, FTN OIDC authorize/callback, VC JWT format
  *   v2.2.0 — 2026-09-04 — The VC issuance read joins them. v2.1.0 closed the two doors that stamp an
@@ -27,7 +36,7 @@ import type { EudiwService } from '../services/eudiw.js';
 import type { VcIssuerService } from '../services/vc-issuer.js';
 import type { MyDataReceiptService } from '../services/mydata-receipt.js';
 import type { OidcClient } from '../services/oidc-client.js';
-import { requireAuth, requireOwnerPrincipal, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireOwnerPrincipal, requireRole, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 
@@ -42,7 +51,17 @@ export function verificationRouter(
   const router = Router();
 
   // GET /v1/ghii/verify/eudiw/request — Generate OpenID4VP Authorization Request
-  router.get('/v1/ghii/verify/eudiw/request', requireAuth(), async (req, res) => {
+  //
+  // requireOwnerPrincipal, not requireAuth, since 2026-09-04, for the reason the POST below carries
+  // and this door had been missing: the nonce written here is stamped with `req.auth!.owner`, the
+  // ACCOUNT NAME, which every principal acting in the person's name carries — an agent JWT, an
+  // ecosystem token, an app grant, a PAT. The callback that consumes the state cannot be
+  // authenticated (it is a wallet redirect, like every OIDC callback on this node), so it writes
+  // verificationLevel 3 and the presented attributes onto the GHII the NONCE names. Fencing only the
+  // POST left the flow half fenced: any principal could open a verification bound to the human, and
+  // whoever completed it against that state had their own identity written onto the human's record.
+  // The fence has to be here, where the state is minted, because there is nowhere later to put it.
+  router.get('/v1/ghii/verify/eudiw/request', requireAuth(), requireOwnerPrincipal(), async (req, res) => {
     try {
       if (!config.eudiwEnabled) {
         res.status(503).json(error(config.nodeId, 'FEATURE_DISABLED', 'EUDIW verification not available'));
@@ -225,7 +244,14 @@ export function verificationRouter(
   });
 
   // GET /v1/ghii/verify/ftn/authorize — Initiate FTN OIDC flow
-  router.get('/v1/ghii/verify/ftn/authorize', requireAuth(), async (req, res) => {
+  // requireOwnerPrincipal, not requireAuth, since 2026-09-04 — same split as the EUDIW request door
+  // above, and this is the sharper half of it. The bank-ID rail ends at GET /v1/ghii/verify/ftn/
+  // callback, which is unauthenticated by necessity and writes verificationLevel 3, ftnVerified and
+  // the eIDAS attributes onto the GHII named by the nonce this door mints. So the person who
+  // FINISHES the login need not be the person the record is written to: any principal in the human's
+  // name could open the rail, and whoever walked through it would have their own given name, family
+  // name, birthdate and national identifier hash stamped on somebody else's account as proved.
+  router.get('/v1/ghii/verify/ftn/authorize', requireAuth(), requireOwnerPrincipal(), async (req, res) => {
     try {
       if (!config.ftnEnabled || !oidcClient?.initialized) {
         res.status(503).json(error(config.nodeId, 'FEATURE_DISABLED', 'FTN verification not available'));
@@ -417,7 +443,7 @@ export function verificationRouter(
   });
 
   // GET /v1/consent/:id/receipt — MyData Consent Receipt
-  router.get('/v1/consent/:id/receipt', requireAuth(), async (req, res) => {
+  router.get('/v1/consent/:id/receipt', requireAuth(), requireScope('consent:manage'), async (req, res) => {
     try {
       const consentId = req.params.id as string;
       const consent = await storage.getConsent(consentId);
@@ -473,7 +499,7 @@ export function verificationRouter(
   });
 
   // GET /v1/trusted-issuers — List trusted issuers
-  router.get('/v1/trusted-issuers', requireAuth(), async (req, res) => {
+  router.get('/v1/trusted-issuers', requireAuth(), requireScope('catalogue:read'), async (req, res) => {
     try {
       const type = req.query.type as string | undefined;
       const issuers = await storage.listTrustedIssuers(type ? { type } : undefined);

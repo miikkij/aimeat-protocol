@@ -183,6 +183,37 @@ await test('10. Logged-in account whose verified email MATCHES accepts as self (
     assert((m.body.data.members || []).some((x: any) => x.ghii === V.name), 'V is a member');
 });
 
+// The signed-in branch is the person's own decision, since 2026-09-04. `req.auth.owner` is the
+// ACCOUNT NAME, carried alike by an agent JWT, an ecosystem token and an app grant, so an agent of V
+// passed the same test V does — and the recipient binding above did not stop it, because the
+// invitation genuinely was addressed to V's verified email. What it could do was walk its human into
+// an organism and take the inviter's chosen role and workspace grants with them. The refusal must
+// also leave the invitation alone, or a machine that cannot accept could still burn it.
+await test('10a-i. An AGENT of the matched account cannot accept for them (invite stays pending)', async () => {
+    const inviteEmail = `agentaccept.${Date.now()}@example.com`;
+    const W = await registerVerified(inviteEmail);
+    const c = await json(`/v1/organisms/${orgId}/invitations/email`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ email: inviteEmail, orgRole: 'member' }) });
+    const t = tokenFrom(c.body.data.accept_url);
+
+    const da = await json('/v1/agents/device-authorize', { method: 'POST', body: JSON.stringify({ agent_name: 'joiner', owner: W.name }) });
+    const v = await json('/v1/agents/verify', { method: 'POST', body: JSON.stringify({ user_code: da.body.data.user_code, action: 'approve', scopes: ['*'], owner_token: W.token }) });
+    assert(v.status === 200, `verify ${v.status}: ${JSON.stringify(v.body?.error)}`);
+    const tk = await json('/v1/agents/device-token', { method: 'POST', body: JSON.stringify({ device_code: da.body.data.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }) });
+    const agentTok = tk.body.token as string;
+
+    // Full access, so what refuses it is the principal and not a missing word.
+    const asAgent = await json(`/v1/invitations/${t}/accept`, { method: 'POST', headers: auth(agentTok), body: '{}' });
+    assert(asAgent.status === 403, `an agent joined its human to an organism: ${asAgent.status} ${JSON.stringify(asAgent.body?.data ?? asAgent.body?.error)}`);
+    assert(asAgent.body.error?.code === 'ACCESS_DENIED', `refused for the wrong reason: ${JSON.stringify(asAgent.body.error)}`);
+
+    // Not consumed, and the person it was for can still use it.
+    const still = await json(`/v1/invitations/${t}`);
+    assert(still.status === 200, `the refusal burned the invite: ${still.status}`);
+    const asPerson = await json(`/v1/invitations/${t}/accept`, { method: 'POST', headers: auth(W.token), body: '{}' });
+    assert(asPerson.status === 200 && asPerson.body.data.status === 'joined',
+        `the person it was addressed to could no longer accept: ${asPerson.status} ${JSON.stringify(asPerson.body?.error)}`);
+});
+
 await test('10b. Logged-in account with a DIFFERENT verified email → 403 EMAIL_MISMATCH (invite stays pending)', async () => {
     const otherEmail = `other.${Date.now()}@example.com`;
     const c = await json(`/v1/organisms/${orgId}/invitations/email`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ email: otherEmail, orgRole: 'member' }) });

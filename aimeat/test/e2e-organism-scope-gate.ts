@@ -208,6 +208,49 @@ async function main() {
         });
     }
 
+    // ── The READ half of the same word pair, gated 2026-09-04 ──
+    //
+    // Eighteen organism read doors carried requireAuth() alone while the `organisms` SSE domain
+    // demanded organism:read (auth/sse-domain-scopes.ts) and the consent screen promised the owner
+    // it meant something (app-grant-vocabulary.ts: "Read the published content of workspaces you are
+    // a member of"). A word enforced on the live stream and not on the fetch of the same content is
+    // invariant 15, and it is the same finding this suite was written about, one direction over.
+    //
+    // The two agents here are the proof in both directions and neither is a stand-in: `scoped` holds
+    // organism:write and NOT organism:read, so it shows the neighbouring word in the same domain does
+    // not open a read door — which is the exact symmetry Phase 1 asserts for writes.
+    const READ_DOORS: Array<{ what: string; path: string }> = [
+        { what: 'read the whole workspace', path: `/v1/organisms/${'{org}'}/workspace?ws={ws}` },
+        { what: 'read the organism overview', path: '/v1/organisms/{org}/overview' },
+        { what: 'search the organism content', path: '/v1/organisms/{org}/search?q=x' },
+        { what: 'read the comment threads', path: '/v1/organisms/{org}/comments?ws={ws}' },
+        { what: 'export the whole organism', path: '/v1/organisms/{org}/export' },
+        { what: 'read the structure history', path: '/v1/organisms/{org}/structure/history' },
+    ];
+    const readDoor = (path: string) => path.replace('{org}', orgId).replace(/\{ws\}/g, wsId);
+
+    console.log('\nPhase 4b: The READ word decides the read doors, and the write word does not carry it');
+
+    for (const door of READ_DOORS) {
+        await test(`an agent holding organism:write but not organism:read cannot ${door.what}`, async () => {
+            const r = await json(readDoor(door.path), { headers: auth(scopedToken) });
+            assert(r.status === 403, `expected 403, got ${r.status} ${JSON.stringify(r.body?.error)}`);
+            assert(r.body.error?.code === 'SCOPE_DENIED', `expected SCOPE_DENIED, got ${r.body.error?.code}: ${r.body.error?.message}`);
+            assert((r.body.error?.message ?? '').includes('organism:read'),
+                `the refusal must name the scope, got: ${r.body.error?.message}`);
+        });
+
+        await test(`an agent holding organism:read can ${door.what}`, async () => {
+            const r = await json(readDoor(door.path), { headers: auth(narrowTokenBefore) });
+            assert(r.status !== 403, `the word did not admit its own holder: ${r.status} ${JSON.stringify(r.body?.error)}`);
+        });
+
+        await test(`the owner session can still ${door.what}`, async () => {
+            const r = await json(readDoor(door.path), { headers: auth(ownerToken) });
+            assert(r.status !== 403, `the account holder was refused their own organism: ${r.status} ${JSON.stringify(r.body?.error)}`);
+        });
+    }
+
     console.log('\nPhase 5: The boot migration hands the word to an agent that already had the reach');
 
     const provider = (process.env.AIMEAT_DB ?? 'memory') as StorageProvider;

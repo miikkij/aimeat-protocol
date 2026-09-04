@@ -403,7 +403,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
   /* ── POST /v1/organisms/:id/workspace-access/grant — creator/admin DIRECTLY adds a member with a role
    * (no prior request). Body: { ws, grantee, role: 'viewer' | 'contributor' }. grantee may be an owner
    * name, GHII, or GAII — the grant applies to that OWNER (so all their agents inherit it). ── */
-  router.post('/v1/organisms/:id/workspace-access/grant', requireAuth(), async (req, res) => {
+  router.post('/v1/organisms/:id/workspace-access/grant', requireAuth(), requireScope('organism:invite'), async (req, res) => {
     const id = req.params.id as string;
     const { ws, grantee, role } = req.body ?? {};
     if (!grantee || typeof grantee !== 'string' || (role !== 'viewer' && role !== 'contributor')) {
@@ -424,7 +424,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
 
   /* ── POST /v1/organisms/:id/workspace-access/revoke — creator/admin removes a member's access.
    * Body: { ws, grantee }. ── */
-  router.post('/v1/organisms/:id/workspace-access/revoke', requireAuth(), async (req, res) => {
+  router.post('/v1/organisms/:id/workspace-access/revoke', requireAuth(), requireScope('organism:invite'), async (req, res) => {
     const id = req.params.id as string;
     const { ws, grantee } = req.body ?? {};
     if (!grantee || typeof grantee !== 'string') { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'grantee is required')); return; }

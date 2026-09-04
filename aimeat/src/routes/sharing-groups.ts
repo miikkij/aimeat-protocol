@@ -79,7 +79,7 @@ export function sharingGroupsRouter(config: AimeatConfig, storage: Storage): Rou
   });
 
   /* ── GET /v1/groups -- List own + member-of groups ── */
-  router.get('/v1/groups', requireAuth(), async (req, res) => {
+  router.get('/v1/groups', requireAuth(), requireScope('memory:read'), async (req, res) => {
     const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
     const identity = resolve(req);
 
@@ -108,7 +108,7 @@ export function sharingGroupsRouter(config: AimeatConfig, storage: Storage): Rou
   });
 
   /* ── GET /v1/groups/:id -- Get group detail ── */
-  router.get('/v1/groups/:id', requireAuth(), async (req, res) => {
+  router.get('/v1/groups/:id', requireAuth(), requireScope('memory:read'), async (req, res) => {
     const id = req.params.id as string;
     const identity = resolve(req);
 

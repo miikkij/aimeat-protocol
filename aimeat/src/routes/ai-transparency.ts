@@ -50,7 +50,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AiProvenanceRecordRow } from '../storage/interface.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { success } from '../middleware/envelope.js';
 import { sendMarkdown, prefersHtmlPage } from '../services/markdown-negotiation.js';
 import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
@@ -387,7 +387,7 @@ export function aiTransparencyRouter(config: AimeatConfig, storage: Storage): Ro
   // ── GET /v1/ai-transparency/mine — what YOUR agents published, and how it was labelled ──
   // Most publishing on this node is done by accounts, so an account has to be able to see its own
   // exposure without asking the operator. Scoped by resolveIdentity(), never by a query parameter.
-  router.get('/v1/ai-transparency/mine', requireAuth(), async (req: Request, res: Response) => {
+  router.get('/v1/ai-transparency/mine', requireAuth(), requireScope('wallet:read'), async (req: Request, res: Response) => {
     const ownerGhii = ownerGhiiOf(resolveIdentity(req.auth!, config.nodeId));
     const sinceDays = Number.parseInt(String(req.query.since_days ?? ''), 10);
     const opts = { ownerGhii, sinceDays: Number.isFinite(sinceDays) ? sinceDays : undefined };

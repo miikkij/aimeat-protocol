@@ -21,7 +21,7 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth } from '../auth/middleware.js';
+import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { registerChatInstance, touchChatInstance } from '../services/chat-instance-write.js';
@@ -83,7 +83,7 @@ export function chatInstancesRouter(config: AimeatConfig, storage: Storage): Rou
   });
 
   // GET /v1/chat-instances/:id — Get chat instance details
-  router.get('/v1/chat-instances/:id', requireAuth(), async (req, res) => {
+  router.get('/v1/chat-instances/:id', requireAuth(), requireScope('wallet:read'), async (req, res) => {
     const id = req.params.id as string;
     const record = await storage.getChatInstance(id);
 

@@ -33,7 +33,7 @@ import type { Storage, AgentTaskRecord, AgentTaskRating, RaterType } from '../..
 import { RATING_CONTEXTS_REQUIRING_GROUNDING } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
 import { refuseNotYours } from '../../middleware/refusals.js';
-import { requireAuth, requireRole } from '../../auth/middleware.js';
+import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
 import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
 import { completeTask, failTask } from '../../services/agent-task-fanout.js';
@@ -162,7 +162,7 @@ export function registerTaskCompletionRoutes(
    * faithfulness (POC-proven). Human owners are exempt; `creative` accepts an
    * output-alone craft rating.
    */
-  router.post('/v1/agents/:name/tasks/:id/rate', requireAuth(), async (req, res) => {
+  router.post('/v1/agents/:name/tasks/:id/rate', requireAuth(), requireScope('task:write'), async (req, res) => {
     const id = req.params.id as string;
 
     const task = await storage.getAgentTask(id);

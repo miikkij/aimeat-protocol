@@ -18,7 +18,7 @@ import type { Response } from 'express';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth } from '../auth/middleware.js';
+import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { createAttestation, getAttestation, signAttestation, verifyAttestation } from '../services/attestation.js';
@@ -46,7 +46,7 @@ export function attestationsRouter(config: AimeatConfig, storage: Storage): Rout
   const router = Router();
 
   // POST /v1/attestations — create; the creator must be one of the parties.
-  router.post('/v1/attestations', requireAuth(), async (req, res) => {
+  router.post('/v1/attestations', requireAuth(), requireScope('memory:write-reserved'), async (req, res) => {
     const parsed = CreateSchema.safeParse(req.body);
     if (!parsed.success) { res.status(400).json(error(config.nodeId, 'INVALID_ATTESTATION', parsed.error.message)); return; }
     try {

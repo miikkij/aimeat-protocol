@@ -18,6 +18,12 @@
  *   - Apps (apps.ts): app storage, versioning, manifest, search
  *
  * @version-history
+ *   v1.3.0 — 2026-09-04 — The purchase door asks appSpendRefusal before it debits. It was the fifth
+ *     place that charges and the only one that asked nothing, so an app grant approved for
+ *     memory:read alone could buy from the store with the human's morsels — debitBalance resolves
+ *     any principal to the owner GHII — and the per-app spend ceiling was never consulted. The four
+ *     checkout doors gained the same check as audit H-3 on 2026-08-10, through
+ *     commerce/session-service.ts; this one is not on that path.
  *   v1.2.0 — 2026-08-23 — SECURITY (audit AI-triage, invariant 1): purchases and licences key on the
  *     buyer's OWNER GHII (ownerGhiiOf(resolveIdentity(...))), the same identity the wallet debits,
  *     instead of the raw `sub`. The raw form split one person's licences across two coordinates (bare
@@ -33,12 +39,13 @@ import { Router } from 'express';
 import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AppManifest } from '../storage/interface.js';
-import { requireAuth } from '../auth/middleware.js';
+import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { ownerCoordinate } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import { sign } from '../auth/keypair.js';
 import { settleMarketplaceFee } from '../services/marketplace-fee.js';
+import { appSpendRefusal } from '../services/metered-access.js';
 import { percentFee } from '../commerce/money.js';
 
 export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
@@ -103,6 +110,31 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
         const feePercent = config.marketplaceTransactionFeePercent ?? 5;
         const transactionFee = percentFee(price, feePercent);
         const totalCost = price;
+
+        // SECURITY: money leaves the buyer on the next line, so the spend permission is asked on
+        // this one. `appSpendRefusal` is the same check the four checkout doors share through
+        // commerce/session-service.ts (audit H-3, 2026-08-10), and its own docblock says it belongs
+        // "at EVERY place that actually charges" — this door was the fifth, and it asked nothing. An
+        // app grant resolves to the owner's GHII in debitBalance, so an app the owner approved for
+        // reading their notes could buy from the store with their morsels, and the per-app ceiling
+        // they set was never consulted either. Asked HERE rather than as a middleware because the
+        // answer only matters once the price is known: a free app leaves at APP_IS_FREE above, and a
+        // buyer who already holds a lifetime licence leaves at ALREADY_LICENSED, neither of them
+        // needing permission to spend nothing.
+        const spendRefusal = await appSpendRefusal(storage, req.auth ?? null);
+        if (spendRefusal) {
+            if (spendRefusal.kind === 'scope_required') {
+                res.status(403).json(error(config.nodeId, 'SCOPE_DENIED',
+                    `This app may not spend on your behalf. It needs the "${spendRefusal.scope}" permission, `
+                    + 'which you can grant it from Profile > Access. Reading your data and buying with your '
+                    + 'money are separate permissions.'));
+            } else {
+                res.status(402).json(error(config.nodeId, 'APP_SPEND_CAP',
+                    `This app has spent the ${spendRefusal.capMorsels}-morsel limit you set for it `
+                    + `(${spendRefusal.spentMorsels} used). Raise or clear the limit in Profile > Access.`));
+            }
+            return;
+        }
 
         // Debit buyer (atomic — resolves GAII to GHII internally)
         const debited = await storage.debitBalance(buyerGaii, totalCost);
@@ -207,7 +239,7 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
     });
 
     // GET /v1/app-store/purchases — List buyer's purchases
-    router.get('/v1/app-store/purchases', requireAuth(), async (req, res) => {
+    router.get('/v1/app-store/purchases', requireAuth(), requireScope('wallet:read'), async (req, res) => {
         const gaii = coordinateOf(req);
         const purchases = await storage.listAppPurchasesByBuyer(gaii);
 
@@ -264,7 +296,7 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
     });
 
     // GET /v1/app-store/sales — List seller's sales
-    router.get('/v1/app-store/sales', requireAuth(), async (req, res) => {
+    router.get('/v1/app-store/sales', requireAuth(), requireScope('wallet:read'), async (req, res) => {
         const gaii = coordinateOf(req);
         const sales = await storage.listAppPurchasesBySeller(gaii);
 
@@ -285,7 +317,7 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
     });
 
     // GET /v1/app-store/license-check — Check if user has valid license for an app
-    router.get('/v1/app-store/license-check', requireAuth(), async (req, res) => {
+    router.get('/v1/app-store/license-check', requireAuth(), requireScope('wallet:read'), async (req, res) => {
         const gaii = coordinateOf(req);
         const appFilename = req.query.app_filename as string;
         const appOwner = req.query.app_owner as string;

@@ -1187,6 +1187,55 @@ await test('guests: turning up is recorded, and one person appears in exactly on
     assert(nosy.status === 403, `a stranger cannot read who else has been here: ${nosy.status}`);
 });
 
+// Approving a member does two things, and the second is what needs a permission: syncGrantsForMember
+// issues the exchange grants that let that person call what the owner SELLS without being billed —
+// the same act as POST /v1/exchange/grants, which has always demanded `exchange:grant`. The isOwner
+// test inside these routes is not that check: it compares the caller's OWNER ACCOUNT NAME, and the
+// comment beside it says so ("an agent acting for the app's owner administers as the owner does"),
+// so before 2026-09-04 an agent or an app grant approved for one unrelated word approved members,
+// handed them free access to the owner's paid capabilities, and removed them again.
+await test('an agent of the owner needs exchange:grant to approve or remove a member', async () => {
+    const da = await json('/v1/agents/device-authorize', { method: 'POST', body: JSON.stringify({ agent_name: 'rosterhand', owner: owner.name }) });
+    const v = await json('/v1/agents/verify', { method: 'POST', body: JSON.stringify({ user_code: da.body.data.user_code, action: 'approve', scopes: ['memory:read'], owner_token: owner.token }) });
+    assert(v.status === 200, `verify ${v.status}`);
+    const t = await json('/v1/agents/device-token', { method: 'POST', body: JSON.stringify({ device_code: da.body.data.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }) });
+    const mute = t.body.token as string;
+
+    // Read the roster as it stands rather than assuming who is on it — earlier tests in this suite
+    // add and remove people, and what is under test is that this agent changes nothing.
+    const rosterOf = async () => {
+        const r = await json(`/v1/apps/${owner.name}/${APP}/members`, { headers: auth(owner.token) });
+        assert(r.status === 200, `roster ${r.status}`);
+        return ((r.body.data.members ?? []) as any[]).map(m => m.owner).sort();
+    };
+    const before = await rosterOf();
+    assert(before.length > 0, 'this assertion needs somebody on the roster to try to remove');
+
+    const approve = await json(`/v1/apps/${owner.name}/${APP}/members`, {
+        method: 'POST', headers: auth(mute), body: JSON.stringify({ account: stranger.name, role: 'member' }),
+    });
+    assert(approve.status === 403, `an agent without exchange:grant approved a member: ${approve.status} ${JSON.stringify(approve.body?.error)}`);
+    assert(approve.body.error.code === 'SCOPE_DENIED', `refused for the wrong reason: ${JSON.stringify(approve.body.error)}`);
+
+    const remove = await json(`/v1/apps/${owner.name}/${APP}/members/${before[0]}`, {
+        method: 'DELETE', headers: auth(mute),
+    });
+    assert(remove.status === 403, `an agent without exchange:grant removed a member: ${remove.status}`);
+
+    // The refusals refused rather than half-acting: the roster is exactly as it was.
+    const after = await rosterOf();
+    assert(JSON.stringify(after) === JSON.stringify(before),
+        `the roster moved under a refused agent: ${JSON.stringify(before)} -> ${JSON.stringify(after)}`);
+
+    // And the owner's own session still does both — owner sessions bypass scopes, so what the gate
+    // costs is a machine acting unasked, not the person using their own Members screen.
+    const asOwner = await json(`/v1/apps/${owner.name}/${APP}/members`, {
+        method: 'POST', headers: auth(owner.token), body: JSON.stringify({ account: stranger.name, role: 'member' }),
+    });
+    assert(asOwner.status === 200 || asOwner.status === 201, `the owner was refused their own roster: ${asOwner.status} ${JSON.stringify(asOwner.body?.error)}`);
+    await json(`/v1/apps/${owner.name}/${APP}/members/${stranger.name}`, { method: 'DELETE', headers: auth(owner.token) });
+});
+
 console.log(`\napp member roster E2E: ${passed} passed, ${failed} failed (${passed + failed} total)\n`);
 if (failed > 0) process.exit(1);
 

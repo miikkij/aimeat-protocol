@@ -112,7 +112,9 @@ const b64 = (s: string) => Buffer.from(s, 'utf-8').toString('base64');
 
     const o = await setupOwner('o');
     const other = await setupOwner('x');
-    const agent = await connectAgent(o.token, o.name, `posture${Date.now()}`, ['memory:read', 'memory:write', 'apps:write']);
+    // 'app:write', not 'apps:write': the plural is not a word this node knows, and asking for one
+    // that nothing reads grants nothing. It passed only while the publish doors checked no scope.
+    const agent = await connectAgent(o.token, o.name, `posture${Date.now()}`, ['memory:read', 'memory:write', 'app:write']);
 
     // ── The publish check: three outcomes, and none of them is a refusal ──────────────────────
 

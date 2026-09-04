@@ -57,7 +57,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // ── GET /v1/cortex — list installed cortex extensions ──
-  router.get('/v1/cortex', requireAuth(), async (req, res) => {
+  router.get('/v1/cortex', requireAuth(), requireScope('catalogue:read'), async (req, res) => {
     const status = req.query.status as string | undefined;
     const namespace = req.query.namespace as string | undefined;
     const visibility = req.query.visibility as string | undefined;

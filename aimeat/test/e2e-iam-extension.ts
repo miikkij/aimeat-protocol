@@ -184,6 +184,16 @@ await test('6. a DIFFERENT authenticated owner CANNOT drive the admin surface', 
         assert(r.ok === false && /forbidden/.test(r.error || ''), `${op} by a non-owner must be refused, got ${JSON.stringify(r)}`);
     }
 
+    // …and the case the comment above makes dangerous: NO caller at all. `isOwner` is computed by
+    // comparing the caller's gaii to the extension's owner, so the whole admin surface rests on
+    // there BEING a caller. If the door ever let an anonymous request through, the comparison would
+    // be made against nothing — and every refusal proven above would have been proven against the
+    // one principal the check can see. This is the only assertion in the suite that tests the door
+    // rather than the script behind it.
+    const noone = await json(`/v1/ext/${EXT}/admin`, { method: 'POST', body: JSON.stringify({ op: 'getState' }) });
+    assert(noone.status === 401 || noone.status === 403,
+        `the admin action answered a caller with no token at all: ${noone.status} ${JSON.stringify(noone.body?.data ?? noone.body?.error)}`);
+
     // The refusals were real: none of what B tried to write landed.
     const after = data(await admin('getState'));
     assert(JSON.stringify(after.levels) === JSON.stringify({ admin: 0, editor: 10, viewer: 20 }), `levels must be untouched: ${JSON.stringify(after.levels)}`);

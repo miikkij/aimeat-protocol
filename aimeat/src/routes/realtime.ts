@@ -17,7 +17,7 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import type { RealtimeManager } from '../services/realtime-manager.js';
@@ -27,7 +27,7 @@ export function realtimeRouter(config: AimeatConfig, storage: Storage, realtimeM
   const router = Router();
 
   // POST /v1/realtime/rooms — create a new room
-  router.post('/v1/realtime/rooms', requireAuth(), async (req, res) => {
+  router.post('/v1/realtime/rooms', requireAuth(), requireScope('social:write'), async (req, res) => {
     if (!config.realtimeEnabled) {
       res.status(503).json(error(config.nodeId, 'FEATURE_DISABLED', 'Realtime is disabled on this node'));
       return;
@@ -177,7 +177,7 @@ export function realtimeRouter(config: AimeatConfig, storage: Storage, realtimeM
   });
 
   // GET /v1/realtime/ice-servers — return ICE server configuration for WebRTC
-  router.get('/v1/realtime/ice-servers', requireAuth(), (_req, res) => {
+  router.get('/v1/realtime/ice-servers', requireAuth(), requireScope('social:read'), (_req, res) => {
     if (!config.realtimeEnabled) {
       res.status(503).json(error(config.nodeId, 'FEATURE_DISABLED', 'Realtime is disabled on this node'));
       return;

@@ -229,7 +229,7 @@ export function commerceBeneficiariesRouter(config: AimeatConfig, storage: Stora
   });
 
   /** GET /v1/commerce/beneficiary-splits — every split the caller's owner has declared. */
-  router.get('/v1/commerce/beneficiary-splits', requireAuth(), async (req: Request, res: Response) => {
+  router.get('/v1/commerce/beneficiary-splits', requireAuth(), requireScope('exchange:beneficiary'), async (req: Request, res: Response) => {
     const providerGhii = ownerGhiiOf(resolveIdentity(req.auth!, config.nodeId));
     const splits = await listSplitsByProvider(storage, providerGhii);
     return res.json(success(config.nodeId, { splits: splits.map(splitView), count: splits.length }));

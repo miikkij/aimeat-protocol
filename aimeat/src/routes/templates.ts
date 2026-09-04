@@ -34,7 +34,7 @@ import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, TemplateListingRecord, TemplateReview, TemplateDiscussion } from '../storage/interface.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
@@ -332,7 +332,7 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
   });
 
   // ── PATCH /v1/templates/:id — Update listing ───────────────────────
-  router.patch('/v1/templates/:id', requireAuth(), async (req, res) => {
+  router.patch('/v1/templates/:id', requireAuth(), requireScope('app:write'), async (req, res) => {
     const id = req.params.id as string;
     const owner = req.auth!.owner;
     const roles = req.auth!.roles;
@@ -368,7 +368,7 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
   });
 
   // ── DELETE /v1/templates/:id — Remove listing ──────────────────────
-  router.delete('/v1/templates/:id', requireAuth(), async (req, res) => {
+  router.delete('/v1/templates/:id', requireAuth(), requireScope('app:manage'), async (req, res) => {
     const id = req.params.id as string;
     const owner = req.auth!.owner;
     const roles = req.auth!.roles;
@@ -395,7 +395,7 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
   });
 
   // ── POST /v1/templates/:id/review — Add/update review ──────────────
-  router.post('/v1/templates/:id/review', requireAuth(), async (req, res) => {
+  router.post('/v1/templates/:id/review', requireAuth(), requireScope('social:write'), async (req, res) => {
     if (!config.templateReviewsEnabled) {
       res.status(403).json(error(config.nodeId, 'DISABLED', 'Reviews are switched off on this node. Whoever runs it can turn them on.'));
       return;
@@ -479,7 +479,7 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
   });
 
   // ── POST /v1/templates/:id/discussion — Add discussion message ─────
-  router.post('/v1/templates/:id/discussion', requireAuth(), async (req, res) => {
+  router.post('/v1/templates/:id/discussion', requireAuth(), requireScope('social:write'), async (req, res) => {
     if (!config.templateDiscussionsEnabled) {
       res.status(403).json(error(config.nodeId, 'DISABLED', 'Discussions are switched off on this node. Whoever runs it can turn them on.'));
       return;

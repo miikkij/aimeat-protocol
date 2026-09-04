@@ -19,7 +19,7 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { FlagCreateSchema, validateBody } from '../models/schemas.js';
@@ -41,7 +41,7 @@ export function flagsRouter(config: AimeatConfig, storage: Storage): Router {
     // ── POST /v1/flags — Create a flag (auth required) ──
     // validateBody rejects a malformed body with the zod detail an HTTP client expects; everything
     // the flag itself decides is in createModerationFlag, which the MCP tool calls too.
-    router.post('/v1/flags', requireAuth(), validateBody(FlagCreateSchema, config.nodeId), async (req, res) => {
+    router.post('/v1/flags', requireAuth(), requireScope('social:write'), validateBody(FlagCreateSchema, config.nodeId), async (req, res) => {
         const { targetType, targetId, reason, description } = req.body ?? {};
 
         const out = await createModerationFlag({ storage, config }, req.auth!.sub, {

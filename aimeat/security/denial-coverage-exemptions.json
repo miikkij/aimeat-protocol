@@ -2,36 +2,28 @@
   "note": "Registered E2E suites with no assertion about a 401 or 403. Seeded from the state on 2026-08-15 so the gate can only ratchet down. The `sha` pins the reason to the file it was written about: EDIT THE SUITE AND ITS EXEMPTION EXPIRES, because the person editing it is the one person who has the context to add the missing case. Re-stamping the sha without adding a denial is available and is a decision someone has to write down.",
   "exempt": {
     "test/e2e-oauth-login.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "reason": "REVIEWED 2026-09-04 — in the standard test config no provider is configured, so every authorize and callback answers 503 before any principal question can be reached. That is the suite's purpose against a running node: prove the routes are MOUNTED and gated rather than 404, which is the failure a mounting mistake produces and which no unit test can see. The refusals that involve an identity — an unmapped subject, a state that does not match, a session issued to the wrong account — need a working IdP and are covered by test/unit/oauth-login.test.ts against a fake one.",
       "sha": "0b3718a6714b3ae4"
     },
     "test/e2e-portfolio-origin.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "reason": "REVIEWED 2026-09-04 — the portfolio origin is a public vanity host: <username>.portfolio.<apex> serves whatever that owner chose to publish, to anyone, with no session anywhere in the flow. The suite self-spawns a node with the origin provisioned because the shared runner keeps the flag off. Its refusals are host-shaped and asserted four times over, all as the same 404: an account that has not published yet, a username no account holds, a reserved label ('www'), and an owner who set enabled:false. One answer for all four, so the host cannot be used to find out which usernames exist. There is no door here for a second principal to be refused at.",
       "sha": "8121169cd1184d2d"
     },
     "test/e2e-mcp-sse-parity.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "reason": "REVIEWED 2026-09-04 — the question this suite asks has no refusal in it: does a change an agent makes reach an open page on the right SSE domain, and does a change on one domain stay off another (a memory write must not announce itself as a board change). Both halves are about routing, and both are asserted for one owner. WHAT WOULD BE WORTH ADDING, and is not a denial in the 401/403 sense either: a SECOND owner holding an open stream must not hear the first owner's change at all — an SSE event that crossed owners would leak that someone is working and roughly on what, which no other suite in this repo currently asks. Left as a note here rather than filed, because it needs a second live stream and that machinery does not exist in this file yet.",
       "sha": "52885311c2194490"
     },
     "test/e2e-pacing.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "reason": "REVIEWED 2026-09-04 — the refusal is the whole subject and it is 402. The suite self-spawns a node with AIMEAT_PACING_TOLL_DEFAULT set and proves the hole the developer spotted: a MONEY-priced capability used to pass the pacing floor untouched, so paying removed the rate bound instead of adding to it. What it asserts is that a caller out of pace is refused with 402 whatever the call is paid in. Pace belongs to the human in whose name the caller acts, so a second principal of the same owner shares one balance by design and would be refused identically. The interesting second principal is another OWNER, whose pace is a different balance, and that is where a morsel MOVES rather than where it runs out: test/e2e-ext-paywall.ts holds it, asserting that a cross-owner payment is an atomic debit-caller + credit-owner while an anti-abuse toll burns without crediting anyone.",
       "sha": "d227f8a82210602f"
     },
     "test/e2e-exchange-projection.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "reason": "REVIEWED 2026-09-04 — the cross-owner refusal is here and it is the point of the suite; it is a PAYWALL, so it answers 402 rather than 403. 'BYPASS: calling the backing extension action directly is NOT free once a tool sells it' registers a stranger, calls the extension behind a priced listing as that stranger, and asserts 402 PAYMENT_REQUIRED naming every product that sells the capability — the hole measured on production on 2026-07-27, where any signed-in principal could POST the extension action and get the paid answer for nothing. Its control is the next test: the provider still calls their own extension free. 402 is the correct code for a door that refuses because the caller has not paid rather than because they may not; the detector counts 401 and 403.",
       "sha": "fec3a0c5c834fe14"
-    },
-    "test/e2e-iam-extension.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "4d37d4f8f13b0d78"
     },
     "test/e2e-registration-invites.ts": {
       "reason": "REVIEWED 2026-09-04. This surface has no refusal to test, and that is the design rather than an omission. The suite guards ONE route, POST /v1/registration-invites, which is open by necessity: an AI calls it with a person's email before that person has any account, so there is no principal to refuse. Its whole security property is the OPPOSITE of a refusal — the response must be byte-identical whether the address is new, already has an account, or already has a live invitation, because any difference turns it into an address-checking machine. The suite asserts exactly that in three tests, plus the per-address cap and single-use expiry that bound the abuse a 403 cannot. There is no second route on this router: no listing, no read, nothing an owner could reach across. A 401 or 403 added here would have to be invented.",
       "sha": "9bfa527729132d7e"
-    },
-    "test/e2e-ai-provenance-surfaces.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "c5e93def548ac8ea"
     },
     "test/e2e-mcp-scopes.ts": {
       "reason": "Reviewed 2026-08-15. This suite is ALL refusal, and none of it is status-shaped: the MCP tool surface refuses by not registering the tool (assert(!tools.includes(...))) and a filtered call comes back through a local {ok} wrapper rather than isError. Kept exempt because the detector cannot see those two shapes, not because the fence is untested — it now also asserts that a '*' agent is refused every tool riding a SCOPES_OUTSIDE_WILDCARD word, list derived from the vocabulary.",
@@ -50,11 +42,11 @@
       "sha": "c217ca906dc01af2"
     },
     "test/e2e-connect-tunnel-delivery.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "reason": "REVIEWED 2026-09-04 — one owner, one agent, and that is the subject rather than an omission: the suite measures the DELIVERY invariants of the push tunnel (latency budget, id-dedup, no-loss across a disconnect, that an ack is not a completion, that a status change is what clears the backlog, that an offline agent gets backlog and not live). Each of those is a statement about one agent's own queue, and a second principal cannot make any of them truer. The access half of the same transport — who may subscribe to what, and what a revoked token can still open — is test/e2e-connect-tunnel-records.ts, which asserts it three ways against a second owner.",
       "sha": "374ff3925654ca54"
     },
     "test/e2e-connect-tunnel-records.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "reason": "REVIEWED 2026-09-04 — this suite is denser in refusals than most suites the gate passes; it just does not speak HTTP. Its refusals arrive as tunnel frames: test 5 subscribes B's agent to A's PRIVATE workspace and asserts the ack carries 0 accepted and rejected[0].reason === 'access_denied'; test 6 then writes a record and asserts NO push reaches B (push access is REST read access, which is the security invariant the file header states); test 7b revokes A's agent token and asserts a new tunnel cannot be opened with it at all. Those are three cross-principal denials on a transport with no status line. This is the same blind spot the detector already learned once for MCP's isError — the file header records it saying e2e-mcp-cross-owner.ts, a file that exists solely to refuse owner B seventeen ways, had no denial case. Adding an HTTP call to this suite purely so the scanner can see something would be a worse test than the three it already has.",
       "sha": "cbfc438922d7864c"
     },
     "test/e2e-audio-speech.ts": {
@@ -66,7 +58,7 @@
       "sha": "fb430ca2ff090d70"
     },
     "test/e2e-members.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "reason": "REVIEWED 2026-09-04 — GET /v1/portfolio/members is a public list with no authenticated door on it, so 'what does a second principal get' has one answer: the same list. Its only refusal is content-shaped and IS asserted — test 2 publishes nothing for one of the four owners and asserts that owner is absent, and test 5 resolves every listed member back to a published portfolio, so the list cannot name somebody who did not opt in. The four owners exist to cover the four gaii shapes a portfolio config can be stored under, not to compare principals.",
       "sha": "f3bc7fae3449b261"
     },
     "test/e2e-attachment-sweep.ts": {
@@ -74,15 +66,11 @@
       "sha": "3026905962578080"
     },
     "test/e2e-agent-connect-email.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "reason": "REVIEWED 2026-09-04 — there is no second principal, because there is no first one. Every test here drives POST /v1/agents/device-authorize, which is unauthenticated by construction: RFC 8628's whole point is that the credential being collected is the caller's first, so a session gate is impossible (the same reasoning carries the route-scope exemption for its ecosystem twin). The door's entire refusal vocabulary IS asserted: 404 NO_ACCOUNT for an email no account holds, 400 INVALID_EMAIL for one that is not an address, and the one-verified-email-per-account invariant the resolver depends on — without which an email would resolve to two accounts and the caller could not tell which one they had connected to. The 404 is a deliberate existence answer, not a leak: a person who typed their address wrong has to be able to find that out. The cross-owner question this door raises — can I start a connection to somebody ELSE's account by naming their email — is decided one step later at approval, and test/e2e-app-agent-deploy.ts asserts it ('CROSS-OWNER authenticated device-authorize stays pending (never auto-approved)').",
       "sha": "6d1fb46364ba68c7"
     },
-    "test/e2e-workflows-human.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "6af766619d4ae496"
-    },
     "test/e2e-public-activity.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "reason": "REVIEWED 2026-09-04 — GET /v1/public/activity-feed is public by definition, and every refusal it has is content-shaped rather than principal-shaped. All of them are asserted: a PRIVATE organism does not appear, a knowledge package without catalog_listed does not appear, nothing owned by system@ reaches the ticker, and the seeded built-in skills specifically do not. Those four are the security property this feed has — an action becomes visible because it was made public, not because of who is asking — and asking as a second principal would return the identical feed.",
       "sha": "067aba73c3ec539c"
     },
     "test/e2e-public-totals.ts": {
