@@ -39,7 +39,7 @@ import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentUsageDailyRecord } from '../storage/interface.js';
 import type { AgentUsageEvent } from '../storage/types/agents-messaging.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { runInReadScope } from '../storage/read-scope/read-scope.js';
 import { getOwnerBudgetStatus } from '../services/ledger-budget.js';
@@ -167,7 +167,7 @@ export function ledgerRouter(config: AimeatConfig, storage: Storage): Router {
 
   // ── GET /v1/ledger/usage ── daily aggregates, owner-scoped, grouped.
   router.get('/v1/ledger/usage',
-    requireAuth(),
+    requireAuth(), requireScope('wallet:read'),
     async (req: Request, res: Response) => {
       const ownerGhii = resolve(req);
       const agentGaii = typeof req.query.agent === 'string' ? req.query.agent : undefined;
@@ -193,7 +193,7 @@ export function ledgerRouter(config: AimeatConfig, storage: Storage): Router {
 
   // ── GET /v1/ledger/usage/runs ── raw events grouped by run, owner-scoped (drill to deliverable).
   router.get('/v1/ledger/usage/runs',
-    requireAuth(),
+    requireAuth(), requireScope('wallet:read'),
     async (req: Request, res: Response) => {
       const ownerGhii = resolve(req);
       const agentGaii = typeof req.query.agent === 'string' ? req.query.agent : undefined;
@@ -216,7 +216,7 @@ export function ledgerRouter(config: AimeatConfig, storage: Storage): Router {
   // requests GET /usage?group_by=model + GET /usage/runs). Owner-scoped like the rest of the ledger
   // (req.auth.owner GHII, app-grant accessible). Reuses the same aggregation as the individual routes.
   router.get('/v1/ledger/usage/overview',
-    requireAuth(),
+    requireAuth(), requireScope('wallet:read'),
     async (req: Request, res: Response) => {
       const ownerGhii = resolve(req);
       const agentGaii = typeof req.query.agent === 'string' ? req.query.agent : undefined;
@@ -247,7 +247,7 @@ export function ledgerRouter(config: AimeatConfig, storage: Storage): Router {
   // figure that sits next to the morsel escrow. Consumer-side cross-owner views come later
   // with the capability-invoke context wiring.
   router.get('/v1/ledger/usage/capabilities',
-    requireAuth(),
+    requireAuth(), requireScope('wallet:read'),
     async (req: Request, res: Response) => {
       const ownerGhii = resolve(req);
       const capabilityId = typeof req.query.capability_id === 'string' ? req.query.capability_id : undefined;
@@ -297,7 +297,7 @@ export function ledgerRouter(config: AimeatConfig, storage: Storage): Router {
   // ── GET /v1/ledger/budget ── owner's spend-vs-budget status for a day (TARGET-017).
   // Backs FLEET's "budget and actual side by side". Reports only — never hard-stops runs.
   router.get('/v1/ledger/budget',
-    requireAuth(),
+    requireAuth(), requireScope('wallet:read'),
     async (req: Request, res: Response) => {
       const ownerGhii = resolve(req);
       const date = typeof req.query.date === 'string' ? req.query.date : undefined;

@@ -175,6 +175,33 @@ decorative on the door that writes.
 *Check:* when you add a scope word, name every door that reaches the capability and gate all of them.
 A word enforced on one door teaches an owner that they have controlled something they have not.
 
+#### 15b. Closing a bypass, or inventing a requirement: the twin decides
+
+Satisfying 15 means adding a gate to a door that has none, and that is where it can go wrong in the
+other direction. If a route is one an agent drives as its ordinary work, demanding a word nobody knew
+to ask for turns the capability off for every agent already doing the job. So the question before
+adding a gate is not "does this door look unguarded" but **"does the MCP tool for the same capability
+already demand this word?"**
+
+- **A twin demands it** → gating the REST door closes a BYPASS. It cannot turn anything off, because
+  every agent doing that job through the tool already holds the word: the owner ticked that box the
+  day they connected it. `POST /v1/exchange/work/:id/deliver` demanded nothing while
+  `aimeat_exchange_work_deliver` had demanded `exchange:write` all along, and the triage measured what
+  the gap bought — an app grant with one unrelated scope could mark work delivered and charge a THIRD
+  PARTY. Gate it, and say in the diff which tool the word came from.
+- **No twin demands it** → the word is a PROPOSAL, not a finding. `organism:read` is asked for by one
+  REST route and zero tools, so gating the eleven workspace reads behind it would create a
+  requirement no owner has ever granted and dress it as a fix. Read who actually calls the route
+  first, and expect the answer sometimes to be that the word should not exist.
+
+Measured on 2026-09-04 against the 156 route-scope entries marked DEBT: **102 are twin-backed and 54
+are not.** Two thirds of that backlog is mechanical and the rest is a judgement per route, which is
+worth knowing before anyone promises a date for it.
+
+*Check:* `TOOL_SCOPES` in `src/mcp/catalog/scopes.ts` is the register. `pnpm check:scope-parity`
+fails when a word lives on one side only, in either direction, which is the same question asked
+before either side exists.
+
 ### 16. Deprecated is not removed
 RFC v4.0 marks One-Time Keys / Tier 0.5 deprecated and says the feature sits behind
 `keyedBrowseEnabled`. Three of its write paths were behind no flag at all, and the flag defaults to
