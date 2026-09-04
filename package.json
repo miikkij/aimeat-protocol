@@ -113,6 +113,7 @@
     "check:sse-parity": "cd aimeat && pnpm check:sse-parity",
     "check:copied-logic": "cd aimeat && pnpm check:copied-logic",
     "check:doc-counts": "cd aimeat && pnpm check:doc-counts",
+    "check:scope-parity": "cd aimeat && pnpm check:scope-parity",
     "debt": "cd aimeat && pnpm debt",
     "check:liaison-surface": "cd aimeat && pnpm check:liaison-surface",
     "check:storage-parity": "cd aimeat && pnpm check:storage-parity",

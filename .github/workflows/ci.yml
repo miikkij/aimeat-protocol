@@ -163,6 +163,12 @@ jobs:
         working-directory: aimeat
         run: pnpm check:doc-counts -- --strict
 
+      # A permission word on one side only: offered to the owner and asked by nothing, or demanded
+      # by a door and offered to nobody. Also in check:audit-gates; here so a red run names itself.
+      - name: One permission word, every door (check:scope-parity)
+        working-directory: aimeat
+        run: pnpm check:scope-parity
+
       - name: Unit tests (vitest)
         working-directory: aimeat
         run: pnpm test
