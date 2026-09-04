@@ -15,7 +15,7 @@
  *   v1.0.0 — 2026-08-29 — Extracted from vendored.ts when the leaflet pack pushed it past
  *     the cap. No entry changed.
  */
-import type { LibraryPack } from '../library-packs.js';
+import type { LibraryPack } from './types.js';
 
 export const CREATIVE_PACKS: LibraryPack[] = [
   {

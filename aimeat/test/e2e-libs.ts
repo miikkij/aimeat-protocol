@@ -1112,6 +1112,46 @@ await test('GET /v1/libs — catalogue lists markdown, organism, editor, commerc
         `aimeat-exchange must declare both dependencies, got "${exchange?.requires}"`);
 });
 
+await test('GET /v1/libs/aimeat-science.js — serves the Worksheet with every piece', async () => {
+    const res = await fetch(`${BASE}/v1/libs/aimeat-science.js`);
+    assert(res.ok, `science lib failed: ${res.status}`);
+    const text = await res.text();
+    assert(res.headers.get('Content-Type')?.includes('javascript'), 'should be javascript');
+    // One assertion per named piece: a piece that silently stops being exported fails here rather
+    // than as a missing meter in somebody's app.
+    for (const part of [
+        'mount', 'read', 'save', 'evaluate',
+        'quantity', 'FACES', 'series', 'points', 'control', 'formula', 'typeset', 'ensureKatex',
+        'follow', 'numberIn',
+    ]) {
+        assert(text.includes(part), `should export ${part}`);
+    }
+    // The five faces are the wish's own line: one reading shown five ways. Matched without quotes
+    // because the bundler decides how it writes a string literal and that is not this test's business.
+    for (const face of ['figure', 'chip', 'gauge', 'sparkline', 'thermometer']) {
+        assert(text.includes(face), `should carry the ${face} face`);
+    }
+    // KaTeX comes from this node. A CDN would be refused by the app CSP and is the failure this catches.
+    assert(text.includes('/lib/katex@0/katex.min.js'), 'KaTeX must load from this node');
+    assert(!/cdn\.jsdelivr|unpkg\.com|cdnjs/.test(text), 'no CDN may appear in a served library');
+    // The maths is the node's, so there is one set of unit rules rather than two.
+    assert(text.includes('/v1/worksheet/evaluate'), 'the sheet must be worked out on the node');
+});
+
+await test('GET /lib/katex@0/ — the maths setter and its faces are served from this node', async () => {
+    const js = await fetch(`${BASE}/lib/katex@0/katex.min.js`);
+    assert(js.ok, `katex script: ${js.status}`);
+    const css = await fetch(`${BASE}/lib/katex@0/katex.min.css`);
+    assert(css.ok, `katex stylesheet: ${css.status}`);
+    const sheet = await css.text();
+    // Only woff2 is carried, so a src naming woff or ttf would be a 404 on every page that sets maths.
+    assert(!/\.woff\b|\.ttf\b/.test(sheet), 'the stylesheet must name only the woff2 faces that are here');
+    const face = /url\(fonts\/([A-Za-z0-9_-]+\.woff2)\)/.exec(sheet);
+    assert(!!face, 'the stylesheet must name at least one face');
+    const font = await fetch(`${BASE}/lib/katex@0/fonts/${face![1]}`);
+    assert(font.ok, `the face the stylesheet names must be served: ${face![1]} → ${font.status}`);
+});
+
 await test('GET /v1/libs/aimeat-atelier.js — serves the Atelier kit with every component', async () => {
     const res = await fetch(`${BASE}/v1/libs/aimeat-atelier.js`);
     assert(res.ok, `atelier lib failed: ${res.status}`);

@@ -92,13 +92,14 @@ tarball is. "Installed by the operator" means AIMEAT does not ship the file at a
 | [htm](https://github.com/developit/htm) | 3.1.1 | Apache-2.0 | Copyright (c) Jason Miller and the htm contributors | served by the node | notice only |
 | [minidenticons](https://github.com/laurentpayot/minidenticons) | 4.2.1 | MIT | Copyright (c) 2021 Laurent Payot | served by the node | notice only |
 | [Baloo 2, Bangers, Inter, Archivo, Archivo Black, Space Grotesk, Fraunces, JetBrains Mono, Fjalla One, DM Sans, VT323](https://fonts.google.com) | see fonts/LICENSE.md | OFL-1.1 | see fonts/LICENSE.md for the copyright holder of each family | served by the node | notice only |
+| [KaTeX](https://katex.org) | 0.18.5 | MIT | Copyright (c) 2013-2020 Khan Academy and other contributors | served by the node | notice only |
 | [AIMEAT (this project's own served libraries)](https://github.com/miikkij/aimeat-protocol) | see each file's @version-history header | MIT | Copyright (c) 2026 Jouni Miikki | served by the node | notice only |
 
-Components AIMEAT changed rather than copied verbatim: **world-atlas (Natural Earth 110m country shapes)** (The GEOMETRY is derived: the TopoJSON was projected to SVG path strings so the Atelier atlas component does not have to carry a projection library. The data itself is public domain (Natural Earth); the ISC notice covers the world-atlas packaging.)
+Components AIMEAT changed rather than copied verbatim: **world-atlas (Natural Earth 110m country shapes)** (The GEOMETRY is derived: the TopoJSON was projected to SVG path strings so the Atelier atlas component does not have to carry a projection library. The data itself is public domain (Natural Earth); the ISC notice covers the world-atlas packaging.); **KaTeX** (The stylesheet is the published one with the woff and ttf entries removed from each @font-face src, and only the twenty woff2 faces are carried: the other two formats are the pre-2015 fallbacks in the same src list, every browser this node serves takes woff2, and they weigh 876 kB to be requested by nobody. The repository publishes one MIT licence over the whole distribution, the fonts included, and carries no separate font licence file.)
 
 ## Production dependencies
 
-The 455 npm packages that travel inside the `aimeat` package. Build and test
+The 458 npm packages that travel inside the `aimeat` package. Build and test
 tools are not listed: they do not ship, so they carry no obligation for you.
 
 | Package | Version | Licence |
@@ -106,9 +107,11 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [@a2a-js/sdk](https://github.com/a2aproject/a2a-js#readme) | 1.1.0 | Apache-2.0 |
 | [@ag-ui/core](https://github.com/ag-ui-protocol/ag-ui#readme) | 0.0.59 | MIT |
 | [@agentclientprotocol/sdk](https://github.com/agentclientprotocol/typescript-sdk#readme) | 1.4.0 | Apache-2.0 |
+| [@arnog/colors](https://github.com/arnog/colors#readme) | 0.7.0 | MIT |
 | [@clack/core](https://github.com/bombshell-dev/clack/tree/main/packages/core#readme) | 1.4.3 | MIT |
 | [@clack/prompts](https://github.com/bombshell-dev/clack/tree/main/packages/prompts#readme) | 1.7.0 | MIT |
 | [@colors/colors](https://github.com/DABH/colors.js) | 1.6.0 | MIT |
+| [@cortex-js/compute-engine](https://cortexjs.io/compute-engine/) | 0.123.1 | MIT |
 | [@dabh/diagnostics](https://github.com/DABH/diagnostics) | 2.0.8 | MIT |
 | [@hexagon/base64](https://base64.56k.guru) | 1.1.28 | MIT |
 | [@hono/node-server](https://github.com/honojs/node-server) | 2.1.1 | MIT |
@@ -233,6 +236,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [color-string](https://github.com/Qix-/color-string#readme) | 2.1.4 | MIT |
 | [color](https://github.com/Qix-/color#readme) | 5.0.3 | MIT |
 | [commander](https://github.com/tj/commander.js#readme) | 12.1.0 | MIT |
+| [complex-esm](https://raw.org/article/complex-numbers-in-javascript/) | 2.1.1-esm1 | MIT |
 | [compress-commons](https://github.com/archiverjs/node-compress-commons) | 7.0.1 | MIT |
 | [compressible](https://github.com/jshttp/compressible#readme) | 2.0.18 | MIT |
 | [compression](https://github.com/expressjs/compression#readme) | 1.8.1 | MIT |
@@ -828,6 +832,32 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
+```
+
+### @cortex-js/compute-engine 0.123.1
+
+```text
+MIT License
+
+Copyright (c) 2019 CortexJS
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 ```
 
 ### @dabh/diagnostics 2.0.8, @so-ric/colorspace 1.1.6, enabled 2.0.0
@@ -3735,6 +3765,32 @@ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
 CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
+### complex-esm 2.1.1-esm1
+
+```text
+MIT License
+
+Copyright (c) 2018 Robert Eisele
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 ```
 
 ### compress-commons 7.0.1, crc32-stream 7.0.1, zip-stream 7.0.5
@@ -7439,6 +7495,32 @@ INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PA
 PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE
 FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
+### KaTeX 0.18.5
+
+```text
+The MIT License (MIT)
+
+Copyright (c) 2013-2020 Khan Academy and other contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 ```
 
 ### kuler 2.0.0

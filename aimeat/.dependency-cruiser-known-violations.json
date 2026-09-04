@@ -12955,6 +12955,15 @@
   },
   {
     "type": "module",
+    "from": "src/static/sdk-libs/dist/aimeat-science.js",
+    "to": "src/static/sdk-libs/dist/aimeat-science.js",
+    "rule": {
+      "severity": "warn",
+      "name": "no-orphans"
+    }
+  },
+  {
+    "type": "module",
     "from": "src/static/sdk-libs/dist/aimeat-social.js",
     "to": "src/static/sdk-libs/dist/aimeat-social.js",
     "rule": {

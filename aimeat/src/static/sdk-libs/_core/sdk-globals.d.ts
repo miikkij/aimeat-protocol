@@ -54,6 +54,8 @@ interface Window {
   DOMPurify?: any;
   hljs?: any;
   mermaid?: any;
+  /** katex@0 vendored pack, lazy-loaded by science/formula.js — untyped external lib. */
+  katex?: any;
   /* eslint-enable @typescript-eslint/no-explicit-any */
   /** Safari's prefixed AudioContext. */
   webkitAudioContext?: typeof AudioContext;

@@ -1,0 +1,133 @@
+/**
+ * @file aimeat-science.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The Worksheet's own layout (sci- prefix), for the aimeat-science library. Every value
+ *   is an Atelier kit token (`--ak-*`) with the node's own theme token behind it, so a worksheet
+ *   wears whatever look the page it lands on is wearing — the poster face on aimeat.io, the app's
+ *   chosen look in an Atelier app, and readable defaults in an MCP App frame that has neither.
+ *
+ *   IT DECLARES ITS OWN --border AND --text. A component that may render inside an app with vendored
+ *   styling must not read the ambient value (docs/frontend-development-guide.md, the daisyUI
+ *   collision rule), so the two are set on `.sci-sheet` and on every piece that can stand alone.
+ *
+ *   NOTHING ANIMATES. A drawn sheet repaints when an answer changes and at no other time, which is
+ *   what the finish gate measures.
+ * @version-history
+ *   v1.0.0 — 2026-09-05 — Initial (wish-tyokirja-tieteellinen-laskenta, stage 2).
+ */
+
+.sci-sheet,
+.sci-q,
+.sci-formula,
+.sci-control,
+.sci-series {
+  --sci-ink: var(--ak-ink, var(--text, #1A1A2E));
+  --sci-dim: var(--ak-muted, var(--text-dim, #6B7280));
+  --sci-line: var(--ak-line, var(--border, #E5E7EB));
+  --sci-accent: var(--ak-accent, var(--accent, #E8564A));
+  --sci-paper: var(--ak-surface, var(--card-bg, #FFFFFF));
+  color: var(--sci-ink);
+  font-family: var(--ak-font-body, var(--font-body, system-ui, sans-serif));
+}
+
+/* ── The sheet ─────────────────────────────────────────────────────────────────────────────── */
+.sci-sheet { display: flex; flex-direction: column; gap: .1rem; min-width: 0; }
+.sci-sheet-note {
+  padding: .5rem .7rem; margin-bottom: .4rem;
+  border: 2px dashed var(--sci-accent); color: var(--sci-dim);
+  font-size: .82rem; line-height: 1.5;
+}
+.sci-row {
+  display: flex; flex-direction: column; gap: .25rem;
+  padding: .7rem 0; border-bottom: 1px solid var(--sci-line); min-width: 0;
+}
+.sci-row:last-child { border-bottom: 0; }
+.sci-row--text { padding: .4rem 0; border-bottom: 0; }
+.sci-text { margin: 0; font-size: .95rem; line-height: 1.6; }
+.sci-note { font-size: .78rem; line-height: 1.5; color: var(--sci-dim); }
+.sci-follows {
+  font-family: var(--ak-font-mono, var(--font-mono, ui-monospace, monospace));
+  font-size: .68rem; color: var(--sci-dim);
+}
+
+/* ── One reading, five faces ───────────────────────────────────────────────────────────────── */
+.sci-q { display: flex; flex-direction: column; gap: .2rem; min-width: 0; }
+.sci-q-label {
+  font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--sci-accent);
+}
+.sci-q-empty { font-size: .88rem; color: var(--sci-dim); }
+.sci-q-figure { display: flex; align-items: baseline; gap: .35rem; flex-wrap: wrap; }
+.sci-q-figure b {
+  font-family: var(--ak-font-display, var(--font-headline, inherit));
+  font-weight: var(--font-poster-weight, 400);
+  font-size: 2.1rem; line-height: 1;
+}
+.sci-q-figure small { font-size: .9rem; color: var(--sci-dim); }
+.sci-q-under { font-size: .88rem; font-weight: 700; }
+
+.sci-q--chip { flex-direction: row; align-items: baseline; gap: .35rem; display: inline-flex; }
+.sci-q-chip-label { font-size: .72rem; color: var(--sci-dim); }
+.sci-q-chip-value {
+  font-family: var(--ak-font-mono, var(--font-mono, ui-monospace, monospace));
+  font-size: .74rem; font-weight: 500;
+  padding: .05rem .4rem; border: 2px solid var(--sci-line);
+}
+
+.sci-gauge { width: 100%; max-width: 10rem; height: auto; }
+.sci-therm { width: 2.2rem; height: auto; }
+.sci-q--therm { align-items: flex-start; }
+
+.sci-q-sparkrow { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+.sci-spark { width: 7.5rem; height: 1.75rem; flex: none; }
+.sci-q-sparkvalue { font-size: 1rem; }
+
+/* ── A formula ─────────────────────────────────────────────────────────────────────────────── */
+.sci-formula { display: flex; flex-direction: column; gap: .3rem; min-width: 0; }
+.sci-math {
+  display: block; overflow-x: auto; padding: .2rem 0;
+  font-family: var(--ak-font-mono, var(--font-mono, ui-monospace, monospace)); font-size: .84rem;
+}
+.sci-formula-answer { display: flex; align-items: baseline; gap: .45rem; }
+.sci-formula-answer b { font-size: 1.15rem; }
+.sci-eq { color: var(--sci-dim); }
+.sci-formula-error {
+  font-size: .84rem; line-height: 1.5; color: var(--sci-accent);
+  border-left: 3px solid var(--sci-accent); padding-left: .6rem;
+}
+.sci-work { font-size: .84rem; }
+.sci-work summary { cursor: pointer; color: var(--sci-dim); }
+
+/* ── A number a person moves ───────────────────────────────────────────────────────────────── */
+.sci-control { display: flex; flex-direction: column; gap: .25rem; min-width: 0; }
+.sci-control-row { display: flex; align-items: center; gap: .7rem; flex-wrap: wrap; }
+.sci-control-value { font-size: 1.05rem; white-space: nowrap; }
+.sci-control-bounds {
+  font-family: var(--ak-font-mono, var(--font-mono, ui-monospace, monospace));
+  font-size: .68rem; color: var(--sci-dim);
+}
+.sci-slider { flex: 1 1 12rem; min-width: 8rem; accent-color: var(--sci-accent); }
+.sci-field { flex: 0 1 8rem; min-width: 5rem; }
+.sci-step {
+  flex: none; min-width: 2rem; min-height: 2.75rem; padding: 0 .6rem;
+  font-size: 1rem; line-height: 1; cursor: pointer;
+}
+.sci-control input:disabled, .sci-step:disabled { opacity: .5; cursor: default; }
+
+/* ── A history ─────────────────────────────────────────────────────────────────────────────── */
+.sci-series { display: flex; flex-direction: column; gap: .3rem; min-width: 0; }
+.sci-series-svg { width: 100%; max-width: 26rem; height: auto; }
+.sci-series-tick {
+  font-family: var(--ak-font-mono, var(--font-mono, ui-monospace, monospace));
+  font-size: 8px; fill: var(--sci-dim);
+}
+.sci-series-foot { font-size: .72rem; color: var(--sci-dim); }
+
+/* ── Phone ─────────────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .sci-q-figure b { font-size: 1.7rem; }
+  .sci-control-row { gap: .5rem; }
+  .sci-slider { flex-basis: 100%; }
+  .sci-series-svg, .sci-gauge { max-width: 100%; }
+}

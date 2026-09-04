@@ -28,7 +28,7 @@
  *     scroll). All three are modelTier 'frontier' — each pins an API that broke against the one
  *     models write from memory.
  */
-import type { LibraryPack } from '../library-packs.js';
+import type { LibraryPack } from './types.js';
 import { CREATIVE_PACKS } from './vendored-creative.js';
 import { MOTION_PACKS } from './vendored-motion.js';
 
@@ -522,6 +522,47 @@ export const VENDORED_PACKS: LibraryPack[] = [
     interviewTriggers: ['diagram', 'flowchart', 'sequence', 'gantt', 'mindmap', 'kaavio', 'vuokaavio'],
     sizeEstimate: '~3.2MB',
     status: 'stable',
+    modelTier: 'any',
+  },
+  {
+    id: 'katex',
+    kind: 'vendored',
+    category: 'ui',
+    title: 'KaTeX maths typesetting',
+    description: 'KaTeX 0.18 (window.katex) self-hosted — set a LaTeX expression as real mathematics in the page, synchronously and without a network call.',
+    url: '/lib/katex@0/katex.min.js',
+    include: [
+      '<link href="{{BASE_URL}}/lib/katex@0/katex.min.css" rel="stylesheet" type="text/css" />',
+      '<script src="{{BASE_URL}}/lib/katex@0/katex.min.js"></script>',
+    ],
+    requires: [],
+    version: '0.18.5',
+    majorPin: 'katex@0 (the 0.x line)',
+    license: 'MIT',
+    sourceUrl: 'https://katex.org',
+    apiSurface: 'window.katex',
+    aiDoc: [
+      'KaTeX as the window.katex global (self-hosted — never load KaTeX from a CDN; the node serves',
+      'no font or script from one and the app CSP refuses it).',
+      'THE STYLESHEET IS NOT OPTIONAL. Both include lines or nothing: with the script alone every',
+      'formula renders as unspaced glyphs, which looks like a broken font rather than a missing file.',
+      'Set into an element: katex.render("c = \\\\pm\\\\sqrt{a^2 + b^2}", el, { throwOnError: false });',
+      'Set to a string: const html = katex.renderToString(latex, { throwOnError: false });',
+      'throwOnError:false is the setting to use in a page: a bad expression then shows in red where it',
+      'is rather than taking the render with it.',
+      'displayMode:true centres the formula on its own line; the default sets it inside a sentence.',
+      'Only woff2 faces are carried, which every browser this node serves takes.',
+      'If you want a formula that also COMPUTES — a result under it, an input a person moves, units',
+      'that are checked — do not build it on KaTeX alone: AIMEAT.science (the aimeat-science lib)',
+      'sets the expression with this and works the answer out on the node.',
+    ].join('\n'),
+    changelog: [
+      { version: '0.18.5', date: '2026-09-05', summary: 'Initial vendoring at /lib/katex@0/, for the Worksheet (aimeat-science). The stylesheet is the published one with the woff and ttf entries removed from each @font-face src: those are the pre-2015 fallbacks in the same list, every browser this node serves takes woff2, and carrying them costs 876 kB nobody requests.' },
+    ],
+    tierHint: 'T1',
+    interviewTriggers: ['formula', 'equation', 'maths', 'math', 'latex', 'kaava', 'yhtälö', 'matematiikka'],
+    sizeEstimate: '~590kB (268kB script, 22kB stylesheet, 296kB fonts)',
+    status: 'preview',
     modelTier: 'any',
   },
   // The creative/3D/game packs (three, three-world, p5, pixi, phaser) moved whole to
