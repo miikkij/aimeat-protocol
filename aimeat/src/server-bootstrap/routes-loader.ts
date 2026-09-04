@@ -88,6 +88,7 @@ import { ecosystemEventsRouter } from '../routes/ecosystem-events.js';
 import { schemaRouter } from '../routes/schemas.js';
 import { consentRouter } from '../routes/consent.js';
 import { permissionsRouter } from '../routes/permissions.js';
+import { worksheetRouter } from '../routes/worksheet.js';
 import { memoryRouter } from '../routes/memory.js';
 import { memoryHandsRouter } from '../routes/memory-hands.js';
 import { dataMapRouter } from '../routes/data-map.js';
@@ -480,6 +481,7 @@ export async function mountRoutes(
   const notifyDirectoryChange = () => directoryService.notifyChange();
   app.use(consentRouter(config, storage, stats, notifyDirectoryChange));  // Phase 0.3
   app.use(permissionsRouter(config, storage));  // Phase 0.3 — permission listing API
+  app.use(worksheetRouter(config));  // the Worksheet: a sheet in, an answer per cell out (no storage)
   app.use(schemaRouter(config, storage));  // MUST be before memoryRouter (Phase 0.1)
   app.use('/v1/memory', workspaceAccessMiddleware(config, storage));  // Phase 2.3 — organism workspace access
   // Who has had their hands on a key. MUST be before memoryRouter: that router serves
