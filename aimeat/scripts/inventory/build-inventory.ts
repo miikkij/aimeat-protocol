@@ -35,6 +35,7 @@ import { fileURLToPath } from 'node:url';
 import { collectRestRoutes, collectMcpTools, collectCliDispatch, guardArraysIn, type EntryPoint } from './entries.js';
 import { principalsFor, isPublic, type Principal } from './principals.js';
 import { scopeMentions } from './scope-mentions.js';
+import { srcProgram } from './program.js';
 import { TOOL_SCOPES } from '../../src/mcp/catalog/scopes.js';
 
 /**
@@ -79,22 +80,6 @@ interface Row extends EntryPoint {
     unknownGuards: string[];
     scopes: string[];
     public: boolean;
-}
-
-/** The compiler's own file list, so nothing is missed and nothing generated is counted. */
-function sourceFiles(): ts.SourceFile[] {
-    const configPath = join(AIMEAT, 'tsconfig.json');
-    const config = ts.readConfigFile(configPath, ts.sys.readFile);
-    const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, AIMEAT);
-    const program = ts.createProgram(parsed.fileNames, { ...parsed.options, noEmit: true });
-    // Forces the binder to run, which is what sets `node.parent`. Without it every parent is
-    // undefined and any walk that asks "what encloses this literal" silently answers nothing —
-    // which is exactly how the constant-following pass reported two enforced scopes as orphans.
-    program.getTypeChecker();
-    return program.getSourceFiles().filter(f =>
-        !f.isDeclarationFile
-        && f.fileName.includes('/src/')
-        && !f.fileName.includes('/node_modules/'));
 }
 
 function collect(files: ts.SourceFile[]): EntryPoint[] {
@@ -253,7 +238,7 @@ function report(rows: Row[], mentions: Map<string, Array<{ file: string; line: n
 
 function main(): void {
     const VOCABULARY = readVocabulary();
-    const files = sourceFiles();
+    const files = srcProgram().files;
     const rows = toRows(collect(files));
     // The two files that DEFINE the vocabulary rather than demand it. Counting a definition as a
     // demand would make every word look asked-for, which is the opposite of what this measures.

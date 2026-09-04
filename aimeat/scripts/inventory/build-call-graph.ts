@@ -27,22 +27,11 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { join, resolve, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildCallGraph, reachable, pathTo, type CallGraph, type FnId } from './call-graph.js';
+import { srcProgram } from './program.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const AIMEAT = resolve(HERE, '..', '..');
 const OUT_DIR = join(resolve(AIMEAT, '..'), 'secaudit');
-
-function sourceFiles(): { program: ts.Program; files: ts.SourceFile[] } {
-    const config = ts.readConfigFile(join(AIMEAT, 'tsconfig.json'), ts.sys.readFile);
-    const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, AIMEAT);
-    const program = ts.createProgram(parsed.fileNames, { ...parsed.options, noEmit: true });
-    program.getTypeChecker();
-    const files = program.getSourceFiles().filter(f =>
-        !f.isDeclarationFile
-        && f.fileName.includes('/src/')
-        && !f.fileName.includes('/node_modules/'));
-    return { program, files };
-}
 
 /** The storage methods that WRITE. Everything else on the interface reads. */
 const WRITE_PREFIXES = ['set', 'create', 'add', 'put', 'update', 'delete', 'remove', 'insert', 'save', 'append', 'credit', 'debit', 'transfer'];
@@ -52,7 +41,7 @@ const isWrite = (name: string): boolean => WRITE_PREFIXES.some(p => name.startsW
 const PUBLISH = /publish|share|makePublic|visibility/i;
 
 function main(): void {
-    const { program, files } = sourceFiles();
+    const { program, files } = srcProgram();
     const graph = buildCallGraph(program, files, AIMEAT);
 
     const storageNodes = [...graph.nodes.values()].filter(n =>
@@ -167,4 +156,4 @@ function main(): void {
 
 main();
 
-export { sourceFiles, isWrite, type CallGraph, type FnId };
+export { isWrite, type CallGraph, type FnId };
