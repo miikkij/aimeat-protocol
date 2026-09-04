@@ -1,0 +1,6 @@
+{
+  "note": "Permission words that exist on one side only: offered to the owner and asked for by nothing, or demanded by a door and offered to nobody. The vocabulary this gate reads is the AGENT consent screen (public/views/profile/agents/scope-model.js), which is the list an owner ticks when connecting an agent. A word belonging to a different grant path is not a defect and belongs here with the path named. A word in this file is otherwise a question nobody has answered, not a clearance.",
+  "exempt": {
+    "demanded:events:emit": "REVIEWED 2026-09-04, and it is meant to exist on one side only. The door is POST /v1/ecosystem/events (src/routes/ecosystem-events.ts:53) and it is gated requireRole('ecosystem') BEFORE requireScope, so the only principal that reaches it is a GEAI. An ecosystem app does not get its scopes from the agent consent screen: it declares them at hello, the owner narrows them at approve, and they are pinned into the token with a data-area allowlist (docs/building-an-aimeat-compatible-ecosystem-app.md). Putting `events:emit` on the agent screen would offer a human the power to let an AGENT emit ecosystem events, which is not a thing that exists. The gate reports it because it reads one of the two vocabularies; teaching it the ecosystem one is worth doing the day a second word appears here, and not before."
+  }
+}

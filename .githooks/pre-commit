@@ -40,6 +40,7 @@
 #  20. An agent writes, page hears it — pnpm check:sse-parity
 #  21. No decision written out twice  — pnpm check:copied-logic
 #  21b. Stated counts match the code  — pnpm check:doc-counts
+#  21c. One word, every door          — pnpm check:scope-parity
 #  22. Published surfaces + release   — pnpm check:liaison-surface
 #  23. The vitest unit suite          — pnpm test
 #
@@ -215,6 +216,14 @@ pnpm -s check:copied-logic
 
 echo "[pre-commit] The counts this project states about itself (check:doc-counts)…"
 pnpm -s check:doc-counts -- --strict
+
+# A permission word the owner is OFFERED and nothing asks for changes nothing when it is ticked; a
+# word a DOOR demands and the screen never offers cannot be granted by anybody, so the door is shut
+# to every principal that has to be given permission — and from outside that is indistinguishable
+# from closed by design. `aimeat_seo_status` sat in the second state, invisible to every agent on
+# every node, from the day it was added until the day this gate was written.
+echo "[pre-commit] One permission word, every door (check:scope-parity)…"
+pnpm -s check:scope-parity
 
 echo "[pre-commit] Published surfaces match, and neither needs a release (check:liaison-surface)…"
 pnpm -s check:liaison-surface
