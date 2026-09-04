@@ -31,7 +31,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth } from '../auth/middleware.js';
+import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { resolvePacingToll } from './extensions/pacing.js';
@@ -107,7 +107,7 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
   /** List a supply offering. Two kinds: an extension action (the raw data-service surface, default) or an
    *  `app-tool` (a method a provider app sells cross-app — a pinned interface version). Pricing is always
    *  authoritative from the provider. Both require a published I/O schema + usage terms (the legibility gate). */
-  router.post('/v1/exchange/offerings', requireAuth(), async (req: Request, res: Response) => {
+  router.post('/v1/exchange/offerings', requireAuth(), requireScope('exchange:write'), async (req: Request, res: Response) => {
     const owner = req.auth!.owner;
     const b = (req.body ?? {}) as Record<string, unknown>;
 
@@ -429,7 +429,7 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
    * Offering CONSUMERS (provider lineage) — who holds a contract against my offering, how much they consumed,
    * when they last used it. Provider-only: "where is my data used, by whom?".
    */
-  router.get('/v1/exchange/offerings/:id/consumers', requireAuth(), async (req: Request, res: Response) => {
+  router.get('/v1/exchange/offerings/:id/consumers', requireAuth(), requireScope('exchange:read'), async (req: Request, res: Response) => {
     const o = await getOffering(storage, str(req.params.id));
     if (!o || o.providerOwner !== req.auth!.owner) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such offering of yours'));
     const consumers = await offeringConsumers(storage, o);
@@ -463,7 +463,7 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
    * delisting it by hand would come straight back on the next reconcile — the honest answer is to turn the
    * source's `exchange` flag off, and that is what this reports (409) instead of lying about the outcome.
    */
-  router.delete('/v1/exchange/offerings/:id', requireAuth(), async (req: Request, res: Response) => {
+  router.delete('/v1/exchange/offerings/:id', requireAuth(), requireScope('exchange:write'), async (req: Request, res: Response) => {
     const o = await getOffering(storage, str(req.params.id));
     if (!o || o.providerOwner !== req.auth!.owner) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such offering of yours'));
     if (o.auto && str(req.query.force) !== '1') {
@@ -482,7 +482,7 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
    * before anything changes, and `migrate` to adopt hand-authored listings into the projection model
    * (flag their source, keep their offeringId so existing contracts keep resolving).
    */
-  router.post('/v1/exchange/reconcile', requireAuth(), async (req: Request, res: Response) => {
+  router.post('/v1/exchange/reconcile', requireAuth(), requireScope('exchange:write'), async (req: Request, res: Response) => {
     const b = (req.body ?? {}) as Record<string, unknown>;
     const dryRun = b.dry_run === true || str(req.query.dry_run) === '1';
     const migrate = b.migrate === true || str(req.query.migrate) === '1';
@@ -502,7 +502,7 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
 
   // ── NEEDS (demand) ──────────────────────────────────────────────────────────
   /** Post an open need. Providers browse open needs and bid. */
-  router.post('/v1/exchange/needs', requireAuth(), async (req: Request, res: Response) => {
+  router.post('/v1/exchange/needs', requireAuth(), requireScope('exchange:write'), async (req: Request, res: Response) => {
     const b = (req.body ?? {}) as Record<string, unknown>;
     const description = str(b.description);
     if (!description) return res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'description is required'));
@@ -542,7 +542,7 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
   });
 
   /** Close a need (requester only). */
-  router.post('/v1/exchange/needs/:id/close', requireAuth(), async (req: Request, res: Response) => {
+  router.post('/v1/exchange/needs/:id/close', requireAuth(), requireScope('exchange:write'), async (req: Request, res: Response) => {
     const n = await getNeed(storage, str(req.params.id));
     if (!n || n.requesterOwner !== req.auth!.owner) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such need of yours'));
     n.state = 'closed'; n.updatedAt = new Date().toISOString();
@@ -552,7 +552,7 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
 
   // ── BIDS ────────────────────────────────────────────────────────────────────
   /** A provider bids on an open need (must own the bid's extension). */
-  router.post('/v1/exchange/needs/:id/bids', requireAuth(), async (req: Request, res: Response) => {
+  router.post('/v1/exchange/needs/:id/bids', requireAuth(), requireScope('exchange:write'), async (req: Request, res: Response) => {
     const owner = req.auth!.owner;
     const n = await getNeed(storage, str(req.params.id));
     if (!n) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such need'));
@@ -581,7 +581,7 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
   });
 
   /** The requester accepts a bid → mints the entitlement (consumer = requester, provider = bidder). */
-  router.post('/v1/exchange/needs/:id/bids/:bidId/accept', requireAuth(), async (req: Request, res: Response) => {
+  router.post('/v1/exchange/needs/:id/bids/:bidId/accept', requireAuth(), requireScope('exchange:write'), async (req: Request, res: Response) => {
     const owner = req.auth!.owner;
     const consumerGaii = resolveIdentity(req.auth!, config.nodeId);
     const n = await getNeed(storage, str(req.params.id));

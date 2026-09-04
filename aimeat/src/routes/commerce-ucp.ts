@@ -25,7 +25,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth } from '../auth/middleware.js';
+import { requireAuth, requireScope } from '../auth/middleware.js';
 import { error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { safeFetch } from '../utils/url-validator.js';
@@ -178,7 +178,7 @@ export function commerceUcpRouter(config: AimeatConfig, storage: Storage): Route
     return session;
   }
 
-  router.post('/ucp/v1/checkout-sessions', requireAuth(), async (req, res) => {
+  router.post('/ucp/v1/checkout-sessions', requireAuth(), requireScope('commerce:buy'), async (req, res) => {
     const parsed = CreateSchema.safeParse(req.body);
     if (!parsed.success) { res.status(400).json(ucpEnvelope(UCP_CAPABILITIES, error(config.nodeId, 'INVALID_CHECKOUT', parsed.error.message))); return; }
     try {
@@ -194,14 +194,14 @@ export function commerceUcpRouter(config: AimeatConfig, storage: Storage): Route
     } catch (err) { sendUcpError(res, config, err); }
   });
 
-  router.get('/ucp/v1/checkout-sessions/:id', requireAuth(), async (req, res) => {
+  router.get('/ucp/v1/checkout-sessions/:id', requireAuth(), requireScope('commerce:buy'), async (req, res) => {
     try {
       const session = await loadOwnSession(req);
       res.json(ucpEnvelope(UCP_CAPABILITIES, { checkout_session: toUcpSession(session) }));
     } catch (err) { sendUcpError(res, config, err); }
   });
 
-  router.patch('/ucp/v1/checkout-sessions/:id', requireAuth(), async (req, res) => {
+  router.patch('/ucp/v1/checkout-sessions/:id', requireAuth(), requireScope('commerce:buy'), async (req, res) => {
     const parsed = PatchSchema.safeParse(req.body);
     if (!parsed.success) { res.status(400).json(ucpEnvelope(UCP_CAPABILITIES, error(config.nodeId, 'INVALID_CHECKOUT', parsed.error.message))); return; }
     try {
