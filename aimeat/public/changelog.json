@@ -6,6 +6,32 @@
       "version": "3.13.0",
       "kind": "feature",
       "title": {
+        "en": "Sign in with your fingerprint, and no password at all",
+        "fi": "Kirjaudu sormenjäljellä, ilman salasanaa"
+      },
+      "body": {
+        "en": "There is a passkey button on the sign-in form now. Press it with the name field empty and your device asks for your fingerprint, your face or your screen lock, and you are in — nothing typed, nothing remembered, nothing to be phished, because the device checks for itself which site is asking before it answers. Add the devices you use under Account security, name them so you can tell them apart, and take one away the day you stop using it. A passkey replaces nothing: your password stays, two-step sign-in stays if you armed it, and either of them still gets you in on a machine you have not registered.",
+        "fi": "Kirjautumislomakkeella on nyt pääsyavainpainike. Paina sitä nimikenttä tyhjänä, niin laite kysyy sormenjälkeä, kasvoja tai näytön lukitusta ja olet sisällä: mitään ei kirjoiteta, mitään ei tarvitse muistaa, eikä avainta voi kalastella, koska laite tarkistaa itse mikä sivusto sitä pyytää ennen kuin vastaa. Lisää käyttämäsi laitteet kohdassa Tilin turvallisuus, nimeä ne niin erotat ne toisistaan, ja poista laite sinä päivänä kun lakkaat käyttämästä sitä. Pääsyavain ei korvaa mitään: salasanasi säilyy, kaksivaiheinen kirjautuminen säilyy jos otit sen käyttöön, ja kummallakin pääset sisään koneella jota et ole rekisteröinyt."
+      }
+    },
+    {
+      "date": "2026-09-04",
+      "version": "3.13.0",
+      "kind": "security",
+      "title": {
+        "en": "Two-step sign-in, and a way back if you lose the phone",
+        "fi": "Kaksivaiheinen kirjautuminen, ja tie takaisin jos puhelin katoaa"
+      },
+      "body": {
+        "en": "Account security now shows a QR code you scan with an authenticator app, the ten backup codes to write down, and the field that turns it on. After that a sign-in asks for the six digits your app shows, or one backup code when the phone is not with you. Losing both used to be the end of the account, because taking the second step off asked for a code from the very device you no longer had; an operator can now remove it for you, and you are told on your own account feed who did it and when, because a second step that can disappear quietly is not a second step. Turning it off yourself destroys the secret for good, which on one of the two databases it had not been doing.",
+        "fi": "Tilin turvallisuus näyttää nyt QR-koodin jonka luet todennussovelluksella, kymmenen varakoodia talteen kirjoitettavaksi, ja kentän joka kytkee sen päälle. Sen jälkeen kirjautuminen kysyy sovelluksen näyttämät kuusi numeroa, tai yhden varakoodin silloin kun puhelin ei ole mukanasi. Molempien menettäminen oli ennen tilin loppu, koska toisen vaiheen poistaminen vaati koodin juuri siltä laitteelta jota sinulla ei enää ollut; nyt operaattori voi poistaa sen puolestasi, ja näet omalta tapahtumalistaltasi kuka sen teki ja milloin, koska toinen vaihe joka voi kadota huomaamatta ei ole toinen vaihe. Kun poistat sen itse, salaisuus tuhoutuu lopullisesti — mitä se toisessa kahdesta tietokannasta ei ollut tehnyt."
+      }
+    },
+    {
+      "date": "2026-09-04",
+      "version": "3.13.0",
+      "kind": "feature",
+      "title": {
         "en": "Your agents can sign in with a key of their own",
         "fi": "Agenttisi voivat kirjautua omalla avaimellaan"
       },
