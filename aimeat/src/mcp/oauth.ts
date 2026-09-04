@@ -35,7 +35,7 @@ import { issueJWT } from '../auth/jwt.js';
 import { verify } from '../auth/keypair.js';
 import { parseGAII } from '../utils/gaii.js';
 import { buildAgentAuthMetadata } from '../services/auth-md.js';
-import { buildProtectedResourceMetadata } from '../services/protected-resource.js';
+import { buildProtectedResourceMetadata, mcpResourceMetadata, MCP_RESOURCE_METADATA_PATH } from '../services/protected-resource.js';
 
 // OAuth 2.1 — authorization codes stay in-memory (short-lived, single-use).
 // Clients, refresh tokens, and approvals are persisted to storage.
@@ -500,6 +500,15 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
     // metadata whose `resource` is not the resource it is talking to.
     router.get('/.well-known/oauth-protected-resource', async (req: Request, res: Response) => {
         res.json(await buildProtectedResourceMetadata(req, config, storage));
+    });
+
+    // THE MCP ENDPOINT'S OWN DOCUMENT, at the address RFC 9728 gives a resource that has a path.
+    // The bare URL above describes the ORIGIN; this one describes `${apex}/v1/mcp`, and it is the
+    // one the 401 challenge names, so a client following the challenge reads a `resource` that
+    // matches what it is talking to. Registered AFTER the bare path, which Express matches exactly,
+    // so neither shadows the other.
+    router.get(MCP_RESOURCE_METADATA_PATH, (_req: Request, res: Response) => {
+        res.json(mcpResourceMetadata(config));
     });
 
     // GET /.well-known/oauth-authorization-server — OAuth metadata (RFC 8414), extended with

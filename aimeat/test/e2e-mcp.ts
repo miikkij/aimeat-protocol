@@ -897,6 +897,46 @@ await test('34. …and knowing a tool exists is not permission to call it', asyn
     assert(res.status === 401, `tools/call without a credential must be refused, got ${res.status}`);
 });
 
+await test('35b. The two protected-resource documents each name what their own address means', async () => {
+    // RFC 9728 §3.1 gives a resource WITH A PATH its metadata at `/.well-known/…-resource<path>`,
+    // so the bare URL describes the ORIGIN. The apex answered `<origin>/v1/mcp` there, which §3.3
+    // entitles a conformant client to reject — and isitagentready did, against production, while
+    // the MCP 401 challenge was pointing every client at exactly that document. The app-origin and
+    // portfolio branches had been fixed for this in July; the branch the fix started from had not.
+    const origin = BASE.replace(/\/+$/, '');
+    const bare = await json('/.well-known/oauth-protected-resource');
+    assert(bare.status === 200, `bare metadata: ${bare.status}`);
+    assert(bare.body.resource === origin,
+        `the bare well-known URL describes the origin, got ${bare.body.resource}`);
+
+    const scoped = await json('/.well-known/oauth-protected-resource/v1/mcp');
+    assert(scoped.status === 200, `scoped metadata: ${scoped.status}`);
+    assert(scoped.body.resource === `${origin}/v1/mcp`,
+        `the path-suffixed URL describes the MCP endpoint, got ${scoped.body.resource}`);
+    assert(Array.isArray(scoped.body.authorization_servers) && scoped.body.authorization_servers.length > 0,
+        'and it still says where to get a token');
+});
+
+await test('35c. The 401 challenge points at the document that matches the resource', async () => {
+    // The half that makes the other half safe. A challenge naming the origin's document sends a
+    // client protecting /v1/mcp to a `resource` it must reject; these two ship together or the
+    // change is worse than what it replaced.
+    const res = await fetch(`${BASE}/v1/mcp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} }),
+    });
+    const challenge = res.headers.get('www-authenticate') ?? '';
+    assert(challenge.includes('/.well-known/oauth-protected-resource/v1/mcp'),
+        `the challenge must name the MCP resource's own metadata, got ${challenge}`);
+    // Fetch what the challenge actually names and check the client would accept it.
+    const named = challenge.match(/resource_metadata="([^"]+)"/)?.[1];
+    assert(!!named, `the challenge carries a resource_metadata URL, got ${challenge}`);
+    const doc = await (await fetch(named!)).json() as any;
+    assert(doc.resource === `${BASE.replace(/\/+$/, '')}/v1/mcp`,
+        `and that document names the resource the client is talking to, got ${doc.resource}`);
+});
+
 await test('35. initialize is still refused, and still points at the OAuth flow', async () => {
     // DELIBERATE, and the temptation to open it is real because a readiness scanner probes exactly
     // this method. Every real MCP client initializes first and finds the OAuth flow through this

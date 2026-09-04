@@ -97,6 +97,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { randomBytes } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { MCP_RESOURCE_METADATA_PATH } from '../services/protected-resource.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -439,7 +440,11 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
                 return;
             }
             // No token — challenge client to authenticate via OAuth (MCP spec §5.3)
-            const resourceMetadataUrl = `${config.baseUrl}/.well-known/oauth-protected-resource`;
+            // THE MCP RESOURCE'S OWN METADATA, not the origin's. RFC 9728 §3.3 has a client reject
+            // metadata whose `resource` is not the resource it is talking to, and the bare
+            // well-known URL describes the origin — so pointing a client that is protecting
+            // `/v1/mcp` at it handed them a document they are entitled to throw away.
+            const resourceMetadataUrl = `${config.baseUrl.replace(/\/+$/, '')}${MCP_RESOURCE_METADATA_PATH}`;
             res.status(401)
                 .setHeader('WWW-Authenticate', `Bearer resource_metadata="${resourceMetadataUrl}"`)
                 .json({
