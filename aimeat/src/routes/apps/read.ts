@@ -50,6 +50,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { verifyDraftToken, DraftTokenError } from '../../services/draft-token.js';
 import { generateAppAccessToken } from '../../services/app-access-token.js';
 import { decodeStrictBase64 } from '../../utils/base64.js';
+import { ownerCoordinate } from '../../utils/gaii.js';
 import { applyServeMarks } from '../../services/app-serve-marks.js';
 import { appBadgeOn, appReviewedBy } from '../../services/app-marks.js';
 import { appToolNames } from '../../services/app-tool-names.js';
@@ -514,9 +515,16 @@ export function registerReadRoutes(
                     'This is a paid app. Authenticate and purchase it first via POST /v1/app-store/purchase'));
                 return;
             }
-            // Seller can always download their own app
-            if (req.auth.sub !== app.ownerGaii) {
-                const hasLicense = await storage.hasValidLicense(req.auth.sub, app.ownerGaii, filename);
+            // A right belongs to the PERSON, so both questions here are asked of the owner coordinate
+            // rather than of the exact caller. `req.auth.sub` is the bare account name on an owner
+            // session and the agent GAII on an agent one, while every receipt is keyed on `owner@node`
+            // — so this door answered 402 PURCHASE_REQUIRED to the buyer, to the buyer's agent, and to
+            // the seller on their own app. app-store.ts keyed on the coordinate from 2026-08-23; this
+            // one was missed, and utils/gaii.ts holds the function now so a third door cannot be.
+            const caller = ownerCoordinate(req.auth, config.nodeId);
+            // The seller always gets their own app.
+            if (caller !== app.ownerGaii) {
+                const hasLicense = await storage.hasValidLicense(caller, app.ownerGaii, filename);
                 if (!hasLicense) {
                     res.status(402).json(error(config.nodeId, 'PURCHASE_REQUIRED',
                         `This app costs ${app.manifest.priceMorsels} morsels. Purchase it first via POST /v1/app-store/purchase`));

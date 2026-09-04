@@ -11,9 +11,14 @@
  *   asserted per-case in test/unit/saml-assertion.test.ts against the same router.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=saml-login
  * @version-history
+ *   v1.1.0 — 2026-09-04 — The suite puts `sso.enabled` and `sso.connections_locked` where it needs
+ *     them before its first assertion. They are node config rather than per-run fixtures, so a run
+ *     that dies before its own restore leaves them set, and on Postgres they survive; inherited
+ *     `connections_locked` used to turn into eleven assertion failures none of which named it.
  *   v1.0.0 — 2026-08-24 — Initial, with the feature (BR-04 phase 2).
  */
-import { FAKE_IDP, buildSamlResponse, buildIdpMetadataXml, requestIdFromAuthorizeUrl } from './helpers/fake-saml-idp.js';
+import { buildSamlResponse, buildIdpMetadataXml, requestIdFromAuthorizeUrl } from './helpers/fake-saml-idp.js';
+import { requireCleanSsoState } from './helpers/sso-state.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -95,6 +100,9 @@ console.log('\n=== SAML organisation sign-in over live HTTP (BR-04) ===\n');
 
 async function run() {
     const op = await setupOwner('op');
+    // The two flags below are node config, not fixtures: a run that died before its own restore
+    // leaves them set, and on Postgres they survive. → test/helpers/sso-state.ts
+    await requireCleanSsoState(BASE, op.ownerToken);
 
     await test('SSO OFF: every public door answers 503, management still works', async () => {
         assert((await rawGet(`/v1/ghii/login/saml/${CONN}`)).status === 503, 'login door should 503');

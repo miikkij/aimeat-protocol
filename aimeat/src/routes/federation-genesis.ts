@@ -14,6 +14,10 @@
  *   - subscriptions + network-stats + /v1/organisms/:id/reputation
  *
  * @version-history
+ *   v1.3.0 — 2026-09-04 — POST genesis-memory-read requires memory:read. It had requireAuth alone, so
+ *     any principal carrying the account name could make this node fan out one request per active
+ *     genesis peer whatever it had been granted. Noted as an open question by
+ *     check:federation-signatures on the day that gate was written, and closed here.
  *   v1.2.0 — 2026-09-04 — The genesis memory cache is one module, services/genesis-memory-cache.ts,
  *     because the two halves written out here disagreed: the write filed keys under
  *     `genesis-cache:` and the lookup listed the prefix `genesis:`, which a LIKE search does not
@@ -28,7 +32,7 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import type { PeerInfo } from '../services/federation.js';
 import type { ServiceSummary } from '../utils/service-summary.js';
@@ -386,9 +390,20 @@ export function federationGenesisRouter(config: AimeatConfig, storage: Storage, 
         }
     });
 
-    // POST /v1/federation/genesis-memory-read — E.2: Cross-genesis memory routing
-    // Forwards memory read requests to genesis peers, aggregates responses
-    router.post('/v1/federation/genesis-memory-read', requireAuth(), async (req, res) => {
+    /**
+     * POST /v1/federation/genesis-memory-read — ask the genesis peers for memory and aggregate what
+     * they answer. E.2, cross-genesis memory routing.
+     *
+     * requireScope('memory:read') since 2026-09-04. It had requireAuth alone, which admitted any
+     * principal carrying the account name whatever it was granted — including an app-grant token
+     * holding one unrelated scope — and each call fans out one outbound request per active genesis
+     * peer. Nothing discloses more than it should: the ANSWERING side (the GET below) returns a record
+     * only when visibility is public and the owner has a federation consent. What the word adds is
+     * that reaching across the genesis network is something the owner granted rather than something
+     * any credential of theirs can do. An owner session bypasses scopes, so nothing a person does
+     * changes.
+     */
+    router.post('/v1/federation/genesis-memory-read', requireAuth(), requireScope('memory:read'), async (req, res) => {
         try {
             const { target_gaii, key, prefix, target_scope } = req.body ?? {};
 

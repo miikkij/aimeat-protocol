@@ -1011,6 +1011,39 @@ await test('27. replica:, genesis: and expiring: keys are excluded even when pub
     }
 });
 
+// The OUTBOUND half of the same feature, which had no test at all. POST asks every active genesis
+// peer for memory and aggregates what they answer; it carried requireAuth alone until 2026-09-04, so
+// any principal holding the account name could make this node fan out one request per peer whatever
+// it had been granted. The word is memory:read, and an owner session bypasses scopes.
+await test('28. the outbound genesis read needs memory:read, and an agent without it is refused', async () => {
+    const narrow = await json('/v1/agents', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ name: `genesisnarrow${Date.now() % 100000}`, owner: ownerName, capabilities: [], scopes: ['memory:write'] }),
+    });
+    assert(narrow.status === 201, `narrow agent: ${narrow.status} ${JSON.stringify(narrow.body)}`);
+    const gaii = narrow.body.data.agent.gaii as string;
+    const ts = new Date().toISOString();
+    const tok = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ gaii, timestamp: ts, signature: await signMsg(narrow.body.data.private_key as string, gaii + ts) }),
+    });
+    assert(tok.body.ok === true, `narrow agent token: ${JSON.stringify(tok.body.error)}`);
+
+    const refused = await json('/v1/federation/genesis-memory-read', {
+        method: 'POST', headers: { Authorization: `Bearer ${tok.body.data.token}` },
+        body: JSON.stringify({ key: `${GEN_PREFIX}.open`, target_scope: 'genesis' }),
+    });
+    assert(refused.status === 403, `expected 403 for memory:write only, got ${refused.status} ${JSON.stringify(refused.body)}`);
+
+    // The owner still gets through. What comes back depends on whether any genesis peer is active,
+    // so the assertion is that the request reached the handler rather than what it found.
+    const allowed = await json('/v1/federation/genesis-memory-read', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ key: `${GEN_PREFIX}.open`, target_scope: 'genesis' }),
+    });
+    assert(allowed.status !== 403, `owner was refused: ${allowed.status} ${JSON.stringify(allowed.body)}`);
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 

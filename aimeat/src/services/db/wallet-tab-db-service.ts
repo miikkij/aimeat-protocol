@@ -14,6 +14,8 @@
  * @structure WalletTabService.overview(ownerName, ownerGhii) → { wallet, transactions, checkoutSessions, orders }
  * @usage const w = await createWalletTabService(config, storage).overview(owner, `${owner}@${nodeId}`);
  * @version-history
+ *   v1.1.0 — 2026-09-04 — `lifetime` through services/wallet-stats.ts, the same function GET /v1/wallet
+ *     uses: every row kind counted, plus in/out, ledger_sum, unrecorded and by_type.
  *   v1.0.0 — 2026-07-16 — Phase 4: fold the Wallet tab's 4 core reads into one composite.
  */
 import type { AimeatConfig } from '../../config.js';
@@ -22,6 +24,7 @@ import { runInReadScope } from '../../storage/read-scope/read-scope.js';
 import { calculateEscrow } from '../morsel.js';
 import { cached, TTL } from '../cache.js';
 import { listSessions, listOrders } from '../../commerce/session-service.js';
+import { lifetimeOf } from '../wallet-stats.js';
 
 export interface WalletOverview {
   wallet: Record<string, unknown> | null;
@@ -61,22 +64,14 @@ export class WalletTabService {
         listOrders(this.storage, ownerGhii, 100),      // seller's received orders (sales)
       ]);
 
-      // Lifetime totals from the single ledger read (mirrors GET /v1/wallet).
-      let earned = 0, spent = 0, receivedAllowance = 0, welcomeBonus = 0;
-      for (const tx of allTx as WalletTransaction[]) {
-        if (tx.type === 'earned') earned += tx.amount;
-        else if (tx.type === 'spent') spent += Math.abs(tx.amount);
-        else if (tx.type === 'allowance') receivedAllowance += tx.amount;
-        else if (tx.type === 'welcome_bonus') welcomeBonus += tx.amount;
-      }
-
+      // Lifetime totals from the single ledger read: the same function GET /v1/wallet uses.
       const wallet = {
         gaii: identity,
         balance,
         in_escrow: inEscrow,
         available: balance - inEscrow,
         daily_allowance: { amount: this.config.dailyAllowance, accumulation_cap: this.config.dailyAllowanceCap },
-        lifetime: { earned, spent, received_allowance: receivedAllowance, welcome_bonus: welcomeBonus },
+        lifetime: lifetimeOf(allTx as WalletTransaction[], balance),
       };
 
       // Recent list — first 20, in the GET /v1/wallet/transactions row shape.

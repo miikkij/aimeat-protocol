@@ -117,6 +117,18 @@ A change to the account itself, its password, its recovery address, its second f
 its export, goes behind `requireOwnerPrincipal()`: role `owner` present, `agent`, `ecosystem` and
 `app` absent. `requireRole('owner')` alone is not that test, because a role can be inherited (see 12).
 
+*Gate:* `pnpm check:owner-principal`, since 2026-09-04. It reads every refusal decided by comparing
+`auth.owner` and requires each door to be behind a principal guard, to compute the test itself, or to
+be listed in `security/owner-principal-exemptions.json` with the sentence that makes a name the right
+question there. 45 refusals, 15 doors already naming the principal, 30 listed and triaged. It found
+`GET /v1/ghii/:ghii/credential` minting a SIGNED verifiable identity credential for any principal
+carrying the account name — the same file's two write doors had been closed in August and the read
+that hands identity out had not. Three of the 30 are marked an open question rather than cleared:
+`requireRole('owner')` keeps machine principals out but an owner-level PAT satisfies it, and the door
+grants something (an agent's scopes, an agent's key, an ecosystem app's access). What counts as a
+principal guard is one list, `AUTHORIZATION_GATES` in `scripts/inventory/principals.ts` — this script
+and `check:route-scopes` used to carry one each and they disagreed about four names.
+
 ### 12. A role is granted, never inherited at mint time
 `POST /v1/auth/token` read the owner record and copied the owner's `owner` and `operator` roles onto
 the AGENT's JWT, so every agent of an operator was an operator. The consequence was not the role test

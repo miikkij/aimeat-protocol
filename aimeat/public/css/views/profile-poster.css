@@ -19,6 +19,8 @@
  *   renders in a sandboxed frame with its own stylesheet.
  * @usage Linked from public/spa.html after every other stylesheet.
  * @version-history
+ *   v1.4.2 — 2026-09-04 — The wallet-card and wallet-request selectors go: the wallet wears its own
+ *     poster face (wallet-poster.css) and the classes they styled no longer exist.
  *   v1.4.1 — 2026-09-04 — The fnd-cal- selectors go: the calibrator wears its own poster face
  *     (calibrator-poster.css) and the classes they quieted no longer exist.
  *   v1.4.0 — 2026-09-03 — The starter card (.pf-agd-basic, September's "begin with two agents")
@@ -77,7 +79,7 @@
 .pf .card-subtitle { font-weight: 600; }
 
 /* ── Cards become sections: a rule on top, the page behind them ────────────────────────── */
-.pf .card, .pf .card.card-glass, .pf .pf-agd-card, .pj-section, .kpkg-card, .pf .wallet-card, .pf .key-rules-box,
+.pf .card, .pf .card.card-glass, .pf .pf-agd-card, .pj-section, .kpkg-card, .pf .key-rules-box,
 .portfolio-step, .portfolio-instructions, .pf .pf-agd-webhook-form {
   background: none; border: 0; border-top: 3px solid var(--text); border-radius: 0; box-shadow: none;
   padding: 1.1rem 0 1.5rem; margin-bottom: 2rem;
@@ -238,14 +240,12 @@
 .pj-org-openbtn { white-space: nowrap; }
 
 /* ── Money: the amounts as numerals ─────────────────────────────────────────────────────── */
-.pf .wallet-card, .pf .stat-card { text-align: left; }
-.pf .wallet-card .amount, .pf .stat-card-value {
+.pf .stat-card { text-align: left; }
+.pf .stat-card-value {
   font-family: var(--font-poster); font-weight: var(--font-poster-weight);
   font-size: 2.4rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); color: var(--text);
 }
-.pf .wallet-card .amount.positive { color: var(--success-fg); }
-.pf .wallet-card .amount.neutral { color: var(--accent); }
-.pf .wallet-card .wlabel, .pf .stat-card-label {
+.pf .stat-card-label {
   font-size: 0.72rem; font-weight: var(--font-poster-strong-weight); letter-spacing: 0.1em; text-transform: uppercase; color: var(--text); margin-top: 0.5rem;
 }
 .pf .stat-card { padding: 0.9rem 0 1rem; margin-bottom: 0; }
@@ -340,7 +340,7 @@
 .pf .sch-form, .pf .sch-cal-freq, .pf .of-mapwrap, .pf .of-empty-need, .pf .pf-nb-suggest, .pf .pf-nb-enrich, .pf .pf-nb-plan-step,
 .pf .wf-form-section, .pf .cap-info-section, .pf .pf-ld-pending, .pf .pf-ld-charter-box, .pf .pf-ld-editor, .pf .pf-ld-chart,
 .pf .pf-agd-crew-live, .pf .pf-agd-crew-problems, .pf .pf-agd-crew-tools-group, .pf .mbr-yours,
-.pf .wallet-request, .pf .mem-tools-section, .pf .mem-detail, .pf .mem-browse-panel, .pf .mem-bulkbar, .pf .pn-card, .pf .pn-setup, .pf .agent-cta, .pf .create-form,
+.pf .mem-tools-section, .pf .mem-detail, .pf .mem-browse-panel, .pf .mem-bulkbar, .pf .pn-card, .pf .pn-setup, .pf .agent-cta, .pf .create-form,
 .pf .ext-detail-section, .pf .platform-content, .pf .pf-agd-governance-section, .pf .agd-governance-section, .pf .pf-agd-services-info, .pf .agd-services-info,
 .pf .pf-agd-create-form, .pf .agd-create-form, .pf .pf-agd-builder, .pf .agd-builder, .pf .pf-agd-cgroup-empty, .pf .pf-agd-msg-proposed-task, .pf .agd-msg-proposed-task,
 .pf .pf-agd-directives-content, .pf .stat-card, .pf .pf-usage-card {

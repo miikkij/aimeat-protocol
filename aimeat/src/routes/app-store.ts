@@ -35,7 +35,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, AppManifest } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
+import { ownerCoordinate } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import { sign } from '../auth/keypair.js';
 import { settleMarketplaceFee } from '../services/marketplace-fee.js';
@@ -45,14 +45,11 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
 
     // The coordinate a purchase and a licence key on: the buyer's OWNER GHII, the same identity the
-    // wallet debits. `req.auth!.sub` is the bare owner name on an owner session and the agent GAII on
-    // an agent session, so keying receipts on it split one person's licences across two coordinates —
-    // the owner's purchase was invisible to their own agent and the app could be paid for twice
-    // (audit AI-triage 2026-08-23, invariant 1). resolveIdentity turns an owner session into its
-    // GHII; ownerGhiiOf collapses an agent (or ecosystem) principal to the same owner GHII. The
-    // seller side already keys on `app.ownerGaii`, which is that same `owner@node` form.
-    const ownerCoordinate = (req: { auth?: { sub: string; owner: string; roles: string[] } }): string =>
-        ownerGhiiOf(resolveIdentity(req.auth!, config.nodeId));
+    // wallet debits. It lives in utils/gaii.ts now, with the full reason — this was written out here
+    // on 2026-08-23 and the door that serves the paid app was still comparing `req.auth.sub` a
+    // fortnight later. The seller side keys on `app.ownerGaii`, which is that same `owner@node` form.
+    const coordinateOf = (req: { auth?: { sub: string; owner: string; roles: string[] } }): string =>
+        ownerCoordinate(req.auth!, config.nodeId);
 
     // POST /v1/app-store/purchase — Purchase an app
     router.post('/v1/app-store/purchase', requireAuth(), async (req, res) => {
@@ -61,7 +58,7 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
             return;
         }
 
-        const buyerGaii = ownerCoordinate(req);
+        const buyerGaii = coordinateOf(req);
         const buyerOwner = req.auth!.owner;
         const { app_filename, app_owner } = req.body ?? {};
 
@@ -211,7 +208,7 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
 
     // GET /v1/app-store/purchases — List buyer's purchases
     router.get('/v1/app-store/purchases', requireAuth(), async (req, res) => {
-        const gaii = ownerCoordinate(req);
+        const gaii = coordinateOf(req);
         const purchases = await storage.listAppPurchasesByBuyer(gaii);
 
         res.json(success(config.nodeId, {
@@ -231,7 +228,7 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
 
     // GET /v1/app-store/purchases/:txId — Get specific purchase (includes full content)
     router.get('/v1/app-store/purchases/:txId', requireAuth(), async (req, res) => {
-        const gaii = ownerCoordinate(req);
+        const gaii = coordinateOf(req);
         const txId = req.params.txId as string;
 
         const purchase = await storage.getAppPurchase(txId);
@@ -268,7 +265,7 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
 
     // GET /v1/app-store/sales — List seller's sales
     router.get('/v1/app-store/sales', requireAuth(), async (req, res) => {
-        const gaii = ownerCoordinate(req);
+        const gaii = coordinateOf(req);
         const sales = await storage.listAppPurchasesBySeller(gaii);
 
         res.json(success(config.nodeId, {
@@ -289,7 +286,7 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
 
     // GET /v1/app-store/license-check — Check if user has valid license for an app
     router.get('/v1/app-store/license-check', requireAuth(), async (req, res) => {
-        const gaii = ownerCoordinate(req);
+        const gaii = coordinateOf(req);
         const appFilename = req.query.app_filename as string;
         const appOwner = req.query.app_owner as string;
 
