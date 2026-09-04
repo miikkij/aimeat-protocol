@@ -57,7 +57,6 @@
  */
 const EXEMPT = new Set([
   'src/mcp/agent-capabilities.ts',
-  'src/mcp/agent-management.ts',
   'src/mcp/agent-messages.ts',
   'src/mcp/agent-onboarding.ts',
   'src/mcp/agent-schedules.ts',
@@ -65,7 +64,6 @@ const EXEMPT = new Set([
   'src/mcp/agent-telemetry.ts',
   'src/mcp/app-template-proposals.ts',
   'src/mcp/appdev-pitfalls.ts',
-  'src/mcp/appdev-proofs.ts',
   'src/mcp/apps.ts',
   'src/mcp/apps-fork.ts',              // pure extraction out of apps.ts (max-file-lines), same backlog
   'src/mcp/boards.ts',
@@ -77,15 +75,11 @@ const EXEMPT = new Set([
   'src/mcp/consent.ts',
   'src/mcp/core-boards.ts',            // pure extraction out of core.ts (max-file-lines), same backlog
   'src/mcp/core-admin.ts',
-  'src/mcp/core-storage.ts',
   'src/mcp/core.ts',
   'src/mcp/cortex.ts',
-  'src/mcp/dm-messages.ts',
   'src/mcp/exchange-run.ts',
   'src/mcp/exchange.ts',
   'src/mcp/extensions.ts',
-  'src/mcp/feedback.ts',
-  'src/mcp/flags.ts',
   'src/mcp/index.ts',
   'src/mcp/knowledge.ts',
   'src/mcp/memory-extended.ts',
@@ -94,14 +88,12 @@ const EXEMPT = new Set([
   'src/mcp/organisms-email-invites.ts',
   'src/mcp/organisms-name-invites.ts',
   'src/mcp/organisms.ts',
-  'src/mcp/portfolio.ts',
   'src/mcp/prompts-managed.ts',
   'src/mcp/prompts.ts',
   'src/mcp/sharing-groups.ts',
   'src/mcp/skills.ts',
   'src/mcp/wallet-extended.ts',
   'src/mcp/workspace-members.ts',
-  'src/mcp/workspace-create.ts',        // pure extraction out of workspaces.ts (max-file-lines), same backlog
   'src/mcp/workspaces.ts',
 ]);
 

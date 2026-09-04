@@ -112,25 +112,65 @@ The August 2026 audit produced this finding eleven times, and the report's own s
 recorded one of them as fixed because an operator clause had been added: `owner !== name &&
 !roles.includes('operator')` WIDENS the door, and reading it as a narrowing cost a second pass.
 
-**THE FORM THE GATE CANNOT SEE: a door that SCOPES a query by the name instead of REFUSING on it.**
-`check:owner-principal` reads comparisons, so a door with no comparison on it is invisible to the
-scanner however completely it acts on the human's own things. Four were found by hand on 2026-09-04
-and all four are now behind `requireOwnerPrincipal()`:
+#### 11a. Two code shapes, one invariant, and a scanner for each half
+
+The owner name reaches a handler in two shapes, and every scanner we own reads exactly one of them.
+
+**REFUSING on the name** is a comparison: `if (row.owner !== req.auth!.owner) return 403`.
+`check:owner-principal` reads these. **SCOPING a query by the name** is not a comparison at all:
+`listActiveSessions(req.auth!.owner)`, and act on whatever comes back. There is nothing for a
+comparison-reader to read, so a door of the second shape is invisible to that gate however completely
+it acts on the human's own things.
+
+The reverse blind spot is real too, and it belongs beside this one.
+`check:identity-resolution` counts a unit as resolved when it computes a principal test, so a handler
+that writes `roles.includes('owner') && !roles.includes('agent')` three lines above a raw
+`req.auth!.sub` read is scored resolved. That exclusion is deliberate — without it the gate cries at
+the twenty-eight handlers that resolve by hand — and it means **the two gates cover different halves
+of one invariant and neither alone is coverage.**
+
+`GET /v1/memory` (crud.ts) is the case that shows both halves in ONE handler, which is why it is the
+example worth remembering: `agentParam !== gaii` is a comparison — the refusal shape with the wrong
+operand, and `?agent=alice` compares EQUAL to the bare name, so the ownership check is skipped — and
+`listMemoryMeta(gaii, …)` is then a query scoped by the unresolved identity, listing under a
+coordinate owner data does not occupy. One shape makes it exploitable, the other makes it wrong. A
+scanner reading refusals sees a comparison and is satisfied; one reading scoping sees a query and
+cannot tell resolved from unresolved. Each gate's blind spot is the other's subject.
+
+Four scoping-shape doors were found by hand on 2026-09-04, all now behind `requireOwnerPrincipal()`:
 
 - `GET`/`DELETE /v1/auth/sessions` and `DELETE /v1/auth/sessions/:id` pass `req.auth!.owner` to
   `listActiveSessions` and revoke what comes back — the human's device list, and signing them out of
   every device they own, their current one included, for any principal carrying their account name.
 - `GET /v1/ghii/cors` names the web origins that already hold credentialed access to the account.
   Audit H-7 fenced the PUT and left the read, which is the reconnaissance for the same attack.
-- `GET /v1/ghii/verify/eudiw/request` and `GET /v1/ghii/verify/ftn/authorize` mint a verification
-  nonce stamped with `req.auth!.owner`. **This is the sharp one, and it shows the pattern's second
-  half: a flow is only as fenced as its FIRST step.** The callbacks that consume those states cannot
-  be authenticated — they are wallet and bank-ID redirects — so they write `verificationLevel: 3` and
-  the presented attributes onto the GHII the NONCE names. Fencing the two POSTs in August left each
-  rail half fenced: any principal in the person's name could open a verification bound to the human,
-  and whoever then completed the bank-ID login had their own given name, family name, birthdate and
-  national identifier hash stamped on somebody else's account as proved. The fence has to sit where
-  the state is minted, because there is nowhere later to put it.
+
+#### 11b. A two-legged flow is only as fenced as its FIRST leg
+
+`GET /v1/ghii/verify/eudiw/request` and `GET /v1/ghii/verify/ftn/authorize` are not another line in
+that list. The doors above hand over data that already belongs to the account. **These MINT A
+CREDENTIAL.**
+
+Each writes a verification nonce stamped with `req.auth!.owner` and hands back a state. The callback
+that consumes that state cannot be authenticated by construction — it is a wallet or a bank-ID
+redirect, arriving from the issuer and not from the person — so it writes `verificationLevel: 3`,
+`ftnVerified` and the presented eIDAS attributes onto the GHII **the nonce names**.
+
+August fenced the two POSTs and left these two GETs open. So any principal acting in the person's
+name could open a verification bound to that human, and whoever then completed the bank-ID login —
+the agent's operator, a different person entirely — had their own given name, family name, birthdate
+and national identifier hash written onto somebody else's account as PROVED. The failure is not an
+agent reading something it should not. It is a person's identity recorded as verified on an account
+that is not theirs, by the one rail on this node whose entire purpose is to be trusted afterwards.
+
+**Half-fencing is worse than not fencing, because the fenced leg makes the flow look done.** Both
+POSTs carried `requireOwnerPrincipal()` and a reader checking "is the verification path guarded"
+found a guard. The gate has to sit where the STATE IS MINTED, because after that there is nowhere to
+put it: the callback has no principal to test.
+
+*Check:* when a flow has an unauthenticated leg by design, fence the leg that BINDS it to a person.
+Ask what the unauthenticated end writes and whose record it names; if the answer comes from something
+minted earlier, that mint is the door.
 
 *Check:* every authorization names WHICH KIND of principal may do this, never only whose data it is.
 A change to the account itself, its password, its recovery address, its second factor, its deletion or
