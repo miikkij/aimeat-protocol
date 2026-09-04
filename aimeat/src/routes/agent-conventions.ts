@@ -25,6 +25,9 @@
  *   - GET /.well-known/x402.json    — machine-payment discovery, derived from the network registry
  * @usage app.use(agentConventionsRouter(config, storage));
  * @version-history
+ *   2026-09-04 - /.well-known/x402.json names the seller. It carried the network, the assets and
+ *     the facilitator and nothing that said who the counterparty was, which every x402 scanner
+ *     asks for. The node id, not a brand: a self-hosted node is its own seller.
  *   v1.0.0 — 2026-07-29 — Initial (agent-readability phase 14)
  */
 import { Router } from 'express';
@@ -187,6 +190,11 @@ function buildX402Json(config: AimeatConfig): object {
   const testnet = config.x402Network.includes('sepolia') || config.x402Network.includes('testnet');
   return {
     x402Version: 1,
+    // WHO IS SELLING. A buyer's agent reading this file cold has the network, the assets and the
+    // facilitator, and nothing that names the counterparty; every x402 scanner asks for this and
+    // every one of them was right to. The node id rather than a brand, because a self-hosted node
+    // is its own seller and "AIMEAT" would name the software instead of the party.
+    name: config.nodeId,
     enabled: config.x402Enabled,
     // Stated plainly rather than left to be discovered after a transfer. A testnet rail is a real
     // rail with play money, and a buyer deciding whether to use it deserves to know which it is.

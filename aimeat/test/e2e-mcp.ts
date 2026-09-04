@@ -859,6 +859,55 @@ await test('32. Request on closed session → new session', async () => {
         `status ${res.status}: ${JSON.stringify(body)}`);
 });
 
+// ─── What a stranger with no account may learn, and what they may not ───
+//
+// A foreign agent arriving with nothing but the hostname could not learn ONE capability of this
+// node without a credential first, which is the wrong way round: you decide whether to ask your
+// owner for an account by knowing what the account is for. `tools/list` now answers the contract —
+// names, descriptions, input shapes, all of it already public in openapi.json — and nothing else
+// moved. The three assertions are the three halves of "discoverable but not usable".
+
+async function anonRpc(method: string, id: number) {
+    const res = await fetch(`${BASE}/v1/mcp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' },
+        body: JSON.stringify({ jsonrpc: '2.0', id, method, params: {} }),
+    });
+    return { status: res.status, body: await res.json() as any, challenge: res.headers.get('www-authenticate') };
+}
+
+await test('33. tools/list without a credential answers the catalogue', async () => {
+    const { status, body } = await anonRpc('tools/list', 401);
+    assert(status === 200, `status ${status}: ${JSON.stringify(body).slice(0, 200)}`);
+    const tools = body.result?.tools;
+    assert(Array.isArray(tools) && tools.length > 50, `expected the catalogue, got ${Array.isArray(tools) ? tools.length : typeof tools}`);
+    const one = tools.find((t: any) => t.name === 'aimeat_memory_read');
+    assert(!!one, 'a known tool is in the list');
+    assert(typeof one.description === 'string' && one.description.length > 20, 'and it carries its description');
+    assert(one.inputSchema?.type === 'object' && one.inputSchema.properties, 'and an input schema a client can read');
+});
+
+await test('34. …and knowing a tool exists is not permission to call it', async () => {
+    // The whole point. Reading the contract must not become access to anything behind it.
+    const res = await fetch(`${BASE}/v1/mcp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 402, method: 'tools/call', params: { name: 'aimeat_memory_read', arguments: { key: 'x' } } }),
+    });
+    assert(res.status === 401, `tools/call without a credential must be refused, got ${res.status}`);
+});
+
+await test('35. initialize is still refused, and still points at the OAuth flow', async () => {
+    // DELIBERATE, and the temptation to open it is real because a readiness scanner probes exactly
+    // this method. Every real MCP client initializes first and finds the OAuth flow through this
+    // 401's WWW-Authenticate header; answering 200 with no session would walk Claude, Cursor and
+    // the rest past their only signpost and fail them one call later.
+    const { status, challenge } = await anonRpc('initialize', 1);
+    assert(status === 401, `initialize without a credential stays 401, got ${status}`);
+    assert(!!challenge && challenge.includes('resource_metadata'),
+        `and the challenge still names where to authenticate, got ${challenge}`);
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 

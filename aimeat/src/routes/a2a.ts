@@ -40,6 +40,11 @@
  * @structure a2aRouter(config, storage)
  * @usage app.use(a2aRouter(config, storage));
  * @version-history
+ *   v1.3.0 — 2026-09-04 — The node directory at `/.well-known/agent-card.json` validates as an A2A
+ *     Agent Card. It carried only a registry, so a client that checks the schema before reading the
+ *     document got nothing — a validator named all six missing fields. They are present now and
+ *     every one is true of a directory: no interface of its own, nothing streamed, JSON in and out,
+ *     and one skill which is saying where the real cards are. The `agents` array is unchanged.
  *   v1.2.0 — 2026-09-01 — A stranger can hire this agent: a verified foreign card reaches a
  *     published offering, pays for it with x402 and reads the result, over a separate handler.
  *   v1.1.0 — 2026-09-01 — The OASF record (V6c): the third projection of the same agent.
@@ -108,14 +113,34 @@ export function a2aRouter(config: AimeatConfig, storage: Storage): Router {
     const base = config.baseUrl.replace(/\/+$/, '');
     res.setHeader('Cache-Control', 'public, max-age=60');
     res.json({
-      // Not an AgentCard itself: a card describes ONE agent, and pretending this is one would make
-      // a directory look like an agent with a very odd skill list. A registry with `url`s, which is
-      // what a stranger needs to go and read the real cards.
+      // A DIRECTORY THAT VALIDATES AS A CARD, because this path is A2A's and A2A says a card lives
+      // here. It was a bare registry until 2026-09-04, on the reasoning that a card describes ONE
+      // agent and a directory pretending to be one would have a very odd skill list. That reasoning
+      // still holds and the shape below obeys it — what it missed is that a client which validates
+      // the document before reading it gets nothing at all, and a validator reported exactly that:
+      // missing version, capabilities, supportedInterfaces, defaultInputModes, defaultOutputModes,
+      // skills. So the required fields are present and every one of them is TRUE of a directory:
+      // it streams nothing, it answers as JSON, it offers no interface of its own, and its one
+      // skill is telling you where the real cards are. `agents` is unchanged and is still the point.
       name: config.nodeId,
       description: `Agents on ${config.nodeId} that are offered to other agents.`,
       protocol: 'a2a',
       node: config.nodeId,
       url: base,
+      version: '1.0.0',
+      // NOT AN ENDPOINT, and the empty list is the honest way to say so. Work goes to an agent's
+      // own interface, named per row below; there is no node-level A2A JSON-RPC and inventing one
+      // in this document would send a stranger's task to an address that answers nothing.
+      supportedInterfaces: [],
+      capabilities: { streaming: false, pushNotifications: false, stateTransitionHistory: false, extensions: [] },
+      defaultInputModes: ['application/json'],
+      defaultOutputModes: ['application/json'],
+      skills: [{
+        id: 'directory',
+        name: 'Agent directory',
+        description: `Lists the agents on ${config.nodeId} whose owners have published an offering, with the address of each one's own agent card. Publishing the offering is the consent, so an agent absent from this list is not hidden — it is not for sale.`,
+        tags: ['directory', 'discovery', 'a2a'],
+      }],
       agents: published.map(({ agent, offerings }) => ({
         name: agent.name,
         owner: agent.owner,

@@ -144,6 +144,29 @@ await test('8. It lists agents with a PUBLISHED OFFERING and nobody else', async
   assert(!listed.includes(gaiiA), `an agent with no offering is not listed, saw ${JSON.stringify(listed)}`);
 });
 
+await test('8b. The directory validates as an A2A Agent Card, because this path is A2A\'s', async () => {
+  // A client that validates the document before reading it used to get nothing: the six fields
+  // below were absent, so `/.well-known/agent-card.json` failed schema validation and a stranger
+  // who checked before parsing learned neither the directory nor that it existed. Reported by an
+  // agent-readiness validator against production on 2026-09-04, naming all six.
+  //
+  // Each one is asserted for its VALUE, not its presence, because presence is what a directory
+  // dressed as a card would also have. These say something true about a directory.
+  const r = await json('/.well-known/agent-card.json');
+  for (const field of ['version', 'capabilities', 'supportedInterfaces', 'defaultInputModes', 'defaultOutputModes', 'skills']) {
+    assert(r.body[field] !== undefined, `the A2A schema requires ${field}, and it is missing`);
+  }
+  // NOT AN ENDPOINT. Work goes to an agent's own interface, and an empty list is how this document
+  // says it has none of its own. A non-empty one here would send a stranger's task nowhere.
+  assert(Array.isArray(r.body.supportedInterfaces) && r.body.supportedInterfaces.length === 0,
+    `the directory offers no interface of its own, got ${JSON.stringify(r.body.supportedInterfaces)}`);
+  assert(r.body.capabilities.streaming === false, 'a directory streams nothing');
+  assert(r.body.skills.length === 1 && r.body.skills[0].id === 'directory',
+    `its one skill is being a directory, got ${JSON.stringify(r.body.skills)}`);
+  // The point of the document survived the fields being added to it.
+  assert(Array.isArray(r.body.agents), 'the directory is still a directory');
+});
+
 await test('9. The per-agent card still answers at its own address', async () => {
   // Both addresses stay: the new one is a directory, not a replacement.
   const r = await json(`/v1/a2a/${encodeURIComponent(ownerA)}/webresearcher/agent-card.json`);
