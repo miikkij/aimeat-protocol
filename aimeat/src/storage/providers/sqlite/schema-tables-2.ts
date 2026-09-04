@@ -298,6 +298,7 @@ export function applySchemaTables2(db: Database.Database): void {
       scopes           TEXT NOT NULL DEFAULT '[]',
       spendCapMorsels  INTEGER,
       spentMorsels     INTEGER NOT NULL DEFAULT 0,
+      scopesFixedAt    TEXT,
       refreshTokenHash TEXT,
       createdAt        TEXT NOT NULL,
       lastUsedAt       TEXT,

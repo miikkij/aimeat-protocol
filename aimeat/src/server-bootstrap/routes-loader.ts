@@ -77,6 +77,7 @@ import { agentSkillsDiscoveryRouter } from '../routes/agent-skills-discovery.js'
 import { authRouter } from '../routes/auth.js';
 import { accessTokensRouter } from '../routes/access-tokens.js';
 import { appGrantsRouter } from '../routes/app-grants.js';
+import { appGrantsManageRouter } from '../routes/app-grants-manage.js';
 import { ownersRouter } from '../routes/owners.js';
 import { agentsRouter } from '../routes/agents.js';
 import { agentsV2Router } from '../routes/agents-v2.js';
@@ -356,6 +357,7 @@ export async function mountRoutes(
   app.use(authRouter(config, storage));
   app.use(accessTokensRouter(config, storage));
   app.use(appGrantsRouter(config, storage));   // H-2: explicit scoped app grants (OAuth-like)
+  app.use(appGrantsManageRouter(config, storage));   // the owner's list / narrow / cap / revoke of those grants
   app.use(sseRouter(config, storage));
   app.use(presenceRouter(config, storage));
 

@@ -147,6 +147,13 @@ export const capabilitiesGroupsSkillsTools: AimeatToolDefinition[] = [
         input: {},
     },
     {
+        name: 'aimeat_access_list',
+        description: "Who holds a key to your owner's account, and how far each key reaches, in one answer: the apps that act in their name with the rights each one has, the tokens they minted (label, level, expiry, last use; never the token itself), the accounts connected at other services, and the sign-in state (password set, two-step on or off, passkeys, the open sessions by device and by agent). The same read the Access page shows. Read-only: nothing here revokes; the person does that on the page. Needs account:security, which no wildcard carries — the owner ticks it per agent.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {},
+    },
+    {
         name: 'aimeat_consent_revoke',
         description: 'Revoke a consent grant by its id, setting status to revoked and stamping the time (the record is kept for audit, not deleted). Only the consent owner may revoke. Find the id with aimeat_consent_list.',
         caller: 'agent',

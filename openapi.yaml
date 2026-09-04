@@ -6475,6 +6475,33 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
 
+  /v1/access/overview:
+    get:
+      operationId: getAccessOverview
+      summary: Who holds a key to this account, and how far each key reaches
+      description: >
+        The Access page in one read, and the answer behind `aimeat_access_list`: the consents, the
+        public key, the apps' grants with their rights (`can_spend`, `spend_cap_morsels`,
+        `scopes_fixed_at` like GET /v1/app-grants), the tokens (labels and levels, never the token),
+        the sharing groups, the agent defaults, `base_package` (the eight words the boot migration
+        wrote onto every grant made before 2026-08-10), `access_ttl_seconds` (how long an app's
+        issued token outlives a narrowing), `sign_in` (password set, organisation-managed or not,
+        two-step state, passkeys, and the OPEN sessions grouped: the person's by device with the
+        caller's own marked current, the agents' by agent, and how many expired rows the store still
+        keeps) and `connections` (the accounts connected at other services, the providers on offer,
+        the person's own app registrations). No secret leaves. Readable by the owner, or by a
+        principal carrying `account:security`, the scope no wildcard carries.
+      tags: [Auth]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+
   /v1/access/tokens:
     post:
       operationId: createAccessToken
@@ -6712,6 +6739,40 @@ paths:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
 
   /v1/app-grants/{grantId}:
+    patch:
+      operationId: appGrantNarrowScopes
+      summary: Keep only some of the rights a connected app holds
+      description: >
+        Body `{ scopes: string[] }` names the scope words the app KEEPS; every one of them must
+        already be on the grant. A word the grant does not hold is refused with `SCOPES_WIDEN`, because
+        the consent screen is the only door that adds a right (it is the only place the app's own ask
+        is on the screen), and an empty list is refused (that is what DELETE is for). The grant is
+        stamped `scopes_fixed_at`, which the boot-time vocabulary migration honours, so a right the
+        person took away does not come back at the next restart. The access token the app already
+        holds keeps its claims until it expires; the response says how long that can take
+        (`applies_within_seconds`), and the app's next refresh mints from the narrowed grant. Owner-only.
+      tags: [Auth]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { in: path, name: grantId, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [scopes]
+              properties:
+                scopes:
+                  type: array
+                  items: { type: string }
+                  description: The scope words to keep. A subset of what the grant holds, at least one.
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/AimeatError' }
+        '401': { $ref: '#/components/responses/AimeatError' }
+        '404': { $ref: '#/components/responses/NotFound' }
     delete:
       operationId: revokeAppGrant
       summary: Revoke an app's grant
@@ -48914,6 +48975,39 @@ paths:
                         properties:
                           revoked_sessions: { type: integer }
                           owner: { type: string }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /v1/auth/sessions/others:
+    delete:
+      operationId: deleteOtherAuthSessions
+      tags: [Auth]
+      summary: Sign the owner out of every device except this one
+      description: >
+        Ends every other open session of the person's own sign-ins and keeps the caller's, so "close
+        the laptop I left at the office" does not also send this device to the sign-in screen. Agents'
+        sessions are untouched; an agent is ended from the Agents surface. A credential that carries
+        no session (a token exchange, an API key) is refused with `NO_SESSION` and pointed at
+        DELETE /v1/auth/sessions. Owner principal only.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Other sessions revoked
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          revoked_sessions: { type: integer }
+                          kept_session_id: { type: string }
+                          owner: { type: string }
+        '400':
+          $ref: '#/components/responses/AimeatError'
         '401':
           $ref: '#/components/responses/Unauthorized'
   /v1/auth/sessions/{id}:

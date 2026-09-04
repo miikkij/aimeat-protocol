@@ -650,6 +650,10 @@ export const coreTools: ConnectCliToolDefinition[] = [
         handler: ({ client }) => client.get('/v1/consent'),
     },
     {
+        name: 'aimeat_access_list',
+        handler: ({ client }) => client.get('/v1/access/overview'),
+    },
+    {
         name: 'aimeat_consent_revoke',
         handler: ({ client }, input) => client.delete(`/v1/consent/${encodeURIComponent(requiredString(input, 'id'))}`),
     },

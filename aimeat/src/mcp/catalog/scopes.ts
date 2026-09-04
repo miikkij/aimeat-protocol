@@ -434,6 +434,9 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_consent_grant: 'consent:manage',
     aimeat_consent_list: 'consent:manage',
     aimeat_consent_revoke: 'consent:manage',
+    // The Access page's read (GET /v1/access/overview → owner, or account:security). Every key to the
+    // account in one answer, so the word that opens it is the one no wildcard carries.
+    aimeat_access_list: 'account:security',
 
     // Cortex management (POST/PUT/DELETE /v1/cortex* → cortex:write; PUT is the idempotent upsert)
     // List/get are NOT gated (mirrors REST: GET /v1/cortex is just requireAuth).

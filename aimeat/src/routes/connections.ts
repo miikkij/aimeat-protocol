@@ -47,7 +47,7 @@ import {
   buildOutboundProviders, listProviderMeta, findProvider,
 } from '../services/connections/providers.js';
 import { requireEncryptionKey, sealCredential } from '../services/connections/credential.js';
-import { listOwnConnections, requireOwnConnection, toPublicConnection } from '../services/connections/access.js';
+import { listOwnConnections, requireOwnConnection, toPublicConnection, toPublicClient } from '../services/connections/access.js';
 import { startAuthorization, completeAuthorization, type ConnectContext } from '../services/connections/oauth.js';
 import { revokeConnection, ensureFreshCredential } from '../services/connections/refresh.js';
 import { readResource } from '../services/connections/read.js';
@@ -56,10 +56,7 @@ import { quotaStatus, openPublish } from '../services/connections/publish-gate.j
 import { publishToProvider } from '../services/connections/publish.js';
 import { readMetrics, toStoredSample } from '../services/connections/metrics.js';
 import { runOwnPublish } from '../services/connections/publish-run.js';
-import type {
-  ConnectionMode, ModerationMode,
-  ProviderClientRecord, PublicProviderClient,
-} from '../models/connection-schemas.js';
+import type { ConnectionMode, ModerationMode } from '../models/connection-schemas.js';
 
 // The projection and the two access sentences live in services/connections/access.ts, so the MCP
 // door cannot carry a second copy of them. `toPublic` stays as the local name every handler below
@@ -227,19 +224,8 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
   // the node's. To LinkedIn or X they are one application, sharing one rate limit, one reputation
   // and, on X, one bill, because pay-per-use charges the app rather than the member. A principal
   // who brings their own app spends their own allowance and carries their own name.
-
-  /** Never the secret, and never another principal's row. */
-  function toPublicClient(row: ProviderClientRecord, connectionCount: number): PublicProviderClient {
-    return {
-      provider: row.provider,
-      clientId: row.clientId,
-      // Not a secret, and visible on purpose: the tenant decides whether the sign-in reaches the
-      // right directory at all, so whoever set it must be able to read back what they set.
-      tenant: row.tenant ?? null,
-      registeredAt: row.registeredAt,
-      connectionCount,
-    };
-  }
+  // The projection (toPublicClient) lives in services/connections/access.ts since 2026-09-05, so the
+  // Access page's composite read carries the same shape without a second copy of it.
 
   router.get('/v1/connections/clients', requireAuth(), requireScope('connections:read'), async (req: Request, res: Response) => {
     if (!capabilityOn(res)) return;

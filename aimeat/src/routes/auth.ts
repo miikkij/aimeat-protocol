@@ -10,6 +10,9 @@
  * @usage
  *   app.use(authRouter(config, storage));
  * @version-history
+ *   v1.8.0 -- 2026-09-05 -- DELETE /v1/auth/sessions/others: end every other device's session and
+ *     keep this one, the Access page's "sign out everywhere else". The device list no longer shows
+ *     rows past their expiry: on aimeat.io it listed 3 290 sessions of which 2 848 were dead.
  *   v1.7.0 -- 2026-09-04 -- The three session doors are behind requireOwnerPrincipal(). All three
  *     read `req.auth!.owner` and act on the HUMAN's device sessions, so any principal carrying the
  *     account name could list where the person signs in and sign them out of every device they own,
@@ -497,7 +500,11 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
   // values in it are exactly the ids the DELETE below accepts.
   router.get('/v1/auth/sessions', requireAuth(), requireOwnerPrincipal(), async (req, res) => {
     const owner = req.auth!.owner;
-    const sessions = (await storage.listActiveSessions(owner)).filter(s => !isExternalPrincipal(s.gaii));
+    // "Active" in the store means not revoked; a row past its expiry opens nothing and is only
+    // waiting for the sweep. Listing it told the person they were signed in on devices they were not.
+    const now = Date.now();
+    const sessions = (await storage.listActiveSessions(owner))
+      .filter(s => !isExternalPrincipal(s.gaii) && new Date(s.expiresAt).getTime() > now);
     const currentSessionId = req.auth!.sessionId;
 
     res.json(success(config.nodeId, {
@@ -512,6 +519,30 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
       })),
       total: sessions.length,
     }));
+  });
+
+  // DELETE /v1/auth/sessions/others — sign the person out of every device except this one.
+  //
+  // The question the Access page asks is "is anyone else signed in as me", and the answer it needs
+  // is a door that ends every other session and leaves the one the person is pressing it from. The
+  // all-devices door below ends the caller's own session too, which sends them to the sign-in screen
+  // to prove they are still themselves; that is the right shape for "I think my password is out"
+  // and the wrong one for "close the laptop I left at the office". Declared before the /:id door so
+  // the word "others" is never read as a session id. The person's OWN sign-ins only, like the other
+  // three: an agent is ended from the Agents surface, deliberately, one at a time.
+  router.delete('/v1/auth/sessions/others', requireAuth(), requireOwnerPrincipal(), async (req, res) => {
+    const owner = req.auth!.owner;
+    const currentSessionId = req.auth!.sessionId;
+    if (!currentSessionId) {
+      res.status(400).json(error(config.nodeId, 'NO_SESSION', 'This key has no sign-in of its own to keep, so there is nothing to keep open. Sign out everywhere instead, which ends every session.', 400, { sign_out_everywhere: 'DELETE /v1/auth/sessions' }));
+      return;
+    }
+    const now = Date.now();
+    const others = (await storage.listActiveSessions(owner))
+      .filter(s => !isExternalPrincipal(s.gaii) && s.sessionId !== currentSessionId && new Date(s.expiresAt).getTime() > now);
+    let count = 0;
+    for (const s of others) if (await storage.revokeSession(s.sessionId)) count++;
+    res.json(success(config.nodeId, { revoked_sessions: count, kept_session_id: currentSessionId, owner }));
   });
 
   // DELETE /v1/auth/sessions/:id — revoke a specific session

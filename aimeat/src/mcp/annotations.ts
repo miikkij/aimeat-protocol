@@ -401,6 +401,7 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_consent_list: { title: 'List Consents', readOnlyHint: true },
     aimeat_consent_grant: { title: 'Grant Consent', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_consent_revoke: { title: 'Revoke Consent', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    aimeat_access_list: { title: 'Access: Who Holds a Key', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 
     // ── Flags / moderation ──
     aimeat_flag_report: { title: 'Report Content for Moderation', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },

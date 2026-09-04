@@ -2,9 +2,13 @@
  * @file security-tab.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Profile tab for two-step sign-in, CORS origin management (GHII + per-agent) and
- *   session revocation.
+ * @description Profile tab for CORS origin management (GHII + per-agent): which web addresses may
+ *   reach the account's API. Operator-only in the menu (the Infrastructure group).
  * @version-history
+ *   v1.5.0 — 2026-09-05 — Two-step sign-in, the passkeys and the sessions moved to the Access page,
+ *     which every member can open; this tab sits in the operator-only group, so a member could not
+ *     switch two-step on from anywhere. What stays here is the one thing that belongs to an
+ *     operator or a developer: the CORS origins (design canvas "AIMEAT Pääsy-sivu", decision 1).
  *   v1.4.0 — 2026-09-04 — The passkey section, under two-step sign-in: the devices that can sign
  *     in as you, adding this one, renaming and removing. Hidden for an organisation-managed
  *     account, whose way in is the organisation's directory.
@@ -30,19 +34,14 @@ import { DataTable } from '/components/DataTable.js';
 import { useConfirm } from '/components/Modal.js';
 import * as securityService from '/js/services/security.js';
 import { listAgents } from '/js/services/agents.js';
-import { TwoFactorSection } from './security-tab/two-factor.js';
-import { PasskeysSection } from './security-tab/passkeys.js';
 import { swallowed } from '/js/swallowed.js';
 
 export default function SecurityTab({ session, showToast }) {
-  const { confirm, ConfirmUI } = useConfirm();
+  const { ConfirmUI } = useConfirm();
   const [securityData, setSecurityData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [corsEditGhii, setCorsEditGhii] = useState(null);
   const [corsEditAgent, setCorsEditAgent] = useState(null);
-  const [revoking, setRevoking] = useState(false);
-  const [sessions, setSessions] = useState([]);
-  const [revokingId, setRevokingId] = useState(null);
 
   // No setLoading(true) here, on purpose. The render guard below already shows the spinner while
   // there is no data, which covers the first read; raising the flag again on a RE-read replaced the
@@ -55,16 +54,11 @@ export default function SecurityTab({ session, showToast }) {
       // fall back to listAgents + the per-agent CORS fan-out + listSessions.
       const ov = await securityService.getSecurityOverview();
       if (ov) {
-        setSecurityData({ ghii: ov.ghii, agents: ov.agents, managedBy: ov.managed_by || null, twoFactor: ov.two_factor || null });
-        setSessions(ov.sessions);
+        setSecurityData({ ghii: ov.ghii, agents: ov.agents, managedBy: ov.managed_by || null });
       } else {
-        const [agents, sessionsList] = await Promise.all([
-          listAgents(session.owner),
-          securityService.listSessions(),
-        ]);
+        const agents = await listAgents(session.owner);
         const result = await securityService.loadAll(agents);
         setSecurityData(result);
-        setSessions(sessionsList);
       }
     } catch (err) { swallowed('security-tab', err); setSecurityData({ ghii: { }, agents: [] }); }
     setLoading(false);
@@ -108,22 +102,6 @@ export default function SecurityTab({ session, showToast }) {
     } catch(e) { showToast(e.message || t('profile.error'), true); }
   }
 
-  async function handleRevokeAll() {
-    confirm(t('profile.security.revokeConfirm') || 'Are you sure you want to revoke all active sessions? You will be logged out.', async () => {
-      setRevoking(true);
-      try {
-        const data = await securityService.revokeAllSessions();
-        if (data.ok !== false) {
-          showToast((t('profile.security.sessionsRevoked') || 'All sessions revoked') + ` (${data.data?.revoked ?? 0})`);
-          setTimeout(() => { localStorage.removeItem('aimeat_session'); location.reload(); }, 1500);
-        } else {
-          showToast(data.error?.message || 'Failed to revoke sessions', true);
-        }
-      } catch(e) { showToast(e.message || 'Error', true); }
-      setRevoking(false);
-    }, { danger: true });
-  }
-
   if (loading || !securityData) return html`<${Spinner} text=${t('profile.security.loading')} />`;
 
   const ghii = securityData.ghii || {};
@@ -142,13 +120,7 @@ export default function SecurityTab({ session, showToast }) {
       </div>
     `}
 
-    <${TwoFactorSection}
-      twoFactor=${securityData.twoFactor}
-      managed=${!!securityData.managedBy}
-      showToast=${showToast}
-      onChanged=${loadData} />
-
-    ${!securityData.managedBy && html`<${PasskeysSection} showToast=${showToast} />`}
+    <p class="text-caption mb-1">${t('profile.security.signInMoved')}</p>
 
     <h3 class="card-h3 mt-section">${t('profile.security.ghiiTitle')}</h3>
     <p class="text-caption mb-1">${t('profile.security.ghiiDesc')}</p>
@@ -217,43 +189,6 @@ export default function SecurityTab({ session, showToast }) {
       </div>
     </div>
 
-    <h3 class="card-h3 mt-section">${t('profile.security.sessions')}</h3>
-    <p class="text-caption mb-1">${t('profile.security.sessionsHint')}</p>
-
-    ${sessions.length === 0
-      ? html`<div class="empty">${t('profile.security.noSessions')}</div>`
-      : html`<div class="card scroll-x">
-          <${DataTable}
-            headers=${[t('profile.security.sessionIdentity'), t('profile.security.sessionIssuedAt'), t('profile.security.sessionExpiresAt'), '']}
-            rows=${sessions.map(s => [
-              html`<span class="text-code">${escHtml(s.gaii || session.owner)}</span>${s.current ? html` <span class="badge badge-success">${t('profile.security.currentSession')}</span>` : null}`,
-              html`<span class="text-meta">${new Date(s.issued_at).toLocaleString()}</span>`,
-              html`<span class="text-meta">${new Date(s.expires_at).toLocaleString()}</span>`,
-              s.current ? null : html`
-                <button class="btn-danger-solid btn-sm" disabled=${revokingId === s.session_id}
-                  onClick=${async () => {
-                    setRevokingId(s.session_id);
-                    try {
-                      await securityService.revokeSession(s.session_id);
-                      showToast(t('profile.security.sessionRevoked'));
-                      setSessions(prev => prev.filter(x => x.session_id !== s.session_id));
-                    } catch(e) { showToast(e.message || 'Error', true); }
-                    setRevokingId(null);
-                  }}>
-                  ${revokingId === s.session_id ? '...' : t('profile.security.revoke')}
-                </button>
-              `,
-            ])}
-          />
-        </div>`
-    }
-
-    <div class="card mt-1">
-      <p class="text-caption mb-half">${t('profile.security.sessionsDesc')}</p>
-      <button class="btn-danger-solid" onClick=${handleRevokeAll} disabled=${revoking}>
-        ${revoking ? t('profile.security.revoking') : t('profile.security.revokeAll')}
-      </button>
-    </div>
     <${ConfirmUI} />
   `;
 }
