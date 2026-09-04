@@ -24,6 +24,7 @@
 #  11b. Language files agree with en.json  — pnpm check:locales
 #  11c. Licences allowed + every served file — pnpm check:licenses
 #  11d. THIRD-PARTY-NOTICES.md is current  — pnpm check:notices
+#  11e. Protocol versions vs what is current — pnpm check:protocol-versions
 #  12. Route authorization gates        — pnpm check:route-scopes
 #  12b. E2E suites test a refusal       — pnpm check:denial-coverage
 #  13. Outbound fetch through safeFetch — pnpm check:outbound-fetch
@@ -146,6 +147,17 @@ pnpm -s check:licenses
 
 echo "[pre-commit] Third-party notices match the tree (check:notices)…"
 pnpm -s check:notices
+
+# THE PROTOCOL REGISTER. Which version of each external protocol this node DECLARES, which one is
+# current, and the day somebody last looked. It fails on two things: the ledger no longer describing
+# the code (a version bumped in one of the two files that carry it, say), and an entry going stale
+# past its clock. Untriaged entries are counted and never fail — they are the countable backlog.
+#
+# Written 2026-09-04, the day an audit of this node's own MCP and A2A surfaces was wrong three times
+# in one afternoon and an outside scanner, not us, noticed we were declaring an MCP revision two
+# versions behind. A document would have recorded that once and gone quiet.
+echo "[pre-commit] Protocol versions declared vs current (check:protocol-versions)…"
+pnpm -s check:protocol-versions
 
 
 # ── August 2026 audit gates ──────────────────────────────────────────────────

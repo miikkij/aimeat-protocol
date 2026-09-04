@@ -39,6 +39,7 @@
     "check:licenses": "cd aimeat && pnpm check:licenses",
     "gen:notices": "cd aimeat && pnpm gen:notices",
     "check:notices": "cd aimeat && pnpm check:notices",
+    "check:protocol-versions": "cd aimeat && pnpm check:protocol-versions",
     "sbom": "cd aimeat && pnpm sbom",
     "scan:vulns": "cd aimeat && pnpm scan:vulns",
     "build:app-catalog": "cd aimeat && pnpm build:app-catalog",
