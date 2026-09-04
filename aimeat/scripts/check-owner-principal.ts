@@ -37,6 +37,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ownerDecisions, PRINCIPAL_GUARDS, type OwnerDecision } from './inventory/owner-decisions.js';
+import { srcProgram } from './inventory/program.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const AIMEAT = resolve(HERE, '..');
@@ -52,27 +53,13 @@ const SEED_REASON = 'SEEDED 2026-09-04, NOT TRIAGED — refuses by comparing the
     + 'on this door names the principal. Whether that is right depends on what is behind it: a name is '
     + 'the right question for a person\'s own DATA and the wrong one for their ACCOUNT. Not yet decided.';
 
-function sourceFiles(): { program: ts.Program; files: ts.SourceFile[] } {
-    const config = ts.readConfigFile(join(AIMEAT, 'tsconfig.json'), ts.sys.readFile);
-    const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, AIMEAT);
-    const program = ts.createProgram(parsed.fileNames, { ...parsed.options, noEmit: true });
-    // Forces the binder, which is what sets node.parent. Without it nothing can be asked what
-    // encloses it, and every row would come back as <module>.
-    program.getTypeChecker();
-    const files = program.getSourceFiles().filter(f =>
-        !f.isDeclarationFile
-        && /[/\\]src[/\\](routes|services)[/\\]/.test(f.fileName)
-        && !f.fileName.includes('node_modules'));
-    return { program, files };
-}
-
 const key = (r: OwnerDecision): string => `${r.file}:${r.unit}`;
 
 function main(): void {
     const strict = process.argv.includes('--strict');
     const seed = process.argv.includes('--seed');
 
-    const { program, files } = sourceFiles();
+    const { program, files } = srcProgram(/[/\\]src[/\\](routes|services)[/\\]/);
     const all = ownerDecisions(program, files, AIMEAT);
     // A door that names the principal is asking the right question already; the name comparison beside
     // it is a second, narrower one. Those are not the gate's business.

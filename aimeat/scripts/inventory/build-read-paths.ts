@@ -19,21 +19,14 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readPaths, stateColumnsPerTable, type ReadPath } from './read-paths.js';
+import { srcProgram } from './program.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const AIMEAT = resolve(HERE, '..', '..');
 const OUT_DIR = join(resolve(AIMEAT, '..'), 'secaudit');
 
-function sourceFiles(): ts.SourceFile[] {
-    const config = ts.readConfigFile(join(AIMEAT, 'tsconfig.json'), ts.sys.readFile);
-    const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, AIMEAT);
-    const program = ts.createProgram(parsed.fileNames, { ...parsed.options, noEmit: true });
-    program.getTypeChecker(); // sets node.parent — see build-inventory.ts
-    return program.getSourceFiles().filter(f => !f.isDeclarationFile && f.fileName.includes('/src/'));
-}
-
 function main(): void {
-    const files = sourceFiles();
+    const files = srcProgram().files;
     const paths = readPaths(files, AIMEAT);
     const declared = stateColumnsPerTable(files);
 

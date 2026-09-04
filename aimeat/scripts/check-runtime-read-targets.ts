@@ -28,6 +28,7 @@ import ts from 'typescript';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readPaths, PARAMETERISED } from './inventory/read-paths.js';
+import { srcProgram } from './inventory/program.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const AIMEAT = resolve(HERE, '..');
@@ -54,7 +55,7 @@ function sourceFiles(): ts.SourceFile[] {
 
 function main(): void {
     const strict = process.argv.includes('--strict');
-    const found = readPaths(sourceFiles(), AIMEAT)
+    const found = readPaths(srcProgram().files, AIMEAT)
         .filter(p => p.target === PARAMETERISED)
         // One query can be matched more than once inside the same function; the function is the unit.
         .filter((p, i, all) => all.findIndex(q => q.file === p.file && q.fn === p.fn) === i);
