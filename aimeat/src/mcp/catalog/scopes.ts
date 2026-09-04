@@ -110,6 +110,7 @@ export const SCOPE_EXEMPT_TOOLS = new Set<string>([
     'aimeat_admin_sso_scim_token',
     'aimeat_admin_owner_disable',
     'aimeat_admin_owner_enable',
+    'aimeat_admin_totp_reset',
     // Reading how a page is arranged, and the catalogue of blocks this node can serve. Gated in the
     // handler on the operator, like the admin tools above it, and there is nothing here to narrow:
     // a layout is a list of block names, and the front page's describes a page anyone can look at.

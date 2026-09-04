@@ -11,6 +11,9 @@
  *   - imports adminConfig/Monitoring/Agents/Maintenance/Economy/Memory sub-routers
  *
  * @version-history
+ *   v1.4.0 — 2026-09-04 — DELETE /v1/admin/owners/:name/totp: the operator reset for two-step
+ *     sign-in. Removing it needs a code from the very device that was lost, so until now losing
+ *     the phone and the backup codes ended the account. Records an account event on the target.
  *   v1.3.0 — 2026-08-23 — Owner deactivation doors (BR-04): POST /v1/admin/owners/:name/disable
  *     and /enable, operator-only, never on yourself; the owners list carries the lifecycle state.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
@@ -24,7 +27,7 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { generateKeyPair, sign } from '../auth/keypair.js';
-import { validateOwnerName } from '../utils/gaii.js';
+import { validateOwnerName, resolveIdentity } from '../utils/gaii.js';
 import { issueJWT } from '../auth/jwt.js';
 // i18n imports removed — admin UI is now a client-side SPA
 // admin-dashboard.ts SSR removed — admin UI is now a SPA at /v1/admin
@@ -33,6 +36,7 @@ import type { ConfigProvenance } from '../services/config-provenance.js';
 import type { ConsulConfigService } from '../services/consul-config.js';
 import { emitChange } from '../services/event-bus.js';
 import { deactivateOwnerByOperator, reactivateOwnerByOperator } from '../services/owner-lifecycle.js';
+import { resetTotpByOperator } from '../services/totp-recovery.js';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -572,6 +576,24 @@ export function adminRouter(
         }
         emitChange('ghii');
         res.json(success(config.nodeId, { name, disabled: false }));
+    });
+
+    // DELETE /v1/admin/owners/:name/totp — take two-step sign-in off an account, without a code.
+    //
+    // The person's own removal door asks for a code, which is what somebody who lost their phone
+    // and their backup codes does not have. Before this, that was the end of the account. The act
+    // grants no access — the password still stands — but it writes an account event the person
+    // reads, because a second factor disappearing quietly is the thing the factor exists to stop.
+    // Never on yourself: the refusals live in the service, shared with the MCP tool.
+    router.delete('/v1/admin/owners/:name/totp', requireAuth(), requireRole('operator'), async (req, res) => {
+        const name = req.params.name as string;
+        const r = await resetTotpByOperator(storage, name, req.auth!.owner as string, resolveIdentity(req.auth!, config.nodeId), config);
+        if (!r.ok) {
+            res.status(r.status).json(error(config.nodeId, r.code, r.message));
+            return;
+        }
+        emitChange('totp');
+        res.json(success(config.nodeId, { name, ghii: r.ghii, two_factor: false }));
     });
 
     // GET /v1/admin/ui — legacy URL, redirect to SPA

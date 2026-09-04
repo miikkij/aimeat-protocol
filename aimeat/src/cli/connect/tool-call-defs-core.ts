@@ -418,6 +418,10 @@ export const coreTools: ConnectCliToolDefinition[] = [
         handler: ({ client }, input) => client.post(`/v1/admin/owners/${encodeURIComponent(requiredString(input, 'name'))}/enable`),
     },
     {
+        name: 'aimeat_admin_totp_reset',
+        handler: ({ client }, input) => client.delete(`/v1/admin/owners/${encodeURIComponent(requiredString(input, 'name'))}/totp`),
+    },
+    {
         // `part` is validated against the two literals rather than interpolated, because it lands in
         // a path segment. An unchecked value here would be a path the route never declared.
         name: 'aimeat_compliance_report',

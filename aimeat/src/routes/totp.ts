@@ -12,6 +12,9 @@
  *   - POST /v1/ghii/totp/setup: create encrypted secret, backup codes, and provisioning URI/QR
  *
  * @version-history
+ *   v1.3.0 — 2026-09-04 — Arming and removing the factor land on the person's own feed as account
+ *     events. The operator reset that answers a lost phone lives in services/totp-recovery.ts,
+ *     behind DELETE /v1/admin/owners/:name/totp.
  *   v1.2.0 — 2026-09-04 — Turning the factor off actually destroys the secret on BOTH backends. The
  *     disable route cleared with `undefined`, which postgres-kysely drops from the UPDATE, so on the
  *     production backend the encrypted secret, the backup-code hashes and the replay marker
@@ -28,8 +31,11 @@ import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireOwnerPrincipal } from '../auth/middleware.js';
+import { resolveIdentity } from '../utils/gaii.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
+import { recordAccountEvent } from '../services/account-events.js';
+import { eraseTotp } from '../services/totp-recovery.js';
 import { setupTotp, validateTotpCode, validateBackupCode, generateBackupCodes } from '../services/totp.js';
 import type { TotpConfig } from '../services/totp.js';
 
@@ -122,6 +128,12 @@ export function totpRouter(config: AimeatConfig, storage: Storage): Router {
       totpEnabled: true,
     });
 
+    // A change to how this account is entered is news on the person's own feed, whoever made it.
+    void recordAccountEvent(storage, {
+      ownerGhii: ghiiRecord.ghii, kind: 'two_factor_armed', actorGaii: resolveIdentity(req.auth!, config.nodeId),
+      link: '/v1/profile?tab=security', subject: 'two-factor',
+    }, config);
+
     res.json(success(config.nodeId, {
       status: 'totp_enabled',
       note: 'TOTP two-factor authentication is now active.',
@@ -166,21 +178,16 @@ export function totpRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    // CLEAR, and clear means null. On postgres-kysely a key whose value is `undefined` is dropped
-    // from the UPDATE — "leave this column alone" — so this wrote totpEnabled=false and left the
-    // encrypted secret and the backup-code hashes sitting in the row on the production backend,
-    // while the sqlite provider (which rewrites the whole row) really did erase them. Turning the
-    // factor off is supposed to destroy the secret; on postgres it never did. Same shape as the
-    // CORS clear in routes/ghii/profile.ts, and found the same way: a test driven on both backends.
-    await storage.updateGHII(ghiiRecord.ghii, {
-      totpEnabled: false,
-      totpSecret: null,
-      totpBackupCodes: null,
-      totpLastUsedCode: null,
-      totpLastUsedAt: null,
-      totpFailedAttempts: 0,
-      totpLockedUntil: null,
-    } as unknown as Parameters<typeof storage.updateGHII>[1]);
+    // What "gone" means is defined once, in services/totp-recovery.ts, because the operator's
+    // no-code reset removes the same factor and a door that erased less would leave an account
+    // somebody else can re-arm. It used to clear with `undefined` here, which postgres-kysely drops
+    // from the UPDATE, so the secret survived a removal on the production backend.
+    await eraseTotp(storage, ghiiRecord.ghii);
+
+    void recordAccountEvent(storage, {
+      ownerGhii: ghiiRecord.ghii, kind: 'two_factor_removed', actorGaii: resolveIdentity(req.auth!, config.nodeId),
+      link: '/v1/profile?tab=security', subject: 'two-factor',
+    }, config);
 
     res.json(success(config.nodeId, {
       status: 'totp_disabled',

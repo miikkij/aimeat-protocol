@@ -17,12 +17,22 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=totp-lifecycle
  * @version-history
+ *   v1.1.0 — 2026-09-04 — The operator's reset (DELETE /v1/admin/owners/:name/totp) and its four
+ *     refusals, plus the account-event row that tells the person it happened. That door is the one
+ *     removal that asks for no code, so who may open it is most of what is asserted here.
  *   v1.0.0 — 2026-09-04 — Initial, with the SPA's two-step sign-in.
  */
 import { TOTP, Secret } from 'otpauth';
+import * as ed from '@noble/ed25519';
+import { createHash } from 'node:crypto';
+ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
+const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const stamp = Date.now() % 1000000;
+// The operator is registered FIRST, because the first owner of a clean suite database becomes one.
+const operatorName = `totpop${stamp}`;
+const bystanderName = `totpby${stamp}`;
 const owner = `totplife${stamp}`;
 const PASSWORD = 'TotpLifecycleTest1234';
 
@@ -71,12 +81,41 @@ async function login(second: () => Record<string, string> = () => ({})) {
     return r;
 }
 
+/** Register an owner and mint its owner JWT by signing. No login, so the login limiter is untouched. */
+async function registerOwner(username: string): Promise<string> {
+    let reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username, display_name: username, password: PASSWORD }) });
+    for (let i = 0; reg.status === 429 && i < 8; i++) {
+        await new Promise(r => setTimeout(r, 1500));
+        reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username, display_name: username, password: PASSWORD }) });
+    }
+    assert(reg.status === 201, `register ${username}: ${reg.status} ${JSON.stringify(reg.body)}`);
+    const privateKey = reg.body.data.private_key as string;
+    const ts = new Date().toISOString();
+    const sig = Buffer.from(
+        await ed.signAsync(new TextEncoder().encode(username + NODE_ID + ts), Buffer.from(privateKey, 'base64')),
+    ).toString('base64');
+    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: username, timestamp: ts, signature: sig }) });
+    assert(tok.status === 200, `auth/token ${username}: ${tok.status} ${JSON.stringify(tok.body?.error)}`);
+    return tok.body.data.token as string;
+}
+
 async function main() {
     console.log('\n=== Two-step sign-in: the whole lifecycle ===\n');
 
     let ownerToken = '';
     let secret = '';
     let backupCodes: string[] = [];
+    let operatorToken = '';
+    let bystanderToken = '';
+
+    // The FIRST owner in a clean suite database becomes the operator (self-heal), so it is minted
+    // before anything else. The bystander is here to prove the door refuses an ordinary account.
+    await test('setup: an operator and a bystander exist', async () => {
+        operatorToken = await registerOwner(operatorName);
+        bystanderToken = await registerOwner(bystanderName);
+        const who = await json('/v1/admin/owners', { headers: auth(operatorToken) });
+        assert(who.status === 200, `the first owner is the operator: /v1/admin/owners answered ${who.status}`);
+    });
 
     await test('an account is created and signs in with a password alone', async () => {
         let reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: owner, display_name: owner, password: PASSWORD }) });
@@ -223,9 +262,84 @@ async function main() {
         assert(ov.body.data.two_factor.pending === false, 'the secret is gone, not left pending');
     });
 
-    await test('the account is erased (cleanup)', async () => {
+    // ── The operator's reset: what happens when the phone AND the backup codes are gone ──
+    //
+    // Every assertion here is about who may open this door, because it is the one removal that asks
+    // for no code at all. The person is told afterwards, and that record is asserted too: a reset
+    // nobody can see is the same as no second factor at all.
+
+    await test('the factor is armed again, for the operator door', async () => {
+        if (!armed) return;
+        const s = await json('/v1/ghii/totp/setup', { method: 'POST', headers: auth(ownerToken), body: '{}' });
+        assert(s.status === 200, `second setup: ${s.status} ${JSON.stringify(s.body.error)}`);
+        secret = s.body.data.totp_secret;
+        const v = await json('/v1/ghii/totp/verify', { method: 'POST', headers: auth(ownerToken), body: JSON.stringify({ code: codeNow(secret) }) });
+        assert(v.status === 200, `second verify: ${v.status} ${JSON.stringify(v.body.error)}`);
+    });
+
+    await test('an ordinary account cannot reset anyone: 403', async () => {
+        if (!armed) return;
+        const r = await json(`/v1/admin/owners/${owner}/totp`, { method: 'DELETE', headers: auth(bystanderToken) });
+        assert(r.status === 403, `expected 403, got ${r.status} ${JSON.stringify(r.body.error)}`);
+    });
+
+    await test('nobody at all cannot reset anyone: 401', async () => {
+        if (!armed) return;
+        const r = await json(`/v1/admin/owners/${owner}/totp`, { method: 'DELETE' });
+        assert(r.status === 401, `expected 401, got ${r.status}`);
+    });
+
+    await test('the account keeps its factor after both refusals', async () => {
+        if (!armed) return;
+        const still = await login();
+        assert(still.body.error?.code === 'TOTP_REQUIRED', `still armed, got ${still.status} ${still.body.error?.code}`);
+    });
+
+    await test('an operator cannot reset THEIR OWN factor: 400', async () => {
+        if (!armed) return;
+        const r = await json(`/v1/admin/owners/${operatorName}/totp`, { method: 'DELETE', headers: auth(operatorToken) });
+        assert(r.status === 400, `expected 400, got ${r.status} ${JSON.stringify(r.body.error)}`);
+    });
+
+    await test('an account with no factor has nothing to reset: 400', async () => {
+        if (!armed) return;
+        const r = await json(`/v1/admin/owners/${bystanderName}/totp`, { method: 'DELETE', headers: auth(operatorToken) });
+        assert(r.status === 400, `expected 400, got ${r.status} ${JSON.stringify(r.body.error)}`);
+        assert(r.body.error?.code === 'TOTP_NOT_ENABLED', `expected TOTP_NOT_ENABLED, got ${r.body.error?.code}`);
+    });
+
+    await test('the operator removes it, and the password alone gets in', async () => {
+        if (!armed) return;
+        const r = await json(`/v1/admin/owners/${owner}/totp`, { method: 'DELETE', headers: auth(operatorToken) });
+        assert(r.status === 200, `reset: ${r.status} ${JSON.stringify(r.body.error)}`);
+        assert(r.body.data.two_factor === false, 'the answer says the factor is off');
+
+        const plain = await login();
+        assert(plain.status === 200, `password-only login after the reset: ${plain.status} ${JSON.stringify(plain.body.error)}`);
+        ownerToken = plain.body.data.token as string;
+
+        const ov = await json('/v1/security/overview', { headers: auth(ownerToken) });
+        assert(ov.body.data.two_factor.enabled === false, 'the overview says it is off');
+        assert(ov.body.data.two_factor.pending === false, 'the secret is gone, not left pending');
+    });
+
+    await test('the person is told, on their own feed, and it names the operator', async () => {
+        if (!armed) return;
+        const ev = await json('/v1/account/events?limit=50', { headers: auth(ownerToken) });
+        assert(ev.status === 200, `events: ${ev.status}`);
+        const rows: any[] = ev.body.data.events ?? [];
+        const reset = rows.find(e => e.kind === 'two_factor_reset_by_operator');
+        assert(!!reset, `the reset is on the feed (kinds seen: ${rows.map(e => e.kind).join(', ')})`);
+        assert(reset.data?.operator === operatorName, `it names the operator, got ${reset.data?.operator}`);
+        assert(rows.some(e => e.kind === 'two_factor_armed'), 'arming it was recorded too');
+        assert(rows.some(e => e.kind === 'two_factor_removed'), 'their own removal was recorded too');
+    });
+
+    await test('the accounts are erased (cleanup)', async () => {
         const r = await json(`/v1/owners/${owner}`, { method: 'DELETE', headers: auth(ownerToken) });
-        assert(r.status === 200, `cleanup: ${r.status} ${JSON.stringify(r.body)}`);
+        assert(r.status === 200, `cleanup target: ${r.status} ${JSON.stringify(r.body)}`);
+        const b = await json(`/v1/owners/${bystanderName}`, { method: 'DELETE', headers: auth(bystanderToken) });
+        assert(b.status === 200, `cleanup bystander: ${b.status}`);
     });
 
     console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);

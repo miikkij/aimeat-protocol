@@ -147,6 +147,8 @@ export const updateGhiiLevel = (ghii, level) => apiPut(`/v1/admin/ghii/${encodeU
 export const deleteGhii      = (ghii)   => apiDelete(`/v1/admin/ghii/${encodeURIComponent(ghii)}`);
 export const removeGhiiEmail = (ghii)   => apiDelete(`/v1/admin/ghii/${encodeURIComponent(ghii)}/email`);
 export const clearGhiiCors   = (ghii)   => apiPut(`/v1/admin/ghii/${encodeURIComponent(ghii)}/cors`, { allowed_origins: null });
+// Keyed by the OWNER name, not the GHII: this is the account door, alongside disable/enable.
+export const resetGhiiTotp   = (name)   => apiDelete(`/v1/admin/owners/${encodeURIComponent(name)}/totp`);
 
 // ── Email ──
 export const getEmailStatus  = ()       => apiGet('/v1/admin/email/status');

@@ -318,6 +318,15 @@ export const discoveryWorkBoardsTools: AimeatToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_admin_totp_reset',
+        description: 'Operator-only. Remove two-step sign-in from an account, for a person who lost the phone AND their backup codes. Their own removal door asks for a code, which is exactly what they no longer have, so without this the account is unreachable. It grants nobody access: the password still stands and you are handed nothing. The person is told — the reset lands on their account feed with your name on it. You cannot use it on your own account; ask another operator, or use one of your backup codes.',
+        caller: 'operator',
+        visibility: agentEverywhere,
+        input: {
+            name: { type: 'string', required: true, description: 'The owner name whose two-step sign-in should be removed.' },
+        },
+    },
+    {
         name: 'aimeat_admin_organism_ownership',
         description: 'Operator-only. Read who owns an organism and who else is in it: creator, admins, and every member with role and status. Read this before aimeat_admin_organism_owner_set — installing an owner is a cross-account act and the roster it re-points should be seen first. For an organism you belong to yourself, use aimeat_organism_get.',
         caller: 'operator',

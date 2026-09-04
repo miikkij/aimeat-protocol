@@ -15,6 +15,9 @@
  * @usage
  *   import type { AccountEventInput } from '../storage/interface.js';
  * @version-history
+ *   v1.2.0 — 2026-09-04 — three kinds for two-step sign-in: armed, removed, and reset by an operator.
+ *     A change to how the account is entered is the clearest case of "worth interrupting someone
+ *     with", and the operator reset needs a trace the person can read without asking anyone.
  *   v1.1.0 — 2026-08-17 — eight kinds the code already emits (consent grant/revoke, AI settings and key
  *     changes, workflow lifecycle): the union lost them in a merge and main failed typecheck.
  *   v1.0.0 — 2026-08-17 — Initial: account events as their own system, not as memory records.
@@ -84,6 +87,16 @@ export type AccountEventKind =
   | 'ai_spend_daily'
   | 'ai_key_changed'
   | 'ai_settings_changed'
+  // The way in
+  //
+  // A change to how this account is entered is always news, whoever made it. The operator reset is
+  // its own kind rather than a flag on `two_factor_removed`, because "you turned it off" and
+  // "somebody else turned it off for you" are two different messages and only one of them needs
+  // reading today. The reset door exists because losing the phone AND the backup codes was
+  // otherwise the end of the account.
+  | 'two_factor_armed'
+  | 'two_factor_removed'
+  | 'two_factor_reset_by_operator'
   // Permissions and limits
   | 'consent_granted'
   | 'consent_revoked'
