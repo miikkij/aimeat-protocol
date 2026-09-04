@@ -38,17 +38,17 @@
  */
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { AUTHORIZATION_GATES } from './inventory/principals.js';
 
 const ROOT = process.cwd();
 const ROUTES_DIR = join(ROOT, 'src', 'routes');
 const EXEMPTIONS = join(ROOT, 'security', 'route-scope-exemptions.json');
 
-/** Middleware that constitutes an explicit authorization decision. `requireAuth` is NOT one: it
- *  answers "is anyone there", never "may this principal do this". `requireOwnerPrincipal` is one:
- *  it answers "is this the account holder, or something acting for them", which is the decision the
- *  account-security doors need and the one no scope word can express. */
-export const GATES = ['requireScope', 'requireAnyScope', 'requireRole', 'requireRoleOrScope', 'requireOperator',
-    'requireOwnerPrincipal', 'requireScimConnection'];
+/** Middleware that constitutes an explicit authorization decision. One list, in
+ *  scripts/inventory/principals.ts, because this script and the door inventory each used to carry
+ *  their own and they disagreed about four names. Re-exported so the other gates that ask this
+ *  question keep one import. */
+export const GATES = AUTHORIZATION_GATES;
 
 export interface Finding {
     file: string;

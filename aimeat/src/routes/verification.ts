@@ -7,6 +7,11 @@
  * @version-history
  *   v1.0.0 — 2026-03-01 — Initial scaffold
  *   v2.0.0 — 2026-05-02 — Nonce validation, FTN OIDC authorize/callback, VC JWT format
+ *   v2.2.0 — 2026-09-04 — The VC issuance read joins them. v2.1.0 closed the two doors that stamp an
+ *     identity INTO the record and left the one that hands a signed identity OUT: any principal
+ *     carrying the account name could have the node mint and sign a verifiable credential asserting
+ *     who this person is. Same invariant, same file, opposite direction — which is why a gate that
+ *     reads every such comparison found it and two audits by hand did not.
  *   v2.1.0 — 2026-08-11 — Security audit H-1/H-7: the two routes that raise the human's
  *     verification level to 3 are behind requireOwnerPrincipal(). Both keyed off req.auth.owner,
  *     which is the human's account name on an agent, ecosystem or app-grant token, so a machine
@@ -368,8 +373,22 @@ export function verificationRouter(
     }
   });
 
-  // GET /v1/ghii/:ghii/credential — Issue W3C Verifiable Credential
-  router.get('/v1/ghii/:ghii/credential', requireAuth(), async (req, res) => {
+  /**
+   * GET /v1/ghii/:ghii/credential — issue a W3C Verifiable Credential for this person.
+   *
+   * requireOwnerPrincipal, not requireAuth, since 2026-09-04. This door has the node SIGN a
+   * statement about who a human is, and the only check under it was `ownerName !== req.auth.owner` —
+   * a comparison that every principal carrying the account name passes: an agent JWT, an ecosystem
+   * app's token, an app grant, a personal access token. Each of those could have a signed identity
+   * assertion minted for the person and walk away with it, which is invariant 11 at its most
+   * expensive: not data read sideways, but the node vouching for someone on a machine's say-so.
+   *
+   * An agent can still do it, on purpose rather than by accident: requireOwnerPrincipal admits the
+   * exact `account:security` permission, which the owner grants per agent. Found by
+   * check:owner-principal on the day it was written; the refusals are in
+   * test/e2e-account-security-gate.ts beside the other doors of this kind.
+   */
+  router.get('/v1/ghii/:ghii/credential', requireAuth(), requireOwnerPrincipal(), async (req, res) => {
     try {
       const ghiiId = req.params.ghii as string;
       const ghiiRecord = await storage.getGHII(ghiiId);

@@ -112,6 +112,11 @@ const DOORS: Door[] = [
     { what: 'stamp a wallet identity onto the person', method: 'POST', path: '/v1/ghii/verify/eudiw', body: { vp_token: 'x' } },
     { what: 'stamp a bank identity onto the person', method: 'POST', path: '/v1/ghii/verify/ftn', body: { callback_token: 'x' } },
     { what: 'export everything the account holds', method: 'GET', path: `/v1/owners/${ownerA}/export` },
+    // Added 2026-09-04 by check:owner-principal, which found this door carrying requireAuth() and a
+    // name comparison. It has the node MINT AND SIGN a W3C verifiable credential asserting who this
+    // person is — the strongest statement a node makes about a human — and every principal carrying
+    // the account name passed the comparison.
+    { what: 'have a signed identity credential minted', method: 'GET', path: `/v1/ghii/${ownerA}@${NODE_ID}/credential` },
 ];
 
 async function call(door: Door, token: string) {
