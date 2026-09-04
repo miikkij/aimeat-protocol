@@ -17,8 +17,8 @@
  *
  *   TWO VOLUMES, ONE RULE. A look that stands on the palette's own page may run a field preset
  *   only at the page whisper (peak × alpha within the AK-PAGE cap, 8%), exactly as its still
- *   page ground is held; a WORLD that owns its ground (stage, broadcast, riso) may run it as
- *   loud as the ink allows, because the matrix proves the words on it. The shipped
+ *   page ground is held; a WORLD that owns its ground (lounge, dawn, stage, broadcast) may run
+ *   it as loud as the ink allows, because the matrix proves the words on it. The shipped
  *   default alpha of every field preset sits at the whisper, so a preset named without a
  *   number is legal on every look; the worlds turn it up in their own tokens.
  *
@@ -30,6 +30,7 @@
  * @usage
  *   import { AMBIENTS, AMBIENT_BOUNDS, ambientById } from '../data/atelier-ambients.js';
  * @version-history
+ *   v1.0.1 — 2026-09-05 — lounge and dawn exist: the fits lists name them.
  *   v1.0.0 — 2026-09-05 — Initial: the six shipped presets (waves, aurora, dust, grid, static,
  *     ink), described for choosing and measured for proving (wish-atelier-ambient-visuals).
  */
@@ -97,8 +98,8 @@ export const AMBIENTS: readonly AtelierAmbient[] = [
     defaultAlpha: 0.22,
     defaultSpeed: 1,
     fps: 30,
-    fitsLooks: ['stage'],
-    note: 'Additive on a dark ground, where light adds up the way it does on a screen; low-alpha source-over on a light one, because additive on white washes to nothing. The ribbons are drawn at half resolution and upscaled: the upscale is the glow, and it costs a quarter of the pixels. A world that owns its night may run it loud; on a palette page the whisper is all there is.',
+    fitsLooks: ['lounge', 'stage'],
+    note: 'Additive on a dark ground, where light adds up the way it does on a screen; low-alpha source-over on a light one, because additive on white washes to nothing. The ribbons are drawn at half resolution and upscaled: the upscale is the glow, and it costs a quarter of the pixels. Lounge owns its navy and runs it at 0.8; on a palette page the whisper is all there is.',
   },
   {
     id: 'aurora',
@@ -113,8 +114,8 @@ export const AMBIENTS: readonly AtelierAmbient[] = [
     defaultAlpha: 0.3,
     defaultSpeed: 1,
     fps: 0,
-    fitsLooks: ['aurora', 'vivid'],
-    note: 'The one preset with no script: an oversized layer of radial lobes tweened on transform by the compositor, so it never repaints a page-sized gradient. The aurora look stands on the palette page and keeps it at the whisper; a world that owns its paper may run it at full volume.',
+    fitsLooks: ['dawn', 'aurora', 'vivid'],
+    note: 'The one preset with no script: an oversized layer of radial lobes tweened on transform by the compositor, so it never repaints a page-sized gradient. Dawn owns its warm paper and runs it at 0.9; the aurora look stands on the palette page and keeps it at the whisper.',
   },
   {
     id: 'dust',
@@ -129,7 +130,7 @@ export const AMBIENTS: readonly AtelierAmbient[] = [
     defaultAlpha: 0.6,
     defaultSpeed: 1,
     fps: 30,
-    fitsLooks: ['stage', 'gallery'],
+    fitsLooks: ['stage', 'lounge', 'gallery'],
     note: 'Sixty to a hundred and twenty motes scaled to the area, depth driving size, alpha, speed and sway. Points, not a ground: a word never sits on one, so the matrix bounds how loud they are and asks nothing else.',
   },
   {
@@ -145,7 +146,7 @@ export const AMBIENTS: readonly AtelierAmbient[] = [
     defaultAlpha: 0.5,
     defaultSpeed: 1,
     fps: 30,
-    fitsLooks: ['neon-dense', 'terminal'],
+    fitsLooks: ['neon-dense', 'terminal', 'lounge'],
     note: 'Forty stroked lines a frame, which is why it is a canvas and not a transformed CSS plane: a perspective-transformed plane rasterises at its transformed size times the device pixel ratio, tens of megabytes on a phone, and would need a second pause mechanism of its own.',
   },
   {
