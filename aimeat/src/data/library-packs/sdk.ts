@@ -32,8 +32,7 @@
  *   v1.0.0 — 2026-07-16 — initial: 20 SDK packs migrated from libs.ts catalogue +
  *     build-app-prompt lines + llms-template table (Library Acceleration Program, Phase 1).
  */
-import type { LibraryPack } from './types.js';
-import { SCIENCE_PACKS } from './sdk-science.js';
+import type { LibraryPack } from '../library-packs.js';
 
 export const SDK_PACKS: LibraryPack[] = [
   {
@@ -783,5 +782,4 @@ export const SDK_PACKS: LibraryPack[] = [
     status: 'deprecated',
     modelTier: 'needs-doc',
   },
-  ...SCIENCE_PACKS,
 ];
