@@ -972,15 +972,22 @@ console.log('\n--- Boards Tab ---');
 let boardId = '';
 let postId = '';
 
-// Audit H-2 again, one tab further down. A public board is the operator's to create, and this
-// section used to create one with the agent token. It passed because POST /v1/auth/token copied the
-// owner's roles onto the agent JWT, so the agent arrived holding 'operator'. The mint now issues
-// ['agent'] alone, and both halves of that are asserted here: the public board is refused, and the
-// board the tab actually gives a normal principal is 'shared'.
-await test('POST /v1/boards — an agent token cannot create a public board', async () => {
+// Audit H-2 again, one tab further down. This section used to create an operator-only board with the
+// agent token and it passed, because POST /v1/auth/token copied the owner's roles onto the agent JWT
+// and the agent arrived holding 'operator'. The mint now issues ['agent'] alone (invariant 12: a role
+// is granted, never inherited), and both halves of that are asserted here: the operator's board is
+// refused, and the board the tab actually gives a normal principal is 'shared'.
+//
+// The probe is `system`, not `public`, since 2026-08-30. Boards came back as Core (RFC §27) that day
+// and a PUBLIC board stopped being the operator's — a notice board someone keeps for their street is
+// the shape it exists for, so any account may open one up to config.boardPublicPerOwnerMax. A system
+// board, one the node itself speaks through, is still the operator's alone, so it is what carries the
+// invariant-12 claim now. This was the third suite asserting the old rule; federation-mesh and
+// e2e-mcp-catalogue had the same line.
+await test('POST /v1/boards — an agent token cannot create an operator-only board', async () => {
     const { status, body } = await authJson('/v1/boards', agentToken, {
         method: 'POST',
-        body: JSON.stringify({ name: 'E2E Operator Board', description: 'Operator-only', visibility: 'public' }),
+        body: JSON.stringify({ name: 'E2E Operator Board', description: 'Operator-only', visibility: 'system' }),
     });
     assert(status === 403 && body.error?.code === 'ACCESS_DENIED',
         `an agent must not reach the operator's board, got ${status} ${JSON.stringify(body.error)}`);
