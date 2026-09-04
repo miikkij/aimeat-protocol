@@ -318,8 +318,16 @@ export const memoryMethods = {
     return removed;
   },
 
+  // Through applyArchive, which is where the bin is hidden. It used to write `archived = false` by
+  // hand and say nothing about `deletedAt`, so this listing returned rows every by-key read answers
+  // 404 for — the one bulk read that did not pass through the chokepoint whose own comment says
+  // every bulk read does. The SQLite twin had both clauses from the start, so the two backends
+  // disagreed and only production was wrong: a crew's pruned revisions kept appearing in its version
+  // history, and e2e-agent-crew's "thirteen publishes keep the last ten" counted thirteen.
   async listMemoryKeysByPrefix(this: PostgresKyselyStorage, keyPrefix: string): Promise<{ ownerGaii: string; key: string }[]> {
-    const rows = await this.db.selectFrom('Memory').select(['ownerGaii', 'key']).where('key', 'like', keyPrefix + '%').where('archived', '=', false).execute();
+    const rows = await applyArchive(
+      this.db.selectFrom('Memory').select(['ownerGaii', 'key']).where('key', 'like', keyPrefix + '%'),
+    ).execute() as Array<{ ownerGaii: string; key: string }>;
     return rows.map(r => ({ ownerGaii: r.ownerGaii, key: r.key }));
   },
 
