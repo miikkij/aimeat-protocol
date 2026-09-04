@@ -188,6 +188,11 @@ const SDK_LIB_NAMES = [
   // scripts/build-sdk-libs.ts since 2026-08-29; this list is the second place a lib is named,
   // and a lib missing here is a 404 that the publish gate turns into APP_ARTIFACT_BROKEN.
   'rows',
+  // aimeat-science.js — the Worksheet: a sheet of cells that recompute, one reading drawn five ways,
+  // a history as a line, and the controls that move a number. Same rule as `rows` above: this list
+  // is the second place a lib is named, and a lib missing here is a 404 the publish gate turns into
+  // APP_ARTIFACT_BROKEN.
+  'science',
 ] as const;
 
 function sendJavascriptLibrary(res: Response, source: string): void {

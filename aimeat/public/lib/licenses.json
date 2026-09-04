@@ -465,6 +465,22 @@
       "note": "The OFL permits bundling and selling the software that uses these fonts; it forbids selling the font files on their own and requires that a MODIFIED font be renamed. Neither applies here: the files are the upstream subsets, unchanged."
     },
     {
+      "id": "katex",
+      "name": "KaTeX",
+      "version": "0.18.5",
+      "spdx": "MIT",
+      "copyright": "Copyright (c) 2013-2020 Khan Academy and other contributors",
+      "homepage": "https://katex.org",
+      "source": "npm katex@0.18.5 (dist/katex.min.js, dist/katex.min.css, dist/fonts/*.woff2)",
+      "licenseFile": "LICENSES/katex.txt",
+      "files": [
+        "katex@0/**"
+      ],
+      "modified": true,
+      "purl": "pkg:npm/katex@0.18.5",
+      "note": "The stylesheet is the published one with the woff and ttf entries removed from each @font-face src, and only the twenty woff2 faces are carried: the other two formats are the pre-2015 fallbacks in the same src list, every browser this node serves takes woff2, and they weigh 876 kB to be requested by nobody. The repository publishes one MIT licence over the whole distribution, the fonts included, and carries no separate font licence file."
+    },
+    {
       "id": "aimeat",
       "name": "AIMEAT (this project's own served libraries)",
       "version": "see each file's @version-history header",
@@ -474,6 +490,8 @@
       "source": "this repository",
       "licenseFile": "../../../LICENSE",
       "files": [
+        "aimeat-assets.css",
+        "aimeat-assets/**",
         "aimeat-atelier.css",
         "aimeat-atelier/**",
         "aimeat-boot.js",
@@ -481,10 +499,9 @@
         "aimeat-fonts.css",
         "aimeat-game.css",
         "aimeat-game/**",
-   "aimeat-phaser.css",
-   "aimeat-phaser/**",
-   "aimeat-assets.css",
-   "aimeat-assets/**",
+        "aimeat-phaser.css",
+        "aimeat-phaser/**",
+        "aimeat-science.css",
         "aimeat-theme.css",
         "fonts.css",
         "live-updates.js",
