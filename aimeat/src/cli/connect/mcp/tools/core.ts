@@ -144,6 +144,9 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     if (tags?.length) params.set('tags', tags.join(','));
     if (owner_scope) params.set('owner_scope', 'true');
     if (limit !== undefined) params.set('limit', String(limit));
+    // Keys and sizes, never values — the same answer the node's own MCP surface gives and the same
+    // one this tool's output schema promises. The CLI dispatch says why at length. → pitfalls §44
+    params.set('include', 'meta');
     const qs = params.toString();
     const resp = await client.get(`/v1/memory${qs ? `?${qs}` : ''}`);
     return jsonContent(shapeResponse('aimeat_memory_list', response_format, resp.data ?? resp));
