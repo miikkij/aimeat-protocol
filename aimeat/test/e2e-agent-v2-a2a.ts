@@ -340,6 +340,50 @@ async function run(): Promise<void> {
             'and the status message travels as a message part');
     });
 
+    // ─── The extended card says whether the work will go through, and never says more ───
+    //
+    // The public card already carries what the agent declares and everything published for hire, so
+    // a stranger is held nothing back and the extended card was returning that same card — honest,
+    // and pointless. What the public card cannot answer is whether a call will actually be allowed,
+    // because that depends on the scopes the owner granted. Those are facts about the ACCOUNT.
+    //
+    // The second half of this test is the one that matters: a webhook secret, a webhook URL and the
+    // owner's money are on the same record, and the extension names its fields one by one rather
+    // than spreading precisely so that adding a field cannot publish them by accident.
+    await test('the extended card carries the scopes and the operational facts', async () => {
+        const r = await rpc(a.owner, worker.name, caller.token, 'GetExtendedAgentCard', {});
+        assert(!r.error, `GetExtendedAgentCard: ${JSON.stringify(r.error)}`);
+        const card = r.result;
+        assert(card.capabilities?.extendedAgentCard === true,
+            'the extended card says an extended card exists');
+        const ext = (card.capabilities.extensions ?? []).find((e: any) => e.uri?.includes('agent-operations'));
+        assert(!!ext, `the AIMEAT operations extension is present, got ${JSON.stringify((card.capabilities.extensions ?? []).map((e: any) => e.uri))}`);
+        assert(Array.isArray(ext.params?.granted_scopes),
+            `the granted scopes are the operative fact, got ${JSON.stringify(ext.params)}`);
+        assert('last_seen' in ext.params, 'and when the agent was last seen');
+    });
+
+    await test('…and the extended card never carries a credential, an address or the money', async () => {
+        const r = await rpc(a.owner, worker.name, caller.token, 'GetExtendedAgentCard', {});
+        const said = JSON.stringify(r.result);
+        for (const forbidden of ['webhookSecret', 'webhook_secret', 'webhookUrl', 'webhook_url',
+            'dailySpendLimit', 'daily_spend_limit', 'morselBalance', 'morsel_balance']) {
+            assert(!said.includes(forbidden), `the extended card must not carry ${forbidden}`);
+        }
+    });
+
+    await test('the PUBLIC card offers the extended one without carrying its contents', async () => {
+        // A stranger reads this card. It may learn that a fuller one exists behind authentication —
+        // that is what the flag is for — and must learn nothing that is behind it.
+        const pub = await json(`/v1/a2a/${encodeURIComponent(a.owner)}/${worker.name}/agent-card.json`);
+        assert(pub.status === 200, `public card ${pub.status}`);
+        const said = JSON.stringify(pub.body);
+        assert(!said.includes('agent-operations'),
+            'the operations extension is not on the public card');
+        assert(!said.includes('granted_scopes'),
+            'and neither are the scopes it carries');
+    });
+
     // ─── A refusal is not a fault, and ListTasks has to be able to tell them apart ───
     //
     // Five statuses here become eight states in A2A, and the three extra ones are carried by the

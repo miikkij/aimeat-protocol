@@ -45,6 +45,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentRecord, AgentV2TaskRecord, MessagePart } from '../storage/interface.js';
 import { toA2ATask, toA2APushConfig, fromA2APart } from './a2a-projection.js';
 import { statusesForA2AState, matchesA2AState } from './a2a-task-state.js';
+import { a2aExtendedCardFrom } from './a2a-card.js';
 import { createTask, getTask, cancelTask, listTasks } from './agent-v2-tasks-ops.js';
 import { sendTurn, setPushTarget, listPushTargets, deletePushTarget, type Principal, type OpResult } from './agent-v2-messaging-ops.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
@@ -118,11 +119,20 @@ export class AimeatA2ARequestHandler implements A2ARequestHandler {
   }
 
   /**
-   * The extended card is for a caller that has authenticated. Every caller here has, because the
-   * route refuses an unauthenticated one before the SDK sees it, so this is the same card.
+   * The extended card, for a caller that has authenticated as a principal of this account.
+   *
+   * It used to return the public card unchanged, which made the method honest and pointless: the
+   * public card already carries the agent's own declared capabilities and everything published for
+   * hire, so a stranger is held nothing back. What it cannot say is whether the work will actually
+   * go through — that depends on the scopes the owner granted and what the agent has loaded, which
+   * are facts about the ACCOUNT. Those ride in the AIMEAT extension now.
+   *
+   * THE FENCE IS THE ROUTE'S, and it is the same one every other method here trusts: an
+   * unauthenticated caller never reaches this handler, and a stranger is served by
+   * ForeignA2AHandler, which has no extended card at all.
    */
   async getAuthenticatedExtendedAgentCard(_params: GetExtendedAgentCardRequest, _context: ServerCallContext): Promise<AgentCard> {
-    return this.card;
+    return a2aExtendedCardFrom(this.card, this.agent);
   }
 
   /** The turns of one task, oldest first, for a Task's `history`. */
