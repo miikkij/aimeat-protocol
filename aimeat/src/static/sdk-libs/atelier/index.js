@@ -31,6 +31,10 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.47.0 — 2026-09-05 — THE AMBIENT (wish-atelier-ambient-visuals): the contract gains
+ *     --ak-ambient, --ak-ambient-alpha and --ak-ambient-speed — the one layer allowed to move
+ *     at idle, named by the look and proven by the matrix (AK-AMBIENT). The version moves with
+ *     the contract; the layer's modules land in this same version line.
  *   v0.46.0 — 2026-09-02 — ROUND THREE (wish-atelier-motion-round-three): layoutMove, swipeStack
  *     and micro on Motion; morph, draggable, burst and scrub on anime.js; the director learns
  *     snap and sideways chapters, with parallax and readingRail beside it; the transitions reach
@@ -271,7 +275,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.46.0',
+  version: '0.47.0',
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,

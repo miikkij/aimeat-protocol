@@ -43,6 +43,11 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.47.0 — 2026-09-05 — THE AMBIENT (wish-atelier-ambient-visuals): three tokens join the
+ *     contract — --ak-ambient (a preset id or none), --ak-ambient-alpha and --ak-ambient-speed —
+ *     so a LOOK names the one layer allowed to move at idle and the matrix proves it
+ *     (AK-AMBIENT). Mode-independent like the spring hand: the layer reads its colours off the
+ *     tokens at run time.
  *   v0.46.0 — 2026-09-02 — ROUND THREE: motion-show.css, anime-more.css and lenis-more.css join
  *     the imports (wish-atelier-motion-round-three). Pinned to the JS version, as ever.
  *   v0.45.1 — 2026-09-02 — THE SPRING HAND joins the contract: --ak-spring-stiffness,
@@ -378,6 +383,17 @@
   --ak-spring-stiffness: 170;
   --ak-spring-damping:   20;
   --ak-spring-mass:      1;
+  /* THE AMBIENT (2026-09-05). The one layer allowed to move at idle: a preset id (waves, aurora,
+   * dust, grid, static, ink — the registry in src/data/atelier-ambients.ts) or none. THE LOOK
+   * DECIDES: every look declares its own three, an app overrides through app({ ambient }), and
+   * the viewer's weather switch and the Less-motion switch win over both. Alpha is how much of
+   * the layer shows through (0..1); speed is a multiplier on the preset's design speed
+   * (0.25..2). Mode-independent like the spring hand: the layer reads its colours off the
+   * tokens at run time, so night and day come from the ground, never from a second declaration
+   * in the dark block. */
+  --ak-ambient:       none;
+  --ak-ambient-alpha: 1;
+  --ak-ambient-speed: 1;
 
   /* ── The node's injected bottom controls — never draw under them ──────────────────────── */
   --ak-chrome-bottom: var(--aimeat-chrome-bottom, 56px);

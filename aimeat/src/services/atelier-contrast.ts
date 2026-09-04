@@ -23,6 +23,13 @@
  *   import { runMatrix } from './atelier-contrast.js';
  *   const failures = runMatrix({ '--ak-accent': '#b3261e' }).filter((r) => !r.ok);
  * @version-history
+ *   v1.3.0 — 2026-09-05 — AK-AMBIENT: the ambient LAYER is proven (wish-atelier-ambient-visuals).
+ *     REQUIRED_BASE grows by --ak-ambient, --ak-ambient-alpha and --ak-ambient-speed; a look
+ *     (or a signature override) that names a preset is held to the registry's numbers: a field
+ *     preset's pigments composited over the page at peak × alpha must keep body ink and accent
+ *     text readable, and on a look standing on the palette page the field is held to the same
+ *     whisper AK-PAGE holds the still ground; a sparse preset carries no ground check. An
+ *     unknown preset and an alpha outside the bounds refuse with words.
  *   v1.2.0 — 2026-09-02 — REQUIRED_BASE grows by the spring hand (--ak-spring-stiffness,
  *     --ak-spring-damping, --ak-spring-mass), so every look must resolve the physics its
  *     motion rides and the matrix says which one does not.
@@ -36,6 +43,7 @@
  *     verbatim). The zone volume carries no text by rule, so it carries no floor.
  */
 import { readFileSync } from 'node:fs';
+import { AMBIENT_BOUNDS, AMBIENT_IDS, AMBIENT_NONE, ambientById } from '../data/atelier-ambients.js';
 
 // ── WCAG 2.1, exactly as tools/theme-contrast.ts computes it ─────────────────────────────────
 
@@ -361,6 +369,9 @@ export const SURFACE_TINT_CAP = 8;
 /** The hero mesh budget is wider: text never sits on raw mesh (AK-SCRIM covers text). An
  *  aesthetic bound (a mesh, not a solid poster fill); the readability guarantee is AK-SCRIM. */
 export const HERO_MESH_CAP = 36;
+/** A SPARSE ambient (motes, lines) is bounded by its registry peak rather than proven as a
+ *  ground; this is the ceiling that peak may reach (test/unit/atelier-ambients.test.ts). */
+export const AMBIENT_SPARSE_CAP = 0.6;
 /** The GROUND TOKENS a world-look may claim with literal values — the one licence to bring a
  *  colour of its own (paper, phosphor, night), because every check in this matrix then runs
  *  against exactly those values in both modes. Anything else stays var()/color-mix only. */
@@ -390,6 +401,9 @@ export const REQUIRED_BASE = [
   // sample, read off the element. Contract tokens so every look declares its own feel and this
   // matrix proves each one resolves. Mode-independent, so REQUIRED_DARK leaves them alone.
   '--ak-spring-stiffness', '--ak-spring-damping', '--ak-spring-mass',
+  // The ambient layer (2026-09-05): the preset a look runs at idle, how much of it shows and how
+  // fast it moves. Contract tokens so every look declares its own and AK-AMBIENT proves it.
+  '--ak-ambient', '--ak-ambient-alpha', '--ak-ambient-speed',
   // The broadcast family's channel colours and the set's ground (2026-09-01): contract tokens
   // so a look may retune the CRT, the countdown and the crawl under this matrix's proof.
   '--ak-crt-ch1', '--ak-crt-ch2', '--ak-crt-ch3', '--ak-crt-ch4', '--ak-crt-set',
@@ -590,22 +604,60 @@ export function runMatrix(
           else failR(combo, 'AK-CAP hero mesh %', `the hero mesh above ${HERO_MESH_CAP}% stops being a wash (uses ${p}%)`);
         }
 
-        // AK-PAGE: the ambient page ground. Body ink must read on every ambient stop, and the
-        // ambient's pigment is capped at the SURFACE budget — the page whispers, the hero speaks.
+        // A world that owns its ground may light it as it pleases — the ink checks still prove
+        // every stop readable. The whisper cap guards only the looks that stand on the palette's
+        // own page; AK-PAGE and AK-AMBIENT below both read it.
+        const ownsGround = preset !== 'vivid' && sheet.presets.get(preset)!.decls.has('--ak-bg');
+
+        // AK-PAGE: the STILL page ground (--ak-page-image; the moving layer is AK-AMBIENT below).
+        // Body ink must read on every stop, and the pigment is capped at the SURFACE budget —
+        // the page whispers, the hero speaks.
         const pageRaw = vars.get('--ak-page-image') ?? 'none';
         if (pageRaw !== 'none') {
           for (const s of gradientStops(pageRaw, vars, `${combo} --ak-page-image`)) {
             add(combo, 'AK-PAGE ink on ambient ground', ratio(ink, s.alpha === 1 ? s.hex : over(s, bg)), MIN_TEXT, 'body text on the ambient page ground');
           }
-          // A world that owns its ground may light it as it pleases — the ink-on-ambient check
-          // above still proves every stop readable. The whisper cap guards only the looks that
-          // stand on the palette's own page.
-          const ownsGround = preset !== 'vivid' && sheet.presets.get(preset)!.decls.has('--ak-bg');
           if (!ownsGround) {
             for (const p of groundMixPercents(pageRaw, '--ak-bg')) {
               if (p <= SURFACE_TINT_CAP) passR(combo, 'AK-PAGE ambient %');
               else failR(combo, 'AK-PAGE ambient %', `the page ambient above ${SURFACE_TINT_CAP}% stops being a whisper (uses ${p}%)`);
             }
+          }
+        }
+
+        // AK-AMBIENT: the ambient LAYER — the one thing the kit lets move at idle (the registry
+        // in data/atelier-ambients.ts). A FIELD preset lays pigment under the words: every token
+        // it paints is composited over the page at its peak × the alpha the look (or the
+        // signature) set, and body ink must still read on that. At the whisper (the AK-PAGE cap)
+        // the layer is the same class of ground as the still page wash and carries the same
+        // proof; LOUDER than the whisper it is a new ground, so accent-coloured text is proven
+        // on it too — and only a world that owns its ground may run it that loud, exactly as
+        // AK-PAGE holds a palette-page look to the whisper. A SPARSE preset (motes, lines) is
+        // not a ground a word sits on: its peak is bounded in the registry (the unit test) and
+        // its alpha here, so it only records that it ran.
+        const ambientRaw = (vars.get('--ak-ambient') ?? AMBIENT_NONE).trim();
+        if (ambientRaw !== AMBIENT_NONE) {
+          const ambient = ambientById(ambientRaw);
+          const alphaRaw = (vars.get('--ak-ambient-alpha') ?? '1').trim();
+          const alpha = Number(alphaRaw);
+          if (!ambient) {
+            failR(combo, 'AK-AMBIENT preset', `"${ambientRaw}" is not an ambient the kit ships — one of ${AMBIENT_IDS.join(', ')}, or none`);
+          } else if (!Number.isFinite(alpha) || alpha < AMBIENT_BOUNDS.alpha[0] || alpha > AMBIENT_BOUNDS.alpha[1]) {
+            failR(combo, 'AK-AMBIENT alpha', `--ak-ambient-alpha is how much of the layer shows through: a number from ${AMBIENT_BOUNDS.alpha[0]} to ${AMBIENT_BOUNDS.alpha[1]} (got "${alphaRaw}")`);
+          } else if (ambient.proof === 'sparse') {
+            passR(combo, `AK-AMBIENT ${ambient.id} sparse`);
+          } else {
+            const strength = ambient.peak * alpha;
+            const pct = strength * 100;
+            const loud = pct > SURFACE_TINT_CAP + EPS;
+            for (const token of ambient.pigments) {
+              const pigment = colorOf(token);
+              const ground = ambient.blend === 'mix' ? mixOklab(pigment, bg, strength) : over({ hex: pigment, alpha: strength }, bg);
+              add(combo, `AK-AMBIENT ink over ${ambient.id} (${token})`, ratio(ink, ground), MIN_TEXT, `body text over the ${ambient.id} layer at its strongest`);
+              if (loud) add(combo, `AK-AMBIENT accent-as-text over ${ambient.id} (${token})`, ratio(accentText, ground), MIN_TEXT, `accent-coloured text over the ${ambient.id} layer, which runs louder than a whisper`);
+            }
+            if (ownsGround || !loud) passR(combo, `AK-AMBIENT ${ambient.id} %`);
+            else failR(combo, `AK-AMBIENT ${ambient.id} %`, `the ${ambient.id} layer above ${SURFACE_TINT_CAP}% stops being a whisper on a look that stands on the palette's page (peak ${ambient.peak} × alpha ${alpha} = ${+pct.toFixed(1)}%) — lower --ak-ambient-alpha, or give the look its own ground`);
           }
         }
 
