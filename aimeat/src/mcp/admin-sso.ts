@@ -24,6 +24,7 @@ import {
   deleteSsoConnectionAdmin, mintScimToken, setIdpMetadata,
 } from '../services/sso-connections.js';
 import { resolveOperatorName, deactivateOwnerByOperator, reactivateOwnerByOperator } from '../services/owner-lifecycle.js';
+import { resetTotpByOperator } from '../services/totp-recovery.js';
 import { emitChange } from '../services/event-bus.js';
 
 const text = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] });
@@ -148,5 +149,17 @@ export function registerAdminSsoTools(
       if (!r.ok) return refuse(`${r.code}: ${r.message}`);
       emitChange('ghii');
       return text({ name, disabled: false });
+    });
+
+  mcp.tool('aimeat_admin_totp_reset', descriptionFor('aimeat_admin_totp_reset'),
+    { name: z.string().describe('The owner name whose two-step sign-in should be removed.') },
+    annotationsFor('aimeat_admin_totp_reset'),
+    async ({ name }) => {
+      const by = await operatorName();
+      if (!by) return refuse('Operator role required');
+      const r = await resetTotpByOperator(storage, name, by, agentGaii, config);
+      if (!r.ok) return refuse(`${r.code}: ${r.message}`);
+      emitChange('totp');
+      return text({ name, ghii: r.ghii, two_factor: false });
     });
 }

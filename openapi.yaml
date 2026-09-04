@@ -27570,6 +27570,32 @@ paths:
         '403': { description: Operator role required }
         '404': { description: Owner not found }
 
+  /v1/admin/owners/{name}/totp:
+    delete:
+      operationId: adminTotpReset
+      summary: Remove two-step sign-in from an account (operator)
+      description: |
+        The answer to a lost phone. Removing two-step sign-in through /v1/ghii/totp needs a current
+        code or an unused backup code, which is exactly what a locked-out person does not have, so
+        without this door losing both ended the account.
+
+        Grants no access: the password still stands, and nothing is handed to the operator. Every
+        field the factor is made of is cleared, not only the flag, so a secret somebody else still
+        holds cannot turn it back on. The act writes a `two_factor_reset_by_operator` account event
+        on the target naming the operator, because a second factor disappearing quietly is the thing
+        the factor exists to prevent. An operator cannot use it on their own account.
+      tags: [Admin]
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: 'Removed; the person signs in with their password alone' }
+        '400': { description: Your own account, or the account does not use two-step sign-in }
+        '403': { description: Operator role required }
+        '404': { description: Owner not found }
+
   # ============================================================
   # Phase 1.4: Directories
   # ============================================================

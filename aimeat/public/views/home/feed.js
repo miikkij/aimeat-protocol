@@ -94,6 +94,12 @@ export function line(item) {
       return d.title
         ? tr('home.feed.taskFailedTitled', '{agent} could not finish: {title}').replace('{agent}', d.agent || '').replace('{title}', d.title)
         : tr('home.feed.taskFailed', '{agent} could not finish a task.').replace('{agent}', d.agent || '');
+    case 'two_factor_armed':
+      return tr('home.feed.twoFactorArmed', 'You turned on two-step sign-in.');
+    case 'two_factor_removed':
+      return tr('home.feed.twoFactorRemoved', 'You turned off two-step sign-in.');
+    case 'two_factor_reset_by_operator':
+      return tr('home.feed.twoFactorResetByOperator', 'An operator removed two-step sign-in from your account. Turn it back on if this was not arranged with you.');
     case 'app_published':
       return tr('home.feed.appPublished', 'You published {name}.').replace('{name}', d.name || '');
     case 'app_updated':
@@ -193,12 +199,14 @@ export function kindCategory(kind) {
     'extension_installed'].includes(k)) return 'made';
   if (['agent_connected', 'agent_knocking', 'agent_task_done', 'workflow_run_started',
     'workflow_run_finished', 'app_tool_first_use'].includes(k)) return 'agent';
+  // The operator reset sits with 'trouble' rather than with the other two: a second factor that
+  // disappeared without the person doing it is the one row on this feed they must not scroll past.
   if (['agent_task_failed', 'workflow_run_failed', 'ai_budget_reached', 'checkout_cancelled',
-    'agent_removed'].includes(k)) return 'trouble';
+    'agent_removed', 'two_factor_reset_by_operator'].includes(k)) return 'trouble';
   if (['payment_received', 'payment_sent', 'checkout_completed', 'app_tool_paid', 'ai_spend_daily',
     'contract_started', 'contract_ended'].includes(k)) return 'money';
   if (['consent_granted', 'consent_revoked', 'app_granted', 'app_revoked', 'organism_joined',
-    'organism_left', 'organism_member_joined'].includes(k)) return 'access';
+    'organism_left', 'organism_member_joined', 'two_factor_armed', 'two_factor_removed'].includes(k)) return 'access';
   return 'system';
 }
 

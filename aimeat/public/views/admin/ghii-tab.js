@@ -8,9 +8,14 @@
  *
  * @structure
  *   - GhiiTab({ data, reload }): renders stats + user table with confirm-guarded actions
- *   - setLevel / doDelete / doRemoveEmail: call admin service (updateGhiiLevel, deleteGhii, removeGhiiEmail)
+ *   - setLevel / doDelete / doRemoveEmail / doResetTotp: call admin service
  *
  * @version-history
+ *   v1.1.0 — 2026-09-04 — The two-step sign-in reset, on the rows that have it armed. Removing it
+ *     the normal way needs a code from the device the person lost, so this was the account's only
+ *     way back and it did not exist. The table gained its scroll box in the same change: at 390px
+ *     it is 766px wide against a page that clips, so the actions column was unreachable on a phone
+ *     and the reset button is the last control in it.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { h } from 'preact';
@@ -19,7 +24,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { dt, Badge, StatsGrid, Empty, ExpandableHelp, useToast, Toast } from './shared.js';
-import { updateGhiiLevel, deleteGhii, removeGhiiEmail } from '/js/services/admin.js';
+import { updateGhiiLevel, deleteGhii, removeGhiiEmail, resetGhiiTotp } from '/js/services/admin.js';
 import { useConfirm } from '/components/Modal.js';
 
 export default function GhiiTab({ data, reload }) {
@@ -35,6 +40,15 @@ export default function GhiiTab({ data, reload }) {
   function doDelete(ghii) {
     confirm(t('dashboard.deleteGhiiConfirm') + ' ' + ghii + '?', async () => {
       try { await deleteGhii(ghii); reload(); }
+      catch (e) { showErr(e.message); }
+    }, { danger: true });
+  }
+
+  // The answer to "I lost my phone and my backup codes". It hands the operator nothing: the
+  // password still stands, and the person is told on their own feed who did this.
+  function doResetTotp(u) {
+    confirm(t('dashboard.ghiiTotpResetConfirm').replace('{name}', u.display_name || u.username), async () => {
+      try { await resetGhiiTotp(u.username); showOk(t('dashboard.ghiiTotpResetDone')); reload(); }
       catch (e) { showErr(e.message); }
     }, { danger: true });
   }
@@ -73,7 +87,10 @@ export default function GhiiTab({ data, reload }) {
 
     ${!users.length
       ? html`<${Empty} text=${t('dashboard.noGhiiUsers')} />`
-      : html`<table>
+      // Eight columns and an actions cell: 766px wide, against a page that clips at overflow-x
+      // hidden. On a phone the actions column was simply cut off, and the reset button added here
+      // is the last control in it. The box scrolls; the page still must not.
+      : html`<div class="adm-table-wrap"><table>
         <thead><tr>
           <th>GHII</th>
           <th>${t('dashboard.displayName')}</th>
@@ -106,12 +123,13 @@ export default function GhiiTab({ data, reload }) {
                 </select>
                 ${' '}
                 ${u.masked_email ? html`<button class="adm-btn-sm" onClick=${() => doRemoveEmail(u)} title=${t('dashboard.ghiiRemoveEmail')}>✉✕</button> ` : ''}
+                ${u.totp_enabled ? html`<button class="adm-btn-sm" onClick=${() => doResetTotp(u)} title=${t('dashboard.ghiiTotpResetHint')}>${t('dashboard.ghiiTotpReset')}</button> ` : ''}
                 <button class="adm-btn-sm" onClick=${() => doDelete(u.ghii)}>${t('dashboard.deleteLabel')}</button>
               </td>
             </tr>`;
           })}
         </tbody>
-      </table>`
+      </table></div>`
     }
     <${ConfirmUI} />
   `;

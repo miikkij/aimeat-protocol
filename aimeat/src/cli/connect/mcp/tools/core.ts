@@ -568,4 +568,12 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     const { client } = pickAgent(registry, agent_name);
     return asText(await client.post(`/v1/admin/owners/${encodeURIComponent(name)}/enable`));
   });
+
+  mcp.tool('aimeat_admin_totp_reset', descriptionFor('aimeat_admin_totp_reset'), {
+    agent_name: agentNameSchema,
+    name: z.string().describe('The owner name whose two-step sign-in should be removed.'),
+  }, annotationsFor('aimeat_admin_totp_reset'), async ({ agent_name, name }) => {
+    const { client } = pickAgent(registry, agent_name);
+    return asText(await client.delete(`/v1/admin/owners/${encodeURIComponent(name)}/totp`));
+  });
 }

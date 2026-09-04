@@ -258,7 +258,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         // BR-04: the operator connects an organisation's identity provider and offboards by hand.
         'aimeat_admin_sso_list', 'aimeat_admin_sso_get', 'aimeat_admin_sso_create', 'aimeat_admin_sso_update',
         'aimeat_admin_sso_delete', 'aimeat_admin_sso_idp_metadata', 'aimeat_admin_sso_scim_token',
-        'aimeat_admin_owner_disable', 'aimeat_admin_owner_enable',
+        'aimeat_admin_owner_disable', 'aimeat_admin_owner_enable', 'aimeat_admin_totp_reset',
         // Arranging this node's front page and the page its members land on.
         'aimeat_surface_layout_get', 'aimeat_surface_layout_set',
         // The operator's break-glass over an organism whose creator account is unreachable, plus the
