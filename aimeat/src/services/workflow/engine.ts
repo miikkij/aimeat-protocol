@@ -72,7 +72,7 @@ import {
 } from './engine-steps.js';
 import { validateHumanAnswer, applyHumanAnswer } from './engine-human.js';
 import type {
-  WorkflowDef, WorkflowRun, WorkflowRunStep, WorkflowStep, Signal,
+  WorkflowDef, WorkflowRun, WorkflowRunStep, Signal,
 } from '../../models/workflow-schemas.js';
 
 export { isAgentReachable } from './engine-reachability.js';
@@ -83,39 +83,13 @@ let _active: WorkflowEngine | null = null;
 export function setActiveWorkflowEngine(e: WorkflowEngine): void { _active = e; }
 export function getActiveWorkflowEngine(): WorkflowEngine | null { return _active; }
 
-const TERMINAL_STEP_STATES = new Set<WorkflowRunStep['state']>(['green', 'input-red', 'output-red', 'timed-out', 'skipped', 'agent-offline']);
-
 /** Default wait for a human-input step's answer — humans sleep; 24h, not the agent-step 60 min. */
 export const HUMAN_TIMEOUT_MIN_DEFAULT = 1440;
 
-/**
- * The steps that may start now: pending, past any retry backoff, and their `after` deps satisfied.
- * "Satisfied" depends on the workflow's resume policy:
- *   - default: every `after` dep must be GREEN (a failed dep blocks the subtree — restart-and-skip).
- *   - resume:  every `after` dep must be TERMINAL (green OR failed) — `after` is ordering only; the
- *     step's OWN required_to_function (evaluated in tick) becomes the real gate, so a dependent whose
- *     input is present runs even when a parent timed out / went red.
- * Pure — operates on the def + the current run-step map.
- */
-export function computeReadySteps(def: WorkflowDef, steps: Record<string, WorkflowRunStep>, now: string): WorkflowStep[] {
-  const resume = def.resume === true;
-  return def.steps.filter(s => {
-    const rs = steps[s.id];
-    if (!rs || rs.state !== 'pending') return false;
-    if (rs.notBefore && rs.notBefore > now) return false;
-    return (s.after ?? []).every(dep => {
-      const st = steps[dep]?.state;
-      return resume ? !!st && TERMINAL_STEP_STATES.has(st) : st === 'green';
-    });
-  });
-}
-
-/** The terminal run status given the step states: done if all green, else partial; running otherwise. */
-export function runOutcome(steps: Record<string, WorkflowRunStep>): 'done' | 'partial' | 'running' {
-  const all = Object.values(steps);
-  if (all.some(s => !TERMINAL_STEP_STATES.has(s.state))) return 'running';
-  return all.every(s => s.state === 'green') ? 'done' : 'partial';
-}
+// The readiness rules live in engine-readiness.ts. Imported for use here AND re-exported, because
+// they are this module's published surface: routes import the timeout, tests the decision helpers.
+import { computeReadySteps, runOutcome, isHumanGate } from './engine-readiness.js';
+export { computeReadySteps, runOutcome } from './engine-readiness.js';
 
 export interface StartRunOpts {
   // full-sandbox dispatches like full-live but namespaces every key under `wf-test.<runId>.` so a
@@ -658,14 +632,28 @@ export class WorkflowEngine {
     return evaluateSignal(signal, tracking);
   }
 
-  /** Mark every step that (transitively) depends on a failed step as skipped (partial-fail policy). */
+  /**
+   * Mark every step that (transitively) depends on a failed step as skipped (partial-fail policy).
+   *
+   * A HUMAN GATE IS NOT SWEPT AWAY WITH THE SUBTREE. It is left pending, and computeReadySteps asks
+   * it once its deps are terminal and one of them is green — the person then decides on what did get
+   * made. The cascade also stops there rather than skipping what comes AFTER the gate: those steps
+   * are the answer's business, and skipping them now would decide on the person's behalf. If the
+   * gate never becomes askable, or times out, this runs again from the gate and they are skipped
+   * then.
+   */
   private skipSubtree(run: WorkflowRun, failedId: string): void {
+    const byId = new Map(run.defSnapshot.steps.map(s => [s.id, s]));
     const dependents = (id: string): string[] => run.defSnapshot.steps.filter(s => (s.after ?? []).includes(id)).map(s => s.id);
     const queue = [...dependents(failedId)];
     while (queue.length) {
       const id = queue.shift()!;
       const rs = run.steps[id];
-      if (rs && rs.state === 'pending') { rs.state = 'skipped'; queue.push(...dependents(id)); }
+      if (!rs || rs.state !== 'pending') continue;
+      const def = byId.get(id);
+      if (def && isHumanGate(def) && (def.after ?? []).some(d => run.steps[d]?.state === 'green')) continue;
+      rs.state = 'skipped';
+      queue.push(...dependents(id));
     }
   }
 
