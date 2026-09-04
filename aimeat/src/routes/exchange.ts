@@ -145,7 +145,7 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
    * owner. Body: { ext, action, contract_ref, cap_units?, app_id?, escrow_party? }. The per-call price
    * is taken from the provider's ext action (authoritative), never the request.
    */
-  router.post('/v1/exchange/entitlements', requireAuth(), async (req: Request, res: Response) => {
+  router.post('/v1/exchange/entitlements', requireAuth(), requireScope('exchange:write'), async (req: Request, res: Response) => {
     const consumerGaii = resolveIdentity(req.auth!, config.nodeId);
     const owner = req.auth!.owner;
     const b = (req.body ?? {}) as Record<string, unknown>;
@@ -331,7 +331,7 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   /** GET /v1/exchange/grants — every grant the caller's owner has ISSUED, and what each has cost them. */
-  router.get('/v1/exchange/grants', requireAuth(), async (req: Request, res: Response) => {
+  router.get('/v1/exchange/grants', requireAuth(), requireScope('exchange:read'), async (req: Request, res: Response) => {
     const providerGhii = `${req.auth!.owner}@${config.nodeId}`;
     const mine = await listGrantsByProvider(storage, providerGhii);
     const appId = typeof req.query.app_id === 'string' ? req.query.app_id : '';
@@ -408,7 +408,7 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   /** GET /v1/exchange/entitlements — every entitlement the caller's owner holds (as consumer). */
-  router.get('/v1/exchange/entitlements', requireAuth(), async (req: Request, res: Response) => {
+  router.get('/v1/exchange/entitlements', requireAuth(), requireScope('exchange:read'), async (req: Request, res: Response) => {
     const consumerGaii = resolveIdentity(req.auth!, config.nodeId);
     const mine = await listEntitlementsByConsumer(storage, consumerGaii);
     return res.json(success(config.nodeId, { entitlements: mine.map(e => view(config, e)) }));
@@ -418,7 +418,7 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
    * POST /v1/exchange/entitlements/off — the consumer's off-switch. Body: { ext, action, mode }
    * with mode `pause` (reversible) or `revoke` (terminal). Only the entitlement's own consumer may.
    */
-  router.post('/v1/exchange/entitlements/off', requireAuth(), async (req: Request, res: Response) => {
+  router.post('/v1/exchange/entitlements/off', requireAuth(), requireScope('exchange:write'), async (req: Request, res: Response) => {
     const consumerGaii = resolveIdentity(req.auth!, config.nodeId);
     const owner = req.auth!.owner;
     const b = (req.body ?? {}) as Record<string, unknown>;
@@ -538,7 +538,7 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
    * (pass `consumer_gaii`). Body: `{ ext, action, consumer_gaii?, new_price_per_call?, new_cap_units?, note? }`.
    * A message is delivered to the counterparty; they accept/decline. Nothing changes until accepted.
    */
-  router.post('/v1/exchange/proposals', requireAuth(), async (req: Request, res: Response) => {
+  router.post('/v1/exchange/proposals', requireAuth(), requireScope('exchange:write'), async (req: Request, res: Response) => {
     const owner = req.auth!.owner;
     const b = (req.body ?? {}) as Record<string, unknown>;
     const ext = typeof b.ext === 'string' ? b.ext : '';
@@ -574,13 +574,13 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   /** GET /v1/exchange/proposals — every proposal the caller is party to (incoming + outgoing). */
-  router.get('/v1/exchange/proposals', requireAuth(), async (req: Request, res: Response) => {
+  router.get('/v1/exchange/proposals', requireAuth(), requireScope('exchange:read'), async (req: Request, res: Response) => {
     const list = await listProposalsForOwner(storage, req.auth!.owner);
     return res.json(success(config.nodeId, { proposals: list.map(proposalView), count: list.length }));
   });
 
   /** POST /v1/exchange/proposals/:id/accept — the COUNTERPARTY accepts → supersede (archive old + mint new). */
-  router.post('/v1/exchange/proposals/:id/accept', requireAuth(), async (req: Request, res: Response) => {
+  router.post('/v1/exchange/proposals/:id/accept', requireAuth(), requireScope('exchange:write'), async (req: Request, res: Response) => {
     const owner = req.auth!.owner;
     const p = await getProposal(storage, typeof req.params.id === 'string' ? req.params.id : '');
     if (!p || p.status !== 'pending') return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such pending proposal'));
@@ -594,7 +594,7 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   /** POST /v1/exchange/proposals/:id/decline — the counterparty declines (no change). */
-  router.post('/v1/exchange/proposals/:id/decline', requireAuth(), async (req: Request, res: Response) => {
+  router.post('/v1/exchange/proposals/:id/decline', requireAuth(), requireScope('exchange:write'), async (req: Request, res: Response) => {
     const owner = req.auth!.owner;
     const p = await getProposal(storage, typeof req.params.id === 'string' ? req.params.id : '');
     if (!p || p.status !== 'pending') return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such pending proposal'));
@@ -605,7 +605,7 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   /** POST /v1/exchange/proposals/:id/withdraw — the PROPOSER withdraws their own pending proposal. */
-  router.post('/v1/exchange/proposals/:id/withdraw', requireAuth(), async (req: Request, res: Response) => {
+  router.post('/v1/exchange/proposals/:id/withdraw', requireAuth(), requireScope('exchange:write'), async (req: Request, res: Response) => {
     const owner = req.auth!.owner;
     const p = await getProposal(storage, typeof req.params.id === 'string' ? req.params.id : '');
     if (!p || p.status !== 'pending') return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such pending proposal'));
@@ -615,14 +615,14 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   /** GET /v1/exchange/entitlements/history — the caller-owner's PAST (archived/superseded) contracts as consumer. */
-  router.get('/v1/exchange/entitlements/history', requireAuth(), async (req: Request, res: Response) => {
+  router.get('/v1/exchange/entitlements/history', requireAuth(), requireScope('exchange:read'), async (req: Request, res: Response) => {
     const consumerGaii = resolveIdentity(req.auth!, config.nodeId);
     const past = await listEntitlementHistoryByConsumer(storage, consumerGaii);
     return res.json(success(config.nodeId, { history: past.map(e => historyView(config, e)), count: past.length }));
   });
 
   /** GET /v1/exchange/provider/history — the caller-owner's PAST (archived/superseded) contracts as provider. */
-  router.get('/v1/exchange/provider/history', requireAuth(), async (req: Request, res: Response) => {
+  router.get('/v1/exchange/provider/history', requireAuth(), requireScope('exchange:read'), async (req: Request, res: Response) => {
     const providerGhii = resolveIdentity(req.auth!, config.nodeId);
     const past = await listEntitlementHistoryByProvider(storage, providerGhii);
     return res.json(success(config.nodeId, { history: past.map(e => historyView(config, e)), count: past.length }));
@@ -705,7 +705,7 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
    * `{ offering_id, input, note? }`. Requires an active metered entitlement for the offering's coordinate
    * (contract first). Nothing is charged yet — the per-task price is metered when the provider DELIVERS.
    */
-  router.post('/v1/exchange/work', requireAuth(), async (req: Request, res: Response) => {
+  router.post('/v1/exchange/work', requireAuth(), requireScope('exchange:write'), async (req: Request, res: Response) => {
     const consumerGaii = resolveIdentity(req.auth!, config.nodeId);
     const owner = req.auth!.owner;
     const b = (req.body ?? {}) as Record<string, unknown>;
@@ -740,7 +740,7 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
    * consumer the per-task price, credit the provider, route the rake, decrement the budget). Body:
    * `{ output, note? }`. A 402/429 (budget/rate) leaves the work open and unpaid.
    */
-  router.post('/v1/exchange/work/:id/deliver', requireAuth(), async (req: Request, res: Response) => {
+  router.post('/v1/exchange/work/:id/deliver', requireAuth(), requireScope('exchange:write'), async (req: Request, res: Response) => {
     const owner = req.auth!.owner;
     const w = await getWork(storage, typeof req.params.id === 'string' ? req.params.id : '');
     if (!w || w.providerOwner !== owner) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such work of yours to deliver'));
@@ -786,7 +786,7 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   /** GET /v1/exchange/work?role=consumer|provider — the caller-owner's agent-work items (default: consumer). */
-  router.get('/v1/exchange/work', requireAuth(), async (req: Request, res: Response) => {
+  router.get('/v1/exchange/work', requireAuth(), requireScope('exchange:read'), async (req: Request, res: Response) => {
     const owner = req.auth!.owner;
     const role = req.query.role === 'provider' ? 'provider' : 'consumer';
     const items = role === 'provider' ? await listWorkByProvider(storage, owner) : await listWorkByConsumer(storage, owner);

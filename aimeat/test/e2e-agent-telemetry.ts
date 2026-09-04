@@ -4,6 +4,12 @@
  *   Tests event creation for llm_call and tool_call types, listing, type filtering,
  *   time-based filtering, and input validation.
  * @version-history
+ *   v1.1.0 -- 2026-09-04 -- Phase 4: whose telemetry is it. Both directions, because telemetry
+ *     carries what a model was asked and what it cost: a stranger writing into somebody else's
+ *     agent poisons their usage record, and a stranger reading it learns what that agent has been
+ *     doing. The positive control asserts the refused write did not land anyway, since a 403 that
+ *     still writes is the worst of both. One of the 34 seeded into
+ *     security/denial-coverage-exemptions.json on 2026-08-15 (quality plan stream B).
  *   v1.0.0 -- 2026-05-23 -- Initial creation
  */
 
@@ -227,6 +233,67 @@ await test('6. POST telemetry with invalid type -> 400', async () => {
         }),
     });
     assert(status === 400, `expected 400, got ${status}: ${JSON.stringify(body)}`);
+});
+
+// ─── Phase 4: Whose telemetry is it ───
+//
+// Every call above is this owner writing and reading their own agent's telemetry, so it proves the
+// shape of an event and says nothing about the address. Telemetry names the agent in the URL and
+// carries what a model was asked and what it cost, which makes both directions worth asking: can a
+// stranger WRITE events into somebody else's agent (poisoning their usage record), and can a
+// stranger READ them (learning what that agent has been doing).
+console.log('\nPhase 4 -- Whose telemetry is it');
+
+const otherOwner = `telother${Date.now()}`;
+let otherOwnerToken = '';
+
+await test('7. Register a second owner', async () => {
+    const { status, body } = await json('/v1/owners', {
+        method: 'POST', body: JSON.stringify({ name: otherOwner, public_key: 'placeholder' }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    otherOwnerToken = await getToken(otherOwner, body.data.private_key, false);
+});
+
+await test('8. A second owner cannot write telemetry into this agent', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/telemetry`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${otherOwnerToken}` },
+        body: JSON.stringify({ type: 'llm_call', data: { model: 'planted', tokens: 999999 } }),
+    });
+    // 404 and not 403: the route resolves the agent by NAME under the caller's own identity, so an
+    // agent belonging to somebody else is simply not there. Pinned to the one status rather than
+    // accepting either, because a drift from 404 to 403 would start confirming that the agent exists.
+    assert(status === 404, `expected 404, got ${status}: ${JSON.stringify(body)}`);
+});
+
+await test('9. A second owner cannot read this agent\'s telemetry', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/telemetry`, {
+        headers: { Authorization: `Bearer ${otherOwnerToken}` },
+    });
+    assert(status === 404, `expected 404, got ${status}: ${JSON.stringify(body)}`);
+});
+
+await test('10. An unauthenticated caller cannot read it', async () => {
+    const { status } = await json(`/v1/agents/${agentName}/telemetry`);
+    assert(status === 401, `expected 401, got ${status}`);
+});
+
+await test('11. POSITIVE CONTROL: the owner still reads their own, and nothing was planted', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/telemetry`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `owner read ${status}`);
+    const events: any[] = body.data?.events ?? body.data ?? [];
+    assert(!JSON.stringify(events).includes('planted'),
+        'the refused write landed anyway — a 403 that still wrote is the worst of both');
+});
+
+await test('12. Cascade-delete the second owner', async () => {
+    const { status } = await json(`/v1/owners/${encodeURIComponent(otherOwner)}`, {
+        method: 'DELETE', headers: { Authorization: `Bearer ${otherOwnerToken}` },
+    });
+    assert(status === 200, `status ${status}`);
 });
 
 // ─── Cleanup ───

@@ -114,11 +114,16 @@
     "check:surface-focus": "cd aimeat && pnpm check:surface-focus",
     "check:sse-parity": "cd aimeat && pnpm check:sse-parity",
     "check:copied-logic": "cd aimeat && pnpm check:copied-logic",
+    "check:doc-counts": "cd aimeat && pnpm check:doc-counts",
+    "check:scope-parity": "cd aimeat && pnpm check:scope-parity",
+    "debt": "cd aimeat && pnpm debt",
     "check:liaison-surface": "cd aimeat && pnpm check:liaison-surface",
     "check:storage-parity": "cd aimeat && pnpm check:storage-parity",
     "check:audit-gates": "cd aimeat && pnpm check:audit-gates",
     "audit:security": "cd aimeat && pnpm audit:security",
     "outdated:libs": "cd aimeat && pnpm outdated:libs",
-    "libs:usage": "cd aimeat && pnpm libs:usage"
+    "libs:usage": "cd aimeat && pnpm libs:usage",
+    "check:open-writes": "cd aimeat && pnpm check:open-writes",
+    "check:open-writes:report": "cd aimeat && pnpm check:open-writes:report"
   }
 }

@@ -27,7 +27,7 @@ import {
 export function appdevOverviewRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
-  router.get('/v1/appdev/overview', requireAuth(), async (req, res) => {
+  router.get('/v1/appdev/overview', requireAuth(), requireScope('memory:read'), async (req, res) => {
     const identity = resolveIdentity(req.auth!, config.nodeId);
     const model = typeof req.query.model === 'string' ? req.query.model : undefined;
     const sections = typeof req.query.sections === 'string'
@@ -45,14 +45,14 @@ export function appdevOverviewRouter(config: AimeatConfig, storage: Storage): Ro
   // ── Template proposals (the profile UI's management surface) ──
 
   // GET /v1/appdev/templates — the caller's owner-scope template proposals (full manifests).
-  router.get('/v1/appdev/templates', requireAuth(), async (req, res) => {
+  router.get('/v1/appdev/templates', requireAuth(), requireScope('memory:read'), async (req, res) => {
     const identity = resolveIdentity(req.auth!, config.nodeId);
     const templates = await listTemplateProposals(storage, config, identity);
     res.json(success(config.nodeId, { templates, total: templates.length }));
   });
 
   // GET /v1/appdev/templates/:id — one proposal + the source app's live state.
-  router.get('/v1/appdev/templates/:id', requireAuth(), async (req, res) => {
+  router.get('/v1/appdev/templates/:id', requireAuth(), requireScope('memory:read'), async (req, res) => {
     const identity = resolveIdentity(req.auth!, config.nodeId);
     const found = await getTemplateProposal(storage, config, identity, req.params.id as string);
     if (!found) {

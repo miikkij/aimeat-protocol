@@ -429,17 +429,27 @@ await test('POST /v1/boards -- create board with federate=true', async () => {
     assert(sharedStatus === 201, `agent shared+federate board: status ${sharedStatus}: ${JSON.stringify(sharedBody)}`);
     assert(sharedBody.data.federate === true, `shared board federate: ${sharedBody.data.federate}`);
 
+    // The probe is `system`, not `public`, since 2026-08-30. A public board stopped being the
+    // operator's that day — boards came back as Core (RFC §27) and a notice board a person keeps for
+    // their street is the shape it exists for, so any account may open one up to
+    // config.boardPublicPerOwnerMax (services/board-write.ts says so in a comment and in its version
+    // history). A `system` board — one the node itself speaks through — is still operator-only, which
+    // is what this test was always asking: an agent session is not an operator.
+    //
+    // Until this line was moved it asserted 403 on a door that had deliberately started answering
+    // 201, and because the assert throws, the owner's create fifteen lines below never ran either:
+    // one stale expectation, four red tests, three of them looking like a federation fault.
     const { status: refusedStatus } = await json('/v1/boards', {
         method: 'POST',
         headers: { Authorization: `Bearer ${agentToken}` },
         body: JSON.stringify({
             name: `mesh-board-fed-refused-${Date.now()}`,
-            visibility: 'public',
+            visibility: 'system',
             description: 'An agent session is not an operator',
             federate: true,
         }),
     });
-    assert(refusedStatus === 403, `agent public board: expected 403, got ${refusedStatus}`);
+    assert(refusedStatus === 403, `agent system board: expected 403, got ${refusedStatus}`);
 
     const { status, body } = await json('/v1/boards', {
         method: 'POST',

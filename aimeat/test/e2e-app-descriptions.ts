@@ -8,6 +8,11 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-app-descriptions
  * @version-history
+ *   v1.1.0 — 2026-09-04 — Who else can rewrite what an app says about itself. A description is the
+ *     sentence a stranger reads in the catalogue before deciding whether to open the app, and the
+ *     route is addressed by filename alone, so nothing here had called it as anyone but the owner.
+ *     One of the 34 seeded into security/denial-coverage-exemptions.json on 2026-08-15
+ *     (quality plan stream B).
  *   v1.0.0 — 2026-07-20 — initial (Phase 2a multilingual descriptions).
  */
 
@@ -131,6 +136,42 @@ await test('PATCH with a non-object descriptions → 400', async () => {
 await test('PATCH with a non-string locale value → 400', async () => {
     const r = await json(`/v1/apps/${FILE}`, auth({ method: 'PATCH', body: JSON.stringify({ descriptions: { en: 123 } }) }));
     assert(r.status === 400, `non-string locale value must 400, got ${r.status}`);
+});
+
+// ── Who else can rewrite what an app says about itself ──
+//
+// Everything above is one owner editing their own manifest, which proves the descriptions map and
+// says nothing about the door. A description is the sentence a stranger reads in the catalogue
+// before deciding whether to open the app, so being able to rewrite somebody else's is being able
+// to put words in their mouth on a public listing. The route is PATCH /v1/apps/:filename, addressed
+// by filename alone, and nothing here had ever called it as anyone but the owner.
+
+await test('A second owner cannot rewrite this app\'s descriptions', async () => {
+    const strangerToken = await registerOwner(`descother${Date.now() % 100000}`);
+    const r = await json(`/v1/apps/${FILE}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${strangerToken}` },
+        body: JSON.stringify({ descriptions: { en: 'written by somebody else' } }),
+    });
+    // 404 and not 403: the route resolves the app under the caller's own owner, so a filename that
+    // is not theirs is not there. Pinned to the one status, because a drift to 403 would confirm
+    // which filenames another owner has published.
+    assert(r.status === 404, `expected 404, got ${r.status}: ${JSON.stringify(r.body)}`);
+});
+
+await test('An unauthenticated caller cannot rewrite them either', async () => {
+    const r = await json(`/v1/apps/${FILE}`, {
+        method: 'PATCH', body: JSON.stringify({ descriptions: { en: 'anonymous' } }),
+    });
+    assert(r.status === 401, `expected 401, got ${r.status}`);
+});
+
+await test('POSITIVE CONTROL: the owner\'s own descriptions are untouched', async () => {
+    // Two refusals in a row pass just as happily against a route that stopped writing for everyone.
+    const m = await manifest();
+    const en = m?.descriptions?.en ?? '';
+    assert(!en.includes('somebody else') && !en.includes('anonymous'),
+        `a refused write landed anyway: ${JSON.stringify(m?.descriptions)}`);
 });
 
 // ── Summary ──

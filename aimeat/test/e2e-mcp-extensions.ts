@@ -475,12 +475,18 @@ await test('9d. Cross-owner notify DELIVERS once the target consents (extension_
   const result = JSON.parse(body.result.content[0].text);
   assert(result.sent === true, `consented cross-notify should deliver, sent=${result.sent}`);
 
-  // The notification landed in the TARGET's private list, attributed to the extension.
-  const mem = await json(`/v1/memory/notifications.${targetName}`, { headers: { Authorization: `Bearer ${targetToken}` } });
-  assert(mem.status === 200, `target notifications read: ${mem.status}`);
-  const list = mem.body.data?.value ?? mem.body.data?.memory?.value ?? [];
-  assert(Array.isArray(list) && list.some((n: any) => n.message === 'kello soi' && n.source === extName),
-    `notification present for target: ${JSON.stringify(list).slice(0, 200)}`);
+  // The notification landed in the TARGET's bell, attributed to the extension.
+  //
+  // Read at GET /v1/notifications, not at the memory key. `notifications.<owner>` was a SECOND list
+  // beside the bell's own rows and was deleted on 2026-08-30 — services/extension-ctx.ts:220 and
+  // services/extension-notify.ts:77 both carry the same sentence, "One store, the bell's". The
+  // delivery path was never broken; this read had been asking a key nobody writes any more, so the
+  // 404 it got was the correct answer to the wrong question (pitfalls §19, category three).
+  const bell = await json('/v1/notifications', { headers: { Authorization: `Bearer ${targetToken}` } });
+  assert(bell.status === 200, `target notifications read: ${bell.status}`);
+  const list = bell.body.data?.notifications ?? [];
+  assert(Array.isArray(list) && list.some((n: any) => n.body === 'kello soi' && n.source?.name === extName),
+    `notification present for target: ${JSON.stringify(list).slice(0, 300)}`);
 });
 
 await test('9e. Notification link: a node-relative deep link is kept, a foreign host is refused', async () => {

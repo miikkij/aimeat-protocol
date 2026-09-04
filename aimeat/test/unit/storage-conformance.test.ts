@@ -20,6 +20,12 @@
  *   - the cases: delete cascade, transaction lookup, memory listing order, push subscriptions
  * @usage cd aimeat && pnpm exec vitest run test/unit/storage-conformance.test.ts
  * @version-history
+ *   v1.3.0 — 2026-09-04 — Six tables join the seed and the cascade check: memory version history,
+ *     the owner's agent defaults, the two usage tables, group shares and the ecosystem-app handshake.
+ *     Each had been listed in security/storage-parity-exemptions.json as "decide" since 2026-08-10,
+ *     where the gate could prove a table was NAMED in a delete path and nothing proved the row was
+ *     gone. AgentUsageEventArchive is cleared by the same change but is not asserted here: it has no
+ *     read method on the Storage interface, so the parity gate is its only proof.
  *   v1.1.0 — 2026-08-11 — Push subscriptions join the seed and the cascade check, and get a case of
  *     their own: one row per device, refresh in place, prune one endpoint (audit H-8).
  *   v1.0.0 — 2026-08-10 — Initial (August 2026 audit, step 5c / systemic pattern 5).
@@ -67,6 +73,12 @@ afterAll(async () => {
     }
 });
 
+/** The trackable key whose overwrite leaves a row in the version-history table. */
+const TRACKED_KEY = 'conformance.tracked';
+
+/** The device code of this owner's seeded ecosystem-app handshake, readable back by code alone. */
+const deviceCodeFor = (name: string) => `dc-${name}`;
+
 /**
  * One owner carrying data in several owner-scoped tables, so a partial cascade is visible. Rows land
  * under BOTH identities on purpose: the GHII (where an owner session and an app grant write) and the
@@ -103,8 +115,9 @@ async function seedOwner(s: Storage, name: string): Promise<{ ghii: string; gaii
         key: 'conformance.txt', ownerGaii: ghii, visibility: 'private', mimeType: 'text/plain',
         size: 3, data: Buffer.from('abc'), tags: [], createdAt: now,
     });
+    const groupId = randomUUID();
     await s.createSharingGroup({
-        id: randomUUID(), name: 'conformance group', ownerGaii: ghii, members: [],
+        id: groupId, name: 'conformance group', ownerGaii: ghii, members: [],
         defaultPermissions: { read: true, write: false }, createdAt: now, updatedAt: now,
     });
     // Keyed on the bare owner name rather than an identity: a push subscription belongs to a device
@@ -113,7 +126,55 @@ async function seedOwner(s: Storage, name: string): Promise<{ ghii: string; gaii
         ownerName: name, endpoint: `https://push.example.test/${name}/laptop`,
         keys: { p256dh: 'conf-p256dh', auth: 'conf-auth' }, createdAt: now, lastUsedAt: now,
     });
-    return { ghii, gaii };
+
+    // ── The six tables the parity gate had listed as exempt since 2026-08-10 ──
+    // Each was owner-scoped and cleared by neither cascade. They are seeded here rather than only
+    // named in the gate, because the gate proves a table is MENTIONED in a delete path and this
+    // proves the row is actually gone. A deleted username is released for reuse, so a survivor is
+    // inheritable by the next registrant.
+
+    // Version history only exists for a TRACKABLE key, and only from the second write: the first
+    // write has nothing to archive. Two writes, one archived row.
+    await s.setMemory({
+        key: TRACKED_KEY, ownerGaii: ghii, value: { v: 1 }, visibility: 'private',
+        tags: [], ttlHours: null, version: 1, trackable: true, createdAt: now, updatedAt: now,
+    });
+    await s.setMemory({
+        key: TRACKED_KEY, ownerGaii: ghii, value: { v: 2 }, visibility: 'private',
+        tags: [], ttlHours: null, version: 2, trackable: true, createdAt: now, updatedAt: now,
+    });
+
+    await s.upsertOwnerAgentDefaults({
+        ownerGaii: ghii, rules: [], defaultTokenBudget: 1000, defaultMemoryAreas: [], updatedAt: now,
+    });
+
+    // Usage is keyed by the AGENT that spent and the GHII that pays, so it is seeded under both and
+    // the cascade has to clear it from whichever identity it is walking.
+    await s.appendUsageEvent({
+        id: randomUUID(), ts: now, agentGaii: gaii, ownerGhii: ghii, model: 'test/model',
+        provider: 'test', promptTokens: 10, completionTokens: 5, costUsd: null, priceRef: null,
+        source: 'conformance', apiKeyScope: 'own',
+    });
+    await s.incrementUsageDaily({
+        date: now.slice(0, 10), agentGaii: gaii, ownerGhii: ghii, apiKeyScope: 'own',
+        model: 'test/model', provider: 'test', organismId: '', workspaceId: '',
+        promptTokens: 10, completionTokens: 5, costUsd: 0, calls: 1, unpricedCalls: 1,
+    });
+
+    await s.createGroupShare({
+        id: randomUUID(), groupId, ownerGaii: ghii, keyPattern: 'conformance.*',
+        note: 'conformance share', expiresAt: null, createdAt: now, createdBy: ghii,
+    });
+
+    // Keyed on the bare owner name, like the push subscription above: the handshake happens before
+    // the ecosystem app has an identity of its own.
+    await s.createEcoAuth({
+        deviceCode: deviceCodeFor(name), userCode: `UC-${name}`.slice(0, 24), ownerName: name,
+        app: 'conformance-app', status: 'pending', createdAt: now,
+        expiresAt: new Date(Date.now() + 600_000).toISOString(), pollInterval: 5,
+    });
+
+    return { ghii, gaii, groupId };
 }
 
 /** Everything the cascade must leave empty, read back through the Storage interface. */
@@ -126,6 +187,12 @@ async function leftovers(s: Storage, owner: string, ghii: string, gaii: string) 
         sharingGroups: (await s.listSharingGroups(ghii)).length,
         pushSubscriptions: (await s.listPushSubscriptionsByOwner(owner)).length,
         agents: (await s.getAgentsByOwner(owner)).length,
+        memoryHistory: (await s.listMemoryHistory(ghii, TRACKED_KEY)).length,
+        ownerAgentDefaults: (await s.getOwnerAgentDefaults(ghii)) ? 1 : 0,
+        usageEvents: (await s.listUsageEvents({ ownerGhii: ghii })).length,
+        usageDaily: (await s.queryUsageDaily({ ownerGhii: ghii })).length,
+        groupShares: (await s.listGroupSharesByOwner(ghii)).length,
+        ecoAuth: (await s.getEcoAuthByDeviceCode(deviceCodeFor(owner))) ? 1 : 0,
         ghii: !!(await s.getGHII(ghii)),
     };
 }

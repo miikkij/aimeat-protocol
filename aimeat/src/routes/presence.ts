@@ -21,7 +21,7 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth } from '../auth/middleware.js';
+import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import {
@@ -42,7 +42,7 @@ export function presenceRouter(config: AimeatConfig, _storage: Storage): Router 
   const router = Router();
 
   // GET /v1/presence/me — own config + own computed status (visibility never hides it from self)
-  router.get('/v1/presence/me', requireAuth(), async (req, res) => {
+  router.get('/v1/presence/me', requireAuth(), requireScope('social:read'), async (req, res) => {
     const me = resolveIdentity(req.auth!, config.nodeId);
     const [cfg, status] = await Promise.all([presence.getConfig(me), presence.getOwnStatus(me)]);
     res.json(success(config.nodeId, { ghii: me, config: cfg, status: status.status, since: status.since }, [
@@ -51,7 +51,7 @@ export function presenceRouter(config: AimeatConfig, _storage: Storage): Router 
   });
 
   // PUT /v1/presence/me — update own config (partial: mode / status / visibility)
-  router.put('/v1/presence/me', requireAuth(), async (req, res) => {
+  router.put('/v1/presence/me', requireAuth(), requireScope('social:write'), async (req, res) => {
     const me = resolveIdentity(req.auth!, config.nodeId);
     const body = (req.body ?? {}) as Record<string, unknown>;
     const partial: Partial<PresenceConfig> = {};
@@ -84,7 +84,7 @@ export function presenceRouter(config: AimeatConfig, _storage: Storage): Router 
   });
 
   // GET /v1/presence?ids=a,b,c — batch viewer-scoped status
-  router.get('/v1/presence', requireAuth(), async (req, res) => {
+  router.get('/v1/presence', requireAuth(), requireScope('social:read'), async (req, res) => {
     const viewer = resolveIdentity(req.auth!, config.nodeId);
     const raw = (req.query.ids as string | undefined) ?? '';
     const ids = raw.split(',').map(s => s.trim()).filter(Boolean).slice(0, MAX_BATCH);
@@ -95,7 +95,7 @@ export function presenceRouter(config: AimeatConfig, _storage: Storage): Router 
   });
 
   // GET /v1/presence/:ghii — single viewer-scoped status
-  router.get('/v1/presence/:ghii', requireAuth(), async (req, res) => {
+  router.get('/v1/presence/:ghii', requireAuth(), requireScope('social:read'), async (req, res) => {
     const viewer = resolveIdentity(req.auth!, config.nodeId);
     const target = decodeURIComponent(req.params.ghii as string);
     const view = await presence.getVisible(viewer, target);

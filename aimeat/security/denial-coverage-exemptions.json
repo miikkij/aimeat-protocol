@@ -1,25 +1,13 @@
 {
   "note": "Registered E2E suites with no assertion about a 401 or 403. Seeded from the state on 2026-08-15 so the gate can only ratchet down. The `sha` pins the reason to the file it was written about: EDIT THE SUITE AND ITS EXEMPTION EXPIRES, because the person editing it is the one person who has the context to add the missing case. Re-stamping the sha without adding a denial is available and is a decision someone has to write down.",
   "exempt": {
-    "test/e2e-agent-capabilities.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "0db93e273c4c88a8"
-    },
     "test/e2e-oauth-login.ts": {
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
       "sha": "0b3718a6714b3ae4"
     },
-    "test/e2e-app-descriptions.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "265bfbbae4e81d36"
-    },
     "test/e2e-portfolio-origin.ts": {
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
       "sha": "8121169cd1184d2d"
-    },
-    "test/e2e-ext-files.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "7ac09408557ee264"
     },
     "test/e2e-mcp-sse-parity.ts": {
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
@@ -33,33 +21,17 @@
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
       "sha": "fec3a0c5c834fe14"
     },
-    "test/e2e-exchange-mcp.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "24594cc6df6f6d57"
-    },
-    "test/e2e-extension-secrets.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "d2b0d7c7c65afbfd"
-    },
     "test/e2e-iam-extension.ts": {
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
       "sha": "4d37d4f8f13b0d78"
     },
-    "test/e2e-agent-reapproval.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "f3130c42b0cdd0aa"
-    },
     "test/e2e-registration-invites.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "reason": "REVIEWED 2026-09-04. This surface has no refusal to test, and that is the design rather than an omission. The suite guards ONE route, POST /v1/registration-invites, which is open by necessity: an AI calls it with a person's email before that person has any account, so there is no principal to refuse. Its whole security property is the OPPOSITE of a refusal — the response must be byte-identical whether the address is new, already has an account, or already has a live invitation, because any difference turns it into an address-checking machine. The suite asserts exactly that in three tests, plus the per-address cap and single-use expiry that bound the abuse a 403 cannot. There is no second route on this router: no listing, no read, nothing an owner could reach across. A 401 or 403 added here would have to be invented.",
       "sha": "9bfa527729132d7e"
     },
     "test/e2e-ai-provenance-surfaces.ts": {
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
       "sha": "c5e93def548ac8ea"
-    },
-    "test/e2e-appdev-pitfalls.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "3fd5b45ba2427af2"
     },
     "test/e2e-mcp-scopes.ts": {
       "reason": "Reviewed 2026-08-15. This suite is ALL refusal, and none of it is status-shaped: the MCP tool surface refuses by not registering the tool (assert(!tools.includes(...))) and a filtered call comes back through a local {ok} wrapper rather than isError. Kept exempt because the detector cannot see those two shapes, not because the fence is untested — it now also asserts that a '*' agent is refused every tool riding a SCOPES_OUTSIDE_WILDCARD word, list derived from the vocabulary.",
@@ -70,24 +42,12 @@
       "sha": "e3dca6fe2c37cc12"
     },
     "test/e2e-x402-testnet.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "reason": "REVIEWED 2026-09-04. This suite never runs in CI and has no refusal to add. Its first twelve lines are a skip guard: it exits 0 unless AIMEAT_X402_ENABLED=true AND the REAL x402.org facilitator is in use, because Phase B signs an EIP-3009 authorization with a throwaway key and settles ~0.10 USDC on Base Sepolia. It is a manual on-chain acceptance harness a person runs after funding an address, not a suite. Adding a cross-owner case here would write a test that never executes, which is worse than the gap: it reads as coverage. The refusals on the same surface that DO run belong in e2e-money-audit, which is in the guard tier. If this suite is ever made to run unattended, this line expires with its sha.",
       "sha": "63a20107e5207f5e"
     },
     "test/e2e-organism-member-visibility.ts": {
       "reason": "Reviewed 2026-08-16. This suite is entirely about refusal, and none of it is a status: the roster doors answer 200 with the roster REDACTED (members_hidden, an empty members[], empty agentGaiis), because hiding who is in an organism is not the same as hiding that it exists. It asserts that on BOTH doors — the members listing and the detail handler, which is a separate handler with its own canSeeMembers call. Re-seeded 2026-08-23 after adding test 8 (a duplicated ?member= param must not 500 the list, CodeQL type-confusion) — a correctness assertion, not a new gated surface, so the exemption still holds.",
       "sha": "c217ca906dc01af2"
-    },
-    "test/e2e-transparency-page.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "768ed6a78d9a41d4"
-    },
-    "test/e2e-organism-decision-cap.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "6bb6ee5195ac41dc"
-    },
-    "test/e2e-workspace-publish-guard.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "c9d466047db413a4"
     },
     "test/e2e-connect-tunnel-delivery.ts": {
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
@@ -97,41 +57,21 @@
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
       "sha": "cbfc438922d7864c"
     },
-    "test/e2e-memory-file-presigned.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "6ee449518f5be4ee"
-    },
-    "test/e2e-capability-trust-guard.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "a0094d954e9bf230"
-    },
     "test/e2e-audio-speech.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "reason": "REVIEWED 2026-09-04. The whole surface is GET /v1/libs/aimeat-audio.js, /aimeat-speech.js and the /v1/libs index — served browser libraries, and serving them to anybody is the requirement rather than an oversight: an app running in a visitor's browser loads them by URL before that visitor has any account, and routes/libs.ts registers them with no auth middleware for exactly that reason. A 401 here would break every published app. What COULD go wrong on this surface is the file being stale or wrong, which check:sdk and check:vendored already gate, not who may read it.",
       "sha": "f7c0ce1ae8df2766"
     },
     "test/e2e-message-transcript.ts": {
       "reason": "REVIEWED 2026-08-16 (E2E test-quality audit, finding e2e-message-transcript:145). This surface refuses with 404, not 403, and that is deliberate: the transcribe route looks the message up as storage.getDirectMessage(id, ownerGhii), so a caller who is not a party to the message is told the message does not exist rather than that it exists and is not theirs. The suite now drives that refusal with a THIRD owner, on the plain and the force:true paths, and reads the sender's copy back afterwards to show nothing was written; the recipient reaching their OWN copy is the positive control. There is no 401 or 403 on this route to assert.",
       "sha": "fb430ca2ff090d70"
     },
-    "test/e2e-interactive-messages.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "2329b525c19e5057"
-    },
     "test/e2e-members.ts": {
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
       "sha": "f3bc7fae3449b261"
     },
     "test/e2e-attachment-sweep.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "reason": "REVIEWED 2026-09-04. There is no door here to refuse. This suite is IN-PROCESS: it imports createServer, loadConfig and sweepReferenceAttachments directly and calls the sweep function, and it makes zero fetch() calls (measured: 0). What it tests is a background job deciding whether an attachment reference is retried or expired, which has no caller and therefore no principal to refuse. The HTTP doors that create those attachments live in the DM suites and carry their refusals there. If this ever grows an HTTP call, the sha pin expires with it.",
       "sha": "3026905962578080"
-    },
-    "test/e2e-inbox-cursor.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "3d71cf560b1be0cc"
-    },
-    "test/e2e-agent-telemetry.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "ad2e21d075f17afc"
     },
     "test/e2e-agent-connect-email.ts": {
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
@@ -146,8 +86,8 @@
       "sha": "067aba73c3ec539c"
     },
     "test/e2e-public-totals.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "c7185060f37715d3"
+      "reason": "REVIEWED 2026-09-04. GET /v1/public/node-totals has no refusal to test and that is the requirement rather than an omission: it powers the landing panel a visitor sees before they have an account, and the suite asserts it answers with no Authorization header at all. The question a public counter DOES raise is asked instead, and it is not status-shaped: a counter that rises when a PRIVATE organism is created tells an anonymous caller that one exists, which is the whole of what private was supposed to prevent. Added 2026-09-04 and it holds. If an authenticated door is ever added to this router, this line expires with its sha.",
+      "sha": "6c6a625e86caf82f"
     },
     "test/e2e-datapackage-odata.ts": {
       "reason": "REVIEWED 2026-08-15: this surface has no refusal to test, and that is the design rather than an omission. An OData feed serves the rows of a PUBLISHED data package, whose CSV already sits at a permanent, world-readable /v1/pub address; putting a token in front of the feed while the file stays open would be theatre, not a control. There is therefore no second principal that gets a different answer. What the suite DOES prove instead is the fence that exists here: test 13b shows the feed is a door onto packages and cannot be steered at the owner's other storage, and tests 7-11 prove every unimplemented query construct is REFUSED (501/400) rather than ignored — which on this surface is the failure with real consequences, because an ignored $filter returns the wrong rows into somebody's report with no symptom. If the metered feed is ever built it will be a separate authenticated door, and that one owes a 401/403 case.",

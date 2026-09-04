@@ -175,6 +175,67 @@ decorative on the door that writes.
 *Check:* when you add a scope word, name every door that reaches the capability and gate all of them.
 A word enforced on one door teaches an owner that they have controlled something they have not.
 
+#### 15b. Closing a bypass, or inventing a requirement: the twin decides
+
+Satisfying 15 means adding a gate to a door that has none, and that is where it can go wrong in the
+other direction. If a route is one an agent drives as its ordinary work, demanding a word nobody knew
+to ask for turns the capability off for every agent already doing the job. So the question before
+adding a gate is not "does this door look unguarded" but **"does the MCP tool for the same capability
+already demand this word?"**
+
+- **A twin demands it** → gating the REST door closes a BYPASS. It cannot turn anything off, because
+  every agent doing that job through the tool already holds the word: the owner ticked that box the
+  day they connected it. `POST /v1/exchange/work/:id/deliver` demanded nothing while
+  `aimeat_exchange_work_deliver` had demanded `exchange:write` all along, and the triage measured what
+  the gap bought — an app grant with one unrelated scope could mark work delivered and charge a THIRD
+  PARTY. Gate it, and say in the diff which tool the word came from.
+- **No twin demands it** → the word is a PROPOSAL, not a finding. `organism:read` is asked for by one
+  REST route and zero tools, so gating the eleven workspace reads behind it would create a
+  requirement no owner has ever granted and dress it as a fix. Read who actually calls the route
+  first, and expect the answer sometimes to be that the word should not exist.
+
+Measured on 2026-09-04 against the 156 route-scope entries marked DEBT: **102 are twin-backed and 54
+are not.** Two thirds of that backlog is mechanical and the rest is a judgement per route, which is
+worth knowing before anyone promises a date for it.
+
+*Check:* `TOOL_SCOPES` in `src/mcp/catalog/scopes.ts` is the register. `pnpm check:scope-parity`
+fails when a word lives on one side only, in either direction, which is the same question asked
+before either side exists.
+
+#### 15c. A door already gated on the word it needs does not get a weaker one in front
+
+15b says when a word may be added. This says when it may not. A route whose handler already refuses
+without the strongest word for what it does is gated; adding a second, weaker word in front of it
+satisfies a middleware scanner and changes nothing about who gets in — except that it can now refuse
+somebody the first word would have let through.
+
+Both payment-completion doors on this node are in that state, and they are why this is a rule rather
+than a judgement made twice. `POST /v1/commerce/checkout-sessions/:id/complete` and its UCP twin both
+refuse without `contract:spend`, bounded by the owner's per-app spend ceiling; the triage entry for
+the first says in as many words "This is the H-3 fix and it holds on this door". `commerce:buy` in
+front of either would be a scanner-shaped change to a money path, and the caller is not obviously the
+buyer — a PSP callback holds no buyer scopes at all. Both were left, and both exemptions now say why,
+so the next reader does not "finish the job".
+
+*Check:* before gating, read what the handler already refuses. If the answer is "the word that
+matters for this operation", the door is done and the exemption needs a sentence, not a middleware.
+
+#### 15d. A ratchet is recomputed, not maintained — that is the whole of it
+
+"The count may only go down" is the property people remember. "The count is recomputed from source on
+every run" is the one doing the work, and the difference shows only in the failure nobody reports:
+an exemption cleared AHEAD of the code. The file says the debt is gone, the count went down, the
+commit message is true about intent — and the door is still open. Every direction a person would look
+reads as progress.
+
+Measured 2026-09-04, on this exact mistake: clearing the entry for `GET /v1/schedules/:id` while
+gating only the four routes the triage had listed. `check:route-scopes` failed on the next run with
+one NEW ungated handler naming that line, because it counts the source and compares, rather than
+trusting the file. A checklist would have accepted it and the number would have been right.
+
+*Check:* a new gate script recomputes its finding every run and uses the seed file only to decide
+whether a finding is NEW. A gate that reads its own bookkeeping as the truth is a list, not a gate.
+
 ### 16. Deprecated is not removed
 RFC v4.0 marks One-Time Keys / Tier 0.5 deprecated and says the feature sits behind
 `keyedBrowseEnabled`. Three of its write paths were behind no flag at all, and the flag defaults to

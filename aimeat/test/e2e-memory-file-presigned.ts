@@ -15,7 +15,15 @@
  *   (4) a file over the limit is refused with FILE_TOO_LARGE rather than accepted and truncated.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-memory-file-presigned
+ *   (5) Added 2026-09-04: who ELSE reaches the stored bytes. Everything above drove one owner, which
+ *   proves a ceiling and says nothing about an audience. A second owner gets 404 rather than 403 —
+ *   the route resolves the caller's own identity and looks the key up under it — an unauthenticated
+ *   caller gets 401, the second owner's listing does not carry the key, and a positive control keeps
+ *   the three refusals honest by proving the owner can still read their own file.
  * @version-history
+ *   v1.1.0 — 2026-09-04 — Cross-owner and unauthenticated cases (quality plan stream B). This suite
+ *     was one of the 34 seeded into security/denial-coverage-exemptions.json on 2026-08-15 as
+ *     "drives its surface with one principal and never asks what a second one gets".
  *   v1.0.0 — 2026-07-31 — Initial.
  */
 import * as ed from '@noble/ed25519';
@@ -162,7 +170,52 @@ await test('A file over the node limit is refused with FILE_TOO_LARGE', async ()
     assert(check.status === 404, `refused upload still left a file (status ${check.status})`);
 });
 
-// ── 4. The inline path still works for small files ──
+// ── 4. Who else can reach the file ──
+//
+// Everything above drives one owner. That proves the ceiling works and says nothing about who the
+// stored bytes are for, which is the question a 6 MB private file actually raises. A second owner
+// and an unauthenticated caller ask it here.
+
+const otherName = `mfpother${Date.now() % 1000000}`;
+let otherHeaders: Record<string, string> = {};
+
+await test('Register a second owner', async () => {
+    const { status, body } = await json('/v1/owners', {
+        method: 'POST', body: JSON.stringify({ name: otherName, public_key: 'placeholder' }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    otherHeaders = { Authorization: `Bearer ${await getOwnerToken(otherName, body.data.private_key)}` };
+});
+
+await test('An unauthenticated caller cannot download the file', async () => {
+    const res = await fetch(`${BASE}/v1/memory/files/${encodeURIComponent(bigKey)}`);
+    assert(res.status === 401, `expected 401, got ${res.status}`);
+});
+
+await test('A second owner does not reach the first owner\'s key, and is not told it exists', async () => {
+    const res = await fetch(`${BASE}/v1/memory/files/${encodeURIComponent(bigKey)}`, { headers: otherHeaders });
+    // 404 rather than 403 on purpose: the route resolves the caller's own identity and looks the key
+    // up under it, so a key that is not theirs is simply not there. Telling them it exists but is
+    // forbidden would answer a question they may not ask.
+    assert(res.status === 404, `expected 404, got ${res.status}`);
+});
+
+await test('A second owner\'s listing does not carry the first owner\'s file', async () => {
+    const { status, body } = await json('/v1/memory/files', { headers: otherHeaders });
+    assert(status === 200, `list ${status}`);
+    const list: any[] = body.data?.files ?? body.data ?? [];
+    assert(!list.some(f => f.key === bigKey), `the other owner's listing carries ${bigKey}`);
+});
+
+await test('POSITIVE CONTROL: the owner still downloads their own file', async () => {
+    // Without this line the three refusals above would pass just as happily against a route that
+    // refuses everyone, which is the failure mode of a suite made entirely of denials.
+    const res = await fetch(`${BASE}/v1/memory/files/${encodeURIComponent(bigKey)}`, { headers: authHeaders });
+    assert(res.status === 200, `owner download ${res.status}`);
+    assert(Buffer.from(await res.arrayBuffer()).length === bigSize, 'owner got the wrong bytes back');
+});
+
+// ── 5. The inline path still works for small files ──
 
 await test('Inline base64 upload still works', async () => {
     const content = Buffer.from('small inline file').toString('base64');

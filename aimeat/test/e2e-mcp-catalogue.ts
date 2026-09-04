@@ -321,11 +321,15 @@ await test('6b. A later owner\'s agent cannot create a public board (the operato
     assert(agTok.body.ok === true, `second agent token: ${JSON.stringify(agTok.body.error)}`);
     const agentAuth = { Authorization: `Bearer ${agTok.body.data.token}` };
 
+    // `system`, not `public`, since 2026-08-30: boards came back as Core (RFC §27) and a public board
+    // stopped being the operator's — any account may keep one up to config.boardPublicPerOwnerMax,
+    // which is the point of a notice board. A `system` board, one the node itself speaks through, is
+    // still the operator's alone, and that is the gate this test was always about.
     const pub = await json('/v1/boards', {
         method: 'POST', headers: agentAuth,
-        body: JSON.stringify({ name: 'not-allowed-public', visibility: 'public', description: 'should be refused' }),
+        body: JSON.stringify({ name: 'not-allowed-system', visibility: 'system', description: 'should be refused' }),
     });
-    assert(pub.status === 403, `a non-operator agent creating a public board expected 403, got ${pub.status}: ${JSON.stringify(pub.body).slice(0, 200)}`);
+    assert(pub.status === 403, `a non-operator agent creating a system board expected 403, got ${pub.status}: ${JSON.stringify(pub.body).slice(0, 200)}`);
     assert(pub.body.error?.code === 'ACCESS_DENIED', `expected ACCESS_DENIED, got ${pub.body.error?.code}`);
 
     // The refusal is about `public`, not about creating boards at all — otherwise this test would
