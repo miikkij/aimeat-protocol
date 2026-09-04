@@ -7,7 +7,12 @@
  *   404 NOT_FOUND). Registry source: src/data/appdev-pitfalls.ts.
  * @usage registered in test/run-e2e-ci.ts; run via the e2e harness
  *   (cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=appdev-pitfalls).
- * @version-history v1.0.0 — 2026-07-19 — initial (AppDev Knowledge Base, Phase 1).
+ * @version-history
+ *   v1.1.0 — 2026-09-04 — The curated half is public; the learned half is not. This suite read only
+ *     the registry meant to answer any agent, and the same router carries three per-owner doors
+ *     holding what somebody's own agents got wrong while building. One of the 34 seeded into
+ *     security/denial-coverage-exemptions.json on 2026-08-15 (quality plan stream B).
+ *   v1.0.0 — 2026-07-19 — initial (AppDev Knowledge Base, Phase 1).
  */
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -107,6 +112,35 @@ await test('unknown id → 404 NOT_FOUND', async () => {
   const { status, body } = await json('/v1/appdev/pitfalls/no-such-pitfall');
   assert(status === 404, `Expected 404, got ${status}`);
   assert(body.error?.code === 'NOT_FOUND', `Expected NOT_FOUND, got ${body.error?.code}`);
+});
+
+// ── The curated half is public; the learned half is not ──
+//
+// Everything above reads the curated registry, which is meant to answer any agent that asks — that
+// is the point of a knowledge base. The same router carries three doors that are per-owner: the
+// LEARNED pitfalls an owner's agents wrote for themselves, and the two that edit them. Those hold
+// what somebody's own agents got wrong while building, which is not a thing to hand to a stranger,
+// and nothing here had ever knocked on them.
+
+await test('the learned registry is not readable without a credential', async () => {
+  const { status } = await json('/v1/appdev/pitfalls/learned');
+  assert(status === 401, `expected 401, got ${status}`);
+});
+
+await test('and it cannot be written or deleted without one either', async () => {
+  for (const method of ['PATCH', 'DELETE']) {
+    const res = await fetch(`${BASE}/v1/appdev/pitfalls/learned/build/some-slug`, {
+      method, headers: { 'Content-Type': 'application/json' }, body: method === 'PATCH' ? '{}' : undefined,
+    });
+    assert(res.status === 401, `${method} answered ${res.status}, expected 401`);
+  }
+});
+
+await test('POSITIVE CONTROL: the curated half still answers with no credential', async () => {
+  // Without this the two refusals would pass against a router that had started refusing everyone,
+  // which for a knowledge base meant to be read by any agent is the opposite of the requirement.
+  const { status } = await json('/v1/appdev/pitfalls');
+  assert(status === 200, `the curated registry answered ${status}`);
 });
 
 console.log('\n' + '─'.repeat(40));
