@@ -40,6 +40,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { identityReads, type IdentityRead } from './inventory/identity-reads.js';
+import { srcProgram } from './inventory/program.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const AIMEAT = resolve(HERE, '..');
@@ -56,27 +57,13 @@ const SEED_REASON = 'SEEDED 2026-09-04, NOT TRIAGED — reads `sub` and never ca
     + 'Whether that is the account name it wants or the identity it should have resolved is a question '
     + 'nobody has answered. Kept so the gate can refuse a NEW one; the decision is still owed.';
 
-function sourceFiles(): { program: ts.Program; files: ts.SourceFile[] } {
-    const config = ts.readConfigFile(join(AIMEAT, 'tsconfig.json'), ts.sys.readFile);
-    const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, AIMEAT);
-    const program = ts.createProgram(parsed.fileNames, { ...parsed.options, noEmit: true });
-    // Forces the binder, which is what sets node.parent. Without it enclosingUnit() walks nothing
-    // and every read is reported as <module>.
-    program.getTypeChecker();
-    const files = program.getSourceFiles().filter(f =>
-        !f.isDeclarationFile
-        && /[/\\]src[/\\](routes|services)[/\\]/.test(f.fileName)
-        && !f.fileName.includes('node_modules'));
-    return { program, files };
-}
-
 const key = (r: IdentityRead): string => `${r.file}:${r.unit}`;
 
 function main(): void {
     const strict = process.argv.includes('--strict');
     const seed = process.argv.includes('--seed');
 
-    const { program, files } = sourceFiles();
+    const { program, files } = srcProgram(/[/\\]src[/\\](routes|services)[/\\]/);
     const all = identityReads(program, files, AIMEAT);
     const bare = all.filter(r => !r.resolvesToo);
     // The unit is what is decided about, so several reads inside one handler are one entry. The one

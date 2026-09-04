@@ -363,6 +363,7 @@ const ALL_SUITES = [
     'test/e2e-organism-workspace-engagements.ts',
     'test/e2e-write-guards.ts',
     'test/e2e-wallet-page.ts',
+    'test/e2e-data-wallet-page.ts',
     'test/e2e-invitations.ts',
     'test/e2e-invite-grants.ts',
     'test/e2e-contact-picker.ts',

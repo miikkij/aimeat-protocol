@@ -25932,6 +25932,24 @@ paths:
           schema:
             type: string
           description: Filter by a specific consent record id
+        - name: key_prefix
+          in: query
+          schema:
+            type: string
+          description: Only entries whose memory key starts with this prefix (the rows of one Data Wallet group)
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 1000
+          description: Page size; omitted means every matching entry
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+          description: Entries to skip before the page (newest first)
       responses:
         '200':
           description: Consent audit log
@@ -25968,8 +25986,15 @@ paths:
                                   type: boolean
                           total:
                             type: integer
+                            description: Matching entries before paging
                           period_days:
                             type: integer
+                          limit:
+                            type: integer
+                            description: Present when a page was asked for
+                          offset:
+                            type: integer
+                            description: Present when a page was asked for
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -50848,10 +50873,13 @@ paths:
     get:
       operationId: getDataWallet
       tags: [Consent]
-      summary: Data Wallet overview (consents + audit + permission summary)
+      summary: Data Wallet overview (consents + audit + permission summary + names)
       description: |
-        Fold the Data Wallet tab into one call: active consents, the audit report (including the
-        pending buffer), and a permission summary. Requires the `consent:manage` scope.
+        Fold the Data Wallet tab into one call: every consent (active and revoked), the audit
+        report of the window GROUPED by accessor × target × outcome with only the newest rows
+        verbatim (the rows of one group come from GET /v1/consent/audit with `key_prefix`), a
+        permission summary with the consent quota, and the names of every organism and workspace
+        the consents and the audit keys point at. Requires the `consent:manage` scope.
       security:
         - BearerAuth: []
       parameters:
@@ -50860,13 +50888,71 @@ paths:
           required: false
           schema: { type: integer, default: 30 }
           description: Audit window in days.
+        - name: entry_limit
+          in: query
+          required: false
+          schema: { type: integer, default: 20, minimum: 0, maximum: 1000 }
+          description: How many of the newest audit rows to return verbatim beside the groups.
       responses:
         '200':
           description: Data Wallet overview
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AimeatEnvelope'
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          consents:
+                            type: object
+                            properties:
+                              consents: { type: array, items: { type: object } }
+                              total: { type: integer }
+                          audit:
+                            type: object
+                            properties:
+                              entries: { type: array, items: { type: object }, description: The newest rows, at most entry_limit }
+                              total: { type: integer, description: Every row in the window }
+                              period_days: { type: integer }
+                              entry_limit: { type: integer }
+                              groups:
+                                type: array
+                                description: Biggest first
+                                items:
+                                  type: object
+                                  properties:
+                                    accessor_gaii: { type: string }
+                                    target:
+                                      type: object
+                                      properties:
+                                        kind: { type: string, enum: [ws, org, key] }
+                                        organism_id: { type: string }
+                                        rest: { type: string, description: What follows the organism or workspace id }
+                                        key: { type: string, description: The plain key when kind is key }
+                                    action: { type: string }
+                                    allowed: { type: boolean }
+                                    count: { type: integer }
+                                    first: { type: string, format: date-time }
+                                    last: { type: string, format: date-time }
+                                    keys: { type: array, items: { type: string }, description: Distinct keys, newest first, at most 20 }
+                                    key_count: { type: integer }
+                          permSummary:
+                            type: object
+                            properties:
+                              total_memory_keys: { type: integer }
+                              total_storage_files: { type: integer }
+                              active_consents: { type: integer }
+                              consent_quota: { type: integer }
+                              rules_by_recipient_type: { type: object, additionalProperties: { type: integer } }
+                              data_patterns: { type: array, items: { type: string } }
+                          names:
+                            type: object
+                            properties:
+                              organisms: { type: object, additionalProperties: { type: string }, description: organism id → name }
+                              workspaces: { type: object, additionalProperties: { type: object, additionalProperties: { type: string } }, description: organism id → workspace id → name }
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':

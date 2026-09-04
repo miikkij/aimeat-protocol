@@ -151,6 +151,15 @@ export const coreTools: ConnectCliToolDefinition[] = [
                 tags: tags?.length ? tags.join(',') : undefined,
                 owner_scope: optionalBoolean(input, 'owner_scope') ? 'true' : undefined,
                 limit: optionalNumber(input, 'limit'),
+                // A LISTING IS A LISTING. `include=meta` is what the node MCP surface has always
+                // answered with and what this tool's published output schema promises ("the listing
+                // carries no values (always the case)"); this door was the one shipping them, and
+                // it moved a whole article archive across a shared socket so a caller could print
+                // eighty key names. Measured by crewaimeat-dev on 2026-09-04 at 0.53 MB a day
+                // against a 25 MB tunnel cap: 25 MB of bodies, every byte discarded on arrival, and
+                // past seven weeks it stopped fitting at all. Whoever wants a value reads it with
+                // aimeat_memory_read. → pitfalls §44
+                include: 'meta',
             })}`);
         },
     },

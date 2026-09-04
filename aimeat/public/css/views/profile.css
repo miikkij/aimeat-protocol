@@ -6,6 +6,7 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v3.5.0 — 2026-09-04 — The old Data Wallet tab rules (dw- prefix) removed; the page has data-wallet-poster.css.
  *   v3.4.0 — 2026-09-04 — The old Wallet tab rules (.pf .wallet-*, .pf-psp-chip, .tx-*) removed; the page
  *     has wallet-poster.css.
  *   v3.3.0 — 2026-09-03 — The old Libraries tab rules (.pf .lib-*) removed; the page has libraries-poster.css.
@@ -1477,26 +1478,6 @@
   padding: .75rem 1rem;
 }
 
-/* ── Data wallet tab-specific ── */
-.pf .dw-summary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: .75rem; }
-.pf .dw-expiring      { background: rgba(245, 158, 11, .08); }
-/* A revoked or expired grant is history: readable, but visibly not part of who has access now. */
-.pf .dw-consent-dead  { opacity: .55; }
-.pf .dw-section-lead  { max-width: 68ch; margin: 0 0 .5rem; }
-.pf .dw-summary-card  { margin-bottom: 1.5rem; padding: 1rem; }
-.pf .dw-stat           { text-align: center; }
-.pf .dw-stat-value     { font-size: 1.4rem; font-weight: 700; color: var(--love1, #E8564A); }
-.pf .dw-type-tag       { font-size: .75rem; padding: 3px 8px; border-radius: 4px; background: var(--bg-secondary); border: 1px solid var(--border); }
-.pf .dw-form-grid      { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
-.pf .dw-label          { font-size: .8rem; font-weight: 600; display: block; margin-bottom: 4px; }
-.pf .dw-filter-input   { flex: 1; max-width: 300px; }
-.pf .dw-checkbox-col   { width: 30px; }
-.pf .dw-code-accent    { font-family: var(--font-mono, monospace); font-size: .8rem; color: var(--love3); }
-.pf .dw-recipient-cell { display: flex; gap: 4px; align-items: center; }
-.pf .dw-expiring-icon  { color: var(--warn); font-size: .7rem; margin-right: 4px; }
-.pf .dw-consent-card   { margin-bottom: 1rem; padding: 1rem; border-color: var(--love1); }
-.pf .dw-section-title  { margin: 1rem 0 .75rem; }
-.pf .dw-section-heading { color: var(--love1, #E8564A); margin: 1.5rem 0 .75rem; }
 .pf .w-full            { width: 100%; }
 
 /* ── Knowledge tab references ── */
@@ -2066,16 +2047,6 @@
 }
 .pf .kpkg-fed-toggle:disabled { opacity: .5; cursor: wait; }
 
-/* --- Data Wallet scope filter buttons --- */
-.pf .dw-scope-filters {
-  display: flex;
-  gap: 4px;
-  flex-shrink: 0;
-}
-.pf .dw-filter-row {
-  flex-wrap: wrap;
-  gap: 6px;
-}
 
 /* --- Memory federation badge --- */
 .pf .pf-fed-badge {

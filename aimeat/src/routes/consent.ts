@@ -87,7 +87,8 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
     const dataWalletDb = createDataWalletService(storage);
     router.get('/v1/data-wallet', requireAuth(), requireScope('consent:manage'), async (req, res) => {
         const days = req.query.days ? parseInt(req.query.days as string, 10) : 30;
-        const data = await dataWalletDb.overview(resolve(req), days);
+        const entryLimit = req.query.entry_limit ? Math.max(0, Math.min(1000, parseInt(req.query.entry_limit as string, 10) || 0)) : 20;
+        const data = await dataWalletDb.overview(resolve(req), days, entryLimit);
         res.json(success(config.nodeId, data));
     });
 
@@ -140,7 +141,16 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
         const pending = getPendingConsentAudit(ownerGaii, opts)
             .sort((a, b) => (a.timestamp < b.timestamp ? 1 : a.timestamp > b.timestamp ? -1 : 0));
         const stored = await storage.listConsentAudit(ownerGaii, opts);
-        const entries = [...pending, ...stored];
+        let entries = [...pending, ...stored];
+
+        // The rows of ONE group of the Data Wallet page (who × what): the accessor filter above plus
+        // the key's prefix, and a page of them. The composite (GET /v1/data-wallet) serves the groups.
+        const keyPrefix = typeof req.query.key_prefix === 'string' ? req.query.key_prefix : '';
+        if (keyPrefix) entries = entries.filter(e => e.memoryKey.startsWith(keyPrefix));
+        const total = entries.length;
+        const limit = req.query.limit ? Math.max(0, Math.min(1000, parseInt(req.query.limit as string, 10) || 0)) : 0;
+        const offset = req.query.offset ? Math.max(0, parseInt(req.query.offset as string, 10) || 0) : 0;
+        if (limit || offset) entries = entries.slice(offset, limit ? offset + limit : undefined);
 
         res.json(success(config.nodeId, {
             entries: entries.map(e => ({
@@ -152,8 +162,9 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
                 timestamp: e.timestamp,
                 allowed: e.allowed,
             })),
-            total: entries.length,
+            total,
             period_days: days,
+            ...(limit || offset ? { limit, offset } : {}),
         }));
     });
 
