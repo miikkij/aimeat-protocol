@@ -17,6 +17,9 @@
  *   focus, ak-busy)
  * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
  * @version-history
+ *   v0.47.0 — 2026-09-05 — The frame opens its own stacking context (isolation: isolate) so the
+ *     ambient layer paints between its ground and its content; .ak-app__weather places the
+ *     weather switch beside the motion switch (wish-atelier-ambient-visuals).
  *   v0.46.0 — 2026-09-02 — .ak-app__motion: the bar's less-motion switch, on the tokens, pressed
  *     state visible in the ground and in the mark's own stroke.
  *   v0.7.0 — 2026-08-29 — The figure numeral sizes against its own container (cqi), never the
@@ -73,6 +76,11 @@
   display: flex;
   flex-direction: column;
   overflow-x: clip;
+  /* The frame is its own stacking context, so the ambient layer (z-index -1, ambient.css)
+   * paints above this ground and under the bar, the main and the foot. Without it a negative
+   * z-index child falls behind the frame's own background and the layer is never seen. The
+   * curtain (fixed, on body) and the bottom navigation keep their order. */
+  isolation: isolate;
   background-color: var(--ak-bg);
   /* The ambient: the page ground carries the spectrum, whisper-quiet. Flat turns it off.
    * The grain layer rides on top as a small repeating tile — paper for the print looks,
@@ -139,6 +147,12 @@
 }
 .ak-app__motion-slash { opacity: 0; }
 .ak-app__motion[aria-pressed='true'] .ak-app__motion-slash { opacity: 1; }
+/* The WEATHER switch (ambient.css draws it) sits before the motion switch when the look or the
+   app runs an ambient; hidden otherwise. It takes the auto margin so the cluster still reads as
+   one; the :not([hidden]) matters because the kit's hidden rule removes the box but `+` still
+   matches the element. */
+.ak-app__weather { flex: none; margin-left: auto; }
+.ak-app__weather:not([hidden]) + .ak-app__motion { margin-left: 0; }
 /* A hero below carries the same name at display size (hero.js sets the class), so the bar's copy
  * yields to the screen reader alone — the name appears once, where it is largest. */
 .ak-app--hero-titled .ak-app__title {
