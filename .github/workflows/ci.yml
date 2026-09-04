@@ -186,7 +186,7 @@ jobs:
       # THE GUARD TIER BLOCKS. 64 suites, chosen on one question: does a failure here mean a
       # principal can reach money, an identity, or another account's data that they must not? The
       # list and the reason for each entry are in test/run-e2e-ci.ts (GUARD_SUITES). The runner
-      # prints the assertion total (2226 on 2026-09-04) and takes a few minutes per backend — it was
+      # prints the assertion total (2227 on 2026-09-04) and takes a few minutes per backend — it was
       # 20 suites and under a minute until the 44 promoted that day, each one earned by running it
       # alone on a freshly deleted database, three consecutive identical green runs on BOTH backends.
       # No continue-on-error — a red run here is a hole, and merging
