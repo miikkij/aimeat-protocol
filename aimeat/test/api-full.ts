@@ -767,13 +767,11 @@ await test('Memory — tab overview composite (Phase 4 DbService, meta-only)', a
     assert(d.memory.total === mem.data.total, `overview memory total (${d.memory.total}) == /v1/memory?include=meta (${mem.data.total})`);
 });
 
-await test('Matches — list handler runs the batched enrichment (owner with no matches)', async () => {
-    const { body } = await json('/v1/matches', { method: 'GET', headers: { Authorization: `Bearer ${ownerToken}` } });
-    assert(body.ok === true, `matches: ${JSON.stringify(body.error)}`);
-    assert(Array.isArray(body.data?.matches), 'matches is an array');
-    // The batched enrichment (getGHIIsByGhiis + getAgentsByOwners + listConsentsForAgents) runs cleanly
-    // even with no matched profiles to enrich (empty maps → nothing to redact).
-});
+// A GET /v1/matches test stood here until 2026-09-04. The matching engine was removed on 2026-08-29
+// with the developer's explicit go-ahead, after being shown it could not produce a match: it needed a
+// consent whose purpose was the exact string 'matching', so every round scanned zero profiles. The
+// route went with it and this asked for it for six days. Matchmaking between profiles is an
+// application on this platform, not part of it. Same removal as the two in e2e-admin-features.
 
 await test('Notebook overview composite folds inbox + settings + organisms (Phase 4 DbService)', async () => {
     // Capture an inbox note, then confirm the composite returns it (server-side prefix scan).
