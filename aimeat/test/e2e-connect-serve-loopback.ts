@@ -649,6 +649,44 @@ await test('A full identity routes a /local/call to that owner and no other', as
   }
 });
 
+// ─── The REST proxy says WHOSE call it is, and the node agrees ───
+//
+// A shared socket routes each frame on a stamp naming the identity that sent it, and the proxy
+// forwarded without one, so every /v1/* call was attributed to whichever identity OPENED the
+// socket. That is right for exactly one agent, which is why it survived: a daemon serving one
+// agent cannot show it, and on a fleet the opener works while everyone else is misread.
+//
+// Measured on a live 62-identity fleet on 2026-09-04 and reported by crewaimeat-dev: an agent
+// asking for its own tasks was refused as another agent, and then SERVED that other agent's task
+// list when it asked for it. This path also carries `DELETE /v1/memory/…`, so writes landed under
+// the wrong name too. → pitfalls §43
+//
+// `/v1/agents/me` is the question with no other way to answer it: the node replies with the
+// identity it believes is calling. Asserting on a list would pass on the wrong caller whenever the
+// two identities can see similar things.
+await test('The REST proxy forwards each identity as ITSELF, not as whoever opened the socket', async () => {
+  const gaiiA = `concierge#${acc3a!.ownerName}@${NODE_ID}`;
+  const gaiiB = `concierge#${acc3b!.ownerName}@${NODE_ID}`;
+  const seen: string[] = [];
+  for (const gaii of [gaiiA, gaiiB]) {
+    const r = await json(lb3, '/v1/agents/me', { headers: { 'X-Aimeat-Agent': gaii } });
+    assert(r.status === 200, `${gaii}: /v1/agents/me through the proxy ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    const me = r.body?.data?.gaii;
+    assert(me === gaii, `the node must see ${gaii} calling, it saw ${me}`);
+    seen.push(me);
+  }
+  // Belt and braces: if both answers were the opener's, each assertion above could only catch it
+  // for the one identity that is NOT the opener, and this catches it whichever one that is.
+  assert(seen[0] !== seen[1], `two identities got the same answer (${seen[0]}) — the stamp is missing`);
+});
+
+// NOT COVERED HERE, and saying so rather than shipping a green test that proves nothing:
+// `/local/subscribe` had the identical missing stamp and is fixed in the same commit, but the only
+// way to observe it is to write a record into a subscribed space and see which identity the node
+// wakes. That is the record-push machinery in e2e-connect-tunnel-records, not this suite's, and a
+// test written here without it passes with the defect in place — which is exactly the kind of
+// coverage that let this survive in the first place.
+
 // ─── An MCP session on a two-owner daemon says who it is ───
 //
 // The 28 tool modules resolve an agent ONCE, at registration time, with no identifier. Harmless
