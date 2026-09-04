@@ -11,16 +11,24 @@
  *   RFC 9728 §3.3 has the client REJECT metadata whose `resource` is not the resource it is talking
  *   to, so an agent standing on an app origin learned nothing about how to authenticate there.
  *
- *   The apex response is unchanged (same fields, same values) — only the other origins gain an
- *   answer of their own, naming the app, its declared scopes, and where its tools live.
+ *   THE APEX HAD THE SAME DEFECT, in the branch this file was written to fix everything BUT. It
+ *   answered `<origin>/v1/mcp` at the bare well-known URL, which §3.1 pairs with the ORIGIN — so
+ *   the same §3.3 rejection applied to the apex itself, and the MCP 401 challenge was pointing
+ *   every client at exactly that document. The bare URL names the origin now, and the MCP endpoint
+ *   has its own document at the path-suffixed address the RFC gives it.
  * @structure
  *   - requestOrigin(req, config) — the origin the client used (app/portfolio host aware)
  *   - resourceMetadataUrl(req, config) — that origin's `/.well-known/oauth-protected-resource`
+ *   - mcpResourceMetadata(config) — the `/v1/mcp` resource's own document (RFC 9728 §3.1 address)
  *   - buildProtectedResourceMetadata(req, config, storage) — the document to serve
  * @usage
  *   import { buildProtectedResourceMetadata } from '../services/protected-resource.js';
  *   res.json(await buildProtectedResourceMetadata(req, config, storage));
  * @version-history
+ *   v1.1.0 — 2026-09-04 — The apex names the ORIGIN at the bare well-known URL, and `/v1/mcp` gets
+ *     its own document at the §3.1 address the 401 challenge now points at. Same defect as v1.0.0's,
+ *     left in the branch that fix started from; reported against production by isitagentready, which
+ *     is the same scanner that found the app-origin half in July. → pitfalls §43
  *   v1.0.0 — 2026-07-28 — Initial: per-origin protected-resource metadata (app + portfolio origins
  *     described themselves as the apex, so isitagentready and any RFC-conformant client rejected it).
  */
@@ -77,6 +85,29 @@ export function resourceMetadataUrl(req: Request, config: AimeatConfig): string 
 }
 
 /**
+ * The MCP endpoint as its own protected resource, at the address RFC 9728 §3.1 gives it.
+ *
+ * A resource with a path (`https://node/v1/mcp`) publishes its metadata at
+ * `/.well-known/oauth-protected-resource/v1/mcp`, not at the bare well-known URL — that one belongs
+ * to the origin. Both are served: this document is what the MCP 401 challenge points at, so a
+ * client following the challenge reads a `resource` that matches the resource it is talking to and
+ * has nothing to reject.
+ */
+export const MCP_RESOURCE_METADATA_PATH = '/.well-known/oauth-protected-resource/v1/mcp';
+
+export function mcpResourceMetadata(config: AimeatConfig): ProtectedResourceMetadata {
+  const apex = config.baseUrl.replace(/\/+$/, '');
+  return {
+    resource: `${apex}/v1/mcp`,
+    authorization_servers: [apex],
+    scopes_supported: ['aimeat:full'],
+    bearer_methods_supported: ['header'],
+    resource_name: 'AIMEAT MCP',
+    resource_documentation: `${apex}/.well-known/mcp.json`,
+  };
+}
+
+/**
  * Read an app's declared scopes from its `<meta name="aimeat-scopes">`. That meta is the app's own
  * statement of what it will ask the owner to grant (H-2 app grant), so it is the honest answer to
  * "what scopes can a token for this resource carry". Returns [] when the app declares none.
@@ -128,8 +159,20 @@ export async function buildProtectedResourceMetadata(
   const onPortfolioOrigin = Boolean(req.portfolioOrigin);
 
   if (!onAppOrigin && !onPortfolioOrigin) {
+    // THE ORIGIN, because that is what this ADDRESS means. RFC 9728 §3.1 pairs a resource with a
+    // path to `/.well-known/oauth-protected-resource<path>`, so the bare well-known URL describes
+    // the origin and nothing else; naming `${apex}/v1/mcp` here made the document a mismatch by
+    // §3.3 for every client that asked about the origin, and a conformant one rejects a mismatch
+    // rather than reading past it. isitagentready reported exactly that against production.
+    //
+    // This is the same defect this file was written to fix, left in the branch the fix started
+    // from: the app and portfolio branches below already answer with their own origin. A rule
+    // applied to every place but the one it was noticed in. → pitfalls §43
+    //
+    // The MCP resource keeps its own document at the path-suffixed address, which is where §3.1
+    // says it belongs and where the 401 challenge now sends a client.
     return {
-      resource: `${apex}/v1/mcp`,
+      resource: apex,
       authorization_servers: [apex],
       scopes_supported: ['aimeat:full'],
       bearer_methods_supported: ['header'],
