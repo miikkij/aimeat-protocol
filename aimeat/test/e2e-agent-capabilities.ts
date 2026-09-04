@@ -1,5 +1,19 @@
-// E2E Tests for Agent Capabilities
-// Run: cd aimeat && pnpm exec tsx test/e2e-agent-capabilities.ts
+/**
+ * @file test/e2e-agent-capabilities.ts
+ * @description E2E for PUT/GET /v1/agents/:name/capabilities — what an agent declares it can be
+ *   asked to do. Phase 1 covers the write semantics (full replace, not merge; empty arrays clear).
+ *   Phase 2 asks who else may write it: the list is what the catalogue and the exchange read, so
+ *   declaring somebody else's is advertising work they never offered, and the agent is named in
+ *   the URL rather than taken from the token.
+ * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
+ *   test/run-e2e-ci.ts --test=e2e-agent-capabilities
+ * @version-history
+ *   v1.1.0 — 2026-09-04 — Phase 2: a second owner and an unauthenticated caller, with a positive
+ *     control asserting the refused write did not land. One of the 34 seeded into
+ *     security/denial-coverage-exemptions.json on 2026-08-15 (quality plan stream B). Header added;
+ *     the file pre-dates the header standard.
+ *   v1.0.0 — 2026-05-23 — Initial.
+ */
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -263,6 +277,60 @@ await test('4. Empty arrays clear capabilities', async () => {
 
 // ─── Cleanup ───
 console.log('\nCleanup');
+
+// ─── Phase 2: Whose capability list is it ───
+//
+// Every PUT above declares this agent's own capabilities with its own token or its owner's, which
+// proves the replace semantics and says nothing about the address. The list is what the catalogue
+// and the exchange read to decide what this agent can be asked to do, so writing somebody else's is
+// advertising work they never offered — and the agent is named in the URL.
+console.log('\nPhase 2 -- Whose capability list is it');
+
+const otherOwner = `capother${Date.now() % 1000000}`;
+let otherOwnerToken = '';
+
+await test('5. Register a second owner', async () => {
+    const { status, body } = await json('/v1/owners', {
+        method: 'POST', body: JSON.stringify({ name: otherOwner, public_key: 'placeholder' }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    otherOwnerToken = await getToken(otherOwner, body.data.private_key, false);
+});
+
+await test('6. A second owner cannot declare capabilities for this agent', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/capabilities`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${otherOwnerToken}` },
+        body: JSON.stringify({ capabilities: [{ id: 'planted', description: 'never offered' }] }),
+    });
+    // 404 and not 403: the agent is resolved by NAME under the caller's own owner, so somebody
+    // else's agent is not there. Pinned to the one status, because a drift to 403 would tell a
+    // stranger that an agent by that name exists on this node.
+    assert(status === 404, `expected 404, got ${status}: ${JSON.stringify(body)}`);
+});
+
+await test('7. An unauthenticated caller cannot declare them either', async () => {
+    const { status } = await json(`/v1/agents/${agentName}/capabilities`, {
+        method: 'PUT', body: JSON.stringify({ capabilities: [] }),
+    });
+    assert(status === 401, `expected 401, got ${status}`);
+});
+
+await test('8. POSITIVE CONTROL: the list is the owner\'s own, and nothing was planted', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/capabilities`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `owner read ${status}`);
+    assert(!JSON.stringify(body.data).includes('planted'),
+        `a refused write landed anyway: ${JSON.stringify(body.data).slice(0, 200)}`);
+});
+
+await test('9. Cascade-delete the second owner', async () => {
+    const { status } = await json(`/v1/owners/${encodeURIComponent(otherOwner)}`, {
+        method: 'DELETE', headers: { Authorization: `Bearer ${otherOwnerToken}` },
+    });
+    assert(status === 200, `status ${status}`);
+});
 
 await test('Cascade-delete owner', async () => {
     const { status, body } = await json(`/v1/owners/${encodeURIComponent(ownerName)}`, {

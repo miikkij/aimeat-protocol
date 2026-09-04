@@ -1,10 +1,6 @@
 {
   "note": "Registered E2E suites with no assertion about a 401 or 403. Seeded from the state on 2026-08-15 so the gate can only ratchet down. The `sha` pins the reason to the file it was written about: EDIT THE SUITE AND ITS EXEMPTION EXPIRES, because the person editing it is the one person who has the context to add the missing case. Re-stamping the sha without adding a denial is available and is a decision someone has to write down.",
   "exempt": {
-    "test/e2e-agent-capabilities.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "0db93e273c4c88a8"
-    },
     "test/e2e-oauth-login.ts": {
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
       "sha": "0b3718a6714b3ae4"
@@ -32,10 +28,6 @@
     "test/e2e-iam-extension.ts": {
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
       "sha": "4d37d4f8f13b0d78"
-    },
-    "test/e2e-agent-reapproval.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "f3130c42b0cdd0aa"
     },
     "test/e2e-registration-invites.ts": {
       "reason": "REVIEWED 2026-09-04. This surface has no refusal to test, and that is the design rather than an omission. The suite guards ONE route, POST /v1/registration-invites, which is open by necessity: an AI calls it with a person's email before that person has any account, so there is no principal to refuse. Its whole security property is the OPPOSITE of a refusal — the response must be byte-identical whether the address is new, already has an account, or already has a live invitation, because any difference turns it into an address-checking machine. The suite asserts exactly that in three tests, plus the per-address cap and single-use expiry that bound the abuse a 403 cannot. There is no second route on this router: no listing, no read, nothing an owner could reach across. A 401 or 403 added here would have to be invented.",
@@ -70,23 +62,19 @@
       "sha": "cbfc438922d7864c"
     },
     "test/e2e-audio-speech.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "reason": "REVIEWED 2026-09-04. The whole surface is GET /v1/libs/aimeat-audio.js, /aimeat-speech.js and the /v1/libs index — served browser libraries, and serving them to anybody is the requirement rather than an oversight: an app running in a visitor's browser loads them by URL before that visitor has any account, and routes/libs.ts registers them with no auth middleware for exactly that reason. A 401 here would break every published app. What COULD go wrong on this surface is the file being stale or wrong, which check:sdk and check:vendored already gate, not who may read it.",
       "sha": "f7c0ce1ae8df2766"
     },
     "test/e2e-message-transcript.ts": {
       "reason": "REVIEWED 2026-08-16 (E2E test-quality audit, finding e2e-message-transcript:145). This surface refuses with 404, not 403, and that is deliberate: the transcribe route looks the message up as storage.getDirectMessage(id, ownerGhii), so a caller who is not a party to the message is told the message does not exist rather than that it exists and is not theirs. The suite now drives that refusal with a THIRD owner, on the plain and the force:true paths, and reads the sender's copy back afterwards to show nothing was written; the recipient reaching their OWN copy is the positive control. There is no 401 or 403 on this route to assert.",
       "sha": "fb430ca2ff090d70"
     },
-    "test/e2e-interactive-messages.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "2329b525c19e5057"
-    },
     "test/e2e-members.ts": {
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
       "sha": "f3bc7fae3449b261"
     },
     "test/e2e-attachment-sweep.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "reason": "REVIEWED 2026-09-04. There is no door here to refuse. This suite is IN-PROCESS: it imports createServer, loadConfig and sweepReferenceAttachments directly and calls the sweep function, and it makes zero fetch() calls (measured: 0). What it tests is a background job deciding whether an attachment reference is retried or expired, which has no caller and therefore no principal to refuse. The HTTP doors that create those attachments live in the DM suites and carry their refusals there. If this ever grows an HTTP call, the sha pin expires with it.",
       "sha": "3026905962578080"
     },
     "test/e2e-agent-connect-email.ts": {
