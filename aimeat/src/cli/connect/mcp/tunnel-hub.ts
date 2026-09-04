@@ -22,6 +22,9 @@
  * @structure TunnelHub — hubFor() · ownerOf() · isShared() · sockets()
  * @usage const hub = await hubs.hubFor(entry, identity);
  * @version-history
+ *   v1.1.0 — 2026-09-05 — The hub client is built with the opener's own `gaii`, so a frame for an
+ *     identity it has since evicted is dropped rather than landing on these handlers by default —
+ *     which is how one owner's task reached another owner's queue.
  *   v1.0.0 — 2026-09-03 — Initial, extracted from local-server.ts (wish-tunnel-one-socket-many-agents).
  */
 import { ConnectTunnelClient, type TunnelIdentity } from '../tunnel-client.js';
@@ -81,6 +84,10 @@ export class TunnelHub {
 
     const hub = new ConnectTunnelClient({
       nodeUrl: url,
+      // The opener's own identity, so the client can tell a frame for itself from a frame for an
+      // identity it has since evicted. Without this the two were the same miss on the same map and
+      // both landed on these handlers — one owner's task in another owner's queue.
+      gaii: entry.gaii,
       getToken: handlers.getToken,
       label: `tunnel:${url}`,
       onDeliver: handlers.onDeliver,

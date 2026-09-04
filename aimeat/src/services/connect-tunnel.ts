@@ -25,6 +25,13 @@
  *   mgr.startHeartbeatMonitor();
  *   mgr.handleConnection(ws, verifiedToken, rawToken);
  * @version-history
+ *   v2.1.0 -- 2026-09-05 -- One heartbeat refreshes EVERY identity on its socket. The connector
+ *     sends one unstamped heartbeat per connection, which resolved to the opener alone; every
+ *     attached identity kept its attach-time timestamp, aged past the threshold, and the monitor
+ *     closed the SHARED ws for it. A multi-identity socket was torn down one threshold after its
+ *     first attach, every time, and each reconnect re-attached the fleet -- one mint per identity in
+ *     a burst against a per-minute budget. Liveness is the socket's; now it is recorded on everyone
+ *     riding it. Found by an adversarial review the day the mint refusal was fixed on the client.
  *   v2.0.0 -- 2026-09-03 -- ONE SOCKET, MANY IDENTITIES. A connector held one socket per agent:
  *     38 TCP connections to one node from one machine, growing with the number of AGENTS rather
  *     than of nodes. `connections` is still keyed by principal, so every lookup here is unchanged;
@@ -446,7 +453,21 @@ export class ConnectTunnelManager {
 
     switch (frame.type) {
       case 'heartbeat': {
-        conn.lastHeartbeat = Date.now();
+        // ONE HEARTBEAT PER SOCKET REFRESHES EVERY IDENTITY ON IT. The client sends a single
+        // heartbeat per connection, unstamped, so it resolves to the socket's opener — and until
+        // 2026-09-05 only the opener's `lastHeartbeat` moved. Every ATTACHED identity kept the
+        // timestamp from its attach, aged past `offlineThreshold`, and the monitor below judged it
+        // silent and closed its ws — which is the SHARED ws. So a socket carrying two or more
+        // identities was torn down about `offlineThreshold` after the first attach, every time,
+        // and every reconnect re-attached the whole fleet, which is one mint per identity in a
+        // burst against a per-minute budget. Two defects fixed the same day compounding into one
+        // outage. Liveness is a property of the socket; this records it on everyone riding it.
+        const now = Date.now();
+        for (const p of this.sockets.principalsOn(conn.socketId)) {
+          const rider = this.connections.get(p);
+          if (rider && rider.socketId === conn.socketId) rider.lastHeartbeat = now;
+        }
+        conn.lastHeartbeat = now;
         this.sendTo(conn, { type: 'heartbeat_ack', id: frame.id, timestamp: new Date().toISOString() });
         break;
       }
