@@ -79,7 +79,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, ScheduledJobRecord } from '../storage/interface.js';
 import type { Scheduler } from '../services/scheduler.js';
 import { success, error } from '../middleware/envelope.js';
-import { requireAuth } from '../auth/middleware.js';
+import { requireAuth, requireScope } from '../auth/middleware.js';
 import { buildGAII, resolveIdentity } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { createScheduleRecord, updateScheduleRecord, deleteScheduleRecord, triggerScheduleRecord } from '../services/schedule-write.js';
@@ -173,7 +173,7 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
   }
 
   // ── GET /v1/schedules — master aggregate ──
-  router.get('/v1/schedules', requireAuth(), async (req, res) => {
+  router.get('/v1/schedules', requireAuth(), requireScope('workflow:read'), async (req, res) => {
     try {
       const { schedules } = await aggregateSchedules(ownerGhii(req), req.auth!.owner as string);
       res.json(success(config.nodeId, schedules));
@@ -187,7 +187,7 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
   // agent list (names, for the create-schedule dropdown). Folds GET /v1/schedules + GET /v1/agents,
   // resolving the owner's agents once. The calendar's occurrence projection stays a separate request (it
   // is range-driven — re-fetched as the user navigates day/week/month).
-  router.get('/v1/scheduler/tab', requireAuth(), async (req, res) => {
+  router.get('/v1/scheduler/tab', requireAuth(), requireScope('workflow:read'), async (req, res) => {
     try {
       const { schedules, agents } = await aggregateSchedules(ownerGhii(req), req.auth!.owner as string);
       res.json(success(config.nodeId, {
@@ -216,7 +216,7 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
   // cron-bearing jobs the owner can see (managed + owner-installed extension
   // crons) are projected; the '@activate' sentinel has no recurring pattern and
   // is skipped. Must be registered BEFORE '/v1/schedules/:id' (static-before-param).
-  router.get('/v1/schedules/occurrences', requireAuth(), async (req, res) => {
+  router.get('/v1/schedules/occurrences', requireAuth(), requireScope('workflow:read'), async (req, res) => {
     try {
       const owner = ownerGhii(req);
       const ownerName = req.auth!.owner as string;
@@ -316,7 +316,7 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
   });
 
   // ── GET /v1/schedules/:id — detail + recent runs ──
-  router.get('/v1/schedules/:id', requireAuth(), async (req, res) => {
+  router.get('/v1/schedules/:id', requireAuth(), requireScope('workflow:read'), async (req, res) => {
     const id = req.params.id as string;
     const job = await storage.getScheduledJob(id);
     if (!job || job.ownerScope !== ownerGhii(req)) {
@@ -362,7 +362,7 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
   });
 
   // ── GET /v1/agents/:name/schedules — per-agent view ──
-  router.get('/v1/agents/:name/schedules', requireAuth(), async (req, res) => {
+  router.get('/v1/agents/:name/schedules', requireAuth(), requireScope('workflow:read'), async (req, res) => {
     try {
       const agentName = req.params.name as string;
       const agentGaii = buildGAII(agentName, req.auth!.owner as string, config.nodeId);

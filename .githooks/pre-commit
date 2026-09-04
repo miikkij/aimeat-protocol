@@ -36,9 +36,12 @@
 #  19b. Caller resolved, not sub raw  — pnpm check:identity-resolution
 #  19c. A refusal names a principal   — pnpm check:owner-principal
 #  19d. Federation writes are signed  — pnpm check:federation-signatures
+#  19d2. Open write doors accounted  — pnpm check:open-writes
 #  19e. No new cycle or inversion    — pnpm check:deps
 #  20. An agent writes, page hears it — pnpm check:sse-parity
 #  21. No decision written out twice  — pnpm check:copied-logic
+#  21b. Stated counts match the code  — pnpm check:doc-counts
+#  21c. One word, every door          — pnpm check:scope-parity
 #  22. Published surfaces + release   — pnpm check:liaison-surface
 #  23. The vitest unit suite          — pnpm test
 #
@@ -198,6 +201,14 @@ pnpm -s check:owner-principal
 echo "[pre-commit] Federation write doors are owner-gated or peer-signed (check:federation-signatures)…"
 pnpm -s check:federation-signatures
 
+# The other half of the same population: forty doors that write and take no credential at the chain.
+# None is a hole — every one is gated inside its handler by something a middleware scanner cannot see
+# (an OAuth code plus PKCE verifier, a device_code, a pre-signed token, the admin password, an IP
+# check that closes the moment one owner exists), and the triage that says so read all forty. The gate
+# is for the forty-first, which would look exactly like them.
+echo "[pre-commit] Every credential-free write door is accounted for (check:open-writes)…"
+pnpm -s check:open-writes
+
 # dependency-cruiser, bought rather than built: layer direction across the whole tree, import cycles
 # and modules nothing reaches — the last two of which nothing here has ever checked. Its baseline
 # (.dependency-cruiser-known-violations.json) holds the 335 that existed on 2026-09-04, so this gate
@@ -211,6 +222,17 @@ pnpm -s check:sse-parity
 
 echo "[pre-commit] No decision is written out on two sides (check:copied-logic)…"
 pnpm -s check:copied-logic
+
+echo "[pre-commit] The counts this project states about itself (check:doc-counts)…"
+pnpm -s check:doc-counts -- --strict
+
+# A permission word the owner is OFFERED and nothing asks for changes nothing when it is ticked; a
+# word a DOOR demands and the screen never offers cannot be granted by anybody, so the door is shut
+# to every principal that has to be given permission — and from outside that is indistinguishable
+# from closed by design. `aimeat_seo_status` sat in the second state, invisible to every agent on
+# every node, from the day it was added until the day this gate was written.
+echo "[pre-commit] One permission word, every door (check:scope-parity)…"
+pnpm -s check:scope-parity
 
 echo "[pre-commit] Published surfaces match, and neither needs a release (check:liaison-surface)…"
 pnpm -s check:liaison-surface

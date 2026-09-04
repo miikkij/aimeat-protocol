@@ -195,7 +195,12 @@ export const TOOL_SCOPES: Record<string, string> = {
     // app:write, not app:read: the route behind every door is gated on the one app scope the
     // owner's checkboxes carry, and an agent that may manage an app may read its log.
     aimeat_app_audit:                         'app:write',
-    aimeat_seo_status:                        'app:read',
+    // The line above states the rule and this line broke it until 2026-09-04. `app:read` is not a
+    // word the owner is offered — the app domain carries write and manage — so no owner could grant
+    // it, and the surface is filtered by the words the owner ticked: aimeat_seo_status was invisible
+    // to every agent on every node since it was added. Found by check:scope-parity, which asks the
+    // vocabulary and the demands whether they are the same list.
+    aimeat_seo_status:                        'app:write',
     aimeat_image_generate:                    'ai:use',
     aimeat_app_fork:                          'app:write',
     aimeat_app_publish:                       'app:write',

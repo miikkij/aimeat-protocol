@@ -456,9 +456,27 @@ await test('SHELL: /local/call/aimeat_memory_write honours a declaration too', a
 // ─── 7. The scope gate is not bypassed by going through the connector ───
 console.log('\nPhase 7 — MCP is not a way around the REST scope gate');
 
+// The mute agent needs its OWN MCP session. A connector MCP session is scoped to one identity,
+// chosen at connect time from the X-Aimeat-Agent header and defaulting to the primary — the session
+// registry holds exactly that one agent "so `resolve()` inside every tool module has exactly one
+// answer and cannot refuse" (mcp/local-server.ts). So `agent_name` selects nothing across identities
+// any more, and these two tests had been asking the provbot session for mutebot and being told,
+// correctly, that mutebot is not loaded in it. The daemon had both all along; its own log says
+// "2 agent(s)".
+let muteMcp: Client | undefined;
+
+await test('a second MCP session binds to the OTHER identity through X-Aimeat-Agent', async () => {
+  muteMcp = new Client({ name: 'prov-connector-e2e-mute', version: '1.0.0' });
+  await muteMcp.connect(new StreamableHTTPClientTransport(new URL(`${loopbackBase}/v1/mcp`), {
+    requestInit: { headers: { 'X-Aimeat-Agent': mute } },
+  }));
+  const tools = await muteMcp.listTools();
+  assert(tools.tools.some(t => t.name === 'aimeat_memory_write'),
+    'the mute session serves the same tool surface');
+});
+
 await test('CROSS-SCOPE → refused: an agent without provenance:write cannot declare through the connector', async () => {
-  const r = await mcpCall(mcp!, 'aimeat_memory_write', {
-    agent_name: mute,
+  const r = await mcpCall(muteMcp!, 'aimeat_memory_write', {
     key: 'crew.unscoped.declaration',
     value: { x: 3 },
     ai_provenance: { level: 'original', human_involvement: 'full-human' },
@@ -469,14 +487,25 @@ await test('CROSS-SCOPE → refused: an agent without provenance:write cannot de
 
 await test('The same agent can still WRITE — only the declaration is gated', async () => {
   const key = 'crew.unscoped.plain';
-  const r = await mcpCall(mcp!, 'aimeat_memory_write', { agent_name: mute, key, value: { x: 4 } });
+  const r = await mcpCall(muteMcp!, 'aimeat_memory_write', { key, value: { x: 4 } });
   assert(!r.isError, `an undeclared write was refused: ${r.raw.slice(0, 400)}`);
   const { record } = await storedProvenanceFor(muteToken, key);
   assert(record?.level === 'ai-generated' && record?.humanInvolvement === 'none',
     `the node's own stamp is missing or wrong: ${JSON.stringify(record)}`);
 });
 
+// A refusal from the connector that names an agent as "not loaded" is only readable next to what the
+// daemon said while loading it. serve.json's agent list is written straight from the registry, so a
+// suite that passes "both agents register" and then cannot address one of them has lost an entry
+// somewhere in between — and the answer is in the daemon's own log, which was being buffered and
+// thrown away on every failure but the discovery one.
+if (failed > 0 && daemon) {
+  console.log('\n--- daemon output (last 40 lines) ---');
+  console.log(daemon.output().split('\n').slice(-40).join('\n'));
+}
+
 // ─── Teardown ───
+if (muteMcp) { try { await muteMcp.close(); } catch { /* closing */ } }
 if (mcp) { try { await mcp.close(); } catch { /* closing */ } }
 if (daemon) {
   daemon.child.kill('SIGTERM');

@@ -8,6 +8,11 @@
  *   (AIMEAT_ORGANISM_DECISION_LOG_CAP, set to 20 in the test env) bounds the log: after many publishes the
  *   decision count stays at/below the cap, and the newest decision always survives the prune.
  * @version-history
+ *   v1.1.0 — 2026-09-04 — Who else reads the log. The cap above is about size; a gate decision names
+ *     the record, the namespace and the caller, so the log is a record of who did what inside this
+ *     organism — under a memory prefix a stranger can build from the organism id, which is public.
+ *     Nothing had checked that guessing it is not enough. One of the 34 seeded into
+ *     security/denial-coverage-exemptions.json on 2026-08-15 (quality plan stream B).
  *   v1.0.0 — 2026-07-16 — Initial: decision-log cap (prune oldest, keep newest).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-organism-decision-cap
@@ -111,6 +116,37 @@ await test('Newest decision survives the prune (recent audit preserved)', async 
     const newest = (list.body.data.items as any[]).reduce((a, b) => (a && a.updated_at > b.updated_at ? a : b), null);
     assert(!!newest, 'has a newest decision');
     assert(Date.now() - new Date(newest.updated_at).getTime() < 60_000, `newest decision is recent, got ${newest.updated_at}`);
+});
+
+// ── Who else reads the decision log ──
+//
+// The cap above is about size; this is about the audience. A gate decision names the record, the
+// namespace and the caller who published it, so the log is a record of who did what inside this
+// organism — and it lives in the owner's memory namespace under a prefix a stranger can guess from
+// the organism id alone, which is public. Nothing had checked that guessing it is not enough.
+
+await test('A stranger cannot read the decision log, and gets their own empty namespace instead', async () => {
+    const B = await setupOwner('stranger');
+    const r = await json(`/v1/memory?owner_scope=true&prefix=${encodeURIComponent(decisionsPrefix())}`, {
+        headers: { Authorization: `Bearer ${B.token}` },
+    });
+    // /v1/memory resolves the CALLER's identity and lists under it, so the honest answer to a
+    // stranger asking for this prefix is an empty list rather than a 403: they are being shown
+    // their own namespace, which has nothing at that prefix.
+    assert(r.status === 200, `stranger list ${r.status}`);
+    assert((r.body.data.total as number) === 0,
+        `stranger sees ${r.body.data.total} of the organism's gate decisions`);
+});
+
+await test('An unauthenticated caller cannot read memory at all', async () => {
+    const r = await json(`/v1/memory?owner_scope=true&prefix=${encodeURIComponent(decisionsPrefix())}`);
+    assert(r.status === 401, `expected 401, got ${r.status}`);
+});
+
+await test('POSITIVE CONTROL: the owner still reads their own decision log', async () => {
+    const r = await json(`/v1/memory?owner_scope=true&prefix=${encodeURIComponent(decisionsPrefix())}`, { headers: auth() });
+    assert(r.status === 200, `owner list ${r.status}`);
+    assert((r.body.data.total as number) > 0, 'the owner sees their own decisions');
 });
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed out of ${passed + failed} ===`);

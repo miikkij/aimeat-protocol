@@ -5,6 +5,11 @@
 // an agent asks a person a set of option questions (aimeat_dm_ask / POST /v1/messages role=questions),
 // the spec survives storage + the first-contact gate, the person replies with role=answers, the agent
 // reads the machine-readable picks back via its thread, and malformed specs / orphan answers are rejected.
+//
+// A third party is then added (2026-09-04): an answer here is a person's considered reply to a
+// structured question, the picks an agent will act on, so a stranger must neither read Bob's thread
+// nor accept the first-contact request on his behalf. One of the 34 seeded into
+// security/denial-coverage-exemptions.json on 2026-08-15 (quality plan stream B).
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -239,6 +244,63 @@ await test('8. Owner can ask its OWN agent a question (own-agent path, no gate)'
     const inbox = await json('/v1/messages/agent-inbox', { headers: { Authorization: `Bearer ${myAgent.token}` } });
     const m = inbox.body.data.messages.find((x: any) => x.interactive?.role === 'questions');
     assert(m !== undefined, 'the agent receives the interactive question from its owner');
+});
+
+// ── Who may read the answers, and who may give them ──
+//
+// The suite already has two owners, and every case above is Alice's agent asking and Bob answering,
+// which is the flow working. The question it never asks is what a THIRD person gets. An answer here
+// is a person's considered reply to a structured question — the picks an agent will act on — so two
+// things must hold: a stranger cannot read Bob's thread, and a stranger cannot answer as Bob.
+console.log('\nA third party — neither the asker nor the person asked');
+
+let mallory: { token: string; ghii: string };
+
+await test('9. Register a third owner with no part in the conversation', async () => {
+    mallory = await registerOwner(`iqmallory${stamp}`);
+    assert(mallory.ghii.length > 0, 'third owner exists');
+});
+
+await test('10. A stranger\'s inbox does not carry the question or the answers', async () => {
+    const inbox = await json('/v1/messages/inbox', { headers: { Authorization: `Bearer ${mallory.token}` } });
+    assert(inbox.status === 200, `inbox ${inbox.status}`);
+    const msgs = (inbox.body.data?.messages ?? []) as any[];
+    assert(!msgs.some(m => m.id === questionId), 'the stranger sees the question');
+    assert(!JSON.stringify(msgs).includes('answersFor'), 'the stranger sees an answers payload');
+});
+
+await test('11. A stranger cannot accept the first-contact request on Bob\'s behalf', async () => {
+    const r = await json(`/v1/messages/requests/${encodeURIComponent(askbot.gaii)}/accept`, {
+        method: 'POST', headers: { Authorization: `Bearer ${mallory.token}` },
+    });
+    // 404 and not 403: the pending request is looked up under the caller's own identity, so one
+    // addressed to Bob is not there for anybody else. Pinned, because a drift to 403 would confirm
+    // that askbot has asked this person something.
+    assert(r.status === 404, `expected 404, got ${r.status}: ${JSON.stringify(r.body)}`);
+});
+
+await test('12. An unauthenticated caller cannot ask a question at all', async () => {
+    // The one door on this surface that answers with a status rather than an empty result: POST
+    // /v1/messages carries requireAuth, so a question with no credential never reaches the
+    // interactive validation. Without this, an anonymous sender could put a structured prompt in
+    // front of a person and collect their picks.
+    const r = await json('/v1/messages', {
+        method: 'POST',
+        body: JSON.stringify({
+            to: bob.ghii, body: 'anonymous question',
+            interactive: { role: 'questions', v: 1, questions: QUESTIONS, submitLabel: 'Send' },
+        }),
+    });
+    assert(r.status === 401, `expected 401, got ${r.status}: ${JSON.stringify(r.body)}`);
+});
+
+await test('13. POSITIVE CONTROL: Bob still reads his own question and its answers', async () => {
+    // Two refusals in a row pass just as happily against a thread that had become unreadable to
+    // everyone, which for a question-and-answer flow would be the failure rather than the fix.
+    const inbox = await json('/v1/messages/inbox', { headers: { Authorization: `Bearer ${bob.token}` } });
+    assert(inbox.status === 200, `bob inbox ${inbox.status}`);
+    assert((inbox.body.data?.messages ?? []).some((m: any) => m.id === questionId),
+        'Bob can no longer see the question he was asked');
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total\n`);

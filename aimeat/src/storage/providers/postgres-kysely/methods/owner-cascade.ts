@@ -30,6 +30,10 @@
  *   - deleteOwnerCascade(db, name) — agents + GHIIs through the cascade, then the owner-level tables
  * @usage Called by identityMethods.deleteOwner inside one db.transaction().
  * @version-history
+ *   v1.1.0 — 2026-09-04 — Seven tables join the cascade: MemoryVersion, OwnerAgentDefault,
+ *     GroupShare, AgentUsageEvent, AgentUsageEventArchive, AgentUsageDaily and (owner-level) EcoAuth.
+ *     All seven had sat in security/storage-parity-exemptions.json since 2026-08-10 as "decide", and
+ *     each is now asserted row-by-row by test/unit/storage-conformance.test.ts on both providers.
  *   v1.0.0 — 2026-08-11 — Initial: Postgres reaches parity with the SQLite cascade, and the whole
  *     delete runs in one transaction (GAP-001's first half).
  */
@@ -56,6 +60,12 @@ export async function cascadeDeleteIdentityData(db: Db, gaii: string): Promise<v
   // pseudonymised instead, by pseudonymiseTallyWriter, called from deleteOwner.
   await db.deleteFrom('MemoryWriteTally').where('ownerGaii', '=', gaii).execute();
   await db.deleteFrom('MemoryFamilyTally').where('ownerGaii', '=', gaii).execute();
+
+  // The archived prior versions of a trackable key. The live row goes above; without this line the
+  // value the person last overwrote outlives the value they last wrote, which is the wrong way round.
+  // SQLite calls this table memory_history, which is why the parity gate needed a name mapping
+  // before it could see either side of it.
+  await db.deleteFrom('MemoryVersion').where('ownerGaii', '=', gaii).execute();
 
   // Actions offered by this identity
   await db.deleteFrom('Action').where('providerGaii', '=', gaii).execute();
@@ -123,7 +133,35 @@ export async function cascadeDeleteIdentityData(db: Db, gaii: string): Promise<v
   await db.deleteFrom('WebhookDeliveryLog').where('agentGaii', '=', gaii).execute();
   await db.deleteFrom('AgentOnboarding').where('agentGaii', '=', gaii).execute();
 
-  // Sharing groups
+  // The agent rules and budget this identity set for itself.
+  await db.deleteFrom('OwnerAgentDefault').where('ownerGaii', '=', gaii).execute();
+
+  // AI usage: the raw events, their archive, and the daily rollup. Two owner columns, and the
+  // cascade walks each identity once, so one clause with the same value catches the agent pass and
+  // the GHII pass alike. `consumerGhii` is deliberately NOT matched: on a row where somebody else
+  // consumed this owner's capability it names the OTHER party, and clearing by it would delete a
+  // counterparty's record of what they spent — the same reasoning that pseudonymises the write tally
+  // instead of deleting it.
+  //
+  // Written out three times rather than looped over the names. A loop reads as one idea, but
+  // scripts/check-storage-parity.ts greps these files for `deleteFrom('<Table>')` and a table name
+  // that only ever exists as a loop variable is invisible to it: the first draft of this block was a
+  // loop, the cascade was correct, and the gate reported all three tables as uncleared.
+  await db.deleteFrom('AgentUsageEvent')
+    .where(eb => eb.or([eb('agentGaii', '=', gaii), eb('ownerGhii', '=', gaii)])).execute();
+  await db.deleteFrom('AgentUsageEventArchive')
+    .where(eb => eb.or([eb('agentGaii', '=', gaii), eb('ownerGhii', '=', gaii)])).execute();
+  await db.deleteFrom('AgentUsageDaily')
+    .where(eb => eb.or([eb('agentGaii', '=', gaii), eb('ownerGhii', '=', gaii)])).execute();
+
+  // Sharing groups, and the key-space shares inside them. The shares go first and by two keys: by
+  // ownerGaii for this person's own shares, then by the id of each group being removed, because a
+  // share whose group is gone grants nothing and would sit there unreadable. GroupShare.groupId
+  // references SharingGroup.id, the surrogate, unlike the board and dispute relations above.
+  await db.deleteFrom('GroupShare').where('ownerGaii', '=', gaii).execute();
+  const groups = await db.selectFrom('SharingGroup').select('id').where('ownerGaii', '=', gaii).execute();
+  const groupIds = groups.map(g => g.id);
+  if (groupIds.length) await db.deleteFrom('GroupShare').where('groupId', 'in', groupIds).execute();
   await db.deleteFrom('SharingGroup').where('ownerGaii', '=', gaii).execute();
 }
 
@@ -171,6 +209,12 @@ export async function deleteOwnerCascade(db: Db, name: string): Promise<boolean>
   // Chat instances and pending email verifications
   await db.deleteFrom('ChatInstance').where('ownerName', '=', name).execute();
   await db.deleteFrom('EmailVerification').where('ownerName', '=', name).execute();
+
+  // Ecosystem-app device handshakes. Keyed on the bare owner name, like the push subscriptions
+  // above, because the handshake happens before the app has an identity of its own. A pending row is
+  // a live invitation to bind an app to this account, and the name is released for reuse, so leaving
+  // one hands the next registrant somebody else's handshake.
+  await db.deleteFrom('EcoAuth').where('ownerName', '=', name).execute();
 
   // Live sessions: a surviving refresh token for a deleted account is a live credential.
   await db.deleteFrom('Session').where('owner', '=', name).execute();

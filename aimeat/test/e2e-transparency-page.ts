@@ -22,6 +22,11 @@
  *   Accept negotiation on the JSON route · the openapi and namespace decisions
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=transparency-page
  * @version-history
+ *   v1.3.0 — 2026-09-04 — The private siblings. Everything here drives routes meant to answer
+ *     everybody, and the same router carries /mine and /logging-policy, which must not. A page
+ *     whose job is openness sitting beside two doors that must stay shut is where a requireAuth
+ *     gets dropped without anyone noticing, because the page next to it keeps working. One of the
+ *     34 seeded into security/denial-coverage-exemptions.json on 2026-08-15 (quality plan stream B).
  *   v1.2.0 — 2026-08-09 — The footer assertion follows the footer: the landing's `ld-footer` became
  *     the shell's SiteFooter in spa.html, and the transparency label moved from
  *     `landing.footTransparency` to `footer.transparency`. Same requirement, new address.
@@ -349,6 +354,27 @@ const FORBIDDEN: Array<[string, RegExp]> = [
         const shell = readFileSync(join(here, '..', 'public', 'spa.html'), 'utf-8');
         const footer = shell.slice(shell.indexOf('function SiteFooter'));
         assert(footer.includes('/v1/transparency'), 'the site footer has no transparency link');
+    });
+
+    // ── The public page is not a door to a private one ──
+    //
+    // Everything above drives the routes that are meant to answer everybody, which is the whole
+    // point of a transparency page. The same router carries two that are not: /mine is this
+    // person's own AI-usage record and /logging-policy is what the operator retains. A page whose
+    // job is openness sitting next to two doors that must stay shut is exactly where a `requireAuth`
+    // gets dropped and nobody notices, because the page it is next to keeps working.
+    await test('the private siblings of the public page refuse an unauthenticated caller', async () => {
+        for (const path of ['/v1/ai-transparency/mine', '/v1/ai-transparency/logging-policy']) {
+            const r = await fetchText(path);
+            assert(r.status === 401, `${path} answered ${r.status}, expected 401`);
+        }
+    });
+
+    await test('POSITIVE CONTROL: the public page still answers with no credential at all', async () => {
+        // Without this the refusals above would pass just as happily against a node that had started
+        // refusing everyone, which for a transparency page would be the opposite of the requirement.
+        const r = await fetchText('/v1/transparency');
+        assert(r.status === 200, `the public page answered ${r.status}`);
     });
 
     console.log(`\n  ${passed} passed, ${failed} failed`);

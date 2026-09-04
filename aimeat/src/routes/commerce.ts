@@ -301,7 +301,7 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
     return res.json(success(config.nodeId, { configured: false, note: 'Stablecoin sales now fail until an address is set again. Card/invoice settlement is unaffected.' }));
   });
 
-  router.post('/v1/commerce/checkout-sessions', requireAuth(), async (req, res) => {
+  router.post('/v1/commerce/checkout-sessions', requireAuth(), requireScope('commerce:buy'), async (req, res) => {
     const parsed = CreateSchema.safeParse(req.body);
     if (!parsed.success) { res.status(400).json(error(config.nodeId, 'INVALID_CHECKOUT', parsed.error.message)); return; }
     try {
@@ -320,7 +320,7 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // GET /v1/commerce/checkout-sessions — the buyer's sessions (purchases), newest first.
-  router.get('/v1/commerce/checkout-sessions', requireAuth(), async (req, res) => {
+  router.get('/v1/commerce/checkout-sessions', requireAuth(), requireScope('commerce:buy'), async (req, res) => {
     const buyerGhii = `${req.auth!.owner}@${config.nodeId}`;
     const limit = Math.min(200, Math.max(1, parseInt(String(req.query.limit ?? '50'), 10) || 50));
     const sessions = await listSessions(storage, buyerGhii, limit);
@@ -328,7 +328,7 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // GET /v1/commerce/orders — the seller's received orders (completed sessions), newest first.
-  router.get('/v1/commerce/orders', requireAuth(), async (req, res) => {
+  router.get('/v1/commerce/orders', requireAuth(), requireScope('wallet:read'), async (req, res) => {
     const sellerGhii = `${req.auth!.owner}@${config.nodeId}`;
     const limit = Math.min(200, Math.max(1, parseInt(String(req.query.limit ?? '50'), 10) || 50));
     const orders = await listOrders(storage, sellerGhii, limit);
@@ -336,7 +336,7 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // GET /v1/commerce/checkout-sessions/:id — buyer reads their session (lazy expiry applies).
-  router.get('/v1/commerce/checkout-sessions/:id', requireAuth(), async (req, res) => {
+  router.get('/v1/commerce/checkout-sessions/:id', requireAuth(), requireScope('commerce:buy'), async (req, res) => {
     try {
       const session = await loadOwnSession(req);
       res.json(success(config.nodeId, { session }));
@@ -344,7 +344,7 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // PATCH /v1/commerce/checkout-sessions/:id — replace the cart, or cancel.
-  router.patch('/v1/commerce/checkout-sessions/:id', requireAuth(), async (req, res) => {
+  router.patch('/v1/commerce/checkout-sessions/:id', requireAuth(), requireScope('commerce:buy'), async (req, res) => {
     const parsed = PatchSchema.safeParse(req.body);
     if (!parsed.success) { res.status(400).json(error(config.nodeId, 'INVALID_CHECKOUT', parsed.error.message)); return; }
     try {
@@ -394,7 +394,7 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // GET /v1/commerce/holds — the caller's holds: side=buyer (default) or side=seller (inbound).
-  router.get('/v1/commerce/holds', requireAuth(), async (req, res) => {
+  router.get('/v1/commerce/holds', requireAuth(), requireScope('wallet:read'), async (req, res) => {
     const side = String(req.query.side ?? 'buyer') === 'seller' ? 'seller' as const : 'buyer' as const;
     const limit = Math.min(200, Math.max(1, parseInt(String(req.query.limit ?? '50'), 10) || 50));
     const holds = await listHolds(storage, config, req.auth!.owner as string, side, limit);
@@ -402,7 +402,7 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // GET /v1/commerce/holds/:id — buyer or seller reads (lazy expiry applies; others get 404).
-  router.get('/v1/commerce/holds/:id', requireAuth(), async (req, res) => {
+  router.get('/v1/commerce/holds/:id', requireAuth(), requireScope('wallet:read'), async (req, res) => {
     try {
       const hold = await getHold(storage, config, req.auth!.owner as string, req.params.id as string);
       res.json(success(config.nodeId, { hold }));

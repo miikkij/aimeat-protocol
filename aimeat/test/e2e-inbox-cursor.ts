@@ -4,6 +4,13 @@
  *   Covers all cursor edge cases: no cursor, valid cursor with/without new events, malformed cursors,
  *   expired cursors, has_more with limit, and approximate cursor_status.
  * @version-history
+ *   v1.1.0 -- 2026-09-04 -- Test 7: whose inbox is it. Every poll before it carried this agent's own
+ *     token against its own inbox, which proves the cursor arithmetic and says nothing about the
+ *     address — and the inbox is named in the URL, so the question is what happens when the name in
+ *     the path is not the name in the token. Asked with a cursor as well as without: a paginated
+ *     read is where an ownership check gets written on the first branch and missed on the resumed
+ *     one. One of the 34 seeded into security/denial-coverage-exemptions.json on 2026-08-15
+ *     (quality plan stream B).
  *   v1.0.0 -- 2026-05-23 -- Initial creation covering all cursor edge cases
  */
 
@@ -369,6 +376,79 @@ await test('10. Walk through all items one at a time using cursors', async () =>
 
     assert(collected.length >= 2, `collected ${collected.length} items, expected >=2`);
     assert(iterations < maxIterations, 'pagination should terminate');
+});
+
+// ─── Test 6: Whose inbox is it ───
+//
+// Every poll above carries this agent's own token against this agent's own inbox, which proves the
+// cursor arithmetic and says nothing about the address. An inbox is named in the URL — /v1/agents/
+// <name>/inbox — so the question the cursor tests never ask is what happens when the name in the
+// path is not the name in the token.
+console.log('\nTest 7 -- Whose inbox is it');
+
+const otherOwner = `inboxother${Date.now() % 1000000}`;
+const otherAgentName = `otherbot${Date.now() % 1000000}`;
+let otherAgentToken = '';
+let otherOwnerToken = '';
+
+await test('7a. Register a second owner with an agent of their own', async () => {
+    const reg = await json('/v1/owners', {
+        method: 'POST', body: JSON.stringify({ name: otherOwner, public_key: 'placeholder' }),
+    });
+    assert(reg.status === 201, `owner ${reg.status}: ${JSON.stringify(reg.body)}`);
+    otherOwnerToken = await getToken(otherOwner, reg.body.data.private_key, false);
+    const ag = await json('/v1/agents', {
+        method: 'POST', headers: { Authorization: `Bearer ${otherOwnerToken}` },
+        body: JSON.stringify({ name: otherAgentName, owner: otherOwner, capabilities: ['memory'] }),
+    });
+    assert(ag.status === 201, `agent ${ag.status}: ${JSON.stringify(ag.body)}`);
+    otherAgentToken = await getToken(ag.body.data.agent.gaii, ag.body.data.private_key, true);
+});
+
+await test('7b. Another owner\'s agent cannot poll this inbox', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/inbox`, {
+        headers: { Authorization: `Bearer ${otherAgentToken}` },
+    });
+    // 403, and it is a deliberate 403: the body reads "This agent belongs to someone else, so it
+    // cannot be used from here", which is written for a person and tells them what to do instead.
+    // That trade is made knowingly — the answer confirms the name exists, and in exchange the
+    // person is not left guessing.
+    //
+    // WORTH KNOWING, because it surprised this test: the sibling door one path segment away,
+    // /v1/agents/:name/telemetry, answers 404 for the same cross-owner call (e2e-agent-telemetry
+    // test 9). Two doors addressed by agent name, two different answers about whether the name's
+    // existence is a secret. Neither is a hole and the pair is not consistent; both are now pinned,
+    // so whichever way that is resolved, a test says so.
+    assert(status === 403, `expected 403, got ${status}: ${JSON.stringify(body)}`);
+});
+
+await test('7c. Another owner\'s agent cannot poll it with a cursor either', async () => {
+    // A cursor is a resume token, and a door that checks the caller on the first page and not on a
+    // resumed one is a real shape — the paginated read is where an ownership check tends to be
+    // written once and then skipped on the branch that has a cursor.
+    const { status } = await json(`/v1/agents/${agentName}/inbox?cursor=0`, {
+        headers: { Authorization: `Bearer ${otherAgentToken}` },
+    });
+    assert(status === 403, `expected 403, got ${status}`);
+});
+
+await test('7d. An unauthenticated caller cannot poll it', async () => {
+    const { status } = await json(`/v1/agents/${agentName}/inbox`);
+    assert(status === 401, `expected 401, got ${status}`);
+});
+
+await test('7e. POSITIVE CONTROL: the agent still polls its own inbox', async () => {
+    const { status } = await json(`/v1/agents/${agentName}/inbox`, {
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(status === 200, `own inbox ${status}`);
+});
+
+await test('7f. Cascade-delete the second owner', async () => {
+    const { status } = await json(`/v1/owners/${encodeURIComponent(otherOwner)}`, {
+        method: 'DELETE', headers: { Authorization: `Bearer ${otherOwnerToken}` },
+    });
+    assert(status === 200, `status ${status}`);
 });
 
 // ─── Cleanup ───

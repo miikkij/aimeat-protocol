@@ -32,90 +32,19 @@ import ts from 'typescript';
 import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { collectRestRoutes, collectMcpTools, collectCliDispatch, guardArraysIn, type EntryPoint } from './entries.js';
-import { principalsFor, isPublic, type Principal } from './principals.js';
+import { collectDoors, toRows, type Row } from './doors.js';
 import { scopeMentions } from './scope-mentions.js';
+import { readVocabulary } from './scope-vocabulary.js';
 import { srcProgram } from './program.js';
 import { TOOL_SCOPES } from '../../src/mcp/catalog/scopes.js';
 
-/**
- * The words the OWNER can grant, read from the screen they are granted on.
- *
- * That source and not a server-side constant on purpose: a permission the owner is OFFERED and
- * nothing asks for is the defect this section exists to find, and only the owner-facing list shows
- * the offer. Parsed rather than imported, like everything else here — the module is browser JS with
- * no declarations, and importing it would buy an `any` and a typecheck exception for nothing.
- */
-function readVocabulary(): Set<string> {
-    const file = join(AIMEAT, 'public', 'views', 'profile', 'agents', 'scope-model.js');
-    const source = ts.createSourceFile(file, readFileSync(file, 'utf-8'), ts.ScriptTarget.ESNext, true);
-    const words = new Set<string>();
-
-    const visit = (node: ts.Node): void => {
-        if (ts.isObjectLiteralExpression(node)) {
-            const prop = (name: string): ts.Expression | undefined => node.properties
-                .find((p): p is ts.PropertyAssignment =>
-                    ts.isPropertyAssignment(p) && ts.isIdentifier(p.name) && p.name.text === name)?.initializer;
-            const key = prop('key');
-            const permissions = prop('permissions');
-            if (key && ts.isStringLiteral(key) && permissions && ts.isArrayLiteralExpression(permissions)) {
-                for (const p of permissions.elements) {
-                    if (ts.isStringLiteral(p)) words.add(`${key.text}:${p.text}`);
-                }
-            }
-        }
-        ts.forEachChild(node, visit);
-    };
-    visit(source);
-    return words;
-}
+// readVocabulary moved to ./scope-vocabulary.ts by pure extraction on 2026-09-04: check:scope-parity
+// needs the identical answer, and a second copy would drift the day one of them learned a new shape.
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const AIMEAT = resolve(HERE, '..', '..');
 const REPO = resolve(AIMEAT, '..');
 const OUT_DIR = join(REPO, 'secaudit');
-
-interface Row extends EntryPoint {
-    principals: Principal[];
-    unknownGuards: string[];
-    scopes: string[];
-    public: boolean;
-}
-
-function collect(files: ts.SourceFile[]): EntryPoint[] {
-    const out: EntryPoint[] = [];
-
-    // Guard arrays first, from every file, because a chain declared in one module is spread in
-    // another. Per-file resolution reports those rows as ungated, and wrong-in-the-permissive-
-    // direction is the one kind of wrong an inventory must not be.
-    const arrays = new Map<string, ReturnType<typeof guardArraysIn> extends Map<string, infer V> ? V : never>();
-    for (const source of files) for (const [name, guards] of guardArraysIn(source)) arrays.set(name, guards);
-
-    for (const source of files) {
-        const path = source.fileName;
-        if (path.includes('/src/routes/')) out.push(...collectRestRoutes(source, AIMEAT, arrays));
-        if (path.includes('/src/mcp/')) out.push(...collectMcpTools(source, AIMEAT, 'mcp.node'));
-        if (path.includes('/src/cli/connect/mcp/')) out.push(...collectMcpTools(source, AIMEAT, 'mcp.connector'));
-        if (/tool-call-defs-.*\.ts$/.test(path)) out.push(...collectCliDispatch(source, AIMEAT));
-    }
-    return out;
-}
-
-function toRows(entries: EntryPoint[]): Row[] {
-    return entries.map(e => {
-        const { principals, unknown, scopes } = principalsFor(e.guards);
-        // Only a REST door has a middleware chain; the other kinds are gated elsewhere, so their
-        // principal set is left empty rather than reported as "everyone".
-        const applies = e.kind === 'rest';
-        return {
-            ...e,
-            principals: applies ? principals : [],
-            unknownGuards: applies ? unknown : [],
-            scopes: applies ? scopes : [],
-            public: applies ? isPublic(principals) : false,
-        };
-    });
-}
 
 function tally<T extends string>(values: T[]): Array<[T, number]> {
     const counts = new Map<T, number>();
@@ -237,9 +166,9 @@ function report(rows: Row[], mentions: Map<string, Array<{ file: string; line: n
 }
 
 function main(): void {
-    const VOCABULARY = readVocabulary();
+    const VOCABULARY = readVocabulary(AIMEAT);
     const files = srcProgram().files;
-    const rows = toRows(collect(files));
+    const rows = toRows(collectDoors(files));
     // The two files that DEFINE the vocabulary rather than demand it. Counting a definition as a
     // demand would make every word look asked-for, which is the opposite of what this measures.
     const mentions = scopeMentions(files, VOCABULARY, AIMEAT, ['mcp/catalog/scopes.ts', 'utils/scope-coverage.ts']);

@@ -19,6 +19,11 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-capability-trust-guard
  * @version-history
+ *   v1.1.0 — 2026-09-04 — Phase 5: a third principal who is neither the owner nor the operator.
+ *     Everything before it was operator against owner, and its refusals are shaped like "the value
+ *     did not change" rather than like a status — a real refusal, and an answer to a different
+ *     question from "what does a stranger get". This suite was one of the 34 seeded into
+ *     security/denial-coverage-exemptions.json on 2026-08-15 (quality plan stream B).
  *   v1.0.0 — 2026-08-14 — Initial (August 2026 audit NEW-2).
  */
 import * as ed from '@noble/ed25519';
@@ -257,6 +262,55 @@ await test('A vouch from someone else still counts', async () => {
 });
 
 console.log('\nCleanup');
+
+console.log('\nPhase 5 — a third principal, who is neither the owner nor the operator');
+
+// Everything above is operator versus owner, and its refusals are shaped like "the value did not
+// change" rather than like a status. That is a real refusal and it answers a different question
+// from this one: what does a STRANGER get. Nothing here had ever asked, and the route-scope triage
+// of 2026-08-16 marks POST /v1/capabilities/:id/invoke as high debt for exactly this reason.
+
+const strangerName = `captruststranger${stamp}`;
+let strangerToken = '';
+
+await test('Register a stranger — a third owner with no relationship to the capability', async () => {
+    strangerToken = await registerOwner(strangerName);
+    assert(strangerToken.length > 0, 'stranger token');
+});
+
+await test('A stranger cannot rewrite the capability', async () => {
+    const { status, body } = await json(`/v1/capabilities/${capId}`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${strangerToken}` },
+        body: JSON.stringify({ summary: 'written by somebody else entirely' }),
+    });
+    // 403 and not 404: the capability is addressed by an id that is discoverable from the catalogue,
+    // so its existence is not the secret — who may rewrite it is. Pinned to the one status, because
+    // a drift to 404 would hide a real capability from a caller who is allowed to know it is there.
+    assert(status === 403, `expected 403, got ${status}: ${JSON.stringify(body.error ?? body)}`);
+});
+
+await test('A stranger cannot delete the capability', async () => {
+    const { status } = await json(`/v1/capabilities/${capId}`, {
+        method: 'DELETE', headers: { Authorization: `Bearer ${strangerToken}` },
+    });
+    assert(status === 403, `expected 403, got ${status}`);
+});
+
+await test('An unauthenticated caller cannot rewrite the capability', async () => {
+    const { status } = await json(`/v1/capabilities/${capId}`, {
+        method: 'PUT', body: JSON.stringify({ summary: 'anonymous' }),
+    });
+    assert(status === 401, `expected 401, got ${status}`);
+});
+
+await test('POSITIVE CONTROL: the capability survived all three, unchanged', async () => {
+    // Three refusals in a row pass just as happily against a capability that was deleted by the
+    // second one. This is the line that tells them apart.
+    const { status, body } = await json(`/v1/capabilities/${capId}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(status === 200, `owner GET ${status}`);
+    assert(body.data.summary !== 'written by somebody else entirely', 'a stranger\'s summary landed');
+});
 
 await test('Delete the capability and both owners', async () => {
     const del = await json(`/v1/capabilities/${capId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` } });

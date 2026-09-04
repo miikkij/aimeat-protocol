@@ -8,6 +8,10 @@
  *   - A2: a space declared `versioned:false` (e.g. a request queue) keeps only .latest — publishing it
  *     (even with real changes) never writes a .version.N.
  * @version-history
+ *   v1.1.0 — 2026-09-04 — Who else may publish. The organism here is public and open-join on
+ *     purpose, so "public" and "may write" have to be different answers, and nothing had asked.
+ *     One of the 34 seeded into security/denial-coverage-exemptions.json on 2026-08-15
+ *     (quality plan stream B).
  *   v1.0.0 — 2026-07-01 — Initial: change-guard + versioned-flag coverage (Lanka A).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=workspace-publish-guard
@@ -140,6 +144,73 @@ await test('A2: advancing the req status re-publishes .latest and still writes n
     assert(await versionCount(base) === 0, `still no versions on versioned:false, got ${await versionCount(base)}`);
     assert((await latestValue(base))?.status === 'done', 'latest advanced to done');
 });
+
+// ── Who else may publish into this workspace ──
+//
+// Everything above is owner A publishing into owner A's organism, which proves the change-guard and
+// the versioned flag and says nothing about the door. The organism above is deliberately public and
+// open-join, so "public" and "may write" have to be different answers, and this is where that is
+// asked. Publishing is what writes the .latest a reader sees, so a stranger who can publish can
+// rewrite what an organism says about itself.
+
+let B!: Awaited<ReturnType<typeof setupOwner>>;
+const bAuth = () => ({ Authorization: `Bearer ${B.token}` });
+
+await test('Setup owner B, who is not a member of A\'s organism', async () => {
+    B = await setupOwner('b');
+    assert(B.token.length > 0, 'owner B token');
+});
+
+await test('A stranger cannot publish into the workspace', async () => {
+    const r = await json(`/v1/organisms/${orgId}/publish`, {
+        method: 'POST', headers: bAuth(),
+        body: JSON.stringify({ ws: WS, namespace: 'shared.notes', id: 'n1' }),
+    });
+    // 403 and not 404: the organism is deliberately PUBLIC here, so a stranger already knows it
+    // exists and hiding it would be theatre. What must not happen is that they can write to it.
+    // Pinned to the one status so "public but not writable" stays the tested answer.
+    assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body)}`);
+});
+
+await test('An unauthenticated caller cannot publish into the workspace', async () => {
+    const r = await json(`/v1/organisms/${orgId}/publish`, {
+        method: 'POST', body: JSON.stringify({ ws: WS, namespace: 'shared.notes', id: 'n1' }),
+    });
+    assert(r.status === 401, `expected 401, got ${r.status}`);
+});
+
+await test('A stranger\'s memory listing does not carry the workspace records', async () => {
+    // The records live under organism.<id>.w.<ws>.* in the OWNER's namespace, and /v1/memory is
+    // resolved against the caller. A stranger asking for the same prefix must get their own empty
+    // namespace back, not A's rows.
+    const r = await json(`/v1/memory?prefix=${encodeURIComponent(root() + '.')}`, { headers: bAuth() });
+    assert(r.status === 200, `stranger list ${r.status}`);
+    assert((r.body.data.items as any[]).length === 0,
+        `stranger sees ${(r.body.data.items as any[]).length} of A's workspace rows`);
+});
+
+await test('POSITIVE CONTROL: owner A still publishes, and the guard still skips a no-op', async () => {
+    // The three refusals above would pass against an organism whose publish route was broken for
+    // everyone. This proves it still works for the one principal it is meant to work for, and it
+    // writes its own draft first: the A2 test above consumed r1's, and a positive control that
+    // depends on a leftover from another test proves whichever ran last.
+    const base = `${root()}.shared.reqs.r1`;
+    const live = await latestValue(base);
+    assert(live?.status === 'done', `expected the A2 publish to have left status done, got ${JSON.stringify(live)}`);
+    // Byte-identical to .latest, so the change-guard has something to refuse.
+    await json('/v1/memory', {
+        method: 'POST', headers: auth(),
+        body: JSON.stringify({ key: `${base}.draft`, value: live, visibility: 'private' }),
+    });
+    const r = await json(`/v1/organisms/${orgId}/publish`, {
+        method: 'POST', headers: auth(),
+        body: JSON.stringify({ ws: WS, namespace: 'shared.reqs', id: 'r1' }),
+    });
+    assert(r.status === 200, `owner publish ${r.status}: ${JSON.stringify(r.body)}`);
+    assert(r.body.data.skipped === true, `an unchanged republish must skip, got ${JSON.stringify(r.body.data)}`);
+});
+
+await test('Cleanup owner B', async () => { const r = await json(`/v1/owners/${B.name}`, { method: 'DELETE', headers: bAuth() }); assert(r.status === 200, `del ${r.status}`); });
 
 await test('Cleanup owner A', async () => { const r = await json(`/v1/owners/${A.name}`, { method: 'DELETE', headers: auth() }); assert(r.status === 200, `del ${r.status}`); });
 

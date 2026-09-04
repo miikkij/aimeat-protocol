@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Owner and Memory storage methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.8.0 — 2026-09-04 — deleteOwner clears eco_auth, the ecosystem-app device handshakes keyed on
+ *     the owner name. It had sat in security/storage-parity-exemptions.json since 2026-08-10.
  *   v1.7.0 — 2026-09-03 — createMemoryIfAbsent treats a row in the bin as absent and takes it over
  *     (new value, tombstone cleared), as setMemory already did; a DO NOTHING against a binned row
  *     answered null on every retry, and the workspace append could never seed a draft for a
@@ -150,6 +152,12 @@ export const ownerMethods = {
 
       // 10. Delete email verifications for this owner
       this.db.prepare('DELETE FROM email_verifications WHERE ownerName = ?').run(name);
+
+      // 10b. Ecosystem-app device handshakes. Keyed on the bare owner name, like the push
+      // subscriptions above, because the handshake happens before the app has an identity of its
+      // own. A pending row is a live invitation to bind an app to this account, and the name is
+      // released for reuse, so leaving one hands the next registrant somebody else's handshake.
+      this.db.prepare('DELETE FROM eco_auth WHERE ownerName = ?').run(name);
 
       // 11. Delete the owner record itself
       const result = this.db.prepare('DELETE FROM owners WHERE name = ?').run(name);

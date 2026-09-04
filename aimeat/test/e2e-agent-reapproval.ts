@@ -265,5 +265,65 @@ await test('re-approving with NO scopes issues the scopes the owner chose, not t
         `the record and the credential disagree: record ${JSON.stringify(stored)} vs token ${JSON.stringify(issued)}`);
 });
 
+// ── Who may answer a pending request ──
+//
+// Every approval above is this owner approving their own agent, which proves the scope arithmetic
+// and never asks the question the flow actually turns on. POST /v1/agents/verify takes a user_code
+// and an owner_token, and the two arrive as SEPARATE fields in one body: the code names a pending
+// request, the token names who is answering. Nothing here had ever sent a token belonging to
+// somebody other than the owner whose request the code is for. If that combination were accepted,
+// any account on the node could grant scopes to a stranger's agent by quoting a six-character code.
+console.log('\nPhase 4: a stranger holding somebody else\'s user_code');
+
+const stranger = `reapstranger${Date.now() % 1000000}`;
+let strangerToken = '';
+/** The pending request the stranger tries and the owner then completes — one request, two answers. */
+let pendingUserCode = '';
+
+await test('a second owner exists', async () => {
+    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: stranger, public_key: 'placeholder' }) });
+    assert(reg.status === 201, `register ${reg.status}: ${JSON.stringify(reg.body)}`);
+    const ts = new Date().toISOString();
+    const tok = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ owner: stranger, timestamp: ts, signature: await signMsg(reg.body.data.private_key, stranger + NODE_ID + ts) }),
+    });
+    assert(tok.body.ok === true, `token: ${JSON.stringify(tok.body.error)}`);
+    strangerToken = tok.body.data.token;
+});
+
+await test('a stranger cannot approve this owner\'s pending request', async () => {
+    pendingUserCode = await authorize();
+    const r = await json('/v1/agents/verify', {
+        method: 'POST',
+        body: JSON.stringify({ user_code: pendingUserCode, action: 'approve', owner_token: strangerToken, scopes: ['*'] }),
+    });
+    assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body)}`);
+    // Whatever the status, the request must still be pending rather than approved for the stranger.
+    const poll = await json('/v1/agents/device-token', {
+        method: 'POST',
+        body: JSON.stringify({ device_code: lastDeviceCode, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }),
+    });
+    assert(poll.status !== 200, `the stranger's approval issued a token anyway: ${JSON.stringify(poll.body).slice(0, 200)}`);
+});
+
+await test('an unauthenticated caller cannot approve it either', async () => {
+    const r = await json('/v1/agents/verify', {
+        method: 'POST',
+        body: JSON.stringify({ user_code: 'AAAA-BBBB', action: 'approve' }),
+    });
+    // 400, not 401: owner_token is a BODY field on this route rather than a header, so a request
+    // without one never reaches an authentication check — it fails validation first. That is the
+    // honest shape for a device-flow endpoint, and pinning it says so rather than accepting either.
+    assert(r.status === 400, `expected 400, got ${r.status}`);
+});
+
+await test('POSITIVE CONTROL: the real owner still approves the same pending request', async () => {
+    // The refusals above would pass just as happily against a door that had stopped approving for
+    // everyone, which would make the whole device flow dead rather than safe.
+    const r = await approve(pendingUserCode, ['memory:read']);
+    assert(r.status === 200 && r.body.ok === true, `owner approve ${r.status}: ${JSON.stringify(r.body.error)}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);
 if (failed > 0) process.exit(1);

@@ -287,6 +287,67 @@ await test('aimeat_app_tool_invoke — a session token that went stale fails by 
     assert(after === before, `a failed invoke must leave no charge (before ${before}, after ${after})`);
 });
 
+// ── The HTTP twin asks for the same word the tool does ──
+//
+// Every case above drives an OWNER token, and an owner session bypasses requireScope by design, so
+// none of them can see a scope gate at all. The gate matters for the principal that has to be GIVEN
+// permission, and until 2026-09-04 the REST routes under /v1/exchange asked for nothing while their
+// MCP twins asked for exchange:read or exchange:write. An agent scoped to one unrelated word could
+// therefore skip the tool, call the route, and — per the route-scope triage of 2026-08-16 — mark
+// work delivered and charge a THIRD PARTY. These are the assertions that prove the gate bites, and
+// they are here rather than in a new file because this suite already owns this surface.
+
+/** An agent of the consumer that holds ONE unrelated word: the principal the gate is for. */
+async function narrowAgent(owner: { name: string; token: string }) {
+    const r = await json('/v1/agents', {
+        method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ name: `narrow${Date.now() % 100000}`, owner: owner.name, capabilities: ['memory'], scopes: ['memory:read'] }),
+    });
+    assert(r.status === 201, `create narrow agent: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    const ts = new Date().toISOString();
+    const gaii = r.body.data.agent.gaii as string;
+    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp: ts, signature: await sign(r.body.data.private_key, gaii + ts) }) });
+    assert(tok.body.ok === true, `narrow agent token: ${JSON.stringify(tok.body?.error)}`);
+    return { gaii, token: tok.body.data.token as string };
+}
+
+let narrow: { gaii: string; token: string };
+
+await test('an agent holding only memory:read exists', async () => {
+    narrow = await narrowAgent(consumer);
+    assert(narrow.token.length > 0, 'narrow agent token');
+});
+
+await test('CROSS-SCOPE → refused: it cannot queue work that would charge its owner', async () => {
+    const r = await json('/v1/exchange/work', {
+        method: 'POST', headers: auth(narrow.token),
+        body: JSON.stringify({ offering_id: awOfferingId, input: { note: 'not mine to spend' } }),
+    });
+    assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body)}`);
+});
+
+await test('CROSS-SCOPE → refused: it cannot declare work delivered', async () => {
+    const r = await json('/v1/exchange/work/whatever/deliver', {
+        method: 'POST', headers: auth(narrow.token), body: JSON.stringify({ output: { forged: true } }),
+    });
+    // 403 before the 404: the scope gate is middleware and runs before the handler looks the work
+    // up, so a caller without the word never learns whether that id exists. Pinned, because a drift
+    // to 404 would mean the gate moved into the handler and now leaks existence.
+    assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body)}`);
+});
+
+await test('CROSS-SCOPE → refused: it cannot read the work list either', async () => {
+    const r = await json('/v1/exchange/work', { headers: auth(narrow.token) });
+    assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body)}`);
+});
+
+await test('POSITIVE CONTROL: the same doors still answer the owner', async () => {
+    // Four refusals in a row pass just as happily against routes that now refuse everybody, which
+    // would be a worse outcome than the hole they were added to close.
+    const r = await json('/v1/exchange/work', { headers: auth(consumer.token) });
+    assert(r.status === 200, `owner work list ${r.status}: ${JSON.stringify(r.body?.error)}`);
+});
+
 console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);
 await new Promise<void>((resolve) => server.close(() => resolve()));
 process.exit(failed === 0 ? 0 : 1);
