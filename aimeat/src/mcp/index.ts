@@ -11,6 +11,12 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   v1.23.0 -- 2026-09-04 -- An unauthenticated `tools/list` answers the public catalogue
+ *     (./public-catalogue.ts), so a stranger's agent can learn what this node does before
+ *     deciding whether to ask its owner for an account. Names, descriptions and input shapes
+ *     only, all of it already in openapi.json; `tools/call` still answers 401. `initialize` is
+ *     deliberately left at 401 with its WWW-Authenticate challenge, because that 401 is how
+ *     every real client finds the OAuth flow.
  *   v1.22.0 -- 2026-09-03 -- tools.listChanged is declared and emitted, so a client re-reads the
  *     tool list when the owner changes an agent's scopes instead of the person reconnecting by
  *     hand. The 56-line registration block moves to register-all.ts, which the schema audit calls
@@ -411,6 +417,27 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         }
 
         if (!agentGaii) {
+            // ONE QUESTION A STRANGER MAY ASK WITHOUT AN ACCOUNT: what can you do?
+            //
+            // A foreign agent arriving with nothing but the hostname could not learn a single
+            // capability without first getting a credential, which is the wrong way round — you
+            // decide whether to ask for an account by knowing what the account is for. `tools/list`
+            // answers with names, descriptions and input shapes: the contract, which openapi.json
+            // already publishes. No data, no session, no identity, and `tools/call` still 401s.
+            //
+            // `initialize` is DELIBERATELY NOT ANSWERED HERE, and the temptation is real because an
+            // agent-readiness scanner probes exactly that. Every real MCP client initializes first
+            // and relies on this 401 plus its WWW-Authenticate header to find the OAuth flow (MCP
+            // spec §5.3); answering 200 with no session would send Claude, Cursor and the rest past
+            // the only signpost they have and fail them one call later, on a route where the
+            // failure would read as ours. A single unauthenticated `tools/list` is not a step any
+            // real client takes before initializing, so this branch cannot be reached by one.
+            const probe = Array.isArray(req.body) ? undefined : req.body as { method?: string; id?: unknown } | undefined;
+            if (probe?.method === 'tools/list') {
+                const { publicToolCatalogue } = await import('./public-catalogue.js');
+                res.json({ jsonrpc: '2.0', id: probe.id ?? null, result: { tools: publicToolCatalogue() } });
+                return;
+            }
             // No token — challenge client to authenticate via OAuth (MCP spec §5.3)
             const resourceMetadataUrl = `${config.baseUrl}/.well-known/oauth-protected-resource`;
             res.status(401)

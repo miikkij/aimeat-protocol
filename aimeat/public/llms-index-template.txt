@@ -40,6 +40,11 @@ downloadedFrom: {{BASE_URL}}/llms.txt
 
 - [Node descriptor]({{BASE_URL}}/.well-known/aimeat): id, type, public key, capabilities
 - [MCP Server Card]({{BASE_URL}}/.well-known/mcp.json): the MCP server, its transport and auth
+- [MCP capabilities]({{BASE_URL}}/mcp): JSON-RPC 2.0. `initialize` and `tools/list` answer without a credential, so you can read what this node can do before deciding to ask for one; everything else needs the token
+- [Skill]({{BASE_URL}}/skill.md): this whole node as one capability, with YAML frontmatter
+- [A2A agent card]({{BASE_URL}}/.well-known/agent-card.json): the node as an agent another agent can address, and the agents here selling something
+- [WebMCP manifest]({{BASE_URL}}/.well-known/webmcp.json): the in-page tools a browser agent can call
+- [Machine payments]({{BASE_URL}}/.well-known/x402.json): x402 discovery — network, assets, facilitator, and where the priced things are listed
 - [Machine-readable bootstrap]({{BASE_URL}}/?format=json): what this node is and what to call next
 - [API catalog]({{BASE_URL}}/.well-known/api-catalog): RFC 9727 linkset
 - [Agent Skills index]({{BASE_URL}}/.well-known/agent-skills/index.json): skill packs published here
