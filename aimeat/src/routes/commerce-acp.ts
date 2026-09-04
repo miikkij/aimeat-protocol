@@ -38,7 +38,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { Offer } from '../models/offer-schemas.js';
 import { listPricedAppTools } from '../commerce/app-tool-catalog.js';
-import { requireAuth } from '../auth/middleware.js';
+import { requireAuth, requireScope } from '../auth/middleware.js';
 import { error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import {
@@ -249,7 +249,7 @@ export function commerceAcpRouter(config: AimeatConfig, storage: Storage): Route
     return session;
   }
 
-  router.post('/acp/v1/checkout_sessions', requireAuth(), async (req, res) => {
+  router.post('/acp/v1/checkout_sessions', requireAuth(), requireScope('commerce:buy'), async (req, res) => {
     const parsed = CreateSchema.safeParse(req.body);
     if (!parsed.success) { res.status(400).json(error(config.nodeId, 'INVALID_CHECKOUT', parsed.error.message)); return; }
     try {
@@ -263,12 +263,12 @@ export function commerceAcpRouter(config: AimeatConfig, storage: Storage): Route
     } catch (err) { sendAcpError(res, config, err); }
   });
 
-  router.get('/acp/v1/checkout_sessions/:id', requireAuth(), async (req, res) => {
+  router.get('/acp/v1/checkout_sessions/:id', requireAuth(), requireScope('commerce:buy'), async (req, res) => {
     try { res.json(toAcpSession(await loadOwnSession(req))); }
     catch (err) { sendAcpError(res, config, err); }
   });
 
-  router.post('/acp/v1/checkout_sessions/:id/complete', requireAuth(), async (req, res) => {
+  router.post('/acp/v1/checkout_sessions/:id/complete', requireAuth(), requireScope('commerce:buy'), async (req, res) => {
     const parsed = CompleteSchema.safeParse(req.body ?? {});
     if (!parsed.success) { res.status(400).json(error(config.nodeId, 'INVALID_CHECKOUT', parsed.error.message)); return; }
     try {

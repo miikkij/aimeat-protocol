@@ -140,7 +140,7 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // GET /v1/wallet/history — transaction history (DEPRECATED: use /v1/wallet/transactions)
-  router.get('/v1/wallet/history', requireAuth(), async (req, res) => {
+  router.get('/v1/wallet/history', requireAuth(), requireScope('wallet:read'), async (req, res) => {
     res.setHeader('X-Deprecated', 'Use GET /v1/wallet/transactions instead');
     res.setHeader('Deprecation', 'true');
     res.setHeader('Sunset', '2026-09-01');
@@ -170,7 +170,7 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // POST /v1/wallet/request — request morsels (single GHII-based balance)
-  router.post('/v1/wallet/request', requireAuth(), validateBody(MorselRequestSchema, config.nodeId), async (req, res) => {
+  router.post('/v1/wallet/request', requireAuth(), requireScope('wallet:read'), validateBody(MorselRequestSchema, config.nodeId), async (req, res) => {
     const { amount, reason } = req.body ?? {};
     const grantAmount = Math.min(amount ?? config.dailyAllowance, config.dailyAllowance);
 

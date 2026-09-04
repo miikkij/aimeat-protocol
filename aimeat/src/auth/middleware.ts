@@ -13,6 +13,11 @@
  *   - the refusal path itself (deny401/deny403 and the audit context) lives in ./deny.ts
  *
  * @version-history
+ *   v1.9.0 — 2026-09-04 — isOwnerPrincipal(auth) is the requireOwnerPrincipal test as a value, and
+ *     the middleware now calls it rather than restating it. For a handler whose other branch is
+ *     legitimately open and therefore cannot take a door gate — POST /v1/invitations/:token/accept is
+ *     the first — the alternative was a near-copy, which is precisely what this file's own docblock
+ *     records going wrong three times over.
  *   v1.8.0 — 2026-08-23 — credentialRevoked() asks a FOURTH question (BR-04): is the owner this
  *     credential acts for deactivated. Uncached keyed read per authenticated request, same
  *     reasoning as the session check; federated principals excluded (their owner is remote and
@@ -448,23 +453,34 @@ export function requireRole(role: string) {
  * is consent to use the account, never consent to take it over — and the word is deliberately
  * absent from APP_GRANTABLE_SCOPES so an app cannot ask for it either.
  */
+/**
+ * The test requireOwnerPrincipal() makes, as a value rather than a door.
+ *
+ * A handler whose OTHER branch is legitimately open cannot take the middleware — POST
+ * /v1/invitations/:token/accept is the first of those: the anonymous branch is how a person
+ * registers from an emailed link, and it must stay open, while the signed-in branch joins an
+ * existing account to an organism and should not be reachable by a machine acting in that person's
+ * name. Such a handler asks this instead of restating the test, because the docblock above says what
+ * a near-copy costs: three copies of the scope test once lived in this file and none of them knew
+ * about the exception the vocabulary module was written to hold.
+ */
+export function isOwnerPrincipal(auth: Request['auth'] | undefined): boolean {
+  if (!auth) return false;
+  const roles = auth.roles;
+  const isApp = roles.includes('app');
+  if (roles.includes('owner') && !isApp && !roles.includes('agent') && !roles.includes('ecosystem')) return true;
+  // Exact string, no wildcard. scope-coverage.ts enforces the same rule everywhere a scope is
+  // proposed or approved; this line is that rule at the door itself.
+  return !isApp && (auth.scopes ?? []).includes(ACCOUNT_SECURITY_SCOPE);
+}
+
 export function requireOwnerPrincipal() {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.auth) {
       deny401(req, res, 'Authentication required');
       return;
     }
-    const roles = req.auth.roles;
-    const isApp = roles.includes('app');
-    const isOwnerPrincipal = roles.includes('owner') && !isApp &&
-      !roles.includes('agent') && !roles.includes('ecosystem');
-    if (isOwnerPrincipal) {
-      next();
-      return;
-    }
-    // Exact string, no wildcard. scope-coverage.ts enforces the same rule everywhere a scope is
-    // proposed or approved; this line is that rule at the door itself.
-    if (!isApp && (req.auth.scopes ?? []).includes(ACCOUNT_SECURITY_SCOPE)) {
+    if (isOwnerPrincipal(req.auth)) {
       next();
       return;
     }

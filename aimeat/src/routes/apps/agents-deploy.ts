@@ -22,7 +22,7 @@
 import type { Router, Request, Response } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AppRecord } from '../../storage/interface.js';
-import { requireAuth, optionalAuth } from '../../auth/middleware.js';
+import { requireAuth, optionalAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { buildGAII, validateAgentName } from '../../utils/gaii.js';
 import { deployedAgentName } from '../../models/crew-def-schemas.js';
@@ -154,10 +154,10 @@ export function registerAppAgentRoutes(router: Router, config: AimeatConfig, sto
     }
 
     // POST /v1/apps/:owner/:filename/agents/:agentName/deploy
-    router.post('/v1/apps/:owner/:filename/agents/:agentName/deploy', requireAuth(), (req, res) => void handleAction(req, res, 'deploy-app-agent'));
+    router.post('/v1/apps/:owner/:filename/agents/:agentName/deploy', requireAuth(), requireScope('task:write'), (req, res) => void handleAction(req, res, 'deploy-app-agent'));
 
     // POST /v1/apps/:owner/:filename/agents/:agentName/undeploy
-    router.post('/v1/apps/:owner/:filename/agents/:agentName/undeploy', requireAuth(), (req, res) => void handleAction(req, res, 'undeploy-app-agent'));
+    router.post('/v1/apps/:owner/:filename/agents/:agentName/undeploy', requireAuth(), requireScope('task:write'), (req, res) => void handleAction(req, res, 'undeploy-app-agent'));
 
     // GET /v1/apps/:owner/:filename/agents/:agentName/instances — hosted instances of an app's
     // bundled agent on THIS node, with their PUBLIC offers + prices. This is the "buy it hosted

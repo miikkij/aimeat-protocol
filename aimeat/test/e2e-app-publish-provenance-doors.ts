@@ -144,7 +144,9 @@ async function main() {
         assert(da.status === 200, `device-authorize: ${da.status}`);
         const v = await json('/v1/agents/verify', {
             method: 'POST',
-            body: JSON.stringify({ user_code: da.body.data.user_code, action: 'approve', scopes: ['memory:read', 'apps:write', 'agent:write'], owner_token: ownerToken }),
+            // 'app:write', not 'apps:write': the plural is not a word this node knows, and asking
+            // for one nothing reads grants nothing. It passed while the doors checked no scope.
+            body: JSON.stringify({ user_code: da.body.data.user_code, action: 'approve', scopes: ['memory:read', 'app:write', 'agent:write'], owner_token: ownerToken }),
         });
         assert(v.status === 200, `verify: ${v.status} ${JSON.stringify(v.body.error ?? '')}`);
         const t = await json('/v1/agents/device-token', {

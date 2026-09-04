@@ -10,6 +10,13 @@
  *   - GET    /v1/owner/agent-defaults         -- Get owner-level defaults
  *   - PUT    /v1/owner/agent-defaults         -- Upsert owner defaults
  * @version-history
+ *   v1.8.0 -- 2026-09-04 -- An APP principal needs task:read to read an agent's directives, and only
+ *     an app principal does. Same shape and same word as GET /v1/agents/:name/tasks: a conditional
+ *     refusal in the handler rather than a requireScope, because task:read is not in
+ *     defaultAgentScopes and a middleware would refuse the owner's own agents from reading the rules
+ *     they exist to follow. What an app grant reached before was the owner's rules for the agent,
+ *     the memory key prefixes it is pointed at, its shared tags and its token budget, on whatever
+ *     single word the consent screen showed.
  *   v1.7.0 -- 2026-08-01 -- TARGET-058 Phase 4: the AI-transparency convention ships as a SYSTEM-layer
  *     directive, so declaring provenance is part of what an agent agrees to rather than something
  *     buried in a tool schema. Appended after the operator's configurable principles rather than
@@ -32,8 +39,9 @@ import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
-import { refuseNotYours } from '../middleware/refusals.js';
+import { refuseNotYours, refuseNeedsPermission } from '../middleware/refusals.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
+import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { agentGaiiFromIdentifier } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
@@ -115,6 +123,18 @@ export function agentDirectivesRouter(config: AimeatConfig, storage: Storage, we
   router.get('/v1/agents/:name/directives', requireAuth(), async (req, res) => {
     const agentName = req.params.name as string;
     const agentGaii = resolveAgentGaii(req, agentName);
+
+    // An APP principal needs task:read for this, and only an app principal does — the same shape,
+    // and the same word, as GET /v1/agents/:name/tasks (agent-tasks/create-read.ts:163). A blanket
+    // requireScope would have been the wrong instrument: task:read is not in defaultAgentScopes, so
+    // it would refuse the owner's own agents from reading the rules they are meant to follow, which
+    // is the one thing this door exists for. What it hands an app grant is the other half: the
+    // owner's rules for the agent, the memory key prefixes it is pointed at, its shared tags and its
+    // token budget, on whatever single word the consent screen showed.
+    if (req.auth!.roles.includes('app') && !scopeIsCovered(req.auth!.scopes, 'task:read')) {
+      res.status(403).json(refuseNeedsPermission(config, { want: "read an agent's directives", scope: 'task:read' }));
+      return;
+    }
 
     // Verify agent exists
     const agent = await storage.getAgent(agentGaii);

@@ -19,7 +19,7 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth } from '../auth/middleware.js';
+import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { getOwnerUsageSummary } from '../services/usage-summary.js';
 import { createHomeDashboardService } from '../services/db/index.js';
@@ -30,7 +30,7 @@ export function usageRouter(config: AimeatConfig, storage: Storage): Router {
 
   // GET /v1/owner/usage — quota usage + resource counts + morsel balance for the caller's owner.
   // Both owner and agent sessions resolve to the same owner (req.auth.owner). Cached 60s per owner.
-  router.get('/v1/owner/usage', requireAuth(), async (req, res) => {
+  router.get('/v1/owner/usage', requireAuth(), requireScope('wallet:read'), async (req, res) => {
     const ownerName = req.auth!.owner as string | undefined;
     if (!ownerName) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'No owner associated with this session'));
@@ -46,7 +46,7 @@ export function usageRouter(config: AimeatConfig, storage: Storage): Router {
   // GET /v1/owner/home — the whole profile Home dashboard in one call: the stats-bar counts, the cached
   // usage summary, and the agents list, with the owner's agent list resolved ONCE and shared across all
   // three (IdentityMap). Owner + agent sessions both resolve to the same owner (req.auth.owner).
-  router.get('/v1/owner/home', requireAuth(), async (req, res) => {
+  router.get('/v1/owner/home', requireAuth(), requireScope('wallet:read'), async (req, res) => {
     const ownerName = req.auth!.owner as string | undefined;
     if (!ownerName) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'No owner associated with this session'));

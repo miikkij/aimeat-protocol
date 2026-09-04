@@ -20,7 +20,7 @@ import { Router } from 'express';
 import { createHash, randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { resolveIdentity } from '../utils/gaii.js';
@@ -243,7 +243,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
   // Privacy: (1) requireAuth() — you must be a SIGNED-IN user to browse it (the anonymous internet
   // is rejected); (2) opt-in — DirectoryService only indexes profiles with an active "federation"
   // consent grant, so every entry has already opted in to being listed.
-  router.get('/v1/catalogue/directory', requireAuth(), async (req, res) => {
+  router.get('/v1/catalogue/directory', requireAuth(), requireScope('catalogue:read'), async (req, res) => {
     if (!directoryService) {
       res.status(503).json(error(config.nodeId, 'FEATURE_DISABLED', 'Directory service is not available'));
       return;

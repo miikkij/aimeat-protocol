@@ -4,6 +4,12 @@
  * SPDX-License-Identifier: MIT
  * @description Agent read + owner-managed metadata routes (public profile, list, tags, engagements, mode, concurrency, schedule constraints, heartbeat). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.0 — 2026-09-04 — An APP principal needs task:read for GET /v1/agents, and only an app
+ *     principal does. The bypass this closes sat inside one feature: ?include=stats returns the
+ *     active task ids and titles that GET /v1/agents/:name/tasks had just refused the same grant for
+ *     want of task:read, so the data was one query string away from the refusal meant to protect it.
+ *     A conditional refusal rather than a requireScope, matching the sibling door — task:read is not
+ *     in defaultAgentScopes and an agent listing its owner's fleet is ordinary.
  *   v1.6.0 — 2026-08-31 — Agent v2 on the read side: `run_mode`, `identity_version`, `card_enrolled`
  *     and `enrolled_at` on the agent list, plus PATCH /v1/agents/:name/run-mode. Stored and shown,
  *     never enforced — the runtime is what honours a run mode, as it is for max-concurrent-tasks.
@@ -28,6 +34,8 @@ import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
+import { scopeIsCovered } from '../../utils/scope-coverage.js';
+import { refuseNeedsPermission } from '../../middleware/refusals.js';
 import { success, error } from '../../middleware/envelope.js';
 import { buildGAII } from '../../utils/gaii.js';
 import { calculateTrustScore } from '../../services/trust.js';
@@ -121,6 +129,17 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
   // timestamps + active-task list + onboarding) computed in a few grouped queries, so a
   // fleet dashboard gets everything in ONE request instead of N+1 per-agent round trips.
   router.get('/v1/agents', requireAuth(), async (req, res) => {
+    // An APP principal needs task:read here, and only an app principal does — the same conditional
+    // refusal, on the same word, as GET /v1/agents/:name/tasks (agent-tasks/create-read.ts:163).
+    // The bypass this closes is inside one feature: ?include=stats returns the active task ids and
+    // titles that the tasks door had just refused the same grant for want of task:read, so the data
+    // was one query string away from the refusal that was supposed to protect it. A blanket
+    // requireScope would be the wrong instrument — task:read is not in defaultAgentScopes, and an
+    // agent listing its owner's fleet is ordinary.
+    if (req.auth!.roles.includes('app') && !scopeIsCovered(req.auth!.scopes, 'task:read')) {
+      res.status(403).json(refuseNeedsPermission(config, { want: 'see what your agents are working on', scope: 'task:read' }));
+      return;
+    }
     const all = await storage.getAgentsByOwner(req.auth!.owner);
 
     // ?run_mode=spawn — the roster read a runtime does on a timer. Without it a fleet runtime
@@ -258,7 +277,7 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
   // an agent may set tags on itself or a same-owner sibling (mirrors how agents
   // self-report capabilities, and matches the server-MCP aimeat_agent_tags_set
   // handler). Cross-owner is rejected by the ownership check below.
-  router.patch('/v1/agents/:name/tags', requireAuth(), async (req, res) => {
+  router.patch('/v1/agents/:name/tags', requireAuth(), requireScope('agent:write'), async (req, res) => {
     const identifier = decodeURIComponent(req.params.name as string);
     // Ownership, normalisation and the write are services/agent-profile-write.ts, shared with
     // aimeat_agent_tags_set.
@@ -325,7 +344,7 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
   // connector drops `connect add --mode`) self-sets task-runner at startup via aimeat_agent_mode_set.
   // Cross-owner is rejected by the ownership check below. Affects Hello Integration step set:
   // task-runner gets a reduced 7-step flow, workstation the narrowest 4-step flow.
-  router.patch('/v1/agents/:name/mode', requireAuth(), async (req, res) => {
+  router.patch('/v1/agents/:name/mode', requireAuth(), requireScope('agent:write'), async (req, res) => {
     const identifier = decodeURIComponent(req.params.name as string);
     // Ownership, the mode vocabulary, the write and the Hello Integration step-list re-derive are
     // services/agent-profile-write.ts, shared with aimeat_agent_mode_set.

@@ -28,7 +28,7 @@ import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AppProtection } from '../../storage/interface.js';
 import { validateCortexAgents } from '../../models/crew-def-schemas.js';
-import { requireAuth } from '../../auth/middleware.js';
+import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { forkApp, deleteOwnedApp } from '../../services/app-lifecycle.js';
@@ -58,7 +58,7 @@ export function registerForkManageRoutes(
     // On success the source bytes + manifest are copied under the caller's canonical
     // owner as a NEW app (version 1), stamped with `manifest.forkedFrom` provenance,
     // its own `forkable` defaulting to false, and a fork event is recorded for lineage.
-    router.post('/v1/apps/:owner/:filename/fork', requireAuth(), async (req, res) => {
+    router.post('/v1/apps/:owner/:filename/fork', requireAuth(), requireScope('app:write'), async (req, res) => {
         const sourceOwnerParam = req.params.owner as string;
         const sourceFilename = req.params.filename as string;
         const sourceOwner = sourceOwnerParam.includes('@') ? sourceOwnerParam.split('@')[0] : sourceOwnerParam;
@@ -140,7 +140,7 @@ export function registerForkManageRoutes(
     // `access_code` (set/remove protection), `parked` (hide from / restore to the
     // public catalogue) and/or `forkable` (allow others to fork). Fields are
     // independent: each is applied only when present.
-    router.patch('/v1/apps/:filename', requireAuth(), async (req, res) => {
+    router.patch('/v1/apps/:filename', requireAuth(), requireScope('app:write'), async (req, res) => {
         const callerGaii = resolveIdentity(req.auth!, config.nodeId);
         const { owner, ownerGhii } = await canonicalOwner(req);
         const filename = req.params.filename as string;
@@ -428,7 +428,7 @@ export function registerForkManageRoutes(
     // no-version case sweeps ALL buckets that match the owner name. A
     // single-version delete still targets one bucket (you might want to keep
     // versions in one bucket while removing a stray version from another).
-    router.delete('/v1/apps/:filename', requireAuth(), async (req, res) => {
+    router.delete('/v1/apps/:filename', requireAuth(), requireScope('app:manage'), async (req, res) => {
         const callerGaii = resolveIdentity(req.auth!, config.nodeId);
         const { owner, ownerGhii } = await canonicalOwner(req);
         const filename = req.params.filename as string;

@@ -45,7 +45,7 @@ export function appdevPitfallsRouter(config: AimeatConfig, storage: Storage): Ro
   //   &applies_to=&shared=&q=&sort=&limit=&offset=] — one page of the caller's own learned
   // entries (full bodies, any visibility) + optionally other owners' public-shared entries, with
   // the facet counts around it. The step is the one the MCP list tool uses (appdev-kb.ts).
-  router.get('/v1/appdev/pitfalls/learned', requireAuth(), async (req, res) => {
+  router.get('/v1/appdev/pitfalls/learned', requireAuth(), requireScope('memory:read'), async (req, res) => {
     const identity = resolveIdentity(req.auth!, config.nodeId);
     const str = (v: unknown, max = 200) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : undefined);
     const bool = (v: unknown) => (v === '1' || v === 'true' ? true : v === '0' || v === 'false' ? false : undefined);

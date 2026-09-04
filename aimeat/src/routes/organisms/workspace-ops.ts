@@ -60,7 +60,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
   /* ── POST /v1/organisms/:id/workspace/engagements — ACTIVATE (adopt) a contract engagement. Body:
    * { ws, agent, contract? }. The caller must own the agent (you bring your OWN agent in) and be a
    * member of the organism. ── */
-  router.post('/v1/organisms/:id/workspace/engagements', requireAuth(), async (req, res) => {
+  router.post('/v1/organisms/:id/workspace/engagements', requireAuth(), requireScope('organism:write'), async (req, res) => {
     const id = req.params.id as string;
     const { ws, agent, contract } = req.body ?? {};
     if (!ws || typeof ws !== 'string' || !agent || typeof agent !== 'string') {
@@ -82,7 +82,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
    * off-switch: an agent's processing loop skips a workspace whose engagement is retired). Body:
    * { ws, agent, contract? }. Allowed for the agent's OWNER (my agent, I pull it) OR the workspace
    * creator/admin (I run this workspace, I remove your agent). ── */
-  router.post('/v1/organisms/:id/workspace/engagements/retire', requireAuth(), async (req, res) => {
+  router.post('/v1/organisms/:id/workspace/engagements/retire', requireAuth(), requireScope('organism:write'), async (req, res) => {
     const id = req.params.id as string;
     const { ws, agent, contract } = req.body ?? {};
     if (!ws || typeof ws !== 'string' || !agent || typeof agent !== 'string') {
@@ -108,7 +108,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
 
   /* ── GET /v1/organisms/:id/workspace/engagements?ws= — list the contract engagements declared in a
    * workspace (active + retired), for the People panel chips. Member-gated. ── */
-  router.get('/v1/organisms/:id/workspace/engagements', requireAuth(), async (req, res) => {
+  router.get('/v1/organisms/:id/workspace/engagements', requireAuth(), requireScope('organism:read'), async (req, res) => {
     const id = req.params.id as string;
     const ws = typeof req.query.ws === 'string' ? req.query.ws : undefined;
     const organism = await storage.getOrganism(id);
@@ -122,7 +122,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
   /* ── GET /v1/organisms/:id/workspace/activity?ws= — deterministic activity feed for a workspace,
    * derived from the version history: who did what, in which space, draft-edit vs publish, when.
    * Each .version.N = a publish event; each .draft = an edit event. Member-gated; access-filtered. ── */
-  router.get('/v1/organisms/:id/workspace/activity', requireAuth(), async (req, res) => {
+  router.get('/v1/organisms/:id/workspace/activity', requireAuth(), requireScope('organism:read'), async (req, res) => {
     const id = req.params.id as string;
     const ws = typeof req.query.ws === 'string' ? req.query.ws : undefined;
     const organism = await storage.getOrganism(id);
@@ -155,7 +155,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
    * the caller can read, in ONE request (replaces the organism Agents tab's per-workspace
    * getWorkspaceActivity fan-out). Same read-authorized event derivation as GET /workspace/activity.
    * Returns { agents: { agentName: { count, lastAt, workspaces:[names] } } }. ── */
-  router.get('/v1/organisms/:id/agents/activity', requireAuth(), async (req, res) => {
+  router.get('/v1/organisms/:id/agents/activity', requireAuth(), requireScope('organism:read'), async (req, res) => {
     const id = req.params.id as string;
     const organism = await storage.getOrganism(id);
     if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
@@ -228,7 +228,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
    * plus organism membership. Builds a node → owner → agents hierarchy. Agent NAMES are revealed only
    * for the CALLER's own agents; every other owner's agents come back anonymized (name: null), so the
    * caller sees their own agents named and everyone else's only as ghost boxes + counts. ── */
-  router.get('/v1/organisms/:id/workspace/participants', requireAuth(), async (req, res) => {
+  router.get('/v1/organisms/:id/workspace/participants', requireAuth(), requireScope('organism:read'), async (req, res) => {
     const id = req.params.id as string;
     const ws = typeof req.query.ws === 'string' ? req.query.ws : undefined;
     const organism = await storage.getOrganism(id);
@@ -561,7 +561,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
 
   /* ── GET /v1/organisms/:id/workspace/export?ws= — download a full-fidelity ZIP backup of a
    * workspace (workspace.json + images/). The workspace creator (or an org admin) only. ── */
-  router.get('/v1/organisms/:id/workspace/export', requireAuth(), async (req, res) => {
+  router.get('/v1/organisms/:id/workspace/export', requireAuth(), requireScope('organism:read'), async (req, res) => {
     const id = req.params.id as string;
     const ws = typeof req.query.ws === 'string' ? req.query.ws : undefined;
     const organism = await storage.getOrganism(id);
@@ -597,7 +597,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
   /* ── POST /v1/organisms/:id/workspace/import — restore a workspace ZIP as a NEW workspace in this
    * organism. Body is the raw ZIP (Content-Type application/zip). Member of the target org only;
    * the importer becomes the new workspace's creator. ── */
-  router.post('/v1/organisms/:id/workspace/import', requireAuth(),
+  router.post('/v1/organisms/:id/workspace/import', requireAuth(), requireScope('organism:write'),
     // Raw-parse the body EXCEPT application/json (which the global json parser handles → { zip_base64 }).
     raw({ type: (r) => !/application\/json/i.test(r.headers['content-type'] || ''), limit: '64mb' }),
     async (req, res) => {
@@ -627,7 +627,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
    * agentGaiis don't qualify): the bundle contains only what the member can already read live, so
    * the gate matches the read model instead of silently 403ing members the UI shows the button to.
    * ?format=base64 for a size-capped JSON payload. ── */
-  router.get('/v1/organisms/:id/export', requireAuth(), async (req, res) => {
+  router.get('/v1/organisms/:id/export', requireAuth(), requireScope('organism:read'), async (req, res) => {
     const id = req.params.id as string;
     const organism = await storage.getOrganism(id);
     if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }

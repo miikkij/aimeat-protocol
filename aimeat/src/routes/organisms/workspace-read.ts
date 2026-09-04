@@ -62,7 +62,7 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
    * Each non-owned record is then gated through the shared `authorizeRead` guard, so a
    * member only sees records their consent/visibility allows (own records pass directly).
    */
-  router.get('/v1/organisms/:id/workspace', requireAuth(), async (req, res) => {
+  router.get('/v1/organisms/:id/workspace', requireAuth(), requireScope('organism:read'), async (req, res) => {
     const id = req.params.id as string;
     const organism = await storage.getOrganism(id);
     if (!organism) {
@@ -266,7 +266,7 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
    * per-space counts and totals. Membership-gated; a workspace the caller can't read is listed by
    * name only. Generic: any client (an AI agent wanting a fast structural map, the portal UI) renders
    * the returned Markdown. ?format=md returns raw text/markdown; default returns the envelope. */
-  router.get('/v1/organisms/:id/overview', requireAuth(), async (req, res) => {
+  router.get('/v1/organisms/:id/overview', requireAuth(), requireScope('organism:read'), async (req, res) => {
     const id = req.params.id as string;
     const organism = await storage.getOrganism(id);
     if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
@@ -292,7 +292,7 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
    * which is the whole point. Three formats for three paste targets (CLAUDE.md, AGENTS.md, the
    * chat's own instructions field) plus where each one goes. Same membership gate as /overview.
    * ?lang=en|fi, ?format=txt → the chat-instructions variant as raw text. */
-  router.get('/v1/organisms/:id/instruction-block', requireAuth(), async (req, res) => {
+  router.get('/v1/organisms/:id/instruction-block', requireAuth(), requireScope('organism:read'), async (req, res) => {
     const id = req.params.id as string;
     const organism = await storage.getOrganism(id);
     if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
@@ -341,7 +341,7 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
    * next targeted read goes straight to the id. Same workspace-level read gate as GET /:id/workspace.
    * Registered BEFORE /:id/workspace would be a concern, but that route has no extra path segment, so
    * the literal `/workspace/overview` is matched here first by Express. ?format=md → raw markdown. */
-  router.get('/v1/organisms/:id/workspace/overview', requireAuth(), async (req, res) => {
+  router.get('/v1/organisms/:id/workspace/overview', requireAuth(), requireScope('organism:read'), async (req, res) => {
     const id = req.params.id as string;
     const ws = typeof req.query.ws === 'string' ? req.query.ws : '';
     if (!ws) { res.status(400).json(error(config.nodeId, 'MISSING_WS', 'Provide ?ws=<workspace id> (list them with GET /v1/organisms/:id/workspaces)')); return; }
@@ -367,7 +367,7 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
    * Deterministic JSON (organism → workspaces → spaces + members/agents) the client renders as a
    * clickable Mermaid diagram. Membership-gated like the overview; unreadable workspaces appear with
    * readable:false (name only). Generic projection of live state, never persisted. */
-  router.get('/v1/organisms/:id/graph', requireAuth(), async (req, res) => {
+  router.get('/v1/organisms/:id/graph', requireAuth(), requireScope('organism:read'), async (req, res) => {
     const id = req.params.id as string;
     const organism = await storage.getOrganism(id);
     if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
@@ -387,7 +387,7 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
   /* ── GET /v1/organisms/:id/workspace/graph — graph of ONE workspace (root = workspace) ──
    * Same workspace-level read gate as GET /:id/workspace. Registered before the bare /:id/workspace
    * so Express matches the literal `/workspace/graph` first. */
-  router.get('/v1/organisms/:id/workspace/graph', requireAuth(), async (req, res) => {
+  router.get('/v1/organisms/:id/workspace/graph', requireAuth(), requireScope('organism:read'), async (req, res) => {
     const id = req.params.id as string;
     const ws = typeof req.query.ws === 'string' ? req.query.ws : '';
     if (!ws) { res.status(400).json(error(config.nodeId, 'MISSING_WS', 'Provide ?ws=<workspace id>')); return; }
@@ -411,7 +411,7 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
    * never blocks a write. Optional ?ws=<id> limits the scan to one workspace; otherwise every
    * registered workspace the caller can read. Same membership + manifest read gate as GET
    * /:id/workspace. Generic across every organism (peer of /overview, /graph, /search). */
-  router.get('/v1/organisms/:id/workspace/dangling-refs', requireAuth(), async (req, res) => {
+  router.get('/v1/organisms/:id/workspace/dangling-refs', requireAuth(), requireScope('organism:read'), async (req, res) => {
     const id = req.params.id as string;
     const organism = await storage.getOrganism(id);
     if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
@@ -432,7 +432,7 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
    * `_event`/`_diff`/`_recordedAt` it carried. Backed by the trackable memory key
    * organism.{id}.meta.structure + memory_history (Osa D). Captures the current state first (safety
    * net for any structural change that no explicit trigger recorded), then returns the timeline. */
-  router.get('/v1/organisms/:id/structure/history', requireAuth(), async (req, res) => {
+  router.get('/v1/organisms/:id/structure/history', requireAuth(), requireScope('organism:read'), async (req, res) => {
     const id = req.params.id as string;
     const organism = await storage.getOrganism(id);
     if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
@@ -462,7 +462,7 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
    * space (objectType), instance id, a title, and a snippet around the hit. Honours the same
    * workspace-level read authorization as GET /:id/workspace (manifest gate) — a member only
    * searches workspaces they may read; drafts, version history and meta records are skipped. */
-  router.get('/v1/organisms/:id/search', requireAuth(), async (req, res) => {
+  router.get('/v1/organisms/:id/search', requireAuth(), requireScope('organism:read'), async (req, res) => {
     const id = req.params.id as string;
     const q = (typeof req.query.q === 'string' ? req.query.q : '').trim();
     const onlyWs = typeof req.query.ws === 'string' ? req.query.ws : undefined;
@@ -535,7 +535,7 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
   });
 
   /* GET /v1/organisms/:id/comments?ws=&space=&instance_id= — list a target's thread */
-  router.get('/v1/organisms/:id/comments', requireAuth(), async (req, res) => {
+  router.get('/v1/organisms/:id/comments', requireAuth(), requireScope('organism:read'), async (req, res) => {
     const id = req.params.id as string;
     const ws = req.query.ws as string;
     const space = req.query.space as string;
@@ -561,7 +561,7 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
    * as the single GET; instances in a workspace the caller can't read are simply OMITTED (the batch is
    * not 403'd). Per readable ws, ONE scan of its comments subtree buckets every thread. Response is a
    * map keyed by a stable composite "ws\0space\0instance_id". ── */
-  router.post('/v1/organisms/:id/comments/batch', requireAuth(), async (req, res) => {
+  router.post('/v1/organisms/:id/comments/batch', requireAuth(), requireScope('organism:read'), async (req, res) => {
     const id = req.params.id as string;
     const instances = Array.isArray(req.body?.instances) ? req.body.instances : null;
     const countsOnly = req.body?.countsOnly === true;

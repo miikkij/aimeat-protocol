@@ -112,6 +112,66 @@ The August 2026 audit produced this finding eleven times, and the report's own s
 recorded one of them as fixed because an operator clause had been added: `owner !== name &&
 !roles.includes('operator')` WIDENS the door, and reading it as a narrowing cost a second pass.
 
+#### 11a. Two code shapes, one invariant, and a scanner for each half
+
+The owner name reaches a handler in two shapes, and every scanner we own reads exactly one of them.
+
+**REFUSING on the name** is a comparison: `if (row.owner !== req.auth!.owner) return 403`.
+`check:owner-principal` reads these. **SCOPING a query by the name** is not a comparison at all:
+`listActiveSessions(req.auth!.owner)`, and act on whatever comes back. There is nothing for a
+comparison-reader to read, so a door of the second shape is invisible to that gate however completely
+it acts on the human's own things.
+
+The reverse blind spot is real too, and it belongs beside this one.
+`check:identity-resolution` counts a unit as resolved when it computes a principal test, so a handler
+that writes `roles.includes('owner') && !roles.includes('agent')` three lines above a raw
+`req.auth!.sub` read is scored resolved. That exclusion is deliberate — without it the gate cries at
+the twenty-eight handlers that resolve by hand — and it means **the two gates cover different halves
+of one invariant and neither alone is coverage.**
+
+`GET /v1/memory` (crud.ts) is the case that shows both halves in ONE handler, which is why it is the
+example worth remembering: `agentParam !== gaii` is a comparison — the refusal shape with the wrong
+operand, and `?agent=alice` compares EQUAL to the bare name, so the ownership check is skipped — and
+`listMemoryMeta(gaii, …)` is then a query scoped by the unresolved identity, listing under a
+coordinate owner data does not occupy. One shape makes it exploitable, the other makes it wrong. A
+scanner reading refusals sees a comparison and is satisfied; one reading scoping sees a query and
+cannot tell resolved from unresolved. Each gate's blind spot is the other's subject.
+
+Four scoping-shape doors were found by hand on 2026-09-04, all now behind `requireOwnerPrincipal()`:
+
+- `GET`/`DELETE /v1/auth/sessions` and `DELETE /v1/auth/sessions/:id` pass `req.auth!.owner` to
+  `listActiveSessions` and revoke what comes back — the human's device list, and signing them out of
+  every device they own, their current one included, for any principal carrying their account name.
+- `GET /v1/ghii/cors` names the web origins that already hold credentialed access to the account.
+  Audit H-7 fenced the PUT and left the read, which is the reconnaissance for the same attack.
+
+#### 11b. A two-legged flow is only as fenced as its FIRST leg
+
+`GET /v1/ghii/verify/eudiw/request` and `GET /v1/ghii/verify/ftn/authorize` are not another line in
+that list. The doors above hand over data that already belongs to the account. **These MINT A
+CREDENTIAL.**
+
+Each writes a verification nonce stamped with `req.auth!.owner` and hands back a state. The callback
+that consumes that state cannot be authenticated by construction — it is a wallet or a bank-ID
+redirect, arriving from the issuer and not from the person — so it writes `verificationLevel: 3`,
+`ftnVerified` and the presented eIDAS attributes onto the GHII **the nonce names**.
+
+August fenced the two POSTs and left these two GETs open. So any principal acting in the person's
+name could open a verification bound to that human, and whoever then completed the bank-ID login —
+the agent's operator, a different person entirely — had their own given name, family name, birthdate
+and national identifier hash written onto somebody else's account as PROVED. The failure is not an
+agent reading something it should not. It is a person's identity recorded as verified on an account
+that is not theirs, by the one rail on this node whose entire purpose is to be trusted afterwards.
+
+**Half-fencing is worse than not fencing, because the fenced leg makes the flow look done.** Both
+POSTs carried `requireOwnerPrincipal()` and a reader checking "is the verification path guarded"
+found a guard. The gate has to sit where the STATE IS MINTED, because after that there is nowhere to
+put it: the callback has no principal to test.
+
+*Check:* when a flow has an unauthenticated leg by design, fence the leg that BINDS it to a person.
+Ask what the unauthenticated end writes and whose record it names; if the answer comes from something
+minted earlier, that mint is the door.
+
 *Check:* every authorization names WHICH KIND of principal may do this, never only whose data it is.
 A change to the account itself, its password, its recovery address, its second factor, its deletion or
 its export, goes behind `requireOwnerPrincipal()`: role `owner` present, `agent`, `ecosystem` and
@@ -180,8 +240,16 @@ A word enforced on one door teaches an owner that they have controlled something
 Satisfying 15 means adding a gate to a door that has none, and that is where it can go wrong in the
 other direction. If a route is one an agent drives as its ordinary work, demanding a word nobody knew
 to ask for turns the capability off for every agent already doing the job. So the question before
-adding a gate is not "does this door look unguarded" but **"does the MCP tool for the same capability
-already demand this word?"**
+adding a gate is not "does this door look unguarded" but **"does an MCP tool doing the SAME KIND OF
+THING already demand this word?"**
+
+Per operation, not per word, and that is the whole of the refinement. A word can be write-only in the
+tool table and still look twin-backed to anyone who checks only the word. `cortex:write` is demanded
+by install, activate, deactivate and delete — and by no read. So gating the four `GET /v1/cortex/…`
+routes behind it invents a requirement, and `ext:write` is the same story: invoke, install, activate,
+deactivate, delete, and no read, so an agent granted `ext:invoke` would stop being able to list the
+instances it invokes. Both were about to be gated by a bulk pass on 2026-09-04 that was quoting this
+rule while doing it, and the reverts came from grepping the diff for read doors handed a write word.
 
 - **A twin demands it** → gating the REST door closes a BYPASS. It cannot turn anything off, because
   every agent doing that job through the tool already holds the word: the owner ticked that box the
@@ -198,9 +266,18 @@ Measured on 2026-09-04 against the 156 route-scope entries marked DEBT: **102 ar
 are not.** Two thirds of that backlog is mechanical and the rest is a judgement per route, which is
 worth knowing before anyone promises a date for it.
 
-*Check:* `TOOL_SCOPES` in `src/mcp/catalog/scopes.ts` is the register. `pnpm check:scope-parity`
-fails when a word lives on one side only, in either direction, which is the same question asked
-before either side exists.
+**A bulk pass is the draft, never the result.** Applying the triage's proposed word across a batch is
+the right way to move a hundred routes, and it is wrong often enough that the review step is part of
+the method rather than diligence on top of it: grep the resulting diff for READ doors handed a
+write-flavoured word and re-test each one per operation. On 2026-09-04 that step caught six of
+ninety-one, and each of the six had TWO independent reasons to be left alone — no read tool demanded
+the word, and the two extension reads already carried an owner fence in the handler (15c). The
+mechanical pass saw neither.
+
+*Check:* `TOOL_SCOPES` in `src/mcp/catalog/scopes.ts` is the register, and the tool NAMES in it are
+what you read — `aimeat_x_list` and `aimeat_x_read` demanding a word is what makes that word safe on
+a GET. `pnpm check:scope-parity` fails when a word lives on one side only, in either direction, which
+is the same question asked before either side exists.
 
 #### 15c. A door already gated on the word it needs does not get a weaker one in front
 
@@ -217,8 +294,27 @@ front of either would be a scanner-shaped change to a money path, and the caller
 buyer — a PSP callback holds no buyer scopes at all. Both were left, and both exemptions now say why,
 so the next reader does not "finish the job".
 
+**A door can be gated by DEGRADING instead of by refusing, and a middleware destroys that.** This is
+the third form, and it is the one that reads as ungated from every angle a scanner has.
+`GET /v1/librarian/search` reads `memory:read` and uses it to NARROW: without the word the search
+stays inside the caller's own records, and `e2e-librarian` asserts exactly that — status 200, and a
+sibling agent's private record absent from the hits. A `requireScope` in front turns "serves you your
+own things" into "refuses you", which is a worse answer to the same question.
+
+**And a door whose permission depends on the answer is decided after the answer, not before it.** The
+extension-invoke routes hold their decision until the paywall knows whether the call costs anything.
+This codebase had already learned it once, and `e2e-money-audit` carries the sentence: the permission
+"used to be demanded before the node knew whether the call cost anything, so an app holding only
+`memory:read` was refused with `SCOPE_DENIED` on a capability that charges nobody — which locked
+published apps out of their own free extensions." Both invoke doors were re-gated on 2026-09-04 by a
+scanner-driven pass and both reintroduced that regression one word over. Any gate on such a door
+belongs INSIDE the paywall, after the price is known, never in front of it.
+
 *Check:* before gating, read what the handler already refuses. If the answer is "the word that
 matters for this operation", the door is done and the exemption needs a sentence, not a middleware.
+Then read what it does with the word when the word is absent: if it answers a narrower question
+rather than refusing, or if it defers until it knows the price, the middleware is the wrong shape and
+the exemption says which of the three it is.
 
 #### 15d. A ratchet is recomputed, not maintained — that is the whole of it
 

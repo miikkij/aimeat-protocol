@@ -45,7 +45,7 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, GHIIRecord, AgentRecord } from '../storage/interface.js';
-import { requireAuth, optionalAuth } from '../auth/middleware.js';
+import { requireAuth, optionalAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 
@@ -184,7 +184,7 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
    * Returns all publishable content for the authenticated user.
    * Used by the portfolio builder wizard to populate checkboxes.
    */
-  router.get('/v1/portfolio/catalog', requireAuth(), async (req, res) => {
+  router.get('/v1/portfolio/catalog', requireAuth(), requireScope('memory:read'), async (req, res) => {
     const ownerName = req.auth!.owner;
     const agents = await storage.getAgentsByOwner(ownerName);
     if (!agents.length) {
@@ -336,7 +336,7 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
    * GET /v1/portfolio/config
    * Returns the user's portfolio configuration from memory.
    */
-  router.get('/v1/portfolio/config', requireAuth(), async (req, res) => {
+  router.get('/v1/portfolio/config', requireAuth(), requireScope('memory:read'), async (req, res) => {
     const ownerName = req.auth!.owner;
     // Read across every identity this owner's portfolio could live under: the mat is written
     // under the GHII before any agent exists, and must stay visible once one does.
@@ -380,7 +380,7 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
    * route disagreeing with it is how one of them would eventually erase the other's work. A caller
    * that wants a field GONE sends it as null rather than omitting it.
    */
-  router.put('/v1/portfolio/config', requireAuth(), async (req, res) => {
+  router.put('/v1/portfolio/config', requireAuth(), requireScope('memory:write'), async (req, res) => {
     const ownerName = req.auth!.owner;
     const target = await portfolioWriteGaii(storage, ownerName, config.nodeId);
     const body = req.body ?? {};
@@ -408,7 +408,7 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
    * Two content types, one behaviour: `text/html` with the document as the raw body (what the
    * browser sends), or `application/json` with `{ "html": "..." }`.
    */
-  router.put('/v1/portfolio/upload', requireAuth(), async (req, res) => {
+  router.put('/v1/portfolio/upload', requireAuth(), requireScope('storage:write'), async (req, res) => {
     const ownerName = req.auth!.owner;
     // The NO_AGENT refusal that used to stand here is gone (11-avoimet-kysymykset.md): under the
     // remake the welcome mat IS the portfolio and it comes BEFORE the first agent, so the check

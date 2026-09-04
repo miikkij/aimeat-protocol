@@ -47,7 +47,7 @@ import type { Request } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, CapabilityFilter, CapabilityRecord } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { resolveIdentity } from '../utils/gaii.js';
 
 /**
@@ -290,7 +290,7 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
 
   // ── Invoke (Tier 1) ──
 
-  router.post('/v1/capabilities/:id/invoke', requireAuth(), async (req, res) => {
+  router.post('/v1/capabilities/:id/invoke', requireAuth(), requireScope('work:request'), async (req, res) => {
     const cap = await storage.getCapability(req.params.id as string);
     if (!cap) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Capability not found'));
 
@@ -332,7 +332,7 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
   // moves the published average by any amount), and `lastError` — free text that is rendered on
   // somebody else's public capability record, which is a stranger writing on the owner's page.
   // The error TEXT is accepted from the owner only; a third party still counts their failure.
-  router.post('/v1/capabilities/:id/telemetry', requireAuth(), async (req, res) => {
+  router.post('/v1/capabilities/:id/telemetry', requireAuth(), requireScope('work:request'), async (req, res) => {
     const capId = req.params.id as string;
     const cap = await storage.getCapability(capId);
     if (!cap) {

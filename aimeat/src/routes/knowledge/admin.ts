@@ -8,6 +8,14 @@
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/knowledge.ts (max-file-lines)
  *   v1.1.0 — 2026-07-16 — review-list / delete / find batch the per-agent scans (listMemoryForOwners)
+ *   v1.2.0 — 2026-09-04 — GET /v1/knowledge/:id/reviews answers about the caller's OWN packages, or
+ *     to an operator. It was requireAuth() alone, so any principal read the operator's moderation
+ *     record for any package id on the node. The check is ownership rather than a scope word — a
+ *     scope would still have served every package to everyone holding it — and it is bounded to the
+ *     caller's own fleet, two indexed reads, rather than the node-wide scan the operator delete does.
+ *     A package imported by the person's agent stays readable by the person, because both resolve to
+ *     one owner. The refusal is the same 404 a missing package gets: whether a package exists is not
+ *     something this door should confirm to a stranger.
  */
 import type { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -355,9 +363,32 @@ export function registerAdminRoutes(
   });
 
   /* ── GET /v1/knowledge/:id/reviews — List operator reviews for a package ── */
+  // The one route in this file that is not operator-only, and it must not be: a person whose package
+  // was actioned deserves to read why, and e2e-knowledge asserts exactly that ("Package owner can see
+  // operator reviews", through the AGENT that imported it). What it must not be is what it was —
+  // requireAuth() alone, so any principal read the operator's moderation record for ANY package id on
+  // the node, other people's included, with nothing in the chain asking who was calling.
+  //
+  // The gate is ownership, not a scope word: a scope would still have served every package to
+  // everyone holding it. Bounded to the CALLER'S OWN fleet rather than the node's — the operator's
+  // delete route above scans every agent on the node to find a package, which is fine once for a
+  // moderator and wrong on a read anyone can make. Two indexed reads: the owner's agents, then one
+  // keyed lookup across that owner's identities. A package imported by the person's agent is read by
+  // the person's browser session and by that agent alike, because both resolve to the same owner.
   router.get('/v1/knowledge/:id/reviews', requireAuth(), async (req, res) => {
     const packageId = req.params.id as string;
     const manifestKey = `packages/${packageId}/manifest`;
+
+    if (!req.auth!.roles.includes('operator')) {
+      const owner = req.auth!.owner;
+      const identities = [`${owner}@${config.nodeId}`, ...(await storage.getAgentsByOwner(owner)).map(a => a.gaii)];
+      const mine = (await storage.listMemoryForOwners(identities, { prefix: manifestKey }))
+        .some(r => r.key === manifestKey);
+      if (!mine) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such package.'));
+        return;
+      }
+    }
 
     const reviews = await storage.listReviews(manifestKey);
 

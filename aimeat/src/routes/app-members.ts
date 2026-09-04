@@ -28,7 +28,7 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth } from '../auth/middleware.js';
+import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import {
@@ -146,7 +146,7 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
     }));
   });
 
-  router.put('/v1/apps/:owner/:filename/members/plan', requireAuth(), async (req, res) => {
+  router.put('/v1/apps/:owner/:filename/members/plan', requireAuth(), requireScope('commerce:sell'), async (req, res) => {
     const c = await context(req);
     if ('bad' in c) return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', c.bad));
     if (!c.isOwner) return res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the app owner sets its carry plan'));
@@ -249,7 +249,14 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
   });
 
   // ── POST .../members — approve someone, or change their role. Owner only. ──
-  router.post('/v1/apps/:owner/:filename/members', requireAuth(), async (req, res) => {
+  // `exchange:grant`, because syncGrantsForMember below issues the same exchange grants that
+  // POST /v1/exchange/grants issues, and that door has always demanded the word: giving away free
+  // access to what the owner sells is the operation, whichever door it is reached through. The
+  // isOwner test in `context` is not this check — it compares the caller's OWNER ACCOUNT NAME, and
+  // the comment beside it says so ("an agent acting for the app's owner administers as the owner
+  // does"), so an app grant approved for one unrelated word passed it. Owner sessions bypass scopes,
+  // so the person's own Members screen is untouched; what needs the word is a machine doing it.
+  router.post('/v1/apps/:owner/:filename/members', requireAuth(), requireScope('exchange:grant'), async (req, res) => {
     const c = await context(req);
     if ('bad' in c) return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', c.bad));
     if (!c.isOwner) return res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the app owner approves its members'));
@@ -353,7 +360,9 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
   });
 
   // ── DELETE .../members/:account — remove a member. Owner only. ──
-  router.delete('/v1/apps/:owner/:filename/members/:account', requireAuth(), async (req, res) => {
+  // Same word as the approval above, and for the same reason one door over: this withdraws the
+  // grants, which is what POST /v1/exchange/grants/revoke does and demands `exchange:grant` for.
+  router.delete('/v1/apps/:owner/:filename/members/:account', requireAuth(), requireScope('exchange:grant'), async (req, res) => {
     const c = await context(req);
     if ('bad' in c) return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', c.bad));
     if (!c.isOwner) return res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the app owner removes its members'));
@@ -383,7 +392,7 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
   });
 
   // ── POST .../members/requests — ask to be let in. Any authenticated caller. ──
-  router.post('/v1/apps/:owner/:filename/members/requests', requireAuth(), async (req, res) => {
+  router.post('/v1/apps/:owner/:filename/members/requests', requireAuth(), requireScope('social:write'), async (req, res) => {
     const c = await context(req);
     if ('bad' in c) return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', c.bad));
     if (c.isOwner) {

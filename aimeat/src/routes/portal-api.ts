@@ -16,7 +16,7 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth } from '../auth/middleware.js';
+import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 
@@ -27,7 +27,7 @@ import { resolveIdentity } from '../utils/gaii.js';
 export function portalApiRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
-  router.post('/v1/portal/try-memory', requireAuth(), async (req, res) => {
+  router.post('/v1/portal/try-memory', requireAuth(), requireScope('memory:write'), async (req, res) => {
     const text = req.body?.text;
     if (!text || typeof text !== 'string' || text.length > 280) {
       res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'Text required (max 280 chars)'));

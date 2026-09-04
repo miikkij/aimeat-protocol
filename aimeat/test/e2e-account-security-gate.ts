@@ -91,6 +91,7 @@ async function agentToken(name: string, scopes: string[]): Promise<string> {
 }
 
 let ownerAToken = '';
+let ownerAKey = '';
 let ownerBToken = '';
 let plainAgentToken = '';
 let grantedAgentToken = '';
@@ -119,6 +120,28 @@ const DOORS: Door[] = [
     // person is — the strongest statement a node makes about a human — and every principal carrying
     // the account name passed the comparison.
     { what: 'have a signed identity credential minted', method: 'GET', path: `/v1/ghii/${ownerA}@${NODE_ID}/credential` },
+    // Added 2026-09-04, hand-found while paying down the route-scope backlog. All six are the same
+    // shape and it is the one check:owner-principal cannot see: they do not REFUSE on the account
+    // name, they SCOPE A QUERY by it, so there is no comparison for a scanner to read.
+    //
+    // The two verification OPENERS. Their POST halves are ten lines above; these mint the nonce
+    // those flows are bound to, and the callback that consumes it is unauthenticated by necessity —
+    // a wallet or bank-ID redirect — so it writes verificationLevel 3 and the presented attributes
+    // onto the GHII the NONCE names. Fencing only the POSTs left each rail half fenced: whoever
+    // FINISHED the login walked away with their own name, birthdate and national identifier hash
+    // recorded as this person's, proved. Answered before the feature flag is read, so the refusal is
+    // 403 on a node with the rails switched off, which is what the shared test config is.
+    { what: 'open a wallet verification bound to the person', method: 'GET', path: '/v1/ghii/verify/eudiw/request' },
+    { what: 'open a bank-ID verification bound to the person', method: 'GET', path: '/v1/ghii/verify/ftn/authorize' },
+    // The three session doors. A device list says where and when the person signs in, and the
+    // session_id values in it are exactly the ids the two DELETEs accept.
+    { what: 'read where the person is signed in', method: 'GET', path: '/v1/auth/sessions' },
+    { what: 'sign the person out of one device', method: 'DELETE', path: '/v1/auth/sessions/no-such-session' },
+    { what: 'sign the person out of every device', method: 'DELETE', path: '/v1/auth/sessions' },
+    // The read half of the CORS pair whose write is above. Audit H-7 closed the write and left this,
+    // and this is the reconnaissance for the same attack: which web origins already hold
+    // credentialed access to the account.
+    { what: 'read which web origins may read the account', method: 'GET', path: '/v1/ghii/cors' },
 ];
 
 async function call(door: Door, token: string) {
@@ -136,6 +159,7 @@ async function main() {
     await test('two owners, an agent with full access, and an agent with account:security', async () => {
         const a = await registerOwner(ownerA);
         ownerAToken = a.token;
+        ownerAKey = a.privateKey;
         const b = await registerOwner(ownerB);
         ownerBToken = b.token;
         // Full access, which is what most agents hold. The point of the assertions below is that
@@ -269,6 +293,22 @@ async function main() {
         assert(a.status === 403, `agent: expected 403, got ${a.status} ${JSON.stringify(a.body)}`);
         const b = await json(`/v1/owners/${ownerA}`, { method: 'DELETE', headers: auth(appToken) });
         assert(b.status === 403, `app: expected 403, got ${b.status} ${JSON.stringify(b.body)}`);
+    });
+
+    // "Sign the person out of every device" is the one door in this table whose OWNER path succeeds
+    // by destroying the credential that reached it — and two phases drive the table as a principal
+    // that passes, the owner's session and the owner's PAT, so by here the session is twice revoked.
+    // Re-minted rather than dropped from the table, because the refusals in Phase 1 are why the door
+    // is listed and they are what dropping it would lose. e2e-profile-tabs carries the same repair
+    // for the same door, and the comment beside it records the day this was first learned.
+    await test('the owner signs back in after signing themselves out everywhere', async () => {
+        const ts = new Date().toISOString();
+        const again = await json('/v1/auth/token', {
+            method: 'POST',
+            body: JSON.stringify({ owner: ownerA, timestamp: ts, signature: await signMsg(ownerAKey, ownerA + NODE_ID + ts) }),
+        });
+        assert(again.body.ok === true, `owner re-auth: ${JSON.stringify(again.body.error)}`);
+        ownerAToken = again.body.data.token as string;
     });
 
     await test('the owner can delete their own identity record', async () => {

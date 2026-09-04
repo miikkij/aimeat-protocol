@@ -28,7 +28,7 @@ import { randomUUID, randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
-import { requireAuth } from '../../auth/middleware.js';
+import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { validateMemoryWrite } from '../../services/schema-validator.js';
@@ -103,7 +103,7 @@ export function registerOrganismIntakeRoutes(router: Router, config: AimeatConfi
   const strList = (v: unknown): string[] => Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
 
   /* ── POST /v1/intake/forms — define/update a public intake form (ws creator / org admin). ── */
-  router.post('/v1/intake/forms', requireAuth(), async (req, res) => {
+  router.post('/v1/intake/forms', requireAuth(), requireScope('organism:write'), async (req, res) => {
     const b = (req.body ?? {}) as Record<string, unknown>;
     const org = typeof b.organism_id === 'string' ? b.organism_id : (typeof b.org === 'string' ? b.org : '');
     const ws = typeof b.ws === 'string' ? b.ws : '';
@@ -169,7 +169,7 @@ export function registerOrganismIntakeRoutes(router: Router, config: AimeatConfi
   });
 
   /* ── DELETE /v1/intake/forms?ws=&form_id= — remove a form (the public link stops working). ── */
-  router.delete('/v1/intake/forms', requireAuth(), async (req, res) => {
+  router.delete('/v1/intake/forms', requireAuth(), requireScope('organism:write'), async (req, res) => {
     const org = typeof req.query.organism_id === 'string' ? req.query.organism_id : (typeof req.query.org === 'string' ? req.query.org : '');
     const ws = typeof req.query.ws === 'string' ? req.query.ws : '';
     const formId = typeof req.query.form_id === 'string' ? req.query.form_id : '';
