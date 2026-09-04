@@ -104,6 +104,15 @@ function main(): void {
         return;
     }
 
+    // Triage needs the whole population, not only what is new: the report below names the unlisted
+    // ones because those are what a commit must answer for, and a person working through the backlog
+    // needs every unit with the line that made it a candidate.
+    if (process.argv.includes('--list')) {
+        for (const u of units) console.log(`${u.asArgument ? 'ARG ' : '    '}${u.file}:${u.line}\t${u.unit}\t${u.text}`);
+        console.log(`\n  ${units.length} units, ${units.filter(u => u.asArgument).length} of them handing the value to a call`);
+        return;
+    }
+
     const exempt: ExemptionFile = JSON.parse(readFileSync(EXEMPTIONS, 'utf-8')) as ExemptionFile;
     const listed = Object.keys(exempt.exempt);
     const fresh = units.filter(u => exempt.exempt[key(u)] === undefined);

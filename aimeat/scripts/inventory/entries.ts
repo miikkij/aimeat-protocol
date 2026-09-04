@@ -75,6 +75,46 @@ export function enclosingUnit(node: ts.Node): { unit: string; body: ts.Node } | 
 }
 
 /**
+ * The roles a principal test must EXCLUDE. Naming the person means refusing the things acting in
+ * their name, so the NEGATION is the signal: `!roles.includes('agent')` asks the question,
+ * `roles.includes('owner')` only asks what a token carries.
+ */
+const PRINCIPAL_NEGATIONS = ['agent', 'ecosystem'];
+
+/**
+ * Does this unit work out for itself whether a PERSON is calling?
+ *
+ * The idiom, which is written out by hand in a dozen route handlers rather than called:
+ *
+ *   const isOwnerSession = roles.includes('owner') && !roles.includes('agent');
+ *   if (isOwnerSession) { …fan out across the owner's agents… } else { …use auth.sub… }
+ *
+ * `resolveIdentity` and `requireOwnerPrincipal` are written the same way. Two gates need to know it:
+ * invariant 11's, because a door that computes this has asked the principal question whatever
+ * middleware it carries, and the identity gate's, because a door with an explicit owner branch has
+ * resolved the caller even though it never called the resolver. Both got this wrong first and
+ * reported handlers that were right, which is the failure mode that gets a gate switched off.
+ */
+export function computesPrincipalTest(unit: ts.Node): boolean {
+    let found = false;
+    const visit = (n: ts.Node): void => {
+        if (found) return;
+        if (ts.isPrefixUnaryExpression(n) && n.operator === ts.SyntaxKind.ExclamationToken
+            && ts.isCallExpression(n.operand) && ts.isPropertyAccessExpression(n.operand.expression)
+            && n.operand.expression.name.text === 'includes') {
+            const arg = n.operand.arguments[0];
+            if (arg && ts.isStringLiteral(arg) && PRINCIPAL_NEGATIONS.includes(arg.text)) {
+                found = true;
+                return;
+            }
+        }
+        ts.forEachChild(n, visit);
+    };
+    visit(unit);
+    return found;
+}
+
+/**
  * Every function called anywhere inside a node, by name, however deeply nested.
  *
  * Used to answer "does this handler do X somewhere in its body" — verify a peer signature, resolve

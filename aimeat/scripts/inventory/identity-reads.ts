@@ -27,7 +27,7 @@
  */
 import ts from 'typescript';
 import { relative } from 'node:path';
-import { callsInside, enclosingUnit } from './entries.js';
+import { callsInside, computesPrincipalTest, enclosingUnit } from './entries.js';
 
 /** The verified token, declared on Express's Request in src/auth/middleware.ts. */
 const AUTH_TYPE = 'VerifiedToken';
@@ -42,7 +42,20 @@ export interface IdentityRead {
     line: number;
     /** `POST /v1/memory` for a route handler, `listForOwner` for a named function. */
     unit: string;
-    /** Does anything in the same unit call resolveIdentity()? */
+    /**
+     * Does the unit resolve the caller at all — by calling `resolveIdentity`, or by writing the same
+     * decision out by hand?
+     *
+     * The hand-written form is the majority idiom in the routes, and reading only the call missed it:
+     *
+     *   const isOwnerSession = roles.includes('owner') && !roles.includes('agent');
+     *   if (isOwnerSession) { …fan out across the owner's agents… }
+     *   else { …use auth.sub, which for an agent IS its GAII… }
+     *
+     * GET /v1/work/inbox and GET /v1/memory/files are both written exactly that way. A door like that
+     * has answered the question this gate asks, so reporting it is reporting correct code — and the
+     * first version of the gate reported 65 units of which most were this.
+     */
     resolvesToo: boolean;
     /**
      * Is the value handed to a call, rather than compared, logged or interpolated? This is what
@@ -109,7 +122,9 @@ export function identityReads(program: ts.Program, files: ts.SourceFile[], root:
                     file: rel,
                     line: line + 1,
                     unit: found?.unit ?? '<module>',
-                    resolvesToo: found ? callsInside(found.body).has(RESOLVER) : false,
+                    resolvesToo: found
+                        ? callsInside(found.body).has(RESOLVER) || computesPrincipalTest(found.body)
+                        : false,
                     asArgument: isCallArgument(hit),
                     text: source.text.split('\n')[line].trim().slice(0, 120),
                 });
