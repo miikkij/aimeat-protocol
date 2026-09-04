@@ -1,0 +1,122 @@
+/**
+ * @file data-wallet-poster.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The Data Wallet page in the poster face (dw- prefix; design canvas "AIMEAT
+ *   Tietolompakko-sivu", direction A). The shared parts come from organism.css's og- rules; this
+ *   file carries what the page adds: the permission rows (target, who and what, since, door) and the
+ *   opened target with its grants; the trail rows (who, what, count, when, door) and the opened
+ *   group with its keys and rows; the grant form as a fold; the export box with its contents; the
+ *   two roads. Every column is bounded so a long key or name wraps inside its cell. NOTE: this file
+ *   must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-04 — Initial.
+ */
+
+.og-dw .og-door:disabled, .og-dw .og-slab:disabled { opacity: .5; cursor: default; }
+.og-dw .og-strip b.is-dim, .og-dw .is-dim { color: var(--text-dim); }
+.og-dw .og-strip small { white-space: normal; overflow: visible; }
+.og-dw .is-low { color: var(--accent); }
+.og-dw .is-good { color: var(--success-fg); }
+.dw-hint { margin: .7rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--text-dim); }
+.dw-para { margin: 0 0 .6rem; font-size: .95rem; line-height: 1.55; color: var(--text-dim); }
+.dw-lead { margin: 0 0 .7rem; font-size: .95rem; line-height: 1.55; }
+.dw-empty { margin: 0; padding: .3rem 0 .8rem; font-size: .95rem; line-height: 1.55; font-weight: 600; color: var(--text-dim); }
+.dw-empty b { color: var(--text); font-weight: 800; }
+.dw-msg { display: block; margin: .4rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--success-fg); }
+.dw-msg.is-err { color: var(--accent); }
+.dw-slab-hint { display: block; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); max-width: 18rem; text-align: right; }
+.dw-label { display: block; margin: 1rem 0 .4rem; }
+.dw-box { margin-top: 1.4rem; }
+.dw-why { margin-top: .9rem; padding: .8rem 1rem; border: 3px solid var(--text); background: var(--card-bg); font-size: .9rem; line-height: 1.55; }
+.dw-why b { font-weight: 800; }
+
+/* ── Filters and rows ─────────────────────────────────────────────────────────────────────── */
+.dw-filters { display: flex; flex-wrap: wrap; gap: .5rem; margin: .2rem 0 .8rem; align-items: center; }
+.dw-filters .og-chip { cursor: pointer; background: transparent; }
+.dw-filters .og-chip.og-chip--sun { background: var(--sun); }
+.dw-filters .dw-filters-r { margin-left: auto; }
+.dw-rows { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.6fr) 8.5rem auto; gap: 0 1rem; align-items: stretch; }
+.dw-rows--log { grid-template-columns: minmax(0, .9fr) minmax(0, 1.6fr) 5.5rem 8rem auto; }
+.dw-rows--plain { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.6fr) 10rem auto; }
+.dw-row { display: contents; }
+.dw-row > div { padding: .65rem 0; border-bottom: 1px solid var(--border); min-width: 0; display: grid; align-content: center; }
+.dw-row--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.dw-row.is-open > div { border-bottom: 0; }
+.dw-row.is-focus > div { background: var(--bg-dim); }
+.dw-row > .dw-nm { font-size: .9rem; font-weight: 800; color: var(--text); overflow-wrap: anywhere; }
+.dw-nm .og-tbl-name { font-size: .9rem; }
+.dw-nm small { display: block; margin-top: .15rem; font-family: var(--font-mono); font-size: .68rem; font-weight: 400; color: var(--text-dim); overflow-wrap: anywhere; white-space: normal; }
+.dw-row > .dw-w { font-size: .85rem; line-height: 1.5; color: var(--text-dim); overflow-wrap: anywhere; }
+.dw-w b { color: var(--text); font-weight: 800; }
+.dw-w small { display: block; font-family: var(--font-mono); font-size: .68rem; }
+.dw-row > .dw-when { font-family: var(--font-mono); font-size: .72rem; line-height: 1.5; color: var(--text-dim); overflow-wrap: anywhere; }
+.dw-row > .dw-n { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.35rem; line-height: 1; color: var(--text); text-align: right; white-space: nowrap; }
+.dw-row > .dw-n.is-low { color: var(--accent); }
+.dw-row > .dw-n.is-good { color: var(--success-fg); }
+.dw-n small { display: block; margin-top: .15rem; font-family: var(--font-mono); font-size: .66rem; font-weight: 400; color: var(--text-dim); }
+.dw-row--head > .dw-n { font-family: inherit; font-size: .66rem; }
+.dw-row > .dw-go { display: flex; justify-content: flex-end; align-items: center; gap: .8rem; white-space: nowrap; }
+.dw-go .og-door { font-size: .72rem; }
+.dw-row > .dw-open { grid-column: 1 / -1; display: block; margin: 0 0 .6rem; padding: 1rem 1.2rem 1.1rem; border: 3px solid var(--text); box-shadow: 8px 8px 0 var(--sun); background: var(--card-bg); font-size: .9rem; line-height: 1.55; color: var(--text); }
+.dw-open .og-doors { margin-top: .9rem; }
+.dw-open .og-label { display: block; margin: .9rem 0 .3rem; }
+.dw-open code, .dw-v code { display: inline-block; max-width: 100%; font-family: var(--font-mono); font-size: .72rem; background: var(--bg-dim); padding: .05rem .35rem; overflow-wrap: anywhere; }
+.dw-more { margin-top: .8rem; }
+.dw-more small { font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); }
+
+/* the grants inside an opened target, and the keys inside an opened group */
+.dw-grants { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) 7rem 8rem auto; gap: 0 1rem; margin-top: .4rem; }
+.dw-grants--keys { grid-template-columns: minmax(0, 1.6fr) 8rem; }
+.dw-grants--rows { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) 9rem; }
+.dw-grants > div { padding: .45rem 0; border-bottom: 1px solid var(--border); font-size: .85rem; line-height: 1.5; min-width: 0; overflow-wrap: anywhere; }
+.dw-grants > div b { font-weight: 800; }
+.dw-grants > div small { display: block; font-family: var(--font-mono); font-size: .68rem; color: var(--text-dim); }
+.dw-grants > .dw-gh { padding: 0 0 .25rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.dw-grants .og-door { font-size: .72rem; }
+.dw-grants > .dw-gr { text-align: right; }
+
+/* ── 03: the form ──────────────────────────────────────────────────────────────────────────── */
+.dw-form { display: grid; grid-template-columns: minmax(8rem, 11rem) minmax(0, 1fr); gap: .9rem 1.2rem; margin-top: .4rem; align-items: start; }
+.dw-form .og-label { padding-top: .35rem; }
+.dw-form .og-input, .dw-form .og-textarea, .dw-form select.og-input { width: 100%; box-sizing: border-box; }
+.dw-form .dw-hint { margin-top: .3rem; }
+.dw-opts { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .4rem; }
+.dw-opt { padding: .2rem .7rem; border: 2px solid var(--border); background: transparent; font: inherit; font-size: .8rem; font-weight: 600; color: var(--text-dim); cursor: pointer; }
+.dw-opt.is-on { border-color: var(--text); color: var(--text); background: var(--sun); }
+.dw-form .dw-submit { display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap; }
+
+/* ── 04: the export ────────────────────────────────────────────────────────────────────────── */
+.dw-contents { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .4rem 1.2rem; margin-top: .2rem; font-size: .84rem; line-height: 1.5; }
+.dw-contents > div { padding: .4rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
+.dw-contents b { display: block; font-weight: 800; color: var(--text); }
+.dw-contents small { display: block; margin-top: .1rem; font-family: var(--font-mono); font-size: .68rem; color: var(--text-dim); overflow-wrap: anywhere; }
+.dw-export { display: flex; align-items: center; gap: 1.4rem; margin-top: .9rem; padding: .9rem 1.1rem; border: 3px solid var(--text); background: var(--card-bg); font-size: .9rem; line-height: 1.55; }
+.dw-export .og-slab { flex: none; }
+
+/* ── 05: the two roads ─────────────────────────────────────────────────────────────────────── */
+.dw-roads { display: grid; grid-template-columns: 1.2fr 1fr; gap: 1.2rem; }
+.dw-road { display: flex; flex-direction: column; gap: .5rem; padding: .9rem 1.1rem; border: 2px solid var(--text); background: var(--card-bg); font-size: .9rem; line-height: 1.55; }
+.dw-road.is-lead { border-width: 3px; box-shadow: 8px 8px 0 var(--sun); }
+.dw-road p { margin: 0; }
+.dw-road small { font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); overflow-wrap: anywhere; }
+.dw-road pre { margin: 0; padding: .6rem .7rem; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-mono); font-size: .74rem; line-height: 1.5; background: var(--bg-dim); border-left: 3px solid var(--text); }
+
+/* ── Phone ─────────────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 860px) {
+  .dw-contents, .dw-roads { grid-template-columns: minmax(0, 1fr); }
+  .dw-rows, .dw-rows--log, .dw-rows--plain { grid-template-columns: minmax(0, 1fr) 5.5rem; }
+  .dw-row--head { display: none; }
+  .dw-row > .dw-w, .dw-row > .dw-when { grid-column: 1 / -1; padding-top: 0; border-bottom: 0; }
+  .dw-row > .dw-nm { border-bottom: 0; padding-bottom: .1rem; }
+  .dw-row > .dw-go { grid-column: 1 / -1; justify-content: flex-start; padding-top: .1rem; }
+  .dw-row > .dw-open { padding: .8rem .8rem .9rem; }
+  .dw-grants, .dw-grants--keys, .dw-grants--rows { grid-template-columns: minmax(0, 1fr); }
+  .dw-grants > .dw-gh { display: none; }
+  .dw-grants > .dw-gr { text-align: left; }
+  .dw-form { grid-template-columns: minmax(0, 1fr); gap: .3rem 0; }
+  .dw-form .og-label { padding-top: .6rem; }
+  .dw-export { flex-direction: column; align-items: flex-start; }
+  .dw-slab-hint { text-align: left; }
+  .dw-filters .dw-filters-r { margin-left: 0; }
+}
