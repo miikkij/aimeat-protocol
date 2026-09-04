@@ -10,6 +10,13 @@
  *   the result, return only the new key — no base64 in the arguments or the result.
  * @usage cd aimeat && AIMEAT_EXTENSIONS_ENABLED=true pnpm exec tsx test/e2e-ext-files.ts
  * @version-history
+ *   v1.1.0 — 2026-09-04 — The HTTP door, not the sandbox's answer. This suite was already
+ *     cross-owner, and its refusals are result objects — `{ ok: false }` — because the caller is
+ *     inside an extension and there is nothing to send a status to. That is the right shape there
+ *     and it left the door itself unasked: an unauthenticated invoke, and the same private file
+ *     requested the way an ordinary client would, so the refusal does not rest on the extension
+ *     alone. One of the 34 seeded into security/denial-coverage-exemptions.json on 2026-08-15
+ *     (quality plan stream B).
  *   v1.0.0 — 2026-07-26 — Initial (ctx.files.read/write).
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -154,6 +161,35 @@ await test('A missing reference answers null rather than throwing', async () => 
   const r = await invoke(owner.token, 'peek', { ref: 'nothing/here.bin' });
   assert(r.status === 200, `status ${r.status}`);
   assert(r.body.data.ok === true && r.body.data.size === null, 'null, not an error');
+});
+
+// ── The HTTP door, not the sandbox's answer ──
+//
+// Everything above is a cross-owner test already, and its refusals are result objects: the sandbox
+// answers `{ ok: false }` because the caller is inside an extension and there is nothing to send a
+// status to. That is the right shape THERE and it leaves the door itself unasked. These are the two
+// questions the sandbox cannot answer, because they are decided before it runs.
+
+await test('An unauthenticated caller cannot invoke the extension at all', async () => {
+  const r = await json(`/v1/ext/${EXT}/probe`, { method: 'POST', body: JSON.stringify({}) });
+  assert(r.status === 401, `expected 401, got ${r.status}`);
+});
+
+await test('Another owner cannot read the source file through the storage door either', async () => {
+  // The sandbox already refuses `peek` on a private ref. This is the same file asked for the same
+  // way an ordinary client would, so that the refusal is not resting on the extension alone.
+  // 404 and not 403: the storage door resolves the caller's own identity and looks the key up under
+  // it, so a key that is not theirs is not there. Pinned, because a drift to 403 would confirm that
+  // this owner holds a file at that exact path.
+  const r = await json(`/v1/storage/${SOURCE_KEY}`, { headers: auth(other.token) });
+  assert(r.status === 404, `expected 404, got ${r.status}`);
+});
+
+await test('POSITIVE CONTROL: the owner still invokes and still reads their own file', async () => {
+  const inv = await invoke(owner.token, 'probe', {});
+  assert(inv.status === 200, `owner invoke ${inv.status}`);
+  const r = await json(`/v1/storage/${SOURCE_KEY}`, { headers: auth(owner.token) });
+  assert(r.status === 200, `owner read ${r.status}`);
 });
 
 console.log(`\n  Results: ${passed} passed, ${failed} failed out of ${passed + failed}`);

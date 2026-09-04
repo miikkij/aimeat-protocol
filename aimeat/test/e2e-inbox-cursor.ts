@@ -409,7 +409,17 @@ await test('7b. Another owner\'s agent cannot poll this inbox', async () => {
     const { status, body } = await json(`/v1/agents/${agentName}/inbox`, {
         headers: { Authorization: `Bearer ${otherAgentToken}` },
     });
-    assert(status === 403 || status === 404, `expected 403 or 404, got ${status}: ${JSON.stringify(body)}`);
+    // 403, and it is a deliberate 403: the body reads "This agent belongs to someone else, so it
+    // cannot be used from here", which is written for a person and tells them what to do instead.
+    // That trade is made knowingly — the answer confirms the name exists, and in exchange the
+    // person is not left guessing.
+    //
+    // WORTH KNOWING, because it surprised this test: the sibling door one path segment away,
+    // /v1/agents/:name/telemetry, answers 404 for the same cross-owner call (e2e-agent-telemetry
+    // test 9). Two doors addressed by agent name, two different answers about whether the name's
+    // existence is a secret. Neither is a hole and the pair is not consistent; both are now pinned,
+    // so whichever way that is resolved, a test says so.
+    assert(status === 403, `expected 403, got ${status}: ${JSON.stringify(body)}`);
 });
 
 await test('7c. Another owner\'s agent cannot poll it with a cursor either', async () => {
@@ -419,7 +429,7 @@ await test('7c. Another owner\'s agent cannot poll it with a cursor either', asy
     const { status } = await json(`/v1/agents/${agentName}/inbox?cursor=0`, {
         headers: { Authorization: `Bearer ${otherAgentToken}` },
     });
-    assert(status === 403 || status === 404, `expected 403 or 404, got ${status}`);
+    assert(status === 403, `expected 403, got ${status}`);
 });
 
 await test('7d. An unauthenticated caller cannot poll it', async () => {

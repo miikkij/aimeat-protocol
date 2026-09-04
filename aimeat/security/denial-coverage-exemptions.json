@@ -17,10 +17,6 @@
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
       "sha": "8121169cd1184d2d"
     },
-    "test/e2e-ext-files.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "7ac09408557ee264"
-    },
     "test/e2e-mcp-sse-parity.ts": {
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
       "sha": "52885311c2194490"
@@ -73,10 +69,6 @@
       "reason": "Reviewed 2026-08-16. This suite is entirely about refusal, and none of it is a status: the roster doors answer 200 with the roster REDACTED (members_hidden, an empty members[], empty agentGaiis), because hiding who is in an organism is not the same as hiding that it exists. It asserts that on BOTH doors — the members listing and the detail handler, which is a separate handler with its own canSeeMembers call. Re-seeded 2026-08-23 after adding test 8 (a duplicated ?member= param must not 500 the list, CodeQL type-confusion) — a correctness assertion, not a new gated surface, so the exemption still holds.",
       "sha": "c217ca906dc01af2"
     },
-    "test/e2e-transparency-page.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "768ed6a78d9a41d4"
-    },
     "test/e2e-connect-tunnel-delivery.ts": {
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
       "sha": "374ff3925654ca54"
@@ -118,8 +110,8 @@
       "sha": "067aba73c3ec539c"
     },
     "test/e2e-public-totals.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "c7185060f37715d3"
+      "reason": "REVIEWED 2026-09-04. GET /v1/public/node-totals has no refusal to test and that is the requirement rather than an omission: it powers the landing panel a visitor sees before they have an account, and the suite asserts it answers with no Authorization header at all. The question a public counter DOES raise is asked instead, and it is not status-shaped: a counter that rises when a PRIVATE organism is created tells an anonymous caller that one exists, which is the whole of what private was supposed to prevent. Added 2026-09-04 and it holds. If an authenticated door is ever added to this router, this line expires with its sha.",
+      "sha": "6c6a625e86caf82f"
     },
     "test/e2e-datapackage-odata.ts": {
       "reason": "REVIEWED 2026-08-15: this surface has no refusal to test, and that is the design rather than an omission. An OData feed serves the rows of a PUBLISHED data package, whose CSV already sits at a permanent, world-readable /v1/pub address; putting a token in front of the feed while the file stays open would be theatre, not a control. There is therefore no second principal that gets a different answer. What the suite DOES prove instead is the fence that exists here: test 13b shows the feed is a door onto packages and cannot be steered at the owner's other storage, and tests 7-11 prove every unimplemented query construct is REFUSED (501/400) rather than ignored — which on this surface is the failure with real consequences, because an ignored $filter returns the wrong rows into somebody's report with no symptom. If the metered feed is ever built it will be a separate authenticated door, and that one owes a 401/403 case.",
