@@ -261,14 +261,17 @@ await test('8. A second owner cannot write telemetry into this agent', async () 
         headers: { Authorization: `Bearer ${otherOwnerToken}` },
         body: JSON.stringify({ type: 'llm_call', data: { model: 'planted', tokens: 999999 } }),
     });
-    assert(status === 403 || status === 404, `expected 403 or 404, got ${status}: ${JSON.stringify(body)}`);
+    // 404 and not 403: the route resolves the agent by NAME under the caller's own identity, so an
+    // agent belonging to somebody else is simply not there. Pinned to the one status rather than
+    // accepting either, because a drift from 404 to 403 would start confirming that the agent exists.
+    assert(status === 404, `expected 404, got ${status}: ${JSON.stringify(body)}`);
 });
 
 await test('9. A second owner cannot read this agent\'s telemetry', async () => {
     const { status, body } = await json(`/v1/agents/${agentName}/telemetry`, {
         headers: { Authorization: `Bearer ${otherOwnerToken}` },
     });
-    assert(status === 403 || status === 404, `expected 403 or 404, got ${status}: ${JSON.stringify(body)}`);
+    assert(status === 404, `expected 404, got ${status}: ${JSON.stringify(body)}`);
 });
 
 await test('10. An unauthenticated caller cannot read it', async () => {

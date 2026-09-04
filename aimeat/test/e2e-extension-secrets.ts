@@ -292,9 +292,12 @@ await test('a second owner cannot read the instance, masked or otherwise', async
   const { status, body } = await json('/v1/extensions/rest-connector/instances/acme', {
     headers: { Authorization: `Bearer ${strangerToken}` },
   });
-  assert(status === 403 || status === 404, `expected 403 or 404, got ${status}: ${JSON.stringify(body)}`);
+  // 404 and not 403, which is the shape the fix chose: the instance id is the caller's guess, and
+  // confirming that somebody else's instance exists answers a question they did not get to ask.
+  // Pinned to the one status so that choice cannot drift back without a test noticing.
+  assert(status === 404, `expected 404, got ${status}: ${JSON.stringify(body)}`);
   // Belt and braces: whatever the status, the plaintext must not be in the body. A refusal that
-  // still echoes the config would be the same defect wearing a 403.
+  // still echoes the config would be the same defect wearing a 404.
   assert(JSON.stringify(body).indexOf(SECRET) === -1, 'plaintext secret leaked in the refusal');
 });
 
@@ -302,7 +305,9 @@ await test('a second owner cannot delete the extension', async () => {
   const { status } = await json('/v1/extensions/rest-connector', {
     method: 'DELETE', headers: { Authorization: `Bearer ${strangerToken}` },
   });
-  assert(status === 403 || status === 404, `expected 403 or 404, got ${status}`);
+  // 403 and not 404, unlike the instance above: an extension is installed under a name that is
+  // node-wide and discoverable, so its existence is not the secret — who may uninstall it is.
+  assert(status === 403, `expected 403, got ${status}`);
 });
 
 await test('POSITIVE CONTROL: the extension is still there and still the owner\'s', async () => {

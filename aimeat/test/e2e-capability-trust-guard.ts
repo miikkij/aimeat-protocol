@@ -284,14 +284,17 @@ await test('A stranger cannot rewrite the capability', async () => {
         headers: { Authorization: `Bearer ${strangerToken}` },
         body: JSON.stringify({ summary: 'written by somebody else entirely' }),
     });
-    assert(status === 403 || status === 404, `expected 403 or 404, got ${status}: ${JSON.stringify(body.error ?? body)}`);
+    // 403 and not 404: the capability is addressed by an id that is discoverable from the catalogue,
+    // so its existence is not the secret — who may rewrite it is. Pinned to the one status, because
+    // a drift to 404 would hide a real capability from a caller who is allowed to know it is there.
+    assert(status === 403, `expected 403, got ${status}: ${JSON.stringify(body.error ?? body)}`);
 });
 
 await test('A stranger cannot delete the capability', async () => {
     const { status } = await json(`/v1/capabilities/${capId}`, {
         method: 'DELETE', headers: { Authorization: `Bearer ${strangerToken}` },
     });
-    assert(status === 403 || status === 404, `expected 403 or 404, got ${status}`);
+    assert(status === 403, `expected 403, got ${status}`);
 });
 
 await test('An unauthenticated caller cannot rewrite the capability', async () => {

@@ -136,6 +136,23 @@ await test('Cache invalidates on a relevant write (new public organism reflected
   assert(after === before + 1, `organisms should rise immediately after creating one (cache invalidated, not waiting out TTL): ${after} vs ${before}`);
 });
 
+// The question a public counter actually raises. This endpoint has no refusal to test — it is meant
+// to answer everyone, and the test below asserts that. What it must NOT do is count something the
+// person who made it kept private: a counter that rises when a private organism is created tells an
+// anonymous caller that one was created, which is the whole of what "private" was supposed to
+// prevent. The cache invalidation above makes this measurable in the same breath rather than after
+// a 30s TTL.
+await test('A PRIVATE organism does not move the public counter', async () => {
+  const before = (await json('/v1/public/node-totals')).body?.data?.organisms ?? 0;
+  const org = await json('/v1/organisms', agentAuth({
+    method: 'POST', body: JSON.stringify({ name: `PT Org Private ${stamp}`, visibility: 'private' }),
+  }));
+  assert(org.status === 201, `private org status ${org.status}: ${JSON.stringify(org.body)}`);
+  const after = (await json('/v1/public/node-totals')).body?.data?.organisms ?? 0;
+  assert(after === before,
+    `a private organism moved the public counter ${before} → ${after}, which tells an anonymous caller it exists`);
+});
+
 await test('Endpoint is public — works with no Authorization header', async () => {
   const res = await fetch(`${BASE}/v1/public/node-totals`);
   assert(res.status === 200, `unauthenticated status ${res.status}`);

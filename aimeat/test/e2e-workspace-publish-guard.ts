@@ -166,7 +166,10 @@ await test('A stranger cannot publish into the workspace', async () => {
         method: 'POST', headers: bAuth(),
         body: JSON.stringify({ ws: WS, namespace: 'shared.notes', id: 'n1' }),
     });
-    assert(r.status === 403 || r.status === 404, `expected 403 or 404, got ${r.status}: ${JSON.stringify(r.body)}`);
+    // 403 and not 404: the organism is deliberately PUBLIC here, so a stranger already knows it
+    // exists and hiding it would be theatre. What must not happen is that they can write to it.
+    // Pinned to the one status so "public but not writable" stays the tested answer.
+    assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body)}`);
 });
 
 await test('An unauthenticated caller cannot publish into the workspace', async () => {
