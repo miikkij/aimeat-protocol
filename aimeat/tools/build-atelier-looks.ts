@@ -10,6 +10,9 @@
  * @structure emitLooksCss() · main (writes the file)
  * @usage pnpm build:atelier-looks   (or: pnpm exec tsx tools/build-atelier-looks.ts)
  * @version-history
+ *   v1.2.0 — 2026-09-05 — --ak-ambient joins the never-inherited set: a calm look previewed
+ *     inside a lounge gallery must not inherit the wave (wish-atelier-ambient-visuals). Every
+ *     block now declares it, its own preset or none.
  *   v1.1.0 — 2026-08-28 — The NESTING GUARD: every look's block (the bare default included)
  *     declares the never-inherited trio (--ak-hero-ink, --ak-hero-ink-dim, --ak-scrim) — its
  *     own value or the contract default — so a look previewed inside another look never wears
@@ -40,6 +43,10 @@ const NEVER_INHERITED: Record<string, string> = {
   // against the PALETTE surface, so a world's chrome floated on white glass over a night page
   // (found by the terminal ground). Re-declared per block, it follows the block's own surface.
   '--ak-glass': 'color-mix(in oklab, var(--ak-surface) 74%, transparent)',
+  // The ambient layer is the look's own weather: a calm look previewed inside a lounge gallery
+  // must not inherit the wave. Alpha and speed need no guard — every look that names a preset
+  // declares its own pair in the registry.
+  '--ak-ambient': 'none',
 };
 
 /** The whole generated stylesheet, deterministically — the drift gate compares against this. */
