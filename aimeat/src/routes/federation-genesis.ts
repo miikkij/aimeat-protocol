@@ -14,6 +14,16 @@
  *   - subscriptions + network-stats + /v1/organisms/:id/reputation
  *
  * @version-history
+ *   v1.3.0 — 2026-09-04 — POST genesis-memory-read requires memory:read. It had requireAuth alone, so
+ *     any principal carrying the account name could make this node fan out one request per active
+ *     genesis peer whatever it had been granted. Noted as an open question by
+ *     check:federation-signatures on the day that gate was written, and closed here.
+ *   v1.2.0 — 2026-09-04 — The genesis memory cache is one module, services/genesis-memory-cache.ts,
+ *     because the two halves written out here disagreed: the write filed keys under
+ *     `genesis-cache:` and the lookup listed the prefix `genesis:`, which a LIKE search does not
+ *     match. The cache was written on every request and read on none, so `genesisMemoryCache` cost a
+ *     storage write per result and saved nothing, in silence. `genesis:` is the surviving prefix
+ *     because the GET below refuses to re-export keys under it.
  *   v1.1.0 — 2026-08-10 — Security audit: genesis catalogue ingest refuses a missing signature. The gate
  *     read `if (signature && ...)`, so omitting it wrote straight into the publicly served catalogue.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
@@ -22,7 +32,7 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import type { PeerInfo } from '../services/federation.js';
 import type { ServiceSummary } from '../utils/service-summary.js';
@@ -32,6 +42,7 @@ import { emitChange } from '../services/event-bus.js';
 import { createGenesisPeeringService } from '../services/genesis-peering.js';
 import { createOrganismReputationService } from '../services/organism-reputation.js';
 import { matchesKeyword, matchesActionKeyword, matchesGenesisKeyword, matchesLocation } from '../services/federation-helpers.js';
+import { cacheGenesisResults, findCachedGenesis } from '../services/genesis-memory-cache.js';
 import { logger } from '../utils/logger.js';
 
 export function federationGenesisRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>, networkDirectory?: Map<string, ServiceSummary>): Router {
@@ -379,9 +390,20 @@ export function federationGenesisRouter(config: AimeatConfig, storage: Storage, 
         }
     });
 
-    // POST /v1/federation/genesis-memory-read — E.2: Cross-genesis memory routing
-    // Forwards memory read requests to genesis peers, aggregates responses
-    router.post('/v1/federation/genesis-memory-read', requireAuth(), async (req, res) => {
+    /**
+     * POST /v1/federation/genesis-memory-read — ask the genesis peers for memory and aggregate what
+     * they answer. E.2, cross-genesis memory routing.
+     *
+     * requireScope('memory:read') since 2026-09-04. It had requireAuth alone, which admitted any
+     * principal carrying the account name whatever it was granted — including an app-grant token
+     * holding one unrelated scope — and each call fans out one outbound request per active genesis
+     * peer. Nothing discloses more than it should: the ANSWERING side (the GET below) returns a record
+     * only when visibility is public and the owner has a federation consent. What the word adds is
+     * that reaching across the genesis network is something the owner granted rather than something
+     * any credential of theirs can do. An owner session bypasses scopes, so nothing a person does
+     * changes.
+     */
+    router.post('/v1/federation/genesis-memory-read', requireAuth(), requireScope('memory:read'), async (req, res) => {
         try {
             const { target_gaii, key, prefix, target_scope } = req.body ?? {};
 
@@ -405,14 +427,8 @@ export function federationGenesisRouter(config: AimeatConfig, storage: Storage, 
             // Check local genesis cache first (if enabled)
             if (config.genesisMemoryCache && key) {
                 try {
-                    const cachePrefix = 'genesis:';
-                    const cachedEntries = await storage.listMemory('__genesis__', { prefix: cachePrefix });
-                    const cached = cachedEntries.find(m => {
-                        const val = m.value as Record<string, unknown>;
-                        return val.key === key && (!target_gaii || val.gaii === target_gaii);
-                    });
-                    if (cached) {
-                        const val = cached.value as Record<string, unknown>;
+                    const val = await findCachedGenesis(storage, key, target_gaii);
+                    if (val) {
                         res.json(success(config.nodeId, {
                             results: [{
                                 key: val.key,
@@ -480,28 +496,13 @@ export function federationGenesisRouter(config: AimeatConfig, storage: Storage, 
 
             await Promise.allSettled(peerPromises);
 
-            // Optionally cache results
+            // Optionally cache results. The key and the prefix live in services/genesis-memory-cache.ts
+            // with the lookup above, because they were written out separately here once and disagreed.
             if (config.genesisMemoryCache && results.length > 0) {
-                const now = new Date().toISOString();
-                for (const result of results) {
-                    try {
-                        const cacheKey = `genesis-cache:${result.source_genesis}:${result.key ?? 'unknown'}`;
-                        await storage.setMemory({
-                            key: cacheKey,
-                            ownerGaii: '__genesis__',
-                            value: result,
-                            visibility: 'public',
-                            tags: ['genesis-cache'],
-                            ttlHours: config.genesisMemoryCacheTtlHours,
-                            version: 1,
-                            createdAt: now,
-                            updatedAt: now,
-                        });
-                    } catch (err) {
-                        // Cache write failure is non-critical
-                      logger.warn('POST /v1/federation/genesis-memory-read: continuing after a suppressed failure', { error: String(err) });
-                    }
-                }
+                await cacheGenesisResults(storage, results, config.genesisMemoryCacheTtlHours, (cacheKey, err) => {
+                    // A cache write failure is not an answer failure: the caller already has its data.
+                    logger.warn('POST /v1/federation/genesis-memory-read: continuing after a suppressed failure', { key: cacheKey, error: String(err) });
+                });
             }
 
             res.json(success(config.nodeId, {
