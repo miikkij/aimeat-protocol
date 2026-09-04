@@ -32,8 +32,7 @@ import ts from 'typescript';
 import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { collectRestRoutes, collectMcpTools, collectCliDispatch, guardArraysIn, type EntryPoint } from './entries.js';
-import { principalsFor, isPublic, type Principal } from './principals.js';
+import { collectDoors, toRows, type Row } from './doors.js';
 import { scopeMentions } from './scope-mentions.js';
 import { srcProgram } from './program.js';
 import { TOOL_SCOPES } from '../../src/mcp/catalog/scopes.js';
@@ -74,48 +73,6 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const AIMEAT = resolve(HERE, '..', '..');
 const REPO = resolve(AIMEAT, '..');
 const OUT_DIR = join(REPO, 'secaudit');
-
-interface Row extends EntryPoint {
-    principals: Principal[];
-    unknownGuards: string[];
-    scopes: string[];
-    public: boolean;
-}
-
-function collect(files: ts.SourceFile[]): EntryPoint[] {
-    const out: EntryPoint[] = [];
-
-    // Guard arrays first, from every file, because a chain declared in one module is spread in
-    // another. Per-file resolution reports those rows as ungated, and wrong-in-the-permissive-
-    // direction is the one kind of wrong an inventory must not be.
-    const arrays = new Map<string, ReturnType<typeof guardArraysIn> extends Map<string, infer V> ? V : never>();
-    for (const source of files) for (const [name, guards] of guardArraysIn(source)) arrays.set(name, guards);
-
-    for (const source of files) {
-        const path = source.fileName;
-        if (path.includes('/src/routes/')) out.push(...collectRestRoutes(source, AIMEAT, arrays));
-        if (path.includes('/src/mcp/')) out.push(...collectMcpTools(source, AIMEAT, 'mcp.node'));
-        if (path.includes('/src/cli/connect/mcp/')) out.push(...collectMcpTools(source, AIMEAT, 'mcp.connector'));
-        if (/tool-call-defs-.*\.ts$/.test(path)) out.push(...collectCliDispatch(source, AIMEAT));
-    }
-    return out;
-}
-
-function toRows(entries: EntryPoint[]): Row[] {
-    return entries.map(e => {
-        const { principals, unknown, scopes } = principalsFor(e.guards);
-        // Only a REST door has a middleware chain; the other kinds are gated elsewhere, so their
-        // principal set is left empty rather than reported as "everyone".
-        const applies = e.kind === 'rest';
-        return {
-            ...e,
-            principals: applies ? principals : [],
-            unknownGuards: applies ? unknown : [],
-            scopes: applies ? scopes : [],
-            public: applies ? isPublic(principals) : false,
-        };
-    });
-}
 
 function tally<T extends string>(values: T[]): Array<[T, number]> {
     const counts = new Map<T, number>();
@@ -239,7 +196,7 @@ function report(rows: Row[], mentions: Map<string, Array<{ file: string; line: n
 function main(): void {
     const VOCABULARY = readVocabulary();
     const files = srcProgram().files;
-    const rows = toRows(collect(files));
+    const rows = toRows(collectDoors(files));
     // The two files that DEFINE the vocabulary rather than demand it. Counting a definition as a
     // demand would make every word look asked-for, which is the opposite of what this measures.
     const mentions = scopeMentions(files, VOCABULARY, AIMEAT, ['mcp/catalog/scopes.ts', 'utils/scope-coverage.ts']);
