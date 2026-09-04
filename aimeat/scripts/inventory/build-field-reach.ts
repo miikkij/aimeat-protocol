@@ -13,21 +13,14 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { recordFields, fieldReach } from './field-reach.js';
+import { srcProgram } from './program.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const AIMEAT = resolve(HERE, '..', '..');
 const OUT_DIR = join(resolve(AIMEAT, '..'), 'secaudit');
 
-function sourceFiles(): ts.SourceFile[] {
-    const config = ts.readConfigFile(join(AIMEAT, 'tsconfig.json'), ts.sys.readFile);
-    const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, AIMEAT);
-    const program = ts.createProgram(parsed.fileNames, { ...parsed.options, noEmit: true });
-    program.getTypeChecker();
-    return program.getSourceFiles().filter(f => !f.isDeclarationFile && f.fileName.includes('/src/'));
-}
-
 function main(): void {
-    const files = sourceFiles();
+    const files = srcProgram().files;
     const fields = recordFields(files);
     const reach = fieldReach(files, fields);
 
