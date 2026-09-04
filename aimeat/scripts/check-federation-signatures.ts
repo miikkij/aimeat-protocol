@@ -60,13 +60,10 @@ const ALLOWED: Record<string, string> = {
         + 'session and no peer relationship can exist yet by construction. Bounded by the login rate '
         + 'limit and a five-minute timestamp window, and it answers the same FEDERATION_AUTH_FAILED '
         + 'whether the account is missing, has no password or gave the wrong one.',
-    'src/routes/federation-genesis.ts:POST:/v1/federation/genesis-memory-read':
-        'A POST that reads: it asks the genesis peers for memory and aggregates what they answer. '
-        + 'The disclosure boundary is on the ANSWERING side, not here — the inbound GET beside it '
-        + '(federation-genesis.ts:520) returns a record only when visibility === "public", so this '
-        + 'door can never assemble anything its owner did not publish. requireAuth() keeps out the '
-        + 'anonymous identity. Open question rather than a clearance: it carries no scope word, so an '
-        + 'app-grant token reaches it and each call fans out one request per active peer.',
+    // POST /v1/federation/genesis-memory-read was here on 2026-09-04, listed as an open question:
+    // requireAuth alone, so any principal carrying the account name could make this node fan out one
+    // request per active genesis peer whatever it had been granted. It carries requireScope('memory:read')
+    // now, which is a gate, so it leaves this list by being fixed rather than by being forgiven.
 };
 
 interface Door {

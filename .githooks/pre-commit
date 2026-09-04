@@ -34,8 +34,9 @@
 #  18. Run-time-chosen read targets  — pnpm check:runtime-read-targets
 #  19. v2 surfaces stay projections  — pnpm check:surface-focus
 #  19b. Caller resolved, not sub raw  — pnpm check:identity-resolution
-#  19c. Federation writes are signed  — pnpm check:federation-signatures
-#  19d. No new cycle or inversion    — pnpm check:deps
+#  19c. A refusal names a principal   — pnpm check:owner-principal
+#  19d. Federation writes are signed  — pnpm check:federation-signatures
+#  19e. No new cycle or inversion    — pnpm check:deps
 #  20. An agent writes, page hears it — pnpm check:sse-parity
 #  21. No decision written out twice  — pnpm check:copied-logic
 #  22. Published surfaces + release   — pnpm check:liaison-surface
@@ -183,6 +184,13 @@ pnpm -s check:surface-focus
 # `alice@node-id` is not found again by list, search or update.
 echo "[pre-commit] A route resolves the caller rather than reading sub raw (check:identity-resolution)…"
 pnpm -s check:identity-resolution
+
+# Invariant 11. `auth.owner` is the same string on an owner session, an agent JWT, an ecosystem token,
+# a PAT and an app grant, so a refusal decided by comparing it turns away a different PERSON and
+# admits everything acting in this one's name. Right for a person's DATA, wrong for their ACCOUNT.
+# The gate found GET /v1/ghii/:ghii/credential minting a signed identity credential for any of them.
+echo "[pre-commit] A refusal names the principal, not just the owner (check:owner-principal)…"
+pnpm -s check:owner-principal
 
 # check:route-scopes skips /v1/federation/* on purpose — a scope word is meaningless for a peer node —
 # and that correct decision left the largest unauthenticated WRITE surface here with no gate at all.

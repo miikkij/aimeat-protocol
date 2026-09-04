@@ -27,7 +27,7 @@
  */
 import ts from 'typescript';
 import { relative } from 'node:path';
-import { callsInside } from './entries.js';
+import { callsInside, enclosingUnit } from './entries.js';
 
 /** The verified token, declared on Express's Request in src/auth/middleware.ts. */
 const AUTH_TYPE = 'VerifiedToken';
@@ -55,37 +55,6 @@ export interface IdentityRead {
     asArgument: boolean;
     /** The line as written, trimmed, so a reader can judge without opening the file. */
     text: string;
-}
-
-/**
- * The unit a read belongs to, walking outwards.
- *
- * A route handler is an anonymous arrow, so the name that survives an edit is the door it hangs on —
- * the same identity `check-route-scopes.ts` keys its exemptions by, and for the same reason: a line
- * number goes stale the moment anything above it moves. Outside a router, the nearest named function
- * is the unit. The search stops at the first of the two, so a helper declared inside a handler is
- * reported as the helper.
- */
-function enclosingUnit(node: ts.Node): { unit: string; body: ts.Node } | undefined {
-    for (let n: ts.Node | undefined = node.parent; n; n = n.parent) {
-        if (ts.isCallExpression(n) && ts.isPropertyAccessExpression(n.expression)
-            && VERBS.has(n.expression.name.text) && n.arguments.length >= 2) {
-            const first = n.arguments[0];
-            if (first && ts.isStringLiteral(first)) {
-                return { unit: `${n.expression.name.text.toUpperCase()} ${first.text}`, body: n };
-            }
-        }
-        if (ts.isFunctionDeclaration(n) || ts.isMethodDeclaration(n)) {
-            if (n.name && ts.isIdentifier(n.name)) return { unit: n.name.text, body: n };
-        }
-        // `const listForOwner = async (…) => {…}` and `function listForOwner()` both read as the
-        // name they are bound to; an arrow with no name keeps walking outwards.
-        if ((ts.isArrowFunction(n) || ts.isFunctionExpression(n))
-            && n.parent && ts.isVariableDeclaration(n.parent) && ts.isIdentifier(n.parent.name)) {
-            return { unit: n.parent.name.text, body: n };
-        }
-    }
-    return undefined;
 }
 
 /**

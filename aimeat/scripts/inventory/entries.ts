@@ -15,9 +15,11 @@
  *   ...guards, handler)`, `mcp.tool(name, ...)`, and a literal table for the CLI dispatch. A
  *   codebase that registered routes dynamically could not be enumerated this way, and the audit
  *   would need a different instrument.
- * @structure collectRestRoutes · collectMcpTools · collectCliDispatch · callsInside · EntryPoint
+ * @structure collectRestRoutes · collectMcpTools · collectCliDispatch · enclosingUnit · callsInside · EntryPoint
  * @usage const entries = [...collectRestRoutes(program), ...collectMcpTools(program)];
  * @version-history
+ *   v1.2.0 — 2026-09-04 — enclosingUnit() joins it, for the same reason: the third analyser needed
+ *     the same "which door is this line inside" walk, and the answer must not differ between gates.
  *   v1.1.0 — 2026-09-04 — callsInside() lives here now. Two gates written the same day each carried
  *     their own copy of it, which is the shape check:copied-logic exists to refuse.
  *   v1.0.0 — 2026-09-03 — Initial (wish-invarianttiauditointi, phase 1).
@@ -40,6 +42,37 @@ export interface EntryPoint {
 }
 
 const VERBS = new Set(['get', 'post', 'put', 'patch', 'delete', 'all']);
+
+/**
+ * The unit a node belongs to, walking outwards.
+ *
+ * A route handler is an anonymous arrow, so the name that survives an edit is the door it hangs on —
+ * the same identity `check-route-scopes.ts` keys its exemptions by, and for the same reason: a line
+ * number goes stale the moment anything above it moves. Outside a router, the nearest named function
+ * is the unit. The search stops at the first of the two, so a helper declared inside a handler is
+ * reported as the helper.
+ */
+export function enclosingUnit(node: ts.Node): { unit: string; body: ts.Node } | undefined {
+    for (let n: ts.Node | undefined = node.parent; n; n = n.parent) {
+        if (ts.isCallExpression(n) && ts.isPropertyAccessExpression(n.expression)
+            && VERBS.has(n.expression.name.text) && n.arguments.length >= 2) {
+            const first = n.arguments[0];
+            if (first && ts.isStringLiteral(first)) {
+                return { unit: `${n.expression.name.text.toUpperCase()} ${first.text}`, body: n };
+            }
+        }
+        if (ts.isFunctionDeclaration(n) || ts.isMethodDeclaration(n)) {
+            if (n.name && ts.isIdentifier(n.name)) return { unit: n.name.text, body: n };
+        }
+        // `const listForOwner = async (…) => {…}` and `function listForOwner()` both read as the
+        // name they are bound to; an arrow with no name keeps walking outwards.
+        if ((ts.isArrowFunction(n) || ts.isFunctionExpression(n))
+            && n.parent && ts.isVariableDeclaration(n.parent) && ts.isIdentifier(n.parent.name)) {
+            return { unit: n.parent.name.text, body: n };
+        }
+    }
+    return undefined;
+}
 
 /**
  * Every function called anywhere inside a node, by name, however deeply nested.

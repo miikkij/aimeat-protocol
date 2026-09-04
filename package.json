@@ -102,6 +102,8 @@
     "check:identity-resolution": "cd aimeat && pnpm check:identity-resolution",
     "check:identity-resolution:report": "cd aimeat && pnpm check:identity-resolution:report",
     "check:federation-signatures": "cd aimeat && pnpm check:federation-signatures",
+    "check:owner-principal": "cd aimeat && pnpm check:owner-principal",
+    "check:owner-principal:report": "cd aimeat && pnpm check:owner-principal:report",
     "check:deps": "cd aimeat && pnpm check:deps",
     "deps:report": "cd aimeat && pnpm deps:report",
     "deps:baseline": "cd aimeat && pnpm deps:baseline",
