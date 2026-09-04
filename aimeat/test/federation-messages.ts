@@ -53,8 +53,26 @@ interface NodeState {
     ownerName: string;
     ownerGhii: string;
     ownerToken: string;
+    /** Kept so the token can be minted AGAIN after a later node boots. See BOOTED below. */
+    ownerPrivateKey: string;
     adminPw: string;
 }
+
+/**
+ * Every node booted in this process, in order.
+ *
+ * WHY THIS EXISTS. `initNodeKeys` (src/auth/jwt.ts) writes the signing keypair into module-level
+ * variables and overwrites them unconditionally. That is correct for a real node, which is one per
+ * process; here three nodes share one process, so booting a node REPLACES the key every earlier
+ * node's tokens were signed with, and those tokens stop verifying — 401 AUTH_REQUIRED, from a live
+ * server, on a token that worked a line earlier.
+ *
+ * It cost this suite seven assertions that had never run. Node C is booted inside test 5b, and every
+ * test from 5b to 10 failed on a 401 from node A or B: the cross-node image pull, the block, the
+ * agent DM, the interactive question and the operator broadcast. They read as a federation
+ * regression and were a key rotation.
+ */
+const BOOTED: NodeState[] = [];
 
 async function bootNode(port: number, nodeId: string): Promise<NodeState> {
     const adminPw = randomBytes(16).toString('base64url');
@@ -78,7 +96,32 @@ async function bootNode(port: number, nodeId: string): Promise<NodeState> {
 
     const { app } = await createServer(config);
     const server = await new Promise<Server>((resolve) => { const s = app.listen(port, () => resolve(s)); });
-    return { server, config, baseUrl: `http://localhost:${port}`, nodeId, json: makeJson(`http://localhost:${port}`), ownerName: '', ownerGhii: '', ownerToken: '', adminPw };
+    const node: NodeState = {
+        server, config, baseUrl: `http://localhost:${port}`, nodeId,
+        json: makeJson(`http://localhost:${port}`),
+        ownerName: '', ownerGhii: '', ownerToken: '', ownerPrivateKey: '', adminPw,
+    };
+
+    // createServer has just replaced the process-wide signing key (see BOOTED). Every token an
+    // earlier node handed out was signed with the old one and no longer verifies, so mint them again
+    // here rather than at the call site: a suite that adds a fourth node later must not have to know
+    // this, and finding out by way of a 401 six tests further on takes an afternoon.
+    for (const earlier of BOOTED) {
+        if (earlier.ownerName) await mintOwnerToken(earlier);
+    }
+    BOOTED.push(node);
+    return node;
+}
+
+/** The bootstrap token door: the admin password plus possession of the owner's private key. */
+async function mintOwnerToken(node: NodeState): Promise<void> {
+    const tok = await node.json('/v1/admin/setup/token', {
+        method: 'POST',
+        headers: { 'X-Admin-Password': node.adminPw },
+        body: JSON.stringify({ owner: node.ownerName, private_key: node.ownerPrivateKey }),
+    });
+    assert(tok.body.ok === true, `token on ${node.nodeId}: ${JSON.stringify(tok.body.error)}`);
+    node.ownerToken = tok.body.token;
 }
 
 async function setupOwner(node: NodeState, ownerName: string): Promise<void> {
@@ -86,13 +129,10 @@ async function setupOwner(node: NodeState, ownerName: string): Promise<void> {
         method: 'POST', headers: { 'X-Admin-Password': node.adminPw }, body: JSON.stringify({ name: ownerName }),
     });
     assert(reg.status === 200 && reg.body.ok === true, `register owner on ${node.nodeId}: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const tok = await node.json('/v1/admin/setup/token', {
-        method: 'POST', headers: { 'X-Admin-Password': node.adminPw }, body: JSON.stringify({ owner: ownerName, private_key: reg.body.private_key }),
-    });
-    assert(tok.body.ok === true, `token on ${node.nodeId}: ${JSON.stringify(tok.body.error)}`);
     node.ownerName = ownerName;
     node.ownerGhii = `${ownerName}@${node.nodeId}`;
-    node.ownerToken = tok.body.token;
+    node.ownerPrivateKey = reg.body.private_key;
+    await mintOwnerToken(node);
 }
 
 /** The far node's published verification key, read the way any stranger would read it. */

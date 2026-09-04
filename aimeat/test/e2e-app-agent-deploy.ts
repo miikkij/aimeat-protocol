@@ -295,9 +295,28 @@ async function main() {
         assert(p.status === 200 && !!p.body.access_token && p.body.gaii === `owner-spawned#${owner1}@${NODE_ID}`, `poll creds: ${p.status} ${JSON.stringify(p.body).slice(0, 200)}`);
     });
 
-    await test('SAME-OWNER AGENT (crew-forge) auto-registers the deployed sibling within its own scopes', async () => {
+    // Making an agent needs `agent:write`, which the owner grants per agent (device-auth.ts
+    // APPROVER_SCOPE). Same-owner is not enough on its own: an agent the owner never allowed to make
+    // agents lands in the manual queue like any stranger's request would. This test asked crew-forge
+    // — which holds memory and task scopes and not that one — to settle it alone, and had been red
+    // since the permission was added. Both halves are asserted now, because the refusal is the newer
+    // rule and nothing was checking it.
+    await test('a same-owner agent WITHOUT agent:write cannot settle a sibling alone', async () => {
         const r = await json('/v1/agents/device-authorize', {
             method: 'POST', headers: { Authorization: `Bearer ${runner1Token}` },
+            body: JSON.stringify({ owner: owner1, agent_name: `unpermitted-${Date.now() % 100000}`, mode: 'task-runner', scopes: ['memory:read'] }),
+        });
+        assert(r.status === 200, `authorize: ${r.status}`);
+        assert(r.body.data.auto_approved !== true, 'an agent with no agent:write must not auto-approve');
+        assert(String(r.body.data.user_instructions ?? '').includes('agent:write'),
+            `the note names the missing permission: ${JSON.stringify(r.body.data.user_instructions ?? '').slice(0, 160)}`);
+    });
+
+    await test('SAME-OWNER AGENT holding agent:write auto-registers the deployed sibling within its own scopes', async () => {
+        const approver = await registerAgent(owner1Token, owner1, `forge-approver-${Date.now() % 100000}`, 'task-runner',
+            ['memory:read', 'memory:write', 'agent:write']);
+        const r = await json('/v1/agents/device-authorize', {
+            method: 'POST', headers: { Authorization: `Bearer ${approver.token}` },
             body: JSON.stringify({ owner: owner1, agent_name: DEPLOYED().slice(0, 32), mode: 'task-runner', scopes: ['memory:read', 'memory:write'] }),
         });
         assert(r.status === 200 && r.body.data.auto_approved === true, `agent auto: ${r.status} ${JSON.stringify(r.body.data)}`);

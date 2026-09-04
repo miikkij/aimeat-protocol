@@ -126,7 +126,12 @@ await test('Agent auth token', async () => {
 // ─── Group 1: Poll Inbox ───
 console.log('\nGroup 1 -- Poll Inbox');
 
-await test('1. Empty inbox', async () => {
+// A newly registered agent's inbox is NOT empty, and has not been since 2026-08-24: registration
+// creates the onboarding verification task, because step 9 of the connect flow is accept_test_task
+// and an agent registered here used to sit at that step with an empty queue and no explanation
+// (routes/agents/registration.ts). So this asks what it means — nothing is QUEUED yet, and the one
+// active task is that one — instead of asking for a zero the flow stopped producing.
+await test('1. A fresh inbox holds the onboarding task and nothing queued', async () => {
     const { status, body } = await json(`/v1/agents/${agentName}/inbox`, {
         headers: { Authorization: `Bearer ${agentToken}` },
     });
@@ -134,7 +139,9 @@ await test('1. Empty inbox', async () => {
     assert(Array.isArray(body.data.queued_tasks), 'queued_tasks is array');
     assert(Array.isArray(body.data.active_tasks), 'active_tasks is array');
     assert(body.data.queued_tasks.length === 0, `expected 0 queued, got ${body.data.queued_tasks.length}`);
-    assert(body.data.active_tasks.length === 0, `expected 0 active, got ${body.data.active_tasks.length}`);
+    const titles = body.data.active_tasks.map((t: any) => t.title);
+    assert(body.data.active_tasks.length === 1 && titles[0] === 'Onboarding verification',
+        `expected only the onboarding task active, got ${JSON.stringify(titles)}`);
 });
 
 await test('2. Create task, poll inbox', async () => {
