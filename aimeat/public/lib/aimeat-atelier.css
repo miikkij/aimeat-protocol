@@ -47,7 +47,9 @@
  *     contract — --ak-ambient (a preset id or none), --ak-ambient-alpha and --ak-ambient-speed —
  *     so a LOOK names the one layer allowed to move at idle and the matrix proves it
  *     (AK-AMBIENT). Mode-independent like the spring hand: the layer reads its colours off the
- *     tokens at run time.
+ *     tokens at run time. ambient.css joins the imports: the layer, the aurora drift (the
+ *     second and last infinite animation in this kit, beside the hero drift), the stage, the
+ *     weather control and attract mode.
  *   v0.46.0 — 2026-09-02 — ROUND THREE: motion-show.css, anime-more.css and lenis-more.css join
  *     the imports (wish-atelier-motion-round-three). Pinned to the JS version, as ever.
  *   v0.45.1 — 2026-09-02 — THE SPRING HAND joins the contract: --ak-spring-stiffness,
@@ -262,6 +264,7 @@
 @import url('./aimeat-atelier/scenics.css');
 @import url('./aimeat-atelier/patterns.css');
 @import url('./aimeat-atelier/mosaic.css');
+@import url('./aimeat-atelier/ambient.css');
 /* LAST on purpose: the generated look blocks (tokens + structure recipes) override the parts. */
 @import url('./aimeat-atelier/looks.css');
 

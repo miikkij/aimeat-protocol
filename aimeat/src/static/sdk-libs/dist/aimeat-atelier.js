@@ -318,6 +318,10 @@
     en: {
       loading: "Loading…",
       lessMotion: "Less motion",
+      ambient: "Ambient",
+      ambientOff: "Off",
+      ambientCalm: "Calm",
+      ambientFull: "Full",
       ready: "Ready.",
       retry: "Try again",
       close: "Close",
@@ -388,6 +392,10 @@
     fi: {
       loading: "Ladataan…",
       lessMotion: "Vähemmän liikettä",
+      ambient: "Taustaliike",
+      ambientOff: "Pois",
+      ambientCalm: "Rauhallinen",
+      ambientFull: "Täysi",
       ready: "Valmis.",
       retry: "Yritä uudelleen",
       close: "Sulje",
@@ -458,6 +466,10 @@
     es: {
       loading: "Cargando…",
       lessMotion: "Menos movimiento",
+      ambient: "Ambiente",
+      ambientOff: "Apagado",
+      ambientCalm: "Suave",
+      ambientFull: "Completo",
       ready: "Listo.",
       retry: "Inténtalo otra vez",
       close: "Cerrar",
@@ -4101,6 +4113,26 @@
   var NODE_ID = cfg().nodeId;
   var HEARTBEAT_MS = cfg().heartbeatMs || 3e4;
 
+  // src/static/sdk-libs/atelier/token-color.js
+  var colorCtx = null;
+  function tokenRgb(node, name, fallbackName) {
+    const probe = document.createElement("span");
+    probe.style.display = "none";
+    probe.style.color = fallbackName ? "var(" + name + ", var(" + fallbackName + ", currentColor))" : "var(" + name + ", currentColor)";
+    node.appendChild(probe);
+    const resolved = getComputedStyle(probe).color;
+    probe.remove();
+    if (!colorCtx) colorCtx = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
+    colorCtx.fillStyle = resolved;
+    colorCtx.fillRect(0, 0, 1, 1);
+    const px = colorCtx.getImageData(0, 0, 1, 1).data;
+    return [px[0], px[1], px[2]];
+  }
+  function tokenColor(node, name, fallbackName) {
+    const c = tokenRgb(node, name, fallbackName);
+    return "rgb(" + c[0] + "," + c[1] + "," + c[2] + ")";
+  }
+
   // src/static/sdk-libs/atelier/scene3d.js
   var threePromise = null;
   function ensureThree() {
@@ -4139,20 +4171,6 @@
       });
       return loadersPromise;
     });
-  }
-  var colorCtx = null;
-  function tokenColor(node, name, fallbackName) {
-    const probe = document.createElement("span");
-    probe.style.display = "none";
-    probe.style.color = fallbackName ? "var(" + name + ", var(" + fallbackName + ", currentColor))" : "var(" + name + ", currentColor)";
-    node.appendChild(probe);
-    const resolved = getComputedStyle(probe).color;
-    probe.remove();
-    if (!colorCtx) colorCtx = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
-    colorCtx.fillStyle = resolved;
-    colorCtx.fillRect(0, 0, 1, 1);
-    const px = colorCtx.getImageData(0, 0, 1, 1).data;
-    return "rgb(" + px[0] + "," + px[1] + "," + px[2] + ")";
   }
   function easeOut(x) {
     return 1 - Math.pow(1 - x, 3);
