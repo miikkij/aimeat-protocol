@@ -292,6 +292,28 @@ export function ownerGhiiOf(principal: string): string {
 }
 
 /**
+ * The one coordinate a RIGHT is keyed on: the owner GHII behind whoever is calling.
+ *
+ * Two steps, and both are needed. `resolveIdentity` turns an owner session's bare account name into
+ * its GHII; `ownerGhiiOf` collapses an agent or ecosystem principal to the same GHII. Together they
+ * answer "whose right is this" identically for every principal one person has.
+ *
+ * WHY IT IS A FUNCTION AND NOT AN IDIOM. It was an idiom, written out once inside app-store.ts on
+ * 2026-08-23 to fix exactly this class of defect: receipts keyed on the raw `sub` split one person's
+ * licences across two coordinates, so the app could be paid for twice and the owner's own agent was
+ * refused what the owner had bought. That fix reached /license-check and /fork and did not reach
+ * GET /v1/apps/:owner/:filename, which kept comparing `req.auth.sub` — and on 2026-09-04 that door
+ * answered 402 PURCHASE_REQUIRED to the buyer, to the buyer's agent, and to the SELLER on their own
+ * app. One place, so the next door cannot be half-fixed.
+ *
+ * Rights and billing only. Attribution wants the exact principal that called, which is the whole
+ * point of agents having identities of their own.
+ */
+export function ownerCoordinate(auth: { sub: string; owner: string; roles: string[] }, nodeId: string): string {
+  return ownerGhiiOf(resolveIdentity(auth, nodeId));
+}
+
+/**
  * Is this identity something acting FOR a person rather than the person themselves?
  *
  * `bot#alice@node` (GAII) and `eco:drum#alice@node` (GEAI) are; `alice` and `alice@node` are not.

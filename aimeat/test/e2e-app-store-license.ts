@@ -113,6 +113,39 @@ await test('The buyer\'s agent can fork the paid app it now holds a licence for'
     assert(fork.status === 200 || fork.status === 201, `the licensed fork must pass the paywall, got ${fork.status}: ${JSON.stringify(fork.body).slice(0, 200)}`);
 });
 
+// The DOWNLOAD door, which the 2026-08-23 fix did not reach. /license-check and /fork were keyed on
+// the owner coordinate that day; GET /v1/apps/:owner/:filename kept reading `req.auth.sub`, so the
+// paywall it enforces asked for a licence under the bare owner name for an owner session and under
+// the agent GAII for an agent, while every receipt is keyed on `owner@node`. Both answered 402 for an
+// app the person had paid for. Found 2026-09-04 by check:identity-resolution.
+await test('The owner in person can DOWNLOAD the app they bought', async () => {
+    if (!marketplaceOn) return;
+    const dl = await json(`/v1/apps/${sellerName}/${PAID}`, auth(buyerTok));
+    assert(dl.status !== 402, `the buyer's own purchase must open the paywall, got ${dl.status}: ${JSON.stringify(dl.body).slice(0, 200)}`);
+    assert(dl.status === 200, `download: ${dl.status} ${JSON.stringify(dl.body).slice(0, 200)}`);
+});
+
+await test('The buyer\'s AGENT can download the app its owner bought', async () => {
+    if (!marketplaceOn) return;
+    const dl = await json(`/v1/apps/${sellerName}/${PAID}`, auth(buyerAgent.token));
+    assert(dl.status !== 402, `the owner's licence must open the paywall for their agent, got ${dl.status}: ${JSON.stringify(dl.body).slice(0, 200)}`);
+    assert(dl.status === 200, `agent download: ${dl.status} ${JSON.stringify(dl.body).slice(0, 200)}`);
+});
+
+await test('The SELLER can download their own paid app without buying it', async () => {
+    if (!marketplaceOn) return;
+    const dl = await json(`/v1/apps/${sellerName}/${PAID}`, auth(sellerTok));
+    assert(dl.status !== 402, `the seller must not be paywalled out of their own app, got ${dl.status}: ${JSON.stringify(dl.body).slice(0, 200)}`);
+});
+
+await test('Someone who has NOT bought it is still refused (402)', async () => {
+    if (!marketplaceOn) return;
+    const stranger = await registerOwner(`apstr${ts}`);
+    const dl = await json(`/v1/apps/${sellerName}/${PAID}`, auth(stranger.token));
+    assert(dl.status === 402, `an unpaid caller must be refused, got ${dl.status}: ${JSON.stringify(dl.body).slice(0, 200)}`);
+    await json(`/v1/owners/apstr${ts}`, { ...auth(stranger.token), method: 'DELETE' });
+});
+
 await test('A THIRD party — neither buyer nor seller — is refused the purchase detail (403)', async () => {
     if (!marketplaceOn) return;
     const outsider = await registerOwner(`apout${ts}`);

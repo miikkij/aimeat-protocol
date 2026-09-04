@@ -1753,6 +1753,12 @@ components:
               example: 500
         lifetime:
           type: object
+          description: |
+            Computed from every row kind of the ledger (services/wallet-stats.ts). `earned` is every
+            positive row that came from somebody (work, tool calls, sales, offers, fees); the daily pace,
+            the welcome bonus and an operator mint are received, not earned. `unrecorded` is
+            `balance − ledger_sum`: what reached the balance without a row, which is what the daily pace
+            does.
           properties:
             earned:
               type: integer
@@ -1762,6 +1768,28 @@ components:
               type: integer
             welcome_bonus:
               type: integer
+            in:
+              type: integer
+              description: Every positive row, the pace and gifts included.
+            out:
+              type: integer
+              description: Every negative row, as a positive figure.
+            ledger_sum:
+              type: integer
+              description: The signed sum of every row.
+            unrecorded:
+              type: integer
+              description: balance − ledger_sum; what accrued without a row.
+            total_rows:
+              type: integer
+            by_type:
+              type: object
+              description: One entry per row kind.
+              additionalProperties:
+                type: object
+                properties:
+                  count: { type: integer }
+                  sum: { type: integer }
     # === Boards ===
     BoardCreate:
       type: object

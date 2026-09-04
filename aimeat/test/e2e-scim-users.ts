@@ -12,9 +12,13 @@
  *   binding adds exactly a membership.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=scim-users
  * @version-history
+ *   v1.1.0 — 2026-09-04 — Clears the SSO flags before its first assertion. It builds connections
+ *     through the management routes, which an inherited `sso.connections_locked` refuses — and a
+ *     refusal there fails every test after it without naming what caused it.
  *   v1.0.0 — 2026-08-24 — Initial, with the feature (BR-04 phase 3).
  */
 import { buildSamlResponse, buildIdpMetadataXml, requestIdFromAuthorizeUrl } from './helpers/fake-saml-idp.js';
+import { requireCleanSsoState } from './helpers/sso-state.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -82,6 +86,9 @@ console.log('\n=== SCIM provisioning over live HTTP (BR-04) ===\n');
 
 async function run() {
     const op = await setupOwner('op');
+    // Connection management is refused while sso.connections_locked is set, and a run that died
+    // before its own restore leaves it set. → test/helpers/sso-state.ts
+    await requireCleanSsoState(BASE, op.ownerToken);
     let scimToken = '';
     let otherToken = '';
     let organismId = '';

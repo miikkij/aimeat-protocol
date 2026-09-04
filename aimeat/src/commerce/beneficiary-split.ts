@@ -31,6 +31,8 @@
  *   const split = await readSplit(storage, providerGhii, ext, action);
  *   const { pool, lines, providerNet } = computeSplit(providerGross, split, designations);
  * @version-history
+ *   v1.0.1 — 2026-09-04 — listSplitsByProvider sorts null-safe: a record without capabilityLabel threw
+ *     inside the sort and GET /v1/commerce/beneficiary-splits answered 500 on aimeat.io.
  *   v1.0.0 — 2026-07-30 — Initial: multi-beneficiary revenue splitting on the metered settlement path.
  */
 import { createHash, randomUUID } from 'node:crypto';
@@ -277,7 +279,8 @@ export async function listSplitsByProvider(storage: Storage, providerGhii: strin
   return items
     .map(r => r.value as BeneficiarySplit)
     .filter(v => v && v.providerGhii === providerGhii)
-    .sort((a, b) => a.capabilityLabel.localeCompare(b.capabilityLabel));
+    // A record written before `capabilityLabel` existed has none; sorting must not throw on it.
+    .sort((a, b) => String(a.capabilityLabel ?? `${a.ext}/${a.action}`).localeCompare(String(b.capabilityLabel ?? `${b.ext}/${b.action}`)));
 }
 
 /** Declare (or replace) a split. The caller has already established that `providerGhii` is the writer. */

@@ -20,6 +20,9 @@
  *   v1.2.0 — 2026-07-16 — Add GET /v1/wallet/overview: the Wallet tab's 4 core reads (wallet + transactions
  *     + commerce sessions + orders) folded into one composite (WalletTabService, Phase 4). Owner-gated;
  *     EE PSP stays separate; individual endpoints stay for interactive refresh.
+ *   v1.3.0 — 2026-09-04 — `lifetime` comes from services/wallet-stats.ts, which reads every row kind
+ *     (the route had summed four of eleven and said "earned 0" over +190) and adds in/out, ledger_sum,
+ *     unrecorded (balance − rows: what the daily pace credited without a row) and by_type.
  */
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
@@ -32,6 +35,7 @@ import { MorselRequestSchema, validateBody } from '../models/schemas.js';
 import { emitChange } from '../services/event-bus.js';
 import { cached, TTL } from '../services/cache.js';
 import { createWalletTabService } from '../services/db/wallet-tab-db-service.js';
+import { lifetimeOf } from '../services/wallet-stats.js';
 
 export function walletRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -76,14 +80,8 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
       ['domain:work', 'domain:wallet'],
     );
 
-    // Calculate lifetime stats from transactions
-    let earned = 0, spent = 0, receivedAllowance = 0, welcomeBonus = 0;
-    for (const tx of transactions) {
-      if (tx.type === 'earned') earned += tx.amount;
-      if (tx.type === 'spent') spent += Math.abs(tx.amount);
-      if (tx.type === 'allowance') receivedAllowance += tx.amount;
-      if (tx.type === 'welcome_bonus') welcomeBonus += tx.amount;
-    }
+    // Lifetime figures from every row kind, computed once for this route and the tab's composite.
+    const lifetime = lifetimeOf(transactions, balance);
 
     const isAgentSession = req.auth!.roles.includes('agent') && !req.auth!.roles.includes('owner');
     res.json(success(config.nodeId, {
@@ -98,12 +96,7 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
         amount: config.dailyAllowance,
         accumulation_cap: config.dailyAllowanceCap,
       },
-      lifetime: {
-        earned,
-        spent,
-        received_allowance: receivedAllowance,
-        welcome_bonus: welcomeBonus,
-      },
+      lifetime,
     }, [
       { description: 'View transaction history', method: 'GET', url: '/v1/wallet/transactions' },
       { description: 'Browse the action catalogue', method: 'GET', url: '/v1/catalogue' },
