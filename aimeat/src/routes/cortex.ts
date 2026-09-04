@@ -9,6 +9,16 @@
  * @structure cortexRouter() — all /v1/cortex* routes; activateExtension()/deactivateExtension() — init helpers.
  * @usage app.use(cortexRouter(config, storage)) in server.ts
  * @version-history
+ *   v1.5.0 — 2026-09-05 — The four detail reads and the list ask canSeeCortex. `visibility` was a
+ *     field this file stored, showed on every read and enforced on none: any signed-in principal
+ *     read the full component map, prompts, ontology and activation artifacts of another owner's
+ *     PRIVATE cortex by name, and `?visibility=private` on the list returned everyone's, because the
+ *     query string went to storage as a filter with nobody asking whose. Not a scope word — the
+ *     question is whose, and the rule (services/cortex-lifecycle.ts) has a third answer a naive
+ *     owner fence misses: the bundled cortexes are seeded as system@<nodeId> and default to
+ *     private, so they stay readable by everyone. A refused read is the same 404 a missing name
+ *     gets. GET /:name/libs/:libFile is deliberately untouched: it is the address a <script> tag
+ *     loads, it carries no credential by construction, and it already serves only ACTIVE cortexes.
  *   v1.4.0 — 2026-09-03 — used_by on the list, versions on the detail and GET /:name/versions; a lib address may pin a version (name@version, served immutably); PUT refreshes the dependency map and snapshots the version.
  *   v1.3.0 — 2026-08-11 — Install, activate, deactivate and uninstall call
  *     services/cortex-lifecycle.ts, which the MCP tools call too. Each of the four had a second
@@ -31,7 +41,7 @@ import { emitChange } from '../services/event-bus.js';
 import { parseCortexManifest, validateNamespaceOwnership } from '../services/cortex-manifest.js';
 import { cortexInstallRefusal } from '../services/install-quotas.js';
 import {
-  installCortex, activateCortex, deactivateCortex, deleteCortex, type CortexCaller,
+  installCortex, activateCortex, deactivateCortex, deleteCortex, canSeeCortex, visibleCortexes, type CortexCaller,
 } from '../services/cortex-lifecycle.js';
 import { activateExtension, deactivateExtension } from './cortex/activation.js';
 import { refreshCortexDependencies, dependencyIndex, visibleAppRefs, usedBySummary } from '../services/dependency-map.js';
@@ -61,11 +71,15 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
     const status = req.query.status as string | undefined;
     const namespace = req.query.namespace as string | undefined;
     const visibility = req.query.visibility as string | undefined;
-    const extensions = await storage.listCortexExtensions({
+    // `?visibility=` is the caller's FILTER, not their permission: asking for `private` used to
+    // return every owner's private cortexes, because nothing between the query string and storage
+    // asked whose they were. The filter still narrows; canSeeCortex decides what it may narrow
+    // over — public, the node's own bundled ones, the caller's own, and everything for an operator.
+    const extensions = visibleCortexes(callerOf(req), await storage.listCortexExtensions({
       status: status || undefined,
       namespace: namespace || undefined,
       visibility: visibility || undefined,
-    });
+    }), config.nodeId);
     // Who loads each cortex, from the dependency map: one read for the whole list.
     const deps = await dependencyIndex(storage);
     const { visible } = await visibleAppRefs(storage, `${req.auth!.owner}@${config.nodeId}`);
@@ -360,7 +374,9 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
     const name = decodeURIComponent(req.params.name as string);
     const ext = await storage.getCortexExtension(name);
 
-    if (!ext) {
+    // One 404 for "no such cortex" and "not yours to see": a different answer would confirm which
+    // private names exist. Same shape as the extension-instance read (instances.ts:162).
+    if (!ext || !canSeeCortex(callerOf(req), ext, config.nodeId)) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Cortex extension not found: ${name}`));
       return;
     }
@@ -511,7 +527,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
     const name = decodeURIComponent(req.params.name as string);
     const ext = await storage.getCortexExtension(name);
 
-    if (!ext) {
+    if (!ext || !canSeeCortex(callerOf(req), ext, config.nodeId)) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Cortex extension not found: ${name}`));
       return;
     }
@@ -535,7 +551,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
     const promptName = decodeURIComponent(req.params.promptName as string);
     const ext = await storage.getCortexExtension(name);
 
-    if (!ext) {
+    if (!ext || !canSeeCortex(callerOf(req), ext, config.nodeId)) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Cortex extension not found: ${name}`));
       return;
     }
@@ -565,7 +581,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
     const name = decodeURIComponent(req.params.name as string);
     const ext = await storage.getCortexExtension(name);
 
-    if (!ext) {
+    if (!ext || !canSeeCortex(callerOf(req), ext, config.nodeId)) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Cortex extension not found: ${name}`));
       return;
     }
