@@ -2,423 +2,276 @@
  * @file data-wallet-tab.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Data Wallet profile tab — displays consent rules, audit trail,
- *   permission summary, and GDPR export controls for the logged-in owner.
- * @structure
- *   - DataWalletTab (default export) — main tab component
- *   - Permission summary card, consent table with filter/bulk-revoke,
- *     audit log with day-range selector, GDPR export button
- * @usage Loaded by profile.js route as a lazy tab component.
+ * @description Profile tab: the Data Wallet in the poster face. What you own (memory keys and
+ *   files), who reaches it and by which permission (grouped by what the permission opens: an
+ *   organism with its workspaces, or a key area), what was refused (the trail grouped by who tried
+ *   what), a grant form as a fold, everything you own as one file, and how your AI uses the wallet.
+ *   This file holds the reads and the handlers: the composite mount (consents, the grouped trail,
+ *   the summary, the names), the trail's window, the rows of one group page by page, a grant (a
+ *   workspace role through the workspace door, anything else through the consent door), a revoke,
+ *   the export. The render is data-wallet/page.js and data-wallet/rows.js.
+ * @structure DataWalletTab() — state + handlers → renderPage(ctx)
+ * @usage registered in profile.js TABS as id 'dataWallet'
  * @version-history
- *   v1.7.0 — 2026-08-25 — Both tables told the owner something untrue. The consent table listed
- *     REVOKED grants alongside live ones and stamped every non-expired row `active`, so a grant the
- *     owner had withdrawn read as still standing; it now reads `status`, shows revoked rows only
- *     behind a toggle, and offers Revoke on a row that still has something to revoke. The audit
- *     table read `data_key` and `purpose`, which the audit API has never returned (it sends
- *     `memory_key`, `action`, `allowed`), so two of its four columns were a dash on every row and
- *     the one fact that matters, whether the read was allowed or denied, was not shown at all.
- *   v1.6.0 — 2026-08-25 — The coverage view, above the permission summary. That card counts memory
- *     keys without saying which, and this is the drill-down it is asking for.
- *   v1.5.0 — 2026-08-24 — Live update is filtered and split by concern. It was a raw
- *     `aimeat-live-update` listener with no domain filter, so every tick of every domain re-ran all
- *     three reads; `memory` alone emits from thirty places. Consents + audit follow `consent`, and
- *     the permission summary follows `memory` and `files` as well, because it counts both.
- *   v1.4.0 — 2026-07-18 — Vaihe 2d: the bespoke `audit-table` → canonical generic <DataTable>
- *     (rows/headers), unifying its look with the node-wide table style. The consents `consent-table`
- *     stays hand-rolled (its per-row `dw-expiring` highlight isn't expressible via DataTable).
- *   v1.3.0 — 2026-07-16 — Mount folds consents + audit + permission-summary into GET /v1/data-wallet
- *     (getDataWalletOverview); individual reads kept as fallback + interactive re-fetch.
- *   v1.2.0 — 2026-07-16 — Consent-grant recipient input is the shared ContactPicker (contacts +
- *     directory suggestions + email resolve, full-id mode).
- *   v1.1.1 — 2026-06-19 — lint fixes (misleading-char-class/unused-expression/empty-block)
- *   v1.1.0 — 2026-03-17 — Refactor: replace all inline styles with CSS classes
- *   v1.0.0 — 2026-03-10 — Initial data wallet tab implementation
+ *   v2.0.0 — 2026-09-04 — The poster face (design canvas "AIMEAT Tietolompakko-sivu", direction A):
+ *     permissions grouped by target and said in words with names, the trail grouped and the grants
+ *     and revocations read off the permissions' own timestamps, the form as a fold whose target is
+ *     picked from your organisms, the export with its contents, every word through the locales.
+ *   v1.7.0 — 2026-08-18 — Permission rows say what they are, the trail says what it shows.
+ *   v1.4.0 — 2026-07-16 — Mount folds the three reads into GET /v1/data-wallet.
+ *   v1.0.0 — 2026-03-06 — Initial Data Wallet tab.
  */
-import { h } from 'preact';
-import { useState, useEffect, useRef } from 'preact/hooks';
-import htm from 'htm';
-const html = htm.bind(h);
-import { t } from '/js/i18n.js';
-import { escHtml, timeAgo } from '/js/utils.js';
-import { Spinner, recipientBadge, isExpiringSoon } from './shared.js';
-import { DataTable } from '/components/DataTable.js';
-import * as consentService from '/js/services/consent.js';
-import { ContactPicker } from '/components/ContactPicker.js';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'preact/hooks';
+import { t, getLocale } from '/js/i18n.js';
+import { useConfirm } from '/components/Modal.js';
 import { swallowed } from '/js/swallowed.js';
+import { apiGet, apiPost } from '/js/api.js';
+import * as consentService from '/js/services/consent.js';
+import { getOrganismsTab } from '/js/services/organisms.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
+import { renderPage } from './data-wallet/page.js';
+import { x, targetRows, targetOf, targetWords, whoOf, roleOf, consentEvents, openTab } from './data-wallet/frame.js';
+import { groupId } from './data-wallet/rows.js';
+
+const ENTRY_LIMIT = 20;
+const ROWS_PAGE = 50;
+const FIRST_TRAIL = 12;
+const EMPTY_FORM = { open: false, whoKind: 'contact', who: '', what: 'ws', orgId: '', wsId: '', key: '', may: 'read', why: '', scope: 'private', untilKind: 'never', until: '' };
+const flashFor = (setter) => (text, error = false) => { setter({ text, error }); setTimeout(() => setter(null), 7000); };
+const errText = (e, fallback) => e?.error?.message || e?.response?.error?.message || e?.message || (typeof e === 'string' ? e : '') || fallback || t('profile.error');
 
 export default function DataWalletTab({ session, showToast }) {
-  const [consents, setConsents] = useState(null);
-  const [auditEntries, setAuditEntries] = useState(null);
-  const [auditDays, setAuditDays] = useState(30);
-  const [permSummary, setPermSummary] = useState(null);
-  const [showConsentForm, setShowConsentForm] = useState(false);
-  const [consentFilter, setConsentFilter] = useState('');
-  const [scopeFilter, setScopeFilter] = useState('all');
-  // Revoked grants are history, not access. They stay out of the list until the owner asks for them.
-  const [showRevoked, setShowRevoked] = useState(false);
-  const [selectedConsents, setSelectedConsents] = useState(new Set());
-  const [recipientValue, setRecipientValue] = useState('');
+  const { confirm, ConfirmUI } = useConfirm();
+  const [ov, setOv] = useState(null);
+  const [failed, setFailed] = useState(false);
+  const [days, setDaysState] = useState(30);
+  const [reloading, setReloading] = useState(false);
+  const [nodeId, setNodeId] = useState('');
+  const [filter, setFilterState] = useState('all');
+  const [trailFilter, setTrailFilter] = useState('all');
+  const [personFocus, setPersonFocus] = useState('');
+  const [openTarget, setOpenTarget] = useState(null);
+  const [openGroup, setOpenGroup] = useState(null);
+  const [groupRows, setGroupRows] = useState({});
+  const [shownTrail, setShownTrail] = useState(FIRST_TRAIL);
+  const [form, setFormState] = useState(EMPTY_FORM);
+  const [orgs, setOrgs] = useState([]);
+  const [formMsg, setFormMsg] = useState(null);
+  const [exportMsg, setExportMsg] = useState(null);
+  const [exporting, setExporting] = useState(false);
+  const [busy, setBusy] = useState(false);
 
+  const toast = (m, isErr) => showToast?.(m, !!isErr);
+  const federated = !!session?.federated;
+
+  /* ── Reads ─────────────────────────────────────────────────────────────────────────────────── */
+
+  const load = useCallback(async (d = days) => {
+    if (federated) return;
+    setReloading(true);
+    const o = await consentService.getDataWalletOverview(d, ENTRY_LIMIT);
+    setReloading(false);
+    if (!o) { setFailed(true); return; }
+    setFailed(false);
+    setOv(o);
+  }, [federated, days]);
+
+  useEffect(() => { load(); }, [load]);
   useEffect(() => {
-    if (!session) return;
-    // Mount fold: ONE composite (consents + audit + permission summary). On failure, fall back to the
-    // three individual reads. Interactive re-fetches (grant/revoke, audit day-range) keep the individuals.
-    (async () => {
-      const ov = await consentService.getDataWalletOverview(30);
-      if (ov) {
-        setConsents(Array.isArray(ov.consents) ? ov.consents : []);
-        setAuditEntries(Array.isArray(ov.audit) ? ov.audit : []);
-        setPermSummary(ov.permSummary || null);
-        return;
+    if (federated) return;
+    apiGet('/v1/ghii/me').then((r) => { const g = r?.data?.ghii || ''; const at = g.indexOf('@'); if (at > 0) setNodeId(g.slice(at + 1)); else if (r?.node) setNodeId(r.node); }).catch((e) => swallowed('data-wallet: me', e));
+  }, [federated]);
+  const loadRef = useRef(null);
+  loadRef.current = () => load();
+  useEffect(() => onLiveUpdate(['consent', 'memory', 'files'], () => loadRef.current()), []);
+
+  /** The owner's organisms with their workspaces, for the form; read once when the form first opens. */
+  const loadOrgs = useCallback(async () => {
+    if (orgs.length) return;
+    const tab = await getOrganismsTab();
+    const mine = (tab?.mine || []).map((o) => ({ id: o.id, name: o.name || o.id, workspaces: null }));
+    setOrgs(mine);
+  }, [orgs.length]);
+
+  const loadWorkspaces = useCallback(async (orgId) => {
+    if (!orgId) return;
+    const have = orgs.find((o) => o.id === orgId);
+    if (!have || have.workspaces) return;
+    const r = await apiGet(`/v1/organisms/${encodeURIComponent(orgId)}/workspaces`).catch((e) => { swallowed('data-wallet: workspaces', e); return null; });
+    const list = (r?.data?.workspaces || []).filter((w) => !w.archived).map((w) => ({ id: w.id, name: w.name || w.id, access: w.access }));
+    setOrgs((cur) => cur.map((o) => (o.id === orgId ? { ...o, workspaces: list } : o)));
+  }, [orgs]);
+  useEffect(() => { if (form.open && form.orgId) loadWorkspaces(form.orgId); }, [form.open, form.orgId, loadWorkspaces]);
+
+  /* ── What the page reads off the state ─────────────────────────────────────────────────────── */
+
+  // The words inside the rows are in the reader's language, so the names bag carries the locale and a
+  // language switch recomputes everything derived from it.
+  const locale = getLocale();
+  const names = useMemo(() => ({ organisms: ov?.names?.organisms || {}, workspaces: ov?.names?.workspaces || {}, locale }), [ov, locale]);
+  const consents = useMemo(() => ov?.consents?.consents || [], [ov]);
+  const active = useMemo(() => consents.filter((c) => c.status === 'active'), [consents]);
+  const revokedList = useMemo(() => consents.filter((c) => c.status !== 'active').sort((a, b) => ((a.revoked_at || a.granted_at) < (b.revoked_at || b.granted_at) ? 1 : -1)), [consents]);
+  /** The targets somebody reaches now; a target whose every grant is withdrawn lives under the "withdrawn" filter. */
+  const targets = useMemo(() => targetRows(consents, names).filter((r) => r.grants.length), [consents, names]);
+  const people = useMemo(() => {
+    const by = new Map();
+    for (const c of active) {
+      const w = whoOf(c.recipient, names);
+      const slot = by.get(c.recipient) || { id: `p|${c.recipient}`, name: w.name, kind: w.kind, grants: [], since: null };
+      slot.grants.push(c);
+      if (!slot.since || c.granted_at < slot.since) slot.since = c.granted_at;
+      by.set(c.recipient, slot);
+    }
+    return [...by.values()].map((p) => {
+      const tw = p.grants.map((c) => targetWords(c.data_pattern, names));
+      const seen = [];
+      for (const w of tw) { const s = `${w.title} · ${w.sub}`; if (!seen.includes(s)) seen.push(s); }
+      return { ...p, words: seen.slice(0, 3).join('; ') + (seen.length > 3 ? ` +${seen.length - 3}` : '') };
+    }).sort((a, b) => b.grants.length - a.grants.length);
+  }, [active, names]);
+  const kinds = useMemo(() => { const k = {}; for (const c of active) { const w = whoOf(c.recipient, names).kind; k[w] = (k[w] || 0) + 1; } return k; }, [active, names]);
+  const groups = useMemo(() => ov?.audit?.groups || [], [ov]);
+  const deniedGroupsList = useMemo(() => groups.filter((g) => !g.allowed), [groups]);
+  const deniedCount = useMemo(() => deniedGroupsList.reduce((s, g) => s + g.count, 0), [deniedGroupsList]);
+  const manifestDenied = useMemo(() => deniedGroupsList.filter((g) => g.target?.rest === 'meta.manifest').reduce((s, g) => s + g.count, 0), [deniedGroupsList]);
+  const events = useMemo(() => consentEvents(consents, days, names), [consents, days, names]);
+  /** Groups and events in one list, newest first by their last moment; the mutation rows the server keeps (grant/revoke) are dropped, the events say the same from the permissions. */
+  const trail = useMemo(() => {
+    const items = groups.filter((g) => g.action !== 'grant' && g.action !== 'revoke').map((g) => ({ kind: 'group', at: g.last, group: g }));
+    const evs = events.map((e) => ({ kind: 'event', at: e.at, event: e }));
+    const all = trailFilter === 'events' ? evs : [...items, ...evs];
+    return all.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
+  }, [groups, events, trailFilter]);
+  const swapped = useMemo(() => {
+    // A revoke followed within a minute by a grant to the same recipient on the same target is a role swap.
+    let k = 0;
+    for (const r of revokedList) {
+      if (!r.revoked_at) continue;
+      const rv = new Date(r.revoked_at).getTime();
+      if (consents.some((c) => c.id !== r.id && c.recipient === r.recipient && c.data_pattern === r.data_pattern && Math.abs(new Date(c.granted_at).getTime() - rv) < 60000)) k++;
+    }
+    return k;
+  }, [revokedList, consents]);
+  const expiring = useMemo(() => active.filter((c) => c.expires).length, [active]);
+  const quota = ov?.permSummary?.consent_quota || 100;
+  const exportName = `aimeat-${session?.owner || 'me'}-${new Date().toISOString().slice(0, 10)}.json`;
+
+  /* ── Handlers ──────────────────────────────────────────────────────────────────────────────── */
+
+  const setDays = (d) => { setDaysState(d); setOpenGroup(null); setGroupRows({}); setShownTrail(FIRST_TRAIL); };
+  const setFilter = (f) => { setFilterState(f); setOpenTarget(null); if (f !== 'people') setPersonFocus(''); };
+  const toggleTarget = (id) => setOpenTarget((cur) => (cur === id ? null : id));
+  const toggleGroup = (id) => setOpenGroup((cur) => (cur === id ? null : id));
+  const showMoreTrail = () => setShownTrail((k) => k + 20);
+  const showPerson = (name) => { setFilterState('people'); setPersonFocus(name); const p = people.find((q) => q.name === name); setOpenTarget(p ? p.id : null); window.setTimeout(() => document.getElementById('dw-targets')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0); };
+
+  /** The rows of one group, a page at a time: the accessor and the key prefix the family shares. */
+  const loadGroupRows = async (g, id, more) => {
+    const tg = g.target || {};
+    const keyPrefix = tg.kind === 'key' ? tg.key : tg.kind === 'ws' ? `organism.${tg.organism_id}.w.` : `organism.${tg.organism_id}.${tg.rest || ''}`;
+    const cur = groupRows[id] || { entries: [], total: 0, offset: 0 };
+    setGroupRows((s) => ({ ...s, [id]: { ...cur, loading: true } }));
+    try {
+      const r = await consentService.listAuditRows({ days, accessor: g.accessor_gaii, keyPrefix, limit: ROWS_PAGE, offset: more ? cur.offset : 0 });
+      const fits = (e) => tg.kind !== 'ws' || targetOf(e.memory_key).rest === tg.rest;
+      const rows = r.entries.filter((e) => fits(e) && e.allowed === g.allowed && e.action === g.action);
+      setGroupRows((s) => ({ ...s, [id]: { entries: more ? [...cur.entries, ...rows] : rows, total: tg.kind === 'ws' ? g.count : r.total, offset: (more ? cur.offset : 0) + r.entries.length, loading: false } }));
+    } catch (e) { swallowed('data-wallet: rows', e); setGroupRows((s) => ({ ...s, [id]: { ...cur, loading: false } })); }
+  };
+
+  const setForm = (patch) => setFormState((f) => ({ ...f, ...patch }));
+  const toggleForm = (open) => {
+    const next = typeof open === 'boolean' ? open : !form.open;
+    setForm({ open: next });
+    setFormMsg(null);
+    if (next) { loadOrgs(); window.setTimeout(() => document.getElementById('dw-grant')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0); }
+  };
+  /** Open the form with a person, an organism, a workspace or a key already chosen. */
+  const prefillGrant = ({ who = '', orgId = '', wsId = '', key = '' } = {}) => {
+    const person = who && !who.startsWith('shared#') && who !== 'anonymous' ? who.replace(/^ghii:/, '') : '';
+    setFormState((f) => ({ ...f, open: true, whoKind: 'contact', who: person, what: key ? 'key' : wsId ? 'ws' : orgId ? 'org' : f.what, orgId: orgId || f.orgId, wsId: wsId || '', key: key || '', may: 'read' }));
+    setFormMsg(null);
+    loadOrgs();
+    if (orgId) setOrgs((cur) => (cur.some((o) => o.id === orgId) ? cur : [...cur, { id: orgId, name: names.organisms?.[orgId] || orgId, workspaces: null }]));
+    window.setTimeout(() => document.getElementById('dw-grant')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
+  };
+
+  const submitGrant = async () => {
+    const f = form;
+    const flash = flashFor(setFormMsg);
+    const who = f.who.trim();
+    let recipient;
+    if (f.whoKind === 'all') recipient = '*';
+    else if (f.whoKind === 'nodeUsers') recipient = `node:${nodeId}`;
+    else if (f.whoKind === 'orgMembers') recipient = f.orgId ? `organism.${f.orgId}` : '';
+    else recipient = who.includes('#') ? who : `ghii:${who.includes('@') ? who : `${who}@${nodeId}`}`;
+    if (!recipient) { flash(x('form.needWho'), true); return; }
+    const pattern = f.what === 'key' ? f.key.trim() : f.what === 'ws' ? `organism.${f.orgId}.w.${f.wsId}.**` : `organism.${f.orgId}.**`;
+    const expires = f.untilKind === 'date' && f.until ? new Date(f.until + 'T23:59:59').toISOString() : null;
+    setBusy('grant');
+    try {
+      if (f.what === 'ws' && f.whoKind === 'contact' && !expires && f.scope === 'private') {
+        // A person on a workspace is a workspace role: the same door the Organisms page uses, so the
+        // member list there and the permission here are one record.
+        const grantee = who.includes('#') ? who : who.includes('@') ? who : `${who}@${nodeId}`;
+        const r = await apiPost(`/v1/organisms/${encodeURIComponent(f.orgId)}/workspace-access/grant`, { ws: f.wsId, grantee, role: f.may === 'write' ? 'contributor' : 'viewer' });
+        if (r?.ok === false) throw r;
+      } else {
+        const r = await consentService.grantConsent({ data_pattern: pattern, recipient, purpose: f.why.trim() || 'general', scope: f.scope, expires });
+        if (r?.ok === false) throw r;
       }
-      loadConsents(); loadAudit(30); loadPermSummary();
-    })();
-  }, [session]);
+      const said = x('granted', { who: whoOf(recipient, names).name });
+      flash(said);
+      toast(said);
+      setFormState({ ...EMPTY_FORM, open: false });
+      await load();
+    } catch (e) { flash(errText(e, x('grantFailed')), true); }
+    setBusy(false);
+  };
 
-  async function loadConsents() {
-    try {
-      const list = await consentService.listConsents();
-      setConsents(Array.isArray(list) ? list : []);
-    } catch (err) { swallowed('data-wallet-tab', err); setConsents([]); }
-  }
+  const revoke = (c) => {
+    const who = whoOf(c.recipient, names).name;
+    const tw = targetWords(c.data_pattern, names);
+    confirm(x('confirmRevoke', { who, target: `${tw.title} · ${tw.sub}`, role: x('role.' + roleOf(c)) }), async () => {
+      setBusy(c.id);
+      try {
+        const r = await consentService.revokeConsent(c.id);
+        if (r?.ok === false) throw r;
+        toast(x('revoked', { who }));
+        await load();
+      } catch (e) { toast(errText(e, x('revokeFailed')), true); }
+      setBusy(false);
+    }, { danger: true });
+  };
 
-  async function loadAudit(days) {
-    try {
-      const list = await consentService.listAuditEntries(days);
-      setAuditEntries(Array.isArray(list) ? list : []);
-    } catch (err) { swallowed('data-wallet-tab', err); setAuditEntries([]); }
-  }
-
-  async function loadPermSummary() {
-    try {
-      const data = await consentService.getPermissionSummary();
-      setPermSummary(data || null);
-    } catch (err) { swallowed('data-wallet-tab', err); setPermSummary(null); }
-  }
-
-  // Live update, one subscription per concern.
-  //
-  // This used to be a raw `aimeat-live-update` listener with NO domain filter, so every tick of every
-  // domain — and `memory` alone emits from thirty places — re-ran all three reads. On an account with
-  // a busy agent that is three requests a second for data that had not changed. Consents and the audit
-  // trail both move only on `consent`; the permission summary counts memory keys and storage files, so
-  // it also follows `memory` and `files`.
-  const loadConsentSideRef = useRef(null);
-  loadConsentSideRef.current = () => { loadConsents(); loadAudit(auditDays); loadPermSummary(); };
-  const loadPermSummaryRef = useRef(null);
-  loadPermSummaryRef.current = () => { loadPermSummary(); };
-  useEffect(() => onLiveUpdate(['consent'], () => loadConsentSideRef.current()), []);
-  useEffect(() => onLiveUpdate(['memory', 'files'], () => loadPermSummaryRef.current()), []);
-
-  async function handleGrant(body) {
-    try {
-      await consentService.grantConsent(body);
-      showToast(t('permissions.granted'));
-      setShowConsentForm(false);
-      loadConsents();
-      loadPermSummary();
-    } catch (e) { showToast(e.message || t('profile.error'), true); }
-  }
-
-  async function handleRevoke(id) {
-    try {
-      await consentService.revokeConsent(id);
-      showToast(t('wallet.consents.revoked'));
-      loadConsents();
-    } catch (e) { showToast(e.message || t('profile.error'), true); }
-  }
-
-  async function handleBulkRevoke(ids) {
-    try {
-      await consentService.bulkRevoke([...ids]);
-      showToast(t('wallet.consents.revoked'));
-    } catch (e) { showToast(e.message || t('profile.error'), true); }
-    setSelectedConsents(new Set());
-    loadConsents();
-    loadPermSummary();
-  }
-
-  async function handleExport() {
+  const exportAll = async () => {
+    setExporting(true);
+    const flash = flashFor(setExportMsg);
     try {
       const data = await consentService.exportGdpr(session.owner);
-      const json = JSON.stringify(data, null, 2);
-      const blob = new Blob([json], { type: 'application/json' });
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'aimeat-export-' + new Date().toISOString().slice(0, 10) + '.json';
+      a.download = exportName;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    } catch (err) { swallowed('data-wallet-tab', err); showToast(t('profile.error'), true); }
-  }
+      flash(x('exported', { mb: Math.max(1, Math.round(blob.size / 100000) / 10) }));
+    } catch (e) { swallowed('data-wallet: export', e); flash(x('exportFailed'), true); toast(x('exportFailed'), true); }
+    setExporting(false);
+  };
 
-  /** A grant the owner withdrew, or one the node expired: neither gives access any more. */
-  const isRevoked = (c) => c.status === 'revoked';
-  const isExpiredConsent = (c) => c.status === 'expired'
-    || !!((c.expires_at || c.expires) && new Date(c.expires_at || c.expires) < new Date());
-  const isLive = (c) => !isRevoked(c) && !isExpiredConsent(c);
-
-  const filteredConsents = consents?.filter(c => {
-    // Status: what is live is the answer to "who has access"; the rest is history, behind the toggle.
-    if (!showRevoked && !isLive(c)) return false;
-    // Scope filter
-    if (scopeFilter === 'federation' && c.scope !== 'federation') return false;
-    if (scopeFilter === 'auth' && c.scope !== 'auth') return false;
-    // Text filter
-    if (!consentFilter) return true;
-    const q = consentFilter.toLowerCase();
-    const recip = (c.recipient_gaii || c.recipient || '').toLowerCase();
-    const pat = (c.data_pattern || c.pattern || '').toLowerCase();
-    return recip.includes(q) || pat.includes(q);
-  });
-
-  return html`
-    <div class="section-title">\u{1F6E1}\uFE0F ${t('profile.tabs.dataWallet')}</div>
-
-      ${/* What is stored here that nobody has described. Above the totals, because the summary
-            card below counts memory keys without saying which, and this is the drill-down that
-            counter is asking for. */ ''}
-
-    ${permSummary && html`
-      <div class="card dw-summary-card">
-        <h3 class="card-h3">${t('permissions.summaryTitle')}</h3>
-        <div class="dw-summary-grid mb-1">
-          <div class="dw-stat">
-            <div class="dw-stat-value">${permSummary.active_consents || 0}</div>
-            <div class="text-meta-sm">${t('permissions.summaryActiveRules')}</div>
-          </div>
-          <div class="dw-stat">
-            <div class="dw-stat-value">${permSummary.total_memory_keys || 0}</div>
-            <div class="text-meta-sm">${t('permissions.summaryMemoryKeys')}</div>
-          </div>
-          <div class="dw-stat">
-            <div class="dw-stat-value">${permSummary.total_storage_files || 0}</div>
-            <div class="text-meta-sm">${t('permissions.summaryStorageFiles')}</div>
-          </div>
-        </div>
-        ${permSummary.rules_by_recipient_type && html`
-          <div class="text-meta mb-half">${t('permissions.summaryByType')}</div>
-          <div class="flex-row-wrap">
-            ${Object.entries(permSummary.rules_by_recipient_type).filter(([,v]) => v > 0).map(([k,v]) => html`
-              <span class="dw-type-tag">${k}: ${v}</span>
-            `)}
-          </div>
-        `}
-      </div>
-    `}
-
-    <div class="flex-between dw-section-title">
-      <h3 class="dw-section-heading">${t('wallet.consents.title')}</h3>
-      <button class="btn-primary" onClick=${() => setShowConsentForm(!showConsentForm)}>${t('permissions.grantBtn')}</button>
-    </div>
-    <p class="text-caption dw-section-lead">${t('wallet.consents.intro')}</p>
-    <p class="text-caption dw-section-lead">${t('wallet.consents.scopeHelp')}</p>
-
-    ${showConsentForm && html`
-      <div class="card dw-consent-card">
-        <h4 class="card-h3">${t('permissions.grantTitle')}</h4>
-        <form onSubmit=${(e) => {
-          e.preventDefault();
-          const fd = new FormData(e.target);
-          const rType = fd.get('recipientType');
-          let recipVal = recipientValue.trim();
-          if (rType === 'wildcard') recipVal = '*';
-          else if (rType === 'ghii') recipVal = 'ghii:' + recipVal;
-          else if (rType === 'domain') recipVal = 'domain:' + recipVal;
-          else if (rType === 'node') recipVal = 'node:' + recipVal;
-          else if (rType === 'organism') recipVal = 'organism.' + recipVal;
-          handleGrant({
-            data_pattern: fd.get('dataPattern'),
-            recipient: recipVal,
-            purpose: fd.get('purpose') || 'general',
-            scope: fd.get('scope') || 'private',
-            expires_at: fd.get('expires') || undefined,
-          });
-        }}>
-          <div class="dw-form-grid">
-            <div>
-              <label class="dw-label">${t('permissions.dataPattern')}</label>
-              <input name="dataPattern" class="input-field w-full" placeholder=${t('permissions.dataPatternHint')} required />
-            </div>
-            <div>
-              <label class="dw-label">${t('permissions.recipientType')}</label>
-              <select name="recipientType" class="input-field w-full">
-                <option value="gaii">${t('permissions.typGaii')}</option>
-                <option value="ghii">${t('permissions.typGhii')}</option>
-                <option value="organism">${t('permissions.typOrganism')}</option>
-                <option value="domain">${t('permissions.typDomain')}</option>
-                <option value="node">${t('permissions.typNode')}</option>
-                <option value="wildcard">${t('permissions.typWildcard')}</option>
-              </select>
-            </div>
-            <div>
-              <label class="dw-label">${t('permissions.recipient')}</label>
-              <${ContactPicker} value=${recipientValue} onChange=${setRecipientValue} valueMode="full"
-                placeholder="agent#owner@node" />
-            </div>
-            <div>
-              <label class="dw-label">${t('permissions.purpose')}</label>
-              <input name="purpose" class="input-field w-full" placeholder=${t('permissions.purposeHint')} />
-            </div>
-            <div>
-              <label class="dw-label">${t('permissions.scope')}</label>
-              <select name="scope" class="input-field w-full">
-                <option value="private">${t('permissions.scopePrivate')}</option>
-                <option value="dmz">${t('permissions.scopeDmz')}</option>
-                <option value="federation">${t('permissions.scopeFederation')}</option>
-              </select>
-            </div>
-            <div>
-              <label class="dw-label">${t('permissions.expires')}</label>
-              <input name="expires" type="date" class="input-field w-full" />
-            </div>
-          </div>
-          <div class="flex-actions">
-            <button type="submit" class="btn-primary">${t('permissions.grantBtn')}</button>
-            <button type="button" class="btn-outline btn-sm" onClick=${() => setShowConsentForm(false)}>${t('permissions.cancelBtn')}</button>
-          </div>
-        </form>
-      </div>
-    `}
-
-    ${consents && consents.length > 0 && html`
-      <div class="flex-row mb-half dw-filter-row">
-        <input type="text" class="input-field dw-filter-input"
-          placeholder=${t('permissions.filterPlaceholder')}
-          value=${consentFilter}
-          onInput=${(e) => { setConsentFilter(e.target.value); setSelectedConsents(new Set()); }} />
-        <div class="dw-scope-filters">
-          <button class="btn-sm ${scopeFilter === 'all' ? 'btn-primary' : 'btn-outline'}"
-            onClick=${() => { setScopeFilter('all'); setSelectedConsents(new Set()); }}>
-            ${t('wallet.consents.filterAll')}
-          </button>
-          <button class="btn-sm ${scopeFilter === 'federation' ? 'btn-primary' : 'btn-outline'}"
-            onClick=${() => { setScopeFilter('federation'); setSelectedConsents(new Set()); }}>
-            ${t('wallet.consents.filterFederation')}
-          </button>
-          <button class="btn-sm ${scopeFilter === 'auth' ? 'btn-primary' : 'btn-outline'}"
-            onClick=${() => { setScopeFilter('auth'); setSelectedConsents(new Set()); }}>
-            ${t('wallet.consents.filterAuth')}
-          </button>
-          <button class="btn-sm ${showRevoked ? 'btn-primary' : 'btn-ghost'}"
-            onClick=${() => { setShowRevoked(!showRevoked); setSelectedConsents(new Set()); }}>
-            ${showRevoked ? t('wallet.consents.hideRevoked') : t('wallet.consents.showRevoked')}
-            ${' '}(${consents.filter(c => !isLive(c)).length})
-          </button>
-        </div>
-        ${selectedConsents.size > 0 && html`
-          <button class="btn-danger text-meta" onClick=${() => handleBulkRevoke(selectedConsents)}>
-            ${t('permissions.revokeSelected')} (${selectedConsents.size})
-          </button>
-        `}
-      </div>
-    `}
-
-    ${!consents ? html`<${Spinner} />`
-      : filteredConsents.length === 0 ? html`<div class="empty">${t('wallet.consents.empty')}</div>`
-      : html`<div class="card scroll-x">
-          <table class="consent-table"><thead><tr>
-            <th class="dw-checkbox-col"><input type="checkbox"
-              checked=${filteredConsents.length > 0 && filteredConsents.every(c => selectedConsents.has(c.id || c.consent_id))}
-              onChange=${(e) => {
-                if (e.target.checked) {
-                  // Select-all means "everything I could revoke here", so it skips what is already gone.
-                  setSelectedConsents(new Set(filteredConsents.filter(isLive).map(c => c.id || c.consent_id)));
-                } else {
-                  setSelectedConsents(new Set());
-                }
-              }} /></th>
-            <th>${t('wallet.consents.pattern')}</th>
-            <th>${t('wallet.consents.recipient')}</th>
-            <th>${t('wallet.consents.purpose')}</th>
-            <th>${t('wallet.consents.status')}</th>
-            <th>${t('wallet.consents.scope')}</th>
-            <th>${t('wallet.consents.granted')}</th>
-            <th>${t('wallet.consents.expires')}</th>
-            <th></th>
-          </tr></thead><tbody>
-            ${filteredConsents.map(c => {
-              const cId = c.id || c.consent_id;
-              const revoked = isRevoked(c);
-              const isExpired = isExpiredConsent(c);
-              const live = isLive(c);
-              const expSoon = live && isExpiringSoon(c.expires_at);
-              return html`<tr class=${[expSoon ? 'dw-expiring' : '', live ? '' : 'dw-consent-dead'].filter(Boolean).join(' ')}>
-                <td>${live && html`<input type="checkbox" checked=${selectedConsents.has(cId)}
-                  onChange=${(e) => {
-                    const next = new Set(selectedConsents);
-                    if (e.target.checked) next.add(cId); else next.delete(cId);
-                    setSelectedConsents(next);
-                  }} />`}</td>
-                <td><span class="dw-code-accent">${escHtml(c.data_pattern || c.pattern || '-')}</span></td>
-                <td class="dw-recipient-cell">${recipientBadge(c.recipient_gaii || c.recipient)} <span class="text-meta">${escHtml(c.recipient_gaii || c.recipient || '-')}</span></td>
-                <td>${escHtml(c.purpose || '-')}</td>
-                <td>
-                  ${revoked
-                    ? html`<span class="badge badge-muted">${t('wallet.consents.statusRevoked')}</span>`
-                    : isExpired
-                    ? html`<span class="badge badge-muted">${t('wallet.consents.statusExpired')}</span>`
-                    : html`<span class="badge badge-success">${t('wallet.consents.statusActive')}</span>`}
-                </td>
-                <td>
-                  ${c.scope === 'federation'
-                    ? html`<span class="badge badge-info">${t('wallet.consents.scopeFederation')}</span>`
-                    : c.scope === 'auth'
-                    ? html`<span class="badge badge-warn">${t('wallet.consents.scopeAuth')}</span>`
-                    : html`<span>${escHtml(c.scope || '-')}</span>`}
-                </td>
-                <td class="text-meta">${c.granted_at ? new Date(c.granted_at).toLocaleDateString() : '-'}</td>
-                <td class="text-meta">
-                  ${expSoon && html`<span class="dw-expiring-icon" title=${t('permissions.expiringWarning')}>\u26A0\uFE0F</span>`}
-                  ${c.expires_at ? new Date(c.expires_at).toLocaleDateString() : t('wallet.consents.never')}
-                </td>
-                <td>${live && html`<button class="btn-danger-solid btn-sm" onClick=${() => handleRevoke(cId)}>${t('wallet.consents.revoke')}</button>`}
-                  ${revoked && c.revoked_at && html`<span class="text-meta">${new Date(c.revoked_at).toLocaleDateString()}</span>`}</td>
-              </tr>`;
-            })}
-          </tbody></table>
-        </div>`
-    }
-
-    <h3 class="dw-section-heading">${t('wallet.audit.title')}</h3>
-    <p class="text-caption dw-section-lead">${t('wallet.audit.intro')}</p>
-    <div class="flex-row mb-1">
-      ${[7, 30, 90].map(d => html`
-        <button class="audit-day-btn ${auditDays === d ? 'active' : ''}" onClick=${() => { setAuditDays(d); loadAudit(d); }}>${d} ${t('wallet.audit.days')}</button>
-      `)}
-    </div>
-    ${!auditEntries ? html`<${Spinner} />`
-      : auditEntries.length === 0 ? html`<div class="empty">${t('wallet.audit.empty')}</div>`
-      : html`<div class="card scroll-x">
-          <${DataTable}
-            headers=${[t('wallet.audit.who'), t('wallet.audit.what'), t('wallet.audit.action'), t('wallet.audit.when'), t('wallet.audit.outcome')]}
-            rows=${auditEntries.map(e => {
-              // Both doors (GET /v1/consent/audit and the /v1/data-wallet mount) send the same shape.
-              const key = e.memory_key || '-';
-              const action = e.action || '-';
-              const when = e.timestamp;
-              const allowed = e.allowed === true || e.allowed === 1;
-              return [
-                escHtml(e.accessor_gaii || '-'),
-                html`<span class="dw-code-accent">${escHtml(key)}</span>`,
-                escHtml(action),
-                html`<span class="text-meta">${when ? timeAgo(when) : '-'}</span>`,
-                allowed
-                  ? html`<span class="badge badge-success">${t('wallet.audit.allowed')}</span>`
-                  : html`<span class="badge badge-danger">${t('wallet.audit.denied')}</span>`,
-              ];
-            })}
-          />
-        </div>`
-    }
-
-    <h3 class="dw-section-heading">${t('wallet.export.title')}</h3>
-    <div class="card">
-      <p class="text-caption mb-1">${t('wallet.export.description')}</p>
-      <button class="btn-primary" onClick=${handleExport}>${t('wallet.export.button')}</button>
-    </div>
-  `;
+  const ctx = {
+    session, federated, ov, failed, names, consents, active, revokedList, targets, people, kinds, groups, events, trail, shownTrail,
+    days, reloading, deniedCount, deniedGroups: deniedGroupsList.length, manifestDenied, manifestShare: deniedCount ? manifestDenied / deniedCount : 0,
+    swapped, expiring, quota, filter, trailFilter, personFocus, openTarget, openGroup, groupRows, form, orgs, formMsg, exportMsg, exporting, exportName, busy, ConfirmUI,
+    setDays, setFilter, setTrailFilter, toggleTarget, toggleGroup, showMoreTrail, showPerson, loadGroupRows, setForm, toggleForm, prefillGrant, submitGrant, revoke, exportAll,
+    openOrganisms: () => openTab('organisms'),
+    openAgents: () => openTab('agents'),
+    groupId,
+  };
+  return renderPage(ctx);
 }
