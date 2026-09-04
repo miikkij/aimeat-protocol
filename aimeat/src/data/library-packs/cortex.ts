@@ -18,7 +18,7 @@
  *     rules covered layout only), with a keyboard equivalent per gesture so one implementation
  *     serves phone and desktop.
  */
-import type { LibraryPack } from './types.js';
+import type { LibraryPack } from '../library-packs.js';
 
 export const CORTEX_PACKS: LibraryPack[] = [
   {
