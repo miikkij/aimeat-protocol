@@ -787,6 +787,43 @@ await test('include=meta omits value and reports bytes', async () => {
     assert(typeof item.bytes === 'number' && item.bytes > 0, `bytes reported, got ${item.bytes}`);
 });
 
+// ─── ?limit is the only way to ask for less, so it has to work ───
+//
+// `aimeat_memory_list` publishes `limit` on the connector MCP surface and the CLI dispatch forwards
+// it here, where NOTHING read it: `limit=1` and no limit at all produced byte-identical responses.
+// That is what turned a size wall into a blocker. crewaimeat-dev measured it on a live fleet on
+// 2026-09-04, four values on each of two doors: an agent whose archive had grown past the tunnel's
+// 25 MB response cap could not list it, and had no smaller thing to ask for. → pitfalls §44
+//
+// The assertions pin BOTH halves, because the wrong fix here is easy: bound what comes back, and
+// keep telling the truth about how much there is.
+await test('?limit bounds the listing, on the path that carries values and the one that does not', async () => {
+    for (let i = 0; i < 5; i++) {
+        await json('/v1/memory', { method: 'POST', headers: auth1(), body: JSON.stringify({ key: `lim.${i}`, value: { n: i, pad: 'y'.repeat(200) }, visibility: 'private' }) });
+    }
+    for (const path of ['/v1/memory?prefix=lim.&limit=2', '/v1/memory?prefix=lim.&limit=2&include=meta']) {
+        const { status, body } = await json(path, { headers: auth1() });
+        assert(status === 200, `${path}: status ${status}`);
+        const items = body.data?.items ?? [];
+        assert(items.length === 2, `${path}: expected 2 items, got ${items.length}`);
+        // The number that made this a blocker: with the limit dropped, this was 5 on both doors.
+        assert(body.data?.shown === 2, `${path}: shown should be 2, got ${body.data?.shown}`);
+        assert(body.data?.truncated === true, `${path}: a bounded listing must say it was bounded`);
+    }
+});
+
+await test('a bounded listing still tells the truth about how much there is', async () => {
+    // The wrong fix: slice, and let `total`, `count` and the quota describe the slice. The Memory
+    // tab reads those, so its "used" figure would shrink whenever anything passed a limit, and an
+    // agent deciding whether to narrow further would be reading its own limit back.
+    const { body } = await json('/v1/memory?prefix=lim.&limit=2&include=meta', { headers: auth1() });
+    assert(body.data?.total === 5, `total must count what MATCHED, got ${body.data?.total}`);
+    assert(body.data?.quota?.used_keys === 5, `quota describes the keyspace, got ${body.data?.quota?.used_keys}`);
+
+    const counted = await json('/v1/memory?prefix=lim.&limit=2&count=true', { headers: auth1() });
+    assert(counted.body.data?.count === 5, `a count answers how many there are, not how many were asked for: got ${counted.body.data?.count}`);
+});
+
 await test('search?prefix scopes to a namespace', async () => {
     await json('/v1/memory', { method: 'POST', headers: auth1(), body: JSON.stringify({ key: 'proj.one', value: { note: 'needlexyz' }, visibility: 'private' }) });
     await json('/v1/memory', { method: 'POST', headers: auth1(), body: JSON.stringify({ key: 'other.one', value: { note: 'needlexyz' }, visibility: 'private' }) });

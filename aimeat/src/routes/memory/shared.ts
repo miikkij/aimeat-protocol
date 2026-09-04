@@ -15,6 +15,18 @@ import type { Storage } from '../../storage/interface.js';
 import type { StatsCollector } from '../../services/stats.js';
 import type { MemoryDbService } from '../../services/db/memory-db-service.js';
 
+/**
+ * The most entries one listing will hand back, and the ceiling `?limit` is clamped to.
+ *
+ * Here rather than beside the route that enforces it, because `aimeat_memory_list` publishes this
+ * number to every agent that reads its parameter list and the MCP tool held a second copy of it.
+ * A published cap the enforcing route disagrees with is a promise nobody keeps. This module is the
+ * one both can import: crud.ts already reads it, and it imports nothing back out of the route
+ * group, so the MCP surface can read it without the cycle that exporting from crud.ts creates
+ * (crud → mcp/index → register-all → core → crud, caught by `pnpm check:deps`).
+ */
+export const MEMORY_LIST_MAX_LIMIT = 1000;
+
 /** Context shared by every memory route group module (closed-over deps from memoryRouter). */
 export interface MemoryRouteCtx {
   config: AimeatConfig;

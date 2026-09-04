@@ -117,6 +117,9 @@ import { resolveMcpWriteTarget } from '../routes/memory/owner-target.js';
 import { versionConflict } from './memory-version-lock.js';
 import { writeMemoryRecord } from '../services/memory-write.js';
 import { createWorkItem } from '../routes/work.js';
+// Imported, not restated. The route ENFORCES this cap and this surface only announces it; the two
+// disagreeing is how a published number becomes a promise nobody keeps.
+import { MEMORY_LIST_MAX_LIMIT } from '../routes/memory/shared.js';
 import { acceptWork, deliverWork } from '../services/work-lifecycle.js';
 import type { PeerInfo } from '../services/federation.js';
 
@@ -125,7 +128,6 @@ import type { PeerInfo } from '../services/federation.js';
 // unbounded payload. jsonContent() is the universal char-budget backstop; these caps stop the
 // aggregation earlier and give the agent an actionable "narrow your query" signal.
 const MEMORY_LIST_DEFAULT_LIMIT = 200;
-const MEMORY_LIST_MAX_LIMIT = 1000;
 
 export function registerCoreTools(
     mcp: McpServer,
