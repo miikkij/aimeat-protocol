@@ -34,6 +34,8 @@
  *     discovery-file lifecycle, signal handling.
  * @usage Called by mcp/server.ts `runServe()` when `--http`/`--daemon` is set.
  * @version-history
+ *   2026-09-05 — The private socket is built with its own `gaii`, like the hub's, so the client can
+ *     drop a frame for an identity it does not hold instead of handing it to these handlers.
  *   2026-09-04 — Every call to the node goes through `ch.forward`, which carries the stamp naming
  *     whose call it is. The REST proxy and `/local/subscribe` called `ch.tunnel.forward()` and
  *     `subscribe()` bare, and on a shared socket a frame with no name is the OPENER's — so on a
@@ -304,6 +306,9 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
     // exactly as before this change — the degradation is per agent and nobody else notices.
     const tunnel = new ConnectTunnelClient({
       nodeUrl: entry.config.node_url,
+      // Its own identity, for the same reason the hub passes one: a frame for an identity this
+      // socket does not hold must be dropped, never handed to these handlers by default.
+      gaii: entry.gaii,
       getToken: identity.getToken,
       label: `tunnel:${displayName(entry)}`,
       onInvoke: identity.onInvoke,
