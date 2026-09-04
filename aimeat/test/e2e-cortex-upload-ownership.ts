@@ -153,6 +153,33 @@ async function mcpCortexInstall(p: Party, args: Record<string, unknown>): Promis
     return { isError: call?.result?.isError === true || call?.error !== undefined, text };
 }
 
+/** Call any MCP tool as this party and return the tool's own answer. Same session dance as above. */
+async function mcpCall(p: Party, name: string, args: Record<string, unknown>): Promise<{ isError: boolean; text: string }> {
+    let sessionId = '';
+    const rpc = async (method: string, params: Record<string, any>, id: number) => {
+        const res = await fetch(`${BASE}/v1/mcp`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json', Accept: 'application/json, text/event-stream',
+                Authorization: `Bearer ${p.mcpToken}`,
+                ...(sessionId ? { 'mcp-session-id': sessionId, 'mcp-protocol-version': '2025-03-26' } : {}),
+            },
+            body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
+        });
+        const sid = res.headers.get('mcp-session-id');
+        if (sid) sessionId = sid;
+        const ct = res.headers.get('content-type') ?? '';
+        return ct.includes('text/event-stream') ? await parseSSE(await res.text(), id) : await res.json() as any;
+    };
+    await rpc('initialize', {
+        protocolVersion: '2025-03-26', capabilities: {},
+        clientInfo: { name: 'cortex visibility', version: '1.0.0' },
+    }, 1);
+    const call = await rpc('tools/call', { name, arguments: args }, 2);
+    const text = call?.result?.content?.[0]?.text ?? JSON.stringify(call?.error ?? call ?? {});
+    return { isError: call?.result?.isError === true || call?.error !== undefined, text };
+}
+
 /** Ask aimeat_cortex_install (no manifest) for a presigned cortex upload URL, as this party. */
 async function cortexUploadUrl(p: Party): Promise<string> {
     const { text } = await mcpCortexInstall(p, {});
@@ -194,6 +221,89 @@ await test('A activates it, so the lib bytes are served (that is what makes an o
         method: 'POST', headers: { Authorization: `Bearer ${A.ownerToken}` },
     });
     assert(status === 200 || status === 201, `activate status ${status}: ${JSON.stringify(body)}`);
+});
+
+// ── Visibility is enforced on the READ doors, not only stored ─────────────────────────────────
+//
+// A cortex is private unless its manifest says public (cortex-manifest.ts), and the victim above
+// says nothing, so it is private. Until 2026-09-05 that decided nothing on a read: any signed-in
+// principal fetched its component map, prompts, ontology and activation artifacts by name, both
+// list doors returned it — the HTTP one on `?visibility=private`, the MCP one always — and a managed
+// prompt named it. The rule is canSeeCortex in services/cortex-lifecycle.ts, and every door here
+// calls it, which is why the HTTP reads and the MCP list are asserted in one place: they leaked
+// together and they must agree.
+//
+// The bundled cortexes are the reason this cannot be a plain owner fence. They are seeded as
+// system@<nodeId> and default to PRIVATE (8 of 14 on the dev node), so "installedBy equals the
+// caller" would hide every built-in from every user — green in a test with one fixture, broken on
+// the first real node. B still seeing one is the assertion that guards that.
+
+const readDoors = [
+    `/v1/cortex/${VICTIM_ENC}`,
+    `/v1/cortex/${VICTIM_ENC}/prompts`,
+    `/v1/cortex/${VICTIM_ENC}/prompts/anything`,
+    `/v1/cortex/${VICTIM_ENC}/ontology`,
+];
+const asB = { headers: { Authorization: `Bearer ${B.ownerToken}` } };
+const asA = { headers: { Authorization: `Bearer ${A.ownerToken}` } };
+
+await test('the victim is PRIVATE by default, which is what the rest of this block relies on', async () => {
+    const { status, body } = await json(`/v1/cortex/${VICTIM_ENC}`, asA);
+    assert(status === 200, `owner read ${status}`);
+    assert(body.data.visibility === 'private', `expected private by default, got ${body.data.visibility}`);
+});
+
+await test("Owner B CANNOT read A's private cortex by name — same 404 as a name that does not exist", async () => {
+    const missing = await json('/v1/cortex/no-such-cortex-at-all', asB);
+    assert(missing.status === 404, `control ${missing.status}`);
+    for (const door of readDoors) {
+        const r = await json(door, asB);
+        assert(r.status === 404, `${door}: B read A's private cortex: ${r.status}`);
+        assert(r.body.error?.code === missing.body.error?.code, `${door}: the 404 differs from a missing name, which says the name exists`);
+    }
+});
+
+await test("Owner B's HTTP list omits A's private cortex, even on ?visibility=private — and still shows a bundled one", async () => {
+    for (const q of ['', '?visibility=private']) {
+        const { status, body } = await json(`/v1/cortex${q}`, asB);
+        assert(status === 200, `list${q} ${status}`);
+        const names = (body.data.extensions as any[]).map(e => e.name);
+        assert(!names.includes(victimName), `list${q}: B was shown A's private cortex: ${JSON.stringify(names)}`);
+    }
+    // The regression guard for the naive fence: the node's own bundled cortexes stay visible.
+    const { body } = await json('/v1/cortex', asB);
+    const bundled = (body.data.extensions as any[]).filter(e => String(e.installed_by ?? '').startsWith('system@'));
+    assert(bundled.length > 0, 'a fence that hides the bundled system@ cortexes would strand every user; B sees none');
+});
+
+await test("Owner B's MCP cortex list omits it too — the tool surface and the HTTP door agree", async () => {
+    const { isError, text } = await mcpCall(B, 'aimeat_cortex_list', {});
+    assert(!isError, `list failed: ${text.slice(0, 200)}`);
+    const names = (JSON.parse(text) as any[]).map(e => e.name);
+    assert(!names.includes(victimName), `aimeat_cortex_list showed B another owner's private cortex: ${JSON.stringify(names)}`);
+});
+
+await test('Owner A reads all four doors and sees it in the list — the fence is not a ban', async () => {
+    for (const door of readDoors.slice(0, 2).concat(readDoors.slice(3))) {
+        const r = await json(door, asA);
+        assert(r.status === 200, `${door}: the owner was refused their own cortex: ${r.status}`);
+    }
+    const { body } = await json('/v1/cortex?visibility=private', asA);
+    assert((body.data.extensions as any[]).some(e => e.name === victimName), 'the owner cannot find their own private cortex in their own list');
+});
+
+await test('Flipped to PUBLIC, B reads it and lists it; flipped back, B loses it again', async () => {
+    const pub = await json(`/v1/cortex/${VICTIM_ENC}/visibility`, { ...asA, method: 'POST', body: JSON.stringify({ visibility: 'public' }) });
+    assert(pub.status === 200, `set public ${pub.status}: ${JSON.stringify(pub.body?.error)}`);
+    const r = await json(`/v1/cortex/${VICTIM_ENC}`, asB);
+    assert(r.status === 200, `public cortex refused to B: ${r.status}`);
+    const { body } = await json('/v1/cortex', asB);
+    assert((body.data.extensions as any[]).some(e => e.name === victimName), 'public cortex missing from B\'s list');
+
+    const priv = await json(`/v1/cortex/${VICTIM_ENC}/visibility`, { ...asA, method: 'POST', body: JSON.stringify({ visibility: 'private' }) });
+    assert(priv.status === 200, `set private ${priv.status}`);
+    const again = await json(`/v1/cortex/${VICTIM_ENC}`, asB);
+    assert(again.status === 404, `private again, but B still reads it: ${again.status}`);
 });
 
 await test('A can read back the lib bytes it installed', async () => {
