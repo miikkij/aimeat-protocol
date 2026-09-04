@@ -205,21 +205,6 @@
     listeners[event] = listeners[event].filter((f) => f !== fn);
   }
 
-  // src/static/sdk-libs/auth/pkce.js
-  function b64url(buf) {
-    var bytes = new Uint8Array(buf), s = "";
-    for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
-    return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-  }
-  async function pkce() {
-    var verifier = b64url(crypto.getRandomValues(new Uint8Array(32)).buffer);
-    if (crypto.subtle && crypto.subtle.digest) {
-      var digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
-      return { verifier, challenge: b64url(digest), method: "S256" };
-    }
-    return { verifier, challenge: verifier, method: "plain" };
-  }
-
   // src/static/sdk-libs/auth/ink.js
   var LIGHT = "--aimeat-ink:var(--aimeat-pill-fg,var(--text,#1A1A2E));--aimeat-paper:var(--aimeat-pill-bg,var(--bg,#FAFAF8))";
   var DARK = "--aimeat-ink:var(--aimeat-pill-fg,var(--text,#EDEEF2));--aimeat-paper:var(--aimeat-pill-bg,var(--bg,#14151A))";
@@ -526,6 +511,126 @@
     ".aimeat-why-num{font:400 12px/1.45 " + mono + ";color:" + accent + "}"
   ].join("");
 
+  // src/static/sdk-libs/auth/modal-totp.js
+  function onlyDigits(value) {
+    return String(value || "").replace(/\D/g, "").slice(0, 6);
+  }
+  function totpViewHtml(i, field) {
+    return '<div id="aimeat-totp-view" class="aimeat-body" style="display:none"><h3 class="aimeat-sub-title">' + escHtml(i.totpTitle || "One more step") + '</h3><p class="aimeat-sub-desc">' + escHtml(i.totpDesc || "Your account asks for a code. Open your authenticator app and enter the six digits it shows.") + "</p>" + field(
+      i.totpCodeLabel || "Code",
+      '<input id="aimeat-totp-code" class="aimeat-inp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456">'
+    ) + field(
+      i.totpBackupLabel || "Backup code",
+      '<input id="aimeat-totp-backup" class="aimeat-inp" autocomplete="off" maxlength="16" placeholder="' + escHtml(i.totpBackupPlaceholder || "One of your backup codes") + '">',
+      '<p class="aimeat-hint">' + escHtml(i.totpBackupHint || "Use this if you cannot reach the app. Each code works once.") + "</p>"
+    ) + '<div class="aimeat-actions"><button id="aimeat-totp-go" class="aimeat-go">' + escHtml(i.totpSubmit || "Sign in") + '</button><button id="aimeat-totp-back" class="aimeat-cancel">' + escHtml(i.backToLogin || "Back to Login") + '</button></div><p id="aimeat-totp-err" class="aimeat-err"></p></div>';
+  }
+  function wireTotpStep(ctx) {
+    var i = ctx.i;
+    var pending = null;
+    var codeEl = (
+      /** @type {any} */
+      document.getElementById("aimeat-totp-code")
+    );
+    var backupEl = (
+      /** @type {any} */
+      document.getElementById("aimeat-totp-backup")
+    );
+    var errEl = document.getElementById("aimeat-totp-err");
+    var goBtn = (
+      /** @type {any} */
+      document.getElementById("aimeat-totp-go")
+    );
+    var backBtn = document.getElementById("aimeat-totp-back");
+    if (!codeEl || !backupEl || !errEl || !goBtn || !backBtn) return { openTotpStep: function() {
+    } };
+    function fail(message) {
+      errEl.textContent = message;
+      errEl.style.display = "block";
+    }
+    function forget() {
+      pending = null;
+      codeEl.value = "";
+      backupEl.value = "";
+    }
+    codeEl.addEventListener("input", function() {
+      codeEl.value = onlyDigits(codeEl.value);
+      if (codeEl.value) backupEl.value = "";
+    });
+    backupEl.addEventListener("input", function() {
+      if (backupEl.value) codeEl.value = "";
+    });
+    [codeEl, backupEl].forEach(function(el) {
+      el.addEventListener("keydown", function(e) {
+        if (e.key !== "Enter") return;
+        e.preventDefault();
+        if (!goBtn.disabled) goBtn.click();
+      });
+    });
+    backBtn.addEventListener("click", function() {
+      forget();
+      errEl.style.display = "none";
+      ctx.showView("login");
+    });
+    goBtn.addEventListener("click", async function() {
+      if (!pending) {
+        ctx.showView("login");
+        return;
+      }
+      var code = onlyDigits(codeEl.value);
+      var backup = backupEl.value.trim();
+      errEl.style.display = "none";
+      if (!code && !backup) {
+        fail(i.errTotpRequired || "Enter the code from your app, or one backup code.");
+        return;
+      }
+      if (code && code.length !== 6) {
+        fail(i.errTotpSix || "The code is six digits.");
+        return;
+      }
+      var label = i.totpSubmit || "Sign in";
+      goBtn.textContent = i.working || "Working...";
+      goBtn.disabled = true;
+      try {
+        var session = await ctx.submit(
+          pending.username,
+          pending.password,
+          code ? { totpCode: code } : { backupCode: backup }
+        );
+        forget();
+        ctx.onSuccess(session);
+      } catch (e) {
+        if (e.code === "TOTP_LOCKED") fail(e.message);
+        else if (e.code === "TOTP_REPLAY") fail(i.errTotpReplay || "That code was already used. Wait for your app to show the next one.");
+        else if (e.code === "INVALID_TOTP") fail(i.errTotpWrong || "That code does not match. Check the app and try again.");
+        else fail(e.message);
+        codeEl.value = "";
+        goBtn.textContent = label;
+        goBtn.disabled = false;
+      }
+    });
+    return {
+      /** The password was right and the server asked for the second factor. */
+      openTotpStep: function(username, password) {
+        pending = { username, password };
+        codeEl.value = "";
+        backupEl.value = "";
+        errEl.style.display = "none";
+        goBtn.textContent = i.totpSubmit || "Sign in";
+        goBtn.disabled = false;
+        ctx.showView("totp");
+        setTimeout(function() {
+          codeEl.focus();
+        }, 50);
+      }
+    };
+  }
+
+  // src/static/sdk-libs/auth/modal-recovery-views.js
+  function recoveryViewsHtml(i, field) {
+    return '<div id="aimeat-forgot-pw-view" class="aimeat-body" style="display:none"><div id="aimeat-fpw-step1"><h3 class="aimeat-sub-title">' + escHtml(i.resetPasswordTitle || "Reset Password") + '</h3><p class="aimeat-sub-desc">' + escHtml(i.resetPasswordDesc || "Enter your username to receive a reset code by email.") + "</p>" + field(i.usernameLabel || "Username", '<input id="aimeat-fpw-username" class="aimeat-inp" placeholder="' + escHtml(i.usernamePlaceholder || "Username") + '">') + '<div class="aimeat-actions"><button id="aimeat-fpw-send" class="aimeat-go">' + escHtml(i.sendResetCode || "Send Reset Code") + '</button><button id="aimeat-fpw-back" class="aimeat-cancel">' + escHtml(i.backToLogin || "Back to Login") + '</button></div><p id="aimeat-fpw-msg" class="aimeat-msg"></p><p id="aimeat-fpw-err" class="aimeat-err"></p></div><div id="aimeat-fpw-step2" style="display:none"><h3 class="aimeat-sub-title">' + escHtml(i.enterNewPasswordTitle || "Enter New Password") + '</h3><p class="aimeat-sub-desc">' + escHtml(i.resetCodeSent || "A reset code was sent to your email. Enter it below with your new password.") + "</p>" + field(i.codeLabel || "Reset Code", '<input id="aimeat-fpw-code" class="aimeat-inp" placeholder="123456" maxlength="6">') + field(i.newPasswordLabel || "New Password", '<input id="aimeat-fpw-newpass" type="password" class="aimeat-inp" placeholder="' + escHtml(i.newPasswordPlaceholder || "New password (min 8 chars)") + '">') + '<div class="aimeat-actions"><button id="aimeat-fpw-reset" class="aimeat-go">' + escHtml(i.resetPassword || "Reset Password") + '</button><button id="aimeat-fpw-back2" class="aimeat-cancel">' + escHtml(i.backToLogin || "Back to Login") + '</button></div><p id="aimeat-fpw-msg2" class="aimeat-msg"></p><p id="aimeat-fpw-err2" class="aimeat-err"></p></div></div><div id="aimeat-forgot-user-view" class="aimeat-body" style="display:none"><h3 class="aimeat-sub-title">' + escHtml(i.recoverUsernameTitle || "Recover Username") + '</h3><p class="aimeat-sub-desc">' + escHtml(i.recoverUsernameDesc || "Enter the email address associated with your account.") + "</p>" + field(i.emailLabel || "Email", '<input id="aimeat-fu-email" class="aimeat-inp" type="email" placeholder="you@example.com">') + '<div class="aimeat-actions"><button id="aimeat-fu-send" class="aimeat-go">' + escHtml(i.sendUsername || "Send My Username") + '</button><button id="aimeat-fu-back" class="aimeat-cancel">' + escHtml(i.backToLogin || "Back to Login") + '</button></div><p id="aimeat-fu-msg" class="aimeat-msg"></p></div><div id="aimeat-email-view" class="aimeat-body" style="display:none"><div id="aimeat-em-step1"><h3 class="aimeat-sub-title">' + escHtml(i.completeAccountTitle || "One last step") + '</h3><p class="aimeat-sub-desc">' + escHtml(i.completeAccountDesc || "Add an email to finish setting up your account. We’ll send a verification code to confirm it.") + "</p>" + field(i.emailLabel || "Email", '<input id="aimeat-em-email" class="aimeat-inp" type="email" placeholder="you@example.com">') + '<div class="aimeat-actions"><button id="aimeat-em-send" class="aimeat-go">' + escHtml(i.sendVerificationCode || "Send Verification Code") + '</button><button id="aimeat-em-back" class="aimeat-cancel">' + escHtml(i.backToLogin || "Back to Login") + '</button></div><p id="aimeat-em-err" class="aimeat-err"></p></div><div id="aimeat-em-step2" style="display:none"><h3 class="aimeat-sub-title">' + escHtml(i.enterCodeTitle || "Enter Verification Code") + '</h3><p class="aimeat-sub-desc">' + escHtml(i.enterCodeDesc || "We sent a 6-digit code to your email. Enter it below to finish and sign in.") + "</p>" + field(i.codeLabel || "Verification Code", '<input id="aimeat-em-code" class="aimeat-inp" placeholder="123456" maxlength="6" inputmode="numeric">') + '<div class="aimeat-actions"><button id="aimeat-em-confirm" class="aimeat-go">' + escHtml(i.confirmAndSignIn || "Confirm & Sign In") + '</button><button id="aimeat-em-back2" class="aimeat-cancel">' + escHtml(i.backToLogin || "Back to Login") + '</button></div><p id="aimeat-em-msg2" class="aimeat-msg"></p><p id="aimeat-em-err2" class="aimeat-err"></p></div></div>';
+  }
+
   // src/static/sdk-libs/auth/modal.js
   var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   var OWNER_NAME_RE = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
@@ -653,7 +758,7 @@
         i2.displayNameOptional || "optional"
       ) + '<div class="aimeat-actions"><button id="aimeat-reg-btn" class="aimeat-go">' + escHtml(i2.createAccountBtn || "Create account") + '</button><button id="aimeat-reg-cancel-btn" class="aimeat-cancel">' + escHtml(i2.cancelBtn || "Cancel") + '</button></div><p id="aimeat-reg-error" class="aimeat-err"></p></div>' + (AUTH_PROVIDERS.length ? '<div class="aimeat-or"><span></span><b>' + escHtml(i2.orLabel || "OR") + "</b><span></span></div>" + AUTH_PROVIDERS.map(function(p) {
         return '<button type="button" class="aimeat-oauth-btn" data-provider="' + escHtml(p.id) + '">' + (PROVIDER_ICONS[p.id] || "") + escHtml(i2[p.i18nKey] || p.label) + "</button>";
-      }).join("") : "") + '</div><div id="aimeat-forgot-pw-view" class="aimeat-body" style="display:none"><div id="aimeat-fpw-step1"><h3 class="aimeat-sub-title">' + escHtml(i2.resetPasswordTitle || "Reset Password") + '</h3><p class="aimeat-sub-desc">' + escHtml(i2.resetPasswordDesc || "Enter your username to receive a reset code by email.") + "</p>" + field(i2.usernameLabel || "Username", '<input id="aimeat-fpw-username" class="aimeat-inp" placeholder="' + escHtml(i2.usernamePlaceholder || "Username") + '">') + '<div class="aimeat-actions"><button id="aimeat-fpw-send" class="aimeat-go">' + escHtml(i2.sendResetCode || "Send Reset Code") + '</button><button id="aimeat-fpw-back" class="aimeat-cancel">' + escHtml(i2.backToLogin || "Back to Login") + '</button></div><p id="aimeat-fpw-msg" class="aimeat-msg"></p><p id="aimeat-fpw-err" class="aimeat-err"></p></div><div id="aimeat-fpw-step2" style="display:none"><h3 class="aimeat-sub-title">' + escHtml(i2.enterNewPasswordTitle || "Enter New Password") + '</h3><p class="aimeat-sub-desc">' + escHtml(i2.resetCodeSent || "A reset code was sent to your email. Enter it below with your new password.") + "</p>" + field(i2.codeLabel || "Reset Code", '<input id="aimeat-fpw-code" class="aimeat-inp" placeholder="123456" maxlength="6">') + field(i2.newPasswordLabel || "New Password", '<input id="aimeat-fpw-newpass" type="password" class="aimeat-inp" placeholder="' + escHtml(i2.newPasswordPlaceholder || "New password (min 8 chars)") + '">') + '<div class="aimeat-actions"><button id="aimeat-fpw-reset" class="aimeat-go">' + escHtml(i2.resetPassword || "Reset Password") + '</button><button id="aimeat-fpw-back2" class="aimeat-cancel">' + escHtml(i2.backToLogin || "Back to Login") + '</button></div><p id="aimeat-fpw-msg2" class="aimeat-msg"></p><p id="aimeat-fpw-err2" class="aimeat-err"></p></div></div><div id="aimeat-forgot-user-view" class="aimeat-body" style="display:none"><h3 class="aimeat-sub-title">' + escHtml(i2.recoverUsernameTitle || "Recover Username") + '</h3><p class="aimeat-sub-desc">' + escHtml(i2.recoverUsernameDesc || "Enter the email address associated with your account.") + "</p>" + field(i2.emailLabel || "Email", '<input id="aimeat-fu-email" class="aimeat-inp" type="email" placeholder="you@example.com">') + '<div class="aimeat-actions"><button id="aimeat-fu-send" class="aimeat-go">' + escHtml(i2.sendUsername || "Send My Username") + '</button><button id="aimeat-fu-back" class="aimeat-cancel">' + escHtml(i2.backToLogin || "Back to Login") + '</button></div><p id="aimeat-fu-msg" class="aimeat-msg"></p></div><div id="aimeat-email-view" class="aimeat-body" style="display:none"><div id="aimeat-em-step1"><h3 class="aimeat-sub-title">' + escHtml(i2.completeAccountTitle || "One last step") + '</h3><p class="aimeat-sub-desc">' + escHtml(i2.completeAccountDesc || "Add an email to finish setting up your account. We’ll send a verification code to confirm it.") + "</p>" + field(i2.emailLabel || "Email", '<input id="aimeat-em-email" class="aimeat-inp" type="email" placeholder="you@example.com">') + '<div class="aimeat-actions"><button id="aimeat-em-send" class="aimeat-go">' + escHtml(i2.sendVerificationCode || "Send Verification Code") + '</button><button id="aimeat-em-back" class="aimeat-cancel">' + escHtml(i2.backToLogin || "Back to Login") + '</button></div><p id="aimeat-em-err" class="aimeat-err"></p></div><div id="aimeat-em-step2" style="display:none"><h3 class="aimeat-sub-title">' + escHtml(i2.enterCodeTitle || "Enter Verification Code") + '</h3><p class="aimeat-sub-desc">' + escHtml(i2.enterCodeDesc || "We sent a 6-digit code to your email. Enter it below to finish and sign in.") + "</p>" + field(i2.codeLabel || "Verification Code", '<input id="aimeat-em-code" class="aimeat-inp" placeholder="123456" maxlength="6" inputmode="numeric">') + '<div class="aimeat-actions"><button id="aimeat-em-confirm" class="aimeat-go">' + escHtml(i2.confirmAndSignIn || "Confirm & Sign In") + '</button><button id="aimeat-em-back2" class="aimeat-cancel">' + escHtml(i2.backToLogin || "Back to Login") + '</button></div><p id="aimeat-em-msg2" class="aimeat-msg"></p><p id="aimeat-em-err2" class="aimeat-err"></p></div></div><div id="aimeat-why" class="aimeat-why"' + (isReg ? "" : ' style="display:none"') + '><h4 class="aimeat-why-title">' + escHtml(i2.whyTitle || "What do you get?") + '</h4><div class="aimeat-why-row"><span class="aimeat-why-num">01</span><span>' + escHtml(i2.whyGhii || "Your own digital identity. Only you control it") + '</span></div><div class="aimeat-why-row"><span class="aimeat-why-num">02</span><span>' + escHtml(i2.whyPrivacy || "Your own private memory space, protected by your password") + '</span></div><div class="aimeat-why-row"><span class="aimeat-why-num">03</span><span>' + escHtml(i2.whyAgents || "Connect AI agents that remember you and work on your behalf") + '</span></div><div class="aimeat-why-row strong"><span class="aimeat-why-num">04</span><span>' + escHtml(i2.whyMorsels || "Your own AI-built apps and agents work for you: your own AI operating system.") + "</span></div></div></div></div>";
+      }).join("") : "") + "</div>" + recoveryViewsHtml(i2, field) + totpViewHtml(i2, field) + '<div id="aimeat-why" class="aimeat-why"' + (isReg ? "" : ' style="display:none"') + '><h4 class="aimeat-why-title">' + escHtml(i2.whyTitle || "What do you get?") + '</h4><div class="aimeat-why-row"><span class="aimeat-why-num">01</span><span>' + escHtml(i2.whyGhii || "Your own digital identity. Only you control it") + '</span></div><div class="aimeat-why-row"><span class="aimeat-why-num">02</span><span>' + escHtml(i2.whyPrivacy || "Your own private memory space, protected by your password") + '</span></div><div class="aimeat-why-row"><span class="aimeat-why-num">03</span><span>' + escHtml(i2.whyAgents || "Connect AI agents that remember you and work on your behalf") + '</span></div><div class="aimeat-why-row strong"><span class="aimeat-why-num">04</span><span>' + escHtml(i2.whyMorsels || "Your own AI-built apps and agents work for you: your own AI operating system.") + "</span></div></div></div></div>";
     }
     function wireModal() {
       modal.querySelectorAll(".aimeat-lang").forEach(function(b) {
@@ -743,7 +848,21 @@
         document.getElementById("aimeat-forgot-pw-view").style.display = view === "forgot-pw" ? "" : "none";
         document.getElementById("aimeat-forgot-user-view").style.display = view === "forgot-user" ? "" : "none";
         document.getElementById("aimeat-email-view").style.display = view === "email" ? "" : "none";
+        document.getElementById("aimeat-totp-view").style.display = view === "totp" ? "" : "none";
       }
+      function finishLogin(session) {
+        modal.remove();
+        renderBtn();
+        if (opts.onLogin) opts.onLogin(session);
+      }
+      var totpStep = wireTotpStep({
+        i,
+        showView,
+        submit: function(user, pass, secondFactor) {
+          return auth.loginWithPassword(user, pass, secondFactor);
+        },
+        onSuccess: finishLogin
+      });
       var pendingEmailLogin = null;
       function openEmailCompletion(user, pass, hasEmail, mode, displayName, prefillEmail) {
         pendingEmailLogin = { username: user, password: pass, mode: mode || "attach", displayName: displayName || user };
@@ -1040,13 +1159,22 @@
         btn.disabled = true;
         try {
           const session = await auth.loginWithPassword(isEmail || isFederated ? raw : localName, password);
-          modal.remove();
-          renderBtn();
-          if (opts.onLogin) opts.onLogin(session);
+          finishLogin(session);
         } catch (e) {
           if (e.code === "EMAIL_NOT_VERIFIED" && !isFederated) {
             releaseBtn("aimeat-go-btn", signInLabel);
             openEmailCompletion(localName, password, !!(e.details && e.details.has_email));
+            return;
+          }
+          if (e.code === "TOTP_REQUIRED") {
+            releaseBtn("aimeat-go-btn", signInLabel);
+            totpStep.openTotpStep(isEmail || isFederated ? raw : localName, password);
+            return;
+          }
+          if (e.code === "TOTP_LOCKED") {
+            errEl.textContent = e.message;
+            errEl.style.display = "block";
+            releaseBtn("aimeat-go-btn", signInLabel);
             return;
           }
           errEl.textContent = e.message.includes("Invalid username or password") ? i.errWrongCredentials || "That username or email and password do not match an account here." : e.message;
@@ -1632,75 +1760,22 @@
     }
   }
 
-  // src/static/sdk-libs/auth/session.js
-  var currentSession = null;
-  var refreshTimer = null;
-  var ownerRefreshInFlight = null;
-  var _appOriginLoginInFlight = null;
-  var focusRefreshInFlight = null;
-  async function api(path, opts = {}) {
-    const url = NODE_URL + path;
-    const headers = { "Content-Type": "application/json", ...opts.headers };
-    const resp = await fetch(url, { ...opts, headers });
-    const data = await resp.json();
-    if (!data.ok) {
-      const err = (
-        /** @type {Error & { code?: string, details?: unknown }} */
-        new Error(data.error?.message || "API error")
-      );
-      err.code = data.error?.code;
-      err.details = data.error?.details;
-      throw err;
+  // src/static/sdk-libs/auth/pkce.js
+  function b64url(buf) {
+    var bytes = new Uint8Array(buf), s = "";
+    for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+    return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  async function pkce() {
+    var verifier = b64url(crypto.getRandomValues(new Uint8Array(32)).buffer);
+    if (crypto.subtle && crypto.subtle.digest) {
+      var digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
+      return { verifier, challenge: b64url(digest), method: "S256" };
     }
-    return data;
+    return { verifier, challenge: verifier, method: "plain" };
   }
-  function persistSession(session) {
-    save("session", {
-      owner: session.owner,
-      gaii: session.gaii,
-      ghii: session.ghii,
-      jwt: session.jwt,
-      publicKey: session.publicKey,
-      roles: session.roles,
-      displayName: session.displayName || "",
-      federated: session.federated || false,
-      homeNode: session.homeNode || "",
-      homeUrl: session.homeUrl || "",
-      // H-2 app-origin grant session metadata (drives the consent gear on the login pill).
-      _appOrigin: session._appOrigin || false,
-      _app: session._app || null,
-      _own: session._own || false
-    });
-  }
-  async function restoreSessionFromCookie() {
-    try {
-      const data = await api("/v1/auth/refresh", {
-        method: "POST",
-        credentials: "include",
-        headers: { "X-AIMEAT-Refresh": "1" }
-      });
-      const token = data && data.data && data.data.token;
-      if (!token) return null;
-      const payload = parseJwt(token) || {};
-      const ownerName = payload.owner || payload.sub;
-      if (!ownerName) return null;
-      const session = createSession({
-        owner: ownerName,
-        ghii: String(ownerName).indexOf("@") >= 0 ? ownerName : ownerName + "@" + NODE_ID,
-        gaii: null,
-        jwt: token,
-        roles: payload.roles || [],
-        displayName: ""
-      });
-      persistSession(session);
-      currentSession = session;
-      scheduleAutoRefresh(session);
-      emit("login", session);
-      return session;
-    } catch {
-      return null;
-    }
-  }
+
+  // src/static/sdk-libs/auth/app-origin.js
   function isAppOrigin() {
     try {
       return location.origin !== new URL(APEX_URL).origin;
@@ -1849,6 +1924,76 @@
       });
       var j = await resp.json();
       return j && j.ok && j.data && j.data.access_token ? j.data : null;
+    } catch {
+      return null;
+    }
+  }
+
+  // src/static/sdk-libs/auth/session.js
+  var currentSession = null;
+  var refreshTimer = null;
+  var ownerRefreshInFlight = null;
+  var _appOriginLoginInFlight = null;
+  var focusRefreshInFlight = null;
+  async function api(path, opts = {}) {
+    const url = NODE_URL + path;
+    const headers = { "Content-Type": "application/json", ...opts.headers };
+    const resp = await fetch(url, { ...opts, headers });
+    const data = await resp.json();
+    if (!data.ok) {
+      const err = (
+        /** @type {Error & { code?: string, details?: unknown }} */
+        new Error(data.error?.message || "API error")
+      );
+      err.code = data.error?.code;
+      err.details = data.error?.details;
+      throw err;
+    }
+    return data;
+  }
+  function persistSession(session) {
+    save("session", {
+      owner: session.owner,
+      gaii: session.gaii,
+      ghii: session.ghii,
+      jwt: session.jwt,
+      publicKey: session.publicKey,
+      roles: session.roles,
+      displayName: session.displayName || "",
+      federated: session.federated || false,
+      homeNode: session.homeNode || "",
+      homeUrl: session.homeUrl || "",
+      // H-2 app-origin grant session metadata (drives the consent gear on the login pill).
+      _appOrigin: session._appOrigin || false,
+      _app: session._app || null,
+      _own: session._own || false
+    });
+  }
+  async function restoreSessionFromCookie() {
+    try {
+      const data = await api("/v1/auth/refresh", {
+        method: "POST",
+        credentials: "include",
+        headers: { "X-AIMEAT-Refresh": "1" }
+      });
+      const token = data && data.data && data.data.token;
+      if (!token) return null;
+      const payload = parseJwt(token) || {};
+      const ownerName = payload.owner || payload.sub;
+      if (!ownerName) return null;
+      const session = createSession({
+        owner: ownerName,
+        ghii: String(ownerName).indexOf("@") >= 0 ? ownerName : ownerName + "@" + NODE_ID,
+        gaii: null,
+        jwt: token,
+        roles: payload.roles || [],
+        displayName: ""
+      });
+      persistSession(session);
+      currentSession = session;
+      scheduleAutoRefresh(session);
+      emit("login", session);
+      return session;
     } catch {
       return null;
     }
@@ -2165,13 +2310,25 @@
     },
     /**
      * Login with username + password (works from any device).
+     *
+     * An account with two-step sign-in refuses the first call with code TOTP_REQUIRED; call again with
+     * the second factor. The password travels a second time on purpose: the server holds no partial
+     * login state between the two calls, so there is nothing a stolen intermediate token could carry.
+     *
+     * @param {string} username
+     * @param {string} password
+     * @param {{ totpCode?: string, backupCode?: string }} [secondFactor] The code from the
+     *   authenticator app, or one unused backup code. Pass one, not both.
      * @returns {Promise<object>} Session object
      */
-    async loginWithPassword(username, password) {
+    async loginWithPassword(username, password, secondFactor) {
+      const body = { username, password };
+      if (secondFactor && secondFactor.totpCode) body.totp_code = secondFactor.totpCode;
+      else if (secondFactor && secondFactor.backupCode) body.backup_code = secondFactor.backupCode;
       const data = await api("/v1/ghii/login", {
         method: "POST",
         credentials: "include",
-        body: JSON.stringify({ username, password })
+        body: JSON.stringify(body)
       });
       const d = data.data;
       let ownerCryptoKey = null;

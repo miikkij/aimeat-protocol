@@ -9,9 +9,12 @@
  *   - getGhiiCors / setGhiiCors: owner-wide CORS allowed origins (null = allow all)
  *   - getAgentCors / setAgentCors: per-agent CORS allowed origins
  *   - listSessions / revokeSession / revokeAllSessions: active session management
+ *   - totpSetup / totpVerify / totpDisable / totpRegenerateBackupCodes: two-step sign-in
  *   - loadAll(agents): aggregates GHII CORS + all agents' CORS in one call
  *
  * @version-history
+ *   v1.2.0 — 2026-09-04 — The four TOTP calls, and two_factor carried through the overview. The
+ *     routes had been live since July with nothing in the SPA reaching them.
  *   v1.1.0 — 2026-08-24 — The overview carries managed_by through (BR-04): the field was served
  *     and this shaping dropped it, so the "signed in through your organisation" row never rendered.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
@@ -63,6 +66,37 @@ export async function revokeAllSessions() {
   return api('/v1/auth/sessions', { method: 'DELETE' });
 }
 
+// ── Two-step sign-in (TOTP) ──
+// The secret, the QR image and the backup codes exist in ONE response each, and the server keeps no
+// readable copy. Whatever calls these owns showing them before the state moves on.
+
+/** Begin setup: returns { totp_secret, totp_uri, qr_data_url, backup_codes }. Not active until verified. */
+export async function totpSetup() {
+  const data = await api('/v1/ghii/totp/setup', { method: 'POST', body: '{}' });
+  return data?.data || {};
+}
+
+/** Confirm setup with a code from the authenticator app. This is what arms the factor. */
+export async function totpVerify(code) {
+  return api('/v1/ghii/totp/verify', { method: 'POST', body: JSON.stringify({ code }) });
+}
+
+/**
+ * Turn it off. Needs a current code or one unused backup code: pass exactly one.
+ * @param {{ code?: string, backupCode?: string }} answer
+ */
+export async function totpDisable({ code, backupCode }) {
+  return api('/v1/ghii/totp', {
+    method: 'DELETE',
+    body: JSON.stringify(code ? { code } : { backup_code: backupCode }),
+  });
+}
+
+/** Mint a fresh set of backup codes. The old ones stop working the moment this returns. */
+export async function totpRegenerateBackupCodes(code) {
+  return api('/v1/ghii/totp/backup-codes', { method: 'POST', body: JSON.stringify({ code }) });
+}
+
 /**
  * Load full security data: GHII CORS + all agent CORS settings.
  * @param {Array} agents - List of agent objects (must have .name)
@@ -91,6 +125,12 @@ export async function getSecurityOverview() {
     const data = await apiGet('/v1/security/overview');
     const d = data?.data;
     if (!d) return null;
-    return { ghii: d.ghii ?? null, agents: d.agents || [], sessions: d.sessions || [], managed_by: d.managed_by ?? null };
+    return {
+      ghii: d.ghii ?? null,
+      agents: d.agents || [],
+      sessions: d.sessions || [],
+      managed_by: d.managed_by ?? null,
+      two_factor: d.two_factor ?? null,
+    };
   } catch (err) { swallowed('security: getSecurityOverview', err); return null; }
 }

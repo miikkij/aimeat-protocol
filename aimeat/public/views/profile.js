@@ -146,7 +146,10 @@ const TABS = [
   { id: 'access',        key: 'profile.tabs.access',         component: AccessTab,         minTier: 'new' },
   { id: 'dataWallet',    key: 'profile.tabs.dataWallet',     component: DataWalletTab,     minTier: 'active' },
   { id: 'nodeStats',     key: 'profile.tabs.nodeStats',      component: NodeStatsTab,      minTier: 'experienced' },
-  { id: 'security',      key: 'profile.tabs.security',       component: SecurityTab,       minTier: 'experienced' },
+  // 'new', not 'experienced': this tab is where two-step sign-in is switched on, and that is not an
+  // expert setting — it is the first thing a careful person looks for after making an account.
+  // Behind 'experienced' the control existed and nobody could find it.
+  { id: 'security',      key: 'profile.tabs.security',       component: SecurityTab,       minTier: 'new' },
   { id: 'email',         key: 'profile.tabs.email',          component: EmailTab,          minTier: 'new' },
   { id: 'notifications', key: 'profile.tabs.notifications',  component: NotificationsTab,  minTier: 'active' },
   // 'new', not 'active', for the same reason as the mcp tab above: the own-key road is one of the

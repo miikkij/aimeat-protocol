@@ -2,8 +2,13 @@
  * @file security-tab.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Profile tab for CORS origin management (GHII + per-agent) and session revocation.
+ * @description Profile tab for two-step sign-in, CORS origin management (GHII + per-agent) and
+ *   session revocation.
  * @version-history
+ *   v1.3.0 — 2026-09-04 — Two-step sign-in (TOTP) has a door, in the section-tab/two-factor.js
+ *     panel: the routes shipped in July with no way to reach them from a screen. It sits first,
+ *     above CORS, because it is the one thing on this tab a person came here to switch on. The
+ *     lock glyph leaves the section title with it — no emoji in the interface.
  *   v1.2.0 — 2026-07-18 — Vaihe 2d: the two bespoke `consent-table`s (per-agent CORS + sessions) →
  *     canonical generic <DataTable> (rows/headers), unifying them with the node-wide table look
  *     (accent-tinted divider/hover → neutral canonical). Cell content preserved verbatim.
@@ -22,6 +27,7 @@ import { DataTable } from '/components/DataTable.js';
 import { useConfirm } from '/components/Modal.js';
 import * as securityService from '/js/services/security.js';
 import { listAgents } from '/js/services/agents.js';
+import { TwoFactorSection } from './security-tab/two-factor.js';
 import { swallowed } from '/js/swallowed.js';
 
 export default function SecurityTab({ session, showToast }) {
@@ -34,14 +40,18 @@ export default function SecurityTab({ session, showToast }) {
   const [sessions, setSessions] = useState([]);
   const [revokingId, setRevokingId] = useState(null);
 
+  // No setLoading(true) here, on purpose. The render guard below already shows the spinner while
+  // there is no data, which covers the first read; raising the flag again on a RE-read replaced the
+  // whole tab with a spinner, unmounted the two-step panel mid-setup, and took the secret and the
+  // backup codes with it — material the server shows once and never again. Measured in a browser:
+  // arming the factor emits a change event, the tab re-read, and the QR being scanned vanished.
   const loadData = useCallback(async () => {
-    setLoading(true);
     try {
       // Mount fold: ONE composite (GHII CORS + per-agent CORS resolved server-side + sessions). On failure,
       // fall back to listAgents + the per-agent CORS fan-out + listSessions.
       const ov = await securityService.getSecurityOverview();
       if (ov) {
-        setSecurityData({ ghii: ov.ghii, agents: ov.agents, managedBy: ov.managed_by || null });
+        setSecurityData({ ghii: ov.ghii, agents: ov.agents, managedBy: ov.managed_by || null, twoFactor: ov.two_factor || null });
         setSessions(ov.sessions);
       } else {
         const [agents, sessionsList] = await Promise.all([
@@ -59,6 +69,14 @@ export default function SecurityTab({ session, showToast }) {
   useEffect(() => {
     if (session) loadData();
   }, [session, loadData]);
+
+  // This tab shows server state (sessions, and now whether a second factor is armed), so it follows
+  // the node-wide convention and re-reads on the live-update event.
+  useEffect(() => {
+    const handler = () => loadData();
+    window.addEventListener('aimeat-live-update', handler);
+    return () => window.removeEventListener('aimeat-live-update', handler);
+  }, [loadData]);
 
   async function saveGhiiCors(originsText) {
     const origins = originsText.trim()
@@ -110,7 +128,7 @@ export default function SecurityTab({ session, showToast }) {
   const effectiveOrigins = ghii.effective || [];
 
   return html`
-    <div class="section-title">\u{1F512} ${t('profile.security.title')}</div>
+    <div class="section-title">${t('profile.security.title')}</div>
     <div class="section-desc">${t('profile.security.desc')}</div>
 
     ${securityData.managedBy && html`
@@ -119,6 +137,12 @@ export default function SecurityTab({ session, showToast }) {
         <p class="text-caption mb-0">${t('profile.security.managedDesc').replace('{name}', securityData.managedBy.name)}</p>
       </div>
     `}
+
+    <${TwoFactorSection}
+      twoFactor=${securityData.twoFactor}
+      managed=${!!securityData.managedBy}
+      showToast=${showToast}
+      onChanged=${loadData} />
 
     <h3 class="card-h3 mt-section">${t('profile.security.ghiiTitle')}</h3>
     <p class="text-caption mb-1">${t('profile.security.ghiiDesc')}</p>
