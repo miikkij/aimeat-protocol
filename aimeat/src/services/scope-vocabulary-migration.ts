@@ -205,7 +205,23 @@ export async function migrateAgentScopeVocabulary(storage: Storage): Promise<num
  * particular agent, and an app grant's scope list is a different conversation with a different
  * screen; the two should not be reasoned about with one table until someone decides they mean the
  * same thing.
+ *
+ * TWO GRANTS THIS NEVER TOUCHES (2026-09-05). A grant approved on or after the day the words got
+ * their names went through a consent screen that LISTED them, so the owner's answer stands as
+ * given: measured on aimeat.io, 122 of 123 grants carried the eight words and none of the apps had
+ * asked for them, because this ran on every boot and wrote them onto grants made weeks after the
+ * screen could show them. And a grant the owner has narrowed by hand (scopesFixedAt) keeps what the
+ * owner left it; handing the words back at the next restart made the page's "take this away" a
+ * promise that lasted until the next deploy.
  */
+export const VOCABULARY_NAMED_AT = '2026-08-10T00:00:00.000Z';
+
+/** Is this a grant the migration may still widen: made before the words had names, and never narrowed by its owner? */
+export function appGrantPredatesVocabulary(grant: { createdAt: string; scopesFixedAt?: string | null }): boolean {
+    if (grant.scopesFixedAt) return false;
+    return new Date(grant.createdAt).getTime() < new Date(VOCABULARY_NAMED_AT).getTime();
+}
+
 export async function migrateAppGrantScopeVocabulary(storage: Storage): Promise<number> {
     const grants = await storage.listAppGrants();
     let changed = 0;
@@ -213,6 +229,7 @@ export async function migrateAppGrantScopeVocabulary(storage: Storage): Promise<
     for (const grant of grants) {
         const held = grant.scopes;
         if (!Array.isArray(held) || held.includes('*')) continue;
+        if (!appGrantPredatesVocabulary(grant)) continue;
         const missing = GRANDFATHERED_SCOPES.filter(s => !held.includes(s));
         if (!missing.length) continue;
         await storage.updateAppGrant(grant.grantId, { scopes: [...held, ...missing] });

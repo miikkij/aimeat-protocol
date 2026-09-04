@@ -1,0 +1,169 @@
+/**
+ * @file access-poster.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The Access page in the poster face (ac- prefix; design canvas "AIMEAT Pääsy-sivu",
+ *   direction A). The shared parts come from organism.css's og- rules; this file carries what the
+ *   page adds: the sign-in rows (a state chip and a door on the right), the sessions by device and by
+ *   agent, the key rows (who, what it may do in words, when, door) and the opened key with its rights
+ *   each behind a "take away" door, the token form as a fold with its levels as chips and the token
+ *   shown once, the address rows with a copy door, the two roads. The older sections that stay
+ *   (connected accounts, sharing groups) wear the poster skin through profile-poster.css and are only
+ *   quieted here. Every column is bounded so a long origin or label wraps inside its cell.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-05 — Initial.
+ */
+
+.og-ac .og-door:disabled, .og-ac .og-slab:disabled { opacity: .5; cursor: default; }
+.og-ac .og-strip small { white-space: normal; overflow: visible; }
+.og-ac .is-low { color: var(--accent); }
+.og-ac .is-good { color: var(--success-fg); }
+.og-ac .is-dim { color: var(--text-dim); }
+.ac-hint { margin: .7rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--text-dim); }
+.ac-para { margin: 0 0 .6rem; font-size: .95rem; line-height: 1.55; color: var(--text-dim); }
+.ac-lead { margin: 0 0 .7rem; font-size: .95rem; line-height: 1.55; }
+.ac-empty { margin: 0; padding: .3rem 0 .8rem; font-size: .95rem; line-height: 1.55; font-weight: 600; color: var(--text-dim); }
+.ac-empty b { color: var(--text); font-weight: 800; }
+.ac-msg { display: block; margin: .4rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--success-fg); }
+.ac-msg.is-err { color: var(--accent); }
+.ac-slab-hint { display: block; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); max-width: 18rem; text-align: right; }
+.ac-why { margin-top: .9rem; padding: .8rem 1rem; border: 3px solid var(--text); background: var(--card-bg); font-size: .9rem; line-height: 1.55; }
+.ac-why b { font-weight: 800; }
+.ac-label { display: block; margin: 1.1rem 0 .3rem; }
+
+/* ── 01: the sign-in rows ─────────────────────────────────────────────────────────────────── */
+.ac-rows { display: flex; flex-direction: column; }
+.ac-row { display: flex; align-items: center; gap: 1rem; padding: .7rem 0; border-bottom: 1px solid var(--border); }
+.ac-row > .ac-nm { min-width: 0; flex: 1 1 auto; }
+.ac-row > .ac-nm b { display: block; font-size: .95rem; font-weight: 800; color: var(--text); }
+.ac-row > .ac-nm small { display: block; margin-top: .15rem; font-family: var(--font-mono); font-size: .7rem; font-weight: 400; color: var(--text-dim); overflow-wrap: anywhere; white-space: normal; }
+.ac-row > .ac-w { flex: 1 1 22rem; min-width: 0; font-size: .85rem; line-height: 1.5; color: var(--text-dim); overflow-wrap: anywhere; }
+.ac-row > .ac-w b { color: var(--text); font-weight: 800; }
+.ac-row > .ac-r { display: flex; align-items: center; gap: 1rem; flex: none; margin-left: auto; white-space: nowrap; }
+.ac-row > .ac-r .og-door { font-size: .72rem; }
+.ac-row > .ac-r .ac-n { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.35rem; line-height: 1; color: var(--text); }
+.ac-row.is-sub { padding-left: 1.4rem; }
+.ac-row.is-last { border-bottom: 0; }
+/* The two panels that come from the Security tab (two-step, passkeys) sit inside the row list and
+   wear the poster skin; their own section titles duplicate the row above them and go. */
+.ac-panel { border-bottom: 1px solid var(--border); padding: .2rem 0 .6rem; }
+.ac-panel > .card-h3, .ac-panel > .text-caption:first-of-type { display: none; }
+.ac-panel .card { border-top: 0; padding: .4rem 0 .4rem; margin-bottom: 0; }
+.ac-panel .card:last-child { padding-bottom: .2rem; }
+.ac-devices { display: grid; grid-template-columns: minmax(0, 1.3fr) 7rem 9rem; gap: 0 1rem; margin: .2rem 0 0 1.4rem; }
+.ac-devices > div { padding: .4rem 0; border-bottom: 1px solid var(--border); font-size: .85rem; line-height: 1.5; min-width: 0; overflow-wrap: anywhere; }
+.ac-devices > div b { font-weight: 800; }
+.ac-devices > div small { display: block; font-family: var(--font-mono); font-size: .68rem; color: var(--text-dim); }
+.ac-devices > .ac-dh { padding: 0 0 .25rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.ac-devices > .ac-dn { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.2rem; line-height: 1; text-align: right; }
+.ac-keybox { margin-top: .9rem; padding: .8rem 1rem; border: 3px solid var(--text); background: var(--card-bg); font-size: .9rem; line-height: 1.55; display: flex; align-items: center; gap: 1.4rem; flex-wrap: wrap; }
+.ac-keybox b { font-weight: 800; }
+.ac-keybox code { display: inline-block; max-width: 100%; margin-top: .3rem; font-family: var(--font-mono); font-size: .78rem; background: var(--bg-dim); padding: .15rem .5rem; overflow-wrap: anywhere; filter: blur(4px); transition: filter .2s; }
+.ac-keybox code.is-shown { filter: none; }
+.ac-keybox .og-doors { flex: none; margin-left: auto; }
+.ac-fed { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin: .2rem 0 0 1.4rem; padding-bottom: .6rem; }
+.ac-fed .og-input { flex: 1 1 14rem; min-width: 10rem; }
+.ac-fed-node { display: flex; align-items: center; gap: .8rem; padding: .35rem 0; margin-left: 1.4rem; border-bottom: 1px solid var(--border); font-family: var(--font-mono); font-size: .78rem; }
+.ac-fed-node .og-door { font-size: .7rem; }
+
+/* ── 02: the keys ─────────────────────────────────────────────────────────────────────────── */
+.ac-filters { display: flex; flex-wrap: wrap; gap: .5rem; margin: .2rem 0 .8rem; align-items: center; }
+.ac-filters .og-chip { cursor: pointer; background: transparent; }
+.ac-filters .og-chip.og-chip--sun { background: var(--sun); }
+.ac-filters .og-chip.og-chip--coral { border-color: var(--accent); color: var(--accent); }
+.ac-filters .ac-filters-r { margin-left: auto; }
+.ac-keys { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.9fr) 7.5rem auto; gap: 0 1rem; align-items: stretch; }
+.ac-key { display: contents; }
+.ac-key > div { padding: .65rem 0; border-bottom: 1px solid var(--border); min-width: 0; display: grid; align-content: center; }
+.ac-key--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.ac-key.is-open > div { border-bottom: 0; }
+.ac-key > .ac-knm { font-size: .9rem; font-weight: 800; color: var(--text); overflow-wrap: anywhere; }
+.ac-knm .og-tbl-name { font-size: .9rem; }
+.ac-knm small { display: block; margin-top: .15rem; font-family: var(--font-mono); font-size: .68rem; font-weight: 400; color: var(--text-dim); overflow-wrap: anywhere; white-space: normal; }
+.ac-knm small.is-low { color: var(--accent); }
+.ac-key > .ac-kw { font-size: .85rem; line-height: 1.5; color: var(--text-dim); overflow-wrap: anywhere; }
+.ac-kw b { color: var(--text); font-weight: 800; }
+.ac-key > .ac-kwhen { font-family: var(--font-mono); font-size: .72rem; line-height: 1.5; color: var(--text-dim); overflow-wrap: anywhere; }
+.ac-key > .ac-kwhen.is-low { color: var(--accent); }
+.ac-key > .ac-kgo { display: flex; justify-content: flex-end; align-items: center; gap: .8rem; white-space: nowrap; }
+.ac-kgo .og-door { font-size: .72rem; }
+.ac-key > .ac-open { grid-column: 1 / -1; display: block; margin: 0 0 .6rem; padding: 1rem 1.2rem 1.1rem; border: 3px solid var(--text); box-shadow: 8px 8px 0 var(--sun); background: var(--card-bg); font-size: .9rem; line-height: 1.55; color: var(--text); }
+.ac-open .og-doors { margin-top: .9rem; }
+.ac-open .og-label { display: block; margin: .9rem 0 .3rem; }
+.ac-rights { display: grid; grid-template-columns: minmax(7rem, 11rem) minmax(0, 1fr) auto; gap: 0 1rem; margin-top: .4rem; }
+.ac-rights > div { padding: .45rem 0; border-bottom: 1px solid var(--border); font-size: .85rem; line-height: 1.5; min-width: 0; overflow-wrap: anywhere; }
+.ac-rights > .ac-rk { font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); align-self: center; }
+.ac-rights > .ac-rk.is-dim { color: var(--text-dim); }
+.ac-rights > .ac-rw.is-dim { color: var(--text-dim); }
+.ac-rights > .ac-rw b { font-weight: 800; }
+.ac-rights > .ac-rgo { text-align: right; }
+.ac-rights .og-door { font-size: .7rem; }
+.ac-spend { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-top: .6rem; }
+.ac-spend .og-input { width: 9rem; }
+.ac-more { margin-top: .8rem; display: flex; gap: 1.4rem; flex-wrap: wrap; align-items: center; }
+
+/* the token form (a fold) and the token shown once */
+.ac-form { display: grid; grid-template-columns: minmax(8rem, 11rem) minmax(0, 1fr); gap: .9rem 1.2rem; margin-top: .4rem; align-items: start; }
+.ac-form .og-label { padding-top: .35rem; }
+.ac-form .og-input { width: 100%; box-sizing: border-box; }
+.ac-form .ac-hint { margin-top: .3rem; }
+.ac-opts { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .4rem; }
+.ac-opt { padding: .2rem .7rem; border: 2px solid var(--border); background: transparent; font: inherit; font-size: .8rem; font-weight: 600; color: var(--text-dim); cursor: pointer; }
+.ac-opt.is-on { border-color: var(--text); color: var(--text); background: var(--sun); }
+.ac-opt.is-coral { border-color: var(--accent); color: var(--accent); }
+.ac-opt.is-coral.is-on { background: var(--accent); color: #FFFFFF; }
+.ac-form .ac-submit { display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap; }
+.ac-token { display: flex; align-items: center; gap: 1rem; margin: .6rem 0; padding: .6rem .8rem; border: 2px solid var(--text); background: var(--bg-dim); font-family: var(--font-mono); font-size: .78rem; overflow-wrap: anywhere; }
+.ac-token code { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.ac-token .og-door { flex: none; font-size: .7rem; }
+
+/* ── 03 and 04: the sections that keep their components ───────────────────────────────────── */
+.ac-kept .access-section > .access-h3, .ac-kept > .card-h3, .ac-kept .card-h3.access-h3 { display: none; }
+.ac-kept .section-desc { display: none; }
+.ac-kept .access-section > .text-meta-sm:first-of-type { display: none; }
+
+/* ── 05: the addresses ────────────────────────────────────────────────────────────────────── */
+.ac-kv { display: grid; grid-template-columns: minmax(9rem, 12rem) minmax(0, 1fr) auto; gap: 0 1.2rem; margin-top: .2rem; align-items: center; }
+.ac-kv > div { padding: .6rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
+.ac-kv > .ac-k { font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.ac-kv > .ac-v { font-size: .9rem; line-height: 1.5; }
+.ac-kv > .ac-v code { display: inline-block; max-width: 100%; font-family: var(--font-mono); font-size: .8rem; font-weight: 500; background: var(--bg-dim); padding: .1rem .4rem; overflow-wrap: anywhere; }
+.ac-kv > .ac-v small { display: block; margin-top: .2rem; color: var(--text-dim); font-size: .8rem; }
+.ac-kv > .ac-go { text-align: right; }
+.ac-kv .og-door { font-size: .72rem; }
+
+/* ── 06: the two roads ────────────────────────────────────────────────────────────────────── */
+.ac-roads { display: grid; grid-template-columns: 1.2fr 1fr; gap: 1.2rem; }
+.ac-road { display: flex; flex-direction: column; gap: .5rem; padding: .9rem 1.1rem; border: 2px solid var(--text); background: var(--card-bg); font-size: .9rem; line-height: 1.55; }
+.ac-road.is-lead { border-width: 3px; box-shadow: 8px 8px 0 var(--sun); }
+.ac-road p { margin: 0; }
+.ac-road small { font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); overflow-wrap: anywhere; }
+.ac-road pre { margin: 0; padding: .6rem .7rem; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-mono); font-size: .74rem; line-height: 1.5; background: var(--bg-dim); border-left: 3px solid var(--text); }
+
+/* ── Phone ─────────────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 860px) {
+  .ac-roads { grid-template-columns: minmax(0, 1fr); }
+  .ac-row { flex-wrap: wrap; }
+  .ac-row > .ac-w { flex-basis: 100%; }
+  .ac-row > .ac-r { margin-left: 0; }
+  .ac-devices { grid-template-columns: minmax(0, 1fr) 4rem; margin-left: 0; }
+  .ac-devices > .ac-dh:nth-child(3), .ac-devices > div:nth-child(3n) { display: none; }
+  .ac-keys { grid-template-columns: minmax(0, 1fr) 5.5rem; }
+  .ac-key--head { display: none; }
+  .ac-key > .ac-kw, .ac-key > .ac-kwhen { grid-column: 1 / -1; padding-top: 0; border-bottom: 0; }
+  .ac-key > .ac-knm { border-bottom: 0; padding-bottom: .1rem; }
+  .ac-key > .ac-kgo { grid-column: 1 / -1; justify-content: flex-start; padding-top: .1rem; }
+  .ac-key > .ac-open { padding: .8rem .8rem .9rem; }
+  .ac-rights { grid-template-columns: minmax(0, 1fr); }
+  .ac-rights > .ac-rgo { text-align: left; }
+  .ac-form { grid-template-columns: minmax(0, 1fr); gap: .3rem 0; }
+  .ac-form .og-label { padding-top: .6rem; }
+  .ac-kv { grid-template-columns: minmax(0, 1fr); }
+  .ac-kv > .ac-go { text-align: left; }
+  .ac-keybox { flex-direction: column; align-items: flex-start; }
+  .ac-keybox .og-doors { margin-left: 0; }
+  .ac-slab-hint { text-align: left; }
+  .ac-filters .ac-filters-r { margin-left: 0; }
+  .ac-fed, .ac-fed-node { margin-left: 0; }
+}

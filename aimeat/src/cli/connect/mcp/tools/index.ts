@@ -38,6 +38,7 @@ import { registerConnectionTools } from './connections.js';
 import { registerSchedulesTools } from './schedules.js';
 import { registerWorkflowTools } from './workflows.js';
 import { registerConsentTools } from './consent.js';
+import { registerAccessTools } from './access.js';
 import { registerGroupsTools } from './groups.js';
 import { registerInstancesTools } from './instances.js';
 import { registerMemoryExtTools } from './memory-ext.js';
@@ -82,6 +83,7 @@ export function registerAllTools(mcp: McpServer, registry: AgentRegistry): void 
   registerSchedulesTools(mcp, registry);
   registerWorkflowTools(mcp, registry);
   registerConsentTools(mcp, registry);
+  registerAccessTools(mcp, registry);
   registerGroupsTools(mcp, registry);
   registerInstancesTools(mcp, registry);
   registerMemoryExtTools(mcp, registry);

@@ -1,10 +1,13 @@
 /**
- * @file views/profile/access-tab/agent-defaults.js
+ * @file views/profile/agents/agent-defaults-section.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Agent Defaults section — owner-level default rules and token
- *   budget for agents. Extracted from access-tab.js to satisfy max-file-lines.
+ *   budget for agents. Mounted at the foot of the Your agents page.
  * @version-history
+ *   v1.1.0 — 2026-09-05 — Moved from access-tab/agent-defaults.js to the agents' own folder and
+ *     mounted on the Your agents page: the rules are about the agents, not about who holds a key.
+ *     Self-loads now (no composite slice to seed from). Nothing else changed.
  *   v1.0.0 — 2026-07-13 — Extracted from access-tab.js (max-file-lines)
  */
 import { h } from 'preact';

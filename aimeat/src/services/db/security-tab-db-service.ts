@@ -13,6 +13,8 @@
  * @structure SecurityTabService.overview(owner, currentSessionId) → { ghii, agents, sessions, two_factor }
  * @usage const ov = await createSecurityTabService(storage, config).overview(owner, req.auth.sessionId);
  * @version-history
+ *   v1.3.0 — 2026-09-05 — Sessions past their expiry are left out. The Access page took over the
+ *     sign-in state (two_factor stays here for the Security tab's own read).
  *   v1.2.0 — 2026-09-04 — two_factor in the overview. The TOTP routes shipped with no way to ask
  *     whether the factor is on, so the Security tab could not render a state and nobody could arm
  *     one. `pending` separates a half-finished setup (secret stored, never verified) from an armed
@@ -57,6 +59,7 @@ export class SecurityTabService {
    */
   overview(owner: string, currentSessionId: string | undefined): Promise<SecurityOverview> {
     return runInReadScope(async () => {
+      const now = Date.now();
       const [agents, ghiiRecord, sessions, ownerRecord] = await Promise.all([
         this.storage.getAgentsByOwner(owner),
         this.storage.getGHIIByOwner(owner),
@@ -102,7 +105,9 @@ export class SecurityTabService {
           pending: !!ghiiRecord?.totpSecret && ghiiRecord.totpEnabled !== true,
           backup_codes_left: ghiiRecord?.totpEnabled === true ? (ghiiRecord.totpBackupCodes?.length ?? 0) : 0,
         },
-        sessions: sessions.map(s => ({
+        // Open sessions only. The store keeps a row until its sweep; a row past its expiry opens
+        // nothing, and on aimeat.io 2 848 of the 3 290 rows served here were of that kind.
+        sessions: sessions.filter(s => new Date(s.expiresAt).getTime() > now).map(s => ({
           session_id: s.sessionId, gaii: s.gaii, issued_at: s.issuedAt, expires_at: s.expiresAt,
           last_used_at: s.lastUsedAt ?? null, device_label: s.deviceLabel ?? null,
           current: s.sessionId === currentSessionId,
