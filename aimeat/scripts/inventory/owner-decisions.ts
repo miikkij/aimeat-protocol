@@ -28,7 +28,7 @@
  */
 import ts from 'typescript';
 import { relative } from 'node:path';
-import { callsInside, enclosingUnit } from './entries.js';
+import { callsInside, computesPrincipalTest, enclosingUnit } from './entries.js';
 
 /** The verified token, declared on Express's Request in src/auth/middleware.ts. */
 const AUTH_TYPE = 'VerifiedToken';
@@ -37,22 +37,12 @@ const AUTH_TYPE = 'VerifiedToken';
 export const PRINCIPAL_GUARDS = ['requireOwnerPrincipal', 'requireOperatorPrincipal', 'requireOwnerSession'];
 
 /**
- * The roles a principal test must EXCLUDE, and the reason this is the mark to look for.
- *
- * A door can ask the principal question without any middleware, by computing it:
- *
- *   const isOwnerSession = (roles.includes('owner') || roles.includes('operator'))
- *     && !roles.includes('agent') && !roles.includes('ecosystem');
- *
- * `resolveIdentity` is written the same way, and so is DELETE /v1/agents/:name, which implements
- * invariant 11 in depth and cites it by name. What separates that from a role check is the NEGATION:
- * naming the person means refusing the things acting in their name. So a unit that negates an
- * agent-or-ecosystem role test has asked the question, whatever middleware it carries.
- *
- * The first version of this gate had only the middleware list and reported that door as untriaged
- * debt — a gate crying at the one handler that got it right, which is how a gate gets switched off.
+ * A door can ask the principal question without any middleware, by computing it — and the mark is the
+ * NEGATION of an agent-or-ecosystem role. `computesPrincipalTest` in ./entries.ts is that reading,
+ * shared with the identity gate, which needs the same answer for the opposite reason. The first
+ * version of THIS gate had only the middleware list and reported DELETE /v1/agents/:name as untriaged
+ * debt — the one handler that implements invariant 11 in depth and cites it by name.
  */
-const IN_HANDLER_PRINCIPAL_ROLES = ['agent', 'ecosystem'];
 
 /**
  * The statuses that mean "not you". 409 is deliberately absent: a conflict is a statement about the
@@ -114,34 +104,6 @@ function branchRefuses(node: ts.Node): boolean {
     // throw stand on its own, which is the service-layer shape.
     if (statuses.length > 0) return statuses.some(s => REFUSING_CODES.some(code => s.includes(code)));
     return envelopeOrThrow;
-}
-
-/**
- * Does this unit compute the principal test itself, by refusing what acts in the person's name?
- *
- * Looks for a negated role test — `!roles.includes('agent')`, `!req.auth!.roles.includes('ecosystem')`
- * — anywhere in the unit. The negation is the whole signal; a positive `roles.includes('owner')` is a
- * role check and invariant 11 is about the difference.
- */
-function computesPrincipalTest(unit: ts.Node): boolean {
-    let found = false;
-    const visit = (n: ts.Node): void => {
-        if (found) return;
-        if (ts.isPrefixUnaryExpression(n) && n.operator === ts.SyntaxKind.ExclamationToken) {
-            const operand = n.operand;
-            if (ts.isCallExpression(operand) && ts.isPropertyAccessExpression(operand.expression)
-                && operand.expression.name.text === 'includes') {
-                const arg = operand.arguments[0];
-                if (arg && ts.isStringLiteral(arg) && IN_HANDLER_PRINCIPAL_ROLES.includes(arg.text)) {
-                    found = true;
-                    return;
-                }
-            }
-        }
-        ts.forEachChild(n, visit);
-    };
-    visit(unit);
-    return found;
 }
 
 /** The `if` this comparison is the test of, if it is one. */
