@@ -10,9 +10,13 @@
  *   across every agent) + the session list, with NO per-agent read. Single-master: the Security tab mount
  *   only. The individual endpoints stay for interactive re-fetch (save GHII/agent CORS, revoke sessions).
  *
- * @structure SecurityTabService.overview(owner, currentSessionId) → { ghii, agents, sessions }
+ * @structure SecurityTabService.overview(owner, currentSessionId) → { ghii, agents, sessions, two_factor }
  * @usage const ov = await createSecurityTabService(storage, config).overview(owner, req.auth.sessionId);
  * @version-history
+ *   v1.2.0 — 2026-09-04 — two_factor in the overview. The TOTP routes shipped with no way to ask
+ *     whether the factor is on, so the Security tab could not render a state and nobody could arm
+ *     one. `pending` separates a half-finished setup (secret stored, never verified) from an armed
+ *     factor, which is the difference between "finish this" and "you are protected".
  *   v1.1.0 — 2026-08-24 — managed_by (BR-04): the Security tab tells an organisation-managed
  *     account that its lifecycle lives in the organisation's directory, by the connection's name.
  *   v1.0.0 — 2026-07-16 — Phase 4: fold the Security tab's CORS-per-agent N+1 into two shared reads.
@@ -27,6 +31,19 @@ export interface SecurityOverview {
   sessions: Array<Record<string, unknown>>;
   /** Set when an organisation's identity provider manages this account's lifecycle (BR-04). */
   managed_by: { connection: string; name: string } | null;
+  /**
+   * Two-step sign-in as it stands for this account. `available` is the node's switch, so a node
+   * that turned TOTP off renders nothing rather than a control that 503s. `pending` means a secret
+   * was generated and never verified: the person started and stopped, and the account is NOT
+   * protected. Never carries the secret or the backup codes — those are shown once, by the routes
+   * that mint them.
+   */
+  two_factor: {
+    available: boolean;
+    enabled: boolean;
+    pending: boolean;
+    backup_codes_left: number;
+  };
 }
 
 export class SecurityTabService {
@@ -79,6 +96,12 @@ export class SecurityTabService {
         ghii,
         agents: agentsCors,
         managed_by: managedBy,
+        two_factor: {
+          available: this.config.totpEnabled,
+          enabled: ghiiRecord?.totpEnabled === true,
+          pending: !!ghiiRecord?.totpSecret && ghiiRecord.totpEnabled !== true,
+          backup_codes_left: ghiiRecord?.totpEnabled === true ? (ghiiRecord.totpBackupCodes?.length ?? 0) : 0,
+        },
         sessions: sessions.map(s => ({
           session_id: s.sessionId, gaii: s.gaii, issued_at: s.issuedAt, expires_at: s.expiresAt,
           last_used_at: s.lastUsedAt ?? null, device_label: s.deviceLabel ?? null,

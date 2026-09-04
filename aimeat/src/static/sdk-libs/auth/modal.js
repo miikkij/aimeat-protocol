@@ -13,6 +13,12 @@
  *   openEmailCompletion, sendEmailCode, showView, capture/restoreInputs }.
  * @usage import { showLoginModal } from './modal.js';
  * @version-history
+ *   v1.7.0 — 2026-09-04 — The second-factor step (modal-totp.js). An account with two-step sign-in
+ *     answered the login with TOTP_REQUIRED, which this modal rendered as a red line with nowhere to
+ *     go, so arming TOTP locked the person out of every AIMEAT front end. Now the refusal opens a
+ *     code view that takes the six digits or one backup code and finishes the same login. The three
+ *     recovery sub-views' markup left for modal-recovery-views.js in the same change, as a pure
+ *     extraction: the new step took this file past the 800-line ceiling.
  *   v1.6.1 — 2026-08-29 — The hints and the username rules show only while the person is in the field
  *     (modal-styles.js, :focus-within); the has-value class that kept them on screen is gone.
  *   v1.6.0 — 2026-08-29 — Three ways out: an X in the top-right corner (the one people look for first),
@@ -47,6 +53,8 @@ import { escHtml } from './theme.js';
 import { currentModalLang, loadModalI18n, MODAL_LANG_KEY, MODAL_LANGS } from './i18n.js';
 import { NODE_URL, NODE_ID, AUTH_PROVIDERS, PROVIDER_ICONS, EMAIL_REQUIRED } from './config.js';
 import { MODAL_CSS } from './modal-styles.js';
+import { totpViewHtml, wireTotpStep } from './modal-totp.js';
+import { recoveryViewsHtml } from './modal-recovery-views.js';
 
 /** An identifier is an email when it carries a dot-bearing domain. A GHII (`alice@node-id`) never
  *  does, so this separates the two without asking the person which one they typed. */
@@ -261,67 +269,10 @@ export function showLoginModal(opts, renderBtn) {
         }).join('')
       ) : '')
       + '</div>'
-      // Forgot password sub-view (hidden by default)
-      + '<div id="aimeat-forgot-pw-view" class="aimeat-body" style="display:none">'
-      + '<div id="aimeat-fpw-step1">'
-      + '<h3 class="aimeat-sub-title">' + escHtml(i.resetPasswordTitle || 'Reset Password') + '</h3>'
-      + '<p class="aimeat-sub-desc">' + escHtml(i.resetPasswordDesc || 'Enter your username to receive a reset code by email.') + '</p>'
-      + field(i.usernameLabel || 'Username', '<input id="aimeat-fpw-username" class="aimeat-inp" placeholder="' + escHtml(i.usernamePlaceholder || 'Username') + '">')
-      + '<div class="aimeat-actions">'
-      + '<button id="aimeat-fpw-send" class="aimeat-go">' + escHtml(i.sendResetCode || 'Send Reset Code') + '</button>'
-      + '<button id="aimeat-fpw-back" class="aimeat-cancel">' + escHtml(i.backToLogin || 'Back to Login') + '</button>'
-      + '</div>'
-      + '<p id="aimeat-fpw-msg" class="aimeat-msg"></p>'
-      + '<p id="aimeat-fpw-err" class="aimeat-err"></p>'
-      + '</div>'
-      + '<div id="aimeat-fpw-step2" style="display:none">'
-      + '<h3 class="aimeat-sub-title">' + escHtml(i.enterNewPasswordTitle || 'Enter New Password') + '</h3>'
-      + '<p class="aimeat-sub-desc">' + escHtml(i.resetCodeSent || 'A reset code was sent to your email. Enter it below with your new password.') + '</p>'
-      + field(i.codeLabel || 'Reset Code', '<input id="aimeat-fpw-code" class="aimeat-inp" placeholder="123456" maxlength="6">')
-      + field(i.newPasswordLabel || 'New Password', '<input id="aimeat-fpw-newpass" type="password" class="aimeat-inp" placeholder="' + escHtml(i.newPasswordPlaceholder || 'New password (min 8 chars)') + '">')
-      + '<div class="aimeat-actions">'
-      + '<button id="aimeat-fpw-reset" class="aimeat-go">' + escHtml(i.resetPassword || 'Reset Password') + '</button>'
-      + '<button id="aimeat-fpw-back2" class="aimeat-cancel">' + escHtml(i.backToLogin || 'Back to Login') + '</button>'
-      + '</div>'
-      + '<p id="aimeat-fpw-msg2" class="aimeat-msg"></p>'
-      + '<p id="aimeat-fpw-err2" class="aimeat-err"></p>'
-      + '</div>'
-      + '</div>'
-      // Forgot username sub-view (hidden by default)
-      + '<div id="aimeat-forgot-user-view" class="aimeat-body" style="display:none">'
-      + '<h3 class="aimeat-sub-title">' + escHtml(i.recoverUsernameTitle || 'Recover Username') + '</h3>'
-      + '<p class="aimeat-sub-desc">' + escHtml(i.recoverUsernameDesc || 'Enter the email address associated with your account.') + '</p>'
-      + field(i.emailLabel || 'Email', '<input id="aimeat-fu-email" class="aimeat-inp" type="email" placeholder="you@example.com">')
-      + '<div class="aimeat-actions">'
-      + '<button id="aimeat-fu-send" class="aimeat-go">' + escHtml(i.sendUsername || 'Send My Username') + '</button>'
-      + '<button id="aimeat-fu-back" class="aimeat-cancel">' + escHtml(i.backToLogin || 'Back to Login') + '</button>'
-      + '</div>'
-      + '<p id="aimeat-fu-msg" class="aimeat-msg"></p>'
-      + '</div>'
-      // Complete-account sub-view (hidden) — email verification (legacy accounts + register-under-gate).
-      + '<div id="aimeat-email-view" class="aimeat-body" style="display:none">'
-      + '<div id="aimeat-em-step1">'
-      + '<h3 class="aimeat-sub-title">' + escHtml(i.completeAccountTitle || 'One last step') + '</h3>'
-      + '<p class="aimeat-sub-desc">' + escHtml(i.completeAccountDesc || 'Add an email to finish setting up your account. We’ll send a verification code to confirm it.') + '</p>'
-      + field(i.emailLabel || 'Email', '<input id="aimeat-em-email" class="aimeat-inp" type="email" placeholder="you@example.com">')
-      + '<div class="aimeat-actions">'
-      + '<button id="aimeat-em-send" class="aimeat-go">' + escHtml(i.sendVerificationCode || 'Send Verification Code') + '</button>'
-      + '<button id="aimeat-em-back" class="aimeat-cancel">' + escHtml(i.backToLogin || 'Back to Login') + '</button>'
-      + '</div>'
-      + '<p id="aimeat-em-err" class="aimeat-err"></p>'
-      + '</div>'
-      + '<div id="aimeat-em-step2" style="display:none">'
-      + '<h3 class="aimeat-sub-title">' + escHtml(i.enterCodeTitle || 'Enter Verification Code') + '</h3>'
-      + '<p class="aimeat-sub-desc">' + escHtml(i.enterCodeDesc || 'We sent a 6-digit code to your email. Enter it below to finish and sign in.') + '</p>'
-      + field(i.codeLabel || 'Verification Code', '<input id="aimeat-em-code" class="aimeat-inp" placeholder="123456" maxlength="6" inputmode="numeric">')
-      + '<div class="aimeat-actions">'
-      + '<button id="aimeat-em-confirm" class="aimeat-go">' + escHtml(i.confirmAndSignIn || 'Confirm & Sign In') + '</button>'
-      + '<button id="aimeat-em-back2" class="aimeat-cancel">' + escHtml(i.backToLogin || 'Back to Login') + '</button>'
-      + '</div>'
-      + '<p id="aimeat-em-msg2" class="aimeat-msg"></p>'
-      + '<p id="aimeat-em-err2" class="aimeat-err"></p>'
-      + '</div>'
-      + '</div>'
+      // The forgot-password, forgot-username and complete-account sub-views (all hidden here).
+      + recoveryViewsHtml(i, field)
+      // Second-factor sub-view (hidden) — opened when the login answers TOTP_REQUIRED.
+      + totpViewHtml(i, field)
       // Features footer — an argument FOR creating an account, so it rides with the Register tab.
       // A returning person signing in does not need to be sold the thing they already have. A
       // numbered index under an ink rule, the last line in bold.
@@ -427,7 +378,23 @@ export function showLoginModal(opts, renderBtn) {
       document.getElementById('aimeat-forgot-pw-view').style.display = view === 'forgot-pw' ? '' : 'none';
       document.getElementById('aimeat-forgot-user-view').style.display = view === 'forgot-user' ? '' : 'none';
       document.getElementById('aimeat-email-view').style.display = view === 'email' ? '' : 'none';
+      document.getElementById('aimeat-totp-view').style.display = view === 'totp' ? '' : 'none';
     }
+
+    /** A finished sign-in, whichever step produced it. */
+    function finishLogin(session) {
+      modal.remove();
+      renderBtn();
+      if (opts.onLogin) opts.onLogin(session);
+    }
+
+    // The second-factor step. It holds the password for its own call and drops it when it closes.
+    var totpStep = wireTotpStep({
+      i: i,
+      showView: showView,
+      submit: function (user, pass, secondFactor) { return auth.loginWithPassword(user, pass, secondFactor); },
+      onSuccess: finishLogin,
+    });
 
     // Credentials captured from the last correct-password attempt that hit the email gate.
     var pendingEmailLogin = null;
@@ -684,14 +651,26 @@ export function showLoginModal(opts, renderBtn) {
       try {
         // Email and federated GHII go over as typed; a local GHII goes as the bare name.
         const session = await auth.loginWithPassword(isEmail || isFederated ? raw : localName, password);
-        modal.remove();
-        renderBtn();
-        if (opts.onLogin) opts.onLogin(session);
+        finishLogin(session);
       } catch (e) {
         // Password correct but the account still needs a verified email — finish that here.
         if (e.code === 'EMAIL_NOT_VERIFIED' && !isFederated) {
           releaseBtn('aimeat-go-btn', signInLabel);
           openEmailCompletion(localName, password, !!(e.details && e.details.has_email));
+          return;
+        }
+        // Password correct, account has two-step sign-in — ask for the code and finish there. The
+        // identifier goes on as it was typed, so the second call resolves the same account.
+        if (e.code === 'TOTP_REQUIRED') {
+          releaseBtn('aimeat-go-btn', signInLabel);
+          totpStep.openTotpStep(isEmail || isFederated ? raw : localName, password);
+          return;
+        }
+        // A locked account is not a wrong password: say what the server said, not "does not match".
+        if (e.code === 'TOTP_LOCKED') {
+          errEl.textContent = e.message;
+          errEl.style.display = 'block';
+          releaseBtn('aimeat-go-btn', signInLabel);
           return;
         }
         errEl.textContent = e.message.includes('Invalid username or password')

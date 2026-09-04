@@ -12,6 +12,11 @@
  *   - POST /v1/ghii/totp/setup: create encrypted secret, backup codes, and provisioning URI/QR
  *
  * @version-history
+ *   v1.2.0 — 2026-09-04 — Turning the factor off actually destroys the secret on BOTH backends. The
+ *     disable route cleared with `undefined`, which postgres-kysely drops from the UPDATE, so on the
+ *     production backend the encrypted secret, the backup-code hashes and the replay marker
+ *     survived a removal. Cleared with null now. Found by e2e-totp-lifecycle.ts, which is the first
+ *     test to drive the whole flow, and it failed on postgres while passing on sqlite.
  *   v1.1.0 — 2026-08-11 — Security audit H-1/H-7: all four routes are behind
  *     requireOwnerPrincipal(). They ran on requireAuth() alone and keyed off req.auth.owner, so an
  *     agent, a GEAI or a granted app could arm a second factor on the human's account with a secret
@@ -161,11 +166,21 @@ export function totpRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
+    // CLEAR, and clear means null. On postgres-kysely a key whose value is `undefined` is dropped
+    // from the UPDATE — "leave this column alone" — so this wrote totpEnabled=false and left the
+    // encrypted secret and the backup-code hashes sitting in the row on the production backend,
+    // while the sqlite provider (which rewrites the whole row) really did erase them. Turning the
+    // factor off is supposed to destroy the secret; on postgres it never did. Same shape as the
+    // CORS clear in routes/ghii/profile.ts, and found the same way: a test driven on both backends.
     await storage.updateGHII(ghiiRecord.ghii, {
       totpEnabled: false,
-      totpSecret: undefined,
-      totpBackupCodes: undefined,
-    });
+      totpSecret: null,
+      totpBackupCodes: null,
+      totpLastUsedCode: null,
+      totpLastUsedAt: null,
+      totpFailedAttempts: 0,
+      totpLockedUntil: null,
+    } as unknown as Parameters<typeof storage.updateGHII>[1]);
 
     res.json(success(config.nodeId, {
       status: 'totp_disabled',
