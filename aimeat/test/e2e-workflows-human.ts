@@ -335,6 +335,108 @@ async function run() {
       `the agent's answer must green the step, got ${after.data.steps.gate.state}`);
   });
 
+  // ── What a SECOND principal gets at the same gate ──
+  //
+  // Every test above answers as the run's own owner or as their own agent. A parked question is the
+  // one place in a workflow where the run stops and waits for somebody to decide, so "who may
+  // decide" is the whole security question of the feature, and it has two halves that fail
+  // differently: a principal of this owner without the word (403 on the door) and a principal of
+  // ANOTHER owner (404, because the run is addressed through ownerGhiiOf and a foreign run is not
+  // a run this caller has). Both are asserted against a live parked step, and the step is proven
+  // still answerable afterwards — otherwise a refusal that had eaten the question would pass too.
+
+  await test('DENIED — a parked question is answered by neither a scope-less agent nor another owner', async () => {
+    // The test above answers its gate, which dispatches `ship` through the same fire-and-forget
+    // path startAndReachGate races with. Let that settle before starting one more run.
+    // Its OWN workflow, with an answer key nothing has written yet. Every step in this suite's main
+    // workflow reads and writes the owner's real memory, so by this point plan.draft and
+    // gate.decision both hold values from earlier runs and a fresh run of it greens straight
+    // through without ever parking — the run reaches `ship` in 46 ms and there is no question to
+    // refuse. A parked step is the whole subject here, so this one is built to park.
+    const answerKey = `gate.denial.${Date.now()}`;
+    const put = await json('/v1/workflows/gatedx', {
+      method: 'PUT', headers: auth,
+      body: JSON.stringify({
+        title: { en_US: 'Denial gate' }, description: { en_US: 'one human step, nothing else' },
+        trigger: { kind: 'manual' }, vars: [], on_step_fail: 'inspect',
+        steps: [{
+          id: 'gate', description: { en_US: 'Approval gate' }, required_to_function: 'none',
+          action: {
+            kind: 'human-input',
+            question: {
+              header: 'Approval', prompt: 'Approve run {run}?',
+              options: [{ id: 'approve', label: 'Approve' }, { id: 'reject', label: 'Reject' }],
+            },
+            answer_to_key: answerKey,
+          },
+        }],
+      }),
+    });
+    assert(put.status === 200, `put gatedx ${put.status}: ${JSON.stringify(put.body?.error ?? put.body)}`);
+
+    const st = await json('/v1/workflows/gatedx/run', { method: 'POST', headers: auth, body: JSON.stringify({ mode: 'full' }) });
+    assert(st.status === 200, `run gatedx ${st.status}: ${JSON.stringify(st.body?.error)}`);
+    const runId = st.body.data.runId;
+    await sleep(700);
+    const { body: r0 } = await json(`/v1/workflows/gatedx/runs/${runId}`, { headers: auth });
+    assert(r0.data.steps.gate.state === 'waiting-human',
+      `the run must be parked for any of this to mean anything, got ${r0.data.steps.gate.state}`);
+
+    // 1. No credential at all.
+    const anon = await json(`/v1/workflows/gatedx/runs/${runId}/steps/gate/answer`, {
+      method: 'POST', body: JSON.stringify({ picks: ['approve'] }),
+    });
+    assert(anon.status === 401, `an unauthenticated caller answered the gate: ${anon.status}`);
+
+    // 2. This owner's own agent, holding memory:read and nothing else. The negative control is the
+    //    test above: the same door, the same agent shape, one word apart — hwf-reviewer holds
+    //    workflow:write and gets 200, hwf-mute does not and gets 403. The pair is what makes either
+    //    half mean anything, which is why they are asserted in the same suite rather than one of
+    //    them alone.
+    const mute = 'hwf-mute';
+    const reg = await json('/v1/agents', {
+      method: 'POST', headers: auth,
+      body: JSON.stringify({ name: mute, owner: ownerName, capabilities: ['memory'], scopes: ['memory:read'] }),
+    });
+    assert(reg.status === 201, `mute agent ${reg.status}: ${JSON.stringify(reg.body).slice(0, 200)}`);
+    const gaii = reg.body.data.agent.gaii as string;
+    const ts = new Date().toISOString();
+    const sig = Buffer.from(await ed.signAsync(new TextEncoder().encode(gaii + ts), Buffer.from(reg.body.data.private_key, 'base64'))).toString('base64');
+    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp: ts, signature: sig }) });
+    assert(tok.body.ok === true, `mute token: ${JSON.stringify(tok.body.error)}`);
+    const muteAuth = { Authorization: `Bearer ${tok.body.data.token}` };
+
+    const scoped = await json(`/v1/workflows/gatedx/runs/${runId}/steps/gate/answer`, {
+      method: 'POST', headers: muteAuth, body: JSON.stringify({ picks: ['approve'] }),
+    });
+    assert(scoped.status === 403, `an agent without workflow:write answered the gate: ${scoped.status} ${JSON.stringify(scoped.body?.error)}`);
+    assert(scoped.body.error.code === 'SCOPE_DENIED', `refused for the wrong reason: ${JSON.stringify(scoped.body.error)}`);
+
+    // 3. Another OWNER entirely, holding every word their own account gives them.
+    const strangerName = `hwfstranger${Date.now()}`;
+    const s = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: strangerName, public_key: 'placeholder' }) });
+    assert(s.status === 201, `stranger owner ${s.status}: ${JSON.stringify(s.body)}`);
+    const strangerAuth = { Authorization: `Bearer ${await getToken(strangerName, s.body.data.private_key)}` };
+
+    const foreign = await json(`/v1/workflows/gatedx/runs/${runId}/steps/gate/answer`, {
+      method: 'POST', headers: strangerAuth, body: JSON.stringify({ picks: ['approve'] }),
+    });
+    assert(foreign.status === 404, `another owner answered this run's gate: ${foreign.status} ${JSON.stringify(foreign.body?.error)}`);
+
+    // …and the question was never theirs to see in the first place.
+    const roster = await json('/v1/workflows/pending-inputs', { headers: strangerAuth });
+    assert(roster.status === 200, `stranger pending-inputs ${roster.status}`);
+    const rows = roster.body.data.pending ?? roster.body.data.inputs ?? roster.body.data ?? [];
+    assert(!JSON.stringify(rows).includes(runId),
+      `another owner's roster names this run: ${JSON.stringify(rows).slice(0, 300)}`);
+
+    // The three refusals refused, rather than consuming the question: its own owner still can.
+    const mine = await json(`/v1/workflows/gatedx/runs/${runId}/steps/gate/answer`, {
+      method: 'POST', headers: auth, body: JSON.stringify({ picks: ['approve'] }),
+    });
+    assert(mine.status === 200, `the owner can no longer answer their own parked step: ${mine.status} ${JSON.stringify(mine.body?.error)}`);
+  });
+
   console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);
   if (failed > 0) process.exit(1);
 }

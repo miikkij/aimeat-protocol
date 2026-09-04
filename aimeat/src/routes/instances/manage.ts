@@ -12,7 +12,7 @@
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, PackageComponentType } from '../../storage/interface.js';
-import { requireAuth } from '../../auth/middleware.js';
+import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { refuseNotYours } from '../../middleware/refusals.js';
 import { emitChange } from '../../services/event-bus.js';
@@ -254,7 +254,7 @@ export function registerManageRoutes(
   });
 
   // DELETE /v1/instances/:id — Remove instance
-  router.delete('/v1/instances/:id', requireAuth(), async (req, res) => {
+  router.delete('/v1/instances/:id', requireAuth(), requireScope('packages:write'), async (req, res) => {
     const id = req.params.id as string;
     const owner = req.auth!.owner;
     const ownerGaii = await resolveGhii(storage, owner, req.auth!.sub);

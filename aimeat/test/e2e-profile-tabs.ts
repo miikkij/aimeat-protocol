@@ -1499,8 +1499,16 @@ await test('GET /v1/portfolio/data/:owner — view portfolio', async () => {
 // ══════════════════════════════════════════════════════════════════
 console.log('\n--- Session Revocation ---');
 
+// The owner's own credential, not the agent's, since 2026-09-04. This is the same correction the
+// comment below records for DELETE /v1/owners/:name on 2026-08-11, one door over: the three session
+// doors gained requireOwnerPrincipal(), so the agent token this line used to pass is now refused —
+// and it should be. What the button does is sign the PERSON out of every device they own; an agent
+// carrying the same account name is not the person, which is invariant 11.
 await test('DELETE /v1/auth/sessions — revoke sessions', async () => {
-    const { body } = await authJson('/v1/auth/sessions', agentToken, { method: 'DELETE' });
+    const denied = await authJson('/v1/auth/sessions', agentToken, { method: 'DELETE' });
+    assert(denied.status === 403, `an agent signed the human out of every device: ${denied.status}`);
+
+    const { body } = await authJson('/v1/auth/sessions', ownerToken, { method: 'DELETE' });
     assert(body.ok === true, `revoke sessions: ${JSON.stringify(body.error)}`);
 });
 

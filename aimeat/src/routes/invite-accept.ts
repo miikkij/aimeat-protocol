@@ -21,6 +21,13 @@
  * @structure inviteAcceptRouter(config, storage, deps): the two public routes
  * @usage app.use(inviteAcceptRouter(config, storage, { findWsEntry }));
  * @version-history
+ *   v1.2.0 — 2026-09-04 — The SIGNED-IN branch is the person's own, asked through isOwnerPrincipal()
+ *     rather than through a middleware, because the anonymous branch must stay open. `req.auth.owner`
+ *     is the account name, so an agent, an ecosystem token or an app grant approved for one unrelated
+ *     word could accept as the human and take the inviter's org role and workspace grants with it.
+ *     The recipient binding already bounded the damage to invitations genuinely addressed to that
+ *     human; this makes joining a shared space the person's own decision. The invite is not consumed
+ *     by the refusal, so the right party can still use it.
  *   v1.1.0 — 2026-08-18 — Registration-mode gate (open|invite|closed): redeeming an invitation stays open in 'invite' mode and answers 403 only on a fully closed node; the invite is never consumed by the refusal.
  *   v1.0.0 — 2026-08-07 — Extracted from routes/organisms/workspace-access.ts when the node-level
  *     registration invite (remake 4b) made the flow shared. No behaviour change for organism
@@ -31,7 +38,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
-import { optionalAuth } from '../auth/middleware.js';
+import { optionalAuth, isOwnerPrincipal } from '../auth/middleware.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { validateOwnerName } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
@@ -138,6 +145,21 @@ export function inviteAcceptRouter(config: AimeatConfig, storage: Storage, deps:
     let createdAccount = false;
     if (authed) {
       ownerName = authed;
+      // THE PERSON, NOT THEIR MACHINES. Accepting joins this account to an organism and takes the
+      // inviter's chosen role and workspace grants with it, which is a decision about who the person
+      // belongs to rather than a use of their data — and `req.auth.owner` above is the ACCOUNT NAME,
+      // carried alike by an agent JWT, an ecosystem token, an app grant and a PAT. The recipient
+      // binding below bounds it (the invitation must be addressed to this human's own verified
+      // email), so what was left was narrow: an app approved for memory:read could still walk its
+      // owner into an organism the owner had merely been invited to. Asked here rather than as
+      // requireOwnerPrincipal() on the route because the OTHER branch must stay open — registering
+      // from an emailed link is how most people arrive, and there is no session to be a principal of.
+      // An owner-level PAT passes, as it does at every other door of this kind.
+      if (!isOwnerPrincipal(req.auth)) {
+        res.status(403).json(error(config.nodeId, 'ACCESS_DENIED',
+          'Joining an account to a shared space is the account holder\'s own decision, so it is not something an assistant or an app can do on your behalf. Open the invitation link while signed in as yourself.'));
+        return; // do NOT consume the invite
+      }
       // RECIPIENT BINDING (invite-hijack guard): an invitation is a rights-bearing capability minted
       // for one specific email (inv.emailHash). A signed-in session may absorb it ONLY when its OWN
       // verified email matches that address — otherwise any logged-in visitor who opens the link would

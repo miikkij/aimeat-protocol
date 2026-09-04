@@ -28,7 +28,7 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
   const { memberRole, readManifest, writeDecision, readConfig, canWriteNamespace, publishDraft, publishDraftsBatch, revertToDraft } = H;
 
   // POST /v1/organisms/:id/approvals — request approval for an action (gate or auto-run).
-  router.post('/v1/organisms/:id/approvals', requireAuth(), async (req, res) => {
+  router.post('/v1/organisms/:id/approvals', requireAuth(), requireScope('organism:write'), async (req, res) => {
     const id = req.params.id as string;
     const organism = await storage.getOrganism(id);
     if (!organism) {
@@ -80,7 +80,7 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
   });
 
   // GET /v1/organisms/:id/approvals — the approval inbox (members).
-  router.get('/v1/organisms/:id/approvals', requireAuth(), async (req, res) => {
+  router.get('/v1/organisms/:id/approvals', requireAuth(), requireScope('organism:read'), async (req, res) => {
     const id = req.params.id as string;
     const organism = await storage.getOrganism(id);
     if (!organism) {
@@ -99,7 +99,7 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
   });
 
   // POST /v1/organisms/:id/publish — snapshot a draft into a new version + latest (or gate it).
-  router.post('/v1/organisms/:id/publish', requireAuth(), async (req, res) => {
+  router.post('/v1/organisms/:id/publish', requireAuth(), requireScope('organism:write'), async (req, res) => {
     const id = req.params.id as string;
     const organism = await storage.getOrganism(id);
     if (!organism) {
@@ -279,7 +279,7 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
 
   // POST /v1/organisms/:id/revert — reopen a published record for editing (copy .latest → .draft).
   // Same write access as publish; not gated (creating a private draft is not a publish).
-  router.post('/v1/organisms/:id/revert', requireAuth(), async (req, res) => {
+  router.post('/v1/organisms/:id/revert', requireAuth(), requireScope('organism:write'), async (req, res) => {
     const id = req.params.id as string;
     const organism = await storage.getOrganism(id);
     if (!organism) {

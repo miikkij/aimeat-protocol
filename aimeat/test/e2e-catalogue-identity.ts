@@ -13,7 +13,7 @@
  *   v1.0.0 — 2026-08-23 — Initial: owner-session provider_gaii is a GHII; cross-owner delete → 404.
  */
 import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -88,6 +88,56 @@ await test('Owner A deletes their own action (the stored key round-trips)', asyn
     assert(del.status === 200, `owner delete: ${del.status} ${JSON.stringify(del.body)}`);
     const gone = await json(`/v1/catalogue/${actionId}`);
     assert(gone.status === 404, `the action must be gone, got ${gone.status}`);
+});
+
+// Four browse doors were gated on catalogue:read on 2026-09-04. The word already existed and was
+// already enforced — on four SSE domains (auth/sse-domain-scopes.ts) and on the consent screen
+// (app-grants.ts) — while the fetch of the same content asked nothing. What it refuses is narrow by
+// design: catalogue:read is a DEFAULT scope for agents, for anonymous sessions and for federation,
+// so nothing that browses today loses anything. An APP GRANT is the exception, because an app holds
+// only what its owner ticked, and what the directory hands out is bulk data about OTHER people —
+// display names, bios, interests, city and country, and lat/lon for everyone who opted in.
+await test('An app grant approved for memory:read alone cannot browse the directories', async () => {
+    const APP_FILE = `catbrowse-${ts}.html`;
+    const pub = await json('/v1/apps', {
+        ...auth(aTok), method: 'POST',
+        body: JSON.stringify({ filename: APP_FILE, content: Buffer.from('<h1>browse</h1>', 'utf8').toString('base64'), name: 'Browser', description: 'browses', category: 'utility', tags: [] }),
+    });
+    assert(pub.status === 201, `publish: ${pub.status} ${JSON.stringify(pub.body)}`);
+
+    const REDIRECT = 'http://localhost:9/cb';
+    const verifier = randomBytes(32).toString('base64url');
+    const challenge = createHash('sha256').update(verifier).digest('base64url');
+    const q = new URLSearchParams({
+        app: `${aName}/${APP_FILE}`, response_type: 'code', scope: 'memory:read',
+        redirect_uri: REDIRECT, code_challenge: challenge, code_challenge_method: 'S256',
+    });
+    const authz = await fetch(`${BASE}/v1/app-grants/authorize?${q}`, { redirect: 'manual' });
+    const rid = decodeURIComponent(/req=([^&]+)/.exec(authz.headers.get('location') ?? '')?.[1] ?? '');
+    assert(!!rid, `expected a consent redirect, got ${authz.status}`);
+    const con = await json('/v1/app-grants/authorize-consent', {
+        ...auth(aTok), method: 'POST', body: JSON.stringify({ request_id: rid }),
+    });
+    const code = new URL(con.body.data.redirect_url).searchParams.get('code') ?? '';
+    const tok = await json('/v1/app-grants/token', {
+        method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: REDIRECT }),
+    });
+    assert(tok.body.ok === true, `grant token: ${JSON.stringify(tok.body?.error)}`);
+    const appToken = tok.body.data.access_token as string;
+
+    for (const path of ['/v1/catalogue/directory', '/v1/ghii/list', '/v1/cortex', '/v1/trusted-issuers']) {
+        const r = await json(path, auth(appToken));
+        assert(r.status === 403, `${path}: an app approved for memory:read alone browsed it: ${r.status}`);
+        assert(r.body.error?.code === 'SCOPE_DENIED', `${path}: refused for the wrong reason: ${JSON.stringify(r.body.error)}`);
+        assert((r.body.error?.message ?? '').includes('catalogue:read'), `${path}: the refusal must name the word, got: ${r.body.error?.message}`);
+    }
+
+    // The control: the person's own session still browses all four. Owner sessions bypass scopes, so
+    // what the gate costs is a third-party app reading about other people, not anybody's own use.
+    for (const path of ['/v1/catalogue/directory', '/v1/ghii/list', '/v1/cortex', '/v1/trusted-issuers']) {
+        const r = await json(path, auth(aTok));
+        assert(r.status !== 403, `${path}: the account holder was refused: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    }
 });
 
 await test('Cleanup', async () => {

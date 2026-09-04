@@ -17,7 +17,7 @@ import type { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, KnowledgeManifest, MemoryLinkRecord } from '../../storage/interface.js';
-import { requireAuth, requireRole } from '../../auth/middleware.js';
+import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { recordPublicActivity } from '../../services/public-activity.js';
@@ -50,7 +50,7 @@ export function registerPackagesCoreRoutes(
   const { resolve, findOwnerScopeMemory } = helpers;
 
   /* ── POST /v1/knowledge/import — Import a knowledge package from AI Chat output ── */
-  router.post('/v1/knowledge/import', requireAuth(), async (req, res) => {
+  router.post('/v1/knowledge/import', requireAuth(), requireScope('memory:write'), async (req, res) => {
     const ownerGaii = resolve(req);
     const ghii = req.auth!.owner as string;
     const { package: pkg, overrides } = req.body;

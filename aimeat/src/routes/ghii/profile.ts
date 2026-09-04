@@ -6,6 +6,13 @@
  *   get/put, GET /v1/ghii/me, GET /v1/ghii/:ghii, PUT /v1/ghii, DELETE /v1/ghii. Extracted from
  *   src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-09-04 — The read halves catch up with the writes H-7 fenced. GET /v1/ghii/cors is
+ *     behind requireOwnerPrincipal() beside its PUT: it names the web origins that already hold
+ *     credentialed access to this account, which is the reconnaissance for the attack the PUT was
+ *     closed against. GET /v1/ghii/list is gated on catalogue:read — a default scope for agents,
+ *     anonymous sessions and federation, so what it refuses is an app grant approved for one
+ *     unrelated word browsing every opted-in member of the node. GET /v1/ghii/me is deliberately
+ *     NOT gated; its exemption entry says why, and what the fix actually is.
  *   v1.2.0 — 2026-08-11 — Security audit H-1/H-7: PUT /v1/ghii/cors and DELETE /v1/ghii are behind
  *     requireOwnerPrincipal(). The rest of PUT /v1/ghii deliberately is not — an agent keeping the
  *     person's details current is what this platform is for, and the note at the notification_email
@@ -20,7 +27,7 @@ import type { Router } from 'express';
 import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { requireAuth, requireOwnerPrincipal } from '../../auth/middleware.js';
+import { requireAuth, requireOwnerPrincipal, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 
@@ -38,7 +45,7 @@ export function registerProfileRoutes(
     //     the shared anonymous identity, is rejected 401). Was previously world-readable.
     //  2. Opt-in — only members who explicitly listed themselves (PUT /v1/ghii { directory_listed:
     //     true } → the profile.{username}.directory_listed memory key) appear. Default = unlisted.
-    router.get('/v1/ghii/list', requireAuth(), async (req, res) => {
+    router.get('/v1/ghii/list', requireAuth(), requireScope('catalogue:read'), async (req, res) => {
         const q = typeof req.query.q === 'string' ? req.query.q : undefined;
         const level = typeof req.query.level === 'string' ? parseInt(req.query.level, 10) : undefined;
 
@@ -89,7 +96,12 @@ export function registerProfileRoutes(
     // ── CORS per-GHII management ──
 
     // GET /v1/ghii/cors — Get your CORS allowed origins
-    router.get('/v1/ghii/cors', requireAuth(), async (req, res) => {
+    //
+    // requireOwnerPrincipal since 2026-09-04, matching the PUT below. Audit H-7 fenced the write and
+    // left the read beside it open, and the read is the reconnaissance for the same attack: it tells
+    // any principal in the person's name — a third-party app holding one unrelated scope included —
+    // exactly which web origins already hold credentialed access to this account.
+    router.get('/v1/ghii/cors', requireAuth(), requireOwnerPrincipal(), async (req, res) => {
         const ownerName = req.auth!.owner;
         const ghiiRecord = await storage.getGHIIByOwner(ownerName);
         if (!ghiiRecord) {
@@ -224,7 +236,7 @@ export function registerProfileRoutes(
     });
 
     // PUT /v1/ghii — Update own profile (requires JWT auth as owner)
-    router.put('/v1/ghii', requireAuth(), async (req, res) => {
+    router.put('/v1/ghii', requireAuth(), requireScope('memory:write-reserved'), async (req, res) => {
         const ownerName = req.auth!.owner;
         const ghiiRecord = await storage.getGHIIByOwner(ownerName);
         if (!ghiiRecord) {

@@ -13,7 +13,7 @@ import type { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, KnowledgeManifest, MemoryRecord } from '../../storage/interface.js';
-import { requireAuth, requireRole } from '../../auth/middleware.js';
+import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import type { KnowledgeHelpers } from './helpers.js';
@@ -93,7 +93,7 @@ export function registerOrganismRoutes(
   });
 
   /* ── GET /v1/knowledge/organism/:id — List packages shared with an organism ── */
-  router.get('/v1/knowledge/organism/:id', requireAuth(), async (req, res) => {
+  router.get('/v1/knowledge/organism/:id', requireAuth(), requireScope('memory:read'), async (req, res) => {
     const ghii = req.auth!.owner as string;
     const organismId = req.params.id as string;
 

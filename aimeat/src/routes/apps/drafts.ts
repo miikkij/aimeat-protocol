@@ -73,7 +73,7 @@ export function registerDraftRoutes(
     // PUT /v1/apps/:owner/:filename/draft — save (upsert) the app's draft. The live
     // published versions are untouched. Manifest fields default from the current live
     // app when omitted, so a draft that only changes the HTML keeps its name/category.
-    router.put('/v1/apps/:owner/:filename/draft', requireAuth(), async (req, res) => {
+    router.put('/v1/apps/:owner/:filename/draft', requireAuth(), requireScope('app:write'), async (req, res) => {
         const filename = req.params.filename as string;
         const { owner, ownerGhii } = await canonicalOwner(req);
         const { content, mime_type, name, description, category, tags, icon, uses_cortex, protection } = req.body ?? {};
@@ -282,7 +282,7 @@ export function registerDraftRoutes(
     // it through the ?preview= URL is not an option for a client: on an app-origin node that path
     // 301s to the isolated origin, which is deliberately cross-origin and CORS-less.
     // Owner-only: canonicalOwner resolves the caller, so a draft is never readable by anyone else.
-    router.get('/v1/apps/:owner/:filename/draft', requireAuth(), async (req, res) => {
+    router.get('/v1/apps/:owner/:filename/draft', requireAuth(), requireScope('app:write'), async (req, res) => {
         const filename = req.params.filename as string;
         const { ownerGhii } = await canonicalOwner(req);
         const draft = await storage.getAppDraft(ownerGhii, filename);
@@ -304,7 +304,7 @@ export function registerDraftRoutes(
     // URL for the draft. On a node with the app origin ON, the URL points at the
     // isolated app origin (a real, session-less origin where getUserMedia works); with
     // it OFF, at the apex inline URL. Either way it opens TOP-LEVEL as a clean page.
-    router.post('/v1/apps/:owner/:filename/draft/preview-token', requireAuth(), async (req, res) => {
+    router.post('/v1/apps/:owner/:filename/draft/preview-token', requireAuth(), requireScope('app:write'), async (req, res) => {
         const filename = req.params.filename as string;
         const { owner, ownerGhii } = await canonicalOwner(req);
         const draft = await storage.getAppDraft(ownerGhii, filename);
@@ -339,7 +339,7 @@ export function registerDraftRoutes(
     // list grows with how many apps the owner has, and at 76 it overran the reverse proxy's
     // header buffer and 502'd every app subdomain. A grant puts exactly one origin in the header,
     // so its size does not depend on anything the user accumulates.
-    router.post('/v1/apps/:owner/:filename/frame-token', requireAuth(), async (req, res) => {
+    router.post('/v1/apps/:owner/:filename/frame-token', requireAuth(), requireScope('app:write'), async (req, res) => {
         const filename = req.params.filename as string;
         const { owner, ownerGhii } = await canonicalOwner(req);
 
@@ -374,7 +374,7 @@ export function registerDraftRoutes(
 
     // DELETE /v1/apps/:owner/:filename/draft — discard the draft. The live app is
     // untouched. Idempotent (404 only signals there was nothing to discard).
-    router.delete('/v1/apps/:owner/:filename/draft', requireAuth(), async (req, res) => {
+    router.delete('/v1/apps/:owner/:filename/draft', requireAuth(), requireScope('app:write'), async (req, res) => {
         const filename = req.params.filename as string;
         const { ownerGhii } = await canonicalOwner(req);
         const deleted = await discardAppDraft(storage, ownerGhii, filename);

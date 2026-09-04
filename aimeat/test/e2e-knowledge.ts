@@ -418,6 +418,9 @@ await test('Operator can review a package', async () => {
   assert(body.data?.review_id, 'Expected review_id');
 });
 
+/** The ordinary owner registered below, kept for the review-read boundary that follows it. */
+let plainToken = '';
+
 await test('An ORDINARY owner cannot list or review packages node-wide', async () => {
   // Both moderation tests above use ownerToken, and that account is the first owner registered on the
   // cleared database — operator only by the bootstrap promotion. So no ordinary owner is ever refused:
@@ -434,7 +437,7 @@ await test('An ORDINARY owner cannot list or review packages node-wide', async (
     method: 'POST',
     body: JSON.stringify({ owner: plainName, timestamp: ts, signature: await signMsg(reg.body.data.private_key, plainName + NODE_ID + ts) }),
   });
-  const plainToken = tok.body.data.token as string;
+  plainToken = tok.body.data.token as string;
 
   const list = await json('/v1/admin/knowledge', { headers: { Authorization: `Bearer ${plainToken}` } });
   assert(list.status === 403, `a plain owner listed every package on the node: ${list.status}`);
@@ -460,6 +463,23 @@ await test('Package owner can see operator reviews', async () => {
   assert(status === 200, `Expected 200, got ${status}`);
   assert(body.data?.count >= 1, 'Expected at least 1 review');
   assert(body.data?.reviews[0]?.action === 'approve', 'Expected approve action');
+
+  // …and NOBODY ELSE can. The door carried requireAuth() alone until 2026-09-04, so any signed-in
+  // principal read the operator's moderation record — reason, action and the operator's own
+  // wording — for ANY package id on the node, other people's included. The check is ownership
+  // rather than a scope word, because a word would still have served every package to everyone
+  // holding it. The plain owner registered above is a real second account, not a scope-stripped
+  // version of this one, so what this asserts is the boundary and not a missing permission.
+  const stranger = await json(`/v1/knowledge/${discoverablePackageId}/reviews`, {
+    headers: { Authorization: `Bearer ${plainToken}` },
+  });
+  assert(stranger.status === 404, `another account read this package's moderation record: ${stranger.status}`);
+  // The same answer a package that does not exist gets: whether one does is not this door's to tell.
+  const missing = await json('/v1/knowledge/no-such-package-at-all/reviews', {
+    headers: { Authorization: `Bearer ${plainToken}` },
+  });
+  assert(missing.status === 404 && missing.body.error?.code === stranger.body.error?.code,
+    `the two 404s differ, which says the package exists: ${JSON.stringify(stranger.body.error)} vs ${JSON.stringify(missing.body.error)}`);
 });
 
 // ─── Phase 5: Organism-Member Consent Resolution (Fix 2) ───

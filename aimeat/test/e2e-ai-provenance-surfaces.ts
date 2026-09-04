@@ -177,7 +177,9 @@ const APP_HTML = [
     console.log('\n── AI Provenance surfaces (TARGET-058 Phase 2) ──');
 
     const o = await setupOwner('o');
-    const agent = await connectAgent(o.token, o.name, `surfpub${Date.now()}`, ['memory:read', 'memory:write', 'apps:write']);
+    // 'app:write', not 'apps:write': the plural is not a word this node knows, and asking for one
+    // that nothing reads grants nothing. It passed only while the publish doors checked no scope.
+    const agent = await connectAgent(o.token, o.name, `surfpub${Date.now()}`, ['memory:read', 'memory:write', 'app:write']);
     const filename = `provsurface${Date.now()}.html`;
 
     let appProvId = '';
@@ -452,6 +454,77 @@ const APP_HTML = [
         assert(res.ok, `served lib ${res.status}`);
         const text = await res.text();
         assert(text.includes('getPublicEntry'), 'the served bundle predates the source — run pnpm build:sdk');
+    });
+
+    // ── What a SECOND principal gets, on the same two doors ──
+    //
+    // Every fetch above asks what the record's own side sees. This suite's criterion is that
+    // visibility follows the content, and the parking test proves it for apps by taking the content
+    // away. The other half of the same statement can only be asked by somebody else: the content
+    // stays private and the CALLER changes. Both doors here are built to say nothing — one 404 for
+    // "no such record", "not yours" and "not public" alike (ai-provenance.ts:214-227), and the
+    // by-hash widening done in SQL so a third party's row never enters the process (:174-176).
+
+    const stranger = await setupOwner('x');
+    const privKey = `prov.private.${Date.now()}`;
+    let privProvId = '', privHash = '';
+
+    await test('A PRIVATE record is stamped, and its own owner resolves it', async () => {
+        const w = await json('/v1/memory', {
+            method: 'POST', headers: auth(agent.token),
+            body: JSON.stringify({ key: privKey, value: 'Vain omistajalle.', visibility: 'private' }),
+        });
+        assert(w.status === 200 || w.status === 201, `write ${w.status}: ${JSON.stringify(w.body?.error)}`);
+        const r = await json(`/v1/memory/${encodeURIComponent(privKey)}`, { headers: auth(o.token) });
+        assert(r.status === 200, `owner read ${r.status}`);
+        privProvId = r.body.meta?.provenance?.id;
+        assert(!!privProvId, `a private write carries no provenance: ${JSON.stringify(r.body.meta)}`);
+
+        const mine = await json(`/v1/provenance/${privProvId}`, { headers: auth(o.token) });
+        assert(mine.status === 200, `the owner cannot resolve their own private record: ${mine.status}`);
+        privHash = mine.body.data.content_hash;
+        assert(!!privHash, 'the owner projection carries no content hash to look the record up by');
+    });
+
+    await test('DENIED — a stranger asking for that id gets the IDENTICAL 404 as a nonexistent one', async () => {
+        const theirs = await json(`/v1/provenance/${privProvId}`, { headers: auth(stranger.token) });
+        const missing = await json('/v1/provenance/00000000-0000-4000-8000-000000000000', { headers: auth(stranger.token) });
+        assert(theirs.status === 404, `a stranger resolved a private record: ${theirs.status}`);
+        // Byte-identical, not merely both-404: a different message is an oracle for which ids exist.
+        assert(theirs.body.error.code === missing.body.error.code
+            && theirs.body.error.message === missing.body.error.message,
+            `the two 404s differ, which says the id exists: ${JSON.stringify(theirs.body.error)} vs ${JSON.stringify(missing.body.error)}`);
+        // And the refusal was about the CALLER, not about a record that had gone away.
+        const still = await json(`/v1/provenance/${privProvId}`, { headers: auth(o.token) });
+        assert(still.status === 200, `the record vanished for its owner too — the 404 proves nothing: ${still.status}`);
+    });
+
+    // The mirror of everything above. Each test so far watches the NODE mint a record about the
+    // agent's work, which needs no permission because the agent is not the one making the claim.
+    // Declaring provenance is the opposite act — a statement about content, made by the caller — and
+    // it is the one this agent may not make: it holds memory:read, memory:write and app:write, and
+    // `provenance:write` was never on its consent screen.
+    await test('DENIED — the agent is STAMPED without asking, but it cannot DECLARE', async () => {
+        const r = await json('/v1/provenance', {
+            method: 'POST', headers: auth(agent.token),
+            body: JSON.stringify({
+                content_hash: `sha256:${'0'.repeat(64)}`,
+                provenance: { spec: 'aimeat.provenance/v1', generator: { type: 'ai', name: 'not-mine' } },
+            }),
+        });
+        assert(r.status === 403, `an agent with no provenance:write declared provenance: ${r.status} ${JSON.stringify(r.body?.data ?? r.body?.error)}`);
+        assert(r.body.error.code === 'SCOPE_DENIED', `refused for the wrong reason: ${JSON.stringify(r.body.error)}`);
+    });
+
+    await test('DENIED — and the hash lookup does not widen to a stranger either', async () => {
+        const bare = privHash.replace(/^sha256:/, '');
+        const theirs = await json(`/v1/provenance/by-hash/${bare}`, { headers: auth(stranger.token) });
+        assert(theirs.status === 200, `by-hash ${theirs.status}`);
+        assert(!(theirs.body.data.records ?? []).some((x: any) => x.id === privProvId),
+            'a stranger hashing the content found the private record: the widening is not fenced to the caller');
+        const mine = await json(`/v1/provenance/by-hash/${bare}`, { headers: auth(o.token) });
+        assert((mine.body.data.records ?? []).some((x: any) => x.id === privProvId),
+            'the owner cannot find their own record by hash — the assertion above would pass on a broken lookup');
     });
 
     console.log(`\n  ${passed} passed, ${failed} failed`);

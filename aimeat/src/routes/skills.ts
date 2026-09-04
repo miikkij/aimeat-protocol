@@ -114,7 +114,7 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   /* ── POST /v1/skills — publish or update. Body: { skill_md, files?, scope?, visibility? } ── */
-  router.post('/v1/skills', requireAuth(), async (req, res) => {
+  router.post('/v1/skills', requireAuth(), requireScope('memory:write'), async (req, res) => {
     try {
       const accessor = accessorOf(req);
       if (!accessor.ownerName) {
@@ -310,7 +310,7 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   /* ── DELETE /v1/skills/:name — own user skill, or node scope for operators ── */
-  router.delete('/v1/skills/:name', requireAuth(), async (req, res) => {
+  router.delete('/v1/skills/:name', requireAuth(), requireScope('memory:write'), async (req, res) => {
     try {
       const name = req.params.name as string;
       const accessor = accessorOf(req);
@@ -366,7 +366,7 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
 
   /* ── POST /v1/agents/:name/skills — link a skill. Owner sessions, or agents acting for
    *    their owner (links always target agents under req.auth.owner). Body: { ref } ── */
-  router.post('/v1/agents/:name/skills', requireAuth(), async (req, res) => {
+  router.post('/v1/agents/:name/skills', requireAuth(), requireScope('memory:write'), async (req, res) => {
     try {
       if (isAnonymous(req)) {
         res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Authentication required'));
@@ -388,7 +388,7 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   /* ── DELETE /v1/agents/:name/skills — unlink. Same access as link. Body or query: { ref } ── */
-  router.delete('/v1/agents/:name/skills', requireAuth(), async (req, res) => {
+  router.delete('/v1/agents/:name/skills', requireAuth(), requireScope('memory:write'), async (req, res) => {
     try {
       if (isAnonymous(req)) {
         res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Authentication required'));
@@ -426,7 +426,7 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   /* ── Expose current link records without resolution (cheap; used by UIs) ── */
-  router.get('/v1/agents/:name/skills/links', requireAuth(), async (req, res) => {
+  router.get('/v1/agents/:name/skills/links', requireAuth(), requireScope('memory:read'), async (req, res) => {
     try {
       if (isAnonymous(req)) {
         res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Authentication required'));
