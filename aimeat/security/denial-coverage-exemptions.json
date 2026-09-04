@@ -9,10 +9,6 @@
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
       "sha": "0b3718a6714b3ae4"
     },
-    "test/e2e-app-descriptions.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "265bfbbae4e81d36"
-    },
     "test/e2e-portfolio-origin.ts": {
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
       "sha": "8121169cd1184d2d"
@@ -48,10 +44,6 @@
     "test/e2e-ai-provenance-surfaces.ts": {
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
       "sha": "c5e93def548ac8ea"
-    },
-    "test/e2e-appdev-pitfalls.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "3fd5b45ba2427af2"
     },
     "test/e2e-mcp-scopes.ts": {
       "reason": "Reviewed 2026-08-15. This suite is ALL refusal, and none of it is status-shaped: the MCP tool surface refuses by not registering the tool (assert(!tools.includes(...))) and a filtered call comes back through a local {ok} wrapper rather than isError. Kept exempt because the detector cannot see those two shapes, not because the fence is untested — it now also asserts that a '*' agent is refused every tool riding a SCOPES_OUTSIDE_WILDCARD word, list derived from the vocabulary.",
