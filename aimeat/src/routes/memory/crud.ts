@@ -30,6 +30,7 @@ import { writeMemoryRecord } from '../../services/memory-write.js';
 import { ecoMayWriteKey } from '../../services/ecosystem-access.js';
 import { appMayWriteKey } from '../../utils/reserved-keys.js';
 import { resolveWriteTarget } from './owner-target.js';
+import { resolveIdentity } from '../../utils/gaii.js';
 import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone, MEMORY_LIST_MAX_LIMIT } from './shared.js';
 
 export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
@@ -184,7 +185,13 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
   // Optional ?owner_scope=true — list keys across the owner's GHII and agents
   // Owner sessions automatically use owner_scope (see all agents' memory)
   router.get('/v1/memory', requireAuth(), requireExternalPrincipal(), requireScope('memory:read'), async (req, res) => {
-    let gaii = req.auth!.sub;
+    // resolveIdentity, not raw `sub`. For an agent or an ecosystem principal the two are the same
+    // string, so nothing changes there; for an OWNER session `sub` is the bare account name and this
+    // is `alice@node`. The owner-scope branch below never reaches this value, which is why the raw
+    // form survived — but `?agent=` bypasses that branch, and `?agent=alice` compared equal to the
+    // bare name, skipped the ownership check, and listed under a coordinate where owner data is not
+    // supposed to exist. Reported by the repo's own semgrep rule, owner-data-must-resolve-identity.
+    let gaii = resolveIdentity(req.auth!, config.nodeId);
     const agentParam = req.query.agent as string | undefined;
     // Owner sessions (human user) automatically see all their agents' memory
     const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
@@ -393,7 +400,11 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
   // Owner sessions search across all their agents' memory
   router.get('/v1/memory/search', requireAuth(), requireExternalPrincipal(), requireScope('memory:read'), async (req, res) => {
     const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
-    let gaii = req.auth!.sub;
+    // Same as the listing above: resolved, so `?agent=` cannot compare equal to a bare owner name and
+    // search a coordinate nothing is filed under. Semgrep did not flag this one — searchText takes its
+    // identities inside an options object rather than as the first argument — but it is the same
+    // handler shape three hundred lines down, so it is fixed with the two that were flagged.
+    let gaii = resolveIdentity(req.auth!, config.nodeId);
     const agentParam = req.query.agent as string | undefined;
     if (agentParam && agentParam !== gaii) {
       const callerOwner = req.auth!.owner;
