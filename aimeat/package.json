@@ -184,7 +184,8 @@
     "audit:security": "tsx scripts/security-report.ts",
     "outdated:libs": "tsx scripts/check-lib-freshness.ts",
     "libs:usage": "tsx scripts/check-lib-usage.ts",
-    "check:version-drift": "node scripts/check-version-drift.mjs"
+    "check:version-drift": "node scripts/check-version-drift.mjs",
+    "audit:cycles": "tsx scripts/inventory/build-cycles.ts"
   },
   "keywords": [
     "aimeat",
