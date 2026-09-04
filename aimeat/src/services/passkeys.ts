@@ -15,8 +15,12 @@
  *   THE CHALLENGE STORE IS IN MEMORY, on purpose and with a limit. A challenge is a random value
  *   that must be used once, within a minute, by the browser it was handed to. Putting it in the
  *   database would make every sign-in two extra writes for a value whose whole life is 60 seconds.
- *   The cost is that a node behind two replicas must pin the ceremony to one of them, which is the
- *   same condition the rate limiter already carries (middleware/rate-limit.ts).
+ *
+ *   AND IT STAYS IN MEMORY, because a node is one process. This platform does not grow by putting
+ *   replicas behind one address; it grows by there being more nodes, each its own, federated. A
+ *   ceremony therefore begins and ends in the same process by construction, and there is no shared
+ *   store to add later. Same reasoning as the rate limiter (middleware/rate-limit.ts), whose note
+ *   about a shared store is about a deployment shape this platform does not have.
  *
  *   THE RELYING PARTY ID IS THE HOST, and a passkey is bound to it forever. Changing this node's
  *   domain makes every registered key unusable, which is why config derives it from baseUrl rather
