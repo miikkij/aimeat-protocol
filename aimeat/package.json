@@ -176,7 +176,7 @@
     "check:copied-logic": "tsx scripts/check-copied-logic.ts --strict",
     "check:liaison-surface": "tsx scripts/check-liaison-surface.ts --strict",
     "check:storage-parity": "tsx scripts/check-storage-parity.ts --strict",
-    "check:audit-gates": "pnpm check:route-scopes && pnpm check:denial-coverage && pnpm check:outbound-fetch && pnpm check:trusted-keys && pnpm check:storage-parity && pnpm check:ext-entrypoints && pnpm check:shared-impl && pnpm check:surface-focus && pnpm check:runtime-read-targets && pnpm check:identity-resolution && pnpm check:owner-principal && pnpm check:federation-signatures && pnpm check:deps && pnpm check:sse-parity && pnpm check:copied-logic && pnpm check:liaison-surface",
+    "check:audit-gates": "pnpm check:route-scopes && pnpm check:denial-coverage && pnpm check:outbound-fetch && pnpm check:trusted-keys && pnpm check:storage-parity && pnpm check:ext-entrypoints && pnpm check:shared-impl && pnpm check:surface-focus && pnpm check:runtime-read-targets && pnpm check:identity-resolution && pnpm check:owner-principal && pnpm check:federation-signatures && pnpm check:open-writes && pnpm check:deps && pnpm check:sse-parity && pnpm check:copied-logic && pnpm check:liaison-surface",
     "audit:report": "node ../security/semantic-audit/generate-report.mjs",
     "audit:triage": "node ../security/semantic-audit/ai-triage.mjs",
     "audit:full": "pnpm audit:triage && pnpm audit:report",
@@ -186,7 +186,10 @@
     "libs:usage": "tsx scripts/check-lib-usage.ts",
     "check:version-drift": "node scripts/check-version-drift.mjs",
     "audit:cycles": "tsx scripts/inventory/build-cycles.ts",
-    "audit:call-graph": "tsx scripts/inventory/build-call-graph.ts"
+    "audit:call-graph": "tsx scripts/inventory/build-call-graph.ts",
+    "check:open-writes": "tsx scripts/check-open-writes.ts --strict",
+    "check:open-writes:report": "tsx scripts/check-open-writes.ts",
+    "check:open-writes:seed": "tsx scripts/check-open-writes.ts --seed"
   },
   "keywords": [
     "aimeat",
