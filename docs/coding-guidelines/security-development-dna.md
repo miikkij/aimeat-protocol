@@ -202,6 +202,40 @@ worth knowing before anyone promises a date for it.
 fails when a word lives on one side only, in either direction, which is the same question asked
 before either side exists.
 
+#### 15c. A door already gated on the word it needs does not get a weaker one in front
+
+15b says when a word may be added. This says when it may not. A route whose handler already refuses
+without the strongest word for what it does is gated; adding a second, weaker word in front of it
+satisfies a middleware scanner and changes nothing about who gets in — except that it can now refuse
+somebody the first word would have let through.
+
+Both payment-completion doors on this node are in that state, and they are why this is a rule rather
+than a judgement made twice. `POST /v1/commerce/checkout-sessions/:id/complete` and its UCP twin both
+refuse without `contract:spend`, bounded by the owner's per-app spend ceiling; the triage entry for
+the first says in as many words "This is the H-3 fix and it holds on this door". `commerce:buy` in
+front of either would be a scanner-shaped change to a money path, and the caller is not obviously the
+buyer — a PSP callback holds no buyer scopes at all. Both were left, and both exemptions now say why,
+so the next reader does not "finish the job".
+
+*Check:* before gating, read what the handler already refuses. If the answer is "the word that
+matters for this operation", the door is done and the exemption needs a sentence, not a middleware.
+
+#### 15d. A ratchet is recomputed, not maintained — that is the whole of it
+
+"The count may only go down" is the property people remember. "The count is recomputed from source on
+every run" is the one doing the work, and the difference shows only in the failure nobody reports:
+an exemption cleared AHEAD of the code. The file says the debt is gone, the count went down, the
+commit message is true about intent — and the door is still open. Every direction a person would look
+reads as progress.
+
+Measured 2026-09-04, on this exact mistake: clearing the entry for `GET /v1/schedules/:id` while
+gating only the four routes the triage had listed. `check:route-scopes` failed on the next run with
+one NEW ungated handler naming that line, because it counts the source and compares, rather than
+trusting the file. A checklist would have accepted it and the number would have been right.
+
+*Check:* a new gate script recomputes its finding every run and uses the seed file only to decide
+whether a finding is NEW. A gate that reads its own bookkeeping as the truth is a list, not a gate.
+
 ### 16. Deprecated is not removed
 RFC v4.0 marks One-Time Keys / Tier 0.5 deprecated and says the feature sits behind
 `keyedBrowseEnabled`. Three of its write paths were behind no flag at all, and the flag defaults to
