@@ -433,11 +433,29 @@ async function main() {
 
         const APP_ORIGIN = `http://${SUB}.${APP_HOST}:${PORT}`;
 
-        await test('apex protected-resource metadata is unchanged (the MCP endpoint)', async () => {
+        // This assertion used to read `resource === ${BASE}/v1/mcp` and was called "unchanged". It
+        // was pinning the defect: RFC 9728 §3.1 pairs a resource with a PATH under
+        // `/.well-known/oauth-protected-resource<path>`, so the BARE well-known URL describes the
+        // ORIGIN and nothing else. The apex answered with the MCP endpoint's identifier there, §3.3
+        // entitles a conformant client to reject metadata naming a resource it is not talking to,
+        // and isitagentready rejected production for exactly that. Fixed in 0356d9cc1
+        // (services/protected-resource.ts v1.1.0); this suite was outside the guard tier at the time
+        // and so did not block it. A test named "unchanged" is a golden value, and a golden value is
+        // only as good as the day it was taken.
+        await test('the apex bare well-known names the APEX ORIGIN (RFC 9728 §3.1)', async () => {
             const r = await json('/.well-known/oauth-protected-resource');
             assert(r.status === 200, `status ${r.status}`);
-            assert(r.body.resource === `${BASE}/v1/mcp`, `apex resource changed: ${r.body.resource}`);
+            assert(r.body.resource === BASE, `the bare URL must name the origin, got: ${r.body.resource}`);
             assert(JSON.stringify(r.body.authorization_servers) === JSON.stringify([BASE]), `apex AS: ${JSON.stringify(r.body.authorization_servers)}`);
+        });
+
+        // …and the MCP endpoint keeps a document of its own, at the address §3.1 gives it. Without
+        // this half the correction above would read as "the /v1/mcp identifier was dropped", which
+        // is the opposite of what happened: there are two documents now, each true of its address.
+        await test('the MCP endpoint has its own document at the §3.1 path-suffixed address', async () => {
+            const r = await json('/.well-known/oauth-protected-resource/v1/mcp');
+            assert(r.status === 200, `status ${r.status}`);
+            assert(r.body.resource === `${BASE}/v1/mcp`, `the MCP document must name the MCP endpoint, got: ${r.body.resource}`);
         });
 
         await test('the app origin names ITSELF as the resource, and the node as its authorization server', async () => {
@@ -725,7 +743,11 @@ async function main() {
             const body = (await hostRequest(BASE, '/.well-known/oauth-protected-resource', `localhost:${PORT}`, {
                 headers: { 'x-app-origin': '1', 'x-subdomain': SUB },
             })).json<any>();
-            assert(body.resource === `${BASE}/v1/mcp`, `the apex must keep its own identity, got: ${body.resource}`);
+            // The INTENT here is untouched — a forged marker must not make the apex answer as an app
+            // origin — and only the apex's own correct value moved under it (0356d9cc1): the bare
+            // well-known URL names the origin, so that is what the apex must still be saying when
+            // somebody forges the header.
+            assert(body.resource === BASE, `the apex must keep its own identity, got: ${body.resource}`);
             assert(body.aimeat === undefined, `no app may be named for an apex request: ${JSON.stringify(body.aimeat)}`);
         });
 

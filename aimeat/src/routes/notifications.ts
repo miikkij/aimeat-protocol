@@ -59,7 +59,7 @@ export function notificationsRouter(config: AimeatConfig, storage: Storage): Rou
    * `limit` then returns effectively all of them regardless of each backend's ordering
    * (Kysely key-ASC / SQLite updatedAt-DESC), and the JS sort-desc + slice(0,50) below
    * yields the newest 50 with an accurate unread count. */
-  router.get('/v1/notifications', requireAuth(), async (req, res) => {
+  router.get('/v1/notifications', requireAuth(), requireScope('memory:read'), async (req, res) => {
     const ghii = ownerGhii(req);
     const { items } = await storage.listAllMemory({ prefix: NOTIF_PREFIX, ownerPrefix: ghii, limit: 1000 });
     const mine = items
@@ -171,7 +171,7 @@ export function notificationsRouter(config: AimeatConfig, storage: Storage): Rou
   });
 
   /* ── POST /v1/notifications/read — mark notifications read ({ ids: [...] } or { all: true }) ── */
-  router.post('/v1/notifications/read', requireAuth(), async (req, res) => {
+  router.post('/v1/notifications/read', requireAuth(), requireScope('memory:write'), async (req, res) => {
     const ghii = ownerGhii(req);
     const { ids, all } = req.body ?? {};
     if (!all && !Array.isArray(ids)) {
@@ -202,7 +202,7 @@ export function notificationsRouter(config: AimeatConfig, storage: Storage): Rou
    * "Clear all" from the header bell: notifications are per-owner memory rows under NOTIF_PREFIX, so we
    * list THIS owner's notif rows (owner-scoped, never NOT deleteMemoryByPrefix which spans all owners)
    * and remove them — batched via bulkDeleteMemory when the backend offers it, else a per-key fallback. */
-  router.delete('/v1/notifications', requireAuth(), async (req, res) => {
+  router.delete('/v1/notifications', requireAuth(), requireScope('memory:delete'), async (req, res) => {
     const ghii = ownerGhii(req);
     const ids = Array.isArray(req.body?.ids) ? new Set(req.body.ids) : null;
     const mine = await storage.listMemory(ghii, { prefix: NOTIF_PREFIX });

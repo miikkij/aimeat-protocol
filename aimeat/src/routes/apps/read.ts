@@ -278,7 +278,7 @@ export function registerReadRoutes(
         ]));
     });
 
-    router.post('/v1/apps/:owner/:filename/screenshot', requireAuth(), async (req, res) => {
+    router.post('/v1/apps/:owner/:filename/screenshot', requireAuth(), requireScope('app:write'), async (req, res) => {
         const ownerParam = req.params.owner as string;
         const filename = req.params.filename as string;
         const owner = ownerParam.includes('@') ? ownerParam.split('@')[0] : ownerParam;
@@ -345,7 +345,7 @@ export function registerReadRoutes(
     // one. The node's scheduled auto-capture job regenerates it on its next scan. This is the
     // "refresh thumbnail" action: clearing is cheap and queues a batch recapture, so there is no
     // on-demand server render to hammer (DoS-safe). The app's owner, or a node operator, may clear.
-    router.delete('/v1/apps/:owner/:filename/screenshot', requireAuth(), async (req, res) => {
+    router.delete('/v1/apps/:owner/:filename/screenshot', requireAuth(), requireScope('app:write'), async (req, res) => {
         const ownerParam = req.params.owner as string;
         const filename = req.params.filename as string;
         const owner = ownerParam.includes('@') ? ownerParam.split('@')[0] : ownerParam;

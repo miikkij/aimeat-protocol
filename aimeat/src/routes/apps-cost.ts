@@ -24,7 +24,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth } from '../auth/middleware.js';
+import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { commerceFeePercent } from '../services/marketplace-fee.js';
@@ -74,7 +74,7 @@ export function appsCostRouter(config: AimeatConfig, storage: Storage): Router {
    * entitlement attributed to this appId whose consumer is the requesting owner, plus roll-up totals.
    * `app_id` is a query param (app ids are "owner/filename" — a slash breaks a path segment).
    */
-  router.get('/v1/apps/cost', requireAuth(), async (req: Request, res: Response) => {
+  router.get('/v1/apps/cost', requireAuth(), requireScope('exchange:read'), async (req: Request, res: Response) => {
     const appId = typeof req.query.app_id === 'string' ? req.query.app_id : '';
     if (!appId) return res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'app_id query parameter is required'));
     const owner = req.auth!.owner;

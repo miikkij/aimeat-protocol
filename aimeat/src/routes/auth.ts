@@ -10,6 +10,14 @@
  * @usage
  *   app.use(authRouter(config, storage));
  * @version-history
+ *   v1.7.0 -- 2026-09-04 -- The three session doors are behind requireOwnerPrincipal(). All three
+ *     read `req.auth!.owner` and act on the HUMAN's device sessions, so any principal carrying the
+ *     account name could list where the person signs in and sign them out of every device they own,
+ *     their current one included. This is invariant 11 in the form check:owner-principal cannot see:
+ *     the doors do not REFUSE on the name, they SCOPE a query by it, so nothing on them reads as a
+ *     comparison. requireScope('account:security') would have been the wrong instrument — the word is
+ *     in neither list in scope-vocabulary-migration.ts and no wildcard carries it, so it would have
+ *     refused every agent rather than the unapproved ones.
  *   v1.6.0 -- 2026-08-23 -- Both /v1/auth/token branches answer 403 ACCOUNT_DISABLED for a
  *     deactivated owner (BR-04), after the signature check and before any row is written.
  *   v1.5.0 -- 2026-08-15 -- The Tier 0.5 OTK write path stops being a fourth implementation and a
@@ -51,7 +59,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { verify } from '../auth/keypair.js';
 import { issueJWT, revokeToken, generateSessionId } from '../auth/jwt.js';
-import { requireAuth, requireRole, optionalAuth, isAnonymousMode, getAnonymousCredentials } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireOwnerPrincipal, optionalAuth, isAnonymousMode, getAnonymousCredentials } from '../auth/middleware.js';
 import { registerOtkRoutes } from './auth-otk.js';
 import { success, error } from '../middleware/envelope.js';
 import { loginTarpit } from '../middleware/login-tarpit.js';
@@ -480,7 +488,14 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
   // The human's own sign-ins only. An agent's session row carries the same `owner` but its `gaii` is
   // a GAII, and this list is a device list: it shows a label, a user agent and a Sign out button.
   // The owner's agents have their own surface, with far more to say about each one.
-  router.get('/v1/auth/sessions', requireAuth(), async (req, res) => {
+  //
+  // requireOwnerPrincipal, not requireAuth, since 2026-09-04. All three session doors here read
+  // `req.auth!.owner` and act on the HUMAN's device sessions — a name every principal in the
+  // person's name carries, which is invariant 11 in the form the owner-principal scanner cannot see:
+  // these doors do not REFUSE on the name, they SCOPE a query by it, so nothing on them looks like a
+  // comparison. What this list hands out is where and when the person signs in, and the session_id
+  // values in it are exactly the ids the DELETE below accepts.
+  router.get('/v1/auth/sessions', requireAuth(), requireOwnerPrincipal(), async (req, res) => {
     const owner = req.auth!.owner;
     const sessions = (await storage.listActiveSessions(owner)).filter(s => !isExternalPrincipal(s.gaii));
     const currentSessionId = req.auth!.sessionId;
@@ -500,7 +515,9 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // DELETE /v1/auth/sessions/:id — revoke a specific session
-  router.delete('/v1/auth/sessions/:id', requireAuth(), async (req, res) => {
+  // requireOwnerPrincipal since 2026-09-04 — see the list door above. This one signs the person out
+  // of one of their own devices.
+  router.delete('/v1/auth/sessions/:id', requireAuth(), requireOwnerPrincipal(), async (req, res) => {
     const sessionId = req.params.id as string;
     // Verify the session belongs to this owner by checking active sessions
     const sessions = await storage.listActiveSessions(req.auth!.owner);
@@ -526,7 +543,10 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
   // turn "sign out of my other browser" into disconnecting every agent, each of which then needs the
   // owner to approve device authorization again. An agent is ended from the Agents surface, one at a
   // time, deliberately. Erasing the account still takes everything (services/owner-erasure.ts).
-  router.delete('/v1/auth/sessions', requireAuth(), async (req, res) => {
+  // requireOwnerPrincipal since 2026-09-04 — the sharpest of the three: it signs the person out of
+  // EVERY device they own, their current one included, and it did so for any principal carrying
+  // their account name.
+  router.delete('/v1/auth/sessions', requireAuth(), requireOwnerPrincipal(), async (req, res) => {
     const owner = req.auth!.owner;
     const mine = (await storage.listActiveSessions(owner)).filter(s => !isExternalPrincipal(s.gaii));
     let count = 0;

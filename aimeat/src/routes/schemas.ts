@@ -16,7 +16,7 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth } from '../auth/middleware.js';
+import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { validateSchemaItself, removeFromCache } from '../services/schema-validator.js';
 import { SchemaSetSchema } from '../models/schemas.js';
@@ -119,7 +119,7 @@ export function schemaRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // DELETE /v1/memory/:key/schema — delete schema for a memory key
-  router.delete('/v1/memory/:key/schema', requireAuth(), async (req, res) => {
+  router.delete('/v1/memory/:key/schema', requireAuth(), requireScope('memory:write'), async (req, res) => {
     const key = decodeURIComponent(req.params.key as string);
 
     const record = await storage.getSchema(key, 'exact') ?? await storage.getSchema(key, 'prefix');

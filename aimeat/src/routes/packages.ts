@@ -36,7 +36,7 @@ import { randomUUID, createHash } from 'node:crypto';
 import Busboy from 'busboy';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, PackageRecord, PackageComponent, PackageComponentType, TemplateListingRecord } from '../storage/interface.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { createPackagesTabService } from '../services/db/packages-tab-db-service.js';
 import { emitChange } from '../services/event-bus.js';
@@ -445,7 +445,7 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
   // ── Parameterized routes ─────────────────────────────────────────
 
   // POST /v1/packages/:groupId/versions — publish new version
-  router.post('/v1/packages/:groupId/versions', requireAuth(), async (req, res) => {
+  router.post('/v1/packages/:groupId/versions', requireAuth(), requireScope('app:write'), async (req, res) => {
     const groupId = decodeURIComponent(req.params.groupId as string);
     const owner = req.auth!.owner;
 
@@ -618,7 +618,7 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // PATCH /v1/packages/:groupId/versions/:version — update version status
-  router.patch('/v1/packages/:groupId/versions/:version', requireAuth(), async (req, res) => {
+  router.patch('/v1/packages/:groupId/versions/:version', requireAuth(), requireScope('app:write'), async (req, res) => {
     const groupId = decodeURIComponent(req.params.groupId as string);
     const version = req.params.version as string;
     const owner = req.auth!.owner;
@@ -650,7 +650,7 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // PATCH /v1/packages/:groupId — update group metadata (all versions)
-  router.patch('/v1/packages/:groupId', requireAuth(), async (req, res) => {
+  router.patch('/v1/packages/:groupId', requireAuth(), requireScope('app:write'), async (req, res) => {
     const groupId = decodeURIComponent(req.params.groupId as string);
     const owner = req.auth!.owner;
 
@@ -696,7 +696,7 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
   // Used by the profile UI's "Delete" button on own packages. Author-only.
   // Does not touch installed instances; only removes the package source itself
   // from the gallery / browse listings.
-  router.delete('/v1/packages/:groupId', requireAuth(), async (req, res) => {
+  router.delete('/v1/packages/:groupId', requireAuth(), requireScope('app:manage'), async (req, res) => {
     const groupId = decodeURIComponent(req.params.groupId as string);
     const owner = req.auth!.owner;
 
@@ -728,7 +728,7 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // DELETE /v1/packages/:groupId/versions/:version — archive version
-  router.delete('/v1/packages/:groupId/versions/:version', requireAuth(), async (req, res) => {
+  router.delete('/v1/packages/:groupId/versions/:version', requireAuth(), requireScope('app:manage'), async (req, res) => {
     const groupId = decodeURIComponent(req.params.groupId as string);
     const version = req.params.version as string;
     const owner = req.auth!.owner;

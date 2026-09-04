@@ -13,7 +13,7 @@ import type { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, KnowledgeManifest, MemoryRecord } from '../../storage/interface.js';
-import { requireAuth, requireRole } from '../../auth/middleware.js';
+import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { recordPublicActivity } from '../../services/public-activity.js';
@@ -155,7 +155,7 @@ export function registerSharingRoutes(
   });
 
   /* ── POST /v1/knowledge/:id/clone — Clone public entries to your own namespace ── */
-  router.post('/v1/knowledge/:id/clone', requireAuth(), async (req, res) => {
+  router.post('/v1/knowledge/:id/clone', requireAuth(), requireScope('memory:write'), async (req, res) => {
     const requesterGaii = resolve(req);
     const requesterGhii = req.auth!.owner as string;
     const sourcePackageId = req.params.id as string;
