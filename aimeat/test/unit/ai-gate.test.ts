@@ -39,6 +39,11 @@ function mockRes(): Response & { _status: number | null } {
         _status: null as number | null,
         status(code: number) { r._status = code; return r; },
         json() { return r; },
+        // A scope refusal carries a `WWW-Authenticate` challenge since 2026-09-04, so the double
+        // needs a header sink or every test here throws `res.setHeader is not a function`. This
+        // file only asks whether the gate ADMITS a principal, so the value is discarded — but a
+        // double that cannot receive what production sends is not standing in for it.
+        setHeader() { return r; },
     };
     return r as unknown as Response & { _status: number | null };
 }

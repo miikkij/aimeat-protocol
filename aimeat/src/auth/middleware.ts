@@ -66,7 +66,7 @@ import { resolvePat, PAT_PREFIX } from '../services/access-token.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
-import { deny401, deny403, setDenyConfig } from './deny.js';
+import { deny401, deny403, denyScope403, setDenyConfig } from './deny.js';
 
 // P3-7: Reference to storage for session revocation checks
 let _sessionStorage: Storage | null = null;
@@ -545,8 +545,8 @@ export function requireOperatorPrincipal(storage: Storage, scope: string = OPERA
     }
     if (!(req.auth.scopes ?? []).includes(scope)) {
       logger.warn(`[operator-scope-denied] ${req.auth.sub} on ${req.method} ${req.path}`);
-      deny403(req, res, 'SCOPE_DENIED', `Scope "${scope}" required. The node operator grants it per agent, ` +
-        'and no wildcard carries it.');
+      denyScope403(req, res, [scope], `Scope "${scope}" required. The node operator grants it per agent, `
+        + 'and no wildcard carries it.');
       return;
     }
     next();
@@ -717,7 +717,7 @@ export function requireScope(...requiredScopes: string[]) {
     for (const required of requiredScopes) {
       if (!scopeIsCovered(agentScopes, required)) {
         logger.warn(`[scope-denied] ${req.auth.sub} needs "${required}", has [${agentScopes.join(', ')}] on ${req.method} ${req.path}`);
-        deny403(req, res, 'SCOPE_DENIED', `Scope "${required}" required. Agent scopes: [${agentScopes.join(', ')}]`);
+        denyScope403(req, res, [required], `Scope "${required}" required. Agent scopes: [${agentScopes.join(', ')}]`);
         return;
       }
     }
@@ -755,7 +755,9 @@ export function requireAnyScope(...acceptableScopes: string[]) {
       return;
     }
     logger.warn(`[scope-denied] ${req.auth.sub} needs any of "${acceptableScopes.join('", "')}", has [${held.join(', ')}] on ${req.method} ${req.path}`);
-    deny403(req, res, 'SCOPE_DENIED', `One of these scopes is required: ${acceptableScopes.join(', ')}. Agent scopes: [${held.join(', ')}]`);
+    // ANY of them is enough, so the header lists them all and the client picks. A header naming one
+    // would send a client to ask for a permission it may not need.
+    denyScope403(req, res, acceptableScopes, `One of these scopes is required: ${acceptableScopes.join(', ')}. Agent scopes: [${held.join(', ')}]`);
   };
 }
 

@@ -20,15 +20,26 @@ function mockReq(overrides: Partial<Request & { auth?: VerifiedToken }> = {}): R
     } as unknown as Request;
 }
 
-/** Build a mock Express Response that captures status codes and JSON bodies. */
-function mockRes(): Response & { _status: number | null; _json: unknown } {
+/**
+ * Build a mock Express Response that captures status codes, JSON bodies and HEADERS.
+ *
+ * `setHeader` was added on 2026-09-04 when a scope refusal started carrying a
+ * `WWW-Authenticate` challenge and every test using this double threw
+ * `res.setHeader is not a function`. The double had no header sink at all, so anything the
+ * middleware set on the response short of a status or a body was invisible to every test in this
+ * file — the fixture had stopped being a stand-in for an Express response, and nothing said so
+ * until something used the part that was missing.
+ */
+function mockRes(): Response & { _status: number | null; _json: unknown; _headers: Record<string, string> } {
     const r = {
         _status: null as number | null,
         _json: undefined as unknown,
+        _headers: {} as Record<string, string>,
         status(code: number) { r._status = code; return r; },
         json(body: unknown) { r._json = body; return r; },
+        setHeader(name: string, value: string) { r._headers[name.toLowerCase()] = value; return r; },
     };
-    return r as unknown as Response & { _status: number | null; _json: unknown };
+    return r as unknown as Response & { _status: number | null; _json: unknown; _headers: Record<string, string> };
 }
 
 /** Create a VerifiedToken for testing. */
@@ -86,6 +97,15 @@ describe('requireScope', () => {
             expect(next).not.toHaveBeenCalled();
             expect(res._status).toBe(403);
             expect((res._json as any).error.code).toBe('SCOPE_DENIED');
+
+            // THE HALF A CLIENT CAN USE. The sentence in the body has always named the scope, which
+            // helps whoever reads the log and not the agent that hit the door: its only moves were
+            // to stop, or to be re-approved from scratch — re-granting every permission it already
+            // had to add one. RFC 6750 §3.1's challenge, adopted by MCP in 2025-11-25, lets it read
+            // which word it lacks and ask for that one.
+            const challenge = res._headers['www-authenticate'] ?? '';
+            expect(challenge).toContain('error="insufficient_scope"');
+            expect(challenge).toContain('scope="memory:write"');
         });
 
         it('passes when agent has multiple scopes including the required one', () => {

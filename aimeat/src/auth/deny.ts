@@ -104,6 +104,46 @@ export function deny403(req: Request, res: Response, code: string, message: stri
   res.status(403).json(errorEnvelope(code, message));
 }
 
+/**
+ * A scope refusal a CLIENT can act on, not only a person reading the sentence.
+ *
+ * WHAT WAS MISSING. This node has always named the scope in the message — "Scope "memory:write"
+ * required" — which is exactly right for a developer reading a log and useless to the agent that
+ * hit it. An agent's only move was to stop, or to have its owner re-approve it from scratch, which
+ * means re-granting every permission it already had in order to add one.
+ *
+ * RFC 6750 §3.1 defines the machine-readable form and MCP adopted it in 2025-11-25 (SEP-835) for
+ * exactly this: `insufficient_scope` plus the scope that was needed, on a header a client already
+ * parses because it is the same header that carries the OAuth challenge on a 401. A client can then
+ * ask for that one word instead of starting again.
+ *
+ * `resource_metadata` rides along for the same reason it does on the 401: it is where a client
+ * learns which authorization server to ask.
+ *
+ * WHAT THIS DOES NOT DO, said plainly rather than implied: granting the scope is still a separate
+ * act by the owner, in Profile → Agents. This half tells the client precisely what to ask for; the
+ * half that lets it ask for one word and be granted one word is not built.
+ */
+export function denyScope403(
+  req: Request,
+  res: Response,
+  needed: string[],
+  message: string,
+  resourceMetadataUrl?: string,
+): void {
+  recordAuthFailure(auditContext(req), { status: 403, code: 'SCOPE_DENIED', reason: message });
+  // Quoted and space-separated, which is the scope syntax RFC 6749 §3.3 defines and what a client
+  // splits on. A comma-separated list here would parse as one scope with commas in it.
+  const parts = [
+    'Bearer error="insufficient_scope"',
+    `error_description="${message.replace(/"/g, '\'')}"`,
+    `scope="${needed.join(' ')}"`,
+  ];
+  if (resourceMetadataUrl) parts.push(`resource_metadata="${resourceMetadataUrl}"`);
+  res.setHeader('WWW-Authenticate', parts.join(', '));
+  res.status(403).json(errorEnvelope('SCOPE_DENIED', message));
+}
+
 function errorEnvelope(code: string, message: string) {
   return {
     ok: false,
