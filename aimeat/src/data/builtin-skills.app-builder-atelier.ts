@@ -13,6 +13,9 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.2.0 — 2026-09-05 — The look brings its own ambient (the one layer allowed to move at
+ *     idle), and a background animation of one's own joins the never-list
+ *     (wish-atelier-ambient-visuals).
  *   v1.1.0 — 2026-09-02 — The game shell is named beside the Atelier shell.
  *   v1.0.0 — 2026-08-27 — Initial (TARGET-074).
  */
@@ -65,7 +68,9 @@ moved under you says so.
 3. **Build** — start from the shell; compose screens from the catalogue in the spec (hero, list,
    listDetail, cardGrid, form, table, statRow, searchBar, timeline, tabs); the \`section\`
    component is the ONLY place your own raw markup goes. One look via \`app({ look })\` —
-   vivid unless the owner asked for something else; flat only on request.
+   vivid unless the owner asked for something else; flat only on request. The look brings its
+   own ambient, the one layer allowed to move at idle: leave it unless the owner asked for
+   weather, then name a preset with \`app({ ambient })\` (the spec lists the six).
 4. **Imagery** — generate at most ONE hero and ONE empty-state image without asking
    (\`aimeat_image_generate\` → storage URL; the spec carries the style-word tables). Check the
    \`atelier.img.*\` cache first; never inline a data: URI. Zero images still looks finished.
@@ -82,6 +87,9 @@ moved under you says so.
 - A theme, palette or language control — the login pill owns all three.
 - Colours in JavaScript or CSS — the \`--ak-*\` tokens are the entire look, and every preset ×
   palette × mode combination is verified arithmetically on this node.
+- A background animation of your own — the ambient layer is the kit's, chosen by preset, and it
+  pauses on a hidden tab, stills under Less motion and yields to the viewer's weather switch
+  without a line from you.
 - The Classic build spec.
 
 When something will not complete or a decision needs a human, say so to the owner in their
