@@ -905,6 +905,41 @@ await test('37. A client_id that is not https is refused, and never fetched', as
     }
 });
 
+await test('38b. A scope refusal tells the CLIENT what to ask for, not only the log', async () => {
+    // This node has always named the missing scope in the message, which is right for a developer
+    // reading a log and useless to the agent that hit it: its only move was to stop, or to have its
+    // owner re-approve it from scratch — re-granting every permission it already had to add one.
+    //
+    // RFC 6750 §3.1 defines the machine-readable form and MCP adopted it in 2025-11-25 (SEP-835).
+    // The header is the same one that carries the OAuth challenge on a 401, so a client already
+    // parses it. Asserted on the HEADER, because the sentence was always there and is not the change.
+    const scoped = await json('/v1/agents', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ name: 'narrowagent', owner: ownerName, capabilities: [], scopes: ['memory:read'] }),
+    });
+    assert(scoped.status === 201, `narrow agent ${scoped.status}: ${JSON.stringify(scoped.body?.error)}`);
+    const ts = new Date().toISOString();
+    const tok = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({
+            gaii: scoped.body.data.agent.gaii, timestamp: ts,
+            signature: await signMsg(scoped.body.data.private_key, scoped.body.data.agent.gaii + ts),
+        }),
+    });
+
+    const refused = await json('/v1/memory', {
+        method: 'POST', headers: { Authorization: `Bearer ${tok.body.data.token}` },
+        body: JSON.stringify({ key: 'x', value: { a: 1 }, visibility: 'private' }),
+    });
+    assert(refused.status === 403, `a read-only agent must be refused a write, got ${refused.status}`);
+
+    const challenge = refused.headers.get('www-authenticate') ?? '';
+    assert(challenge.includes('error="insufficient_scope"'),
+        `the refusal must be machine-readable, got ${challenge || '(no header)'}`);
+    assert(/scope="[^"]*memory:write[^"]*"/.test(challenge),
+        `and must name the scope to ask for, got ${challenge}`);
+});
+
 await test('38. An unknown client is told which of the two roads to take', async () => {
     // The refusal names the mechanism, because "Unknown client_id" alone leaves a client that could
     // have used a metadata document with no way to find out that it could.
