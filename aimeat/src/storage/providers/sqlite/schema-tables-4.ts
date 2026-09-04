@@ -6,6 +6,7 @@
  *   domain and the outbound door). Split from schema-tables-3.ts at the max-file-lines
  *   boundary; idempotent (IF NOT EXISTS), applied after part 3.
  * @version-history
+ *   v1.6.0 — 2026-09-04 — passkeys table (WebAuthn credentials).
  *   v1.5.0 — 2026-09-03 — dependency_edges and component_versions tables.
  *   v1.4.0 — 2026-08-26 — Workspace row spaces: rows a group accumulates, as a table rather than as
  *     memory keys, with the three declared index columns and the three times. Mirrors Postgres 0052.
@@ -575,6 +576,25 @@ export function applySchemaTables4(db: Database.Database): void {
       createdBy TEXT NOT NULL,
       PRIMARY KEY (kind, name, version)
     );
+
+    -- ── Passkeys (types/passkeys.ts; mirrors Postgres 0068) ──
+    -- One WebAuthn credential on one device. Read BEFORE anyone is signed in: the login door has a
+    -- credential id and nothing else, so the id is the primary key and the owner index serves the
+    -- person's own list. transports is a JSON array of strings.
+    CREATE TABLE IF NOT EXISTS passkeys (
+      id         TEXT PRIMARY KEY,
+      ghii       TEXT NOT NULL,
+      owner      TEXT NOT NULL,
+      publicKey  TEXT NOT NULL,
+      counter    INTEGER NOT NULL DEFAULT 0,
+      transports TEXT NOT NULL DEFAULT '[]',
+      label      TEXT NOT NULL DEFAULT '',
+      aaguid     TEXT NOT NULL DEFAULT '',
+      backedUp   INTEGER NOT NULL DEFAULT 0,
+      createdAt  TEXT NOT NULL,
+      lastUsedAt TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_passkeys_owner ON passkeys(owner);
 
   `);
 }

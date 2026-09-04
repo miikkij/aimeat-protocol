@@ -143,8 +143,9 @@ import type { SitePresenceConfig } from './config-site-presence.js';
 import type { SocialLoginConfig } from './config-types-social-login.js';
 import type { ConnectionsConfig } from './config-types-connections.js';
 import type { EnterpriseSsoConfig } from './config-types-enterprise-sso.js';
+import type { AccountSecurityConfig } from './config-types-account-security.js';
 
-export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig, SocialLoginConfig, ConnectionsConfig, EnterpriseSsoConfig {
+export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig, SocialLoginConfig, ConnectionsConfig, EnterpriseSsoConfig, AccountSecurityConfig {
   port: number;
   baseUrl: string;
   /**
@@ -448,18 +449,8 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   executionLogRetentionDays: number;
   consentMaxPerUser: number;
 
-  // TOTP / 2FA (Phase 0.5)
-  totpEnabled: boolean;
-  totpIssuer: string;
-  totpPeriod: number;
-  totpWindow: number;
-  totpBackupCodeCount: number;
-  totpSecretEncryptionKey: string | null;
-  totpMaxFailedAttempts: number;
-  totpLockoutSeconds: number;
-
-  // General-purpose encryption key (fallback: totpSecretEncryptionKey)
-  encryptionKey: string | null;
+  // Two-step sign-in, passkeys and the key that encrypts what they store: AccountSecurityConfig,
+  // in config-types-account-security.ts.
 
   // MSM installation role restriction
   msmInstallRole: 'operator' | 'owner';

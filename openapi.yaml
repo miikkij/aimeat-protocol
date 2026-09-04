@@ -26434,6 +26434,169 @@ paths:
 
   # --- Phase 0.5: TOTP Two-Factor Authentication ---
 
+  # ============================================================
+  # Passkeys (WebAuthn) — a sign-in method of its own
+  # ============================================================
+
+  /v1/ghii/passkeys/register/options:
+    post:
+      operationId: passkeyRegisterOptions
+      summary: Start adding a passkey to your account
+      description: |
+        Returns a `ceremony_id` and the options to hand to `navigator.credentials.create()`. The
+        options carry the credentials this account already has, so the browser says "you already
+        registered this device" instead of quietly making a second key for the same one.
+
+        Account-holder only: an agent, a granted app or an ecosystem app carries the human's account
+        name and must not be able to register a way in that the human never made. The ceremony
+        expires in 60 seconds.
+      tags: [Passkeys]
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { description: 'Registration options and the ceremony id' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: Account holder only }
+        '503': { description: Passkeys are not enabled on this node }
+
+  /v1/ghii/passkeys/register/verify:
+    post:
+      operationId: passkeyRegisterVerify
+      summary: Finish adding a passkey
+      description: |
+        Submit the browser's answer with the `ceremony_id` it belongs to. The public half is stored
+        with the signature counter; the private half never leaves the device. A credential id that
+        already exists on this node is refused rather than reassigned — it belongs to whoever
+        registered it first.
+      tags: [Passkeys]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ceremony_id, response]
+              properties:
+                ceremony_id: { type: string }
+                response: { type: object, description: The RegistrationResponseJSON from the browser }
+                label: { type: string, description: What to call this device. Defaults to "Passkey". }
+      responses:
+        '201': { description: The device is registered }
+        '400': { description: The ceremony expired, or the answer did not check out }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { description: That device is already registered here }
+
+  /v1/ghii/passkeys:
+    get:
+      operationId: passkeyList
+      summary: The devices that can sign in as you
+      description: |
+        Label, transports, whether the key is synced to a cloud keychain, when it was added and when
+        it was last used. Never the public key: that is the node's, not the person's to read.
+      tags: [Passkeys]
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { description: The list, and whether this node offers passkeys at all }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/ghii/passkeys/{id}:
+    patch:
+      operationId: passkeyRename
+      summary: Rename one of your devices
+      tags: [Passkeys]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [label]
+              properties:
+                label: { type: string, maxLength: 80 }
+      responses:
+        '200': { description: Renamed }
+        '404': { description: No passkey of yours with that id }
+    delete:
+      operationId: passkeyDelete
+      summary: Take a device away
+      description: |
+        Scoped to your own account, so an id alone is not enough. The removal lands on your account
+        feed. Removing the last one leaves the password (and two-step sign-in, if you armed it) as
+        the way in, which is why neither is replaced when a passkey is added.
+      tags: [Passkeys]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Removed }
+        '404': { description: No passkey of yours with that id }
+
+  /v1/ghii/login/passkey/options:
+    post:
+      operationId: passkeyLoginOptions
+      summary: Start signing in with a passkey (no auth)
+      description: |
+        Returns a `ceremony_id` and the options for `navigator.credentials.get()`.
+
+        The username is OPTIONAL and omitting it is the better path: the ceremony is then
+        discoverable, the device offers whatever it holds for this domain, and its answer names the
+        account. Naming a username narrows the offer for an older authenticator that needs it.
+
+        A username that does not exist is answered exactly like one that does — an empty allow-list
+        and a real challenge — because this door takes no credential and would otherwise tell anyone
+        who types a name whether an account by that name is here.
+      tags: [Passkeys]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username: { type: string }
+      responses:
+        '200': { description: Authentication options and the ceremony id }
+        '503': { description: Passkeys are not enabled on this node }
+
+  /v1/ghii/login/passkey/verify:
+    post:
+      operationId: passkeyLoginVerify
+      summary: Finish signing in with a passkey (no auth)
+      description: |
+        Checks the device's answer and, if it holds, mints the same owner session a password login
+        would: the same deactivation refusal, the same login count, the same owner-key handling and
+        the same response body. The signature counter is stored back.
+      tags: [Passkeys]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ceremony_id, response]
+              properties:
+                ceremony_id: { type: string }
+                response: { type: object, description: The AuthenticationResponseJSON from the browser }
+                want_owner_key: { type: boolean, description: This device holds no signing key and wants a fresh one }
+      responses:
+        '200': { description: Signed in, with the session token }
+        '400': { description: The ceremony expired }
+        '401': { description: The device is unknown here, or its answer did not check out }
+        '403': { description: The account has been deactivated }
+
   /v1/ghii/totp/setup:
     post:
       operationId: totpSetup

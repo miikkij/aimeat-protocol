@@ -1284,6 +1284,20 @@ export interface ComponentVersion {
   createdBy: string;
 }
 
+export interface Passkey {
+  id: string;
+  ghii: string;
+  owner: string;
+  publicKey: string;
+  counter: Generated<string | number | bigint>;
+  transports: Generated<string>;
+  label: Generated<string>;
+  aaguid: Generated<string>;
+  backedUp: Generated<boolean>;
+  createdAt: string;
+  lastUsedAt: string | null;
+}
+
 export interface DependencyEdge {
   fromKind: string;
   fromRef: string;
@@ -2254,6 +2268,7 @@ export interface DB {
   OwnerAgentDefault: OwnerAgentDefault;
   Package: Package;
   PackageInstance: PackageInstance;
+  Passkey: Passkey;
   PeeringRequest: PeeringRequest;
   PendingApproval: PendingApproval;
   PersonalAccessToken: PersonalAccessToken;

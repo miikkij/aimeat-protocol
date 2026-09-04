@@ -5,6 +5,9 @@
  * @description Profile tab for two-step sign-in, CORS origin management (GHII + per-agent) and
  *   session revocation.
  * @version-history
+ *   v1.4.0 — 2026-09-04 — The passkey section, under two-step sign-in: the devices that can sign
+ *     in as you, adding this one, renaming and removing. Hidden for an organisation-managed
+ *     account, whose way in is the organisation's directory.
  *   v1.3.0 — 2026-09-04 — Two-step sign-in (TOTP) has a door, in the section-tab/two-factor.js
  *     panel: the routes shipped in July with no way to reach them from a screen. It sits first,
  *     above CORS, because it is the one thing on this tab a person came here to switch on. The
@@ -28,6 +31,7 @@ import { useConfirm } from '/components/Modal.js';
 import * as securityService from '/js/services/security.js';
 import { listAgents } from '/js/services/agents.js';
 import { TwoFactorSection } from './security-tab/two-factor.js';
+import { PasskeysSection } from './security-tab/passkeys.js';
 import { swallowed } from '/js/swallowed.js';
 
 export default function SecurityTab({ session, showToast }) {
@@ -143,6 +147,8 @@ export default function SecurityTab({ session, showToast }) {
       managed=${!!securityData.managedBy}
       showToast=${showToast}
       onChanged=${loadData} />
+
+    ${!securityData.managedBy && html`<${PasskeysSection} showToast=${showToast} />`}
 
     <h3 class="card-h3 mt-section">${t('profile.security.ghiiTitle')}</h3>
     <p class="text-caption mb-1">${t('profile.security.ghiiDesc')}</p>

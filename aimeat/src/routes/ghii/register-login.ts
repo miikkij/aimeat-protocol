@@ -40,12 +40,11 @@ import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { validateOwnerName } from '../../utils/gaii.js';
 import { issueJWT } from '../../auth/jwt.js';
-import { establishOwnerSession } from '../../services/owner-session.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { validateTotpCode, validateBackupCode } from '../../services/totp.js';
 import type { TotpConfig } from '../../services/totp.js';
 import { hashPassword, verifyPassword, isLegacyHash } from '../../services/password.js';
-import { issueFirstLoginKeyCredentials } from '../../services/key-credentials.js';
+import { completeOwnerLogin } from './owner-session.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { loginTarpit } from '../../middleware/login-tarpit.js';
 import { logger } from '../../utils/logger.js';
@@ -674,96 +673,8 @@ export function registerRegisterLoginRoutes(
             }
         }
 
-        // Deactivated account (BR-04): refused AFTER the password check on purpose — answering
-        // before it would tell anyone who types a username whether the account is disabled.
-        // Refused BEFORE the login-count write and the session, so nothing records a "login".
-        const preSessionOwner = await storage.getOwner(loginName);
-        if (preSessionOwner?.disabledAt) {
-            res.status(403).json(error(config.nodeId, 'ACCOUNT_DISABLED', 'This account has been deactivated'));
-            return;
-        }
-
-        // Password (+ TOTP if enabled) verified — track login
-        const isFirstLogin = (ghiiRecord.loginCount ?? 0) === 0;
-        const loginNow = new Date().toISOString();
-        await storage.updateGHII(ghiiRecord.ghii, {
-            lastLoginAt: loginNow,
-            loginCount: (ghiiRecord.loginCount ?? 0) + 1,
-        });
-
-        // Provisioned-code ("key") account, first sign-in: rotate its dash-carrying bootstrap code to
-        // a durable, validator-clean password and hand the owner their real login (username + password),
-        // both in this response and by email. Runs exactly once (gated by the invite flipping accepted).
-        const keyCredentials = isFirstLogin
-            ? await issueFirstLoginKeyCredentials(storage, config, ghiiRecord)
-            : null;
-
-        // Issue OWNER JWT (human users authenticate as owners, not agents)
-        const ownerRecord = await storage.getOwner(loginName);
-
-        // Owner signing-key handling — mint a fresh keypair ONLY when necessary.
-        // Rotating the key on every login (the previous behaviour) rewrote the
-        // stored public key, which silently invalidated the private key held by
-        // every OTHER device/tab in IndexedDB. Those sessions could then no longer
-        // sign a refresh and were force-logged-out at JWT expiry. The server only
-        // persists the public key (the private key lives solely in the browser),
-        // so we re-mint only when the owner has no key yet, or the client asks for
-        // one because it holds none locally (a brand-new device). Otherwise we keep
-        // the existing key and return no private key, leaving every already-signed-in
-        // device's refresh capability intact.
-        const needsNewOwnerKey = wantsOwnerKey || !ownerRecord?.publicKey;
-        let ownerKeyPair: { publicKey: string; privateKey: string } | null = null;
-        if (needsNewOwnerKey) {
-            ownerKeyPair = await generateKeyPair();
-            await storage.updateOwner(loginName, { publicKey: ownerKeyPair.publicKey });
-        }
-
-        const roles: string[] = [];
-        if (ownerRecord?.roles.includes('owner')) roles.push('owner');
-        if (ownerRecord?.roles.includes('operator')) roles.push('operator');
-
-        // Self-heal: if no operator exists anywhere, promote this user
-        if (ownerRecord && !roles.includes('operator')) {
-          const allOwners = await storage.listOwners();
-          const hasOperator = allOwners.some(o => o.roles.includes('operator'));
-          if (!hasOperator) {
-            roles.push('operator');
-            await storage.updateOwner(loginName, { roles: [...ownerRecord.roles, 'operator'] });
-          }
-        }
-
-        // Establish an owner session: short-lived access JWT (bound to the session via
-        // jti) + a rotating refresh token delivered as an httpOnly cookie. Refresh no
-        // longer depends on the owner keypair, so other devices are never invalidated.
-        const { token, sessionId, expiresIn } = await establishOwnerSession(
-            storage, config, req, res, { owner: loginName, roles },
-        );
-
-        // SECURITY: Prevent caching of response containing private keys
-        res.set('Cache-Control', 'no-store');
-        res.set('Pragma', 'no-cache');
-        res.json(success(config.nodeId, {
-            ghii: {
-                ghii: ghiiRecord.ghii,
-                username: ghiiRecord.username,
-                display_name: ghiiRecord.displayName,
-            },
-            owner: { name: loginName },
-            token,
-            session_id: sessionId,
-            expires_in: expiresIn,
-            expires_at: new Date(Date.now() + expiresIn * 1000).toISOString(),
-            // Only hand back the private key when a new one was minted — otherwise
-            // the client keeps the key it already holds in IndexedDB (see above).
-            ...(ownerKeyPair ? { owner_private_key: ownerKeyPair.privateKey } : {}),
-            owner_public_key: ownerKeyPair?.publicKey ?? ownerRecord?.publicKey ?? '',
-            // First-login durable credentials for a provisioned-code account (also emailed). Lets the
-            // entry surface show the exact username + password the login form accepts. Absent otherwise.
-            ...(keyCredentials ? { key_credentials: keyCredentials } : {}),
-        }, [
-            { description: 'Store data in memory', method: 'POST', url: '/v1/memory' },
-            { description: 'Upload an app', method: 'POST', url: '/v1/apps' },
-        ]));
-        emitChange('ghii');
+        // The credential checked out. Everything from here — the deactivation refusal, the login
+        // count, the owner key, the session and the response — is shared with the passkey door.
+        await completeOwnerLogin(config, storage, req, res, { ghiiRecord, loginName, wantsOwnerKey });
     });
 }

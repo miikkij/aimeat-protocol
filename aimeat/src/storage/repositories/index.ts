@@ -11,6 +11,7 @@
  *
  * @version-history
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ *   v1.2.0 — 2026-09-04 — PasskeyRepository exported.
  *   v1.1.0 — 2026-09-03 — DependencyRepository and ComponentVersionRepository exported.
  */
 export type { OwnerRepository } from './owner.repository.js';
@@ -42,6 +43,7 @@ export type { KnowledgeRepository } from './knowledge.repository.js';
 export type { ExtensionInstanceRepository } from './extension-instance.repository.js';
 export type { DependencyRepository } from './dependency.repository.js';
 export type { ComponentVersionRepository } from './component-version.repository.js';
+export type { PasskeyRepository } from './passkey.repository.js';
 export type { ReplicationQueueRepository } from './replication-queue.repository.js';
 export type { DeviceAuthRepository } from './device-auth.repository.js';
 export type { OAuthRepository } from './oauth.repository.js';

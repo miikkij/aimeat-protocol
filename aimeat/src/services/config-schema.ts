@@ -259,6 +259,17 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'totpMaxFailedAttempts', dotPath: 'totp.max_failed_attempts', envVar: 'AIMEAT_TOTP_MAX_FAILED', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 20, immutable: false, description: 'Max failed TOTP attempts before lockout', range: '1-20' },
   { key: 'totpLockoutSeconds', dotPath: 'totp.lockout_seconds', envVar: 'AIMEAT_TOTP_LOCKOUT_SECONDS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 30 && (v as number) <= 3600, immutable: false, description: 'TOTP lockout duration in seconds', range: '30-3600' },
 
+  // ── Passkeys (WebAuthn) ──
+  //
+  // The relying party id is IMMUTABLE at runtime on purpose: a passkey is bound to it forever, so
+  // changing it while the node is up makes every registered device stop working, and the operator
+  // would have no way back. It is derived from the node's own address; the env override exists for
+  // a node under a subdomain that wants its keys to work across the parent domain.
+  { key: 'passkeyEnabled', dotPath: 'passkey.enabled', envVar: 'AIMEAT_PASSKEY_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Passkeys (WebAuthn) offered as a sign-in method' },
+  { key: 'passkeyRpId', dotPath: 'passkey.rp_id', envVar: 'AIMEAT_PASSKEY_RP_ID', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: true, description: 'The domain a passkey is bound to (derived from the node address)' },
+  { key: 'passkeyRpName', dotPath: 'passkey.rp_name', envVar: 'AIMEAT_PASSKEY_RP_NAME', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: true, description: 'The name shown in the device prompt' },
+  { key: 'passkeyExtraOrigins', dotPath: 'passkey.extra_origins', envVar: 'AIMEAT_PASSKEY_EXTRA_ORIGINS', type: 'object', validate: v => Array.isArray(v) && v.every(o => typeof o === 'string' && /^https?:\/\//i.test(o)), immutable: true, description: 'Extra origins a passkey ceremony may come from (the node address always counts)' },
+
   // ── TOTP secrets (immutable) ──
   { key: 'totpSecretEncryptionKey', dotPath: 'totp.encryption_key', envVar: 'AIMEAT_TOTP_ENCRYPTION_KEY', type: 'string', validate: () => true, immutable: true, description: 'TOTP encryption key (secret)', adminDisplay: 'configured' },
 

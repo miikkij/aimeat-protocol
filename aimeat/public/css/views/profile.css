@@ -6,6 +6,7 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v3.7.0 — 2026-09-04 — Security tab: the registered-device rows (pf-2fa-devices/-device).
  *   v3.6.0 — 2026-09-04 — Security tab: the two-step sign-in rules (pf-2fa-qr, -codes, -code-input).
  *     The QR keeps a white ground in both themes, because a scanner reads dark on light.
  *   v3.5.0 — 2026-09-04 — The old Data Wallet tab rules (dw- prefix) removed; the page has data-wallet-poster.css.
@@ -1635,6 +1636,14 @@
 }
 .pf .pf-2fa-codes code { font-family: var(--font-mono); font-size: .9rem; letter-spacing: .05em; }
 .pf .pf-2fa-code-input { width: 8rem; letter-spacing: .25em; text-align: center; }
+
+/* Security tab: one registered device per row, its name and what it is on the left, its two
+   controls on the right. Wraps rather than squeezing on a phone. */
+.pf .pf-2fa-devices { display: flex; flex-direction: column; gap: .5rem; }
+.pf .pf-2fa-device {
+  display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; justify-content: space-between;
+  padding: .6rem; border: 1px solid var(--border); border-radius: 8px;
+}
 
 /* ========================================================================
    LANDING PAGE — Adaptive profile dashboard (new / active / experienced)

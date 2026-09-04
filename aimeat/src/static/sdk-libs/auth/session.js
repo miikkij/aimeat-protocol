@@ -13,6 +13,9 @@
  * @usage import { auth, api, isAppOrigin, restoreSessionFromAppOrigin } from './session.js';
  * @version-history
  *   v1.0.0 — 2026-07-19 — Merged from src/routes/libs/auth-lib-part1/2/3.ts (SDK-libs migration Phase 3).
+ *   v1.3.0 — 2026-09-04 — signInWithPasskey / addPasskey / passkeySupported, and the session
+ *     builder both login doors share (sessionFromLogin). The app-origin helpers moved to
+ *     ./app-origin.js as a pure extraction when this file passed the 800-line ceiling.
  *   v1.2.0 — 2026-09-04 — loginWithPassword takes an optional second factor ({ totpCode } or
  *     { backupCode }). The login route has accepted both since July and no caller could send one,
  *     so an account with two-step sign-in could not get in through any AIMEAT front end.
@@ -25,6 +28,8 @@ import { emit, on, off } from './events.js';
 import { mountPill } from './pill.js';
 import { showLoginModal } from './modal.js';
 import { isAppOrigin, appScopeDrift, silentAppToken, apexLogout, requestConsentPopup } from './app-origin.js';
+import { passkeySupported, passkeySignIn, passkeyAdd } from './passkey.js';
+import { api, authApi } from './http.js';
 
 // The app-origin helpers moved to ./app-origin.js on 2026-09-04 (pure extraction, 800-line ceiling).
 // Re-exported from here because pill.js and the SDK's consumers import them from './session.js'.
@@ -38,26 +43,11 @@ export { isAppOrigin, apexLogout, requestConsentPopup };
 /** @type {any} */ let focusRefreshInFlight = null;
 
 // ── API helpers ──
-
-export async function api(path, opts = {}) {
-  const url = NODE_URL + path;
-  const headers = { 'Content-Type': 'application/json', ...opts.headers };
-  const resp = await fetch(url, { ...opts, headers });
-  const data = await resp.json();
-  if (!data.ok) {
-    // Preserve the machine-readable code + details on the thrown Error so callers can branch
-    // (e.g. EMAIL_NOT_VERIFIED → open the email-completion flow) instead of matching on text.
-    const err = /** @type {Error & { code?: string, details?: unknown }} */ (new Error(data.error?.message || 'API error'));
-    err.code = data.error?.code;
-    err.details = data.error?.details;
-    throw err;
-  }
-  return data;
-}
-
-export async function authApi(path, jwt, opts = {}) {
-  return api(path, { ...opts, headers: { ...opts.headers, 'Authorization': 'Bearer ' + jwt } });
-}
+//
+// They live in ./http.js, at the bottom of the import graph. Keeping them here made a cycle the
+// moment a module needed both them and a place in this file's own API (passkey.js). Re-exported
+// so every existing `import { api } from './session.js'` keeps working.
+export { api, authApi };
 
 // ── Session persistence ──
 
@@ -344,6 +334,46 @@ export function refreshOnFocus() {
     .finally(() => { focusRefreshInFlight = null; });
 }
 
+/**
+ * A login answered; make it the session. Shared by the password door and the passkey door, so a
+ * session built one way cannot drift from one built the other — the server already answers both
+ * with the same body, and this is the half that reads it.
+ */
+async function sessionFromLogin(data) {
+  const d = data.data;
+
+  // Federated logins may still return an owner key pair; store it if present (harmless).
+  let ownerCryptoKey = null;
+  if (d.owner_private_key) {
+    ownerCryptoKey = await importEd25519Key(d.owner_private_key);
+    await storeKey('owner_key', ownerCryptoKey);
+  }
+
+  const session = createSession({
+    ghii: d.ghii.ghii,
+    owner: d.owner.name,
+    gaii: null,
+    jwt: d.token,
+    _cryptoKey: ownerCryptoKey,
+    publicKey: d.owner_public_key || '',
+    displayName: d.ghii.display_name || '',
+    federated: d.federated || false,
+    homeNode: d.home_node || '',
+    homeUrl: d.home_url || '',
+  });
+
+  // First sign-in of a provisioned-code account issues durable credentials in the response.
+  // Expose them once on the returned session (NOT persisted) so the entry surface can show them.
+  if (d.key_credentials) session._keyCredentials = d.key_credentials;
+
+  persistSession(session);
+
+  currentSession = session;
+  scheduleAutoRefresh(session);
+  emit('login', session);
+  return session;
+}
+
 // ── Public API ──
 
 export const auth = {
@@ -490,38 +520,31 @@ export const auth = {
       body: JSON.stringify(body),
     });
 
-    const d = data.data;
+    return sessionFromLogin(data);
+  },
 
-    // Federated logins may still return an owner key pair; store it if present (harmless).
-    let ownerCryptoKey = null;
-    if (d.owner_private_key) {
-      ownerCryptoKey = await importEd25519Key(d.owner_private_key);
-      await storeKey('owner_key', ownerCryptoKey);
-    }
+  /**
+   * Sign in with a passkey. `username` is optional and leaving it out is the better path: the
+   * ceremony is discoverable, the device offers whatever it holds for this domain, and its answer
+   * names the account. Ends in the same session the password path builds, because the server ends
+   * in the same response.
+   *
+   * Throws with code PASSKEY_CANCELLED when the person closed the prompt, which a caller should
+   * treat as "they changed their mind" rather than as a failure to show in red.
+   */
+  async signInWithPasskey(username) {
+    const data = await passkeySignIn(username);
+    return sessionFromLogin(data);
+  },
 
-    const session = createSession({
-      ghii: d.ghii.ghii,
-      owner: d.owner.name,
-      gaii: null,
-      jwt: d.token,
-      _cryptoKey: ownerCryptoKey,
-      publicKey: d.owner_public_key || '',
-      displayName: d.ghii.display_name || '',
-      federated: d.federated || false,
-      homeNode: d.home_node || '',
-      homeUrl: d.home_url || '',
-    });
+  /** Does this browser have WebAuthn? A caller shows the passkey button only when it does. */
+  passkeySupported,
 
-    // First sign-in of a provisioned-code account issues durable credentials in the response.
-    // Expose them once on the returned session (NOT persisted) so the entry surface can show them.
-    if (d.key_credentials) session._keyCredentials = d.key_credentials;
-
-    persistSession(session);
-
-    currentSession = session;
-    scheduleAutoRefresh(session);
-    emit('login', session);
-    return session;
+  /** Add THIS device to the signed-in account. Returns the stored passkey as the node describes it. */
+  async addPasskey(label) {
+    if (!currentSession?.jwt) throw new Error('Sign in first');
+    const data = await passkeyAdd(currentSession.jwt, label);
+    return data.data.passkey;
   },
 
   /** Get the current session (or null if not logged in) */
