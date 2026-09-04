@@ -28,7 +28,7 @@
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V6a).
  */
 import {
-  TaskState, Role,
+  Role,
   type AgentCard, type Message, type Task,
   type SendMessageRequest, type GetTaskRequest, type CancelTaskRequest,
   type TaskPushNotificationConfig, type GetTaskPushNotificationConfigRequest,
@@ -42,8 +42,9 @@ import {
   JsonRpcUnsupportedOperationError, JsonRpcPushNotificationNotSupportedError,
 } from '@a2a-js/sdk/errors';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, AgentRecord, AgentV2TaskRecord, AgentV2TaskStatus, MessagePart } from '../storage/interface.js';
+import type { Storage, AgentRecord, AgentV2TaskRecord, MessagePart } from '../storage/interface.js';
 import { toA2ATask, toA2APushConfig, fromA2APart } from './a2a-projection.js';
+import { statusesForA2AState, matchesA2AState } from './a2a-task-state.js';
 import { createTask, getTask, cancelTask, listTasks } from './agent-v2-tasks-ops.js';
 import { sendTurn, setPushTarget, listPushTargets, deletePushTarget, type Principal, type OpResult } from './agent-v2-messaging-ops.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
@@ -81,26 +82,10 @@ function asRpcError(out: Extract<OpResult<unknown>, { ok: false }>): Error {
   return new Error(out.message);
 }
 
-/** The A2A state a client asked to filter by, as the MCP statuses that produce it. */
-function statusesForA2AState(state: TaskState): AgentV2TaskStatus[] | undefined {
-  switch (state) {
-    case TaskState.TASK_STATE_SUBMITTED:
-    case TaskState.TASK_STATE_WORKING:
-      return ['working'];
-    case TaskState.TASK_STATE_INPUT_REQUIRED:
-    case TaskState.TASK_STATE_AUTH_REQUIRED:
-      return ['input_required'];
-    case TaskState.TASK_STATE_COMPLETED:
-      return ['completed'];
-    case TaskState.TASK_STATE_FAILED:
-    case TaskState.TASK_STATE_REJECTED:
-      return ['failed'];
-    case TaskState.TASK_STATE_CANCELED:
-      return ['cancelled'];
-    default:
-      return undefined;
-  }
-}
+// The state relation lives in services/a2a-task-state.ts. `statusesForA2AState` narrows the QUERY;
+// `matchesA2AState` decides. This file used to hold its own BACKWARDS copy of the table, and it
+// disagreed with the two forward ones: REJECTED narrowed to `failed` and stopped there, so a client
+// asking for what was refused was handed everything that broke. → pitfalls §43
 
 export class AimeatA2ARequestHandler implements A2ARequestHandler {
   constructor(
@@ -268,7 +253,12 @@ export class AimeatA2ARequestHandler implements A2ARequestHandler {
       limit: params.pageSize && params.pageSize > 0 ? params.pageSize : 50,
     });
     if (!out.ok) throw asRpcError(out);
-    const tasks = await Promise.all(out.value.map(async t => toA2ATask(t, await this.history(t, params.historyLength))));
+    // THE PREFILTER IS NOT THE ANSWER. Two A2A states share the status `failed` and two share
+    // `working`, so narrowing the query is only half of the question a client asked; asking for
+    // `rejected` returned every failure until this line. The predicate is the forward mapping read
+    // as a question, so it cannot drift away from what the tasks below are labelled with.
+    const rows = params.status ? out.value.filter(t => matchesA2AState(t, params.status!)) : out.value;
+    const tasks = await Promise.all(rows.map(async t => toA2ATask(t, await this.history(t, params.historyLength))));
     return { tasks, nextPageToken: '', pageSize: tasks.length, totalSize: tasks.length };
   }
 

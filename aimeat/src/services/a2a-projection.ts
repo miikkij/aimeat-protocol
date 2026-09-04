@@ -27,6 +27,7 @@
  */
 import { TaskState, Role, type Part, type Message, type Task, type TaskPushNotificationConfig } from '@a2a-js/sdk';
 import type { AgentV2MessageRecord, AgentV2TaskRecord, AgentV2PushConfigRecord, MessagePart } from '../storage/interface.js';
+import { a2aTaskStateOf } from './a2a-task-state.js';
 
 /** One of our parts, as an A2A part. */
 export function toA2APart(part: MessagePart): Part {
@@ -86,25 +87,18 @@ export function toA2AMessage(m: AgentV2MessageRecord): Message {
 /**
  * The A2A state for a stored task.
  *
- * Four A2A states have no MCP status of their own and are recovered from what sits beside it:
- * `submitted` from a task nobody started, `rejected` and `auth-required` from an error code. This
- * is the same mapping models/agent-v2-task.ts states in words; it is written twice because one is
- * the string a person reads and the other is a protobuf enum, and collapsing them would mean the
- * REST answer and the A2A answer share a bug rather than merely agreeing.
+ * Four A2A states have no status of their own here and are recovered from what sits beside it:
+ * `submitted` from a task nobody started, `rejected` and `auth-required` from an error code.
+ *
+ * IT USED TO BE WRITTEN OUT HERE, and the comment above it argued that the duplication was
+ * deliberate — that collapsing this with models/agent-v2-task.ts would make the REST answer and the
+ * A2A answer "share a bug rather than merely agreeing". The opposite is what happened: a THIRD
+ * copy, the backwards one in a2a-handler.ts, disagreed with both and filtered `rejected` as every
+ * failure. Two copies do not agree by being separate; they agree until one of them is edited.
+ * → services/a2a-task-state.ts, which is the one table now, and pitfalls §43.
  */
 export function toA2ATaskState(task: Pick<AgentV2TaskRecord, 'status' | 'startedAt' | 'error'>): TaskState {
-  switch (task.status) {
-    case 'working':
-      return task.startedAt ? TaskState.TASK_STATE_WORKING : TaskState.TASK_STATE_SUBMITTED;
-    case 'input_required':
-      return task.error?.code === 'AUTH_REQUIRED' ? TaskState.TASK_STATE_AUTH_REQUIRED : TaskState.TASK_STATE_INPUT_REQUIRED;
-    case 'completed':
-      return TaskState.TASK_STATE_COMPLETED;
-    case 'failed':
-      return task.error?.code === 'REJECTED' ? TaskState.TASK_STATE_REJECTED : TaskState.TASK_STATE_FAILED;
-    case 'cancelled':
-      return TaskState.TASK_STATE_CANCELED;
-  }
+  return a2aTaskStateOf(task);
 }
 
 /**

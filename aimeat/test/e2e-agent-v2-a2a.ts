@@ -340,6 +340,50 @@ async function run(): Promise<void> {
             'and the status message travels as a message part');
     });
 
+    // ─── A refusal is not a fault, and ListTasks has to be able to tell them apart ───
+    //
+    // Five statuses here become eight states in A2A, and the three extra ones are carried by the
+    // task's error code. `failed` + REJECTED is A2A's "the agent looked at this and declined";
+    // `failed` + anything else is "it tried and broke". Both are stored as `failed`.
+    //
+    // The list filter knew only the status. Asking for REJECTED narrowed the query to `failed` and
+    // stopped there, so a client asking what had been REFUSED was handed everything that had
+    // BROKEN. The relation lives in services/a2a-task-state.ts now, and the filter is the forward
+    // mapping read as a question, so the two cannot drift apart again. → pitfalls §43
+    await test('ListTasks(REJECTED) returns what was refused and not what broke', async () => {
+        const made: Record<string, string> = {};
+        for (const [label, code] of [['refused', 'REJECTED'], ['broke', 'TIMEOUT']] as const) {
+            const created = await rpc(a.owner, worker.name, caller.token, 'SendMessage', {
+                message: { messageId: `filter-${label}`, role: 'ROLE_USER', parts: [{ text: `task that ${label}` }] },
+            });
+            made[label] = created.result.task.id;
+            const settled = await json(`/v1/agents/v2/tasks/${made[label]}/status`, {
+                method: 'POST', headers: { Authorization: `Bearer ${worker.token}` },
+                body: JSON.stringify({ status: 'failed', statusMessage: label, error: { code, message: label } }),
+            });
+            assert(settled.status === 200, `settle ${label}: ${settled.status} ${JSON.stringify(settled.body?.error)}`);
+        }
+
+        // Each one reads back as its own state, which is the half that already worked.
+        const refused = await rpc(a.owner, worker.name, caller.token, 'GetTask', { id: made.refused });
+        assert(refused.result.status.state === 'TASK_STATE_REJECTED',
+            `a REJECTED error code is A2A's rejected, got ${refused.result.status.state}`);
+        const broke = await rpc(a.owner, worker.name, caller.token, 'GetTask', { id: made.broke });
+        assert(broke.result.status.state === 'TASK_STATE_FAILED',
+            `any other error code is a plain failure, got ${broke.result.status.state}`);
+
+        // The half that did not. Before the fix this returned both, because both are `failed`.
+        const listed = await rpc(a.owner, worker.name, caller.token, 'ListTasks', { status: 'TASK_STATE_REJECTED' });
+        assert(!listed.error, `ListTasks: ${JSON.stringify(listed.error)}`);
+        const ids = (listed.result.tasks as any[]).map(t => t.id);
+        assert(ids.includes(made.refused), `the refused task is in the list, got ${JSON.stringify(ids)}`);
+        assert(!ids.includes(made.broke), `the one that broke is NOT, got ${JSON.stringify(ids)}`);
+        for (const t of listed.result.tasks as any[]) {
+            assert(t.status.state === 'TASK_STATE_REJECTED',
+                `everything in the list is what was asked for, saw ${t.status.state}`);
+        }
+    });
+
     await test('a second message on the same task is another turn, not another task', async () => {
         const r = await rpc(a.owner, worker.name, caller.token, 'SendMessage', {
             message: { messageId: 'client-msg-2', role: 'ROLE_USER', taskId, parts: [{ text: 'The short version, please.' }] },
