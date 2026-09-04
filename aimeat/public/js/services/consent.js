@@ -49,6 +49,23 @@ export async function listAuditEntries(days) {
   return data?.data?.entries || (Array.isArray(data?.data) ? data.data : []);
 }
 
+/**
+ * The rows of one group of the trail: the window, the accessor, the key prefix and a page.
+ * @param {{ days?: number, accessor?: string, keyPrefix?: string, limit?: number, offset?: number }} [opts]
+ * @returns {Promise<{ entries: Array, total: number }>}
+ */
+export async function listAuditRows(opts) {
+  const o = opts || {};
+  const q = new URLSearchParams();
+  q.set('days', String(o.days || 30));
+  if (o.accessor) q.set('accessor_gaii', o.accessor);
+  if (o.keyPrefix) q.set('key_prefix', o.keyPrefix);
+  if (o.limit) q.set('limit', String(o.limit));
+  if (o.offset) q.set('offset', String(o.offset));
+  const data = await apiGet('/v1/consent/audit?' + q.toString());
+  return { entries: data?.data?.entries || [], total: data?.data?.total ?? 0 };
+}
+
 /** Load permissions summary. */
 export async function getPermissionSummary() {
   const data = await apiGet('/v1/permissions/summary');
@@ -59,15 +76,20 @@ export async function getPermissionSummary() {
  * Composite mount for the Data Wallet tab: consents + audit + permission summary in ONE call. Returns
  * { consents, audit, permSummary } or null on error so the caller can fall back to the individual reads.
  */
-export async function getDataWalletOverview(days) {
+export async function getDataWalletOverview(days, entryLimit) {
   try {
-    const data = await apiGet('/v1/data-wallet' + (days ? '?days=' + days : ''));
+    const q = new URLSearchParams();
+    if (days) q.set('days', String(days));
+    if (entryLimit !== undefined) q.set('entry_limit', String(entryLimit));
+    const qs = q.toString();
+    const data = await apiGet('/v1/data-wallet' + (qs ? '?' + qs : ''));
     const d = data?.data;
     if (!d) return null;
     return {
-      consents: d.consents?.consents || [],
-      audit: d.audit?.entries || [],
+      consents: { consents: d.consents?.consents || [], total: d.consents?.total ?? (d.consents?.consents || []).length },
+      audit: { entries: d.audit?.entries || [], total: d.audit?.total ?? 0, period_days: d.audit?.period_days ?? days ?? 30, entry_limit: d.audit?.entry_limit ?? 0, groups: d.audit?.groups || [] },
       permSummary: d.permSummary || null,
+      names: { organisms: d.names?.organisms || {}, workspaces: d.names?.workspaces || {} },
     };
   } catch (err) { swallowed('consent: getDataWalletOverview', err); return null; }
 }

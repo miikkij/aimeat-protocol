@@ -13,12 +13,15 @@
  * @usage
  *   const ch = new AgentChannel(entry); ch.handleTask(payload, 'deliver'); await ch.nextTask(25_000);
  * @version-history
+ *   v1.1.0 — 2026-09-04 — Carries `forward`, the identity's ONE door to the node, with the stamp
+ *     saying whose call it is already baked in. Call sites reaching for `tunnel.forward()` lost that
+ *     stamp and were attributed to whichever identity opened the shared socket. → pitfalls §43
  *   v1.0.1 — 2026-08-28 — SECURITY (CodeQL js/resource-exhaustion): the four long-poll setTimeouts
  *     took `waitMs` straight from the caller. The /local routes already clamp it to [0, 120s], but
  *     the bound now also sits at each timer (Math.min(waitMs, MAX_WAIT_MS)) so it holds for any caller.
  *   v1.0.0 — 2026-08-28 — Pure extraction from local-server.ts (max-file-lines). No behaviour change.
  */
-import type { ConnectTunnelClient } from '../tunnel-client.js';
+import type { ConnectTunnelClient, ForwardOptions, ForwardResult } from '../tunnel-client.js';
 import type { RegisteredAgent } from '../agent-registry.js';
 import { wakeAgent } from './wakeup.js';
 import { legacyWakeAdapter } from './poller.js';
@@ -26,6 +29,20 @@ import { launchTaskRunner, isRunner } from '../task-runner.js';
 
 /** How an agent's API calls reach the node right now. Mirrors ServeDiscoveryAgent['transport']. */
 export type ChannelTransport = 'tunnel' | 'direct' | 'auth_failed';
+
+/**
+ * THE ONE DOOR TO THE NODE FOR THIS IDENTITY, already carrying its name.
+ *
+ * A shared socket routes on a stamp saying whose call a frame is, and a bare `tunnel.forward()`
+ * carries no stamp — so every call made that way is attributed to whichever identity opened the
+ * socket. On a 62-agent fleet that was one agent right and sixty-one wrong, and it was invisible
+ * for exactly as long as it took someone to look, because the one it was right for is the one
+ * that answers when you test with a single agent.
+ *
+ * So the stamp is not a parameter a call site can forget. It is baked in here once, when the
+ * identity gets its socket, and nothing below reaches past it.
+ */
+export type ChannelForward = (method: string, path: string, opts?: ForwardOptions) => Promise<ForwardResult>;
 
 /**
  * Upper bound on a long-poll timer, matching the [0, 120s] clamp every /local route already applies
@@ -60,6 +77,11 @@ export interface SpaceRef { organism_id: string; ws: string; space: string }
 export class AgentChannel {
   transportMode: ChannelTransport = 'direct';
   tunnel: ConnectTunnelClient | null = null;
+  /**
+   * Every call to the node for THIS identity goes through here, never through `tunnel.forward()`.
+   * Null until the identity has a socket. See ChannelForward for why the stamp cannot be optional.
+   */
+  forward: ChannelForward | null = null;
   /** Tunnel (re)connect count (mirrors the client's connectCount). A consumer that sees this change
    *  between cycles knows the socket reconnected and does its one catch-up read (record push is
    *  per-socket; events during the disconnect window are not replayed). */

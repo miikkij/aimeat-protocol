@@ -32,10 +32,10 @@ import ts from 'typescript';
 import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { collectRestRoutes, collectMcpTools, collectCliDispatch, guardArraysIn, type EntryPoint } from './entries.js';
-import { principalsFor, isPublic, type Principal } from './principals.js';
+import { collectDoors, toRows, type Row } from './doors.js';
 import { scopeMentions } from './scope-mentions.js';
 import { readVocabulary } from './scope-vocabulary.js';
+import { srcProgram } from './program.js';
 import { TOOL_SCOPES } from '../../src/mcp/catalog/scopes.js';
 
 // readVocabulary moved to ./scope-vocabulary.ts by pure extraction on 2026-09-04: check:scope-parity
@@ -45,64 +45,6 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const AIMEAT = resolve(HERE, '..', '..');
 const REPO = resolve(AIMEAT, '..');
 const OUT_DIR = join(REPO, 'secaudit');
-
-interface Row extends EntryPoint {
-    principals: Principal[];
-    unknownGuards: string[];
-    scopes: string[];
-    public: boolean;
-}
-
-/** The compiler's own file list, so nothing is missed and nothing generated is counted. */
-function sourceFiles(): ts.SourceFile[] {
-    const configPath = join(AIMEAT, 'tsconfig.json');
-    const config = ts.readConfigFile(configPath, ts.sys.readFile);
-    const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, AIMEAT);
-    const program = ts.createProgram(parsed.fileNames, { ...parsed.options, noEmit: true });
-    // Forces the binder to run, which is what sets `node.parent`. Without it every parent is
-    // undefined and any walk that asks "what encloses this literal" silently answers nothing —
-    // which is exactly how the constant-following pass reported two enforced scopes as orphans.
-    program.getTypeChecker();
-    return program.getSourceFiles().filter(f =>
-        !f.isDeclarationFile
-        && f.fileName.includes('/src/')
-        && !f.fileName.includes('/node_modules/'));
-}
-
-function collect(files: ts.SourceFile[]): EntryPoint[] {
-    const out: EntryPoint[] = [];
-
-    // Guard arrays first, from every file, because a chain declared in one module is spread in
-    // another. Per-file resolution reports those rows as ungated, and wrong-in-the-permissive-
-    // direction is the one kind of wrong an inventory must not be.
-    const arrays = new Map<string, ReturnType<typeof guardArraysIn> extends Map<string, infer V> ? V : never>();
-    for (const source of files) for (const [name, guards] of guardArraysIn(source)) arrays.set(name, guards);
-
-    for (const source of files) {
-        const path = source.fileName;
-        if (path.includes('/src/routes/')) out.push(...collectRestRoutes(source, AIMEAT, arrays));
-        if (path.includes('/src/mcp/')) out.push(...collectMcpTools(source, AIMEAT, 'mcp.node'));
-        if (path.includes('/src/cli/connect/mcp/')) out.push(...collectMcpTools(source, AIMEAT, 'mcp.connector'));
-        if (/tool-call-defs-.*\.ts$/.test(path)) out.push(...collectCliDispatch(source, AIMEAT));
-    }
-    return out;
-}
-
-function toRows(entries: EntryPoint[]): Row[] {
-    return entries.map(e => {
-        const { principals, unknown, scopes } = principalsFor(e.guards);
-        // Only a REST door has a middleware chain; the other kinds are gated elsewhere, so their
-        // principal set is left empty rather than reported as "everyone".
-        const applies = e.kind === 'rest';
-        return {
-            ...e,
-            principals: applies ? principals : [],
-            unknownGuards: applies ? unknown : [],
-            scopes: applies ? scopes : [],
-            public: applies ? isPublic(principals) : false,
-        };
-    });
-}
 
 function tally<T extends string>(values: T[]): Array<[T, number]> {
     const counts = new Map<T, number>();
@@ -225,8 +167,8 @@ function report(rows: Row[], mentions: Map<string, Array<{ file: string; line: n
 
 function main(): void {
     const VOCABULARY = readVocabulary(AIMEAT);
-    const files = sourceFiles();
-    const rows = toRows(collect(files));
+    const files = srcProgram().files;
+    const rows = toRows(collectDoors(files));
     // The two files that DEFINE the vocabulary rather than demand it. Counting a definition as a
     // demand would make every word look asked-for, which is the opposite of what this measures.
     const mentions = scopeMentions(files, VOCABULARY, AIMEAT, ['mcp/catalog/scopes.ts', 'utils/scope-coverage.ts']);

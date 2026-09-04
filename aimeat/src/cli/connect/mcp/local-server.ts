@@ -34,6 +34,14 @@
  *     discovery-file lifecycle, signal handling.
  * @usage Called by mcp/server.ts `runServe()` when `--http`/`--daemon` is set.
  * @version-history
+ *   2026-09-04 — Every call to the node goes through `ch.forward`, which carries the stamp naming
+ *     whose call it is. The REST proxy and `/local/subscribe` called `ch.tunnel.forward()` and
+ *     `subscribe()` bare, and on a shared socket a frame with no name is the OPENER's — so on a
+ *     62-identity fleet one agent was right and sixty-one were attributed to it. Reads
+ *     misattributed, writes too, and this path carries `DELETE /v1/memory/…`. An agent asking for
+ *     its own tasks was refused as another agent and then served that agent's list. Found by
+ *     crewaimeat-dev on a live fleet; nothing here had regressed, the ground moved when the socket
+ *     became shared. → pitfalls §43
  *   2026-09-03 — One tunnel client per NODE, not per agent (./tunnel-hub.ts). /local/status reports
  *     each identity's own status rather than its socket's, which on a shared socket is not the
  *     same thing — a deleted agent read `online` until this.
@@ -205,14 +213,19 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
     const inv = new InvokeChannel((id, ok, result) => ch.tunnel?.replyInvoke(id, ok, result, entry.gaii));
     invokeChannels.set(entry.gaii, inv);
 
-    // THE WIRE THIS IDENTITY ENDS UP ON — a `let` both branches fill in, never a closure over one
-    // branch's `const`. `identity.onInvoke` used to call the `tunnel` declared inside the NO-shared-
-    // socket branch, which the shared path returns before reaching: the binding stayed in its
-    // temporal dead zone for the daemon's life and every invoke threw `Cannot access 'tunnel'
-    // before initialization`. Enrolment is an invoke, so the migration button failed for every
-    // agent on a shared socket — all of them, since one-socket-per-node. Reproduced against a live
-    // connector on 2026-09-03; it is why no real agent had ever moved to a key. → pitfalls §40
-    let wire: ((method: string, path: string, opts: { body?: unknown }) => Promise<{ status: number; body: unknown }>) | null = null;
+    // THE WIRE THIS IDENTITY ENDS UP ON lives on the channel (`ch.forward`), filled in by whichever
+    // branch below gets it a socket, and it is the ONLY way anything here talks to the node.
+    //
+    // It was a `let` in this function until 2026-09-04, and before that a `const` inside one branch:
+    // `identity.onInvoke` closed over the `tunnel` declared in the NO-shared-socket branch, which
+    // the shared path returns before reaching, so the binding sat in its temporal dead zone for the
+    // daemon's life and every invoke threw `Cannot access 'tunnel' before initialization`. Enrolment
+    // is an invoke, so the migration button failed for every agent on a shared socket — all of them,
+    // since one-socket-per-node. → pitfalls §40
+    //
+    // It moved onto the channel because the REST proxy and the subscribe route, which are handlers
+    // registered far below this function and could not see the `let` at all, each reached for
+    // `ch.tunnel.forward()` instead and lost the stamp that says whose call it is. → pitfalls §43
 
     // What this identity needs from a socket, whichever socket it turns out to be. Built once and
     // handed either to the shared hub (as an attachment) or to a private client (as its options) —
@@ -230,11 +243,11 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
         if (frame.capability === ENROL_CAPABILITY) {
           const id = frame.id;
           void handleEnrolOffer(frame.input, {
-            // Never `tunnel` directly: see the `wire` note above. A refusal naming the missing wire
-            // beats a TDZ ReferenceError, which reaches the owner's button as a stack-trace phrase.
+            // Never `tunnel` directly: see the note above. A refusal naming the missing wire beats
+            // a TDZ ReferenceError, which reaches the owner's button as a stack-trace phrase.
             forward: (m, p, o) => {
-              if (!wire) throw new Error('This agent has no connection to the node yet.');
-              return wire(m, p, o ?? {});
+              if (!ch.forward) throw new Error('This agent has no connection to the node yet.');
+              return ch.forward(m, p, o ?? {});
             },
             attach: (a) => attachNewAgent(a),
             version: freshness.stamp?.version ?? undefined,
@@ -279,9 +292,9 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
       ch.tunnel = joined.client;
       ch.transportMode = 'tunnel';
       // `joined.who` is what routes a frame to this identity on a socket someone else opened, and
-      // it is undefined for the identity that opened it. The enrolment forward needs the same
-      // stamp, which is the second reason this cannot be a bare `tunnel.forward`.
-      wire = (m, pth, o) => joined.client.forward(m, pth, o ?? {}, joined.who);
+      // it is undefined for the identity that opened it — which is why a call site that forgets the
+      // stamp looks correct for exactly one agent out of however many share the socket.
+      ch.forward = (m, pth, o) => joined.client.forward(m, pth, o ?? {}, joined.who);
       entry.client.setTransport({ request: (m, pth, o) => joined.client.forward(m, pth, o ?? {}, joined.who) });
       console.error(`[serve] ${entry.agent}@${entry.owner}: on the shared tunnel to ${entry.config.node_url} (${joined.client.identityCount()} identities, 1 socket)`);
       return;
@@ -304,7 +317,9 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
     if (outcome === 'online') {
       ch.tunnel = tunnel;
       ch.transportMode = 'tunnel';
-      wire = (m, p, o) => tunnel.forward(m, p, o ?? {});
+      // No stamp here, and that is right: this socket carries this identity and nobody else, so the
+      // node reads every frame on it as this agent's own.
+      ch.forward = (m, p, o) => tunnel.forward(m, p, o ?? {});
       entry.client.setTransport({ request: (m, p, o) => tunnel.forward(m, p, o ?? {}) });
       console.error(`[serve] ${entry.agent}@${entry.owner}: tunnel online — API + realtime delivery over one WS (no upstream polling)`);
     } else if (outcome === 'auth_failed') {
@@ -524,7 +539,11 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
     }
     const ch = channels.get(entry.gaii)!;
     ch.setSubscriptions(spaces);
-    ch.tunnel?.subscribe(spaces);
+    // The same omission as the REST proxy had, in the second place nobody looked: without the name
+    // this registers the subscription under the socket's opener, so another agent's records would
+    // wake this one. The reconnect path already passed `entry.gaii`, so the two disagreed and the
+    // first reconnect silently corrected what the first subscribe got wrong. → pitfalls §43
+    ch.tunnel?.subscribe(spaces, entry.gaii);
     res.json({ ok: true, data: { agent: entry.agent, subscribed: spaces.length, online: ch.transportMode === 'tunnel' } });
   });
 
@@ -677,8 +696,15 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
     const body = hasBody ? req.body : undefined;
 
     try {
-      if (ch.tunnel?.isOnline()) {
-        const r = await ch.tunnel.forward(req.method, req.path, { query, body });
+      // `ch.forward`, NEVER `ch.tunnel.forward`. This handler proxies for whichever agent the
+      // request names, and on a shared socket a bare forward carries no name, so the node read
+      // every one of these as the agent that opened the socket. Measured on a live 62-identity
+      // fleet on 2026-09-04: `news-fetcher` asked for its own tasks, was refused as
+      // `activity-reporter`, and was then served `activity-reporter`'s list when it asked for that
+      // one. Reads misattributed, writes misattributed AND landed under the wrong agent — this
+      // path carries `DELETE /v1/memory/…`. Found by crewaimeat-dev. → pitfalls §43
+      if (ch.tunnel?.isOnline() && ch.forward) {
+        const r = await ch.forward(req.method, req.path, { query, body });
         res.status(r.status).json(r.body);
         return;
       }

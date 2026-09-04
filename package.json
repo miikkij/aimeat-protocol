@@ -82,6 +82,8 @@
     "audit:mcp-tools": "cd aimeat && pnpm audit:mcp-tools",
     "audit:mcp-schemas": "cd aimeat && pnpm audit:mcp-schemas",
     "audit:inventory": "cd aimeat && pnpm audit:inventory",
+    "audit:cycles": "cd aimeat && pnpm audit:cycles",
+    "audit:call-graph": "cd aimeat && pnpm audit:call-graph",
     "audit:triage": "cd aimeat && pnpm audit:triage",
     "audit:report": "cd aimeat && pnpm audit:report",
     "audit:full": "cd aimeat && pnpm audit:full",
@@ -120,6 +122,8 @@
     "check:audit-gates": "cd aimeat && pnpm check:audit-gates",
     "audit:security": "cd aimeat && pnpm audit:security",
     "outdated:libs": "cd aimeat && pnpm outdated:libs",
-    "libs:usage": "cd aimeat && pnpm libs:usage"
+    "libs:usage": "cd aimeat && pnpm libs:usage",
+    "check:open-writes": "cd aimeat && pnpm check:open-writes",
+    "check:open-writes:report": "cd aimeat && pnpm check:open-writes:report"
   }
 }

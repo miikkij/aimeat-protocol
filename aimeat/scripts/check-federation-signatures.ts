@@ -39,6 +39,7 @@ import { join, resolve, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GATES } from './check-route-scopes.js';
 import { callsInside } from './inventory/entries.js';
+import { srcProgram } from './inventory/program.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const AIMEAT = resolve(HERE, '..');
@@ -79,19 +80,6 @@ interface Door {
 }
 
 const WRITE_VERBS = new Set(['post', 'put', 'patch', 'delete']);
-
-function sourceFiles(): ts.SourceFile[] {
-    const config = ts.readConfigFile(join(AIMEAT, 'tsconfig.json'), ts.sys.readFile);
-    const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, AIMEAT);
-    const program = ts.createProgram(parsed.fileNames, { ...parsed.options, noEmit: true });
-    // Forces the binder, which is what sets node.parent. Without it every parent is undefined and
-    // any walk that asks "what encloses this" silently answers nothing.
-    program.getTypeChecker();
-    return program.getSourceFiles().filter(f =>
-        !f.isDeclarationFile
-        && /[/\\]src[/\\]routes[/\\]federation/.test(f.fileName)
-        && !f.fileName.includes('node_modules'));
-}
 
 /**
  * The middleware arguments of a `router.verb(path, ...middleware, handler)` call, by name. A guard
@@ -161,7 +149,7 @@ const softKey = (d: Door): string => `${d.file}:${d.id.replace(' ', ':')}`;
 
 function main(): void {
     const strict = process.argv.includes('--strict');
-    const doors = collectFederationWrites(sourceFiles());
+    const doors = collectFederationWrites(srcProgram(/[/\\]src[/\\]routes[/\\]federation/).files);
 
     const owned = doors.filter(d => d.gated);
     const signed = doors.filter(d => !d.gated && d.verifies);

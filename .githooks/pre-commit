@@ -36,6 +36,7 @@
 #  19b. Caller resolved, not sub raw  — pnpm check:identity-resolution
 #  19c. A refusal names a principal   — pnpm check:owner-principal
 #  19d. Federation writes are signed  — pnpm check:federation-signatures
+#  19d2. Open write doors accounted  — pnpm check:open-writes
 #  19e. No new cycle or inversion    — pnpm check:deps
 #  20. An agent writes, page hears it — pnpm check:sse-parity
 #  21. No decision written out twice  — pnpm check:copied-logic
@@ -199,6 +200,14 @@ pnpm -s check:owner-principal
 # Each of these doors is either the owner's own action or a peer's signed one; neither is not allowed.
 echo "[pre-commit] Federation write doors are owner-gated or peer-signed (check:federation-signatures)…"
 pnpm -s check:federation-signatures
+
+# The other half of the same population: forty doors that write and take no credential at the chain.
+# None is a hole — every one is gated inside its handler by something a middleware scanner cannot see
+# (an OAuth code plus PKCE verifier, a device_code, a pre-signed token, the admin password, an IP
+# check that closes the moment one owner exists), and the triage that says so read all forty. The gate
+# is for the forty-first, which would look exactly like them.
+echo "[pre-commit] Every credential-free write door is accounted for (check:open-writes)…"
+pnpm -s check:open-writes
 
 # dependency-cruiser, bought rather than built: layer direction across the whole tree, import cycles
 # and modules nothing reaches — the last two of which nothing here has ever checked. Its baseline
