@@ -33,7 +33,7 @@ import { resolveIdentity } from '../utils/gaii.js';
 import { validateTaskInput, validateStatusInput, allowedFrom, isTerminal } from '../models/agent-v2-task.js';
 import { resolveRecipient, type Principal, type OpResult } from './agent-v2-messaging-ops.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
-import { emitDelivery } from './event-bus.js';
+import { emitDelivery, emitTaskMoved } from './event-bus.js';
 import { logger } from '../utils/logger.js';
 
 /** The tunnel `deliver` kinds for task news. Additive: the wire's `kind` is an open string. */
@@ -49,6 +49,17 @@ function isOwnerSession(auth: Principal): boolean {
 
 /** Tell a principal something happened to a task it cares about. Never fails the operation. */
 function notify(target: string, kind: string, task: AgentV2TaskRecord): void {
+  // UNCONDITIONAL, and before the tunnel gate. An A2A client streaming this task is not anybody's
+  // connector and holds no tunnel, so gating this the way the delivery below is gated would mean a
+  // subscriber heard about a task only when some OTHER principal happened to be online. It carries
+  // the id and nothing else; the listener re-reads through the same op every other reader uses.
+  try {
+    emitTaskMoved(task.taskId);
+  } catch (err) {
+    logger.warn('v2 task: the move event failed; the task is stored and readable', {
+      taskId: task.taskId, error: String(err),
+    });
+  }
   try {
     if (getActiveConnectTunnelManager()?.isConnected(target)) {
       emitDelivery({ target, kind, id: task.taskId, payload: { taskId: task.taskId, status: task.status, contextId: task.contextId } });

@@ -39,13 +39,14 @@ import {
 import type { A2ARequestHandler, ServerCallContext } from '@a2a-js/sdk/server';
 import {
   JsonRpcTaskNotFoundError, JsonRpcTaskNotCancelableError, JsonRpcRequestMalformedError,
-  JsonRpcUnsupportedOperationError, JsonRpcPushNotificationNotSupportedError,
+  JsonRpcPushNotificationNotSupportedError,
 } from '@a2a-js/sdk/errors';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentRecord, AgentV2TaskRecord, MessagePart } from '../storage/interface.js';
 import { toA2ATask, toA2APushConfig, fromA2APart } from './a2a-projection.js';
 import { statusesForA2AState, matchesA2AState } from './a2a-task-state.js';
 import { a2aExtendedCardFrom } from './a2a-card.js';
+import { streamTask } from './a2a-stream.js';
 import { createTask, getTask, cancelTask, listTasks } from './agent-v2-tasks-ops.js';
 import { sendTurn, setPushTarget, listPushTargets, deletePushTarget, type Principal, type OpResult } from './agent-v2-messaging-ops.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
@@ -221,23 +222,41 @@ export class AimeatA2ARequestHandler implements A2ARequestHandler {
   }
 
   /**
-   * Streaming is declared off in the card (`capabilities.streaming: false`), which is the spec's own
-   * way of saying a server does not do this. Answering the method anyway with a one-shot stream
-   * would be worse than refusing: a client would hold a connection open expecting updates that
-   * never arrive. The push-notification road is the one this node supports for the same need.
+   * Send a message and watch the task it becomes.
+   *
+   * THE SAME WRITE AS `sendMessage`, and deliberately so: this method is the non-streaming one plus
+   * a subscription, not a second way to create work. Anything else would be two lifecycles again.
+   *
+   * Streaming was declared off until 2026-09-04 and both methods refused, on the reasoning that a
+   * one-shot stream is worse than an honest refusal — a client holding a connection open for
+   * updates that never arrive. That reasoning was right about the pretence and wrong about the
+   * remedy: what the node lacked was an event when a task moved, and the delivery bus only fired
+   * for a principal holding a live connector tunnel, which an A2A client is not.
    */
-  // eslint-disable-next-line require-yield
-  async *sendMessageStream(_params: SendMessageRequest, _context: ServerCallContext): AsyncGenerator<StreamResponse, void, undefined> {
-    throw new JsonRpcUnsupportedOperationError({
-      message: 'This agent does not stream. The card says so in capabilities.streaming; register a push notification config to be told when the task moves.',
-    });
+  async *sendMessageStream(params: SendMessageRequest, _context: ServerCallContext): AsyncGenerator<StreamResponse, void, undefined> {
+    const task = await this.sendMessage(params, _context);
+    // sendMessage always answers with a Task here; the union is A2A's, not this node's.
+    const id = (task as Task).id;
+    if (!id) return;
+    for await (const t of streamTask(this.storage, this.caller, id, task => this.history(task))) {
+      yield { payload: { $case: 'task', value: t } };
+    }
   }
 
-  // eslint-disable-next-line require-yield
-  async *resubscribe(_params: SubscribeToTaskRequest, _context: ServerCallContext): AsyncGenerator<StreamResponse, void, undefined> {
-    throw new JsonRpcUnsupportedOperationError({
-      message: 'This agent does not stream, so there is nothing to resubscribe to. Read the task with GetTask, or register a push notification config.',
-    });
+  /**
+   * Attach to a task already in flight.
+   *
+   * The first frame is the task AS IT STANDS, not the next change: a client that reconnects after a
+   * dropped connection needs to know where the work got to, and a stream that only spoke on the
+   * next move would leave it waiting on a task that had already finished.
+   */
+  async *resubscribe(params: SubscribeToTaskRequest, _context: ServerCallContext): AsyncGenerator<StreamResponse, void, undefined> {
+    // Existence and access are settled here, so a subscription to somebody else's task is a refusal
+    // rather than a stream that never speaks — which is what an unchecked loop would produce.
+    await this.taskOr404(params.id);
+    for await (const t of streamTask(this.storage, this.caller, params.id, task => this.history(task))) {
+      yield { payload: { $case: 'task', value: t } };
+    }
   }
 
   // The reads take no scope, matching their REST twins: the task reads on /v1/agents/v2/tasks are
