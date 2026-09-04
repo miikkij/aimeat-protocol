@@ -7,6 +7,10 @@
  *   whisper on a look that stands on the palette page — with the number.
  * @usage cd aimeat && pnpm test -- atelier-ambients
  * @version-history
+ *   v1.2.0 — 2026-09-05 — validateAmbientSpec (stage 5): every preset accepted at its default,
+ *     none accepted, the refusals worded, a loud field refused on the palette page and proven
+ *     on a world; the shelf alpha proven on each preset's first fit, because that is the
+ *     seeded part.
  *   v1.1.0 — 2026-09-05 — The kit is pinned to the registry (stage 4): PRESET_IDS, BASE_ALPHA,
  *     PEAK, FPS, CSS_PRESETS and RENDERERS in ambient-presets.js, the bounds in ambient.js and
  *     the aurora lobes in ambient.css all read from source and compared, so the renderers can
@@ -22,6 +26,7 @@ import { LOOKS } from '../../src/data/atelier-looks.js';
 import {
   runMatrix, loadAtelierSheets, REQUIRED_BASE, SURFACE_TINT_CAP, AMBIENT_SPARSE_CAP,
 } from '../../src/services/atelier-contrast.js';
+import { validateAmbientSpec, AppUiError } from '../../src/services/app-ui/validate.js';
 
 const AMBIENT_TOKENS = ['--ak-ambient', '--ak-ambient-alpha', '--ak-ambient-speed'];
 
@@ -109,6 +114,19 @@ describe('atelier-ambients — the registry', () => {
     }
   });
 
+  it('the shelf alpha is within the bounds and proven on the first look each preset fits', () => {
+    for (const a of AMBIENTS) {
+      expect(a.shelfAlpha).toBeGreaterThan(0);
+      expect(a.shelfAlpha).toBeLessThanOrEqual(AMBIENT_BOUNDS.alpha[1]);
+      expect(a.shelfAlpha).toBeGreaterThanOrEqual(a.defaultAlpha);
+      // The seeded part is this combination; a registry that fails here would seed nothing.
+      const failures = runMatrix({ '--ak-ambient': a.id, '--ak-ambient-alpha': String(a.shelfAlpha) }, { presets: [a.fitsLooks[0]!] }).filter((r) => !r.ok);
+      expect(failures, `${a.id} at ${a.shelfAlpha} on ${a.fitsLooks[0]}`).toEqual([]);
+      // And the gallery text fits the part's fields without a cut.
+      expect(a.feel.length).toBeLessThanOrEqual(240);
+    }
+  });
+
   it('ambientById and isAmbientValue agree with the list', () => {
     for (const id of AMBIENT_IDS) expect(ambientById(id)?.id).toBe(id);
     expect(ambientById('banana')).toBeUndefined();
@@ -178,6 +196,34 @@ describe('atelier-ambients — the matrix proves the layer (AK-AMBIENT)', () => 
   it('none is the quiet default: no ambient check runs', () => {
     const results = runMatrix(undefined, { presets: ['vivid'] });
     expect(results.some((r) => r.label.startsWith('AK-AMBIENT'))).toBe(false);
+  });
+});
+
+describe('atelier-ambients — validateAmbientSpec, the bench two doors share', () => {
+  const refusal = (raw: unknown, look?: string): string => {
+    try { validateAmbientSpec(raw, look); } catch (e) { if (e instanceof AppUiError) return e.message; throw e; }
+    throw new Error('expected a refusal');
+  };
+
+  it('accepts every preset at its default on the palette page, and none', () => {
+    for (const a of AMBIENTS) expect(validateAmbientSpec({ preset: a.id })).toEqual({ preset: a.id });
+    expect(validateAmbientSpec({ preset: 'none', alpha: 0.5 })).toEqual({ preset: 'none' });
+    expect(validateAmbientSpec({ preset: 'dust', alpha: 0.4, speed: 1.2 }, 'stage')).toEqual({ preset: 'dust', alpha: 0.4, speed: 1.2 });
+  });
+
+  it('refuses an unknown preset naming the six and the nearest, and a number outside the bounds', () => {
+    const fog = refusal({ preset: 'fog' });
+    for (const id of AMBIENT_IDS) expect(fog).toContain(id);
+    expect(refusal({ preset: 'wavez' })).toMatch(/Did you mean "waves"/);
+    expect(refusal({ preset: 'waves', alpha: 2 })).toMatch(/alpha/);
+    expect(refusal({ preset: 'waves', speed: 0.1 })).toMatch(/speed/);
+    expect(refusal('waves')).toMatch(/one object/);
+  });
+
+  it('proves a field on the look it lives on: loud on the palette page refuses with numbers, loud on a world passes', () => {
+    expect(refusal({ preset: 'waves', alpha: 0.9 })).toMatch(/contrast matrix on the vivid look/);
+    expect(refusal({ preset: 'waves', alpha: 0.9 }, 'editorial')).toMatch(/whisper/);
+    expect(validateAmbientSpec({ preset: 'waves', alpha: 0.8 }, 'lounge')).toEqual({ preset: 'waves', alpha: 0.8 });
   });
 });
 

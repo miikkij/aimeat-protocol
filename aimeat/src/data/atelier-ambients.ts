@@ -30,6 +30,10 @@
  * @usage
  *   import { AMBIENTS, AMBIENT_BOUNDS, ambientById } from '../data/atelier-ambients.js';
  * @version-history
+ *   v1.1.0 — 2026-09-05 — shelfAlpha: the alpha the Design Book's seeded part shows each preset
+ *     at, on the first look it fits — a world that owns its ground — so the shelf shows the
+ *     wave at eight tenths on lounge rather than the whisper the bare preset ships at. The
+ *     propose bench proves every seed on that look, and the unit test proves it earlier.
  *   v1.0.1 — 2026-09-05 — lounge and dawn exist: the fits lists name them.
  *   v1.0.0 — 2026-09-05 — Initial: the six shipped presets (waves, aurora, dust, grid, static,
  *     ink), described for choosing and measured for proving (wish-atelier-ambient-visuals).
@@ -65,6 +69,9 @@ export interface AtelierAmbient {
   /** The alpha the preset ships at when a look or an app names none — at the whisper for a
    *  field, so the bare preset is legal on every look. */
   defaultAlpha: number;
+  /** The alpha the Design Book's shelf shows it at, on the first look it fits (a world that
+   *  owns its ground, so the matrix proves it loud): the seeded part's alpha. */
+  shelfAlpha: number;
   /** The speed the preset ships at (1 = the design speed). */
   defaultSpeed: number;
   /** Frames per second the loop is gated to; 0 for a compositor animation. */
@@ -96,6 +103,7 @@ export const AMBIENTS: readonly AtelierAmbient[] = [
     peak: 0.35,
     blend: 'over',
     defaultAlpha: 0.22,
+    shelfAlpha: 0.8,
     defaultSpeed: 1,
     fps: 30,
     fitsLooks: ['lounge', 'stage'],
@@ -112,6 +120,7 @@ export const AMBIENTS: readonly AtelierAmbient[] = [
     peak: 0.26,
     blend: 'mix',
     defaultAlpha: 0.3,
+    shelfAlpha: 0.9,
     defaultSpeed: 1,
     fps: 0,
     fitsLooks: ['dawn', 'aurora', 'vivid'],
@@ -128,6 +137,7 @@ export const AMBIENTS: readonly AtelierAmbient[] = [
     peak: 0.5,
     blend: 'over',
     defaultAlpha: 0.6,
+    shelfAlpha: 0.7,
     defaultSpeed: 1,
     fps: 30,
     fitsLooks: ['stage', 'lounge', 'gallery'],
@@ -144,6 +154,7 @@ export const AMBIENTS: readonly AtelierAmbient[] = [
     peak: 0.6,
     blend: 'over',
     defaultAlpha: 0.5,
+    shelfAlpha: 0.5,
     defaultSpeed: 1,
     fps: 30,
     fitsLooks: ['neon-dense', 'terminal', 'lounge'],
@@ -160,6 +171,7 @@ export const AMBIENTS: readonly AtelierAmbient[] = [
     peak: 0.3,
     blend: 'over',
     defaultAlpha: 0.25,
+    shelfAlpha: 0.35,
     defaultSpeed: 1,
     fps: 12,
     fitsLooks: ['broadcast', 'terminal'],
@@ -176,6 +188,7 @@ export const AMBIENTS: readonly AtelierAmbient[] = [
     peak: 0.22,
     blend: 'over',
     defaultAlpha: 0.35,
+    shelfAlpha: 0.7,
     defaultSpeed: 1,
     fps: 24,
     fitsLooks: ['riso', 'gallery', 'broadsheet'],

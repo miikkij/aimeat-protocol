@@ -21,6 +21,12 @@
  * @usage
  *   const result = await runPartBench(storage, config, 'leiska-cover');
  * @version-history
+ *   v1.4.0 — 2026-09-05 — Two counts join the measurements: ambient_layers (layers with a box)
+ *     and ambient_painted (those that stamped their first frame), and an AMBIENT part passes
+ *     only when every viewport painted one. Counts, never pixels: a low-alpha layer over the
+ *     ground is not reliably non-blank through getImageData, and a shader canvas would need
+ *     its drawing buffer kept. The settle stays at 1200 ms because the layer paints its first
+ *     frame synchronously at mount (wish-atelier-ambient-visuals).
  *   v1.3.1 — 2026-09-02 — The "no browser here" sentence comes from screenshot-capture
  *     (NO_HEADLESS_BROWSER), so this bench and the app playtest say the same thing.
  *   v1.3.0 — 2026-08-30 — The page builder moved whole to preview.ts (pure extraction:
@@ -59,6 +65,10 @@ export interface BenchViewportResult {
   overflow_px: number;
   units_rendered: number;
   controls_below_touch_min: number;
+  /** Ambient layers on the page with a box, and those that stamped their first frame. Absent
+   *  on results stamped before 2026-09-05. */
+  ambient_layers?: number;
+  ambient_painted?: number;
 }
 
 export interface DesignBookBenchResult {
@@ -89,8 +99,21 @@ const MEASURE_JS = `(() => {
     if (r.width === 0 && r.height === 0) continue;    // not rendered (hidden projection state)
     if (r.height < 24 || r.width < 24) smallControls++;
   }
-  return { overflow, units, smallControls };
+  // The ambient layer stamps data-ak-ambient-painted in the tick it first draws; a layer whose
+  // preset is none has no box and is not counted.
+  let ambientLayers = 0;
+  let ambientPainted = 0;
+  for (const el of document.querySelectorAll('[data-ak-ambient]')) {
+    const r = el.getBoundingClientRect();
+    if (r.width === 0 || r.height === 0) continue;
+    ambientLayers++;
+    if (el.getAttribute('data-ak-ambient-painted') === '1') ambientPainted++;
+  }
+  return { overflow, units, smallControls, ambientLayers, ambientPainted };
 })()`;
+
+/** What MEASURE_JS answers. */
+interface Measured { overflow: number; units: number; smallControls: number; ambientLayers: number; ambientPainted: number }
 
 /**
  * Render one part at the three bench viewports and measure the guarantees. Reads the part through
@@ -122,7 +145,7 @@ export async function runPartBench(
     // A render-time failure (the page never loads, the browser dies mid-run) is part of the
     // CONTRACT, not an exception: the bench answers ran:false WITH THE REAL REASON, because a
     // 500 tells the operator nothing and an unavailable bench is never a passed bench.
-    let measured: { overflow: number; units: number; smallControls: number } | null;
+    let measured: Measured | null;
     try {
       measured = await withHeadlessContext({ width: vp.width, height: vp.height }, async (ctx) => {
         const page = await ctx.newPage() as BenchPage;
@@ -140,7 +163,7 @@ export async function runPartBench(
           // host) must never time the whole bench out — layout is measured after the settle.
           await page.goto(url, { waitUntil: 'domcontentloaded', timeout: PAGE_TIMEOUT_MS });
           await page.waitForTimeout(SETTLE_MS);
-          return await page.evaluate<{ overflow: number; units: number; smallControls: number }>(MEASURE_JS);
+          return await page.evaluate<Measured>(MEASURE_JS);
         } finally {
           await page.close();
         }
@@ -161,10 +184,15 @@ export async function runPartBench(
       overflow_px: measured.overflow,
       units_rendered: measured.units,
       controls_below_touch_min: measured.smallControls,
+      ambient_layers: measured.ambientLayers,
+      ambient_painted: measured.ambientPainted,
     });
   }
 
-  const passed = viewports.every((v) => v.overflow_px === 0 && v.units_rendered > 0 && v.controls_below_touch_min === 0);
+  // An ambient part has one more thing to prove: its layer painted at every viewport. Every
+  // other kind is measured the same but not held to it — a layout's look may run none.
+  const passed = viewports.every((v) => v.overflow_px === 0 && v.units_rendered > 0 && v.controls_below_touch_min === 0
+    && (part.kind !== 'ambient' || (v.ambient_painted ?? 0) > 0));
   return { ran: true, passed, viewports, at };
 }
 
