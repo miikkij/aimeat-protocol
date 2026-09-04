@@ -95,6 +95,8 @@ let ownerBToken = '';
 let plainAgentToken = '';
 let grantedAgentToken = '';
 let appToken = '';
+/** An owner-level PAT. It reaches these doors ON PURPOSE — see Phase 5. */
+let ownerPatToken = '';
 
 /** One door, described the way a person would say it. */
 interface Door { what: string; method: string; path: string; body?: unknown }
@@ -140,6 +142,16 @@ async function main() {
         // '*' does not reach these doors.
         plainAgentToken = await agentToken('plainbot', ['*']);
         grantedAgentToken = await agentToken('securitybot', ['memory:read', 'account:security']);
+    });
+
+    await test('an owner-level personal access token', async () => {
+        const mint = await json('/v1/access/tokens', {
+            method: 'POST', headers: auth(ownerAToken),
+            body: JSON.stringify({ label: 'account-security probe', grant_owner: true }),
+        });
+        assert(mint.status === 200 || mint.status === 201, `mint PAT: ${mint.status} ${JSON.stringify(mint.body)}`);
+        ownerPatToken = mint.body.data?.token as string;
+        assert(!!ownerPatToken, `the mint returns the raw token once: ${JSON.stringify(mint.body.data)}`);
     });
 
     await test('an app-grant token for the same owner', async () => {
@@ -217,6 +229,21 @@ async function main() {
         });
         assert(r.status === 403, `expected 403 for the '*' agent, got ${r.status} ${JSON.stringify(r.body)}`);
     });
+
+    // A PAT is the person's own credential, minted by them on purpose, and it is how everything gets
+    // managed from outside a browser. So it reaches these doors, and that is a decision rather than an
+    // oversight — asserted here so that tightening requireOwnerPrincipal() to mean "a browser session"
+    // fails this suite instead of quietly breaking somebody's automation. The gate cannot tell a PAT
+    // from a login: resolvePatToken builds the same VerifiedToken, and maybeSetPatBrowserSession
+    // deliberately turns an owner PAT into a browser session.
+    console.log('\nPhase 3b: The owner\'s own long-lived token gets through, by design');
+
+    for (const door of DOORS) {
+        await test(`an owner PAT can ${door.what}`, async () => {
+            const r = await call(door, ownerPatToken);
+            assert(r.status !== 403, `${door.method} ${door.path}: the owner's own token was refused with ${JSON.stringify(r.body)}`);
+        });
+    }
 
     console.log('\nPhase 4: Cross-owner, and the two destructive doors');
 
