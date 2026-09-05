@@ -88,6 +88,8 @@ let otherToken = '';
 let groupId = '';
 let encodedGroupId = '';
 let exportedZip: Buffer | null = null;
+let instanceId = '';
+let installedShopFilename = '';
 
 // Both apps load the SAME cortex, which is what proves the dedup. The reference shape is the one
 // services/dependency-map.ts reads from the source at publish time.
@@ -259,11 +261,18 @@ await test('The second owner installs it and gets both apps under their own name
     });
     assert(status === 201, `install: ${status} ${JSON.stringify(body)}`);
 
+    instanceId = body.data?.id ?? '';
+    assert(!!instanceId, 'the install returns an instance id');
+
     const installed = body.data?.installedComponents ?? [];
     assert(installed.length === 3, `three components registered, got ${installed.length}`);
     for (const c of installed.filter((x: any) => x.type === 'app')) {
         assert(/\.html$/i.test(c.registeredAs), `app filename ends in .html, got ${c.registeredAs}`);
     }
+
+    const installedShop = installed.find((c: any) => c.componentId === APP_A);
+    installedShopFilename = installedShop?.registeredAs ?? '';
+    assert(!!installedShopFilename, 'the installed shop app has a filename');
 });
 
 await test('An installed app keeps the name it was published under', async () => {
@@ -343,7 +352,131 @@ await test('The ZIP manifest carries the per-app metadata', async () => {
     assert(shop.meta?.app?.icon === '🧪', `icon survived, got ${shop.meta?.app?.icon}`);
 });
 
-console.log('\nPhase 5 — Refusals');
+console.log('\nPhase 5 — Updating the whole instance in one act');
+
+/** Publish a new version of the composed package with the shop app's bytes changed. */
+async function publishNewVersion(marker: string): Promise<string> {
+    const { body } = await json(`/v1/packages/${encodedGroupId}`, { headers: authed(ownerToken) });
+    const components = (body.data.components ?? []).map((c: any) =>
+        c.id === APP_A ? { ...c, content: c.content.replace('</body>', `<p>${marker}</p></body>`) } : c);
+
+    const res = await json(`/v1/packages/${encodedGroupId}/versions`, {
+        method: 'POST',
+        headers: authed(ownerToken),
+        body: JSON.stringify({ changelog: `shop gains ${marker}`, components, status: 'published' }),
+    });
+    assert(res.status === 201, `publish version: ${res.status} ${JSON.stringify(res.body)}`);
+    return res.body.data.version as string;
+}
+
+await test('A dry run names what would change and writes nothing', async () => {
+    await publishNewVersion('v2-mark');
+
+    const { status, body } = await json(`/v1/instances/${instanceId}/update`, {
+        method: 'POST', headers: authed(otherToken), body: JSON.stringify({ dry_run: true }),
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.updateAvailable === true, 'an update is available');
+    assert(body.data.dryRun === true, 'the answer says it was a dry run');
+    assert(body.data.applied === null, 'a dry run applies nothing');
+    assert(body.data.willUpdate.includes(APP_A), `the changed app is listed, got ${JSON.stringify(body.data.willUpdate)}`);
+    assert(!body.data.willUpdate.includes(APP_B), `the untouched app is not, got ${JSON.stringify(body.data.willUpdate)}`);
+
+    // Proof it wrote nothing: the instance is still on the old version.
+    const inst = await json(`/v1/instances/${instanceId}`, { headers: authed(otherToken) });
+    assert(inst.body.data.packageVersion === body.data.currentVersion,
+        `still on ${body.data.currentVersion}, got ${inst.body.data.packageVersion}`);
+});
+
+await test('The update applies, and the updated app still points at its own cortex copy', async () => {
+    const { status, body } = await json(`/v1/instances/${instanceId}/update`, {
+        method: 'POST', headers: authed(otherToken), body: JSON.stringify({}),
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.applied !== null, 'something was applied');
+    assert((body.data.applied.failedComponents ?? []).length === 0,
+        `nothing failed, got ${JSON.stringify(body.data.applied.failedComponents)}`);
+    assert(body.data.applied.updatedComponents.includes(APP_A), 'the shop app was updated');
+
+    // THE REGRESSION THIS EXISTS FOR. The migration path never passed urlRewrites, so an updated app
+    // went back to the package author's cortex name and 404ed its own library. The bytes must name
+    // this instance's copy, not the author's.
+    const res = await fetch(`${BASE}/v1/apps/${otherName}/${installedShopFilename}`);
+    assert(res.status === 200, `the updated app is served, got ${res.status}`);
+    const source = await res.text();
+    assert(source.includes('v2-mark'), 'the new version of the bytes is what is served');
+    assert(!source.includes(`/v1/cortex/${CORTEX}/`),
+        `the updated app must NOT point at the author's cortex ${CORTEX}: ${source.slice(0, 400)}`);
+    assert(/\/v1\/cortex\/[^/]+\/libs\/kit\.js/.test(source),
+        `it still loads a cortex, under this instance's name: ${source.slice(0, 400)}`);
+});
+
+await test('A component the owner edited is reported, not overwritten', async () => {
+    // The installer edits their own copy of the shop app.
+    const edited = `<!DOCTYPE html><html><head><title>My Shop</title>`
+        + `<script src="/v1/cortex/${CORTEX}/libs/kit.js"></script>`
+        + `</head><body><h1>MY OWN EDIT</h1></body></html>`;
+    const pub = await json('/v1/apps', {
+        method: 'POST',
+        headers: authed(otherToken),
+        body: JSON.stringify({
+            filename: installedShopFilename,
+            content: b64(edited),
+            name: 'My Shop',
+            description: 'The installer made this their own',
+            category: 'utility',
+            tags: [],
+        }),
+    });
+    assert(pub.status === 201, `edit: ${pub.status} ${JSON.stringify(pub.body)}`);
+
+    // Upstream moves again.
+    await publishNewVersion('v3-mark');
+
+    const { status, body } = await json(`/v1/instances/${instanceId}/update`, {
+        method: 'POST', headers: authed(otherToken), body: JSON.stringify({}),
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+
+    // THE REGRESSION THIS EXISTS FOR. check-update read a `customized` flag that is only refreshed
+    // when somebody opens the status route, so an edited component reported as a safe overwrite and
+    // an update button silently destroyed the owner's work.
+    const needs = (body.data.needsYou ?? []).map((n: any) => n.componentId);
+    assert(needs.includes(APP_A),
+        `the edited component needs the owner, got needsYou=${JSON.stringify(needs)} willUpdate=${JSON.stringify(body.data.willUpdate)}`);
+    assert(!body.data.willUpdate.includes(APP_A), 'and it is not in what will be updated');
+
+    const res = await fetch(`${BASE}/v1/apps/${otherName}/${installedShopFilename}`);
+    const source = await res.text();
+    assert(source.includes('MY OWN EDIT'),
+        `the owner's bytes are untouched, got: ${source.slice(0, 200)}`);
+    assert(!source.includes('v3-mark'), 'and the upstream change did not land on top of them');
+});
+
+await test('Updating an instance that is already current changes nothing', async () => {
+    const { status, body } = await json(`/v1/instances/${instanceId}/update`, {
+        method: 'POST', headers: authed(otherToken), body: JSON.stringify({}),
+    });
+    assert(status === 200, `status ${status}`);
+    assert(body.data.applied === null, 'nothing left that can be applied safely');
+    assert(body.data.willUpdate.length === 0, `willUpdate is empty, got ${JSON.stringify(body.data.willUpdate)}`);
+});
+
+await test("Another owner cannot update someone else's instance", async () => {
+    const { status } = await json(`/v1/instances/${instanceId}/update`, {
+        method: 'POST', headers: authed(ownerToken), body: JSON.stringify({}),
+    });
+    assert(status === 403, `expected 403, got ${status}`);
+});
+
+await test('Updating without a token answers 401', async () => {
+    const { status } = await json(`/v1/instances/${instanceId}/update`, {
+        method: 'POST', body: JSON.stringify({}),
+    });
+    assert(status === 401, `expected 401, got ${status}`);
+});
+
+console.log('\nPhase 6 — Refusals');
 
 await test('An app that calls an extension is refused, naming the extension', async () => {
     const pub = await json('/v1/apps', {

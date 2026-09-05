@@ -117,14 +117,23 @@ export function hashContent(content: string): string {
     return createHash('sha256').update(content).digest('hex');
 }
 
-/** Client shape → stored shape. Hashes what was not hashed, defaults what was omitted. */
+/**
+ * Client shape → stored shape.
+ *
+ * THE HASH IS ALWAYS COMPUTED FROM THE CONTENT, never taken from the caller. A supplied hash used to
+ * win, and a caller that fetched a package, edited one component and posted it back as a new version
+ * sent the OLD hash with the NEW bytes — after which the update diff compared hash to hash, saw no
+ * change, and the new version was invisible to every installed copy. Nothing needs the caller's
+ * value: the ZIP path computes it from the file bytes anyway, so this costs one hash per component
+ * and removes a whole class of silently wrong answers downstream.
+ */
 export function normalizeComponents(raw: RawComponentInput[]): PackageComponent[] {
     return raw.map(c => ({
         id: c.id,
         type: c.type as PackageComponentType,
         label: c.label ?? '',
         content: c.content ?? '',
-        contentHash: c.contentHash ?? hashContent(c.content ?? ''),
+        contentHash: hashContent(c.content ?? ''),
         dependencies: c.dependencies ?? [],
         ...(c.meta && Object.keys(c.meta).length > 0 ? { meta: c.meta } : {}),
     }));

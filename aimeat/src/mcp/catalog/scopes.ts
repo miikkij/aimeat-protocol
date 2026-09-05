@@ -222,6 +222,7 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_package_publish:                   'app:write',
     aimeat_package_status_set:                'app:write',
     aimeat_package_compose:                   'packages:write',
+    aimeat_package_update:                    'packages:write',
 
     // Installing registers an app, a cortex, an extension and any @activate cron the manifest
     // declares, all under the owner's identity — a write with a long tail, and its own word on the

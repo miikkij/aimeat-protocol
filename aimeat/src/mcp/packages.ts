@@ -37,6 +37,7 @@ import { installPackage } from '../services/package-install.js';
 import { listPackagesFor, getPackageFor } from '../services/package-read.js';
 import { setPackageVersionStatus } from '../services/package-create.js';
 import { composePackageFromApps } from '../services/package-compose.js';
+import { updateInstanceToLatest } from '../services/package-migrate.js';
 import { getActiveScheduler } from '../services/scheduler.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
@@ -135,6 +136,24 @@ export function registerPackageTools(
                 }, null, 2),
             }],
         };
+    });
+
+    mcp.tool('aimeat_package_update', descriptionFor('aimeat_package_update'), {
+        instance_id: z.string().describe('The installed copy, from the instances list.'),
+        dry_run: z.boolean().optional().describe('Report what would change and change nothing.'),
+    }, annotationsFor('aimeat_package_update'), async ({ instance_id, dry_run: dryRun }) => {
+        const owner = ownerOf();
+        const gaii = getAgentGaii();
+        const out = await updateInstanceToLatest({ storage, config },
+            { owner, ownerGhii: await resolveGhii(storage, owner, gaii), sub: gaii },
+            { instanceId: instance_id, dryRun: dryRun === true });
+        if (!out.ok) {
+            return {
+                content: [{ type: 'text' as const, text: `${out.code}: ${out.message}` }],
+                isError: true,
+            };
+        }
+        return { content: [{ type: 'text' as const, text: JSON.stringify(out.answer, null, 2) }] };
     });
 
     mcp.tool('aimeat_package_status_set', descriptionFor('aimeat_package_status_set'), {
