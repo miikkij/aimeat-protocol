@@ -25,94 +25,96 @@ Typical use:
 
 See the package README and `examples/` for full recipes.
 """
-from .liaison import (
-    create_liaison_agent,
-    liaison_tools,
-    AimeatLiaisonError,
-)
-from .mcp_client import (
-    stdio_params,
-    http_params,
-    sse_params,
-    serve_params,
-    ensure_serve,
-    AimeatServeError,
-)
 from .daemon import (
-    run_crew_daemon,
-    run_invoke_listener,
+    DAEMON_DEFAULT_TOOL_FILTER,
     BuildCrewCallback,
     InvokeHandler,
-    DAEMON_DEFAULT_TOOL_FILTER,
-)
-from .workflow_spec import (
-    Sig,
-    NONE,
-    SignalError,
-    validate_signal,
-    assess_offer,
-    assess_offers_doc,
-    is_workflow_compatible,
-)
-from .offers import (
-    build_offer,
-    build_offers_doc,
-    validate_offers_doc,
-    publish_offers,
-    resolve_agent_token,
-    OfferValidationError,
-)
-from .offers_tool import offers_check, offers_publish, offers_tools
-from .onboarding import (
-    run_hello_integration,
-    OnboardingError,
-    ONBOARDING_CONFIRM_TOOLS,
-)
-from .messaging import (
-    ServeClient,
-    serve_client,
-    build_question,
-    ask,
-    read_answers,
-    answers_from_dm,
-    AimeatMessagingError,
-)
-from .files import (
-    AimeatFileError,
-    split_ref,
-    file_handle,
-    read_file,
-    upload_file,
-    attachments_of,
-    inbox_files,
-    task_files,
-    delegate_file,
+    run_crew_daemon,
+    run_invoke_listener,
 )
 from .datapackage import (
     AimeatPackageError,
-    QualityGateRefused,
     DataPackage,
-    read_package,
+    QualityGateRefused,
     package_versions,
-    to_dataframe,
-    rows_of,
     publish_package,
+    read_package,
+    rows_of,
+    to_dataframe,
     to_parquet,
 )
-from .usage_telemetry import (
-    install_usage_telemetry,
-    usage_run,
-    build_llm_call_payload,
+from .files import (
+    AimeatFileError,
+    attachments_of,
+    delegate_file,
+    file_handle,
+    inbox_files,
+    read_file,
+    split_ref,
+    task_files,
+    upload_file,
+)
+from .liaison import (
+    AimeatLiaisonError,
+    create_liaison_agent,
+    liaison_tools,
+)
+from .mcp_client import (
+    AimeatServeError,
+    ensure_serve,
+    http_params,
+    serve_params,
+    sse_params,
+    stdio_params,
+)
+from .messaging import (
+    AimeatMessagingError,
+    ServeClient,
+    answers_from_dm,
+    ask,
+    build_question,
+    read_answers,
+    serve_client,
+)
+from .offers import (
+    OfferValidationError,
+    build_offer,
+    build_offers_doc,
+    publish_offers,
+    resolve_agent_token,
+    validate_offers_doc,
+)
+from .offers_tool import offers_check, offers_publish, offers_tools
+from .onboarding import (
+    ONBOARDING_CONFIRM_TOOLS,
+    OnboardingError,
+    run_hello_integration,
 )
 from .provenance import (
     SPEC as PROVENANCE_SPEC,
+)
+from .provenance import (
+    HumanInvolvement,
     Level,
     Method,
-    HumanInvolvement,
     declare,
-    source,
-    read_provenance,
     is_model_written,
+    read_provenance,
+    source,
+)
+from .usage_telemetry import (
+    build_llm_call_payload,
+    install_usage_telemetry,
+    usage_run,
+)
+from .workflow_spec import (
+    NONE,
+    Sig,
+    SignalError,
+    assess_offer,
+    assess_offers_doc,
+    is_workflow_compatible,
+    validate_signal,
 )
 
 # Kept in step with pyproject BY HAND, which is why it was wrong: 0.20.0 shipped announcing

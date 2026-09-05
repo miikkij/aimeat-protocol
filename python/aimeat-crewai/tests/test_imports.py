@@ -81,8 +81,9 @@ def test_sse_params_shape() -> None:
 
 def test_create_liaison_agent_requires_mcp_params() -> None:
     """Passing None should raise a clear error rather than failing inside the adapter."""
-    from aimeat_crewai import create_liaison_agent, AimeatLiaisonError
     import pytest
+
+    from aimeat_crewai import AimeatLiaisonError, create_liaison_agent
 
     with pytest.raises(AimeatLiaisonError, match="mcp_server_params"):
         with create_liaison_agent(mcp_server_params=None):
@@ -114,6 +115,7 @@ def test_default_backstory_template_has_placeholder() -> None:
 def test_windows_stdio_no_op_on_unix() -> None:
     """The Windows shim resolver must be a no-op on non-Windows hosts."""
     import sys
+
     from aimeat_crewai.mcp_client import _resolve_windows_command
 
     if sys.platform == "win32":
@@ -184,9 +186,10 @@ def test_read_token_owner_auto_detect(tmp_path, monkeypatch) -> None:
 
 def test_read_token_ambiguous_owner_raises(tmp_path, monkeypatch) -> None:
     """Multiple owners for the same agent name -> caller must specify owner."""
-    from aimeat_crewai.daemon import _read_token
-    from aimeat_crewai import AimeatLiaisonError
     import pytest
+
+    from aimeat_crewai import AimeatLiaisonError
+    from aimeat_crewai.daemon import _read_token
 
     monkeypatch.setenv("AIMEAT_HOME", str(tmp_path))
     (tmp_path / "tokens").mkdir()
@@ -199,9 +202,10 @@ def test_read_token_ambiguous_owner_raises(tmp_path, monkeypatch) -> None:
 
 def test_read_token_missing_raises(tmp_path, monkeypatch) -> None:
     """No token file -> clear error pointing to the connect-add command."""
-    from aimeat_crewai.daemon import _read_token
-    from aimeat_crewai import AimeatLiaisonError
     import pytest
+
+    from aimeat_crewai import AimeatLiaisonError
+    from aimeat_crewai.daemon import _read_token
 
     monkeypatch.setenv("AIMEAT_HOME", str(tmp_path))
 
@@ -245,9 +249,10 @@ def test_read_key_v2_agent_owner_auto_detect(tmp_path, monkeypatch) -> None:
 
 def test_read_token_ambiguous_across_both_families(tmp_path, monkeypatch) -> None:
     """Two OWNERS is ambiguous whichever family each of them uses."""
-    from aimeat_crewai.daemon import _read_token
-    from aimeat_crewai import AimeatLiaisonError
     import pytest
+
+    from aimeat_crewai import AimeatLiaisonError
+    from aimeat_crewai.daemon import _read_token
 
     monkeypatch.setenv("AIMEAT_HOME", str(tmp_path))
     (tmp_path / "tokens").mkdir()
@@ -307,9 +312,10 @@ def test_read_token_still_reads_the_old_shared_config_path(tmp_path, monkeypatch
 
 def test_read_token_missing_names_both_places(tmp_path, monkeypatch) -> None:
     """The fast failure this function exists for is KEPT, and now says where it looked."""
-    from aimeat_crewai.daemon import _read_token
-    from aimeat_crewai import AimeatLiaisonError
     import pytest
+
+    from aimeat_crewai import AimeatLiaisonError
+    from aimeat_crewai.daemon import _read_token
 
     monkeypatch.setenv("AIMEAT_HOME", str(tmp_path))
 
@@ -324,7 +330,8 @@ def _write_key(home, agent, owner, gaii) -> None:
 
 
 def _write_bearer(home, agent, owner, sub) -> None:
-    import base64 as _b64, json as _json
+    import base64 as _b64
+    import json as _json
     (home / "tokens").mkdir(exist_ok=True)
     b64 = lambda o: _b64.urlsafe_b64encode(_json.dumps(o).encode()).decode().rstrip("=")
     (home / "tokens" / f"{agent}@{owner}.token").write_text(
@@ -362,9 +369,10 @@ def test_identity_gaii_is_read_from_a_v1_bearer_sub(tmp_path, monkeypatch) -> No
 
 def test_identity_refuses_a_credential_carrying_no_identity(tmp_path, monkeypatch) -> None:
     """Guessing a GAII would put the wrong agent on the wire, so it is refused instead."""
-    from aimeat_crewai.daemon import resolve_agent_identity
-    from aimeat_crewai import AimeatLiaisonError
     import pytest
+
+    from aimeat_crewai import AimeatLiaisonError
+    from aimeat_crewai.daemon import resolve_agent_identity
 
     monkeypatch.setenv("AIMEAT_HOME", str(tmp_path))
     (tmp_path / "keys").mkdir()
@@ -389,7 +397,7 @@ def test_two_owners_one_name_resolve_to_two_identities(tmp_path, monkeypatch) ->
 
 
 def test_api_routes_by_gaii_and_builds_paths_from_the_name(tmp_path, monkeypatch) -> None:
-    from aimeat_crewai.daemon import _Api, AgentIdentity
+    from aimeat_crewai.daemon import AgentIdentity, _Api
 
     ident = AgentIdentity(name="concierge", owner="isoalice", gaii="concierge#isoalice@aimeat-iso-001-a")
     api = _Api("http://127.0.0.1:1234", ident)
@@ -432,9 +440,10 @@ def test_serve_params_matches_the_gaii_row(monkeypatch) -> None:
 
 
 def test_serve_params_unknown_agent_lists_identities_not_bare_names(monkeypatch) -> None:
+    import pytest
+
     from aimeat_crewai import mcp_client
     from aimeat_crewai.mcp_client import AimeatServeError
-    import pytest
 
     doc = {"port": 5555, "agents": [{"agent": "concierge", "gaii": "concierge#isoalice@n"}]}
     monkeypatch.setattr(mcp_client, "ensure_serve", lambda **kw: doc)
@@ -488,8 +497,9 @@ def test_omitting_the_agent_with_one_loaded_works_as_today(monkeypatch) -> None:
 
 def test_omitting_the_agent_with_several_loaded_refuses_at_once(monkeypatch) -> None:
     """An instant refusal that names the candidates beats a silent 30-second timeout."""
-    from aimeat_crewai import mcp_client
     import pytest
+
+    from aimeat_crewai import mcp_client
 
     doc = {"port": 7004, "agents": [
         {"agent": "concierge", "gaii": "concierge#isoalice@n"},
@@ -555,8 +565,9 @@ def test_daemon_default_tool_filter_exported_and_curated() -> None:
 def test_ensure_serve_no_daemon_no_autostart_raises(tmp_path, monkeypatch) -> None:
     """0.4.0: with no discovery file and auto_start=False, ensure_serve must
     fail fast with guidance instead of spawning anything."""
-    from aimeat_crewai import ensure_serve, AimeatServeError
     import pytest
+
+    from aimeat_crewai import AimeatServeError, ensure_serve
 
     monkeypatch.setenv("AIMEAT_HOME", str(tmp_path))
     with pytest.raises(AimeatServeError, match="aimeat connect serve --http"):
@@ -572,7 +583,7 @@ def test_serve_discovery_honors_aimeat_home(tmp_path, monkeypatch) -> None:
 
 def test_slim_vs_full_backstory_templates_exist() -> None:
     """0.2.0 ships two templates; default selection is auto based on skill presence."""
-    from aimeat_crewai.liaison import SLIM_BACKSTORY_TEMPLATE, FULL_BACKSTORY_TEMPLATE
+    from aimeat_crewai.liaison import FULL_BACKSTORY_TEMPLATE, SLIM_BACKSTORY_TEMPLATE
 
     # SLIM template references "Skill" because it expects the skill bundle to
     # carry the manual; FULL template doesn't because it carries the manual itself.

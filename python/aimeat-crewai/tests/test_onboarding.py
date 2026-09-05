@@ -10,7 +10,7 @@ import json
 
 import pytest
 
-from aimeat_crewai import run_hello_integration, OnboardingError, ONBOARDING_CONFIRM_TOOLS
+from aimeat_crewai import ONBOARDING_CONFIRM_TOOLS, OnboardingError, run_hello_integration
 
 
 class FakeTool:

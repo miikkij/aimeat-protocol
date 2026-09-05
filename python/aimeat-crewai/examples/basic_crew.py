@@ -18,6 +18,7 @@ Run:
 from __future__ import annotations
 
 import os
+
 from crewai import Agent, Crew, Task
 
 from aimeat_crewai import create_liaison_agent, stdio_params
