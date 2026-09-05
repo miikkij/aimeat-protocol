@@ -238,10 +238,21 @@ def test_serve_params_auto_starts_daemon(env: Env) -> None:
     params = serve_params(agent_name=AGENT_NAME, **SERVE_OPTS)
 
     disc = _read_serve_json(env.home)
-    assert disc["schema_version"] == 1
+    # AT LEAST 2, not EQUAL TO a number. The discovery file is a contract between two processes and
+    # its version moves on the node's schedule: it went to 2 on 2026-09-01 when every agents[] row
+    # gained a `gaii`, because two owners with one agent name had been one indistinguishable row.
+    # This client reads that field (mcp_client.py), so 2 is the floor it actually needs; pinning the
+    # number instead meant the suite failed on a node that had moved on, and said "assert 2 == 1"
+    # rather than what was wrong. Nobody saw it for five days: the Ruff step failed first and pytest
+    # never ran.
+    assert disc["schema_version"] >= 2, (
+        f"this client reads agents[].gaii, which arrived in schema 2; daemon says "
+        f"{disc['schema_version']}"
+    )
     assert isinstance(disc["port"], int) and disc["port"] > 0
     assert _pid_alive(disc["pid"]), "discovery pid is not alive"
     assert disc["agents"][0]["agent"] == AGENT_NAME
+    assert disc["agents"][0].get("gaii"), "schema 2 names the identity, not just the bare agent name"
     assert disc["agents"][0]["transport"] == "tunnel", (
         f"expected tunnel transport, got {disc['agents'][0]['transport']} "
         f"(see {env.home / 'serve.log'})"
