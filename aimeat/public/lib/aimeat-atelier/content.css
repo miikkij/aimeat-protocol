@@ -12,6 +12,11 @@
  * @structure ak-list · ak-listdetail · ak-grid + ak-card · ak-mediacard · ak-timeline
  * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
  * @version-history
+ *   v0.39.0 — 2026-09-05 — The list, the card grid and the timeline read their own tokens instead
+ *     of the literals they carried: --ak-list-gap / -row-gap / -row-pad-y / -row-pad-x /
+ *     -line-gap, --ak-card-min / -gap / -aspect / -pad, --ak-timeline-dot / -gap / -rail /
+ *     -indent. Every default is the value that was there, so nothing moved. The empty parts and
+ *     the variants those three gained live in custom.css.
  *   v0.38.0 — 2026-09-05 — The measured review: the chart's tooltip and note labels and the
  *     graph's edge labels read at --ak-text-micro. All three were a literal 10px, which is
  *     under the kit's floor and under the size the token now names.
@@ -45,15 +50,15 @@
  */
 
 /* ── The keyed list ───────────────────────────────────────────────────────────────────────── */
-.ak-list { display: flex; flex-direction: column; gap: 8px; }
+.ak-list { display: flex; flex-direction: column; gap: var(--ak-list-gap); }
 .ak-list__row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--ak-gap);
+  gap: var(--ak-list-row-gap);
   width: 100%;
   min-height: var(--ak-touch);
-  padding: 10px var(--ak-pad);
+  padding: var(--ak-list-row-pad-y) var(--ak-list-row-pad-x);
   border: var(--ak-line-w) solid var(--ak-line);
   border-radius: var(--ak-radius-sm);
   background: var(--ak-surface);
@@ -73,7 +78,7 @@ button.ak-list__row:hover { box-shadow: var(--ak-elev-1); }
   0% { background-color: color-mix(in oklab, var(--ak-accent) 14%, var(--ak-surface)); }
   100% { background-color: var(--ak-surface); }
 }
-.ak-list__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ak-list__text { display: flex; flex-direction: column; gap: var(--ak-list-line-gap); min-width: 0; }
 .ak-list__title { font-weight: 600; overflow-wrap: anywhere; }
 /* Two lines and a real ellipsis: a long sub reads as designed, never as cut mid-word. */
 .ak-list__sub {
@@ -94,6 +99,8 @@ button.ak-list__row:hover { box-shadow: var(--ak-elev-1); }
   .ak-list__side { width: 100%; justify-content: flex-start; }
 }
 .ak-list__meta { font-size: var(--ak-text-fine); color: var(--ak-ink-dim); font-variant-numeric: tabular-nums; }
+/* The row's own EMPTY parts (extra, aside) and its three shapes live in custom.css, with the
+ * rest of the customisation model. */
 
 /* ── Master–detail: both panes wide, one at a time narrow ─────────────────────────────────── */
 .ak-listdetail {
@@ -128,9 +135,10 @@ button.ak-list__row:hover { box-shadow: var(--ak-elev-1); }
 /* ── Card grid ────────────────────────────────────────────────────────────────────────────── */
 .ak-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(11rem, 100%), 1fr));
-  gap: var(--ak-gap);
+  grid-template-columns: repeat(auto-fill, minmax(min(var(--ak-card-min), 100%), 1fr));
+  gap: var(--ak-card-gap);
 }
+/* The card's EMPTY parts and the grid's three shapes: custom.css. */
 .ak-card {
   position: relative;
   display: flex;
@@ -171,7 +179,7 @@ button.ak-card:hover { box-shadow: var(--ak-elev-2); transform: translateY(-2px)
   display: flex;
   align-items: center;
   justify-content: center;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: var(--ak-card-aspect);
   background-size: cover;
   background-position: center;
 }
@@ -208,7 +216,7 @@ button.ak-card:hover { box-shadow: var(--ak-elev-2); transform: translateY(-2px)
   filter: drop-shadow(0 3px 0 color-mix(in oklab, var(--ak-ink) 30%, transparent));
 }
 .ak-card__badge { position: absolute; top: 8px; right: 8px; }
-.ak-card__body { display: flex; flex-direction: column; gap: 2px; padding: 10px var(--ak-pad) var(--ak-pad); }
+.ak-card__body { display: flex; flex-direction: column; gap: 2px; padding: 10px var(--ak-card-pad) var(--ak-card-pad); }
 .ak-card__title { font-weight: 650; overflow-wrap: anywhere; }
 .ak-card__sub { font-size: var(--ak-text-fine); color: var(--ak-ink-dim); overflow-wrap: anywhere; }
 
@@ -243,13 +251,13 @@ button.ak-card:hover { box-shadow: var(--ak-elev-2); transform: translateY(-2px)
 .ak-timeline__item {
   position: relative;
   display: flex;
-  gap: var(--ak-gap);
-  padding: 0 0 var(--ak-pad) 0;
+  gap: var(--ak-timeline-gap);
+  padding: 0 0 var(--ak-timeline-rail) 0;
 }
 .ak-timeline__item::before {
   content: '';
   position: absolute;
-  left: 5px;
+  left: var(--ak-timeline-indent);
   top: 14px;
   bottom: 0;
   width: 2px;
@@ -258,8 +266,8 @@ button.ak-card:hover { box-shadow: var(--ak-elev-2); transform: translateY(-2px)
 .ak-timeline__item:last-child::before { display: none; }
 .ak-timeline__dot {
   flex: none;
-  width: 12px;
-  height: 12px;
+  width: var(--ak-timeline-dot);
+  height: var(--ak-timeline-dot);
   margin-top: 4px;
   border-radius: var(--ak-radius-pill);
   background: var(--ak-line);
@@ -273,6 +281,7 @@ button.ak-card:hover { box-shadow: var(--ak-elev-2); transform: translateY(-2px)
 .ak-timeline__when { font-size: var(--ak-text-fine); color: var(--ak-ink-dim); font-variant-numeric: tabular-nums; }
 .ak-timeline__title { font-weight: 600; overflow-wrap: anywhere; }
 .ak-timeline__sub { font-size: var(--ak-text-fine); color: var(--ak-ink-dim); overflow-wrap: anywhere; }
+/* The event's EMPTY parts and the line's two shapes: custom.css. */
 
 /* ── The aide panel ────────────────────────────────────────────────────────────────────────
    A chat surface inside the app: the log scrolls, the person's words sit right on the accent
@@ -646,6 +655,7 @@ button.ak-card:hover { box-shadow: var(--ak-elev-2); transform: translateY(-2px)
 .ak-dialog__text { margin: 0; color: var(--ak-ink-dim); }
 .ak-dialog__field { width: 100%; }
 .ak-dialog__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+/* The dialog's four slots and the search bar's right-hand side: custom.css. */
 
 .ak-drawer { margin: 0; height: 100dvh; max-height: 100dvh; width: 100vw; }
 .ak-drawer--bottom { height: auto; margin-top: auto; }

@@ -3429,7 +3429,66 @@
     };
   }
 
+  // src/static/sdk-libs/atelier/parts-model.js
+  function partValue(spec, name, ...args) {
+    const parts = spec && spec.parts;
+    if (!parts || typeof parts !== "object") return void 0;
+    if (!(name in parts)) return void 0;
+    const v = parts[name];
+    return typeof v === "function" ? v.apply(null, args) : v;
+  }
+  function hasPart(spec, name) {
+    const parts = spec && spec.parts;
+    return !!(parts && typeof parts === "object" && name in parts);
+  }
+  function fillPart(node, value) {
+    if (value == null || value === false) return false;
+    if (Array.isArray(value)) {
+      let any = false;
+      for (const v of value) any = fillPart(node, v) || any;
+      return any;
+    }
+    if (value instanceof Node) {
+      node.appendChild(value);
+      return true;
+    }
+    if (typeof value === "string" || typeof value === "number") {
+      node.appendChild(document.createTextNode(String(value)));
+      return true;
+    }
+    return false;
+  }
+  function partEl(tag, cls, name, attrs) {
+    const a = Object.assign({ class: cls, "data-ak-part": name }, attrs || {});
+    return el(tag, a);
+  }
+  function slotInto(host, spec, name, own, opts) {
+    const o = opts || {};
+    const given = partValue(spec, name, ...o.args || []);
+    const value = given === void 0 ? own : given;
+    const node = partEl(o.tag || "span", o.cls || "", name, o.attrs);
+    if (!fillPart(node, value)) return null;
+    host.appendChild(node);
+    return node;
+  }
+  function variantOf(spec, allowed) {
+    const v = spec && spec.variant;
+    if (v == null || v === "" || v === "default") return null;
+    if (allowed.indexOf(String(v)) >= 0) return String(v);
+    console.warn('aimeat-atelier: unknown variant "' + v + '" — this component has: ' + allowed.join(", "));
+    return null;
+  }
+  function applyVariant(root, spec, allowed) {
+    const v = variantOf(spec, allowed);
+    if (v) root.setAttribute("data-ak-variant", v);
+    return v;
+  }
+
   // src/static/sdk-libs/atelier/shell.js
+  function tabLabel(spec, name, item) {
+    const given = partValue(spec, name, item);
+    return given === void 0 ? item.label : given;
+  }
   var BOOT_POLL_MS = 300;
   var SIGNIN_GRACE_MS = 2500;
   var SVG_NS3 = "http://www.w3.org/2000/svg";
@@ -3762,13 +3821,30 @@
   }
   function section(spec) {
     const s = spec || {};
-    const heading = s.title != null ? el("h2", { class: "ak-section__title", text: s.title }) : null;
-    const hint = s.hint != null ? el("p", { class: "ak-section__hint", text: s.hint }) : null;
-    const body = el("div", { class: "ak-section__body" });
+    const heading = s.title != null ? el("h2", { class: "ak-section__title", "data-ak-part": "title", text: s.title }) : null;
+    const hint = s.hint != null ? el("p", { class: "ak-section__hint", "data-ak-part": "hint", text: s.hint }) : null;
+    const body = el("div", { class: "ak-section__body", "data-ak-part": "body" });
     if (s.body != null) append(body, s.body);
     const root = el("section", {
-      class: "ak-root ak-section" + (s.flush ? " ak-section--flush" : "")
-    }, [heading, hint, body]);
+      class: "ak-root ak-section" + (s.flush ? " ak-section--flush" : ""),
+      "data-ak-part": "root"
+    });
+    applyVariant(root, s, ["dense", "plain", "quiet"]);
+    if (hasPart(s, "actions")) {
+      const head = partEl("div", "ak-section__head", "head");
+      const words = el("div", { class: "ak-section__words", "data-ak-part": "words" });
+      if (heading) words.appendChild(heading);
+      if (hint) words.appendChild(hint);
+      head.appendChild(words);
+      slotInto(head, s, "actions", null, { cls: "ak-section__actions", tag: "div" });
+      root.appendChild(head);
+    } else {
+      if (heading) root.appendChild(heading);
+      if (hint) root.appendChild(hint);
+    }
+    slotInto(root, s, "before", null, { cls: "ak-section__before", tag: "div" });
+    root.appendChild(body);
+    slotInto(root, s, "after", null, { cls: "ak-section__after", tag: "div" });
     if (s.target) resolve(s.target).appendChild(root);
     enter(body);
     return {
@@ -3791,7 +3867,8 @@
   }
   function tabs(spec) {
     const state = { items: spec.items || [], value: spec.value || (spec.items && spec.items[0] ? spec.items[0].id : "") };
-    const root = el("div", { class: "ak-root ak-tabs", role: "tablist" });
+    const root = el("div", { class: "ak-root ak-tabs", role: "tablist", "data-ak-part": "root" });
+    applyVariant(root, spec, ["dense", "pill"]);
     if (spec.target) resolve(spec.target).appendChild(root);
     function render() {
       clear(root);
@@ -3801,6 +3878,8 @@
           type: "button",
           class: "ak-tab" + (active ? " ak-tab--active" : ""),
           role: "tab",
+          "data-ak-part": "tab",
+          "data-ak-id": item.id,
           "aria-selected": active ? "true" : "false",
           "data-ak-noguard": true,
           on: {
@@ -3813,7 +3892,7 @@
               }, { kind: spec.transition, node: root });
             }
           }
-        }, item.label));
+        }, tabLabel(spec, "tab", item)));
       }
     }
     render();
@@ -3833,7 +3912,8 @@
   }
   function bottomNav(spec) {
     const state = { items: spec.items || [], value: spec.value || "" };
-    const root = el("nav", { class: "ak-root ak-bottomnav" });
+    const root = el("nav", { class: "ak-root ak-bottomnav", "data-ak-part": "root" });
+    applyVariant(root, spec, ["dense"]);
     if (spec.target) resolve(spec.target).appendChild(root);
     function render() {
       clear(root);
@@ -3843,6 +3923,8 @@
           type: "button",
           class: "ak-bottomnav__item" + (active ? " ak-bottomnav__item--active" : ""),
           "aria-current": active ? "page" : null,
+          "data-ak-part": "item",
+          "data-ak-id": item.id,
           "data-ak-noguard": true,
           on: {
             click: function() {
@@ -3857,7 +3939,7 @@
               }, { kind: spec.transition, node: root });
             }
           }
-        }, item.label));
+        }, tabLabel(spec, "item", item)));
       }
     }
     render();
@@ -3877,6 +3959,19 @@
   }
 
   // src/static/sdk-libs/atelier/hero.js
+  var HERO_VARIANTS = ["tall", "compact", "center"];
+  var STAT_VARIANTS = ["compact", "trend", "plain"];
+  var FIGURE_VARIANTS = ["compact", "center"];
+  var DIRECTION_MARK = { up: "↑", down: "↓", flat: "–" };
+  function deltaPart(host, d) {
+    const dir = DIRECTION_MARK[d.direction] ? d.direction : null;
+    if (!dir && d.delta == null) return null;
+    const node = partEl("span", "ak-statrow__delta", "delta", dir ? { "data-ak-direction": dir } : null);
+    if (dir) node.appendChild(el("span", { class: "ak-statrow__arrow", "aria-hidden": "true", text: DIRECTION_MARK[dir] }));
+    if (d.delta != null) node.appendChild(el("span", { class: "ak-statrow__deltatext", text: String(d.delta) }));
+    host.appendChild(node);
+    return node;
+  }
   function imageLayer(url) {
     if (!url) return null;
     const v = String(url);
@@ -3889,17 +3984,25 @@
   function hero(spec) {
     const state = { title: spec.title, sub: spec.sub, actions: spec.actions || [] };
     const titleId = uid("ak-hero-title");
-    const title = el("h1", { class: "ak-hero__title", id: titleId });
-    const sub = el("p", { class: "ak-hero__sub" });
-    const actions = el("div", { class: "ak-hero__actions" });
-    const inner = el("div", { class: "ak-hero__inner" }, [title, sub, actions]);
-    const scrim = el("span", { class: "ak-hero__scrim", "aria-hidden": "true" });
-    const image = el("span", { class: "ak-hero__image", "aria-hidden": "true" });
+    const title = el("h1", { class: "ak-hero__title", id: titleId, "data-ak-part": "title" });
+    const sub = el("p", { class: "ak-hero__sub", "data-ak-part": "sub" });
+    const actions = el("div", { class: "ak-hero__actions", "data-ak-part": "actions" });
+    const inner = el("div", { class: "ak-hero__inner", "data-ak-part": "inner" });
+    slotInto(inner, spec, "before", null, { cls: "ak-hero__before" });
+    inner.appendChild(title);
+    inner.appendChild(sub);
+    inner.appendChild(actions);
+    slotInto(inner, spec, "after", null, { cls: "ak-hero__after", tag: "div" });
+    const scrim = el("span", { class: "ak-hero__scrim", "data-ak-part": "scrim", "aria-hidden": "true" });
+    const image = el("span", { class: "ak-hero__image", "data-ak-part": "image", "aria-hidden": "true" });
     const root = el("div", {
       class: "ak-root ak-hero",
       "data-ak-hero": true,
+      "data-ak-part": "root",
       "aria-labelledby": titleId
     }, [image, scrim, inner]);
+    applyVariant(root, spec, HERO_VARIANTS);
+    slotInto(root, spec, "aside", null, { cls: "ak-hero__aside" });
     const layer = imageLayer(spec.image);
     if (layer) {
       root.style.setProperty("--ak-hero-image", layer);
@@ -3915,9 +4018,17 @@
       if (same) appRoot.classList.add("ak-app--hero-titled");
     });
     function render() {
-      title.textContent = state.title;
-      sub.textContent = state.sub || "";
-      sub.hidden = !state.sub;
+      if (hasPart(spec, "title")) {
+        clear(title);
+        fillPart(title, partValue(spec, "title"));
+      } else title.textContent = state.title;
+      if (hasPart(spec, "sub")) {
+        clear(sub);
+        sub.hidden = !fillPart(sub, partValue(spec, "sub"));
+      } else {
+        sub.textContent = state.sub || "";
+        sub.hidden = !state.sub;
+      }
       clear(actions);
       actions.hidden = !state.actions.length;
       for (const action of state.actions) {
@@ -3925,6 +4036,7 @@
         actions.appendChild(el("button", {
           type: "button",
           class: "ak-btn" + (kind === "plain" ? "" : " ak-btn--" + kind),
+          "data-ak-part": "action",
           "data-ak-id": action.id,
           on: { click: function() {
             if (action.onClick) action.onClick(action);
@@ -3986,6 +4098,7 @@
     if (!entry.spark) {
       entry.spark = document.createElementNS("http://www.w3.org/2000/svg", "svg");
       entry.spark.setAttribute("class", "ak-statrow__spark");
+      entry.spark.setAttribute("data-ak-part", "trend");
       entry.spark.setAttribute("viewBox", "0 0 " + W22 + " " + H22);
       entry.spark.setAttribute("aria-hidden", "true");
       entry.spark.appendChild(document.createElementNS("http://www.w3.org/2000/svg", "polygon"));
@@ -3997,7 +4110,8 @@
   }
   function statRow(spec) {
     const shown = /* @__PURE__ */ new Map();
-    const root = el("div", { class: "ak-root ak-statrow" });
+    const root = el("div", { class: "ak-root ak-statrow", "data-ak-part": "root" });
+    applyVariant(root, spec, STAT_VARIANTS);
     if (spec.target) resolve(spec.target).appendChild(root);
     function render(tiles, first) {
       const seen = /* @__PURE__ */ new Set();
@@ -4008,18 +4122,33 @@
         };
         let entry = shown.get(tile.id);
         if (!entry) {
-          const value = el("span", { class: "ak-statrow__value", text: fmt(first ? tile.value : 0) });
-          const label = el("span", { class: "ak-statrow__label", text: tile.label });
-          const hint = el("span", { class: "ak-statrow__hint", text: tile.hint || "" });
+          const value = el("span", { class: "ak-statrow__value", "data-ak-part": "value", text: fmt(first ? tile.value : 0) });
+          const figureRow = el("div", { class: "ak-statrow__figure", "data-ak-part": "figure" }, value);
+          const label = el("span", { class: "ak-statrow__label", "data-ak-part": "label", text: tile.label });
+          const hint = el("span", { class: "ak-statrow__hint", "data-ak-part": "hint", text: tile.hint || "" });
           hint.hidden = !tile.hint;
-          const tileEl = el("div", { class: "ak-statrow__tile" }, [value, label, hint]);
+          const tileEl = el("div", { class: "ak-statrow__tile", "data-ak-part": "tile", "data-ak-id": tile.id }, [figureRow, label, hint]);
           root.appendChild(tileEl);
-          entry = { value: first ? tile.value : 0, node: value, label, hint, tile: tileEl, spark: null };
+          entry = { value: first ? tile.value : 0, node: value, label, hint, tile: tileEl, spark: null, figure: figureRow };
           shown.set(tile.id, entry);
         }
-        entry.label.textContent = tile.label;
-        entry.hint.textContent = tile.hint || "";
-        entry.hint.hidden = !tile.hint;
+        for (const gone of entry.figure.querySelectorAll('[data-ak-part="unit"], [data-ak-part="delta"]')) gone.remove();
+        slotInto(entry.figure, spec, "unit", tile.unit == null ? null : tile.unit, { cls: "ak-statrow__unit", args: [tile] });
+        deltaPart(entry.figure, tile);
+        if (!entry.tile.querySelector('[data-ak-part="aside"]')) {
+          slotInto(entry.tile, spec, "aside", null, { cls: "ak-statrow__aside", args: [tile] });
+        }
+        if (hasPart(spec, "label")) {
+          clear(entry.label);
+          fillPart(entry.label, partValue(spec, "label", tile));
+        } else entry.label.textContent = tile.label;
+        if (hasPart(spec, "hint")) {
+          clear(entry.hint);
+          entry.hint.hidden = !fillPart(entry.hint, partValue(spec, "hint", tile));
+        } else {
+          entry.hint.textContent = tile.hint || "";
+          entry.hint.hidden = !tile.hint;
+        }
         drawTrend(entry, tile.trend);
         if (entry.value !== tile.value) {
           countUp(entry.node, entry.value, tile.value, { format: fmt });
@@ -4030,8 +4159,7 @@
       }
       for (const [id, entry] of shown) {
         if (!seen.has(id)) {
-          const tileEl = entry.node.parentNode;
-          if (tileEl && tileEl.parentNode) tileEl.parentNode.removeChild(tileEl);
+          if (entry.tile && entry.tile.parentNode) entry.tile.parentNode.removeChild(entry.tile);
           shown.delete(id);
         }
       }
@@ -4058,17 +4186,24 @@
     const fmt = spec.format || function(n) {
       return String(Math.round(n));
     };
-    const label = el("span", { class: "ak-figure__label", text: state.label });
-    const value = el("span", { class: "ak-figure__value", text: fmt(state.value) });
-    const delta = el("span", { class: "ak-figure__delta", text: state.delta || "" });
-    delta.hidden = !state.delta;
-    const sub = el("p", { class: "ak-figure__sub", text: state.sub || "" });
+    const label = el("span", { class: "ak-figure__label", "data-ak-part": "label", text: state.label });
+    const value = el("span", { class: "ak-figure__value", "data-ak-part": "value", text: fmt(state.value) });
+    const dir = DIRECTION_MARK[spec.direction] ? spec.direction : null;
+    const delta = el("span", {
+      class: "ak-figure__delta",
+      "data-ak-part": "delta",
+      "data-ak-direction": dir,
+      text: (dir ? DIRECTION_MARK[dir] + " " : "") + (state.delta || "")
+    });
+    delta.hidden = !state.delta && !dir;
+    const sub = el("p", { class: "ak-figure__sub", "data-ak-part": "sub", text: state.sub || "" });
     sub.hidden = !state.sub;
-    const root = el("div", { class: "ak-root ak-figure" }, [
-      label,
-      el("div", { class: "ak-figure__row" }, [value, delta]),
-      sub
-    ]);
+    const row = el("div", { class: "ak-figure__row", "data-ak-part": "row" }, [value]);
+    slotInto(row, spec, "unit", spec.unit == null ? null : spec.unit, { cls: "ak-figure__unit" });
+    row.appendChild(delta);
+    const root = el("div", { class: "ak-root ak-figure", "data-ak-part": "root" }, [label, row, sub]);
+    applyVariant(root, spec, FIGURE_VARIANTS);
+    slotInto(root, spec, "aside", null, { cls: "ak-figure__aside" });
     if (spec.target) resolve(spec.target).appendChild(root);
     enter(root);
     return {
@@ -4087,8 +4222,8 @@
         }
         if (patch.delta !== void 0) {
           state.delta = patch.delta;
-          delta.textContent = state.delta || "";
-          delta.hidden = !state.delta;
+          delta.textContent = (dir ? DIRECTION_MARK[dir] + " " : "") + (state.delta || "");
+          delta.hidden = !state.delta && !dir;
         }
         if (patch.value != null && patch.value !== state.value) {
           countUp(value, state.value, patch.value, { format: fmt });
@@ -4117,15 +4252,16 @@
   }
   function rating(spec) {
     const state = { value: Number(spec.value) || 0, max: Number(spec.max) > 0 ? Number(spec.max) : 5, count: spec.count };
-    const root = el("div", { class: "ak-root ak-rating", role: "img" });
+    const root = el("div", { class: "ak-root ak-rating", role: "img", "data-ak-part": "root" });
+    applyVariant(root, spec, ["compact"]);
     if (spec.target) resolve(spec.target).appendChild(root);
-    const number = el("b", { class: "ak-rating__value" });
-    const track = el("span", { class: "ak-rating__track" });
+    const number = el("b", { class: "ak-rating__value", "data-ak-part": "value" });
+    const track = el("span", { class: "ak-rating__track", "data-ak-part": "track" });
     track.appendChild(starRow());
-    const fill = el("span", { class: "ak-rating__fill" });
+    const fill = el("span", { class: "ak-rating__fill", "data-ak-part": "fill" });
     fill.appendChild(starRow());
     track.appendChild(fill);
-    const words = el("span", { class: "ak-rating__words" });
+    const words = el("span", { class: "ak-rating__words", "data-ak-part": "words" });
     root.appendChild(number);
     root.appendChild(track);
     root.appendChild(words);
@@ -4133,10 +4269,15 @@
       const frac = Math.min(Math.max(state.value / state.max, 0), 1);
       number.textContent = (Math.round(state.value * 10) / 10).toLocaleString();
       fill.style.width = (frac * 100).toFixed(1) + "%";
-      words.textContent = [
-        spec.label || "",
-        state.count != null ? "(" + Number(state.count).toLocaleString() + ")" : ""
-      ].filter(Boolean).join(" ");
+      if (hasPart(spec, "words")) {
+        clear(words);
+        fillPart(words, partValue(spec, "words", state));
+      } else {
+        words.textContent = [
+          spec.label || "",
+          state.count != null ? "(" + Number(state.count).toLocaleString() + ")" : ""
+        ].filter(Boolean).join(" ");
+      }
       root.setAttribute("aria-label", `${state.value} / ${state.max}` + (state.count != null ? ` · ${state.count}` : ""));
     }
     paint();
@@ -4403,23 +4544,28 @@
   }
   function timeline(spec) {
     const fmt = spec.format || fmtTs;
-    const root = el("ol", { class: "ak-root ak-timeline" });
+    const root = el("ol", { class: "ak-root ak-timeline", "data-ak-part": "root" });
+    applyVariant(root, spec, ["dense", "plain"]);
     if (spec.target) resolve(spec.target).appendChild(root);
     let emptyCard = null;
     function fillItem(node, item) {
       clear(node);
-      node.appendChild(el("span", {
-        class: "ak-timeline__dot ak-timeline__dot--" + (item.tone || "plain"),
-        "aria-hidden": "true"
-      }));
-      node.appendChild(el("div", { class: "ak-timeline__body" }, [
-        el("span", { class: "ak-timeline__when", text: fmt(item.ts) }),
-        el("span", { class: "ak-timeline__title", text: item.title }),
-        item.sub != null ? el("span", { class: "ak-timeline__sub", text: item.sub }) : null
-      ]));
+      const whole = partValue(spec, "item", item);
+      if (whole !== void 0) {
+        fillPart(node, whole);
+        return;
+      }
+      node.appendChild(partEl("span", "ak-timeline__dot ak-timeline__dot--" + (item.tone || "plain"), "dot", { "aria-hidden": "true" }));
+      const body = partEl("div", "ak-timeline__body", "body");
+      slotInto(body, spec, "when", fmt(item.ts), { cls: "ak-timeline__when", args: [item] });
+      slotInto(body, spec, "title", item.title, { cls: "ak-timeline__title", args: [item] });
+      slotInto(body, spec, "sub", item.sub == null ? null : item.sub, { cls: "ak-timeline__sub", args: [item] });
+      slotInto(body, spec, "extra", null, { cls: "ak-timeline__extra", args: [item] });
+      node.appendChild(body);
+      slotInto(node, spec, "aside", null, { cls: "ak-timeline__aside", args: [item] });
     }
     function buildItem(item) {
-      const node = el("li", { class: "ak-timeline__item" });
+      const node = el("li", { class: "ak-timeline__item", "data-ak-part": "item" });
       fillItem(node, item);
       return node;
     }
@@ -4583,24 +4729,30 @@
   }
 
   // src/static/sdk-libs/atelier/list.js
+  var LIST_VARIANTS = ["dense", "numbered", "plain"];
   var DETAIL_MARKED = ".ak-listdetail__title";
   var DETAIL_HEADING = "h1, h2, h3";
-  function fillRow(row, item) {
+  function fillRow(row, item, spec) {
     clear(row);
-    const text = el("span", { class: "ak-list__text" }, [
-      el("span", { class: "ak-list__title", text: item.title }),
-      item.sub != null ? el("span", { class: "ak-list__sub", text: item.sub }) : null
-    ]);
-    const side = item.meta != null || item.badge != null ? el("span", { class: "ak-list__side" }, [
-      item.badge != null ? el("span", { class: "ak-badge", text: item.badge }) : null,
-      item.meta != null ? el("span", { class: "ak-list__meta", text: item.meta }) : null
-    ]) : null;
-    append(row, side ? [text, side] : [text]);
+    if (hasPart(spec, "row")) {
+      fillPart(row, partValue(spec, "row", item));
+      return;
+    }
+    const text = partEl("span", "ak-list__text", "text");
+    slotInto(text, spec, "title", item.title, { cls: "ak-list__title", args: [item] });
+    slotInto(text, spec, "sub", item.sub == null ? null : item.sub, { cls: "ak-list__sub", args: [item] });
+    slotInto(text, spec, "extra", null, { cls: "ak-list__extra", args: [item] });
+    const side = partEl("span", "ak-list__side", "side");
+    slotInto(side, spec, "badge", item.badge == null ? null : item.badge, { cls: "ak-badge ak-list__badge", args: [item] });
+    slotInto(side, spec, "meta", item.meta == null ? null : item.meta, { cls: "ak-list__meta", args: [item] });
+    slotInto(side, spec, "aside", null, { cls: "ak-list__aside", args: [item] });
+    append(row, side.childNodes.length ? [text, side] : [text]);
   }
   function list(spec) {
     const shown = /* @__PURE__ */ new Map();
     const pickable = typeof spec.onPick === "function";
-    const root = el("div", { class: "ak-root ak-list", role: pickable ? "list" : null });
+    const root = el("div", { class: "ak-root ak-list", role: pickable ? "list" : null, "data-ak-part": "root" });
+    applyVariant(root, spec, LIST_VARIANTS);
     if (spec.target) resolve(spec.target).appendChild(root);
     let emptyCard = null;
     function buildRow(item) {
@@ -4608,6 +4760,7 @@
         class: "ak-list__row",
         type: pickable ? "button" : null,
         role: pickable ? "listitem" : null,
+        "data-ak-part": "row",
         "data-ak-noguard": true,
         "data-ak-id": item.id,
         on: pickable ? { click: function() {
@@ -4620,7 +4773,7 @@
           if (spec.onPick) spec.onPick(shown.get(item.id)?.item || item);
         } } : null
       });
-      fillRow(row, item);
+      fillRow(row, item, spec);
       return row;
     }
     function reconcile(items) {
@@ -4653,9 +4806,9 @@
           entry = { row, item };
           shown.set(item.id, entry);
         } else {
-          const changed = entry.item.title !== item.title || entry.item.sub !== item.sub || entry.item.meta !== item.meta || entry.item.badge !== item.badge;
+          const changed = spec.parts && entry.item !== item || entry.item.title !== item.title || entry.item.sub !== item.sub || entry.item.meta !== item.meta || entry.item.badge !== item.badge;
           if (changed) {
-            fillRow(entry.row, item);
+            fillRow(entry.row, item, spec);
             entry.row.classList.remove("ak-list__row--changed");
             void entry.row.offsetWidth;
             entry.row.classList.add("ak-list__row--changed");
@@ -4695,27 +4848,31 @@
   function listDetail(spec) {
     let selected = null;
     let items = spec.items || [];
-    const detailBody = el("div", { class: "ak-listdetail__body" });
+    const detailBody = el("div", { class: "ak-listdetail__body", "data-ak-part": "body" });
     const backBtn = el("button", {
       type: "button",
       class: "ak-btn ak-btn--ghost ak-listdetail__back",
+      "data-ak-part": "back",
       "data-ak-noguard": true,
       on: { click: function() {
         select(null);
       } }
     }, "↩ " + t("back"));
-    const detail = el("div", { class: "ak-listdetail__detail" }, [backBtn, detailBody]);
+    const detail = el("div", { class: "ak-listdetail__detail", "data-ak-part": "detail" }, [backBtn, detailBody]);
     const master = list({
       items,
       empty: spec.empty,
+      variant: spec.variant,
+      parts: spec.parts,
       onPick: function(item) {
         select(item.id);
       }
     });
-    const root = el("div", { class: "ak-root ak-listdetail" }, [
-      el("div", { class: "ak-listdetail__master" }, master.el),
+    const root = el("div", { class: "ak-root ak-listdetail", "data-ak-part": "root" }, [
+      el("div", { class: "ak-listdetail__master", "data-ak-part": "master" }, master.el),
       detail
     ]);
+    applyVariant(root, spec, LIST_VARIANTS);
     if (spec.target) resolve(spec.target).appendChild(root);
     let detailEmptyCard = null;
     function renderDetail() {
@@ -4834,6 +4991,7 @@
   }
 
   // src/static/sdk-libs/atelier/grid.js
+  var CARD_VARIANTS = ["dense", "wide", "plain"];
   function imageLayer2(url) {
     if (!url) return null;
     const v = String(url);
@@ -4850,37 +5008,44 @@
     for (let i = 0; i < s.length; i++) h = h * 31 + s.charCodeAt(i) | 0;
     return Math.abs(h) % 3 + 1;
   }
-  function buildCard(item, pickable, onPick) {
+  function buildCard(item, pickable, onPick, spec) {
     const layer = imageLayer2(item.image);
-    const art = el("span", {
-      class: "ak-card__art ak-card__art--w" + washOf(item.id),
+    const art = partEl("span", "ak-card__art ak-card__art--w" + washOf(item.id), "art", {
       "aria-hidden": "true",
       vars: layer ? { "--ak-card-image": layer } : null
-    }, layer ? null : el("span", {
-      class: "ak-card__monogram",
+    });
+    const own = layer ? null : partEl("span", "ak-card__monogram", "monogram", {
       // Array.from splits by code point: an emoji-led title keeps its emoji instead of showing
       // a broken surrogate half — found in the first real-data experiment run.
       text: (Array.from(item.title || "?")[0] || "?").toUpperCase()
-    }));
+    });
+    const givenArt = partValue(spec, "art", item);
+    if (givenArt !== void 0) fillPart(art, givenArt);
+    else if (own) art.appendChild(own);
     if (layer) art.classList.add("ak-card__art--image");
-    const body = el("span", { class: "ak-card__body" }, [
-      el("span", { class: "ak-card__title", text: item.title }),
-      item.sub != null ? el("span", { class: "ak-card__sub", text: item.sub }) : null
-    ]);
+    const body = partEl("span", "ak-card__body", "body");
+    slotInto(body, spec, "title", item.title, { cls: "ak-card__title", args: [item] });
+    slotInto(body, spec, "sub", item.sub == null ? null : item.sub, { cls: "ak-card__sub", args: [item] });
+    slotInto(body, spec, "extra", null, { cls: "ak-card__extra", args: [item] });
     const card = el(pickable ? "button" : "div", {
       class: "ak-card",
       type: pickable ? "button" : null,
+      "data-ak-part": "card",
       "data-ak-noguard": true,
       "data-ak-id": item.id,
       on: pickable && onPick ? { click: function() {
         onPick(item);
       } } : null
-    }, [art, item.badge != null ? el("span", { class: "ak-badge ak-card__badge", text: item.badge }) : null, body]);
+    }, art);
+    slotInto(card, spec, "badge", item.badge == null ? null : item.badge, { cls: "ak-badge ak-card__badge", args: [item] });
+    card.appendChild(body);
+    slotInto(card, spec, "aside", null, { cls: "ak-card__aside", args: [item] });
     return card;
   }
   function cardGrid(spec) {
     const pickable = typeof spec.onPick === "function";
-    const root = el("div", { class: "ak-root ak-grid" });
+    const root = el("div", { class: "ak-root ak-grid", "data-ak-part": "root" });
+    applyVariant(root, spec, CARD_VARIANTS);
     if (spec.target) resolve(spec.target).appendChild(root);
     let emptyCard = null;
     function render(items) {
@@ -4907,7 +5072,7 @@
         build: function(item) {
           const card = buildCard(item, pickable, pickable ? function() {
             if (spec.onPick) spec.onPick(SHOWING.get(card));
-          } : void 0);
+          } : void 0, spec);
           SHOWING.set(card, item);
           return card;
         },
@@ -4915,7 +5080,7 @@
         // element stays (no re-entrance), everything inside it is replaced.
         update: function(node, item) {
           SHOWING.set(node, item);
-          const next = buildCard(item, pickable, void 0);
+          const next = buildCard(item, pickable, void 0, spec);
           node.className = next.className;
           clear(node);
           while (next.firstChild) node.appendChild(next.firstChild);
@@ -4937,19 +5102,24 @@
     };
   }
   function mediaCard(spec) {
-    let card = buildCard(spec.item, typeof spec.onPick === "function" && !spec.actions, spec.onPick);
-    const actions = spec.actions && spec.actions.length ? el("span", { class: "ak-card__actions" }, spec.actions.map(function(action) {
-      const kind = action.kind || "plain";
-      return el("button", {
-        type: "button",
-        class: "ak-btn" + (kind === "plain" ? "" : " ak-btn--" + kind),
-        "data-ak-id": action.id,
-        on: { click: function() {
-          if (action.onClick) action.onClick(action);
-        } }
-      }, action.label);
-    })) : null;
-    const root = el("div", { class: "ak-root ak-mediacard" }, [card, actions]);
+    let card = buildCard(spec.item, typeof spec.onPick === "function" && !spec.actions, spec.onPick, spec);
+    const actions = spec.actions && spec.actions.length ? partEl("span", "ak-card__actions", "actions") : null;
+    if (actions) {
+      for (const action of spec.actions) {
+        const kind = action.kind || "plain";
+        actions.appendChild(el("button", {
+          type: "button",
+          class: "ak-btn" + (kind === "plain" ? "" : " ak-btn--" + kind),
+          "data-ak-part": "action",
+          "data-ak-id": action.id,
+          on: { click: function() {
+            if (action.onClick) action.onClick(action);
+          } }
+        }, action.label));
+      }
+    }
+    const root = el("div", { class: "ak-root ak-mediacard", "data-ak-part": "root" }, [card, actions]);
+    applyVariant(root, spec, ["dense", "plain"]);
     if (spec.target) resolve(spec.target).appendChild(root);
     enter(root);
     return {
@@ -4957,7 +5127,7 @@
       /** @param {{ item: CardItem }} patch */
       set(patch) {
         if (!patch || !patch.item) return;
-        const next = buildCard(patch.item, typeof spec.onPick === "function" && !spec.actions, spec.onPick);
+        const next = buildCard(patch.item, typeof spec.onPick === "function" && !spec.actions, spec.onPick, spec);
         card.replaceWith(next);
         card = next;
       },
@@ -5151,6 +5321,7 @@
   }
 
   // src/static/sdk-libs/atelier/table.js
+  var TABLE_VARIANTS = ["dense", "plain", "lined"];
   var RECORD = /* @__PURE__ */ new WeakMap();
   function table(spec) {
     const columns = spec.columns || [];
@@ -5161,14 +5332,15 @@
       return first == null ? "row-" + i : String(first);
     };
     let sort = null;
-    const thead = el("thead");
-    const tbody = el("tbody");
-    const tableEl = el("table", { class: "ak-table__table" }, [
-      spec.caption ? el("caption", { class: "ak-sr-only", text: spec.caption }) : null,
+    const thead = el("thead", { "data-ak-part": "head" });
+    const tbody = el("tbody", { "data-ak-part": "body" });
+    const tableEl = el("table", { class: "ak-table__table", "data-ak-part": "table" }, [
+      spec.caption ? el("caption", { class: "ak-sr-only", "data-ak-part": "caption", text: spec.caption }) : null,
       thead,
       tbody
     ]);
-    const root = el("div", { class: "ak-root ak-table" }, tableEl);
+    const root = el("div", { class: "ak-root ak-table", "data-ak-part": "root" }, tableEl);
+    applyVariant(root, spec, TABLE_VARIANTS);
     if (spec.target) resolve(spec.target).appendChild(root);
     let emptyCard = null;
     function renderHead() {
@@ -5179,12 +5351,17 @@
         const th = el("th", {
           scope: "col",
           class: col.align === "right" ? "ak-table__num" : null,
+          "data-ak-part": "headcell",
+          "data-ak-key": col.key,
           "aria-sort": sorted
         });
+        const given = partValue(spec, "head", col);
+        const heading = given === void 0 ? col.label : given;
         if (col.sortable) {
-          th.appendChild(el("button", {
+          const btn = el("button", {
             type: "button",
             class: "ak-table__sort",
+            "data-ak-part": "sort",
             "data-ak-noguard": true,
             on: {
               click: function() {
@@ -5193,8 +5370,11 @@
                 renderBody();
               }
             }
-          }, col.label + (sorted ? sorted === "ascending" ? " ↑" : " ↓" : "")));
-        } else {
+          });
+          if (!fillPart(btn, heading)) btn.textContent = col.label;
+          if (sorted) btn.appendChild(document.createTextNode(sorted === "ascending" ? " ↑" : " ↓"));
+          th.appendChild(btn);
+        } else if (!fillPart(th, heading)) {
           th.textContent = col.label;
         }
         tr.appendChild(th);
@@ -5217,10 +5397,22 @@
     }
     function fillRow2(tr, row) {
       clear(tr);
+      const wholeRow = partValue(spec, "row", row);
+      if (wholeRow !== void 0) {
+        fillPart(tr, wholeRow);
+        return;
+      }
       for (const col of columns) {
         const raw = row[col.key];
-        const text = col.format ? col.format(raw, row) : raw == null ? "" : String(raw);
-        tr.appendChild(el("td", { class: col.align === "right" ? "ak-table__num" : null, text }));
+        const given = partValue(spec, "cell", raw, row, col);
+        const own = col.format ? col.format(raw, row) : raw == null ? "" : String(raw);
+        const td = el("td", {
+          class: col.align === "right" ? "ak-table__num" : null,
+          "data-ak-part": "cell",
+          "data-ak-key": col.key
+        });
+        fillPart(td, given === void 0 ? own : given);
+        tr.appendChild(td);
       }
     }
     function renderBody() {
@@ -5246,6 +5438,7 @@
         build: function(row) {
           const tr = el("tr", {
             class: pickable ? "ak-table__row--pick" : null,
+            "data-ak-part": "row",
             tabindex: pickable ? "0" : null,
             on: pickable ? {
               click: function() {
@@ -5290,6 +5483,7 @@
     const input = el("input", {
       type: "search",
       class: "ak-input ak-search__input",
+      "data-ak-part": "input",
       placeholder: spec.placeholder || t("search"),
       "aria-label": spec.label || t("search"),
       on: {
@@ -5317,6 +5511,7 @@
     const clearBtn = el("button", {
       type: "button",
       class: "ak-search__clear",
+      "data-ak-part": "clear",
       "aria-label": t("close"),
       "data-ak-noguard": true,
       on: {
@@ -5327,7 +5522,9 @@
         }
       }
     }, "×");
-    const root = el("div", { class: "ak-root ak-search", role: "search" }, [input, clearBtn]);
+    const root = el("div", { class: "ak-root ak-search", role: "search", "data-ak-part": "root" }, [input, clearBtn]);
+    applyVariant(root, spec, ["dense", "plain"]);
+    slotInto(root, spec, "aside", null, { cls: "ak-search__aside" });
     if (spec.target) resolve(spec.target).appendChild(root);
     return {
       el: root,
@@ -7569,7 +7766,8 @@
     return TONES3.indexOf(value) >= 0 ? value : "plain";
   }
   function health(spec) {
-    const root = el("div", { class: "ak-root ak-health", role: "list" });
+    const root = el("div", { class: "ak-root ak-health", role: "list", "data-ak-part": "root" });
+    applyVariant(root, spec, ["dense", "plain"]);
     if (spec.target) resolve(spec.target).appendChild(root);
     let emptyCard = null;
     function render(data) {
@@ -7589,16 +7787,16 @@
         const row = el(spec.onPick ? "button" : "div", {
           class: "ak-health__row",
           role: "listitem",
+          "data-ak-part": "row",
           type: spec.onPick ? "button" : void 0
-        }, [
-          el("span", { class: "ak-health__lamp ak-health__lamp--" + tone, "aria-hidden": "true" }),
-          el("span", { class: "ak-health__name" }, [
-            el("span", { class: "ak-health__label", text: item.label || item.id }),
-            item.sub ? el("span", { class: "ak-health__sub", text: item.sub }) : null
-          ]),
-          item.reading != null ? el("span", { class: "ak-health__reading", text: String(item.reading) }) : null,
-          el("span", { class: "ak-sr-only", text: tone === "ok" ? t("opsOk") : tone === "err" ? t("opsDown") : tone === "warn" ? t("opsWarn") : "" })
-        ]);
+        }, partEl("span", "ak-health__lamp ak-health__lamp--" + tone, "lamp", { "aria-hidden": "true" }));
+        const name = partEl("span", "ak-health__name", "name");
+        slotInto(name, spec, "label", item.label || item.id, { cls: "ak-health__label", args: [item] });
+        slotInto(name, spec, "sub", item.sub || null, { cls: "ak-health__sub", args: [item] });
+        row.appendChild(name);
+        slotInto(row, spec, "reading", item.reading == null ? null : String(item.reading), { cls: "ak-health__reading", args: [item] });
+        slotInto(row, spec, "aside", null, { cls: "ak-health__aside", args: [item] });
+        row.appendChild(el("span", { class: "ak-sr-only", text: tone === "ok" ? t("opsOk") : tone === "err" ? t("opsDown") : tone === "warn" ? t("opsWarn") : "" }));
         if (spec.onPick) row.addEventListener("click", function() {
           spec.onPick(item);
         });
@@ -7619,19 +7817,27 @@
   }
   var QUEUE_STATES = ["waiting", "running", "done", "failed"];
   var QUEUE_TONE = { waiting: "plain", running: "warn", done: "ok", failed: "err" };
-  function fillJob(row, item) {
+  function fillJob(row, item, spec) {
     const s = QUEUE_STATES.indexOf(item.state) >= 0 ? item.state : "waiting";
     clear(row);
-    row.appendChild(el("span", { class: "ak-queue__state ak-queue__state--" + s, text: t("queue." + s) }));
-    row.appendChild(el("span", { class: "ak-queue__words" }, [
-      el("span", { class: "ak-queue__title", text: item.title || item.id }),
-      item.sub ? el("span", { class: "ak-queue__sub", text: item.sub }) : null
-    ]));
+    const whole = partValue(spec, "row", item);
+    if (whole !== void 0) {
+      fillPart(row, whole);
+      return;
+    }
+    slotInto(row, spec, "state", t("queue." + s), { cls: "ak-queue__state ak-queue__state--" + s, args: [item] });
+    const words = partEl("span", "ak-queue__words", "words");
+    slotInto(words, spec, "title", item.title || item.id, { cls: "ak-queue__title", args: [item] });
+    slotInto(words, spec, "sub", item.sub || null, { cls: "ak-queue__sub", args: [item] });
+    slotInto(words, spec, "extra", null, { cls: "ak-queue__extra", args: [item] });
+    row.appendChild(words);
+    slotInto(row, spec, "aside", null, { cls: "ak-queue__aside", args: [item] });
   }
   function queue(spec) {
-    const root = el("div", { class: "ak-root ak-queue" });
-    const strip = el("div", { class: "ak-queue__strip", role: "status" });
-    const list2 = el("div", { class: "ak-queue__list", role: "list" });
+    const root = el("div", { class: "ak-root ak-queue", "data-ak-part": "root" });
+    applyVariant(root, spec, ["dense", "plain"]);
+    const strip = el("div", { class: "ak-queue__strip", role: "status", "data-ak-part": "strip" });
+    const list2 = el("div", { class: "ak-queue__list", role: "list", "data-ak-part": "list" });
     root.appendChild(strip);
     root.appendChild(list2);
     if (spec.target) resolve(spec.target).appendChild(root);
@@ -7679,10 +7885,11 @@
           const row = el(spec.onPick ? "button" : "div", {
             class: "ak-queue__row",
             role: "listitem",
+            "data-ak-part": "row",
             type: spec.onPick ? "button" : void 0
           });
           JOB.set(row, item);
-          fillJob(row, item);
+          fillJob(row, item, spec);
           if (spec.onPick) row.addEventListener("click", function() {
             spec.onPick(JOB.get(row));
           });
@@ -7690,7 +7897,7 @@
         },
         update: function(row, item) {
           JOB.set(row, item);
-          fillJob(row, item);
+          fillJob(row, item, spec);
         }
       });
     }
@@ -7707,7 +7914,7 @@
     };
   }
   function gauge(spec) {
-    const root = el("figure", { class: "ak-root ak-gauge", role: "img" });
+    const root = el("figure", { class: "ak-root ak-gauge", role: "img", "data-ak-part": "root" });
     if (spec.target) resolve(spec.target).appendChild(root);
     let emptyCard = null;
     const R = 96;
@@ -9079,7 +9286,8 @@
     return emptyState({ target: root, tone: "quiet", title: e.title || t("empty"), hint: e.hint || t("emptyHint") });
   }
   function kanban(spec) {
-    const root = el("div", { class: "ak-root ak-kanban" });
+    const root = el("div", { class: "ak-root ak-kanban", "data-ak-part": "root" });
+    applyVariant(root, spec, ["dense", "plain"]);
     if (spec.target) resolve(spec.target).appendChild(root);
     let emptyCard = null;
     let current2 = null;
@@ -9123,12 +9331,12 @@
       const movable = !!spec.onMove;
       columns.forEach((col, colIdx) => {
         const inCol = cards.filter((c) => c.column === col.id);
-        const lane = el("div", { class: "ak-kanban__col", "data-col": col.id, role: "group", "aria-label": `${col.label} · ${inCol.length}` });
-        lane.appendChild(el("div", { class: "ak-kanban__head ak-kanban__head--" + toneOf2(col.tone, "accent") }, [
-          el("span", { class: "ak-kanban__colname", text: col.label || col.id }),
-          el("span", { class: "ak-kanban__count", text: String(inCol.length) })
-        ]));
-        const well = el("div", { class: "ak-kanban__well" });
+        const lane = el("div", { class: "ak-kanban__col", "data-ak-part": "col", "data-col": col.id, role: "group", "aria-label": `${col.label} · ${inCol.length}` });
+        const head = partEl("div", "ak-kanban__head ak-kanban__head--" + toneOf2(col.tone, "accent"), "head");
+        slotInto(head, spec, "colhead", col.label || col.id, { cls: "ak-kanban__colname", args: [col, inCol] });
+        head.appendChild(el("span", { class: "ak-kanban__count", "data-ak-part": "count", text: String(inCol.length) }));
+        lane.appendChild(head);
+        const well = el("div", { class: "ak-kanban__well", "data-ak-part": "well" });
         if (movable) {
           well.addEventListener("dragover", (ev) => {
             ev.preventDefault();
@@ -9145,14 +9353,21 @@
         inCol.forEach((card, i) => {
           const node = el("div", {
             class: "ak-kanban__card" + (TONES5.indexOf(card.tone) >= 0 ? " ak-kanban__card--" + card.tone : ""),
+            "data-ak-part": "card",
             "data-card": card.id,
             tabindex: movable ? "0" : void 0,
             role: movable ? "button" : void 0
-          }, [
-            el("span", { class: "ak-kanban__cardtitle", text: card.title || card.id }),
-            card.sub ? el("span", { class: "ak-kanban__cardsub", text: card.sub }) : null,
-            card.badge ? el("span", { class: "ak-kanban__badge", text: card.badge }) : null
-          ]);
+          });
+          const whole = partValue(spec, "card", card);
+          if (whole !== void 0) {
+            fillPart(node, whole);
+          } else {
+            slotInto(node, spec, "cardtitle", card.title || card.id, { cls: "ak-kanban__cardtitle", args: [card] });
+            slotInto(node, spec, "cardsub", card.sub || null, { cls: "ak-kanban__cardsub", args: [card] });
+            slotInto(node, spec, "extra", null, { cls: "ak-kanban__extra", args: [card] });
+            slotInto(node, spec, "badge", card.badge || null, { cls: "ak-kanban__badge", args: [card] });
+            slotInto(node, spec, "aside", null, { cls: "ak-kanban__aside", args: [card] });
+          }
           if (!motionOff(root) && !arrived.has(card.id)) {
             arrived.add(card.id);
             node.classList.add("ak-kanban__card--enter");
@@ -9199,7 +9414,7 @@
     return isNaN(d.getTime()) ? null : d;
   }
   function plan(spec) {
-    const root = el("div", { class: "ak-root ak-plan" });
+    const root = el("div", { class: "ak-root ak-plan", "data-ak-part": "root" });
     if (spec.target) resolve(spec.target).appendChild(root);
     let emptyCard = null;
     function render(data) {
@@ -9281,7 +9496,7 @@
     return m ? Number(m[1]) * 60 + Number(m[2]) : null;
   }
   function schedule(spec) {
-    const root = el("div", { class: "ak-root ak-schedule" });
+    const root = el("div", { class: "ak-root ak-schedule", "data-ak-part": "root" });
     if (spec.target) resolve(spec.target).appendChild(root);
     let emptyCard = null;
     function render(data) {
@@ -9348,7 +9563,7 @@
     };
   }
   function steps(spec) {
-    const root = el("ol", { class: "ak-root ak-steps" });
+    const root = el("ol", { class: "ak-root ak-steps", "data-ak-part": "root" });
     if (spec.target) resolve(spec.target).appendChild(root);
     let emptyCard = null;
     function render(data) {
@@ -12827,41 +13042,49 @@
       /** @type {HTMLDialogElement} */
       el("dialog", {
         class: "ak-root ak-dialog ak-dialog--" + from + " ak-dialog--" + tone + " ak-dialog--" + size,
+        "data-ak-part": "root",
+        "data-ak-variant": spec.tone && tone !== "plain" ? tone : size !== "compact" ? size : null,
         "aria-labelledby": "ak-dlg-title"
       })
     );
-    const head = el("div", { class: "ak-dialog__head" }, [
-      el("h2", { class: "ak-dialog__title", id: "ak-dlg-title", text: spec.title }),
+    const head = el("div", { class: "ak-dialog__head", "data-ak-part": "head" }, [
+      el("h2", { class: "ak-dialog__title", "data-ak-part": "title", id: "ak-dlg-title", text: spec.title }),
       dismissible ? el("button", {
         type: "button",
         class: "ak-btn ak-btn--ghost ak-dialog__x",
+        "data-ak-part": "close",
         "aria-label": t("close"),
         on: { click: function() {
           close("dismiss");
         } }
       }, "✕") : null
     ]);
-    const body = el("div", { class: "ak-dialog__body" });
-    if (spec.text) body.appendChild(el("p", { class: "ak-dialog__text", text: spec.text }));
+    slotInto(head, spec, "aside", null, { cls: "ak-dialog__aside" });
+    const body = el("div", { class: "ak-dialog__body", "data-ak-part": "body" });
+    slotInto(body, spec, "before", null, { cls: "ak-dialog__before", tag: "div" });
+    if (spec.text) body.appendChild(el("p", { class: "ak-dialog__text", "data-ak-part": "text", text: spec.text }));
     if (spec.layout) {
       mosaic({ target: body, layout: spec.layout, sources: spec.sources || {} });
     }
     if (spec.body) spec.body(body);
-    const foot = el("div", { class: "ak-dialog__actions" });
+    slotInto(body, spec, "after", null, { cls: "ak-dialog__after", tag: "div" });
+    const foot = el("div", { class: "ak-dialog__actions", "data-ak-part": "actions" });
     for (const action of spec.actions || []) {
       foot.appendChild(el("button", {
         type: "button",
         class: "ak-btn ak-btn--" + (action.tone === "danger" ? "danger" : action.tone === "primary" ? "primary" : "ghost"),
+        "data-ak-part": "action",
         "data-ak-action": action.id,
         on: { click: function() {
           if (action.run) action.run();
         } }
       }, action.label));
     }
+    slotInto(foot, spec, "actions", null, { cls: "ak-dialog__extra" });
     node.appendChild(el(
       "div",
-      { class: "ak-dialog__panel" },
-      [head, body, (spec.actions || []).length ? foot : null]
+      { class: "ak-dialog__panel", "data-ak-part": "panel" },
+      [head, body, (spec.actions || []).length || foot.childNodes.length ? foot : null]
     ));
     document.body.appendChild(node);
     let closed = false;
@@ -15843,6 +16066,154 @@
     else watch();
   }
 
+  // src/static/sdk-libs/atelier/describe-data.js
+  var PARTS = {
+    "bottomNav": {
+      parts: ["root", "item"],
+      slots: ["item(entry)"],
+      variants: ["dense"],
+      tokens: ["--ak-chrome-bottom"],
+      fork: "Copy .ak-bottomnav* out of shell.css; the chrome reserve is the shell's.",
+      file: "shell.js"
+    },
+    "cardGrid": {
+      parts: ["root", "card", "art", "monogram", "badge", "body", "title", "sub", "extra", "aside"],
+      slots: ["title(item)", "sub(item)", "extra(item)", "badge(item)", "aside(item)", "art(item)"],
+      variants: ["dense", "wide", "plain"],
+      tokens: ["--ak-card-min", "--ak-card-gap", "--ak-card-aspect", "--ak-card-pad"],
+      fork: "Copy .ak-grid and .ak-card* out of content.css; you keep the monogram washes and lose the keyed reconcile that stops the wall re-entering on every change.",
+      file: "grid.js"
+    },
+    "dialog": {
+      parts: ["root", "panel", "head", "title", "close", "body", "text", "before", "after", "actions", "action"],
+      slots: ["before()", "after()", "actions()", "aside()"],
+      variants: ["danger", "celebrate", "ai", "roomy", "wide"],
+      tokens: [],
+      fork: "Do not: the focus trap, Escape and focus return are the browser's through native <dialog>, and a hand-rolled overlay loses all three. Put your own markup in body(host) instead.",
+      file: "dialog.js"
+    },
+    "figure": {
+      parts: ["root", "label", "row", "value", "unit", "delta", "sub", "aside"],
+      slots: ["unit()", "aside()"],
+      variants: ["compact", "center"],
+      tokens: ["--ak-stat-unit-size", "--ak-stat-up", "--ak-stat-down"],
+      fork: "One element, one number: build it yourself and call countUp(node, from, to).",
+      file: "hero.js"
+    },
+    "health": {
+      parts: ["root", "row", "lamp", "name", "label", "sub", "reading", "aside"],
+      slots: ["label(item)", "sub(item)", "reading(item)", "aside(item)"],
+      variants: ["dense", "plain"],
+      tokens: ["--ak-health-lamp", "--ak-health-row-pad-y"],
+      fork: "One row, one lamp; copy .ak-health* out of data.css.",
+      file: "ops.js"
+    },
+    "hero": {
+      parts: ["root", "image", "scrim", "inner", "before", "title", "sub", "actions", "after", "aside"],
+      slots: ["before()", "title()", "sub()", "after()", "aside()"],
+      variants: ["tall", "compact", "center"],
+      tokens: ["--ak-hero-min", "--ak-hero-pad", "--ak-hero-gap", "--ak-hero-title-size", "--ak-hero-image", "--ak-scrim"],
+      fork: "Copy .ak-hero and .ak-hero__* out of shell.css; you keep the tokens and the scrim's mode-following arithmetic, and you give up the repeated-title claim and the picture layer an effect knows how to land on.",
+      file: "hero.js"
+    },
+    "kanban": {
+      parts: ["root", "col", "head", "colname", "count", "well", "card", "cardtitle", "cardsub", "badge", "extra", "aside"],
+      slots: ["card(card)", "cardtitle(card)", "cardsub(card)", "extra(card)", "badge(card)", "aside(card)", "colhead(column)"],
+      variants: ["dense", "plain"],
+      tokens: ["--ak-kanban-col-min", "--ak-kanban-card-pad", "--ak-kanban-gap"],
+      fork: "Copy .ak-kanban* out of planner.css; you keep the tokens and give up the drag, the arrow-key move and the card's spring travel.",
+      file: "planner.js"
+    },
+    "list": {
+      parts: ["root", "row", "text", "title", "sub", "extra", "side", "badge", "meta", "aside"],
+      slots: ["row(item)", "title(item)", "sub(item)", "extra(item)", "badge(item)", "meta(item)", "aside(item)"],
+      variants: ["dense", "numbered", "plain"],
+      tokens: ["--ak-list-gap", "--ak-list-row-gap", "--ak-list-row-pad-y", "--ak-list-row-pad-x", "--ak-list-line-gap", "--ak-list-aside-size"],
+      fork: "Copy .ak-list and .ak-list__* out of content.css and build the row yourself; you keep the tokens, the look and settle()/keyedRows() if you call them, and you give up the empty state, the pick mark and every later fix to this row.",
+      file: "list.js"
+    },
+    "listDetail": {
+      parts: ["root", "master", "detail", "back", "body"],
+      slots: ["title(item)", "sub(item)", "extra(item)", "badge(item)", "meta(item)", "aside(item)"],
+      variants: ["dense", "numbered", "plain"],
+      tokens: ["--ak-list-gap", "--ak-list-row-gap", "--ak-list-aside-size"],
+      fork: "Do not fork the container: mark your detail's own heading .ak-listdetail__title and the picked row's words travel into it. Its `variant` and `parts` are the list's, handed to the master pane.",
+      file: "list.js"
+    },
+    "mediaCard": {
+      parts: ["root", "card", "art", "monogram", "badge", "body", "title", "sub", "extra", "actions"],
+      slots: ["title(item)", "sub(item)", "extra(item)", "badge(item)", "art(item)"],
+      variants: ["dense", "plain"],
+      tokens: ["--ak-card-aspect", "--ak-card-pad"],
+      fork: "Same as cardGrid; this is one card and its action row.",
+      file: "grid.js"
+    },
+    "queue": {
+      parts: ["root", "strip", "list", "row", "state", "words", "title", "sub", "extra", "aside"],
+      slots: ["row(item)", "state(item)", "title(item)", "sub(item)", "extra(item)", "aside(item)"],
+      variants: ["dense", "plain"],
+      tokens: ["--ak-queue-row-pad-y", "--ak-queue-state-min"],
+      fork: "Copy .ak-queue* out of data.css; you give up the keyed line, so a job finishing looks like a repaint.",
+      file: "ops.js"
+    },
+    "rating": {
+      parts: ["root", "value", "track", "fill", "words"],
+      slots: ["words(state)"],
+      variants: ["compact"],
+      tokens: [],
+      fork: "Copy .ak-rating* out of content.css; the clip trick is four rules.",
+      file: "hero.js"
+    },
+    "searchBar": {
+      parts: ["root", "input", "clear"],
+      slots: ["aside()"],
+      variants: ["dense", "plain"],
+      tokens: [],
+      fork: "Two elements and a debounce; copy them if the shape is wrong.",
+      file: "table.js"
+    },
+    "section": {
+      parts: ["root", "head", "words", "title", "hint", "actions", "before", "body", "after"],
+      slots: ["actions()", "before()", "after()"],
+      variants: ["dense", "plain", "quiet"],
+      tokens: ["--ak-section-pad", "--ak-section-gap"],
+      fork: "It IS the escape hatch: put your own markup in its body and keep the frame.",
+      file: "shell.js"
+    },
+    "statRow": {
+      parts: ["root", "tile", "value", "unit", "delta", "label", "hint", "trend", "aside"],
+      slots: ["label(tile)", "hint(tile)", "aside(tile)"],
+      variants: ["compact", "trend", "plain"],
+      tokens: ["--ak-stat-min", "--ak-stat-pad", "--ak-stat-gap", "--ak-stat-figure-size", "--ak-stat-unit-size", "--ak-stat-up", "--ak-stat-down"],
+      fork: "Copy .ak-statrow* out of shell.css; you keep the tokens and lose countUp() on a changed figure.",
+      file: "hero.js"
+    },
+    "table": {
+      parts: ["root", "table", "head", "headcell", "sort", "body", "row", "cell", "caption"],
+      slots: ["cell(value, row, column)", "head(column)", "row(row)"],
+      variants: ["dense", "plain", "lined"],
+      tokens: ["--ak-table-cell-pad-y", "--ak-table-cell-pad-x"],
+      fork: "Copy .ak-table* out of content.css; you keep the tokens and the tabular numerals, and you give up the keyed body, so a sort stops being seen as a move.",
+      file: "table.js"
+    },
+    "tabs": {
+      parts: ["root", "tab"],
+      slots: ["tab(item)"],
+      variants: ["dense", "pill"],
+      tokens: ["--ak-tabs-gap"],
+      fork: "A row of buttons; copy .ak-tabs* out of shell.css and you give up the view transition.",
+      file: "shell.js"
+    },
+    "timeline": {
+      parts: ["root", "item", "dot", "body", "when", "title", "sub", "extra", "aside"],
+      slots: ["item(item)", "when(item)", "title(item)", "sub(item)", "extra(item)", "aside(item)"],
+      variants: ["dense", "plain"],
+      tokens: ["--ak-timeline-dot", "--ak-timeline-rail", "--ak-timeline-gap", "--ak-timeline-indent"],
+      fork: "Copy .ak-timeline* out of content.css; the rail is one ::before and the dot is one span, and you give up the keyed line so every event re-enters on every change.",
+      file: "timeline.js"
+    }
+  };
+
   // src/static/sdk-libs/atelier/index.js
   var atelier = {
     /**
@@ -15850,7 +16221,26 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.50.0",
+    version: "0.51.0",
+    /**
+     * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
+     * named parts (every one carries `data-ak-part`, so an app's own CSS reaches it), the slots
+     * `parts: { … }` accepts, the shapes `variant:` accepts, the `--ak-*` properties an app may
+     * set on its own box, and what copying the component out would cost.
+     *
+     * The answer is READ OUT OF THE SOURCE: tools/build-atelier-parts.ts collects each module's
+     * own `@parts` / `@slots` / `@variants` / `@tokens` / `@fork` lines, and `pnpm
+     * check:atelier-parts` refuses a commit where the generated list and the modules disagree —
+     * so this is never a second list somebody has to remember to update.
+     * @param {string} [name] - a component id; omitted, every id the kit describes
+     * @returns {object|string[]|null}
+     */
+    describe(name) {
+      if (name == null) return Object.keys(PARTS).sort();
+      const found = PARTS[String(name)];
+      if (!found) return null;
+      return Object.assign({ id: String(name) }, found);
+    },
     // ── Shell and navigation ──
     app,
     section,
@@ -16018,6 +16408,9 @@
     viewSwap,
     motionOff,
     setMotionDefaults,
+    // ── The customisation model: what a component's parts, slots, variants and tokens ARE, read
+    //    out of its own source, so an AI builder asks the kit instead of guessing ──
+    parts: PARTS,
     // ── Theme, i18n, helpers ──
     injectStyle,
     i18n,

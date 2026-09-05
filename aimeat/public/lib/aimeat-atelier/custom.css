@@ -1,0 +1,205 @@
+/*
+ * @file aimeat-atelier/custom.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description THE PARTS THE KIT LEAVES EMPTY, AND THE SHAPES A BUILDER PICKS. One sheet for the
+ *   whole customisation model, so a builder reading "how do I change this" has one place to
+ *   look and a component's own sheet stays about the component.
+ *
+ *   Two kinds of rule live here and nothing else:
+ *
+ *     THE EMPTY PARTS — .ak-list__extra, .ak-list__aside, .ak-card__extra, the timeline's, the
+ *     queue's, the kanban's, the hero's kicker and corner mark, the dialog's four, the search
+ *     bar's right-hand side. Every one of them is rendered by the component ONLY when an app
+ *     fills the matching slot (`parts: { extra: … }`), so a component nobody customised carries
+ *     none of them and its markup is byte for byte what it was.
+ *
+ *     THE VARIANTS — [data-ak-variant='dense'|'numbered'|'plain'|…] on a component root. A
+ *     variant sets that component's OWN tokens wherever it can (dense is four token values, not
+ *     four overridden rules), so the shape a builder picks and the shape a builder tunes are the
+ *     same mechanism.
+ *
+ *   Nothing here introduces a colour or a size of its own: every value is a --ak-* property from
+ *   the contract in aimeat-atelier.css, which is where the per-component tokens are declared
+ *   with the value the component already had.
+ * @structure the list's parts and shapes · the card grid's · the timeline's · the table's ·
+ *   the queue and health wall's · the kanban's · the hero's · the section's · the tab row's ·
+ *   the statRow and figure's · the dialog's · the search bar's
+ * @usage imported by /lib/aimeat-atelier.css; never linked on its own
+ * @version-history
+ *   v0.51.0 — 2026-09-05 — Initial (wish-atelier-always-excellent, part 3). Pure extraction of
+ *     the rules first written into content.css, shell.css, data.css and planner.css beside the
+ *     components they belong to; content.css crossed 800 lines carrying them.
+ */
+
+/* ── The list: the third line, the right-hand figure, and three shapes ────────────────────── */
+.ak-list__extra { font-size: var(--ak-text-fine); color: var(--ak-ink-dim); overflow-wrap: anywhere; }
+.ak-list__aside {
+  font-family: var(--ak-font-display);
+  font-weight: var(--ak-weight-display);
+  font-size: var(--ak-list-aside-size);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.ak-list[data-ak-variant='dense'] { --ak-list-gap: 2px; --ak-list-row-pad-y: 6px; --ak-list-line-gap: 0px; }
+.ak-list[data-ak-variant='plain'] { --ak-list-gap: 0px; }
+.ak-list[data-ak-variant='plain'] .ak-list__row {
+  border-color: transparent;
+  border-bottom-color: var(--ak-line);
+  border-radius: 0;
+  background: none;
+  background-image: none;
+  box-shadow: none;
+}
+.ak-list[data-ak-variant='numbered'] { counter-reset: ak-list-n; }
+.ak-list[data-ak-variant='numbered'] .ak-list__row::before {
+  counter-increment: ak-list-n;
+  content: counter(ak-list-n);
+  flex: none;
+  align-self: center;
+  min-width: 1.6em;
+  font-family: var(--ak-font-mono);
+  font-size: var(--ak-text-fine);
+  color: var(--ak-ink-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── The card grid ─────────────────────────────────────────────────────────────────────────── */
+.ak-grid[data-ak-variant='dense'] { --ak-card-min: 8rem; --ak-card-pad: 10px; }
+.ak-grid[data-ak-variant='wide'] { --ak-card-min: 18rem; --ak-card-aspect: 16 / 9; }
+.ak-grid[data-ak-variant='plain'] .ak-card { border-color: transparent; box-shadow: none; background: none; }
+.ak-card__extra { font-size: var(--ak-text-fine); color: var(--ak-ink-dim); overflow-wrap: anywhere; }
+.ak-card__aside {
+  font-family: var(--ak-font-display);
+  font-weight: var(--ak-weight-display);
+  font-variant-numeric: tabular-nums;
+  padding: 0 var(--ak-card-pad) var(--ak-card-pad);
+}
+
+/* ── The timeline ──────────────────────────────────────────────────────────────────────────── */
+.ak-timeline__extra { font-size: var(--ak-text-micro); color: var(--ak-ink-dim); font-family: var(--ak-font-mono); }
+.ak-timeline__aside { margin-inline-start: auto; align-self: flex-start; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ak-timeline[data-ak-variant='dense'] { --ak-timeline-rail: 8px; --ak-timeline-dot: 8px; --ak-timeline-indent: 3px; }
+.ak-timeline[data-ak-variant='plain'] .ak-timeline__item::before { display: none; }
+
+/* ── The table ─────────────────────────────────────────────────────────────────────────────── */
+.ak-table[data-ak-variant='dense'] { --ak-table-cell-pad-y: 5px; --ak-table-cell-pad-x: 10px; }
+.ak-table[data-ak-variant='plain'] { border: 0; box-shadow: none; background: none; }
+.ak-table[data-ak-variant='lined'] td { border-inline-end: var(--ak-line-w) solid color-mix(in oklab, var(--ak-line) 55%, var(--ak-surface)); }
+.ak-table[data-ak-variant='lined'] td:last-child { border-inline-end: 0; }
+
+/* ── The queue and the health wall ─────────────────────────────────────────────────────────── */
+.ak-queue__extra { color: var(--ak-ink-dim); font-size: var(--ak-text-micro); font-family: var(--ak-font-mono); }
+.ak-queue__aside,
+.ak-health__aside { margin-inline-start: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ak-queue[data-ak-variant='dense'] { --ak-queue-row-pad-y: 4px; --ak-queue-state-min: 56px; }
+.ak-queue[data-ak-variant='plain'] .ak-queue__row { background: none; }
+.ak-health[data-ak-variant='dense'] { --ak-health-row-pad-y: 5px; --ak-health-lamp: 8px; }
+.ak-health[data-ak-variant='plain'] .ak-health__row { background: none; }
+
+/* ── The kanban board ──────────────────────────────────────────────────────────────────────── */
+.ak-kanban__extra { font-size: var(--ak-text-micro); color: var(--ak-ink-dim); font-family: var(--ak-font-mono); }
+.ak-kanban__aside { font-variant-numeric: tabular-nums; color: var(--ak-ink-dim); font-size: var(--ak-text-fine); }
+.ak-kanban[data-ak-variant='dense'] { --ak-kanban-col-min: 10rem; --ak-kanban-card-pad: 6px; }
+.ak-kanban[data-ak-variant='plain'] .ak-kanban__card { box-shadow: none; }
+
+/* ── The hero band: the kicker, the line under the actions, the corner mark ─────────────────
+ * The kicker is mono small-caps so it reads as a label and never competes with the display
+ * line; the corner mark sits over the scrim and never over the words. */
+.ak-hero__before {
+  font-family: var(--ak-font-mono);
+  font-size: var(--ak-text-fine);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ak-hero-ink-dim);
+}
+.ak-hero__after { font-size: var(--ak-text-fine); color: var(--ak-hero-ink-dim); }
+.ak-hero__aside {
+  position: absolute;
+  top: var(--ak-hero-pad);
+  inset-inline-end: var(--ak-hero-pad);
+  z-index: 1;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.ak-hero[data-ak-variant='tall'] { --ak-hero-min: 18rem; }
+.ak-hero[data-ak-variant='compact'] { --ak-hero-min: 7rem; --ak-hero-title-size: var(--ak-text-title); }
+.ak-hero[data-ak-variant='center'] { align-items: center; }
+.ak-hero[data-ak-variant='center'] .ak-hero__inner { align-items: center; text-align: center; }
+.ak-hero[data-ak-variant='center'] .ak-hero__actions { justify-content: center; }
+
+/* ── The section ──────────────────────────────────────────────────────────────────────────────
+ * The head is a row ONLY when the app declared a right-hand side; without it the title and the
+ * hint are the section's own children, exactly as they were before 0.51.0. */
+.ak-section__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--ak-gap); flex-wrap: wrap; }
+.ak-section__words { display: flex; flex-direction: column; gap: var(--ak-section-gap); min-width: 0; }
+.ak-section__actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ak-section__before, .ak-section__after { min-width: 0; }
+.ak-section[data-ak-variant='dense'] { --ak-section-pad: 10px; --ak-section-gap: 4px; }
+.ak-section[data-ak-variant='plain'] { border-color: transparent; box-shadow: none; background: none; background-image: none; }
+.ak-section[data-ak-variant='quiet'] { background: var(--ak-surface-2); box-shadow: none; }
+
+/* ── The tab row ───────────────────────────────────────────────────────────────────────────── */
+.ak-tabs[data-ak-variant='dense'] { --ak-tabs-gap: 2px; }
+.ak-tabs[data-ak-variant='dense'] .ak-tab { min-height: var(--ak-touch-min); padding: 0 10px; }
+.ak-tabs[data-ak-variant='pill'] {
+  padding: 3px;
+  border-radius: var(--ak-radius-pill);
+  background: var(--ak-surface-2);
+  --ak-tabs-gap: 2px;
+}
+.ak-tabs[data-ak-variant='pill'] .ak-tab { border-color: transparent; background: none; }
+.ak-tabs[data-ak-variant='pill'] .ak-tab--active { background: var(--ak-accent); border-color: var(--ak-accent); }
+
+/* ── The figure line: the number, its unit, and which way it went ──────────────────────────────
+ * One baseline, so the unit sits under the number's shoulder rather than beside it as another
+ * number. The direction is a tone, not a colour written here: --ak-stat-up and --ak-stat-down
+ * fall back to the look's own ok/err text tokens, so a look retunes them with everything else. */
+.ak-statrow__figure { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.ak-statrow__unit {
+  font-size: var(--ak-stat-unit-size);
+  color: var(--ak-ink-dim);
+  font-family: var(--ak-font-mono);
+}
+.ak-statrow__delta {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  font-size: var(--ak-text-fine);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--ak-ink-dim);
+}
+.ak-statrow__delta[data-ak-direction='up'] { color: var(--ak-stat-up); }
+.ak-statrow__delta[data-ak-direction='down'] { color: var(--ak-stat-down); }
+.ak-statrow__aside { font-size: var(--ak-text-fine); color: var(--ak-ink-dim); }
+.ak-statrow[data-ak-variant='compact'] { --ak-stat-min: 7rem; --ak-stat-pad: 10px; --ak-stat-figure-size: var(--ak-text-body); }
+.ak-statrow[data-ak-variant='trend'] { --ak-stat-min: 11rem; }
+.ak-statrow[data-ak-variant='plain'] .ak-statrow__tile { border-color: transparent; box-shadow: none; background: none; background-image: none; }
+/* The figure block wears the same pair, so one app-level token retunes both. */
+.ak-figure__unit { font-size: var(--ak-stat-unit-size); color: var(--ak-ink-dim); font-family: var(--ak-font-mono); }
+.ak-figure__delta[data-ak-direction='up'] { color: var(--ak-stat-up); }
+.ak-figure__delta[data-ak-direction='down'] { color: var(--ak-stat-down); }
+.ak-figure__aside { font-size: var(--ak-text-fine); color: var(--ak-ink-dim); }
+.ak-figure[data-ak-variant='compact'] .ak-figure__value { font-size: var(--ak-text-title); }
+.ak-figure[data-ak-variant='center'] { align-items: center; text-align: center; }
+/* The score without its words: the number and the stars, for a row or a card corner. */
+.ak-rating[data-ak-variant='compact'] .ak-rating__words { display: none; }
+
+/* ── The featured card, the master–detail split, the search bar, the bottom bar ─────────────
+ * Four components whose shapes had no rules of their own until 0.51.0, so `variant` on them
+ * stamped an attribute nothing read. Each one now means something. */
+.ak-mediacard[data-ak-variant='dense'] { --ak-card-aspect: 21 / 9; --ak-card-pad: 10px; }
+.ak-mediacard[data-ak-variant='plain'] .ak-card { border-color: transparent; box-shadow: none; background: none; }
+.ak-listdetail[data-ak-variant='dense'] { gap: 8px; }
+.ak-listdetail[data-ak-variant='plain'] .ak-listdetail__detail { border-color: transparent; box-shadow: none; background: none; }
+.ak-search[data-ak-variant='dense'] .ak-search__input { min-height: var(--ak-touch-min); }
+.ak-search[data-ak-variant='plain'] .ak-search__input { border-color: transparent; background: none; box-shadow: none; }
+.ak-bottomnav[data-ak-variant='dense'] .ak-bottomnav__item { min-height: var(--ak-touch-min); font-size: var(--ak-text-fine); }
+
+/* ── The dialog and the search bar ─────────────────────────────────────────────────────────── */
+.ak-dialog__before, .ak-dialog__after { min-width: 0; }
+.ak-dialog__extra { margin-inline-end: auto; display: flex; align-items: center; gap: 8px; font-size: var(--ak-text-fine); color: var(--ak-ink-dim); }
+.ak-dialog__aside { margin-inline-start: auto; display: flex; align-items: center; gap: 8px; }
+.ak-search__aside { display: flex; align-items: center; gap: 8px; flex: none; }

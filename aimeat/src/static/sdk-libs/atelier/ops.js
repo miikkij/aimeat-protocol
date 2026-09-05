@@ -21,7 +21,25 @@
  *     { id: 'j1', title: 'Nightly import', state: 'running', sub: 'row 1 200 of 8 000' } ] } });
  *   AIMEAT.atelier.gauge({ target: host, data: { value: 72, max: 100, label: 'CPU', unit: '%',
  *     bands: [{ upTo: 60, tone: 'ok' }, { upTo: 85, tone: 'warn' }, { upTo: 100, tone: 'err' }] } });
+ * @parts health root · row · lamp · name · label · sub · reading · aside
+ * @slots health label(item) · sub(item) · reading(item) · aside(item)
+ * @variants health dense · plain
+ * @tokens health --ak-health-lamp · --ak-health-row-pad-y
+ * @fork health One row, one lamp; copy .ak-health* out of data.css.
+ * @parts queue root · strip · list · row · state · words · title · sub · extra · aside
+ * @slots queue row(item) · state(item) · title(item) · sub(item) · extra(item) · aside(item)
+ * @variants queue dense · plain
+ * @tokens queue --ak-queue-row-pad-y · --ak-queue-state-min
+ * @fork queue Copy .ak-queue* out of data.css; you give up the keyed line, so a job finishing looks like a repaint.
+ *
+ *   gauge has NOT joined the customisation model: the dial is arithmetic in this file rather than
+ *   markup an app would want to fill, so it carries no @parts declaration and describe() claims
+ *   nothing for it. Adding it is the same three steps as the queue's.
  * @version-history
+ *   v0.51.0 — 2026-09-05 — THE WALL AND THE QUEUE TAKE WHAT THE APP GIVES THEM: named parts on
+ *     every element, `extra` and `aside` left empty on a job and on a watched thing, `parts.row`
+ *     for the whole line, two variants each and four tokens (the lamp, the two row paddings, the
+ *     state chip's width).
  *   v0.50.0 — 2026-09-05 — THE QUEUE MOVES. It had no entrance of any kind and was rebuilt whole
  *     on every set, which is the worst shape for the one block whose subject IS change: a job
  *     arriving, running and finishing all looked like the same silent repaint. The list is kept
@@ -33,6 +51,7 @@ import { el, clear, resolve, reducedMotion } from './dom.js';
 import { keyedRows } from './arrive.js';
 import { t } from './i18n.js';
 import { emptyState } from './state.js';
+import { partEl, slotInto, applyVariant, partValue, fillPart } from './parts-model.js';
 
 /** Which job a kept row is showing right now, so a pick reports what is under the finger. */
 const JOB = new WeakMap();
@@ -55,7 +74,8 @@ function toneOf(value) { return TONES.indexOf(value) >= 0 ? value : 'plain'; }
  * }} spec
  */
 export function health(spec) {
-  const root = el('div', { class: 'ak-root ak-health', role: 'list' });
+  const root = el('div', { class: 'ak-root ak-health', role: 'list', 'data-ak-part': 'root' });
+  applyVariant(root, spec, ['dense', 'plain']);
   if (spec.target) resolve(spec.target).appendChild(root);
   let emptyCard = null;
 
@@ -71,16 +91,16 @@ export function health(spec) {
     for (const item of items) {
       const tone = toneOf(item.tone);
       const row = el(spec.onPick ? 'button' : 'div', {
-        class: 'ak-health__row', role: 'listitem', type: spec.onPick ? 'button' : undefined,
-      }, [
-        el('span', { class: 'ak-health__lamp ak-health__lamp--' + tone, 'aria-hidden': 'true' }),
-        el('span', { class: 'ak-health__name' }, [
-          el('span', { class: 'ak-health__label', text: item.label || item.id }),
-          item.sub ? el('span', { class: 'ak-health__sub', text: item.sub }) : null,
-        ]),
-        item.reading != null ? el('span', { class: 'ak-health__reading', text: String(item.reading) }) : null,
-        el('span', { class: 'ak-sr-only', text: tone === 'ok' ? t('opsOk') : tone === 'err' ? t('opsDown') : tone === 'warn' ? t('opsWarn') : '' }),
-      ]);
+        class: 'ak-health__row', role: 'listitem', 'data-ak-part': 'row',
+        type: spec.onPick ? 'button' : undefined,
+      }, partEl('span', 'ak-health__lamp ak-health__lamp--' + tone, 'lamp', { 'aria-hidden': 'true' }));
+      const name = partEl('span', 'ak-health__name', 'name');
+      slotInto(name, spec, 'label', item.label || item.id, { cls: 'ak-health__label', args: [item] });
+      slotInto(name, spec, 'sub', item.sub || null, { cls: 'ak-health__sub', args: [item] });
+      row.appendChild(name);
+      slotInto(row, spec, 'reading', item.reading == null ? null : String(item.reading), { cls: 'ak-health__reading', args: [item] });
+      slotInto(row, spec, 'aside', null, { cls: 'ak-health__aside', args: [item] });
+      row.appendChild(el('span', { class: 'ak-sr-only', text: tone === 'ok' ? t('opsOk') : tone === 'err' ? t('opsDown') : tone === 'warn' ? t('opsWarn') : '' }));
       if (spec.onPick) row.addEventListener('click', function () { spec.onPick(item); });
       root.appendChild(row);
     }
@@ -105,24 +125,29 @@ const QUEUE_TONE = { waiting: 'plain', running: 'warn', done: 'ok', failed: 'err
  * }} spec
  */
 /** One job's row contents, written into the element that already stands for it.
- *  @param {HTMLElement} row @param {any} item */
-function fillJob(row, item) {
+ *  @param {HTMLElement} row @param {any} item @param {any} spec */
+function fillJob(row, item, spec) {
   const s = QUEUE_STATES.indexOf(item.state) >= 0 ? item.state : 'waiting';
   clear(row);
-  row.appendChild(el('span', { class: 'ak-queue__state ak-queue__state--' + s, text: t('queue.' + s) }));
-  row.appendChild(el('span', { class: 'ak-queue__words' }, [
-    el('span', { class: 'ak-queue__title', text: item.title || item.id }),
-    item.sub ? el('span', { class: 'ak-queue__sub', text: item.sub }) : null,
-  ]));
+  const whole = partValue(spec, 'row', item);
+  if (whole !== undefined) { fillPart(row, whole); return; }
+  slotInto(row, spec, 'state', t('queue.' + s), { cls: 'ak-queue__state ak-queue__state--' + s, args: [item] });
+  const words = partEl('span', 'ak-queue__words', 'words');
+  slotInto(words, spec, 'title', item.title || item.id, { cls: 'ak-queue__title', args: [item] });
+  slotInto(words, spec, 'sub', item.sub || null, { cls: 'ak-queue__sub', args: [item] });
+  slotInto(words, spec, 'extra', null, { cls: 'ak-queue__extra', args: [item] });
+  row.appendChild(words);
+  slotInto(row, spec, 'aside', null, { cls: 'ak-queue__aside', args: [item] });
 }
 
 export function queue(spec) {
-  const root = el('div', { class: 'ak-root ak-queue' });
+  const root = el('div', { class: 'ak-root ak-queue', 'data-ak-part': 'root' });
+  applyVariant(root, spec, ['dense', 'plain']);
   // THE LIST OUTLIVES THE RENDER, which is the whole point: a job kept across a change keeps its
   // element, so only what actually changed moves. The strip above it is one line of counts and is
   // rewritten each time.
-  const strip = el('div', { class: 'ak-queue__strip', role: 'status' });
-  const list = el('div', { class: 'ak-queue__list', role: 'list' });
+  const strip = el('div', { class: 'ak-queue__strip', role: 'status', 'data-ak-part': 'strip' });
+  const list = el('div', { class: 'ak-queue__list', role: 'list', 'data-ak-part': 'list' });
   root.appendChild(strip);
   root.appendChild(list);
   if (spec.target) resolve(spec.target).appendChild(root);
@@ -161,14 +186,15 @@ export function queue(spec) {
       key: function (item, i) { return item && item.id != null ? String(item.id) : 'job-' + i; },
       build: function (item) {
         const row = el(spec.onPick ? 'button' : 'div', {
-          class: 'ak-queue__row', role: 'listitem', type: spec.onPick ? 'button' : undefined,
+          class: 'ak-queue__row', role: 'listitem', 'data-ak-part': 'row',
+          type: spec.onPick ? 'button' : undefined,
         });
         JOB.set(row, item);
-        fillJob(row, item);
+        fillJob(row, item, spec);
         if (spec.onPick) row.addEventListener('click', function () { spec.onPick(JOB.get(row)); });
         return row;
       },
-      update: function (row, item) { JOB.set(row, item); fillJob(row, item); },
+      update: function (row, item) { JOB.set(row, item); fillJob(row, item, spec); },
     });
   }
 
@@ -190,7 +216,7 @@ export function queue(spec) {
  * }} spec
  */
 export function gauge(spec) {
-  const root = el('figure', { class: 'ak-root ak-gauge', role: 'img' });
+  const root = el('figure', { class: 'ak-root ak-gauge', role: 'img', 'data-ak-part': 'root' });
   if (spec.target) resolve(spec.target).appendChild(root);
   let emptyCard = null;
 

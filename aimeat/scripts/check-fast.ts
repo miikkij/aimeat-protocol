@@ -49,6 +49,7 @@ const CHECKS: Check[] = [
     { script: 'check:changelog', label: 'Landing change log parses + newest first' },
     { script: 'check:sdk', label: 'SDK-libs dist ↔ sources in sync' },
     { script: 'check:atelier', label: 'Atelier look matrix — every preset × palette × mode' },
+    { script: 'check:atelier-parts', label: 'Atelier parts list ↔ the components\' own JSDoc' },
     { script: 'check:mcp-tools', label: 'MCP tool surface/handler parity' },
     { script: 'check:mcp-schemas', label: 'MCP tool input-schema parity' },
     { script: 'check:plain-language', label: 'Plain language for the messages a person hears' },

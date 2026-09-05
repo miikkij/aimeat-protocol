@@ -17,6 +17,11 @@
  *   fade, for every scroller in the kit) · shared primitives (ak-btn, ak-scroll, focus, ak-busy)
  * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
  * @version-history
+ *   v0.50.0 — 2026-09-05 — The hero, the KPI row, the section and the tab row read their own
+ *     tokens instead of the literals they carried: --ak-hero-pad / -gap / -title-size,
+ *     --ak-stat-min / -gap / -pad / -figure-size, --ak-section-pad / -gap, --ak-tabs-gap, at the
+ *     phone width too. Every default is the value that was there, so nothing moved. The slots
+ *     and the variants those four gained live in custom.css.
  *   v0.49.0 — 2026-09-05 — THE SIDEWAYS EDGE FADE, kit-wide: [data-ak-scroll] paints a mask on
  *     the side that still has content, so a strip that is cut off stops looking like a strip
  *     that ended. scroll-edge.js writes the attribute; the rule is here.
@@ -287,17 +292,17 @@
 .ak-hero__inner {
   position: relative;
   width: 100%;
-  padding: calc(var(--ak-pad) * 1.5) var(--ak-pad) var(--ak-pad);
+  padding: calc(var(--ak-hero-pad) * 1.5) var(--ak-hero-pad) var(--ak-hero-pad);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--ak-hero-gap);
 }
 .ak-hero__title {
   margin: 0;
   color: var(--ak-hero-ink);
   font-family: var(--ak-font-display);
   font-weight: var(--ak-weight-display);
-  font-size: var(--ak-text-hero);
+  font-size: var(--ak-hero-title-size);
   line-height: 1.08;
   letter-spacing: -0.01em;
   overflow-wrap: anywhere;
@@ -308,16 +313,18 @@
 .ak-hero__sub[hidden] { display: none; }
 .ak-hero__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
 .ak-hero__actions[hidden] { display: none; }
+/* The band's own slots (the kicker, the line under the actions, the corner mark) and its three
+ * shapes live in custom.css, with the rest of the customisation model. */
 
 /* ── KPI row ──────────────────────────────────────────────────────────────────────────────── */
 .ak-statrow {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(9.5rem, 100%), 1fr));
-  gap: var(--ak-gap);
+  grid-template-columns: repeat(auto-fit, minmax(min(var(--ak-stat-min), 100%), 1fr));
+  gap: var(--ak-stat-gap);
 }
 .ak-statrow__tile {
   min-width: 0;
-  padding: var(--ak-pad);
+  padding: var(--ak-stat-pad);
   border-radius: var(--ak-radius);
   background: var(--ak-surface);
   background-image: var(--ak-surface-image);
@@ -334,16 +341,18 @@
 .ak-statrow__value {
   font-family: var(--ak-font-display);
   font-weight: var(--ak-weight-display);
-  font-size: var(--ak-text-title);
+  font-size: var(--ak-stat-figure-size);
   font-variant-numeric: tabular-nums;
 }
 .ak-statrow__label { font-size: var(--ak-text-fine); color: var(--ak-ink-dim); }
 .ak-statrow__hint { font-size: var(--ak-text-fine); color: var(--ak-accent-text); }
 .ak-statrow__hint[hidden] { display: none; }
+/* The figure line (the number, its unit, which way it went) and the tile's three shapes live in
+ * custom.css, with the rest of the customisation model. */
 
 /* ── Section (and the escape hatch) ───────────────────────────────────────────────────────── */
 .ak-section {
-  padding: var(--ak-pad);
+  padding: var(--ak-section-pad);
   border-radius: var(--ak-radius);
   background: var(--ak-surface);
   background-image: var(--ak-surface-image);
@@ -351,8 +360,9 @@
   box-shadow: var(--ak-elev-1);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--ak-section-gap);
 }
+/* The section's head row, its slots and its three shapes: custom.css. */
 .ak-section--flush { padding: 0; background: none; background-image: none; border: 0; box-shadow: none; }
 .ak-section__title {
   margin: 0;
@@ -403,11 +413,12 @@
 /* ── Tabs ─────────────────────────────────────────────────────────────────────────────────── */
 .ak-tabs {
   display: flex;
-  gap: 6px;
+  gap: var(--ak-tabs-gap);
   overflow-x: auto;
   overflow-y: clip;
   padding-bottom: 2px;
 }
+/* The tab row's two shapes: custom.css. */
 .ak-tab {
   flex: none;
   min-height: var(--ak-touch);
@@ -629,10 +640,10 @@
    story was a sliver (first design review). Display sizes cap against the viewport HEIGHT. */
 @media (max-height: 540px) {
   .ak-hero { min-height: 18vh; }
-  .ak-hero__title { font-size: min(var(--ak-text-hero), 9vh); }
-  .ak-hero__inner { padding: calc(var(--ak-pad) * 0.75) var(--ak-pad); }
-  .ak-statrow__value { font-size: min(var(--ak-text-title), 7vh); }
-  .ak-statrow__tile { padding: calc(var(--ak-pad) * 0.6) var(--ak-pad); }
+  .ak-hero__title { font-size: min(var(--ak-hero-title-size), 9vh); }
+  .ak-hero__inner { padding: calc(var(--ak-hero-pad) * 0.75) var(--ak-hero-pad); }
+  .ak-statrow__value { font-size: min(var(--ak-stat-figure-size), 7vh); }
+  .ak-statrow__tile { padding: calc(var(--ak-stat-pad) * 0.6) var(--ak-stat-pad); }
   .ak-figure__value { font-size: min(2.8rem, 14vh); }
   .ak-empty { padding: calc(var(--ak-pad) * 0.6) var(--ak-pad); }
   .ak-empty__mark { display: none; }

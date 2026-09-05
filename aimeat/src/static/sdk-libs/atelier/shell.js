@@ -25,7 +25,28 @@
  *   tabs(spec) · bottomNav(spec)
  * @usage  const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  *         a.main.appendChild(view);   // the main element is yours to fill
+ * @parts section root · head · words · title · hint · actions · before · body · after
+ * @slots section actions() · before() · after()
+ * @variants section dense · plain · quiet
+ * @tokens section --ak-section-pad · --ak-section-gap
+ * @fork section It IS the escape hatch: put your own markup in its body and keep the frame.
+ * @parts tabs root · tab
+ * @slots tabs tab(item)
+ * @variants tabs dense · pill
+ * @tokens tabs --ak-tabs-gap
+ * @fork tabs A row of buttons; copy .ak-tabs* out of shell.css and you give up the view transition.
+ * @parts bottomNav root · item
+ * @slots bottomNav item(entry)
+ * @variants bottomNav dense
+ * @tokens bottomNav --ak-chrome-bottom
+ * @fork bottomNav Copy .ak-bottomnav* out of shell.css; the chrome reserve is the shell's.
  * @version-history
+ *   v0.51.0 — 2026-09-05 — THE SECTION AND THE TWO NAVIGATIONS TAKE WHAT THE APP GIVES THEM:
+ *     `parts.actions` puts the app's own right-hand side beside the section's title (and only
+ *     then does the head become a row, so a section nobody customised keeps the markup it had),
+ *     `parts.before` / `parts.after` sit either side of the body, `parts.tab` and `parts.item`
+ *     take a node where a navigation entry only ever took a string, every element carries
+ *     `data-ak-part`, and the three take variants (dense, plain, quiet, pill) and two tokens.
  *   v0.47.0 — 2026-09-05 — THE AMBIENT behind the frame (wish-atelier-ambient-visuals): app()
  *     mounts the one layer allowed to move at idle, the look deciding unless `ambient` names a
  *     preset (a string, or { preset, alpha, speed, fps, gl }) and `ambient: false` opting out;
@@ -56,6 +77,14 @@ import { emptyState } from './state.js';
 import { screenTransition, curtain } from './transitions.js';
 import { ambient } from './ambient.js';
 import { weather } from './ambient-parts.js';
+import { partEl, slotInto, applyVariant, hasPart, partValue } from './parts-model.js';
+
+/** A navigation entry's own words, or whatever the app declared for that part — a string, a
+ *  node, or an array of both. The kit's label is the default, never the ceiling. */
+function tabLabel(spec, name, item) {
+  const given = partValue(spec, name, item);
+  return given === undefined ? item.label : given;
+}
 
 /** How often the boot poll looks for a session the silent login produced without an event. */
 const BOOT_POLL_MS = 300;
@@ -494,13 +523,34 @@ export function app(spec) {
  */
 export function section(spec) {
   const s = spec || {};
-  const heading = s.title != null ? el('h2', { class: 'ak-section__title', text: s.title }) : null;
-  const hint = s.hint != null ? el('p', { class: 'ak-section__hint', text: s.hint }) : null;
-  const body = el('div', { class: 'ak-section__body' });
+  const heading = s.title != null ? el('h2', { class: 'ak-section__title', 'data-ak-part': 'title', text: s.title }) : null;
+  const hint = s.hint != null ? el('p', { class: 'ak-section__hint', 'data-ak-part': 'hint', text: s.hint }) : null;
+  const body = el('div', { class: 'ak-section__body', 'data-ak-part': 'body' });
   if (s.body != null) append(body, s.body);
   const root = el('section', {
     class: 'ak-root ak-section' + (s.flush ? ' ak-section--flush' : ''),
-  }, [heading, hint, body]);
+    'data-ak-part': 'root',
+  });
+  applyVariant(root, s, ['dense', 'plain', 'quiet']);
+  // THE HEAD IS A ROW ONLY WHEN THE APP GAVE IT A RIGHT-HAND SIDE. A section nobody customised
+  // keeps exactly the markup and the 8px column it had; declare `parts.actions` and the words
+  // move into a head that puts them beside the count, the filter or the one control that
+  // belongs to this block rather than to the page.
+  if (hasPart(s, 'actions')) {
+    const head = partEl('div', 'ak-section__head', 'head');
+    const words = el('div', { class: 'ak-section__words', 'data-ak-part': 'words' });
+    if (heading) words.appendChild(heading);
+    if (hint) words.appendChild(hint);
+    head.appendChild(words);
+    slotInto(head, s, 'actions', null, { cls: 'ak-section__actions', tag: 'div' });
+    root.appendChild(head);
+  } else {
+    if (heading) root.appendChild(heading);
+    if (hint) root.appendChild(hint);
+  }
+  slotInto(root, s, 'before', null, { cls: 'ak-section__before', tag: 'div' });
+  root.appendChild(body);
+  slotInto(root, s, 'after', null, { cls: 'ak-section__after', tag: 'div' });
   if (s.target) resolve(s.target).appendChild(root);
   enter(body);
   return {
@@ -530,7 +580,8 @@ export function section(spec) {
  */
 export function tabs(spec) {
   const state = { items: spec.items || [], value: spec.value || (spec.items && spec.items[0] ? spec.items[0].id : '') };
-  const root = el('div', { class: 'ak-root ak-tabs', role: 'tablist' });
+  const root = el('div', { class: 'ak-root ak-tabs', role: 'tablist', 'data-ak-part': 'root' });
+  applyVariant(root, spec, ['dense', 'pill']);
   if (spec.target) resolve(spec.target).appendChild(root);
 
   function render() {
@@ -541,6 +592,8 @@ export function tabs(spec) {
         type: 'button',
         class: 'ak-tab' + (active ? ' ak-tab--active' : ''),
         role: 'tab',
+        'data-ak-part': 'tab',
+        'data-ak-id': item.id,
         'aria-selected': active ? 'true' : 'false',
         'data-ak-noguard': true,
         on: {
@@ -558,7 +611,7 @@ export function tabs(spec) {
             }, { kind: spec.transition, node: root });
           },
         },
-      }, item.label));
+      }, tabLabel(spec, 'tab', item)));
     }
   }
   render();
@@ -588,7 +641,8 @@ export function tabs(spec) {
  */
 export function bottomNav(spec) {
   const state = { items: spec.items || [], value: spec.value || '' };
-  const root = el('nav', { class: 'ak-root ak-bottomnav' });
+  const root = el('nav', { class: 'ak-root ak-bottomnav', 'data-ak-part': 'root' });
+  applyVariant(root, spec, ['dense']);
   if (spec.target) resolve(spec.target).appendChild(root);
 
   function render() {
@@ -599,6 +653,8 @@ export function bottomNav(spec) {
         type: 'button',
         class: 'ak-bottomnav__item' + (active ? ' ak-bottomnav__item--active' : ''),
         'aria-current': active ? 'page' : null,
+        'data-ak-part': 'item',
+        'data-ak-id': item.id,
         'data-ak-noguard': true,
         on: {
           click: function () {
@@ -611,7 +667,7 @@ export function bottomNav(spec) {
             }, { kind: spec.transition, node: root });
           },
         },
-      }, item.label));
+      }, tabLabel(spec, 'item', item)));
     }
   }
   render();

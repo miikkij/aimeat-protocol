@@ -18,7 +18,32 @@
  *   figure(spec) → { el, set, destroy } · rating(spec) → { el, set, destroy }
  * @usage  AIMEAT.atelier.hero({ target: a.main, title: 'Errands', sub: '3 open',
  *           actions: [{ id: 'add', label: 'Add', kind: 'primary', onClick }] });
+ * @parts hero root · image · scrim · inner · before · title · sub · actions · after · aside
+ * @slots hero before() · title() · sub() · after() · aside()
+ * @variants hero tall · compact · center
+ * @tokens hero --ak-hero-min · --ak-hero-pad · --ak-hero-gap · --ak-hero-title-size · --ak-hero-image · --ak-scrim
+ * @fork hero Copy .ak-hero and .ak-hero__* out of shell.css; you keep the tokens and the scrim's mode-following arithmetic, and you give up the repeated-title claim and the picture layer an effect knows how to land on.
+ * @parts statRow root · tile · value · unit · delta · label · hint · trend · aside
+ * @slots statRow label(tile) · hint(tile) · aside(tile)
+ * @variants statRow compact · trend · plain
+ * @tokens statRow --ak-stat-min · --ak-stat-pad · --ak-stat-gap · --ak-stat-figure-size · --ak-stat-unit-size · --ak-stat-up · --ak-stat-down
+ * @fork statRow Copy .ak-statrow* out of shell.css; you keep the tokens and lose countUp() on a changed figure.
+ * @parts figure root · label · row · value · unit · delta · sub · aside
+ * @slots figure unit() · aside()
+ * @variants figure compact · center
+ * @tokens figure --ak-stat-unit-size · --ak-stat-up · --ak-stat-down
+ * @fork figure One element, one number: build it yourself and call countUp(node, from, to).
+ * @parts rating root · value · track · fill · words
+ * @slots rating words(state)
+ * @variants rating compact
+ * @fork rating Copy .ak-rating* out of content.css; the clip trick is four rules.
  * @version-history
+ *   v0.51.0 — 2026-09-05 — THE BAND AND THE TILE TAKE WHAT THE APP GIVES THEM. hero gains the
+ *     kicker above the title (`parts.before`), the line under the actions (`parts.after`), the
+ *     corner mark (`parts.aside`) and three variants; statRow's tiles gain `unit` and
+ *     `direction`, so a figure carries what it is measured in and which way it went without an
+ *     app writing a span beside it; figure gains the same pair. Every element in all three is a
+ *     named part with `data-ak-part`, and the sizes that were literals are tokens.
  *   v0.48.0 — 2026-09-05 — The picture is a layer element of its own (.ak-hero__image, shown
  *     by shell.css only when there is an image), so an effect on the hero can land on the
  *     picture and never on the words (wish-atelier-post-process-effects, stage 3).
@@ -38,6 +63,31 @@
  */
 import { el, clear, resolve, uid, enter, kinetic, countUp } from './dom.js';
 import { i18n } from './i18n.js';
+import { partEl, slotInto, applyVariant, hasPart, partValue, fillPart } from './parts-model.js';
+
+const HERO_VARIANTS = ['tall', 'compact', 'center'];
+const STAT_VARIANTS = ['compact', 'trend', 'plain'];
+const FIGURE_VARIANTS = ['compact', 'center'];
+
+/** Which way a figure went, as the one glyph beside it. Flat is a dash, never an arrow: an
+ *  arrow that means "nothing moved" is read as movement. */
+const DIRECTION_MARK = { up: '↑', down: '↓', flat: '–' };
+
+/**
+ * The arrow-and-delta beside a number, as one part. Nothing at all when the tile declares
+ * neither a direction nor a delta, so an ordinary KPI row is exactly what it was.
+ * @param {HTMLElement} host @param {{ direction?: string, delta?: string }} d
+ * @returns {HTMLElement|null}
+ */
+function deltaPart(host, d) {
+  const dir = DIRECTION_MARK[d.direction] ? d.direction : null;
+  if (!dir && d.delta == null) return null;
+  const node = partEl('span', 'ak-statrow__delta', 'delta', dir ? { 'data-ak-direction': dir } : null);
+  if (dir) node.appendChild(el('span', { class: 'ak-statrow__arrow', 'aria-hidden': 'true', text: DIRECTION_MARK[dir] }));
+  if (d.delta != null) node.appendChild(el('span', { class: 'ak-statrow__deltatext', text: String(d.delta) }));
+  host.appendChild(node);
+  return node;
+}
 
 /**
  * @typedef {object} HeroAction
@@ -67,7 +117,8 @@ function imageLayer(url) {
  * The focal band.
  * @param {{
  *   target?: string|Element, title: string, sub?: string, image?: string,
- *   actions?: HeroAction[],
+ *   actions?: HeroAction[], variant?: 'tall'|'compact'|'center',
+ *   parts?: Record<string, any>,
  * }} spec
  * @returns {{ el: HTMLElement, set: (patch: any) => void, destroy: () => void }}
  */
@@ -75,21 +126,32 @@ export function hero(spec) {
   const state = { title: spec.title, sub: spec.sub, actions: spec.actions || [] };
   const titleId = uid('ak-hero-title');
 
-  const title = el('h1', { class: 'ak-hero__title', id: titleId });
-  const sub = el('p', { class: 'ak-hero__sub' });
-  const actions = el('div', { class: 'ak-hero__actions' });
-  const inner = el('div', { class: 'ak-hero__inner' }, [title, sub, actions]);
+  const title = el('h1', { class: 'ak-hero__title', id: titleId, 'data-ak-part': 'title' });
+  const sub = el('p', { class: 'ak-hero__sub', 'data-ak-part': 'sub' });
+  const actions = el('div', { class: 'ak-hero__actions', 'data-ak-part': 'actions' });
+  const inner = el('div', { class: 'ak-hero__inner', 'data-ak-part': 'inner' });
+  // THE KICKER, above the display line: the one thing every band wanted and no app could add
+  // without forking the component. It is a slot, so it exists only when the app fills it.
+  slotInto(inner, spec, 'before', null, { cls: 'ak-hero__before' });
+  inner.appendChild(title);
+  inner.appendChild(sub);
+  inner.appendChild(actions);
+  slotInto(inner, spec, 'after', null, { cls: 'ak-hero__after', tag: 'div' });
   // The scrim+grain layer: a child, not a pseudo, so it paints ABOVE the drifting aurora
   // (::before) and BELOW the text — the readable zone stays put while the colour wanders.
-  const scrim = el('span', { class: 'ak-hero__scrim', 'aria-hidden': 'true' });
+  const scrim = el('span', { class: 'ak-hero__scrim', 'data-ak-part': 'scrim', 'aria-hidden': 'true' });
   // The picture is a layer of its own, under the scrim and over the mesh (shell.css shows it
   // only when there is an image): an effect on the hero lands here and never on the words.
-  const image = el('span', { class: 'ak-hero__image', 'aria-hidden': 'true' });
+  const image = el('span', { class: 'ak-hero__image', 'data-ak-part': 'image', 'aria-hidden': 'true' });
   const root = el('div', {
     class: 'ak-root ak-hero',
     'data-ak-hero': true,
+    'data-ak-part': 'root',
     'aria-labelledby': titleId,
   }, [image, scrim, inner]);
+  applyVariant(root, spec, HERO_VARIANTS);
+  // The corner mark: a badge, a channel number, a week — over the scrim, never over the words.
+  slotInto(root, spec, 'aside', null, { cls: 'ak-hero__aside' });
 
   const layer = imageLayer(spec.image);
   if (layer) { root.style.setProperty('--ak-hero-image', layer); root.classList.add('ak-hero--image'); }
@@ -111,9 +173,17 @@ export function hero(spec) {
   });
 
   function render() {
-    title.textContent = state.title;
-    sub.textContent = state.sub || '';
-    sub.hidden = !state.sub;
+    // The words the app wrote itself win over the words it passed as props, and a node is as
+    // welcome as a string — a masthead with a mark in it stops being a reason to fork the band.
+    if (hasPart(spec, 'title')) { clear(title); fillPart(title, partValue(spec, 'title')); }
+    else title.textContent = state.title;
+    if (hasPart(spec, 'sub')) {
+      clear(sub);
+      sub.hidden = !fillPart(sub, partValue(spec, 'sub'));
+    } else {
+      sub.textContent = state.sub || '';
+      sub.hidden = !state.sub;
+    }
     clear(actions);
     actions.hidden = !state.actions.length;
     for (const action of state.actions) {
@@ -121,6 +191,7 @@ export function hero(spec) {
       actions.appendChild(el('button', {
         type: 'button',
         class: 'ak-btn' + (kind === 'plain' ? '' : ' ak-btn--' + kind),
+        'data-ak-part': 'action',
         'data-ak-id': action.id,
         on: { click: function () { if (action.onClick) action.onClick(action); } },
       }, action.label));
@@ -158,6 +229,9 @@ export function hero(spec) {
  * @property {number} value
  * @property {(n: number) => string} [format]
  * @property {string} [hint]
+ * @property {string} [unit] - what the figure is measured in, set beside it in quiet type
+ * @property {'up'|'down'|'flat'} [direction] - which way it went, as one glyph
+ * @property {string} [delta] - how far it went, in the app's own words
  * @property {number[]} [trend] - a short history drawn as a sparkline under the number
  */
 
@@ -181,6 +255,7 @@ function drawTrend(entry, trend) {
   if (!entry.spark) {
     entry.spark = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     entry.spark.setAttribute('class', 'ak-statrow__spark');
+    entry.spark.setAttribute('data-ak-part', 'trend');
     entry.spark.setAttribute('viewBox', '0 0 ' + W2 + ' ' + H2);
     entry.spark.setAttribute('aria-hidden', 'true');
     entry.spark.appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'polygon'));
@@ -196,13 +271,15 @@ function drawTrend(entry, trend) {
  * The KPI row. On `set`, a tile whose value changed counts up to the new figure — the
  * state-change motion arrives with the data, not from app code. A tile carrying `trend`
  * shows its short history as a sparkline under the number.
- * @param {{ target?: string|Element, tiles: StatTile[] }} spec
+ * @param {{ target?: string|Element, tiles: StatTile[],
+ *   variant?: 'compact'|'trend'|'plain', parts?: Record<string, any> }} spec
  * @returns {{ el: HTMLElement, set: (patch: { tiles: StatTile[] }) => void, destroy: () => void }}
  */
 export function statRow(spec) {
-  /** @type {Map<string, { value: number, node: HTMLElement, label: HTMLElement, hint: HTMLElement, tile: HTMLElement, spark: SVGElement|null }>} */
+  /** @type {Map<string, { value: number, node: HTMLElement, label: HTMLElement, hint: HTMLElement, tile: HTMLElement, spark: SVGElement|null, figure: HTMLElement }>} */
   const shown = new Map();
-  const root = el('div', { class: 'ak-root ak-statrow' });
+  const root = el('div', { class: 'ak-root ak-statrow', 'data-ak-part': 'root' });
+  applyVariant(root, spec, STAT_VARIANTS);
   if (spec.target) resolve(spec.target).appendChild(root);
 
   /** @param {StatTile[]} tiles @param {boolean} first */
@@ -213,18 +290,35 @@ export function statRow(spec) {
       const fmt = tile.format || function (n) { return String(Math.round(n)); };
       let entry = shown.get(tile.id);
       if (!entry) {
-        const value = el('span', { class: 'ak-statrow__value', text: fmt(first ? tile.value : 0) });
-        const label = el('span', { class: 'ak-statrow__label', text: tile.label });
-        const hint = el('span', { class: 'ak-statrow__hint', text: tile.hint || '' });
+        const value = el('span', { class: 'ak-statrow__value', 'data-ak-part': 'value', text: fmt(first ? tile.value : 0) });
+        // THE FIGURE LINE: the number, what it is measured in, and which way it went — three
+        // parts on one baseline, so a KPI stops needing a hand-written span beside it.
+        const figureRow = el('div', { class: 'ak-statrow__figure', 'data-ak-part': 'figure' }, value);
+        const label = el('span', { class: 'ak-statrow__label', 'data-ak-part': 'label', text: tile.label });
+        const hint = el('span', { class: 'ak-statrow__hint', 'data-ak-part': 'hint', text: tile.hint || '' });
         hint.hidden = !tile.hint;
-        const tileEl = el('div', { class: 'ak-statrow__tile' }, [value, label, hint]);
+        const tileEl = el('div', { class: 'ak-statrow__tile', 'data-ak-part': 'tile', 'data-ak-id': tile.id }, [figureRow, label, hint]);
         root.appendChild(tileEl);
-        entry = { value: first ? tile.value : 0, node: value, label: label, hint: hint, tile: tileEl, spark: null };
+        entry = { value: first ? tile.value : 0, node: value, label: label, hint: hint, tile: tileEl, spark: null, figure: figureRow };
         shown.set(tile.id, entry);
       }
-      entry.label.textContent = tile.label;
-      entry.hint.textContent = tile.hint || '';
-      entry.hint.hidden = !tile.hint;
+      // The unit and the direction are rewritten on every render, so a tile that gained a
+      // trend between two set() calls shows it without the tile being rebuilt.
+      for (const gone of entry.figure.querySelectorAll('[data-ak-part="unit"], [data-ak-part="delta"]')) gone.remove();
+      slotInto(entry.figure, spec, 'unit', tile.unit == null ? null : tile.unit, { cls: 'ak-statrow__unit', args: [tile] });
+      deltaPart(entry.figure, tile);
+      if (!entry.tile.querySelector('[data-ak-part="aside"]')) {
+        slotInto(entry.tile, spec, 'aside', null, { cls: 'ak-statrow__aside', args: [tile] });
+      }
+      if (hasPart(spec, 'label')) { clear(entry.label); fillPart(entry.label, partValue(spec, 'label', tile)); }
+      else entry.label.textContent = tile.label;
+      if (hasPart(spec, 'hint')) {
+        clear(entry.hint);
+        entry.hint.hidden = !fillPart(entry.hint, partValue(spec, 'hint', tile));
+      } else {
+        entry.hint.textContent = tile.hint || '';
+        entry.hint.hidden = !tile.hint;
+      }
       drawTrend(entry, tile.trend);
       if (entry.value !== tile.value) {
         countUp(entry.node, entry.value, tile.value, { format: fmt });
@@ -235,8 +329,9 @@ export function statRow(spec) {
     }
     for (const [id, entry] of shown) {
       if (!seen.has(id)) {
-        const tileEl = entry.node.parentNode;
-        if (tileEl && tileEl.parentNode) tileEl.parentNode.removeChild(tileEl);
+        // The tile, not the value's parent: since 0.51.0 the number sits inside a figure line,
+        // and reading the parent of the value took that line away and left the tile standing.
+        if (entry.tile && entry.tile.parentNode) entry.tile.parentNode.removeChild(entry.tile);
         shown.delete(id);
       }
     }
@@ -266,6 +361,8 @@ export function statRow(spec) {
  * line under it, an optional delta. `set()` counts the value up or down to the new figure.
  * @param {{
  *   target?: string|Element, value: number, label: string, sub?: string, delta?: string,
+ *   unit?: string, direction?: 'up'|'down'|'flat',
+ *   variant?: 'compact'|'center', parts?: Record<string, any>,
  *   format?: (n: number) => string,
  * }} spec
  * @returns {{ el: HTMLElement, set: (patch: any) => void, destroy: () => void }}
@@ -274,17 +371,22 @@ export function figure(spec) {
   const state = { value: spec.value || 0, label: spec.label || '', sub: spec.sub, delta: spec.delta };
   const fmt = spec.format || function (n) { return String(Math.round(n)); };
 
-  const label = el('span', { class: 'ak-figure__label', text: state.label });
-  const value = el('span', { class: 'ak-figure__value', text: fmt(state.value) });
-  const delta = el('span', { class: 'ak-figure__delta', text: state.delta || '' });
-  delta.hidden = !state.delta;
-  const sub = el('p', { class: 'ak-figure__sub', text: state.sub || '' });
+  const label = el('span', { class: 'ak-figure__label', 'data-ak-part': 'label', text: state.label });
+  const value = el('span', { class: 'ak-figure__value', 'data-ak-part': 'value', text: fmt(state.value) });
+  const dir = DIRECTION_MARK[spec.direction] ? spec.direction : null;
+  const delta = el('span', {
+    class: 'ak-figure__delta', 'data-ak-part': 'delta',
+    'data-ak-direction': dir, text: (dir ? DIRECTION_MARK[dir] + ' ' : '') + (state.delta || ''),
+  });
+  delta.hidden = !state.delta && !dir;
+  const sub = el('p', { class: 'ak-figure__sub', 'data-ak-part': 'sub', text: state.sub || '' });
   sub.hidden = !state.sub;
-  const root = el('div', { class: 'ak-root ak-figure' }, [
-    label,
-    el('div', { class: 'ak-figure__row' }, [value, delta]),
-    sub,
-  ]);
+  const row = el('div', { class: 'ak-figure__row', 'data-ak-part': 'row' }, [value]);
+  slotInto(row, spec, 'unit', spec.unit == null ? null : spec.unit, { cls: 'ak-figure__unit' });
+  row.appendChild(delta);
+  const root = el('div', { class: 'ak-root ak-figure', 'data-ak-part': 'root' }, [label, row, sub]);
+  applyVariant(root, spec, FIGURE_VARIANTS);
+  slotInto(root, spec, 'aside', null, { cls: 'ak-figure__aside' });
   if (spec.target) resolve(spec.target).appendChild(root);
   enter(root);
 
@@ -295,7 +397,11 @@ export function figure(spec) {
       if (!patch) return;
       if (patch.label != null) { state.label = patch.label; label.textContent = state.label; }
       if (patch.sub !== undefined) { state.sub = patch.sub; sub.textContent = state.sub || ''; sub.hidden = !state.sub; }
-      if (patch.delta !== undefined) { state.delta = patch.delta; delta.textContent = state.delta || ''; delta.hidden = !state.delta; }
+      if (patch.delta !== undefined) {
+        state.delta = patch.delta;
+        delta.textContent = (dir ? DIRECTION_MARK[dir] + ' ' : '') + (state.delta || '');
+        delta.hidden = !state.delta && !dir;
+      }
       if (patch.value != null && patch.value !== state.value) {
         countUp(value, state.value, patch.value, { format: fmt });
         state.value = patch.value;
@@ -332,16 +438,17 @@ function starRow() {
  */
 export function rating(spec) {
   const state = { value: Number(spec.value) || 0, max: Number(spec.max) > 0 ? Number(spec.max) : 5, count: spec.count };
-  const root = el('div', { class: 'ak-root ak-rating', role: 'img' });
+  const root = el('div', { class: 'ak-root ak-rating', role: 'img', 'data-ak-part': 'root' });
+  applyVariant(root, spec, ['compact']);
   if (spec.target) resolve(spec.target).appendChild(root);
 
-  const number = el('b', { class: 'ak-rating__value' });
-  const track = el('span', { class: 'ak-rating__track' });
+  const number = el('b', { class: 'ak-rating__value', 'data-ak-part': 'value' });
+  const track = el('span', { class: 'ak-rating__track', 'data-ak-part': 'track' });
   track.appendChild(starRow());
-  const fill = el('span', { class: 'ak-rating__fill' });
+  const fill = el('span', { class: 'ak-rating__fill', 'data-ak-part': 'fill' });
   fill.appendChild(starRow());
   track.appendChild(fill);
-  const words = el('span', { class: 'ak-rating__words' });
+  const words = el('span', { class: 'ak-rating__words', 'data-ak-part': 'words' });
   root.appendChild(number);
   root.appendChild(track);
   root.appendChild(words);
@@ -350,10 +457,13 @@ export function rating(spec) {
     const frac = Math.min(Math.max(state.value / state.max, 0), 1);
     number.textContent = (Math.round(state.value * 10) / 10).toLocaleString();
     fill.style.width = (frac * 100).toFixed(1) + '%';
-    words.textContent = [
-      spec.label || '',
-      state.count != null ? '(' + Number(state.count).toLocaleString() + ')' : '',
-    ].filter(Boolean).join(' ');
+    if (hasPart(spec, 'words')) { clear(words); fillPart(words, partValue(spec, 'words', state)); }
+    else {
+      words.textContent = [
+        spec.label || '',
+        state.count != null ? '(' + Number(state.count).toLocaleString() + ')' : '',
+      ].filter(Boolean).join(' ');
+    }
     root.setAttribute('aria-label', `${state.value} / ${state.max}` + (state.count != null ? ` · ${state.count}` : ''));
   }
   paint();

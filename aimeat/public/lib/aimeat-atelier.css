@@ -43,6 +43,21 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.51.0 — 2026-09-05 — NEARLY RIGHT, MADE RIGHT (wish-atelier-always-excellent, part 3).
+ *     Thirty-six PER-COMPONENT tokens join the contract — --ak-list-row-gap, --ak-stat-figure-size,
+ *     --ak-card-aspect, --ak-hero-title-size and their kind — because the rule of this file was
+ *     always "a value a builder would reach for is a variable" and it had only ever held for the
+ *     LOOK's values. Every default is the literal the component already carried, so the matrix
+ *     and every screenshot are unmoved. custom.css joins the imports and carries the whole
+ *     model's own rules, so a builder asking "how do I change this" has one place to look.
+ *     Beside them: the parts the components leave EMPTY until
+ *     an app fills them (.ak-list__extra, .ak-list__aside, the card's, the timeline's, the
+ *     queue's, the kanban's, the hero's kicker/corner, the statRow's unit and direction, the
+ *     dialog's four), and the VARIANTS a builder picks instead of overriding
+ *     ([data-ak-variant='dense'|'numbered'|'plain'|'tall'|'compact'|'center'|'wide'|'lined'|
+ *     'trend'|'pill'|'quiet'] on the component root). --ak-stat-up and --ak-stat-down are the
+ *     only new colour names, and both are derived from --ak-ok-text / --ak-err-text, so a look
+ *     retunes them with everything else and the matrix proves them where it proved those.
  *   v0.50.0 — 2026-09-05 — MOTION IS THE DEFAULT (wish-atelier-always-excellent, part 2), and the
  *     STILL block now hears all three voices instead of one. The operating system's setting was
  *     the only thing that reached it, so the bar's own Less-motion switch quieted every script in
@@ -276,6 +291,10 @@
 @import url('./aimeat-atelier/content.css');
 @import url('./aimeat-atelier/data.css');
 @import url('./aimeat-atelier/planner.css');
+/* The customisation model's own sheet: the parts every component leaves EMPTY until an app fills
+ * them, and the variants a builder picks. It follows the four sheets above so a variant rule
+ * always lands after the rule it narrows. */
+@import url('./aimeat-atelier/custom.css');
 @import url('./aimeat-atelier/commercial.css');
 @import url('./aimeat-atelier/mtv.css');
 @import url('./aimeat-atelier/materials.css');
@@ -460,6 +479,51 @@
   --ak-crt-ch3:       #ffe14d;
   --ak-crt-ch4:       #38f2a0;
   --ak-crt-set:       #14101f;
+
+  /* ── PER-COMPONENT TOKENS (0.51.0) ──────────────────────────────────────────────────────
+   * The rule of this contract is that a value a builder would reach for is a variable, and
+   * until now that held for the LOOK's values and not for one component's. These are the
+   * sizes that were literals inside a component's own rules: an app sets one on its own box
+   * ("--ak-list-aside-size: 1.75rem" on a wrapper) and changes exactly that part, in every
+   * look and both modes, with no .ak-* selector overridden. Every default below is the value
+   * the component already had, so nothing moves until somebody moves it.
+   * ────────────────────────────────────────────────────────────────────────────────────── */
+  --ak-list-gap:          8px;                  /* between rows                              */
+  --ak-list-row-gap:      var(--ak-gap);        /* words to the right-hand side              */
+  --ak-list-row-pad-y:    10px;
+  --ak-list-row-pad-x:    var(--ak-pad);
+  --ak-list-line-gap:     2px;                  /* title to sub to the third line            */
+  --ak-list-aside-size:   var(--ak-text-body);  /* the right-hand figure                     */
+  --ak-card-min:          11rem;                /* the grid's narrowest card                 */
+  --ak-card-gap:          var(--ak-gap);
+  --ak-card-aspect:       4 / 3;
+  --ak-card-pad:          var(--ak-pad);
+  --ak-table-cell-pad-y:  10px;
+  --ak-table-cell-pad-x:  var(--ak-pad);
+  --ak-timeline-dot:      12px;
+  --ak-timeline-gap:      var(--ak-gap);
+  --ak-timeline-rail:     var(--ak-pad);        /* the drop under each event                 */
+  --ak-timeline-indent:   5px;                  /* where the rail stands                     */
+  --ak-stat-min:          9.5rem;
+  --ak-stat-gap:          var(--ak-gap);
+  --ak-stat-pad:          var(--ak-pad);
+  --ak-stat-figure-size:  var(--ak-text-title);
+  --ak-stat-unit-size:    var(--ak-text-fine);
+  --ak-stat-up:           var(--ak-ok-text);    /* the direction marks, tone-derived         */
+  --ak-stat-down:         var(--ak-err-text);
+  --ak-hero-pad:          var(--ak-pad);
+  --ak-hero-gap:          6px;
+  --ak-hero-title-size:   var(--ak-text-hero);
+  --ak-section-pad:       var(--ak-pad);
+  --ak-section-gap:       8px;
+  --ak-queue-row-pad-y:   9px;
+  --ak-queue-state-min:   72px;
+  --ak-health-lamp:       11px;
+  --ak-health-row-pad-y:  10px;
+  --ak-kanban-col-min:    13rem;
+  --ak-kanban-card-pad:   10px;
+  --ak-kanban-gap:        calc(var(--ak-gap) * 0.75);
+  --ak-tabs-gap:          6px;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════════════════

@@ -26,7 +26,23 @@
  *     { label: 'Oven rebuild', spans: [{ from: '2026-08-10', to: '2026-09-02', label: 'build' }] } ] } });
  *   AIMEAT.atelier.schedule({ target: host, data: { days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
  *     from: '08:00', to: '18:00', events: [{ day: 1, from: '09:00', to: '11:30', label: 'Baking class' }] } });
+ * @parts kanban root · col · head · colname · count · well · card · cardtitle · cardsub · badge · extra · aside
+ * @slots kanban card(card) · cardtitle(card) · cardsub(card) · extra(card) · badge(card) · aside(card) · colhead(column)
+ * @variants kanban dense · plain
+ * @tokens kanban --ak-kanban-col-min · --ak-kanban-card-pad · --ak-kanban-gap
+ * @fork kanban Copy .ak-kanban* out of planner.css; you keep the tokens and give up the drag, the arrow-key move and the card's spring travel.
+ *
+ *   plan, schedule and steps have NOT joined the customisation model yet: they carry no @parts
+ *   declaration, so describe() does not claim slots or tokens they do not have. Their shapes are
+ *   arithmetic in this file rather than markup an app would want to fill, which is why they were
+ *   left last. Adding them is the same three steps as the rest — stamp data-ak-part, route the
+ *   fillable elements through slotInto, declare the lines — and describe() picks them up from
+ *   the JSDoc on the next `pnpm build:atelier-parts`.
  * @version-history
+ *   v0.51.0 — 2026-09-05 — THE CARD TAKES WHAT THE APP GIVES IT: named parts on every element of
+ *     the board, `extra` and `aside` left empty on a card, `parts.card` for the whole card and
+ *     `parts.colhead` for a column's own heading, two variants and three tokens. The drag, the
+ *     arrow-key move and the spring travel are untouched.
  *   v0.50.0 — 2026-09-05 — The kanban entrance runs ONCE PER CARD, not once per rebuild: the
  *     board is rebuilt whenever anything changes, and every card was re-animating each time one
  *     was dragged one column. Its stagger is capped with the rest of the kit's, and the opt-out
@@ -42,6 +58,7 @@ import { el, clear, resolve, reducedMotion, motionOff } from './dom.js';
 import { t } from './i18n.js';
 import { emptyState } from './state.js';
 import { flipFrom } from './flow-parts.js';
+import { partEl, slotInto, applyVariant, partValue, fillPart } from './parts-model.js';
 
 const TONES = ['ok', 'warn', 'err', 'accent'];
 
@@ -65,7 +82,8 @@ function emptyInto(root, spec) {
  * @returns {{ el: HTMLElement, set: (patch: { data?: object|null }) => void, destroy: () => void }}
  */
 export function kanban(spec) {
-  const root = el('div', { class: 'ak-root ak-kanban' });
+  const root = el('div', { class: 'ak-root ak-kanban', 'data-ak-part': 'root' });
+  applyVariant(root, spec, ['dense', 'plain']);
   if (spec.target) resolve(spec.target).appendChild(root);
   let emptyCard = null;
   let current = null;
@@ -110,12 +128,12 @@ export function kanban(spec) {
 
     columns.forEach((col, colIdx) => {
       const inCol = cards.filter((c) => c.column === col.id);
-      const lane = el('div', { class: 'ak-kanban__col', 'data-col': col.id, role: 'group', 'aria-label': `${col.label} · ${inCol.length}` });
-      lane.appendChild(el('div', { class: 'ak-kanban__head ak-kanban__head--' + toneOf(col.tone, 'accent') }, [
-        el('span', { class: 'ak-kanban__colname', text: col.label || col.id }),
-        el('span', { class: 'ak-kanban__count', text: String(inCol.length) }),
-      ]));
-      const well = el('div', { class: 'ak-kanban__well' });
+      const lane = el('div', { class: 'ak-kanban__col', 'data-ak-part': 'col', 'data-col': col.id, role: 'group', 'aria-label': `${col.label} · ${inCol.length}` });
+      const head = partEl('div', 'ak-kanban__head ak-kanban__head--' + toneOf(col.tone, 'accent'), 'head');
+      slotInto(head, spec, 'colhead', col.label || col.id, { cls: 'ak-kanban__colname', args: [col, inCol] });
+      head.appendChild(el('span', { class: 'ak-kanban__count', 'data-ak-part': 'count', text: String(inCol.length) }));
+      lane.appendChild(head);
+      const well = el('div', { class: 'ak-kanban__well', 'data-ak-part': 'well' });
       if (movable) {
         well.addEventListener('dragover', (ev) => { ev.preventDefault(); well.classList.add('ak-kanban__well--over'); });
         well.addEventListener('dragleave', () => well.classList.remove('ak-kanban__well--over'));
@@ -129,14 +147,21 @@ export function kanban(spec) {
       inCol.forEach((card, i) => {
         const node = el('div', {
           class: 'ak-kanban__card' + (TONES.indexOf(card.tone) >= 0 ? ' ak-kanban__card--' + card.tone : ''),
+          'data-ak-part': 'card',
           'data-card': card.id,
           tabindex: movable ? '0' : undefined,
           role: movable ? 'button' : undefined,
-        }, [
-          el('span', { class: 'ak-kanban__cardtitle', text: card.title || card.id }),
-          card.sub ? el('span', { class: 'ak-kanban__cardsub', text: card.sub }) : null,
-          card.badge ? el('span', { class: 'ak-kanban__badge', text: card.badge }) : null,
-        ]);
+        });
+        const whole = partValue(spec, 'card', card);
+        if (whole !== undefined) {
+          fillPart(node, whole);
+        } else {
+          slotInto(node, spec, 'cardtitle', card.title || card.id, { cls: 'ak-kanban__cardtitle', args: [card] });
+          slotInto(node, spec, 'cardsub', card.sub || null, { cls: 'ak-kanban__cardsub', args: [card] });
+          slotInto(node, spec, 'extra', null, { cls: 'ak-kanban__extra', args: [card] });
+          slotInto(node, spec, 'badge', card.badge || null, { cls: 'ak-kanban__badge', args: [card] });
+          slotInto(node, spec, 'aside', null, { cls: 'ak-kanban__aside', args: [card] });
+        }
         // The entrance belongs to a card ARRIVING on this board, once. The board is rebuilt on
         // every change (a move, a repaint, a new card), and without this set the whole wall
         // re-animated each time one card was dragged one column.
@@ -187,7 +212,7 @@ function day(value) { const d = new Date(value); return isNaN(d.getTime()) ? nul
  * @returns {{ el: HTMLElement, set: (patch: { data?: object|null }) => void, destroy: () => void }}
  */
 export function plan(spec) {
-  const root = el('div', { class: 'ak-root ak-plan' });
+  const root = el('div', { class: 'ak-root ak-plan', 'data-ak-part': 'root' });
   if (spec.target) resolve(spec.target).appendChild(root);
   let emptyCard = null;
 
@@ -279,7 +304,7 @@ function minutes(value) {
  * @returns {{ el: HTMLElement, set: (patch: { data?: object|null }) => void, destroy: () => void }}
  */
 export function schedule(spec) {
-  const root = el('div', { class: 'ak-root ak-schedule' });
+  const root = el('div', { class: 'ak-root ak-schedule', 'data-ak-part': 'root' });
   if (spec.target) resolve(spec.target).appendChild(root);
   let emptyCard = null;
 
@@ -351,7 +376,7 @@ export function schedule(spec) {
  * @returns {{ el: HTMLElement, set: (patch: { data?: object|null }) => void, destroy: () => void }}
  */
 export function steps(spec) {
-  const root = el('ol', { class: 'ak-root ak-steps' });
+  const root = el('ol', { class: 'ak-root ak-steps', 'data-ak-part': 'root' });
   if (spec.target) resolve(spec.target).appendChild(root);
   let emptyCard = null;
 
