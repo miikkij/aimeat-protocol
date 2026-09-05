@@ -8,11 +8,16 @@
  * @usage  AIMEAT.atelier.timeline({ target: host, items: [
  *           { id: 'e1', ts: '2026-08-27T10:00:00Z', title: 'Published', tone: 'ok' } ] });
  * @version-history
+ *   v0.50.0 — 2026-09-05 — EVENTS ARE KEPT BY THEIR ID. The line was rebuilt on every set and
+ *     re-ran its entrance over every event each time, so five events arriving one at a time
+ *     animated fifteen rows. Reconciled now: a new event rises in on its own, one that is gone
+ *     fades out where it stood, and the rest stand still.
  *   v0.10.0 — 2026-08-27 — Date-only timestamps render as dates: "2026-08-26" no longer becomes
  *     "3:00 AM" through the midnight-UTC parse (first design review).
  *   v0.3.0 — 2026-08-27 — Initial (TARGET-074 phase 1, slice 3).
  */
-import { el, clear, resolve, enter } from './dom.js';
+import { el, clear, resolve } from './dom.js';
+import { keyedRows } from './arrive.js';
 import { t } from './i18n.js';
 import { emptyState } from './state.js';
 
@@ -53,10 +58,32 @@ export function timeline(spec) {
   let emptyCard = null;
 
   /** @param {TimelineItem[]} items */
+  /** One event's contents, written into the element that already stands for it (a kept event
+   *  keeps its element, which is what stops the whole line re-entering on every change).
+   *  @param {HTMLElement} node @param {TimelineItem} item */
+  function fillItem(node, item) {
+    clear(node);
+    node.appendChild(el('span', {
+      class: 'ak-timeline__dot ak-timeline__dot--' + (item.tone || 'plain'), 'aria-hidden': 'true',
+    }));
+    node.appendChild(el('div', { class: 'ak-timeline__body' }, [
+      el('span', { class: 'ak-timeline__when', text: fmt(item.ts) }),
+      el('span', { class: 'ak-timeline__title', text: item.title }),
+      item.sub != null ? el('span', { class: 'ak-timeline__sub', text: item.sub }) : null,
+    ]));
+  }
+
+  /** @param {TimelineItem} item @returns {HTMLElement} */
+  function buildItem(item) {
+    const node = el('li', { class: 'ak-timeline__item' });
+    fillItem(node, item);
+    return node;
+  }
+
   function render(items) {
     if (emptyCard) { emptyCard.destroy(); emptyCard = null; }
-    clear(root);
     if (!items.length) {
+      clear(root);
       const e = spec.empty || {};
       emptyCard = emptyState({
         target: root, tone: 'quiet',
@@ -64,17 +91,11 @@ export function timeline(spec) {
       });
       return;
     }
-    for (const item of items) {
-      root.appendChild(el('li', { class: 'ak-timeline__item', 'data-ak-id': item.id }, [
-        el('span', { class: 'ak-timeline__dot ak-timeline__dot--' + (item.tone || 'plain'), 'aria-hidden': 'true' }),
-        el('div', { class: 'ak-timeline__body' }, [
-          el('span', { class: 'ak-timeline__when', text: fmt(item.ts) }),
-          el('span', { class: 'ak-timeline__title', text: item.title }),
-          item.sub != null ? el('span', { class: 'ak-timeline__sub', text: item.sub }) : null,
-        ]),
-      ]));
-    }
-    enter(root);
+    keyedRows(root, items, {
+      key: function (item, i) { return item.id != null ? String(item.id) : 'ev-' + i; },
+      build: buildItem,
+      update: fillItem,
+    });
   }
 
   render(spec.items || []);

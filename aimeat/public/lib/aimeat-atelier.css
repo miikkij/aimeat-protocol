@@ -43,6 +43,14 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.50.0 — 2026-09-05 — MOTION IS THE DEFAULT (wish-atelier-always-excellent, part 2), and the
+ *     STILL block now hears all three voices instead of one. The operating system's setting was
+ *     the only thing that reached it, so the bar's own Less-motion switch quieted every script in
+ *     the kit and left every CSS entrance and shimmer running behind it; `html[data-ak-motion=
+ *     "less"]` closes that, and `[data-ak-motion-defaults="off"]` — written by an app's
+ *     `motion: false` or a block's — closes the app-side opt-out the same way. No token changes:
+ *     the amount of motion was already the look's, in --ak-motion, --ak-ease and the entrance
+ *     pair, and a look declaring 0 and 0 still moves nothing.
  *   v0.49.0 — 2026-09-05 — THE MEASURED REVIEW, five findings closed in the kit.
  *     (1) The reduced-motion block reaches ::before and ::after, so the hero's aurora drift —
  *     the one animation in this kit that ran forever under prefers-reduced-motion — stops.
@@ -503,6 +511,13 @@
    ambient layer beside it was safe only because ambient.css names its own `animation: none`.
    The four selectors below are the whole surface a declaration can be attached to, so a new
    decorative layer is caught whether it is an element or a mark painted by one.
+
+   AND THREE VOICES REACH IT, NOT ONE. The operating system's setting was the only one this block
+   ever heard, so the bar's own Less-motion switch quieted every SCRIPT in the kit (they all ask
+   reducedMotion()) and left every CSS entrance, shimmer and lift running behind it — the switch
+   said "less" and the stylesheet carried on. `html[data-ak-motion="less"]` is that switch, and
+   `[data-ak-motion-defaults="off"]` is an app's `motion: false` or a block's; all three land in
+   the same three declarations.
    ══════════════════════════════════════════════════════════════════════════════════════════ */
 @media (prefers-reduced-motion: reduce) {
   .ak-root, .ak-root *,
@@ -512,4 +527,21 @@
     animation-iteration-count: 1 !important;
     transition-duration: 1ms !important;
   }
+}
+
+html[data-ak-motion='less'] .ak-root,
+html[data-ak-motion='less'] .ak-root *,
+html[data-ak-motion='less'] .ak-root::before,
+html[data-ak-motion='less'] .ak-root::after,
+html[data-ak-motion='less'] .ak-root *::before,
+html[data-ak-motion='less'] .ak-root *::after,
+[data-ak-motion-defaults='off'],
+[data-ak-motion-defaults='off'] *,
+[data-ak-motion-defaults='off']::before,
+[data-ak-motion-defaults='off']::after,
+[data-ak-motion-defaults='off'] *::before,
+[data-ak-motion-defaults='off'] *::after {
+  animation-duration: 1ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 1ms !important;
 }

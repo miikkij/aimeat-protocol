@@ -87,7 +87,7 @@
  *     by their `span`, and the `rail` projection arrives (desktop left rail, phone strip).
  *   v0.4.0 — 2026-08-27 — Initial (TARGET-074 phase 2, the client renderer).
  */
-import { el, clear, resolve, enter } from './dom.js';
+import { el, clear, resolve, enter, setMotionDefaults } from './dom.js';
 import { t } from './i18n.js';
 import { section, tabs } from './shell.js';
 import { hero, statRow, figure, rating } from './hero.js';
@@ -588,6 +588,10 @@ export function mosaic(spec) {
         continue;
       }
       const unitEl = el('section', { class: 'ak-mosaic__unit', 'data-ak-block': block.id });
+      // ONE BLOCK MAY STAND STILL while the rest of the screen moves: `motion: false` in a
+      // block's props is the block-level opt-out, stamped on its unit before the component is
+      // built inside it, so everything the component makes reads the same answer.
+      if (block.props && block.props.motion === false) setMotionDefaults(unitEl, false);
       buildBlock(block, unitEl);
       // The block's effect wears on its unit: the server proved it on this look (a colour or
       // overlay effect under words through the matrix; a picture effect only on a picture).

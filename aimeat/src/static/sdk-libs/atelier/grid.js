@@ -10,9 +10,14 @@
  * @structure cardGrid(spec) → { el, set, destroy } · mediaCard(spec) → { el, set, destroy }
  * @usage  AIMEAT.atelier.cardGrid({ target: a.main, items, onPick(item) { open(item); } });
  * @version-history
+ *   v0.50.0 — 2026-09-05 — CARDS ARE KEPT BY THEIR ID. The grid was cleared and rebuilt on every
+ *     set, which re-ran the entrance over the whole wall each time one card changed. Reconciled
+ *     now: a card that arrived rises in, a card that is gone fades out where it stood, and a card
+ *     that moved to another place in the grid glides there.
  *   v0.3.0 — 2026-08-27 — Initial (TARGET-074 phase 1, slice 3).
  */
 import { el, clear, resolve, enter } from './dom.js';
+import { keyedRows } from './arrive.js';
 import { t } from './i18n.js';
 import { emptyState } from './state.js';
 
@@ -35,6 +40,10 @@ function imageLayer(url) {
   }
   return 'url("' + v.replace(/"/g, '%22') + '")';
 }
+
+/** Which record a kept card is showing right now. A card survives a change of its own contents,
+ *  so a pick handler must not close over the record the card was built with. */
+const SHOWING = new WeakMap();
 
 /** A stable 1..3 from an id, so the same item keeps the same monogram wash forever. */
 function washOf(id) {
@@ -94,8 +103,8 @@ export function cardGrid(spec) {
   /** @param {CardItem[]} items */
   function render(items) {
     if (emptyCard) { emptyCard.destroy(); emptyCard = null; }
-    clear(root);
     if (!items.length) {
+      clear(root);
       const e = spec.empty || {};
       emptyCard = emptyState({
         target: root, tone: 'quiet',
@@ -103,8 +112,27 @@ export function cardGrid(spec) {
       });
       return;
     }
-    for (const item of items) root.appendChild(buildCard(item, pickable, spec.onPick));
-    enter(root);
+    keyedRows(root, items, {
+      key: function (item, i) { return item.id != null ? String(item.id) : 'card-' + i; },
+      build: function (item) {
+        // The pick reads the record the card is showing NOW, not the one it was built with: a
+        // kept card survives an update, and a handler closed over the old item would report it.
+        const card = buildCard(item, pickable, pickable
+          ? function () { if (spec.onPick) spec.onPick(SHOWING.get(card)); }
+          : undefined);
+        SHOWING.set(card, item);
+        return card;
+      },
+      // A card's whole surface is its content, so a changed card is refilled in place: the
+      // element stays (no re-entrance), everything inside it is replaced.
+      update: function (node, item) {
+        SHOWING.set(node, item);
+        const next = buildCard(item, pickable, undefined);
+        node.className = next.className;
+        clear(node);
+        while (next.firstChild) node.appendChild(next.firstChild);
+      },
+    });
   }
 
   render(spec.items || []);

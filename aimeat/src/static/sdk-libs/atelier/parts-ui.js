@@ -13,9 +13,13 @@
  *   AIMEAT.atelier.toast({ title: 'Part adopted', sub: 'shop.html', action: { label: 'Undo', onPick } });
  *   AIMEAT.atelier.palette({ items: [{ id: 'adopt', label: 'Adopt…', run() {} }], hotkey: 'k' });
  * @version-history
+ *   v0.50.0 — 2026-09-05 — A toast arrives and LEAVES: it rose in only by way of its own
+ *     children before, and vanished with no exit at all — a confirmation that blinks out mid-read
+ *     reads as a bug rather than as a message ending.
  *   v0.42.0 — 2026-09-01 — Initial (wish-atelier-night-gallery, stage 3).
  */
-import { el, clear, resolve, enter, reducedMotion } from './dom.js';
+import { el, clear, resolve, enter, reducedMotion, motionOff } from './dom.js';
+import { fadeIn, paceOf } from './arrive.js';
 
 let toastHost = null;
 
@@ -41,11 +45,23 @@ export function toast(spec) {
       click: function () { spec.action.onPick(); close(); },
     } }, spec.action.label) : null,
   ].filter(Boolean));
+  // A toast ARRIVES and LEAVES. It appeared out of nothing and vanished the same way until
+  // 0.50.0, which is the one shape where motion is not decoration: a confirmation nobody saw
+  // arrive reads as a page glitch, and one that blinks out mid-read reads as a bug.
+  const pace = paceOf(node);
   function close() {
     if (timer) clearTimeout(timer);
-    if (node.parentNode) node.parentNode.removeChild(node);
+    const drop = function () { if (node.parentNode) node.parentNode.removeChild(node); };
+    if (motionOff(node) || typeof node.animate !== 'function') { drop(); return; }
+    const anim = node.animate(
+      [{ opacity: 1, transform: 'translateY(0)' }, { opacity: 0, transform: 'translateY(' + (pace.dist || 8) + 'px)' }],
+      { duration: pace.span, easing: 'ease-in' },
+    );
+    anim.onfinish = drop;
+    anim.oncancel = drop;
   }
   toastHost.appendChild(node);
+  fadeIn(node, pace, 0);
   enter(node);
   const ttl = spec.ttl == null ? 6000 : spec.ttl;
   if (ttl > 0) timer = setTimeout(close, ttl);

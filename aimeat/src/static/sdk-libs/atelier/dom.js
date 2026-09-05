@@ -14,11 +14,18 @@
  *   appear instantly), uses transform/opacity only, and collapses to end states under
  *   prefers-reduced-motion. Finished WAAPI animations leave nothing running, so an idle Atelier
  *   surface repaints zero times — the finish gate measures exactly that.
- * @structure el · append · $ · $$ · clear · uid · reducedMotion · setMotion · resolve ·
- *   injectStyle · busy · guardButtons · whileBusy · enter · kinetic · countUp · attention
+ * @structure el · append · $ · $$ · clear · uid · reducedMotion · setMotion · motionOff ·
+ *   setMotionDefaults · resolve · injectStyle · busy · guardButtons · whileBusy · enter ·
+ *   kinetic · countUp · attention
  * @usage  import { el, $, injectStyle, enter } from './dom.js';
  *   el('div', { class: 'ak-card', vars: { '--ak-fill': '42%' }, on: { click: fn } }, ['text']);
  * @version-history
+ *   v0.50.0 — 2026-09-05 — MOTION IS THE DEFAULT, AND THE OPT-OUT IS ONE ATTRIBUTE.
+ *     motionOff(node) is the one question every moving part in this kit asks: the viewer's
+ *     answer, or an app's `app({ motion: false })` / a block's `motion: false`, both of which
+ *     land as data-ak-motion-defaults="off" written by setMotionDefaults(). enter() asks it too,
+ *     and caps the whole entrance at ENTER_SPAN_CAP: a stagger is a beat times an index, and a
+ *     look running 70 ms over twelve rows took 770 ms of trickle before this.
  *   v0.46.0 — 2026-09-02 — LESS MOTION IS THE VIEWER'S TO ASK FOR, not only the operating
  *     system's: reducedMotion() now answers true for the root's data-ak-motion="less" as well,
  *     setMotion() writes it and remembers it, and the remembered choice is put back on the root
@@ -40,6 +47,13 @@ const SPECIAL = { text: 1, on: 1, vars: 1, children: 1 };
 /** The most children one entrance choreographs; later ones appear instantly (the game-kit lesson:
  *  a fifty-row stagger reads as lag, not delight). */
 const ENTER_MAX = 12;
+
+/** The ceiling on the last child's entrance delay, whatever the look's beat: an entrance is over
+ *  within half a second or it is not an entrance, it is the page loading slowly in front of you. */
+const ENTER_SPAN_CAP = 500;
+
+/** The mark an app or a block wears when it wants the kit's default motion to stand down. */
+const DEFAULTS_ATTR = 'data-ak-motion-defaults';
 
 let seq = 0;
 
@@ -157,6 +171,38 @@ export function setMotion(mode) {
     window.dispatchEvent(new CustomEvent('ak-motion', { detail: { motion: next } }));
   } catch { /* no window to tell */ }
   return next;
+}
+
+/**
+ * Should this element move at all? Three voices answer, and any one of them is enough to stand
+ * the motion down: the viewer (the operating system's setting or the bar's Less-motion switch),
+ * the APP (`app({ motion: false })`), and the BLOCK (`motion: false` on a mosaic block) — the last
+ * two both leaving the same mark, so a part asks one question rather than three.
+ *
+ * Every default move in the kit runs through here, which is why an app turns the whole thing off
+ * with one option and a single block opts out without touching the app.
+ * @param {Element|null|undefined} node
+ * @returns {boolean}
+ */
+export function motionOff(node) {
+  if (reducedMotion()) return true;
+  if (!node || typeof (/** @type {any} */ (node).closest) !== 'function') return false;
+  const marked = /** @type {Element|null} */ (node.closest('[' + DEFAULTS_ATTR + ']'));
+  return !!marked && marked.getAttribute(DEFAULTS_ATTR) === 'off';
+}
+
+/**
+ * Say whether the kit's default motion applies inside this element and everything under it. The
+ * mark is an attribute rather than a flag in a closure, so the stylesheet stands down with it and
+ * a component built later inside the same box reads the same answer.
+ * @param {Element|null} node
+ * @param {boolean} on
+ * @returns {void}
+ */
+export function setMotionDefaults(node, on) {
+  if (!node) return;
+  if (on === false) node.setAttribute(DEFAULTS_ATTR, 'off');
+  else node.removeAttribute(DEFAULTS_ATTR);
 }
 
 /** Whether the remembered choice has already been put back, so the restore runs exactly once. */
@@ -299,13 +345,15 @@ export function whileBusy(node, work) {
  * `--ak-motion` on the element; this function only reads them, so a skin changes the feel
  * without a line of JavaScript changing.
  *
- * Runs once; children past ENTER_MAX appear instantly; reduced motion appears instantly.
+ * Runs once; children past ENTER_MAX appear instantly; reduced motion appears instantly; and the
+ * LAST child's delay never passes ENTER_SPAN_CAP, so a slow look's beat cannot turn an entrance
+ * into a page that seems to be loading in front of the reader.
  * @param {Element|null} root
  * @param {{ max?: number }} [opts]
  * @returns {void}
  */
 export function enter(root, opts) {
-  if (!root || reducedMotion() || typeof root.animate !== 'function') return;
+  if (!root || motionOff(root) || typeof root.animate !== 'function') return;
   const cs = getComputedStyle(root);
   const dist = parseFloat(cs.getPropertyValue('--ak-enter-distance')) || 0;
   const step = parseFloat(cs.getPropertyValue('--ak-enter-stagger')) || 0;
@@ -322,7 +370,7 @@ export function enter(root, opts) {
         { opacity: 0, transform: 'translateY(' + dist + 'px)' },
         { opacity: 1, transform: 'translateY(0)' },
       ],
-      { duration: span, delay: i * step, easing: ease, fill: 'backwards' },
+      { duration: span, delay: Math.min(i * step, ENTER_SPAN_CAP), easing: ease, fill: 'backwards' },
     );
   }
 }

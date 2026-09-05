@@ -13,6 +13,9 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.5.0 — 2026-09-05 — Motion of one's own joins the never-list, because there is nothing left
+ *     for it to do: arrivals, the three moves of a change, the count-up and the view crossings
+ *     are the kit's defaults now, and the two opt-outs are named (wish-atelier-always-excellent).
  *   v1.4.0 — 2026-09-05 — The effects: a block's field or fx() in code, still on the words, a
  *     moment on a cue, living only behind them; a filter of one's own joins the never-list
  *     (wish-atelier-post-process-effects).
@@ -106,6 +109,13 @@ moved under you says so.
 - daisyUI/Tailwind classes outside a \`section\` body.
 - Hand-written ARIA, focus management or animation code — the components carry them, and a
   hand-rolled control is an accessibility regression, not a shortcut.
+- **Any motion of your own, anywhere.** It is already there: a block and a row arrive with a fade
+  and a rise, a \`set()\` makes the rows that arrived rise in, the rows that left fade out where
+  they stood and the rows that moved glide there, a changed figure counts to it, a tab or a
+  bottom-bar pick crosses into the next view, and a dialog, drawer or toast enters and leaves.
+  You call none of it. The pace and the distance are the look's, so a still register stays still
+  from the same code. \`app({ motion: false })\` is the only switch, and one block stands still
+  with \`motion: false\` in its props.
 - A theme, palette or language control — the login pill owns all three.
 - Colours in JavaScript or CSS — the \`--ak-*\` tokens are the entire look, and every preset ×
   palette × mode combination is verified arithmetically on this node.

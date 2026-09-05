@@ -27,6 +27,10 @@
  *   AIMEAT.atelier.schedule({ target: host, data: { days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
  *     from: '08:00', to: '18:00', events: [{ day: 1, from: '09:00', to: '11:30', label: 'Baking class' }] } });
  * @version-history
+ *   v0.50.0 — 2026-09-05 — The kanban entrance runs ONCE PER CARD, not once per rebuild: the
+ *     board is rebuilt whenever anything changes, and every card was re-animating each time one
+ *     was dragged one column. Its stagger is capped with the rest of the kit's, and the opt-out
+ *     (an app's `motion: false`, a block's) reaches it through motionOff.
  *   v0.43.0 — 2026-09-02 — A moved kanban card TRAVELS to its new column on the kit's spring
  *     (FLIP through flipFrom: its rect is read before the board rebuilds, the inverse becomes the
  *     spring's starting state, and it springs to identity). The HTML5 drag, the keyboard move and
@@ -34,7 +38,7 @@
  *   v0.37.0 — 2026-08-30 — steps: the process tracker (done / current / ahead on one line).
  *   v0.36.0 — 2026-08-30 — Initial (basket two of the approved expansion).
  */
-import { el, clear, resolve, reducedMotion } from './dom.js';
+import { el, clear, resolve, reducedMotion, motionOff } from './dom.js';
 import { t } from './i18n.js';
 import { emptyState } from './state.js';
 import { flipFrom } from './flow-parts.js';
@@ -65,6 +69,9 @@ export function kanban(spec) {
   if (spec.target) resolve(spec.target).appendChild(root);
   let emptyCard = null;
   let current = null;
+  /** Which cards have already arrived on this board, so an entrance runs once per card and not
+   *  once per rebuild. A card the app removes and sends back later enters again, which is right. */
+  const arrived = new Set();
 
   function moveCard(cardId, toColumn) {
     if (!current) return;
@@ -130,7 +137,14 @@ export function kanban(spec) {
           card.sub ? el('span', { class: 'ak-kanban__cardsub', text: card.sub }) : null,
           card.badge ? el('span', { class: 'ak-kanban__badge', text: card.badge }) : null,
         ]);
-        if (!reducedMotion()) { node.classList.add('ak-kanban__card--enter'); node.style.animationDelay = `${i * 40}ms`; }
+        // The entrance belongs to a card ARRIVING on this board, once. The board is rebuilt on
+        // every change (a move, a repaint, a new card), and without this set the whole wall
+        // re-animated each time one card was dragged one column.
+        if (!motionOff(root) && !arrived.has(card.id)) {
+          arrived.add(card.id);
+          node.classList.add('ak-kanban__card--enter');
+          node.style.animationDelay = `${Math.min(i * 40, 500)}ms`;
+        }
         if (movable) {
           node.draggable = true;
           node.addEventListener('dragstart', (ev) => {
