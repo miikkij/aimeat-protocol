@@ -9,6 +9,9 @@
  *   them; entrances are finite and reduced-motion drops them, like the rest of the kit.
  * @structure .ak-kanban · .ak-plan · .ak-schedule · reduced-motion
  * @version-history
+ *   v0.37.0 — 2026-09-05 — The measured review: a kanban card is a control (it is a button you
+ *     pick up), so it reaches 40px of hit area, and a booking's time reads at --ak-text-micro
+ *     instead of 0.68rem, which resolved to 10.9px.
  *   v0.36.0 — 2026-08-30 — Initial (basket two of the approved expansion).
  */
 
@@ -57,8 +60,10 @@
 .ak-kanban__card {
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: 2px;
   position: relative;
+  min-height: var(--ak-touch-min);
   padding: 10px 12px;
   border-radius: var(--ak-radius-sm);
   background: var(--ak-surface);
@@ -217,7 +222,9 @@ button.ak-schedule__event { cursor: pointer; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.ak-schedule__eventtime { font-size: 0.68rem; color: var(--ak-ink-dim); font-variant-numeric: tabular-nums; }
+/* The hours inside a booking block: an annotation on the name above it, so it reads at the micro
+ * size. 0.68rem resolved to 10.9px. */
+.ak-schedule__eventtime { font-size: var(--ak-text-micro); color: var(--ak-ink-dim); font-variant-numeric: tabular-nums; }
 .ak-schedule__event--enter { opacity: 0; animation: ak-band-in calc(var(--ak-motion) * 1.6) var(--ak-ease) forwards; }
 
 /* ── Steps: the process tracker ──────────────────────────────────────────────────────────── */

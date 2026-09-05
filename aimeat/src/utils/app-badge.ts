@@ -15,6 +15,15 @@
  *   trap all live ONCE in services/app-serve-marks.ts, which is what actually puts it in the page.
  * @usage import { badgeSnippet } from '../utils/app-badge.js';  // via applyServeMarks({ badge: true })
  * @version-history
+ *   v2.1.0 — 2026-09-05 — THE BOLT IS A DRAWING NOW, and the surface is opaque. Two findings from
+ *     the Atelier measuring review, one fix each. (1) The house rule is no emoji in the
+ *     interface, and the badge carried a ⚡ in two places; it is an inline SVG bolt, sized in
+ *     ems so the pill and the round button keep the size they had. (2) The glyph measured 4.19
+ *     to 4.29 against its ground on every app page, under the 4.5 text needs, and it measured
+ *     DIFFERENTLY on every page because the ground was a .92-alpha panel over whatever the app
+ *     painted behind it. The surface is solid now, so the coral sits at 5.1 in both themes and
+ *     on every page; backdrop-filter went with the translucency, since a blur under an opaque
+ *     panel is work nobody sees. Size, wording and link are untouched.
  *   v2.0.0 — 2026-08-01 — TARGET-058 Phase 5 step 0a: injectAimeatBadge() becomes badgeSnippet().
  *     Four serve-time injectors each re-parsed the same document and each carried its own copy of
  *     the last-</body> rule; they are now one pass (services/app-serve-marks.ts) and this file
@@ -66,20 +75,37 @@ function entities(s: string): string {
 }
 
 /**
+ * The bolt, drawn rather than typed.
+ *
+ * The house rule is no emoji in the interface, and this badge is served into somebody else's page
+ * on every app on the node, so it was the most-seen emoji we had. An inline SVG also gets the
+ * lightning off the text-contrast books: a glyph is TEXT and owes 4.5, a drawing is a graphic and
+ * owes 3. It is sized in ems so it follows whatever font-size the surrounding rule already sets —
+ * 12px in the pill, 16px in the round button — which is how the badge keeps the size it had.
+ */
+const BOLT = '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" '
+    + 'aria-hidden="true" focusable="false"><path d="M13.5 2 4 13.2h6.1L9.6 22 20 10.4h-6.4z"/></svg>';
+
+/**
  * The badge markup. The label + link are the fixed aimeat.io attribution (deliberate, since
  * publishing/hosting is free). Pure static markup + a scoped `<style>` block — no script, so it needs
  * nothing the inline CSP doesn't already allow (style-src 'unsafe-inline' governs `<style>` elements
- * and style attributes alike). On narrow viewports the pill collapses to a small round ⚡ button so it
- * doesn't cover app UI; tapping toggles the full pill via a hidden-checkbox CSS toggle (the only way
- * to get tap-to-expand without a script).
+ * and style attributes alike). On narrow viewports the pill collapses to a small round bolt button so
+ * it doesn't cover app UI; tapping toggles the full pill via a hidden-checkbox CSS toggle (the only
+ * way to get tap-to-expand without a script).
  */
 export function badgeSnippet(): string {
-    // Shared surface look for both the pill and the collapsed ⚡ button. Everything is !important
+    // Shared surface look for both the pill and the collapsed bolt button. Everything is !important
     // so arbitrary app CSS (resets, `a{...}`, `label{...}`) can't restyle the badge.
+    //
+    // OPAQUE, ON PURPOSE. At .92 alpha the ground under the words was whatever the app painted
+    // behind the badge, so the same coral measured 4.19 on one page and 4.29 on the next and was
+    // under 4.5 on both. A solid panel is the same colour on every page and in both themes, and
+    // puts the coral at 5.1 — the contrast stops being the app's business. The backdrop blur went
+    // with the translucency: there is nothing behind an opaque panel to blur.
     const surface =
-        'background:rgba(20,20,28,.92)!important;box-shadow:0 4px 16px rgba(0,0,0,.28)!important;'
-        + 'border:1px solid rgba(255,255,255,.14)!important;backdrop-filter:blur(8px)!important;'
-        + '-webkit-backdrop-filter:blur(8px)!important;';
+        'background:#14141c!important;box-shadow:0 4px 16px rgba(0,0,0,.28)!important;'
+        + 'border:1px solid rgba(255,255,255,.14)!important;';
     const css =
         // display:contents — the wrapper adds no box of its own, children position:fixed themselves.
         '#aimeat-app-badge{display:contents!important}'
@@ -87,7 +113,11 @@ export function badgeSnippet(): string {
         + '#aimeat-app-badge input{position:fixed!important;right:20px!important;bottom:20px!important;'
         + 'width:1px!important;height:1px!important;margin:0!important;opacity:0!important;'
         + 'pointer-events:none!important;z-index:2147483647!important}'
-        // Collapsed ⚡ button — hidden on wide viewports, shown on narrow ones.
+        // The drawn bolt: sized off the rule that contains it, never squeezed by an app's own
+        // `svg{width:100%}` reset.
+        + '#aimeat-app-badge svg{width:1em!important;height:1em!important;display:block!important;'
+        + 'flex:none!important;fill:currentColor!important}'
+        // Collapsed bolt button — hidden on wide viewports, shown on narrow ones.
         + '#aimeat-app-badge label{display:none!important;position:fixed!important;right:12px!important;'
         + 'bottom:12px!important;z-index:2147483647!important;width:34px!important;height:34px!important;'
         + 'align-items:center!important;justify-content:center!important;border-radius:50%!important;'
@@ -102,8 +132,8 @@ export function badgeSnippet(): string {
         + '#aimeat-app-badge a>span:first-child{color:var(--color-primary,#E8564A)!important}'
         + '#aimeat-app-badge a>span:last-child{opacity:.7!important;font-weight:500!important}'
         + '#aimeat-app-badge input:focus-visible~label{outline:2px solid var(--color-primary,#E8564A)!important;outline-offset:2px!important}'
-        // Narrow viewports: only the ⚡ button by default; checking the toggle reveals the pill
-        // beside it (the button stays visible to collapse again; the pill drops its own ⚡).
+        // Narrow viewports: only the bolt button by default; checking the toggle reveals the pill
+        // beside it (the button stays visible to collapse again; the pill drops its own bolt).
         + '@media (max-width:640px){'
         + '#aimeat-app-badge label{display:flex!important}'
         + '#aimeat-app-badge a{display:none!important}'
@@ -112,14 +142,15 @@ export function badgeSnippet(): string {
         + '}';
 
     // Every user-visible string goes through entities(): the glyphs here are exactly the ones that
-    // were rendering as mojibake in a charset-less document.
+    // were rendering as mojibake in a charset-less document. The bolt no longer needs it — SVG
+    // markup is ASCII, which is a second thing a drawing buys over a glyph.
     return '<div ' + BADGE_MARK + '>'
         + '<style>' + css + '</style>'
         + '<input type="checkbox" id="aimeat-app-badge-open">'
-        + '<label for="aimeat-app-badge-open" aria-label="' + entities('Publish your own app on ' + AIMEAT_LABEL) + '">' + entities('⚡') + '</label>'
+        + '<label for="aimeat-app-badge-open" aria-label="' + entities('Publish your own app on ' + AIMEAT_LABEL) + '">' + BOLT + '</label>'
         + '<a href="' + AIMEAT_HOME + '" target="_blank" rel="noopener noreferrer" '
         + 'aria-label="' + entities('Publish your own app on ' + AIMEAT_LABEL) + '">'
-        + '<span>' + entities('⚡') + '</span>'
+        + '<span>' + BOLT + '</span>'
         + '<span>' + entities(AIMEAT_LABEL) + '</span>'
         + '<span>' + entities('· Publish your own app for free') + '</span>'
         + '</a>'

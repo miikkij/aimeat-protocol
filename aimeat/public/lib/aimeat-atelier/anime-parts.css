@@ -15,6 +15,11 @@
  * @usage  Imported by aimeat-atelier.css; the components are AIMEAT.atelier.calendar and
  *   AIMEAT.atelier.priceTable.
  * @version-history
+ *   v0.45.0 — 2026-09-05 — The measured review: the month's two arrows and the billing-period
+ *     switch reach 40px of hit area (they were 34), and the "+1" that stands for the events a
+ *     day cell could not fit reads at --ak-text-micro instead of 0.75em, which resolved to 9.8px.
+ *     The pips row wraps with it: it was already 3px wider than its cell at 1440, and the bigger
+ *     "+1" made that 4, so it now folds inside the cell instead of reaching past it.
  *   v0.44.0 — 2026-09-02 — Initial: the anime.js pair (calendar, priceTable).
  */
 
@@ -47,8 +52,8 @@
 .ak-calendar__nav {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: var(--ak-touch-min);
+  height: var(--ak-touch-min);
   flex: none;
   padding: 0;
   border: var(--ak-line-w) solid var(--ak-line);
@@ -103,7 +108,19 @@
 .ak-calendar__day--today { border-color: var(--ak-accent); font-weight: 700; }
 .ak-calendar__num { line-height: 1.1; }
 
-.ak-calendar__pips { display: flex; align-items: center; gap: 3px; min-height: 6px; }
+/* The pips row is as wide as the cell and no wider. Three pips and a "+1" have always been a
+ * squeeze in a seventh of a phone's width — it overflowed by 3px before the "+1" grew to the
+ * micro size and by 4px after — so the row wraps rather than reaching past the cell it belongs
+ * to. Wrapping puts the "+1" under the pips, which is where there is room. */
+.ak-calendar__pips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  max-width: 100%;
+  min-height: 6px;
+}
 .ak-calendar__pip {
   width: 6px;
   height: 6px;
@@ -113,9 +130,11 @@
 .ak-calendar__pip--ok { background: var(--ak-ok); }
 .ak-calendar__pip--warn { background: var(--ak-warn); }
 .ak-calendar__pip--err { background: var(--ak-err); }
+/* "+1" for the events the cell could not fit: an annotation on the pips beside it, so it reads
+ * at the micro size. 0.75em of the cell resolved to 9.8px. */
 .ak-calendar__more {
   font-family: var(--ak-font-mono);
-  font-size: 0.75em;
+  font-size: var(--ak-text-micro);
   color: var(--ak-ink-dim);
 }
 
@@ -143,7 +162,7 @@
   background: var(--ak-surface-2);
 }
 .ak-price__period {
-  min-height: 34px;
+  min-height: var(--ak-touch-min);
   padding: 0 18px;
   border: 0;
   border-radius: var(--ak-radius-pill);

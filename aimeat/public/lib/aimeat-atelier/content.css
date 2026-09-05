@@ -12,6 +12,9 @@
  * @structure ak-list · ak-listdetail · ak-grid + ak-card · ak-mediacard · ak-timeline
  * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
  * @version-history
+ *   v0.38.0 — 2026-09-05 — The measured review: the chart's tooltip and note labels and the
+ *     graph's edge labels read at --ak-text-micro. All three were a literal 10px, which is
+ *     under the kit's floor and under the size the token now names.
  *   v0.37.0 — 2026-09-05 — The list-detail fold spans its panes over every track (a container
  *     query cannot restyle its own container, so the open detail sat at 40 percent of a phone),
  *     and a dialog taller than the screen scrolls in its body instead of growing past it.
@@ -396,10 +399,12 @@ button.ak-card:hover { box-shadow: var(--ak-elev-2); transform: translateY(-2px)
   box-shadow: var(--ak-elev-2);
   pointer-events: none;
 }
+/* The month or category a tooltip and a note are ABOUT, over the figure itself: an annotation,
+ * which is what --ak-text-micro is for. It was 10px. */
 .ak-chart__tip-label, .ak-chart__note-label {
   display: block;
   font-family: var(--ak-font-mono);
-  font-size: 10px;
+  font-size: var(--ak-text-micro);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   opacity: 0.7;
@@ -549,7 +554,8 @@ button.ak-card:hover { box-shadow: var(--ak-elev-2); transform: translateY(-2px)
 }
 .ak-graph__svg { display: block; width: 100%; height: auto; }
 .ak-graph__edge { stroke: var(--ak-line); stroke-width: 1.5; }
-.ak-graph__edgelabel { fill: var(--ak-ink-dim); font-family: var(--ak-font-mono); font-size: 10px; }
+/* The word on a line between two nodes: an annotation on the edge, at the micro size (was 10px). */
+.ak-graph__edgelabel { fill: var(--ak-ink-dim); font-family: var(--ak-font-mono); font-size: var(--ak-text-micro); }
 .ak-graph__pill { fill: var(--ak-surface-2); stroke: var(--ak-line); stroke-width: var(--ak-line-w); }
 .ak-graph__label { fill: var(--ak-ink); font-size: 12.5px; font-weight: 600; }
 .ak-graph__node--ok .ak-graph__pill     { fill: color-mix(in oklab, var(--ak-ok) 16%, var(--ak-surface)); stroke: color-mix(in oklab, var(--ak-ok) 45%, var(--ak-line)); }

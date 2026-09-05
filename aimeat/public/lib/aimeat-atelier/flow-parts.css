@@ -10,8 +10,12 @@
  *   (spring, drag, stagger, odometer) and to the cart's own collapse, all finite. The rules below
  *   carry two transitions only, both on a hover or a press, so an idle surface repaints zero
  *   times and the finish gate can measure that.
- * @structure .ak-sortable · .ak-cart · .ak-notices · .ak-facets
+ * @structure .ak-sortable · .ak-cart · .ak-notices · .ak-facets · the phone's target floor
  * @version-history
+ *   v0.44.0 — 2026-09-05 — The measured review: the cart stepper, the remove and mark-all
+ *     buttons, the facet chip and its clear all reach 40px of hit area; the grip keeps its
+ *     narrow look on a desk and widens to 40 under a finger; and .ak-facets__sep stops using
+ *     the hairline colour as text (1.75 dark, 2.28 light) and takes the muted ink.
  *   v0.43.0 — 2026-09-02 — Initial (wish-atelier-motion-libraries-and-parts, stage 3).
  */
 
@@ -97,7 +101,7 @@
   background: var(--ak-surface-2);
 }
 .ak-cart__step {
-  width: 32px; height: 32px;
+  width: var(--ak-touch-min); height: var(--ak-touch-min);
   border: 0; padding: 0; border-radius: var(--ak-radius-pill);
   background: transparent; color: var(--ak-ink);
   font: inherit; font-size: var(--ak-text-body); line-height: 1;
@@ -113,7 +117,7 @@
   flex: none; min-width: 6ch; text-align: right;
   font-family: var(--ak-font-mono); font-variant-numeric: tabular-nums;
 }
-.ak-cart__remove { flex: none; min-height: 32px; padding: 4px 10px; font-size: var(--ak-text-fine); }
+.ak-cart__remove { flex: none; min-height: var(--ak-touch-min); padding: 4px 10px; font-size: var(--ak-text-fine); }
 
 .ak-cart__foot {
   display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
@@ -132,7 +136,7 @@
 .ak-notices { display: flex; flex-direction: column; gap: 10px; }
 .ak-notices__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .ak-notices__title { font-weight: 700; color: var(--ak-ink); }
-.ak-notices__markall { min-height: 32px; padding: 4px 10px; font-size: var(--ak-text-fine); }
+.ak-notices__markall { min-height: var(--ak-touch-min); padding: 4px 10px; font-size: var(--ak-text-fine); }
 .ak-notices__body { display: flex; flex-direction: column; gap: 6px; }
 .ak-notices__day {
   margin-top: 6px;
@@ -181,7 +185,7 @@
 .ak-facets__chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .ak-facets__chip {
   display: inline-flex; align-items: center; gap: 6px;
-  min-height: 32px; padding: 4px 12px;
+  min-height: var(--ak-touch-min); padding: 4px 12px;
   border: var(--ak-line-w) solid var(--ak-line);
   border-radius: var(--ak-radius-pill);
   background: var(--ak-surface); color: var(--ak-ink);
@@ -200,5 +204,26 @@
 .ak-facets__chip[aria-pressed='true'] .ak-facets__chipcount { color: var(--ak-accent-ink); }
 .ak-facets__summary { display: flex; align-items: center; gap: 8px; font-size: var(--ak-text-fine); color: var(--ak-ink-dim); }
 .ak-facets__tally { font-variant-numeric: tabular-nums; }
-.ak-facets__sep { color: var(--ak-line); }
-.ak-facets__clear { min-height: 30px; padding: 3px 10px; font-size: var(--ak-text-fine); }
+/* The dot between the tally and the clear is TEXT, so it answers to the text contrast rule and
+ * not to the hairline one. On --ak-line it measured 1.75 dark and 2.28 light. */
+.ak-facets__sep { color: var(--ak-ink-dim); }
+.ak-facets__clear { min-height: var(--ak-touch-min); padding: 3px 10px; font-size: var(--ak-text-fine); }
+
+/* ── Under a finger ───────────────────────────────────────────────────────────────────────────
+   The grip: a 28px column of six dots is the right WEIGHT beside a row of text on a desk, where
+   the pointer lands where it is aimed. A thumb does not, so the grip takes the target floor at
+   the phone width and under any coarse pointer, and keeps its painted mark at 10px either way.
+
+   The cart line: a picture, a name, a stepper, a price and a Remove is more than 322px of row,
+   and it always was — the name's column had already collapsed to zero and Remove hung 8px past
+   the line before the stepper reached the target floor, which took it to 24. Growing the
+   controls is the right answer and shrinking the row is not, so the line wraps into two: the
+   picture and the name across the top, and the stepper, the price and Remove under them, with
+   Remove pushed to the far edge where it is on a wide screen. */
+@media (max-width: 760px), (pointer: coarse) {
+  .ak-sortable__grip { width: var(--ak-touch-min); }
+
+  .ak-cart__line { flex-wrap: wrap; }
+  .ak-cart__body { flex: 1 1 8rem; }
+  .ak-cart__remove { margin-left: auto; }
+}

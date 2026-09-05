@@ -13,6 +13,10 @@
  *   ak-table · ak-search
  * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
  * @version-history
+ *   v0.8.0 — 2026-09-05 — The measured review: the search bar's clear button and the table's
+ *     sort header take the 40px target floor (the sort header's sideways floor was 24 since
+ *     v0.7.0, which is the WCAG minimum and not this kit's), and Leaflet's licence credit reads
+ *     at --ak-text-micro instead of 10px.
  *   v0.7.0 — 2026-08-30 — .ak-table__sort gains the 24px touch floor sideways too (a squeezed
  *     phone column left a header narrower than a fingertip).
  *   v0.6.0 — 2026-08-29 — .ak-map: the REAL map's chrome — Leaflet's popups, controls and
@@ -95,7 +99,7 @@
   padding: 0;
   min-height: var(--ak-touch);
   /* A short header word ("Qty") on a squeezed phone column still leaves a real target. */
-  min-width: 24px;
+  min-width: var(--ak-touch-min);
   cursor: pointer;
   touch-action: manipulation;
 }
@@ -104,15 +108,16 @@
 
 /* ── Search ───────────────────────────────────────────────────────────────────────────────── */
 .ak-search { position: relative; display: flex; min-width: 0; }
-.ak-search__input { padding-right: 40px; }
+.ak-search__input { padding-right: 48px; }
 .ak-search__input::-webkit-search-cancel-button { display: none; }
 .ak-search__clear {
   position: absolute;
-  right: 4px;
+  right: 2px;
   top: 50%;
   transform: translateY(-50%);
-  width: 32px;
-  min-height: 32px;
+  width: var(--ak-touch-min);
+  height: var(--ak-touch-min);
+  min-height: var(--ak-touch-min);
   border: 0;
   border-radius: var(--ak-radius-pill);
   background: none;
@@ -384,10 +389,13 @@ button.ak-queue__row:hover { background: var(--ak-surface-2); }
   font-size: 20px;
 }
 .ak-map .leaflet-bar a:hover { background: var(--ak-surface-2); }
+/* The licence credit is an annotation on the tiles, which is one of the four places
+ * --ak-text-micro exists for. It was 10px, which is Leaflet's own number and under this kit's
+ * floor. */
 .ak-map .leaflet-control-attribution {
   background: color-mix(in oklab, var(--ak-surface) 82%, transparent);
   color: var(--ak-ink-dim);
-  font-size: 10px;
+  font-size: var(--ak-text-micro);
 }
 /* The licence links are real targets: WCAG 2.2 wants 24px of them, and the bench checks. */
 .ak-map .leaflet-control-attribution a {
@@ -397,7 +405,7 @@ button.ak-queue__row:hover { background: var(--ak-surface-2); }
   min-width: 24px;
   min-height: 24px;
   box-sizing: border-box;
-  line-height: 10px;
+  line-height: var(--ak-text-micro);
 }
 /* Dark mode re-tones the photographic tiles instead of shouting against them. */
 :root[data-theme='dark'] .ak-map .leaflet-tile {

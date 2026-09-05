@@ -9,6 +9,8 @@
  * @structure .ak-toasts/.ak-toast · .ak-palette · .ak-compare · .ak-ring · .ak-crew ·
  *   .ak-dropzone · .ak-tour · .ak-poll · .ak-keys/.ak-kbd
  * @version-history
+ *   v0.43.0 — 2026-09-05 — The measured review: the tour's own buttons and a poll option reach
+ *     40px of hit area (they were 34 and 38).
  *   v0.42.0 — 2026-09-01 — Initial (wish-atelier-night-gallery, stage 3).
  */
 
@@ -164,13 +166,13 @@
 }
 .ak-tour__step { font-family: var(--ak-font-mono); color: var(--ak-accent); margin-right: 6px; }
 .ak-tour__nav { display: flex; gap: 8px; margin-top: 8px; }
-.ak-tour__nav .ak-btn { min-height: 34px; padding: 4px 10px; color: var(--ak-bg); border-color: color-mix(in oklab, var(--ak-bg) 40%, transparent); }
+.ak-tour__nav .ak-btn { min-height: var(--ak-touch-min); padding: 4px 10px; color: var(--ak-bg); border-color: color-mix(in oklab, var(--ak-bg) 40%, transparent); }
 
 /* ── The poll: one question, live shares ─────────────────────────────────────────────────── */
 .ak-poll { display: flex; flex-direction: column; gap: 8px; }
 .ak-poll__q { font-weight: 700; color: var(--ak-ink); }
 .ak-poll__opt {
-  position: relative; width: 100%; height: 38px;
+  position: relative; width: 100%; height: var(--ak-touch-min);
   border: 0; padding: 0; border-radius: var(--ak-radius-sm);
   background: var(--ak-surface-2); color: var(--ak-ink);
   font: inherit; text-align: left; cursor: pointer; overflow: hidden;
