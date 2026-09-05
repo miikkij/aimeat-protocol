@@ -18,9 +18,14 @@
  *   cd aimeat && pnpm exec tsx scripts/check-silent-catch.ts --strict   # CI-style gate
  *   cd aimeat && pnpm exec tsx scripts/check-silent-catch.ts --area src/storage --list
  * @version-history
+ *   v1.1.0 — 2026-09-05 — `--staged`: lint only the files about to be committed. The hook's
+ *     whole-tree pass was a second full ESLint run, 35 s of every commit, for a rule a new file
+ *     can only break in itself. CI keeps the whole-tree pass.
  *   v1.0.0 — 2026-07-26 — Initial (silent-exception cleanup roadmap).
  */
 import { ESLint } from 'eslint';
+import { execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 // The parser comes from the installed `typescript-eslint` meta-package (as eslint.config.js does)
 // rather than a new direct dependency on @typescript-eslint/parser.
 import tseslint from 'typescript-eslint';
@@ -60,7 +65,23 @@ const UNGATED = ['src/static/'];
 const args = process.argv.slice(2);
 const strict = args.includes('--strict');
 const list = args.includes('--list');
+const staged = args.includes('--staged');
 const areaFilter = args.includes('--area') ? args[args.indexOf('--area') + 1] : undefined;
+
+const EVERYTHING = ['src/**/*.ts', 'src/**/*.js', 'public/**/*.js'];
+
+/**
+ * The files git is about to commit, as paths relative to this package. `--staged` is the hook's
+ * mode: a new silent handler can only be in a file the commit touches, so the whole-tree pass —
+ * a second full ESLint run of every file, 35 s on 2026-09-05 — is the CI's job and not the
+ * commit's. Deleted files are left out (nothing to lint), renamed and copied ones are in.
+ */
+function stagedFiles(): string[] {
+  const out = execFileSync('git', ['diff', '--cached', '--name-only', '--diff-filter=ACMR'], { encoding: 'utf8' });
+  return out.split('\n')
+    .map(l => l.trim().replace(/^aimeat\//, ''))
+    .filter(f => /^(src\/.*\.(ts|js)|public\/.*\.js)$/.test(f) && existsSync(f));
+}
 
 async function main(): Promise<void> {
   const eslint = new ESLint({
@@ -92,7 +113,18 @@ async function main(): Promise<void> {
     ],
   });
 
-  const results = await eslint.lintFiles(['src/**/*.ts', 'src/**/*.js', 'public/**/*.js']);
+  let targets = EVERYTHING;
+  if (staged) {
+    const candidates = stagedFiles();
+    targets = [];
+    for (const f of candidates) if (!await eslint.isPathIgnored(f)) targets.push(f);
+    if (targets.length === 0) {
+      console.log('\n  ✓ no staged file is in scope of the rule (--staged); the whole tree is CI\'s pass\n');
+      return;
+    }
+    console.log(`\n  --staged: ${targets.length} file(s) about to be committed`);
+  }
+  const results = await eslint.lintFiles(targets);
 
   type Finding = { file: string; line: number; messageId: string };
   const findings: Finding[] = [];

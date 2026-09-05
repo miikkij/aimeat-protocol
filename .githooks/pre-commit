@@ -1,59 +1,30 @@
 #!/bin/sh
 #
-# AIMEAT pre-commit gate — blocks the commit unless the fast static checks pass:
-#   1. ESLint (src/ + public/)           — pnpm lint
-#   2. Backend type check (tsc)          — pnpm typecheck
-#   3. Frontend type check (checkJs)     — pnpm typecheck:frontend
-#   4. SDK-libs type check (checkJs)      — pnpm typecheck:sdk
-#   5. Importmap ↔ imports in sync       — pnpm check:importmap
-#   5b. Surface blocks have components    — pnpm check:surface-blocks
-#   5b. Every profile tab has a menu door — pnpm check:profile-tabs
-#   5b. Shipped crew defs match the rules — pnpm check:crew-defs
-#   5c. Every setting is in the Config tab — pnpm check:config-coverage
-#   6. No max_tokens caps on AI calls    — pnpm check:no-max-tokens
-#   7. openapi.yaml parse + $ref health  — pnpm check:openapi
-#   8. app-catalog.html ↔ its sources    — pnpm check:app-catalog
-#   8b. Landing change log is well-formed — pnpm check:changelog
-#   8. SDK-libs dist ↔ their sources     — pnpm check:sdk
-#   8c. Atelier preset × palette matrix  — pnpm check:atelier
-#   9. MCP tool surface/handler parity    — pnpm check:mcp-tools
-#   9b. MCP tool input-schema parity      — pnpm check:mcp-schemas
-#   9c. Plain language for a person       — pnpm check:plain-language
-#  10. Cortex pack integrity (embed + versions) — pnpm check:viewport
-#  11. AI disclosure gates (TARGET-058)  — pnpm check:ai-disclosure
-#  11b. Language files agree with en.json  — pnpm check:locales
-#  11c. Licences allowed + every served file — pnpm check:licenses
-#  11d. THIRD-PARTY-NOTICES.md is current  — pnpm check:notices
-#  11e. Protocol versions vs what is current — pnpm check:protocol-versions
-#  12. Route authorization gates        — pnpm check:route-scopes
-#  12b. E2E suites test a refusal       — pnpm check:denial-coverage
-#  13. Outbound fetch through safeFetch — pnpm check:outbound-fetch
-#  14. Server-trusted memory keys       — pnpm check:trusted-keys
-#  15. Owner-scoped tables vs cascades  — pnpm check:storage-parity
-#  16. Sandbox entry points on builder — pnpm check:ext-entrypoints
-#  17. One capability one impl       — pnpm check:shared-impl
-#  18. Run-time-chosen read targets  — pnpm check:runtime-read-targets
-#  19. v2 surfaces stay projections  — pnpm check:surface-focus
-#  19b. Caller resolved, not sub raw  — pnpm check:identity-resolution
-#  19c. A refusal names a principal   — pnpm check:owner-principal
-#  19d. Federation writes are signed  — pnpm check:federation-signatures
-#  19d2. Open write doors accounted  — pnpm check:open-writes
-#  19e. No new cycle or inversion    — pnpm check:deps
-#  20. An agent writes, page hears it — pnpm check:sse-parity
-#  21. No decision written out twice  — pnpm check:copied-logic
-#  21b. Stated counts match the code  — pnpm check:doc-counts
-#  21c. One word, every door          — pnpm check:scope-parity
-#  22. Published surfaces + release   — pnpm check:liaison-surface
-#  23. The vitest unit suite          — pnpm test
+# AIMEAT pre-commit gate — blocks the commit unless the static checks pass. Eight lines, in this
+# order, because each fails faster than the next:
+#   1. ESLint (src/ + public/), cached              — pnpm lint
+#   2. Backend type check, incremental              — pnpm typecheck
+#   3. Frontend type check (checkJs), incremental   — pnpm typecheck:frontend
+#   4. SDK-libs type check (checkJs), incremental   — pnpm typecheck:sdk
+#   5. No silent exception handler in a STAGED file — pnpm check:silent-catch -- --strict --staged
+#   6. The read-only gates, four at a time          — pnpm check:fast   (`pnpm check:fast --list` names them)
+#   7. The five program-reading gates, one program  — pnpm check:invariants
+#   8. The unit tests reachable from what changed   — pnpm test:changed
 #
-# These are the "green before commit" checks. E2E/Playwright are intentionally NOT here
-# (too slow / need a DB) — run those before pushing a feature (see CLAUDE.md Rule 1).
+# WHAT CHANGED ON 2026-09-05 AND WHY. This hook had grown to 45 lines run one after another and
+# cost 7–9 minutes per commit, measured: ESLint twice over the whole tree (lint, then silent-catch
+# with one rule), three type checks with no cache, five gates each building the same compiler
+# program, one vitest file run here and again inside the unit suite, thirty small scripts each
+# paying 1.5 s of process start one after another, and then the whole unit suite. Every check is
+# still run; what moved is HOW: the caches (eslint --cache, tsc --incremental), the second ESLint
+# pass reads only the staged files, the five gates share one program, the small scripts overlap
+# four at a time, and the unit suite runs the files reachable from the change here and the whole
+# suite in the pre-push hook and CI. The pre-push hook also runs the guard tier when src/routes,
+# src/auth, src/services or src/storage changed. Measured after: about two minutes warm. The
+# analysis with every number: docs/internal/testausajan-analyysi-2026-09-05.md (local, gitignored).
 #
-# The unit suite (21) was CI-only until 2026-08-15, and the gap had a cost: a commit that added two
-# MCP tools to the v2 surface allowlists without a connector implementation passed all twenty static
-# checks, because the check that would have caught it — connector-surfaces — is a vitest test rather
-# than a script. It is 18 seconds against the ~40 the rest of this hook takes, and it turns "green
-# before commit" into something that is actually true.
+# E2E/Playwright are intentionally NOT here (they need a DB) — the pre-push hook runs the guard
+# tier, see docs/coding-guidelines/testing-requirements.md Rule 1b.
 #
 # Bypass in a genuine emergency with:  git commit --no-verify
 #
@@ -62,10 +33,10 @@
 
 set -e
 
-echo "[pre-commit] ESLint (lint)…"
+echo "[pre-commit] ESLint, cached (lint)…"
 pnpm -s lint
 
-echo "[pre-commit] Type check — backend (typecheck)…"
+echo "[pre-commit] Type check — backend, incremental (typecheck)…"
 pnpm -s typecheck
 
 echo "[pre-commit] Type check — frontend / checkJs (typecheck:frontend)…"
@@ -74,189 +45,25 @@ pnpm -s typecheck:frontend
 echo "[pre-commit] Type check — SDK libs / checkJs (typecheck:sdk)…"
 pnpm -s typecheck:sdk
 
-echo "[pre-commit] Importmap ↔ imports in sync (check:importmap)…"
-pnpm -s check:importmap
+# A new silent handler can only be in a file this commit touches; the whole tree is CI's pass.
+echo "[pre-commit] No silent exception handler in a staged file (check:silent-catch --staged)…"
+pnpm -s check:silent-catch -- --strict --staged
 
-echo "[pre-commit] Every surface block has a component (check:surface-blocks)…"
-pnpm -s check:surface-blocks
+# Thirty-odd read-only checks, four at a time. The list, each with the sentence it used to print
+# here, is CHECKS in aimeat/scripts/check-fast.ts; `pnpm check:fast --list` prints it. A check that
+# WRITES the tree does not belong there: two writers on one file is a race, not a speed-up.
+echo "[pre-commit] The read-only gates, four at a time (check:fast)…"
+pnpm -s check:fast
 
-echo "[pre-commit] Every profile tab reachable from the menu (check:profile-tabs)…"
-pnpm -s check:profile-tabs
+# Runtime read targets, identity resolution, owner-principal refusals, federation write
+# signatures, credential-free write doors: five gates, one compiler program, and all five run
+# before any of them refuses.
+echo "[pre-commit] The five program-reading gates (check:invariants)…"
+pnpm -s check:invariants
 
-echo "[pre-commit] Shipped crew definitions match the runtime's rules (check:crew-defs)…"
-pnpm -s check:crew-defs
-
-echo "[pre-commit] Every setting reachable in the admin Config tab (check:config-coverage)…"
-pnpm -s check:config-coverage
-
-echo "[pre-commit] No max_tokens caps on AI calls (check:no-max-tokens)…"
-pnpm -s check:no-max-tokens
-
-echo "[pre-commit] openapi.yaml parses + refs resolve (check:openapi)…"
-pnpm -s check:openapi
-
-echo "[pre-commit] app-catalog.html ↔ sources in sync (check:app-catalog)…"
-pnpm -s check:app-catalog
-
-echo "[pre-commit] Landing change log parses + newest first (check:changelog)…"
-pnpm -s check:changelog
-
-echo "[pre-commit] SDK-libs dist ↔ sources in sync (check:sdk)…"
-pnpm -s check:sdk
-
-echo "[pre-commit] Atelier look matrix — every preset × palette × mode (check:atelier)…"
-pnpm -s check:atelier
-
-echo "[pre-commit] MCP tool surface/handler parity (check:mcp-tools)…"
-pnpm -s check:mcp-tools
-
-# Names are not enough. check:mcp-tools proves the two MCP surfaces expose the same tool NAMES;
-# this one proves they take the same PARAMETERS. A parameter declared on one surface and not the
-# other is stripped by zod in silence — the call returns ok and does less than it was asked, which
-# is how aimeat_task_complete lost every deliverable_key a connector client ever sent.
-echo "[pre-commit] MCP tool input-schema parity (check:mcp-schemas)…"
-pnpm -s check:mcp-schemas
-
-# A message a PERSON hears must read like a sentence and must leave them somewhere to go. Measured
-# before this existed: 490 refusal-shaped messages, 22 of which said what to do next, and 43 reading
-# exactly "Access denied". Only the audience that actually hears it is held to this — a machine
-# correcting its own call is better served by precision. src/middleware/message-audience.ts decides.
-echo "[pre-commit] Plain language for the messages a person hears (check:plain-language)…"
-pnpm -s check:plain-language
-
-echo "[pre-commit] Cortex pack integrity: embed + VERSION constants (check:viewport)…"
-pnpm -s check:viewport
-
-echo "[pre-commit] No silent exception handlers in the cleaned areas (check:silent-catch)…"
-pnpm -s check:silent-catch -- --strict
-
-echo "[pre-commit] AI disclosure gates: one LLM path, one publish path, labels intact (check:ai-disclosure)…"
-pnpm -s check:ai-disclosure
-
-echo "[pre-commit] Language files agree with en.json (check:locales)…"
-pnpm -s check:locales
-
-# AIMEAT is MIT and people run it commercially, so "can a company ship this" has to keep being
-# answerable. check:licenses reads the production tree AND public/lib/, which no npm tool looks at
-# and which is where the problems were: a GPL ffmpeg build inside the MIT npm package for every
-# release up to 3.10.0, an LGPL p5 with no licence text beside it, and six minified libraries
-# carrying no copyright line at all. check:notices proves THIRD-PARTY-NOTICES.md followed the
-# dependency that changed. Together under two seconds.
-echo "[pre-commit] Licences allowed, every served file accounted for (check:licenses)…"
-pnpm -s check:licenses
-
-echo "[pre-commit] Third-party notices match the tree (check:notices)…"
-pnpm -s check:notices
-
-# THE PROTOCOL REGISTER. Which version of each external protocol this node DECLARES, which one is
-# current, and the day somebody last looked. It fails on two things: the ledger no longer describing
-# the code (a version bumped in one of the two files that carry it, say), and an entry going stale
-# past its clock. Untriaged entries are counted and never fail — they are the countable backlog.
-#
-# Written 2026-09-04, the day an audit of this node's own MCP and A2A surfaces was wrong three times
-# in one afternoon and an outside scanner, not us, noticed we were declaring an MCP revision two
-# versions behind. A document would have recorded that once and gone quiet.
-echo "[pre-commit] Protocol versions declared vs current (check:protocol-versions)…"
-pnpm -s check:protocol-versions
-
-
-# ── August 2026 audit gates ──────────────────────────────────────────────────
-# Each is a ratchet seeded with that day's count: the gate fails only on a NEW
-# offender, so the backlog is visible, countable, and can only shrink. The
-# seeds live in aimeat/security/*.json with a reason per entry.
-echo "[pre-commit] Route authorization gates (check:route-scopes)…"
-pnpm -s check:route-scopes
-
-echo "[pre-commit] Every suite asks what a second principal gets (check:denial-coverage)…"
-pnpm -s check:denial-coverage
-
-echo "[pre-commit] Outbound fetch goes through safeFetch (check:outbound-fetch)…"
-pnpm -s check:outbound-fetch
-
-echo "[pre-commit] Server-trusted memory keys are guarded, and each exemption says why (check:trusted-keys)…"
-pnpm -s check:trusted-keys
-
-echo "[pre-commit] Owner-scoped tables are in both deletion cascades (check:storage-parity)…"
-pnpm -s check:storage-parity
-
-
-echo "[pre-commit] Extension sandbox entry points use the shared context builder (check:ext-entrypoints)…"
-pnpm -s check:ext-entrypoints
-
-echo "[pre-commit] MCP tools call what REST calls (check:shared-impl)…"
-pnpm -s check:shared-impl
-
-echo "[pre-commit] A read that picks its table at run time is listed (check:runtime-read-targets)…"
-pnpm -s check:runtime-read-targets
-
-echo "[pre-commit] The v2 surfaces are still projections (check:surface-focus)…"
-pnpm -s check:surface-focus
-
-# The identity rule had been written in CLAUDE.md for months with nothing reading the places it
-# applies to, which is worse than an unwritten rule: it is read as if something enforced it. On an
-# agent token `sub` and the resolved identity are the same string, so the mistake passes every test
-# that uses an agent, and shows only on an owner session — where data filed under `alice` instead of
-# `alice@node-id` is not found again by list, search or update.
-echo "[pre-commit] A route resolves the caller rather than reading sub raw (check:identity-resolution)…"
-pnpm -s check:identity-resolution
-
-# Invariant 11. `auth.owner` is the same string on an owner session, an agent JWT, an ecosystem token,
-# a PAT and an app grant, so a refusal decided by comparing it turns away a different PERSON and
-# admits everything acting in this one's name. Right for a person's DATA, wrong for their ACCOUNT.
-# The gate found GET /v1/ghii/:ghii/credential minting a signed identity credential for any of them.
-echo "[pre-commit] A refusal names the principal, not just the owner (check:owner-principal)…"
-pnpm -s check:owner-principal
-
-# check:route-scopes skips /v1/federation/* on purpose — a scope word is meaningless for a peer node —
-# and that correct decision left the largest unauthenticated WRITE surface here with no gate at all.
-# Each of these doors is either the owner's own action or a peer's signed one; neither is not allowed.
-echo "[pre-commit] Federation write doors are owner-gated or peer-signed (check:federation-signatures)…"
-pnpm -s check:federation-signatures
-
-# The other half of the same population: forty doors that write and take no credential at the chain.
-# None is a hole — every one is gated inside its handler by something a middleware scanner cannot see
-# (an OAuth code plus PKCE verifier, a device_code, a pre-signed token, the admin password, an IP
-# check that closes the moment one owner exists), and the triage that says so read all forty. The gate
-# is for the forty-first, which would look exactly like them.
-echo "[pre-commit] Every credential-free write door is accounted for (check:open-writes)…"
-pnpm -s check:open-writes
-
-# dependency-cruiser, bought rather than built: layer direction across the whole tree, import cycles
-# and modules nothing reaches — the last two of which nothing here has ever checked. Its baseline
-# (.dependency-cruiser-known-violations.json) holds the 335 that existed on 2026-09-04, so this gate
-# fails on a NEW one only. Regenerating that file with `pnpm deps:baseline` forgives the backlog and
-# is a decision, not maintenance.
-echo "[pre-commit] No new import cycle or layer inversion (check:deps)…"
-pnpm -s check:deps
-
-echo "[pre-commit] An agent writes, and the open page hears about it (check:sse-parity)…"
-pnpm -s check:sse-parity
-
-# A commit must carry the files it imports: c932f2f17 shipped two imports whose files existed only
-# in the author's worktree, and origin/main stopped booting (2026-09-04).
-echo "[pre-commit] Every relative import points at a tracked file (check:imports-tracked)…"
-(cd "$(git rev-parse --show-toplevel)/aimeat" && pnpm -s check:imports-tracked)
-
-echo "[pre-commit] No decision is written out on two sides (check:copied-logic)…"
-pnpm -s check:copied-logic
-
-echo "[pre-commit] The counts this project states about itself (check:doc-counts)…"
-pnpm -s check:doc-counts -- --strict
-
-# A permission word the owner is OFFERED and nothing asks for changes nothing when it is ticked; a
-# word a DOOR demands and the screen never offers cannot be granted by anybody, so the door is shut
-# to every principal that has to be given permission — and from outside that is indistinguishable
-# from closed by design. `aimeat_seo_status` sat in the second state, invisible to every agent on
-# every node, from the day it was added until the day this gate was written.
-echo "[pre-commit] One permission word, every door (check:scope-parity)…"
-pnpm -s check:scope-parity
-
-echo "[pre-commit] Published surfaces match, and neither needs a release (check:liaison-surface)…"
-pnpm -s check:liaison-surface
-
-# Last, because it is the slowest thing here (~18s) and every check above fails faster. It is also
-# the only one that runs the code rather than reading it.
-echo "[pre-commit] Unit suite (test)…"
-pnpm -s test
+# Last, because it is the slowest thing here and everything above fails faster. `--changed` runs
+# the test files whose import graph reaches a changed file; the whole suite runs before a push.
+echo "[pre-commit] Unit tests reachable from the change (test:changed)…"
+pnpm -s test:changed
 
 echo "[pre-commit] ✓ all checks passed"
