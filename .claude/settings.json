@@ -1,0 +1,25 @@
+{
+  "$comment": [
+    "Tracked session settings for every Claude Code session in this repo.",
+    "Written 2026-09-06 because the coordination ritual was documented and never triggered:",
+    "a session went 18 hours without writing its claim, and its heartbeat then stood four hours",
+    "stale, both times found by the developer rather than by the session. A rule nothing enforces",
+    "is a rule that holds only while somebody remembers it, and eight sessions share this repo.",
+    "SessionStart prints the ritual and the live board into the session's own context before its",
+    "first tool call, so the claim is written from what the session already knows."
+  ],
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/session-start.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}
