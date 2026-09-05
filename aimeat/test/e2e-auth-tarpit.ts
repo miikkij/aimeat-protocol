@@ -183,12 +183,20 @@ async function main() {
         });
 
         await test('5. The guess after the free ones waits, and each one after that waits longer', async () => {
+            // Each guess is measured against ITS OWN floor, never against the previous one's clock.
+            // A wall time is the delay plus the work — a bcrypt round and a database call — and that
+            // work is not constant on a CI box running four lanes: `third >= second + STEP - 60`
+            // failed at 512ms then 727ms, where the delay had grown by exactly its step and the work
+            // had shrunk by 85ms. Differencing two noisy numbers to prove a difference smaller than
+            // the noise cannot be made reliable by widening the tolerance; a floor per call can.
+            // Growth is still proven, because test 4 pins the first guess BELOW one step and these
+            // pin the next two at one step and two steps.
             const second = await timed('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: USER, password: 'wrong-2' }) });
             assert(second.status === 401, `expected 401, got ${second.status}`);
             assert(second.ms >= STEP_MS, `the guess after the free one waits a step, took ${second.ms}ms`);
             const third = await timed('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: USER, password: 'wrong-3' }) });
             assert(third.status === 401, `expected 401, got ${third.status}`);
-            assert(third.ms >= second.ms + STEP_MS - 60, `the delay grows: ${second.ms}ms then ${third.ms}ms`);
+            assert(third.ms >= 2 * STEP_MS, `the one after that waits two steps, took ${third.ms}ms`);
         });
 
         await test('6. Past the threshold the door refuses CHEAPLY instead of holding the connection', async () => {
