@@ -825,13 +825,23 @@ function fixedPorts(suites: string[]): Map<string, number[]> {
     for (const suite of suites) {
         let src: string;
         try { src = readFileSync(suite, 'utf-8'); } catch { continue; }
+        // 40251 is the runner's own default and 40050 the dev server's: a suite mentioning either
+        // has not claimed a port of its own. Excluding only TARGET.port was wrong the moment a
+        // caller overrode it — with AIMEAT_PORT=40512 every suite that so much as names 40251
+        // counted as pinned, all 65 landed in lane 0, and a four-lane run silently became one
+        // (measured 2026-09-05: "Suites: 65", one lane, 611 s instead of about 300).
         const ports = [...src.matchAll(/\b(40[0-9]{3})\b/g)].map(m => Number(m[1]))
-            .filter(p => p !== Number(TARGET.port) && p !== 40050);
+            .filter(p => p !== Number(TARGET.port) && p !== 40050 && p !== 40251);
         if (ports.length > 0) out.set(suite, [...new Set(ports)]);
     }
     return out;
 }
 
+/**
+ * A lane's own port, from a range no suite writes down. It also has to avoid the port the RUNNER was
+ * given: a caller who says AIMEAT_PORT=40512 to keep out of another session's way would otherwise
+ * have a lane bind the same number (`taken` covers it, and this comment is why that matters).
+ */
 function lanePort(lane: number, taken: Set<number>): string {
     for (let p = 40500 + lane; p < 40600; p++) {
         if (taken.has(p)) continue;
