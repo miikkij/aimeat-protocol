@@ -12,6 +12,9 @@
  * @structure packagesTools[] -- catalog entries, folded into definitions.ts
  * @usage import { packagesTools } from './packages.js';
  * @version-history
+ *   v1.3.0 -- 2026-09-05 -- aimeat_package_status_set, because publishing was reachable on no
+ *     surface at all; aimeat_package_list gains the parameters the route actually reads (its `query`
+ *     was sent as ?q= and the route reads ?search=, so the filter was dropped in silence).
  *   v1.2.0 -- 2026-08-23 -- aimeat_package_install: taking a package into use was reachable over
  *     HTTP and nowhere else, so a conversation could name a package and not install it.
  *   v1.1.0 -- 2026-08-23 -- aimeat_package_publish declared {name, description, content} while
@@ -28,7 +31,11 @@ export const packagesTools: AimeatToolDefinition[] = [
         description: 'List component packages on this node. These are NOT the single-file web apps — for those use aimeat_app_list.',
         caller: 'agent',
         visibility: agentEverywhere,
-        input: { query: { type: 'string', description: 'Optional search query.' } },
+        input: {
+            search: { type: 'string', description: 'Optional search over name, description and tags.' },
+            author: { type: 'string', description: 'Only this author\'s packages. Your own name also shows your private ones.' },
+            status: { type: 'string', enum: ['draft', 'published', 'archived'], description: 'Defaults to published.' },
+        },
     },
     {
         name: 'aimeat_package_get',
@@ -70,6 +77,22 @@ export const packagesTools: AimeatToolDefinition[] = [
                 description: 'The components, each { id, type: "app"|"extension"|"cortex"|"translation", label?, content, dependencies? }. At least one.',
             },
             manifest: { type: 'object', description: 'Package manifest: object types, schedules, the workspace it provisions.' },
+        },
+    },
+    {
+        // Publishing was unreachable. A package is created private and, until this tool existed, the
+        // only way to move it between draft, published and archived was PATCH
+        // /v1/packages/{group}/versions/{version} — a door no MCP or CLI surface carried. So an agent
+        // could author a package and then neither see it (the list and get doors read published) nor
+        // install it (install refuses anything else).
+        name: 'aimeat_package_status_set',
+        description: 'Move one package version between draft, published and archived. Only the author may.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            group_id: { type: 'string', required: true, description: 'Package group identifier.' },
+            version: { type: 'string', description: 'Which version. Defaults to the latest one.' },
+            status: { type: 'string', required: true, enum: ['draft', 'published', 'archived'], description: 'The status to set.' },
         },
     },
     {

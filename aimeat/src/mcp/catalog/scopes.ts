@@ -220,6 +220,7 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_app_fork:                          'app:write',
     aimeat_app_publish:                       'app:write',
     aimeat_package_publish:                   'app:write',
+    aimeat_package_status_set:                'app:write',
 
     // Installing registers an app, a cortex, an extension and any @activate cron the manifest
     // declares, all under the owner's identity — a write with a long tail, and its own word on the

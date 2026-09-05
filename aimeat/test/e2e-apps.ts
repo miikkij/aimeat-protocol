@@ -314,6 +314,33 @@ await test("Owner B publishing the same filename creates B's OWN record, not a w
     assert((await bDownload.text()) === '<h1>owner B</h1>', "B's namespace serves B's content");
 });
 
+// ── own=true: the listing narrows to the caller ──
+// aimeat_app_list published `own` on all three MCP surfaces and GET /v1/apps never read it, so
+// "list my apps" answered with the whole catalogue and reported success. Two owners now hold an app
+// of the same filename, which is exactly the shape that made the old behaviour invisible.
+
+await test('Listing without own=true shows both owners', async () => {
+    const { body } = await json('/v1/apps?limit=200', bAuthed());
+    const owners = new Set((body.data?.apps ?? []).map((a: any) => a.owner));
+    assert(owners.has(ownerName), `A's apps present, owners seen: ${[...owners].join(', ')}`);
+    assert(owners.has(ownerBName), `B's apps present, owners seen: ${[...owners].join(', ')}`);
+});
+
+await test('own=true narrows the listing to the caller alone', async () => {
+    const { status, body } = await json('/v1/apps?limit=200&own=true', bAuthed());
+    assert(status === 200, `status ${status}`);
+    const apps = body.data?.apps ?? [];
+    assert(apps.length > 0, 'B owns at least one app, so the list is not empty');
+    const foreign = apps.filter((a: any) => a.owner !== ownerBName);
+    assert(foreign.length === 0,
+        `own=true must return only the caller's apps, got ${foreign.length} from ${[...new Set(foreign.map((a: any) => a.owner))].join(', ')}`);
+});
+
+await test('own=true without a session is refused, not answered with everyone', async () => {
+    const { status } = await json('/v1/apps?own=true');
+    assert(status === 401, `expected 401, got ${status}`);
+});
+
 // ── Phase 6: screenshots (set/replace without re-publishing) ──
 // Backs the screenshot worker + manual override: an owner (or operator) sets an app's
 // screenshot via a dedicated endpoint, no re-publish; a different non-operator owner cannot.

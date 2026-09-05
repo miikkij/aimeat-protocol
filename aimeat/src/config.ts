@@ -655,7 +655,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
 
     // Packages & Templates
     packagesEnabled: process.env.AIMEAT_PACKAGES_ENABLED !== 'false',
-    packageCreateRole: (process.env.AIMEAT_PACKAGE_CREATE_ROLE as 'operator' | 'owner') || 'operator',
+    packageCreateRole: (process.env.AIMEAT_PACKAGE_CREATE_ROLE as 'operator' | 'owner') || 'owner',
     packageMaxSizeMb: parseInt(process.env.AIMEAT_PACKAGE_MAX_SIZE_MB ?? '50', 10),
     packageMaxComponents: parseInt(process.env.AIMEAT_PACKAGE_MAX_COMPONENTS ?? '20', 10),
     packageMaxPerAuthor: parseInt(process.env.AIMEAT_PACKAGE_MAX_PER_AUTHOR ?? '50', 10),

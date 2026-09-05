@@ -211,7 +211,11 @@ await test('Agent auth — sign + token', async () => {
 
 console.log('\nPhase 1 — Package CRUD');
 
-await test('Create package (POST /v1/packages)', async () => {
+// A draft is REQUESTED here, not defaulted: since 2026-09-05 a created package is published unless
+// the body says otherwise (the old default left it unreachable — the read doors and install all
+// require published, and no MCP surface carried the door that flipped it). Everything below this
+// point still needs a draft as its subject, so the suite asks for one.
+await test('Create package (POST /v1/packages) — status honoured from the body', async () => {
   const { status, body } = await json('/v1/packages', {
     method: 'POST',
     headers: authed(ownerToken),
@@ -221,6 +225,7 @@ await test('Create package (POST /v1/packages)', async () => {
       category: 'utility',
       tags: ['test', 'widget'],
       visibility: 'public',
+      status: 'draft',
       components: [
         { id: 'csm-main', type: 'csm', label: 'Main CSM', content: '{"fields":[]}', dependencies: [] },
         { id: 'ext-helper', type: 'extension', label: 'Helper Extension', content: "{\"manifest\":\"metadata:\\n  name: pkg-ext-helper\\n  version: 1.0.0\\n  description: Helper extension used by the packages E2E fixture\\n  author: e2e\\nactions:\\n  - id: helper\\n    method: POST\\n    path: /helper\\n    script: helper\",\"scripts\":{\"helper\":\"export default async function(ctx, input){ return { v: '1.0.0' }; }\"}}", dependencies: ['csm-main'] },
@@ -231,11 +236,42 @@ await test('Create package (POST /v1/packages)', async () => {
   assert(body.data?.id, 'Missing id');
   assert(body.data?.packageGroupId, 'Missing packageGroupId');
   assert(body.data?.status === 'draft', `Expected status=draft, got ${body.data?.status}`);
+  assert(body.data?.visibility === 'public', `Expected visibility=public, got ${body.data?.visibility}`);
 
   firstVersionId = body.data.id;
   firstVersion = body.data.version;
   groupId = body.data.packageGroupId;
   encodedGroupId = encodeURIComponent(groupId);
+});
+
+// The defaults themselves. Published so the author can install what they just made; private so a
+// package does not become world-visible by omission, which is what the connector's own published
+// tool description has always promised.
+await test('Create package defaults: published and private', async () => {
+  const { status, body } = await json('/v1/packages', {
+    method: 'POST',
+    headers: authed(ownerToken),
+    body: JSON.stringify({
+      name: `${pkgName}-defaults`,
+      components: [{ id: 'csm-main', type: 'csm', label: 'Main CSM', content: '{"fields":[]}' }],
+    }),
+  });
+  assert(status === 201, `Expected 201, got ${status}: ${JSON.stringify(body)}`);
+  assert(body.data?.status === 'published', `Expected status=published, got ${body.data?.status}`);
+  assert(body.data?.visibility === 'private', `Expected visibility=private, got ${body.data?.visibility}`);
+});
+
+await test('Create package rejects an invalid visibility', async () => {
+  const { status } = await json('/v1/packages', {
+    method: 'POST',
+    headers: authed(ownerToken),
+    body: JSON.stringify({
+      name: `${pkgName}-badvis`,
+      visibility: 'secret',
+      components: [{ id: 'csm-main', type: 'csm', content: '{}' }],
+    }),
+  });
+  assert(status === 400, `Expected 400, got ${status}`);
 });
 
 await test('Validation: missing name returns 400', async () => {
@@ -405,6 +441,54 @@ await test('Latest now points to second version', async () => {
   assert(status === 200, `Expected 200, got ${status}`);
   assert(body.data?.version === secondVersion, `Expected ${secondVersion}, got ${body.data?.version}`);
   assert(body.data?.components?.length === 3, `Expected 3 components in v2, got ${body.data?.components?.length}`);
+});
+
+// ── PATCH /v1/packages/:groupId/status — the door that makes a package installable ─────────────
+// The version-level PATCH above demands an exact version string in the path, which a caller can
+// only know by listing the group first. "Publish it" means the newest version, and until this route
+// existed no MCP or CLI surface carried the act at all.
+
+await test('Status door with no version publishes the newest version', async () => {
+  // Park it first so the assertion cannot pass on a state it already had.
+  const parked = await json(`/v1/packages/${encodedGroupId}/status`, {
+    method: 'PATCH', headers: authed(ownerToken), body: JSON.stringify({ status: 'draft' }),
+  });
+  assert(parked.status === 200, `Expected 200 setting draft, got ${parked.status}`);
+  assert(parked.body.data?.status === 'draft', `Expected draft, got ${parked.body.data?.status}`);
+  assert(parked.body.data?.version === secondVersion,
+    `Expected the newest version ${secondVersion}, got ${parked.body.data?.version}`);
+
+  const { status, body } = await json(`/v1/packages/${encodedGroupId}/status`, {
+    method: 'PATCH', headers: authed(ownerToken), body: JSON.stringify({ status: 'published' }),
+  });
+  assert(status === 200, `Expected 200, got ${status}`);
+  assert(body.data?.status === 'published', `Expected published, got ${body.data?.status}`);
+  assert(body.data?.version === secondVersion, `Expected ${secondVersion}, got ${body.data?.version}`);
+});
+
+await test('Status door names a specific version', async () => {
+  const { status, body } = await json(`/v1/packages/${encodedGroupId}/status`, {
+    method: 'PATCH', headers: authed(ownerToken),
+    body: JSON.stringify({ status: 'draft', version: firstVersion }),
+  });
+  assert(status === 200, `Expected 200, got ${status}`);
+  assert(body.data?.version === firstVersion, `Expected ${firstVersion}, got ${body.data?.version}`);
+  assert(body.data?.status === 'draft', `Expected draft, got ${body.data?.status}`);
+});
+
+await test('Status door rejects an invalid status', async () => {
+  const { status } = await json(`/v1/packages/${encodedGroupId}/status`, {
+    method: 'PATCH', headers: authed(ownerToken), body: JSON.stringify({ status: 'live' }),
+  });
+  assert(status === 400, `Expected 400, got ${status}`);
+});
+
+await test('Status door needs a token (401)', async () => {
+  const { status } = await json(`/v1/packages/${encodedGroupId}/status`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: 'archived' }),
+  });
+  assert(status === 401, `Expected 401, got ${status}`);
 });
 
 await test('Export package as ZIP (GET /v1/packages/:groupId/export)', async () => {
@@ -586,12 +670,15 @@ await test('An app component gets a filename that an app origin recognises', asy
 });
 
 await test('Cannot install draft package', async () => {
-  // Create a draft-only package to test against
+  // Create a draft-only package to test against. The status is asked for: since 2026-09-05 a created
+  // package is published by default, so a draft is now something a caller chooses rather than
+  // something they are left with. The refusal under test is unchanged.
   const { body: draftPkg } = await json('/v1/packages', {
     method: 'POST',
     headers: authed(ownerToken),
     body: JSON.stringify({
       name: 'draft-only-pkg',
+      status: 'draft',
       components: [{ id: 'x', type: 'csm', content: '{}' }],
     }),
   });
@@ -1110,6 +1197,15 @@ await test('Second owner cannot publish version to first owner package', async (
       changelog: 'Unauthorized version',
       components: [{ id: 'x', type: 'csm', content: '{}' }],
     }),
+  });
+  assert(status === 403, `Expected 403, got ${status}`);
+});
+
+await test('Second owner cannot publish or archive first owner package', async () => {
+  const { status } = await json(`/v1/packages/${encodedGroupId}/status`, {
+    method: 'PATCH',
+    headers: authed(owner2Token),
+    body: JSON.stringify({ status: 'archived' }),
   });
   assert(status === 403, `Expected 403, got ${status}`);
 });

@@ -538,6 +538,29 @@ export interface SystemPromptVersionRecord {
 /** Shared type alias for all AIMEAT component types that can be included in a package. */
 export type PackageComponentType = 'csm' | 'extension' | 'cortex' | 'app' | 'msm' | 'memory' | 'translation';
 
+/**
+ * What an `app` component carries besides its bytes, so an installed app is not a nameless blob.
+ *
+ * ONLY THE FIELDS AN APP NEEDS TO LOOK LIKE ITSELF. Everything else on `AppManifest` is deliberately
+ * absent, and the absences are the design rather than an oversight: `seo` (an operator's search
+ * approval must not ride into another owner's copy), `marks`/`authorship`/`legal` (the named human
+ * who answers for the app — carrying them puts one person's name and legal statements on another
+ * person's copy), `dataMap` (its stamp addresses a memory key that does not exist under the
+ * installed filename), `aiPosture`/`track`/`specCheck` (re-derived from the bytes at publish),
+ * `protection`/`priceMorsels`/`licenseType`/`forkedFrom`/`aiProvenanceId` (the source owner's own
+ * commercial decisions and the provenance of the version published THERE).
+ */
+export interface PackageAppMeta {
+  name?: string;
+  description?: string;
+  descriptions?: Record<string, string>;
+  version?: string;                // the display semver, not the identity
+  category?: string;
+  tags?: string[];
+  icon?: string;
+  usesCortex?: string[];
+}
+
 /** A single component within a package version. */
 export interface PackageComponent {
   id: string;                      // "csm-signage", "app-kiosk", "cortex-signage"
@@ -546,6 +569,18 @@ export interface PackageComponent {
   content: string;                 // raw content (YAML, JS, HTML, JSON)
   contentHash: string;             // SHA-256 of content (for change detection)
   dependencies: string[];          // references to other component IDs ["csm-signage"]
+  /**
+   * Per-component metadata that travels with the bytes. `meta.app` is a PackageAppMeta.
+   *
+   * WHY A FIELD AND NOT MORE HTML. Until this existed `content` was the only thing the ZIP round
+   * trip carried, so a packaged app arrived named "Installed from package" with no icon and no
+   * category. The alternative — encoding it in the HTML — is what bundled crews had to do, and it
+   * means the installer must parse an app's source to render a listing row.
+   *
+   * Optional on purpose: a package written before this field, or by another node, has none, and
+   * every reader falls back to what it did before.
+   */
+  meta?: Record<string, unknown>;
 }
 
 /**
@@ -676,6 +711,17 @@ export interface InstalledComponent {
   originalHash: string;            // SHA-256 at install time (for customization detection)
   customized: boolean;             // true if current hash differs from originalHash
   customizedAt?: string;           // when first customization was detected
+  /**
+   * The SHORT name a cortex or extension component was registered under, as the app components of
+   * this instance address it in their rewritten source.
+   *
+   * WHY IT IS KEPT. An app component's source is rewritten at install time so `/v1/cortex/<name>/`
+   * points at THIS instance's copy (component-registrar.ts). A later update re-registers the app
+   * from the package's original bytes, and without this map the rewrite cannot be repeated: the
+   * updated app would keep the package author's cortex name and 404 its own library. Recovered by
+   * re-parsing the package manifest for instances installed before this field existed.
+   */
+  originalShortName?: string;
 }
 
 export interface InstanceFilter {
