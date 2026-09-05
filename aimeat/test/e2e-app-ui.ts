@@ -177,8 +177,10 @@ const GOOD_LAYOUT = {
     });
 
     await test('the signature COLOUR: a proven pair passes, a failing half refuses with the numbers', async () => {
-        // Measured on 2026-08-28: #0e7c66 passes every light-mode combo, #e8564a every dark one.
-        const good = await validate({ v: 1, tokens: { '--ak-accent': '#0e7c66/#e8564a' },
+        // Measured on 2026-08-28: #0e7c66 passes every light-mode combo, #e8564a every dark one;
+        // since AK-SOLID (kit 0.52.0, 2026-09-05) proves the raw fill too, the dark half is the
+        // brighter #f2776c, which the dark theme's near-black action ink reads on at 4.5 or better.
+        const good = await validate({ v: 1, tokens: { '--ak-accent': '#0e7c66/#f2776c' },
             blocks: [{ id: 'a', component: 'list', props: { source: 'x' } }] });
         assert(good.status === 200 && good.body.data.ok === true,
             `a measured-good pair must validate: ${JSON.stringify(good.body.data)}`);
