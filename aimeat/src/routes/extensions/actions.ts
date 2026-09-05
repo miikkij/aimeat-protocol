@@ -7,6 +7,10 @@
  *   consent/trust/notify/email) and runs the action script. Extracted from src/routes/extensions.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.10.0 — 2026-09-05 — Both handlers attach ctx.workspace when the manifest declares it
+ *     (services/extension-workspace.ts), as the caller with the caller's scopes, and answer a
+ *     workspace refusal the script let through with the service's own status and code instead of
+ *     a 500 EXTENSION_ERROR.
  *   v1.9.0 — 2026-09-03 — A direct call counts into the capability registry's stats when the node
  *     has switched counting on (AIMEAT_CAPABILITY_CALL_COUNTING); proxy calls always counted.
  *   v1.8.0 — 2026-09-03 — An action address may pin a version (name@version) through resolveExtensionForCall; an unknown version is a 404 that says so.
@@ -53,6 +57,7 @@ import { INTERNAL_PASS_HEADER } from './internal-pass.js';
 import { enforcePaywall, APP_TOOL_HEADER } from './paywall.js';
 import { resolveGatedApp } from './permissions.js';
 import { buildExtensionCtx, buildExtensionWallet, buildExtensionNotify, buildExtensionEmail, sandboxLimits } from '../../services/extension-ctx.js';
+import { attachExtensionWorkspace, workspaceRefusalFor, type ExtensionWorkspaceCapability } from '../../services/extension-workspace.js';
 import { takeDesignations } from '../../commerce/beneficiary-designation.js';
 import { recordCallDuration } from '../../services/call-timing.js';
 import { countCapabilityCall } from '../../services/capability-record.js';
@@ -90,6 +95,9 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
     // Who PAYS and whose namespace this runs in is `callerGaii`; who ACTED may be a hosted app, and
     // the money path is where that distinction has to survive or nobody can be told an app spent.
     const meteredCaller = callerPrincipal(req.auth!, config.nodeId);
+    // The caller's organism workspace, when the manifest declares it. Declared outside the try so
+    // the catch can tell a workspace refusal from a script failure.
+    let wsCap: Partial<ExtensionWorkspaceCapability> = {};
 
     try {
       // Look up the extension
@@ -160,9 +168,14 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
       // because ext:{name} is already unique and owner-scoping breaks client reads
       // (apps call getPublic('ext:{name}', key) without knowing the owner suffix).
       const extMemoryOwner = `ext:${ext.name}.${instanceId}`;
+      // The caller's organism workspace, as the caller, with the caller's own scopes deciding the
+      // authority question the way requireScope would (services/extension-workspace.ts).
+      wsCap = attachExtensionWorkspace({ config, storage, ext, actionId: action.id,
+        caller: { gaii: callerGaii, owner: req.auth!.owner as string, roles: req.auth!.roles, scopes: req.auth!.scopes ?? [] } });
       const ctx: ExtensionCtx = buildExtensionCtx({
         config, storage, extMemoryOwner,
         extension: { name: ext.name, owner: ext.installedBy },
+        workspace: wsCap.workspace,
         caller: {
           gaii: callerGaii, owner: req.auth!.owner as string, roles: req.auth!.roles,
           // The caller's standing in the app this extension gates, resolved BEFORE the sandbox and
@@ -241,7 +254,13 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
       const message = (err as Error).message;
       logger.error(`Extension action failed: ${extName}/${instanceId}/${actionId}`, { error: message, caller: callerGaii });
 
-      if (message.includes('Script execution timed out')) {
+      // A workspace refusal the script let through is the SERVICE's answer — not a member, no
+      // scope, schema, version conflict — and it keeps the service's status and code.
+      const wsRefusal = workspaceRefusalFor(err, wsCap);
+      if (wsRefusal) {
+        res.status(wsRefusal.status).json(error(config.nodeId, wsRefusal.code,
+          `Action "${actionId}" refused: ${wsRefusal.message}`));
+      } else if (message.includes('Script execution timed out')) {
         res.status(500).json(error(config.nodeId, 'EXTENSION_TIMEOUT',
           `Action "${actionId}" timed out`));
       } else if (message.includes('API call limit exceeded')) {
@@ -265,6 +284,9 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
     // Who PAYS and whose namespace this runs in is `callerGaii`; who ACTED may be a hosted app, and
     // the money path is where that distinction has to survive or nobody can be told an app spent.
     const meteredCaller = callerPrincipal(req.auth!, config.nodeId);
+    // The caller's organism workspace, when the manifest declares it. Declared outside the try so
+    // the catch can tell a workspace refusal from a script failure.
+    let wsCap: Partial<ExtensionWorkspaceCapability> = {};
 
     try {
       // Look up the extension
@@ -319,9 +341,14 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
       // Extension memory uses a flat namespace (ext:{name}) so apps can
       // read data via getPublic('ext:{name}', key) without knowing the owner.
       const extMemoryOwner = `ext:${ext.name}`;
+      // The caller's organism workspace, as the caller, with the caller's own scopes deciding the
+      // authority question the way requireScope would (services/extension-workspace.ts).
+      wsCap = attachExtensionWorkspace({ config, storage, ext, actionId: action.id,
+        caller: { gaii: callerGaii, owner: req.auth!.owner as string, roles: req.auth!.roles, scopes: req.auth!.scopes ?? [] } });
       const ctx: ExtensionCtx = buildExtensionCtx({
         config, storage, extMemoryOwner,
         extension: { name: ext.name, owner: ext.installedBy },
+        workspace: wsCap.workspace,
         caller: {
           gaii: callerGaii, owner: req.auth!.owner as string, roles: req.auth!.roles,
           // The caller's standing in the app this extension gates, resolved BEFORE the sandbox and
@@ -399,7 +426,13 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
       const message = (err as Error).message;
       logger.error(`Extension action failed: ${extName}/${actionId}`, { error: message, caller: callerGaii });
 
-      if (message.includes('Script execution timed out')) {
+      // A workspace refusal the script let through is the SERVICE's answer — not a member, no
+      // scope, schema, version conflict — and it keeps the service's status and code.
+      const wsRefusal = workspaceRefusalFor(err, wsCap);
+      if (wsRefusal) {
+        res.status(wsRefusal.status).json(error(config.nodeId, wsRefusal.code,
+          `Action "${actionId}" refused: ${wsRefusal.message}`));
+      } else if (message.includes('Script execution timed out')) {
         res.status(500).json(error(config.nodeId, 'EXTENSION_TIMEOUT',
           `Action "${actionId}" timed out`));
       } else if (message.includes('API call limit exceeded')) {

@@ -9,6 +9,10 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.30.0 -- 2026-09-05 -- Add e2e-extension-workspace.ts, in ALL_SUITES and in the guard tier:
+ *            ctx.workspace, a sandboxed script acting on a workspace as its caller. Seven of its
+ *            assertions are refusals (membership, scope, the manifest flag, schema, version, budget,
+ *            the unattended road), which is the tier's question.
  *   v1.29.0 -- 2026-09-05 -- Parallel lanes: `--workers=N` (or AIMEAT_E2E_WORKERS) runs N nodes at
  *            once, each on its own port and database, every suite still on an empty node. Suites
  *            that bind a port of their own stay in lane 0. The summary says where the wall clock
@@ -194,6 +198,9 @@ const ALL_SUITES = [
     'test/e2e-extensions.ts',
     'test/e2e-ext-paywall.ts',
     'test/e2e-ext-files.ts',
+    // ctx.workspace: an extension acting on its CALLER's organism workspace, as the caller, through
+    // the same functions the MCP tools run. One happy path and seven refusals, each a door.
+    'test/e2e-extension-workspace.ts',
     // The same capability on the road that did not have it: an extension on a clock, writing bytes
     // into the INSTALLER's namespace so a scheduled producer and a hand-run one land at one address.
     'test/e2e-scheduled-ext-files.ts',
@@ -656,6 +663,7 @@ const GUARD_SUITES = [
     'test/e2e-ai-provenance.ts',            // what a record claims about who wrote something
     'test/e2e-ai-provenance-agent-plane.ts',// …as an agent sees it
     'test/e2e-ai-provenance-surfaces.ts',   // one record read four ways, and the identical 404 that hides the rest
+    'test/e2e-extension-workspace.ts',      // a sandboxed script reaching a workspace as its caller: membership, scope, schema, version, budget
 ];
 
 // Every other .ts file in test/, with the reason it is not a suite. The reason is the point: someone

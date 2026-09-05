@@ -113,7 +113,7 @@ jobs:
         working-directory: aimeat
         run: pnpm test
 
-  # THE GUARD TIER BLOCKS. 64 suites, chosen on one question: does a failure here mean a
+  # THE GUARD TIER BLOCKS. 65 suites, chosen on one question: does a failure here mean a
   # principal can reach money, an identity, or another account's data that they must not? The
   # list and the reason for each entry are in test/run-e2e-ci.ts (GUARD_SUITES). The runner
   # prints the assertion total and runs the tier over four lanes — four nodes at once, each suite

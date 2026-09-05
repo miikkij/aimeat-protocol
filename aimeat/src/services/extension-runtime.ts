@@ -8,6 +8,12 @@
  *   Node.js globals (process, require, Buffer, etc.) -- only a controlled
  *   `ctx` API proxy.
  * @version-history
+ *   v2.5.0 — 2026-09-05 — `ctx.workspace`: an organism workspace, as the CALLER, through the same
+ *     functions aimeat_workspace_read/_write/_publish run (services/extension-workspace.ts builds
+ *     it; a road attaches it only when the manifest declares `workspace:` and a real caller is
+ *     present). Five host functions, each counted against maxApiCalls like a fetch. A script that
+ *     gated a shared claims board could reach its own `ext:` namespace and the internet and not the
+ *     workspace its members share.
  *   v2.4.0 — 2026-08-23 — `ctx.extension = { name, owner }`, resolved server-side from the record
  *     (`installedBy`) and unreachable by anything a caller sends. A script could not tell its own
  *     owner from any other signed-in stranger, so an owner-only action could not exist and the usual
@@ -138,6 +144,25 @@ export interface ExtensionCtx {
         open(ref: string): Promise<unknown>;
         rows(ref: string, resource: string, opts?: unknown): Promise<unknown>;
         fail(name: string, message: string): Promise<void>;
+    };
+    /**
+     * An organism WORKSPACE, as the caller. Present only when the manifest declares
+     * `workspace: { read, write }` and somebody real invoked the action; a scheduled run gets
+     * nothing here. Every call is the same operation the MCP tool of that name performs, run as
+     * `ctx.caller`, and every refusal the tool would make (not a member, no scope, schema, version
+     * conflict, publish gate) arrives as a thrown `CODE: message`. Counted against maxApiCalls.
+     */
+    workspace?: {
+        /** The manifest, the pinned apps, the locked schemas and per-space titles. No bodies. */
+        index(organismId: string, ws: string): Promise<unknown>;
+        /** The full values of these instance ids; `_draftVersion` is what `write({ ifVersion })` swaps against. */
+        get(organismId: string, ws: string, ids: string[], opts?: { space?: string }): Promise<unknown>;
+        /** A DRAFT record in a records space, schema-validated. `ifVersion: 0` means "only if no draft yet". */
+        write(organismId: string, ws: string, space: string, id: string, value: unknown, opts?: { ifVersion?: number }): Promise<unknown>;
+        /** A DRAFT document `{ title, markdown }` in a document space; the id is generated unless given. */
+        writeDoc(organismId: string, ws: string, space: string, doc: { title: string; markdown: string }, opts?: { id?: string; section?: string }): Promise<unknown>;
+        /** Publish the draft at namespace/id: `.version.N` under the caller, `.latest` under the member. */
+        publish(organismId: string, ws: string, namespace: string, id: string, opts?: { expectedVersion?: number }): Promise<unknown>;
     };
     /**
      * Who invoked this action. `member` is their standing in the app this extension gates, resolved
@@ -359,6 +384,15 @@ ${userFnDecl}
             rows:        async (ref, resource, opts)  => __call(__dp_rows,     [String(ref), String(resource), opts ? JSON.stringify(opts) : '{}']),
             fail:        async (name, message)        => __call(__dp_fail,     [String(name), String(message)]),
         } : undefined,
+        // An organism workspace, as the caller. Absent unless the manifest declares it and a real
+        // caller is present; a refusal REJECTS with the service's own "CODE: message".
+        workspace: __ws_index ? {
+            index:    async (org, ws)                       => __call(__ws_index,    [String(org), String(ws)]),
+            get:      async (org, ws, ids, opts)            => __call(__ws_get,      [String(org), String(ws), JSON.stringify(ids ?? []), JSON.stringify(opts || {})]),
+            write:    async (org, ws, space, id, value, opts) => __call(__ws_write,  [String(org), String(ws), String(space), String(id), JSON.stringify(value === undefined ? null : value), JSON.stringify(opts || {})]),
+            writeDoc: async (org, ws, space, doc, opts)     => __call(__ws_writeDoc, [String(org), String(ws), String(space), JSON.stringify(doc ?? {}), JSON.stringify(opts || {})]),
+            publish:  async (org, ws, ns, id, opts)         => __call(__ws_publish,  [String(org), String(ws), String(ns), String(id), JSON.stringify(opts || {})]),
+        } : undefined,
         wallet: {
             consume:    __wallet_consume    ? (async (amount, reason) => __call(__wallet_consume, [String(amount), reason]))  : undefined,
             getBalance: __wallet_balance    ? (async ()               => __call(__wallet_balance, []))                         : undefined,
@@ -398,51 +432,8 @@ ${userFnDecl}
 `;
 }
 
-// ── Memory access tracking (UNCHANGED) ──────────────────────
-
-export interface MemoryAccessLog {
-    reads: string[];
-    writes: string[];
-}
-
-export function trackMemoryAccess(ctx: ExtensionCtx): { ctx: ExtensionCtx; accessLog: MemoryAccessLog } {
-    const accessLog: MemoryAccessLog = { reads: [], writes: [] };
-    const origMemory = ctx.memory;
-
-    const trackedMemory: ExtensionCtx['memory'] = {
-        get: async (key) => {
-            accessLog.reads.push(key);
-            return origMemory.get(key);
-        },
-        // A compare-and-swap reads the version before it writes, and that read is a read: leaving it
-        // out would make a CAS loop look like a write with no input.
-        getVersioned: async (key) => {
-            accessLog.reads.push(key);
-            return origMemory.getVersioned(key);
-        },
-        set: async (key, value, opts) => {
-            accessLog.writes.push(key);
-            return origMemory.set(key, value, opts);
-        },
-        search: async (prefix, opts) => {
-            accessLog.reads.push(`${prefix}*`);
-            return origMemory.search(prefix, opts);
-        },
-        delete: async (key) => {
-            accessLog.writes.push(`-${key}`);
-            return origMemory.delete(key);
-        },
-        getPublic: async (namespace, key) => {
-            accessLog.reads.push(`${namespace}:${key}`);
-            return origMemory.getPublic(namespace, key);
-        },
-    };
-
-    return {
-        ctx: { ...ctx, memory: trackedMemory },
-        accessLog,
-    };
-}
+// Memory access tracking (trackMemoryAccess, MemoryAccessLog) lives in
+// ./extension-runtime-tracking.ts — a pure extraction at the max-file-lines boundary.
 
 // ── Main entry point ─────────────────────────────────────────
 
@@ -636,6 +627,28 @@ export async function executeExtensionAction(
             counter, limits.maxApiCalls, inflight);
         registerAsyncHostFn(vm, '__dp_fail',
             ctx.datapackage ? async (name, message) => { await ctx.datapackage!.fail(name, message); return { recorded: true }; } : null,
+            counter, limits.maxApiCalls, inflight);
+
+        // ── Workspace API ─────────────────────────────────────
+        // The caller's organism workspace, through the same functions the MCP tools run
+        // (services/extension-workspace.ts). Null when the manifest declares none or nobody real
+        // is calling, so the guest sees `undefined`. Each call is one host call and counts, and a
+        // refusal rejects with the service's own code and words.
+        const wsCap = ctx.workspace;
+        registerAsyncHostFn(vm, '__ws_index',
+            wsCap ? async (org, ws) => wsCap.index(org, ws) : null,
+            counter, limits.maxApiCalls, inflight);
+        registerAsyncHostFn(vm, '__ws_get',
+            wsCap ? async (org, ws, idsJson, optsJson) => wsCap.get(org, ws, JSON.parse(idsJson || '[]') as string[], JSON.parse(optsJson || '{}') as { space?: string }) : null,
+            counter, limits.maxApiCalls, inflight);
+        registerAsyncHostFn(vm, '__ws_write',
+            wsCap ? async (org, ws, space, id, valueJson, optsJson) => wsCap.write(org, ws, space, id, JSON.parse(valueJson || 'null'), JSON.parse(optsJson || '{}') as { ifVersion?: number }) : null,
+            counter, limits.maxApiCalls, inflight);
+        registerAsyncHostFn(vm, '__ws_writeDoc',
+            wsCap ? async (org, ws, space, docJson, optsJson) => wsCap.writeDoc(org, ws, space, JSON.parse(docJson || '{}') as { title: string; markdown: string }, JSON.parse(optsJson || '{}') as { id?: string; section?: string }) : null,
+            counter, limits.maxApiCalls, inflight);
+        registerAsyncHostFn(vm, '__ws_publish',
+            wsCap ? async (org, ws, ns, id, optsJson) => wsCap.publish(org, ws, ns, id, JSON.parse(optsJson || '{}') as { expectedVersion?: number }) : null,
             counter, limits.maxApiCalls, inflight);
 
         // ── Wallet API ────────────────────────────────────────

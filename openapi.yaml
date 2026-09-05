@@ -3044,6 +3044,20 @@ components:
               type: array
               items:
                 type: string
+        workspace:
+          type: object
+          nullable: true
+          description: |
+            What the manifest declared under `workspace:`, or null. When present, the sandbox
+            exposes `ctx.workspace`, through which an action reads or writes the CALLER's organism
+            workspace as the caller (the same operations aimeat_workspace_read / _write / _publish
+            perform, behind the same membership, scope, schema and publish-gate checks). A
+            scheduled run never gets it. Stored on the record as `config.__workspace`.
+          properties:
+            read:
+              type: boolean
+            write:
+              type: boolean
         installedBy:
           type: string
         installedAt:
@@ -33779,7 +33793,13 @@ paths:
                     happen in one command so the upload token is never transcribed.
                 manifest:
                   type: string
-                  description: YAML manifest defining the extension metadata, actions, and limits (required unless mode=presigned)
+                  description: |
+                    YAML manifest defining the extension metadata, actions, and limits (required
+                    unless mode=presigned). A top-level `workspace: { read: bool, write: bool }`
+                    block declares that the extension may act on its CALLER's organism workspace
+                    through `ctx.workspace`; without it the sandbox has no such capability. The
+                    caller's own scopes still apply (`organism:read` to read, `memory:write` to
+                    write or publish, an owner session needs neither).
                 scripts:
                   type: object
                   additionalProperties:

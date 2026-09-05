@@ -15,6 +15,7 @@
  *                         envelope and the wording; the quota, the secret handling, the swap, the
  *                         schedule bookkeeping and the memory cleanup are one implementation.
  *   v1.3.0 — 2026-09-03 — GET /v1/extensions is optionalAuth and carries installedBy, used_by and the manifest schedules; the detail carries versions; GET /:name/versions.
+ *   v1.4.0 — 2026-09-05 — The list and the detail carry `workspace`, the manifest's `workspace:` declaration (or null).
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
@@ -35,6 +36,7 @@ import { buildExtensionRecordFromManifest } from './manifest.js';
 import { hasExtWritePermission, canManageInstalledExt } from './permissions.js';
 import { generateUploadToken, buildUploadMeta } from '../../services/upload-token.js';
 import { resolveIdentity } from '../../utils/gaii.js';
+import { workspaceDeclarationOf } from '../../services/extension-workspace-declaration.js';
 
 export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig, storage: Storage, scheduler?: Scheduler): void {
   // ── GET /v1/extensions — List installed extensions ────────────
@@ -65,6 +67,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
           requiredApis: ext.requiredApis,
           federation: ext.federation,
           instances: ext.instances ?? null,
+          workspace: workspaceDeclarationOf(ext),
           installedAt: ext.installedAt,
           activatedAt: ext.activatedAt,
         })),
@@ -300,6 +303,9 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       res.json(success(config.nodeId, {
         extension: {
           ...ext,
+          // What the manifest declared under `workspace:`, so an app author can see whether the
+          // extension may act on the caller's organism workspace without reading its config.
+          workspace: workspaceDeclarationOf(ext),
           // The kept versions, newest first; `/v1/ext/<name>@<version>/<action>` runs one of them.
           versions: (await listVersions(storage, 'extension', name)).map(v => ({ version: v.version, created_at: v.createdAt })),
           // Never return secret config values (or the internal __secretKeys marker) — masked instead.
