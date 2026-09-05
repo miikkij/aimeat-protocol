@@ -2,6 +2,19 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does.",
   "entries": [
     {
+      "date": "2026-09-05",
+      "version": "3.13.0",
+      "kind": "feature",
+      "title": {
+        "en": "Every key to your account on one page, said in words",
+        "fi": "Kaikki tilisi avaimet yhdellä sivulla, sanoin"
+      },
+      "body": {
+        "en": "The Access page under Account now holds every way into your account: how you sign in (password, two-step, passkeys, the devices that are signed in right now), the apps and tokens that act in your name, the accounts you have connected at other services, your sharing groups, and the addresses an AI uses to find you. Two-step sign-in and passkeys used to sit on a tab only an operator could open; every member can switch them on here. An app's rights are said in words, one row per family such as your memory or your automations, and you can take a single right away without revoking the whole key; the change bites within a few minutes, when the app's current token runs out. Keys not used in thirty days are marked and can be revoked together, and the list of open sessions shows only the ones that still work, grouped by device and by agent, with one button that signs out every other device. A right you took away no longer comes back at the next restart. Your AI can read the same page through the aimeat_access_list tool.",
+        "fi": "Tili-ryhmän Pääsy-sivulla on nyt jokainen tie tilillesi: miten kirjaudut (salasana, kaksivaiheinen kirjautuminen, pääsyavaimet, juuri nyt kirjautuneet laitteet), sovellukset ja tunnisteet jotka toimivat nimissäsi, muihin palveluihin liittämäsi tilit, jakoryhmäsi ja osoitteet joilla tekoäly löytää sinut. Kaksivaiheinen kirjautuminen ja pääsyavaimet olivat välilehdellä, jonka vain operaattori näki; nyt jokainen jäsen kytkee ne päälle täältä. Sovelluksen oikeudet sanotaan sanoin, rivi per perhe kuten muistisi tai automaatiosi, ja yhden oikeuden voi ottaa pois perumatta koko avainta; muutos astuu voimaan muutamassa minuutissa, kun sovelluksen nykyinen tunniste vanhenee. Kolmeenkymmeneen päivään käyttämättömät avaimet merkitään ja ne voi perua yhdellä kertaa, ja avoimien istuntojen lista näyttää vain toimivat, ryhmiteltynä laitteen ja agentin mukaan, yhdellä napilla joka kirjaa ulos kaikki muut laitteet. Pois otettu oikeus ei enää palaa seuraavassa käynnistyksessä. Tekoälysi lukee saman sivun aimeat_access_list-työkalulla."
+      }
+    },
+    {
       "date": "2026-09-04",
       "version": "3.13.0",
       "kind": "feature",
