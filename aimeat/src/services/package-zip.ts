@@ -18,6 +18,10 @@
  *   v1.0.1 — 2026-06-13 — archiver v8: archiver('zip') -> new ZipArchive()
  *   v1.1.0 — 2026-07-05 — Adopt the shared isUnsafeName guard from safe-zip (adds backslash /
  *     drive-letter / null-byte rejection on top of ../ and absolute paths).
+ *   v1.2.0 — 2026-09-05 — A component's `meta` survives the round trip. Until now `content` was the
+ *     only payload a ZIP carried, so a packaged app came back with no name, icon or category and
+ *     installed as "Installed from package". Written only when non-empty, so a package without
+ *     metadata produces the same manifest bytes as before; read only when it is a plain object.
  */
 
 import { createHash } from 'node:crypto';
@@ -64,6 +68,8 @@ export interface ParsedComponent {
   content: string;
   contentHash: string;
   dependencies: string[];
+  /** Per-component metadata carried in the manifest entry. Absent on a package written before it. */
+  meta?: Record<string, unknown>;
 }
 
 export interface ParsedPackage {
@@ -128,6 +134,9 @@ export async function buildZip(pkg: PackageRecord): Promise<Buffer> {
         label: c.label,
         file: `components/${c.id}${COMPONENT_EXTENSIONS[c.type]}`,
         dependencies: c.dependencies,
+        // Only when there is something to say, so a package without metadata produces the same
+        // manifest bytes it produced before this field existed.
+        ...(c.meta && Object.keys(c.meta).length > 0 ? { meta: c.meta } : {}),
       })),
       changelog: pkg.changelog,
     };
@@ -321,6 +330,7 @@ export async function parseZip(buffer: Buffer, options: ZipOptions): Promise<Par
     label: string;
     file: string;
     dependencies?: string[];
+    meta?: unknown;
   }>;
 
   const components: ParsedComponent[] = [];
@@ -332,6 +342,13 @@ export async function parseZip(buffer: Buffer, options: ZipOptions): Promise<Par
     const content = fileBuf.toString('utf-8');
     const contentHash = createHash('sha256').update(content).digest('hex');
 
+    // A ZIP is somebody else's file, so `meta` is admitted only when it is a plain object. Anything
+    // else (a string, an array, null) is dropped rather than refused: it costs the reader a name and
+    // an icon, and refusing would make one malformed entry reject a package whose bytes are fine.
+    const meta = mc.meta && typeof mc.meta === 'object' && !Array.isArray(mc.meta)
+      ? mc.meta as Record<string, unknown>
+      : undefined;
+
     components.push({
       id: mc.id,
       type: mc.type,
@@ -339,6 +356,7 @@ export async function parseZip(buffer: Buffer, options: ZipOptions): Promise<Par
       content,
       contentHash,
       dependencies: mc.dependencies ?? [],
+      ...(meta ? { meta } : {}),
     });
   }
 

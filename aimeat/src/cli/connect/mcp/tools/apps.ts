@@ -117,7 +117,9 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     offset: z.number().int().min(0).optional().describe('How many to skip; with has_more this reads the whole catalogue'),
   }, annotationsFor('aimeat_app_list'), async ({ search, category, tag, own, limit, offset }) => {
     const params = new URLSearchParams();
-    if (search) params.set('search', search);
+    // GET /v1/apps reads `q`, not `search`. Sent under the wrong name the filter was dropped and the
+    // whole catalogue came back as though it had been searched.
+    if (search) params.set('q', search);
     if (category) params.set('category', category);
     if (tag) params.set('tag', tag);
     if (own) params.set('own', 'true');
@@ -163,11 +165,33 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
   });
 
   // ── Component packages: the capability the app_* tools above used to be ──
+  // The search parameter was `query` sent as `?q=`, against a route that reads `?search=`. A
+  // filtered call therefore returned the unfiltered list and reported success. Both halves now use
+  // the route's own names.
   mcp.tool('aimeat_package_list', descriptionFor('aimeat_package_list'), {
-    query: z.string().optional().describe('Search query'),
-  }, annotationsFor('aimeat_package_list'), async ({ query }) => {
-    const qs = query ? `?q=${encodeURIComponent(query)}` : '';
+    search: z.string().optional().describe('Search over name, description and tags'),
+    author: z.string().optional().describe("Only this author's packages. Your own name also shows your private ones."),
+    status: z.enum(['draft', 'published', 'archived']).optional().describe('Defaults to published'),
+  }, annotationsFor('aimeat_package_list'), async ({ search, author, status }) => {
+    const params = new URLSearchParams();
+    if (search) params.set('search', search);
+    if (author) params.set('author', author);
+    if (status) params.set('status', status);
+    const qs = params.size > 0 ? `?${params.toString()}` : '';
     const resp = await client.get(`/v1/packages${qs}`);
+    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+  });
+
+  // A package is created private; this is the act that makes it installable. It existed on no MCP
+  // or CLI surface until now, so publishing left a package its own author could not see.
+  mcp.tool('aimeat_package_status_set', descriptionFor('aimeat_package_status_set'), {
+    group_id: z.string().describe('Package group identifier'),
+    version: z.string().optional().describe('Which version. Defaults to the newest one.'),
+    status: z.enum(['draft', 'published', 'archived']).describe('The status to set'),
+  }, annotationsFor('aimeat_package_status_set'), async ({ group_id, version, status }) => {
+    const body: Record<string, unknown> = { status };
+    if (version !== undefined) body.version = version;
+    const resp = await client.patch(`/v1/packages/${encodeURIComponent(group_id)}/status`, body);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 

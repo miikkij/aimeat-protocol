@@ -22776,6 +22776,7 @@ paths:
         - { in: query, name: limit, required: false, schema: { type: integer, default: 50, maximum: 200 } }
         - { in: query, name: offset, required: false, schema: { type: integer, default: 0 } }
         - { in: query, name: free_only, required: false, schema: { type: boolean } }
+        - { in: query, name: own, required: false, schema: { type: boolean }, description: Only the caller's own apps. Answers 401 without a session, since nobody anonymous has an own. }
         - { in: query, name: include_peers, required: false, schema: { type: boolean }, description: Include federated peer apps }
       responses:
         '200':
@@ -22796,6 +22797,8 @@ paths:
                           total: { type: integer }
                           offset: { type: integer }
                           limit: { type: integer }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
     post:
       operationId: publishApp
       summary: Publish or update an app
@@ -37081,7 +37084,9 @@ paths:
     post:
       operationId: createPackage
       summary: Create package
-      description: Create a new package with components.
+      description: >-
+        Create a new package with components. Created private and published unless the body says
+        otherwise, so the version is installable by its author and invisible to everyone else.
       tags: [Packages]
       security:
         - BearerAuth: []
@@ -37097,7 +37102,12 @@ paths:
                 description: { type: string }
                 category: { type: string, enum: [signage, marketplace, iot, social, productivity, communication, other] }
                 tags: { type: array, items: { type: string } }
-                visibility: { type: string, enum: [private, public] }
+                visibility: { type: string, enum: [private, public], default: private }
+                status:
+                  type: string
+                  enum: [draft, published, archived]
+                  default: published
+                  description: Only a published version can be installed.
                 components:
                   type: array
                   items:
@@ -37108,6 +37118,13 @@ paths:
                       label: { type: string }
                       content: { type: string }
                       dependencies: { type: array, items: { type: string } }
+                      meta:
+                        type: object
+                        description: >-
+                          Per-component metadata that travels with the bytes. For an app component,
+                          meta.app carries name, description, descriptions, version, category, tags,
+                          icon and usesCortex, so an installed app is not a nameless blob.
+                        additionalProperties: true
       responses:
         '201':
           $ref: '#/components/responses/AimeatSuccess'
@@ -37148,6 +37165,9 @@ paths:
         - name: visibility
           in: query
           schema: { type: string, enum: [private, public] }
+        - name: status
+          in: query
+          schema: { type: string, enum: [draft, published, archived], default: published }
         - name: limit
           in: query
           schema: { type: integer, default: 50 }
@@ -37157,6 +37177,46 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+
+  /v1/packages/{groupId}/status:
+    patch:
+      operationId: setPackageStatus
+      summary: Publish, unpublish or archive a package version
+      description: >-
+        Move one version between draft, published and archived, naming the version or taking the
+        newest. Only a published version can be installed, and a package is created private, so this
+        is the act that makes one reachable. Only the package author may.
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [draft, published, archived] }
+                version:
+                  type: string
+                  description: Which version. Defaults to the newest one in the group.
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   /v1/packages/import:
     post:

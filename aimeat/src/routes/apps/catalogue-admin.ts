@@ -6,6 +6,9 @@
  *   /v1/admin/apps/similar, /v1/admin/apps/watermark/decode, /v1/admin/apps/:owner/:filename/moderate,
  *   DELETE /v1/admin/apps/:owner/:filename. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.10.0 — 2026-09-05 — GET /v1/apps reads `own`. aimeat_app_list published the parameter on all
+ *     three surfaces and this route never read it, so "list my apps" answered with the whole
+ *     catalogue and reported success. Refused without a session rather than ignored.
  *   v1.9.0 — 2026-09-03 — GET /v1/apps carries `requires` per app (the dependency map).
  *   v1.8.0 — 2026-08-29 — The listing carries the legal pages as their state; the text is stripped.
  *   v1.7.0 — 2026-08-29 — The public listing strips `authorshipLog`; the reviewer's name stays public.
@@ -66,6 +69,19 @@ export function registerCatalogueAdminRoutes(
         // An operator sees the reason behind their own per-app search block on every row, which is
         // what makes the moderation list in the admin dashboard readable. It grants nothing else.
         const isOperator = req.auth?.roles?.includes('operator') ?? false;
+        // `own=true` narrows the list to the caller's own apps. It was a published parameter on
+        // aimeat_app_list that this route never read, so "list my apps" answered with the whole
+        // catalogue and reported success. Refused rather than ignored without a session: nobody
+        // anonymous has an "own", and answering with everyone else's apps is the defect itself.
+        // The anonymous credential this node injects in anonymous mode is not a person who owns
+        // apps, so it is refused here exactly as requireAuth() refuses it. Reading only `req.auth`
+        // would have filtered to the anonymous identity and answered an empty list, which looks like
+        // an answer and is not one.
+        const ownOnly = req.query.own === 'true';
+        if (ownOnly && (!viewerGhii || req.auth?.anonymous)) {
+            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'own=true needs a signed-in caller'));
+            return;
+        }
         const opts = {
             category: req.query.category as string | undefined,
             q: req.query.q as string | undefined,
@@ -75,6 +91,7 @@ export function registerCatalogueAdminRoutes(
             offset: parseInt(req.query.offset as string) || 0,
             freeOnly: req.query.free_only === 'true',
             viewerGhii,
+            ...(ownOnly ? { ownerGaii: viewerGhii } : {}),
         };
 
         const { apps, total } = await storage.listApps(opts);

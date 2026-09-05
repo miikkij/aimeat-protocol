@@ -17,6 +17,9 @@
  * @structure packageTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { packageTools } from './tool-call-defs-packages.js';
  * @version-history
+ *   v1.2.0 -- 2026-09-05 -- aimeat_package_status_set, the act that makes a package installable at
+ *     all; and aimeat_package_list sending the parameter names the route reads (it sent ?q= against
+ *     a route that reads ?search=, so every filtered list came back unfiltered and said nothing).
  *   v1.1.0 -- 2026-08-23 -- aimeat_package_install, and aimeat_package_publish sending what the
  *     route reads. Publish posted {name, description, content}; POST /v1/packages requires a
  *     `components` array and never reads `content`, so it was answered 400 every time.
@@ -30,10 +33,21 @@ import {
 
 export const packageTools: ConnectCliToolDefinition[] = [
     {
+        // The search parameter was named `query` here and sent as `?q=`, while GET /v1/packages reads
+        // `?search=`. So a filtered list returned the unfiltered one, with no error: the tool
+        // succeeded having done less than it was asked. Both halves are the route's own names now.
         name: 'aimeat_package_list',
         description: 'List component packages on this node. NOT apps — see aimeat_app_list for the single-file web apps.',
-        input: { query: { type: 'string', description: 'Search query.' } },
-        handler: ({ client }, input) => client.get(`/v1/packages${query({ q: optionalString(input, 'query') })}`),
+        input: {
+            search: { type: 'string', description: 'Search over name, description and tags.' },
+            author: { type: 'string', description: 'Only this author\'s packages. Your own name also shows your private ones.' },
+            status: { type: 'string', enum: ['draft', 'published', 'archived'], description: 'Defaults to published.' },
+        },
+        handler: ({ client }, input) => client.get(`/v1/packages${query({
+            search: optionalString(input, 'search'),
+            author: optionalString(input, 'author'),
+            status: optionalString(input, 'status'),
+        })}`),
     },
     {
         name: 'aimeat_package_get',
@@ -90,6 +104,24 @@ export const packageTools: ConnectCliToolDefinition[] = [
             const manifest = optionalRecord(input, 'manifest');
             if (manifest !== undefined) body.manifest = manifest;
             return client.post('/v1/packages', body);
+        },
+    },
+    {
+        // A package is created private, and until this handler existed the only way to make one
+        // installable was a PATCH that no MCP or CLI surface carried. So publish could succeed and
+        // leave a package its own author could neither see nor install.
+        name: 'aimeat_package_status_set',
+        description: 'Move one package version between draft, published and archived. Only the author may.',
+        input: {
+            group_id: { type: 'string', required: true, description: 'Package group identifier.' },
+            version: { type: 'string', description: 'Which version. Defaults to the newest one.' },
+            status: { type: 'string', required: true, enum: ['draft', 'published', 'archived'], description: 'The status to set.' },
+        },
+        handler: ({ client }, input) => {
+            const body: JsonObject = { status: requiredString(input, 'status') };
+            const version = optionalString(input, 'version');
+            if (version !== undefined) body.version = version;
+            return client.patch(`/v1/packages/${encodeURIComponent(requiredString(input, 'group_id'))}/status`, body);
         },
     },
     {

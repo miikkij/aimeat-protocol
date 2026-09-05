@@ -74,11 +74,12 @@ export const V2_EXCLUDED: readonly string[] = [
     'aimeat_task_request_changes',
     // Connector-CLI-only convenience (no v2 MCP surface) — see definitions.ts.
     'aimeat_agent_statistics',
-    // The read/write package tools are registered on the connector doors, not on this node's
-    // /v1/mcp (mcp/packages.ts registers only aimeat_package_install). They are defined in the
-    // catalog for the connector, so they are placed here as deliberately off the v2 node surfaces.
-    'aimeat_package_list', 'aimeat_package_get', 'aimeat_package_versions',
-    'aimeat_package_publish', 'aimeat_package_delete',
+    // Authoring a package by hand and pruning its history stay on the connector doors: publish
+    // carries every component's source inline, which is a payload a chat should not be asked to
+    // produce, and versions/delete are maintenance a person does at a keyboard. list, get,
+    // status_set and install are on the node surfaces, because they are the four steps a
+    // conversation actually takes: find a package, read it, publish it, take it into use.
+    'aimeat_package_versions', 'aimeat_package_publish', 'aimeat_package_delete',
 ];
 
 /** role -> allowlist of tool names. Derived from docs/mcp_audit/11-v2-mcp-design.md §2/§3. */
@@ -120,10 +121,10 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_discover',
         'aimeat_app_publish', 'aimeat_app_draft_save', 'aimeat_app_draft_publish', 'aimeat_app_draft_discard', 'aimeat_app_list', 'aimeat_app_get', 'aimeat_app_versions', 'aimeat_app_delete',
         // Component packages — a different backend from the apps above, named so since 2026-08-16.
-        // Only INSTALL is registered on this node's /v1/mcp (mcp/packages.ts: "installing is the one
-        // a conversation actually needs"); the read/write package tools live on the connector doors.
-        // The v2 surface must list exactly what is registered, so it carries install alone here.
-        'aimeat_package_install',
+        // Four of them are registered on this node's /v1/mcp (mcp/packages.ts) and the v2 surface
+        // must list exactly what is registered. Authoring by hand (publish) and pruning history
+        // (versions, delete) stay on the connector doors; see V2_EXCLUDED for why.
+        'aimeat_package_list', 'aimeat_package_get', 'aimeat_package_status_set', 'aimeat_package_install',
         'aimeat_app_draft_write', 'aimeat_app_draft_replace', 'aimeat_app_draft_read', 'aimeat_app_draft_seed',
         'aimeat_app_screenshot',
         'aimeat_app_seo_set', 'aimeat_app_marks_set', 'aimeat_app_legal_set', 'aimeat_app_audit', 'aimeat_seo_status',
@@ -169,12 +170,12 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_v2_task_status', 'aimeat_v2_task_cancel',
         'aimeat_company_list', 'aimeat_company_create', 'aimeat_company_update',
         'aimeat_company_front_page', 'aimeat_company_portfolio_publish',
-        // Taking a shipped package into use, beside the company tools rather than with the four
+        // Taking a shipped package into use, beside the company tools rather than with the
         // authoring ones on appdev. Installing is not building: it is the person's own agent
         // turning something this node ships into a copy they own, which is this surface's business.
-        // Only install is registered on this node's /v1/mcp (see appdev note); list/get are
-        // connector-only, so the v2 surface lists what is actually served.
-        'aimeat_package_install',
+        // Finding and reading one comes with it, because an agent that cannot list cannot name the
+        // group id install requires, and publishing because a package is created private.
+        'aimeat_package_list', 'aimeat_package_get', 'aimeat_package_status_set', 'aimeat_package_install',
         // The person's own welcome page, beside the company one: same act, different owner.
         'aimeat_portfolio_publish',
         'aimeat_contact_list', 'aimeat_contact_add', 'aimeat_contact_remove', 'aimeat_contact_resolve_email', 'aimeat_contact_invite',

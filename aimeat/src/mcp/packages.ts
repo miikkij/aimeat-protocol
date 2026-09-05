@@ -18,9 +18,13 @@
  *   THE SCOPE IS THE GATE. `packages:write` is what the route requires, and TOOL_SCOPES carries the
  *   same word here, so an agent without it is not handed the tool at all.
  * @structure registerPackageTools(mcp, storage, config, getAgentGaii) — registers
- *   aimeat_package_install.
+ *   aimeat_package_list, aimeat_package_get, aimeat_package_status_set, aimeat_package_install.
  * @usage import { registerPackageTools } from './packages.js';
  * @version-history
+ *   v1.1.0 — 2026-09-05 — list, get and status_set join install, because install alone was a step
+ *     with no way in and no way out: an agent could not name the group id install requires without
+ *     listing, and could not make its own package installable, since a package is created private
+ *     and the status door existed on no MCP or CLI surface at all.
  *   v1.0.0 — 2026-08-23 — Initial: install, so a chat can turn a shipped package into an owned copy.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -30,9 +34,27 @@ import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { installPackage } from '../services/package-install.js';
+import { listPackagesFor, getPackageFor } from '../services/package-read.js';
+import { setPackageVersionStatus } from '../services/package-create.js';
 import { getActiveScheduler } from '../services/scheduler.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
+
+/** A package row as a conversation needs it: what it is, not every byte it holds. */
+function packageSummary(pkg: { packageGroupId: string; name: string; author: string; version: string; status: string; visibility: string; description: string; category: string; tags: string[]; components: { id: string; type: string; label: string }[] }) {
+    return {
+        group_id: pkg.packageGroupId,
+        name: pkg.name,
+        author: pkg.author,
+        version: pkg.version,
+        status: pkg.status,
+        visibility: pkg.visibility,
+        description: pkg.description,
+        category: pkg.category,
+        tags: pkg.tags,
+        components: pkg.components.map(c => ({ id: c.id, type: c.type, label: c.label })),
+    };
+}
 
 export function registerPackageTools(
     mcp: McpServer,
@@ -40,6 +62,58 @@ export function registerPackageTools(
     config: AimeatConfig,
     getAgentGaii: () => string,
 ): void {
+    /** The owner this agent acts for. Never a caller-supplied id. */
+    const ownerOf = (): string => {
+        const gaii = getAgentGaii();
+        return parseGaiiLoose(gaii).owner || gaii;
+    };
+
+    mcp.tool('aimeat_package_list', descriptionFor('aimeat_package_list'), {
+        search: z.string().optional().describe('Search over name, description and tags.'),
+        author: z.string().optional().describe('Only this author\'s packages. Your own name also shows your private ones.'),
+        status: z.enum(['draft', 'published', 'archived']).optional().describe('Defaults to published.'),
+    }, annotationsFor('aimeat_package_list'), async ({ search, author, status }) => {
+        const result = await listPackagesFor(storage, ownerOf(), { search, author, status });
+        return {
+            content: [{
+                type: 'text' as const,
+                text: JSON.stringify({
+                    total: result.total,
+                    packages: result.packages.map(packageSummary),
+                }, null, 2),
+            }],
+        };
+    });
+
+    mcp.tool('aimeat_package_get', descriptionFor('aimeat_package_get'), {
+        group_id: z.string().describe('Package group identifier, e.g. "digital-signage::system". Get it from aimeat_package_list.'),
+    }, annotationsFor('aimeat_package_get'), async ({ group_id }) => {
+        const pkg = await getPackageFor(storage, group_id, ownerOf());
+        if (!pkg) {
+            return {
+                content: [{ type: 'text' as const, text: `NOT_FOUND: Package not found: ${group_id}` }],
+                isError: true,
+            };
+        }
+        return { content: [{ type: 'text' as const, text: JSON.stringify(packageSummary(pkg), null, 2) }] };
+    });
+
+    mcp.tool('aimeat_package_status_set', descriptionFor('aimeat_package_status_set'), {
+        group_id: z.string().describe('Package group identifier.'),
+        version: z.string().optional().describe('Which version. Defaults to the newest one.'),
+        status: z.enum(['draft', 'published', 'archived']).describe('The status to set. Only a published version can be installed.'),
+    }, annotationsFor('aimeat_package_status_set'), async ({ group_id, version, status }) => {
+        const owner = ownerOf();
+        const out = await setPackageVersionStatus({ storage, config },
+            { owner, sub: getAgentGaii() }, { groupId: group_id, version, status });
+        if (!out.ok) {
+            return {
+                content: [{ type: 'text' as const, text: `${out.code}: ${out.message}` }],
+                isError: true,
+            };
+        }
+        return { content: [{ type: 'text' as const, text: JSON.stringify(packageSummary(out.package), null, 2) }] };
+    });
     mcp.tool('aimeat_package_install', descriptionFor('aimeat_package_install'), {
         group_id: z.string().describe('Package group identifier, e.g. "digital-signage::system". Get it from aimeat_package_list.'),
         label: z.string().optional().describe('What to call this copy, e.g. the company it is for. Defaults to "<package> instance".'),

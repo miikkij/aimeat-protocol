@@ -302,6 +302,9 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_package_versions: { title: 'List Package Versions', readOnlyHint: true },
     aimeat_package_publish: { title: 'Publish Package', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_package_delete: { title: 'Delete Package Version', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    // Not destructive: it changes who may reach a version, never its bytes, and archiving is
+    // reversible by setting the status back.
+    aimeat_package_status_set: { title: 'Set Package Status', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     // Not idempotent: each install mints a fresh instance with its own component names, so calling
     // it twice leaves two copies rather than one.
     aimeat_package_install: { title: 'Install Package', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
