@@ -255,13 +255,33 @@ def _pid_alive(pid: int) -> bool:
             kernel32.CloseHandle(handle)
     try:
         os.kill(pid, 0)
-        return True
     except ProcessLookupError:
         return False
     except PermissionError:
         return True  # exists, owned by someone else
     except OSError:
         return False
+
+    # A ZOMBIE ANSWERS THE SIGNAL TOO. On Unix a child that has exited and has not been reaped is
+    # still a pid, and `os.kill(pid, 0)` succeeds for it — so this said "alive" about a daemon that
+    # had already stopped. It matters beyond the test that found it: this function decides whether
+    # to REUSE a running daemon, so on Linux a crew whose daemon had died would have been handed a
+    # loopback URL to nothing. Windows has no such state, which is why it never showed there.
+    #
+    # We are the parent (the daemon is spawned from this process), so we can settle it: reap
+    # without blocking. A pid that comes back has exited; (0, 0) means it is genuinely still
+    # running; ChildProcessError means it is not ours to reap, and then it cannot be a zombie we
+    # are holding open.
+    if hasattr(os, "waitpid"):
+        try:
+            reaped, _status = os.waitpid(pid, os.WNOHANG)
+            if reaped == pid:
+                return False
+        except ChildProcessError:
+            pass
+        except OSError:
+            pass
+    return True
 
 
 def _read_discovery(path: Path) -> dict[str, Any] | None:
