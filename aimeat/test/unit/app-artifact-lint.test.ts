@@ -17,6 +17,10 @@
  *   the check can decide from the bytes alone, plus the classification the probe depends on.
  * @usage cd aimeat && pnpm test -- app-artifact-lint
  * @version-history
+ *   v1.3.0 — 2026-09-05 — The register gate: an Atelier app with no `aimeat-register`, with the
+ *     shell's REPLACE-ME placeholder, or with `custom:default` BLOCKS; a genre id or a named
+ *     custom register is silent; a Classic app never hears about it. The ATELIER fixture names
+ *     a register now, because without one it is the very app the gate refuses.
  *   v1.2.0 — 2026-08-27 — The track-mixing quartet (TARGET-074). The silence cases matter most
  *     here: a correct Atelier shell app and the suite's own CLEAN app must both stay quiet, or the
  *     first thing the new track teaches its builders is to ignore the gate.
@@ -248,6 +252,7 @@ describe('lintAppArtifact — the two tracks never mix', () => {
     <meta name="aimeat-app" content="ate.html">
     <meta name="aimeat-scopes" content="memory:read memory:write">
     <meta name="aimeat-track" content="atelier">
+    <meta name="aimeat-register" content="genre-nightfloor">
     <meta name="aimeat-locales" content="en fi">
     <link rel="stylesheet" href="/lib/aimeat-atelier.css">
     </head><body>
@@ -258,6 +263,50 @@ describe('lintAppArtifact — the two tracks never mix', () => {
       AIMEAT.auth.mountLoginButton('#login', { onLogin: start });
       async function start() { await AIMEAT.data.set('ate.seen', 1); }
     </script></body></html>`;
+
+  describe('the register: an Atelier app names the look it committed to', () => {
+    const REGISTER_LINE = '<meta name="aimeat-register" content="genre-nightfloor">';
+    const withRegister = (value: string) => ATELIER.replace(REGISTER_LINE, `<meta name="aimeat-register" content="${value}">`);
+
+    it('BLOCKS an Atelier app with no register line at all', async () => {
+      const r = await findings(ATELIER.replace(REGISTER_LINE, ''));
+      expect(r.blocking.map(f => f.pitfall)).toContain('atelier-register');
+      const msg = r.blocking.find(f => f.pitfall === 'atelier-register')!.message;
+      expect(msg).toContain('/v1/designbook?kind=genre');
+      expect(msg).toContain('custom:<name>');
+    });
+
+    it('BLOCKS the shell\'s REPLACE-ME placeholder — the bare shell is a frame, not a page', async () => {
+      const r = await findings(withRegister('REPLACE-ME: fork a genre from the Design Book (GET /v1/designbook?kind=genre) or name your own register'));
+      expect(r.blocking.map(f => f.pitfall)).toContain('atelier-register');
+    });
+
+    it('BLOCKS custom:default and an empty custom: — a custom register is a name', async () => {
+      for (const v of ['custom:default', 'custom:', 'custom: ', '']) {
+        const r = await findings(withRegister(v));
+        expect(r.blocking.map(f => f.pitfall), `value "${v}"`).toContain('atelier-register');
+      }
+    });
+
+    it('BLOCKS the kit loaded with no track declared and no register — dropping the track line is not a way past', async () => {
+      const r = await findings(ATELIER.replace('<meta name="aimeat-track" content="atelier">', '').replace(REGISTER_LINE, ''));
+      expect(r.blocking.map(f => f.pitfall)).toContain('atelier-register');
+    });
+
+    it('is silent on a genre id, a Design Book part id and a named custom register', async () => {
+      for (const v of ['genre-nightfloor', 'genre-receipt', 'layout-cover', 'custom:game', 'custom:night-ledger']) {
+        const r = await findings(withRegister(v));
+        expect(r.blocking, `value "${v}"`).toEqual([]);
+      }
+    });
+
+    it('never asks a Classic app for a register', async () => {
+      const r = await findings(CLEAN);
+      expect(r.ids).not.toContain('atelier-register');
+      const classic = CLEAN.replace('<meta name="aimeat-scopes"', '<meta name="aimeat-track" content="classic">\n<meta name="aimeat-scopes"');
+      expect((await findings(classic)).ids).not.toContain('atelier-register');
+    });
+  });
 
   it('stays quiet on a correct Atelier app and on the clean Classic app', async () => {
     const ate = await findings(ATELIER);

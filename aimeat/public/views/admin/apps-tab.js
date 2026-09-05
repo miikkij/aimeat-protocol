@@ -12,6 +12,7 @@
  *   type-to-confirm delete modals.
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v1.1.0 — 2026-09-05 — The two status badges lose their emoji: no emoji anywhere in the interface.
  *   v1.0.0 — 2026-06-24 — Initial: list-all + hide/restore moderation tool.
  *   v1.1.0 — 2026-06-25 — Add operator hard-delete (type-to-confirm) — removes an
  *     app permanently from the node.
@@ -190,11 +191,11 @@ export default function AppsAdminTab() {
                   <td>${a.downloads || 0}</td>
                   <td>
                     ${a.operator_hidden
-                      ? html`<span class="badge badge-danger">\u{1F6AB} ${t('admin.apps.statusHidden')}</span>
+                      ? html`<span class="badge badge-danger">${t('admin.apps.statusHidden')}</span>
                           ${a.operator_hide_reason ? html`<div class="adm-text-sm adm-text-dim">${escHtml(a.operator_hide_reason)}</div>` : ''}
                           ${a.operator_hidden_by ? html`<div class="adm-text-sm adm-text-dim">${t('admin.apps.byAt', { by: a.operator_hidden_by, at: dt(a.operator_hidden_at) })}</div>` : ''}`
                       : a.parked
-                        ? html`<span class="badge badge-dim">\u{1F17F}️ ${t('admin.apps.statusParked')}</span>`
+                        ? html`<span class="badge badge-dim">${t('admin.apps.statusParked')}</span>`
                         : html`<span class="badge badge-success">${t('admin.apps.statusLive')}</span>`}
                   </td>
                   <td>

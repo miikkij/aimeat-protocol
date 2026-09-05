@@ -9,6 +9,15 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=designbook
  * @version-history
+ *   v1.2.1 — 2026-09-05 — The APP fixture names a register (genre-nightfloor): an Atelier app
+ *     without one is refused at publish now, and this suite is about the Book, not the gate.
+ *   v1.2.0 — 2026-09-05 — The AMBIENT kind (wish-atelier-ambient-visuals): the worded refusals
+ *     (an unknown preset with the six named, a number outside the bounds, "none", a field too
+ *     loud for a palette-page look), a proven combination landing with its benches named, the
+ *     kind filter, the operator's publish, another owner's adopt MERGING the layer beside the
+ *     look and the earlier tokens, a loud part refused at adopt on the destination look, the
+ *     no-arrangement 409 with the way out, the preview with the layer riding the layout, the six
+ *     seeded presets, discovery, and the browser bench carrying the layer counts.
  *   v1.1.1 — 2026-09-02 — The preview's img-src is asserted to be the app policy (it was the
  *     SPA's 'self', which blocked every apex illustration once the gallery framed it from an
  *     app origin). Failed on the old route first.
@@ -64,6 +73,7 @@ const APP = (filename: string) => [
     '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
     `<meta name="aimeat-app" content="${filename}">`,
     '<meta name="aimeat-track" content="atelier">',
+    '<meta name="aimeat-register" content="genre-nightfloor">',
     '<link rel="stylesheet" href="/lib/aimeat-atelier.css">',
     '</head><body><script src="/v1/libs/aimeat-atelier.js"></' + 'script></body></html>',
 ].join('\n');
@@ -445,6 +455,135 @@ const GOOD_BODY = {
         assert(prev.status === 200, `genre preview is 200, got ${prev.status}`);
         const page = await prev.text();
         assert(/<!DOCTYPE html>/i.test(page) && !page.includes('demoFor('), 'a genre serves its template page, not the demo frame');
+    });
+
+    // ── The AMBIENT kind: the one layer allowed to move at idle, proven on a look ──────────────
+    const ambientId = `ambient-e2e-${Date.now() % 100000}`;
+    const proposeAmbient = (body: any, id = ambientId) => json('/v1/designbook', {
+        method: 'POST', headers: auth(other.token),
+        body: JSON.stringify({ part: { id, kind: 'ambient', title: 'The wave, tuned', summary: 'The PlayStation wave on the stage look, a little quieter and slower.', body, tags: ['ambient'] } }),
+    });
+
+    await test('an AMBIENT part refuses with words: an unknown preset (the six named), a number outside the bounds, "none", a field too loud for its look', async () => {
+        const unknown = await proposeAmbient({ ambient: 'wavez' });
+        assert(unknown.status === 422 && /Did you mean "waves"/.test(unknown.body.error.message) && /ink/.test(unknown.body.error.message),
+            `an unknown preset names the six and suggests the nearest: ${JSON.stringify(unknown.body)}`);
+        const alpha = await proposeAmbient({ ambient: 'waves', alpha: 1.5 });
+        assert(alpha.status === 422 && /alpha/.test(alpha.body.error.message), `an alpha outside 0..1 refuses: ${JSON.stringify(alpha.body)}`);
+        const speed = await proposeAmbient({ ambient: 'waves', speed: 0.1 });
+        assert(speed.status === 422 && /speed/.test(speed.body.error.message), `a speed outside the bounds refuses: ${JSON.stringify(speed.body)}`);
+        const none = await proposeAmbient({ ambient: 'none' });
+        assert(none.status === 422 && /arrangement's choice/.test(none.body.error.message), `"none" is not a part: ${JSON.stringify(none.body)}`);
+        const loud = await proposeAmbient({ ambient: 'waves', alpha: 0.9, look: 'editorial' });
+        assert(loud.status === 422 && /contrast matrix/.test(loud.body.error.message) && /whisper/.test(loud.body.error.message),
+            `a field louder than the whisper on a look that stands on the palette page refuses with the numbers: ${JSON.stringify(loud.body)}`);
+        const noLook = await proposeAmbient({ ambient: 'dust', look: 'nightclub' });
+        assert(noLook.status === 422 && /not a look this node ships/.test(noLook.body.error.message), `an unknown look refuses by name: ${JSON.stringify(noLook.body)}`);
+    });
+
+    await test('an AMBIENT part lands proven: the benches named, the body whole, invisible anonymous, found by ?kind', async () => {
+        const r = await proposeAmbient({ ambient: 'waves', alpha: 0.2, speed: 0.75, look: 'stage', tokens: { '--ak-radius-sm': '2px' } });
+        assert(r.status === 201, `propose ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        const g = await json(`/v1/designbook/${ambientId}`, { headers: auth(other.token) });
+        assert(g.status === 200, `get ${g.status}`);
+        const checks = g.body.data.part.bench.checks;
+        assert(checks.includes('ambient-valid') && checks.includes('contrast-matrix') && checks.includes('tokens-valid'),
+            `the record says which benches ran: ${checks.join(', ')}`);
+        const body = g.body.data.part.body;
+        assert(body.ambient === 'waves' && body.alpha === 0.2 && body.speed === 0.75 && body.look === 'stage' && body.tokens['--ak-radius-sm'] === '2px',
+            `the body survives whole: ${JSON.stringify(body)}`);
+        const anon = await json(`/v1/designbook/${ambientId}`);
+        assert(anon.status === 404, `a proposal is invisible without a session, got ${anon.status}`);
+        const byKind = await json('/v1/designbook?kind=ambient&limit=200', { headers: auth(other.token) });
+        assert(byKind.body.data.parts.some((p: any) => p.id === ambientId), '?kind=ambient lists it');
+        const byLook = await json('/v1/designbook?kind=look&limit=200', { headers: auth(other.token) });
+        assert(!byLook.body.data.parts.some((p: any) => p.id === ambientId), '?kind=look does not');
+    });
+
+    await test('an AMBIENT part: the operator publishes, another owner adopts — the layer MERGES, the look and the earlier tokens survive', async () => {
+        const pub = await json(`/v1/designbook/${ambientId}/status`, { method: 'POST', headers: auth(op.token), body: JSON.stringify({ status: 'published' }) });
+        assert(pub.status === 200, `publish ${pub.status}`);
+        const before = await json(`/v1/apps/${other.name}/${otherApp}/ui`);
+        const adopt = await json(`/v1/designbook/${ambientId}/adopt`, { method: 'POST', headers: auth(other.token), body: JSON.stringify({ filename: otherApp }) });
+        assert(adopt.status === 200 && adopt.body.data.kind === 'ambient', `adopt ${adopt.status}: ${JSON.stringify(adopt.body?.error)}`);
+        const layout = (await json(`/v1/apps/${other.name}/${otherApp}/ui`)).body.data.layout;
+        assert(JSON.stringify(layout.ambient) === JSON.stringify({ preset: 'waves', alpha: 0.2, speed: 0.75 }),
+            `the layer lands as the arrangement's ambient: ${JSON.stringify(layout.ambient)}`);
+        assert(Array.isArray(layout.blocks) && layout.blocks.length > 0, 'the arrangement SURVIVED — an ambient merges, never replaces');
+        assert(layout.look === before.body.data.layout.look && layout.look === 'editorial', `the app's own look survives (${layout.look})`);
+        assert(layout.tokens?.['--ak-accent'] === '#0e7c66/#e8564a', 'the earlier look\'s pair SURVIVED');
+        assert(layout.tokens?.['--ak-radius-sm'] === '2px', 'the part\'s own token merged in');
+        const anon = await json(`/v1/designbook/${ambientId}`);
+        assert(anon.status === 200 && typeof anon.body.data.part.published_at === 'string', `published: anonymous read answers ${anon.status}`);
+        const row = (await json('/v1/designbook?kind=ambient&limit=200')).body.data.parts.find((p: any) => p.id === ambientId);
+        assert(row && typeof row.published_at === 'string', 'a published row says when');
+    });
+
+    await test('an AMBIENT part proven loud on a world is re-proven on the destination look at adopt, and refuses with the numbers', async () => {
+        const loudId = `${ambientId}-loud`;
+        const r = await json('/v1/designbook', {
+            method: 'POST', headers: auth(op.token),
+            body: JSON.stringify({ part: { id: loudId, kind: 'ambient', title: 'The wave, loud', summary: 'The wave at eight tenths on lounge, which owns its night.', body: { ambient: 'waves', alpha: 0.8, look: 'lounge' }, tags: ['ambient'] } }),
+        });
+        assert(r.status === 201, `a loud wave on lounge is proven at propose: ${JSON.stringify(r.body?.error)}`);
+        await json(`/v1/designbook/${loudId}/status`, { method: 'POST', headers: auth(op.token), body: JSON.stringify({ status: 'published' }) });
+        const adopt = await json(`/v1/designbook/${loudId}/adopt`, { method: 'POST', headers: auth(other.token), body: JSON.stringify({ filename: otherApp }) });
+        assert(adopt.status === 422 && /contrast matrix/.test(String(adopt.body.error?.message)),
+            `on an editorial app the same part is a stain, and the adopt says so with the numbers: ${adopt.status} ${JSON.stringify(adopt.body?.error)}`);
+        const layout = (await json(`/v1/apps/${other.name}/${otherApp}/ui`)).body.data.layout;
+        assert(layout.ambient?.alpha === 0.2, 'the refused adopt wrote nothing');
+    });
+
+    await test('an AMBIENT part: adopting into an app with no stored arrangement → 409 NO_LAYOUT, with the app-code way out', async () => {
+        const r = await json(`/v1/designbook/${ambientId}/adopt`, { method: 'POST', headers: auth(other.token), body: JSON.stringify({ filename: 'db-bare.html' }) });
+        assert(r.status === 409 && r.body.error?.code === 'NO_LAYOUT' && /app\(\{ ambient/.test(r.body.error.message),
+            `NO_LAYOUT with the way out: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    });
+
+    await test('an AMBIENT part previews as the demo arrangement with the layer riding the layout, on the part\'s look', async () => {
+        const res = await fetch(`${BASE}/v1/designbook/${ambientId}/preview`);
+        assert(res.status === 200 && (res.headers.get('content-type') ?? '').includes('text/html'), `preview ${res.status}`);
+        const page = await res.text();
+        assert(page.includes('aimeat-atelier'), 'the kit is on the page');
+        assert(/"ambient":\{"preset":"waves"/.test(page), 'the layer rides the layout the mosaic mounts');
+        assert(/"component":"hero"/.test(page) && /"look":"stage"/.test(page), 'the demo arrangement, on the part\'s own look');
+    });
+
+    await test('a fresh node\'s AMBIENT shelf is never empty: the six presets are seeded published, each on the look it fits', async () => {
+        let seeded: any[] = [];
+        for (let i = 0; i < 10; i++) {
+            const r = await json('/v1/designbook?status=published&kind=ambient&limit=200', { headers: auth(other.token) });
+            seeded = (r.body.data?.parts ?? []).filter((p: any) => p.id.startsWith('ambient-') && p.tags.includes('seed'));
+            if (seeded.length >= 6) break;
+            await new Promise(res => setTimeout(res, 500));
+        }
+        assert(seeded.length === 6, `six seeded ambients, got ${seeded.length}: ${seeded.map((p: any) => p.id).join(', ')}`);
+        assert(seeded.every((p: any) => typeof p.published_at === 'string'), 'every seeded row says when it was published');
+        const w = await json('/v1/designbook/ambient-waves');
+        assert(w.status === 200 && w.body.data.part.body.ambient === 'waves' && w.body.data.part.body.look === 'lounge' && w.body.data.part.body.alpha === 0.8,
+            `ambient-waves is the wave on lounge at eight tenths: ${JSON.stringify(w.body.data?.part?.body)}`);
+    });
+
+    await test('discovery surfaces an ambient part with its kind as the segment', async () => {
+        const r = await json('/v1/discover?type=designbook&scope=public&limit=200', { headers: auth(other.token) });
+        assert(r.status === 200, `discover ${r.status}`);
+        const hit = (r.body.data.entries ?? r.body.data.results ?? []).find((e: any) => e.id === ambientId);
+        assert(!!hit, `the ambient part appears in /v1/discover, got ${JSON.stringify(r.body.data).slice(0, 200)}`);
+        assert(hit.segment === undefined || hit.segment === 'ambient', `its segment is its kind, got ${hit.segment}`);
+    });
+
+    await test('the browser bench on an AMBIENT part carries the layer counts at every viewport, or the worded unavailable', async () => {
+        const r = await json(`/v1/designbook/${ambientId}/bench`, { method: 'POST', headers: auth(op.token) });
+        assert(r.status === 200, `bench ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        if (r.body.data.ran === true) {
+            const vps = r.body.data.viewports;
+            assert(Array.isArray(vps) && vps.length === 3 && vps.every((v: any) => typeof v.ambient_layers === 'number' && typeof v.ambient_painted === 'number'),
+                `the counts ride every viewport: ${JSON.stringify(vps)}`);
+            // Measured, never asserted in the guard tier (a slow box would flake it): what painted.
+            console.log(`     ambient bench: ${vps.map((v: any) => `${v.viewport} layers=${v.ambient_layers} painted=${v.ambient_painted}`).join(' · ')} passed=${r.body.data.passed}`);
+        } else {
+            assert(typeof r.body.data.reason === 'string' && r.body.data.reason.length > 0, 'an unavailable bench says why');
+        }
     });
 
     await test('the operator retires it, and a retired address stays retired', async () => {

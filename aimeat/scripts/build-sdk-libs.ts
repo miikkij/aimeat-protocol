@@ -84,7 +84,6 @@ export const SDK_LIBS: SdkLib[] = [
   { name: 'events', entry: 'events/index.js' },
   { name: 'auth', entry: 'auth/index.js' },
   { name: 'atelier', entry: 'atelier/index.js' },
-  { name: 'science', entry: 'science/index.js' },
 ];
 
 function banner(name: string): string {

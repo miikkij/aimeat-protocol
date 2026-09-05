@@ -5,6 +5,8 @@
  * @description Catalogue/discovery, action execution, work inbox, wallet balance, storage, admin read, and notification-board tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.3.0 — 2026-09-05 — aimeat_admin_security_overview (the Security page in one read) and
+ *     aimeat_admin_incident_resolve, beside the other operator tools.
  *   v1.2.0 — 2026-08-30 — Board tool descriptions say what a board is for (RFC v4.0 §27 reinstated):
  *     a notice board people and agents publish to together, public ones read without a grant,
  *     public posts priced and expiring, subscriptions as a filtered watch.
@@ -324,6 +326,22 @@ export const discoveryWorkBoardsTools: AimeatToolDefinition[] = [
         visibility: agentEverywhere,
         input: {
             name: { type: 'string', required: true, description: 'The owner name whose two-step sign-in should be removed.' },
+        },
+    },
+    {
+        name: 'aimeat_admin_security_overview',
+        description: 'Operator-only. The Security page in one read: what is happening at the door in the last 24 hours (refusals, distinct sources, walled addresses, each with a zone decided from this instance\'s own readable history), the refusal log grouped by door, source, credential kind and credential fingerprint plus its newest 200 lines, the refused-and-kept incidents with the open count, who holds the operator role and which accounts are deactivated or use two-step sign-in, and the door settings (rate limits, tarpit, lockout, TOTP, CORS origins, federation sign-in, body limits, the log file). The same data as GET /v1/admin/security/overview. Returns an operator-role error for non-operators.',
+        caller: 'operator',
+        visibility: agentEverywhere,
+        input: {},
+    },
+    {
+        name: 'aimeat_admin_incident_resolve',
+        description: 'Operator-only. Mark a refused-and-kept security incident resolved; the quarantined bytes stay until the incident is deleted. Read aimeat_admin_security_overview first to see the incidents and their ids. Returns NOT_FOUND for an unknown id and an operator-role error for non-operators.',
+        caller: 'operator',
+        visibility: agentEverywhere,
+        input: {
+            id: { type: 'string', required: true, description: 'The incident id, from the overview\'s incidents list.' },
         },
     },
     {

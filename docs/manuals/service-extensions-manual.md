@@ -172,6 +172,7 @@ federation:
 | `instances.supported` | No | Whether this extension supports multiple instances |
 | `instances.config_per_instance` | No | Per-instance configuration schema |
 | `federation` | No | Cross-node capability advertising |
+| `workspace` | No | `{ read: bool, write: bool }`. Gives the sandbox `ctx.workspace`, which acts on the CALLER's organism workspace as the caller. Absent means no such capability |
 
 ## Writing Action Scripts
 
@@ -213,6 +214,7 @@ export default async function(ctx, input) {
   // ctx.config   -- extension-level config values
   // ctx.instance -- { id, config } -- which instance (if multi-instance)
   // ctx.memory   -- { get, set, search, delete, getPublic }
+  // ctx.workspace -- { index, get, write, writeDoc, publish } -- the CALLER's organism workspace; only when the manifest declares `workspace:`
   // ctx.wallet   -- { consume, getBalance }
   // ctx.consent  -- { check, require }
   // ctx.trust    -- { getScore }
@@ -254,6 +256,29 @@ const listing = await ctx.memory.get(`listing.${id}`);
 // Search all active listings
 const listings = await ctx.memory.search('listing.');
 const active = listings.filter(l => l.value.status === 'active');
+```
+
+#### ctx.workspace
+
+The caller's organism workspace, acted on as the caller. It exists only when the manifest declares it at the top level, `workspace: { read: true, write: true }`; with `read` alone the three writers throw `PERMISSION`. Every method runs the same operation the MCP tool of that name runs (`aimeat_workspace_read`, `_write`, `_publish`), so the checks are the tool's checks: the caller must be an active member of the organism, a writer needs the creator's contributor grant unless they created the workspace, an agent or app token needs `memory:write` to write or publish and `organism:read` to read (an owner session needs neither), a record must pass the space's locked schema, and the publish gate is honoured. A refusal reaches the script as a thrown `CODE: message`; let it propagate and the HTTP caller receives that status and code. A scheduled run never gets `ctx.workspace`. Each call counts as one API call, and a record written this way carries provenance naming the extension.
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `index` | `index(organismId, ws): Promise<object>` | Manifest, pinned apps, locked schemas, per-space titles. No bodies |
+| `get` | `get(organismId, ws, ids: string[], { space? }): Promise<object>` | Full values of those ids; `_draftVersion` is what `ifVersion` swaps against |
+| `write` | `write(organismId, ws, space, id, value, { ifVersion? }): Promise<object>` | A DRAFT record in a records space, schema-validated. `ifVersion: 0` means "only if there is no draft yet"; a mismatch throws `VERSION_CONFLICT` and writes nothing |
+| `writeDoc` | `writeDoc(organismId, ws, space, { title, markdown }, { id?, section? }): Promise<object>` | A DRAFT document in a document space; the id is generated unless given |
+| `publish` | `publish(organismId, ws, namespace, id, { expectedVersion? }): Promise<object>` | Publish the draft: `.version.N` under the caller, `.latest` under the member |
+
+**Example — hold a shared claim, refusing a second claimant:**
+```javascript
+const org = ctx.config.organismId, ws = ctx.config.claimsWorkspace;
+const open = await ctx.workspace.index(org, ws);
+const held = (open.index.claim || []).some(c => c.title === input.port);
+if (held) return { refused: true, reason: 'another active claim holds this port' };
+await ctx.workspace.write(org, ws, 'claim', input.id, { id: input.id, title: input.port, by: ctx.caller.gaii }, { ifVersion: 0 });
+await ctx.workspace.publish(org, ws, 'shared.claim', input.id);
+return { claimed: input.id };
 ```
 
 #### ctx.wallet

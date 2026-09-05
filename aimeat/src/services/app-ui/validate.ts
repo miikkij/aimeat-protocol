@@ -16,6 +16,12 @@
  *   import { validateUiLayout, AppUiError } from './validate.js';
  *   const layout = validateUiLayout(req.body);   // throws AppUiError(422) with words
  * @version-history
+ *   v1.5.0 — 2026-09-05 — The layout's optional `ambient` ({ preset, alpha?, speed? }) and the
+ *     third reusable bench, validateAmbientSpec(): the shape and the bounds come from the
+ *     ambient registry, and a field preset is then PROVEN on the look it will run on through
+ *     the same matrix check every look's own ambient passes (AK-AMBIENT), so a layer too loud
+ *     for its ground refuses with numbers. Serves the layout field and the Design Book's
+ *     `ambient` kind (wish-atelier-ambient-visuals).
  *   v1.4.0 — 2026-08-28 — Two benches step out as REUSABLE doors for the Design Book's new part
  *     kinds: validateSignatureTokens() (pure extraction of the tokens loop, now also serving the
  *     `look` and `motion` kinds) and validateImageryStyle() (new: art direction as data, serving
@@ -41,6 +47,7 @@ import type { BlockPropValue } from '../surface-layout/types.js';
 import { propProblem } from '../surface-layout/validate.js';
 import { componentById, NAV_MODES, CHOREOGRAPHIES, LOOKS, BLOCK_SPANS, UI_COMPONENTS, SIGNATURE_TOKENS } from './registry.js';
 import { runMatrix } from '../atelier-contrast.js';
+import { AMBIENT_IDS, AMBIENT_NONE, AMBIENT_BOUNDS, ambientById, isAmbientValue } from '../../data/atelier-ambients.js';
 
 /** More blocks than this is a page nobody reads — and a payload nobody meant. */
 const MAX_BLOCKS = 40;
@@ -76,6 +83,10 @@ export interface AppUiLayout {
   tokens?: Record<string, string>;
   /** Art direction for the imagery pipeline: a prompt fragment and optional colour words. */
   imagery?: { style: string; palette_words?: string };
+  /** The one layer allowed to move at idle, behind the app: a preset from the ambient registry
+   *  with how much of it shows and how fast it moves, or "none" to switch the look's own off.
+   *  Absent means the look decides. */
+  ambient?: { preset: string; alpha?: number; speed?: number };
   /** This arrangement is a DIALOG's inside: what kind of moment it is and how much room it
    *  takes. Absent means the arrangement is a screen. */
   dialog?: { title?: string; tone?: string; size?: string; from?: string };
@@ -198,6 +209,55 @@ export function validateImageryStyle(raw: unknown): { style: string; palette_wor
   return out;
 }
 
+/**
+ * The ambient behind an arrangement — the one layer allowed to move at idle — as data:
+ * { preset, alpha?, speed? }. Serves the layout's optional `ambient` field and the Design Book's
+ * `ambient` part kind. The shape and the bounds come from the ambient registry; a preset is then
+ * PROVEN on the look it will run on (vivid when none is named) through the same matrix check
+ * every look's own ambient passes (AK-AMBIENT), so a layer too loud for its ground refuses with
+ * the failing numbers. "none" is legal here — an arrangement switching its look's ambient off —
+ * and carries no numbers.
+ */
+export function validateAmbientSpec(raw: unknown, look?: string): { preset: string; alpha?: number; speed?: number } {
+  const ids = [...AMBIENT_IDS];
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    fail(`ambient is one object { preset, alpha?, speed? }: the background animation behind the app. preset is one of ${ids.join(', ')}, or "none" to switch the look's own ambient off.`);
+  }
+  const o = raw as Record<string, unknown>;
+  const preset = typeof o.preset === 'string' ? o.preset.trim() : '';
+  if (!isAmbientValue(preset)) unknownName('ambient preset', String(o.preset ?? ''), [...ids, AMBIENT_NONE]);
+  if (preset === AMBIENT_NONE) return { preset };
+  const entry = ambientById(preset)!;
+  const out: { preset: string; alpha?: number; speed?: number } = { preset };
+  if (o.alpha !== undefined) {
+    const a = typeof o.alpha === 'number' ? o.alpha : Number.NaN;
+    if (!Number.isFinite(a) || a < AMBIENT_BOUNDS.alpha[0] || a > AMBIENT_BOUNDS.alpha[1]) {
+      fail(`ambient.alpha is how much of the layer shows through: a number from ${AMBIENT_BOUNDS.alpha[0]} to ${AMBIENT_BOUNDS.alpha[1]} (${preset} ships at ${entry.defaultAlpha}).`);
+    }
+    out.alpha = a;
+  }
+  if (o.speed !== undefined) {
+    const s = typeof o.speed === 'number' ? o.speed : Number.NaN;
+    if (!Number.isFinite(s) || s < AMBIENT_BOUNDS.speed[0] || s > AMBIENT_BOUNDS.speed[1]) {
+      fail(`ambient.speed is a multiplier on the preset's own pace: a number from ${AMBIENT_BOUNDS.speed[0]} to ${AMBIENT_BOUNDS.speed[1]} (1 is the design speed).`);
+    }
+    out.speed = s;
+  }
+  // Proven where it lives: the layout's own look, with the layer's alpha layered last exactly as
+  // the kit reads it. An omitted alpha is the preset's default — the whisper every look allows.
+  const alpha = out.alpha ?? entry.defaultAlpha;
+  const presets = [look && look.length ? look : 'vivid'];
+  const bad = runMatrix({ '--ak-ambient': preset, '--ak-ambient-alpha': String(alpha) }, { presets }).filter((r) => !r.ok);
+  if (bad.length > 0) {
+    const first = bad[0]!;
+    const where = first.min > 0
+      ? `${first.label} in ${first.combo} measures ${first.actual.toFixed(2)} against the ${first.min} floor (${first.why})`
+      : `${first.label} in ${first.combo}: ${first.why}`;
+    fail(`ambient ${preset} at alpha ${alpha} fails the contrast matrix on the ${presets[0]} look: ${where}; ${bad.length} check(s) fail in all. Lower ambient.alpha (${preset} ships at ${entry.defaultAlpha}, the whisper every look allows), or move the arrangement to a look that owns its ground.`);
+  }
+  return out;
+}
+
 /** The dialog shapes a node can prove — enums, so a shape is data and never a stylesheet. */
 export const DIALOG_TONES = ['plain', 'danger', 'celebrate', 'ai'] as const;
 export const DIALOG_SIZES = ['compact', 'roomy', 'wide'] as const;
@@ -302,6 +362,10 @@ export function validateUiLayout(raw: unknown): AppUiLayout {
 
   if (input.imagery !== undefined) {
     out.imagery = validateImageryStyle(input.imagery);
+  }
+
+  if (input.ambient !== undefined) {
+    out.ambient = validateAmbientSpec(input.ambient, out.look);
   }
 
   if (input.dialog !== undefined) {

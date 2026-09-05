@@ -57,6 +57,14 @@ Server-side, sandboxed. `export default async function(ctx, input) { ... }` per 
   happily sends a bogus credential.
 - `ctx.memory` is the extension's own sovereign `ext:{name}` namespace, and it is **world-readable**.
   "Visible to the operator only" is not something it can express.
+- `ctx.workspace` is how an extension reaches an organism workspace, and it does so **as the caller**:
+  the manifest declares `workspace: { read: true, write: true }` at the top level, and `index`, `get`,
+  `write`, `writeDoc` and `publish` then run the same operations `aimeat_workspace_read/_write/_publish`
+  run, with the same refusals (membership, the contributor grant, `memory:write` on an agent or app
+  token, the locked schema, `ifVersion`, the publish gate) thrown as `CODE: message`. It is absent on
+  a scheduled run and absent without the declaration; check `if (!ctx.workspace)`. Do not reach a
+  workspace through `ctx.fetch` or `ctx.memory`: the first cannot reach the node and the second is
+  fenced to `ext:`.
 - **A collector writes one key per PERIOD, never one per item fetched.** The namespace carries the
   same budget as any principal: 1024 kB per value, 1000 keys by default. `ext:halytyskartta-ext` keeps
   a whole day of alerts in `alerts.byDate.{date}` at a 74 kB median and is fine; `ext:luotain` kept one

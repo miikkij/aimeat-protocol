@@ -496,3 +496,98 @@ describe('a credential that could not be minted, versus one that does not exist'
     expect(client.isOnline()).toBe(true);
   });
 });
+
+/**
+ * A FRAME FOR AN IDENTITY THIS SOCKET NO LONGER HOLDS GOES NOWHERE.
+ *
+ * `handlersFor` used to be `identities.get(gaii) || this.opts`, and `this.opts` are the handlers of
+ * whoever OPENED the socket. It could not tell "this frame names the socket's own identity" from
+ * "this frame names one I evicted": both missed the map, both fell back to the opener. The node
+ * stamps every outbound frame with the principal it is for and keeps pushing until told to detach,
+ * and the 401 eviction never sent one. So after an attached agent's credential died, its next task
+ * arrived stamped with its name, missed the map, and was filed on the OPENER's channel — queued
+ * under the wrong agent, its runner launched, and the auto-ack telling the node the right agent had
+ * it. Two owners on one daemon share a socket, so that is a task crossing an ownership boundary.
+ *
+ * Found by an adversarial review on 2026-09-05 and verified link by link before this was written.
+ */
+describe('a frame for an evicted identity', () => {
+  const OPENER = 'concierge#alice@node';
+  const VICTIM = 'news-fetcher#bob@node';
+
+  /** Opener on a multiplexing node, with VICTIM attached; a forward from VICTIM answers 401. */
+  async function evictedFixture() {
+    const server = await startServer({
+      welcome: { multiplex: true },
+      onRequest: (frame, ws) => {
+        const status = frame.agent === VICTIM ? 401 : 200;
+        // `agent` echoed on the response, because that is what the real node does: sendTo() stamps
+        // every outbound frame with the principal it is for. Without it the client cannot tell
+        // whose 401 this is and treats it as its own — which is a different test.
+        ws.send(JSON.stringify({ type: 'response', id: frame.id, agent: frame.agent, status, body: status === 401 ? { ok: false, error: { code: 'TOKEN_EXPIRED' } } : { ok: true } }));
+      },
+    });
+    const openerDelivers: string[] = [];
+    const { client } = makeClient(server, {
+      gaii: OPENER,
+      onDeliver: (kind, _payload, id) => openerDelivers.push(`${kind}:${id}`),
+    });
+    await client.start();
+    const victimFailures: string[] = [];
+    await client.attachIdentity({
+      gaii: VICTIM,
+      getToken: async () => 'about-to-die',
+      onAuthFailure: (m) => victimFailures.push(m),
+    });
+    // The 401 that evicts VICTIM.
+    await client.forward('GET', '/v1/memory', {}, VICTIM);
+    await waitFor(() => victimFailures.length === 1);
+    return { server, client, openerDelivers, victimFailures };
+  }
+
+  it('is told to the node with a detach, so the node stops pushing', async () => {
+    const { server } = await evictedFixture();
+    // THE HALF THAT WAS MISSING. Deleting the identity locally left the node holding it on this
+    // socket and pushing its deliveries down it, stamped with a name this client no longer knew.
+    await waitFor(() => server.framesOfType('detach').length === 1);
+    expect(server.framesOfType('detach')[0].agent).toBe(VICTIM);
+  });
+
+  it('is dropped, not handed to the socket opener, and not acked', async () => {
+    const { server, openerDelivers } = await evictedFixture();
+    await waitFor(() => server.framesOfType('detach').length === 1);
+    const acksBefore = server.framesOfType('ack').length;
+
+    // The node has not processed the detach yet (or a deliver was already in flight): a task for
+    // VICTIM arrives stamped with VICTIM's name. Before the fix this landed in openerDelivers.
+    const ws = server.sockets[server.sockets.length - 1];
+    ws.send(JSON.stringify({ type: 'deliver', agent: VICTIM, kind: 'task_assigned', id: 'bobs-task', payload: { title: 'bob\'s work' } }));
+    await new Promise(r => setTimeout(r, 150));
+
+    expect(openerDelivers).toEqual([]);
+    // No ack either: an ack tells the node VICTIM received it, and VICTIM is gone.
+    expect(server.framesOfType('ack').length).toBe(acksBefore);
+  });
+
+  it('still delivers to the opener when the frame is genuinely the opener\'s', async () => {
+    // The fence must not swallow the socket's OWN traffic. Two frames prove the discrimination:
+    // one unstamped (a legacy node), one stamped with the opener's own gaii.
+    const { server, openerDelivers } = await evictedFixture();
+    const ws = server.sockets[server.sockets.length - 1];
+    ws.send(JSON.stringify({ type: 'deliver', kind: 'task_assigned', id: 'legacy-1', payload: {} }));
+    ws.send(JSON.stringify({ type: 'deliver', agent: OPENER, kind: 'task_assigned', id: 'mine-1', payload: {} }));
+    await waitFor(() => openerDelivers.length === 2);
+    expect(openerDelivers).toEqual(['task_assigned:legacy-1', 'task_assigned:mine-1']);
+  });
+
+  it('a second 401 for the evicted identity does not stop the whole client', async () => {
+    // Before the fix a straggling 401 for an already-evicted name took the else branch and called
+    // authFailure(), dropping the socket for every other identity riding it.
+    const { server, client } = await evictedFixture();
+    await waitFor(() => server.framesOfType('detach').length === 1);
+    const ws = server.sockets[server.sockets.length - 1];
+    ws.send(JSON.stringify({ type: 'response', id: 'stray', agent: VICTIM, status: 401, body: { ok: false, error: { code: 'TOKEN_EXPIRED' } } }));
+    await new Promise(r => setTimeout(r, 150));
+    expect(client.isOnline()).toBe(true);
+  });
+});

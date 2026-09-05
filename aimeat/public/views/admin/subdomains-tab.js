@@ -9,6 +9,7 @@
  * @structure SubdomainsAdminTab (default)
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v1.1.0 — 2026-09-05 — The globe emoji before a subdomain link goes: no emoji anywhere in the interface.
  *   v1.0.0 — 2026-06-12 — Initial: subdomain routing (operator-only management)
  */
 import { h } from 'preact';
@@ -144,7 +145,7 @@ export default function SubdomainsAdminTab() {
               ${sites.map(s => html`
                 <tr>
                   <td class="mono">
-                    <a href=${siteUrl(s.subdomain)} target="_blank" rel="noopener">\u{1F310} ${s.subdomain}</a>
+                    <a href=${siteUrl(s.subdomain)} target="_blank" rel="noopener">${s.subdomain}</a>
                   </td>
                   <td>${s.kind === 'app' ? t('admin.subdomains.kindApp') : t('admin.subdomains.kindRedirect')}</td>
                   <td class="mono">${s.target}</td>

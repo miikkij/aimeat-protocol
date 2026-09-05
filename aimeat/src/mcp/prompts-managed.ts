@@ -14,6 +14,10 @@
  *   import { registerManagedPrompts } from './prompts-managed.js';
  *   await registerManagedPrompts(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   v1.1.0 — 2026-09-05 — The `cortex_extensions` variable lists only the cortexes this caller may
+ *     see (services/cortex-lifecycle.ts visibleCortexes). It named every active cortex on the node,
+ *     another owner's private one included — a fifth door for the same leak the four cortex reads
+ *     and both list tools had, and the quietest, because it surfaced inside a prompt's text.
  *   v1.0.0 — 2026-08-09 — Initial. The prompts primitive had never been used on this node: mcp.prompt
  *     appeared nowhere in src/mcp/, so the server declared tools and resources only.
  */
@@ -24,6 +28,7 @@ import type { Storage, SystemPromptRecord } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
+import { visibleCortexes } from '../services/cortex-lifecycle.js';
 
 /**
  * A managed prompt is offered to a person when its own `usedIn` says the portal's prompt-package
@@ -120,7 +125,14 @@ export async function registerManagedPrompts(
 
                 if ((record.variables ?? []).includes('cortex_extensions')) {
                     try {
-                        const extensions = await storage.listCortexExtensions({ status: 'active' });
+                        // Names and descriptions only, but of EVERY active cortex on the node until
+                        // 2026-09-05 — another owner's private one included. The same fence the two
+                        // list doors apply; operator-ness is unknown on this surface, so it is not claimed.
+                        const extensions = visibleCortexes(
+                            { ownerName, isOperator: false },
+                            await storage.listCortexExtensions({ status: 'active' }),
+                            config.nodeId,
+                        );
                         known.cortex_extensions = (extensions ?? []).map(e => `- ${e.name}: ${e.description}`).join('\n');
                     } catch (err) {
                         logger.warn('registerManagedPrompts: cortex list unavailable', { error: String(err) });

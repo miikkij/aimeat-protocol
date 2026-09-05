@@ -102,3 +102,27 @@ a whole file still risks everything else about it, and `write_bytes(read_bytes()
 ```python
 p.write_bytes(p.read_bytes().replace(b'old', b'new'))
 ```
+
+## Many sessions, one main
+
+Up to eight Claude Code sessions, several machines and more than one account commit to this
+repo, and every commit carries the same author. On 2026-09-04 that meant the commit that stopped
+main from booting could only be attributed by content and time, after three sessions had been
+asked in turn. Three hooks and a variable answer it; the ritual around them is skill
+`aimeat-dev-session` on the node.
+
+- **`AIMEAT_SESSION=cc-<owner>-<tag>`** in the shell a session commits from. The
+  `prepare-commit-msg` hook stamps `Session: <name>` as a trailer on every commit; the same name
+  is on the session's claim record. A missing variable warns today and will refuse once every
+  active session has adopted it.
+- **`check:imports-tracked`** (pre-commit) refuses a tracked file whose relative import
+  resolves to a file git does not track. It reads the index copy of a file with unstaged edits,
+  so a peer's half-done work in a shared checkout is not this commit's problem, and an
+  untracked importer is ignored until it is staged. c932f2f17 shipped without the two files it
+  imported and passed every gate that read the worktree.
+- **`pre-push`** fetches and refuses a push from behind `origin/main` (rebase first), lists the
+  commits about to go that carry no `Session:` trailer, and runs `pnpm boot:smoke`, which
+  imports the modules on the server's boot path and refuses when one throws at load.
+- **One session, one worktree.** `git worktree add ../aimeat-protocol-<tag> main`, then
+  everything from there. In a shared checkout `git log origin/main..HEAD` shows a peer's
+  commits, and a push would carry them; stop and message the peer.

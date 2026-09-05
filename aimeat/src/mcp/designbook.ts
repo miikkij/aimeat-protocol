@@ -10,6 +10,9 @@
  *   import { registerDesignbookTools } from './designbook.js';
  *   registerDesignbookTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   v1.2.0 — 2026-09-05 — genre and ambient join the kind wording (wish-atelier-ambient-visuals),
+ *     and an adopted ambient is told apart in the answer: the layer runs behind the app on its
+ *     next open with the arrangement and the look untouched.
  *   v1.1.0 — 2026-08-28 — The kind wording grows with the Book: look, motion and illustration
  *     join layout and fill in the search filter and the propose contract.
  *   v1.0.0 — 2026-08-28 — Initial (TARGET-074 phase 5, slice 1).
@@ -50,7 +53,7 @@ export function registerDesignbookTools(
         'aimeat_designbook_search',
         descriptionFor('aimeat_designbook_search'),
         {
-            kind: z.string().optional().describe('Only this part kind: "layout", "fill", "look", "motion" or "illustration".'),
+            kind: z.string().optional().describe('Only this part kind: "layout", "fill", "look", "motion", "illustration", "genre" or "ambient".'),
             status: z.string().optional().describe('Only this lifecycle state: proposed, published, aging or retired.'),
             q: z.string().optional().describe('A word matched against id, title, summary and tags.'),
             limit: z.number().optional().describe('Rows to return, 1-200. Default 50.'),
@@ -81,7 +84,7 @@ export function registerDesignbookTools(
         'aimeat_designbook_propose',
         descriptionFor('aimeat_designbook_propose'),
         {
-            part: z.record(z.string(), z.unknown()).describe('The part: { id, kind: "layout"|"fill"|"look"|"motion"|"illustration", title, summary, body, tags? }. The kind decides the body: a whole mosaic layout (layout/fill), { tokens, look? } (look), { tokens } of motion tokens only (motion), or { style, palette_words? } (illustration).'),
+            part: z.record(z.string(), z.unknown()).describe('The part: { id, kind: "layout"|"fill"|"look"|"motion"|"illustration"|"genre"|"ambient", title, summary, body, tags? }. The kind decides the body: a whole mosaic layout (layout/fill), { tokens, look? } (look), { tokens } of motion tokens only (motion), { style, palette_words? } (illustration), { template } naming a served genre template (genre), or { ambient: waves|aurora|dust|grid|static|ink, alpha?, speed?, look?, tokens? } (ambient — "none" is an arrangement\'s choice, never a part).'),
             ...aiProvenanceInputs,
         },
         annotationsFor('aimeat_designbook_propose'),
@@ -119,7 +122,9 @@ export function registerDesignbookTools(
                 ...out,
                 note: out.kind === 'fill'
                     ? 'Adopted. This part is a starting shape: its <placeholder> texts are yours to replace with aimeat_app_ui_set.'
-                    : 'Adopted. The app renders it on its next open; the replaced layout is archived and one restore brings it back.',
+                    : out.kind === 'ambient'
+                        ? 'Adopted. The ambient runs behind the app on its next open; its arrangement and look are untouched, and only the part\'s own tokens merged in.'
+                        : 'Adopted. The app renders it on its next open; the replaced layout is archived and one restore brings it back.',
             };
         }),
     );

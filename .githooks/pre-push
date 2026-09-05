@@ -1,0 +1,46 @@
+#!/bin/sh
+#
+# AIMEAT pre-push gate — the two things a push must not do to the other sessions, and nothing
+# slower than a boot.
+#
+#   1. Push behind origin. A rebase before the push is the rule; pushing from behind either fails
+#      or, with a force, deletes what a peer landed. The hook fetches and refuses when the local
+#      branch is behind origin/main.
+#   2. Push a tree that does not boot. Every static gate reads files; none of them loads the
+#      server. c932f2f17 (2026-09-04) passed them all and left origin/main unable to start, because
+#      its imports resolved only in the author's worktree. `pnpm boot:smoke` imports the boot path
+#      and refuses when a module throws at load.
+#
+# It also lists, for a Claude Code session, the commits about to go that carry no Session: trailer.
+#
+# WHAT IS NOT HERE, AND WHY (2026-09-05). For a few hours this hook also ran the whole unit suite
+# and the guard tier on both backends, fifteen minutes a push. A day of iterative work is twenty
+# commits and several pushes, and a push that costs a quarter of an hour turns a thirty-minute
+# change into a day; the developer's VS Code Sync Changes became a button that did nothing visible.
+# Those checks now live in `pnpm gate` (and `pnpm gate:full` with Postgres), run once when a piece
+# of work is finished, and in CI on every push, where they block a merge and nobody's afternoon.
+
+set -e
+ROOT="$(git rev-parse --show-toplevel)"
+REMOTE="$1"
+
+git fetch -q "$REMOTE" main 2>/dev/null || true
+BEHIND="$(git rev-list --count HEAD..refs/remotes/$REMOTE/main 2>/dev/null || echo 0)"
+if [ "$BEHIND" != "0" ]; then
+  echo "[pre-push] main is $BEHIND commit(s) behind $REMOTE/main: rebase first (git pull --rebase), then push." >&2
+  exit 1
+fi
+
+# One line per commit: hash, a tab, the Session value, a tab, the subject. The earlier odd/even
+# pairing of a two-line format shifted by one whenever the trailers block emitted an extra blank
+# line, and printed a trailer VALUE as if it were an unstamped commit (seen 2026-09-05). Only a
+# session is told: a person's commit has no session to name.
+UNSTAMPED="$(git log --format='%h%x09%(trailers:key=Session,valueonly,separator=%x20)%x09%s' "refs/remotes/$REMOTE/main..HEAD" 2>/dev/null | awk -F'\t' '$2=="" {print $1" "$3}')"
+if [ -n "$UNSTAMPED" ] && [ -n "$CLAUDECODE" ]; then
+  echo "[pre-push] commits without a Session: trailer (set AIMEAT_SESSION; see skill aimeat-dev-session):" >&2
+  echo "$UNSTAMPED" | sed 's/^/  /' >&2
+fi
+
+cd "$ROOT/aimeat"
+echo "[pre-push] boot smoke (the modules on the boot path load)…"
+pnpm -s boot:smoke

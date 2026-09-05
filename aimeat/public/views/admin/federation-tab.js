@@ -7,6 +7,7 @@
  * @structure FederationTab (default)
  * @usage Mounted by the admin dashboard tab router.
  * @version-history
+ *   v1.6.0 — 2026-09-05 — The emoji on headings and buttons go, and the heavy check and cross marks become ✓ and ✗: no emoji anywhere in the interface.
  *   v1.5.0 — 2026-09-01 — A peer with no verification key cannot be switched on, so the operator
  *     needs to see whether they have any: a "Without a key" tile and a line naming them, both shown
  *     only when the count is above zero.
@@ -318,7 +319,7 @@ export default function FederationTab({ data, reload }) {
     <!-- ═══ Join Genesis Network ═══ -->
     ${!livePeers.length && html`
       <div class="adm-card adm-mb-lg" style="border-left:3px solid #8b5cf6">
-        <h4 class="adm-mb-sm" style="margin:0">\u{1F91D} ${t('dashboard.fedJoinTitle')}</h4>
+        <h4 class="adm-mb-sm" style="margin:0">${t('dashboard.fedJoinTitle')}</h4>
         <p class="adm-text-dim adm-text-base adm-mb-md" style="margin:0">${t('dashboard.fedJoinExplain')}</p>
         <${ExpandableHelp} title=${t('dashboard.fedJoinHelpTitle')}>
           <p>${t('dashboard.fedJoinHelpDetail')}</p>
@@ -402,7 +403,7 @@ export default function FederationTab({ data, reload }) {
         </div>
         ${bookPrimary
           ? html`<button class="adm-btn-sm" onClick=${doRebuildBook}>↻ ${t('dashboard.fedBookRebuild')}</button>`
-          : html`<button class="adm-btn-sm" onClick=${doPullBook}>⬇ ${t('dashboard.fedBookPull')}</button>`}
+          : html`<button class="adm-btn-sm" onClick=${doPullBook}>${t('dashboard.fedBookPull')}</button>`}
       </div>
       ${!book || !book.nodes?.length
         ? html`<${Empty} text=${t('dashboard.fedBookEmpty')} />`
@@ -464,7 +465,7 @@ export default function FederationTab({ data, reload }) {
     <!-- ═══ Pending Peering Requests ═══ -->
     ${pendingRequests.length > 0 && html`
       <div class="adm-card adm-mt-lg" style="border-left:3px solid #f59e0b">
-        <h4 class="adm-mb-sm" style="margin:0">\u{1F514} ${t('dashboard.fedPendingRequestsTitle')}</h4>
+        <h4 class="adm-mb-sm" style="margin:0">${t('dashboard.fedPendingRequestsTitle')}</h4>
         <p class="adm-text-dim adm-text-base adm-mb-md" style="margin:0">${t('dashboard.fedPendingRequestsExplain')}</p>
         <${ExpandableHelp} title=${t('dashboard.fedPendingHelpTitle')}>
           <p>${t('dashboard.fedPendingHelpDetail')}</p>
@@ -486,8 +487,8 @@ export default function FederationTab({ data, reload }) {
               <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${escHtml(r.message || '\u2014')}</td>
               <td class="adm-text-dim">${dt(r.created_at)}</td>
               <td style="display:flex;gap:4px">
-                <button class="adm-btn-sm adm-btn-success" onClick=${() => doApprove(r.id)}>\u2714 ${t('dashboard.approve')}</button>
-                <button class="adm-btn-sm adm-text-error" onClick=${() => doReject(r.id)}>\u2718 ${t('dashboard.fedReject')}</button>
+                <button class="adm-btn-sm adm-btn-success" onClick=${() => doApprove(r.id)}>\u2713 ${t('dashboard.approve')}</button>
+                <button class="adm-btn-sm adm-text-error" onClick=${() => doReject(r.id)}>\u2717 ${t('dashboard.fedReject')}</button>
               </td>
             </tr>`)}
           </tbody>
@@ -497,7 +498,7 @@ export default function FederationTab({ data, reload }) {
 
     <!-- ═══ Live Peers ═══ -->
     <div class="adm-card adm-mt-lg">
-      <h4 class="adm-mb-sm" style="margin:0">\u{1F5A7} ${t('dashboard.fedLivePeersTitle')}</h4>
+      <h4 class="adm-mb-sm" style="margin:0">${t('dashboard.fedLivePeersTitle')}</h4>
       <p class="adm-text-dim adm-text-base adm-mb-md" style="margin:0">${t('dashboard.fedLivePeersExplain')}</p>
       <${ExpandableHelp} title=${t('dashboard.fedLivePeersHelpTitle')}>
         <p>${t('dashboard.fedLivePeersHelpDetail')}</p>
@@ -534,13 +535,13 @@ export default function FederationTab({ data, reload }) {
                   <button class="adm-btn-sm" onClick=${() => doActivate(p.node_id)}>\u25B6 ${t('dashboard.fedActivate')}</button>
                 `}
                 ${p.tier === 'visiting' && html`
-                  <button class="adm-btn-sm" title=${p.promotion_eligible ? t('dashboard.fedPromoteHint') : ((t('dashboard.fedPromoteNotEligible') || 'Not yet eligible') + (p.promotion_failing?.length ? ': ' + p.promotion_failing.join(', ') : ''))} onClick=${() => doPromote(p)}>${p.promotion_eligible ? '\u2B06' : '\u26A0'} ${t('dashboard.fedPromote')}</button>
+                  <button class="adm-btn-sm" title=${p.promotion_eligible ? t('dashboard.fedPromoteHint') : ((t('dashboard.fedPromoteNotEligible') || 'Not yet eligible') + (p.promotion_failing?.length ? ': ' + p.promotion_failing.join(', ') : ''))} onClick=${() => doPromote(p)}>${t('dashboard.fedPromote')}</button>
                 `}
                 ${(p.status === 'active' || p.status === 'degraded') && html`
                   <button class="adm-btn-sm" onClick=${() => doRemove(p.node_id)}>${t('dashboard.fedDepeer')}</button>
                 `}
                 ${(p.status === 'active' || p.status === 'degraded' || p.status === 'offline' || p.status === 'depeering') && html`
-                  <button class="adm-btn-sm adm-text-error" onClick=${() => doEmergencyRemove(p.node_id)}>\u26A0 ${t('dashboard.fedEmergencyDepeer')}</button>
+                  <button class="adm-btn-sm adm-text-error" onClick=${() => doEmergencyRemove(p.node_id)}>${t('dashboard.fedEmergencyDepeer')}</button>
                 `}
               </td>
             </tr>`)}
@@ -552,7 +553,7 @@ export default function FederationTab({ data, reload }) {
     <!-- ═══ Peering Request History ═══ -->
     ${historyRequests.length > 0 && html`
       <div class="adm-card adm-mt-lg">
-        <h4 class="adm-mb-sm" style="margin:0">\u{1F4DC} ${t('dashboard.fedRequestHistoryTitle')}</h4>
+        <h4 class="adm-mb-sm" style="margin:0">${t('dashboard.fedRequestHistoryTitle')}</h4>
         <div class="scrollable"><table>
           <thead><tr>
             <th>${t('dashboard.fedReqId')}</th>
@@ -569,7 +570,7 @@ export default function FederationTab({ data, reload }) {
               <td class="mono adm-text-sm">${escHtml(r.from_node_url || r.target_url || '\u2014')}</td>
               <td>${statusBadge(r.status)}</td>
               <td class="adm-text-dim">${dt(r.created_at)}</td>
-              <td><button class="adm-btn-sm adm-text-error" onClick=${() => doDeleteRequest(r.id)}>\u2718</button></td>
+              <td><button class="adm-btn-sm adm-text-error" onClick=${() => doDeleteRequest(r.id)}>\u2717</button></td>
             </tr>`)}
           </tbody>
         </table></div>
@@ -578,7 +579,7 @@ export default function FederationTab({ data, reload }) {
 
     <!-- ═══ Add Peer Directly ═══ -->
     <div class="adm-card adm-mt-lg">
-      <h4 class="adm-mb-sm" style="margin:0">\u2795 ${t('dashboard.fedAddPeerTitle')}</h4>
+      <h4 class="adm-mb-sm" style="margin:0">${t('dashboard.fedAddPeerTitle')}</h4>
       <p class="adm-text-dim adm-text-base adm-mb-md" style="margin:0">${t('dashboard.fedAddPeerExplain')}</p>
       <${ExpandableHelp} title=${t('dashboard.fedAddPeerHelpTitle')}>
         <p>${t('dashboard.fedAddPeerHelpDetail')}</p>
@@ -593,7 +594,7 @@ export default function FederationTab({ data, reload }) {
 
     <!-- ═══ Test Federation Readiness ═══ -->
     <div class="adm-card adm-mt-lg">
-      <h4 class="adm-mb-sm" style="margin:0">\u{1F50D} ${t('dashboard.fedTestTitle')}</h4>
+      <h4 class="adm-mb-sm" style="margin:0">${t('dashboard.fedTestTitle')}</h4>
       <p class="adm-text-dim adm-text-base adm-mb-md" style="margin:0">${t('dashboard.fedTestExplain')}</p>
       <${ExpandableHelp} title=${t('dashboard.fedTestHelpTitle')}>
         <p>${t('dashboard.fedTestHelpDetail')}</p>
@@ -605,12 +606,12 @@ export default function FederationTab({ data, reload }) {
       ${testResult && html`
         <div class="adm-card adm-mt-sm" style="background:var(--bg-card-inner, rgba(0,0,0,.15))">
           ${testResult.error
-            ? html`<p class="adm-text-error">\u2718 ${escHtml(testResult.error)}</p>`
+            ? html`<p class="adm-text-error">\u2717 ${escHtml(testResult.error)}</p>`
             : html`
               <${EconRow} label=${t('dashboard.fedTestTarget')} value=${escHtml(testResult.target_url || '\u2014')} />
-              <${EconRow} label=${t('dashboard.fedTestReady')} value=${testResult.ready ? '\u2714 Yes' : '\u2718 No'} />
+              <${EconRow} label=${t('dashboard.fedTestReady')} value=${testResult.ready ? '\u2713 Yes' : '\u2717 No'} />
               ${testResult.checks && Object.entries(testResult.checks).map(([k, v]) => html`
-                <${EconRow} label=${escHtml(k)} value=${v.passed ? '\u2714 ' + escHtml(v.detail) : '\u2718 ' + escHtml(v.detail)} />
+                <${EconRow} label=${escHtml(k)} value=${v.passed ? '\u2713 ' + escHtml(v.detail) : '\u2717 ' + escHtml(v.detail)} />
               `)}
               <${EconRow} label=${t('dashboard.fedTestTime')} value=${dt(testResult.tested_at)} />
             `
@@ -621,7 +622,7 @@ export default function FederationTab({ data, reload }) {
 
     <!-- ═══ Federation Bus — Features Overview ═══ -->
     <div class="adm-card adm-mt-lg">
-      <h4 class="adm-mb-sm" style="margin:0">\u{1F680} ${t('dashboard.fedBusTitle')}</h4>
+      <h4 class="adm-mb-sm" style="margin:0">${t('dashboard.fedBusTitle')}</h4>
       <p class="adm-text-dim adm-text-base adm-mb-md" style="margin:0">${t('dashboard.fedBusExplain')}</p>
 
       <${ExpandableHelp} title=${t('dashboard.fedBusHeartbeatTitle')}>
@@ -663,7 +664,7 @@ export default function FederationTab({ data, reload }) {
 
     <!-- ═══ API Reference ═══ -->
     <div class="adm-card adm-mt-lg">
-      <h4 class="adm-mb-sm" style="margin:0">\u{1F4D6} ${t('dashboard.fedApiRefTitle')}</h4>
+      <h4 class="adm-mb-sm" style="margin:0">${t('dashboard.fedApiRefTitle')}</h4>
       <${ExpandableHelp} title=${t('dashboard.fedApiRefHelpTitle')}>
         <div class="adm-text-base" style="line-height:1.6">
           <p><strong>Peer Management</strong></p>
@@ -700,7 +701,7 @@ export default function FederationTab({ data, reload }) {
     <!-- ═══ De-peering Info ═══ -->
     ${depeeringPeers.length > 0 && html`
       <div class="adm-card adm-mt-lg" style="border-left:3px solid #ef4444">
-        <h4 class="adm-mb-sm" style="margin:0">\u26A0 ${t('dashboard.fedDepeeringTitle')}</h4>
+        <h4 class="adm-mb-sm" style="margin:0">${t('dashboard.fedDepeeringTitle')}</h4>
         <p class="adm-text-dim adm-text-base adm-mb-md" style="margin:0">${t('dashboard.fedDepeeringExplain')}</p>
         ${depeeringPeers.map(p => html`
           <${EconRow} label=${escHtml(p.node_id)} value=${t('dashboard.fedDepeeringGrace') + ': ' + (p.depeer_grace_end ? dt(p.depeer_grace_end) : '\u2014')} />

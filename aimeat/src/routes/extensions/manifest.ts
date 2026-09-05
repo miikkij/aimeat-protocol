@@ -5,6 +5,9 @@
  * @description Shared extension-manifest validator/builder — validates a YAML manifest + scripts map
  *   and builds the ExtensionRecord it describes. Extracted from src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 — 2026-09-05 — A manifest may declare `workspace: { read: bool, write: bool }`, which is
+ *                         what makes `ctx.workspace` exist in the sandbox. Validated here and stored
+ *                         as `config.__workspace`, a key the manifest's own `config:` cannot set.
  *   v1.5.0 — 2026-08-10 — config.app must name the installer's own app, and a manifest price and
  *                         toll are bounded. Naming somebody else's app made a private roster a
  *                         per-call oracle; "non-negative integer" admitted 2^31 as a price.
@@ -27,6 +30,7 @@ import type { ExtensionRecord } from '../../storage/interface.js';
 import { parse as parseYaml } from 'yaml';
 import { SECRET_KEYS_FIELD, computeManifestSecretKeys, stripClientEncryptedValues } from '../../services/extension-secrets.js';
 import { MONEY_CURRENCIES } from '../../commerce/money.js';
+import { WORKSPACE_DECLARATION_KEY, type WorkspaceDeclaration } from '../../services/extension-workspace-declaration.js';
 
 /** Discriminated result of validating an extension install/upsert payload. */
 export type ExtBuildResult =
@@ -359,6 +363,28 @@ export function buildExtensionRecordFromManifest(
     }
   }
 
+  // `workspace: { read, write }` is what makes ctx.workspace exist in the sandbox — the
+  // extension acting on its CALLER's organism workspace. Declared at the top level, never inside
+  // `config:`, and stored under a __-prefixed key so a config block cannot grant it to itself.
+  let workspaceDecl: WorkspaceDeclaration | undefined;
+  if (manifest.workspace !== undefined) {
+    const w = manifest.workspace;
+    if (typeof w !== 'object' || w === null || Array.isArray(w)) {
+      return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: 'workspace must be a map with read and/or write booleans, e.g. workspace: { read: true, write: true }' };
+    }
+    const decl = w as Record<string, unknown>;
+    for (const field of ['read', 'write'] as const) {
+      if (decl[field] !== undefined && typeof decl[field] !== 'boolean') {
+        return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: `workspace.${field} must be a boolean, got ${describeYamlValue(decl[field])}` };
+      }
+    }
+    const unknown = Object.keys(decl).filter(k => k !== 'read' && k !== 'write');
+    if (unknown.length) {
+      return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: `workspace declares unknown field(s) ${unknown.join(', ')}; only read and write exist` };
+    }
+    if (decl.read === true || decl.write === true) workspaceDecl = { read: decl.read === true, write: decl.write === true };
+  }
+
   for (const [scriptKey, scriptContent] of Object.entries(scripts)) {
     const sizeKb = Buffer.byteLength(scriptContent, 'utf8') / 1024;
     if (sizeKb > config.extensionMaxCodeSizeKb) {
@@ -467,6 +493,7 @@ export function buildExtensionRecordFromManifest(
           )
         : {}),
       ...(manifestSchedules ? { __schedules: manifestSchedules } : {}),
+      ...(workspaceDecl ? { [WORKSPACE_DECLARATION_KEY]: workspaceDecl } : {}),
       // Record which config fields are `type: 'secret'` so the route can encrypt their values
       // at rest and the runtime can decrypt before the VM (the descriptor type is otherwise
       // lost by the flatten above). See services/extension-secrets.ts.

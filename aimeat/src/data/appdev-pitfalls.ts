@@ -12,6 +12,9 @@
  *   getAppdevPitfalls() / getAppdevPitfallIndex() / getAppdevPitfallFacets() — accessors.
  * @usage import { getAppdevPitfalls, getAppdevPitfallIndex } from '../data/appdev-pitfalls.js';
  * @version-history
+ *   v1.6.0 — 2026-09-05 — +atelier-register, the id the register gate's refusal carries: an
+ *     Atelier app that names no committed look (no `aimeat-register` meta, or the shell's
+ *     REPLACE-ME placeholder) does not publish. The bare shell is a frame, not a page.
  *   v1.5.0 — 2026-08-27 — +track-mixing, the id the four track-separation findings in the publish
  *     artifact check carry (TARGET-074: Classic and Atelier have separate guides that never mix).
  *   v1.4.0 — 2026-08-25 — +one-file-past-a-megabyte. The first entry here about what an app
@@ -114,6 +117,16 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     severity: 'warn',
     source: 'curated',
     updatedAt: '2026-08-27',
+  }),
+  E({
+    id: 'atelier-register',
+    title: 'An Atelier app that never chose a look',
+    symptom: 'The app is the bare shell with words in it: stacked sections in the default look, the same page every other app built that way has. Publishing REFUSES this (APP_ARTIFACT_BROKEN): an Atelier app with no `aimeat-register` meta in its head, or with the shell\'s REPLACE-ME placeholder still there, does not go live.',
+    fix: 'Start from a genre, never from the bare shell. `GET /v1/designbook?kind=genre` lists the committed registers and `GET /v1/app-templates/genre-<id>` hands over the whole page; every genre already carries `<meta name="aimeat-register" content="genre-<id>">`, so a fork passes the gate by construction. Swap the words, sources and images for the app at hand and keep the physics. A page that commits to a look of its own names it: `<meta name="aimeat-register" content="custom:<name>">`, where the name says what the register is (custom:game, custom:ledger), never "default". The bare shell is a frame, not a page.',
+    appliesTo: ['app', 'publish'],
+    severity: 'critical',
+    source: 'curated',
+    updatedAt: '2026-09-05',
   }),
   E({
     id: 'namespace-rule',

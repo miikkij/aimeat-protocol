@@ -7,6 +7,12 @@
  *   process/port waiting, server start and stop.
  * @usage Imported by test/run-e2e-ci.ts. Not a suite; it runs nothing on its own.
  * @version-history
+ *   v1.2.0 -- 2026-09-05 -- Two more pins: the login rate limit (e2e-auth-lib tripped it at random
+ *            once the tarpit stopped spacing its logins out) and the MCP idle-sweep interval (1 s,
+ *            so e2e-mcp-session-expiry proves a 6 s reap in 8 s rather than 18). And lanes:
+ *            laneTarget() derives a second node's target (own port, sibling SQLite file or sibling
+ *            Postgres database) and ensureDatabase() creates that database, for the runner's
+ *            --workers.
  *   v1.1.0 -- 2026-09-04 -- A Postgres cleanup failure throws instead of warning. The SQLite branch
  *            already threw for the identical situation, and said why: continuing hands the next
  *            suite the previous suite's data, which arrives later as unexplained 403s. The softer
@@ -85,6 +91,55 @@ export function resolveTarget(): RunnerTarget {
  * writes a thousand keys is not a claim about what an app may do, and tightening a limit here would
  * change what suites measure rather than make them deterministic.
  */
+/**
+ * A second, third… node for a parallel lane of the same run: the same backend and pins, its own port
+ * and its own database, so what one lane writes no other lane can read. SQLite gets a sibling file;
+ * Postgres gets a sibling DATABASE (`<name>_w<lane>`, see ensureDatabase), because the cleanup is a
+ * TRUNCATE of every table in `public` and two nodes on one database would empty each other.
+ */
+export function laneTarget(base: RunnerTarget, lane: number, port: string): RunnerTarget {
+    const dbUrl = base.dbUrl ? withDatabaseSuffix(base.dbUrl, `_w${lane}`) : '';
+    return {
+        ...base,
+        port,
+        baseUrl: `http://localhost:${port}`,
+        dbPath: base.dbPath.replace(/(\.db)?$/, `.w${lane}$1`),
+        dbUrl,
+    };
+}
+
+function withDatabaseSuffix(dbUrl: string, suffix: string): string {
+    const u = new URL(dbUrl);
+    const name = u.pathname.replace(/^\//, '');
+    u.pathname = `/${name}${suffix}`;
+    return u.toString();
+}
+
+/**
+ * Make sure a lane's Postgres database exists, creating it beside the base one when it does not.
+ * The node runs its migrations on boot, so an empty database is all a lane needs. Needs CREATEDB on
+ * the role; the CI service user is the superuser, and a local role without it gets the error with
+ * the fix in it rather than a lane that fails one suite later for want of a table.
+ */
+export async function ensureDatabase(base: RunnerTarget, lane: RunnerTarget): Promise<void> {
+    if (lane.dbType !== 'postgres-kysely' || !lane.dbUrl || lane.dbUrl === base.dbUrl) return;
+    const pg = (await import('pg')).default;
+    const name = new URL(lane.dbUrl).pathname.replace(/^\//, '');
+    const client = new pg.Client(base.dbUrl);
+    await client.connect();
+    try {
+        const exists = await client.query('SELECT 1 FROM pg_database WHERE datname = $1', [name]);
+        if (exists.rowCount === 0) {
+            // A database name cannot be a bind parameter; it comes from our own suffix rule above.
+            await client.query(`CREATE DATABASE "${name.replace(/"/g, '""')}"`);
+        }
+    } catch (error) {
+        throw new Error(`Could not create the lane database ${name}: ${(error as Error).message}. Grant CREATEDB to the role in DATABASE_URL, create it by hand, or run with --workers=1.`, { cause: error });
+    } finally {
+        await client.end();
+    }
+}
+
 export function pinnedEnv(target: RunnerTarget): Record<string, string> {
     return {
         AIMEAT_PORT: target.port,
@@ -127,6 +182,14 @@ export function pinnedEnv(target: RunnerTarget): Record<string, string> {
         // against — hence their 429-retry loops. Pin it like the other limiters so a suite adding
         // one more account does not cascade into unrelated failures. No suite asserts this 429.
         AIMEAT_REGISTRATION_RATE_LIMIT_MAX: process.env.AIMEAT_REGISTRATION_RATE_LIMIT_MAX ?? '1000',
+        // Login is limited to 15 per 60 s by default. The tarpit used to space logins out so far that
+        // no suite ever reached that ceiling; with AIMEAT_LOGIN_TARPIT_STEP_MS=100 (b5367044a)
+        // e2e-auth-lib signs in 33 times in 18 s and failed 2 of 33 on the limiter, at random.
+        // e2e-auth-tarpit asserts the limiter's own behaviour on a node it boots itself (line 73).
+        AIMEAT_LOGIN_RATE_LIMIT_MAX: process.env.AIMEAT_LOGIN_RATE_LIMIT_MAX ?? '1000',
+        // The MCP idle sweep runs every 10 s in production. e2e-mcp-session-expiry proves a 6 s
+        // idle reap and had to sleep 18 s for it, twice; at 1 s the same proof takes 8.
+        AIMEAT_MCP_SESSION_SWEEP_MS: process.env.AIMEAT_MCP_SESSION_SWEEP_MS ?? '1000',
         AIMEAT_DEFAULT_AGENT_SCOPES: process.env.AIMEAT_DEFAULT_AGENT_SCOPES ?? '*',
         // Outbound door daily limit kept small so e2e-outbound can actually reach the 429
         // without sending two hundred messages (default in prod code is 200).
@@ -462,9 +525,10 @@ export async function cleanDatabase(target: RunnerTarget): Promise<void> {
 function waitForExit(child: ChildProcess, timeoutMs: number): Promise<boolean> {
     if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve(true);
     return new Promise((settle) => {
-        let timer: NodeJS.Timeout;
-        const onExit = () => { clearTimeout(timer); settle(true); };
-        timer = setTimeout(() => { child.off('exit', onExit); settle(false); }, timeoutMs);
+        // A declaration, so the timer can be named before it exists: exit cannot fire before the
+        // listener below is attached, and by then the timer is set.
+        function onExit(): void { clearTimeout(timer); settle(true); }
+        const timer = setTimeout(() => { child.off('exit', onExit); settle(false); }, timeoutMs);
         child.once('exit', onExit);
     });
 }

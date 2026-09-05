@@ -26,6 +26,15 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.22.0 — 2026-09-05 — THE REGISTER IS REQUIRED: the first move of a build is the genre fork,
+ *     the shell paragraph says the shell is a frame that the publish refuses as served, and the
+ *     genre section names the `aimeat-register` meta every genre carries and `custom:<name>` for
+ *     a page that commits to its own look.
+ *   v1.21.0 — 2026-09-05 — THE AMBIENT: the one layer allowed to move at idle, taught after the
+ *     look (wish-atelier-ambient-visuals) — the six presets rendered from the ambient registry
+ *     (feel, evokes, fits, the whisper rule), app({ ambient }) and the stored arrangement's
+ *     field, the physics exception with its stops, and the Book's AMBIENT shelf; the genre
+ *     section's zero-idle sentence names the exception; the Book section says seven kinds.
  *   v1.20.0 — 2026-09-02 — A game starts from shell-phaser-game; the prompt says so under the
  *     shell line.
  *   v1.19.0 — 2026-09-02 — The motion paragraph names the spring hand: a look carries its own
@@ -95,6 +104,7 @@ import type { AimeatConfig } from '../config.js';
 import { LOOKS as LOOK_REGISTRY } from '../data/atelier-looks.js';
 import { getAppTemplateIndex } from '../data/app-templates.js';
 import { PATTERNS } from '../data/atelier-patterns.js';
+import { AMBIENTS } from '../data/atelier-ambients.js';
 
 /** Slot the publish gate's token is substituted into (mirrors build-app-prompt.ts). */
 const SPEC_TOKEN_SLOT = '{{aimeat_spec_token}}';
@@ -107,7 +117,7 @@ const SPEC_TOKEN_SLOT = '{{aimeat_spec_token}}';
 export const ATELIER_COMPONENTS: ReadonlyArray<{ id: string; summary: string; example: string }> = [
   {
     id: 'app',
-    summary: 'The shell that carries the whole ceremony: login pill + boot, language re-render, designed loading/empty/error/sign-in states, the only scrolling region, the bottom chrome reserve. Fill handle.main; switch states with handle.status().',
+    summary: 'The shell that carries the whole ceremony: login pill + boot, language re-render, designed loading/empty/error/sign-in states, the only scrolling region, the bottom chrome reserve, and the ambient layer behind the frame (the look decides; `ambient` names a preset, `{ preset, alpha, speed }`, or `false`). Fill handle.main; switch states with handle.status().',
     example: "var a = AIMEAT.atelier.app({ title: 'Errands', look: 'vivid', onReady: function (s) { render(a, s); } });",
   },
   {
@@ -214,6 +224,19 @@ function renderLooks(): string {
   return ATELIER_LOOKS.map((l) => `- \`${l.id}\` — ${l.feel}. Imagery style: ${l.imagery}.`).join('\n');
 }
 
+/**
+ * The ambient shelf — DERIVED from the ambient registry (src/data/atelier-ambients.ts), the same
+ * source the kit's renderers are pinned to and the mosaic catalogue reads, so the prompt and the
+ * layer cannot drift apart.
+ */
+export const ATELIER_AMBIENTS: ReadonlyArray<{ id: string; feel: string; evokes: string; fits: string[]; defaultAlpha: number; proof: string }> =
+  AMBIENTS.map((a) => ({ id: a.id, feel: a.feel, evokes: a.evokes, fits: a.fitsLooks, defaultAlpha: a.defaultAlpha, proof: a.proof }));
+
+function renderAmbients(): string {
+  return ATELIER_AMBIENTS.map((a) => `- \`${a.id}\` — ${a.feel} Evokes: ${a.evokes} Fits: ${a.fits.join(', ')}. Ships at alpha ${a.defaultAlpha}${
+    a.proof === 'field' ? ' (the whisper; a look that owns its ground may run it louder)' : ' (points and lines, any look)'}.`).join('\n');
+}
+
 export interface AtelierPromptOptions {
   lang?: string;
   mode?: 'new' | 'improve';
@@ -231,12 +254,24 @@ function composeBody(config: AimeatConfig): string {
     + '/v1/prompts/build-app, whose vocabulary (daisyUI classes, hand-written boilerplate) does '
     + 'not apply here. The app declares `<meta name="aimeat-track" content="atelier">` so a '
     + 'later session loads the right guide.\n\n';
-  body += 'Start from the shell — fetch it, never invent the structure:\n\n'
+  body += 'THE FIRST MOVE OF THE BUILD IS THE GENRE FORK. An app here starts from a committed '
+    + 'register, never from the bare shell: list the genres with `GET ' + base
+    + '/v1/designbook?kind=genre`, fork the one that carries the page\'s register with `GET ' + base
+    + '/v1/app-templates/genre-<id>`, and swap the words, sources and images (the genre section '
+    + 'below has the menu). Every Atelier app declares the register it committed to — '
+    + '`<meta name="aimeat-register" content="genre-<id>">`, which every genre already carries, '
+    + 'or `custom:<name>` for a page that commits to a look of its own — and the publish REFUSES '
+    + 'an Atelier app that names none.\n\n';
+  body += 'The shell is the frame the genres are built on — fetch it to learn the structure, '
+    + 'never invent it:\n\n'
     + '```\n'
     + `GET ${base}/v1/app-templates/shell-atelier\n`
     + '```\n\n'
+    + 'It carries a REPLACE-ME register line on purpose, so published as it is served it is '
+    + 'refused: the shell is a frame, not a page. '
     + 'A GAME starts from the game shell instead: the same frame with a Phaser canvas, a title '
-    + 'menu, pause, settings and a leaderboard already wired through aimeat-phaser:\n\n'
+    + 'menu, pause, settings and a leaderboard already wired through aimeat-phaser, and its '
+    + 'register is the canvas (`custom:game`):\n\n'
     + '```\n'
     + `GET ${base}/v1/app-templates/shell-phaser-game\n`
     + '```\n\n';
@@ -339,12 +374,20 @@ function composeBody(config: AimeatConfig): string {
   // THE GENRES — rendered from the template registry, never hand-listed (the surface-layout
   // lesson: a hand-written menu drifts and the builder reads the refusal as a broken AI).
   const genres = getAppTemplateIndex().filter((t) => t.kind === 'genre');
-  body += '## Or start from a GENRE — a complete committed register\n\n';
-  body += 'When the owner wants the app to LOOK LIKE SOMETHING — a poster, a console, a departure '
-    + 'board — do not assemble blocks: FORK A GENRE. Each genre is a finished free-composition '
+  body += '## Start from a GENRE — a complete committed register, and the register is required\n\n';
+  body += 'Every Atelier app names the register it committed to, and the publish refuses one that '
+    + 'does not: `<meta name="aimeat-register" content="genre-<id>">` is in every genre\'s head '
+    + 'already, so a fork carries it; a page that commits to a look of its own declares '
+    + '`<meta name="aimeat-register" content="custom:<name>">`, where the name says what the '
+    + 'register is (custom:game, custom:ledger) and is never "default". The bare shell carries a '
+    + 'REPLACE-ME line in that place, and the gate refuses it as served: the shell is a frame, '
+    + 'not a page.\n\n';
+  body += 'Whatever the app is — a poster, a console, a departure board, a ledger — do not '
+    + 'assemble blocks: FORK A GENRE. Each genre is a finished free-composition '
     + 'page in a committed register; fetch it with `GET ' + base + '/v1/app-templates/<id>`, swap '
     + 'the words, sources and images for the app at hand, and KEEP THE PHYSICS (finite entrances, '
-    + 'motion only under the hand or the scroll, zero idle repaints, reduced-motion honesty). '
+    + 'motion only under the hand or the scroll, zero idle repaints — the look\'s ambient layer is '
+    + 'the one declared exception — reduced-motion honesty). '
     + 'The kit\'s scenic props (`flapify`, `ransom`, `vu`, `typeout`, `dealIn`, the `.ak-stamp` / '
     + '`.ak-ticker` / `.ak-torn` / `.ak-polaroid` family), the MATERIALS (one class per surface: '
     + '`.ak-mat--glass`, `--aurora`, `--grain`, `--ink`, `--signal`, `--ring`, `--spot`) and the '
@@ -398,6 +441,33 @@ function composeBody(config: AimeatConfig): string {
     + 'the `--ak-*` tokens (every preset × palette × mode combination is verified arithmetically '
     + 'on this node), motion comes from the components, and the login pill owns the theme, '
     + 'palette and language controls.\n\n';
+
+  body += '## The ambient: the one layer allowed to move at idle\n\n';
+  body += 'Everything the components render repaints zero times at idle; the AMBIENT is the one '
+    + 'declared exception — a single layer behind the app that moves on its own, the way the '
+    + 'PlayStation 3\'s wave moved behind a menu that did nothing. THE LOOK DECIDES: each look '
+    + 'names its ambient or none (lounge runs the wave, dawn the aurora, stage the dust, '
+    + 'neon-dense and terminal the floor grid, broadcast the static; every other look runs none), '
+    + 'and the kit mounts it for you. Override only when the owner asked for weather: '
+    + '`app({ ambient: \'dust\' })` or `app({ ambient: { preset, alpha, speed } })`; '
+    + '`app({ ambient: false })`, or `ambient: { preset: "none" }` on a stored arrangement, '
+    + 'switches the look\'s own off. The layer earns its exception by keeping the physics: it '
+    + 'pauses on a hidden tab and off-screen, stands still under the bar\'s Less-motion switch '
+    + 'and under the operating system\'s reduced motion, and the viewer\'s weather switch (Off, '
+    + 'Calm, Full) always wins. The layer is the kit\'s, chosen by preset — a background '
+    + 'animation of your own would be a second exception nobody proved.\n\n';
+  body += 'The six, described for choosing. A FIELD lays pigment under the words and is proven '
+    + 'readable by the contrast matrix at its alpha: on a look that stands on the palette\'s own '
+    + 'page it runs only at the whisper it ships at, while a look that owns its ground (lounge, '
+    + 'dawn, stage, broadcast) takes it louder. Points and lines carry no ground and fit any look.'
+    + '\n\n';
+  body += renderAmbients() + '\n\n';
+  body += 'One per app, and a tool someone lives in usually wants none. `ambientStage()` gives one '
+    + 'section its own weather; `weather()` is the visible control; `attract()` dims the working '
+    + 'surface and lets the layer rise after a while without a hand. The Book has an AMBIENT '
+    + 'shelf: `aimeat_designbook_search` with kind `ambient` finds proven combinations, adopting '
+    + 'one merges it into the app\'s arrangement (the look stays), and a combination worth keeping '
+    + 'is proposed back the same way.\n\n';
 
   body += '## Motion, and the moment something needs the eye\n\n';
   body += 'Entrances, live-change repaints and the hover greeting are the components\' own work: '
@@ -459,10 +529,12 @@ function composeBody(config: AimeatConfig): string {
   body += 'Before composing a screen from nothing, search the Design Book '
     + '(`aimeat_designbook_search`, or GET /v1/designbook): it holds PROVEN parts — every one '
     + 'passed its own bench before landing, and adopting one (`aimeat_designbook_adopt`) is one '
-    + 'call. Five kinds: a `layout` (a complete arrangement) or `fill` (a starting shape with '
+    + 'call. Seven kinds: a `layout` (a complete arrangement) or `fill` (a starting shape with '
     + '<placeholder> slots) REPLACES the app\'s arrangement; a `look` (a signature token sheet, '
-    + 'colour pair included), `motion` (a motion recipe) or `illustration` (art direction for '
-    + 'the imagery) MERGES into the arrangement the app already has. A starting shape from the '
+    + 'colour pair included), `motion` (a motion recipe), `illustration` (art direction for '
+    + 'the imagery) or `ambient` (the layer behind the app, proven on its look) MERGES into the '
+    + 'arrangement the app already has; a `genre` (a complete page in a committed register) is '
+    + 'forked from its template, never adopted. A starting shape from the '
     + 'Book plus your words beats a fresh composition, and when you make something worth '
     + 'keeping, propose it back (`aimeat_designbook_propose`) so the next build starts where '
     + 'you finished.\n\n';

@@ -35,7 +35,20 @@ ctx.memory.search(prefix)       → searches ext:{name} namespace
 ctx.memory.delete(key)          → deletes from ext:{name} namespace
 ctx.memory.getPublic(ns, key)   → reads from ANY namespace (cross-read, public only)
 ctx.fetch(url, opts)            → HTTP to external APIs
+ctx.workspace.{index,get,write,writeDoc,publish}
+                                → the CALLER's organism workspace, as the caller, through the same
+                                  operations aimeat_workspace_read/_write/_publish run; present only
+                                  when the manifest declares `workspace: { read, write }` and a real
+                                  caller invoked the action (never on a scheduled run)
 ```
+
+`ctx.workspace` is the one road from the sandbox into a namespace that is not `ext:`, and it is not a
+hole in the fence above: nothing is read or written under the extension's own authority. The caller's
+membership, the creator's contributor grant, the caller's scopes (`memory:write` to write or publish,
+`organism:read` to read; an owner session needs neither), the space's locked schema and the publish
+gate all apply exactly as they do on the MCP tools, and every refusal reaches the script as a thrown
+`CODE: message`. The service is `src/services/workspace-tool-ops.ts`; the sandbox binding is
+`src/services/extension-workspace.ts`.
 
 ### Anything you COUNT needs `ifVersion`
 

@@ -30,6 +30,14 @@
  *   if (outcome === 'online') { const { status, body } = await client.forward('GET', '/v1/memory'); }
  *   await client.close();
  * @version-history
+ *   2026-09-05 — A frame for an identity this socket no longer holds goes NOWHERE. `handlersFor`
+ *     fell back to the opener's handlers for any name not in the map, and the 401 eviction removed a
+ *     name from the map without telling the node, which kept pushing — so an evicted agent's next
+ *     task was filed on the opener's channel, queued under the wrong agent, run, and acked as
+ *     received. Two owners on one daemon share a socket, so that crossed an ownership boundary. The
+ *     client now knows its own gaii (`opts.gaii`), drops a frame for a name it does not hold, sends
+ *     `detach` on eviction, and no longer stops the whole client on a straggling 401 for an
+ *     already-evicted name. Found by an adversarial review, verified link by link.
  *   2026-09-04 — "No stored token" is no longer said about an agent whose key is fine. A credential
  *     that could not be MINTED right now throws (agent-key.ts `MintFailedError`) where a missing
  *     one still answers null, so a busy node degrades an agent to direct HTTP and retries instead
@@ -479,9 +487,36 @@ export class ConnectTunnelClient {
    * means this client's own `opts`. A node older than 2026-09-03 stamps nothing, so every frame
    * lands on `opts` and the multiplex path is simply never taken.
    */
-  private handlersFor(frame: TunnelFrame): Pick<ConnectTunnelClientOptions, 'onDeliver' | 'onInvoke' | 'onBacklog' | 'onAuthFailure'> {
+  /**
+   * Whose handlers a frame goes to, or NULL when it names an identity this socket no longer holds.
+   *
+   * IT USED TO FALL BACK TO THE OPENER. `(identities.get(gaii)) || this.opts` cannot tell "this
+   * frame names the socket's own identity" from "this frame names one I evicted": both miss the map
+   * and both landed on `this.opts`, the handlers of whoever opened the socket. The node stamps
+   * every outbound frame with the principal it is for and keeps pushing until told to detach, so
+   * after an attached agent's credential died, its next task arrived here stamped with its name,
+   * missed the map, and was filed on the OPENER's channel — queued for `/local/tasks/next` under
+   * the wrong agent, its runner launched, and the auto-ack telling the node the right agent had it.
+   * With two owners on one daemon that is a task crossing an ownership boundary. Found by an
+   * adversarial review on 2026-09-05, verified link by link.
+   *
+   * THE THREE CASES, in order. A frame with no `agent` is a legacy node's and is the socket's own.
+   * A frame naming my own gaii is mine. A frame naming an attached identity is that identity's.
+   * Anything else names an identity this socket does not hold, and the only correct thing to do
+   * with it is nothing: dropped, logged, never handed to somebody else's handlers.
+   */
+  private handlersFor(frame: TunnelFrame): Pick<ConnectTunnelClientOptions, 'onDeliver' | 'onInvoke' | 'onBacklog' | 'onAuthFailure'> | null {
     const gaii = typeof frame.agent === 'string' ? frame.agent : '';
-    return (gaii && this.identities.get(gaii)) || this.opts;
+    if (!gaii) return this.opts;
+    if (this.opts.gaii && gaii === this.opts.gaii) return this.opts;
+    const attached = this.identities.get(gaii);
+    if (attached) return attached;
+    // A client built without its own gaii cannot distinguish the second case from the fourth, so it
+    // keeps the old behaviour for the socket's own frames — which is every frame from a node that
+    // never learnt to stamp. The hub and the private socket both set it, so this is the legacy path.
+    if (!this.opts.gaii) return this.opts;
+    console.error(`[${this.label}] frame for ${gaii}, which this socket does not hold — dropped, not delivered to somebody else`);
+    return null;
   }
 
   private handleFrame(frame: TunnelFrame): void {
@@ -513,8 +548,18 @@ export class ConnectTunnelClient {
           const att = who ? this.identities.get(who) : undefined;
           const msg = `Forwarded request returned ${frame.status} ${errCode || 'UNAUTHORIZED'}`;
           if (att) {
-            this.identities.delete(who);
+            // detachIdentity, NOT identities.delete. Deleting only here left the NODE holding the
+            // principal on this socket and pushing its deliveries down it, stamped with a name
+            // this client no longer knew — and those frames fell back onto the opener's handlers.
+            // A detach frame tells the node to stop, which is the half that was missing.
+            this.detachIdentity(who);
             try { att.onAuthFailure?.(msg); } catch (err) { console.error(`[${this.label}] onAuthFailure handler error: ${(err as Error).message}`); }
+          } else if (who && this.opts.gaii && who !== this.opts.gaii) {
+            // A 401 for an identity this socket does not hold — a straggler for one already
+            // evicted, racing the detach. Before this it took the branch below and STOPPED THE
+            // WHOLE CLIENT, dropping every other identity on the socket for a credential none of
+            // them presented. Logged and ignored: the identity is already gone.
+            console.error(`[${this.label}] ${who}: ${msg} — not on this socket, ignored`);
           } else {
             this.authFailure(msg);
           }
@@ -522,6 +567,10 @@ export class ConnectTunnelClient {
         break;
       }
       case 'deliver': {
+        // Not held here: no handler, and NO ACK. An ack tells the node the named agent received
+        // this, and it did not — acking a frame we dropped would have the node mark a task as
+        // delivered to an agent that never saw it, which is worse than the node retrying.
+        if (!h) break;
         const id = frame.id ?? '';
         try { h.onDeliver?.(frame.kind ?? '', frame.payload, id); }
         catch (err) { console.error(`[${this.label}] onDeliver handler error: ${(err as Error).message}`); }
@@ -534,6 +583,10 @@ export class ConnectTunnelClient {
         const id = frame.id ?? '';
         const capability = frame.capability ?? '';
         if (!id) break;
+        // Not held here: dropped, and NOT answered. Replying UNSUPPORTED would be answering in the
+        // name of an identity this socket evicted — the exact thing the null exists to stop. The
+        // node's timeout is the node's; the detach already told it this identity is gone.
+        if (!h) break;
         if (!h.onInvoke) {
           this.replyInvoke(id, false, { code: 'UNSUPPORTED', message: `This client does not answer "${capability}" calls.` });
           break;
@@ -546,6 +599,8 @@ export class ConnectTunnelClient {
         break;
       }
       case 'backlog': {
+        // A backlog for an identity this socket does not hold is somebody else's queue. Dropped.
+        if (!h) break;
         const p = (frame.payload ?? {}) as { tasks?: unknown[]; messages?: unknown[] };
         try { h.onBacklog?.({ tasks: p.tasks ?? [], messages: p.messages ?? [] }); }
         catch (err) { console.error(`[${this.label}] onBacklog handler error: ${(err as Error).message}`); }

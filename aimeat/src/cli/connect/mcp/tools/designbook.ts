@@ -11,6 +11,8 @@
  * @structure registerDesignbookTools(mcp, registry)
  * @usage import { registerDesignbookTools } from './designbook.js';
  * @version-history
+ *   v1.2.0 — 2026-09-05 — genre and ambient join the kind wording (parity with the server MCP,
+ *     wish-atelier-ambient-visuals).
  *   v1.1.0 — 2026-08-28 — The kind wording grows with the Book: look, motion and illustration
  *     join layout and fill in the search filter and the propose contract (parity with the server
  *     MCP, same slice).
@@ -29,7 +31,7 @@ export function registerDesignbookTools(mcp: McpServer, registry: AgentRegistry)
     ({ content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) });
 
   mcp.tool('aimeat_designbook_search', descriptionFor('aimeat_designbook_search'), {
-    kind: z.string().optional().describe('Only this part kind: "layout", "fill", "look", "motion" or "illustration".'),
+    kind: z.string().optional().describe('Only this part kind: "layout", "fill", "look", "motion", "illustration", "genre" or "ambient".'),
     status: z.string().optional().describe('Only this lifecycle state: proposed, published, aging or retired.'),
     q: z.string().optional().describe('A word matched against id, title, summary and tags.'),
     limit: z.number().optional().describe('Rows to return, 1-200. Default 50.'),
@@ -50,7 +52,7 @@ export function registerDesignbookTools(mcp: McpServer, registry: AgentRegistry)
   });
 
   mcp.tool('aimeat_designbook_propose', descriptionFor('aimeat_designbook_propose'), {
-    part: z.record(z.string(), z.unknown()).describe('The part: { id, kind: "layout"|"fill"|"look"|"motion"|"illustration", title, summary, body, tags? }. The kind decides the body: a whole mosaic layout (layout/fill), { tokens, look? } (look), { tokens } of motion tokens only (motion), or { style, palette_words? } (illustration).'),
+    part: z.record(z.string(), z.unknown()).describe('The part: { id, kind: "layout"|"fill"|"look"|"motion"|"illustration"|"genre"|"ambient", title, summary, body, tags? }. The kind decides the body: a whole mosaic layout (layout/fill), { tokens, look? } (look), { tokens } of motion tokens only (motion), { style, palette_words? } (illustration), { template } naming a served genre template (genre), or { ambient: waves|aurora|dust|grid|static|ink, alpha?, speed?, look?, tokens? } (ambient — "none" is an arrangement\'s choice, never a part).'),
     ...aiProvenanceInputs,
   }, annotationsFor('aimeat_designbook_propose'), async ({ part, ai_provenance, ai_provenance_id }) => {
     return out(await client.post('/v1/designbook', {
