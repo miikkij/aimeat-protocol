@@ -107,6 +107,44 @@ export const packageTools: ConnectCliToolDefinition[] = [
         },
     },
     {
+        // Composing reads the dependency map the node already keeps, so a caller names apps rather
+        // than pasting every component's source and getting the dependency order right by hand.
+        name: 'aimeat_package_compose',
+        description: 'Make a package out of apps you already published, with the cortexes they load. Names what the installing node must supply itself.',
+        input: {
+            name: { type: 'string', required: true, description: 'Package name. With your owner name it forms the group id.' },
+            apps: { type: 'array', required: true, description: 'Filenames of your own apps. At least one.' },
+            description: { type: 'string', description: 'What the package is for.' },
+            category: { type: 'string', description: 'Category for the package gallery.' },
+            tags: { type: 'array', description: 'Tags for search.' },
+            visibility: { type: 'string', enum: ['private', 'public'], description: 'Who may install it. Defaults to private.' },
+            status: { type: 'string', enum: ['draft', 'published', 'archived'], description: 'Defaults to published.' },
+            include_cortex: { type: 'boolean', description: 'Package the cortexes you installed yourself. Default true.' },
+            allow_expectations: { type: 'boolean', description: 'Compose even when an app calls an extension the package cannot carry.' },
+        },
+        handler: ({ client }, input) => {
+            const body: JsonObject = {
+                name: requiredString(input, 'name'),
+                apps: requiredArray(input, 'apps'),
+            };
+            const description = optionalString(input, 'description');
+            if (description !== undefined) body.description = description;
+            const category = optionalString(input, 'category');
+            if (category !== undefined) body.category = category;
+            const tags = optionalArray(input, 'tags');
+            if (tags !== undefined) body.tags = tags;
+            const visibility = optionalString(input, 'visibility');
+            if (visibility !== undefined) body.visibility = visibility;
+            const status = optionalString(input, 'status');
+            if (status !== undefined) body.status = status;
+            const includeCortex = optionalBoolean(input, 'include_cortex');
+            if (includeCortex !== undefined) body.include_cortex = includeCortex;
+            const allowExpectations = optionalBoolean(input, 'allow_expectations');
+            if (allowExpectations !== undefined) body.allow_expectations = allowExpectations;
+            return client.post('/v1/packages/compose', body);
+        },
+    },
+    {
         // A package is created private, and until this handler existed the only way to make one
         // installable was a PATCH that no MCP or CLI surface carried. So publish could succeed and
         // leave a package its own author could neither see nor install.

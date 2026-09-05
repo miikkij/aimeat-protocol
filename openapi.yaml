@@ -37178,6 +37178,79 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
 
+  /v1/packages/compose:
+    post:
+      operationId: composePackage
+      summary: Compose a package from apps you already published
+      description: >-
+        Builds a package out of the caller's own apps, with the cortexes those apps load, read from
+        the dependency map the node keeps from each app's source. A cortex the node itself ships, a
+        library pack, and any extension are never packaged: they are recorded in `expects` so the
+        installing node knows what it must already have. An app that calls an extension is refused
+        unless allow_expectations is set, because that package could not work as installed.
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, apps]
+              properties:
+                name: { type: string, description: With the owner name this forms the group id. }
+                apps:
+                  type: array
+                  minItems: 1
+                  items: { type: string }
+                  description: Filenames of the caller's own apps, e.g. ["shop.html", "admin.html"].
+                description: { type: string }
+                category: { type: string }
+                tags: { type: array, items: { type: string } }
+                visibility: { type: string, enum: [private, public], default: private }
+                status: { type: string, enum: [draft, published, archived], default: published }
+                include_cortex:
+                  type: boolean
+                  default: true
+                  description: Package the cortexes the owner installed. Node-shipped ones are never packaged.
+                allow_expectations:
+                  type: boolean
+                  default: false
+                  description: Compose even when an app calls an extension, recording it as a requirement.
+      responses:
+        '201':
+          description: The package, plus what the installing node must supply itself
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          expects:
+                            type: object
+                            properties:
+                              cortex: { type: array, items: { type: string } }
+                              extensions: { type: array, items: { type: string } }
+                              packs: { type: array, items: { type: string } }
+                          notes: { type: array, items: { type: string } }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: A package of this name exists, or a cortex could not be read back for packaging
+        '413':
+          description: Package exceeds size, component count or per-author limit
+
   /v1/packages/{groupId}/status:
     patch:
       operationId: setPackageStatus

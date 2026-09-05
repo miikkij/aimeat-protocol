@@ -182,6 +182,26 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
+  // Making a package out of apps that already exist, instead of pasting every component by hand.
+  mcp.tool('aimeat_package_compose', descriptionFor('aimeat_package_compose'), {
+    name: z.string().describe('Package name. With your owner name it forms the group id.'),
+    apps: z.array(z.string()).min(1).describe('Filenames of your own apps'),
+    description: z.string().optional().describe('What the package is for'),
+    category: z.string().optional().describe('Category for the package gallery'),
+    tags: z.array(z.string()).optional().describe('Tags for search'),
+    visibility: z.enum(['private', 'public']).optional().describe('Who may install it. Defaults to private.'),
+    status: z.enum(['draft', 'published', 'archived']).optional().describe('Defaults to published'),
+    include_cortex: z.boolean().optional().describe('Package the cortexes you installed yourself. Default true.'),
+    allow_expectations: z.boolean().optional().describe('Compose even when an app calls an extension the package cannot carry'),
+  }, annotationsFor('aimeat_package_compose'), async (args) => {
+    const body: Record<string, unknown> = { name: args.name, apps: args.apps };
+    for (const key of ['description', 'category', 'tags', 'visibility', 'status', 'include_cortex', 'allow_expectations'] as const) {
+      if (args[key] !== undefined) body[key] = args[key];
+    }
+    const resp = await client.post('/v1/packages/compose', body);
+    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+  });
+
   // A package is created private; this is the act that makes it installable. It existed on no MCP
   // or CLI surface until now, so publishing left a package its own author could not see.
   mcp.tool('aimeat_package_status_set', descriptionFor('aimeat_package_status_set'), {

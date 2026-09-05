@@ -267,6 +267,10 @@ export async function installPackage(
             packageCategory: pkg.category,
             packageTags: pkg.tags,
             packageDescription: pkg.description,
+            // What the component says about itself, so an installed app carries the name, icon and
+            // category it was published under rather than the package's.
+            meta: comp.meta,
+            callerGaii: caller.sub,
             urlRewrites: { cortexNames: cortexNameMap, extensionNames: extensionNameMap },
         });
 

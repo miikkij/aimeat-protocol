@@ -36,6 +36,7 @@ import { descriptionFor } from './catalog/shape.js';
 import { installPackage } from '../services/package-install.js';
 import { listPackagesFor, getPackageFor } from '../services/package-read.js';
 import { setPackageVersionStatus } from '../services/package-create.js';
+import { composePackageFromApps } from '../services/package-compose.js';
 import { getActiveScheduler } from '../services/scheduler.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
@@ -96,6 +97,44 @@ export function registerPackageTools(
             };
         }
         return { content: [{ type: 'text' as const, text: JSON.stringify(packageSummary(pkg), null, 2) }] };
+    });
+
+    mcp.tool('aimeat_package_compose', descriptionFor('aimeat_package_compose'), {
+        name: z.string().describe('Package name. With your owner name it forms the group id.'),
+        apps: z.array(z.string()).min(1).describe('Filenames of your own apps, e.g. ["shop.html", "admin.html"].'),
+        description: z.string().optional().describe('What the package is for.'),
+        category: z.string().optional().describe('Category for the package gallery.'),
+        tags: z.array(z.string()).optional().describe('Tags for search.'),
+        visibility: z.enum(['private', 'public']).optional().describe('Who may install it. Defaults to private.'),
+        status: z.enum(['draft', 'published', 'archived']).optional().describe('Defaults to published.'),
+        include_cortex: z.boolean().optional().describe('Package the cortexes you installed yourself. Default true.'),
+        allow_expectations: z.boolean().optional().describe('Compose even when an app calls an extension the package cannot carry.'),
+    }, annotationsFor('aimeat_package_compose'), async (args) => {
+        const owner = ownerOf();
+        const gaii = getAgentGaii();
+        const out = await composePackageFromApps({ storage, config },
+            { owner, sub: gaii, ownerGhii: await resolveGhii(storage, owner, gaii) },
+            {
+                name: args.name, apps: args.apps, description: args.description, category: args.category,
+                tags: args.tags, visibility: args.visibility, status: args.status,
+                includeCortex: args.include_cortex, allowExpectations: args.allow_expectations,
+            });
+        if (!out.ok) {
+            return {
+                content: [{ type: 'text' as const, text: `${out.code}: ${out.message}` }],
+                isError: true,
+            };
+        }
+        return {
+            content: [{
+                type: 'text' as const,
+                text: JSON.stringify({
+                    ...packageSummary(out.package),
+                    expects: out.expects,
+                    notes: out.notes,
+                }, null, 2),
+            }],
+        };
     });
 
     mcp.tool('aimeat_package_status_set', descriptionFor('aimeat_package_status_set'), {
