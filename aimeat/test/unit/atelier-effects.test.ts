@@ -13,6 +13,7 @@
  * @version-history
  *   v1.0.0 — 2026-09-05 — initial (wish-atelier-post-process-effects, stage 2).
  */
+import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import {
   EFFECTS, EFFECT_IDS, POST_IDS, POST_MAX, EFFECT_HOSTS, EFFECT_TOKENS, EFFECT_TOKEN_VARS,
@@ -22,6 +23,7 @@ import { LOOKS } from '../../src/data/atelier-looks.js';
 import { UI_COMPONENTS } from '../../src/services/app-ui/registry.js';
 import { hueRotateSrgb, saturateSrgb, duotoneSrgb, lum } from '../../src/services/atelier-color.js';
 import { runMatrix, loadAtelierSheets } from '../../src/services/atelier-contrast.js';
+import { validateEffectSpec, validatePostChain, validateAmbientSpec, AppUiError } from '../../src/services/app-ui/validate.js';
 
 describe('atelier-effects — the registry', () => {
   it('ids are unique lowercase words, and there are nine', () => {
@@ -249,5 +251,113 @@ describe('atelier-effects — the matrix proves the colour and overlay effects (
     expect(results.filter((r) => !r.ok)).toEqual([]);
     expect(results.some((r) => r.label === 'AK-FX distort prop')).toBe(true);
     expect(runMatrix(undefined, { presets: ['vivid'] }).some((r) => r.label.startsWith('AK-FX'))).toBe(false);
+  });
+});
+
+describe('atelier-effects — the kit is pinned to the registry', () => {
+  /** A kit source, as text: the browser modules are read, never imported, into this node test. */
+  const kitSource = (file: string): string =>
+    readFileSync(new URL(`../../src/static/sdk-libs/atelier/${file}`, import.meta.url), 'utf8');
+  /** `export const NAME = { … };` as data: the literal is plain enough to read as JSON once the
+   *  keys are quoted, the quotes doubled and the trailing commas dropped. */
+  const objectLiteral = (src: string, name: string): any => {
+    const start = src.indexOf(`export const ${name} = {`);
+    expect(start, `${name} in the kit`).toBeGreaterThanOrEqual(0);
+    const end = src.indexOf('\n};', start);
+    const body = src.slice(start + `export const ${name} = `.length, end + 2);
+    return JSON.parse(body
+      .replace(/([A-Za-z_][\w-]*)\s*:/g, '"$1":')
+      .replace(/'/g, '"')
+      .replace(/,\s*([}\]])/g, '$1'));
+  };
+
+  it('FX_PARAMS carries every effect, every parameter, and the registry\'s bounds and defaults, in order', () => {
+    const table = objectLiteral(kitSource('effects.js'), 'FX_PARAMS');
+    expect(Object.keys(table)).toEqual([...EFFECT_IDS]);
+    for (const e of EFFECTS) {
+      expect(Object.keys(table[e.id]), `${e.id} parameters`).toEqual(e.params.map((p) => p.name));
+      for (const p of e.params) {
+        const k = table[e.id][p.name];
+        if (p.kind === 'number') expect(k, `${e.id}.${p.name}`).toEqual([p.min, p.max, p.default]);
+        else expect(k, `${e.id}.${p.name}`).toEqual({ tokens: [...p.tokens], default: p.default });
+      }
+    }
+  });
+
+  it('the post passes are the registry\'s, in order, and the chain stops where the registry says', () => {
+    const src = kitSource('ambient-post.js');
+    const ids = src.match(/export const POST_IDS = \[([^\]]*)\]/)![1]!
+      .split(',').map((s) => s.trim().replace(/^'|'$/g, '')).filter(Boolean);
+    expect(ids).toEqual([...POST_IDS]);
+    expect(Number(src.match(/export const POST_MAX = (\d+)/)![1])).toBe(POST_MAX);
+    // A pass exists for every id, by name.
+    for (const id of POST_IDS) expect(src).toMatch(new RegExp(`^const ${id} = \\{`, 'm'));
+  });
+
+  it('every SVG graph the kit builds says sRGB, and no colour is written as text in either module', () => {
+    for (const file of ['effects.js', 'ambient-post.js']) {
+      const src = kitSource(file);
+      expect(src).not.toMatch(/#[0-9a-fA-F]{6}\b/);
+      expect(src).not.toMatch(/rgba?\s*\(\s*\d/);
+    }
+    const fx = kitSource('effects.js');
+    expect(fx).toContain('\'color-interpolation-filters\': \'sRGB\'');
+    // One filter builder, so one place to say it.
+    expect(fx.match(/svgEl\(defs, 'filter'/g)?.length).toBe(1);
+  });
+});
+
+describe('atelier-effects — validateEffectSpec and validatePostChain, the bench every door shares', () => {
+  const refusal = (fn: () => unknown): string => {
+    try { fn(); } catch (e) { if (e instanceof AppUiError) return e.message; throw e; }
+    throw new Error('expected a refusal');
+  };
+
+  it('accepts an effect where it may land, at its default or tuned, and keeps only what was given', () => {
+    expect(validateEffectSpec({ id: 'vignette' }, { component: 'section' })).toEqual({ id: 'vignette' });
+    expect(validateEffectSpec({ id: 'vignette', params: { strength: 0.2, size: 0.75 } }, { component: 'section', look: 'gallery' }))
+      .toEqual({ id: 'vignette', params: { strength: 0.2, size: 0.75 } });
+    expect(validateEffectSpec({ id: 'recolour', params: { hue: 120 }, backdrop: true }, { component: 'list' }))
+      .toEqual({ id: 'recolour', params: { hue: 120 }, backdrop: true });
+    expect(validateEffectSpec({ id: 'distort', params: { scale: 30 } }, { component: 'figure' })).toEqual({ id: 'distort', params: { scale: 30 } });
+    expect(validateEffectSpec({ id: 'duotone', params: { shadow: 'accent' } }, { component: 'hero', hasImage: true }))
+      .toEqual({ id: 'duotone', params: { shadow: 'accent' } });
+    expect(validateEffectSpec({ id: 'glitch' }, { component: 'hero', hasImage: false })).toEqual({ id: 'glitch' });
+    expect(validateEffectSpec({ id: 'scanlines' })).toEqual({ id: 'scanlines' });
+  });
+
+  it('refuses in order, with words: unknown id, unknown knob, a value outside its bounds, a token that is none of them, living on a block, the volume rule, a hero without a picture, backdrop, the matrix', () => {
+    expect(refusal(() => validateEffectSpec({ id: 'vignete' }, { component: 'section' }))).toMatch(/Did you mean "vignette"/);
+    expect(refusal(() => validateEffectSpec({ id: 'vignette', params: { strenght: 0.2 } }, { component: 'section' }))).toMatch(/Did you mean "strength"/);
+    expect(refusal(() => validateEffectSpec({ id: 'vignette', params: { strength: 0.9 } }, { component: 'section' }))).toMatch(/from 0 to 0\.7/);
+    expect(refusal(() => validateEffectSpec({ id: 'duotone', params: { shadow: 'magenta' } }, { component: 'figure' }))).toMatch(/names a token/);
+    expect(refusal(() => validateEffectSpec({ id: 'kaleidoscope' }, { component: 'figure' }))).toMatch(/ambient\.post/);
+    expect(refusal(() => validateEffectSpec({ id: 'distort' }, { component: 'list' }))).toMatch(/bears text/);
+    expect(refusal(() => validateEffectSpec({ id: 'duotone' }, { component: 'section' }))).toMatch(/18 of 19 looks/);
+    expect(refusal(() => validateEffectSpec({ id: 'duotone' }, { component: 'hero', hasImage: false }))).toMatch(/hero's image/);
+    expect(refusal(() => validateEffectSpec({ id: 'duotone', backdrop: true }, { component: 'figure' }))).toMatch(/backdrop-filter/);
+    const loud = refusal(() => validateEffectSpec({ id: 'recolour', params: { saturate: 2 } }, { component: 'section' }));
+    expect(loud).toMatch(/contrast matrix on the vivid look/);
+    expect(loud).toMatch(/AK-FX recolour accent-as-text/);
+    // The same grade passes on a world that owns its ground, and on a backdrop (which touches
+    // what is behind the block, never its words).
+    expect(validateEffectSpec({ id: 'recolour', params: { saturate: 2 } }, { component: 'section', look: 'lounge' }))
+      .toEqual({ id: 'recolour', params: { saturate: 2 } });
+    expect(validateEffectSpec({ id: 'recolour', params: { saturate: 2 }, backdrop: true }, { component: 'section' }))
+      .toEqual({ id: 'recolour', params: { saturate: 2 }, backdrop: true });
+    expect(refusal(() => validateEffectSpec({ id: 'vignette', params: { strength: 0.4 } }, { component: 'section' }))).toMatch(/a quarter of ink/);
+  });
+
+  it('the post chain: ids or { id, params }, at most two, only post effects, each once, never on none', () => {
+    expect(validatePostChain(['kaleidoscope'])).toEqual(['kaleidoscope']);
+    expect(validatePostChain([{ id: 'ripple', params: { amplitude: 0.6 } }, 'vhs'])).toEqual([{ id: 'ripple', params: { amplitude: 0.6 } }, 'vhs']);
+    expect(validatePostChain([{ id: 'glitch' }])).toEqual(['glitch']);
+    expect(refusal(() => validatePostChain(['kaleidoscope', 'ripple', 'vhs']))).toMatch(/at most 2/);
+    expect(refusal(() => validatePostChain(['vignette']))).toMatch(/lands on a block/);
+    expect(refusal(() => validatePostChain(['kaleidoscop']))).toMatch(/Did you mean "kaleidoscope"/);
+    expect(refusal(() => validatePostChain(['vhs', 'vhs']))).toMatch(/once/);
+    expect(refusal(() => validatePostChain([{ id: 'ripple', params: { amplitude: 3 } }]))).toMatch(/from 0 to 1/);
+    expect(validateAmbientSpec({ preset: 'plasma', post: ['kaleidoscope'] }, 'lounge')).toEqual({ preset: 'plasma', post: ['kaleidoscope'] });
+    expect(refusal(() => validateAmbientSpec({ preset: 'none', post: ['vhs'] }))).toMatch(/needs a preset/);
   });
 });

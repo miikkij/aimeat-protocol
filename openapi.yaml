@@ -23420,7 +23420,7 @@ paths:
         the prompts.
       tags: [Apps]
       responses:
-        '200': { description: "The catalogue: components (id, summary, props), nav_modes, looks, look_sheets (with `ambient`), structures, layouts, signature_tokens, dialog, imagery, patterns, ambients (the six presets: feel, evokes, technique, proof, fits_looks, default_alpha, default_speed, peak)" }
+        '200': { description: "The catalogue: components (id, summary, props), nav_modes, looks, look_sheets (with `ambient`), structures, layouts, signature_tokens, dialog, imagery, patterns, ambients (the nine presets: feel, evokes, technique, proof, fits_looks, default_alpha, default_speed, peak), effects (the nine post-process filters: feel, evokes, engine, volume, motion, backdrop, post, proof, params with their bounds and defaults, fits_looks; plus the hosts a prop or zone effect may land on and the passes the ambient layer runs)" }
 
   /v1/apps/ui/validate:
     post:
@@ -23439,7 +23439,7 @@ paths:
             schema:
               type: object
               properties:
-                layout: { type: object, description: "The whole layout: { v: 1, look?, nav?, choreography?, tokens?, imagery?, ambient?: { preset, alpha?, speed? }, dialog?, blocks: [...] }" }
+                layout: { type: object, description: "The whole layout: { v: 1, look?, nav?, choreography?, tokens?, imagery?, ambient?: { preset, alpha?, speed?, post?: [id | { id, params }] }, dialog?, blocks: [{ id, component, props?, span?, hidden?, effect?: { id, params?, backdrop? } }] }. A block's effect is one of the catalogue's effects: a prop or zone effect lands only on a picture or a band (never on a component that bears text), a colour or overlay effect under words is proven by the contrast matrix on the look, backdrop only on recolour, living motion only as an ambient post pass." }
       responses:
         '200': { description: "{ ok: true, blocks } or { ok: false, code, message }" }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -23465,7 +23465,8 @@ paths:
       description: >-
         Whole-value replace — never a merge. Validated before a byte is written (an unknown
         component or setting is refused 422 with the nearest real name suggested; a hero image
-        data: URI is refused; at most one hero). Only the app's owner and the agents acting for
+        data: URI is refused; at most one hero; a block's effect is refused where it would bend
+        or recolour words, and proven by the contrast matrix where it sits under them). Only the app's owner and the agents acting for
         that owner (memory:write); the previous value is archived, so undo is one restore call.
       tags: [Apps]
       security: [{ bearerAuth: [] }]
@@ -23550,8 +23551,10 @@ paths:
         slots — a starting shape), a `look` (a signature token sheet with an optional preset), a
         `motion` (a motion-token recipe), an `illustration` (art direction for the imagery
         pipeline), a `genre` (one of the node's served page templates, shown and forked rather
-        than adopted) or an `ambient` (the one layer allowed to move at idle — a preset with its
-        alpha and speed, proven on a look), with its lifecycle status and how many builds have
+        than adopted), an `ambient` (the one layer allowed to move at idle — a preset with its
+        alpha and speed, proven on a look) or an `effect` (a post-process filter — a moment on
+        the hero band, a picture effect on a figure, or a living pass over the ambient layer,
+        proven where it lands), with its lifecycle status and how many builds have
         adopted it. Published parts
         are what everyone builds from. PUBLIC for the published shelf — a caller without a
         session sees published parts only; signing in adds the parts still in proposal.
@@ -23560,7 +23563,7 @@ paths:
       tags: [Apps]
       security: []
       parameters:
-        - { name: kind, in: query, schema: { type: string, enum: [layout, fill, look, motion, illustration, genre, ambient] } }
+        - { name: kind, in: query, schema: { type: string, enum: [layout, fill, look, motion, illustration, genre, ambient, effect] } }
         - { name: status, in: query, schema: { type: string, enum: [proposed, published, aging, retired] } }
         - { name: q, in: query, schema: { type: string }, description: Matched against id, title, summary and tags }
         - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 200 } }
@@ -23576,7 +23579,9 @@ paths:
         signature-token bench (contrast-matrix pair proof included) for look/motion, the
         imagery-style bench for illustration, the template registry for genre, the ambient bench
         for ambient (the preset proven on the part's look through the contrast matrix, so a
-        layer too loud for its ground refuses with numbers) — and a refusal is worded, with the
+        layer too loud for its ground refuses with numbers), the effect bench for effect (the
+        knobs against the registry's bounds, the target it lands on — a picture effect never on
+        words, living motion only on the layer) — and a refusal is worded, with the
         nearest real name suggested. A new part lands as `proposed`; publishing
         it into the shared catalogue is the node operator's call. A part id is a node-wide
         address: once claimed, it answers the same part for everyone, forever, and updating your
@@ -23593,13 +23598,16 @@ paths:
                 part:
                   type: object
                   description: >-
-                    { id, kind: layout|fill|look|motion|illustration|genre|ambient, title,
+                    { id, kind: layout|fill|look|motion|illustration|genre|ambient|effect, title,
                     summary, body, tags? } — the kind decides the body: a whole mosaic layout
                     (layout/fill), { tokens, look? } (look), { tokens } of motion tokens only
                     (motion), { style, palette_words? } (illustration), { template } naming a
-                    served genre template (genre), or { ambient, alpha?, speed?, look?, tokens? }
-                    (ambient — one of waves, aurora, dust, grid, static, ink; "none" is an
-                    arrangement's choice, never a part)
+                    served genre template (genre), { ambient, alpha?, speed?, look?, tokens? }
+                    (ambient — one of waves, aurora, dust, grid, static, ink, plasma, lava,
+                    tunnel; "none" is an arrangement's choice, never a part), or { effect,
+                    params?, on?: hero|figure|layer, look?, tokens? } (effect — one of
+                    scanlines, vignette, duotone, recolour, distort, glitch, vhs, ripple,
+                    kaleidoscope; the target defaults from the registry)
                 ai_provenance:
                   allOf:
                     - $ref: '#/components/schemas/AiProvenanceDeclaration'
@@ -23680,8 +23688,11 @@ paths:
       summary: Adopt a part into one of your apps
       description: >-
         A layout or fill REPLACES the named app's stored mosaic layout; a look, motion,
-        illustration or ambient part MERGES into the arrangement the app already has (and
-        refuses with words when there is none). An ambient lands as the arrangement's `ambient`
+        illustration, ambient or effect part MERGES into the arrangement the app already has (and
+        refuses with words when there is none). An effect lands on the first block of the
+        component it names, or as a pass on the arrangement's ambient (refused with words when
+        the app runs none or has no such block), and is proven again at the write. An ambient
+        lands as the arrangement's `ambient`
         with its tokens beside the existing ones, never its look, and is proven again on the
         app's own look at the write — a wave proven loud on a night world is refused with the
         numbers on an editorial app. A genre is never adopted: it is forked from its template,
@@ -23726,6 +23737,9 @@ paths:
         demo arrangement wearing its token sheet; an ambient by rendering it with the layer
         running behind it on the part's look, and it passes only when the layer painted its
         first frame at every viewport (ambient_layers, ambient_painted — counts, never pixels);
+        an effect by rendering the demo arrangement wearing it where it lands, and it passes when
+        something wears it and nothing on it is still running after the settle (fx_applied,
+        fx_running), or, as a pass over the layer, when the layer painted;
         an illustration answers ran:false with the reason (its bench is the field validation at
         propose time). A node with no browser answers ran:false with the reason and stamps
         nothing. The operator's or the part's own proposer's call (its result changes what the

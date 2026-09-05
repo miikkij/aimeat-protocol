@@ -16,6 +16,10 @@
  * @usage
  *   import { buildUiCatalogue } from './catalogue.js';
  * @version-history
+ *   v1.1.0 — 2026-09-05 — THE EFFECTS SHELF (wish-atelier-post-process-effects, stage 4): the
+ *     nine effects with their knobs' bounds, the hosts a prop or zone effect may land on, the
+ *     post passes, and a summary teaching still, moment and living; the ambient summary names
+ *     `post`. The three generators reach the ambient shelf on their own.
  *   v1.0.0 — 2026-09-05 — Pure extraction from registry.ts v1.20.0
  *     (wish-atelier-post-process-effects, stage 1).
  */
@@ -23,6 +27,7 @@ import { LOOKS as LOOK_REGISTRY, STRUCTURES } from '../../data/atelier-looks.js'
 import { UI_LAYOUT_PRESETS, type AppUiLayoutPreset } from './layouts.js';
 import { PATTERNS } from '../../data/atelier-patterns.js';
 import { AMBIENTS } from '../../data/atelier-ambients.js';
+import { EFFECTS, EFFECT_HOSTS, POST_IDS, POST_MAX, type AtelierEffectParam } from '../../data/atelier-effects.js';
 import { UI_COMPONENTS, NAV_MODES, CHOREOGRAPHIES, LOOKS, BLOCK_SPANS, type AppUiPropDef } from './registry.js';
 import { SIGNATURE_TOKENS } from './signature-tokens.js';
 
@@ -59,6 +64,16 @@ export function buildUiCatalogue(): {
     presets: Array<{
       id: string; feel: string; evokes: string; technique: string; proof: string;
       fits_looks: string[]; default_alpha: number; default_speed: number; peak: number;
+    }>;
+  };
+  effects: {
+    summary: string;
+    hosts: readonly string[];
+    post: readonly string[];
+    entries: Array<{
+      id: string; feel: string; evokes: string; engine: string; volume: readonly string[];
+      motion: readonly string[]; backdrop: boolean; post: boolean; proof: string;
+      params: readonly AtelierEffectParam[]; fits_looks: readonly string[];
     }>;
   };
 } {
@@ -144,7 +159,9 @@ export function buildUiCatalogue(): {
         + 'below the preset\'s default), while a world that owns its ground (lounge, dawn, stage, '
         + 'broadcast) runs it as loud as the ink allows. The layer pauses on a hidden tab, stills '
         + 'under Less motion and reduced motion, and the viewer\'s weather switch (Off, Calm, '
-        + 'Full) always wins. One per app; a tool someone lives in usually wants none.',
+        + 'Full) always wins. One per app; a tool someone lives in usually wants none. '
+        + `Optional \`post\`: up to ${POST_MAX} passes run over the layer's own field each frame `
+        + `(${POST_IDS.join(', ')}), as ids or { id, params } — the one place an effect may live.`,
       presets: AMBIENTS.map((a) => ({
         id: a.id,
         feel: a.feel,
@@ -155,6 +172,36 @@ export function buildUiCatalogue(): {
         default_alpha: a.defaultAlpha,
         default_speed: a.defaultSpeed,
         peak: a.peak,
+      })),
+    },
+    effects: {
+      summary: 'The effects shelf (effects.css, effects.js): post-process filters a block wears, '
+        + 'declared once with every knob\'s bounds and default. Per block: `effect: { id, params?, '
+        + 'backdrop? }`. STILL on the words (scanlines, vignette, recolour) or on a picture '
+        + '(duotone, distort); a MOMENT the app plays on a cue with AIMEAT.atelier.fxPlay (glitch, '
+        + 'vhs, distort, ripple), finite and gone on finished; LIVING only behind the words — '
+        + '`ambient.post` runs it over the layer\'s own field (glitch, vhs, ripple, kaleidoscope). '
+        + 'A prop or zone effect lands only on a picture or a band (`hosts`; on a hero, on its '
+        + 'image); on any other component it would bend or recolour the words and is refused. A '
+        + 'colour or overlay effect under words is proven by the contrast matrix on the look '
+        + '(AK-FX): a quarter of ink passes every look, any hue at saturate 1.5 or under passes '
+        + 'every look, louder on the six worlds only. `backdrop: true` (recolour alone) '
+        + 'post-processes what is BEHIND the block, the ambient seen through a card. Under Less '
+        + 'motion a moment does not play and a still stays; the viewer\'s weather is the layer\'s.',
+      hosts: EFFECT_HOSTS,
+      post: POST_IDS,
+      entries: EFFECTS.map((e) => ({
+        id: e.id,
+        feel: e.feel,
+        evokes: e.evokes,
+        engine: e.engine,
+        volume: e.volume,
+        motion: e.motion,
+        backdrop: e.backdrop,
+        post: e.post,
+        proof: e.proof,
+        params: e.params,
+        fits_looks: e.fitsLooks,
       })),
     },
   };

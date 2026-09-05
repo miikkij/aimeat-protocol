@@ -7,6 +7,12 @@
  *   never refused has never been tested.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-ui
  * @version-history
+ *   v1.2.0 — 2026-09-05 — A block's `effect` and the ambient's `post` (wish-atelier-post-process-
+ *     effects): a still under words validates, a picture effect on words refuses naming the hosts,
+ *     a loud grade refuses with the matrix numbers and passes on a world, a misspelt knob and a
+ *     number outside its bounds refuse with words, backdrop only on recolour, living motion
+ *     pointed at the layer, a hero without a picture refused; the post chain's bounds; the
+ *     catalogue's effects shelf and the three generators.
  *   v1.1.1 — 2026-09-05 — The APP fixture names a register (genre-nightfloor): an Atelier app
  *     without one is refused at publish now, and this suite is about arrangements, not the gate.
  *   v1.1.0 — 2026-09-05 — The layout's `ambient` field (a preset with its numbers, none, an
@@ -257,6 +263,66 @@ const GOOD_LAYOUT = {
         const editorial = cat.look_sheets.find((l: any) => l.id === 'editorial');
         assert(lounge?.ambient === 'waves' && editorial?.ambient === 'none', `look sheets say what runs at idle: lounge=${lounge?.ambient} editorial=${editorial?.ambient}`);
         assert(cat.looks.includes('lounge') && cat.looks.includes('dawn'), 'the two worlds are in the look list');
+    });
+
+    await test('EFFECT is a block field: a still validates, a picture effect on words refuses naming the hosts, a loud grade refuses with the numbers, backdrop only on recolour', async () => {
+        const section = { id: 'a', component: 'section', props: { title: 'x' } };
+        const figure = { id: 'f', component: 'figure', props: { source: 'x.figure' } };
+        const good = await validate({ v: 1, blocks: [{ ...section, effect: { id: 'vignette', params: { strength: 0.25 } } }] });
+        assert(good.status === 200 && good.body.data.ok === true, `a vignette at a quarter validates under the words: ${JSON.stringify(good.body.data)}`);
+        const words = await validate({ v: 1, blocks: [{ id: 'l', component: 'list', props: { source: 'x.rows' }, effect: { id: 'distort' } }] });
+        assert(words.body.data.ok === false && /bears text/.test(words.body.data.message) && /figure/.test(words.body.data.message),
+            `a distort on a list refuses naming the rule and the hosts: ${words.body.data.message}`);
+        const picture = await validate({ v: 1, blocks: [{ ...figure, effect: { id: 'distort', params: { scale: 30 } } }] });
+        assert(picture.body.data.ok === true, `a distort on a figure validates: ${JSON.stringify(picture.body.data)}`);
+        const loud = await validate({ v: 1, blocks: [{ ...section, effect: { id: 'recolour', params: { saturate: 2 } } }] });
+        assert(loud.body.data.ok === false && /contrast matrix/.test(loud.body.data.message) && /accent/.test(loud.body.data.message),
+            `saturate 2 under words on the palette page refuses with the numbers: ${loud.body.data.message}`);
+        const world = await validate({ v: 1, look: 'lounge', blocks: [{ ...section, effect: { id: 'recolour', params: { saturate: 2 } } }] });
+        assert(world.body.data.ok === true, `the same grade passes on a world that owns its ground: ${JSON.stringify(world.body.data)}`);
+        const knob = await validate({ v: 1, blocks: [{ ...section, effect: { id: 'vignette', params: { strenght: 0.2 } } }] });
+        assert(knob.body.data.ok === false && /Did you mean "strength"/.test(knob.body.data.message), `a misspelt knob gets the nearest: ${knob.body.data.message}`);
+        const bounds = await validate({ v: 1, blocks: [{ ...section, effect: { id: 'vignette', params: { strength: 0.9 } } }] });
+        assert(bounds.body.data.ok === false && /0 to 0\.7/.test(bounds.body.data.message), `a number outside its bounds refuses with the bounds: ${bounds.body.data.message}`);
+        const backdrop = await validate({ v: 1, blocks: [{ ...figure, effect: { id: 'duotone', backdrop: true } }] });
+        assert(backdrop.body.data.ok === false && /backdrop-filter/.test(backdrop.body.data.message) && /recolour/.test(backdrop.body.data.message),
+            `backdrop on an SVG-engine effect refuses naming the browser reason: ${backdrop.body.data.message}`);
+        const living = await validate({ v: 1, blocks: [{ ...figure, effect: { id: 'kaleidoscope' } }] });
+        assert(living.body.data.ok === false && /ambient\.post/.test(living.body.data.message), `living motion on a block is pointed at the layer: ${living.body.data.message}`);
+        const bare = await validate({ v: 1, blocks: [{ id: 'h', component: 'hero', props: { title: 'T' }, effect: { id: 'duotone' } }] });
+        assert(bare.body.data.ok === false && /image/.test(bare.body.data.message), `a picture effect on a hero without an image refuses: ${bare.body.data.message}`);
+        const unknown = await validate({ v: 1, blocks: [{ ...section, effect: { id: 'vignete' } }] });
+        assert(unknown.body.data.ok === false && /Did you mean "vignette"/.test(unknown.body.data.message), `an unknown effect gets the nearest: ${unknown.body.data.message}`);
+    });
+
+    await test('AMBIENT POST is a layout field: a pass over the layer validates, a third refuses, a post on none refuses, a block effect as a pass is pointed back', async () => {
+        const blocks = [{ id: 'a', component: 'section', props: { title: 'x' } }];
+        const good = await validate({ v: 1, look: 'lounge', ambient: { preset: 'plasma', post: ['kaleidoscope', { id: 'ripple', params: { amplitude: 0.6 } }] }, blocks });
+        assert(good.status === 200 && good.body.data.ok === true, `two passes over plasma on lounge validate: ${JSON.stringify(good.body.data)}`);
+        const three = await validate({ v: 1, ambient: { preset: 'waves', post: ['kaleidoscope', 'ripple', 'vhs'] }, blocks });
+        assert(three.body.data.ok === false && /at most 2/.test(three.body.data.message), `a third pass refuses: ${three.body.data.message}`);
+        const none = await validate({ v: 1, ambient: { preset: 'none', post: ['vhs'] }, blocks });
+        assert(none.body.data.ok === false && /needs a preset/.test(none.body.data.message), `a post on none refuses: ${none.body.data.message}`);
+        const block = await validate({ v: 1, ambient: { preset: 'waves', post: ['vignette'] }, blocks });
+        assert(block.body.data.ok === false && /lands on a block/.test(block.body.data.message), `a block effect named as a pass is pointed back: ${block.body.data.message}`);
+    });
+
+    await test('the catalogue carries the EFFECTS shelf: nine filters with their bounds, the hosts, the passes, and the three generators on the ambient shelf', async () => {
+        const r = await json('/v1/apps/ui/catalogue');
+        const cat = r.body.data.catalogue;
+        const ids = (cat.effects?.entries ?? []).map((e: any) => e.id);
+        for (const expected of ['scanlines', 'vignette', 'duotone', 'recolour', 'distort', 'glitch', 'vhs', 'ripple', 'kaleidoscope']) {
+            assert(ids.includes(expected), `effects should carry ${expected} (got: ${ids.join(', ')})`);
+        }
+        const vignette = cat.effects.entries.find((e: any) => e.id === 'vignette');
+        const strength = vignette.params.find((p: any) => p.name === 'strength');
+        assert(strength && strength.min === 0 && strength.max === 0.7 && strength.default === 0.25, `every knob carries its bounds and default: ${JSON.stringify(strength)}`);
+        assert(Array.isArray(cat.effects.hosts) && cat.effects.hosts.includes('hero') && cat.effects.hosts.includes('figure'), 'the hosts a prop or zone effect may land on are named');
+        assert(Array.isArray(cat.effects.post) && cat.effects.post.includes('kaleidoscope') && !cat.effects.post.includes('vignette'), 'the passes the layer runs are named');
+        assert(/living/i.test(cat.effects.summary) && /ambient\.post/.test(cat.effects.summary), 'the summary teaches still, moment and living');
+        const ambientIds = cat.ambients.presets.map((p: any) => p.id);
+        for (const g of ['plasma', 'lava', 'tunnel']) assert(ambientIds.includes(g), `the ambient shelf carries ${g}`);
+        assert(/post/.test(cat.ambients.summary), 'the ambient summary names the post chain');
     });
 
     await test('the chart MURAL is a presentation enum: mural validates, an invented value is refused', async () => {
