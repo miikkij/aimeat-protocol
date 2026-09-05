@@ -1,0 +1,32 @@
+<!doctype html>
+<!--
+  @file public/atelier-ambient-demo.html
+  @author Jouni Miikki
+  SPDX-License-Identifier: MIT
+  @description The ambient layer, driven: the page the browser verification runs against
+    (wish-atelier-ambient-visuals) and a place to see every preset behind every look. One
+    Atelier app frame (the look decides its ambient; the buttons change the look and override
+    the preset), one stage per preset below it, and attract mode armed at four seconds so the
+    idle behaviour can be watched without waiting a minute. window.demo carries the handles.
+  @usage  /atelier-ambient-demo.html on any node that serves the kit
+  @version-history
+    v1.0.0 — 2026-09-05 — Initial (stage 4).
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Atelier ambient</title>
+  <link rel="stylesheet" href="/lib/aimeat-fonts.css">
+  <style>
+    .demo-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    .demo-row button[aria-pressed='true'] { outline: 2px solid var(--ak-accent); outline-offset: 2px; }
+    .demo-stage-title { margin: 0; font-family: var(--ak-font-display); font-size: var(--ak-text-title); }
+    .demo-stages { display: grid; gap: var(--ak-gap); grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+  </style>
+  <script src="/v1/libs/aimeat-atelier.js"></script>
+  <script src="/atelier-ambient-demo.js" defer></script>
+</head>
+<body>
+</body>
+</html>

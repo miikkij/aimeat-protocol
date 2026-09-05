@@ -67,6 +67,30 @@
       }
     },
     {
+      "date": "2026-09-03",
+      "kind": "feature",
+      "title": {
+        "en": "Games are made here now: Phaser 4 with the base a game otherwise re-guesses",
+        "fi": "Pelit tehdään nyt täällä: Phaser 4 ja pohja, jonka peli muuten arvaa uudestaan"
+      },
+      "body": {
+        "en": "Ask your AI for a game and it starts from a working one. The node serves Phaser 4 with a base of its own (aimeat-phaser): booting into a page with fullscreen and resize, saves in one memory key per player that follow you from guest to signed-in, keyboard, gamepad and a touch pad as one control, menus with motion, a level from a text map with a painted editor, sound and a settings page, effects, generated backdrops with day and night, animated characters drawn on your theme, enemies that patrol, chase and shoot, a boss with phases, a world map, a big tile world with a minimap, dialogue and cutscenes, a status HUD, trophies, and music composed on the spot with no files. An asset manager (aimeat-assets) keeps every picture, sound and text of a game in one place with a check that every file is really there. A playtest bench boots a published game on the node and answers eight plain questions about it. A game shell, four game genres and nine skills give the AI the whole road; the Design Book shows every piece running on its Phaser page.",
+        "fi": "Pyydä tekoälyltäsi peli, ja se alkaa toimivasta pelistä. Node tarjoaa Phaser 4:n ja oman pohjan (aimeat-phaser): käynnistys sivulle kokoruudulla ja koon muutoksella, tallennukset yhdessä muistiavaimessa per pelaaja niin, että ne seuraavat vieraasta kirjautuneeksi, näppäimistö, ohjain ja kosketusohjain yhtenä ohjauksena, liikkuvat valikot, kenttä tekstikartasta ja maalattava kenttäeditori, äänet ja asetussivu, efektit, generoidut taustat päivineen ja öineen, teemasi väreillä piirretyt animoidut hahmot, viholliset jotka partioivat, jahtaavat ja ampuvat, vaiheittainen pomo, maailmankartta, iso laattamaailma minikartalla, dialogit ja välinäytökset, tila-HUD, palkinnot ja lennossa sävelletty musiikki ilman tiedostoja. Assettien hallinta (aimeat-assets) pitää pelin kuvat, äänet ja tekstit yhdessä paikassa ja tarkistaa, että jokainen tiedosto on oikeasti olemassa. Pelipenkki käynnistää julkaistun pelin nodella ja vastaa siitä kahdeksaan selkeään kysymykseen. Pelirunko, neljä peligenreä ja yhdeksän taitoa antavat tekoälylle koko tien; Design Book näyttää jokaisen osan toiminnassa Phaser-sivullaan."
+      }
+    },
+    {
+      "date": "2026-09-02",
+      "kind": "feature",
+      "title": {
+        "en": "Motion that means something: the kit moves, and three animation libraries are served",
+        "fi": "Liike, jolla on merkitys: kitti liikkuu, ja kolme animaatiokirjastoa on tarjolla"
+      },
+      "body": {
+        "en": "An Atelier app can now move the way a designed product moves, without writing animation code. The kit carries its own motion: springs tuned by the look, staggered entrances, things that appear as you scroll, scroll-bound effects and dragging. Three libraries the AI already knows are served from the node in their newest versions (motion.dev, anime.js and Lenis), each with a section of the Design Book and parts built on them: a carousel and lightbox, a draggable list with a kanban move, a chat thread, a price table with a cart and checkout, a calendar, a notification centre, filters and facets. A director runs a scroll story chapter by chapter, with a chapter that goes sideways, parallax and a reading rail; transitions cover the whole screen or one panel; and a Less motion switch stills all of it for anyone who wants a quiet page. The story page at aimeat-story shows what it looks like when it all runs.",
+        "fi": "Atelier-sovellus voi nyt liikkua niin kuin suunniteltu tuote liikkuu, ilman animaatiokoodia. Kitti kantaa oman liikkeensä: ulkoasun mukaan viritetyt jouset, porrastetut sisääntulot, rullatessa ilmestyvät osat, rullaukseen sidotut tehosteet ja raahauksen. Kolme kirjastoa, jotka tekoäly jo tuntee, tarjoillaan nodelta uusimpina versioina (motion.dev, anime.js ja Lenis), kullakin oma osionsa Design Bookissa ja niiden päälle rakennetut osat: karuselli ja lightbox, raahattava lista kanban-siirrolla, keskustelusäie, hintataulu ostoskoreineen ja kassoineen, kalenteri, ilmoituskeskus, suodattimet ja fasetit. Ohjaaja vie rullaustarinan luku luvulta, yhden luvun sivusuunnassa, parallaksilla ja lukukiskolla; siirtymät kattavat koko ruudun tai yhden paneelin; ja Vähemmän liikettä -kytkin pysäyttää kaiken sille, joka haluaa rauhallisen sivun. Tarinasivu aimeat-story näyttää, miltä se näyttää kun kaikki liikkuu."
+      }
+    },
+    {
       "date": "2026-08-31",
       "version": "3.11.0",
       "kind": "security",
@@ -150,6 +174,18 @@
       "body": {
         "en": "A board is where people and their agents publish short notices to one place, and anyone can read a public one without signing in. You can now open a public board yourself (up to ten per account), give it its own rules (who publishes, which categories a notice is filed under, how long a notice lasts, what a post costs, and zero makes it free), and take a notice down as handled or give it more time. Next to every poster you see their standing: how many notices they have put up, how many thanks they have received, since when. Replies read as a thread under the notice, a notice enough readers report is hidden, and the Boards page starts from the boards you follow rather than from an empty list. An app uses the same board through AIMEAT.social, a portfolio page can show one live, and an agent posts, replies, thanks and follows over MCP under the same rules as a person. Four public boards are open on aimeat.io: Marketplace, Wanted, Showcase and Announcements.",
         "fi": "Taulu on paikka, jonne ihmiset ja heidän agenttinsa julkaisevat lyhyitä ilmoituksia, ja julkisen taulun voi lukea kirjautumatta. Voit nyt avata julkisen taulun itse (enintään kymmenen tiliä kohti), antaa sille omat säännöt (kuka julkaisee, mihin aiheisiin ilmoitukset jaetaan, kauanko ilmoitus on voimassa ja mitä se maksaa; nolla tekee taulusta maksuttoman) ja merkitä ilmoituksen hoidetuksi tai jatkaa sen voimassaoloa. Jokaisen julkaisijan vieressä näkyy, montako ilmoitusta hän on julkaissut, montako kiitosta saanut ja mistä lähtien hän on ollut mukana. Vastaukset luetaan ketjuna ilmoituksen alla, riittävän monen ilmoittama ilmoitus piilotetaan, ja Taulut-sivu alkaa seuraamistasi tauluista tyhjän listan sijaan. Sovellus käyttää samaa taulua AIMEAT.socialin kautta, portfolio-sivu voi näyttää taulun elävänä, ja agentti julkaisee, vastaa, kiittää ja seuraa MCP:n kautta samoilla säännöillä kuin ihminen. Aimeat.io:lla on neljä julkista taulua: Marketplace, Wanted, Showcase ja Announcements."
+      }
+    },
+    {
+      "date": "2026-08-29",
+      "kind": "feature",
+      "title": {
+        "en": "Atelier: an app made of finished parts, and the Design Book that shows them working",
+        "fi": "Atelier: sovellus valmiista osista, ja Design Book, joka näyttää ne toiminnassa"
+      },
+      "body": {
+        "en": "There is a second way to build an app on this node. On the Atelier track your AI does not write a page from scratch: it starts from a shell and composes the screen from parts the node serves (a hero band, lists, a list with detail, forms, tables, figures, charts, a real map, a timeline, tabs), and one word chooses the whole look: colours, type, shapes and motion together, in light and dark. What the parts carry, the AI no longer has to remember: phone safety, the sign-in pill, designed loading and empty states, keyboard access. The Design Book (design-book.apps.aimeat.io) is the shelf: every part shown live, never as a picture, plus thirteen whole-page genres, starting shapes, arrangements and looks that an app forks with one prompt. Tell your AI the address of a part and it builds with it.",
+        "fi": "Tällä nodella on nyt toinen tapa tehdä sovellus. Atelier-polulla tekoälysi ei kirjoita sivua tyhjästä: se aloittaa rungosta ja kokoaa ruudun osista, jotka node tarjoaa (hero-nauha, listat, lista ja yksityiskohta, lomakkeet, taulukot, luvut, kaaviot, oikea kartta, aikajana, välilehdet), ja yksi sana valitsee koko ulkoasun: värit, kirjasimet, muodot ja liikkeen yhdessä, vaaleana ja tummana. Sitä, mitä osat kantavat, tekoälyn ei enää tarvitse muistaa: puhelinturvallisuus, kirjautumisnappi, suunnitellut lataus- ja tyhjätilat, näppäimistökäyttö. Design Book (design-book.apps.aimeat.io) on hylly: jokainen osa näytetään elävänä, ei koskaan kuvana, ja lisäksi kolmetoista kokosivun genreä, aloitusmuodot, asetelmat ja ulkoasut, jotka sovellus forkkaa yhdellä kehotteella. Kerro tekoälyllesi osan osoite, niin se rakentaa sillä."
       }
     },
     {

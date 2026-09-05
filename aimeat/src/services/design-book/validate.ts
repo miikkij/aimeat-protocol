@@ -14,11 +14,19 @@
  *   every stored app layout passes. `look` (a signature token sheet + optional preset) and
  *   `motion` (the motion-token subset) run the signature-token bench, contrast-matrix pair proof
  *   included. `illustration` (art direction for the imagery pipeline) runs the imagery-style
- *   bench. A kind this file does not know is refused by name rather than stored on trust.
+ *   bench. `genre` names one of the node's served page templates. `ambient` (the one layer
+ *   allowed to move at idle, with the look it was proven on) runs the ambient bench, which
+ *   proves the preset on that look through the contrast matrix. A kind this file does not know
+ *   is refused by name rather than stored on trust.
  * @structure DesignBookError · PART_KINDS · MOTION_TOKENS · PART_STATUSES · validatePartInput()
  * @usage
  *   const part = validatePartInput(raw);   // throws DesignBookError with worded refusals
  * @version-history
+ *   v1.2.0 — 2026-09-05 — The AMBIENT kind (wish-atelier-ambient-visuals): a body of
+ *     { ambient, alpha?, speed?, look?, tokens? } through validateAmbientSpec on the part's look
+ *     (or the first look the registry says the preset fits), "none" refused because a part that
+ *     switches things off is an arrangement's choice; the look-name refusal is one helper now,
+ *     shared by the look and ambient kinds; the unknown-kind sentence names genre and ambient.
  *   v1.1.0 — 2026-08-28 — THREE NEW KINDS, each with a bench that can prove it (TARGET-074):
  *     `look` (a signature token sheet + optional preset — the same token bench a layout's
  *     signature runs, contrast-matrix pair proof included), `motion` (the same sheet restricted
@@ -27,10 +35,11 @@
  *   v1.0.0 — 2026-08-28 — Initial (TARGET-074 phase 5, slice 1).
  */
 import {
-  validateUiLayout, validateSignatureTokens, validateImageryStyle, AppUiError,
+  validateUiLayout, validateSignatureTokens, validateImageryStyle, validateAmbientSpec, AppUiError,
 } from '../app-ui/validate.js';
 import { LOOKS } from '../app-ui/registry.js';
 import { getAppTemplates } from '../../data/app-templates.js';
+import { AMBIENT_IDS, ambientById } from '../../data/atelier-ambients.js';
 
 export class DesignBookError extends Error {
   constructor(public code: string, message: string, public status = 400) {
@@ -40,7 +49,7 @@ export class DesignBookError extends Error {
 }
 
 /** The kinds the node can PROVE. Growing this list means growing the bench first. */
-export const PART_KINDS = ['layout', 'fill', 'look', 'motion', 'illustration', 'genre'] as const;
+export const PART_KINDS = ['layout', 'fill', 'look', 'motion', 'illustration', 'genre', 'ambient'] as const;
 export type PartKind = (typeof PART_KINDS)[number];
 
 /** The motion recipe's vocabulary: the signature tokens that ARE motion. */
@@ -87,7 +96,9 @@ export function validatePartInput(raw: unknown): PartInput {
       `"${kind}" is not a part kind this node can prove. It proves: ${PART_KINDS.join(', ')}. ` +
       '(layout = a complete mosaic arrangement; fill = the same shape with <placeholder> slots to fill; ' +
       'look = a signature token sheet with an optional preset; motion = a motion-token recipe; ' +
-      'illustration = art direction for the imagery pipeline.)');
+      'illustration = art direction for the imagery pipeline; genre = one of the node\'s served page ' +
+      'templates, shown and forked rather than adopted; ambient = the animated layer behind an app, ' +
+      'proven on a look.)');
   }
 
   const title = typeof p.title === 'string' ? p.title.trim() : '';
@@ -131,6 +142,28 @@ function benchBodyFor(kind: PartKind, raw: unknown): Record<string, unknown> {
       }
       return { template: id };
     }
+    // An AMBIENT carries one of the presets, the numbers, and the look it was proven on (the
+    // first look the registry says it fits, when the part names none — the same look the
+    // preview shows it on). "none" is an arrangement's choice and never a part.
+    if (kind === 'ambient') {
+      if (o.ambient === 'none') {
+        throw new DesignBookError('BODY_INVALID',
+          'An ambient part carries one of the presets. "none" is an arrangement\'s choice, not a part: to switch a look\'s ambient off, store { "ambient": { "preset": "none" } } on the app\'s arrangement.', 422);
+      }
+      if (typeof o.ambient !== 'string') throw new DesignBookError('BODY_INVALID', bodyShapeHint(kind), 422);
+      const look = o.look === undefined ? undefined : lookNameOrRefuse(o.look);
+      const provenOn = look ?? ambientById(o.ambient)?.fitsLooks[0];
+      const spec = validateAmbientSpec({ preset: o.ambient, alpha: o.alpha, speed: o.speed }, provenOn);
+      const out: Record<string, unknown> = { ambient: spec.preset };
+      if (spec.alpha !== undefined) out.alpha = spec.alpha;
+      if (spec.speed !== undefined) out.speed = spec.speed;
+      if (o.tokens !== undefined) {
+        const tokens = validateSignatureTokens(o.tokens, look);
+        if (Object.keys(tokens).length > 0) out.tokens = tokens;
+      }
+      if (look !== undefined) out.look = look;
+      return out;
+    }
     // look and motion: a token sheet — the same bench a layout's signature runs, including the
     // contrast-matrix proof of an `--ak-accent` pair.
     const tokens = validateSignatureTokens(o.tokens, typeof o.look === 'string' ? o.look : undefined);
@@ -148,13 +181,7 @@ function benchBodyFor(kind: PartKind, raw: unknown): Record<string, unknown> {
       return { tokens };
     }
     const out: Record<string, unknown> = { tokens };
-    if (o.look !== undefined) {
-      if (typeof o.look !== 'string' || !(LOOKS as readonly string[]).includes(o.look)) {
-        throw new DesignBookError('BODY_INVALID',
-          `"${String(o.look)}" is not a look this node ships. The looks it has: ${LOOKS.join(', ')}.`, 422);
-      }
-      out.look = o.look;
-    }
+    if (o.look !== undefined) out.look = lookNameOrRefuse(o.look);
     return out;
   } catch (err) {
     if (err instanceof AppUiError) {
@@ -165,7 +192,19 @@ function benchBodyFor(kind: PartKind, raw: unknown): Record<string, unknown> {
   }
 }
 
+/** A look this node ships, or the refusal that names them — the look and ambient kinds share it. */
+function lookNameOrRefuse(value: unknown): string {
+  if (typeof value !== 'string' || !(LOOKS as readonly string[]).includes(value)) {
+    throw new DesignBookError('BODY_INVALID',
+      `"${String(value)}" is not a look this node ships. The looks it has: ${LOOKS.join(', ')}.`, 422);
+  }
+  return value;
+}
+
 function bodyShapeHint(kind: PartKind): string {
   if (kind === 'illustration') return 'An illustration part\'s body is { style, palette_words? } — art direction as data.';
+  if (kind === 'ambient') {
+    return `An ambient part's body is { ambient: one of ${AMBIENT_IDS.join(', ')}, alpha?, speed?, look?, tokens? } — the layer behind the app, proven on the look.`;
+  }
   return `A ${kind} part's body is { tokens: { "--ak-…": "value" }${kind === 'look' ? ', look?' : ''} }.`;
 }

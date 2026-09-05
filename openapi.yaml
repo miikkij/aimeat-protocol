@@ -23396,12 +23396,14 @@ paths:
       operationId: getAppUiCatalogue
       summary: The Atelier mosaic vocabulary
       description: >-
-        Every mosaic component this node knows with the settings each takes, the navigation modes
-        and the look presets (TARGET-074). An AI asked to change an app's layout reads this first,
-        so the first write is never a refusal. Public — build guidance, like the prompts.
+        Every mosaic component this node knows with the settings each takes, the navigation modes,
+        the look presets with their data sheets (each saying which ambient it runs at idle), the
+        pattern shelf and the ambient shelf (TARGET-074). An AI asked to change an app's layout
+        reads this first, so the first write is never a refusal. Public — build guidance, like
+        the prompts.
       tags: [Apps]
       responses:
-        '200': { description: "The catalogue: components (id, summary, props), nav_modes, looks" }
+        '200': { description: "The catalogue: components (id, summary, props), nav_modes, looks, look_sheets (with `ambient`), structures, layouts, signature_tokens, dialog, imagery, patterns, ambients (the six presets: feel, evokes, technique, proof, fits_looks, default_alpha, default_speed, peak)" }
 
   /v1/apps/ui/validate:
     post:
@@ -23420,7 +23422,7 @@ paths:
             schema:
               type: object
               properties:
-                layout: { type: object, description: "The whole layout: { v: 1, look?, nav?, blocks: [...] }" }
+                layout: { type: object, description: "The whole layout: { v: 1, look?, nav?, choreography?, tokens?, imagery?, ambient?: { preset, alpha?, speed? }, dialog?, blocks: [...] }" }
       responses:
         '200': { description: "{ ok: true, blocks } or { ok: false, code, message }" }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -23529,8 +23531,11 @@ paths:
         The node's shared library of PROVEN parts (TARGET-074 phase 5). Each part is a `layout`
         (a complete Atelier mosaic arrangement), a `fill` (the same shape with <placeholder>
         slots — a starting shape), a `look` (a signature token sheet with an optional preset), a
-        `motion` (a motion-token recipe) or an `illustration` (art direction for the imagery
-        pipeline), with its lifecycle status and how many builds have adopted it. Published parts
+        `motion` (a motion-token recipe), an `illustration` (art direction for the imagery
+        pipeline), a `genre` (one of the node's served page templates, shown and forked rather
+        than adopted) or an `ambient` (the one layer allowed to move at idle — a preset with its
+        alpha and speed, proven on a look), with its lifecycle status and how many builds have
+        adopted it. Published parts
         are what everyone builds from. PUBLIC for the published shelf — a caller without a
         session sees published parts only; signing in adds the parts still in proposal.
         Retired parts appear in NO default listing (dead is invisible); ask for them by name
@@ -23538,12 +23543,12 @@ paths:
       tags: [Apps]
       security: []
       parameters:
-        - { name: kind, in: query, schema: { type: string, enum: [layout, fill, look, motion, illustration, genre] } }
+        - { name: kind, in: query, schema: { type: string, enum: [layout, fill, look, motion, illustration, genre, ambient] } }
         - { name: status, in: query, schema: { type: string, enum: [proposed, published, aging, retired] } }
         - { name: q, in: query, schema: { type: string }, description: Matched against id, title, summary and tags }
         - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 200 } }
       responses:
-        '200': { description: "{ parts: [{ id, kind, title, summary, tags, status, proposed_by, updated_at, version, usage }], count }" }
+        '200': { description: "{ parts: [{ id, kind, title, summary, tags, status, proposed_by, updated_at, version, usage, published_at? }], count }" }
         '401': { $ref: '#/components/responses/Unauthorized' }
     post:
       operationId: proposeDesignbookPart
@@ -23552,8 +23557,10 @@ paths:
         Propose a part into the Book, or update one you already proposed. The body goes through
         the kind's own bench before anything lands — the layout validator for layout/fill, the
         signature-token bench (contrast-matrix pair proof included) for look/motion, the
-        imagery-style bench for illustration — and a refusal is worded, with the nearest real
-        name suggested. A new part lands as `proposed`; publishing
+        imagery-style bench for illustration, the template registry for genre, the ambient bench
+        for ambient (the preset proven on the part's look through the contrast matrix, so a
+        layer too loud for its ground refuses with numbers) — and a refusal is worded, with the
+        nearest real name suggested. A new part lands as `proposed`; publishing
         it into the shared catalogue is the node operator's call. A part id is a node-wide
         address: once claimed, it answers the same part for everyone, forever, and updating your
         own re-runs the bench and flows as a minor. Requires memory:write.
@@ -23569,10 +23576,13 @@ paths:
                 part:
                   type: object
                   description: >-
-                    { id, kind: layout|fill|look|motion|illustration|genre, title, summary, body,
-                    tags? } — the kind decides the body: a whole mosaic layout (layout/fill),
-                    { tokens, look? } (look), { tokens } of motion tokens only (motion), or
-                    { style, palette_words? } (illustration)
+                    { id, kind: layout|fill|look|motion|illustration|genre|ambient, title,
+                    summary, body, tags? } — the kind decides the body: a whole mosaic layout
+                    (layout/fill), { tokens, look? } (look), { tokens } of motion tokens only
+                    (motion), { style, palette_words? } (illustration), { template } naming a
+                    served genre template (genre), or { ambient, alpha?, speed?, look?, tokens? }
+                    (ambient — one of waves, aurora, dust, grid, static, ink; "none" is an
+                    arrangement's choice, never a part)
                 ai_provenance:
                   allOf:
                     - $ref: '#/components/schemas/AiProvenanceDeclaration'
@@ -23652,11 +23662,15 @@ paths:
       operationId: adoptDesignbookPart
       summary: Adopt a part into one of your apps
       description: >-
-        A layout or fill REPLACES the named app's stored mosaic layout; a look, motion or
-        illustration part MERGES into the arrangement the app already has (and refuses with
-        words when there is none). Every path writes through the same validated, versioned,
-        provenance-stamped door — the replaced layout is archived, so putting it back is one
-        restore. Published parts are adoptable by anyone; a proposed one only by its own
+        A layout or fill REPLACES the named app's stored mosaic layout; a look, motion,
+        illustration or ambient part MERGES into the arrangement the app already has (and
+        refuses with words when there is none). An ambient lands as the arrangement's `ambient`
+        with its tokens beside the existing ones, never its look, and is proven again on the
+        app's own look at the write — a wave proven loud on a night world is refused with the
+        numbers on an editorial app. A genre is never adopted: it is forked from its template,
+        and the refusal carries the address. Every path writes through the same validated,
+        versioned, provenance-stamped door — the replaced layout is archived, so putting it back
+        is one restore. Published parts are adoptable by anyone; a proposed one only by its own
         proposer. Adopting is the usage signal that keeps a part alive. Requires memory:write,
         and the app must belong to the caller's owner.
       tags: [Apps]
@@ -23680,6 +23694,8 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { description: Not published and not yours, or the app belongs to another owner }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: 'GENRE_IS_FORKED — a genre is forked from its template, never adopted; NO_LAYOUT — the app has no stored arrangement to season' }
+        '422': { description: The merged arrangement failed the validator on the app's own look (an ambient too loud for it), in the validator's words }
 
   /v1/designbook/{id}/bench:
     post:
@@ -23690,17 +23706,19 @@ paths:
         1280×460) with the guarantees MEASURED — horizontal overflow zero, units actually
         painted, every control at the touch minimum — and the numbers stamped onto the part's
         bench field. "Ajetaan, ei luvata." A look or motion part is benched by rendering the
-        demo arrangement wearing its token sheet; an illustration answers ran:false with the
-        reason (its bench is the field validation at propose time). A node with no browser
-        answers ran:false with the reason and stamps nothing. The operator's or the part's own
-        proposer's call (its result changes what the gallery says about the part). Requires
-        memory:write.
+        demo arrangement wearing its token sheet; an ambient by rendering it with the layer
+        running behind it on the part's look, and it passes only when the layer painted its
+        first frame at every viewport (ambient_layers, ambient_painted — counts, never pixels);
+        an illustration answers ran:false with the reason (its bench is the field validation at
+        propose time). A node with no browser answers ran:false with the reason and stamps
+        nothing. The operator's or the part's own proposer's call (its result changes what the
+        gallery says about the part). Requires memory:write.
       tags: [Apps]
       security: [{ bearerAuth: [] }]
       parameters:
         - { name: id, in: path, required: true, schema: { type: string } }
       responses:
-        '200': { description: "{ ran, passed?, viewports?: [{ viewport, overflow_px, units_rendered, controls_below_touch_min }], reason?, at }" }
+        '200': { description: "{ ran, passed?, viewports?: [{ viewport, overflow_px, units_rendered, controls_below_touch_min, ambient_layers, ambient_painted }], reason?, at }" }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { description: Not the operator and not the proposer }
         '404': { $ref: '#/components/responses/NotFound' }

@@ -34,6 +34,13 @@
  *   const book = new DesignBookService(storage, config);
  *   const out = await book.propose(callerGaii, raw, provenance);
  * @version-history
+ *   v1.3.0 — 2026-09-05 — The AMBIENT kind in the lifecycle (wish-atelier-ambient-visuals):
+ *     propose stamps ambient-valid and contrast-matrix (plus tokens-valid when a sheet rides
+ *     along); adopt MERGES the layer as the arrangement's `ambient` and its tokens, never its
+ *     look — an ambient is seasoning, and a background that repainted the whole app on adopt
+ *     would be the surprise the merge rule exists to prevent — and the no-arrangement refusal
+ *     names the way an app carries one in its own code. The bench's viewport rows carry the
+ *     layer counts, and a list row says when it was published.
  *   v1.2.0 — 2026-08-29 — Retired parts leave every default listing: dead is invisible, and
  *     only an explicit ?status=retired asks for the graveyard.
  *   v1.1.0 — 2026-08-28 — The new kinds land in the lifecycle: propose stamps the checks the
@@ -65,6 +72,13 @@ function usageKey(id: string): string { return `${USAGE_KEY_PREFIX}${id}`; }
 function proposeChecksFor(input: PartInput): string[] {
   if (input.kind === 'layout' || input.kind === 'fill') return ['layout-valid'];
   if (input.kind === 'illustration') return ['style-valid'];
+  if (input.kind === 'ambient') {
+    // The ambient bench always runs the matrix: the preset is proven on the part's look.
+    const checks = ['ambient-valid', 'contrast-matrix'];
+    const tokens = (input.body as { tokens?: Record<string, string> }).tokens;
+    if (tokens && Object.keys(tokens).length > 0) checks.push('tokens-valid');
+    return checks;
+  }
   const checks = ['tokens-valid'];
   const tokens = (input.body as { tokens?: Record<string, string> }).tokens ?? {};
   if (tokens['--ak-accent']) checks.push('contrast-matrix');
@@ -90,7 +104,10 @@ export interface DesignBookPart {
     /** The automated guarantee bench's last browser run (design-book/bench.ts), when one ran. */
     browser?: {
       ran: boolean; passed?: boolean; reason?: string; at: string;
-      viewports?: Array<{ viewport: string; overflow_px: number; units_rendered: number; controls_below_touch_min: number }>;
+      viewports?: Array<{
+        viewport: string; overflow_px: number; units_rendered: number; controls_below_touch_min: number;
+        ambient_layers?: number; ambient_painted?: number;
+      }>;
     };
   };
   created_at: string;
@@ -102,6 +119,8 @@ export interface PartSummaryRow {
   id: string; kind: PartKind; title: string; summary: string; tags: string[];
   status: PartStatus; proposed_by: string; updated_at: string; version: number;
   usage: number;
+  /** When it was last published — so a gallery can say "new this week" from the truth. */
+  published_at?: string;
 }
 
 export class DesignBookService {
@@ -263,6 +282,7 @@ export class DesignBookService {
         status: part.status, proposed_by: part.proposed_by, updated_at: part.updated_at,
         version: record.version,
         usage: await this.usageOf(part.id),
+        ...(part.published_at ? { published_at: part.published_at } : {}),
       });
       if (rows.length >= limit) break;
     }
@@ -299,10 +319,11 @@ export class DesignBookService {
       throw new DesignBookError('NOT_FOUND',
         `No published app "${filename}" under your owner "${callerOwnerName}". A part is adopted into a published app — publish first, or check the filename.`, 404);
     }
-    // A layout or leiska REPLACES the app's arrangement; a look, motion recipe or illustration
-    // style MERGES into the one it already has — those kinds are seasoning, and seasoning with
-    // no dish to land on refuses with words. Every path writes through the same validated,
-    // versioned, provenance-stamped door, so an adopted accent pair re-proves its matrix here.
+    // A layout or leiska REPLACES the app's arrangement; a look, motion recipe, illustration
+    // style or ambient MERGES into the one it already has — those kinds are seasoning, and
+    // seasoning with no dish to land on refuses with words. Every path writes through the same
+    // validated, versioned, provenance-stamped door, so an adopted accent pair re-proves its
+    // matrix here, and an adopted ambient is proven again on the look it lands on.
     // A GENRE is a whole page: taking one home is a FORK of its template, never a merge into a
     // stored arrangement — adopting it would overwrite an app with a scaffold.
     if (part.kind === 'genre') {
@@ -311,14 +332,30 @@ export class DesignBookService {
         `A genre is forked, not adopted: fetch GET /v1/app-templates/${tid} , swap the words and sources for your app, and publish it as its own file. The Book shows it; the template registry hands it over.`, 409);
     }
     let nextLayout: unknown = part.body;
-    if (part.kind === 'look' || part.kind === 'motion' || part.kind === 'illustration') {
+    if (part.kind === 'look' || part.kind === 'motion' || part.kind === 'illustration' || part.kind === 'ambient') {
       const current = await apps.read(app.ownerGaii, filename);
       if (!current.layout) {
         throw new DesignBookError('NO_LAYOUT',
-          `"${filename}" has no stored arrangement to adopt a ${part.kind} into. Adopt a layout or fill first (or store one with the ui set tool), then season it.`, 409);
+          `"${filename}" has no stored arrangement to adopt a ${part.kind} into. Adopt a layout or fill first (or store one with the ui set tool), then season it.`
+          + (part.kind === 'ambient' ? ' An app with no stored arrangement can still carry an ambient in its own code: app({ ambient: "<preset>" }).' : ''), 409);
       }
       if (part.kind === 'illustration') {
         nextLayout = { ...current.layout, imagery: part.body };
+      } else if (part.kind === 'ambient') {
+        // The layer lands as the arrangement's `ambient` and the sheet merges; the part's look
+        // says where it was proven and previewed, and never overwrites the app's own.
+        const body = part.body as { ambient: string; alpha?: number; speed?: number; tokens?: Record<string, string> };
+        nextLayout = {
+          ...current.layout,
+          ambient: {
+            preset: body.ambient,
+            ...(body.alpha !== undefined ? { alpha: body.alpha } : {}),
+            ...(body.speed !== undefined ? { speed: body.speed } : {}),
+          },
+          ...(body.tokens && Object.keys(body.tokens).length > 0
+            ? { tokens: { ...(current.layout.tokens ?? {}), ...body.tokens } }
+            : {}),
+        };
       } else {
         const body = part.body as { tokens?: Record<string, string>; look?: string };
         nextLayout = {

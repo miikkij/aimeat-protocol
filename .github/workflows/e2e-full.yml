@@ -1,0 +1,88 @@
+name: E2E full sweep
+
+# THE ADVISORY SWEEP, ON ITS OWN CLOCK. Every suite on both backends, nightly and on demand. It
+# lived in ci.yml as two continue-on-error steps until 2026-09-05, where it decided nothing (a red
+# sweep never stopped a merge; the guard tier does that) and decided the wall clock of every push
+# (82 minutes, most of it here). Here it runs at 03:00 Helsinki, and a red run opens an issue —
+# one per backend, reused while it is open — so a failure is a thing somebody sees in the morning
+# rather than a line in a log nobody reads. The way OUT of advisory is unchanged: fix a suite so it
+# can be promoted into the guard tier in ci.yml.
+
+on:
+  schedule:
+    # 00:00 UTC is 03:00 in Helsinki during summer time and 02:00 in winter.
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [sqlite, postgres-kysely]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: appuser
+          POSTGRES_PASSWORD: devpassword123
+          POSTGRES_DB: aimeat_kysely_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.x
+          cache: 'pnpm'
+          cache-dependency-path: aimeat/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: aimeat
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare E2E env files (from committed examples)
+        working-directory: aimeat
+        run: |
+          cp .env.test.sqlite.example .env.test.sqlite
+          cp .env.test.postgres-kysely.example .env.test.postgres-kysely
+
+      # Four lanes: four nodes at once, every suite still alone on an empty database. Measured on
+      # one lane before this existed: 285 suites, 38 minutes, 20 of them restarts between suites.
+      - name: Full sweep (${{ matrix.backend }})
+        working-directory: aimeat
+        run: pnpm test:e2e:${{ matrix.backend }}
+
+      - name: Open or update the issue for a red sweep
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BACKEND: ${{ matrix.backend }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          TITLE="Nightly E2E sweep is red on $BACKEND"
+          BODY="The full E2E sweep on **$BACKEND** failed: $RUN_URL
+
+          The sweep is advisory and blocks nothing; a suite that is red here and matters is one to fix and promote into the guard tier (test/run-e2e-ci.ts, GUARD_SUITES). See docs/coding-guidelines/testing-requirements.md Rule 1b and docs/pitfalls.md §18 before reading a red suite as a regression."
+          EXISTING="$(gh issue list --label nightly-sweep --state open --search "\"$TITLE\" in:title" --json number --jq '.[0].number')"
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body "Still red on $(date -u +%Y-%m-%d): $RUN_URL"
+          else
+            gh label create nightly-sweep --description "Opened by the nightly E2E sweep" --color B60205 2>/dev/null || true
+            gh issue create --title "$TITLE" --label nightly-sweep --body "$BODY"
+          fi

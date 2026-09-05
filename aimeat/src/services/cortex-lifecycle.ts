@@ -43,6 +43,13 @@
  *   const out = await installCortex({ storage, config }, caller, { manifest, libs });
  *   if (!out.ok) { res.status(out.refusal.status).json(error(nodeId, out.refusal.code, out.refusal.message)); return; }
  * @version-history
+ *   v1.3.0 — 2026-09-05 — canSeeCortex / visibleCortexes: the READ counterpart of the ownership
+ *     test the three lifecycle writes already made. Five read doors (four detail reads and both
+ *     lists, HTTP and MCP) carried requireAuth() alone, so any signed-in principal read any owner's
+ *     PRIVATE cortex and the list returned everyone's on `?visibility=private`. The rule has a
+ *     third answer a naive owner fence misses: anything installed as `system@<nodeId>` is the
+ *     node's own and readable by all — the bundled cortexes default to private and 8 of 14 on the
+ *     dev node were, so comparing installedBy to the caller would have hidden every built-in.
  *   v1.2.0 — 2026-09-03 — installCortex refreshes the dependency map and snapshots the version; deleteCortex forgets both.
  *   v1.1.0 — 2026-08-12 — install creates the record before writing lib bytes. The owner check
  *     reads a name that boot seeding may be writing at that same moment, and on that interleaving
@@ -81,6 +88,54 @@ export interface CortexCaller {
 }
 
 /** A refusal, in the terms the HTTP door speaks. The tool renders the code and message as text. */
+/**
+ * May this caller SEE this cortex — its component map, prompts, ontology, activation artifacts?
+ *
+ * The read counterpart of the ownership test the three lifecycle writes make
+ * (`ext.installedBy !== caller.ownerName && !caller.isOperator`), and it exists because those
+ * writes were fenced and the five reads were not: `requireAuth()` was the whole gate on
+ * GET /v1/cortex/:name, /prompts, /prompts/:name, /ontology and on both list doors, so any
+ * authenticated principal read the full component map and activation artifacts of any cortex on
+ * the node — a PRIVATE one belonging to another owner included — and the list took `?visibility=`
+ * from the CALLER as a filter, so asking for `private` returned everyone's. `visibility` was a field
+ * the node stored and showed on every one of those doors and enforced on none of them.
+ *
+ * FOUR ANSWERS, and the third is the one a naive owner fence gets wrong:
+ *   - public                      → anyone signed in. That is what the word means.
+ *   - operator                    → everything, as on the write side.
+ *   - installed by the NODE       → anyone. The bundled cortexes are seeded as `system@<nodeId>`
+ *                                   and default to PRIVATE (cortex-manifest.ts: anything not
+ *                                   `public` is private) — 8 of 14 on the dev node when this was
+ *                                   written. A fence that compared installedBy to the caller's
+ *                                   name would have hidden every built-in from every user, green
+ *                                   in a test with one fixture and broken on the first real node.
+ *   - installed by this owner     → yes. `installedBy` holds the bare owner name for a user
+ *                                   install, which is what the write checks compare against too.
+ *
+ * NOT a scope word. A `cortex:read` permission was proposed for these doors and would not have
+ * closed anything: an app holding it would read every owner's private cortex just the same. The
+ * question is WHOSE, and only ownership answers that.
+ */
+export function canSeeCortex(
+    caller: Pick<CortexCaller, 'ownerName' | 'isOperator'>,
+    ext: Pick<CortexExtensionRecord, 'visibility' | 'installedBy'>,
+    nodeId: string,
+): boolean {
+    if (ext.visibility === 'public') return true;
+    if (caller.isOperator) return true;
+    if (ext.installedBy === `system@${nodeId}`) return true;
+    return ext.installedBy === caller.ownerName;
+}
+
+/** The subset of `exts` this caller may see — one filter for both list doors. */
+export function visibleCortexes<T extends Pick<CortexExtensionRecord, 'visibility' | 'installedBy'>>(
+    caller: Pick<CortexCaller, 'ownerName' | 'isOperator'>,
+    exts: T[],
+    nodeId: string,
+): T[] {
+    return exts.filter(e => canSeeCortex(caller, e, nodeId));
+}
+
 export interface CortexRefusal {
     status: number;
     code: string;

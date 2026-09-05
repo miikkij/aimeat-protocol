@@ -15,6 +15,8 @@
  * @usage  AIMEAT.atelier.i18n.use({ fi: { addTask: 'Lisää tehtävä' }, en: { addTask: 'Add task' } });
  *         AIMEAT.atelier.i18n.t('addTask');
  * @version-history
+ *   v0.4.0 — 2026-09-05 — ambient, ambientOff, ambientCalm, ambientFull (en/fi/es): the weather
+ *     switch's name and its three levels, each language composed as itself.
  *   v0.3.0 — 2026-09-02 — lessMotion (en/fi/es): the label of the bar's less-motion switch.
  *   v0.2.1 — 2026-08-28 — copilot* keys become aide* (the component was renamed before any app
  *     uses it), visible titles per language: Aide / Apuri / Ayudante.
@@ -29,6 +31,10 @@ const BASE = {
   en: {
     loading: 'Loading…',
     lessMotion: 'Less motion',
+    ambient: 'Ambient',
+    ambientOff: 'Off',
+    ambientCalm: 'Calm',
+    ambientFull: 'Full',
     ready: 'Ready.',
     retry: 'Try again',
     close: 'Close',
@@ -89,6 +95,10 @@ const BASE = {
   fi: {
     loading: 'Ladataan…',
     lessMotion: 'Vähemmän liikettä',
+    ambient: 'Taustaliike',
+    ambientOff: 'Pois',
+    ambientCalm: 'Rauhallinen',
+    ambientFull: 'Täysi',
     ready: 'Valmis.',
     retry: 'Yritä uudelleen',
     close: 'Sulje',
@@ -149,6 +159,10 @@ const BASE = {
   es: {
     loading: 'Cargando…',
     lessMotion: 'Menos movimiento',
+    ambient: 'Ambiente',
+    ambientOff: 'Apagado',
+    ambientCalm: 'Suave',
+    ambientFull: 'Completo',
     ready: 'Listo.',
     retry: 'Inténtalo otra vez',
     close: 'Cerrar',

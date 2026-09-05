@@ -11,6 +11,8 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   v1.24.0 -- 2026-09-05 -- The idle sweep's interval comes from config.mcpSessionSweepMs (10 s
+ *            shipped) instead of a constant, so the E2E runner can pin 1 s.
  *   v1.23.0 -- 2026-09-04 -- An unauthenticated `tools/list` answers the public catalogue
  *     (./public-catalogue.ts), so a stranger's agent can learn what this node does before
  *     deciding whether to ask its owner for an account. Names, descriptions and input shapes
@@ -185,9 +187,9 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
     // initialize can keep the agent's MCP use current (services/agent-mcp-touch.ts) without a
     // second token parse. Cleaned wherever the other session maps are.
     const sessionAgents = new Map<string, { gaii: string; platform: string }>();
-    // Every 10 s: the scan is a Map walk over a handful of sessions, and a short interval is what
-    // lets the idle floor go sub-minute (the E2E proves expiry with a 6-second idle).
-    const SWEEP_EVERY_MS = 10_000;
+    // Every config.mcpSessionSweepMs (10 s shipped): the scan is a Map walk over a handful of
+    // sessions, and a short interval is what lets the idle floor go sub-minute. The E2E runner pins
+    // 1 s so e2e-mcp-session-expiry proves a 6-second idle in 8 s rather than 18.
     const sweeper = setInterval(() => {
         const cutoff = Date.now() - config.mcpSessionIdleMinutes * 60_000;
         let reaped = 0;
@@ -206,7 +208,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
             }
         }
         if (reaped > 0) logger.info(`MCP idle sweep: closed ${reaped} session(s) idle over ${config.mcpSessionIdleMinutes} min (${transports.size} remain)`);
-    }, SWEEP_EVERY_MS);
+    }, config.mcpSessionSweepMs);
     sweeper.unref();
 
     async function createMcpServer(

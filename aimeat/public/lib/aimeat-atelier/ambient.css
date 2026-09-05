@@ -1,0 +1,185 @@
+/*
+ * @file aimeat-atelier/ambient.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The ambient layer's sheet: the one layer allowed to move at idle
+ *   (wish-atelier-ambient-visuals). The layer sits behind the app frame (z-index -1 inside the
+ *   frame's own stacking context, which shell.css opens with isolation: isolate), takes no
+ *   pointer, and fades with the viewer's weather: --ak-ambient-weather is 1, 0.5 or 0 from the
+ *   root's data-ak-weather, multiplied by the level the look or the app set on the layer
+ *   itself (--ak-ambient-level, written once by ambient.js, never per frame).
+ *
+ *   The aurora preset is the only one drawn here rather than on a canvas: four lobes in the
+ *   contract's own hues at the registry's peak (26 %), on an oversized layer tweened on
+ *   TRANSFORM by the compositor, so a page-sized gradient is never repainted. It pauses when
+ *   the layer says paused or still, when the kit's Less-motion switch is on, and collapses
+ *   under the operating system's reduced-motion setting (the kit-wide block in the entry sheet
+ *   reaches it too). The unit test holds the lobe percentages at or under the registry's peak.
+ *
+ *   Also here: the stage (a section with its own weather), the weather control (the pressed
+ *   construction of the bar's motion switch, so the two read as one cluster), and attract mode
+ *   (the frame dims its working surface while the layer rises).
+ * @structure --ak-ambient-weather · .ak-ambient · .ak-ambient__canvas · .ak-ambient__drift ·
+ *   static scanlines · .ak-ambient-stage · .ak-ambient-host · .ak-weather · attract
+ * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
+ * @version-history
+ *   v0.47.0 — 2026-09-05 — Initial (wish-atelier-ambient-visuals, stage 3).
+ */
+
+/* ── The viewer's weather ─────────────────────────────────────────────────────────────────── */
+:root { --ak-ambient-weather: 1; }
+html[data-ak-weather='calm'] { --ak-ambient-weather: 0.5; }
+html[data-ak-weather='off'] { --ak-ambient-weather: 0; }
+
+/* ── The layer ────────────────────────────────────────────────────────────────────────────── */
+.ak-ambient {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  contain: strict;
+  opacity: calc(var(--ak-ambient-level, 1) * var(--ak-ambient-weather, 1));
+  transition: opacity calc(var(--ak-motion) * 2) var(--ak-ease);
+}
+.ak-ambient[data-ak-ambient='none'] { display: none; }
+.ak-ambient__canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+/* A host that is not the app frame or a stage (a mosaic root, any element) is made a stacking
+   context by the layer itself, so the layer paints above the host's ground and under its
+   content instead of falling behind the page. */
+.ak-ambient-host { position: relative; isolation: isolate; }
+
+/* ── aurora: the compositor's preset ─────────────────────────────────────────────────────── */
+.ak-ambient__drift {
+  position: absolute;
+  inset: -18%;
+  will-change: transform;
+  background-image:
+    radial-gradient(at 20% 30%, color-mix(in oklab, var(--ak-accent) 26%, var(--ak-bg)), transparent 55%),
+    radial-gradient(at 80% 20%, color-mix(in oklab, var(--ak-spectrum-2) 26%, var(--ak-bg)), transparent 55%),
+    radial-gradient(at 70% 80%, color-mix(in oklab, var(--ak-spectrum-3) 26%, var(--ak-bg)), transparent 55%),
+    radial-gradient(at 25% 85%, color-mix(in oklab, var(--ak-accent) 20%, var(--ak-bg)), transparent 55%);
+  animation: ak-ambient-drift calc(64s / var(--ak-ambient-speed, 1)) ease-in-out infinite alternate;
+}
+@keyframes ak-ambient-drift {
+  from { transform: translate3d(-6%, -4%, 0) scale(1); }
+  to   { transform: translate3d(6%, 4%, 0) scale(1.08); }
+}
+.ak-ambient[data-ak-ambient-state='paused'] .ak-ambient__drift,
+.ak-ambient[data-ak-ambient-state='still'] .ak-ambient__drift,
+html[data-ak-motion='less'] .ak-ambient__drift { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .ak-ambient__drift { animation: none; }
+}
+@media (max-width: 600px) {
+  .ak-ambient__drift { inset: -12%; }
+}
+
+/* ── static: the scanlines ride on CSS, the noise on the canvas ───────────────────────────── */
+.ak-ambient[data-ak-ambient='static']::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(180deg, transparent 0 2px,
+    color-mix(in oklab, var(--ak-ink) 8%, transparent) 2px 4px);
+}
+
+/* ── The stage ────────────────────────────────────────────────────────────────────────────── */
+.ak-ambient-stage {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: var(--ak-ambient-stage-min, 40dvh);
+  border-radius: var(--ak-radius);
+  background: var(--ak-bg);
+  color: var(--ak-ink);
+}
+.ak-ambient-stage__body {
+  position: relative;
+  padding: var(--ak-pad);
+}
+
+/* ── The weather control ──────────────────────────────────────────────────────────────────── */
+.ak-weather {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: var(--ak-touch);
+  min-height: var(--ak-touch);
+  padding: 0 8px;
+  border: var(--ak-line-w) solid var(--ak-line);
+  border-radius: var(--ak-radius-sm);
+  background: var(--ak-surface);
+  color: var(--ak-ink);
+  font: inherit;
+  font-size: var(--ak-text-fine);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: filter var(--ak-motion) var(--ak-ease);
+}
+.ak-weather:hover { filter: brightness(1.04); }
+.ak-weather--cycle[data-ak-level='off'] { color: var(--ak-ink-dim); }
+.ak-weather__icon { display: block; width: 20px; height: 20px; }
+.ak-weather__wave {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  opacity: 0.28;
+  transition: opacity var(--ak-motion) var(--ak-ease);
+}
+.ak-weather--cycle[data-ak-level='calm'] .ak-weather__wave:nth-child(2),
+.ak-weather--cycle[data-ak-level='full'] .ak-weather__wave { opacity: 1; }
+.ak-weather__word { display: none; }
+@media (min-width: 480px) {
+  .ak-weather__word { display: inline; }
+}
+/* The three-way form for a settings screen: one joined row, the chosen level lit the way the
+   motion switch lights when pressed. */
+.ak-weather--segments {
+  gap: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: default;
+}
+.ak-weather__seg {
+  min-height: var(--ak-touch);
+  padding: 0 12px;
+  border: var(--ak-line-w) solid var(--ak-line);
+  border-radius: 0;
+  background: var(--ak-surface);
+  color: var(--ak-ink);
+  font: inherit;
+  font-size: var(--ak-text-fine);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.ak-weather__seg + .ak-weather__seg { border-left: none; }
+.ak-weather__seg:first-child { border-radius: var(--ak-radius-sm) 0 0 var(--ak-radius-sm); }
+.ak-weather__seg:last-child { border-radius: 0 var(--ak-radius-sm) var(--ak-radius-sm) 0; }
+.ak-weather__seg[aria-checked='true'] {
+  background: color-mix(in oklab, var(--ak-accent) 12%, var(--ak-surface));
+  border-color: color-mix(in oklab, var(--ak-accent) 45%, var(--ak-line));
+  color: var(--ak-accent-text);
+}
+
+/* ── Attract mode ─────────────────────────────────────────────────────────────────────────── */
+.ak-app > .ak-app__bar,
+.ak-app > .ak-app__main,
+.ak-app > .ak-app__foot {
+  transition: opacity calc(var(--ak-motion) * 4) var(--ak-ease);
+}
+.ak-app[data-ak-attract='on'] > .ak-app__bar,
+.ak-app[data-ak-attract='on'] > .ak-app__main,
+.ak-app[data-ak-attract='on'] > .ak-app__foot {
+  opacity: var(--ak-attract-dim, 0.35);
+}
