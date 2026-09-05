@@ -38,6 +38,6 @@ export interface AppGrantRepository {
    * writing a permission onto a credential that cannot be used.
    */
   listAppGrants(): Promise<AppGrantRecord[]>;
-  updateAppGrant(grantId: string, updates: Partial<Pick<AppGrantRecord, 'refreshTokenHash' | 'lastUsedAt' | 'revoked' | 'scopes' | 'spendCapMorsels' | 'spentMorsels'>>): Promise<AppGrantRecord | null>;
+  updateAppGrant(grantId: string, updates: Partial<Pick<AppGrantRecord, 'refreshTokenHash' | 'lastUsedAt' | 'revoked' | 'scopes' | 'spendCapMorsels' | 'spentMorsels' | 'scopesFixedAt'>>): Promise<AppGrantRecord | null>;
   deleteAppGrant(grantId: string): Promise<boolean>;
 }

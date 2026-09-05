@@ -7,9 +7,14 @@
  *   scopes (a scoped, sandboxed test GAII) or — when explicitly chosen — full owner / operator
  *   access. Agents exchange the token for a short access JWT to act on the owner's behalf
  *   (e.g. drive/verify a webapp they built). Only the SHA-256 hash of the raw token is stored.
- * @structure accessTokensRouter() — POST/GET/DELETE /v1/access/tokens (owner) + POST /v1/auth/token/exchange (token is the auth).
+ * @structure accessTokensRouter() — GET /v1/access/overview (owner, or account:security) +
+ *   POST/GET/DELETE /v1/access/tokens (owner) + POST /v1/auth/token/exchange (token is the auth).
  * @usage app.use(accessTokensRouter(config, storage));
  * @version-history
+ * v1.2.0 - 2026-09-05 - The overview carries the sign-in state, the open sessions grouped, the
+ *   accounts connected elsewhere and the base package (AccessTabService v2), and opens to a principal
+ *   holding account:security as well as the owner, so aimeat_access_list on the connector and CLI
+ *   surfaces answers through this door with the agent's own credential.
  * v1.1.0 - 2026-07-16 - Add GET /v1/access/overview: the Access tab's 6-request mount folded into one
  *   composite (AccessTabService, Phase 4). Owner-gated; individual endpoints stay for interactive refresh.
  * v1.0.0 - 2026-06-03 - Initial (plan 2026-06-03-agent-access-tokens).
@@ -18,7 +23,7 @@ import { Router } from 'express';
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireRoleOrScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { issueJWT } from '../auth/jwt.js';
@@ -26,20 +31,21 @@ import { buildGAII } from '../utils/gaii.js';
 import { hashToken } from '../services/owner-session.js';
 import { resolvePat } from '../services/access-token.js';
 import { createAccessTabService } from '../services/db/access-tab-db-service.js';
+import { ACCOUNT_SECURITY_SCOPE } from '../utils/scope-coverage.js';
 
 export function accessTokensRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
-  const accessDb = createAccessTabService(storage);
+  const accessDb = createAccessTabService(storage, config);
 
-  /* ── GET /v1/access/overview — the whole Access tab mount in ONE call (consent + ghii public key +
-   * app-grants + access-tokens + sharing-groups + agent-defaults), composed in one read scope by
-   * AccessTabService. Owner-scope: requires 'owner' role — stricter than the six folded endpoints
-   * (some of which agents may reach with a scope), so no section is exposed more widely. Each section is
-   * returned in its source endpoint's payload shape; the individual endpoints stay for interactive
-   * re-fetches. ── */
-  router.get('/v1/access/overview', requireAuth(), requireRole('owner'), async (req, res) => {
+  /* ── GET /v1/access/overview — the whole Access page in ONE call: consent, public key, the apps'
+   * grants, the tokens, sharing groups, agent defaults, and since 2026-09-05 the sign-in state, the
+   * open sessions grouped, the accounts connected elsewhere and the base package. The owner reads it,
+   * and so does a principal the owner ticked account:security for (the MCP tool's road in): the word
+   * is outside every wildcard, so "full access" does not open this door. `owner` is the account name
+   * every principal in the person's name carries, which is exactly the account the answer is about. ── */
+  router.get('/v1/access/overview', requireAuth(), requireRoleOrScope('owner', ACCOUNT_SECURITY_SCOPE), async (req, res) => {
     const owner = req.auth!.owner as string;
-    const data = await accessDb.overview(owner, `${owner}@${config.nodeId}`);
+    const data = await accessDb.overview(owner, `${owner}@${config.nodeId}`, req.auth!.sessionId);
     res.json(success(config.nodeId, data));
   });
 
