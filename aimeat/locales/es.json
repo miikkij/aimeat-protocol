@@ -98,7 +98,7 @@
       "searchPlaceholder": "Busca por nombre, propietario o archivo…",
       "hiddenOnly": "Solo las ocultas",
       "hiddenChip": "oculta",
-      "scanCopies": "🔍 Buscar copias",
+      "scanCopies": "Buscar copias",
       "scanning": "Buscando…",
       "scanned": "revisadas",
       "copyScanTitle": "Búsqueda de copias sin atribuir",
@@ -128,7 +128,7 @@
       "deletedOk": "Aplicación eliminada para siempre.",
       "deleteTitle": "Eliminar la aplicación",
       "deleteConfirm": "Eliminar para siempre",
-      "deleteWarn": "⚠️ Esto quita la aplicación y todas sus versiones del nodo por completo. No se puede deshacer: quien la publicó también la pierde. Si solo quieres ocultarla, usa Ocultar.",
+      "deleteWarn": "Esto quita la aplicación y todas sus versiones del nodo por completo. No se puede deshacer: quien la publicó también la pierde. Si solo quieres ocultarla, usa Ocultar.",
       "deleteTypeLabel": "Escribe el nombre del archivo para confirmar: {filename}"
     },
     "security": {
@@ -4356,7 +4356,7 @@
     "refresh": "Actualizar",
     "logout": "Cerrar sesión",
     "loading": "Cargando...",
-    "loginTitle": "❤️ Panel de AIMEAT",
+    "loginTitle": "Panel de AIMEAT",
     "loginDesc": "Inicia sesión para entrar en el panel de administración",
     "username": "Nombre de usuario",
     "password": "Contraseña",

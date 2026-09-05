@@ -6,6 +6,7 @@
  * @structure Single `loadAll` fetches all dashboard data; tabs render slices of it. SSE
  *            live-updates trigger a debounced, silent background refresh.
  * @version-history
+ *   v1.8.0 — 2026-09-05 — The sign-in card's lock emoji goes: no emoji anywhere in the interface.
  *   v1.5.0 — 2026-07-16 — Drop the per-item emoji icons from the sidebar nav and page title
  *     (label-only menu — the icons added visual noise without aiding scanning).
  *   v1.1.0 — 2026-06-18 — Debounce + silence SSE-driven refresh so busy nodes don't flicker "Loading…".
@@ -378,7 +379,7 @@ export default function Admin({ navigate, locale }) {
     return html`<div class="adm">
       <div class="adm-login">
         <div class="adm-card" style="text-align:center">
-          <h2>\u{1F512} ${t('dashboard.loginTitle')}</h2>
+          <h2>${t('dashboard.loginTitle')}</h2>
           <p>${t('dashboard.loginDesc')}</p>
           <p style="color:var(--text-dim);font-size:.85rem">${t('dashboard.loginNeedOperator') || 'You need to sign in with an operator account from the header.'}</p>
         </div>

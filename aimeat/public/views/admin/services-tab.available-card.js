@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Available (bundled) extension card with disk-script editor + add-action for the admin Services tab. Extracted from services-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-09-05 — The script-editor button loses its emoji: no emoji anywhere in the interface.
  *   v1.0.0 — 2026-07-13 — Extracted from services-tab.js (max-file-lines)
  */
 import { h } from 'preact';
@@ -101,7 +102,7 @@ function AvailableExtCard({ ext, isInstalled, isInstalling, onInstall, onReinsta
         }
         <button class="adm-btn-sm" onClick=${() => setShowEditor(!showEditor)}
           style="font-size:.8rem${showEditor ? ';color:#818cf8;border-color:rgba(79,70,229,0.4)' : ''}">
-          \u{1F4DD} ${t('dashboard.servicesScriptEditor')}
+          ${t('dashboard.servicesScriptEditor')}
         </button>
         ${msg && html`<span class="adm-text-sm" style="color:${msg.ok ? '#22c55e' : '#ef4444'}">${msg.text}</span>`}
       </div>

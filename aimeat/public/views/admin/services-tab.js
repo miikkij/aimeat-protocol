@@ -6,6 +6,7 @@
  *   extensions and their instances, install bundled extensions one-click,
  *   edit action scripts and instance translations.
  * @version-history
+ *   v1.2.0 — 2026-09-05 — The script-editor, config, translation and status buttons say their words instead of emoji: no emoji anywhere in the interface.
  *   v1.1.0 — 2026-06-02 — Admin design unification: raw script/JSON textareas
  *     → adm-textarea adm-input-full (drop inline mono/resize/border styles).
  *   v1.2.0 — 2026-07-13 — Split sub-components (config-form/translation-editor/
@@ -156,7 +157,7 @@ function ExtensionPanel({ ext, onUninstall }) {
             ${(ext.actions || []).length > 0 && html`
               <button class="adm-btn-sm" onClick=${() => setShowScripts(!showScripts)}
                 style="font-size:.8rem${showScripts ? ';color:#818cf8;border-color:rgba(79,70,229,0.4)' : ''}">
-                \u{1F4DD} ${t('dashboard.servicesScriptEditor')}
+                ${t('dashboard.servicesScriptEditor')}
               </button>
             `}
             <button class="adm-btn-sm" onClick=${loadInstances} style="font-size:.8rem">
@@ -219,16 +220,16 @@ function ExtensionPanel({ ext, onUninstall }) {
                           <button class="adm-btn-sm" onClick=${() => openConfigEditor(inst)}
                             style="font-size:.75rem${cfgOpen ? ';color:#818cf8' : ''}"
                             title=${t('dashboard.servicesEditConfig')}>
-                            \u2699
+                            ${t('dashboard.servicesEditConfig')}
                           </button>
                         `}
                         <button class="adm-btn-sm" onClick=${() => setEditingTl(tlOpen ? null : inst.id)}
                           style="font-size:.75rem${tlOpen ? ';color:#818cf8' : ''}"
                           title=${t('dashboard.servicesTlTitle')}>
-                          \uD83C\uDF10
+                          ${t('dashboard.servicesTlTitle')}
                         </button>
                         <button class="adm-btn-sm" onClick=${() => handleToggleStatus(inst)}>
-                          ${inst.status === 'active' ? '\u23F8' : '\u25B6'}
+                          ${inst.status === 'active' ? t('dashboard.csmDisable') : t('dashboard.csmEnable')}
                         </button>
                         <button class="adm-btn-sm adm-btn-danger" onClick=${() => handleDelete(inst)}>
                           \u2715

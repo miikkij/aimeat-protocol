@@ -98,7 +98,7 @@
       "searchPlaceholder": "Hae nimellä, omistajalla tai tiedostonimellä…",
       "hiddenOnly": "Vain piilotetut",
       "hiddenChip": "piilotettu",
-      "scanCopies": "🔍 Etsi kopioita",
+      "scanCopies": "Etsi kopioita",
       "scanning": "Etsitään…",
       "scanned": "skannattu",
       "copyScanTitle": "Luvattomien kopioiden haku",
@@ -128,7 +128,7 @@
       "deletedOk": "Sovellus poistettu pysyvästi.",
       "deleteTitle": "Poista sovellus",
       "deleteConfirm": "Poista pysyvästi",
-      "deleteWarn": "⚠️ Tämä poistaa sovelluksen ja kaikki sen versiot kokonaan solmusta. Tätä ei voi perua — myös omistaja menettää sen. Jos haluat vain piilottaa, käytä Piilota-toimintoa.",
+      "deleteWarn": "Tämä poistaa sovelluksen ja kaikki sen versiot kokonaan solmusta. Tätä ei voi perua — myös omistaja menettää sen. Jos haluat vain piilottaa, käytä Piilota-toimintoa.",
       "deleteTypeLabel": "Vahvista kirjoittamalla tiedostonimi: {filename}"
     },
     "security": {
@@ -4356,7 +4356,7 @@
     "refresh": "Päivitä",
     "logout": "Kirjaudu ulos",
     "loading": "Ladataan...",
-    "loginTitle": "❤️ AIMEAT Hallintapaneeli",
+    "loginTitle": "AIMEAT Hallintapaneeli",
     "loginDesc": "Kirjaudu hallintapaneeliin",
     "username": "Käyttäjänimi",
     "password": "Salasana",
