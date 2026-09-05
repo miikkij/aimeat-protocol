@@ -2,153 +2,171 @@
  * @file security-tab.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Admin Security tab — lists security incidents (e.g. rejected/quarantined ZIP uploads):
- *   what happened, the machine code, on whose behalf, the source, when, and the status. Operators can
- *   download the quarantined payload for inspection, mark an incident resolved, or delete it.
+ * @description Admin Security page in the poster face (design canvas "AIMEAT Admin Security",
+ *   direction A). One read, GET /v1/admin/security/overview, which the aimeat_admin_security_overview
+ *   tool returns too, and six sections in the order an operator asks: what is happening at the door
+ *   right now (every number with a sentence and a zone the server decided from this instance's own
+ *   history), the numeral strip, who was turned away (grouped, then listed), what was refused and
+ *   kept (with the one ink slab, Resolve), who holds the keys, what the doors are set to (read as
+ *   sentences with a door to change them), and the paste for the operator's own AI.
+ * @structure SecurityTab({ switchPage }) — load · alertLine · RightNow · Strip · the sections from
+ *   security-tab.refusals.js and security-tab.sections.js · the actions (resolve, delete, payload)
  * @version-history
+ *   v2.0.0 — 2026-09-05 — The poster face and the one read; the Statistics tab's three security
+ *     counters become rows here with a sentence each; the emoji heading and the party-popper empty
+ *     state go; every admin tab re-reads on a live update, this one included.
  *   v1.1.0 — 2026-08-17 — Refusal-log section: the tail of the auth refusal log as a table
  *     (who was turned away, at which door, from where, with what), plus top-doors/top-IPs
  *     summaries computed from the same rows.
  *   v1.0.0 — 2026-06-09 — Initial: incident list + resolve / delete / download-quarantine.
  */
 import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
-import { dt, useToast, Toast } from './shared.js';
+import { useViewCSS } from '/components/useViewCSS.js';
+import { onLiveUpdate } from '/lib/live-updates.js';
+import { num, fmtUp, Badge, Spinner, useToast, Toast } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
-import { getSecurityIncidents, resolveSecurityIncident, deleteSecurityIncident, getAuthRefusals } from '/js/services/admin.js';
+import { getSecurityOverview, resolveSecurityIncident, deleteSecurityIncident } from '/js/services/admin.js';
 import { authHeaders } from '/js/services/auth.js';
+import { RefusalsSection, ipText } from './security-tab.refusals.js';
+import { IncidentsSection, AccountsSection, SettingsSection, AskAiSection } from './security-tab.sections.js';
 
 const html = htm.bind(h);
+const S = (key, params) => t('admin.security.' + key, params);
 
-/** Top N values of one field across the refusal rows, as [value, count] pairs. */
-function topOf(items, field, n = 5) {
-  const counts = new Map();
-  for (const r of items) {
-    const v = r[field] || '?';
-    counts.set(v, (counts.get(v) || 0) + 1);
+/** The sentence beside the status word: what needs a person, or that nothing does. */
+export function alertLine(ov) {
+  const parts = [];
+  const open = ov.now.open_incidents.value;
+  if (open === 1) parts.push(S('now.lineOpenOne'));
+  else if (open > 1) parts.push(S('now.lineOpenMany', { n: num(open) }));
+  const r = ov.refusals;
+  if (r.walled_in_window > 0) {
+    parts.push(r.walled_sources.length === 1
+      ? S('now.lineWalledOne', { n: num(r.walled_in_window), source: ipText(r.walled_sources[0]) })
+      : S('now.lineWalledMany', { n: num(r.walled_in_window), sources: num(r.walled_sources.length) }));
   }
-  return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, n);
+  if (parts.length) return parts.join(' ');
+  return ov.now.status === 'watch' ? S('now.lineWatch') : S('now.lineQuiet');
 }
 
-export default function SecurityTab() {
-  const [state, setState] = useState({ incidents: [], open: 0, total: 0, loading: true });
-  const [refusals, setRefusals] = useState({ enabled: true, items: [], loading: true });
+/** Section 01: the status word, its sentence, the log line, and the five headline numbers as rows. */
+function RightNow({ ov, switchPage }) {
+  const n = ov.now;
+  const row = (key, zone, value, last) => html`
+    <div class="adm-mrow ${last ? 'adm-mrow--last' : ''}">
+      <span><b>${S('now.' + key)}</b><span class="adm-why">${S('now.' + key + 'Why')}</span></span>
+      <span><${Badge} type=${zone} /></span>
+      <span class="adm-mval">${value}</span>
+    </div>`;
+  const meanText = n.refusals.mean_per_day != null
+    ? S('now.refusalsMean', { mean: num(n.refusals.mean_per_day), hours: num(Math.round(n.refusals.readable_hours || 0)) })
+    : S('now.refusalsNoMean');
+  const topText = n.sources.top_source && n.sources.top_share != null
+    ? S('now.sourcesTop', { share: Math.round(n.sources.top_share * 100), source: ipText(n.sources.top_source) })
+    : '';
+  const wordClass = n.status === 'open' ? 'danger' : n.status === 'watch' ? 'watch' : '';
+  const logLine = (n.log.enabled ? S('now.logOn', { mb: Math.round(n.log.max_bytes / 1048576) }) : S('now.logOff'))
+    + (n.uptime_seconds != null ? ' · ' + S('now.restarted', { ago: fmtUp(n.uptime_seconds) }) : '');
+  return html`
+    <section class="og-sec og-sec--first" id="adm-sec-01">
+      <div class="og-sec-h"><h2>${S('now.title')}<small>01</small></h2>
+        <div class="og-doors"><button type="button" class="og-door og-door--quiet" onClick=${() => switchPage('metrics')}>${S('now.toMetrics')}</button></div></div>
+      <div class="adm-ov-grid">
+        <div>
+          <div class="adm-ov-status ${wordClass}">${S('now.word.' + n.status)}</div>
+          <p class="adm-alert-line">${alertLine(ov)}</p>
+          <div class="adm-ov-up">${logLine}</div>
+        </div>
+        <div>
+          ${row('refusals', n.refusals.zone, `${num(n.refusals.value)} · ${meanText}`)}
+          ${row('sources', n.sources.zone, topText ? `${num(n.sources.value)} · ${topText}` : num(n.sources.value))}
+          ${row('rateLimit', n.rate_limit_hits.zone, num(n.rate_limit_hits.value))}
+          ${row('scope', n.scope_denials.zone, num(n.scope_denials.value))}
+          ${row('open', n.open_incidents.zone, num(n.open_incidents.value), true)}
+        </div>
+      </div>
+    </section>`;
+}
+
+/** The numeral strip: five cells, each a door to the section or the page that explains it. */
+function Strip({ ov, switchPage }) {
+  const n = ov.now, r = ov.refusals, a = ov.accounts, i = ov.incidents;
+  const go = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const cell = (onClick, value, label, sub, hot) => html`
+    <button type="button" onClick=${onClick}><b class=${hot ? 'og-coral-num' : ''}>${value}</b><span>${label}</span>${sub ? html`<small>${sub}</small>` : null}</button>`;
+  return html`<div class="og-strip">
+    ${cell(() => go('adm-sec-02'), num(n.refusals.value), S('strip.refusals'),
+      n.refusals.mean_per_day != null ? S('strip.refusalsSub', { mean: num(n.refusals.mean_per_day) }) : S('strip.refusalsSubNoMean'))}
+    ${cell(() => go('adm-sec-02'), num(n.sources.value), S('strip.sources'), r.by_source[0] ? S('strip.sourcesSub', { n: num(r.by_source[0].count) }) : '')}
+    ${cell(() => go('adm-sec-03'), num(i.open), S('strip.open'), S('strip.openSub', { total: num(i.total), resolved: num(i.total - i.open) }), i.open > 0)}
+    ${cell(() => switchPage('owners'), num(a.operators.length), S('strip.operators'),
+      S('strip.operatorsSub', { total: num(a.owners_total), deactivated: num(a.deactivated.length) }))}
+    ${cell(() => switchPage('ghii'), num(a.two_step_on), S('strip.twoStep'),
+      S('strip.twoStepSub', { total: num(a.owners_total), rest: num(Math.max(0, a.owners_total - a.two_step_on)) }))}
+  </div>`;
+}
+
+export default function SecurityTab(props) {
+  const { switchPage } = props;
+  useViewCSS('/css/views/admin-security.css');
+  const [ov, setOv] = useState(null);
+  const [failed, setFailed] = useState(false);
   const [toast, showErr, showOk, clearToast] = useToast();
   const { confirm, ConfirmUI } = useConfirm();
 
-  const load = async () => {
-    try { const r = await getSecurityIncidents(); setState({ incidents: r?.data?.incidents || [], open: r?.data?.open || 0, total: r?.data?.total || 0, loading: false }); }
-    catch (e) { setState({ incidents: [], open: 0, total: 0, loading: false }); showErr((e && e.message) || 'Failed to load incidents'); }
-    try { const r = await getAuthRefusals(200); setRefusals({ enabled: r?.data?.enabled !== false, items: r?.data?.items || [], loading: false }); }
-    catch (e) { setRefusals({ enabled: true, items: [], loading: false }); showErr((e && e.message) || 'Failed to load refusals'); }
-  };
-  // load once on mount. `load` is re-created each render and closes over showErr/setState; including
-  // it would re-run every render (loop).
+  const load = useCallback(async () => {
+    try {
+      const r = await getSecurityOverview();
+      if (r?.data?.now) { setOv(r.data); setFailed(false); } else setFailed(true);
+    } catch (e) { setFailed(true); showErr((e && e.message) || t('common.error')); }
+  // showErr is re-created each render; listing it would re-create load every render (loop).
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load(); }, []);
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => onLiveUpdate(['security', 'ghii', 'totp', 'config'], () => load()), [load]);
 
   const resolve = async (id) => {
-    try { await resolveSecurityIncident(id); showOk(t('admin.security.resolved') || 'Incident resolved'); load(); }
-    catch (e) { showErr((e && e.message) || 'Failed'); }
+    try { await resolveSecurityIncident(id); showOk(S('resolved')); load(); }
+    catch (e) { showErr((e && e.message) || t('common.error')); }
   };
   const remove = (id) => confirm(
-    t('admin.security.deleteConfirm') || 'Delete this incident and its quarantined file?',
-    async () => { try { await deleteSecurityIncident(id); showOk(t('admin.security.deleted') || 'Deleted'); load(); } catch (e) { showErr((e && e.message) || 'Failed'); } },
-    { danger: true, title: t('admin.security.title') || 'Security' },
+    S('deleteConfirm'),
+    async () => { try { await deleteSecurityIncident(id); showOk(S('deleted')); load(); } catch (e) { showErr((e && e.message) || t('common.error')); } },
+    { danger: true, title: S('title') },
   );
   const downloadQuarantine = async (id) => {
     try {
       const res = await fetch(`/v1/admin/security/incidents/${encodeURIComponent(id)}/quarantine`, { headers: authHeaders() });
-      if (!res.ok) throw new Error('No quarantined payload');
+      if (!res.ok) throw new Error(t('common.error'));
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a'); a.href = url; a.download = `quarantine-${id}.zip`;
       document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-    } catch (e) { showErr((e && e.message) || 'No quarantined file'); }
+    } catch (e) { showErr((e && e.message) || t('common.error')); }
   };
 
-  return html`
-    <div class="adm-section">
-      <${ConfirmUI} />${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
-      <div class="adm-card">
-        <h2 class="adm-sec-title">${'🛡️ '}${t('admin.security.title') || 'Security'}</h2>
-        <p class="adm-sec-desc">
-          ${t('admin.security.desc') || 'Rejected / quarantined uploads and other security incidents.'}
-          ${state.open > 0 ? html` <span class="adm-badge adm-badge--danger">${state.open} ${t('admin.security.open') || 'open'}</span>` : null}
-        </p>
-        ${state.loading
-          ? html`<div class="adm-sec-empty">${t('common.loading') || 'Loading…'}</div>`
-          : state.incidents.length === 0
-            ? html`<div class="adm-sec-empty">${t('admin.security.none') || 'No security incidents 🎉'}</div>`
-            : html`<div class="adm-sec-list">
-                ${state.incidents.map(i => html`
-                  <div class="adm-sec-row ${i.status === 'open' ? 'open' : ''}" key=${i.id}>
-                    <div class="adm-sec-main">
-                      <div class="adm-sec-line1">
-                        <span class="adm-badge ${i.status === 'open' ? 'adm-badge--danger' : 'adm-badge--success'}">${escHtml(i.status)}</span>
-                        <span class="adm-sec-type">${escHtml(i.type)}</span>
-                        <code class="adm-sec-code">${escHtml(i.code)}</code>
-                        <span class="adm-sec-when">${dt(i.createdAt)}</span>
-                      </div>
-                      <div class="adm-sec-line2">
-                        ${escHtml(i.detail || '')}
-                      </div>
-                      <div class="adm-sec-line3">
-                        <span>${t('admin.security.actor') || 'On behalf of'}: <strong>${escHtml(i.actor_name || i.actor || '?')}</strong></span>
-                        ${i.source ? html`<span> · ${t('admin.security.source') || 'Source'}: ${escHtml(i.source)}</span>` : null}
-                        ${i.size_bytes ? html`<span> · ${(i.size_bytes / 1024).toFixed(0)} KB</span>` : null}
-                      </div>
-                    </div>
-                    <div class="adm-sec-actions">
-                      ${i.quarantine_key ? html`<button class="adm-btn" onClick=${() => downloadQuarantine(i.id)}>${'⬇ '}${t('admin.security.evidence') || 'Payload'}</button>` : null}
-                      ${i.status === 'open' ? html`<button class="adm-btn" onClick=${() => resolve(i.id)}>${t('admin.security.resolve') || 'Resolve'}</button>` : null}
-                      <button class="adm-btn" onClick=${() => remove(i.id)}>${'✕ '}${t('admin.security.delete') || 'Delete'}</button>
-                    </div>
-                  </div>`)}
-              </div>`}
-      </div>
+  if (!ov) {
+    return html`<div class="og adm-sec">
+      ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
+      ${failed ? html`<div class="adm-sec-empty adm-sec-empty--last">${S('loadFailed')}</div>` : html`<${Spinner} />`}
+    </div>`;
+  }
 
-      <div class="adm-card">
-        <h2 class="adm-sec-title">${t('admin.security.refusals.title')}</h2>
-        <p class="adm-sec-desc">${t('admin.security.refusals.desc')}</p>
-        ${refusals.loading
-          ? html`<div class="adm-sec-empty">${t('common.loading') || 'Loading…'}</div>`
-          : !refusals.enabled
-            ? html`<div class="adm-sec-empty">${t('admin.security.refusals.disabled')} <code>AIMEAT_AUTH_LOG_PATH</code></div>`
-            : refusals.items.length === 0
-              ? html`<div class="adm-sec-empty">${t('admin.security.refusals.none')}</div>`
-              : html`
-                <div class="adm-sec-line3">
-                  <span>${t('admin.security.refusals.topDoors')}: ${topOf(refusals.items, 'path').map(([v, n]) => html`<code class="adm-sec-code">${escHtml(v)}</code> ×${n} `)}</span>
-                </div>
-                <div class="adm-sec-line3">
-                  <span>${t('admin.security.refusals.topIps')}: ${topOf(refusals.items, 'ip').map(([v, n]) => html`<code class="adm-sec-code">${escHtml(v)}</code> ×${n} `)}</span>
-                </div>
-                <table class="adm-db-table">
-                  <thead>
-                    <tr>
-                      <th>${t('admin.security.refusals.time')}</th>
-                      <th>${t('admin.security.refusals.answer')}</th>
-                      <th>${t('admin.security.refusals.door')}</th>
-                      <th>${t('admin.security.refusals.ip')}</th>
-                      <th>${t('admin.security.refusals.credential')}</th>
-                      <th>${t('admin.security.refusals.reason')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${refusals.items.map((r, i) => html`<tr key=${r.ts + i}>
-                      <td class="adm-sec-when">${dt(r.ts)}</td>
-                      <td><span class="adm-badge ${r.status === 401 ? 'adm-badge--warning' : 'adm-badge--danger'}">${r.status}</span> <code class="adm-sec-code">${escHtml(r.code || '')}</code></td>
-                      <td class="adm-metrics-route">${escHtml(r.method || '')} ${escHtml(r.path || '')}</td>
-                      <td class="adm-metrics-route">${escHtml(r.ip || '')}</td>
-                      <td>${escHtml(r.credential || 'none')}${r.credential_digest ? html` <code class="adm-sec-code">${escHtml(r.credential_digest)}</code>` : null}</td>
-                      <td class="adm-sec-line2">${escHtml((r.reason || '').slice(0, 120))}</td>
-                    </tr>`)}
-                  </tbody>
-                </table>`}
+  return html`
+    <div class="og adm-sec">
+      <${ConfirmUI} />${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
+      <p class="adm-intro">${S('intro')}</p>
+      <${RightNow} ov=${ov} switchPage=${switchPage} />
+      <${Strip} ov=${ov} switchPage=${switchPage} />
+      <${RefusalsSection} ov=${ov} switchPage=${switchPage} onError=${showErr} />
+      <${IncidentsSection} ov=${ov} onResolve=${resolve} onDelete=${remove} onPayload=${downloadQuarantine} />
+      <div class="adm-two">
+        <${AccountsSection} ov=${ov} switchPage=${switchPage} />
+        <${SettingsSection} ov=${ov} switchPage=${switchPage} />
       </div>
+      <${AskAiSection} />
     </div>`;
 }

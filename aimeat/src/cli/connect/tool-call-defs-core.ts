@@ -10,6 +10,9 @@
  * @usage
  *   import { coreTools } from './tool-call-defs-core.js';
  * @version-history
+ *   v1.5.0 -- 2026-09-05 -- aimeat_admin_security_overview (GET /v1/admin/security/overview) and
+ *     aimeat_admin_incident_resolve (POST .../incidents/:id/resolve), so the fleet door does not lag
+ *     the node's Security page.
  *   v1.4.0 -- 2026-09-03 -- The six skill entries moved to tool-call-defs-skills.ts unchanged (this
  *     file crossed 800 lines when aimeat_skill_update joined them).
  *   v1.3.0 -- 2026-08-15 -- aimeat_storage_delete: DELETE /v1/storage/<key>, own namespace only.
@@ -420,6 +423,14 @@ export const coreTools: ConnectCliToolDefinition[] = [
     {
         name: 'aimeat_admin_totp_reset',
         handler: ({ client }, input) => client.delete(`/v1/admin/owners/${encodeURIComponent(requiredString(input, 'name'))}/totp`),
+    },
+    {
+        name: 'aimeat_admin_security_overview',
+        handler: ({ client }) => client.get('/v1/admin/security/overview'),
+    },
+    {
+        name: 'aimeat_admin_incident_resolve',
+        handler: ({ client }, input) => client.post(`/v1/admin/security/incidents/${encodeURIComponent(requiredString(input, 'id'))}/resolve`),
     },
     {
         // `part` is validated against the two literals rather than interpolated, because it lands in
