@@ -200,7 +200,7 @@ async function run() {
     const manifest = (version: string) => JSON.stringify({
       metadata: { name, version, description: 'hardening e2e', author: 'e2e' },
       actions: [{ id: 'ping', method: 'POST', path: '/ping', script: 'echo' }],
-      schedules: [{ id: 'ping-scheduled', cron: '0 2 * * *', action: 'ping', input: {}, description: 'Scheduled: ping', instance_scope: false }],
+      schedules: [{ id: 'ping-scheduled', cron: '0 2 * * *', action: 'ping', input: {}, timezone: 'Europe/Helsinki', description: 'Scheduled: ping', instance_scope: false }],
       config: { greeting: { default: 'hi' } },
       limits: { timeout_ms: 5000, max_api_calls: 1 },
     });
@@ -246,8 +246,14 @@ async function run() {
     assert((survived as Record<string, unknown>).cron === '30 1 * * *',
       `it survived but was rewritten: ${JSON.stringify(survived)}`);
     // And the manifest's own is still there, replaced rather than skipped.
-    assert(jobs.some(j => j.id === `ext:${name}:ping-scheduled`),
+    const declared = jobs.find(j => j.id === `ext:${name}:ping-scheduled`);
+    assert(!!declared,
       `the manifest's own schedule must still be registered: ${JSON.stringify(jobs.map(j => j.id))}`);
+    // The manifest asked for Helsinki and the record can carry it, but the builder never read the
+    // field, so every manifest schedule ran in UTC — and the workaround for the deletion bug was
+    // to move owner schedules INTO the manifest, straight into this.
+    assert((declared as Record<string, unknown>).timezone === 'Europe/Helsinki',
+      `a manifest schedule must keep the zone it asked for, got ${JSON.stringify((declared as Record<string, unknown>).timezone)}`);
   });
 
   // ── 3. A submitted ciphertext ──────────────────────────────────────────────────────────────
