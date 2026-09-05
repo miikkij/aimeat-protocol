@@ -693,8 +693,123 @@
     });
   }
 
-  // src/static/sdk-libs/ai/index.js
+  // src/static/sdk-libs/ai/job.js
   var { authFetch: authFetch2 } = makeSession("aimeat-ai.js");
+  function jobError(r) {
+    const code = r && r.error && r.error.code || "UNKNOWN";
+    const said = r && r.error && r.error.message;
+    const human = {
+      AI_JOB_QUEUE_FULL: "The node is busy right now. Try again in a moment.",
+      AI_JOB_LIMIT_REACHED: "You already have a lot of AI jobs waiting. Something may be looping — check the list before starting more.",
+      AI_JOB_CHAIN_TOO_DEEP: "A chain of jobs kept calling itself and was stopped.",
+      AI_JOB_PROMPT_TOO_LARGE: "The prompt and the records it reads are too big to send. Read fewer records, or smaller ones.",
+      AI_JOB_CALLBACK_FORBIDDEN: "The on_done action does not belong to this account.",
+      AI_JOB_ALREADY_TERMINAL: "That job has already finished; there is nothing left to stop.",
+      NOT_FOUND: "No such job."
+    }[code];
+    const err = (
+      /** @type {Error & { code?: string, retryAfterSeconds?: number }} */
+      new Error(said || human || "The AI job call failed")
+    );
+    err.code = code;
+    if (r && r.error && typeof r.error.retry_after_s === "number") err.retryAfterSeconds = r.error.retry_after_s;
+    return err;
+  }
+  var TERMINAL = ["done", "failed", "cancelled"];
+  var job = {
+    /**
+     * Start one. Returns `{ job_id, state, queue_position }` — a position, never an ETA, because
+     * nobody knows how long a model will take.
+     *
+     * `result_key` is required and is where the answer lands, in the signed-in person's own
+     * namespace. `input_keys` names records that are READ AND PASTED INTO the prompt: the model has no
+     * tools and cannot fetch anything itself, and a record that does not exist is stated as missing so
+     * it cannot be invented.
+     *
+     * Error codes on `.code`: AI_JOB_QUEUE_FULL (with `.retryAfterSeconds`), AI_JOB_LIMIT_REACHED,
+     * AI_JOB_CHAIN_TOO_DEEP, AI_JOB_PROMPT_TOO_LARGE, AI_JOB_CALLBACK_FORBIDDEN, plus everything
+     * AIMEAT.ai.complete() can raise about keys and budgets.
+     */
+    async start(opts) {
+      if (!opts || typeof opts !== "object") throw new Error("opts object required");
+      if (!opts.result_key) throw new Error("opts.result_key required");
+      if (!opts.prompt && !opts.prompt_key) throw new Error("opts.prompt or opts.prompt_key required");
+      const body = {
+        prompt: opts.prompt,
+        prompt_key: opts.prompt_key,
+        input_keys: opts.input_keys,
+        result_key: opts.result_key,
+        result_visibility: opts.result_visibility,
+        model: opts.model,
+        system_prompt: opts.system_prompt,
+        json: opts.json,
+        app_id: opts.app_id,
+        on_done: opts.on_done
+      };
+      const r = await authFetch2("/v1/ai/jobs", { method: "POST", body: JSON.stringify(body) });
+      if (!r || !r.ok) throw jobError(r);
+      return r.data;
+    },
+    /** One job's record: state, cost, where the answer went, and why it failed if it did. */
+    async get(jobId) {
+      if (!jobId) throw new Error("jobId required");
+      const r = await authFetch2("/v1/ai/jobs/" + encodeURIComponent(jobId));
+      if (!r || !r.ok) throw jobError(r);
+      return r.data;
+    },
+    /** The jobs. `state` defaults to the live ones (queued + running). */
+    async list(opts) {
+      const q = new URLSearchParams();
+      if (opts && opts.state) q.set("state", opts.state);
+      if (opts && opts.limit) q.set("limit", String(opts.limit));
+      const qs = q.toString();
+      const r = await authFetch2("/v1/ai/jobs" + (qs ? "?" + qs : ""));
+      if (!r || !r.ok) throw jobError(r);
+      return r.data && r.data.jobs || [];
+    },
+    /** Stop one, queued or running. A finished job raises AI_JOB_ALREADY_TERMINAL. */
+    async cancel(jobId) {
+      if (!jobId) throw new Error("jobId required");
+      const r = await authFetch2("/v1/ai/jobs/" + encodeURIComponent(jobId) + "/cancel", { method: "POST", body: "{}" });
+      if (!r || !r.ok) throw jobError(r);
+      return r.data;
+    },
+    /**
+     * Poll until the job is done, failed or cancelled, and hand back its record.
+     *
+     * A convenience over `get`, not a different mechanism: the tab may still close, and the job
+     * carries on regardless. `onState` is called each time the state changes, which is what a progress
+     * line in the UI wants. `timeoutMs` gives up WAITING; it never cancels the job, because a caller
+     * that stopped watching has not decided to throw the answer away — call `cancel()` for that.
+     */
+    async waitFor(jobId, opts) {
+      const intervalMs = opts && opts.intervalMs || 3e3;
+      const timeoutMs = opts && opts.timeoutMs || 30 * 6e4;
+      const onState = opts && opts.onState;
+      const startedAt = Date.now();
+      let last = null;
+      for (; ; ) {
+        const rec = await job.get(jobId);
+        if (rec && rec.state !== last) {
+          last = rec.state;
+          if (onState) onState(rec.state, rec);
+        }
+        if (rec && TERMINAL.indexOf(rec.state) >= 0) return rec;
+        if (Date.now() - startedAt > timeoutMs) {
+          const err = (
+            /** @type {Error & { code?: string }} */
+            new Error("Stopped waiting for the AI job; it is still running. Read it later with AIMEAT.ai.job.get().")
+          );
+          err.code = "AI_JOB_WAIT_TIMEOUT";
+          throw err;
+        }
+        await new Promise((resolve) => setTimeout(resolve, intervalMs));
+      }
+    }
+  };
+
+  // src/static/sdk-libs/ai/index.js
+  var { authFetch: authFetch3 } = makeSession("aimeat-ai.js");
   var _availCache = null;
   var _modelsCache = null;
   function requiredKeysOf(schema) {
@@ -736,12 +851,12 @@
       const now = Date.now();
       if (_availCache && now - _availCache.t < 6e4) return _availCache.v;
       try {
-        const r = await authFetch2("/v1/ai/available");
+        const r = await authFetch3("/v1/ai/available");
         if (r && r.ok && r.data && typeof r.data.available === "boolean") {
           _availCache = { v: r.data.available, t: now };
           return r.data.available;
         }
-        const s = await authFetch2("/v1/openrouter/settings");
+        const s = await authFetch3("/v1/openrouter/settings");
         const v = !!(s && s.ok && s.data && (s.data.hasApiKey || s.data.has_api_key));
         _availCache = { v, t: now };
         return v;
@@ -800,7 +915,7 @@
           });
           if (!okToSpend) throw cancelledError("The AI request");
         }
-        const r = await authFetch2("/v1/ai/complete", {
+        const r = await authFetch3("/v1/ai/complete", {
           method: "POST",
           body: JSON.stringify(body)
         });
@@ -880,7 +995,7 @@
     async models() {
       const now = Date.now();
       if (_modelsCache && now - _modelsCache.t < 36e5) return _modelsCache.v;
-      const r = await authFetch2("/v1/openrouter/models");
+      const r = await authFetch3("/v1/openrouter/models");
       if (!r || !r.ok) throw new Error(r && r.error && r.error.message || "Failed to list models");
       const v = r.data && r.data.models ? r.data.models : [];
       _modelsCache = { v, t: now };
@@ -890,7 +1005,7 @@
      * Today's spend snapshot (owner-only). Useful for "AI used: $0.04 / $1.00".
      */
     async usage() {
-      const r = await authFetch2("/v1/ai/usage");
+      const r = await authFetch3("/v1/ai/usage");
       if (!r || !r.ok) throw new Error(r && r.error && r.error.message || "Failed to read usage");
       return r.data;
     },
@@ -931,7 +1046,19 @@
      * Returns a new object carrying `aiProvenance`, so anything that reads the record later — your own
      * app, another app, an agent — can still say how it was made.
      */
-    declare
+    declare,
+    /**
+     * Background jobs: a model call with a handle, for anything that may take minutes.
+     *
+     *   const { job_id } = await AIMEAT.ai.job.start({ prompt, result_key: 'report.latest' });
+     *   const done = await AIMEAT.ai.job.waitFor(job_id);
+     *
+     * complete() above is right when the answer arrives in seconds and wrong when it does not: a tab
+     * that navigates away, a laptop that sleeps or a proxy that gives up takes the answer with it, and
+     * the money is spent either way. A job survives all three, and its answer is waiting at
+     * `result_key` whenever the app comes back.
+     */
+    job
   };
   attach("ai", ai);
   attachSpend();

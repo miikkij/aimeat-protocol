@@ -228,6 +228,7 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
     mailboxNotificationService: services.mailboxNotificationService,
     scheduler: services.scheduler,
     workflowEngine: services.workflowEngine,
+    aiJobService: services.aiJobService,
     invalidateHasOwnersCache: guards.invalidateHasOwnersCache,
   });
 

@@ -11,6 +11,10 @@
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-ai.js"></script>
  *   if (await AIMEAT.ai.isAvailable()) { const r = await AIMEAT.ai.complete({ prompt, app_id }); }
  * @version-history
+ *   v1.4.0 - 2026-08-31 - AIMEAT.ai.job.* : background jobs (start/get/list/cancel/waitFor). A
+ *     completion that takes half an hour cannot be a fetch an app holds open, and every published
+ *     app would otherwise have written its own sentence for "the node is busy". The refusal codes
+ *     become human words once, here.
  *   v1.3.0 — 2026-08-22 — completeJson() honours `schema`. The parameter had been in the build
  *     specs since July and in no code path at all: complete() builds its body from a fixed field
  *     list, so the schema was dropped in silence and the caller got an unvalidated 200 carrying
@@ -32,6 +36,7 @@ const { authFetch } = makeSession('aimeat-ai.js');
 import { attach } from '../_core/namespace.js';
 import { once, keyOf, confirmSpend, noteBudget, cancelledError, attachSpend } from '../_core/spend.js';
 import { disclose, chatNotice, declare } from './disclose.js';
+import { job } from './job.js';
 
 // 60s in-memory cache for isAvailable so apps can call it on every render
 // without hammering the server. Cleared on logout via storage event.
@@ -296,6 +301,19 @@ const ai = {
    * app, another app, an agent — can still say how it was made.
    */
   declare,
+
+  /**
+   * Background jobs: a model call with a handle, for anything that may take minutes.
+   *
+   *   const { job_id } = await AIMEAT.ai.job.start({ prompt, result_key: 'report.latest' });
+   *   const done = await AIMEAT.ai.job.waitFor(job_id);
+   *
+   * complete() above is right when the answer arrives in seconds and wrong when it does not: a tab
+   * that navigates away, a laptop that sleeps or a proxy that gives up takes the answer with it, and
+   * the money is spent either way. A job survives all three, and its answer is waiting at
+   * `result_key` whenever the app comes back.
+   */
+  job,
 };
 
 attach('ai', ai);

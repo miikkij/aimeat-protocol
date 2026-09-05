@@ -7,6 +7,10 @@
  *   Supports special @activate trigger: runs on extension activation AND every server startup.
  *   Every execution creates an ExecutionLogEntry with timing, result, and memory I/O.
  * @version-history
+ *   v2.14.0 — 2026-08-31 — The extension-job semaphore moved to services/slot-pool.ts. A pure move:
+ *     two slots, FIFO, same acquire/release points. It left because AI jobs need the same primitive
+ *     with a different ordering, and a second copy of a concurrency guard is how one of them ends up
+ *     with the fix and the other does not.
  *   v2.13.1 — 2026-07-03 — Execution log line shows the human-readable job label (displayName when set,
  *     falling back to name) plus the job type, instead of only the machine name `schedule:<id>`.
  *   v2.13.0 — 2026-07-01 — Light-vs-heavy seam: the tick no longer cheap-authors content (the one-shot
@@ -75,6 +79,7 @@ import { evaluateConstraints, applyAfterRun } from './schedule-constraints.js';
 import { emitChange } from './event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
 import { logger } from '../utils/logger.js';
+import { SlotPool } from './slot-pool.js';
 import { runExtensionJob } from './scheduler-extension-job.js';
 import { runAiJob, runWorkflowJob, runEcoCapabilityJob } from './scheduler-remote-jobs.js';
 
@@ -134,23 +139,15 @@ export class Scheduler {
   // Boot-memory trace 2026-08-17: a cron tick launched 13 jobs in the same second, several of
   // them extension jobs that each open a QuickJS WASM sandbox (external memory spiked to
   // ~570 MB), and the concurrent peak becomes the process's permanent RSS floor via the native
-  // allocator. Extension jobs now take one of two slots and queue behind them; core jobs are
-  // cheap reads and stay unthrottled. The slot holder chain is the queue, so order is FIFO.
+  // allocator. Extension jobs take one of two slots and queue behind them; core jobs are cheap
+  // reads and stay unthrottled. Order is FIFO: one node-wide queue of one kind of work needs no
+  // fairness between anybody.
+  //
+  // The semaphore itself now lives in services/slot-pool.ts, unchanged in what it does. It moved
+  // because AI jobs need the same primitive with a different ordering, and a private field inside
+  // this class could neither be shared nor unit-tested.
   private static readonly EXT_JOB_SLOTS = 2;
-  private extJobsRunning = 0;
-  private extJobWaiters: Array<() => void> = [];
-
-  private async acquireExtSlot(): Promise<void> {
-    if (this.extJobsRunning < Scheduler.EXT_JOB_SLOTS) { this.extJobsRunning++; return; }
-    await new Promise<void>(resolve => this.extJobWaiters.push(resolve));
-    this.extJobsRunning++;
-  }
-
-  private releaseExtSlot(): void {
-    this.extJobsRunning--;
-    const next = this.extJobWaiters.shift();
-    if (next) next();
-  }
+  private readonly extJobPool = new SlotPool(Scheduler.EXT_JOB_SLOTS);
 
   constructor(config: AimeatConfig, storage: Storage, emailService?: EmailService) {
     this.config = config;
@@ -351,7 +348,7 @@ export class Scheduler {
     }
 
     const isExtension = job.type === 'extension';
-    if (isExtension) await this.acquireExtSlot();
+    if (isExtension) await this.extJobPool.acquire();
 
     this.executing.add(job.id);
     const startTime = Date.now();
@@ -391,7 +388,7 @@ export class Scheduler {
       errorMessage = err instanceof Error ? err.message : String(err);
     } finally {
       this.executing.delete(job.id);
-      if (isExtension) this.releaseExtSlot();
+      if (isExtension) this.extJobPool.release();
     }
 
     const durationMs = Date.now() - startTime;

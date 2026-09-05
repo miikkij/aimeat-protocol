@@ -37,6 +37,7 @@ import { registerWorkspaceTools } from './workspaces.js';
 import { registerConnectionTools } from './connections.js';
 import { registerSchedulesTools } from './schedules.js';
 import { registerWorkflowTools } from './workflows.js';
+import { registerAiJobTools } from './ai-jobs.js';
 import { registerConsentTools } from './consent.js';
 import { registerAccessTools } from './access.js';
 import { registerGroupsTools } from './groups.js';
@@ -82,6 +83,7 @@ export function registerAllTools(mcp: McpServer, registry: AgentRegistry): void 
   registerConnectionTools(mcp, registry);
   registerSchedulesTools(mcp, registry);
   registerWorkflowTools(mcp, registry);
+  registerAiJobTools(mcp, registry);
   registerConsentTools(mcp, registry);
   registerAccessTools(mcp, registry);
   registerGroupsTools(mcp, registry);

@@ -68,6 +68,7 @@ import { registerSharingGroupTools } from './sharing-groups.js';
 import { registerAgentTaskTools } from './agent-tasks.js';
 import { registerAgentScheduleTools } from './agent-schedules.js';
 import { registerWorkflowTools } from './workflows.js';
+import { registerAiJobTools } from './ai-jobs.js';
 import { registerAgentCapabilityTools } from './agent-capabilities.js';
 import { registerAgentMessageTools } from './agent-messages.js';
 import { registerAgentV2MessagingTools } from './agent-v2-messaging.js';
@@ -160,6 +161,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerAgentTaskTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerAgentScheduleTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
     registerWorkflowTools(mcp, storage, config, agentGaii);
+    registerAiJobTools(mcp, storage, config, agentGaii);
     registerAgentCapabilityTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerAgentMessageTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     // The v2 turn, beside the dashboard thread above it and the federated DM below. A session
