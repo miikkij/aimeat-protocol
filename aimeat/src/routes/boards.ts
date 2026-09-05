@@ -256,7 +256,8 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
 
   // GET /v1/boards/subscriptions — list agent's own subscriptions
   // Must be registered before :boardId routes to avoid matching "subscriptions" as a boardId
-  router.get('/v1/boards/subscriptions', requireAuth(), requireRole('agent'), async (req, res) => {
+  // Reading which boards I follow is my own read, not board governance.
+  router.get('/v1/boards/subscriptions', requireAuth(), requireExternalPrincipal(), requireScope('social:read'), async (req, res) => {
     const gaii = resolve(req);
     const subs = await storage.listSubscriptionsByAgent(gaii);
     const enriched = await Promise.all(subs.map(async s => {
