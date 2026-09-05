@@ -232,6 +232,11 @@ pnpm -s check:deps
 echo "[pre-commit] An agent writes, and the open page hears about it (check:sse-parity)…"
 pnpm -s check:sse-parity
 
+# A commit must carry the files it imports: c932f2f17 shipped two imports whose files existed only
+# in the author's worktree, and origin/main stopped booting (2026-09-04).
+echo "[pre-commit] Every relative import points at a tracked file (check:imports-tracked)…"
+(cd "$(git rev-parse --show-toplevel)/aimeat" && pnpm -s check:imports-tracked)
+
 echo "[pre-commit] No decision is written out on two sides (check:copied-logic)…"
 pnpm -s check:copied-logic
 

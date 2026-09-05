@@ -1,0 +1,33 @@
+#!/bin/sh
+#
+# AIMEAT prepare-commit-msg — stamps the session that made the commit.
+#
+# Every commit on this repo carries the same author, because every Claude Code session and the
+# developer commit as the same person. On 2026-09-04 four sessions committed to one main in a day
+# and none could answer "whose commit is this" for a change that broke the boot; content and
+# timestamps were all anyone had. This appends a `Session:` trailer from AIMEAT_SESSION, the name
+# the session registered on the node (cc-<owner>-<tag>), so the trailer, the claim record on the
+# node and the worktree all say the same name.
+#
+# A session without AIMEAT_SESSION set still commits, with a warning, until the rollout in
+# docs/coding-guidelines/shell-and-git.md makes it a refusal. A message that already carries a
+# Session: trailer (an amend, a rebase) is left alone.
+
+MSG="$1"
+SOURCE="$2"
+
+case "$SOURCE" in
+  merge|squash) exit 0 ;;
+esac
+
+if grep -qi '^Session:' "$MSG" 2>/dev/null; then
+  exit 0
+fi
+
+if [ -z "$AIMEAT_SESSION" ]; then
+  echo "[prepare-commit-msg] AIMEAT_SESSION is not set: this commit carries no Session: trailer." >&2
+  echo "[prepare-commit-msg] Set it to the session's agent name (cc-<owner>-<tag>), see skill aimeat-dev-session." >&2
+  exit 0
+fi
+
+git interpret-trailers --in-place --if-exists addIfDifferent --trailer "Session: $AIMEAT_SESSION" "$MSG"

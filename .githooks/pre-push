@@ -1,0 +1,35 @@
+#!/bin/sh
+#
+# AIMEAT pre-push gate — the two things a push must not do to the other sessions.
+#
+#   1. Push behind origin. A rebase before the push is the rule; pushing from behind either fails
+#      or, with a force, deletes what a peer landed. The hook fetches and refuses when the local
+#      branch is behind origin/main.
+#   2. Push a tree that does not boot. Every static gate reads files; none of them loads the
+#      server. c932f2f17 (2026-09-04) passed them all and left origin/main unable to start, because
+#      its imports resolved only in the author's worktree. `pnpm boot:smoke` imports the boot path
+#      and refuses when a module throws at load.
+#
+# It also lists the commits about to go that carry no Session: trailer, so a session that forgot
+# to set AIMEAT_SESSION sees it before the push rather than after.
+
+set -e
+ROOT="$(git rev-parse --show-toplevel)"
+REMOTE="$1"
+
+git fetch -q "$REMOTE" main 2>/dev/null || true
+BEHIND="$(git rev-list --count HEAD..refs/remotes/$REMOTE/main 2>/dev/null || echo 0)"
+if [ "$BEHIND" != "0" ]; then
+  echo "[pre-push] main is $BEHIND commit(s) behind $REMOTE/main: rebase first (git pull --rebase), then push." >&2
+  exit 1
+fi
+
+UNSTAMPED="$(git log --format='%h %s%n%(trailers:key=Session,valueonly)' "refs/remotes/$REMOTE/main..HEAD" 2>/dev/null | awk 'NR%2==1{line=$0} NR%2==0{ if ($0=="") print line }')"
+if [ -n "$UNSTAMPED" ]; then
+  echo "[pre-push] commits without a Session: trailer (set AIMEAT_SESSION; see skill aimeat-dev-session):" >&2
+  echo "$UNSTAMPED" | sed 's/^/  /' >&2
+fi
+
+cd "$ROOT/aimeat"
+echo "[pre-push] boot smoke (the modules on the boot path load)…"
+pnpm -s boot:smoke
