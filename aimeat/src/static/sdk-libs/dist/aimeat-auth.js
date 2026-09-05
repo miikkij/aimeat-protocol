@@ -259,21 +259,21 @@
     } catch {
     }
   }
-  var FIXED_REGISTER_PREFIX = "genre-";
-  function aimeatFixedRegister() {
+  var FIXED_LIGHT = "fixed";
+  function aimeatFixedLight() {
     try {
-      var m = document.querySelector('meta[name="aimeat-register"]');
+      var m = document.querySelector('meta[name="aimeat-light"]');
       var v = m && m.getAttribute("content");
-      return v && v.indexOf(FIXED_REGISTER_PREFIX) === 0 ? v : null;
+      return !!v && v.trim().toLowerCase() === FIXED_LIGHT;
     } catch {
-      return null;
+      return false;
     }
   }
   function modeSwitchHtml(i) {
     var cur = aimeatReadTheme();
     var light = i.lightMode || "Light mode";
     var dark = i.darkMode || "Dark mode";
-    var fixed = aimeatFixedRegister();
+    var fixed = aimeatFixedLight();
     var why = i.fixedRegister || "This register keeps its own light";
     var seg = fixed ? ' class="aimeat-seg aimeat-seg--fixed" title="' + escHtml(why) + '" aria-label="' + escHtml(why) + '"' : ' class="aimeat-seg" aria-label="' + escHtml(i.themeLabel || "Theme") + '"';
     var off2 = fixed ? ' disabled aria-disabled="true" title="' + escHtml(why) + '"' : "";
@@ -282,7 +282,7 @@
   function wireModeSwitch(container) {
     var root = container.querySelector("#aimeat-mode-switch");
     if (!root) return;
-    if (aimeatFixedRegister()) return;
+    if (aimeatFixedLight()) return;
     function sync(cur) {
       root.querySelectorAll("button[data-mode]").forEach(function(b) {
         b.setAttribute("aria-pressed", String(b.getAttribute("data-mode") === cur));

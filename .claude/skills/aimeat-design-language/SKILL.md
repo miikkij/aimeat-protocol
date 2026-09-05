@@ -172,9 +172,11 @@ map above reaches the kit too: a value changes in one place, and the apps built 
 is scope, not disagreement: a genre that commits to a tilted photograph is that app's statement,
 and the house surfaces stay flat.
 
-A register keeps its own light: a page declaring `<meta name="aimeat-register" content="genre-…">`
-is a world with a palette of its own, so the login pill's light/dark control renders disabled there
-and says so rather than doing nothing. And the kit's light `--ak-accent` carries a lightness cap,
+A page that hardcodes its palette says so: `<meta name="aimeat-light" content="fixed">`, and the
+login pill's light/dark control renders disabled there and says why rather than doing nothing.
+Absent, or `content="follows"`, means the switch works, which is what a page whose every colour is
+a token wants. The signal is the page's own declaration and not its register, because the register
+names what a page IS while keeping a fixed palette is a fact about how it was built. And the kit's light `--ak-accent` carries a lightness cap,
 because white is the action ink on paper and the house coral at `#E8564A` measured 3.58:1 under it —
 inside the kit it deepens to `#cf3e35`; the house surfaces above keep the coral as it is.
 

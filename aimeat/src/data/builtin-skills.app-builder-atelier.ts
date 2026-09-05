@@ -13,6 +13,10 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.8.0 — 2026-09-06 — A page says whether it keeps its own light: `aimeat-light` beside the
+ *     register line, `fixed` on a genre that hardcodes its palette, inherited by a fork and
+ *     deleted when the fork's colours become tokens. Written because the pill's control read the
+ *     register prefix instead and went dead on every fork of genre-living.
  *   v1.7.0 — 2026-09-05 — THE LIVING DOCUMENT (stage 3a): when the numbers stand on each other,
  *     step 3 forks genre-living and writes the record instead of arithmetic, describe() is the
  *     vocabulary and validate() runs before the save; the acceptance step's screenshot rule covers
@@ -83,6 +87,12 @@ is in every genre's head already, so a fork carries it; a page that commits to a
 declares \`content="custom:<name>"\` (custom:game, custom:ledger; never "default"). The bare shell
 carries a REPLACE-ME line in that place and the publish refuses it: the shell is a frame, not a
 page, and an Atelier app that names no register does not go live.
+
+**And says whether it keeps its own light.** A genre that hardcodes its palette carries
+\`<meta name="aimeat-light" content="fixed">\` beside its register line, which is what makes the
+login pill's light/dark control stand down instead of doing nothing; a fork inherits it, and
+deletes it (or writes \`content="follows"\`) the moment its colours become \`--ak-*\` tokens and
+the page follows the theme, or the reader is left with whatever their operating system decided.
 
 **Carry the spec token.** The spec response includes \`spec_token\` (an \`atelier-\` prefixed
 digest). Pass it on \`aimeat_app_publish\`; the publish answers \`spec_check\` so a spec that

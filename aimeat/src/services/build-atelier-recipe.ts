@@ -24,6 +24,10 @@
  *   import { renderCustomisation, renderLiving, renderPatterns } from './build-atelier-recipe.js';
  *   body += renderCustomisation() + renderLiving(base) + renderPatterns();
  * @version-history
+ *   v1.3.0 — 2026-09-06 — The living section says what `aimeat-light` is for: a genre that
+ *     hardcodes its palette declares `fixed`, a fork inherits it, and the fork deletes it when
+ *     its colours become tokens. genre-living is the one that says `follows`, and every app
+ *     forked from it had a dead light/dark switch until the signal moved off the register prefix.
  *   v1.2.0 — 2026-09-05 — A LIVING DOCUMENT joins the recipe (the living document, stage 3a): the
  *     record a sheet whose numbers stand on each other is written as, the seven node types, the
  *     two spellings that bite first, and a sixth pattern — a paint sheet that recomputes, mounted
@@ -120,6 +124,25 @@ export function renderLiving(base: string): string {
     + 'the browser and persists as the record, which is a memory key — a slider moves faster than '
     + 'a request returns. And the record names a register the same as any other Atelier page, so '
     + 'the sheet arrives wearing a look somebody designed.\n\n'
+    + 'ONE LINE IN THE HEAD DECIDES WHETHER THE READER MAY CHANGE THE LIGHT. A genre that '
+    + 'hardcodes its palette carries `<meta name="aimeat-light" content="fixed">` beside its '
+    + 'register line, and the login pill\'s light/dark control stands down there rather than '
+    + 'doing nothing; a fork inherits that line, so DELETE it (or write `content="follows"`, '
+    + 'which genre-living does) as soon as your page\'s colours are `--ak-*` tokens and it '
+    + 'follows the theme — otherwise the switch is dead and the reader\'s operating system '
+    + 'decides light or dark for them.\n\n'
+    + 'A LABEL IS A LANGUAGE MAP. Any human-facing string in the record may be written as '
+    + '`{ "fi": "Ilma ovella", "en": "Air at the door" }` rather than as a plain string — a label, '
+    + 'a hint, a pick\'s option, a text node\'s whole template, the words a machine\'s entry action '
+    + 'writes, and a layout block\'s `title`, `sub` or `caption` — so ONE record is the document in '
+    + 'every language it was written for. The page\'s language decides which is read (the login '
+    + 'pill sets it), the record\'s own `lang` is the fallback and the map\'s first key the last '
+    + 'resort; `describe("control").languages` names the fields a given type takes as a map. Write '
+    + 'each language as itself rather than translating one into the other, and give a sentence the '
+    + 'SAME `{{ }}` holes in every language — validate() refuses one that reads a node in Finnish '
+    + 'and not in English, and refuses a map with no language keys, naming both. Changing language '
+    + 'moves the words only: the value a person moved stays where they left it and the machine '
+    + 'stays in the state it reached.\n\n'
     + 'TWO SPELLINGS THAT DECIDE WHETHER THE NUMBERS COME OUT RIGHT. A PERCENTAGE IS A LABEL ON A '
     + 'FACE NUMBER: `{ value: 72, unit: "%" }` computes as 72, so `rh / 100` is 0.72 and `ln(rh)` '
     + 'is the logarithm of 72, and the two conversions are asked for out loud — `fraction(rh)` '

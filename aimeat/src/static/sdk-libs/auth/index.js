@@ -10,6 +10,13 @@
  *   listeners; attach('auth', auth) + version.
  * @usage <script src="/v1/libs/aimeat-auth.js"></script>  const s = await AIMEAT.auth.login();
  * @version-history
+ *   v1.4.0 — 2026-09-06 — The page says whether it keeps its own light, and the register no longer
+ *     answers for it. v1.3.0 disabled the control on any body naming a `genre-…` register, which
+ *     was right for the twenty-one that hardcode their palette and wrong for genre-living, whose
+ *     every colour is a token — and wrong for every app forked from it, where the switch went dead
+ *     and the operating system decided. The signal is `<meta name="aimeat-light" content="fixed">`
+ *     now, declared in the body and inherited by a fork; absent or `follows` means the switch
+ *     works. Same rendering, same wording (theme.js v1.5.0).
  *   v1.3.0 — 2026-09-05 — The light/dark control stands down on a page that keeps its own palette.
  *     A body declaring `<meta name="aimeat-register" content="genre-…">` gets the switch rendered
  *     disabled, saying "This register keeps its own light" in the pill's three languages, and it
