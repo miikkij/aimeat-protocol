@@ -115,6 +115,8 @@
     "check:fast": "tsx scripts/check-fast.ts",
     "check:invariants": "tsx scripts/check-invariants.ts",
     "test:changed": "vitest run --changed --passWithNoTests",
+    "gate": "pnpm check:fast && pnpm check:invariants && pnpm test && pnpm test:e2e:guards:sqlite",
+    "gate:full": "pnpm gate && pnpm test:e2e:guards:postgres-kysely",
     "check:importmap": "tsx scripts/check-importmap.ts",
     "check:profile-tabs": "tsx scripts/check-profile-tabs.ts",
     "check:crew-defs": "tsx scripts/check-crew-defs.ts",

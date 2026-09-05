@@ -9,9 +9,13 @@
 # the session registered on the node (cc-<owner>-<tag>), so the trailer, the claim record on the
 # node and the worktree all say the same name.
 #
-# A session without AIMEAT_SESSION set still commits, with a warning, until the rollout in
-# docs/coding-guidelines/shell-and-git.md makes it a refusal. A message that already carries a
-# Session: trailer (an amend, a rebase) is left alone.
+# THE RULE IS FOR SESSIONS, NOT FOR THE PERSON. A Claude Code session always runs with CLAUDECODE=1
+# in its environment; a commit made without it is the developer's own — from VS Code, from a
+# terminal — and carries no session to name. On 2026-09-05 the refusal below was applied to
+# everything, and VS Code's Sync Changes stopped working with an error nobody could see: the
+# hook refused the developer's own commit for lacking a name that only a session has. So: a
+# session without AIMEAT_SESSION is refused; a person is never asked. A message that already
+# carries a Session: trailer (an amend, a rebase) is left alone.
 
 MSG="$1"
 SOURCE="$2"
@@ -24,8 +28,13 @@ if grep -qi '^Session:' "$MSG" 2>/dev/null; then
   exit 0
 fi
 
+# Not a Claude Code session: the developer's own commit. Nothing to stamp, nothing to refuse.
+if [ -z "$CLAUDECODE" ]; then
+  exit 0
+fi
+
 if [ -z "$AIMEAT_SESSION" ]; then
-  echo "[prepare-commit-msg] refused: AIMEAT_SESSION is not set, so this commit would carry no Session: trailer." >&2
+  echo "[prepare-commit-msg] refused: this is a Claude Code session and AIMEAT_SESSION is not set, so the commit would carry no Session: trailer." >&2
   echo "[prepare-commit-msg] Set it to the session's name (cc-<owner>-<tag>) in the shell that commits: export AIMEAT_SESSION=cc-jouni-18bd" >&2
   echo "[prepare-commit-msg] or \$env:AIMEAT_SESSION = 'cc-jouni-18bd' in PowerShell. Skill aimeat-dev-session on the node has the ritual." >&2
   exit 1

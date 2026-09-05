@@ -32,6 +32,8 @@
     "check:fast": "cd aimeat && pnpm check:fast",
     "check:invariants": "cd aimeat && pnpm check:invariants",
     "test:changed": "cd aimeat && pnpm test:changed",
+    "gate": "cd aimeat && pnpm gate",
+    "gate:full": "cd aimeat && pnpm gate:full",
     "check:ai-disclosure": "cd aimeat && pnpm check:ai-disclosure",
     "check:locales": "cd aimeat && pnpm check:locales",
     "locale:extract": "cd aimeat && pnpm locale:extract",
