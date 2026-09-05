@@ -15,13 +15,15 @@
  * @usage
  *   const { task, autoActivated } = await createAppAgentTask(storage, config, { ... });
  * @version-history
+ *   v1.0.1 — 2026-09-05 — Notifies MCP through mcp/resource-events.ts, the leaf, not mcp/index.ts,
+ *     which assembles the registry that imports services back (a cycle the dependency cruiser refuses).
  *   v1.0.0 — 2026-07-16 — Initial creation (Agent-Bundled Apps Slice 1, node side)
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentRecord, AgentTaskRecord, AgentTaskScope } from '../storage/interface.js';
 import { emitChange, emitDelivery } from './event-bus.js';
-import { emitResourceUpdated } from '../mcp/index.js';
+import { emitResourceUpdated } from '../mcp/resource-events.js';
 import { logger } from '../utils/logger.js';
 
 export interface AppAgentTaskInput {

@@ -11,6 +11,10 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   v1.25.0 -- 2026-09-05 -- The resource change event bus moves out to resource-events.ts, a leaf,
+ *            and is re-exported from here. A service that notified an agent through this file
+ *            imported the whole registry, and the registry imports services: the dependency cruiser
+ *            named the cycle the day feat/ai-jobs was merged. A pure move.
  *   v1.24.0 -- 2026-09-05 -- The idle sweep's interval comes from config.mcpSessionSweepMs (10 s
  *            shipped) instead of a constant, so the E2E runner can pin 1 s.
  *   v1.23.0 -- 2026-09-04 -- An unauthenticated `tools/list` answers the public catalogue
@@ -97,7 +101,6 @@
 import { Router, type Request, type Response } from 'express';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { randomBytes } from 'node:crypto';
-import { EventEmitter } from 'node:events';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { MCP_RESOURCE_METADATA_PATH } from '../services/protected-resource.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -119,48 +122,11 @@ import { registerChatInstance, touchChatInstance } from '../services/chat-instan
 import { markAgentMcpUse } from '../services/agent-mcp-touch.js';
 
 // ── Resource change event bus ──
-// Allows REST routes and MCP tools to emit resource change events
-// that get forwarded to subscribed MCP sessions via SSE.
-export const resourceEvents = new EventEmitter();
-// Each concurrent MCP session adds 3 listeners here (resource:updated,
-// resource:listChanged and tool:listChanged) and removes them on session close
-// (see core.ts onclose). This is intentional per-session fan-out, not a leak, so
-// the number of listeners scales with concurrent agents — Node's default cap of 10
-// trips a spurious MaxListenersExceededWarning once ~4 agents connect at once.
-// 384 = the same headroom for 128 concurrent agents the 256 gave when a session
-// took two listeners, while still flagging a genuine leak (e.g. broken onclose
-// cleanup) instead of disabling the detector entirely (0).
-resourceEvents.setMaxListeners(384);
-
-export interface ResourceChangeEvent {
-    agentGaii: string;
-    uri: string;
-}
-
-export function emitResourceUpdated(agentGaii: string, uri: string): void {
-    resourceEvents.emit('resource:updated', { agentGaii, uri } satisfies ResourceChangeEvent);
-}
-
-export function emitResourceListChanged(agentGaii: string): void {
-    resourceEvents.emit('resource:listChanged', { agentGaii } as { agentGaii: string });
-}
-
-/**
- * Tell this agent's open MCP sessions that its tool list is no longer what they hold.
- *
- * WHY IT EXISTS. /v1/mcp registers the tools the agent's scopes allow, so the owner narrowing or
- * widening those scopes changes the list — and until now nothing said so. The client kept the set
- * it read at connect, and the person had to reconnect the connector by hand after every permission
- * change. That is what `notifications/tools/list_changed` is for, and Claude Code, Grok and the
- * other clients that follow the current spec re-read the list when it arrives; a client that
- * ignores it is no worse off than before, because it already held the stale list.
- *
- * Same bus and same shape as the resource notification above, deliberately: one fan-out, one
- * cleanup path in core.ts, and no second way for a session to learn that something changed.
- */
-export function emitToolListChanged(agentGaii: string): void {
-    resourceEvents.emit('tool:listChanged', { agentGaii } as { agentGaii: string });
-}
+// Lives in resource-events.ts, a leaf, so a service can notify an agent without importing the
+// registry this file assembles (which imports the service back: a cycle). Re-exported here so
+// every existing importer keeps working; new code imports the leaf.
+import { emitResourceUpdated, emitResourceListChanged } from './resource-events.js';
+export { resourceEvents, emitResourceUpdated, emitResourceListChanged, emitToolListChanged, type ResourceChangeEvent } from './resource-events.js';
 
 export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
     const router = Router();
