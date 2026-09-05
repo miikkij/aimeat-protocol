@@ -13,6 +13,9 @@
  * @structure SecurityTabService.overview(owner, currentSessionId) → { ghii, agents, sessions, two_factor }
  * @usage const ov = await createSecurityTabService(storage, config).overview(owner, req.auth.sessionId);
  * @version-history
+ *   v1.3.0 — 2026-09-05 — The session list is the person's own devices, as GET /v1/auth/sessions
+ *     has always been: this fold was written from the individual reads and dropped their
+ *     `!isExternalPrincipal` filter, so the Security tab listed every agent session too.
  *   v1.2.0 — 2026-09-04 — two_factor in the overview. The TOTP routes shipped with no way to ask
  *     whether the factor is on, so the Security tab could not render a state and nobody could arm
  *     one. `pending` separates a half-finished setup (secret stored, never verified) from an armed
@@ -24,6 +27,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { runInReadScope } from '../../storage/read-scope/read-scope.js';
+import { isExternalPrincipal } from '../../utils/gaii.js';
 
 export interface SecurityOverview {
   ghii: { ghii: string; allowed_origins: string[] | null; effective: string[]; inherited: boolean } | null;
@@ -102,7 +106,13 @@ export class SecurityTabService {
           pending: !!ghiiRecord?.totpSecret && ghiiRecord.totpEnabled !== true,
           backup_codes_left: ghiiRecord?.totpEnabled === true ? (ghiiRecord.totpBackupCodes?.length ?? 0) : 0,
         },
-        sessions: sessions.map(s => ({
+        // THE PERSON'S OWN DEVICES, and nothing else. An agent's session row carries the same
+        // `owner` but a GAII with a '#' in it, and GET /v1/auth/sessions has always filtered those
+        // out: this list is a device list, and an agent is ended from the Agents surface where
+        // there is something to say about it. This fold was written from the individual reads and
+        // dropped the rule, so the Security tab showed thirty agent rows the dedicated route hides
+        // — measured on aimeat.io 2026-09-05, and reproduced in a sandbox as 1 row against 2.
+        sessions: sessions.filter(s => !isExternalPrincipal(s.gaii)).map(s => ({
           session_id: s.sessionId, gaii: s.gaii, issued_at: s.issuedAt, expires_at: s.expiresAt,
           last_used_at: s.lastUsedAt ?? null, device_label: s.deviceLabel ?? null,
           current: s.sessionId === currentSessionId,

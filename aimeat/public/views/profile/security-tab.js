@@ -5,6 +5,10 @@
  * @description Profile tab for two-step sign-in, CORS origin management (GHII + per-agent) and
  *   session revocation.
  * @version-history
+ *   v1.5.0 — 2026-09-05 — The session list is a DEVICE list: agent sessions are gone from it (the
+ *     composite dropped the filter GET /v1/auth/sessions always had), and the first column names
+ *     the device rather than repeating the account name on every row. What the revoke-all button
+ *     actually does is what the text now says: your devices, not your agents.
  *   v1.4.0 — 2026-09-04 — The passkey section, under two-step sign-in: the devices that can sign
  *     in as you, adding this one, renaming and removing. Hidden for an organisation-managed
  *     account, whose way in is the organisation's directory.
@@ -224,9 +228,9 @@ export default function SecurityTab({ session, showToast }) {
       ? html`<div class="empty">${t('profile.security.noSessions')}</div>`
       : html`<div class="card scroll-x">
           <${DataTable}
-            headers=${[t('profile.security.sessionIdentity'), t('profile.security.sessionIssuedAt'), t('profile.security.sessionExpiresAt'), '']}
+            headers=${[t('profile.security.sessionDevice'), t('profile.security.sessionIssuedAt'), t('profile.security.sessionExpiresAt'), '']}
             rows=${sessions.map(s => [
-              html`<span class="text-code">${escHtml(s.gaii || session.owner)}</span>${s.current ? html` <span class="badge badge-success">${t('profile.security.currentSession')}</span>` : null}`,
+              html`<span>${escHtml(s.device_label || s.gaii || session.owner)}</span>${s.current ? html` <span class="badge badge-success">${t('profile.security.currentSession')}</span>` : null}`,
               html`<span class="text-meta">${new Date(s.issued_at).toLocaleString()}</span>`,
               html`<span class="text-meta">${new Date(s.expires_at).toLocaleString()}</span>`,
               s.current ? null : html`

@@ -144,7 +144,11 @@
       "now": {
         "title": "Juuri nyt",
         "toMetrics": "Mittareihin",
-        "word": { "quiet": "Rauhallista", "watch": "Tarkkaile", "open": "Auki" },
+        "word": {
+          "quiet": "Rauhallista",
+          "watch": "Tarkkaile",
+          "open": "Auki"
+        },
         "lineQuiet": "Mikään ei tarvitse sinua. Yhtään tapahtumaa ei ole auki, eikä mitään ovea ole kokeiltu viimeisen vuorokauden aikana tavallista enempää.",
         "lineWatch": "Mikään ei ole auki, mutta yksi luku on tavallista korkeammalla; rivit kertovat mikä.",
         "lineOpenOne": "Yksi tapahtuma on auki ja odottaa sinua osiossa 03.",
@@ -196,7 +200,12 @@
         "moreSources": "{n} osoitetta lisää",
         "fingerprint": "Yksi sormenjälki, {digest}, on {count} niistä {total} epäyksestä, joissa esitettiin {kind}: jokin skripti pitää yhä hallussaan tunnistetta, joka ei enää toimi.",
         "fingerprint403": "Yksi sormenjälki, {digest}, on {count} niistä {total} epäyksestä, joissa esitettiin {kind}: oikea tunniste, joka kurkottaa oviin joita se ei saa avata, eli väärin säädetty integraatio tai joku, joka koettelee aitaa.",
-        "kind": { "none": "ei tunnistetta", "cookie": "eväste", "pat": "henkilökohtainen tunniste", "jwt": "allekirjoitettu tunniste" },
+        "kind": {
+          "none": "ei tunnistetta",
+          "cookie": "eväste",
+          "pat": "henkilökohtainen tunniste",
+          "jwt": "allekirjoitettu tunniste"
+        },
         "filter24": "24 h",
         "filterAll": "kaikki {n}",
         "walled": "seinä",
@@ -216,9 +225,18 @@
         "none": "Mitään ei ole hylätty ja säilytetty.",
         "noneOpen": "Mikään ei ole auki. Viimeisin tapahtuma hoidettiin {date}.",
         "noneOpenPlain": "Mikään ei ole auki.",
-        "status": { "open": "auki", "resolved": "hoidettu" },
-        "type": { "zip_import": "ZIP-tuonti hylätty" },
-        "source": { "workspace_import": "työtilan tuonti", "organism_import": "organismin tuonti", "app_backup": "sovelluksen varmuuskopio" },
+        "status": {
+          "open": "auki",
+          "resolved": "hoidettu"
+        },
+        "type": {
+          "zip_import": "ZIP-tuonti hylätty"
+        },
+        "source": {
+          "workspace_import": "työtilan tuonti",
+          "organism_import": "organismin tuonti",
+          "app_backup": "sovelluksen varmuuskopio"
+        },
         "kept": "{size} säilytetty",
         "notKept": "ei säilytetty, liian suuri",
         "resolvedOn": "hoidettu {date}",
@@ -241,7 +259,12 @@
         "ssoOnWhy": "Yhdistetty hakemisto voi luoda tilejä tänne ja lopettaa niitä.",
         "ssoOff": "Organisaatiokirjautuminen on pois päältä",
         "ssoOffWhy": "Hakemistoa ei ole yhdistetty, joten tilit tehdään täällä. Päälle kytkettynä yrityksen oma hakemisto voi luoda ja lopettaa niitä.",
-        "registration": { "open": "Rekisteröityminen on avoin", "oauth": "Rekisteröityminen vain kirjautumispalvelujen kautta", "invite": "Rekisteröityminen vain kutsulla", "closed": "Rekisteröityminen on suljettu" },
+        "registration": {
+          "open": "Rekisteröityminen on avoin",
+          "oauth": "Rekisteröityminen vain kirjautumispalvelujen kautta",
+          "invite": "Rekisteröityminen vain kutsulla",
+          "closed": "Rekisteröityminen on suljettu"
+        },
         "registrationWhy": "Vaihtoehdot ovat avoin, vain kirjautumispalvelut, vain kutsulla ja suljettu."
       },
       "settings": {
@@ -267,7 +290,11 @@
         "passkeysWhy": "Pääsyavain on oma tapansa kirjautua, salasanan rinnalla.",
         "cors": "Sallittuja alkuperiä: {n}",
         "corsWhy": "Muiden alkuperien selaimet käännytetään ennen kuin yhtään ovea kysytään.",
-        "federation": { "disabled": "Federoitu kirjautuminen: pois", "all_peers": "Federoitu kirjautuminen: kaikkien vertaisten väki", "specific_peers": "Federoitu kirjautuminen: nimeämäsi vertaiset" },
+        "federation": {
+          "disabled": "Federoitu kirjautuminen: pois",
+          "all_peers": "Federoitu kirjautuminen: kaikkien vertaisten väki",
+          "specific_peers": "Federoitu kirjautuminen: nimeämäsi vertaiset"
+        },
         "federationWhy": "Voivatko vertaisinstanssien ihmiset kirjautua tänne, ja mitkä vertaiset lasketaan.",
         "body": "Pyyntöjen koko: {mb} MB, sovelluksille ja laajennuksille {large} MB",
         "bodyWhy": "Suurempi pyyntö käännytetään ennen kuin sitä luetaan.",
@@ -275,7 +302,10 @@
         "logOff": "Epäysloki: pois päältä",
         "logWhy": "{path}, {bytes} / {max}; vaihtuu sen ylittyessä ja säilyttää yhden vanhemman sukupolven.",
         "logOffWhy": "Käännytyksistä ei kirjoiteta mitään. Aseta tiedostopolku, niin tarina säilyy.",
-        "doors": { "security": "Asetukset · Turvallisuus", "totp": "Asetukset · TOTP" }
+        "doors": {
+          "security": "Asetukset · Turvallisuus",
+          "totp": "Asetukset · TOTP"
+        }
       },
       "ai": {
         "title": "Kysy tekoälyltäsi",
@@ -12154,21 +12184,22 @@
       "edit": "Muokkaa",
       "nodeDefault": "solmun oletus",
       "wildcard": "Kaikki alkuperät (*)",
-      "sessions": "Istuntojen hallinta",
-      "sessionsHint": "Peru kaikki aktiiviset istunnot. Sinun täytyy kirjautua uudelleen kaikilla laitteilla.",
+      "sessions": "Missä olet kirjautuneena",
+      "sessionsHint": "Jokainen selain joka on juuri nyt kirjautuneena tälle tilille. Kun kirjaat yhden ulos, se päättyy heti ja siltä laitteelta pitää kirjautua uudelleen.",
       "sessionsLabel": "Aktiiviset istunnot",
-      "sessionsDesc": "Kaikkien istuntojen peruminen mitätöi kaikki aktiiviset JWT-tunnisteet. Sinut ja kaikki agenttisi kirjataan ulos välittömästi.",
-      "revokeAll": "Peru kaikki istunnot",
-      "revoking": "Perutaan...",
-      "revokeConfirm": "Haluatko varmasti perua kaikki aktiiviset istunnot? Sinut kirjataan ulos.",
-      "sessionsRevoked": "Kaikki istunnot peruttu",
+      "sessionsDesc": "Kirjaa sinut ulos jokaisesta selaimesta, myös tästä. Agenttisi jatkavat työtään: jokaisella niistä on oma kirjautumisensa, ja agentti katkaistaan Omat agentit -näkymästä, tarkoituksella ja yksi kerrallaan.",
+      "revokeAll": "Kirjaa ulos kaikkialta",
+      "revoking": "Kirjataan ulos...",
+      "revokeConfirm": "Kirjataanko sinut ulos jokaisesta selaimesta? Myös täältä. Agenttisi jatkavat työtään.",
+      "sessionsRevoked": "Kirjattu ulos kaikkialta",
       "sessionIdentity": "Identiteetti",
+      "sessionDevice": "Laite",
       "sessionIssuedAt": "Myönnetty",
       "sessionExpiresAt": "Vanhenee",
       "currentSession": "nykyinen",
-      "revoke": "Peru",
-      "sessionRevoked": "Istunto peruttu",
-      "noSessions": "Ei aktiivisia istuntoja",
+      "revoke": "Kirjaa ulos",
+      "sessionRevoked": "Se selain on kirjattu ulos.",
+      "noSessions": "Muita selaimia ei ole kirjautuneena.",
       "twoFactor": {
         "title": "Kaksivaiheinen kirjautuminen",
         "desc": "Salasanan lisäksi tarvitaan koodi puhelimestasi. Pelkkä varastettu salasana ei silloin riitä kenellekään.",

@@ -144,7 +144,11 @@
       "now": {
         "title": "Ahora mismo",
         "toMetrics": "A Métricas",
-        "word": { "quiet": "Tranquilo", "watch": "Atención", "open": "Abierto" },
+        "word": {
+          "quiet": "Tranquilo",
+          "watch": "Atención",
+          "open": "Abierto"
+        },
         "lineQuiet": "Nada te necesita. No hay ningún incidente abierto y ninguna puerta se probó más de lo habitual en las últimas 24 horas.",
         "lineWatch": "No hay nada abierto, pero una cifra está por encima de su nivel habitual; las filas dicen cuál.",
         "lineOpenOne": "Hay un incidente abierto que te espera en la sección 03.",
@@ -196,7 +200,12 @@
         "moreSources": "{n} direcciones más",
         "fingerprint": "Una huella, {digest}, supone {count} de los {total} rechazos con {kind}: algún script sigue guardando una credencial que ya no funciona.",
         "fingerprint403": "Una huella, {digest}, supone {count} de los {total} rechazos con {kind}: una credencial real que busca puertas que no puede abrir, es decir, una integración mal configurada o alguien probando la valla.",
-        "kind": { "none": "sin credencial", "cookie": "cookie", "pat": "token personal", "jwt": "token firmado" },
+        "kind": {
+          "none": "sin credencial",
+          "cookie": "cookie",
+          "pat": "token personal",
+          "jwt": "token firmado"
+        },
         "filter24": "24 h",
         "filterAll": "todas {n}",
         "walled": "muro",
@@ -216,9 +225,18 @@
         "none": "No se ha rechazado ni guardado nada.",
         "noneOpen": "No hay nada abierto. El último incidente se resolvió el {date}.",
         "noneOpenPlain": "No hay nada abierto.",
-        "status": { "open": "abierto", "resolved": "resuelto" },
-        "type": { "zip_import": "Importación ZIP rechazada" },
-        "source": { "workspace_import": "importación de espacio de trabajo", "organism_import": "importación de organismo", "app_backup": "copia de seguridad de una app" },
+        "status": {
+          "open": "abierto",
+          "resolved": "resuelto"
+        },
+        "type": {
+          "zip_import": "Importación ZIP rechazada"
+        },
+        "source": {
+          "workspace_import": "importación de espacio de trabajo",
+          "organism_import": "importación de organismo",
+          "app_backup": "copia de seguridad de una app"
+        },
         "kept": "{size} guardados",
         "notKept": "no guardado, demasiado grande",
         "resolvedOn": "resuelto el {date}",
@@ -241,7 +259,12 @@
         "ssoOnWhy": "Un directorio conectado puede crear cuentas aquí y darlas de baja.",
         "ssoOff": "El inicio de sesión de organización está apagado",
         "ssoOffWhy": "No hay ningún directorio conectado, así que las cuentas se crean aquí. Al activarlo, el directorio de una empresa puede crearlas y darlas de baja.",
-        "registration": { "open": "El registro está abierto", "oauth": "Registro solo a través de proveedores de inicio de sesión", "invite": "Registro solo por invitación", "closed": "El registro está cerrado" },
+        "registration": {
+          "open": "El registro está abierto",
+          "oauth": "Registro solo a través de proveedores de inicio de sesión",
+          "invite": "Registro solo por invitación",
+          "closed": "El registro está cerrado"
+        },
         "registrationWhy": "Los modos son abierto, solo proveedores de inicio de sesión, solo por invitación y cerrado."
       },
       "settings": {
@@ -267,7 +290,11 @@
         "passkeysWhy": "Una llave de acceso es una vía de entrada propia, junto a la contraseña.",
         "cors": "Orígenes permitidos: {n}",
         "corsWhy": "Los navegadores de otros orígenes se rechazan antes de preguntar a ninguna puerta.",
-        "federation": { "disabled": "Inicio de sesión federado: apagado", "all_peers": "Inicio de sesión federado: la gente de cualquier par", "specific_peers": "Inicio de sesión federado: los pares que nombres" },
+        "federation": {
+          "disabled": "Inicio de sesión federado: apagado",
+          "all_peers": "Inicio de sesión federado: la gente de cualquier par",
+          "specific_peers": "Inicio de sesión federado: los pares que nombres"
+        },
         "federationWhy": "Si la gente de instancias pares puede entrar aquí, y qué pares cuentan.",
         "body": "Cuerpos de solicitud: {mb} MB, {large} MB para apps y extensiones",
         "bodyWhy": "Un cuerpo mayor se rechaza antes de leerlo.",
@@ -275,7 +302,10 @@
         "logOff": "Registro de rechazos: apagado",
         "logWhy": "{path}, {bytes} de {max}; rota al pasar de ahí y conserva una generación anterior.",
         "logOffWhy": "No se escribe nada cuando se rechaza a alguien. Define una ruta de archivo para conservar la historia.",
-        "doors": { "security": "Ajustes · Seguridad", "totp": "Ajustes · TOTP" }
+        "doors": {
+          "security": "Ajustes · Seguridad",
+          "totp": "Ajustes · TOTP"
+        }
       },
       "ai": {
         "title": "Pregunta a tu IA",
@@ -11788,21 +11818,22 @@
       "edit": "Editar",
       "nodeDefault": "valor por defecto del nodo",
       "wildcard": "Todos los orígenes (*)",
-      "sessions": "Gestión de sesiones",
-      "sessionsHint": "Revoca todas las sesiones activas. Tendrás que volver a entrar en todos tus dispositivos.",
+      "sessions": "Dónde tienes la sesión abierta",
+      "sessionsHint": "Cada navegador con la sesión abierta en esta cuenta ahora mismo. Al cerrar uno, se termina de inmediato y ese dispositivo tiene que volver a entrar.",
       "sessionsLabel": "Sesiones activas",
-      "sessionsDesc": "Revocar todas las sesiones invalida cada token JWT activo. Tú y todos tus agentes saldréis de la sesión en ese momento.",
-      "revokeAll": "Revocar todas las sesiones",
-      "revoking": "Revocando...",
-      "revokeConfirm": "¿Seguro que quieres revocar todas las sesiones activas? Se cerrará la tuya también.",
-      "sessionsRevoked": "Todas las sesiones revocadas",
+      "sessionsDesc": "Cierra tu sesión en todos los navegadores, incluido este. Tus agentes siguen trabajando: cada uno tiene su propia sesión, y un agente se desconecta desde Tus agentes, a propósito y de uno en uno.",
+      "revokeAll": "Cerrar sesión en todas partes",
+      "revoking": "Cerrando sesión...",
+      "revokeConfirm": "¿Cerrar la sesión en todos los navegadores? También aquí. Tus agentes siguen trabajando.",
+      "sessionsRevoked": "Sesión cerrada en todas partes",
       "sessionIdentity": "Identidad",
+      "sessionDevice": "Dispositivo",
       "sessionIssuedAt": "Emitida",
       "sessionExpiresAt": "Caduca",
       "currentSession": "actual",
-      "revoke": "Revocar",
-      "sessionRevoked": "Sesión revocada",
-      "noSessions": "No hay sesiones activas",
+      "revoke": "Cerrar sesión",
+      "sessionRevoked": "Ese navegador quedó fuera.",
+      "noSessions": "No hay otros navegadores con la sesión abierta.",
       "twoFactor": {
         "title": "Inicio de sesión en dos pasos",
         "desc": "Además de tu contraseña, un código desde tu celular. Con la contraseña sola nadie entra a tu cuenta.",
