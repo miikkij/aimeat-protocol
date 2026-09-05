@@ -21,6 +21,10 @@
  * @usage
  *   const result = await runPartBench(storage, config, 'leiska-cover');
  * @version-history
+ *   v1.5.0 — 2026-09-05 — Two more counts: fx_applied (elements wearing an effect, with a box)
+ *     and fx_running (animations still running on one after the settle, pseudo-element drifts
+ *     excluded); an EFFECT part passes when it is worn and at rest, or, as a pass over the
+ *     layer, when the layer painted (wish-atelier-post-process-effects, stage 5).
  *   v1.4.0 — 2026-09-05 — Two counts join the measurements: ambient_layers (layers with a box)
  *     and ambient_painted (those that stamped their first frame), and an AMBIENT part passes
  *     only when every viewport painted one. Counts, never pixels: a low-alpha layer over the
@@ -69,6 +73,10 @@ export interface BenchViewportResult {
    *  on results stamped before 2026-09-05. */
   ambient_layers?: number;
   ambient_painted?: number;
+  /** Elements wearing an effect with a box, and animations still running on one of them after
+   *  the settle (a moment that did not finish). Absent on results stamped before 2026-09-05. */
+  fx_applied?: number;
+  fx_running?: number;
 }
 
 export interface DesignBookBenchResult {
@@ -109,11 +117,29 @@ const MEASURE_JS = `(() => {
     ambientLayers++;
     if (el.getAttribute('data-ak-ambient-painted') === '1') ambientPainted++;
   }
-  return { overflow, units, smallControls, ambientLayers, ambientPainted };
+  // Effects: elements wearing one (the kit's base class) with a box, and animations still
+  // running on one of them — a moment that did not finish, a keyframe that loops. An animation
+  // on a pseudo-element is one of the kit's two allowed drifts, never an effect's.
+  let fxApplied = 0;
+  for (const el of document.querySelectorAll('.ak-fx')) {
+    const r = el.getBoundingClientRect();
+    if (r.width > 0 && r.height > 0) fxApplied++;
+  }
+  let fxRunning = 0;
+  for (const a of document.getAnimations()) {
+    const eff = a.effect;
+    const target = eff && eff.target;
+    if (a.playState !== 'running' || !target || eff.pseudoElement) continue;
+    if (target.closest && target.closest('.ak-fx')) fxRunning++;
+  }
+  return { overflow, units, smallControls, ambientLayers, ambientPainted, fxApplied, fxRunning };
 })()`;
 
 /** What MEASURE_JS answers. */
-interface Measured { overflow: number; units: number; smallControls: number; ambientLayers: number; ambientPainted: number }
+interface Measured {
+  overflow: number; units: number; smallControls: number; ambientLayers: number; ambientPainted: number;
+  fxApplied: number; fxRunning: number;
+}
 
 /**
  * Render one part at the three bench viewports and measure the guarantees. Reads the part through
@@ -186,13 +212,21 @@ export async function runPartBench(
       controls_below_touch_min: measured.smallControls,
       ambient_layers: measured.ambientLayers,
       ambient_painted: measured.ambientPainted,
+      fx_applied: measured.fxApplied,
+      fx_running: measured.fxRunning,
     });
   }
 
-  // An ambient part has one more thing to prove: its layer painted at every viewport. Every
-  // other kind is measured the same but not held to it — a layout's look may run none.
+  // An ambient part has one more thing to prove: its layer painted at every viewport. An effect
+  // part proves it is worn and at rest — something wears it, and nothing on it is still running
+  // after the settle — or, as a pass over the layer, that the layer painted. Every other kind is
+  // measured the same but not held to it — a layout's look may run none.
+  const on = part.kind === 'effect' ? (part.body as { on?: string }).on : undefined;
   const passed = viewports.every((v) => v.overflow_px === 0 && v.units_rendered > 0 && v.controls_below_touch_min === 0
-    && (part.kind !== 'ambient' || (v.ambient_painted ?? 0) > 0));
+    && (part.kind !== 'ambient' || (v.ambient_painted ?? 0) > 0)
+    && (part.kind !== 'effect' || (on === 'layer'
+      ? (v.ambient_painted ?? 0) > 0
+      : (v.fx_applied ?? 0) > 0 && (v.fx_running ?? 0) === 0)));
   return { ran: true, passed, viewports, at };
 }
 
