@@ -19,7 +19,8 @@
  *   vocabulary and the few rules the structure cannot enforce.
  * @structure
  *   - ATELIER_COMPONENTS / ATELIER_FEATURE_POINTERS — the catalogue data the prompt renders from
- *   - the recipe half (the four doors, the five patterns) is build-atelier-recipe.ts
+ *   - the recipe half (the four doors, the living record, the six patterns) is
+ *     build-atelier-recipe.ts
  *   - ATELIER_LOOKS / PALETTE_COLOR_WORDS — the look picker + the imagery pipeline's style words
  *   - composeAtelierPrompt(config, opts) — { full, body }
  *   - buildAtelierSpecToken(config) — digest of the body, for the publish spec gate
@@ -27,6 +28,10 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.26.0 — 2026-09-05 — A LIVING DOCUMENT joins the recipe, between the four doors and the
+ *     patterns (the living document, stage 3a): a sheet whose numbers stand on each other is ONE
+ *     record on aimeat-living, mounted with one line, and the sixth pattern is such a sheet in
+ *     full. Rendered by renderLiving(base) from build-atelier-recipe.ts.
  *   v1.25.0 — 2026-09-05 — THE RECIPE (wish-atelier-always-excellent, part 4): a component that is
  *     nearly right is customised through the kit's four doors (named parts, slots, variants,
  *     per-component tokens) with the fork priced and the dialog family kept whole, and five
@@ -123,7 +128,7 @@ import { getAppTemplateIndex } from '../data/app-templates.js';
 import { PATTERNS } from '../data/atelier-patterns.js';
 import { AMBIENTS } from '../data/atelier-ambients.js';
 import { EFFECTS, EFFECT_HOSTS, POST_IDS } from '../data/atelier-effects.js';
-import { renderCustomisation, renderPatterns } from './build-atelier-recipe.js';
+import { renderCustomisation, renderLiving, renderPatterns } from './build-atelier-recipe.js';
 
 /** Slot the publish gate's token is substituted into (mirrors build-app-prompt.ts). */
 const SPEC_TOKEN_SLOT = '{{aimeat_spec_token}}';
@@ -331,6 +336,7 @@ function composeBody(config: AimeatConfig): string {
   // this file reached the 800-line ceiling when it landed, and a pure extraction keeps the words
   // together rather than shaving the version history that explains them.
   body += renderCustomisation();
+  body += renderLiving(base);
   body += renderPatterns();
 
   body += '## The mosaic: the arrangement lives outside your file\n\n';

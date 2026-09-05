@@ -13,6 +13,10 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.7.0 — 2026-09-05 — THE LIVING DOCUMENT (stage 3a): when the numbers stand on each other,
+ *     step 3 forks genre-living and writes the record instead of arithmetic, describe() is the
+ *     vocabulary and validate() runs before the save; the acceptance step's screenshot rule covers
+ *     a living record, and arithmetic written into page code joins the never-list.
  *   v1.6.0 — 2026-09-05 — Two steps join the shape of the work (wish-atelier-always-excellent,
  *     part 4): ASK THE KIT BEFORE YOU FORK — describe() and the six-step order (token, variant,
  *     slot, part selector, parts.row, fork) — and ACCEPT IT BESIDE THE GENRE, the screenshot at
@@ -62,6 +66,7 @@ motion — lives in the kit and reaches your app from the node.
 GET /v1/prompts/build-app-atelier   ← the Atelier spec (re-fetch every time, it changes)
 GET /v1/designbook?kind=genre       ← the genres: complete pages in a committed register. A build STARTS here
 GET /v1/app-templates/genre-<id>    ← the genre to fork (swap the words, sources and images; keep the physics)
+GET /v1/app-templates/genre-living  ← when the numbers stand on each other: the document is a record, not code
 GET /v1/app-templates/shell-atelier ← the frame the genres are built on (read it for the structure; never publish it bare)
 GET /v1/app-templates/shell-phaser-game ← a GAME starts here instead: canvas, menus, settings, leaderboard wired
 GET /v1/appdev/pitfalls             ← what bites app builders
@@ -113,12 +118,25 @@ moved under you says so.
    the whole row and keeps it keyed, entered and picked; and a fork, with \`describe(id).fork\`
    read first so you know what that one costs. Two rules survive all six: the \`.ak-*\` selectors
    stay the kit's, and the motion stays the kit's.
-5. **Imagery** — generate at most ONE hero and ONE empty-state image without asking
+5. **When the numbers stand on each other, write the record instead of the arithmetic.** A
+   calculation sheet, a survey, a dosing record, a reading log, a spec that recomputes — anything
+   where moving one number should move the rest — is a LIVING DOCUMENT: fork
+   \`GET /v1/app-templates/genre-living\` and write one JSON record on \`aimeat-living\`
+   (\`{ v: 1, register, look, layout, model }\`, where \`layout\` is an ordinary mosaic arrangement
+   and \`model.nodes\` is one dependency graph of values, formulas with units, controls, bindings,
+   sentences and a statechart). \`AIMEAT.living.mount(host, record)\` is the only line of code on
+   the page, so the person changes what the sheet works out by asking their own AI to edit the
+   record. \`AIMEAT.living.describe()\` is the vocabulary — it names every node type and
+   \`describe("formula")\` gives its inputs, options and a worked example, read out of the
+   library's own source — and \`AIMEAT.living.validate(record)\` reads a document without running
+   it and answers with every refusal in words: call it before you save. The spec's living section
+   carries the whole shape and a sheet you can copy.
+6. **Imagery** — generate at most ONE hero and ONE empty-state image without asking
    (\`aimeat_image_generate\` → storage URL; the spec carries the style-word tables). Check the
    \`atelier.img.*\` cache first; never inline a data: URI. Zero images still looks finished.
-6. **Verify** — 390×844, 1280×900 and 1280×460, both themes, no horizontal scroll, every state
+7. **Verify** — 390×844, 1280×900 and 1280×460, both themes, no horizontal scroll, every state
    reachable, no console errors.
-7. **Accept it beside the genre it forked.** An Atelier app is finished when a screenshot at 390
+8. **Accept it beside the genre it forked.** An Atelier app is finished when a screenshot at 390
    and at 1440, in both themes, holds up NEXT TO the genre page it came from (open the genre at
    \`GET /v1/app-templates/genre-<id>\`, or the Design Book's genre shelf at
    \`GET /v1/designbook?kind=genre\`). Put the two pictures side by side and ask one question
@@ -129,8 +147,10 @@ moved under you says so.
    control under 40 px at 390; contrast 4.5 for body text and 3.0 for large; no animation whose
    duration is over 1 ms under reduced motion (a collapsed one stays in
    \`document.getAnimations()\` for a frame, so count the duration rather than the objects); zero
-   console errors.
-8. **Publish** — \`aimeat_app_publish\` with \`spec_token\`; report the live URL in the owner's
+   console errors. A LIVING DOCUMENT is accepted the same way, beside \`genre-living\`, and it
+   carries one more measured check: move the control the sheet is built around and watch the
+   figure, the printed maths, the sentence and the state all follow it in the same paint.
+9. **Publish** — \`aimeat_app_publish\` with \`spec_token\`; report the live URL in the owner's
    words.
 
 ## Never, on this track
@@ -150,6 +170,11 @@ moved under you says so.
   You call none of it. The pace and the distance are the look's, so a still register stays still
   from the same code. \`app({ motion: false })\` is the only switch, and one block stands still
   with \`motion: false\` in its props.
+- **Arithmetic written into the page** when the person's numbers stand on each other. A number
+  worked out by code you wrote is a number they cannot change without you, so the calculation goes
+  in a \`formula\` node of a living record and the page mounts it with one line. That also keeps
+  the units honest: the library carries them through multiplication and checks them on addition,
+  and a sum of two things that are not the same kind of thing is refused in words.
 - A theme, palette or language control — the login pill owns all three.
 - Colours in JavaScript or CSS — the \`--ak-*\` tokens are the entire look, and every preset ×
   palette × mode combination is verified arithmetically on this node.
