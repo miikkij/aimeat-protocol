@@ -29,20 +29,31 @@
  *   sat blank until the first crossing, so a document opened saying nothing and only became
  *   correct once somebody touched a control. It is handed back rather than run, like every other
  *   assignment here, and it happens ONCE: reset() re-arms it, a second start() is a no-op.
- * @structure createMachine(def) → { path, states, start, send, tick, crossings, nextDue, reset,
- *   errors }
+ *
+ *   AN ENTRY ACTION THAT WRITES WORDS WRITES THEM IN EVERY LANGUAGE. `{ advice: { fi: "\"tuuleta\"",
+ *   en: "\"open a window\"" } }` compiles to one tree per language and the one in force is chosen
+ *   at the moment the assignment is handed over — so a machine sitting in `hot` says the right
+ *   word the instant the page changes language, without the machine moving. `words()` is that
+ *   second door: the active states' word-writing entries, resolved again, for the engine to apply.
+ * @structure createMachine(def, opts) → { path, states, start, send, tick, crossings, words,
+ *   nextDue, reset, errors }
  * @usage
  *   import { createMachine } from './machine.js';
  *   const m = createMachine({ initial: 'fine', states: { fine: { on: { HOT: 'hot' } }, hot: {} } });
  *   m.start();              // { changed: false, path: 'fine', assigns: [] }
  *   m.send('HOT', scope);   // { changed: true, path: 'hot', assigns: [] }
  * @version-history
+ *   v0.4.0 — 2026-09-06 — An entry or exit assignment may be a language map; one tree per language
+ *     is compiled and the one in force is picked when the assignment is handed to the engine.
+ *     words() hands back the active states' word-writing entries so a language change moves the
+ *     words without moving the machine.
  *   v0.3.0 — 2026-09-05 — start(): the initial state's entry actions, and its nested initial
  *     states' entries outermost first, so a value a machine writes is right on the first paint.
  *   v0.1.0 — 2026-09-05 — Initial (the living document, stage 1).
  */
 import { parse } from './formula-parse.js';
 import { evaluate, isError } from './formula-eval.js';
+import { isPlainObject, pickLang } from './i18n.js';
 
 /** Parse every expression in a definition once, collecting the refusals rather than throwing. */
 function compile(def, errors) {
@@ -60,8 +71,22 @@ function compile(def, errors) {
     if (!map || typeof map !== 'object') return;
     const list = [];
     for (const id of Object.keys(map)) {
-      const tree = expr(String(map[id]), where + ' sets ' + id);
-      if (tree) list.push({ id: id, tree: tree });
+      const src = map[id];
+      // A LANGUAGE MAP IS PARSED ONCE PER LANGUAGE, never once per assignment: an entry action
+      // fires on a crossing and a language is chosen on a click, and neither is a moment to be
+      // running the expression parser.
+      if (isPlainObject(src)) {
+        const trees = {};
+        let any = false;
+        for (const lang of Object.keys(src)) {
+          const tree = expr(String(src[lang]), where + ' sets ' + id + ' in ' + lang);
+          if (tree) { trees[lang] = tree; any = true; }
+        }
+        if (any) list.push({ id: id, tree: null, trees: trees });
+        continue;
+      }
+      const tree = expr(String(src), where + ' sets ' + id);
+      if (tree) list.push({ id: id, tree: tree, trees: null });
     }
     assigns.set(key, list);
   }
@@ -118,12 +143,17 @@ function settleInto(def, path) {
 /**
  * The machine.
  * @param {{ initial?: string, states?: object, when?: Array<{ expr: string, send: string }> }} def
+ * @param {{ langs?: () => string[] }} [opts]  how to read the language in force, for an assignment
+ *   written as a language map
  * @returns {{ path: () => string, states: () => string[], send: (event: string, scope: any) => any,
- *   tick: (now: number) => any, crossings: (scope: any) => string[], nextDue: (now: number) => number|null,
- *   reset: () => void, errors: string[] }}
+ *   tick: (now: number) => any, crossings: (scope: any) => string[], words: () => any[],
+ *   nextDue: (now: number) => number|null, reset: () => void, errors: string[] }}
  */
-export function createMachine(def) {
+export function createMachine(def, opts) {
   const errors = [];
+  const wanted = function () {
+    return opts && typeof opts.langs === 'function' ? (opts.langs() || []) : [];
+  };
   const model = def && typeof def === 'object' ? def : {};
   if (!model.states || typeof model.states !== 'object' || !Object.keys(model.states).length) {
     errors.push('a machine with no states');
@@ -146,7 +176,17 @@ export function createMachine(def) {
   }
   markEntered(active, 0);
 
-  function assignsFor(kind, path) { return compiled.assigns.get(kind + ':' + path) || []; }
+  /** One assignment, with the language decided: a plain one is itself, a map picks its entry. */
+  function resolveAssign(a) {
+    if (!a.trees) return a;
+    const got = pickLang(a.trees, wanted());
+    return { id: a.id, tree: got ? got.text : null };
+  }
+
+  function assignsFor(kind, path) {
+    const list = compiled.assigns.get(kind + ':' + path) || [];
+    return list.length ? list.map(resolveAssign) : list;
+  }
 
   /** Exit down to depth `keep`, enter the target path, and collect what has to be assigned. */
   function move(target, keep, now) {
@@ -283,6 +323,25 @@ export function createMachine(def) {
         const now = !isError(v) && truthy(v);
         if (now && !w.was) out.push(w.send);
         w.was = now;
+      }
+      return out;
+    },
+
+    /**
+     * THE WORDS THIS MACHINE IS CURRENTLY SAYING, read again in the language now in force. Only
+     * the entries written as a language map are here: a plain assignment has nothing to re-read,
+     * and re-running it would overwrite a value somebody has since moved. The machine does not
+     * transition, nothing is entered or left — the same states are still active and only the
+     * words in them are read differently.
+     * @returns {Array<{ id: string, tree: any }>}
+     */
+    words() {
+      const out = [];
+      for (let i = 1; i <= active.length; i++) {
+        const path = active.slice(0, i).join('.');
+        for (const a of (compiled.assigns.get('entry:' + path) || [])) {
+          if (a.trees) out.push(resolveAssign(a));
+        }
       }
       return out;
     },

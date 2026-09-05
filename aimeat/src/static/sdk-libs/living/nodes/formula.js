@@ -23,14 +23,18 @@
  *   dew point: that one rounded the maths, and the printed formula then said something its author
  *   did not mean. The vocabulary is format.js's, the same one the sentence template takes.
  *
- * @node     formula   A spreadsheet expression over the other nodes, worked out with its units.
- * @inputs   formula   expr (an expression naming other nodes)
- * @outputs  formula   value — the result, with its unit · tex — the same expression set as mathematics
- * @options  formula   unit (convert the result, or name a plain one) · format (how the answer is printed: 1 · "int" · "unit" · { decimals, group, locale, style, currency, unit, prefix, suffix }) · label · block (a section to print it in)
- * @example  formula   { "type": "formula", "expr": "t * 9/5 + 32", "unit": "°F", "format": 1, "label": "Fahrenheit", "block": "maths" }
+ * @node       formula   A spreadsheet expression over the other nodes, worked out with its units.
+ * @inputs     formula   expr (an expression naming other nodes)
+ * @outputs    formula   value — the result, with its unit · tex — the same expression set as mathematics
+ * @options    formula   unit (convert the result, or name a plain one) · format (how the answer is printed: 1 · "int" · "unit" · { decimals, group, locale, style, currency, unit, prefix, suffix }; `locale: "auto"` writes the number in the page's language) · label · block (a section to print it in)
+ * @languages  formula   label
+ * @example    formula   { "type": "formula", "expr": "t * 9/5 + 32", "unit": "°F", "format": 1, "label": { "fi": "Fahrenheit", "en": "Fahrenheit" }, "block": "maths" }
  * @structure formula: the node-type module (dependsOn · prepare · evaluate)
  * @usage  import { formula } from './formula.js';
  * @version-history
+ *   v0.4.0 — 2026-09-06 — `label` may be a language map. The EXPRESSION never is: arithmetic is
+ *     the same arithmetic in every language, and a formula that differed between them would be
+ *     two documents wearing one id.
  *   v0.3.0 — 2026-09-05 — `format` stops being a documented field nothing read: the answer is
  *     printed through it, and the value that flows on is untouched.
  *   v0.1.0 — 2026-09-05 — Initial (the living document, stage 1).

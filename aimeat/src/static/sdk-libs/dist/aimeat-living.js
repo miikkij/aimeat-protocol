@@ -619,7 +619,11 @@
   function needsIntl(f) {
     return f.group === true || f.locale != null || f.style === "currency";
   }
-  function formatNumber(n, spec) {
+  function localeOf(f, lang) {
+    if (f.locale === "auto") return lang ? String(lang) : void 0;
+    return f.locale || void 0;
+  }
+  function formatNumber(n, spec, lang) {
     const f = parseFormat(spec) || {};
     if (!Number.isFinite(n)) return String(n);
     const scaled = f.style === "percent" ? n * 100 : n;
@@ -639,7 +643,7 @@
         opts.currency = f.currency;
       }
       try {
-        body = new Intl.NumberFormat(f.locale || void 0, opts).format(scaled);
+        body = new Intl.NumberFormat(localeOf(f, lang), opts).format(scaled);
       } catch {
         body = trimNumber(scaled);
       }
@@ -653,7 +657,7 @@
     }
     return (f.prefix || "") + body + tail + (f.suffix || "");
   }
-  function formatParts(value2, spec, defaultPlace) {
+  function formatParts(value2, spec, defaultPlace, lang) {
     const f = parseFormat(spec);
     const fallback = PLACES.indexOf(String(defaultPlace)) >= 0 ? String(defaultPlace) : "none";
     if (isError(value2)) {
@@ -666,7 +670,7 @@
     if (isQuantity(value2) || typeof value2 === "number") {
       const n = isQuantity(value2) ? value2.n : value2;
       const unit = isQuantity(value2) ? unitLabel(value2.u) : "";
-      const number = formatNumber(n, spec);
+      const number = formatNumber(n, spec, lang);
       const place = f && f.place ? f.place : fallback;
       const text = !unit || place === "none" ? number : place === "before" ? unit + " " + number : number + " " + unit;
       return { number, unit, place, text, refused: false };
@@ -674,8 +678,8 @@
     const words = asText(value2);
     return { number: words, unit: "", place: "none", text: words, refused: false };
   }
-  function formatValue(value2, spec) {
-    return formatParts(value2, spec).text;
+  function formatValue(value2, spec, lang) {
+    return formatParts(value2, spec, void 0, lang).text;
   }
 
   // src/static/sdk-libs/living/nodes/value.js
@@ -1225,8 +1229,8 @@
   }
 
   // src/static/sdk-libs/living/text.js
-  function formatValue2(value2, format) {
-    return formatValue(value2, format);
+  function formatValue2(value2, format, lang) {
+    return formatValue(value2, format, lang);
   }
   function splitTag(body) {
     const bar = body.lastIndexOf("|");
@@ -1285,7 +1289,7 @@
     if (stack.length > 1) return { error: "An {{ if }} that never reaches its {{ end }}." };
     return root;
   }
-  function renderTemplate(parts, scope) {
+  function renderTemplate(parts, scope, lang) {
     if (!Array.isArray(parts)) return parts && parts.error ? parts.error : "";
     let out = "";
     for (const part of parts) {
@@ -1294,7 +1298,7 @@
         continue;
       }
       if (part.kind === "value") {
-        out += formatValue2(evaluate(part.tree, scope), part.format);
+        out += formatValue2(evaluate(part.tree, scope), part.format, lang);
         continue;
       }
       if (part.kind === "if") {
@@ -1304,7 +1308,7 @@
           continue;
         }
         const yes = typeof v === "boolean" ? v : isQuantity(v) ? v.n !== 0 : typeof v === "number" ? v !== 0 : typeof v === "string" ? v !== "" : !!v;
-        out += renderTemplate(yes ? part.then : part.other, scope);
+        out += renderTemplate(yes ? part.then : part.other, scope, lang);
       }
     }
     return out;
@@ -1322,6 +1326,175 @@
     return out;
   }
 
+  // src/static/sdk-libs/living/i18n.js
+  var LANG_KEY = /^[a-z]{2}(?:-[A-Za-z0-9]{2,8})?$/;
+  var TEXT_KEYS = [
+    "title",
+    "sub",
+    "hint",
+    "caption",
+    "label",
+    "text",
+    "summary",
+    "note",
+    "placeholder",
+    "emptyTitle",
+    "emptyHint",
+    "legend",
+    "heading",
+    "subtitle",
+    "description",
+    "alt"
+  ];
+  function isPlainObject(v) {
+    return !!v && typeof v === "object" && !Array.isArray(v) && Object.getPrototypeOf(v) === Object.prototype;
+  }
+  function pageLanguage() {
+    try {
+      const ns = (
+        /** @type {any} */
+        window.AIMEAT
+      );
+      if (ns && ns.atelier && ns.atelier.i18n && typeof ns.atelier.i18n.lang === "function") {
+        const l = ns.atelier.i18n.lang();
+        if (l) return String(l);
+      }
+    } catch {
+    }
+    try {
+      const l = document.documentElement.getAttribute("lang");
+      if (l) return String(l);
+    } catch {
+    }
+    try {
+      const stored = localStorage.getItem("aimeat-lang");
+      if (stored) return String(stored);
+    } catch {
+    }
+    try {
+      return String(navigator.language || "en");
+    } catch {
+      return "en";
+    }
+  }
+  function preference(doc, override) {
+    const out = [];
+    const add = (l) => {
+      if (l && out.indexOf(String(l)) < 0) out.push(String(l));
+    };
+    add(override || pageLanguage());
+    add(doc && doc.lang);
+    return out;
+  }
+  function pickLang(map, wanted) {
+    const keys = Object.keys(map || {});
+    if (!keys.length) return null;
+    for (const want of wanted || []) {
+      if (!want) continue;
+      const w = String(want).toLowerCase();
+      const base = w.split("-")[0];
+      for (const k of keys) if (k.toLowerCase() === w) return { lang: k, text: map[k] };
+      for (const k of keys) if (k.toLowerCase() === base) return { lang: k, text: map[k] };
+      for (const k of keys) if (k.toLowerCase().split("-")[0] === base) return { lang: k, text: map[k] };
+    }
+    return { lang: keys[0], text: map[keys[0]] };
+  }
+  function textOf(v, wanted) {
+    if (v == null || typeof v === "string") return v;
+    if (!isPlainObject(v)) return v;
+    const got = pickLang(v, wanted);
+    return got ? got.text : "";
+  }
+  function langKeysOf(v) {
+    if (!isPlainObject(v)) return [];
+    return Object.keys(v).filter((k) => LANG_KEY.test(k));
+  }
+  function langMapError(v) {
+    if (v == null || typeof v === "string") return null;
+    if (typeof v === "number" || typeof v === "boolean") return null;
+    if (!isPlainObject(v)) return "is neither a line of text nor a language map";
+    const keys = Object.keys(v);
+    if (!keys.length) return "is an empty language map — it carries no language at all";
+    const bad = keys.filter((k) => !LANG_KEY.test(k));
+    if (bad.length === keys.length) {
+      return "is a language map with no language in it (" + bad.join(", ") + '); a key is a language tag such as "fi" or "en"';
+    }
+    if (bad.length) {
+      return 'is a language map carrying "' + bad.join('", "') + '", which is not a language tag such as "fi" or "en"';
+    }
+    const notText = keys.filter((k) => typeof v[k] !== "string");
+    if (notText.length) {
+      return "is a language map whose " + notText.map((k) => '"' + k + '"').join(" and ") + " is not a line of text";
+    }
+    return null;
+  }
+  function localizeProps(props, wanted) {
+    if (Array.isArray(props)) return props.map((p) => localizeProps(p, wanted));
+    if (!isPlainObject(props)) return props;
+    const out = {};
+    for (const key of Object.keys(props)) {
+      const v = props[key];
+      if (TEXT_KEYS.indexOf(key) >= 0 && isPlainObject(v)) {
+        out[key] = textOf(v, wanted);
+        continue;
+      }
+      out[key] = isPlainObject(v) || Array.isArray(v) ? localizeProps(v, wanted) : v;
+    }
+    return out;
+  }
+  function hasLangMap(v) {
+    if (Array.isArray(v)) return v.some(hasLangMap);
+    if (!isPlainObject(v)) return false;
+    for (const key of Object.keys(v)) {
+      const at = v[key];
+      if (TEXT_KEYS.indexOf(key) >= 0 && isPlainObject(at)) return true;
+      if ((isPlainObject(at) || Array.isArray(at)) && hasLangMap(at)) return true;
+    }
+    return false;
+  }
+  function localizeLayout(layout, wanted) {
+    if (!layout || !Array.isArray(layout.blocks)) return layout;
+    return Object.assign({}, layout, {
+      blocks: layout.blocks.map(function(block) {
+        if (!block || !block.props) return block;
+        return Object.assign({}, block, { props: localizeProps(block.props, wanted) });
+      })
+    });
+  }
+  function onLanguageChange(cb) {
+    const stops = [];
+    try {
+      const ns = (
+        /** @type {any} */
+        window.AIMEAT
+      );
+      if (ns && ns.atelier && ns.atelier.i18n && typeof ns.atelier.i18n.onChange === "function") {
+        stops.push(ns.atelier.i18n.onChange(function() {
+          cb();
+        }));
+      }
+    } catch {
+    }
+    const onEvent = function() {
+      cb();
+    };
+    try {
+      window.addEventListener("aimeat-lang-change", onEvent);
+      stops.push(function() {
+        window.removeEventListener("aimeat-lang-change", onEvent);
+      });
+    } catch {
+    }
+    return function() {
+      for (const stop of stops) {
+        try {
+          stop();
+        } catch {
+        }
+      }
+    };
+  }
+
   // src/static/sdk-libs/living/nodes/text-node.js
   var textNode = {
     id: "text",
@@ -1329,7 +1502,9 @@
       return symbolsOfTemplate(ctx.compiled.parts).map((s) => s.split(".")[0]);
     },
     prepare(node, ctx) {
-      const parts = parseTemplate(node.template);
+      const langs = ctx.langs ? ctx.langs() : [];
+      const parts = parseTemplate(textOf(node.template, langs));
+      ctx.compiled.lang = langs[0] || "";
       if (isError(parts)) {
         ctx.compiled.parts = [];
         return [parts.error];
@@ -1337,8 +1512,12 @@
       ctx.compiled.parts = parts;
       return [];
     },
+    /** The page changed language: read the sentence again, from the same record. */
+    relanguage(node, ctx) {
+      this.prepare(node, ctx);
+    },
     evaluate(node, ctx) {
-      return renderTemplate(ctx.compiled.parts, ctx.scope);
+      return renderTemplate(ctx.compiled.parts, ctx.scope, ctx.compiled.lang);
     }
   };
 
@@ -1359,8 +1538,22 @@
       if (!map || typeof map !== "object") return;
       const list = [];
       for (const id of Object.keys(map)) {
-        const tree = expr(String(map[id]), where + " sets " + id);
-        if (tree) list.push({ id, tree });
+        const src = map[id];
+        if (isPlainObject(src)) {
+          const trees = {};
+          let any = false;
+          for (const lang of Object.keys(src)) {
+            const tree2 = expr(String(src[lang]), where + " sets " + id + " in " + lang);
+            if (tree2) {
+              trees[lang] = tree2;
+              any = true;
+            }
+          }
+          if (any) list.push({ id, tree: null, trees });
+          continue;
+        }
+        const tree = expr(String(src), where + " sets " + id);
+        if (tree) list.push({ id, tree, trees: null });
       }
       assigns.set(key, list);
     }
@@ -1407,8 +1600,11 @@
       out.push(node.initial);
     }
   }
-  function createMachine(def) {
+  function createMachine(def, opts) {
     const errors = [];
+    const wanted = function() {
+      return opts && typeof opts.langs === "function" ? opts.langs() || [] : [];
+    };
     const model = def && typeof def === "object" ? def : {};
     if (!model.states || typeof model.states !== "object" || !Object.keys(model.states).length) {
       errors.push("a machine with no states");
@@ -1426,8 +1622,14 @@
       }
     }
     markEntered(active, 0);
+    function resolveAssign(a) {
+      if (!a.trees) return a;
+      const got = pickLang(a.trees, wanted());
+      return { id: a.id, tree: got ? got.text : null };
+    }
     function assignsFor(kind, path) {
-      return compiled.assigns.get(kind + ":" + path) || [];
+      const list = compiled.assigns.get(kind + ":" + path) || [];
+      return list.length ? list.map(resolveAssign) : list;
     }
     function move(target, keep, now) {
       const out = [];
@@ -1562,6 +1764,24 @@
         }
         return out;
       },
+      /**
+       * THE WORDS THIS MACHINE IS CURRENTLY SAYING, read again in the language now in force. Only
+       * the entries written as a language map are here: a plain assignment has nothing to re-read,
+       * and re-running it would overwrite a value somebody has since moved. The machine does not
+       * transition, nothing is entered or left — the same states are still active and only the
+       * words in them are read differently.
+       * @returns {Array<{ id: string, tree: any }>}
+       */
+      words() {
+        const out = [];
+        for (let i = 1; i <= active.length; i++) {
+          const path = active.slice(0, i).join(".");
+          for (const a of compiled.assigns.get("entry:" + path) || []) {
+            if (a.trees) out.push(resolveAssign(a));
+          }
+        }
+        return out;
+      },
       /** Back to the initial state, with the crossings forgotten and start() armed again. */
       reset() {
         active = errors.length ? [] : settleInto(model, [model.initial]);
@@ -1585,6 +1805,10 @@
   function referenced(node) {
     const out = [];
     const add = (src) => {
+      if (isPlainObject(src)) {
+        for (const key of Object.keys(src)) add(src[key]);
+        return;
+      }
       const tree = parse(String(src));
       if (!isError(tree)) {
         for (const s of symbolsOf(tree)) if (out.indexOf(s.split(".")[0]) < 0) out.push(s.split(".")[0]);
@@ -1629,7 +1853,9 @@
       return referenced(node);
     },
     prepare(node, ctx) {
-      if (!ctx.state.machines.has(ctx.id)) ctx.state.machines.set(ctx.id, createMachine(node));
+      if (!ctx.state.machines.has(ctx.id)) {
+        ctx.state.machines.set(ctx.id, createMachine(node, { langs: ctx.langs }));
+      }
       const m = ctx.state.machines.get(ctx.id);
       ctx.compiled.machine = m;
       return m.errors.slice();
@@ -1741,7 +1967,10 @@
     }
     return false;
   }
-  function createGraph(doc) {
+  function createGraph(doc, opts) {
+    const langs = opts && typeof opts.langs === "function" ? opts.langs : function() {
+      return [];
+    };
     const model = doc && doc.model || {};
     const nodes = model && model.nodes || {};
     const ids = Object.keys(nodes);
@@ -1770,7 +1999,15 @@
     };
     function ctxFor(id) {
       if (!compiled.has(id)) compiled.set(id, {});
-      return { id, node: nodes[id], doc, scope, state, compiled: compiled.get(id) };
+      return {
+        id,
+        node: nodes[id],
+        doc,
+        scope,
+        state,
+        compiled: compiled.get(id),
+        langs
+      };
     }
     for (const id of ids) {
       const node = nodes[id] || {};
@@ -1908,7 +2145,7 @@
       errors.push("The machines in this document kept sending each other events; the engine stopped after " + MAX_ROUNDS + " rounds.");
     }
     function evaluateAssign(tree) {
-      return evaluate(tree, scope);
+      return tree ? evaluate(tree, scope) : void 0;
     }
     const api = {
       ids,
@@ -1947,6 +2184,35 @@
         pass(ids, changed);
         startMachines(changed);
         settleMachines(changed);
+        return { changed };
+      },
+      /**
+       * THE LANGUAGE CHANGED, AND NOTHING ELSE DID. Every node whose own source is words is read
+       * again from the record, every machine says the words of the state it is already in again,
+       * and only what those touched is recomputed. A value a person moved is not written, a machine
+       * does not transition, and the changed list is the words that actually became different — so
+       * the caller can update those and leave the rest of the screen exactly where it is.
+       * @returns {{ changed: string[] }}
+       */
+      relanguage() {
+        const changed = [];
+        const seed = [];
+        for (const id of order) {
+          const node = nodes[id] || {};
+          const type = typeOf(node.type);
+          if (!type || typeof type.relanguage !== "function") continue;
+          type.relanguage(node, ctxFor(id));
+          if (seed.indexOf(id) < 0) seed.push(id);
+        }
+        for (const id of order) {
+          if ((nodes[id] || {}).type !== "machine") continue;
+          const m = state.machines.get(id);
+          if (!m || typeof m.words !== "function") continue;
+          for (const a of m.words()) {
+            if (put(a.id, evaluateAssign(a.tree)) && seed.indexOf(a.id) < 0) seed.push(a.id);
+          }
+        }
+        if (seed.length) pass(seed, changed);
         return { changed };
       },
       /**
@@ -2205,13 +2471,17 @@
       answerValue,
       answerUnit
     ]);
+    const caption = spec.label ? el("figcaption", { class: "ak-living__formula-label", text: spec.label }) : null;
     const root = el("figure", { class: "ak-living__formula", "data-living-node": spec.id }, [
-      spec.label ? el("figcaption", { class: "ak-living__formula-label", text: spec.label }) : null,
+      caption,
       plain,
       set,
       answer
     ]);
     host.appendChild(root);
+    const lang = function() {
+      return (spec.langs ? spec.langs() || [] : [])[0];
+    };
     let lastTex = "";
     let lastNumber = NaN;
     function typeset(tex) {
@@ -2230,7 +2500,7 @@
     let unitNow = "";
     let placeNow = "none";
     const write = function(n) {
-      const body = formatNumber(n, spec.format);
+      const body = formatNumber(n, spec.format, lang());
       if (!unitNow || placeNow === "none") return body;
       return placeNow === "before" ? unitNow + " " + body : body + " " + unitNow;
     };
@@ -2244,7 +2514,7 @@
         return;
       }
       root.removeAttribute("data-living-state");
-      const parts = formatParts(value2, spec.format);
+      const parts = formatParts(value2, spec.format, void 0, lang());
       if (isQuantity(value2) || typeof value2 === "number") {
         const n = isQuantity(value2) ? value2.n : value2;
         unitNow = parts.unit;
@@ -2260,7 +2530,19 @@
     }
     typeset(spec.tex);
     if ("value" in spec) update(spec.value, spec.tex);
-    return { el: root, update };
+    function relabel(label, value2) {
+      if (caption && label != null && caption.textContent !== String(label)) {
+        caption.textContent = String(label);
+      }
+      const v = value2 === void 0 ? spec.value : value2;
+      if (isError(v) || !(isQuantity(v) || typeof v === "number")) return;
+      const parts = formatParts(v, spec.format, void 0, lang());
+      unitNow = parts.unit;
+      placeNow = parts.place;
+      answerValue.textContent = write(isQuantity(v) ? v.n : v);
+      answerUnit.textContent = parts.place === "none" ? parts.unit : "";
+    }
+    return { el: root, update, relabel };
   }
 
   // src/static/sdk-libs/living/render.js
@@ -2269,13 +2551,18 @@
     seq += 1;
     return "ak-living-" + seq;
   }
-  function readout(v, format) {
-    return formatParts(v, format, "after").text;
+  function langsOf(spec) {
+    if (!spec || typeof spec.langs !== "function") return [];
+    return spec.langs() || [];
+  }
+  function readout(v, format, lang) {
+    return formatParts(v, format, "after", lang).text;
   }
   var FIELD_TYPE = { slider: "range", toggle: "toggle", pick: "select", number: "number", text: "text" };
-  function asOption(o) {
-    const opt = o && typeof o === "object" ? o : { value: o, label: String(o) };
-    return { value: String(opt.value), label: String(opt.label == null ? opt.value : opt.label) };
+  function asOption(o, langs) {
+    const opt = o && typeof o === "object" ? o : { value: o, label: o };
+    const label = textOf(opt.label == null ? opt.value : opt.label, langs);
+    return { value: String(opt.value), label: String(label) };
   }
   function controlRow(host, spec) {
     const kind = String(spec.node.kind || "slider");
@@ -2283,6 +2570,11 @@
     const id = uid();
     const type = FIELD_TYPE[kind] || "text";
     const start = kind === "toggle" ? spec.value === true || asNumber(spec.value) === 1 : isQuantity(spec.value) ? spec.value.n : spec.value == null ? null : asText(spec.value);
+    const wording = function() {
+      const langs = langsOf(spec);
+      const own = textOf(spec.node.label, langs);
+      return String(own || textOf(target.label, langs) || spec.node.target);
+    };
     const k = kit();
     const handle = k.form({
       target: host,
@@ -2291,13 +2583,13 @@
         name: "value",
         id,
         type,
-        label: spec.node.label || target.label || spec.node.target,
+        label: wording(),
         min: target.min,
         max: target.max,
         step: target.step,
         unit: target.unit,
         value: start,
-        options: kind === "pick" ? (spec.node.options || []).map(asOption) : void 0,
+        options: kind === "pick" ? (spec.node.options || []).map((o) => asOption(o, langsOf(spec))) : void 0,
         // The person's hand goes through the ENGINE, exactly where an agent's call goes: the input
         // is never the source of truth, it only reports.
         onInput(v) {
@@ -2337,23 +2629,41 @@
         const n = asNumber(v);
         if (Number.isFinite(n) && String(n) !== input.value) handle.setValues({ value: n });
       }
-      const words = readout(v, target.format);
+      const words = readout(v, target.format, langsOf(spec)[0]);
       if (readoutEl.textContent !== words) readoutEl.textContent = words;
       if (input.hasAttribute("aria-valuetext")) input.setAttribute("aria-valuetext", words);
     }
     update(spec.value);
-    return { el: root, update };
+    function relabel(value2) {
+      const langs = langsOf(spec);
+      if (labelEl) {
+        const words = wording();
+        if (labelEl.textContent !== words) labelEl.textContent = words;
+      }
+      if (kind === "pick" && input.options) {
+        const wanted = (spec.node.options || []).map((o) => asOption(o, langs));
+        for (let i = 0; i < input.options.length && i < wanted.length; i++) {
+          if (input.options[i].textContent !== wanted[i].label) input.options[i].textContent = wanted[i].label;
+        }
+      }
+      update(value2 === void 0 ? spec.value : value2);
+    }
+    return { el: root, update, relabel };
   }
   function textView(host, spec) {
     const body = el("p", { class: "ak-living__text", text: spec.text });
-    const root = el("div", { class: "ak-living__note", "data-living-node": spec.id }, [
-      spec.label ? el("span", { class: "ak-living__note-label", text: spec.label }) : null,
-      body
-    ]);
+    const labelEl = spec.label ? el("span", { class: "ak-living__note-label", text: spec.label }) : null;
+    const root = el("div", { class: "ak-living__note", "data-living-node": spec.id }, [labelEl, body]);
     host.appendChild(root);
-    return { el: root, update(text) {
-      if (body.textContent !== text) body.textContent = String(text);
-    } };
+    return {
+      el: root,
+      update(text) {
+        if (body.textContent !== text) body.textContent = String(text);
+      },
+      relabel(label) {
+        if (labelEl && label != null && labelEl.textContent !== label) labelEl.textContent = String(label);
+      }
+    };
   }
   function machineView(host, spec) {
     const chips = /* @__PURE__ */ new Map();
@@ -2363,10 +2673,8 @@
       chips.set(name, chip);
       strip.appendChild(chip);
     }
-    const root = el("div", { class: "ak-living__machine", "data-living-node": spec.id }, [
-      spec.label ? el("span", { class: "ak-living__note-label", text: spec.label }) : null,
-      strip
-    ]);
+    const labelEl = spec.label ? el("span", { class: "ak-living__note-label", text: spec.label }) : null;
+    const root = el("div", { class: "ak-living__machine", "data-living-node": spec.id }, [labelEl, strip]);
     host.appendChild(root);
     function update(path) {
       root.setAttribute("data-living-state", String(path || ""));
@@ -2378,13 +2686,20 @@
       }
     }
     update(spec.path);
-    return { el: root, update };
+    return {
+      el: root,
+      update,
+      relabel(label) {
+        if (labelEl && label != null && labelEl.textContent !== label) labelEl.textContent = String(label);
+      }
+    };
   }
   function valueRow(host, spec) {
     const figure = el("span", { class: "ak-living__figure" });
     const unit = el("span", { class: "ak-living__figure-unit" });
+    const labelEl = el("span", { class: "ak-living__note-label", text: spec.label || spec.id });
     const root = el("div", { class: "ak-living__value", "data-living-node": spec.id }, [
-      el("span", { class: "ak-living__note-label", text: spec.label || spec.id }),
+      labelEl,
       el("span", { class: "ak-living__figure-row" }, [figure, unit])
     ]);
     host.appendChild(root);
@@ -2392,12 +2707,12 @@
     let unitNow = "";
     let placeNow = "none";
     const write = function(n) {
-      const body = formatNumber(n, spec.format);
+      const body = formatNumber(n, spec.format, langsOf(spec)[0]);
       if (!unitNow || placeNow === "none") return body;
       return placeNow === "before" ? unitNow + " " + body : body + " " + unitNow;
     };
     function update(v) {
-      const parts = formatParts(v, spec.format);
+      const parts = formatParts(v, spec.format, void 0, langsOf(spec)[0]);
       if (isQuantity(v) || typeof v === "number") {
         const n = isQuantity(v) ? v.n : v;
         unitNow = parts.unit;
@@ -2412,7 +2727,26 @@
       last = NaN;
     }
     update(spec.value);
-    return { el: root, update };
+    return {
+      el: root,
+      update,
+      /**
+       * The label, and the figure again: a number written with `locale: "auto"` changes its decimal
+       * separator with the language even though the quantity did not move, so the count-up is not
+       * re-run — the reading is simply written out again where it stands.
+       */
+      relabel(label, value2) {
+        if (label != null && labelEl.textContent !== label) labelEl.textContent = String(label);
+        const v = value2 === void 0 ? spec.value : value2;
+        const parts = formatParts(v, spec.format, void 0, langsOf(spec)[0]);
+        if (isQuantity(v) || typeof v === "number") {
+          unitNow = parts.unit;
+          placeNow = parts.place;
+          figure.textContent = write(isQuantity(v) ? v.n : v);
+          unit.textContent = parts.place === "none" ? parts.unit : "";
+        }
+      }
+    };
   }
   function statesOf(def) {
     const out = [];
@@ -2428,7 +2762,13 @@
   function renderNodeInto(host, spec) {
     const node = spec.node;
     const graph = spec.graph;
+    const langs = spec.langs || function() {
+      return [];
+    };
     const value2 = graph.valueOf(spec.id);
+    const label = function() {
+      return textOf(node.label, langs());
+    };
     if (node.type === "control") {
       const target = graph.nodeOf(String(node.target)) || {};
       const view = controlRow(host, {
@@ -2436,34 +2776,61 @@
         node,
         target,
         value: value2,
+        langs,
         onSet(v) {
           spec.set(String(node.target), v);
         }
       });
-      return { el: view.el, update: () => view.update(graph.valueOf(spec.id)), kind: "control" };
+      return {
+        el: view.el,
+        update: () => view.update(graph.valueOf(spec.id)),
+        relabel: () => view.relabel(graph.valueOf(spec.id)),
+        kind: "control"
+      };
     }
     if (node.type === "formula") {
       const view = formulaView(host, {
         id: spec.id,
-        label: node.label,
+        label: label(),
         value: value2,
         format: node.format,
+        langs,
         tex: (graph.fieldsOf(spec.id) || {}).tex || "",
         plain: spec.id + " = " + String(node.expr)
       });
-      return { el: view.el, update: () => view.update(graph.valueOf(spec.id), (graph.fieldsOf(spec.id) || {}).tex || ""), kind: "formula" };
+      return {
+        el: view.el,
+        update: () => view.update(graph.valueOf(spec.id), (graph.fieldsOf(spec.id) || {}).tex || ""),
+        relabel: () => view.relabel(label(), graph.valueOf(spec.id)),
+        kind: "formula"
+      };
     }
     if (node.type === "text") {
-      const view = textView(host, { id: spec.id, label: node.label, text: String(value2 == null ? "" : value2) });
-      return { el: view.el, update: () => view.update(String(graph.valueOf(spec.id) == null ? "" : graph.valueOf(spec.id))), kind: "text" };
+      const view = textView(host, { id: spec.id, label: label(), text: String(value2 == null ? "" : value2) });
+      return {
+        el: view.el,
+        update: () => view.update(String(graph.valueOf(spec.id) == null ? "" : graph.valueOf(spec.id))),
+        relabel: () => view.relabel(label()),
+        kind: "text"
+      };
     }
     if (node.type === "machine") {
-      const view = machineView(host, { id: spec.id, label: node.label, states: statesOf(node), path: String(value2 || "") });
-      return { el: view.el, update: () => view.update(String(graph.valueOf(spec.id) || "")), kind: "machine" };
+      const view = machineView(host, { id: spec.id, label: label(), states: statesOf(node), path: String(value2 || "") });
+      return {
+        el: view.el,
+        update: () => view.update(String(graph.valueOf(spec.id) || "")),
+        relabel: () => view.relabel(label()),
+        kind: "machine"
+      };
     }
     if (node.type === "value" || node.type === "source") {
-      const view = valueRow(host, { id: spec.id, label: node.label, value: value2, format: node.format });
-      return { el: view.el, update: () => view.update(graph.valueOf(spec.id)), kind: node.type };
+      const view = valueRow(host, { id: spec.id, label: label(), value: value2, format: node.format, langs });
+      return {
+        el: view.el,
+        update: () => view.update(graph.valueOf(spec.id)),
+        relabel: () => view.relabel(label() || spec.id, graph.valueOf(spec.id)),
+        kind: node.type
+      };
     }
     return null;
   }
@@ -2488,7 +2855,7 @@
     }
     return out;
   }
-  function chainData(graph) {
+  function chainData(graph, langs) {
     const nodes = [];
     const edges = [];
     const depth = depths(graph);
@@ -2496,7 +2863,8 @@
     for (const id of graph.ids) column.set(id, depth.get(id) || 0);
     for (const id of graph.ids) {
       const node = graph.nodeOf(id) || {};
-      nodes.push({ id, label: node.label ? node.label + " (" + id + ")" : id, tone: TONE[node.type] || "plain" });
+      const words = textOf(node.label, langs || []);
+      nodes.push({ id, label: words ? words + " (" + id + ")" : id, tone: TONE[node.type] || "plain" });
       if (node.type !== "machine") continue;
       const active = String(graph.valueOf(id) || "").split(".");
       for (const state of statesOf(node)) {
@@ -2532,7 +2900,7 @@
     let order = [];
     const timers = /* @__PURE__ */ new Set();
     function paint() {
-      const data = chainData(spec.graph);
+      const data = chainData(spec.graph, spec.langs ? spec.langs() : []);
       order = data.nodes.map(function(n) {
         return n.id;
       });
@@ -2592,6 +2960,7 @@
       inputs: ["from (the node whose output the prop takes)"],
       outputs: ["value — the same value, so the chain view can show where it went"],
       options: ["block (a layout block id)", "prop (a prop path on that block, dots allowed)"],
+      languages: [],
       example: { "type": "binding", "block": "dial", "prop": "value", "from": "t" },
       file: "nodes/binding.js"
     },
@@ -2600,15 +2969,17 @@
       inputs: ["target (the value node this control moves)"],
       outputs: ["value — what the target holds now, so a template can read the control by name"],
       options: ["kind=slider|toggle|pick|number|text", "label", "options (for pick)", "block (a section to put it in)"],
-      example: { "type": "control", "kind": "slider", "target": "t", "label": "Lämpötila", "block": "controls" },
+      languages: ["label", "options[].label"],
+      example: { "type": "control", "kind": "slider", "target": "t", "label": { "fi": "Lämpötila", "en": "Temperature" }, "block": "controls" },
       file: "nodes/control.js"
     },
     "formula": {
       summary: "A spreadsheet expression over the other nodes, worked out with its units.",
       inputs: ["expr (an expression naming other nodes)"],
       outputs: ["value — the result, with its unit", "tex — the same expression set as mathematics"],
-      options: ["unit (convert the result, or name a plain one)", "format (how the answer is printed: 1", '"int"', '"unit"', "{ decimals, group, locale, style, currency, unit, prefix, suffix })", "label", "block (a section to print it in)"],
-      example: { "type": "formula", "expr": "t * 9/5 + 32", "unit": "°F", "format": 1, "label": "Fahrenheit", "block": "maths" },
+      options: ["unit (convert the result, or name a plain one)", "format (how the answer is printed: 1", '"int"', '"unit"', '{ decimals, group, locale, style, currency, unit, prefix, suffix }; `locale: "auto"` writes the number in the page\'s language)', "label", "block (a section to print it in)"],
+      languages: ["label"],
+      example: { "type": "formula", "expr": "t * 9/5 + 32", "unit": "°F", "format": 1, "label": { "fi": "Fahrenheit", "en": "Fahrenheit" }, "block": "maths" },
       file: "nodes/formula.js"
     },
     "machine": {
@@ -2616,15 +2987,17 @@
       inputs: ["initial", "states (nested allowed)", "when (crossings that send events)"],
       outputs: ['value — the current state as a dotted path, e.g. "hot" or "hot.rising"'],
       options: ["on { EVENT: { target, guard } }", "entry", "exit", "after { ms: target }", "block (a section to show it in)"],
-      example: { "type": "machine", "initial": "fine", "states": { "cold": { "on": { "WARM": "fine" } }, "fine": { "on": { "HOT": "hot", "COLD": "cold" } }, "hot": { "entry": { "note": '"jäähdytä"' }, "on": { "COOL": { "target": "fine", "guard": "t < 30" } } } }, "when": [{ "expr": "t > 30", "send": "HOT" }, { "expr": "t < 30", "send": "COOL" }, { "expr": "t < 5", "send": "COLD" }] },
+      languages: ["label", "the entry and exit assignments that write words"],
+      example: { "type": "machine", "initial": "fine", "states": { "cold": { "on": { "WARM": "fine" } }, "fine": { "on": { "HOT": "hot", "COLD": "cold" } }, "hot": { "entry": { "note": { "fi": '"jäähdytä"', "en": '"cool it down"' } }, "on": { "COOL": { "target": "fine", "guard": "t < 30" } } } }, "when": [{ "expr": "t > 30", "send": "HOT" }, { "expr": "t < 30", "send": "COOL" }, { "expr": "t < 5", "send": "COLD" }] },
       file: "nodes/machine-node.js"
     },
     "source": {
       summary: "A live value from a memory key, or a constant when the page cannot read one.",
       inputs: ["key (a memory key)", "path (a dotted path inside the record)", "value (the fallback)"],
       outputs: ["value — what the key holds now, with the node's unit on it"],
-      options: ["unit", "format (how it is printed: 1", '"int"', '"unit"', "an object)", "scope=own|public", "owner (for a public read)", "label"],
-      example: { "type": "source", "key": "sensors.livingroom", "path": "celsius", "unit": "°C", "format": 1, "value": 21 },
+      options: ["unit", "format (how it is printed: 1", '"int"', '"unit"', 'an object; `locale: "auto"` writes the number in the page\'s language)', "scope=own|public", "owner (for a public read)", "label"],
+      languages: ["label"],
+      example: { "type": "source", "key": "sensors.livingroom", "path": "celsius", "unit": "°C", "format": 1, "value": 21, "label": { "fi": "Olohuone", "en": "Living room" } },
       file: "nodes/source.js"
     },
     "text": {
@@ -2632,22 +3005,103 @@
       inputs: ["template (with {{ node }}, {{ node | format }} and {{ if expr }}…{{ else }}…{{ end }})"],
       outputs: ["value — the rendered sentence"],
       options: ["block (a section to render it into)", "label"],
-      example: { "type": "text", "template": "Lämpötila on {{ t | 1 }} °C, {{ if t > 30 }}liian kuuma{{ else }}hyvä{{ end }}.", "block": "note" },
+      languages: ["template", "label"],
+      example: { "type": "text", "template": { "fi": "Lämpötila on {{ t | 1 }} °C, {{ if t > 30 }}liian kuuma{{ else }}hyvä{{ end }}.", "en": "It is {{ t | 1 }} °C, {{ if t > 30 }}too hot{{ else }}fine{{ end }}." }, "block": "note" },
       file: "nodes/text-node.js"
     },
     "value": {
       summary: "A named quantity: the writable ground the rest of the document stands on.",
       inputs: ["value (the quantity itself, a literal — never a reference)"],
       outputs: ["value — the number with its unit, or the text, truth or list it holds"],
-      options: ["unit", "min", "max", "step", "format (how it is printed: 1", '"int"', '"unit"', "an object)", "label"],
-      example: { "type": "value", "value": 22, "unit": "°C", "min": -20, "max": 40, "step": 0.5, "format": 1, "label": "Lämpötila" },
+      options: ["unit", "min", "max", "step", "format (how it is printed: 1", '"int"', '"unit"', 'an object; `locale: "auto"` writes the number in the page\'s language)', "label"],
+      languages: ["label"],
+      example: { "type": "value", "value": 22, "unit": "°C", "min": -20, "max": 40, "step": 0.5, "format": 1, "label": { "fi": "Lämpötila", "en": "Temperature" } },
       file: "nodes/value.js"
     }
   };
 
   // src/static/sdk-libs/living/index.js
-  var VERSION = "0.3.0";
+  var VERSION = "0.4.0";
   var DRAWN = ["control", "formula", "text", "machine", "value", "source"];
+  function nodeLanguageRefusals(id, node, out) {
+    for (const field of (NODES[String(node.type)] || {}).languages || []) {
+      if (/[^A-Za-z0-9_[\].]/.test(field)) continue;
+      const perItem = /^([A-Za-z0-9_]+)\[\]\.([A-Za-z0-9_]+)$/.exec(field);
+      if (perItem) {
+        const items = node[perItem[1]];
+        if (!Array.isArray(items)) continue;
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i];
+          if (!item || typeof item !== "object") continue;
+          const bad2 = langMapError(item[perItem[2]]);
+          if (bad2) out.push("Option " + (i + 1) + ' of "' + id + '" has a ' + perItem[2] + " that " + bad2 + ".");
+        }
+        continue;
+      }
+      const bad = langMapError(node[field]);
+      if (bad) out.push('Node "' + id + '" has a ' + field + " that " + bad + ".");
+    }
+  }
+  function machineLanguageRefusals(id, node, out) {
+    const walk = (states, prefix) => {
+      for (const name of Object.keys(states || {})) {
+        const state = states[name] || {};
+        const path = prefix ? prefix + "." + name : name;
+        for (const kind of ["entry", "exit"]) {
+          for (const target of Object.keys(state[kind] || {})) {
+            const bad = langMapError(state[kind][target]);
+            if (bad) {
+              out.push("The " + kind + ' of "' + id + '" at ' + path + " writes a " + target + " that " + bad + ".");
+            }
+          }
+        }
+        if (state.states) walk(state.states, path);
+      }
+    };
+    walk(node.states, "");
+  }
+  function templateLanguageRefusals(id, node, out) {
+    const bad = langMapError(node.template);
+    if (bad) {
+      out.push('The sentence "' + id + '" has a template that ' + bad + ".");
+      return;
+    }
+    if (!isPlainObject(node.template)) return;
+    const perLang = /* @__PURE__ */ new Map();
+    for (const lang of langKeysOf(node.template)) {
+      const parts = parseTemplate(node.template[lang]);
+      if (!Array.isArray(parts)) {
+        out.push('The sentence "' + id + '" cannot be read in ' + lang + ": " + parts.error);
+        continue;
+      }
+      perLang.set(lang, symbolsOfTemplate(parts).map((s) => s.split(".")[0]));
+    }
+    const every = [];
+    for (const [, list] of perLang) for (const s of list) if (every.indexOf(s) < 0) every.push(s);
+    for (const [lang, list] of perLang) {
+      for (const s of every) {
+        if (list.indexOf(s) >= 0) continue;
+        out.push('The sentence "' + id + '" reads "' + s + '" in one language and not in ' + lang + ". A sentence carries the same holes in every language it is written in.");
+      }
+    }
+  }
+  function propLanguageRefusals(blockId, props, out, path) {
+    if (Array.isArray(props)) {
+      props.forEach((p, i) => propLanguageRefusals(blockId, p, out, path + "[" + i + "]"));
+      return;
+    }
+    if (!isPlainObject(props)) return;
+    for (const key of Object.keys(props)) {
+      const at = props[key];
+      const where = (path ? path + "." : "") + key;
+      if (TEXT_KEYS.indexOf(key) >= 0 && isPlainObject(at)) {
+        const bad = langMapError(at);
+        if (bad) out.push('Block "' + blockId + '" has a ' + where + " that " + bad + ".");
+        continue;
+      }
+      if (isPlainObject(at) || Array.isArray(at)) propLanguageRefusals(blockId, at, out, where);
+    }
+  }
   function validate(doc) {
     const refusals = [];
     if (!doc || typeof doc !== "object") return { ok: false, refusals: ["This is not a document record."] };
@@ -2655,12 +3109,18 @@
     const model = doc.model || {};
     const nodes = model.nodes || {};
     if (!nodes || typeof nodes !== "object") return { ok: false, refusals: ["The document has no model.nodes to work out."] };
-    const graph = createGraph(doc);
+    const graph = createGraph(doc, { langs: function() {
+      return preference(doc);
+    } });
     for (const e of graph.errors) refusals.push(e);
     const blocks = /* @__PURE__ */ new Map();
     for (const block of (doc.layout || {}).blocks || []) if (block && block.id) blocks.set(String(block.id), block);
+    for (const [blockId, block] of blocks) propLanguageRefusals(blockId, block.props, refusals, "");
     for (const id of Object.keys(nodes)) {
       const node = nodes[id] || {};
+      nodeLanguageRefusals(id, node, refusals);
+      if (node.type === "machine") machineLanguageRefusals(id, node, refusals);
+      if (node.type === "text") templateLanguageRefusals(id, node, refusals);
       if (node.type === "binding") {
         const block2 = blocks.get(String(node.block));
         if (!block2) {
@@ -2707,6 +3167,10 @@
       /** @type {HTMLElement} */
       resolve(target, document.body)
     );
+    let wish = options.language ? String(options.language) : null;
+    const langs = function() {
+      return preference(doc, wish);
+    };
     const check = validate(doc);
     if (!check.ok) {
       const panel = refusalPanel(host, check.refusals);
@@ -2731,15 +3195,32 @@
           return null;
         },
         describe,
+        language() {
+          return langs()[0];
+        },
+        setLanguage() {
+          return { changed: [] };
+        },
         destroy() {
           panel.destroy();
         }
       };
     }
-    const graph = createGraph(doc);
+    const graph = createGraph(doc, { langs });
     graph.refresh();
     const plan = planBindings(doc);
-    const layout = layoutWithSources(doc.layout, plan);
+    const layout = layoutWithSources(localizeLayout(doc.layout, langs()), plan);
+    const wordyBlocks = /* @__PURE__ */ new Set();
+    const heroPlace = /* @__PURE__ */ new Map();
+    let heroes = 0;
+    for (const block of (doc.layout || {}).blocks || []) {
+      if (!block || !block.id) continue;
+      if (hasLangMap(block.props)) wordyBlocks.add(String(block.id));
+      if (String(block.component) === "hero") {
+        heroPlace.set(String(block.id), heroes);
+        heroes += 1;
+      }
+    }
     const drawnByBlock = /* @__PURE__ */ new Map();
     const nodes = (doc.model || {}).nodes || {};
     for (const id of Object.keys(nodes)) {
@@ -2760,7 +3241,7 @@
           const block = ((doc.layout || {}).blocks || []).find(function(b) {
             return b && String(b.id) === id;
           });
-          const base = block && block.props ? block.props.data : null;
+          const base = block && block.props ? localizeProps(block.props.data, langs()) : null;
           return composeBlock(graph, list, base);
         };
       })(blockId, entries);
@@ -2770,7 +3251,13 @@
       fill[blockId] = /* @__PURE__ */ (function(list) {
         return function(body) {
           for (const id of list) {
-            const view = renderNodeInto(body, { id, node: nodes[id], graph, set: apply });
+            const view = renderNodeInto(body, {
+              id,
+              node: nodes[id],
+              graph,
+              langs,
+              set: apply
+            });
             if (view) views.set(id, view);
           }
         };
@@ -2778,7 +3265,7 @@
     }
     if (options.chainBlock) {
       fill[options.chainBlock] = function(body) {
-        chainHandle = chain(body, { graph, title: "The chain" });
+        chainHandle = chain(body, { graph, title: "The chain", langs });
       };
     }
     const k = kit();
@@ -2849,6 +3336,67 @@
       announce(out.changed);
       return out;
     }
+    function elementOf(block, mounted) {
+      const entry = mounted.get(String(block.id));
+      if (!entry || !entry.el || !entry.el.querySelector) return null;
+      if (entry.el.getAttribute && entry.el.getAttribute("data-ak-block") === String(block.id)) return entry.el;
+      if (String(block.component) === "hero") {
+        const band = entry.el.querySelectorAll(".ak-hero");
+        return band[heroPlace.get(String(block.id)) || 0] || band[0] || null;
+      }
+      return entry.el;
+    }
+    function relabelBlocks() {
+      if (!wordyBlocks.size) return;
+      const wanted = langs();
+      const mounted = /* @__PURE__ */ new Map();
+      for (const entry of surface.blocks()) mounted.set(String(entry.id), entry);
+      for (const block of (doc.layout || {}).blocks || []) {
+        if (!block || !wordyBlocks.has(String(block.id))) continue;
+        const root = elementOf(block, mounted);
+        if (!root) continue;
+        const props = localizeProps(block.props, wanted);
+        for (const key of TEXT_KEYS) {
+          const words = props[key];
+          if (typeof words !== "string") continue;
+          const at = root.querySelector('[data-ak-part="' + key + '"]');
+          if (!at || at.closest && at.closest('[data-ak-part="body"]')) continue;
+          if (at.textContent !== words) at.textContent = words;
+        }
+      }
+    }
+    let languageNow = langs().join("|");
+    function relanguage() {
+      const key = langs().join("|");
+      if (destroyed || key === languageNow) return { changed: [], language: langs()[0] };
+      languageNow = key;
+      for (const [, view] of views) if (typeof view.relabel === "function") view.relabel();
+      const out = graph.relanguage();
+      for (const id of out.changed) {
+        const view = views.get(id);
+        if (view) view.update();
+      }
+      relabelBlocks();
+      for (const [blockId, entries] of plan) {
+        const moved = entries.some(function(e) {
+          return out.changed.indexOf(e.from) >= 0;
+        });
+        if (moved || wordyBlocks.has(String(blockId))) surface.refresh(sourceNameFor(blockId));
+      }
+      if (chainHandle) chainHandle.set();
+      if (options.onChange) {
+        options.onChange({
+          changed: out.changed.slice(),
+          values: valuesNow(),
+          state: statesNow(),
+          language: langs()[0]
+        });
+      }
+      return { changed: out.changed, language: langs()[0] };
+    }
+    const stopLang = onLanguageChange(function() {
+      relanguage();
+    });
     function schedule() {
       if (timer) {
         clearTimeout(timer);
@@ -2938,15 +3486,30 @@
       },
       /** Draw the chain somewhere of the host's choosing, following this same document. */
       chain(where) {
-        const view = chain(where, { graph, title: "The chain" });
+        const view = chain(where, { graph, title: "The chain", langs });
         if (!chainHandle) chainHandle = view;
         return view;
       },
       describe,
       version: VERSION,
+      /** The language this screen is written in right now. */
+      language() {
+        return langs()[0];
+      },
+      /**
+       * Ask for a language, for a host that has its own switch. Passing null hands the decision
+       * back to the page, which is where it belongs — the login pill is the switch on this
+       * platform, and a document that fought it would be a second answer to one question.
+       * @param {string|null} lang
+       */
+      setLanguage(lang) {
+        wish = lang == null ? null : String(lang);
+        return relanguage();
+      },
       destroy() {
         destroyed = true;
         if (timer) clearTimeout(timer);
+        stopLang();
         window.removeEventListener("aimeat-live-update", onLive);
         if (chainHandle) chainHandle.destroy();
         for (const [, view] of views) if (view.el && view.el.parentNode) view.el.parentNode.removeChild(view.el);
@@ -2962,9 +3525,12 @@
     return Object.assign({ id: String(type) }, found);
   }
   function chain2(where, doc) {
-    const graph = createGraph(doc);
+    const langs = function() {
+      return preference(doc);
+    };
+    const graph = createGraph(doc, { langs });
     graph.refresh();
-    return chain(where, { graph, title: "The chain" });
+    return chain(where, { graph, title: "The chain", langs });
   }
   var living = {
     version: VERSION,

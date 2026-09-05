@@ -23,13 +23,20 @@
  *   two machines sending each other events settle or stop rather than spin. The FIRST refresh
  *   also runs each machine's initial entry, because a machine that merely occupies its starting
  *   state has never written the word it is supposed to be showing.
- * @structure createGraph(doc) → { ids, errors, get, valueOf, fieldsOf, set, send, tick, refresh,
- *   dependents, nodeOf, edges }
+ *   THE LANGUAGE IS A READING OF THE RECORD, NOT A STATE OF THE GRAPH. relanguage() re-reads the
+ *   nodes whose own source is words — a sentence template — and asks every machine to say the
+ *   words of the state it is already in again; then it recomputes only what those touched. No
+ *   value is reset, no machine transitions, nothing is remounted: the numbers a person moved are
+ *   exactly where they left them and only the words are different.
+ * @structure createGraph(doc, opts) → { ids, errors, get, valueOf, fieldsOf, set, send, tick,
+ *   refresh, relanguage, dependents, nodeOf, edges }
  * @usage
  *   import { createGraph } from './graph.js';
- *   const g = createGraph(doc);
+ *   const g = createGraph(doc, { langs: () => ['fi', 'en'] });
  *   g.set('t', 31);   // { changed: ['t', 'f', 'note', 'state'] }
  * @version-history
+ *   v0.4.0 — 2026-09-06 — `opts.langs` reaches every node's ctx, and relanguage() moves the words
+ *     without moving the graph.
  *   v0.3.0 — 2026-09-05 — The first refresh runs each machine's initial entry actions, so a value
  *     a machine writes is right on the first paint instead of blank until the first crossing.
  *   v0.1.0 — 2026-09-05 — Initial (the living document, stage 1).
@@ -66,9 +73,12 @@ function same(a, b) {
 /**
  * Build the graph for one document.
  * @param {{ model?: { nodes?: Record<string, any> } }} doc
+ * @param {{ langs?: () => string[] }} [opts]  how a node reads the language in force, for the
+ *   fields a record may write as a language map
  * @returns {any}
  */
-export function createGraph(doc) {
+export function createGraph(doc, opts) {
+  const langs = opts && typeof opts.langs === 'function' ? opts.langs : function () { return []; };
   const model = (doc && doc.model) || {};
   const nodes = (model && model.nodes) || {};
   const ids = Object.keys(nodes);
@@ -101,7 +111,10 @@ export function createGraph(doc) {
 
   function ctxFor(id) {
     if (!compiled.has(id)) compiled.set(id, {});
-    return { id: id, node: nodes[id], doc: doc, scope: scope, state: state, compiled: compiled.get(id) };
+    return {
+      id: id, node: nodes[id], doc: doc, scope: scope, state: state,
+      compiled: compiled.get(id), langs: langs,
+    };
   }
 
   // ── Prepare every node once: parse expressions, read units, seed the writable stores. ──
@@ -266,8 +279,12 @@ export function createGraph(doc) {
     errors.push('The machines in this document kept sending each other events; the engine stopped after ' + MAX_ROUNDS + ' rounds.');
   }
 
-  /** What one entry or exit action comes to, in the same expression language as everything else. */
-  function evaluateAssign(tree) { return runExpr(tree, scope); }
+  /**
+   * What one entry or exit action comes to, in the same expression language as everything else.
+   * A null tree is an assignment written as a language map that carries no language this build
+   * could read; it assigns nothing rather than throwing.
+   */
+  function evaluateAssign(tree) { return tree ? runExpr(tree, scope) : undefined; }
 
   const api = {
     ids: ids,
@@ -297,6 +314,36 @@ export function createGraph(doc) {
       pass(ids, changed);
       startMachines(changed);
       settleMachines(changed);
+      return { changed: changed };
+    },
+
+    /**
+     * THE LANGUAGE CHANGED, AND NOTHING ELSE DID. Every node whose own source is words is read
+     * again from the record, every machine says the words of the state it is already in again,
+     * and only what those touched is recomputed. A value a person moved is not written, a machine
+     * does not transition, and the changed list is the words that actually became different — so
+     * the caller can update those and leave the rest of the screen exactly where it is.
+     * @returns {{ changed: string[] }}
+     */
+    relanguage() {
+      const changed = [];
+      const seed = [];
+      for (const id of order) {
+        const node = nodes[id] || {};
+        const type = typeOf(node.type);
+        if (!type || typeof type.relanguage !== 'function') continue;
+        type.relanguage(node, ctxFor(id));
+        if (seed.indexOf(id) < 0) seed.push(id);
+      }
+      for (const id of order) {
+        if ((nodes[id] || {}).type !== 'machine') continue;
+        const m = state.machines.get(id);
+        if (!m || typeof m.words !== 'function') continue;
+        for (const a of m.words()) {
+          if (put(a.id, evaluateAssign(a.tree)) && seed.indexOf(a.id) < 0) seed.push(a.id);
+        }
+      }
+      if (seed.length) pass(seed, changed);
       return { changed: changed };
     },
 

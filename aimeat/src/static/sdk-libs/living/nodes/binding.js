@@ -14,11 +14,17 @@
  *   THE PROP IS A PATH, so a nested shape (series.0.values) is reachable without a new node type,
  *   and several bindings on the same block compose into one patch rather than fighting over it.
  *
- * @node     binding   One block prop on this screen reads one node.
- * @inputs   binding   from (the node whose output the prop takes)
- * @outputs  binding   value — the same value, so the chain view can show where it went
- * @options  binding   block (a layout block id) · prop (a prop path on that block, dots allowed)
- * @example  binding   { "type": "binding", "block": "dial", "prop": "value", "from": "t" }
+ *   NO FIELD OF A BINDING IS EVER A LANGUAGE MAP, which is why its @languages line says none. A
+ *   binding is a wire: the words at the node end belong to that node, and the words at the block
+ *   end are the block's own props, which the arrangement carries in every language it was written
+ *   in and mount() reads through the same door.
+ *
+ * @node       binding   One block prop on this screen reads one node.
+ * @inputs     binding   from (the node whose output the prop takes)
+ * @outputs    binding   value — the same value, so the chain view can show where it went
+ * @options    binding   block (a layout block id) · prop (a prop path on that block, dots allowed)
+ * @languages  binding   none
+ * @example    binding   { "type": "binding", "block": "dial", "prop": "value", "from": "t" }
  * @structure binding: the node-type module (dependsOn · prepare · evaluate) · setPath ·
  *   unboundBlocks(surface, blockIds)
  * @usage  import { binding } from './binding.js';

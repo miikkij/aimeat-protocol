@@ -18,12 +18,18 @@
  *
  *   THE FLASH IS FINITE AND THE VIEWER WINS. One short animation per changed node, removed when
  *   it ends; under reduced motion nothing moves and the final DOM is identical.
- * @structure chain(host, spec) → { el, set, flash, destroy } · chainData(graph)
+ *   A PILL WEARS THE NODE'S OWN LABEL, so when a record carries its labels in two languages the
+ *   chain reads in whichever one the page is in — the picture of the document is in the same
+ *   language as the document. The node ID in brackets never changes: that is the name a formula
+ *   writes and a person debugs with.
+ * @structure chain(host, spec) → { el, set, flash, destroy } · chainData(graph, langs)
  * @usage
  *   import { chain } from './chain.js';
  *   const view = chain(host, { graph: g });
  *   view.flash(['t', 'f']);
  * @version-history
+ *   v0.4.0 — 2026-09-06 — A pill's label is read in the page's language; set() repaints it, which
+ *     is what a language change calls.
  *   v0.2.0 — 2026-09-05 — The 6 % column inset is gone: atelier 0.53.0 measures its own pills and
  *     keeps them inside the frame, so the columns run the full width and the outer labels are
  *     whole because the kit made them so, not because this file guessed at its padding.
@@ -31,6 +37,7 @@
  */
 import { el, clear, kit, reducedMotion } from './dom.js';
 import { statesOf } from './render.js';
+import { textOf } from './i18n.js';
 
 /** How long a changed node stays lit. Short enough to read as a pulse, not as a state. */
 const FLASH_MS = 900;
@@ -63,10 +70,10 @@ function depths(graph) {
  * The record the graph part draws: one node per model node, one per machine state, an edge for
  * every dependency, and a place for each — laid out in columns by depth, so the ground the
  * document stands on is on the left and what it comes to is on the right.
- * @param {any} graph
+ * @param {any} graph @param {string[]} [langs]  the languages a label is read in
  * @returns {{ nodes: Array<any>, edges: Array<any> }}
  */
-export function chainData(graph) {
+export function chainData(graph, langs) {
   const nodes = [];
   const edges = [];
   const depth = depths(graph);
@@ -76,7 +83,8 @@ export function chainData(graph) {
 
   for (const id of graph.ids) {
     const node = graph.nodeOf(id) || {};
-    nodes.push({ id: id, label: node.label ? node.label + ' (' + id + ')' : id, tone: TONE[node.type] || 'plain' });
+    const words = textOf(node.label, langs || []);
+    nodes.push({ id: id, label: words ? words + ' (' + id + ')' : id, tone: TONE[node.type] || 'plain' });
     if (node.type !== 'machine') continue;
     const active = String(graph.valueOf(id) || '').split('.');
     for (const state of statesOf(node)) {
@@ -115,7 +123,7 @@ export function chainData(graph) {
 /**
  * The chain view.
  * @param {string|Element} host
- * @param {{ graph: any, title?: string }} spec
+ * @param {{ graph: any, title?: string, langs?: () => string[] }} spec
  * @returns {{ el: HTMLElement, set: () => void, flash: (ids: string[]) => void, destroy: () => void }}
  */
 export function chain(host, spec) {
@@ -129,7 +137,7 @@ export function chain(host, spec) {
   const timers = new Set();
 
   function paint() {
-    const data = chainData(spec.graph);
+    const data = chainData(spec.graph, spec.langs ? spec.langs() : []);
     order = data.nodes.map(function (n) { return n.id; });
     if (k && typeof k.graph === 'function') {
       if (!handle) handle = k.graph({ target: root, data: data, title: spec.title });

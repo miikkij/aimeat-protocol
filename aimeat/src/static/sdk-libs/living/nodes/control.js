@@ -11,14 +11,21 @@
  *   control is bound to (min, max, step, label, unit) rather than being typed a second time here.
  *   That is why moving a slider can never disagree with what the value will accept.
  *
- * @node     control   A slider, switch, pick, number or text field bound to one value node.
- * @inputs   control   target (the value node this control moves)
- * @outputs  control   value — what the target holds now, so a template can read the control by name
- * @options  control   kind=slider|toggle|pick|number|text · label · options (for pick) · block (a section to put it in)
- * @example  control   { "type": "control", "kind": "slider", "target": "t", "label": "Lämpötila", "block": "controls" }
+ *   A PICK'S OPTIONS ARE A VALUE AND A LABEL, and only the label is words: the value is what the
+ *   document stores and what its formulas compare against, so it stays the same in every language
+ *   while what the person reads on the option changes with the page.
+ *
+ * @node       control   A slider, switch, pick, number or text field bound to one value node.
+ * @inputs     control   target (the value node this control moves)
+ * @outputs    control   value — what the target holds now, so a template can read the control by name
+ * @options    control   kind=slider|toggle|pick|number|text · label · options (for pick) · block (a section to put it in)
+ * @languages  control   label · options[].label
+ * @example    control   { "type": "control", "kind": "slider", "target": "t", "label": { "fi": "Lämpötila", "en": "Temperature" }, "block": "controls" }
  * @structure control: the node-type module (dependsOn · prepare · evaluate)
  * @usage  import { control } from './control.js';
  * @version-history
+ *   v0.4.0 — 2026-09-06 — `label` and a pick option's `label` may be a language map; an option's
+ *     `value` may not, because it is what the document stores.
  *   v0.1.0 — 2026-09-05 — Initial (the living document, stage 1).
  */
 

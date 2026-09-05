@@ -14,14 +14,18 @@
  *   file opened from disk — falls back to the node's own `value`, so a document always renders.
  *   That is the same progressive rule the mosaic's live binding follows.
  *
- * @node     source    A live value from a memory key, or a constant when the page cannot read one.
- * @inputs   source    key (a memory key) · path (a dotted path inside the record) · value (the fallback)
- * @outputs  source    value — what the key holds now, with the node's unit on it
- * @options  source    unit · format (how it is printed: 1 · "int" · "unit" · an object) · scope=own|public · owner (for a public read) · label
- * @example  source    { "type": "source", "key": "sensors.livingroom", "path": "celsius", "unit": "°C", "format": 1, "value": 21 }
+ * @node       source    A live value from a memory key, or a constant when the page cannot read one.
+ * @inputs     source    key (a memory key) · path (a dotted path inside the record) · value (the fallback)
+ * @outputs    source    value — what the key holds now, with the node's unit on it
+ * @options    source    unit · format (how it is printed: 1 · "int" · "unit" · an object; `locale: "auto"` writes the number in the page's language) · scope=own|public · owner (for a public read) · label
+ * @languages  source    label
+ * @example    source    { "type": "source", "key": "sensors.livingroom", "path": "celsius", "unit": "°C", "format": 1, "value": 21, "label": { "fi": "Olohuone", "en": "Living room" } }
  * @structure sourceNode: the node-type module (dependsOn · prepare · evaluate · read)
  * @usage  import { sourceNode } from './source.js';
  * @version-history
+ *   v0.4.0 — 2026-09-06 — `label` may be a language map. The `key` is not one: a memory key is an
+ *     address, and an address that changed with the reader's language would read a different
+ *     device in each.
  *   v0.3.0 — 2026-09-05 — `format`: a reading from a device arrives with as many digits as the
  *     device felt like sending, and this is where a document says how many of them to print.
  *   v0.1.0 — 2026-09-05 — Initial (the living document, stage 1).
