@@ -30,6 +30,7 @@
     "src/routes/organisms/workspace-ops.ts:POST /v1/organisms/:id/workspace/engagements": "ACTS FOR THE OWNER — the comparison parses the GAII in the request and refuses one belonging to a different owner, so it is a cross-owner check on the argument rather than a question about the caller.",
     "src/routes/packages.ts:GET /v1/packages/:groupId/versions/:version": "A PUBLIC READ — no auth on the door at all; the comparison exists so a PRIVATE package answers 404 to everyone but its author. `req.auth?.owner` is read optionally for exactly that reason, and naming a principal would mean requiring one, which this door does not.",
     "src/routes/packages.ts:GET /v1/packages/:groupId/export": "A PUBLIC READ — same shape as the version read above: private packages stay 404 to everyone but the author.",
-    "src/routes/packages.ts:GET /v1/packages/:groupId": "A PUBLIC READ — same shape again, on the package record itself."
+    "src/routes/packages.ts:GET /v1/packages/:groupId": "A PUBLIC READ — same shape again, on the package record itself.",
+    "src/routes/packages.ts:GET /v1/packages/:groupId/upstream-check": "PROTECTS DATA, NOT THE ACCOUNT - it reads one package record the caller authored and asks the node it came from whether there is a newer version. Nothing about the account changes, and every principal that reaches it is already acting for that person under `packages:write`. Same reasoning as the package reads listed above."
   }
 }
