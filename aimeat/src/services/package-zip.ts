@@ -83,6 +83,8 @@ export interface ParsedPackage {
   blueprint?: Record<string, unknown>;
   changelog?: string;
   components: ParsedComponent[];
+  /** The serving node's signed statement, if the ZIP carried one. Read, never verified here. */
+  attestation?: unknown;
 }
 
 // ---------------------------------------------------------------------------
@@ -109,7 +111,7 @@ const ZIP_MAGIC = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
  * Convert a PackageRecord into a ZIP buffer containing manifest.yaml
  * and all component files under components/.
  */
-export async function buildZip(pkg: PackageRecord): Promise<Buffer> {
+export async function buildZip(pkg: PackageRecord, attestation?: unknown): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const archive = new ZipArchive({ zlib: { level: 6 } });
     const chunks: Buffer[] = [];
@@ -143,6 +145,13 @@ export async function buildZip(pkg: PackageRecord): Promise<Buffer> {
 
     // Append manifest.yaml
     archive.append(YAML.stringify(manifest), { name: 'manifest.yaml' });
+
+    // The serving node's signed statement about this version, beside the manifest rather than as a
+    // second format. Absent when the node has no key of its own, which is the only case a package
+    // leaves here unsigned.
+    if (attestation) {
+      archive.append(JSON.stringify(attestation, null, 2), { name: 'signature.json' });
+    }
 
     // Append each component file
     for (const comp of pkg.components) {
@@ -360,6 +369,23 @@ export async function parseZip(buffer: Buffer, options: ZipOptions): Promise<Par
     });
   }
 
+  // The serving node's signed statement, READ but deliberately NOT verified here. Same split as
+  // gatePeer: this function finds what arrived, and the caller — which alone knows whose key to
+  // trust and whether a signature is required on the road it came in on — decides about it.
+  let attestation: unknown;
+  const sigBuf = files.get('signature.json');
+  if (sigBuf) {
+    try {
+      const parsed = JSON.parse(sigBuf.toString('utf-8')) as unknown;
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) attestation = parsed;
+    } catch {
+      // A malformed signature file is not a malformed package. It is reported as "no attestation",
+      // which the federation road refuses and the manual import road records as unverified — both
+      // better answers than rejecting a package whose components are fine.
+      throw new ZipValidationError('INVALID_MANIFEST', 'signature.json is not valid JSON');
+    }
+  }
+
   return {
     name: manifest.name as string,
     author: manifest.author as string,
@@ -371,5 +397,6 @@ export async function parseZip(buffer: Buffer, options: ZipOptions): Promise<Par
     blueprint: manifest.blueprint as Record<string, unknown> | undefined,
     changelog: manifest.changelog as string | undefined,
     components,
+    attestation,
   };
 }

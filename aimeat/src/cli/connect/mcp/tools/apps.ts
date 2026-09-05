@@ -202,6 +202,22 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
+  // Bringing a package in from another node, signature and digests checked before anything lands.
+  mcp.tool('aimeat_package_pull', descriptionFor('aimeat_package_pull'), {
+    group_id: z.string().describe('The package on the other node, e.g. "signage::alice"'),
+    node_id: z.string().optional().describe('A peer this node knows'),
+    source_url: z.string().optional().describe('A node that is not a peer. Operator only, with trust:"tofu"'),
+    trust: z.enum(['tofu']).optional().describe('Accept and pin the key that node publishes'),
+    version: z.string().optional().describe('A specific version. Defaults to the latest one there.'),
+  }, annotationsFor('aimeat_package_pull'), async (args) => {
+    const body: Record<string, unknown> = { group_id: args.group_id };
+    for (const key of ['node_id', 'source_url', 'trust', 'version'] as const) {
+      if (args[key] !== undefined) body[key] = args[key];
+    }
+    const resp = await client.post('/v1/federation/packages/pull', body);
+    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+  });
+
   // One act for a whole installed package. What the owner edited is reported, never overwritten.
   mcp.tool('aimeat_package_update', descriptionFor('aimeat_package_update'), {
     instance_id: z.string().describe('The installed copy, from the instances list'),

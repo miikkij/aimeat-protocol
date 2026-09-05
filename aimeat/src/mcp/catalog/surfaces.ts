@@ -126,6 +126,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         // (versions, delete) stay on the connector doors; see V2_EXCLUDED for why.
         'aimeat_package_list', 'aimeat_package_get', 'aimeat_package_compose',
         'aimeat_package_status_set', 'aimeat_package_install', 'aimeat_package_update',
+        'aimeat_package_pull',
         'aimeat_app_draft_write', 'aimeat_app_draft_replace', 'aimeat_app_draft_read', 'aimeat_app_draft_seed',
         'aimeat_app_screenshot',
         'aimeat_app_seo_set', 'aimeat_app_marks_set', 'aimeat_app_legal_set', 'aimeat_app_audit', 'aimeat_seo_status',
@@ -178,6 +179,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         // group id install requires, and publishing because a package is created private.
         'aimeat_package_list', 'aimeat_package_get', 'aimeat_package_compose',
         'aimeat_package_status_set', 'aimeat_package_install', 'aimeat_package_update',
+        'aimeat_package_pull',
         // The person's own welcome page, beside the company one: same act, different owner.
         'aimeat_portfolio_publish',
         'aimeat_contact_list', 'aimeat_contact_add', 'aimeat_contact_remove', 'aimeat_contact_resolve_email', 'aimeat_contact_invite',

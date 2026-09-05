@@ -173,7 +173,9 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerNotifyTools(mcp, storage, config, agentGaii);
     registerContactTools(mcp, storage, config, agentGaii);
     registerCompanyTools(mcp, storage, config, agentGaii);
-    registerPackageTools(mcp, storage, config, agentGaii);
+    // peers: pulling a package from another node reads that node's address and key from the peer
+    // record, never from the caller's arguments.
+    registerPackageTools(mcp, storage, config, agentGaii, peers);
     registerPortfolioTools(mcp, storage, config, agentGaii);
     registerSurfaceLayoutTools(mcp, storage, config, agentGaii);
     registerAppUiTools(mcp, storage, config, agentGaii);

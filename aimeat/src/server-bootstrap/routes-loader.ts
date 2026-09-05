@@ -712,7 +712,9 @@ export async function mountRoutes(
 
   // Packages, Instances & Templates
   if (config.packagesEnabled) {
-    app.use(packagesRouter(config, storage));
+    // peers: the import door checks a signature on an uploaded ZIP against the key of the node that
+    // signed it, when that node is a peer this one knows.
+    app.use(packagesRouter(config, storage, peers));
     app.use(instancesRouter(config, storage, scheduler));
   }
   if (config.packagesEnabled && config.templatesEnabled) {

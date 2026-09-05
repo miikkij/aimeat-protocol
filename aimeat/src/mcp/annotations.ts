@@ -311,6 +311,9 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // Idempotent: run twice and the second call finds nothing left to update. Not destructive,
     // because a component the owner edited is refused rather than overwritten.
     aimeat_package_update: { title: 'Update Installed Package', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    // openWorld: it reaches another node over the network, which is the one package tool that does.
+    // Idempotent: a source with nothing newer answers applied:false rather than writing again.
+    aimeat_package_pull: { title: 'Pull Package From Another Node', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     // Not idempotent: each install mints a fresh instance with its own component names, so calling
     // it twice leaves two copies rather than one.
     aimeat_package_install: { title: 'Install Package', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
