@@ -27,11 +27,13 @@
  *   NEVER IN THE WAY. Recording a refusal must not be able to change one. Every write is
  *   synchronous but tiny, and every failure is swallowed after one warning: a node that cannot
  *   write its log still has to be able to refuse people.
- * @structure AuthFailureContext · AuthFailureRecord · recordAuthFailure · readRecentAuthFailures · credentialDigest · configureAuthAudit
+ * @structure AuthFailureContext · AuthFailureRecord · recordAuthFailure · readRecentAuthFailures · authLogStatus · credentialDigest · configureAuthAudit
  * @usage
  *   configureAuthAudit(config);                       // once, at boot
  *   recordAuthFailure(ctx, { status: 401, code: 'AUTH_REQUIRED', reason: 'no credential' });
  * @version-history
+ *   v1.2.0 — 2026-09-05 — authLogStatus: on or off, the file, its size and the older generation's,
+ *     for the Security page's log line and its "how much history is readable" honesty.
  *   v1.1.0 — 2026-08-17 — readRecentAuthFailures: the operator-facing tail reader over both
  *     generations, so the admin Security tab can show the list instead of a count.
  *   v1.0.0 — 2026-08-17 — Initial: who was refused, at which door, and with what.
@@ -240,4 +242,20 @@ export function readRecentAuthFailures(limit: number): { enabled: boolean; items
     }
   }
   return { enabled: true, items: items.slice(-limit).reverse() };
+}
+
+/**
+ * Where the log stands: on or off, the file, how full it is and whether an older generation
+ * exists. What the Security page says in its "refusal log on · rotates at 5 MB" line, and what an
+ * operator needs before deciding whether "mean per day" covers enough history to mean anything.
+ */
+export function authLogStatus(): { enabled: boolean; path: string; bytes: number; max_bytes: number; rotated_bytes: number } {
+  if (!filePath) return { enabled: false, path: '', bytes: 0, max_bytes: maxBytes, rotated_bytes: 0 };
+  const sizeOf = (path: string): number => {
+    try {
+      return existsSync(path) ? statSync(path).size : 0;
+    // eslint-disable-next-line aimeat/no-silent-catch -- a file that vanished between exists and stat reads as empty, by design
+    } catch { return 0; }
+  };
+  return { enabled: true, path: filePath, bytes: sizeOf(filePath), max_bytes: maxBytes, rotated_bytes: sizeOf(`${filePath}.1`) };
 }

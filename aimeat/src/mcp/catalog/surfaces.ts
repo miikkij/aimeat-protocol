@@ -22,6 +22,8 @@
  *   import { toolsForSurface } from '../catalog/surfaces.js';
  *   const allowed = toolsForSurface('agent'); // register only these on /v2/mcp/agent
  * @version-history
+ *   2026-09-05 — aimeat_admin_security_overview and aimeat_admin_incident_resolve on the operator
+ *     surface, beside the account-lifecycle tools.
  *   2026-09-03 — A seventh surface, `full`, computed rather than listed: the catalog minus
  *     V2_EXCLUDED, so it cannot fall behind a new tool and the only way to keep one off it is to
  *     say so where the reasons already live. The other six are unchanged.
@@ -259,6 +261,8 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_admin_sso_list', 'aimeat_admin_sso_get', 'aimeat_admin_sso_create', 'aimeat_admin_sso_update',
         'aimeat_admin_sso_delete', 'aimeat_admin_sso_idp_metadata', 'aimeat_admin_sso_scim_token',
         'aimeat_admin_owner_disable', 'aimeat_admin_owner_enable', 'aimeat_admin_totp_reset',
+        // The Security page in one read, and resolving a refused-and-kept incident.
+        'aimeat_admin_security_overview', 'aimeat_admin_incident_resolve',
         // Arranging this node's front page and the page its members land on.
         'aimeat_surface_layout_get', 'aimeat_surface_layout_set',
         // The operator's break-glass over an organism whose creator account is unreachable, plus the
