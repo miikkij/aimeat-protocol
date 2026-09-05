@@ -19,6 +19,7 @@
  *   vocabulary and the few rules the structure cannot enforce.
  * @structure
  *   - ATELIER_COMPONENTS / ATELIER_FEATURE_POINTERS — the catalogue data the prompt renders from
+ *   - the recipe half (the four doors, the five patterns) is build-atelier-recipe.ts
  *   - ATELIER_LOOKS / PALETTE_COLOR_WORDS — the look picker + the imagery pipeline's style words
  *   - composeAtelierPrompt(config, opts) — { full, body }
  *   - buildAtelierSpecToken(config) — digest of the body, for the publish spec gate
@@ -26,6 +27,12 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.25.0 — 2026-09-05 — THE RECIPE (wish-atelier-always-excellent, part 4): a component that is
+ *     nearly right is customised through the kit's four doors (named parts, slots, variants,
+ *     per-component tokens) with the fork priced and the dialog family kept whole, and five
+ *     copy-paste patterns that run as written — a list that arrives, a panel that changes, a
+ *     screen that switches, a form that lands, a nearly-right row. The variant table is the one
+ *     describe-data.js actually carries, so the prompt cannot promise a shape the kit refuses.
  *   v1.24.0 — 2026-09-05 — MOTION IS ALREADY ON, said first in the motion section: what arrives,
  *     what a change looks like row by row, which components are matched up by id, where a view
  *     crossing happens, and the two switches — the app's and the block's — with the viewer over
@@ -116,6 +123,7 @@ import { getAppTemplateIndex } from '../data/app-templates.js';
 import { PATTERNS } from '../data/atelier-patterns.js';
 import { AMBIENTS } from '../data/atelier-ambients.js';
 import { EFFECTS, EFFECT_HOSTS, POST_IDS } from '../data/atelier-effects.js';
+import { renderCustomisation, renderPatterns } from './build-atelier-recipe.js';
 
 /** Slot the publish gate's token is substituted into (mirrors build-app-prompt.ts). */
 const SPEC_TOKEN_SLOT = '{{aimeat_spec_token}}';
@@ -318,6 +326,12 @@ function composeBody(config: AimeatConfig): string {
   body += 'Every component takes a spec and returns `{ el, set(patch), destroy() }`. Copying an '
     + 'example below yields a finished, beautiful, accessible piece — that is the paved path.\n\n';
   body += renderCatalogue() + '\n\n';
+
+  // The recipe half — the four doors and the five patterns — lives in build-atelier-recipe.ts:
+  // this file reached the 800-line ceiling when it landed, and a pure extraction keeps the words
+  // together rather than shaving the version history that explains them.
+  body += renderCustomisation();
+  body += renderPatterns();
 
   body += '## The mosaic: the arrangement lives outside your file\n\n';
   body += 'Render the screen through `AIMEAT.atelier.mosaic(...)` instead of appending components '

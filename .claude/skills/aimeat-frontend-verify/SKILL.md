@@ -35,6 +35,26 @@ Then verify the **feature**, not the render: perform the real interaction and co
 
 The same gate is served to app builders in `src/services/build-app-prompt.ts` under "Before you call it done". Keep the two in step.
 
+## An Atelier app is accepted beside the genre it forked
+
+For an app on the Atelier track the numbers above are the floor, not the verdict. Screenshot it at **390 and 1440, in both themes**, open the genre it names in `<meta name="aimeat-register">` (`/v1/app-templates/genre-<id>`, or the shelf at `/v1/designbook?kind=genre`), and place the two pictures **side by side**. Then ask, while looking: **would this pass beside the genre?**
+
+That question is the acceptance criterion, and it exists because the metrics answered yes on pages the developer then rejected: three Design Book showcase pages passed element counts, overflow zero and a green contrast matrix while reading as "the same dashboard in new paint" (`docs/pitfalls.md` §34). A screenshot beside the genre is what catches a costume.
+
+Under the picture, seven measured checks, all reported as numbers:
+
+| Check | Passes at |
+|---|---|
+| Page width | `scrollWidth === clientWidth` at 390 and 1440 |
+| Past the edge | no element whose right edge passes `clientWidth + 2`, **including inside a box with `overflow-x: clip` or `hidden`** — the width check is blind to those |
+| Text size | no visible text under 11 px |
+| Tap targets | at 390, no control under 40 px in either dimension |
+| Contrast | 4.5 for body text, 3.0 for ≥24 px or ≥19 px bold |
+| Reduced motion | zero animations whose computed duration is over 1 ms (`docs/pitfalls.md` §47) |
+| Console | zero JavaScript errors |
+
+And one measurement only phone width reveals: a kit component that declares `container-type` cannot restyle itself from its own container query, so a fold can succeed and leave the detail pane at 40 % of its panel with no error and a correct page width. When the change touches `listDetail` or another container-query component, measure the panel's width against its container's at 390 (`docs/pitfalls.md` §46).
+
 ## Four things a metric will never tell you
 
 Automated checks prove overflow, contrast and element counts. They say nothing about these, and all four came from the developer having to point at something visible in a screenshot I had already taken.
