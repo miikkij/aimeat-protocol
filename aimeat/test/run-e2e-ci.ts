@@ -9,6 +9,13 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.32.0 -- 2026-09-06 -- The runner REFUSES to start on a port a suite in this run writes down.
+ *            It had computed that answer since fixedPorts() existed and never said it, and the
+ *            silence cost two sessions in one day: a throwaway node on 40262 turned e2e-app-origin
+ *            red for everybody with 44 assertions that read like a regression, and the session that
+ *            had READ that incident then claimed 40272, which three suites write down. A suite on a
+ *            fixed port checks only that SOMETHING answers there, so the collision is invisible from
+ *            inside it. Also: two new suites in ALL_SUITES from the packages work.
  *   v1.31.0 -- 2026-09-05 -- Add e2e-ai-jobs.ts (written 2026-08-31 on branch feat/ai-jobs, merged
  *            today): background model calls with a handle. It owns its server, because every refusal
  *            it measures is a boot-time number, and it follows the runner's backend so what it proves
@@ -821,6 +828,34 @@ function parseWorkers(): number {
     return TARGET.external ? 1 : n;
 }
 
+/**
+ * Which suites write down the port THIS run was given, and would therefore talk to our server
+ * instead of the one they think they started.
+ *
+ * WHY THIS EXISTS. fixedPorts() below excludes TARGET.port on purpose, and for a good reason — the
+ * comment there explains it — but the consequence was that the runner computed the collision and
+ * said nothing about it. It has now cost two sessions in one day: a throwaway node on 40262 turned
+ * e2e-app-origin red for everybody (incident 2026-09-05-port-40262-app-origin, 44 failed
+ * assertions that read exactly like a regression), and a session that had READ that incident then
+ * claimed 40272, which three other suites write down.
+ *
+ * A suite that boots its own server on a fixed port checks only that something ANSWERS there. It
+ * cannot tell our node from its own, so every assertion after that runs against the wrong database
+ * and the output is garbage that looks like broken code. The knowledge to prevent it was already in
+ * this file; only the sentence was missing.
+ */
+function portClashes(suites: string[], port: string): string[] {
+    const n = Number(port);
+    if (!Number.isFinite(n)) return [];
+    const out: string[] = [];
+    for (const suite of suites) {
+        let src: string;
+        try { src = readFileSync(suite, 'utf-8'); } catch { continue; }
+        if ([...src.matchAll(/\b(40[0-9]{3})\b/g)].some(m => Number(m[1]) === n)) out.push(suite);
+    }
+    return out;
+}
+
 /** Every port number a suite has written down, base port excluded: what no lane may be given. */
 function fixedPorts(suites: string[]): Map<string, number[]> {
     const out = new Map<string, number[]>();
@@ -1008,6 +1043,28 @@ async function main() {
     console.log(`  AIMEAT E2E Test Runner`);
     console.log(`  Server: ${TARGET.external ? BASE_URL + ' (external)' : `auto-start on :${TARGET.port}`}`);
     console.log(`  Storage: ${TARGET.dbType}${TARGET.dbType === 'sqlite' ? ` (${TARGET.dbPath})` : ''}`);
+    // Before anything boots: does a suite in this run write down the port we were given? If it
+    // does, that suite will find OUR server answering and never notice it is the wrong one.
+    if (!TARGET.external) {
+        const clashes = portClashes(suites, TARGET.port);
+        if (clashes.length > 0) {
+            console.error(`\n${'='.repeat(50)}`);
+            console.error(`  STOP: port ${TARGET.port} belongs to ${clashes.length} suite(s) in this run`);
+            console.error(`${'='.repeat(50)}`);
+            for (const s of clashes) console.error(`    ${s}`);
+            console.error(`
+  Each of those boots its own server on ${TARGET.port} and checks only that SOMETHING answers
+  there. With this runner on the same number they would talk to our node instead, against our
+  database, and every assertion after that is noise that reads like broken code.
+
+  Give the runner a port no suite writes down:  AIMEAT_PORT=<port> pnpm ...
+  Clear ranges: 40500-40599 is this runner's own lanes, 40600-40649 is pnpm sandbox,
+  and above 40650 nothing is written down at all.
+`);
+            process.exit(1);
+        }
+    }
+
     const workers = parseWorkers();
     const pinned = fixedPorts(suites);
     const lanes = planLanes(suites, workers, pinned);
