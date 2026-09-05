@@ -18,6 +18,10 @@
  *   import { registerAgentScheduleTools } from './agent-schedules.js';
  *   registerAgentScheduleTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.3.0 — 2026-09-05 — An extension schedule can carry the action's own `input` (and an
+ *     `instance_id`), which POST /v1/schedules has stored since it was written while no tool surface
+ *     declared it. Until now every scheduled action ran on its built-in defaults, which is rarely
+ *     what a clock is for.
  *   v1.2.0 — 2026-08-13 — aimeat_schedule_trigger: run one now, through the same
  *     services/schedule-write.ts the HTTP trigger route uses. Creating a morning job from a chat
  *     was possible; proving it works before the user is told it works was not.
@@ -92,6 +96,14 @@ export function registerAgentScheduleTools(
       // extension
       extension_name: z.string().optional(),
       action_id: z.string().optional(),
+      // The action's own parameters. POST /v1/schedules has stored these since the route was
+      // written (services/schedule-write.ts, the kind === 'extension' branch), and a manifest
+      // schedule uses the same field — but no tool surface declared it, so an owner could only ever
+      // put an action on a clock with its built-in defaults. Measured 2026-09-05: the AI Music
+      // Charts radar swept the same thirty search terms for six days and added nothing, while the
+      // same action with a wider term list found sixty-three tracks the bank had never held.
+      input: z.record(z.string(), z.unknown()).optional().describe('extension: the action\'s own parameters, passed on every fire.'),
+      instance_id: z.string().optional().describe('extension: run the action on one named instance rather than the default.'),
     },
     annotationsFor('aimeat_schedule_create'),
     async (a) => {
@@ -122,6 +134,8 @@ export function registerAgentScheduleTools(
         task_description: a.task_description,
         extension_name: a.extension_name,
         action_id: a.action_id,
+        input: a.input,
+        instance_id: a.instance_id,
       });
       if (!out.ok) return err(`${out.code}: ${out.message}`);
       const created = out.schedule;

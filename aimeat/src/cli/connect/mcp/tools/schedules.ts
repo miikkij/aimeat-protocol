@@ -8,6 +8,9 @@
  *   has no dedicated REST route (it is a structured memory write), so it writes the
  *   `agents.<name>.scheduler` mirror via /v1/memory.
  * @version-history
+ *   v1.2.0 -- 2026-09-05 -- An extension schedule can carry the action's own `input` (and an
+ *     `instance_id`), keeping parity with the server MCP surface and with the route, which has
+ *     stored both since it was written.
  *   v1.1.0 -- 2026-08-13 -- Add aimeat_schedule_trigger (run one now), keeping parity with the
  *     server MCP surface where it was added for the same reason: a new schedule is unproven until
  *     it has run once.
@@ -43,6 +46,9 @@ export function registerSchedulesTools(mcp: McpServer, registry: AgentRegistry):
     task_description: z.string().optional(),
     extension_name: z.string().optional(),
     action_id: z.string().optional(),
+    // The action's own parameters, which the route has always stored and no surface declared.
+    input: z.record(z.string(), z.unknown()).optional().describe('extension: the action\'s own parameters, passed on every fire.'),
+    instance_id: z.string().optional().describe('extension: run the action on one named instance rather than the default.'),
   }, annotationsFor('aimeat_schedule_create'), async (a) => {
     return out(await client.post('/v1/schedules', a as Record<string, unknown>));
   });

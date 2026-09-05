@@ -5,6 +5,15 @@
  * @description Schedule, workflow, task lifecycle, and agent memory (read/write/list/search) tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.4.0 — 2026-09-05 — aimeat_schedule_create publishes `input` and `instance_id`, the two fields
+ *     POST /v1/schedules has stored for an extension schedule since it was written and no tool
+ *     surface sent. THE SAME DEFECT AS v1.3.0 BELOW, thirteen days later and in this same file: a
+ *     route reads a field, no tool declares it, and the capability is invisible to everyone who only
+ *     has the tools. What it cost this time: the AI Music Charts radar could only ever be put on a
+ *     clock with its built-in thirty search terms, so it found the same tracks for six nights and
+ *     added nothing, while the same action with a wider term list found sixty-three the bank had
+ *     never held. The lesson, now in docs/pitfalls.md: when a route takes a field, grep the three
+ *     tool surfaces for it before assuming the gap is in the route.
  *   v1.3.0 — 2026-08-30 — aimeat_workflow_run publishes `vars` and `target`, the two fields
  *     POST /v1/workflows/:id/run has always read and no tool surface sent.
  *   v1.2.0 — 2026-08-30 — aimeat_workflow_run and _get say that a signals-only check is not a run:
@@ -36,6 +45,8 @@ export const schedulesTasksMemoryTools: AimeatToolDefinition[] = [
             task_title: { type: 'string', description: 'agent_task: title of the task created each fire.' },
             extension_name: { type: 'string', description: 'extension: installed extension name.' },
             action_id: { type: 'string', description: 'extension: action id to run.' },
+            input: { type: 'object', description: 'extension: the action\'s own parameters, passed on every fire. Without this the action runs on its built-in defaults, which is rarely what a clock is for: the AI Music Charts radar searched the same thirty terms every night for six days and added nothing, while the same action given a wider term list found sixty-three tracks it had never seen.' },
+            instance_id: { type: 'string', description: 'extension: run the action on one named instance of the extension rather than the default one.' },
         },
     },
     {
