@@ -16,15 +16,20 @@
  *   matches the sources, so the drift is a refused commit rather than a wrong answer served.
  *
  *   THE LINE FORMAT, one per type per tag:
- *     @node     <type> <one sentence: what this kind of node is>
- *     @inputs   <type> <what it reads> · <…>
- *     @outputs  <type> <what it answers with> · <…>
- *     @options  <type> <the fields it may carry> · <…>
- *     @example  <type> <one line of JSON — parsed by this tool, so it cannot be wrong>
+ *     @node       <type> <one sentence: what this kind of node is>
+ *     @inputs     <type> <what it reads> · <…>
+ *     @outputs    <type> <what it answers with> · <…>
+ *     @options    <type> <the fields it may carry> · <…>
+ *     @languages  <type> <the fields that may be a language map instead of a string> · <…>
+ *     @example    <type> <one line of JSON — parsed by this tool, so it cannot be wrong>
  * @structure readTags() → per-type records · emit() → the generated module · main(): write or --check
  * @usage cd aimeat && pnpm exec tsx tools/build-living-nodes.ts [--check]
  *   (or: pnpm build:living-nodes / pnpm check:living-nodes)
  * @version-history
+ *   v1.1.0 — 2026-09-06 — `@languages`: which of a node's fields may be written as a language map.
+ *     It is generated for the same reason the rest is — the AI writing a bilingual record asks the
+ *     library which fields take two languages, and a hand-kept answer would go stale on the next
+ *     node type.
  *   v1.0.0 — 2026-09-05 — Initial (the living document, stage 1).
  */
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -42,6 +47,8 @@ type Record_ = {
   inputs: string[];
   outputs: string[];
   options: string[];
+  /** The fields this type may carry as `{ fi: …, en: … }` instead of a plain string. */
+  languages: string[];
   example: unknown;
   file: string;
 };
@@ -54,12 +61,15 @@ export function readTags(): Record_[] {
     const text = readFileSync(join(NODES_DIR, file), 'utf8');
     for (const raw of text.split(/\r?\n/)) {
       const line = raw.replace(/^\s*\*\s?/, '').trim();
-      const m = /^@(node|inputs|outputs|options|example)\s+([a-z][A-Za-z0-9]*)\s+(.+)$/.exec(line);
+      const m = /^@(node|inputs|outputs|options|languages|example)\s+([a-z][A-Za-z0-9]*)\s+(.+)$/.exec(line);
       if (!m) continue;
       const [, tag, id, rest] = m;
       let rec = found.get(id);
       if (!rec) {
-        rec = { id, summary: '', inputs: [], outputs: [], options: [], example: null, file: 'nodes/' + file };
+        rec = {
+          id, summary: '', inputs: [], outputs: [], options: [], languages: [],
+          example: null, file: 'nodes/' + file,
+        };
         found.set(id, rec);
       }
       if (tag === 'node') { rec.summary = rest.trim(); continue; }
@@ -72,7 +82,12 @@ export function readTags(): Record_[] {
         }
         continue;
       }
-      rec[tag as 'inputs' | 'outputs' | 'options'] = rest.split('·').map(s => s.trim()).filter(Boolean);
+      // "none" is a type saying out loud that it has no such field, which is an answer worth
+      // having in the source and an empty list worth having in the generated data.
+      const parts = /^none\b/i.test(rest.trim())
+        ? []
+        : rest.split('·').map(s => s.trim()).filter(Boolean);
+      rec[tag as 'inputs' | 'outputs' | 'options' | 'languages'] = parts;
     }
   }
   return [...found.values()].sort((a, b) => a.id.localeCompare(b.id));
@@ -86,21 +101,24 @@ function emit(records: Record_[]): string {
     + `    inputs: ${JSON.stringify(r.inputs)},\n`
     + `    outputs: ${JSON.stringify(r.outputs)},\n`
     + `    options: ${JSON.stringify(r.options)},\n`
+    + `    languages: ${JSON.stringify(r.languages)},\n`
     + `    example: ${JSON.stringify(r.example)},\n`
     + `    file: ${JSON.stringify(r.file)},\n`
     + `  },`
   )).join('\n');
   return `/**
  * @file living/describe-data.js
- * @description GENERATED — do not edit. Every node type's summary, inputs, outputs, options and
- *   worked example, read out of the node modules' own JSDoc by tools/build-living-nodes.ts.
+ * @description GENERATED — do not edit. Every node type's summary, inputs, outputs, options,
+ *   language-map fields and worked example, read out of the node modules' own JSDoc by
+ *   tools/build-living-nodes.ts.
  *   \`AIMEAT.living.describe(type)\` answers from this, so what an AI reads at run time and what
  *   the source says are the same thing by construction. Run \`pnpm build:living-nodes\` after
- *   changing an @node / @inputs / @outputs / @options / @example line; \`pnpm check:living-nodes\`
- *   refuses a commit where the two have drifted.
+ *   changing an @node / @inputs / @outputs / @options / @languages / @example line;
+ *   \`pnpm check:living-nodes\` refuses a commit where the two have drifted.
  * @structure NODES: one entry per node type
  * @usage  import { NODES } from './describe-data.js';
  * @version-history
+ *   v1.1.0 — 2026-09-06 — Generated: \`languages\` joins each entry.
  *   v1.0.0 — 2026-09-05 — Generated (the living document, stage 1).
  */
 export const NODES = {

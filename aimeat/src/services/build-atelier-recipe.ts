@@ -28,6 +28,8 @@
  *     hardcodes its palette declares `fixed`, a fork inherits it, and the fork deletes it when
  *     its colours become tokens. genre-living is the one that says `follows`, and every app
  *     forked from it had a dead light/dark switch until the signal moved off the register prefix.
+ *   v1.3.0 — 2026-09-06 — One paragraph on the living section: a label is a language map, so a
+ *     bilingual sheet is one record rather than two (aimeat-living 0.4.0).
  *   v1.2.0 — 2026-09-05 — A LIVING DOCUMENT joins the recipe (the living document, stage 3a): the
  *     record a sheet whose numbers stand on each other is written as, the seven node types, the
  *     two spellings that bite first, and a sixth pattern — a paint sheet that recomputes, mounted

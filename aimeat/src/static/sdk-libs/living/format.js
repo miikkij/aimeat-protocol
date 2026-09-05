@@ -21,14 +21,26 @@
  *   for, a number is written with toFixed or trimNumber — never through Intl — so a document
  *   reads the same on every machine that opens it. Ask for `group` or a `locale` and Intl takes
  *   over, which is the moment a person has said they want the local convention.
- * @structure FORMATS · parseFormat(spec) · formatError(spec) · formatNumber(n, spec) ·
- *   formatParts(value, spec, defaultPlace) · formatValue(value, spec)
+ *
+ *   A FORMAT IS PER RECORD, NOT PER LANGUAGE, WITH ONE DOOR OUT. How many decimals a reading is
+ *   worth and whether the unit goes before or after the number are facts about the measurement,
+ *   so they do not change when the words do. The decimal separator and the thousands separator
+ *   are not: 1 234,5 in Finnish is 1,234.5 in English, and a document that carries both languages
+ *   would otherwise have to carry two formats to say one thing. `locale: "auto"` is that door —
+ *   it hands the number to Intl in whatever language the page is reading, and nothing else about
+ *   the format moves.
+ * @structure FORMATS · parseFormat(spec) · formatError(spec) · formatNumber(n, spec, lang) ·
+ *   formatParts(value, spec, defaultPlace, lang) · formatValue(value, spec, lang)
  * @usage
  *   import { formatParts, formatValue } from './format.js';
  *   formatValue({ n: 15.7529759484, u: celsius }, 1);            // '15.8'
  *   formatValue({ n: 15.7529759484, u: celsius }, { decimals: 1, unit: 'after' });  // '15.8 °C'
  *   formatParts(q, '2');   // { number: '15.75', unit: '°C', place: 'none', text: '15.75' }
+ *   formatNumber(1234.5, { decimals: 1, group: true, locale: 'auto' }, 'fi');  // '1 234,5'
  * @version-history
+ *   v0.4.0 — 2026-09-06 — `locale: "auto"` writes the number in the language the page is reading,
+ *     so one record's one format serves every language it carries. Every printer takes the
+ *     language as its last argument and ignores it unless the format asked for "auto".
  *   v0.3.0 — 2026-09-05 — Initial: `format` stops being a documented field nothing read.
  */
 import { isError, isQuantity, asText, trimNumber } from './formula-eval.js';
@@ -45,7 +57,8 @@ const PLACES = ['after', 'before', 'none'];
  * @property {number} [decimals]     exactly this many fraction digits
  * @property {number} [maxDecimals]  at most this many, trailing zeros dropped
  * @property {boolean} [group]       thousands separators (off unless asked for)
- * @property {string} [locale]       a BCP-47 tag; asking for one hands the number to Intl
+ * @property {string} [locale]       a BCP-47 tag, or "auto" for the language the page is reading;
+ *   asking for either hands the number to Intl
  * @property {string} [style]        'decimal' · 'percent' (a fraction of one) · 'currency'
  * @property {string} [currency]     the ISO code, when style is 'currency'
  * @property {string} [place]        where the unit goes: 'after' · 'before' · 'none'
@@ -112,12 +125,24 @@ export function formatError(spec) {
 function needsIntl(f) { return f.group === true || f.locale != null || f.style === 'currency'; }
 
 /**
+ * The BCP-47 tag Intl is actually given. "auto" is the record saying "whatever the page reads",
+ * which is the ONE thing about a format that follows the language; a written-out tag is a
+ * decision the record made and the page does not get to overrule it.
+ * @param {Format} f @param {string} [lang]
+ * @returns {string|undefined}
+ */
+function localeOf(f, lang) {
+  if (f.locale === 'auto') return lang ? String(lang) : undefined;
+  return f.locale || undefined;
+}
+
+/**
  * One number, written the way the spec asks. Never the unit: that is placed by formatParts, so a
  * display with its own unit element (the formula's answer, a control's readout) can keep it.
- * @param {number} n @param {any} spec
+ * @param {number} n @param {any} spec @param {string} [lang]  the language, for `locale: "auto"`
  * @returns {string}
  */
-export function formatNumber(n, spec) {
+export function formatNumber(n, spec, lang) {
   const f = parseFormat(spec) || {};
   if (!Number.isFinite(n)) return String(n);
   const scaled = f.style === 'percent' ? n * 100 : n;
@@ -130,7 +155,7 @@ export function formatNumber(n, spec) {
     else if (f.maxDecimals != null) { opts.minimumFractionDigits = 0; opts.maximumFractionDigits = f.maxDecimals; }
     if (f.style === 'currency') { opts.style = 'currency'; opts.currency = f.currency; }
     try {
-      body = new Intl.NumberFormat(f.locale || undefined, opts).format(scaled);
+      body = new Intl.NumberFormat(localeOf(f, lang), opts).format(scaled);
     } catch {
       body = trimNumber(scaled);
     }
@@ -154,9 +179,10 @@ export function formatNumber(n, spec) {
  * @param {any} spec
  * @param {string} [defaultPlace]  where the unit goes when the spec does not say — a readout that
  *   has always shown the unit passes 'after' so a document without a format looks unchanged
+ * @param {string} [lang]  the language, for `locale: "auto"`
  * @returns {{ number: string, unit: string, place: string, text: string, refused: boolean }}
  */
-export function formatParts(value, spec, defaultPlace) {
+export function formatParts(value, spec, defaultPlace, lang) {
   const f = parseFormat(spec);
   const fallback = PLACES.indexOf(String(defaultPlace)) >= 0 ? String(defaultPlace) : 'none';
   if (isError(value)) {
@@ -169,7 +195,7 @@ export function formatParts(value, spec, defaultPlace) {
   if (isQuantity(value) || typeof value === 'number') {
     const n = isQuantity(value) ? value.n : value;
     const unit = isQuantity(value) ? unitLabel(value.u) : '';
-    const number = formatNumber(n, spec);
+    const number = formatNumber(n, spec, lang);
     const place = f && f.place ? f.place : fallback;
     const text = !unit || place === 'none' ? number
       : place === 'before' ? unit + ' ' + number : number + ' ' + unit;
@@ -181,7 +207,7 @@ export function formatParts(value, spec, defaultPlace) {
 
 /**
  * A value written out whole, which is what a sentence takes.
- * @param {any} value @param {any} spec
+ * @param {any} value @param {any} spec @param {string} [lang]
  * @returns {string}
  */
-export function formatValue(value, spec) { return formatParts(value, spec).text; }
+export function formatValue(value, spec, lang) { return formatParts(value, spec, undefined, lang).text; }

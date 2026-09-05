@@ -17,9 +17,15 @@
  *   writing, so a dew point reads 15.8 the whole way there instead of arriving at 15.8 through
  *   fifteen frames of 15.7529759484. The unit keeps its own element unless the format says where
  *   it goes, in which case the format's text carries it and this element steps aside.
- * @structure formulaView(host, spec) → { el, update } · loadKatex()
+ *   THE MATHEMATICS IS NOT WORDS. The set expression and the plain line beneath it are the node
+ *   ids and the operators, which are the same in every language a record carries; only the
+ *   caption above them and, when the format asked for `locale: "auto"`, the decimal separator in
+ *   the answer, follow the page.
+ * @structure formulaView(host, spec) → { el, update, relabel } · loadKatex()
  * @usage  import { formulaView } from './formula-view.js';
  * @version-history
+ *   v0.4.0 — 2026-09-06 — relabel(): the caption is written again and the answer re-printed in the
+ *     page's language, without re-typesetting the formula or re-running the count-up.
  *   v0.3.0 — 2026-09-05 — The answer is written through format.js: the spec on the node decides
  *     the digits, the grouping and where the unit sits, and the count-up uses the same printer.
  *   v0.1.0 — 2026-09-05 — Initial (the living document, stage 1).
@@ -60,8 +66,10 @@ export function loadKatex() {
 /**
  * The printed formula.
  * @param {HTMLElement} host
- * @param {{ id: string, label?: string, tex: string, plain: string, value?: any, format?: any }} spec
- * @returns {{ el: HTMLElement, update: (value: any, tex: string) => void }}
+ * @param {{ id: string, label?: string, tex: string, plain: string, value?: any, format?: any,
+ *   langs?: () => string[] }} spec
+ * @returns {{ el: HTMLElement, update: (value: any, tex: string) => void,
+ *   relabel: (label: any, value: any) => void }}
  */
 export function formulaView(host, spec) {
   const plain = el('div', { class: 'ak-living__plain', text: spec.plain });
@@ -72,11 +80,16 @@ export function formulaView(host, spec) {
     el('span', { class: 'ak-living__answer-eq', 'aria-hidden': 'true', text: '=' }),
     answerValue, answerUnit,
   ]);
+  const caption = spec.label
+    ? el('figcaption', { class: 'ak-living__formula-label', text: spec.label })
+    : null;
   const root = el('figure', { class: 'ak-living__formula', 'data-living-node': spec.id }, [
-    spec.label ? el('figcaption', { class: 'ak-living__formula-label', text: spec.label }) : null,
-    plain, set, answer,
+    caption, plain, set, answer,
   ]);
   host.appendChild(root);
+  const lang = function () {
+    return (spec.langs ? (spec.langs() || []) : [])[0];
+  };
 
   let lastTex = '';
   let lastNumber = NaN;
@@ -103,7 +116,7 @@ export function formulaView(host, spec) {
   /** The node's own way of writing a number, used for the final value AND for every frame of the
    *  count-up, so the digits do not change shape when it lands. */
   const write = function (n) {
-    const body = formatNumber(n, spec.format);
+    const body = formatNumber(n, spec.format, lang());
     if (!unitNow || placeNow === 'none') return body;
     return placeNow === 'before' ? unitNow + ' ' + body : body + ' ' + unitNow;
   };
@@ -121,7 +134,7 @@ export function formulaView(host, spec) {
       return;
     }
     root.removeAttribute('data-living-state');
-    const parts = formatParts(value, spec.format);
+    const parts = formatParts(value, spec.format, undefined, lang());
     if (isQuantity(value) || typeof value === 'number') {
       const n = isQuantity(value) ? value.n : value;
       unitNow = parts.unit;
@@ -143,5 +156,24 @@ export function formulaView(host, spec) {
   // formula sat at its placeholder until somebody touched a control, which the browser proof
   // caught and no unit test could have: the value was right in the graph the whole time.
   if ('value' in spec) update(spec.value, spec.tex);
-  return { el: root, update: update };
+
+  /**
+   * The caption in the page's language, and the answer written out again in case the format asked
+   * for `locale: "auto"`. The typesetting is untouched: the mathematics did not change, and
+   * re-rendering it would make KaTeX redraw a formula nobody edited.
+   * @param {any} label @param {any} value
+   */
+  function relabel(label, value) {
+    if (caption && label != null && caption.textContent !== String(label)) {
+      caption.textContent = String(label);
+    }
+    const v = value === undefined ? spec.value : value;
+    if (isError(v) || !(isQuantity(v) || typeof v === 'number')) return;
+    const parts = formatParts(v, spec.format, undefined, lang());
+    unitNow = parts.unit;
+    placeNow = parts.place;
+    answerValue.textContent = write(isQuantity(v) ? v.n : v);
+    answerUnit.textContent = parts.place === 'none' ? parts.unit : '';
+  }
+  return { el: root, update: update, relabel: relabel };
 }

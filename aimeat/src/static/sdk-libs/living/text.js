@@ -22,7 +22,14 @@
  *   import { parseTemplate, renderTemplate } from './text.js';
  *   const parts = parseTemplate('It is {{ t }} °C{{ if t > 30 }} — too hot{{ end }}.');
  *   renderTemplate(parts, scope);
+ *   THE TEMPLATE ITSELF MAY BE A LANGUAGE MAP. One template per language, each written as its own
+ *   sentence rather than as a translation of the other — { fi: "Lämpötila on {{ t | 1 }} °C",
+ *   en: "It is {{ t | 1 }} °C" } — and the holes are the same nodes in both, which validate()
+ *   checks by name so a sentence cannot go blank in one language and read in the other. Resolving
+ *   which one is in force is i18n.js's; this file only ever sees the string that came back.
  * @version-history
+ *   v0.4.0 — 2026-09-06 — The printers take the language as a last argument, for a `format` that
+ *     asked for `locale: "auto"`. A template with no such format prints exactly as it did.
  *   v0.3.0 — 2026-09-05 — The words after the bar are format.js's now, not a second copy: the
  *     same vocabulary a node's `format` option takes, so {{ t | 1 }} in a sentence and
  *     "format": 1 on a figure print the same number. `plain` finally means what it said — it
@@ -44,10 +51,10 @@ export { FORMATS };
 /**
  * Write one value the way the template asked for — the SAME printer a node's `format` option
  * goes through, so a sentence and a figure reading the same node cannot disagree about it.
- * @param {any} value @param {string|null} format
+ * @param {any} value @param {string|null} format @param {string} [lang]
  * @returns {string}
  */
-export function formatValue(value, format) { return printValue(value, format); }
+export function formatValue(value, format, lang) { return printValue(value, format, lang); }
 
 /** One {{ … }} tag, split into its expression and its format. */
 function splitTag(body) {
@@ -116,14 +123,15 @@ export function parseTemplate(src) {
 /**
  * Render parsed parts against a scope.
  * @param {Array<any>|{ error: string }} parts @param {{ get: (id: string) => any }} scope
+ * @param {string} [lang]  the language, for a format that asked for `locale: "auto"`
  * @returns {string}
  */
-export function renderTemplate(parts, scope) {
+export function renderTemplate(parts, scope, lang) {
   if (!Array.isArray(parts)) return parts && parts.error ? parts.error : '';
   let out = '';
   for (const part of parts) {
     if (part.kind === 'text') { out += part.text; continue; }
-    if (part.kind === 'value') { out += formatValue(evaluate(part.tree, scope), part.format); continue; }
+    if (part.kind === 'value') { out += formatValue(evaluate(part.tree, scope), part.format, lang); continue; }
     if (part.kind === 'if') {
       const v = evaluate(part.tree, scope);
       if (isError(v)) { out += v.error; continue; }
@@ -132,7 +140,7 @@ export function renderTemplate(parts, scope) {
           : typeof v === 'number' ? v !== 0
             : typeof v === 'string' ? v !== ''
               : !!v;
-      out += renderTemplate(yes ? part.then : part.other, scope);
+      out += renderTemplate(yes ? part.then : part.other, scope, lang);
     }
   }
   return out;

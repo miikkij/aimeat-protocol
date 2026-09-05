@@ -13,6 +13,8 @@
  * @structure LIVING_PACKS: LibraryPack[]
  * @usage Imported by ./sdk.ts (registry assembly). Do not import directly.
  * @version-history
+ *   v1.2.0 — 2026-09-06 — aimeat-living 0.4.0: a label is a language map, so the aiDoc teaches
+ *     writing the record in every language it is meant to be read in.
  *   v1.1.0 — 2026-09-05 — aimeat-living 0.2.0: the three copies of kit behaviour dropped now that
  *     atelier 0.53.0 carries them.
  *   v1.0.0 — 2026-09-05 — Initial: aimeat-living 0.1.0 (the living document, stage 1).
@@ -125,6 +127,20 @@ export const LIVING_PACKS: LibraryPack[] = [
       '   "fine" } is a timer. The machine\'s output is its state as a dotted path, so if(state = "hot", …)',
       '   works from any other node.',
       '',
+      'A LABEL IS A LANGUAGE MAP. Any human-facing string in the record may be written as',
+      '{ "fi": "Ilma ovella", "en": "Air at the door" } instead of a plain string — a label, a hint, a',
+      'pick\'s option label, a text node\'s whole template, the words a machine\'s entry action writes, and a',
+      'layout block\'s title, sub or caption. The page\'s language decides which is read (the login pill sets',
+      'it), the record\'s own top-level "lang" is the fallback, and the map\'s first key is the last resort, so',
+      'the document always says something. `"langs": ["fi","en"]` is the optional list of what it carries.',
+      'Ask AIMEAT.living.describe("control").languages for the fields a given type takes as a map. WRITE EACH',
+      'LANGUAGE AS ITSELF rather than translating one into the other, and give a sentence THE SAME {{ }} holes',
+      'in every language: validate() refuses a template that reads a node in one language and not the other,',
+      'and refuses a map with no language keys in it, naming both. A `format` is per record rather than per',
+      'language — decimals and unit placement are facts about the measurement — except `locale: "auto"`,',
+      'which writes the separators in whatever language the page is reading. Changing language moves the words',
+      'only: values stay where the person left them and the machine stays in the state it reached.',
+      '',
       'TEMPLATES: {{ node }} prints the NUMBER (the sentence around it carries the unit), {{ node | unit }}',
       'prints both, {{ node | 1 }} fixes the decimals, and int, percent, upper and lower are the rest.',
       '{{ if expr }}…{{ else }}…{{ end }} takes any expression. The output is TEXT, never markup.',
@@ -134,6 +150,7 @@ export const LIVING_PACKS: LibraryPack[] = [
       'reporting exactly which nodes changed.',
     ].join('\n'),
     changelog: [
+      { version: '0.4.0', date: '2026-09-06', summary: 'A record carries its own words. Any human-facing string may be a language map — { "fi": "Ilma ovella", "en": "Air at the door" } — on a label, a hint, a pick\'s option, a sentence template, the words a machine\'s entry action writes, or a layout block\'s title and sub, so one record is the document in every language it was written for instead of one record per language. The page\'s language decides which is read, the record\'s own "lang" is the fallback, and the map\'s first key is the last resort. A change of language moves the WORDS ONLY: the value a person moved is where they left it, the machine is in the state it reached, nothing is remounted and no entrance runs again. validate() refuses a map with no language in it and a sentence whose holes differ between languages, naming the node and the language; describe(type).languages says which fields take a map; and a `format` stays per record except `locale: "auto"`, which writes the separators in the page\'s language.' },
       { version: '0.2.0', date: '2026-09-05', summary: 'Nothing to change in a record: this release is three pieces of behaviour handed back to the Atelier kit, which now carries them (0.53.0). A control row is one of the kit\'s own form fields, so a slider gets the kit\'s track, its reading, its label wiring and a 40px hit area rather than markup this library built beside it. The chain view stops padding its columns to keep a long label inside the graph\'s frame; the graph keeps its own pills inside now, so an outer node reads whole at any width. And which layout components accept a bound record is asked of the mounted arrangement instead of being a copied list here — so a binding aimed at a block that cannot read one is refused in the kit\'s words on the mounted handle (`refusals`), where validate() alone could only guess.' },
       { version: '0.1.0', date: '2026-09-05', summary: 'Initial. One JSON record — { v, register, look, layout, model } — mounted as a living screen: seven node types (value, formula, control, binding, text, machine, source) in one dependency graph, spreadsheet formulas with units carried through multiplication and checked on addition, a TeX printer riding the same tree as the evaluator, an XState-vocabulary statechart with guards, entry and exit assignments, timers and crossings, bindings that refresh through the mosaic so the kit\'s own motion runs, templates that change with the state, live sources on the platform\'s own change event, describe() generated from the node modules\' JSDoc, and a chain view that flashes the path a change travelled.' },
     ],

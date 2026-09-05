@@ -11,14 +11,17 @@
  *   one place to start from and a document can never disagree with itself about where a number
  *   came from.
  *
- * @node     value     A named quantity: the writable ground the rest of the document stands on.
- * @inputs   value     value (the quantity itself, a literal — never a reference)
- * @outputs  value     value — the number with its unit, or the text, truth or list it holds
- * @options  value     unit · min · max · step · format (how it is printed: 1 · "int" · "unit" · an object) · label
- * @example  value     { "type": "value", "value": 22, "unit": "°C", "min": -20, "max": 40, "step": 0.5, "format": 1, "label": "Lämpötila" }
+ * @node       value     A named quantity: the writable ground the rest of the document stands on.
+ * @inputs     value     value (the quantity itself, a literal — never a reference)
+ * @outputs    value     value — the number with its unit, or the text, truth or list it holds
+ * @options    value     unit · min · max · step · format (how it is printed: 1 · "int" · "unit" · an object; `locale: "auto"` writes the number in the page's language) · label
+ * @languages  value     label
+ * @example    value     { "type": "value", "value": 22, "unit": "°C", "min": -20, "max": 40, "step": 0.5, "format": 1, "label": { "fi": "Lämpötila", "en": "Temperature" } }
  * @structure value: the node-type module (dependsOn · prepare · evaluate · coerce)
  * @usage  import { value } from './value.js';
  * @version-history
+ *   v0.4.0 — 2026-09-06 — `label` may be a language map; the value itself is never one, because a
+ *     quantity is the same quantity in every language.
  *   v0.3.0 — 2026-09-05 — `format` is read and refused by name when it is not one this build
  *     knows; the printing itself is format.js's, and the value held here is untouched by it.
  *   v0.1.0 — 2026-09-05 — Initial (the living document, stage 1).
