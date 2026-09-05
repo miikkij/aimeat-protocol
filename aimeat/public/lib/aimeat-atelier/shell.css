@@ -17,6 +17,9 @@
  *   focus, ak-busy)
  * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
  * @version-history
+ *   v0.48.0 — 2026-09-05 — The hero's picture layer (.ak-hero__image) shares the mesh pseudo's
+ *     rules through one declaration and replaces the pseudo when a picture is present, so an
+ *     effect can land on the picture alone (wish-atelier-post-process-effects, stage 3).
  *   v0.47.0 — 2026-09-05 — The frame opens its own stacking context (isolation: isolate) so the
  *     ambient layer paints between its ground and its content; .ak-app__weather places the
  *     weather switch beside the motion switch (wish-atelier-ambient-visuals).
@@ -245,8 +248,12 @@
  * live on their own layer element (hero.js renders it) so they STAY PUT over the drift.
  * The drift is a compositor-cheap background-position tween: it mutates no DOM (the mutation
  * gate still reads zero) and collapses under prefers-reduced-motion via the kit-wide block.
- * An image hero rides the same slot, so a real picture gets the same slow life. */
-.ak-hero::before {
+ * An image hero rides the same rules on a layer element of its own (.ak-hero__image, hero.js),
+ * so a real picture gets the same slow life AND an effect can land on the picture alone, never
+ * on the words; the mesh pseudo stands down under it. One declaration for both, so the kit's
+ * count of infinite animations stays at exactly two. */
+.ak-hero::before,
+.ak-hero__image {
   content: '';
   position: absolute;
   inset: 0;
@@ -257,6 +264,9 @@
   animation: ak-hero-drift 46s ease-in-out infinite alternate;
   pointer-events: none;
 }
+.ak-hero__image { display: none; }
+.ak-hero--image::before { content: none; }
+.ak-hero--image .ak-hero__image { display: block; }
 @keyframes ak-hero-drift {
   from { background-position: 10% 20%; }
   to   { background-position: 84% 74%; }

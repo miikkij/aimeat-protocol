@@ -19,6 +19,9 @@
  * @usage  AIMEAT.atelier.hero({ target: a.main, title: 'Errands', sub: '3 open',
  *           actions: [{ id: 'add', label: 'Add', kind: 'primary', onClick }] });
  * @version-history
+ *   v0.48.0 — 2026-09-05 — The picture is a layer element of its own (.ak-hero__image, shown
+ *     by shell.css only when there is an image), so an effect on the hero can land on the
+ *     picture and never on the words (wish-atelier-post-process-effects, stage 3).
  *   v0.37.0 — 2026-08-30 — rating(): a score as stars — inline SVG on the tokens, partial fill
  *     by clipping, the number and the vote count in words beside it.
  *   v0.33.0 — 2026-08-29 — statRow tiles accept `trend: number[]`: a sparkline under the
@@ -79,11 +82,14 @@ export function hero(spec) {
   // The scrim+grain layer: a child, not a pseudo, so it paints ABOVE the drifting aurora
   // (::before) and BELOW the text — the readable zone stays put while the colour wanders.
   const scrim = el('span', { class: 'ak-hero__scrim', 'aria-hidden': 'true' });
+  // The picture is a layer of its own, under the scrim and over the mesh (shell.css shows it
+  // only when there is an image): an effect on the hero lands here and never on the words.
+  const image = el('span', { class: 'ak-hero__image', 'aria-hidden': 'true' });
   const root = el('div', {
     class: 'ak-root ak-hero',
     'data-ak-hero': true,
     'aria-labelledby': titleId,
-  }, [scrim, inner]);
+  }, [image, scrim, inner]);
 
   const layer = imageLayer(spec.image);
   if (layer) { root.style.setProperty('--ak-hero-image', layer); root.classList.add('ak-hero--image'); }

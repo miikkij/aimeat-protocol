@@ -10,6 +10,7 @@
     idle behaviour can be watched without waiting a minute. window.demo carries the handles.
   @usage  /atelier-ambient-demo.html on any node that serves the kit
   @version-history
+    v1.1.0 — 2026-09-05 — The effects rows and the picture (wish-atelier-post-process-effects).
     v1.0.0 — 2026-09-05 — Initial (stage 4).
 -->
 <html lang="en">
@@ -20,9 +21,19 @@
   <link rel="stylesheet" href="/lib/aimeat-fonts.css">
   <style>
     .demo-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    .demo-row + .demo-row { margin-top: 8px; }
     .demo-row button[aria-pressed='true'] { outline: 2px solid var(--ak-accent); outline-offset: 2px; }
     .demo-stage-title { margin: 0; font-family: var(--ak-font-display); font-size: var(--ak-text-title); }
     .demo-stages { display: grid; gap: var(--ak-gap); grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+    .demo-fx-box { margin-top: var(--ak-gap); padding: var(--ak-pad); border-radius: var(--ak-radius); background: var(--ak-surface); color: var(--ak-ink); }
+    .demo-fx-box p { margin: 0 0 6px; }
+    .demo-fx-sub { color: var(--ak-ink-dim); }
+    .demo-fx-picture {
+      margin-top: var(--ak-gap); height: 200px; border-radius: var(--ak-radius);
+      background:
+        radial-gradient(circle at 30% 40%, var(--ak-spectrum-3), transparent 45%),
+        linear-gradient(135deg, var(--ak-accent), var(--ak-spectrum-2) 55%, var(--ak-bg));
+    }
   </style>
   <script src="/v1/libs/aimeat-atelier.js"></script>
   <script src="/atelier-ambient-demo.js" defer></script>

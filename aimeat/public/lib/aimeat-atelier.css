@@ -43,6 +43,11 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.48.0 — 2026-09-05 — THE EFFECTS (wish-atelier-post-process-effects): effects.css joins
+ *     the parts — the .ak-fx-* classes effects.js puts on a block, a hero band or a picture,
+ *     reading their numbers from the --ak-fx-<id>-<param> properties the kit writes from the
+ *     registry's clamp. No token joins the contract: an effect is an arrangement's, not a
+ *     look's. The infinite-animation count stays at two; the sheet's one keyframe runs once.
  *   v0.47.1 — 2026-09-05 — content.css: the list-detail fold spans its panes on a phone, and a
  *     tall dialog scrolls inside its body (wish-atelier-listdetail-narrow-fold).
  *   v0.47.0 — 2026-09-05 — THE AMBIENT (wish-atelier-ambient-visuals): three tokens join the
@@ -267,6 +272,7 @@
 @import url('./aimeat-atelier/patterns.css');
 @import url('./aimeat-atelier/mosaic.css');
 @import url('./aimeat-atelier/ambient.css');
+@import url('./aimeat-atelier/effects.css');
 /* LAST on purpose: the generated look blocks (tokens + structure recipes) override the parts. */
 @import url('./aimeat-atelier/looks.css');
 

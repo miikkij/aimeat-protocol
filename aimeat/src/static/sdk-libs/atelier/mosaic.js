@@ -34,6 +34,10 @@
  *   });
  *   // later, when the app's data changed:  m.refresh('errands.');
  * @version-history
+ *   v0.48.0 — 2026-09-05 — A block's `effect` wears on its unit — on a hero, on its picture layer
+ *     — through fx(); the arrangement's `ambient.post` reaches the layer with the rest of the
+ *     wish; the viewer overlay copies `choreography` too, which it had dropped
+ *     (wish-atelier-post-process-effects, stage 3).
  *   v0.47.0 — 2026-09-05 — A stored arrangement's `ambient` ({ preset, alpha?, speed? }) reaches
  *     the frame: with an app, through app.set({ ambient }) (and back to the look's when a later
  *     layout carries none); without one — the bench page, the Design Book's stage — a layer
@@ -99,6 +103,7 @@ import { waveform } from './waveform.js';
 import { scene3d } from './scene3d.js';
 import { reveal } from './disclose.js';
 import { ambient } from './ambient.js';
+import { fx } from './effects.js';
 import { patchFor, derivedColumns, wireLive } from './mosaic-bind.js';
 import { morph } from './mosaic-motion.js';
 import { appRef, loadLayout, labelOf } from './mosaic-layout.js';
@@ -173,7 +178,7 @@ export function mosaic(spec) {
   /**
    * Build one block. A source-bound block shows a skeleton until its data lands, then the real
    * component enters with it — no flash of the empty state on the way to a full one.
-   * @param {{ id: string, component: string, props?: any }} block
+   * @param {{ id: string, component: string, props?: any, effect?: any }} block
    * @param {HTMLElement} into
    */
   function buildBlock(block, into) {
@@ -195,7 +200,15 @@ export function mosaic(spec) {
 
     switch (block.component) {
       case 'hero': {
-        alive.handles.push(hero({ target: into, title: p.title, sub: p.sub, image: p.image }));
+        const band = hero({ target: into, title: p.title, sub: p.sub, image: p.image });
+        alive.handles.push(band);
+        // An effect on the hero lands on its picture layer; without a picture the validator let
+        // only a moment through, and that plays on the band itself.
+        if (block.effect) {
+          const picture = band.el.classList.contains('ak-hero--image') ? band.el.querySelector('.ak-hero__image') : null;
+          const worn = fx(picture || band.el, block.effect);
+          if (worn) alive.handles.push(worn);
+        }
         return;
       }
       case 'aide': {
@@ -478,7 +491,10 @@ export function mosaic(spec) {
    */
   function applyViewerOverlay(layout, o) {
     if (!o) return layout;
-    const out = { v: layout.v, look: layout.look, nav: o.nav || layout.nav, tokens: layout.tokens, ambient: layout.ambient, meta: layout.meta, blocks: layout.blocks.slice() };
+    const out = {
+      v: layout.v, look: layout.look, nav: o.nav || layout.nav, choreography: layout.choreography,
+      tokens: layout.tokens, ambient: layout.ambient, meta: layout.meta, blocks: layout.blocks.slice(),
+    };
     if (Array.isArray(o.hidden) && o.hidden.length) {
       out.blocks = out.blocks.filter(function (b) { return o.hidden.indexOf(b.id) < 0; });
     }
@@ -518,7 +534,7 @@ export function mosaic(spec) {
       if (wish) { spec.app.set({ ambient: wish }); ambientFromLayout = true; }
       else if (ambientFromLayout) { spec.app.set({ ambient: null }); ambientFromLayout = false; }
     } else if (wish) {
-      alive.handles.push(ambient({ target: root, preset: wish.preset, alpha: wish.alpha, speed: wish.speed }));
+      alive.handles.push(ambient({ target: root, preset: wish.preset, alpha: wish.alpha, speed: wish.speed, post: wish.post }));
     }
     root.setAttribute('data-ak-nav', layout.nav || 'stack');
     // The choreography is a class the stylesheet reads: scroll timelines live entirely in CSS,
@@ -573,6 +589,12 @@ export function mosaic(spec) {
       }
       const unitEl = el('section', { class: 'ak-mosaic__unit', 'data-ak-block': block.id });
       buildBlock(block, unitEl);
+      // The block's effect wears on its unit: the server proved it on this look (a colour or
+      // overlay effect under words through the matrix; a picture effect only on a picture).
+      if (block.effect) {
+        const worn = fx(unitEl, block.effect);
+        if (worn) alive.handles.push(worn);
+      }
       units.push({ el: unitEl, label: labelOf(block), block: block });
     }
     if (band.childNodes.length) root.appendChild(band);

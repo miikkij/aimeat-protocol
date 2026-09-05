@@ -1,0 +1,152 @@
+/**
+ * @file aimeat-atelier/effects.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description THE EFFECTS SHELF — the classes effects.js puts on a block, a hero band or a
+ *   picture (wish-atelier-post-process-effects). Each class reads its numbers from the
+ *   --ak-fx-<id>-<param> custom properties the kit writes from the registry's clamp, so the
+ *   sheet never holds a number of its own. The overlays (scanlines, vignette) are ink over the
+ *   element at the strength the contrast matrix proved (AK-FX overlay: `rgb(from var(--ak-ink)
+ *   r g b / strength)` IS the composite the matrix ran); the filters (duotone, distort, the vhs
+ *   and glitch splits, the ripple ring) reference the instance's own SVG graph through
+ *   --ak-fx-filter; recolour is the filter functions, and the one effect allowed on
+ *   backdrop-filter. The two keyframes here (the tracking band, nothing else) run ONCE — no
+ *   `infinite` in this file, by the kit's own gate — and collapse under reduced motion.
+ * @structure .ak-fx-defs · .ak-fx (the base) · .ak-fx-scanlines · .ak-fx-vignette ·
+ *   .ak-fx-duotone · .ak-fx-recolour[data-ak-fx-backdrop] · .ak-fx-distort · .ak-fx-vhs ·
+ *   .ak-fx-glitch · .ak-fx-ripple · the moment children (.ak-fx__band, .ak-fx__glitch-band)
+ * @usage  @import url('./aimeat-atelier/effects.css'); from aimeat-atelier.css
+ * @version-history
+ *   v0.48.0 — 2026-09-05 — Initial (wish-atelier-post-process-effects, stage 3).
+ */
+
+/* ── The hidden defs every instance's <filter> lives in ───────────────────────────────────── */
+.ak-fx-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* ── The base: an effect is a stacking context of its own, so an overlay sits on the element
+      and never on the page, and a moment's children stay inside its box ──────────────────── */
+.ak-fx {
+  --ak-fx-filter: none;
+  isolation: isolate;
+}
+.ak-fx-scanlines,
+.ak-fx-vignette,
+.ak-fx-vhs,
+.ak-fx-glitch {
+  position: relative;
+}
+.ak-fx-vhs,
+.ak-fx-glitch {
+  overflow: hidden;
+}
+
+/* ── scanlines: one line of ink every `pitch` pixels, at `strength` ───────────────────────── */
+.ak-fx-scanlines::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    180deg,
+    transparent 0,
+    transparent calc(var(--ak-fx-scanlines-pitch, 3) * 1px - 1px),
+    rgb(from var(--ak-ink) r g b / var(--ak-fx-scanlines-strength, 0.12)) calc(var(--ak-fx-scanlines-pitch, 3) * 1px - 1px),
+    rgb(from var(--ak-ink) r g b / var(--ak-fx-scanlines-strength, 0.12)) calc(var(--ak-fx-scanlines-pitch, 3) * 1px)
+  );
+}
+
+/* ── vignette: clear inside `size`, ink at `strength` in the farthest corner ──────────────── */
+.ak-fx-vignette::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse farthest-corner at center,
+    transparent calc(var(--ak-fx-vignette-size, 0.75) * 70%),
+    rgb(from var(--ak-ink) r g b / var(--ak-fx-vignette-strength, 0.25)) 100%
+  );
+}
+
+/* ── duotone and distort: the instance's own graph, at rest ──────────────────────────────── */
+.ak-fx-duotone,
+.ak-fx-distort {
+  filter: var(--ak-fx-filter);
+}
+.ak-fx-distort.is-ak-fx-playing {
+  will-change: filter;
+}
+
+/* ── recolour: the filter functions; on the backdrop, what is behind the element ─────────── */
+.ak-fx-recolour {
+  filter: hue-rotate(calc(var(--ak-fx-recolour-hue, 0) * 1deg)) saturate(var(--ak-fx-recolour-saturate, 1));
+}
+.ak-fx-recolour[data-ak-fx-backdrop] {
+  filter: none;
+  backdrop-filter: hue-rotate(calc(var(--ak-fx-recolour-hue, 0) * 1deg)) saturate(var(--ak-fx-recolour-saturate, 1));
+  -webkit-backdrop-filter: hue-rotate(calc(var(--ak-fx-recolour-hue, 0) * 1deg)) saturate(var(--ak-fx-recolour-saturate, 1));
+}
+
+/* ── ripple: the ring's graph, only while it plays ───────────────────────────────────────── */
+.ak-fx-ripple.is-ak-fx-playing {
+  filter: var(--ak-fx-filter);
+  will-change: filter;
+}
+
+/* ── vhs: the tracking band rolls up the picture once, its height and pace from the numbers ── */
+@keyframes ak-fx-track {
+  from { transform: translateY(0); }
+  to { transform: translateY(calc(-100% - 100vh)); }
+}
+.ak-fx__band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: calc((5% + var(--ak-fx-vhs-strength, 0.5) * 10%));
+  z-index: 3;
+  pointer-events: none;
+  background: rgb(from var(--ak-ink) r g b / calc(0.18 * var(--ak-fx-vhs-strength, 0.5)));
+  box-shadow: 0 0 0 1px rgb(from var(--ak-spectrum-2) r g b / 0.25);
+  animation: ak-fx-track calc(var(--ak-fx-vhs-duration, 800) * 1ms) linear 1;
+}
+
+/* ── glitch: two bands invert what is beneath them as they cross ─────────────────────────── */
+.ak-fx__glitch-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--ak-fx-band-top, 20%);
+  height: var(--ak-fx-band-h, 8%);
+  z-index: 3;
+  pointer-events: none;
+  backdrop-filter: invert(1) hue-rotate(90deg);
+  -webkit-backdrop-filter: invert(1) hue-rotate(90deg);
+}
+@supports not (backdrop-filter: invert(1)) {
+  .ak-fx__glitch-band {
+    background: rgb(from var(--ak-accent) r g b / 0.35);
+  }
+}
+
+/* ── Less motion, either voice: the moments' children stand still and are removed at once ── */
+html[data-ak-motion='less'] .ak-fx__band,
+html[data-ak-motion='less'] .ak-fx__glitch-band {
+  animation: none;
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ak-fx__band,
+  .ak-fx__glitch-band {
+    animation: none;
+    display: none;
+  }
+}
