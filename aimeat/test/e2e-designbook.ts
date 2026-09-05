@@ -9,6 +9,14 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=designbook
  * @version-history
+ *   v1.3.0 — 2026-09-05 — The EFFECT kind (wish-atelier-post-process-effects): the worded
+ *     refusals (an unknown effect with the nearest named, a target outside the three, a picture
+ *     effect on the bare hero band, living motion on a figure, a block effect as a layer pass, a
+ *     knob outside its bounds), a part landing with its bench named and its target defaulted from
+ *     the registry, the operator's publish and another owner's adopt landing on the hero block
+ *     and, as a pass, on the arrangement's ambient, the two no-target refusals, the preview with
+ *     a Play control for a moment, and nine seeded effects; nine seeded ambients (plasma, lava,
+ *     tunnel join the shelf).
  *   v1.2.1 — 2026-09-05 — The APP fixture names a register (genre-nightfloor): an Atelier app
  *     without one is refused at publish now, and this suite is about the Book, not the gate.
  *   v1.2.0 — 2026-09-05 — The AMBIENT kind (wish-atelier-ambient-visuals): the worded refusals
@@ -549,19 +557,113 @@ const GOOD_BODY = {
         assert(/"component":"hero"/.test(page) && /"look":"stage"/.test(page), 'the demo arrangement, on the part\'s own look');
     });
 
-    await test('a fresh node\'s AMBIENT shelf is never empty: the six presets are seeded published, each on the look it fits', async () => {
+    await test('a fresh node\'s AMBIENT shelf is never empty: the nine presets are seeded published, each on the look it fits', async () => {
         let seeded: any[] = [];
         for (let i = 0; i < 10; i++) {
             const r = await json('/v1/designbook?status=published&kind=ambient&limit=200', { headers: auth(other.token) });
             seeded = (r.body.data?.parts ?? []).filter((p: any) => p.id.startsWith('ambient-') && p.tags.includes('seed'));
-            if (seeded.length >= 6) break;
+            if (seeded.length >= 9) break;
             await new Promise(res => setTimeout(res, 500));
         }
-        assert(seeded.length === 6, `six seeded ambients, got ${seeded.length}: ${seeded.map((p: any) => p.id).join(', ')}`);
+        assert(seeded.length === 9, `nine seeded ambients, got ${seeded.length}: ${seeded.map((p: any) => p.id).join(', ')}`);
+        for (const g of ['plasma', 'lava', 'tunnel']) assert(seeded.some((p: any) => p.id === `ambient-${g}`), `the ${g} generator is on the shelf`);
         assert(seeded.every((p: any) => typeof p.published_at === 'string'), 'every seeded row says when it was published');
         const w = await json('/v1/designbook/ambient-waves');
         assert(w.status === 200 && w.body.data.part.body.ambient === 'waves' && w.body.data.part.body.look === 'lounge' && w.body.data.part.body.alpha === 0.8,
             `ambient-waves is the wave on lounge at eight tenths: ${JSON.stringify(w.body.data?.part?.body)}`);
+    });
+
+    // ── The EFFECT kind: a post-process filter, proven where it lands ──────────────────────────
+    const effectId = `effect-e2e-${Date.now() % 100000}`;
+    const proposeEffect = (body: any, id = effectId, token = other.token) => json('/v1/designbook', {
+        method: 'POST', headers: auth(token),
+        body: JSON.stringify({ part: { id, kind: 'effect', title: 'The glitch, hard', summary: 'A hard tear on the hero band of a broadcast page.', body, tags: ['effect'] } }),
+    });
+
+    await test('an EFFECT part refuses with words: an unknown effect (the nearest named), a target that is none of the three, a picture effect on a hero without a picture, living motion on a figure, a block effect as a layer pass, a knob outside its bounds', async () => {
+        const unknown = await proposeEffect({ effect: 'vignete' });
+        assert(unknown.status === 422 && /Did you mean "vignette"/.test(unknown.body.error.message), `an unknown effect suggests the nearest: ${JSON.stringify(unknown.body)}`);
+        const frame = await proposeEffect({ effect: 'vignette', on: 'frame' });
+        assert(frame.status === 422 && /hero, figure, layer/.test(frame.body.error.message) && /frame/.test(frame.body.error.message),
+            `a target outside the three refuses naming them: ${JSON.stringify(frame.body)}`);
+        const bare = await proposeEffect({ effect: 'duotone', on: 'hero' });
+        assert(bare.status === 422 && /image/.test(bare.body.error.message), `a picture effect on the bare hero band refuses: ${JSON.stringify(bare.body)}`);
+        const living = await proposeEffect({ effect: 'kaleidoscope', on: 'figure' });
+        assert(living.status === 422 && /ambient\.post/.test(living.body.error.message), `living motion on a figure is pointed at the layer: ${JSON.stringify(living.body)}`);
+        const block = await proposeEffect({ effect: 'vignette', on: 'layer' });
+        assert(block.status === 422 && /lands on a block/.test(block.body.error.message), `a block effect as a layer pass is pointed back: ${JSON.stringify(block.body)}`);
+        const knob = await proposeEffect({ effect: 'glitch', params: { strength: 4 } });
+        assert(knob.status === 422 && /from 0 to 1/.test(knob.body.error.message), `a knob outside its bounds refuses with the bounds: ${JSON.stringify(knob.body)}`);
+    });
+
+    await test('an EFFECT part lands proven: the bench named, the target defaulted from the registry, the body whole, found by ?kind', async () => {
+        const r = await proposeEffect({ effect: 'glitch', params: { strength: 0.8 }, look: 'broadcast' });
+        assert(r.status === 201, `propose ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        const g = await json(`/v1/designbook/${effectId}`, { headers: auth(other.token) });
+        assert(g.status === 200, `get ${g.status}`);
+        assert(g.body.data.part.bench.checks.includes('effect-valid'), `the record says which bench ran: ${g.body.data.part.bench.checks.join(', ')}`);
+        const body = g.body.data.part.body;
+        assert(body.effect === 'glitch' && body.on === 'hero' && body.params.strength === 0.8 && body.look === 'broadcast',
+            `the body survives whole and the target defaulted to the band: ${JSON.stringify(body)}`);
+        const byKind = await json('/v1/designbook?kind=effect&limit=200', { headers: auth(other.token) });
+        assert(byKind.body.data.parts.some((p: any) => p.id === effectId), '?kind=effect lists it');
+    });
+
+    await test('an EFFECT part: the operator publishes, another owner adopts — it lands on the hero block, the rest of the arrangement survives; a layer pass lands on the ambient', async () => {
+        const pub = await json(`/v1/designbook/${effectId}/status`, { method: 'POST', headers: auth(op.token), body: JSON.stringify({ status: 'published' }) });
+        assert(pub.status === 200, `publish ${pub.status}`);
+        const adopt = await json(`/v1/designbook/${effectId}/adopt`, { method: 'POST', headers: auth(other.token), body: JSON.stringify({ filename: otherApp }) });
+        assert(adopt.status === 200 && adopt.body.data.kind === 'effect', `adopt ${adopt.status}: ${JSON.stringify(adopt.body?.error)}`);
+        const layout = (await json(`/v1/apps/${other.name}/${otherApp}/ui`)).body.data.layout;
+        const hero = layout.blocks.find((b: any) => b.component === 'hero');
+        assert(JSON.stringify(hero?.effect) === JSON.stringify({ id: 'glitch', params: { strength: 0.8 } }), `the effect wears on the hero block: ${JSON.stringify(hero)}`);
+        assert(layout.blocks.length === 3 && layout.ambient?.preset === 'waves' && layout.look === 'editorial', 'the arrangement, its ambient and its look survived');
+        // A pass over the layer lands on the arrangement's ambient, the newest two kept.
+        const layerId = `${effectId}-layer`;
+        const lr = await proposeEffect({ effect: 'kaleidoscope', on: 'layer', look: 'lounge' }, layerId, op.token);
+        assert(lr.status === 201, `a layer pass proposes: ${JSON.stringify(lr.body?.error)}`);
+        await json(`/v1/designbook/${layerId}/status`, { method: 'POST', headers: auth(op.token), body: JSON.stringify({ status: 'published' }) });
+        const la = await json(`/v1/designbook/${layerId}/adopt`, { method: 'POST', headers: auth(other.token), body: JSON.stringify({ filename: otherApp }) });
+        assert(la.status === 200, `adopt the pass ${la.status}: ${JSON.stringify(la.body?.error)}`);
+        const after = (await json(`/v1/apps/${other.name}/${otherApp}/ui`)).body.data.layout;
+        assert(after.ambient?.preset === 'waves' && after.ambient?.alpha === 0.2 && after.ambient?.speed === 0.75
+            && JSON.stringify(after.ambient?.post) === JSON.stringify(['kaleidoscope']),
+        `the pass rides the arrangement's ambient, the preset and its numbers untouched: ${JSON.stringify(after.ambient)}`);
+        // No target: a figure effect into an arrangement with no figure, a pass into an app with no layer.
+        const fig = await json('/v1/designbook/effect-vignette/adopt', { method: 'POST', headers: auth(other.token), body: JSON.stringify({ filename: otherApp }) });
+        assert(fig.status === 409 && fig.body.error?.code === 'NO_TARGET' && /no figure block/.test(fig.body.error.message),
+            `a figure effect with no figure to land on refuses with words: ${fig.status} ${JSON.stringify(fig.body?.error)}`);
+        const bareApp = await json(`/v1/designbook/${layerId}/adopt`, { method: 'POST', headers: auth(other.token), body: JSON.stringify({ filename: 'db-bare.html' }) });
+        assert(bareApp.status === 409 && bareApp.body.error?.code === 'NO_LAYOUT' && /atelier\.fx/.test(bareApp.body.error.message),
+            `NO_LAYOUT with the app-code way out: ${bareApp.status} ${JSON.stringify(bareApp.body?.error)}`);
+    });
+
+    await test('an EFFECT part previews as the demo arrangement wearing it where it lands: a moment gets a Play control, a pass rides the layer', async () => {
+        const res = await fetch(`${BASE}/v1/designbook/${effectId}/preview`);
+        assert(res.status === 200 && (res.headers.get('content-type') ?? '').includes('text/html'), `preview ${res.status}`);
+        const page = await res.text();
+        assert(/"component":"hero"[^}]*\}[^}]*"effect":\{"id":"glitch"/.test(page) || /"effect":\{"id":"glitch","params":\{"strength":0\.8\}\}/.test(page), 'the hero block wears the effect');
+        assert(/"component":"figure"/.test(page) && /"look":"broadcast"/.test(page), 'the demo arrangement carries a figure, on the part\'s own look');
+        assert(/data-ak-fx-play/.test(page), 'a moment gets a real Play control in the frame');
+        const layerPage = await (await fetch(`${BASE}/v1/designbook/${effectId}-layer/preview`)).text();
+        assert(/"post":\[\{"id":"kaleidoscope"\}\]/.test(layerPage) && /"preset":"waves"/.test(layerPage), `a pass rides the look's own ambient: ${layerPage.match(/"ambient":\{[^}]*\}/)?.[0]}`);
+    });
+
+    await test('a fresh node\'s EFFECTS shelf is never empty: the nine effects are seeded published, each where the registry says it lands', async () => {
+        let seeded: any[] = [];
+        for (let i = 0; i < 10; i++) {
+            const r = await json('/v1/designbook?status=published&kind=effect&limit=200', { headers: auth(other.token) });
+            seeded = (r.body.data?.parts ?? []).filter((p: any) => p.id.startsWith('effect-') && p.tags.includes('seed'));
+            if (seeded.length >= 9) break;
+            await new Promise(res => setTimeout(res, 500));
+        }
+        assert(seeded.length === 9, `nine seeded effects, got ${seeded.length}: ${seeded.map((p: any) => p.id).join(', ')}`);
+        const v = await json('/v1/designbook/effect-vignette');
+        assert(v.status === 200 && v.body.data.part.body.on === 'figure' && v.body.data.part.body.look === 'gallery', `the vignette lands on the figure on gallery: ${JSON.stringify(v.body.data.part.body)}`);
+        const k = await json('/v1/designbook/effect-kaleidoscope');
+        assert(k.status === 200 && k.body.data.part.body.on === 'layer', `the kaleidoscope lands on the layer: ${JSON.stringify(k.body.data.part.body)}`);
+        const g = await json('/v1/designbook/effect-glitch');
+        assert(g.status === 200 && g.body.data.part.body.on === 'hero', `the glitch lands on the band: ${JSON.stringify(g.body.data.part.body)}`);
     });
 
     await test('discovery surfaces an ambient part with its kind as the segment', async () => {

@@ -14,10 +14,15 @@
  *   its template's own HTML, as-is. An illustration is art direction as words; its page sets the
  *   style sentence and the palette words in the kit's own type, because there is no image to
  *   show without running the imagery pipeline.
- * @structure DEMO_LAYOUT_FOR_TOKENS · renderableBodyFor() · benchPageHtml() · partPreviewHtml()
+ * @structure DEMO_LAYOUT_FOR_TOKENS · DEMO_LAYOUT_FOR_EFFECTS · renderableBodyFor() ·
+ *   benchPageHtml() · partPreviewHtml()
  * @usage
  *   const html = partPreviewHtml(part);   // a complete self-contained page, kit assets relative
  * @version-history
+ *   v1.2.0 — 2026-09-05 — An effect part renders as the demo arrangement (with a figure after
+ *     the hero) wearing the effect where it lands — the hero band, the figure, or a pass over
+ *     the layer (the look's own ambient, plasma at its whisper when the look runs none) — and a
+ *     moment gets a real Play control in the frame (wish-atelier-post-process-effects, stage 5).
  *   v1.1.0 — 2026-09-05 — An ambient part renders as the demo arrangement with the layer running
  *     behind it, on the part's look or the first look the registry says the preset fits — a
  *     preview is only honest on the ground the part was proven on, and dust on vivid would be
@@ -28,6 +33,8 @@
  */
 import { getAppTemplates } from '../../data/app-templates.js';
 import { ambientById } from '../../data/atelier-ambients.js';
+import { effectById } from '../../data/atelier-effects.js';
+import { LOOKS } from '../../data/atelier-looks.js';
 import type { DesignBookPart } from './service.js';
 
 /** A representative arrangement for parts that are seasoning rather than a dish: a look or
@@ -41,6 +48,17 @@ export const DEMO_LAYOUT_FOR_TOKENS = {
     { id: 'rows', component: 'list', props: { source: 'demo.rows', title: 'Rows' } },
     { id: 'grid', component: 'cardGrid', props: { source: 'demo.cards', title: 'Cards' } },
     { id: 'hist', component: 'timeline', props: { source: 'demo.events', title: 'History' } },
+  ],
+};
+
+/** The demo arrangement an EFFECT part is proven on: the same blocks with one figure after the
+ *  hero, because a picture effect needs a picture and one numeral is the kit's smallest. */
+export const DEMO_LAYOUT_FOR_EFFECTS = {
+  v: 1,
+  blocks: [
+    DEMO_LAYOUT_FOR_TOKENS.blocks[0]!,
+    { id: 'fig', component: 'figure', props: { source: 'demo.figure', title: 'Figure' } },
+    ...DEMO_LAYOUT_FOR_TOKENS.blocks.slice(1),
   ],
 };
 
@@ -74,6 +92,33 @@ export function renderableBodyFor(part: DesignBookPart): Record<string, unknown>
       },
     };
   }
+  // An effect renders as the demo arrangement wearing it where it lands: on the hero band, on
+  // the figure, or as a pass over the layer (the look's own ambient, or plasma at its whisper
+  // when the look runs none), on the part's look or the first the registry says it fits. A
+  // moment gets a real Play control in the frame, so the gallery can press it.
+  if (part.kind === 'effect') {
+    const body = part.body as {
+      effect: string; params?: Record<string, unknown>; on: 'hero' | 'figure' | 'layer';
+      tokens?: Record<string, string>; look?: string;
+    };
+    const entry = effectById(body.effect);
+    const look = body.look ?? entry?.fitsLooks[0] ?? 'vivid';
+    const spec = { id: body.effect, ...(body.params ? { params: body.params } : {}) };
+    if (body.on === 'layer') {
+      const lookAmbient = LOOKS.find((l) => l.id === look)?.tokens['--ak-ambient'];
+      return {
+        ...DEMO_LAYOUT_FOR_EFFECTS, look, tokens: body.tokens ?? {},
+        ambient: { preset: lookAmbient && lookAmbient !== 'none' ? lookAmbient : 'plasma', post: [spec] },
+      };
+    }
+    return {
+      ...DEMO_LAYOUT_FOR_EFFECTS, look, tokens: body.tokens ?? {},
+      blocks: DEMO_LAYOUT_FOR_EFFECTS.blocks.map((b) => (b.component === body.on ? { ...b, effect: spec } : b)),
+      ...(entry?.motion.includes('moment')
+        ? { __fxPlay: { selector: body.on === 'hero' ? '.ak-mosaic__band .ak-hero' : '[data-ak-block="fig"]', id: body.effect } }
+        : {}),
+    };
+  }
   if (part.kind === 'illustration') return null;
   return part.body;
 }
@@ -86,7 +131,8 @@ export function benchPageHtml(body: Record<string, unknown>): string {
   return [
     '<!DOCTYPE html><html lang="en" data-theme="light"><head><meta charset="utf-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
-    '<link rel="stylesheet" href="/lib/aimeat-atelier.css"></head><body>',
+    '<link rel="stylesheet" href="/lib/aimeat-atelier.css">',
+    '<style>.ak-fx-play { position: fixed; right: 16px; bottom: 16px; z-index: 10; }</style></head><body>',
     '<script src="/v1/libs/aimeat-atelier.js"></scr' + 'ipt>',
     '<script>',
     'var BODY = ' + partJson + ';',
@@ -135,6 +181,18 @@ export function benchPageHtml(body: Record<string, unknown>): string {
     '    { layout: BODY, sources: sources }));',
     '} else {',
     '  AIMEAT.atelier.mosaic({ target: frame, layout: BODY, sources: sources });',
+    '}',
+    // A MOMENT effect gets a real control in the frame: the person presses it in the gallery
+    // and the effect the mosaic mounted plays once; the bench measures the page at rest.
+    'if (BODY.__fxPlay) {',
+    '  var play = document.createElement("button");',
+    '  play.type = "button"; play.className = "ak-btn ak-fx-play"; play.textContent = "Play";',
+    '  play.setAttribute("data-ak-fx-play", BODY.__fxPlay.id);',
+    '  play.addEventListener("click", function () {',
+    '    var t = document.querySelector(BODY.__fxPlay.selector);',
+    '    if (t) AIMEAT.atelier.fxPlay(t, BODY.__fxPlay.id);',
+    '  });',
+    '  document.body.appendChild(play);',
     '}',
     '</scr' + 'ipt></body></html>',
   ].join('\n');

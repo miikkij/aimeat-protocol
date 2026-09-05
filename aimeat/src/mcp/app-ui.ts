@@ -21,7 +21,7 @@ import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
 import { descriptionFor } from './catalog/shape.js';
-import { buildUiCatalogue } from '../services/app-ui/registry.js';
+import { buildUiCatalogue } from '../services/app-ui/catalogue.js';
 import { AppUiService } from '../services/app-ui/service.js';
 import { AppUiError } from '../services/app-ui/validate.js';
 

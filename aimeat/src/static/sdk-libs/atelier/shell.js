@@ -133,12 +133,13 @@ function motionIsLess() {
  * What an app may say about its ambient: a preset id or 'none', false for no layer at all,
  * null or undefined for "the look decides", or the full wish.
  * @typedef {string|false|null|undefined|{ preset?: string|null, alpha?: number, speed?: number,
- *   fps?: number, gl?: boolean }} AmbientWish
+ *   fps?: number, gl?: boolean, post?: any }} AmbientWish
  */
 
 /**
  * The layer's spec from an app's wish. A string names the preset; an object carries the
- * numbers; anything else hands the decision to the look.
+ * numbers and the post chain (effects run over the layer's own field); anything else hands
+ * the decision to the look.
  * @param {AmbientWish} want
  */
 function ambientSpec(want) {
@@ -146,7 +147,7 @@ function ambientSpec(want) {
   if (want && typeof want === 'object') {
     return {
       preset: want.preset == null ? null : want.preset,
-      alpha: want.alpha, speed: want.speed, fps: want.fps, gl: want.gl,
+      alpha: want.alpha, speed: want.speed, fps: want.fps, gl: want.gl, post: want.post,
     };
   }
   return { preset: null };
@@ -265,7 +266,7 @@ export function app(spec) {
       weatherCtl.el.classList.add('ak-app__weather');
       bar.insertBefore(weatherCtl.el, motionBtn);
     } else {
-      sky.set(Object.assign({ preset: null, alpha: null, speed: null }, ambientSpec(want)));
+      sky.set(Object.assign({ preset: null, alpha: null, speed: null, post: null }, ambientSpec(want)));
     }
     syncWeather();
   }

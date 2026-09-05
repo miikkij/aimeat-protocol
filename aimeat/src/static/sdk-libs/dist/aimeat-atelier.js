@@ -1284,10 +1284,10 @@
   }
 
   // src/static/sdk-libs/atelier/ambient-presets.js
-  var PRESET_IDS = ["waves", "aurora", "dust", "grid", "static", "ink"];
-  var BASE_ALPHA = { waves: 0.22, aurora: 0.3, dust: 0.6, grid: 0.5, static: 0.25, ink: 0.35 };
-  var PEAK = { waves: 0.35, aurora: 0.26, dust: 0.5, grid: 0.6, static: 0.3, ink: 0.22 };
-  var FPS = { waves: 30, aurora: 0, dust: 30, grid: 30, static: 12, ink: 24 };
+  var PRESET_IDS = ["waves", "aurora", "dust", "grid", "static", "ink", "plasma", "lava", "tunnel"];
+  var BASE_ALPHA = { waves: 0.22, aurora: 0.3, dust: 0.6, grid: 0.5, static: 0.25, ink: 0.35, plasma: 0.25, lava: 0.25, tunnel: 0.5 };
+  var PEAK = { waves: 0.35, aurora: 0.26, dust: 0.5, grid: 0.6, static: 0.3, ink: 0.22, plasma: 0.32, lava: 0.3, tunnel: 0.55 };
+  var FPS = { waves: 30, aurora: 0, dust: 30, grid: 30, static: 12, ink: 24, plasma: 24, lava: 24, tunnel: 30 };
   var CSS_PRESETS = { aurora: true };
   var TAU = Math.PI * 2;
   function mulberry32(seed) {
@@ -1526,7 +1526,157 @@
       ctx.globalCompositeOperation = "source-over";
     }
   };
-  var RENDERERS = { waves, dust, grid, static: staticNoise, ink };
+  function ramp(stops) {
+    const lut = new Uint8ClampedArray(256 * 3);
+    const n = stops.length - 1;
+    for (let i = 0; i < 256; i++) {
+      const f = i / 255 * n;
+      const k = Math.min(n - 1, Math.floor(f));
+      const p = f - k;
+      for (let c = 0; c < 3; c++) lut[i * 3 + c] = stops[k][c] * (1 - p) + stops[k + 1][c] * p;
+    }
+    return lut;
+  }
+  var plasma = {
+    scale: 8,
+    setup(w, h, palette2, rng) {
+      const sin = new Float32Array(1024);
+      for (let i = 0; i < 1024; i++) sin[i] = Math.sin(i / 1024 * TAU);
+      return {
+        sin,
+        lut: ramp([palette2.accent, palette2.spectrum2, palette2.spectrum3, palette2.accent]),
+        img: null,
+        phase: [rng() * TAU, rng() * TAU, rng() * TAU, rng() * TAU],
+        k: [TAU / (w * 0.9), TAU / (h * 0.7), TAU / (w * 1.4), TAU / (Math.min(w, h) * 0.8)]
+      };
+    },
+    frame(ctx, state, t2, w, h) {
+      if (!state.img || state.img.width !== w || state.img.height !== h) state.img = ctx.createImageData(w, h);
+      const d = state.img.data;
+      const sin = state.sin;
+      const lut = state.lut;
+      const k = state.k;
+      const ph = state.phase;
+      const cx = w / 2;
+      const cy = h / 2;
+      const s = function(a) {
+        return sin[((a * 162.9746617 | 0) % 1024 + 1024) % 1024];
+      };
+      let o = 0;
+      for (let y = 0; y < h; y++) {
+        const b = s(y * k[1] - t2 * 0.7 + ph[1]);
+        for (let x = 0; x < w; x++) {
+          const dx = x - cx;
+          const dy = y - cy;
+          const v = s(x * k[0] + t2 + ph[0]) + b + s((x + y) * k[2] + t2 * 0.4 + ph[2]) + s(Math.sqrt(dx * dx + dy * dy) * k[3] - t2 + ph[3]);
+          const i = (v + 4) * 31.875 | 0;
+          d[o] = lut[i * 3];
+          d[o + 1] = lut[i * 3 + 1];
+          d[o + 2] = lut[i * 3 + 2];
+          d[o + 3] = 255;
+          o += 4;
+        }
+      }
+      ctx.putImageData(state.img, 0, 0);
+    }
+  };
+  var lava = {
+    scale: 6,
+    setup(w, h, palette2, rng) {
+      const blobs = [];
+      const n = 5 + Math.floor(rng() * 2);
+      for (let i = 0; i < n; i++) {
+        blobs.push({
+          x: 0.15 + rng() * 0.7,
+          r: 0.09 + rng() * 0.08,
+          period: 24 + rng() * 24,
+          phase: rng() * TAU,
+          sway: 0.03 + rng() * 0.04,
+          swayPeriod: 9 + rng() * 9
+        });
+      }
+      return { blobs, img: null };
+    },
+    frame(ctx, state, t2, w, h, palette2) {
+      if (!state.img || state.img.width !== w || state.img.height !== h) state.img = ctx.createImageData(w, h);
+      const d = state.img.data;
+      const m = Math.min(w, h);
+      const live = [];
+      for (const b of state.blobs) {
+        const ang = TAU * t2 / b.period + b.phase;
+        const y = 0.5 + 0.38 * Math.sin(ang);
+        const vy = Math.cos(ang);
+        const x = b.x + b.sway * Math.sin(TAU * t2 / b.swayPeriod + b.phase);
+        const r = m * b.r * (0.85 + 0.15 * Math.sin(ang * 1.7));
+        live.push({ cx: x * w, cy: y * h, r2: r * r, sy: 1 / (1 + 0.35 * Math.abs(vy)) });
+      }
+      const core = palette2.accent;
+      const rim = palette2.spectrum3;
+      let o = 0;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          let f = 0;
+          for (const b of live) {
+            const dx = x - b.cx;
+            const dy = (y - b.cy) * b.sy;
+            f += b.r2 / (dx * dx + dy * dy + 1);
+          }
+          if (f < 0.75) {
+            d[o + 3] = 0;
+            o += 4;
+            continue;
+          }
+          const edge = f >= 1 ? 1 : (f - 0.75) * 4;
+          const mix = f >= 1.8 ? 1 : f <= 1 ? 0 : (f - 1) * 1.25;
+          d[o] = rim[0] + (core[0] - rim[0]) * mix;
+          d[o + 1] = rim[1] + (core[1] - rim[1]) * mix;
+          d[o + 2] = rim[2] + (core[2] - rim[2]) * mix;
+          d[o + 3] = 255 * edge;
+          o += 4;
+        }
+      }
+      ctx.putImageData(state.img, 0, 0);
+    }
+  };
+  var tunnel = {
+    scale: 1,
+    setup() {
+      return { rings: 24, spokes: 12, period: 2.4 };
+    },
+    frame(ctx, state, t2, w, h, palette2) {
+      ctx.clearRect(0, 0, w, h);
+      const cx = w / 2;
+      const cy = h / 2;
+      const reach = Math.hypot(w, h) / 2;
+      ctx.lineWidth = 1;
+      const frac = t2 / state.period % 1;
+      for (let i = 0; i < state.rings; i++) {
+        const depth = (i + 1 - frac) / state.rings;
+        const r = reach * Math.pow(1 - depth, 2.2);
+        if (r < 1) continue;
+        const a = PEAK.tunnel * Math.pow(1 - depth, 1.2);
+        ctx.strokeStyle = rgba(palette2.accent, a);
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, TAU);
+        ctx.stroke();
+      }
+      const rot = t2 * 0.12;
+      for (let i = 0; i < state.spokes; i++) {
+        const ang = rot + i / state.spokes * TAU;
+        const ex = cx + Math.cos(ang) * reach;
+        const ey = cy + Math.sin(ang) * reach;
+        const g = ctx.createLinearGradient(cx, cy, ex, ey);
+        g.addColorStop(0, rgba(palette2.spectrum2, 0));
+        g.addColorStop(1, rgba(palette2.spectrum2, PEAK.tunnel * 0.6));
+        ctx.strokeStyle = g;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(ex, ey);
+        ctx.stroke();
+      }
+    }
+  };
+  var RENDERERS = { waves, dust, grid, static: staticNoise, ink, plasma, lava, tunnel };
 
   // src/static/sdk-libs/atelier/ambient-gl.js
   var VERT = "attribute vec2 p; void main() { gl_Position = vec4(p, 0.0, 1.0); }";
@@ -1645,6 +1795,606 @@
     };
   }
 
+  // src/static/sdk-libs/atelier/ambient-post.js
+  var TAU2 = Math.PI * 2;
+  var POST_IDS = ["glitch", "vhs", "ripple", "kaleidoscope"];
+  var POST_MAX = 2;
+  function scratchCanvas(w, h) {
+    const c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    return c;
+  }
+  function drawSplit(dst, src, scratch, w, h, dx, palette2, alpha) {
+    const sc = scratch.getContext("2d");
+    if (!sc) return;
+    const tints = [[palette2.accent, -dx], [palette2.spectrum2, dx]];
+    for (const pair of tints) {
+      sc.globalCompositeOperation = "source-over";
+      sc.clearRect(0, 0, w, h);
+      sc.drawImage(src, pair[1], 0);
+      sc.globalCompositeOperation = "source-in";
+      sc.fillStyle = rgba(pair[0], 1);
+      sc.fillRect(0, 0, w, h);
+      dst.globalCompositeOperation = "lighter";
+      dst.globalAlpha = alpha;
+      dst.drawImage(scratch, 0, 0);
+    }
+    dst.globalCompositeOperation = "source-over";
+    dst.globalAlpha = 1;
+  }
+  var kaleidoscope = {
+    setup() {
+      return {};
+    },
+    pass(dst, src, state, t2, w, h, palette2, p) {
+      const n = Math.max(2, Math.round(p.segments));
+      const cx = w / 2;
+      const cy = h / 2;
+      const reach = Math.hypot(w, h) / 2 + 2;
+      const wedge = TAU2 / n;
+      const rot = t2 * p.spin * 0.5;
+      const eps = 0.012;
+      dst.clearRect(0, 0, w, h);
+      for (let i = 0; i < n; i++) {
+        const a0 = rot + i * wedge;
+        dst.save();
+        dst.beginPath();
+        dst.moveTo(cx, cy);
+        dst.arc(cx, cy, reach, a0 - eps, a0 + wedge + eps);
+        dst.closePath();
+        dst.clip();
+        dst.translate(cx, cy);
+        dst.rotate(a0);
+        if (i % 2) {
+          dst.rotate(wedge / 2);
+          dst.scale(1, -1);
+          dst.rotate(-wedge / 2);
+        }
+        dst.translate(-cx, -cy);
+        dst.drawImage(src, 0, 0, w, h);
+        dst.restore();
+      }
+    }
+  };
+  var ripple = {
+    setup(w, h, rng, p, palette2, scale) {
+      const rows = Math.max(4, p.wavelength / Math.max(scale, 1));
+      return { band: 3, k: TAU2 / rows };
+    },
+    pass(dst, src, state, t2, w, h, palette2, p) {
+      const band = state.band;
+      const amp = p.amplitude * Math.min(w, h) * 0.045;
+      const om = p.speed * 1.4;
+      dst.clearRect(0, 0, w, h);
+      for (let y = 0; y < h; y += band) {
+        const bh = Math.min(band, h - y);
+        const dx = Math.round(amp * Math.sin(state.k * y + t2 * om));
+        dst.drawImage(src, 0, y, w, bh, dx, y, w, bh);
+        if (dx > 0) dst.drawImage(src, w - dx, y, dx, bh, 0, y, dx, bh);
+        else if (dx < 0) dst.drawImage(src, 0, y, -dx, bh, w + dx, y, -dx, bh);
+      }
+    }
+  };
+  var vhs = {
+    setup(w, h, rng, p, palette2) {
+      const tile = scratchCanvas(64, 64);
+      const tc2 = tile.getContext("2d");
+      if (tc2) {
+        const img = tc2.createImageData(64, 64);
+        const d = img.data;
+        for (let i = 0; i < d.length; i += 4) {
+          d[i] = palette2.ink[0];
+          d[i + 1] = palette2.ink[1];
+          d[i + 2] = palette2.ink[2];
+          d[i + 3] = Math.floor(rng() * 255);
+        }
+        tc2.putImageData(img, 0, 0);
+      }
+      return { scratch: scratchCanvas(w, h), tile, pattern: null, rng };
+    },
+    pass(dst, src, state, t2, w, h, palette2, p) {
+      const s = p.strength;
+      const unit = Math.max(1, w / 640);
+      dst.clearRect(0, 0, w, h);
+      const jitter = Math.sin(t2 * 9.7) > 0.96 ? Math.round(2 * s * unit) : 0;
+      dst.drawImage(src, 0, jitter);
+      drawSplit(dst, src, state.scratch, w, h, Math.max(1, Math.round((1 + 6 * s) * unit)), palette2, 0.08 + 0.28 * s);
+      const bandH = Math.max(2, Math.round(h * (0.05 + 0.1 * s)));
+      const y = h - t2 * 0.25 * h % (h + bandH);
+      dst.save();
+      dst.beginPath();
+      dst.rect(0, y, w, bandH);
+      dst.clip();
+      dst.clearRect(0, y, w, bandH);
+      dst.drawImage(src, Math.round(8 * s * unit), 0);
+      dst.fillStyle = rgba(palette2.ink, 0.18 * s);
+      dst.fillRect(0, y, w, bandH);
+      dst.restore();
+      if (!state.pattern) state.pattern = dst.createPattern(state.tile, "repeat");
+      dst.save();
+      dst.globalAlpha = 0.05 + 0.1 * s;
+      dst.translate(-Math.floor(state.rng() * 64), -Math.floor(state.rng() * 64));
+      dst.fillStyle = state.pattern;
+      dst.fillRect(0, 0, w + 64, h + 64);
+      dst.restore();
+    }
+  };
+  var glitch = {
+    setup(w, h, rng) {
+      return { scratch: scratchCanvas(w, h), rng, burst: 0, slices: [] };
+    },
+    pass(dst, src, state, t2, w, h, palette2, p) {
+      const s = p.strength;
+      const rng = state.rng;
+      dst.clearRect(0, 0, w, h);
+      if (state.burst <= 0 && rng() < 0.01 + 0.03 * s) {
+        state.burst = 3 + Math.floor(rng() * 6);
+        const n = 3 + Math.floor(rng() * 5);
+        state.slices = [];
+        for (let i = 0; i < n; i++) {
+          state.slices.push({ y: rng(), hgt: 0.02 + rng() * 0.12, dx: (rng() - 0.5) * 0.16 * s });
+        }
+      }
+      dst.drawImage(src, 0, 0);
+      if (state.burst <= 0) return;
+      state.burst--;
+      for (const sl of state.slices) {
+        const y = Math.round(sl.y * h);
+        const hh = Math.max(1, Math.round(sl.hgt * h));
+        const dx = Math.round(sl.dx * w);
+        dst.clearRect(0, y, w, hh);
+        dst.drawImage(src, 0, y, w, hh, dx, y, w, hh);
+      }
+      drawSplit(dst, src, state.scratch, w, h, Math.max(1, Math.round(10 * s * Math.max(1, w / 640))), palette2, 0.35 * s);
+    }
+  };
+  var PASSES = { glitch, vhs, ripple, kaleidoscope };
+  function postById(id) {
+    return PASSES[id] || null;
+  }
+
+  // src/static/sdk-libs/atelier/effects.js
+  var SVG_NS = "http://www.w3.org/2000/svg";
+  var DEFS_ID = "ak-fx-defs";
+  var PLAYING = "is-ak-fx-playing";
+  var INSTANCES = /* @__PURE__ */ new WeakMap();
+  var OWNERS = /* @__PURE__ */ new Map();
+  var FX_PARAMS = {
+    scanlines: { pitch: [2, 8, 3], strength: [0, 0.3, 0.12] },
+    vignette: { size: [0.4, 1, 0.75], strength: [0, 0.7, 0.25] },
+    duotone: {
+      shadow: { tokens: ["ink", "bg", "accent", "spectrum-2", "spectrum-3"], default: "ink" },
+      light: { tokens: ["ink", "bg", "accent", "spectrum-2", "spectrum-3"], default: "bg" },
+      strength: [0, 1, 1]
+    },
+    recolour: { hue: [-180, 180, 0], saturate: [0.5, 2, 1] },
+    distort: { scale: [2, 40, 12], frequency: [2e-3, 0.05, 0.012], octaves: [1, 2, 1], duration: [200, 1500, 700] },
+    glitch: { strength: [0, 1, 0.6], duration: [200, 900, 420] },
+    vhs: { strength: [0, 1, 0.5], duration: [400, 1200, 800] },
+    ripple: { amplitude: [0, 1, 0.4], wavelength: [20, 160, 60], speed: [0.25, 2, 1] },
+    kaleidoscope: { segments: [4, 12, 6], spin: [-1, 1, 0.15] }
+  };
+  var FX_IDS = Object.keys(FX_PARAMS);
+  var MOMENTS = { distort: true, glitch: true, vhs: true, ripple: true };
+  var STILLS = { scanlines: true, vignette: true, duotone: true, recolour: true, distort: true };
+  var SVG_ENGINES = { distort: true, duotone: true, vhs: true, glitch: true, ripple: true };
+  var TOKEN_VARS = {
+    ink: "--ak-ink",
+    bg: "--ak-bg",
+    accent: "--ak-accent",
+    "spectrum-2": "--ak-spectrum-2",
+    "spectrum-3": "--ak-spectrum-3"
+  };
+  var LUM_MATRIX = "0.2126 0.7152 0.0722 0 0 0.2126 0.7152 0.0722 0 0 0.2126 0.7152 0.0722 0 0 0 0 0 1 0";
+  function fxParams(id, given) {
+    const decl = (
+      /** @type {any} */
+      FX_PARAMS[id]
+    );
+    if (!decl) return null;
+    const out = {};
+    for (const name in decl) {
+      const d = decl[name];
+      const v = given ? given[name] : void 0;
+      if (Array.isArray(d)) {
+        const n = v == null ? NaN : Number(v);
+        out[name] = isFinite(n) ? Math.min(d[1], Math.max(d[0], n)) : d[2];
+      } else {
+        out[name] = typeof v === "string" && d.tokens.indexOf(v) >= 0 ? v : d.default;
+      }
+    }
+    return out;
+  }
+  function svgEl(parent, name, attrs) {
+    const n = document.createElementNS(SVG_NS, name);
+    for (const k in attrs) n.setAttribute(k, String(attrs[k]));
+    parent.appendChild(n);
+    return n;
+  }
+  function ensureDefs() {
+    let svg6 = (
+      /** @type {Element|null} */
+      document.getElementById(DEFS_ID)
+    );
+    if (!svg6) {
+      svg6 = document.createElementNS(SVG_NS, "svg");
+      svg6.setAttribute("id", DEFS_ID);
+      svg6.setAttribute("class", "ak-fx-defs");
+      svg6.setAttribute("aria-hidden", "true");
+      svg6.setAttribute("focusable", "false");
+      svg6.appendChild(document.createElementNS(SVG_NS, "defs"));
+      document.body.appendChild(svg6);
+    }
+    return (
+      /** @type {Element} */
+      svg6.querySelector("defs")
+    );
+  }
+  function sweepOrphans() {
+    for (const [fid, owner] of OWNERS) {
+      if (owner.isConnected) continue;
+      const orphan = document.getElementById(fid);
+      if (orphan && orphan.parentNode) orphan.parentNode.removeChild(orphan);
+      OWNERS.delete(fid);
+    }
+  }
+  function settleShared(node, rest) {
+    const ids = rest ? Object.keys(rest) : [];
+    if (!ids.length) {
+      node.classList.remove("ak-fx", "is-ak-fx-still", PLAYING);
+      node.style.removeProperty("--ak-fx-filter");
+      return;
+    }
+    let still = false;
+    let ref = "";
+    for (const k of ids) {
+      if (STILLS[k]) still = true;
+      if (SVG_ENGINES[k] && rest[k].filterId) ref = filterRef(rest[k].filterId);
+    }
+    node.classList.toggle("is-ak-fx-still", still);
+    if (ref) node.style.setProperty("--ak-fx-filter", ref);
+    else node.style.removeProperty("--ak-fx-filter");
+  }
+  function filterRef(id) {
+    const base = document.querySelector("base[href]");
+    return "url(" + (base ? location.href.split("#")[0] : "") + "#" + id + ")";
+  }
+  function ringMapUri() {
+    const n = 64;
+    const c = document.createElement("canvas");
+    c.width = n;
+    c.height = n;
+    const ctx = c.getContext("2d");
+    if (!ctx) return "";
+    const img = ctx.createImageData(n, n);
+    const d = img.data;
+    const mid = (n - 1) / 2;
+    let o = 0;
+    for (let y = 0; y < n; y++) {
+      for (let x = 0; x < n; x++) {
+        const dx = (x - mid) / mid;
+        const dy = (y - mid) / mid;
+        const r = Math.sqrt(dx * dx + dy * dy);
+        const band = Math.max(0, 1 - Math.abs(r - 0.66) / 0.2);
+        const k = band * band * (r > 0 ? 1 / r : 0);
+        d[o] = 128 + 127 * dx * k;
+        d[o + 1] = 128 + 127 * dy * k;
+        d[o + 2] = 128;
+        d[o + 3] = 255;
+        o += 4;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    return c.toDataURL();
+  }
+  var ringMap = "";
+  function buildFilter(inst) {
+    const defs = ensureDefs();
+    const old = document.getElementById(inst.filterId);
+    if (old && old.parentNode) old.parentNode.removeChild(old);
+    const p = inst.params;
+    const f = svgEl(defs, "filter", {
+      id: inst.filterId,
+      "color-interpolation-filters": "sRGB",
+      x: "-6%",
+      y: "-6%",
+      width: "112%",
+      height: "112%"
+    });
+    OWNERS.set(inst.filterId, inst.el);
+    inst.disp = null;
+    inst.map = null;
+    if (inst.id === "distort") {
+      svgEl(f, "feTurbulence", {
+        type: "fractalNoise",
+        baseFrequency: p.frequency,
+        numOctaves: p.octaves,
+        seed: 7,
+        stitchTiles: "stitch",
+        result: "n"
+      });
+      inst.disp = svgEl(f, "feDisplacementMap", {
+        in: "SourceGraphic",
+        in2: "n",
+        scale: p.scale,
+        xChannelSelector: "R",
+        yChannelSelector: "G"
+      });
+    } else if (inst.id === "duotone") {
+      const s = tokenRgb(inst.el, TOKEN_VARS[p.shadow]);
+      const l = tokenRgb(inst.el, TOKEN_VARS[p.light]);
+      svgEl(f, "feColorMatrix", { in: "SourceGraphic", type: "matrix", values: LUM_MATRIX, result: "lum" });
+      const ct = svgEl(f, "feComponentTransfer", { in: "lum", result: "tone" });
+      const channels = ["R", "G", "B"];
+      for (let i = 0; i < 3; i++) {
+        svgEl(ct, "feFunc" + channels[i], { type: "table", tableValues: (s[i] / 255).toFixed(4) + " " + (l[i] / 255).toFixed(4) });
+      }
+      svgEl(f, "feComposite", {
+        in: "tone",
+        in2: "SourceGraphic",
+        operator: "arithmetic",
+        k1: 0,
+        k2: p.strength,
+        k3: 1 - p.strength,
+        k4: 0
+      });
+    } else if (inst.id === "vhs" || inst.id === "glitch") {
+      const d = Math.max(1, Math.round(inst.id === "vhs" ? 2 + 10 * p.strength : 3 + 14 * p.strength));
+      svgEl(f, "feOffset", { in: "SourceGraphic", dx: -d, dy: 0, result: "l" });
+      svgEl(f, "feColorMatrix", { in: "l", type: "matrix", values: "1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0", result: "red" });
+      svgEl(f, "feOffset", { in: "SourceGraphic", dx: d, dy: 0, result: "r" });
+      svgEl(f, "feColorMatrix", { in: "r", type: "matrix", values: "0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 1 0", result: "blue" });
+      svgEl(f, "feColorMatrix", { in: "SourceGraphic", type: "matrix", values: "0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 1 0", result: "green" });
+      svgEl(f, "feBlend", { in: "red", in2: "green", mode: "screen", result: "rg" });
+      svgEl(f, "feBlend", { in: "rg", in2: "blue", mode: "screen" });
+    } else if (inst.id === "ripple") {
+      if (!ringMap) ringMap = ringMapUri();
+      inst.map = svgEl(f, "feImage", { href: ringMap, x: 0, y: 0, width: 0, height: 0, preserveAspectRatio: "none", result: "map" });
+      inst.disp = svgEl(f, "feDisplacementMap", {
+        in: "SourceGraphic",
+        in2: "map",
+        scale: 0,
+        xChannelSelector: "R",
+        yChannelSelector: "G"
+      });
+    }
+  }
+  function apply(inst) {
+    const node = inst.el;
+    const p = inst.params;
+    for (const name in p) node.style.setProperty("--ak-fx-" + inst.id + "-" + name, String(p[name]));
+    if (inst.backdrop) node.setAttribute("data-ak-fx-backdrop", "");
+    else node.removeAttribute("data-ak-fx-backdrop");
+    if (SVG_ENGINES[inst.id]) {
+      buildFilter(inst);
+      node.style.setProperty("--ak-fx-filter", filterRef(inst.filterId));
+    }
+  }
+  function ramp2(inst, ms, fn, done) {
+    const t0 = performance.now();
+    const step = function(now2) {
+      inst.raf = 0;
+      if (inst.destroyed) return;
+      const f = Math.min(1, (now2 - t0) / ms);
+      fn(f);
+      if (f < 1) inst.raf = requestAnimationFrame(step);
+      else done();
+    };
+    fn(0);
+    inst.raf = requestAnimationFrame(step);
+  }
+  function flickerFrames(ref) {
+    return [
+      { filter: ref, offset: 0 },
+      { filter: "none", offset: 0.32 },
+      { filter: ref, offset: 0.46 },
+      { filter: "none", offset: 0.64 },
+      { filter: ref, offset: 0.78 },
+      { filter: "none", offset: 1 }
+    ];
+  }
+  function glitchBands(node, p, dur) {
+    const tops = [0.18, 0.61];
+    for (let i = 0; i < 2; i++) {
+      const band = document.createElement("span");
+      band.className = "ak-fx__glitch-band";
+      band.setAttribute("aria-hidden", "true");
+      band.style.setProperty("--ak-fx-band-top", (tops[i] * 100).toFixed(1) + "%");
+      band.style.setProperty("--ak-fx-band-h", (4 + 8 * p.strength).toFixed(1) + "%");
+      node.appendChild(band);
+      const dir = i ? -1 : 1;
+      const a = band.animate(
+        [{ transform: "translateX(" + dir * -100 + "%)" }, { transform: "translateX(" + dir * 100 + "%)" }],
+        { duration: dur, easing: "steps(6, end)", delay: i * dur * 0.15 }
+      );
+      const gone = function() {
+        if (band.parentNode) band.parentNode.removeChild(band);
+      };
+      a.addEventListener("finish", gone);
+      a.addEventListener("cancel", gone);
+    }
+  }
+  function trackBand(node) {
+    const band = document.createElement("span");
+    band.className = "ak-fx__band";
+    band.setAttribute("aria-hidden", "true");
+    node.appendChild(band);
+    const gone = function() {
+      if (band.parentNode) band.parentNode.removeChild(band);
+    };
+    band.addEventListener("animationend", gone);
+    band.addEventListener("animationcancel", gone);
+    setTimeout(gone, 2500);
+  }
+  function fx(target, spec) {
+    const s = spec || /** @type {any} */
+    {};
+    const id = String(s.id || "");
+    if (!/** @type {any} */
+    FX_PARAMS[id]) {
+      console.warn('aimeat-atelier: "' + id + '" is not an effect this kit ships (' + FX_IDS.join(", ") + ").");
+      return null;
+    }
+    if (id === "kaleidoscope") {
+      console.warn('aimeat-atelier: kaleidoscope folds the ambient layer (ambient({ post: ["kaleidoscope"] })); a page of words folded is unreadable by construction.');
+      return null;
+    }
+    injectStyle();
+    sweepOrphans();
+    const node = (
+      /** @type {HTMLElement} */
+      resolve(target)
+    );
+    const worn = INSTANCES.get(node) || {};
+    if (worn[id]) worn[id].handle.destroy();
+    const inst = {
+      el: node,
+      id,
+      params: fxParams(id, s.params),
+      // Only the filter-function engine may post-process what is behind the element.
+      backdrop: !!s.backdrop && id === "recolour",
+      filterId: uid("ak-fx-" + id),
+      disp: null,
+      map: null,
+      anim: null,
+      raf: 0,
+      playing: false,
+      destroyed: false
+    };
+    node.classList.add("ak-fx", "ak-fx-" + id);
+    if (STILLS[id]) node.classList.add("is-ak-fx-still");
+    apply(inst);
+    const onPalette = function() {
+      if (!inst.destroyed && inst.id === "duotone") apply(inst);
+    };
+    window.addEventListener("aimeat-theme-change", onPalette);
+    window.addEventListener("aimeat-palette-change", onPalette);
+    const lookHost = node.closest("[data-ak-look]");
+    const moLook = lookHost && id === "duotone" ? new MutationObserver(onPalette) : null;
+    if (moLook && lookHost) moLook.observe(lookHost, { attributes: true, attributeFilter: ["data-ak-look"] });
+    const moRoot = id === "duotone" ? new MutationObserver(onPalette) : null;
+    if (moRoot) moRoot.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "data-palette"] });
+    function settle3() {
+      inst.playing = false;
+      inst.anim = null;
+      if (inst.raf) cancelAnimationFrame(inst.raf);
+      inst.raf = 0;
+      node.classList.remove(PLAYING);
+      if (inst.id === "distort" && inst.disp) inst.disp.setAttribute("scale", String(inst.params.scale));
+      if (inst.id === "ripple" && inst.disp) inst.disp.setAttribute("scale", "0");
+    }
+    const handle2 = {
+      el: node,
+      id,
+      params() {
+        return Object.assign({}, inst.params);
+      },
+      /** @param {{ params?: Record<string, any>, backdrop?: boolean }} patch */
+      set(patch) {
+        if (!patch || inst.destroyed) return;
+        if (patch.params) inst.params = fxParams(id, Object.assign({}, inst.params, patch.params));
+        if ("backdrop" in patch) inst.backdrop = !!patch.backdrop && id === "recolour";
+        apply(inst);
+      },
+      /** @param {{ onDone?: () => void }} [opts] */
+      play(opts) {
+        if (inst.destroyed || !MOMENTS[id] || inst.playing || reducedMotion()) return false;
+        const p = inst.params;
+        const done = function() {
+          if (!inst.playing) return;
+          settle3();
+          if (opts && opts.onDone) opts.onDone();
+        };
+        inst.playing = true;
+        node.classList.add(PLAYING);
+        if (id === "distort") {
+          ramp2(inst, p.duration, function(f) {
+            if (inst.disp) inst.disp.setAttribute("scale", (p.scale * (1 + 1.4 * Math.sin(Math.PI * f))).toFixed(2));
+          }, done);
+        } else if (id === "ripple") {
+          const box = node.getBoundingClientRect();
+          const cx = box.width / 2;
+          const cy = box.height / 2;
+          const reach = Math.hypot(cx, cy) * 1.2;
+          ramp2(inst, 900 / p.speed, function(f) {
+            const r = Math.max(1, f * reach);
+            if (inst.map) {
+              inst.map.setAttribute("x", (cx - r).toFixed(1));
+              inst.map.setAttribute("y", (cy - r).toFixed(1));
+              inst.map.setAttribute("width", (2 * r).toFixed(1));
+              inst.map.setAttribute("height", (2 * r).toFixed(1));
+            }
+            if (inst.disp) inst.disp.setAttribute("scale", (p.amplitude * 48 * (1 - f)).toFixed(2));
+          }, done);
+        } else {
+          if (typeof node.animate !== "function") {
+            done();
+            return false;
+          }
+          const anim = node.animate(flickerFrames(filterRef(inst.filterId)), { duration: p.duration, easing: "step-end" });
+          inst.anim = anim;
+          anim.addEventListener("finish", done);
+          anim.addEventListener("cancel", done);
+          if (id === "glitch") glitchBands(node, p, p.duration);
+          else trackBand(node);
+        }
+        return true;
+      },
+      stop() {
+        if (inst.anim) {
+          const a = inst.anim;
+          inst.anim = null;
+          a.cancel();
+        }
+        settle3();
+      },
+      destroy() {
+        if (inst.destroyed) return;
+        handle2.stop();
+        inst.destroyed = true;
+        window.removeEventListener("aimeat-theme-change", onPalette);
+        window.removeEventListener("aimeat-palette-change", onPalette);
+        if (moLook) moLook.disconnect();
+        if (moRoot) moRoot.disconnect();
+        node.classList.remove("ak-fx-" + id);
+        if (inst.backdrop) node.removeAttribute("data-ak-fx-backdrop");
+        for (const name in inst.params) node.style.removeProperty("--ak-fx-" + id + "-" + name);
+        const f = document.getElementById(inst.filterId);
+        if (f && f.parentNode) f.parentNode.removeChild(f);
+        OWNERS.delete(inst.filterId);
+        if (MOMENTS[id]) {
+          for (const band of Array.prototype.slice.call(node.querySelectorAll(".ak-fx__band, .ak-fx__glitch-band"))) {
+            if (band.parentNode) band.parentNode.removeChild(band);
+          }
+        }
+        const rest = INSTANCES.get(node);
+        if (rest && rest[id] === inst) delete rest[id];
+        settleShared(node, rest);
+      }
+    };
+    inst.handle = handle2;
+    worn[id] = inst;
+    INSTANCES.set(node, worn);
+    return handle2;
+  }
+  function fxPlay(target, id, opts) {
+    if (!MOMENTS[id]) return false;
+    const node = resolve(target);
+    const worn = INSTANCES.get(node);
+    if (worn && worn[id]) {
+      if (opts && opts.params) worn[id].handle.set({ params: opts.params });
+      return worn[id].handle.play();
+    }
+    const inst = fx(node, { id, params: opts && opts.params });
+    if (!inst) return false;
+    const played = inst.play({ onDone: function() {
+      inst.destroy();
+    } });
+    if (!played) inst.destroy();
+    return played;
+  }
+
   // src/static/sdk-libs/atelier/ambient.js
   var NONE = "none";
   var WEATHER_ATTR = "data-ak-weather";
@@ -1702,6 +2452,22 @@
   function known(id) {
     return id === NONE || !!RENDERERS[id] || !!CSS_PRESETS[id];
   }
+  function normalizePost(want) {
+    if (!want) return [];
+    const list2 = Array.isArray(want) ? want : [want];
+    const out = [];
+    for (const item of list2) {
+      const id = typeof item === "string" ? item : item && typeof item === "object" ? String(item.id || "") : "";
+      if (!postById(id)) {
+        if (id) console.warn('aimeat-atelier: "' + id + '" is not a post pass this kit ships (' + POST_IDS.join(", ") + ").");
+        continue;
+      }
+      const given = item && typeof item === "object" ? item.params : null;
+      out.push({ id, params: fxParams(id, given) || {} });
+      if (out.length >= POST_MAX) break;
+    }
+    return out;
+  }
   function ambient(spec) {
     const s = spec || {};
     injectStyle();
@@ -1712,7 +2478,8 @@
       alpha: s.alpha == null ? void 0 : clamp(Number(s.alpha), BOUNDS.alpha),
       speed: s.speed == null ? void 0 : clamp(Number(s.speed), BOUNDS.speed),
       fps: s.fps > 0 ? Math.min(s.fps, MAX_FPS) : 0,
-      gl: s.gl !== false
+      gl: s.gl !== false,
+      post: normalizePost(s.post)
     };
     const seed = s.seed > 0 ? Math.floor(s.seed) : 1234567;
     const layer = el("div", {
@@ -1755,7 +2522,9 @@
       warned: false,
       resolveQueued: false,
       styleWait: 0,
-      styleWaiting: false
+      styleWaiting: false,
+      /** The post chain the surface was mounted with, so a changed chain remounts it. */
+      postKey: ""
     };
     function readToken(name) {
       return getComputedStyle(host).getPropertyValue(name).trim();
@@ -1827,6 +2596,10 @@
           su.off.width = 0;
           su.off.height = 0;
         }
+        if (su.buffers) for (const b of su.buffers) {
+          b.canvas.width = 0;
+          b.canvas.height = 0;
+        }
       }
       state.surface = null;
       state.w = 0;
@@ -1860,8 +2633,18 @@
         offCtx: null,
         rstate: null,
         gl: null,
-        glFailed: false
+        glFailed: false,
+        // The post chain: each pass with its clamped parameters and the state its setup returns;
+        // the buffers a chain of two hands from one pass to the next.
+        post: opts.post.map(function(p) {
+          return { id: p.id, pass: postById(p.id), params: p.params, state: null };
+        }),
+        buffers: (
+          /** @type {Array<{ canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D }>} */
+          []
+        )
       };
+      state.postKey = JSON.stringify(opts.post);
       state.fps = Math.min(opts.fps || FPS[preset] || MAX_FPS, MAX_FPS);
       size(true);
     }
@@ -1899,9 +2682,11 @@
       su.canvas.height = Math.round(h * dpr);
       const r = su.renderer;
       const rng = mulberry32(seed);
-      if (r.scale > 1) {
-        const ow = Math.max(1, Math.ceil(w / r.scale));
-        const oh = Math.max(1, Math.ceil(h / r.scale));
+      const scaled = r.scale > 1;
+      const hasPost = su.post.length > 0;
+      if (scaled || hasPost) {
+        const ow = scaled ? Math.max(1, Math.ceil(w / r.scale)) : w;
+        const oh = scaled ? Math.max(1, Math.ceil(h / r.scale)) : h;
         if (!su.off) {
           su.off = document.createElement("canvas");
           su.offCtx = su.off.getContext("2d");
@@ -1909,6 +2694,19 @@
         su.off.width = ow;
         su.off.height = oh;
         su.rstate = r.setup(ow, oh, state.palette, rng);
+        const needed = scaled ? su.post.length : Math.max(0, su.post.length - 1);
+        while (su.buffers.length < needed) {
+          const c = document.createElement("canvas");
+          su.buffers.push({ canvas: c, ctx: c.getContext("2d") });
+        }
+        for (const b of su.buffers) {
+          b.canvas.width = ow;
+          b.canvas.height = oh;
+        }
+        for (let i = 0; i < su.post.length; i++) {
+          const p = su.post[i];
+          p.state = p.pass.setup(ow, oh, mulberry32(seed + 11 * (i + 1)), p.params, state.palette, scaled ? r.scale : 1);
+        }
       } else {
         su.rstate = r.setup(w, h, state.palette, rng);
       }
@@ -1921,7 +2719,7 @@
     }
     function tryGl() {
       const su = state.surface;
-      if (!su || su.kind !== "canvas" || state.preset !== "waves" || !opts.gl || su.gl || su.glFailed) return;
+      if (!su || su.kind !== "canvas" || state.preset !== "waves" || !opts.gl || su.gl || su.glFailed || su.post.length) return;
       const fresh = (
         /** @type {HTMLCanvasElement} */
         el("canvas", { class: "ak-ambient__canvas" })
@@ -1949,17 +2747,36 @@
         su.gl.frame(t2);
       } else if (su.ctx) {
         const r = su.renderer;
-        if (r.scale > 1) {
-          r.frame(su.offCtx, su.rstate, t2, su.off.width, su.off.height, state.palette);
-          const ctx = su.ctx;
-          ctx.clearRect(0, 0, state.w, state.h);
-          ctx.save();
-          ctx.globalAlpha = PEAK[state.preset];
-          ctx.imageSmoothingEnabled = true;
-          ctx.drawImage(su.off, 0, 0, state.w, state.h);
-          ctx.restore();
-        } else {
+        const scaled = r.scale > 1;
+        if (!scaled && !su.post.length) {
           r.frame(su.ctx, su.rstate, t2, state.w, state.h, state.palette);
+        } else {
+          const ow = su.off.width;
+          const oh = su.off.height;
+          r.frame(su.offCtx, su.rstate, t2, ow, oh, state.palette);
+          let cur = su.off;
+          for (let i = 0; i < su.post.length; i++) {
+            const p = su.post[i];
+            const last = i === su.post.length - 1;
+            if (last && !scaled) {
+              su.ctx.clearRect(0, 0, state.w, state.h);
+              p.pass.pass(su.ctx, cur, p.state, t2, state.w, state.h, state.palette, p.params);
+              cur = null;
+            } else {
+              const b = su.buffers[i];
+              p.pass.pass(b.ctx, cur, p.state, t2, ow, oh, state.palette, p.params);
+              cur = b.canvas;
+            }
+          }
+          if (cur) {
+            const ctx = su.ctx;
+            ctx.clearRect(0, 0, state.w, state.h);
+            ctx.save();
+            ctx.globalAlpha = scaled ? PEAK[state.preset] : 1;
+            ctx.imageSmoothingEnabled = true;
+            ctx.drawImage(cur, 0, 0, state.w, state.h);
+            ctx.restore();
+          }
         }
       } else {
         return;
@@ -2050,6 +2867,8 @@
         state.preset = wanted;
         mountSurface(wanted);
         host.dispatchEvent(new CustomEvent("ak-ambient-preset", { bubbles: true, detail: { preset: wanted } }));
+      } else if (state.surface && state.surface.kind === "canvas" && JSON.stringify(opts.post) !== state.postKey) {
+        mountSurface(wanted);
       } else if (state.surface && state.surface.kind === "canvas") {
         size(true);
       }
@@ -2100,12 +2919,13 @@
       preset() {
         return state.preset;
       },
-      /** @param {{ preset?: string|null, alpha?: number|null, speed?: number|null, fps?: number, gl?: boolean }} patch */
+      /** @param {{ preset?: string|null, alpha?: number|null, speed?: number|null, fps?: number, gl?: boolean, post?: any }} patch */
       set(patch) {
         if (!patch || state.destroyed) return;
         if ("preset" in patch) opts.preset = patch.preset == null ? void 0 : String(patch.preset);
         if ("alpha" in patch) opts.alpha = patch.alpha == null ? void 0 : clamp(Number(patch.alpha), BOUNDS.alpha);
         if ("speed" in patch) opts.speed = patch.speed == null ? void 0 : clamp(Number(patch.speed), BOUNDS.speed);
+        if ("post" in patch) opts.post = normalizePost(patch.post);
         if ("fps" in patch) {
           opts.fps = patch.fps > 0 ? Math.min(patch.fps, MAX_FPS) : 0;
           if (state.preset !== NONE && !CSS_PRESETS[state.preset]) {
@@ -2138,7 +2958,10 @@
           alpha: state.alpha,
           alphaSource: state.alphaSource,
           speed: state.speed,
-          level: weatherLevel()
+          level: weatherLevel(),
+          post: su && su.post ? su.post.map(function(p) {
+            return p.id;
+          }) : []
         };
       },
       destroy() {
@@ -2165,7 +2988,7 @@
   // src/static/sdk-libs/atelier/ambient-parts.js
   var LEVELS2 = ["off", "calm", "full"];
   var WORDS = { off: "ambientOff", calm: "ambientCalm", full: "ambientFull" };
-  var SVG_NS = "http://www.w3.org/2000/svg";
+  var SVG_NS2 = "http://www.w3.org/2000/svg";
   function ambientStage(spec) {
     const s = spec || {};
     injectStyle();
@@ -2183,18 +3006,19 @@
       preset: s.preset == null ? null : s.preset,
       alpha: s.alpha,
       speed: s.speed,
-      gl: s.gl
+      gl: s.gl,
+      post: s.post
     });
     enter(body);
     return {
       el: root,
       body,
       ambient: sky,
-      /** @param {{ preset?: string|null, alpha?: number|null, speed?: number|null, look?: string }} patch */
+      /** @param {{ preset?: string|null, alpha?: number|null, speed?: number|null, post?: any, look?: string }} patch */
       set(patch) {
         if (!patch) return;
         if (patch.look != null) root.setAttribute("data-ak-look", patch.look);
-        if ("preset" in patch || "alpha" in patch || "speed" in patch) sky.set(patch);
+        if ("preset" in patch || "alpha" in patch || "speed" in patch || "post" in patch) sky.set(patch);
       },
       destroy() {
         sky.destroy();
@@ -2203,12 +3027,12 @@
     };
   }
   function waveIcon() {
-    const svg6 = document.createElementNS(SVG_NS, "svg");
+    const svg6 = document.createElementNS(SVG_NS2, "svg");
     svg6.setAttribute("viewBox", "0 0 20 20");
     svg6.setAttribute("class", "ak-weather__icon");
     svg6.setAttribute("aria-hidden", "true");
     for (const y of [5, 10, 15]) {
-      const p = document.createElementNS(SVG_NS, "path");
+      const p = document.createElementNS(SVG_NS2, "path");
       p.setAttribute("class", "ak-weather__wave");
       p.setAttribute("d", "M2 " + y + " c2 -2.4 4 -2.4 6 0 s4 2.4 6 0 s2 -1.6 4 -1.4");
       svg6.appendChild(p);
@@ -2403,7 +3227,7 @@
   // src/static/sdk-libs/atelier/shell.js
   var BOOT_POLL_MS = 300;
   var SIGNIN_GRACE_MS = 2500;
-  var SVG_NS2 = "http://www.w3.org/2000/svg";
+  var SVG_NS3 = "http://www.w3.org/2000/svg";
   var MOTION_ATTR2 = "data-ak-motion";
   var MODE_BUTTON = "#aimeat-mode-switch button[data-mode]";
   function motionLabel() {
@@ -2411,7 +3235,7 @@
     return said === "lessMotion" ? "Less motion" : said;
   }
   function motionIcon() {
-    const svg6 = document.createElementNS(SVG_NS2, "svg");
+    const svg6 = document.createElementNS(SVG_NS3, "svg");
     svg6.setAttribute("viewBox", "0 0 24 24");
     svg6.setAttribute("width", "18");
     svg6.setAttribute("height", "18");
@@ -2420,10 +3244,10 @@
     svg6.setAttribute("stroke-width", "2");
     svg6.setAttribute("stroke-linecap", "round");
     svg6.setAttribute("aria-hidden", "true");
-    const lines = document.createElementNS(SVG_NS2, "path");
+    const lines = document.createElementNS(SVG_NS3, "path");
     lines.setAttribute("class", "ak-app__motion-lines");
     lines.setAttribute("d", "M4 7h15M4 12h11M4 17h7");
-    const slash = document.createElementNS(SVG_NS2, "path");
+    const slash = document.createElementNS(SVG_NS3, "path");
     slash.setAttribute("class", "ak-app__motion-slash");
     slash.setAttribute("d", "M20 4 5 20");
     svg6.appendChild(lines);
@@ -2441,7 +3265,8 @@
         alpha: want.alpha,
         speed: want.speed,
         fps: want.fps,
-        gl: want.gl
+        gl: want.gl,
+        post: want.post
       };
     }
     return { preset: null };
@@ -2527,7 +3352,7 @@
         weatherCtl.el.classList.add("ak-app__weather");
         bar.insertBefore(weatherCtl.el, motionBtn);
       } else {
-        sky.set(Object.assign({ preset: null, alpha: null, speed: null }, ambientSpec(want)));
+        sky.set(Object.assign({ preset: null, alpha: null, speed: null, post: null }, ambientSpec(want)));
       }
       syncWeather();
     }
@@ -2847,11 +3672,12 @@
     const actions = el("div", { class: "ak-hero__actions" });
     const inner = el("div", { class: "ak-hero__inner" }, [title, sub, actions]);
     const scrim = el("span", { class: "ak-hero__scrim", "aria-hidden": "true" });
+    const image = el("span", { class: "ak-hero__image", "aria-hidden": "true" });
     const root = el("div", {
       class: "ak-root ak-hero",
       "data-ak-hero": true,
       "aria-labelledby": titleId
-    }, [scrim, inner]);
+    }, [image, scrim, inner]);
     const layer = imageLayer(spec.image);
     if (layer) {
       root.style.setProperty("--ak-hero-image", layer);
@@ -4247,9 +5073,9 @@
   }
 
   // src/static/sdk-libs/atelier/chart-core.js
-  var SVG_NS3 = "http://www.w3.org/2000/svg";
+  var SVG_NS4 = "http://www.w3.org/2000/svg";
   function svg(name, attrs) {
-    const node = document.createElementNS(SVG_NS3, name);
+    const node = document.createElementNS(SVG_NS4, name);
     for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
     return node;
   }
@@ -4414,7 +5240,7 @@
       node.appendChild(label);
     }
     ctx.root.appendChild(node);
-    const ramp = el("figcaption", { class: "ak-chart__ramp" }, [
+    const ramp3 = el("figcaption", { class: "ak-chart__ramp" }, [
       el("span", { text: t("heatLess") }),
       ...[0.15, 0.43, 0.71, 1].map((o) => {
         const sw = el("span", { class: "ak-chart__rampcell" });
@@ -4423,7 +5249,7 @@
       }),
       el("span", { text: t("heatMore") })
     ]);
-    ctx.root.appendChild(ramp);
+    ctx.root.appendChild(ramp3);
   }
   function renderScatter(ctx, data) {
     const points = (data && Array.isArray(data.points) ? data.points : []).filter((p) => p && typeof p.x === "number" && typeof p.y === "number");
@@ -5118,9 +5944,9 @@
   var W2 = 720;
   var H2 = 420;
   var PAD2 = 46;
-  var SVG_NS4 = "http://www.w3.org/2000/svg";
+  var SVG_NS5 = "http://www.w3.org/2000/svg";
   function svg2(name, attrs) {
-    const node = document.createElementNS(SVG_NS4, name);
+    const node = document.createElementNS(SVG_NS5, name);
     for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
     return node;
   }
@@ -5223,9 +6049,9 @@
   // src/static/sdk-libs/atelier/waveform.js
   var W3 = 720;
   var H3 = 120;
-  var SVG_NS5 = "http://www.w3.org/2000/svg";
+  var SVG_NS6 = "http://www.w3.org/2000/svg";
   function svg3(name, attrs) {
-    const node = document.createElementNS(SVG_NS5, name);
+    const node = document.createElementNS(SVG_NS6, name);
     for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
     return node;
   }
@@ -6023,7 +6849,7 @@
     const field = el("div", { class: "ak-mosaic__field" });
     const cam = { x: 0, y: 0, scale: 0.6 };
     let focused = null;
-    function apply() {
+    function apply2() {
       field.style.transform = "translate(" + cam.x + "px," + cam.y + "px) scale(" + cam.scale + ")";
     }
     const viewport = el("div", { class: "ak-mosaic__canvas" }, field);
@@ -6091,7 +6917,7 @@
       cam.x += ev.clientX - drag2.x;
       cam.y += ev.clientY - drag2.y;
       drag2 = { x: ev.clientX, y: ev.clientY };
-      apply();
+      apply2();
     });
     viewport.addEventListener("pointerup", function() {
       drag2 = null;
@@ -6106,7 +6932,7 @@
       cam.x = px - (px - cam.x) * (next / cam.scale);
       cam.y = py - (py - cam.y) * (next / cam.scale);
       cam.scale = next;
-      apply();
+      apply2();
     }, { passive: false });
     function zoomBtn(label, aria, factor) {
       return el("button", {
@@ -6121,7 +6947,7 @@
               cam.x = 0;
               cam.y = 0;
             }
-            apply();
+            apply2();
           }
         }
       }, label);
@@ -6131,7 +6957,7 @@
       zoomBtn("⤢", t("fitView"), 0),
       zoomBtn("+", t("zoomIn"), CANVAS_STEP)
     ]);
-    apply();
+    apply2();
     return el("div", { class: "ak-mosaic__canvaswrap" }, [viewport, zoombar, focusHost]);
   }
 
@@ -6461,9 +7287,9 @@
   }
 
   // src/static/sdk-libs/atelier/ops.js
-  var SVG_NS6 = "http://www.w3.org/2000/svg";
+  var SVG_NS7 = "http://www.w3.org/2000/svg";
   function svg4(name, attrs) {
-    const node = document.createElementNS(SVG_NS6, name);
+    const node = document.createElementNS(SVG_NS7, name);
     for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
     return node;
   }
@@ -10805,9 +11631,9 @@
   }
 
   // src/static/sdk-libs/atelier/atlas.js
-  var SVG_NS7 = "http://www.w3.org/2000/svg";
+  var SVG_NS8 = "http://www.w3.org/2000/svg";
   function svg5(name, attrs) {
-    const node = document.createElementNS(SVG_NS7, name);
+    const node = document.createElementNS(SVG_NS8, name);
     for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
     return node;
   }
@@ -11113,7 +11939,13 @@
       }
       switch (block.component) {
         case "hero": {
-          alive.handles.push(hero({ target: into, title: p.title, sub: p.sub, image: p.image }));
+          const band = hero({ target: into, title: p.title, sub: p.sub, image: p.image });
+          alive.handles.push(band);
+          if (block.effect) {
+            const picture = band.el.classList.contains("ak-hero--image") ? band.el.querySelector(".ak-hero__image") : null;
+            const worn = fx(picture || band.el, block.effect);
+            if (worn) alive.handles.push(worn);
+          }
           return;
         }
         case "aide": {
@@ -11438,7 +12270,16 @@
     let viewerOverlay = spec.overlay || null;
     function applyViewerOverlay(layout, o) {
       if (!o) return layout;
-      const out = { v: layout.v, look: layout.look, nav: o.nav || layout.nav, tokens: layout.tokens, ambient: layout.ambient, meta: layout.meta, blocks: layout.blocks.slice() };
+      const out = {
+        v: layout.v,
+        look: layout.look,
+        nav: o.nav || layout.nav,
+        choreography: layout.choreography,
+        tokens: layout.tokens,
+        ambient: layout.ambient,
+        meta: layout.meta,
+        blocks: layout.blocks.slice()
+      };
       if (Array.isArray(o.hidden) && o.hidden.length) {
         out.blocks = out.blocks.filter(function(b) {
           return o.hidden.indexOf(b.id) < 0;
@@ -11473,7 +12314,7 @@
           ambientFromLayout = false;
         }
       } else if (wish) {
-        alive.handles.push(ambient({ target: root, preset: wish.preset, alpha: wish.alpha, speed: wish.speed }));
+        alive.handles.push(ambient({ target: root, preset: wish.preset, alpha: wish.alpha, speed: wish.speed, post: wish.post }));
       }
       root.setAttribute("data-ak-nav", layout.nav || "stack");
       root.setAttribute("data-ak-choreo", layout.choreography === "cinema" ? "cinema" : "still");
@@ -11520,6 +12361,10 @@
         }
         const unitEl = el("section", { class: "ak-mosaic__unit", "data-ak-block": block.id });
         buildBlock(block, unitEl);
+        if (block.effect) {
+          const worn = fx(unitEl, block.effect);
+          if (worn) alive.handles.push(worn);
+        }
         units.push({ el: unitEl, label: labelOf(block), block });
       }
       if (band.childNodes.length) root.appendChild(band);
@@ -12920,7 +13765,7 @@
   var animePromise2 = null;
   var animeOff2 = false;
   var LATE = 400;
-  var SVG_NS8 = "http://www.w3.org/2000/svg";
+  var SVG_NS9 = "http://www.w3.org/2000/svg";
   function ensureAnime2() {
     if (W5.anime && W5.anime.animate) return Promise.resolve(W5.anime);
     if (animePromise2) return animePromise2;
@@ -13390,11 +14235,11 @@
     if (o.path && typeof o.path !== "string") {
       path = o.path;
     } else if (typeof o.path === "string" && o.path.trim()) {
-      stage = document.createElementNS(SVG_NS8, "svg");
+      stage = document.createElementNS(SVG_NS9, "svg");
       stage.setAttribute("class", "ak-orbit__stage");
       stage.setAttribute("viewBox", o.viewBox || "0 0 100 100");
       stage.setAttribute("aria-hidden", "true");
-      path = document.createElementNS(SVG_NS8, "path");
+      path = document.createElementNS(SVG_NS9, "path");
       path.setAttribute("class", "ak-orbit__path");
       path.setAttribute("d", o.path);
       path.setAttribute("fill", "none");
@@ -14602,7 +15447,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.47.1",
+    version: "0.48.0",
     // ── Shell and navigation ──
     app,
     section,
@@ -14749,6 +15594,10 @@
     attract,
     setWeather,
     weatherLevel,
+    // ── The effects: still on the words, a moment on a cue, living only behind them (a post
+    //    pass on the ambient layer) ──
+    fx,
+    fxPlay,
     // ── Data ──
     form,
     table,

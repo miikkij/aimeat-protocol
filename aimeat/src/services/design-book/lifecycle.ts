@@ -20,6 +20,10 @@
  *   await seedDesignBook(storage, config);                    // server-bootstrap/service-init.ts
  *   scheduler.registerCoreHandler('designbook-aging', ...);   // services/core-jobs.ts
  * @version-history
+ *   v1.2.0 — 2026-09-05 — The nine EFFECTS are seeded published, each at its defaults where the
+ *     registry says it lands (the hero band, the figure, the layer) on the first look it fits;
+ *     the ambient seeds grow to nine with the generators, named
+ *     (wish-atelier-post-process-effects, stages 3 and 5).
  *   v1.1.0 — 2026-09-05 — The six AMBIENTS are seeded published beside the six leiskat
  *     (ambient-<preset>, each on the first look it fits at its shelf alpha), through the same
  *     bench: a fresh node's AMBIENT shelf is never an empty wall, and prod gets them on the
@@ -33,6 +37,8 @@ import { logger } from '../../utils/logger.js';
 import { systemGhiiFor } from '../compliance-register.js';
 import { UI_LAYOUT_PRESETS } from '../app-ui/layouts.js';
 import { AMBIENTS, type AtelierAmbient } from '../../data/atelier-ambients.js';
+import { EFFECTS, type AtelierEffect } from '../../data/atelier-effects.js';
+import { defaultEffectTarget } from './validate.js';
 import { DesignBookService, type DesignBookPart } from './service.js';
 import { DesignBookError, type PartKind } from './validate.js';
 
@@ -58,6 +64,9 @@ export async function seedDesignBook(storage: Storage, config: AimeatConfig): Pr
   // proves the combination on that look, so a registry entry the matrix refuses is logged
   // here and never lands, which doubles as a drift check.
   await seedParts(book, system, AMBIENTS.map(ambientSeed));
+  // The nine effects, each at its defaults where the registry says it lands (the hero band, the
+  // figure, or the layer) on the first look it fits: the bench proves the target and the knobs.
+  await seedParts(book, system, EFFECTS.map(effectSeed));
 }
 
 /** A part the node seeds: the same shape a proposal carries. */
@@ -101,6 +110,34 @@ function ambientSeed(a: AtelierAmbient): SeedPart {
   };
 }
 
+/** One seeded effect: the effect at its defaults, where it lands, on the first look it fits. */
+function effectSeed(e: AtelierEffect): SeedPart {
+  return {
+    id: `effect-${e.id}`,
+    kind: 'effect',
+    title: effectTitle(e.id),
+    summary: e.feel.slice(0, 240),
+    body: { effect: e.id, on: defaultEffectTarget(e.id), look: e.fitsLooks[0] },
+    tags: ['effect', 'seed'],
+  };
+}
+
+/** The gallery card name for a seeded effect — the effect, spoken. */
+function effectTitle(id: string): string {
+  const names: Record<string, string> = {
+    'scanlines': 'Scanlines',
+    'vignette': 'The vignette',
+    'duotone': 'Duotone',
+    'recolour': 'Recolour',
+    'distort': 'Rippled glass',
+    'glitch': 'The glitch',
+    'vhs': 'Worn tape',
+    'ripple': 'The ripple',
+    'kaleidoscope': 'The kaleidoscope',
+  };
+  return names[id] ?? id;
+}
+
 /** The gallery card name for a seeded ambient — the preset, spoken. */
 function ambientTitle(presetId: string): string {
   const names: Record<string, string> = {
@@ -110,6 +147,9 @@ function ambientTitle(presetId: string): string {
     'grid': 'The floor grid',
     'static': 'Static',
     'ink': 'Ink wash',
+    'plasma': 'Plasma',
+    'lava': 'The lava lamp',
+    'tunnel': 'The tunnel',
   };
   return names[presetId] ?? presetId;
 }

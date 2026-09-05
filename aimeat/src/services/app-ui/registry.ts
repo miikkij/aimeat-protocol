@@ -20,11 +20,17 @@
  *   APPEND-ONLY FROM THE FIRST STORED LAYOUT (decided 2026-08-27): a component's props may only
  *   gain entries; a breaking change is a NEW component id. Stored layouts outlive every runtime
  *   version.
- * @structure AppUiPropDef / AppUiComponentDef · NAV_MODES · LOOKS · UI_COMPONENTS ·
- *   componentById() · buildUiCatalogue()
+ * @structure AppUiPropDef / AppUiComponentDef · NAV_MODES · CHOREOGRAPHIES · BLOCK_SPANS · LOOKS ·
+ *   UI_COMPONENTS · SIGNATURE_TOKENS (re-exported) · componentById()
  * @usage
- *   import { UI_COMPONENTS, componentById, buildUiCatalogue } from './registry.js';
+ *   import { UI_COMPONENTS, componentById } from './registry.js';
+ *   import { buildUiCatalogue } from './catalogue.js';   // the catalogue reads this registry
  * @version-history
+ *   v1.21.0 — 2026-09-05 — Two pure moves under the 800-line cap (the file stood at 798, and the
+ *     effects round adds a shelf): SIGNATURE_TOKENS to signature-tokens.ts (re-exported here) and
+ *     buildUiCatalogue() to catalogue.ts (imported by its two doors from there, because a
+ *     re-export would close an import cycle). Nothing else changed
+ *     (wish-atelier-post-process-effects, stage 1).
  *   v1.20.0 — 2026-09-05 — THE AMBIENT SHELF (append-only, wish-atelier-ambient-visuals): the
  *     catalogue carries `ambients` — the six presets from the registry (atelier-ambients.ts),
  *     what each feels like, evokes, how it is drawn and proven, which looks it fits, its
@@ -95,10 +101,13 @@
  *     (TARGET-074 phase 2).
  */
 import type { BlockPropDef } from '../surface-layout/registry-types.js';
-import { LOOKS as LOOK_REGISTRY, STRUCTURES } from '../../data/atelier-looks.js';
-import { UI_LAYOUT_PRESETS, type AppUiLayoutPreset } from './layouts.js';
-import { PATTERNS } from '../../data/atelier-patterns.js';
-import { AMBIENTS } from '../../data/atelier-ambients.js';
+import { LOOKS as LOOK_REGISTRY } from '../../data/atelier-looks.js';
+// The signature tokens live in signature-tokens.ts since 2026-09-05 (a pure move under the
+// 800-line cap) and are re-exported here so every importer keeps the address it had. The
+// catalogue builder moved the same day to catalogue.ts, which imports from this file; it is NOT
+// re-exported, because that would be an import cycle, and its two doors import from there.
+import { SIGNATURE_TOKENS } from './signature-tokens.js';
+export { SIGNATURE_TOKENS };
 
 /** A mosaic prop: the shared grammar, plus whether a layout must supply it. */
 export type AppUiPropDef = BlockPropDef & {
@@ -626,173 +635,9 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
   },
 ];
 
-/**
- * The SIGNATURE TOKENS: the bounded `--ak-*` subset a layout may override to give one app its own
- * hand — colour, shape, typography, density and motion. COLOUR IS ONE TOKEN AND IT IS A PAIR:
- * measurement proved no single hex survives every palette in both modes (the house coral fails 32
- * light-mode checks and passes dark completely), so `--ak-accent` takes "light/dark" and the
- * validator runs the full contrast matrix per mode before accepting it — colour ships proven, not
- * on trust. Growing this list is append-only, and every other entry stays provable-safe by
- * construction (a radius cannot break contrast).
- */
-export const SIGNATURE_TOKENS: Record<string, string> = {
-  '--ak-accent': 'The signature colour, as a LIGHT/DARK PAIR "#hex/#hex" — the light-mode value first, the dark-mode value second, e.g. "#0e7c66/#e8564a". Both values run the full contrast matrix at validation, each against its own mode, and a pair that breaks readability anywhere refuses with the numbers. Every accent derivation (text tint, gradient, spectrum, focus ring) follows the pair.',
-  '--ak-radius': 'Corner rounding of cards and surfaces, e.g. "2px" for a sharp hand, "18px" for a soft one.',
-  '--ak-radius-sm': 'Corner rounding of rows and inputs.',
-  '--ak-radius-pill': 'Rounding of pills and chips.',
-  '--ak-gap': 'The grid gap between blocks.',
-  '--ak-pad': 'The base padding inside surfaces.',
-  '--ak-main-max': 'The content column width, e.g. "56rem" for a tight editorial measure.',
-  '--ak-font': 'The body face (a stack; the platform webfonts are already loaded).',
-  '--ak-font-display': 'The display face for titles and figures.',
-  '--ak-weight-display': 'The display weight, e.g. "900" for a heavy masthead.',
-  '--ak-text-hero': 'The hero title size, e.g. "clamp(2.2rem, 7vw, 4.4rem)".',
-  '--ak-kinetic': 'The masthead letter-throw: "letters" (each glyph arrives on the look\'s spring), "words", or "none". One kinetic headline per screen; the hero runs it, apps call nothing.',
-  '--ak-tilt': 'The playful tilt of cards and tiles, e.g. "1.2deg". "0deg" is calm.',
-  '--ak-motion': 'The base transition duration, e.g. "120ms" for a snappy hand.',
-  '--ak-ease': 'The curve every transition and entrance rides, e.g. "cubic-bezier(0.34, 1.56, 0.64, 1)" for a springy overshoot, "linear" for a machine hand.',
-  '--ak-enter-distance': 'How far content travels on entry, e.g. "0px" turns reveals off.',
-  '--ak-enter-stagger': 'The gap between one entering element and the next, e.g. "0ms" lands everything at once, "90ms" deals them like cards.',
-  '--ak-blur': 'The glass blur of the chrome, e.g. "0px" for solid chrome.',
-};
-
 const byId = new Map(UI_COMPONENTS.map((c) => [c.id, c]));
 
 /** The component, or undefined — the validator words the refusal. */
 export function componentById(id: string): AppUiComponentDef | undefined {
   return byId.get(id);
-}
-
-/**
- * The catalogue every read answers with: ids, summaries and full prop schemas, the nav modes
- * and looks, and the LAYOUT PRESETS — the whole vocabulary in one payload, so an AI asked to
- * change a layout never has to guess at names, and one asked to write a first layout starts
- * from a finished shape rather than from nothing.
- */
-export function buildUiCatalogue(): {
-  components: Array<{ id: string; summary: string; props: Record<string, AppUiPropDef>; max_per_layout?: number }>;
-  nav_modes: readonly string[];
-  choreographies: { values: readonly string[]; summary: string };
-  looks: readonly string[];
-  spans: { values: readonly string[]; summary: string };
-  look_sheets: Array<{ id: string; feel: string; structures: string[]; ambient: string }>;
-  structures: Array<{ id: string; summary: string }>;
-  layouts: readonly AppUiLayoutPreset[];
-  signature_tokens: { values: Record<string, string>; summary: string };
-  dialog: { tones: string[]; sizes: string[]; from: string[]; summary: string };
-  imagery: { summary: string };
-  patterns: {
-    summary: string;
-    recipes: Array<{
-      id: string;
-      looks_like: string;
-      evokes: string;
-      use: { ground?: string; prop?: string; zone?: string };
-      default_size: string;
-    }>;
-  };
-  ambients: {
-    summary: string;
-    presets: Array<{
-      id: string; feel: string; evokes: string; technique: string; proof: string;
-      fits_looks: string[]; default_alpha: number; default_speed: number; peak: number;
-    }>;
-  };
-} {
-  return {
-    components: UI_COMPONENTS.map((c) => ({
-      id: c.id,
-      summary: c.summary,
-      props: c.props,
-      ...(c.maxPerLayout !== undefined ? { max_per_layout: c.maxPerLayout } : {}),
-    })),
-    nav_modes: NAV_MODES,
-    choreographies: {
-      values: CHOREOGRAPHIES,
-      summary: 'How the page moves under the reader\'s hand. still: nothing scroll-driven. cinema: the opening band recedes and each section rises as it enters the view — right for fronts, stories and reports; wrong for a tool someone lives in.',
-    },
-    looks: LOOKS,
-    spans: {
-      values: BLOCK_SPANS,
-      summary: 'Optional per-block `span`: how much of the composition grid the block takes. '
-        + '`full` (the default) is the whole line; `main` + `side` side by side make the '
-        + 'asymmetric editorial split; two `half` blocks share a line. Narrow screens stack '
-        + 'everything, so a span is layout ambition, never a mobile risk.',
-    },
-    // The look data sheets: what each look feels like and which page structures it carries —
-    // enough for an AI to pick by intent instead of by trying them all.
-    look_sheets: LOOK_REGISTRY.map((l) => ({
-      id: l.id, feel: l.feel, structures: l.structures,
-      // The layer this look runs at idle, from its own token — the one place the answer lives.
-      ambient: l.tokens['--ak-ambient'] ?? 'none',
-    })),
-    structures: STRUCTURES.map((s) => ({ id: s.id, summary: s.summary })),
-    layouts: UI_LAYOUT_PRESETS,
-    signature_tokens: {
-      values: SIGNATURE_TOKENS,
-      summary: 'Optional top-level `tokens`: the app\'s SIGNATURE — bounded overrides of colour, '
-        + 'shape, typography, density and motion, applied on top of the look. Only the names '
-        + 'listed here are legal. The one colour door is --ak-accent as a light/dark pair '
-        + '"#hex/#hex", proven by the full contrast matrix at validation — every other colour '
-        + 'derives from it. The design pass: propose two or three token-sets as whole layouts, '
-        + 'dry-run each, show the owner, store the one they pick.',
-    },
-    dialog: {
-      tones: ['plain', 'danger', 'celebrate', 'ai'],
-      sizes: ['compact', 'roomy', 'wide'],
-      from: ['center', 'bottom'],
-      summary: 'Optional top-level `dialog`: this arrangement is the INSIDE OF A MODAL rather '
-        + 'than a screen — { title?, tone?, size?, from? }. The tone says what kind of moment it '
-        + 'is before a word is read (plain, danger, celebrate, ai), the size how much room it '
-        + 'takes, and from whether it arrives centred or up from the bottom edge for a phone. '
-        + 'Open it with AIMEAT.atelier.dialog({ layout, sources, ...the shape }); the buttons and '
-        + 'when it opens stay your app\'s. A dialog SHAPE travels through the Design Book like '
-        + 'any other arrangement.',
-    },
-    imagery: {
-      summary: 'Optional top-level `imagery`: art direction for the imagery pipeline as data — '
-        + '{ style: "the illustration prompt fragment", palette_words?: "colour words" }. '
-        + 'Builders and the Design Book\'s illustration parts write it; image generation reads it.',
-    },
-    patterns: {
-      summary: 'The pattern shelf (patterns.css): gradient-built background recipes on the '
-        + '--ak-* tokens, technique after Temani Afif\'s CSS-Pattern (MIT). Class is '
-        + '.ak-pat-<id> plus ONE volume: .ak-pat--ground (a whole page stands on it, body text '
-        + 'proven readable), .ak-pat--prop (one object\'s texture — a chip, an edge, an empty '
-        + 'state), .ak-pat--zone (full ink, ONE banner or divider per screen, words only inside '
-        + 'solid chips; -2/-3 take the spectrum colours, -ink goes monochrome). Tile size: '
-        + '--ak-pat-size on the element. Both text-bearing volumes are proven by the contrast '
-        + 'matrix (AK-PAT) in every look × palette × mode.',
-      recipes: PATTERNS.map((p) => ({
-        id: p.id,
-        looks_like: p.looksLike,
-        evokes: p.evokes,
-        use: p.use,
-        default_size: p.defaultSize,
-      })),
-    },
-    ambients: {
-      summary: 'The ambient shelf: the one layer allowed to move at idle, behind the app. '
-        + 'THE LOOK DECIDES — each look sheet says which preset it runs (`ambient`, or none), '
-        + 'and an arrangement overrides with an optional top-level `ambient`: { preset, alpha?, '
-        + 'speed? }, or { preset: "none" } to switch the look\'s own off. A field preset (it lays '
-        + 'pigment under the words) is proven by the contrast matrix at peak × alpha: on a look '
-        + 'that stands on the palette\'s own page it may run only at the whisper (alpha at or '
-        + 'below the preset\'s default), while a world that owns its ground (lounge, dawn, stage, '
-        + 'broadcast) runs it as loud as the ink allows. The layer pauses on a hidden tab, stills '
-        + 'under Less motion and reduced motion, and the viewer\'s weather switch (Off, Calm, '
-        + 'Full) always wins. One per app; a tool someone lives in usually wants none.',
-      presets: AMBIENTS.map((a) => ({
-        id: a.id,
-        feel: a.feel,
-        evokes: a.evokes,
-        technique: a.technique,
-        proof: a.proof,
-        fits_looks: a.fitsLooks,
-        default_alpha: a.defaultAlpha,
-        default_speed: a.defaultSpeed,
-        peak: a.peak,
-      })),
-    },
-  };
 }

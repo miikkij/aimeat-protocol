@@ -34,6 +34,11 @@
  *   const book = new DesignBookService(storage, config);
  *   const out = await book.propose(callerGaii, raw, provenance);
  * @version-history
+ *   v1.4.0 — 2026-09-05 — The EFFECT kind (wish-atelier-post-process-effects, stage 5): the
+ *     propose bench is named effect-valid (no words sit under a hero band, a figure or the
+ *     layer, so the matrix runs at the write that lands it on words); adopt MERGES the effect
+ *     onto the first block of the component it names, or as a pass on the arrangement's ambient
+ *     (the newest two kept), and refuses with words when there is no such block or no layer.
  *   v1.3.0 — 2026-09-05 — The AMBIENT kind in the lifecycle (wish-atelier-ambient-visuals):
  *     propose stamps ambient-valid and contrast-matrix (plus tokens-valid when a sheet rides
  *     along); adopt MERGES the layer as the arrangement's `ambient` and its tokens, never its
@@ -60,6 +65,7 @@ import {
   DesignBookError, validatePartInput, PART_STATUSES,
   type PartInput, type PartKind, type PartStatus,
 } from './validate.js';
+import { POST_MAX } from '../../data/atelier-effects.js';
 
 export const PART_KEY_PREFIX = 'atelier.book.part.';
 export const USAGE_KEY_PREFIX = 'atelier.book.usage.';
@@ -75,6 +81,15 @@ function proposeChecksFor(input: PartInput): string[] {
   if (input.kind === 'ambient') {
     // The ambient bench always runs the matrix: the preset is proven on the part's look.
     const checks = ['ambient-valid', 'contrast-matrix'];
+    const tokens = (input.body as { tokens?: Record<string, string> }).tokens;
+    if (tokens && Object.keys(tokens).length > 0) checks.push('tokens-valid');
+    return checks;
+  }
+  if (input.kind === 'effect') {
+    // The effect bench proves the target and the knobs; no words sit under a hero band, a
+    // figure or the layer, so the matrix has nothing to measure until the effect lands on
+    // words in an arrangement, where the layout validator runs it.
+    const checks = ['effect-valid'];
     const tokens = (input.body as { tokens?: Record<string, string> }).tokens;
     if (tokens && Object.keys(tokens).length > 0) checks.push('tokens-valid');
     return checks;
@@ -106,7 +121,7 @@ export interface DesignBookPart {
       ran: boolean; passed?: boolean; reason?: string; at: string;
       viewports?: Array<{
         viewport: string; overflow_px: number; units_rendered: number; controls_below_touch_min: number;
-        ambient_layers?: number; ambient_painted?: number;
+        ambient_layers?: number; ambient_painted?: number; fx_applied?: number; fx_running?: number;
       }>;
     };
   };
@@ -332,15 +347,39 @@ export class DesignBookService {
         `A genre is forked, not adopted: fetch GET /v1/app-templates/${tid} , swap the words and sources for your app, and publish it as its own file. The Book shows it; the template registry hands it over.`, 409);
     }
     let nextLayout: unknown = part.body;
-    if (part.kind === 'look' || part.kind === 'motion' || part.kind === 'illustration' || part.kind === 'ambient') {
+    if (part.kind === 'look' || part.kind === 'motion' || part.kind === 'illustration' || part.kind === 'ambient' || part.kind === 'effect') {
       const current = await apps.read(app.ownerGaii, filename);
       if (!current.layout) {
         throw new DesignBookError('NO_LAYOUT',
           `"${filename}" has no stored arrangement to adopt a ${part.kind} into. Adopt a layout or fill first (or store one with the ui set tool), then season it.`
-          + (part.kind === 'ambient' ? ' An app with no stored arrangement can still carry an ambient in its own code: app({ ambient: "<preset>" }).' : ''), 409);
+          + (part.kind === 'ambient' ? ' An app with no stored arrangement can still carry an ambient in its own code: app({ ambient: "<preset>" }).' : '')
+          + (part.kind === 'effect' ? ' An app with no stored arrangement can still wear an effect in its own code: AIMEAT.atelier.fx(el, { id }).' : ''), 409);
       }
       if (part.kind === 'illustration') {
         nextLayout = { ...current.layout, imagery: part.body };
+      } else if (part.kind === 'effect') {
+        // The effect lands where the part says: as a pass on the arrangement's ambient (which
+        // must be running one), or on the first block of the target component. No target
+        // refuses with words rather than landing somewhere else; the write re-proves it there.
+        const body = part.body as { effect: string; params?: Record<string, number | string>; on: 'hero' | 'figure' | 'layer' };
+        const spec = { id: body.effect, ...(body.params ? { params: body.params } : {}) };
+        if (body.on === 'layer') {
+          const layer = current.layout.ambient;
+          if (!layer || layer.preset === 'none') {
+            throw new DesignBookError('NO_TARGET',
+              `"${filename}" runs no ambient, and a pass runs over the layer's own field: adopt an ambient first (the Book's ambient shelf), then this pass.`, 409);
+          }
+          const rest = (layer.post ?? []).filter((p) => (typeof p === 'string' ? p : p.id) !== body.effect);
+          nextLayout = { ...current.layout, ambient: { ...layer, post: [...rest, spec].slice(-POST_MAX) } };
+        } else {
+          const blocks = current.layout.blocks;
+          const idx = blocks.findIndex((b) => b.component === body.on);
+          if (idx < 0) {
+            throw new DesignBookError('NO_TARGET',
+              `"${filename}" has no ${body.on} block for this effect to land on. Add one (or adopt a layout that has it), then adopt the effect.`, 409);
+          }
+          nextLayout = { ...current.layout, blocks: blocks.map((b, i) => (i === idx ? { ...b, effect: spec } : b)) };
+        }
       } else if (part.kind === 'ambient') {
         // The layer lands as the arrangement's `ambient` and the sheet merges; the part's look
         // says where it was proven and previewed, and never overwrites the app's own.
