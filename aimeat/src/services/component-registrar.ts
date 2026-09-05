@@ -44,6 +44,8 @@ import type { Storage, PackageComponentType, CortexComponent } from '../storage/
 import { logger } from '../utils/logger.js';
 import { parseBundledCrews } from './app-bundled-crews.js';
 import { validateCortexAgents } from '../models/crew-def-schemas.js';
+import { publishApp } from './app-publish.js';
+import { forgetDependencies, appRef } from './dependency-map.js';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -70,6 +72,18 @@ export interface ComponentRegistrationInput {
   packageCategory?: string;
   packageTags?: string[];
   packageDescription?: string;
+  /**
+   * The component's own metadata from the package. For an app, `meta.app` carries the name, icon,
+   * category and tags it was published under, so the installed copy looks like itself instead of
+   * "Installed from package". Absent on a package written before the field existed, and then the
+   * package-level fallbacks below are what an app gets, exactly as before.
+   */
+  meta?: Record<string, unknown>;
+  /**
+   * WHO pressed install, for the audit trail and the provenance stamp on an app component. Falls
+   * back to the owner's own identity, which is what a self-install is.
+   */
+  callerGaii?: string;
   /**
    * URL rewrites applied to app HTML content at install time. Built by the
    * installer from already-registered cortex/extension components in the same
@@ -416,28 +430,54 @@ export async function registerComponent(
           }
           cortex = { agents: checked.agents as unknown as Record<string, unknown>[] };
         }
-        await storage.createApp({
-          ownerGaii,
+
+        // THROUGH THE SAME DOOR AS AN ORDINARY PUBLISH. This used to call storage.createApp with a
+        // synthesised manifest, which meant a package-installed app skipped the artifact lint, the
+        // AI-posture lint, the data-map stamp, the provenance mint, its own address and the
+        // dependency map — a second implementation of publishing, and the reason registeredNameFor
+        // had to grow a `.html` workaround. publishApp does all of it, and returns a refusal rather
+        // than throwing, so the installer's existing reverse rollback handles a bad component.
+        //
+        // The rewrite and the crew parse stay ABOVE, in that order: the rewrite has to happen before
+        // the crews are read, so an `ext:<name>` inside a crew prompt points at this instance's copy.
+        const app = (input.meta?.app ?? {}) as Record<string, unknown>;
+        const published = await publishApp(storage, input.config, {
           ownerName: owner,
+          ownerGhii: ownerGaii,
+          callerGaii: input.callerGaii ?? ownerGaii,
           filename: registeredAs,
-          versionNumber: 1,
-          manifest: {
-            name: label,
-            description: input.packageDescription
-              ? `${label} -- ${input.packageDescription}`
-              : `Installed from package: ${packageName}`,
-            version: '1.0.0',
-            category: input.packageCategory || 'utility',
-            tags: [...(input.packageTags || []), 'package-installed'],
-            authorDisplay: owner,
-            usesCortex: [],
-            ...(cortex ? { cortex } : {}),
-          },
-          mimeType: 'text/html',
-          size: Buffer.byteLength(rewritten, 'utf-8'),
           data: Buffer.from(rewritten, 'utf-8'),
-          createdAt: now,
+          mimeType: 'text/html',
+          requested: {
+            // The component's own metadata first; the package-level values are the fallback, which
+            // is what every package written before `meta` existed still gets.
+            name: (app.name as string) || label,
+            description: (app.description as string)
+              || (input.packageDescription ? `${label} -- ${input.packageDescription}` : `Installed from package: ${packageName}`),
+            descriptions: app.descriptions as Record<string, string> | undefined,
+            version: (app.version as string) || '1.0.0',
+            category: (app.category as string) || input.packageCategory || 'utility',
+            tags: [...((app.tags as string[]) ?? input.packageTags ?? []), 'package-installed'],
+            icon: app.icon as string | undefined,
+            // The rewritten source is what the dependency map reads; a stale declared list from the
+            // author's node would name cortexes under names this instance does not use.
+            usesCortex: [],
+            ...(cortex ? { cortexAgents: cortex.agents } : {}),
+          },
+          accessCode: { mode: 'carry' },
+          source: 'package-install',
         });
+
+        if ('refusal' in published) {
+          return {
+            success: false,
+            componentId,
+            registeredAs,
+            // Verbatim, so a quota ceiling or a broken artifact says which it was instead of
+            // "component failed".
+            error: `${published.refusal.code}: ${published.refusal.message}`,
+          };
+        }
         break;
       }
 
@@ -571,8 +611,23 @@ export async function deleteComponent(
         }
         return await storage.deleteCortexExtension(registeredAs);
       }
-      case 'app':
+      case 'app': {
+        // Three things are created for an app now that it goes through publishApp, and deleting the
+        // rows alone left two of them behind: a subdomain still pointing at a target that no longer
+        // exists, and dependency edges naming an app nobody can open. Both are visible in the
+        // rollback path, which is where a half-installed package ends up.
+        const ownerName = ownerGaii.split('@')[0] ?? ownerGaii;
+        await forgetDependencies(storage, 'app', appRef(ownerName, registeredAs));
+
+        const target = `${ownerName}/${registeredAs}`;
+        for (const site of await storage.listSubdomainSites()) {
+          if (site.kind === 'app' && site.target === target) {
+            await storage.deleteSubdomainSite(site.subdomain);
+          }
+        }
+
         return await storage.deleteApp(ownerGaii, registeredAs);
+      }
       case 'msm':
         return await storage.deleteMsm(registeredAs);
       case 'memory': {

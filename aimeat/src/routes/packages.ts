@@ -53,6 +53,7 @@ import {
 import {
   listPackagesFor, getPackageFor, getPackageVersionFor, listPackageVersionsFor,
 } from '../services/package-read.js';
+import { composePackageFromApps } from '../services/package-compose.js';
 
 /** Generate a date-based version string: v{YYYY}-{MM}-{DD}-{HHmm} */
 function generateVersion(): string {
@@ -81,6 +82,44 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
   router.get('/v1/packages/tab', requireAuth(), requireRole('owner'), async (req, res) => {
     const data = await packagesTabDb.overview(req.auth!.owner as string);
     res.json(success(config.nodeId, data));
+  });
+
+  // POST /v1/packages/compose — build a package out of apps this owner already published.
+  //
+  // Registered with the static routes, before anything parameterized, so "compose" is never read as
+  // a group id. The node already knows what each app loads (the dependency map reads it from the
+  // source at publish time), so the caller names apps and nothing else.
+  router.post('/v1/packages/compose', requireAuth(), requireScope('packages:write'), async (req, res) => {
+    const owner = req.auth!.owner;
+    const roles = req.auth!.roles;
+
+    const createRole = config.packageCreateRole ?? 'owner';
+    if (!roles.includes('operator') && createRole === 'operator') {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only operators can create packages'));
+      return;
+    }
+
+    const {
+      name, apps, description, category, tags, visibility, status,
+      include_cortex: includeCortex, allow_expectations: allowExpectations,
+    } = req.body ?? {};
+
+    const ownerGhii = await resolveGhii(storage, owner, req.auth!.sub);
+    const out = await composePackageFromApps({ storage, config }, { owner, sub: req.auth!.sub, ownerGhii }, {
+      name, apps, description, category, tags, visibility, status,
+      includeCortex, allowExpectations,
+    });
+    if (!out.ok) {
+      res.status(out.status).json(error(config.nodeId, out.code, out.message));
+      return;
+    }
+
+    res.status(201).json(success(config.nodeId, {
+      ...out.package, expects: out.expects, notes: out.notes,
+    }, [
+      { description: 'Install it', method: 'POST', url: `/v1/packages/${encodeURIComponent(out.package.packageGroupId)}/install` },
+      { description: 'Make it public', method: 'PATCH', url: `/v1/packages/${encodeURIComponent(out.package.packageGroupId)}` },
+    ]));
   });
 
   // POST /v1/packages/import — import from ZIP bundle
@@ -204,6 +243,9 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
         content: c.content ?? '',
         contentHash: c.contentHash ?? hashContent(c.content ?? ''),
         dependencies: c.dependencies ?? [],
+        // Carried through, so an app that was packaged with its own name and icon still has them
+        // after a download and an upload. parseZip admits `meta` only as a plain object.
+        ...(c.meta && Object.keys(c.meta).length > 0 ? { meta: c.meta } : {}),
       }));
 
       const record: PackageRecord = {

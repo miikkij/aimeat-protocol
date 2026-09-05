@@ -80,6 +80,26 @@ export const packagesTools: AimeatToolDefinition[] = [
         },
     },
     {
+        // Authoring a package by hand meant pasting every app's source, naming its cortexes and
+        // getting the dependency order right, which is why the only packages on a node were the ones
+        // it seeds itself. The node already knows what each app loads, so the caller names apps.
+        name: 'aimeat_package_compose',
+        description: 'Make a package out of apps you already published, with the cortexes they load. Names what the installing node must supply itself.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            name: { type: 'string', required: true, description: 'Package name. With your owner name it forms the group id.' },
+            apps: { type: 'array', required: true, description: 'Filenames of your own apps, e.g. ["shop.html", "admin.html"]. At least one.' },
+            description: { type: 'string', description: 'What the package is for.' },
+            category: { type: 'string', description: 'Category for the package gallery.' },
+            tags: { type: 'array', description: 'Tags for search.' },
+            visibility: { type: 'string', enum: ['private', 'public'], description: 'Who may install it. Defaults to private.' },
+            status: { type: 'string', enum: ['draft', 'published', 'archived'], description: 'Defaults to published, so you can install it at once.' },
+            include_cortex: { type: 'boolean', description: 'Package the cortexes you installed yourself. Default true. Node-shipped cortexes are never packaged.' },
+            allow_expectations: { type: 'boolean', description: 'Compose even when an app calls an extension the package cannot carry, recording it as a requirement instead.' },
+        },
+    },
+    {
         // Publishing was unreachable. A package is created private and, until this tool existed, the
         // only way to move it between draft, published and archived was PATCH
         // /v1/packages/{group}/versions/{version} — a door no MCP or CLI surface carried. So an agent

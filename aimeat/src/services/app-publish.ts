@@ -135,8 +135,16 @@ export interface PublishAppInput {
    * silently unprotects an app.
    */
   accessCode: { mode: 'explicit'; value?: string } | { mode: 'carry' };
-  /** Which door this came through. Recorded in the change-log line so a reader can tell them apart. */
-  source: 'inline' | 'presigned' | 'draft';
+  /**
+   * Which door this came through. Recorded in the change-log line so a reader can tell them apart.
+   *
+   * `package-install` is the app component of a package being registered. It is a publish in every
+   * way that matters — the same lints, the same provenance, its own address, the dependency map
+   * refreshed — with three announcements muted, because installing a copy of something that already
+   * exists is not the event those announcements are for, and a six-app package would put six rows in
+   * a feed that stops being read at that point. See `announces` below.
+   */
+  source: 'inline' | 'presigned' | 'draft' | 'package-install';
   /** A provenance record the caller asked to attach — checked against their own account. */
   declaredProvenanceId?: string;
   /** What the caller said about how the bytes were made. Absent + non-human principal → MINT-3. */
@@ -436,7 +444,13 @@ export async function publishApp(
   // switch is off until its owner turns it on. So in practice this fires on the republish of an
   // app somebody already chose to have found, which is exactly the case where the wait matters.
   // Best-effort and silent by contract: submitToIndexNow never throws.
-  {
+  //
+  // The three blocks gated on `announces` below say "something new is public here" to three
+  // different audiences: search engines, the announcement board and the node's public feed. A
+  // package install is not that event, and the owner's own change log and account event (which are
+  // NOT gated) still record it, so nothing is lost from the record.
+  const announces = input.source !== 'package-install';
+  if (announces) {
     const published = await storage.getApp(ownerGhii, filename);
     if (published && appSeoIndexable(published, config)) {
       const site = /\.html?$/i.test(filename)
@@ -454,14 +468,15 @@ export async function publishApp(
     // happened to their node. A skip the owner asked for is a decision, and a decision that leaves
     // no trace is indistinguishable from an omission six months later.
     summary: `${isUpdate ? 'Updated' : 'Published'} app "${filename}" v${newVersion}`
-      + `${input.source === 'draft' ? ' from draft' : ''} (${(data.length / 1024).toFixed(1)} KB)`
+      + `${input.source === 'draft' ? ' from draft' : ''}`
+      + `${input.source === 'package-install' ? ' from a package' : ''} (${(data.length / 1024).toFixed(1)} KB)`
       + (specCheck.status === 'ok' ? '' : ` [build spec: ${specCheck.status}]`),
     changedBy: ownerName,
     changedAt: now,
   });
 
   // Board announcement — best-effort, never fails the publish.
-  if (config.appAnnouncementBoardId) {
+  if (announces && config.appAnnouncementBoardId) {
     try {
       await storage.createPost({
         id: `post-${Date.now()}-${randomBytes(4).toString('hex')}`,
@@ -477,13 +492,15 @@ export async function publishApp(
   }
 
   emitChange('apps');
-  void recordPublicActivity(storage, config, {
-    category: 'apps',
-    actor: callerGaii,
-    summary: `App ${manifest.name || filename} ${isUpdate ? 'updated' : 'published'} (v${newVersion})`,
-    detail: manifest.description || '',
-    link: `${downloadUrl}?mode=inline`,
-  }).catch(err => { logger.warn('publishApp: feed is best-effort', { error: String(err) }); });
+  if (announces) {
+    void recordPublicActivity(storage, config, {
+      category: 'apps',
+      actor: callerGaii,
+      summary: `App ${manifest.name || filename} ${isUpdate ? 'updated' : 'published'} (v${newVersion})`,
+      detail: manifest.description || '',
+      link: `${downloadUrl}?mode=inline`,
+    }).catch(err => { logger.warn('publishApp: feed is best-effort', { error: String(err) }); });
+  }
 
   // The owner's own "what has happened". The public feed above tells the NODE; this tells the
   // person, and the two are different audiences with different privacy — a private app publishes

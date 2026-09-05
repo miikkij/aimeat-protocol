@@ -305,6 +305,9 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // Not destructive: it changes who may reach a version, never its bytes, and archiving is
     // reversible by setting the status back.
     aimeat_package_status_set: { title: 'Set Package Status', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    // Not idempotent: composing twice under one name is refused as a conflict, and composing under
+    // another name makes a second package. It reads the owner's apps and writes nothing of theirs.
+    aimeat_package_compose: { title: 'Compose Package From Apps', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     // Not idempotent: each install mints a fresh instance with its own component names, so calling
     // it twice leaves two copies rather than one.
     aimeat_package_install: { title: 'Install Package', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
