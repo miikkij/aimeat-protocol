@@ -1,30 +1,28 @@
 #!/bin/sh
 #
-# AIMEAT pre-commit gate — blocks the commit unless the static checks pass. Eight lines, in this
-# order, because each fails faster than the next:
+# AIMEAT pre-commit — the checks that take seconds, and nothing that takes minutes.
 #   1. ESLint (src/ + public/), cached              — pnpm lint
 #   2. Backend type check, incremental              — pnpm typecheck
 #   3. Frontend type check (checkJs), incremental   — pnpm typecheck:frontend
 #   4. SDK-libs type check (checkJs), incremental   — pnpm typecheck:sdk
 #   5. No silent exception handler in a STAGED file — pnpm check:silent-catch -- --strict --staged
-#   6. The read-only gates, four at a time          — pnpm check:fast   (`pnpm check:fast --list` names them)
-#   7. The five program-reading gates, one program  — pnpm check:invariants
-#   8. The unit tests reachable from what changed   — pnpm test:changed
 #
-# WHAT CHANGED ON 2026-09-05 AND WHY. This hook had grown to 45 lines run one after another and
-# cost 7–9 minutes per commit, measured: ESLint twice over the whole tree (lint, then silent-catch
-# with one rule), three type checks with no cache, five gates each building the same compiler
-# program, one vitest file run here and again inside the unit suite, thirty small scripts each
-# paying 1.5 s of process start one after another, and then the whole unit suite. Every check is
-# still run; what moved is HOW: the caches (eslint --cache, tsc --incremental), the second ESLint
-# pass reads only the staged files, the five gates share one program, the small scripts overlap
-# four at a time, and the unit suite runs the files reachable from the change here and the whole
-# suite in the pre-push hook and CI. The pre-push hook also runs the guard tier when src/routes,
-# src/auth, src/services or src/storage changed. Measured after: about two minutes warm. The
-# analysis with every number: docs/internal/testausajan-analyysi-2026-09-05.md (local, gitignored).
+# WHY ONLY THESE (2026-09-05). This hook had grown to 45 lines and 7–9 minutes a commit, and when
+# it was cut to eight lines and two minutes the developer's answer was still no: a day of iterative
+# work is twenty commits and a few pushes, and a check that costs minutes on each of them turns a
+# thirty-minute change into a day. So the hook keeps what is warm and fast — about twenty seconds —
+# and the rest moves to ONE command run once, when a piece of work is finished:
 #
-# E2E/Playwright are intentionally NOT here (they need a DB) — the pre-push hook runs the guard
-# tier, see docs/coding-guidelines/testing-requirements.md Rule 1b.
+#     pnpm gate          the read-only gates, the five program-reading gates, the unit suite, and
+#                        the guard tier on SQLite
+#     pnpm gate:full     the same plus the guard tier on Postgres
+#
+# CI runs all of it on every push and blocks a merge on it, so nothing is skipped; it is moved to
+# where waiting for it costs nobody an afternoon. A session says "done" only after `pnpm gate` is
+# green (CLAUDE.md, Gates); a person can push a text change and go on with their day.
+#
+# The pre-push hook keeps the two things a push must not do to other sessions (push from behind
+# origin, push a tree that does not boot) and nothing slower.
 #
 # Bypass in a genuine emergency with:  git commit --no-verify
 #
@@ -49,21 +47,4 @@ pnpm -s typecheck:sdk
 echo "[pre-commit] No silent exception handler in a staged file (check:silent-catch --staged)…"
 pnpm -s check:silent-catch -- --strict --staged
 
-# Thirty-odd read-only checks, four at a time. The list, each with the sentence it used to print
-# here, is CHECKS in aimeat/scripts/check-fast.ts; `pnpm check:fast --list` prints it. A check that
-# WRITES the tree does not belong there: two writers on one file is a race, not a speed-up.
-echo "[pre-commit] The read-only gates, four at a time (check:fast)…"
-pnpm -s check:fast
-
-# Runtime read targets, identity resolution, owner-principal refusals, federation write
-# signatures, credential-free write doors: five gates, one compiler program, and all five run
-# before any of them refuses.
-echo "[pre-commit] The five program-reading gates (check:invariants)…"
-pnpm -s check:invariants
-
-# Last, because it is the slowest thing here and everything above fails faster. `--changed` runs
-# the test files whose import graph reaches a changed file; the whole suite runs before a push.
-echo "[pre-commit] Unit tests reachable from the change (test:changed)…"
-pnpm -s test:changed
-
-echo "[pre-commit] ✓ all checks passed"
+echo "[pre-commit] ✓ fast checks passed — run \`pnpm gate\` once when the work is done"

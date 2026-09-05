@@ -1,6 +1,7 @@
 #!/bin/sh
 #
-# AIMEAT pre-push gate — the two things a push must not do to the other sessions.
+# AIMEAT pre-push gate — the two things a push must not do to the other sessions, and nothing
+# slower than a boot.
 #
 #   1. Push behind origin. A rebase before the push is the rule; pushing from behind either fails
 #      or, with a force, deletes what a peer landed. The hook fetches and refuses when the local
@@ -10,12 +11,14 @@
 #      its imports resolved only in the author's worktree. `pnpm boot:smoke` imports the boot path
 #      and refuses when a module throws at load.
 #
-#   3. Push what CI would refuse. The whole unit suite, and the guard tier on both backends when a
-#      commit touches src/routes, src/auth, src/services or src/storage (2026-09-05): what a
-#      developer's machine can answer in a few minutes, CI answers in twenty, after the push.
+# It also lists, for a Claude Code session, the commits about to go that carry no Session: trailer.
 #
-# It also lists the commits about to go that carry no Session: trailer, so a session that forgot
-# to set AIMEAT_SESSION sees it before the push rather than after.
+# WHAT IS NOT HERE, AND WHY (2026-09-05). For a few hours this hook also ran the whole unit suite
+# and the guard tier on both backends, fifteen minutes a push. A day of iterative work is twenty
+# commits and several pushes, and a push that costs a quarter of an hour turns a thirty-minute
+# change into a day; the developer's VS Code Sync Changes became a button that did nothing visible.
+# Those checks now live in `pnpm gate` (and `pnpm gate:full` with Postgres), run once when a piece
+# of work is finished, and in CI on every push, where they block a merge and nobody's afternoon.
 
 set -e
 ROOT="$(git rev-parse --show-toplevel)"
@@ -28,8 +31,12 @@ if [ "$BEHIND" != "0" ]; then
   exit 1
 fi
 
-UNSTAMPED="$(git log --format='%h %s%n%(trailers:key=Session,valueonly)' "refs/remotes/$REMOTE/main..HEAD" 2>/dev/null | awk 'NR%2==1{line=$0} NR%2==0{ if ($0=="") print line }')"
-if [ -n "$UNSTAMPED" ]; then
+# One line per commit: hash, a tab, the Session value, a tab, the subject. The earlier odd/even
+# pairing of a two-line format shifted by one whenever the trailers block emitted an extra blank
+# line, and printed a trailer VALUE as if it were an unstamped commit (seen 2026-09-05). Only a
+# session is told: a person's commit has no session to name.
+UNSTAMPED="$(git log --format='%h%x09%(trailers:key=Session,valueonly,separator=%x20)%x09%s' "refs/remotes/$REMOTE/main..HEAD" 2>/dev/null | awk -F'\t' '$2=="" {print $1" "$3}')"
+if [ -n "$UNSTAMPED" ] && [ -n "$CLAUDECODE" ]; then
   echo "[pre-push] commits without a Session: trailer (set AIMEAT_SESSION; see skill aimeat-dev-session):" >&2
   echo "$UNSTAMPED" | sed 's/^/  /' >&2
 fi
@@ -37,35 +44,3 @@ fi
 cd "$ROOT/aimeat"
 echo "[pre-push] boot smoke (the modules on the boot path load)…"
 pnpm -s boot:smoke
-
-# ── The unit suite and the guard tier (2026-09-05) ──────────────────────────────
-# What CI blocks on, run here first when the commits about to go could have moved it. The unit
-# suite whole (pre-commit runs only the files reachable from a change); the guard tier on both
-# backends when a commit touches src/routes, src/auth, src/services or src/storage
-# (docs/coding-guidelines/testing-requirements.md Rule 1b), Postgres only when its env file is
-# on this machine. Four lanes each (four nodes at once, every suite alone on an empty database):
-# about two minutes for SQLite, and one lane on Postgres where the role cannot create databases.
-RANGE="refs/remotes/$REMOTE/main..HEAD"
-CHANGED="$(git diff --name-only "$RANGE" 2>/dev/null || git diff --name-only HEAD~1..HEAD)"
-
-echo "[pre-push] unit suite, whole (test)…"
-pnpm -s test
-
-if echo "$CHANGED" | grep -qE '^aimeat/src/(routes|auth|services|storage)/'; then
-  # The env files are gitignored, so a fresh worktree has none; node's own "not found" for a
-  # missing --env-file names the file and nothing else.
-  if [ ! -f .env.test.sqlite ]; then
-    echo "[pre-push] aimeat/.env.test.sqlite is missing (gitignored): cp .env.test.sqlite.example .env.test.sqlite, or copy it from the main checkout." >&2
-    exit 1
-  fi
-  echo "[pre-push] guard tier, SQLite (test:e2e:guards:sqlite)…"
-  pnpm -s test:e2e:guards:sqlite
-  if [ -f .env.test.postgres-kysely ]; then
-    echo "[pre-push] guard tier, Postgres (test:e2e:guards:postgres-kysely)…"
-    pnpm -s test:e2e:guards:postgres-kysely
-  else
-    echo "[pre-push] no .env.test.postgres-kysely on this machine: the Postgres tier runs in CI." >&2
-  fi
-else
-  echo "[pre-push] nothing under src/routes, src/auth, src/services or src/storage changed: guard tier left to CI."
-fi
