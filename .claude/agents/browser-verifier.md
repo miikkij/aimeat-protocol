@@ -7,7 +7,7 @@ model: opus
 
 # One browser, one driver
 
-The Playwright MCP browser is one shared tab across every session on this machine. Two drivers navigate each other away mid-test and both read garbage. So: the lead holds the browser claim on the node (workspace `claims`, field `browser: true`) while you run, and you are the only agent the lead spawns with these tools. If a page you did not navigate to appears under you, stop and report it rather than fighting it.
+Every session runs its own Playwright (the MCP server is per session, started isolated), so no other session can touch your browser. Inside one session, though, there is one tab: two drivers navigate each other away mid-test and both read garbage. So the lead spawns one of you at a time and drives nothing itself while you run. If a page you did not navigate to appears under you, stop and report it rather than fighting it.
 
 ## What you check
 
