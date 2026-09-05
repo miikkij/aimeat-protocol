@@ -22,19 +22,35 @@
  *   attempt, and stamps data-ak-ambient-painted on the layer in the same tick: the Design
  *   Book's bench photographs a preview 1200 ms after load and reads that stamp, so a layer that
  *   waited for anything would bench as unpainted.
+ *   THE POST CHAIN (wish-atelier-post-process-effects). `post` names up to two passes from
+ *   ambient-post.js (glitch, vhs, ripple, kaleidoscope) that run over the field each frame at
+ *   the renderer's own resolution, before the one upscale: field → pass → pass → blit. This is
+ *   where living motion of an effect is legal, because the layer already moves and every gate
+ *   above stops the passes with the field. The blit lands at PEAK only when the field was
+ *   drawn scaled: a full-size renderer already holds itself to PEAK, and blitting it at PEAK
+ *   again would apply the cap twice and dim the ground AK-AMBIENT proved. The wave's shader
+ *   stands down while a pass is active, since a pass reads a 2D canvas.
  * @structure setWeather() · weatherLevel() · ambient(spec) → { el, preset, set, pause, resume,
  *   still, stats, destroy }
  * @usage
  *   const sky = AIMEAT.atelier.ambient({ target: app.el });          // the look decides
  *   const sky = AIMEAT.atelier.ambient({ target: host, preset: 'waves', alpha: 0.8 });
- *   sky.set({ preset: 'dust' }); sky.pause(); sky.stats().frames;
+ *   const sky = AIMEAT.atelier.ambient({ target: host, preset: 'plasma', post: ['kaleidoscope'] });
+ *   sky.set({ preset: 'dust' }); sky.set({ post: [{ id: 'ripple', params: { amplitude: 0.6 } }] });
+ *   sky.pause(); sky.stats().frames; sky.stats().post;
  * @version-history
+ *   v0.48.0 — 2026-09-05 — The post chain (wish-atelier-post-process-effects, stage 3): `post`
+ *     in the spec and in set(), the offscreen field allocated whenever a pass is active, a
+ *     ping-pong buffer for a chain of two, the blit alpha rule above, `post` in stats(), and
+ *     the shader standing down while a pass runs.
  *   v0.47.0 — 2026-09-05 — Initial (wish-atelier-ambient-visuals, stage 3).
  */
 import { el, resolve, reducedMotion, injectStyle } from './dom.js';
 import { tokenRgb } from './token-color.js';
 import { RENDERERS, CSS_PRESETS, BASE_ALPHA, PEAK, FPS, PRESET_IDS, mulberry32 } from './ambient-presets.js';
 import { glWaves } from './ambient-gl.js';
+import { POST_IDS, POST_MAX, postById } from './ambient-post.js';
+import { fxParams } from './effects.js';
 
 const NONE = 'none';
 const WEATHER_ATTR = 'data-ak-weather';
@@ -109,23 +125,49 @@ function known(id) {
 }
 
 /**
+ * The post chain an app asked for — ids, or { id, params } — as the passes with their clamped
+ * parameters: an id the kit does not ship is dropped with a word, and the chain stops at
+ * POST_MAX.
+ * @param {any} want
+ * @returns {Array<{ id: string, params: Record<string, any> }>}
+ */
+function normalizePost(want) {
+  if (!want) return [];
+  const list = Array.isArray(want) ? want : [want];
+  /** @type {Array<{ id: string, params: Record<string, any> }>} */
+  const out = [];
+  for (const item of list) {
+    const id = typeof item === 'string' ? item : item && typeof item === 'object' ? String(item.id || '') : '';
+    if (!postById(id)) {
+      if (id) console.warn('aimeat-atelier: "' + id + '" is not a post pass this kit ships (' + POST_IDS.join(', ') + ').');
+      continue;
+    }
+    const given = item && typeof item === 'object' ? item.params : null;
+    out.push({ id, params: fxParams(id, given) || {} });
+    if (out.length >= POST_MAX) break;
+  }
+  return out;
+}
+
+/**
  * @typedef {object} AmbientHandle
  * @property {HTMLElement} el  the layer
  * @property {() => string} preset  the preset in force ('none' when off)
- * @property {(patch: { preset?: string|null, alpha?: number|null, speed?: number|null, fps?: number, gl?: boolean }) => void} set
+ * @property {(patch: { preset?: string|null, alpha?: number|null, speed?: number|null, fps?: number, gl?: boolean, post?: any }) => void} set
  * @property {() => void} pause
  * @property {() => void} resume
  * @property {() => void} still  draw one frame at the current clock
  * @property {() => { preset: string, state: string, running: boolean, frames: number, fps: number,
- *   gl: boolean, alpha: number, alphaSource: 'option'|'token'|'preset', speed: number, level: string }} stats
+ *   gl: boolean, alpha: number, alphaSource: 'option'|'token'|'preset', speed: number, level: string,
+ *   post: string[] }} stats
  * @property {() => void} destroy
  */
 
 /**
  * The ambient layer behind `target`. A `preset` of null (or none given) means the look decides;
- * a string names one preset or 'none'.
+ * a string names one preset or 'none'. `post` names up to two passes run over the field.
  * @param {{ target?: string|Element, preset?: string|null, alpha?: number, speed?: number,
- *   fps?: number, gl?: boolean, seed?: number }} [spec]
+ *   fps?: number, gl?: boolean, seed?: number, post?: any }} [spec]
  * @returns {AmbientHandle}
  */
 export function ambient(spec) {
@@ -140,6 +182,7 @@ export function ambient(spec) {
     speed: s.speed == null ? undefined : clamp(Number(s.speed), BOUNDS.speed),
     fps: s.fps > 0 ? Math.min(s.fps, MAX_FPS) : 0,
     gl: s.gl !== false,
+    post: normalizePost(s.post),
   };
   const seed = s.seed > 0 ? Math.floor(s.seed) : 1234567;
 
@@ -167,6 +210,8 @@ export function ambient(spec) {
       off: weatherLevel() === 'off', paused: false,
     },
     destroyed: false, warned: false, resolveQueued: false, styleWait: 0, styleWaiting: false,
+    /** The post chain the surface was mounted with, so a changed chain remounts it. */
+    postKey: '',
   };
 
   // ── Reading the look ──
@@ -241,6 +286,7 @@ export function ambient(spec) {
       if (su.gl) { su.gl.destroy(); su.gl = null; }
       if (su.canvas) { su.canvas.width = 0; su.canvas.height = 0; }
       if (su.off) { su.off.width = 0; su.off.height = 0; }
+      if (su.buffers) for (const b of su.buffers) { b.canvas.width = 0; b.canvas.height = 0; }
     }
     state.surface = null;
     state.w = 0;
@@ -267,7 +313,12 @@ export function ambient(spec) {
     state.surface = {
       kind: 'canvas', renderer: RENDERERS[preset], canvas,
       ctx: null, off: null, offCtx: null, rstate: null, gl: null, glFailed: false,
+      // The post chain: each pass with its clamped parameters and the state its setup returns;
+      // the buffers a chain of two hands from one pass to the next.
+      post: opts.post.map(function (p) { return { id: p.id, pass: postById(p.id), params: p.params, state: null }; }),
+      buffers: /** @type {Array<{ canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D }>} */ ([]),
     };
+    state.postKey = JSON.stringify(opts.post);
     state.fps = Math.min(opts.fps || FPS[preset] || MAX_FPS, MAX_FPS);
     size(true);
   }
@@ -310,9 +361,13 @@ export function ambient(spec) {
     su.canvas.height = Math.round(h * dpr);
     const r = su.renderer;
     const rng = mulberry32(seed);
-    if (r.scale > 1) {
-      const ow = Math.max(1, Math.ceil(w / r.scale));
-      const oh = Math.max(1, Math.ceil(h / r.scale));
+    const scaled = r.scale > 1;
+    const hasPost = su.post.length > 0;
+    if (scaled || hasPost) {
+      // The field is drawn offscreen whenever it is upscaled or a pass reads it: at 1/scale
+      // for a scaled renderer, at full size for one that draws at full size.
+      const ow = scaled ? Math.max(1, Math.ceil(w / r.scale)) : w;
+      const oh = scaled ? Math.max(1, Math.ceil(h / r.scale)) : h;
       if (!su.off) {
         su.off = document.createElement('canvas');
         su.offCtx = su.off.getContext('2d');
@@ -320,6 +375,19 @@ export function ambient(spec) {
       su.off.width = ow;
       su.off.height = oh;
       su.rstate = r.setup(ow, oh, state.palette, rng);
+      // Each pass gets its own seeded stream and its own state at the same size; a chain hands
+      // its frame on through a buffer, and the last pass draws to the visible canvas when the
+      // field is full size (nothing left to upscale).
+      const needed = scaled ? su.post.length : Math.max(0, su.post.length - 1);
+      while (su.buffers.length < needed) {
+        const c = document.createElement('canvas');
+        su.buffers.push({ canvas: c, ctx: c.getContext('2d') });
+      }
+      for (const b of su.buffers) { b.canvas.width = ow; b.canvas.height = oh; }
+      for (let i = 0; i < su.post.length; i++) {
+        const p = su.post[i];
+        p.state = p.pass.setup(ow, oh, mulberry32(seed + 11 * (i + 1)), p.params, state.palette, scaled ? r.scale : 1);
+      }
     } else {
       su.rstate = r.setup(w, h, state.palette, rng);
     }
@@ -328,10 +396,11 @@ export function ambient(spec) {
     if (su.ctx) su.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
-  /** After the first 2D frame is on screen, the wave may trade up to the shader. */
+  /** After the first 2D frame is on screen, the wave may trade up to the shader — unless a
+   *  post pass is active, because a pass reads a 2D canvas: the shader stands down. */
   function tryGl() {
     const su = state.surface;
-    if (!su || su.kind !== 'canvas' || state.preset !== 'waves' || !opts.gl || su.gl || su.glFailed) return;
+    if (!su || su.kind !== 'canvas' || state.preset !== 'waves' || !opts.gl || su.gl || su.glFailed || su.post.length) return;
     // The 2D context, once opened, owns the element: the shader needs a fresh canvas.
     const fresh = /** @type {HTMLCanvasElement} */ (el('canvas', { class: 'ak-ambient__canvas' }));
     fresh.width = su.canvas.width;
@@ -355,17 +424,40 @@ export function ambient(spec) {
       su.gl.frame(t);
     } else if (su.ctx) {
       const r = su.renderer;
-      if (r.scale > 1) {
-        r.frame(su.offCtx, su.rstate, t, su.off.width, su.off.height, state.palette);
-        const ctx = su.ctx;
-        ctx.clearRect(0, 0, state.w, state.h);
-        ctx.save();
-        ctx.globalAlpha = PEAK[state.preset];
-        ctx.imageSmoothingEnabled = true;
-        ctx.drawImage(su.off, 0, 0, state.w, state.h);
-        ctx.restore();
-      } else {
+      const scaled = r.scale > 1;
+      if (!scaled && !su.post.length) {
         r.frame(su.ctx, su.rstate, t, state.w, state.h, state.palette);
+      } else {
+        // field → pass → pass → blit. The field lands offscreen; each pass reads the frame
+        // before it and writes the next buffer, the last one the visible canvas when there is
+        // nothing to upscale. The blit lands at PEAK only for a scaled field: a full-size
+        // renderer already held itself to PEAK, and the cap is applied once.
+        const ow = su.off.width;
+        const oh = su.off.height;
+        r.frame(su.offCtx, su.rstate, t, ow, oh, state.palette);
+        let cur = su.off;
+        for (let i = 0; i < su.post.length; i++) {
+          const p = su.post[i];
+          const last = i === su.post.length - 1;
+          if (last && !scaled) {
+            su.ctx.clearRect(0, 0, state.w, state.h);
+            p.pass.pass(su.ctx, cur, p.state, t, state.w, state.h, state.palette, p.params);
+            cur = null;
+          } else {
+            const b = su.buffers[i];
+            p.pass.pass(b.ctx, cur, p.state, t, ow, oh, state.palette, p.params);
+            cur = b.canvas;
+          }
+        }
+        if (cur) {
+          const ctx = su.ctx;
+          ctx.clearRect(0, 0, state.w, state.h);
+          ctx.save();
+          ctx.globalAlpha = scaled ? PEAK[state.preset] : 1;
+          ctx.imageSmoothingEnabled = true;
+          ctx.drawImage(cur, 0, 0, state.w, state.h);
+          ctx.restore();
+        }
       }
     } else {
       return;
@@ -459,6 +551,9 @@ export function ambient(spec) {
       state.preset = wanted;
       mountSurface(wanted);
       host.dispatchEvent(new CustomEvent('ak-ambient-preset', { bubbles: true, detail: { preset: wanted } }));
+    } else if (state.surface && state.surface.kind === 'canvas' && JSON.stringify(opts.post) !== state.postKey) {
+      // The same preset with a different post chain is a new surface.
+      mountSurface(wanted);
     } else if (state.surface && state.surface.kind === 'canvas') {
       size(true);
     }
@@ -503,12 +598,13 @@ export function ambient(spec) {
     el: layer,
     preset() { return state.preset; },
 
-    /** @param {{ preset?: string|null, alpha?: number|null, speed?: number|null, fps?: number, gl?: boolean }} patch */
+    /** @param {{ preset?: string|null, alpha?: number|null, speed?: number|null, fps?: number, gl?: boolean, post?: any }} patch */
     set(patch) {
       if (!patch || state.destroyed) return;
       if ('preset' in patch) opts.preset = patch.preset == null ? undefined : String(patch.preset);
       if ('alpha' in patch) opts.alpha = patch.alpha == null ? undefined : clamp(Number(patch.alpha), BOUNDS.alpha);
       if ('speed' in patch) opts.speed = patch.speed == null ? undefined : clamp(Number(patch.speed), BOUNDS.speed);
+      if ('post' in patch) opts.post = normalizePost(patch.post);
       if ('fps' in patch) {
         opts.fps = patch.fps > 0 ? Math.min(patch.fps, MAX_FPS) : 0;
         if (state.preset !== NONE && !CSS_PRESETS[state.preset]) {
@@ -536,6 +632,7 @@ export function ambient(spec) {
         alphaSource: state.alphaSource,
         speed: state.speed,
         level: weatherLevel(),
+        post: su && su.post ? su.post.map(function (p) { return p.id; }) : [],
       };
     },
 

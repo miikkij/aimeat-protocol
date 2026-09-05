@@ -18,10 +18,16 @@
  *   allowed to move at idle, with the look it was proven on) runs the ambient bench, which
  *   proves the preset on that look through the contrast matrix. A kind this file does not know
  *   is refused by name rather than stored on trust.
- * @structure DesignBookError · PART_KINDS · MOTION_TOKENS · PART_STATUSES · validatePartInput()
+ * @structure DesignBookError · PART_KINDS · EFFECT_TARGETS · defaultEffectTarget() · MOTION_TOKENS ·
+ *   PART_STATUSES · validatePartInput()
  * @usage
  *   const part = validatePartInput(raw);   // throws DesignBookError with worded refusals
  * @version-history
+ *   v1.3.0 — 2026-09-05 — The EFFECT kind (wish-atelier-post-process-effects, stage 5): a body of
+ *     { effect, params?, on?, look?, tokens? } through validateEffectSpec on the target it lands
+ *     on (the hero band, a figure) or validatePostChain for the layer, the target defaulting from
+ *     the registry (living to the layer, a band moment to the hero, a picture effect to the
+ *     figure), the frame never a target.
  *   v1.2.0 — 2026-09-05 — The AMBIENT kind (wish-atelier-ambient-visuals): a body of
  *     { ambient, alpha?, speed?, look?, tokens? } through validateAmbientSpec on the part's look
  *     (or the first look the registry says the preset fits), "none" refused because a part that
@@ -35,11 +41,13 @@
  *   v1.0.0 — 2026-08-28 — Initial (TARGET-074 phase 5, slice 1).
  */
 import {
-  validateUiLayout, validateSignatureTokens, validateImageryStyle, validateAmbientSpec, AppUiError,
+  validateUiLayout, validateSignatureTokens, validateImageryStyle, validateAmbientSpec, validateEffectSpec,
+  validatePostChain, AppUiError,
 } from '../app-ui/validate.js';
 import { LOOKS } from '../app-ui/registry.js';
 import { getAppTemplates } from '../../data/app-templates.js';
 import { AMBIENT_IDS, ambientById } from '../../data/atelier-ambients.js';
+import { EFFECT_IDS, effectById } from '../../data/atelier-effects.js';
 
 export class DesignBookError extends Error {
   constructor(public code: string, message: string, public status = 400) {
@@ -49,8 +57,26 @@ export class DesignBookError extends Error {
 }
 
 /** The kinds the node can PROVE. Growing this list means growing the bench first. */
-export const PART_KINDS = ['layout', 'fill', 'look', 'motion', 'illustration', 'genre', 'ambient'] as const;
+export const PART_KINDS = ['layout', 'fill', 'look', 'motion', 'illustration', 'genre', 'ambient', 'effect'] as const;
 export type PartKind = (typeof PART_KINDS)[number];
+
+/** Where an effect part lands: a moment on the hero band, a picture effect on one figure, or a
+ *  living pass over the ambient layer. Never the app frame: a filter on the frame makes it the
+ *  containing block of every fixed control. */
+export const EFFECT_TARGETS = ['hero', 'figure', 'layer'] as const;
+export type EffectTarget = (typeof EFFECT_TARGETS)[number];
+
+/** The target an effect lands on when the part names none: living motion goes to the layer, a
+ *  band effect (a zone moment, or a pass that also plays a moment) to the hero, and everything
+ *  that may sit on a picture to the figure. An unknown id says figure, so the bench words the
+ *  refusal with the nearest name. */
+export function defaultEffectTarget(id: string): EffectTarget {
+  const e = effectById(id);
+  if (!e) return 'figure';
+  if (!e.motion.includes('still') && !e.motion.includes('moment')) return 'layer';
+  if (e.volume.includes('zone') && !e.volume.includes('ground')) return e.post && e.motion.includes('living') ? 'layer' : 'hero';
+  return 'figure';
+}
 
 /** The motion recipe's vocabulary: the signature tokens that ARE motion. */
 export const MOTION_TOKENS = [
@@ -98,7 +124,8 @@ export function validatePartInput(raw: unknown): PartInput {
       'look = a signature token sheet with an optional preset; motion = a motion-token recipe; ' +
       'illustration = art direction for the imagery pipeline; genre = one of the node\'s served page ' +
       'templates, shown and forked rather than adopted; ambient = the animated layer behind an app, ' +
-      'proven on a look.)');
+      'proven on a look; effect = a post-process filter on the hero band, a figure or the ambient ' +
+      'layer, proven where it lands.)');
   }
 
   const title = typeof p.title === 'string' ? p.title.trim() : '';
@@ -164,6 +191,37 @@ function benchBodyFor(kind: PartKind, raw: unknown): Record<string, unknown> {
       if (look !== undefined) out.look = look;
       return out;
     }
+    // An EFFECT lands on one of three targets and is proven where it lands, through the same
+    // bench a stored layout's block passes: a moment on the hero band (the demo hero carries no
+    // picture, so a picture effect refuses there and says so), a picture effect on the figure,
+    // or a living pass over the ambient layer. The stored body keeps only the knobs that differ
+    // from the defaults, the way a layout does.
+    if (kind === 'effect') {
+      if (typeof o.effect !== 'string') throw new DesignBookError('BODY_INVALID', bodyShapeHint(kind), 422);
+      const look = o.look === undefined ? undefined : lookNameOrRefuse(o.look);
+      const on = o.on === undefined ? defaultEffectTarget(o.effect) : o.on;
+      if (!(EFFECT_TARGETS as readonly unknown[]).includes(on)) {
+        throw new DesignBookError('BODY_INVALID',
+          `An effect part lands on one of ${EFFECT_TARGETS.join(', ')} ("on"); "${String(on)}" is none of them. The app frame is never a target: a filter on the frame makes it the containing block of every fixed control.`, 422);
+      }
+      const spec = { id: o.effect, ...(o.params !== undefined ? { params: o.params } : {}) };
+      const provenOn = look ?? effectById(o.effect)?.fitsLooks[0];
+      let params: Record<string, number | string> | undefined;
+      if (on === 'layer') {
+        const first = validatePostChain([spec])[0]!;
+        params = typeof first === 'string' ? undefined : first.params;
+      } else {
+        params = validateEffectSpec(spec, { component: on as string, look: provenOn, hasImage: false, at: 'effect' }).params;
+      }
+      const out: Record<string, unknown> = { effect: o.effect, on };
+      if (params) out.params = params;
+      if (o.tokens !== undefined) {
+        const tokens = validateSignatureTokens(o.tokens, look);
+        if (Object.keys(tokens).length > 0) out.tokens = tokens;
+      }
+      if (look !== undefined) out.look = look;
+      return out;
+    }
     // look and motion: a token sheet — the same bench a layout's signature runs, including the
     // contrast-matrix proof of an `--ak-accent` pair.
     const tokens = validateSignatureTokens(o.tokens, typeof o.look === 'string' ? o.look : undefined);
@@ -205,6 +263,9 @@ function bodyShapeHint(kind: PartKind): string {
   if (kind === 'illustration') return 'An illustration part\'s body is { style, palette_words? } — art direction as data.';
   if (kind === 'ambient') {
     return `An ambient part's body is { ambient: one of ${AMBIENT_IDS.join(', ')}, alpha?, speed?, look?, tokens? } — the layer behind the app, proven on the look.`;
+  }
+  if (kind === 'effect') {
+    return `An effect part's body is { effect: one of ${EFFECT_IDS.join(', ')}, params?, on?: ${EFFECT_TARGETS.join(' | ')}, look?, tokens? } — a post-process filter, proven where it lands.`;
   }
   return `A ${kind} part's body is { tokens: { "--ak-…": "value" }${kind === 'look' ? ', look?' : ''} }.`;
 }

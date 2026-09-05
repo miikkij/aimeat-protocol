@@ -17,12 +17,27 @@
  *   The stylesheets are read from the node's own public/lib files once and cached: the server
  *   trusts what it ships (the drift gate that proves looks.css matches the registry stays in the
  *   tool, where the build lives).
- * @structure lum/ratio (WCAG) · OKLab convert/mix/rotate · evalColor/gradientStops/mix scans ·
- *   parseThemes/parseAtelier · loadAtelierSheets() (cached) · runMatrix(overrides?) → Result[]
+ * @structure the colour arithmetic re-exported from atelier-color.ts · evalColor/gradientStops/mix
+ *   scans · parseThemes/parseAtelier · loadAtelierSheets() (cached) · runMatrix(overrides?, opts?)
+ *   → Result[]
  * @usage
  *   import { runMatrix } from './atelier-contrast.js';
  *   const failures = runMatrix({ '--ak-accent': '#b3261e' }).filter((r) => !r.ok);
+ *   runMatrix(undefined, { presets: ['riso'], effect: { id: 'duotone', params: { strength: 0.8 } } });
  * @version-history
+ *   v1.5.0 — 2026-09-05 — AK-FX: a post-process EFFECT is proven on the grounds the rest of the
+ *     matrix resolves (wish-atelier-post-process-effects, stage 2). `opts.effect` names one of
+ *     the registry's effects and its parameters (clamped as the kit clamps them): a colour effect
+ *     (duotone, recolour) maps page, card, ink, dimmed ink and accent text through the same
+ *     transform the browser applies and holds the mapped pairs to 4.5:1, because a filter
+ *     transforms ground and words together and a hue turn in sRGB does not keep luminance; an
+ *     overlay effect (vignette, scanlines) composites ink at its strength over the page and the
+ *     card and holds body ink to 4.5:1 at the darkest point; an effect with no proof records
+ *     that it ran. An unknown effect refuses naming the nine.
+ *   v1.4.0 — 2026-09-05 — The colour arithmetic (lum, ratio, OKLab both ways, rotateHue, mixOklab,
+ *     Rgba, over) moved whole to atelier-color.ts and is re-exported from here: a pure move under
+ *     the 800-line cap before the effects round adds the CSS filter transforms and the AK-FX
+ *     branch (wish-atelier-post-process-effects, stage 1). Nothing else changed.
  *   v1.3.0 — 2026-09-05 — AK-AMBIENT: the ambient LAYER is proven (wish-atelier-ambient-visuals).
  *     REQUIRED_BASE grows by --ak-ambient, --ak-ambient-alpha and --ak-ambient-speed; a look
  *     (or a signature override) that names a preset is held to the registry's numbers: a field
@@ -44,94 +59,15 @@
  */
 import { readFileSync } from 'node:fs';
 import { AMBIENT_BOUNDS, AMBIENT_IDS, AMBIENT_NONE, ambientById } from '../data/atelier-ambients.js';
-
-// ── WCAG 2.1, exactly as tools/theme-contrast.ts computes it ─────────────────────────────────
-
-/** WCAG 2.1 relative luminance of an #rrggbb colour. */
-export function lum(hex: string): number {
-  const n = parseInt(hex.slice(1), 16);
-  const channels = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => {
-    const c = v / 255;
-    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
-  });
-  return 0.2126 * channels[0]! + 0.7152 * channels[1]! + 0.0722 * channels[2]!;
-}
-
-/** WCAG 2.1 contrast ratio between two #rrggbb colours (order-independent). */
-export function ratio(a: string, b: string): number {
-  const [hi, lo] = [lum(a), lum(b)].sort((p, q) => q - p) as [number, number];
-  return (hi + 0.05) / (lo + 0.05);
-}
-
-// ── OKLab, because the stylesheet mixes in oklab and the numbers must match the browser ──────
-
-type Lab = { L: number; a: number; b: number };
-
-function srgbToLinear(c: number): number {
-  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
-}
-function linearToSrgb(c: number): number {
-  const v = c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
-  return Math.min(1, Math.max(0, v));
-}
-
-function hexToLab(hex: string): Lab {
-  const n = parseInt(hex.slice(1), 16);
-  const r = srgbToLinear(((n >> 16) & 255) / 255);
-  const g = srgbToLinear(((n >> 8) & 255) / 255);
-  const b = srgbToLinear((n & 255) / 255);
-  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
-  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
-  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
-  return {
-    L: 0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s,
-    a: 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s,
-    b: 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s,
-  };
-}
-
-function labToHex(lab: Lab): string {
-  const l = Math.pow(lab.L + 0.3963377774 * lab.a + 0.2158037573 * lab.b, 3);
-  const m = Math.pow(lab.L - 0.1055613458 * lab.a - 0.0638541728 * lab.b, 3);
-  const s = Math.pow(lab.L - 0.0894841775 * lab.a - 1.2914855480 * lab.b, 3);
-  const r = linearToSrgb(+4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s);
-  const g = linearToSrgb(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s);
-  const b = linearToSrgb(-0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s);
-  const to = (c: number): string => Math.round(c * 255).toString(16).padStart(2, '0');
-  return `#${to(r)}${to(g)}${to(b)}`;
-}
-
-/** Rotate a colour's OKLCh hue by `deg`, keeping L and C — the browser's relative-colour
- *  `oklch(from X l c calc(h + deg))`, computed the same way. */
-export function rotateHue(hex: string, deg: number): string {
-  const lab = hexToLab(hex);
-  const c = Math.sqrt(lab.a * lab.a + lab.b * lab.b);
-  const h = Math.atan2(lab.b, lab.a) + (deg * Math.PI) / 180;
-  return labToHex({ L: lab.L, a: c * Math.cos(h), b: c * Math.sin(h) });
-}
-
-/** Mix two opaque colours in OKLab, `p` being the first colour's share (0..1). */
-export function mixOklab(a: string, b: string, p: number): string {
-  const la = hexToLab(a);
-  const lb = hexToLab(b);
-  return labToHex({ L: la.L * p + lb.L * (1 - p), a: la.a * p + lb.a * (1 - p), b: la.b * p + lb.b * (1 - p) });
-}
-
-/** A resolved colour: an opaque hex, or a hex with alpha (a scrim). */
-export interface Rgba { hex: string; alpha: number }
-
-/** Source-over compositing of `top` (with alpha) on an opaque `ground`, in sRGB as browsers do. */
-export function over(top: Rgba, ground: string): string {
-  const t = parseInt(top.hex.slice(1), 16);
-  const g = parseInt(ground.slice(1), 16);
-  const ch = (shift: number): number => {
-    const tv = (t >> shift) & 255;
-    const gv = (g >> shift) & 255;
-    return Math.round(tv * top.alpha + gv * (1 - top.alpha));
-  };
-  const to = (v: number): string => v.toString(16).padStart(2, '0');
-  return `#${to(ch(16))}${to(ch(8))}${to(ch(0))}`;
-}
+import { EFFECT_IDS, EFFECT_TOKEN_VARS, effectById, resolveParams } from '../data/atelier-effects.js';
+// The colour arithmetic (WCAG luminance and ratio, OKLab, the hue rotation, source-over) lives
+// in atelier-color.ts since 2026-09-05, a pure move under the 800-line cap; it is re-exported
+// here so every importer keeps the address it had. The CSS filter transforms beside it are
+// what AK-FX runs.
+import {
+  lum, ratio, rotateHue, mixOklab, over, type Rgba, hueRotateSrgb, saturateSrgb, duotoneSrgb,
+} from './atelier-color.js';
+export { lum, ratio, rotateHue, mixOklab, over, type Rgba };
 
 // ── The tiny CSS colour-expression evaluator ─────────────────────────────────────────────────
 // Grammar (and the contract confines itself to it): #hex · transparent · var(--name[, fallback])
@@ -446,7 +382,12 @@ export function loadAtelierSheets(): AtelierSheets {
  */
 export function runMatrix(
   overrides?: Record<string, string>,
-  opts?: { presets?: readonly string[] },
+  opts?: {
+    presets?: readonly string[];
+    /** A post-process effect to prove on every combination, with its parameters (missing ones
+     *  take the registry's defaults, and every number is clamped as the kit clamps it). */
+    effect?: { id: string; params?: Record<string, unknown> | null };
+  },
 ): Result[] {
   const { themes, sheet, presetNames: allPresets } = loadAtelierSheets();
   // A signature is proven WHERE IT LIVES: an accent pair chosen for one look validates against
@@ -691,6 +632,35 @@ export function runMatrix(
           const hex = c.alpha === 1 ? c.hex : over(c, surface);
           add(combo, `AK-TONE ${tone} text on card`, ratio(hex, surface), MIN_TEXT, 'a tone-coloured reading on a card');
           add(combo, `AK-TONE ${tone} text on vane`, ratio(hex, surface2), MIN_TEXT, 'a tone-coloured log line on the console ground');
+        }
+
+        // AK-FX: a post-process effect is proven on the SAME resolved grounds every check above
+        // stands on — the effect is the last thing the eye sees, after the whole cascade. A
+        // colour effect maps ground and words together, so the mapped PAIR must keep the floor
+        // (a hue turn in sRGB does not keep luminance); an overlay effect lays ink over the
+        // ground, so body ink must read at the darkest point. An effect with no proof records
+        // that it ran: the volume rule the validator enforces is its whole guarantee.
+        if (opts?.effect) {
+          const fx = effectById(opts.effect.id);
+          if (!fx) {
+            failR(combo, 'AK-FX effect', `"${opts.effect.id}" is not an effect the kit ships — one of ${EFFECT_IDS.join(', ')}`);
+          } else if (fx.proof === 'colour') {
+            const p = resolveParams(fx, opts.effect.params);
+            const map = fx.id === 'duotone'
+              ? (hex: string): string => duotoneSrgb(hex, colorOf(EFFECT_TOKEN_VARS[String(p.shadow)]!), colorOf(EFFECT_TOKEN_VARS[String(p.light)]!), Number(p.strength))
+              : (hex: string): string => saturateSrgb(hueRotateSrgb(hex, Number(p.hue)), Number(p.saturate));
+            add(combo, `AK-FX ${fx.id} ink on mapped page`, ratio(map(ink), map(bg)), MIN_TEXT, `body text and the page, both seen through the ${fx.id} effect`);
+            add(combo, `AK-FX ${fx.id} ink on mapped card`, ratio(map(ink), map(surface)), MIN_TEXT, `body text and a card, both seen through the ${fx.id} effect`);
+            add(combo, `AK-FX ${fx.id} dimmed ink on mapped card`, ratio(map(inkDim), map(surface)), MIN_TEXT, `secondary text and a card, both seen through the ${fx.id} effect`);
+            add(combo, `AK-FX ${fx.id} accent-as-text on mapped card`, ratio(map(accentText), map(surface)), MIN_TEXT, `accent-coloured text and a card, both seen through the ${fx.id} effect`);
+          } else if (fx.proof === 'overlay') {
+            const p = resolveParams(fx, opts.effect.params);
+            const veil: Rgba = { hex: ink, alpha: Number(p.strength) };
+            add(combo, `AK-FX ${fx.id} ink at the darkest point on page`, ratio(ink, over(veil, bg)), MIN_TEXT, `body text where the ${fx.id} overlay is darkest on the page`);
+            add(combo, `AK-FX ${fx.id} ink at the darkest point on card`, ratio(ink, over(veil, surface)), MIN_TEXT, `body text where the ${fx.id} overlay is darkest on a card`);
+          } else {
+            passR(combo, `AK-FX ${fx.id} ${fx.volume.join('/')}`);
+          }
         }
       } catch (e) {
         failR(combo, 'resolve', (e as Error).message);

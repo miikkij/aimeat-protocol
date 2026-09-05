@@ -11,11 +11,21 @@
  *   It throws on the FIRST problem (a builder fixes one thing at a time), and the same function
  *   runs on every door — the PUT route, the MCP set tool and the dry-run endpoint — so a layout
  *   that passes anywhere passes everywhere.
- * @structure AppUiError · nearest() · validateUiLayout(raw) → AppUiLayout
+ * @structure AppUiError · nearest() · validateSignatureTokens() · validateImageryStyle() ·
+ *   validateAmbientSpec() · validatePostChain() · validateEffectSpec() · validateDialogShape() ·
+ *   validateUiLayout(raw) → AppUiLayout
  * @usage
  *   import { validateUiLayout, AppUiError } from './validate.js';
  *   const layout = validateUiLayout(req.body);   // throws AppUiError(422) with words
  * @version-history
+ *   v1.6.0 — 2026-09-05 — THE EFFECTS (wish-atelier-post-process-effects, stage 4): a block's
+ *     optional `effect` ({ id, params?, backdrop? }) through validateEffectSpec(), the bench the
+ *     layout field, the Design Book's `effect` kind and the dry-run share: the registry says what
+ *     exists and the bounds, the volume rule says where it may land (a prop or zone effect never
+ *     on a component that bears text; on a hero, on its image), backdrop only where the browser
+ *     honours it, living motion pointed at the layer, and a colour or overlay effect under words
+ *     PROVEN on the look through the matrix (AK-FX). The ambient's optional `post` (at most two
+ *     passes over the layer's field) through validatePostChain().
  *   v1.5.0 — 2026-09-05 — The layout's optional `ambient` ({ preset, alpha?, speed? }) and the
  *     third reusable bench, validateAmbientSpec(): the shape and the bounds come from the
  *     ambient registry, and a field preset is then PROVEN on the look it will run on through
@@ -48,6 +58,9 @@ import { propProblem } from '../surface-layout/validate.js';
 import { componentById, NAV_MODES, CHOREOGRAPHIES, LOOKS, BLOCK_SPANS, UI_COMPONENTS, SIGNATURE_TOKENS } from './registry.js';
 import { runMatrix } from '../atelier-contrast.js';
 import { AMBIENT_IDS, AMBIENT_NONE, AMBIENT_BOUNDS, ambientById, isAmbientValue } from '../../data/atelier-ambients.js';
+import {
+  EFFECTS, EFFECT_IDS, EFFECT_HOSTS, POST_IDS, POST_MAX, effectById, isTextBearing, type AtelierEffect,
+} from '../../data/atelier-effects.js';
 
 /** More blocks than this is a page nobody reads — and a payload nobody meant. */
 const MAX_BLOCKS = 40;
@@ -63,6 +76,17 @@ export class AppUiError extends Error {
   }
 }
 
+/** A post-process effect on a block: one of the registry's effects, the knobs that differ from
+ *  its defaults, and whether it post-processes what is BEHIND the block instead of the block. */
+export interface AppUiEffectSpec {
+  id: string;
+  params?: Record<string, number | string>;
+  backdrop?: boolean;
+}
+
+/** One pass over the ambient layer's own field: an effect id, or the id with its knobs. */
+export type AppUiPostSpec = string | { id: string; params?: Record<string, number | string> };
+
 export interface AppUiBlockInstance {
   id: string;
   component: string;
@@ -70,6 +94,8 @@ export interface AppUiBlockInstance {
   /** How much of the composition grid the block takes. Absent means the full line. */
   span?: string;
   hidden?: boolean;
+  /** The effect the block wears: still on its words, or a moment the app plays on a cue. */
+  effect?: AppUiEffectSpec;
 }
 
 export interface AppUiLayout {
@@ -86,7 +112,7 @@ export interface AppUiLayout {
   /** The one layer allowed to move at idle, behind the app: a preset from the ambient registry
    *  with how much of it shows and how fast it moves, or "none" to switch the look's own off.
    *  Absent means the look decides. */
-  ambient?: { preset: string; alpha?: number; speed?: number };
+  ambient?: { preset: string; alpha?: number; speed?: number; post?: AppUiPostSpec[] };
   /** This arrangement is a DIALOG's inside: what kind of moment it is and how much room it
    *  takes. Absent means the arrangement is a screen. */
   dialog?: { title?: string; tone?: string; size?: string; from?: string };
@@ -218,17 +244,21 @@ export function validateImageryStyle(raw: unknown): { style: string; palette_wor
  * the failing numbers. "none" is legal here — an arrangement switching its look's ambient off —
  * and carries no numbers.
  */
-export function validateAmbientSpec(raw: unknown, look?: string): { preset: string; alpha?: number; speed?: number } {
+export function validateAmbientSpec(raw: unknown, look?: string): { preset: string; alpha?: number; speed?: number; post?: AppUiPostSpec[] } {
   const ids = [...AMBIENT_IDS];
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
-    fail(`ambient is one object { preset, alpha?, speed? }: the background animation behind the app. preset is one of ${ids.join(', ')}, or "none" to switch the look's own ambient off.`);
+    fail(`ambient is one object { preset, alpha?, speed?, post? }: the background animation behind the app. preset is one of ${ids.join(', ')}, or "none" to switch the look's own ambient off.`);
   }
   const o = raw as Record<string, unknown>;
   const preset = typeof o.preset === 'string' ? o.preset.trim() : '';
   if (!isAmbientValue(preset)) unknownName('ambient preset', String(o.preset ?? ''), [...ids, AMBIENT_NONE]);
-  if (preset === AMBIENT_NONE) return { preset };
+  if (preset === AMBIENT_NONE) {
+    if (o.post !== undefined) fail('ambient.post runs over the layer\'s own field, so it needs a preset: name one, or drop the post.');
+    return { preset };
+  }
   const entry = ambientById(preset)!;
-  const out: { preset: string; alpha?: number; speed?: number } = { preset };
+  const out: { preset: string; alpha?: number; speed?: number; post?: AppUiPostSpec[] } = { preset };
+  if (o.post !== undefined) out.post = validatePostChain(o.post);
   if (o.alpha !== undefined) {
     const a = typeof o.alpha === 'number' ? o.alpha : Number.NaN;
     if (!Number.isFinite(a) || a < AMBIENT_BOUNDS.alpha[0] || a > AMBIENT_BOUNDS.alpha[1]) {
@@ -256,6 +286,136 @@ export function validateAmbientSpec(raw: unknown, look?: string): { preset: stri
     fail(`ambient ${preset} at alpha ${alpha} fails the contrast matrix on the ${presets[0]} look: ${where}; ${bad.length} check(s) fail in all. Lower ambient.alpha (${preset} ships at ${entry.defaultAlpha}, the whisper every look allows), or move the arrangement to a look that owns its ground.`);
   }
   return out;
+}
+
+/**
+ * One effect's given knobs against its declarations: every name known (the nearest suggested),
+ * every number inside its bounds, every token one of the allowed names. Returns only what was
+ * given, so a stored layout carries the differences from the defaults and nothing else.
+ */
+function validateEffectParams(effect: AtelierEffect, raw: unknown, at: string): Record<string, number | string> | undefined {
+  if (raw === undefined) return undefined;
+  const names = effect.params.map((p) => p.name);
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    fail(`${at}: params is an object of the effect's own knobs — ${effect.id} takes ${names.join(', ')}.`);
+  }
+  const out: Record<string, number | string> = {};
+  for (const [name, value] of Object.entries(raw as Record<string, unknown>)) {
+    const decl = effect.params.find((p) => p.name === name);
+    if (!decl) {
+      const guess = nearest(name, names);
+      fail(`${at}: ${effect.id} has no knob called "${name}".${guess ? ` Did you mean "${guess}"?` : ''} Its knobs: ${names.join(', ')}.`);
+    }
+    if (decl.kind === 'number') {
+      const n = typeof value === 'number' ? value : Number.NaN;
+      if (!Number.isFinite(n) || n < decl.min || n > decl.max) {
+        fail(`${at}: ${effect.id}.${name} takes a number from ${decl.min} to ${decl.max}${decl.unit ? ` ${decl.unit}` : ''} (it ships at ${decl.default}): ${decl.what}`);
+      }
+      out[name] = n;
+    } else {
+      if (typeof value !== 'string' || !decl.tokens.includes(value)) {
+        fail(`${at}: ${effect.id}.${name} names a token, one of ${decl.tokens.join(', ')} (it ships with ${decl.default}): ${decl.what}`);
+      }
+      out[name] = value;
+    }
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+/**
+ * The post chain over the ambient layer: at most POST_MAX passes, each one of the post effects
+ * as an id or { id, params } with the effect's own knobs, each pass named once. Living motion
+ * is legal here because the layer already moves.
+ */
+export function validatePostChain(raw: unknown): AppUiPostSpec[] {
+  const ids = [...POST_IDS];
+  const list = Array.isArray(raw) ? raw : [raw];
+  if (list.length > POST_MAX) {
+    fail(`ambient.post chains at most ${POST_MAX} passes — a third reads the whole frame again and adds nothing a second did not (got ${list.length}).`);
+  }
+  const out: AppUiPostSpec[] = [];
+  list.forEach((item, i) => {
+    const at = `ambient.post[${i}]`;
+    const obj = item && typeof item === 'object' && !Array.isArray(item) ? item as Record<string, unknown> : null;
+    const id = typeof item === 'string' ? item.trim() : obj ? String(obj.id ?? '').trim() : '';
+    if (!ids.includes(id)) {
+      if (effectById(id)) fail(`${at}: ${id} is not a pass the layer runs — the passes are ${ids.join(', ')}; ${id} lands on a block as its effect.`);
+      unknownName('post effect', id, ids);
+    }
+    const params = obj ? validateEffectParams(effectById(id)!, obj.params, at) : undefined;
+    out.push(params ? { id, params } : id);
+  });
+  if (new Set(out.map((p) => (typeof p === 'string' ? p : p.id))).size !== out.length) fail('ambient.post names each pass once.');
+  return out;
+}
+
+/** The effects that may land on a band without a picture: a moment on the band itself. */
+const ZONE_EFFECT_IDS = EFFECTS.filter((e) => e.volume.includes('zone') && e.motion.includes('moment')).map((e) => e.id);
+
+/**
+ * A post-process effect on a block, as data: { id, params?, backdrop? }. Serves the layout's
+ * per-block `effect`, the Design Book's `effect` kind and the dry-run — one bench, three doors.
+ * The registry says what exists and what the bounds are; the VOLUME rule says where it may land
+ * (a prop or zone effect never on a component that bears text; on a hero, on its image);
+ * `backdrop` is legal only where the browser honours it (the filter-function engine); living
+ * motion (an effect with neither a still nor a moment) is refused on content and pointed at the
+ * layer; and a colour or overlay effect that will sit under words is PROVEN on the look through
+ * the matrix (AK-FX), so a grade that collapses a pair refuses with the numbers.
+ */
+export function validateEffectSpec(
+  raw: unknown,
+  opts: { component?: string; look?: string; hasImage?: boolean; at?: string } = {},
+): AppUiEffectSpec {
+  const at = opts.at ?? 'effect';
+  const ids = [...EFFECT_IDS];
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    fail(`${at} is one object { id, params?, backdrop? }: a post-process effect on the block. id is one of ${ids.join(', ')}.`);
+  }
+  const o = raw as Record<string, unknown>;
+  const id = typeof o.id === 'string' ? o.id.trim() : '';
+  const effect = effectById(id);
+  if (!effect) unknownName('effect', String(o.id ?? ''), ids);
+  const params = validateEffectParams(effect, o.params, at);
+  if (!effect.motion.includes('still') && !effect.motion.includes('moment')) {
+    fail(`${at}: ${effect.id} is living motion, and living motion belongs behind the words — run it as a pass on the ambient layer (ambient.post: ["${effect.id}"]) or inside an ambientStage, never on a block.`);
+  }
+  const component = opts.component;
+  if (component && isTextBearing(component) && !effect.volume.includes('ground')) {
+    fail(`${at}: ${effect.id} is a ${effect.volume.join(' or ')} effect and ${component} bears text — it would bend or recolour the words. A prop or zone effect lands only on a picture or a band: ${EFFECT_HOSTS.join(', ')}.`
+      + (effect.id === 'duotone' ? ' (Measured 2026-09-05: under body text a duotone puts the secondary line in the middle of its ramp on 18 of 19 looks.)' : ''));
+  }
+  if (component === 'hero' && opts.hasImage === false && !effect.volume.includes('zone')) {
+    fail(`${at}: on a hero an effect lands on the hero's image, and this hero has none — give it an image, or play a moment on the band instead (${ZONE_EFFECT_IDS.join(', ')}).`);
+  }
+  let backdrop = false;
+  if (o.backdrop !== undefined) {
+    if (typeof o.backdrop !== 'boolean') {
+      fail(`${at}: backdrop is true or false — whether the effect post-processes what is BEHIND the block (the ambient seen through it) instead of the block itself.`);
+    }
+    if (o.backdrop && !effect.backdrop) {
+      fail(`${at}: ${effect.id} cannot run on the backdrop — browsers honour backdrop-filter for the plain filter functions and not for a filter built from an SVG graph, so recolour is the one effect that post-processes what is behind a block.`);
+    }
+    backdrop = o.backdrop;
+  }
+  // Proven where it lives: an effect under words is measured on the layout's own look (vivid
+  // when none is named) at the numbers it will run at. On a picture no words sit under it, and
+  // a backdrop touches what is behind the block rather than its words.
+  const underWords = !component || isTextBearing(component);
+  if (underWords && !backdrop && effect.proof !== 'none') {
+    const presets = [opts.look && opts.look.length ? opts.look : 'vivid'];
+    const bad = runMatrix(undefined, { presets, effect: { id: effect.id, params } }).filter((r) => !r.ok);
+    if (bad.length > 0) {
+      const first = bad[0]!;
+      const where = first.min > 0
+        ? `${first.label} in ${first.combo} measures ${first.actual.toFixed(2)} against the ${first.min} floor (${first.why})`
+        : `${first.label} in ${first.combo}: ${first.why}`;
+      const advice = effect.proof === 'overlay'
+        ? 'Lower strength (a quarter of ink passes every look)'
+        : 'Ease the grade (any hue at saturate 1.5 or under passes every look)';
+      fail(`${at}: ${effect.id} at these numbers fails the contrast matrix on the ${presets[0]} look: ${where}; ${bad.length} check(s) fail in all. ${advice}, or put the effect on a picture.`);
+    }
+  }
+  return { id: effect.id, ...(params ? { params } : {}), ...(backdrop ? { backdrop: true } : {}) };
 }
 
 /** The dialog shapes a node can prove — enums, so a shape is data and never a stylesheet. */
@@ -433,12 +593,19 @@ export function validateUiLayout(raw: unknown): AppUiLayout {
       }
     }
 
+    let effect: AppUiEffectSpec | undefined;
+    if (b.effect !== undefined) {
+      const hasImage = def.id === 'hero' ? typeof props.image === 'string' && props.image.length > 0 : undefined;
+      effect = validateEffectSpec(b.effect, { component: def.id, look: out.look, hasImage, at: `${at} ("${b.id}") effect` });
+    }
+
     out.blocks.push({
       id: b.id,
       component: def.id,
       ...(Object.keys(props).length ? { props } : {}),
       ...(typeof b.span === 'string' && b.span !== 'full' ? { span: b.span } : {}),
       ...(b.hidden === true ? { hidden: true } : {}),
+      ...(effect ? { effect } : {}),
     });
   });
 

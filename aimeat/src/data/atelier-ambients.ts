@@ -30,6 +30,11 @@
  * @usage
  *   import { AMBIENTS, AMBIENT_BOUNDS, ambientById } from '../data/atelier-ambients.js';
  * @version-history
+ *   v1.2.0 — 2026-09-05 — THE GENERATORS (wish-atelier-post-process-effects, stage 3): plasma
+ *     and lava, two fields drawn per pixel at a fraction of the size, and tunnel, a sparse
+ *     preset of rings and spokes. A generator makes a moving field from nothing, so it is an
+ *     ambient preset like the six before it; a filter, which transforms what is already
+ *     painted, lives in atelier-effects.ts.
  *   v1.1.0 — 2026-09-05 — shelfAlpha: the alpha the Design Book's seeded part shows each preset
  *     at, on the first look it fits — a world that owns its ground — so the shelf shows the
  *     wave at eight tenths on lounge rather than the whisper the bare preset ships at. The
@@ -193,6 +198,57 @@ export const AMBIENTS: readonly AtelierAmbient[] = [
     fps: 24,
     fitsLooks: ['riso', 'gallery', 'broadsheet'],
     note: 'Drawn at a sixth of the resolution and upscaled: the blur is free and the frame is cheap. Slow on purpose — the eye should notice it has changed, never see it move.',
+  },
+  {
+    id: 'plasma',
+    feel: 'Slow interference bands of colour rolling over one another, the old demo-scene plasma: no edges, only bloom sliding into bloom.',
+    evokes: 'A demo party, a screensaver on a CRT, the nineties\' idea of a computer at play, a warm room late at night.',
+    technique: 'canvas',
+    reads: ['--ak-accent', '--ak-spectrum-2', '--ak-spectrum-3', '--ak-bg'],
+    proof: 'field',
+    pigments: ['--ak-accent', '--ak-spectrum-2', '--ak-spectrum-3'],
+    peak: 0.32,
+    blend: 'over',
+    defaultAlpha: 0.25,
+    shelfAlpha: 0.8,
+    defaultSpeed: 1,
+    fps: 24,
+    fitsLooks: ['lounge', 'aurora', 'vivid'],
+    note: 'Four sines per pixel over an eighth-resolution image (about eighteen thousand pixels at a laptop size), a sine table and a 256-entry colour ramp built once per palette, then one putImageData and the upscale: the upscale IS the softness. Every pixel carries pigment, so it is a field proven at peak × alpha.',
+  },
+  {
+    id: 'lava',
+    feel: 'Five or six blobs of colour rising and sinking through the dark, stretching as they move and merging when they meet, the way wax does in a lava lamp.',
+    evokes: 'A lava lamp, a lounge in 1968, a slow evening, a shop window after closing.',
+    technique: 'canvas',
+    reads: ['--ak-accent', '--ak-spectrum-3', '--ak-bg'],
+    proof: 'field',
+    pigments: ['--ak-accent', '--ak-spectrum-3'],
+    peak: 0.3,
+    blend: 'over',
+    defaultAlpha: 0.25,
+    shelfAlpha: 0.7,
+    defaultSpeed: 1,
+    fps: 24,
+    fitsLooks: ['stage', 'lounge'],
+    note: 'Metaballs at a sixth of the resolution: every blob\'s field is summed per pixel and thresholded, so two that touch fuse into one, with a rim in the third hue where the field is thin. A blob squashes along its travel. Drawn into an image and upscaled, which is where the softness comes from.',
+  },
+  {
+    id: 'tunnel',
+    feel: 'Rings rushing outward from a point deep in the screen, a few spokes turning slowly through them: the view down a tunnel that never ends.',
+    evokes: 'A wormhole, a demo-scene intro, the starfield\'s cousin, arriving somewhere at speed.',
+    technique: 'canvas',
+    reads: ['--ak-accent', '--ak-spectrum-2', '--ak-bg'],
+    proof: 'sparse',
+    pigments: [],
+    peak: 0.55,
+    blend: 'over',
+    defaultAlpha: 0.5,
+    shelfAlpha: 0.5,
+    defaultSpeed: 1,
+    fps: 30,
+    fitsLooks: ['terminal', 'neon-dense', 'lounge'],
+    note: 'Twenty-four stroked rings on a perspective spacing with a scrolling phase, and twelve spokes turning at a fraction of the ring speed: about forty strokes a frame, lines and not a ground, so the matrix bounds how loud they are and asks nothing else.',
   },
 ];
 

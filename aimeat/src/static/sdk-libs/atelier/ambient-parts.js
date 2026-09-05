@@ -22,6 +22,8 @@
  *   const sw = AIMEAT.atelier.weather({ target: bar, kind: 'cycle' });
  *   const idle = AIMEAT.atelier.attract({ app: a, after: 60000 });
  * @version-history
+ *   v0.48.0 — 2026-09-05 — A stage carries a `post` chain to its layer, in the spec and in
+ *     set() (wish-atelier-post-process-effects, stage 3).
  *   v0.47.0 — 2026-09-05 — Initial (wish-atelier-ambient-visuals, stage 3).
  */
 import { el, append, resolve, reducedMotion, injectStyle, enter } from './dom.js';
@@ -38,7 +40,7 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
  * A section with its own ambient behind its content. With no preset the stage's look (its
  * own `look`, or the enclosing one) decides, exactly as the app frame does.
  * @param {{ target?: string|Element, preset?: string|null, alpha?: number, speed?: number,
- *   gl?: boolean, look?: string, minHeight?: string, body?: any }} spec
+ *   gl?: boolean, post?: any, look?: string, minHeight?: string, body?: any }} spec
  * @returns {{ el: HTMLElement, body: HTMLElement, ambient: import('./ambient.js').AmbientHandle,
  *   set: (patch: any) => void, destroy: () => void }}
  */
@@ -56,18 +58,18 @@ export function ambientStage(spec) {
   host.appendChild(root);
   const sky = ambient({
     target: root, preset: s.preset == null ? null : s.preset,
-    alpha: s.alpha, speed: s.speed, gl: s.gl,
+    alpha: s.alpha, speed: s.speed, gl: s.gl, post: s.post,
   });
   enter(body);
   return {
     el: root,
     body,
     ambient: sky,
-    /** @param {{ preset?: string|null, alpha?: number|null, speed?: number|null, look?: string }} patch */
+    /** @param {{ preset?: string|null, alpha?: number|null, speed?: number|null, post?: any, look?: string }} patch */
     set(patch) {
       if (!patch) return;
       if (patch.look != null) root.setAttribute('data-ak-look', patch.look);
-      if ('preset' in patch || 'alpha' in patch || 'speed' in patch) sky.set(patch);
+      if ('preset' in patch || 'alpha' in patch || 'speed' in patch || 'post' in patch) sky.set(patch);
     },
     destroy() {
       sky.destroy();
