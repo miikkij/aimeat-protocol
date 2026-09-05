@@ -44,6 +44,14 @@ export const PARTS = {
     fork: "One element, one number: build it yourself and call countUp(node, from, to).",
     file: "hero.js",
   },
+  "form": {
+    parts: ["root","field","label","input","req","hint","error","range","readout","bar","submit","cancel"],
+    slots: [],
+    variants: [],
+    tokens: ["--ak-range-track","--ak-range-thumb"],
+    fork: "Copy .ak-form* and .ak-input* out of data.css and build the fields yourself; you keep the tokens, and you give up the label/hint/error wiring, the announced refusal with focus on the first problem, the submit guard and the range's reading.",
+    file: "form.js",
+  },
   "health": {
     parts: ["root","row","lamp","name","label","sub","reading","aside"],
     slots: ["label(item)","sub(item)","reading(item)","aside(item)"],

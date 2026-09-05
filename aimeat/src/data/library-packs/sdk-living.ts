@@ -13,6 +13,8 @@
  * @structure LIVING_PACKS: LibraryPack[]
  * @usage Imported by ./sdk.ts (registry assembly). Do not import directly.
  * @version-history
+ *   v1.1.0 — 2026-09-05 — aimeat-living 0.2.0: the three copies of kit behaviour dropped now that
+ *     atelier 0.53.0 carries them.
  *   v1.0.0 — 2026-09-05 — Initial: aimeat-living 0.1.0 (the living document, stage 1).
  */
 import type { LibraryPack } from './types.js';
@@ -132,6 +134,7 @@ export const LIVING_PACKS: LibraryPack[] = [
       'reporting exactly which nodes changed.',
     ].join('\n'),
     changelog: [
+      { version: '0.2.0', date: '2026-09-05', summary: 'Nothing to change in a record: this release is three pieces of behaviour handed back to the Atelier kit, which now carries them (0.53.0). A control row is one of the kit\'s own form fields, so a slider gets the kit\'s track, its reading, its label wiring and a 40px hit area rather than markup this library built beside it. The chain view stops padding its columns to keep a long label inside the graph\'s frame; the graph keeps its own pills inside now, so an outer node reads whole at any width. And which layout components accept a bound record is asked of the mounted arrangement instead of being a copied list here — so a binding aimed at a block that cannot read one is refused in the kit\'s words on the mounted handle (`refusals`), where validate() alone could only guess.' },
       { version: '0.1.0', date: '2026-09-05', summary: 'Initial. One JSON record — { v, register, look, layout, model } — mounted as a living screen: seven node types (value, formula, control, binding, text, machine, source) in one dependency graph, spreadsheet formulas with units carried through multiplication and checked on addition, a TeX printer riding the same tree as the evaluator, an XState-vocabulary statechart with guards, entry and exit assignments, timers and crossings, bindings that refresh through the mosaic so the kit\'s own motion runs, templates that change with the state, live sources on the platform\'s own change event, describe() generated from the node modules\' JSDoc, and a chain view that flashes the path a change travelled.' },
     ],
     tierHint: 'T1',

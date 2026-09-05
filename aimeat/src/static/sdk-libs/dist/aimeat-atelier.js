@@ -5138,24 +5138,53 @@
   }
 
   // src/static/sdk-libs/atelier/form.js
+  var NUMERIC = ["number", "range"];
   function form(spec) {
     const controls = /* @__PURE__ */ new Map();
-    const root = el("form", { class: "ak-root ak-form", novalidate: true });
+    const root = el("form", { class: "ak-root ak-form", "data-ak-part": "root", novalidate: true });
     if (spec.target) resolve(spec.target).appendChild(root);
+    function valueOf(name) {
+      const c = controls.get(name);
+      if (!c) return void 0;
+      const type = c.field.type || "text";
+      const node = (
+        /** @type {HTMLInputElement} */
+        c.input
+      );
+      if (type === "checkbox" || type === "toggle") return node.checked;
+      if (NUMERIC.indexOf(type) >= 0) return node.value === "" ? null : Number(node.value);
+      return node.value;
+    }
+    function reading(field, raw) {
+      const unit = field.unit ? " " + field.unit : "";
+      return (raw == null || raw === "" ? "" : String(raw)) + unit;
+    }
+    function refreshReadout(name) {
+      const c = controls.get(name);
+      if (!c || !c.readout) return;
+      const words = reading(
+        c.field,
+        /** @type {HTMLInputElement} */
+        c.input.value
+      );
+      c.readout.textContent = words;
+      c.input.setAttribute("aria-valuetext", words);
+    }
     function buildControl(field) {
       const type = field.type || "text";
-      const id = uid("ak-f");
+      const id = field.id || uid("ak-f");
       const hintId = id + "-hint";
       const errId = id + "-err";
       const describedBy = (field.hint ? hintId + " " : "") + errId;
       let input;
+      let readout = null;
       if (type === "textarea") {
-        input = el("textarea", { id, class: "ak-input ak-input--area", rows: 3, maxlength: field.maxLength || null, "aria-describedby": describedBy });
+        input = el("textarea", { id, class: "ak-input ak-input--area", "data-ak-part": "input", rows: 3, maxlength: field.maxLength || null, "aria-describedby": describedBy });
         input.value = field.value != null ? String(field.value) : "";
       } else if (type === "select") {
         input = el(
           "select",
-          { id, class: "ak-input", "aria-describedby": describedBy },
+          { id, class: "ak-input", "data-ak-part": "input", "aria-describedby": describedBy },
           (field.options || []).map(function(o) {
             return el("option", { value: o.value, selected: field.value === o.value ? true : null }, o.label);
           })
@@ -5165,36 +5194,50 @@
           id,
           type: "checkbox",
           class: type === "toggle" ? "ak-toggle" : "ak-check",
+          "data-ak-part": "input",
           checked: field.value ? true : null,
           "aria-describedby": describedBy
         });
       } else {
         input = el("input", {
           id,
-          type,
-          class: "ak-input",
+          type: type === "range" ? "range" : type,
+          class: "ak-input" + (type === "range" ? " ak-input--range" : ""),
+          "data-ak-part": "input",
           min: field.min != null ? String(field.min) : null,
           max: field.max != null ? String(field.max) : null,
-          maxlength: field.maxLength || null,
+          step: field.step != null ? String(field.step) : null,
+          maxlength: type === "range" ? null : field.maxLength || null,
           "aria-describedby": describedBy
         });
         if (field.value != null) input.value = String(field.value);
+        if (type === "range") readout = el("output", { class: "ak-form__readout", "data-ak-part": "readout", for: id });
       }
-      const label = el("label", { class: "ak-form__label", for: id }, [
+      const label = el("label", { class: "ak-form__label", "data-ak-part": "label", for: id }, [
         field.label,
-        field.required ? el("span", { class: "ak-form__req", "aria-hidden": "true", text: "*" }) : null,
+        field.required ? el("span", { class: "ak-form__req", "data-ak-part": "req", "aria-hidden": "true", text: "*" }) : null,
         field.required ? el("span", { class: "ak-sr-only", text: " (" + t("required") + ")" }) : null
       ]);
-      const hint = field.hint ? el("p", { class: "ak-form__hint", id: hintId, text: field.hint }) : null;
-      const error = el("p", { class: "ak-form__error", id: errId, role: "alert" });
+      const hint = field.hint ? el("p", { class: "ak-form__hint", "data-ak-part": "hint", id: hintId, text: field.hint }) : null;
+      const error = el("p", { class: "ak-form__error", "data-ak-part": "error", id: errId, role: "alert" });
       error.hidden = true;
+      const body = readout ? el("div", { class: "ak-form__range", "data-ak-part": "range" }, [input, readout]) : input;
       const inline = type === "checkbox" || type === "toggle";
-      const wrap = el(
-        "div",
-        { class: "ak-form__field" + (inline ? " ak-form__field--inline" : "") },
-        inline ? [input, label, hint, error] : [label, input, hint, error]
-      );
-      controls.set(field.name, { field, input, error, wrap });
+      const wrap = el("div", {
+        class: "ak-form__field" + (inline ? " ak-form__field--inline" : "") + (type === "range" ? " ak-form__field--range" : ""),
+        "data-ak-part": "field",
+        "data-ak-field": field.name
+      }, inline ? [input, label, hint, error] : [label, body, hint, error]);
+      controls.set(field.name, { field, input, error, wrap, readout });
+      input.addEventListener("input", function() {
+        refreshReadout(field.name);
+        if (field.onInput) field.onInput(valueOf(field.name), field);
+      });
+      input.addEventListener("change", function() {
+        refreshReadout(field.name);
+        if (field.onChange) field.onChange(valueOf(field.name), field);
+      });
+      refreshReadout(field.name);
       return wrap;
     }
     function setError(name, message) {
@@ -5216,19 +5259,7 @@
     }
     function values() {
       const out = {};
-      for (const [name, c] of controls) {
-        const type = c.field.type || "text";
-        if (type === "checkbox" || type === "toggle") out[name] = /** @type {HTMLInputElement} */
-        c.input.checked;
-        else if (type === "number") {
-          const raw = (
-            /** @type {HTMLInputElement} */
-            c.input.value
-          );
-          out[name] = raw === "" ? null : Number(raw);
-        } else out[name] = /** @type {HTMLInputElement} */
-        c.input.value;
-      }
+      for (const [name] of controls) out[name] = valueOf(name);
       return out;
     }
     function validate() {
@@ -5237,12 +5268,13 @@
       for (const [name, c] of controls) {
         const f = c.field;
         const type = f.type || "text";
-        const v = values()[name];
+        const numeric = NUMERIC.indexOf(type) >= 0;
+        const v = valueOf(name);
         let problem = null;
         if (f.required && (v === "" || v == null || v === false)) problem = f.label + ": " + t("required").toLowerCase();
-        else if (type === "number" && v != null && Number.isNaN(v)) problem = f.label + ": " + t("required").toLowerCase();
-        else if (type === "number" && v != null && f.min != null && v < f.min) problem = f.label + " ≥ " + f.min;
-        else if (type === "number" && v != null && f.max != null && v > f.max) problem = f.label + " ≤ " + f.max;
+        else if (numeric && v != null && Number.isNaN(v)) problem = f.label + ": " + t("required").toLowerCase();
+        else if (numeric && v != null && f.min != null && v < f.min) problem = f.label + " ≥ " + f.min;
+        else if (numeric && v != null && f.max != null && v > f.max) problem = f.label + " ≤ " + f.max;
         if (problem) {
           setError(name, problem);
           if (!firstBad) firstBad = name;
@@ -5250,32 +5282,35 @@
       }
       return firstBad;
     }
+    const wantsBar = spec.submit !== false;
     const submitBtn = el(
       "button",
-      { type: "submit", class: "ak-btn ak-btn--primary", "data-ak-noguard": true },
+      { type: "submit", class: "ak-btn ak-btn--primary", "data-ak-part": "submit", "data-ak-noguard": true },
       spec.submitLabel || t("save")
     );
-    const bar = el("div", { class: "ak-form__bar" }, [
+    const bar = wantsBar ? el("div", { class: "ak-form__bar", "data-ak-part": "bar" }, [
       spec.cancel ? el("button", {
         type: "button",
         class: "ak-btn ak-btn--ghost",
+        "data-ak-part": "cancel",
         "data-ak-noguard": true,
         on: { click: function() {
           if (spec.cancel && spec.cancel.onClick) spec.cancel.onClick();
         } }
       }, spec.cancel.label || t("cancel")) : null,
       submitBtn
-    ]);
+    ]) : null;
     function render(fields) {
       controls.clear();
       clear(root);
       for (const field of fields) root.appendChild(buildControl(field));
-      root.appendChild(bar);
+      if (bar) root.appendChild(bar);
       enter(root);
     }
     render(spec.fields || []);
     root.addEventListener("submit", function(ev) {
       ev.preventDefault();
+      if (!spec.onSubmit) return;
       const bad = validate();
       if (bad) {
         const c = controls.get(bad);
@@ -5306,6 +5341,7 @@
           const type = c.field.type || "text";
           if (type === "checkbox" || type === "toggle") c.input.checked = !!next[name];
           else c.input.value = next[name] == null ? "" : String(next[name]);
+          refreshReadout(name);
         }
       },
       setError,
@@ -6411,30 +6447,51 @@
   var W2 = 720;
   var H2 = 420;
   var PAD2 = 46;
+  var PILL_H = 34;
+  var GUTTER = 4;
+  var LABEL_MAX = 24;
   var SVG_NS5 = "http://www.w3.org/2000/svg";
   function svg2(name, attrs) {
     const node = document.createElementNS(SVG_NS5, name);
     for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
     return node;
   }
-  function place(nodes) {
+  function pillLabel(label) {
+    const text = String(label == null ? "" : label);
+    return text.length > LABEL_MAX ? text.slice(0, LABEL_MAX - 1) + "…" : text;
+  }
+  function pillWidth(label) {
+    return Math.min(Math.max(pillLabel(label).length * 7.6 + 26, 60), 190);
+  }
+  function clamp2(v, lo, hi) {
+    if (hi < lo) return (lo + hi) / 2;
+    return Math.min(Math.max(v, lo), hi);
+  }
+  function place(nodes, widths) {
     const out = /* @__PURE__ */ new Map();
+    let widest = 0;
+    for (const w of widths.values()) widest = Math.max(widest, w);
+    const padX = Math.min(Math.max(PAD2, widest / 2 + GUTTER), W2 / 2 - GUTTER);
+    const padY = Math.max(PAD2, PILL_H / 2 + GUTTER);
     const ringed = nodes.filter((n) => typeof n.x !== "number" || typeof n.y !== "number");
     let ringIndex = 0;
     for (const node of nodes) {
+      let x;
+      let y;
       if (typeof node.x === "number" && typeof node.y === "number") {
-        out.set(node.id, {
-          x: PAD2 + Math.min(Math.max(node.x, 0), 100) / 100 * (W2 - PAD2 * 2),
-          y: PAD2 + Math.min(Math.max(node.y, 0), 100) / 100 * (H2 - PAD2 * 2)
-        });
+        x = padX + Math.min(Math.max(node.x, 0), 100) / 100 * (W2 - padX * 2);
+        y = padY + Math.min(Math.max(node.y, 0), 100) / 100 * (H2 - padY * 2);
       } else {
         const angle = 2 * Math.PI * ringIndex / Math.max(ringed.length, 1) - Math.PI / 2;
-        out.set(node.id, {
-          x: W2 / 2 + Math.cos(angle) * (W2 / 2 - PAD2 * 1.6),
-          y: H2 / 2 + Math.sin(angle) * (H2 / 2 - PAD2 * 1.4)
-        });
+        x = W2 / 2 + Math.cos(angle) * (W2 / 2 - padX);
+        y = H2 / 2 + Math.sin(angle) * (H2 / 2 - padY);
         ringIndex++;
       }
+      const half = (widths.get(node.id) || 60) / 2;
+      out.set(node.id, {
+        x: clamp2(x, half + GUTTER, W2 - half - GUTTER),
+        y: clamp2(y, PILL_H / 2 + GUTTER, H2 - PILL_H / 2 - GUTTER)
+      });
     }
     return out;
   }
@@ -6456,7 +6513,9 @@
         return;
       }
       root.setAttribute("aria-label", (spec.title ? spec.title + " — " : "") + nodes.map((n) => n.label).join(", "));
-      const at = place(nodes);
+      const widths = /* @__PURE__ */ new Map();
+      for (const item of nodes) widths.set(item.id, pillWidth(item.label));
+      const at = place(nodes, widths);
       const node = svg2("svg", { viewBox: `0 0 ${W2} ${H2}`, class: "ak-graph__svg", "aria-hidden": "true" });
       for (const edge of edges) {
         const a = at.get(edge.from);
@@ -6476,11 +6535,11 @@
       }
       for (const item of nodes) {
         const p = at.get(item.id);
-        const width = Math.min(Math.max(item.label.length * 7.6 + 26, 60), 190);
+        const width = widths.get(item.id);
         const g = svg2("g", { class: "ak-graph__node ak-graph__node--" + (item.tone || "plain"), transform: `translate(${p.x}, ${p.y})` });
-        g.appendChild(svg2("rect", { x: -width / 2, y: -17, width, height: 34, rx: 17, class: "ak-graph__pill" }));
+        g.appendChild(svg2("rect", { x: -width / 2, y: -PILL_H / 2, width, height: PILL_H, rx: PILL_H / 2, class: "ak-graph__pill" }));
         const label = svg2("text", { x: 0, y: 5, class: "ak-graph__label", "text-anchor": "middle" });
-        label.textContent = item.label.length > 24 ? item.label.slice(0, 23) + "…" : item.label;
+        label.textContent = pillLabel(item.label);
         g.appendChild(label);
         if (spec.onPick) {
           g.setAttribute("role", "button");
@@ -8273,7 +8332,7 @@
     const threshold = o.threshold !== void 0 ? o.threshold : 4;
     node.classList.add("ak-drag");
     let active = null;
-    const clamp2 = function(v, range) {
+    const clamp3 = function(v, range) {
       return range ? Math.max(range[0], Math.min(range[1], v)) : v;
     };
     const down = function(e) {
@@ -8309,8 +8368,8 @@
       active.lx = e.clientX;
       active.ly = e.clientY;
       const s = stateOf(node);
-      s.x = clamp2(active.bx + dx, o.bounds && o.bounds.x);
-      s.y = clamp2(active.by + dy, o.bounds && o.bounds.y);
+      s.x = clamp3(active.bx + dx, o.bounds && o.bounds.x);
+      s.y = clamp3(active.by + dy, o.bounds && o.bounds.y);
       node.style.transform = transformOf(s);
       if (h.onMove) h.onMove(s.x - active.bx, s.y - active.by, node);
       e.preventDefault();
@@ -12421,7 +12480,7 @@
     const host = spec.app ? spec.app.main : resolve(spec.target, document.body);
     const root = el("div", { class: "ak-root ak-mosaic" });
     host.appendChild(root);
-    let alive = { handles: [], bound: [], cleanup: [] };
+    let alive = { handles: [], bound: [], cleanup: [], blocks: [] };
     let destroyed = false;
     let ambientFromLayout = false;
     function resolveSource(name) {
@@ -12432,13 +12491,14 @@
       }
       return Promise.resolve().then(fn);
     }
-    function buildBlock(block, into) {
+    function buildBlock(block, into, entry) {
       const p = block.props || {};
       const pick = spec.onPick ? function(item) {
         spec.onPick(block.id, item);
       } : void 0;
       const empty = { title: p.emptyTitle, hint: p.emptyHint };
       function bound(kind, create) {
+        if (entry) entry.bound = true;
         const wait = skeleton({ target: into, rows: 2 });
         resolveSource(p.source).then(function(data) {
           if (destroyed) return;
@@ -12810,7 +12870,7 @@
         if (h && h.destroy) h.destroy();
       }
       for (const fn of alive.cleanup) fn();
-      alive = { handles: [], bound: [], cleanup: [] };
+      alive = { handles: [], bound: [], cleanup: [], blocks: [] };
       clear(root);
       if (!layout || !Array.isArray(layout.blocks)) return;
       layout = applyViewerOverlay(layout, viewerOverlay);
@@ -12866,13 +12926,22 @@
       const band = el("div", { class: "ak-mosaic__band" });
       const units = [];
       for (const block of visible) {
+        const entry = {
+          id: String(block.id),
+          component: String(block.component),
+          bound: false,
+          source: block.props && block.props.source ? String(block.props.source) : null,
+          el: band
+        };
+        alive.blocks.push(entry);
         if (block.component === "hero") {
-          buildBlock(block, band);
+          buildBlock(block, band, entry);
           continue;
         }
         const unitEl = el("section", { class: "ak-mosaic__unit", "data-ak-block": block.id });
+        entry.el = unitEl;
         if (block.props && block.props.motion === false) setMotionDefaults(unitEl, false);
-        buildBlock(block, unitEl);
+        buildBlock(block, unitEl, entry);
         if (block.effect) {
           const worn = fx(unitEl, block.effect);
           if (worn) alive.handles.push(worn);
@@ -12907,6 +12976,22 @@
     });
     const api = {
       el: root,
+      /**
+       * WHAT IS ACTUALLY ON THIS SCREEN, block by block: the id the layout gave it, the component
+       * it became, whether that component reads a bound source, the source name it was given, and
+       * the element it was built into. A copy, so reading it cannot move anything.
+       *
+       * It exists because the alternative is a second list. A caller that wires a block by id —
+       * a living document binding a number to a gauge, a host writing into one section — was left
+       * to keep its own copy of "which components take data", and a copy of a list in the kit is a
+       * list that goes stale on the next kit release while claiming to be current. Ask instead.
+       * @returns {Array<{ id: string, component: string, bound: boolean, source: string|null, el: HTMLElement }>}
+       */
+      blocks() {
+        return alive.blocks.map(function(b) {
+          return { id: b.id, component: b.component, bound: b.bound, source: b.source, el: b.el };
+        });
+      },
       /** Replace the whole rendered layout — what a live layout-change event calls. */
       set(layout) {
         currentLayout = layout || spec.fallback || null;
@@ -13014,7 +13099,7 @@
           if (h && h.destroy) h.destroy();
         }
         for (const fn of alive.cleanup) fn();
-        alive = { handles: [], bound: [], cleanup: [] };
+        alive = { handles: [], bound: [], cleanup: [], blocks: [] };
         const host2 = (
           /** @type {any} */
           spec.app && spec.app.el ? spec.app.el : root
@@ -16100,6 +16185,14 @@
       fork: "One element, one number: build it yourself and call countUp(node, from, to).",
       file: "hero.js"
     },
+    "form": {
+      parts: ["root", "field", "label", "input", "req", "hint", "error", "range", "readout", "bar", "submit", "cancel"],
+      slots: [],
+      variants: [],
+      tokens: ["--ak-range-track", "--ak-range-thumb"],
+      fork: "Copy .ak-form* and .ak-input* out of data.css and build the fields yourself; you keep the tokens, and you give up the label/hint/error wiring, the announced refusal with focus on the first problem, the submit guard and the range's reading.",
+      file: "form.js"
+    },
     "health": {
       parts: ["root", "row", "lamp", "name", "label", "sub", "reading", "aside"],
       slots: ["label(item)", "sub(item)", "reading(item)", "aside(item)"],
@@ -16221,7 +16314,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.52.0",
+    version: "0.53.0",
     /**
      * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
      * named parts (every one carries `data-ak-part`, so an app's own CSS reaches it), the slots

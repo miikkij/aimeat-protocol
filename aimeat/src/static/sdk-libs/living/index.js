@@ -36,6 +36,14 @@
  *   const doc = AIMEAT.living.mount(host, record, { onChange(e) { save(record); } });
  *   doc.set('t', 31);
  * @version-history
+ *   v0.2.0 — 2026-09-05 — THREE COPIES DROPPED, because the kit grew the seams they worked
+ *     around (atelier 0.53.0). The control row is one form field of the kit's — the input, the
+ *     label wiring, the range's track and its 40px hit area are no longer built here. The chain
+ *     view stops insetting its columns by 6 % to keep a long label inside the graph's frame; the
+ *     graph does that itself now. And which components read a bound record is asked of the
+ *     mounted mosaic (blocks()) instead of being a list of the kit's cases kept in this library —
+ *     which moves that one refusal from validate() to the mounted handle's `refusals`, because
+ *     without a mosaic there is nobody to ask.
  *   v0.1.0 — 2026-09-05 — Initial (the living document, stage 1): the graph, formulas with units,
  *     the TeX printer, the statechart, bindings through the mosaic, templates, live sources, the
  *     chain view and describe().
@@ -43,7 +51,7 @@
 import { attach } from '../_core/namespace.js';
 import { createGraph } from './graph.js';
 import { NODE_TYPES, typeOf } from './nodes/index.js';
-import { BOUND_COMPONENTS } from './nodes/binding.js';
+import { unboundBlocks } from './nodes/binding.js';
 import { planBindings, layoutWithSources, sourceNameFor, composeBlock } from './bindings.js';
 import { renderNodeInto } from './render.js';
 import { chain as chainView } from './chain.js';
@@ -52,7 +60,7 @@ import { resolve, kit } from './dom.js';
 import { isError, isQuantity, asText } from './formula-eval.js';
 import { unitLabel } from './units.js';
 
-const VERSION = '0.1.0';
+const VERSION = '0.2.0';
 
 /** The node types whose rendering this library does itself, when the node names a block. */
 const DRAWN = ['control', 'formula', 'text', 'machine', 'value', 'source'];
@@ -60,6 +68,12 @@ const DRAWN = ['control', 'formula', 'text', 'machine', 'value', 'source'];
 /**
  * Read a document without running it: every refusal it would hit, in words, before anything is
  * on the screen. An empty list means it will mount.
+ *
+ * One refusal is NOT here and cannot be: whether a bound block's component reads a record at all
+ * is the kit's vocabulary, and without a mounted mosaic there is nobody to ask. mount() asks —
+ * `surface.blocks()` — and adds it to the handle's `refusals` with the same words. The library
+ * used to keep a copy of the kit's list so it could answer early, and a copy of somebody else's
+ * list is wrong the day the kit gains a component.
  * @param {any} doc
  * @returns {{ ok: boolean, refusals: string[] }}
  */
@@ -83,9 +97,9 @@ export function validate(doc) {
       const block = blocks.get(String(node.block));
       if (!block) {
         refusals.push('The binding "' + id + '" writes to block "' + String(node.block) + '", and the layout has no block by that name.');
-      } else if (BOUND_COMPONENTS.indexOf(String(block.component)) < 0) {
-        refusals.push('The binding "' + id + '" writes to block "' + block.id + '", which is a ' + block.component + ' — that component does not read a bound record.');
       }
+      // Whether that component READS a bound record is the kit's answer, not this library's, so
+      // it is asked of the mounted mosaic in mount() rather than guessed from a copied list here.
       continue;
     }
     if (!node.block) continue;
@@ -208,6 +222,15 @@ export function mount(target, doc, opts) {
     target: host, layout: layout, fallback: layout, sources: sources, fill: fill,
   });
 
+  // THE ONE REFUSAL THAT NEEDED THE KIT. A binding aimed at a block whose component does not read
+  // a record would land nowhere in silence; the mounted mosaic says which blocks it actually
+  // bound, so the answer is the kit's own rather than a list copied into this library.
+  const lateRefusals = unboundBlocks(surface, plan.keys()).map(function (b) {
+    return 'A binding writes to block "' + b.id + '", which is a ' + b.component
+      + ' — that component does not read a bound record.';
+  });
+  for (const line of lateRefusals) console.warn('aimeat-living: ' + line);
+
   /** Everything one change touched, sent to the screen and to whoever is listening. */
   function announce(changed) {
     if (!changed.length) return;
@@ -292,7 +315,8 @@ export function mount(target, doc, opts) {
   return {
     el: host,
     ok: true,
-    refusals: [],
+    /** What the KIT refused once it had mounted; validate() cannot reach these on its own. */
+    refusals: lateRefusals,
     ready: ready,
     /** The mosaic this document is rendered through — the arrangement is still the kit's. */
     mosaic: surface,

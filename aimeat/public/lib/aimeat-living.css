@@ -22,6 +22,10 @@
  *   does nothing (docs/pitfalls.md §47).
  * @structure tokens · control row · formula · sentence · machine state · chain · refusals · still
  * @version-history
+ *   v0.2.0 — 2026-09-05 — The control row is now the kit's own form field (atelier 0.53.0), so
+ *     the rules that drew a row here only DRESS one: the marker classes keep their meaning on
+ *     the kit's elements, and the kinds the kit draws no reading for get the row shape from a
+ *     grid over its parts rather than from markup of ours.
  *   v0.1.0 — 2026-09-05 — Initial (the living document, stage 1).
  */
 
@@ -74,6 +78,26 @@
 
 .ak-living__control[data-living-kind='toggle'] .ak-living__input {
   flex: 0 0 auto;
+}
+
+/* THE KIT DRAWS THE FIELD; THIS ONLY ARRANGES IT. A range brings its own row (.ak-form__range,
+ * marked .ak-living__control-row above). The other kinds do not, so the control and its reading
+ * are laid out as two columns under the label — reached by the kit's declared part names, which
+ * is the supported way to shape a component from outside without forking it. */
+.ak-living__control .ak-form__field:not(.ak-form__field--range):not(.ak-form__field--inline) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--ak-living-gap);
+}
+.ak-living__control .ak-form__field:not(.ak-form__field--range):not(.ak-form__field--inline) > .ak-form__label,
+.ak-living__control .ak-form__field:not(.ak-form__field--range):not(.ak-form__field--inline) > .ak-form__hint,
+.ak-living__control .ak-form__field:not(.ak-form__field--range):not(.ak-form__field--inline) > .ak-form__error {
+  grid-column: 1 / -1;
+}
+/* A toggle's field is the kit's inline row; the reading goes to the far end of it. */
+.ak-living__control .ak-form__field--inline > .ak-living__readout {
+  margin-inline-start: auto;
 }
 
 .ak-living__slider {

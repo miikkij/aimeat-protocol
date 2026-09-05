@@ -24,6 +24,9 @@
  *   const view = chain(host, { graph: g });
  *   view.flash(['t', 'f']);
  * @version-history
+ *   v0.2.0 — 2026-09-05 — The 6 % column inset is gone: atelier 0.53.0 measures its own pills and
+ *     keeps them inside the frame, so the columns run the full width and the outer labels are
+ *     whole because the kit made them so, not because this file guessed at its padding.
  *   v0.1.0 — 2026-09-05 — Initial (the living document, stage 1).
  */
 import { el, clear, kit, reducedMotion } from './dom.js';
@@ -94,14 +97,15 @@ export function chainData(graph) {
     list.push(n);
     byColumn.set(c, list);
   }
-  // The columns are inset from the frame edge because the kit's graph part CENTRES a pill on its
-  // point and its own padding is narrower than half a long pill, so a node in the first or last
-  // column with a word-length label would be cut off by the viewBox.
-  const INSET = 6;
+  // The columns run the full width of the frame. They used to be inset by 6 % because the kit's
+  // graph part centred a pill on its point and padded the frame by less than half a long pill,
+  // so a first- or last-column node with a word-length label was cut off by the viewBox; the kit
+  // measures its own pills as of atelier 0.53.0 and keeps them inside, so this library stops
+  // guessing at somebody else's geometry.
   const last = Math.max(0, ...byColumn.keys());
   for (const [c, list] of byColumn) {
     for (let i = 0; i < list.length; i++) {
-      list[i].x = last === 0 ? 50 : INSET + (c / last) * (100 - INSET * 2);
+      list[i].x = last === 0 ? 50 : (c / last) * 100;
       list[i].y = list.length === 1 ? 50 : (i / (list.length - 1)) * 100;
     }
   }

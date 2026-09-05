@@ -1038,42 +1038,6 @@
   };
 
   // src/static/sdk-libs/living/nodes/binding.js
-  var BOUND_COMPONENTS = [
-    "statRow",
-    "figure",
-    "rating",
-    "steps",
-    "list",
-    "cardGrid",
-    "table",
-    "timeline",
-    "chart",
-    "matrix",
-    "graph",
-    "waveform",
-    "scene3d",
-    "gauge",
-    "console",
-    "atlas",
-    "map",
-    "health",
-    "queue",
-    "kanban",
-    "plan",
-    "schedule",
-    "crt",
-    "ring",
-    "crew",
-    "poll",
-    "keys",
-    "thread",
-    "calendar",
-    "priceTable",
-    "facets",
-    "carousel",
-    "sortable",
-    "notices"
-  ];
   var binding = {
     id: "binding",
     dependsOn(node) {
@@ -1091,6 +1055,17 @@
       return node.from ? ctx.scope.get(String(node.from)) : void 0;
     }
   };
+  function unboundBlocks(surface, blockIds) {
+    if (!surface || typeof surface.blocks !== "function") return [];
+    const mounted = /* @__PURE__ */ new Map();
+    for (const b of surface.blocks()) mounted.set(String(b.id), b);
+    const out = [];
+    for (const id of blockIds) {
+      const block = mounted.get(String(id));
+      if (block && !block.bound) out.push({ id: block.id, component: block.component });
+    }
+    return out;
+  }
   function setPath(into, path, v) {
     if (!path.length) return;
     let at = into;
@@ -2117,76 +2092,74 @@
     if (isQuantity(v)) return trimNumber(v.n) + (unitLabel(v.u) ? " " + unitLabel(v.u) : "");
     return asText(v);
   }
+  var FIELD_TYPE = { slider: "range", toggle: "toggle", pick: "select", number: "number", text: "text" };
+  function asOption(o) {
+    const opt = o && typeof o === "object" ? o : { value: o, label: String(o) };
+    return { value: String(opt.value), label: String(opt.label == null ? opt.value : opt.label) };
+  }
   function controlRow(host, spec) {
     const kind = String(spec.node.kind || "slider");
     const target = spec.target || {};
     const id = uid();
-    const label = el("label", {
-      class: "ak-form__label ak-living__label",
-      for: id,
-      "data-ak-part": "label",
-      text: spec.node.label || target.label || spec.node.target
-    });
-    const value2 = el("output", { class: "ak-living__readout", "data-ak-part": "readout", for: id });
-    let input;
-    if (kind === "toggle") {
-      input = el("input", { id, type: "checkbox", class: "ak-toggle ak-living__input" });
-    } else if (kind === "pick") {
-      input = el(
-        "select",
-        { id, class: "ak-input ak-living__input" },
-        (spec.node.options || []).map(function(o) {
-          const opt = o && typeof o === "object" ? o : { value: o, label: String(o) };
-          return el("option", { value: String(opt.value) }, String(opt.label == null ? opt.value : opt.label));
-        })
-      );
-    } else if (kind === "text") {
-      input = el("input", { id, type: "text", class: "ak-input ak-living__input" });
-    } else {
-      input = el("input", {
+    const type = FIELD_TYPE[kind] || "text";
+    const start = kind === "toggle" ? spec.value === true || asNumber(spec.value) === 1 : isQuantity(spec.value) ? spec.value.n : spec.value == null ? null : asText(spec.value);
+    const k = kit();
+    const handle = k.form({
+      target: host,
+      submit: false,
+      fields: [{
+        name: "value",
         id,
-        class: "ak-input ak-living__input" + (kind === "slider" ? " ak-living__slider" : ""),
-        type: kind === "slider" ? "range" : "number",
-        min: target.min == null ? null : String(target.min),
-        max: target.max == null ? null : String(target.max),
-        step: target.step == null ? null : String(target.step)
-      });
-    }
-    input.addEventListener("input", function() {
-      const node = (
-        /** @type {any} */
-        input
-      );
-      if (kind === "toggle") {
-        spec.onSet(!!node.checked);
-        return;
-      }
-      if (kind === "text" || kind === "pick") {
-        spec.onSet(node.value);
-        return;
-      }
-      spec.onSet(node.value === "" ? null : Number(node.value));
+        type,
+        label: spec.node.label || target.label || spec.node.target,
+        min: target.min,
+        max: target.max,
+        step: target.step,
+        unit: target.unit,
+        value: start,
+        options: kind === "pick" ? (spec.node.options || []).map(asOption) : void 0,
+        // The person's hand goes through the ENGINE, exactly where an agent's call goes: the input
+        // is never the source of truth, it only reports.
+        onInput(v) {
+          spec.onSet(v);
+        }
+      }]
     });
-    const root = el("div", {
-      class: "ak-form__field ak-living__control",
-      "data-living-node": spec.id,
-      "data-living-kind": kind
-    }, [label, el("div", { class: "ak-living__control-row" }, [input, value2])]);
-    host.appendChild(root);
+    const root = handle.el;
+    root.classList.add("ak-living__control");
+    root.setAttribute("data-living-node", spec.id);
+    root.setAttribute("data-living-kind", kind);
+    const field = root.querySelector('[data-ak-part="field"]');
+    const input = (
+      /** @type {any} */
+      root.querySelector('[data-ak-part="input"]')
+    );
+    const labelEl = root.querySelector('[data-ak-part="label"]');
+    if (labelEl) labelEl.classList.add("ak-living__label");
+    input.classList.add("ak-living__input");
+    if (kind === "slider") input.classList.add("ak-living__slider");
+    const row = root.querySelector('[data-ak-part="range"]');
+    if (row) row.classList.add("ak-living__control-row");
+    let readoutEl = root.querySelector('[data-ak-part="readout"]');
+    if (!readoutEl) {
+      readoutEl = el("output", { class: "ak-form__readout", "data-ak-part": "readout", for: id });
+      (field || root).appendChild(readoutEl);
+    }
+    readoutEl.classList.add("ak-living__readout");
     function update(v) {
-      const node = (
-        /** @type {any} */
-        input
-      );
-      if (kind === "toggle") node.checked = !!(v === true || asNumber(v) === 1);
-      else if (kind === "text" || kind === "pick") {
+      if (kind === "toggle") {
+        const on = !!(v === true || asNumber(v) === 1);
+        if (input.checked !== on) handle.setValues({ value: on });
+      } else if (kind === "text" || kind === "pick") {
         const s = isQuantity(v) ? String(v.n) : asText(v);
-        if (node.value !== s) node.value = s;
+        if (input.value !== s) handle.setValues({ value: s });
       } else {
         const n = asNumber(v);
-        if (Number.isFinite(n) && String(n) !== node.value) node.value = String(n);
+        if (Number.isFinite(n) && String(n) !== input.value) handle.setValues({ value: n });
       }
-      value2.textContent = readout(v);
+      const words = readout(v);
+      if (readoutEl.textContent !== words) readoutEl.textContent = words;
+      if (input.hasAttribute("aria-valuetext")) input.setAttribute("aria-valuetext", words);
     }
     update(spec.value);
     return { el: root, update };
@@ -2350,11 +2323,10 @@
       list.push(n);
       byColumn.set(c, list);
     }
-    const INSET = 6;
     const last = Math.max(0, ...byColumn.keys());
     for (const [c, list] of byColumn) {
       for (let i = 0; i < list.length; i++) {
-        list[i].x = last === 0 ? 50 : INSET + c / last * (100 - INSET * 2);
+        list[i].x = last === 0 ? 50 : c / last * 100;
         list[i].y = list.length === 1 ? 50 : i / (list.length - 1) * 100;
       }
     }
@@ -2483,7 +2455,7 @@
   };
 
   // src/static/sdk-libs/living/index.js
-  var VERSION = "0.1.0";
+  var VERSION = "0.2.0";
   var DRAWN = ["control", "formula", "text", "machine", "value", "source"];
   function validate(doc) {
     const refusals = [];
@@ -2502,8 +2474,6 @@
         const block2 = blocks.get(String(node.block));
         if (!block2) {
           refusals.push('The binding "' + id + '" writes to block "' + String(node.block) + '", and the layout has no block by that name.');
-        } else if (BOUND_COMPONENTS.indexOf(String(block2.component)) < 0) {
-          refusals.push('The binding "' + id + '" writes to block "' + block2.id + '", which is a ' + block2.component + " — that component does not read a bound record.");
         }
         continue;
       }
@@ -2656,6 +2626,10 @@
       sources,
       fill
     });
+    const lateRefusals = unboundBlocks(surface, plan.keys()).map(function(b) {
+      return 'A binding writes to block "' + b.id + '", which is a ' + b.component + " — that component does not read a bound record.";
+    });
+    for (const line of lateRefusals) console.warn("aimeat-living: " + line);
     function announce(changed) {
       if (!changed.length) return;
       for (const id of changed) {
@@ -2740,7 +2714,8 @@
     return {
       el: host,
       ok: true,
-      refusals: [],
+      /** What the KIT refused once it had mounted; validate() cannot reach these on its own. */
+      refusals: lateRefusals,
       ready,
       /** The mosaic this document is rendered through — the arrangement is still the kit's. */
       mosaic: surface,
