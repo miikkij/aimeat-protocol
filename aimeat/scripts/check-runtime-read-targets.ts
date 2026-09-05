@@ -24,8 +24,7 @@
  * @version-history
  *   v1.0.0 — 2026-09-04 — Initial, after the read-path audit found this class has exactly one member.
  */
-import ts from 'typescript';
-import { join, resolve, dirname } from 'node:path';
+import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readPaths, PARAMETERISED } from './inventory/read-paths.js';
 import { srcProgram } from './inventory/program.js';
@@ -45,16 +44,7 @@ const ALLOWED: Record<string, string> = {
         + 'clause it was missing when a deleted record came back from a text search on 2026-09-03.',
 };
 
-function sourceFiles(): ts.SourceFile[] {
-    const config = ts.readConfigFile(join(AIMEAT, 'tsconfig.json'), ts.sys.readFile);
-    const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, AIMEAT);
-    const program = ts.createProgram(parsed.fileNames, { ...parsed.options, noEmit: true });
-    program.getTypeChecker();
-    return program.getSourceFiles().filter(f => !f.isDeclarationFile && f.fileName.includes('/src/'));
-}
-
-function main(): void {
-    const strict = process.argv.includes('--strict');
+export function main(): boolean {
     const found = readPaths(srcProgram().files, AIMEAT)
         .filter(p => p.target === PARAMETERISED)
         // One query can be matched more than once inside the same function; the function is the unit.
@@ -77,17 +67,20 @@ function main(): void {
         console.error('✖ A read that picks its table at run time never passes through the filter its');
         console.error('  siblings share, and no reader or scanner can see which table it means. If this');
         console.error('  one is right, add it to ALLOWED in this script with a sentence saying why.');
-        if (strict) process.exit(1);
-        return;
+        return false;
     }
 
     if (stale.length > 0) {
         console.log(`  ✓ ${stale.length} listed entr${stale.length === 1 ? 'y is' : 'ies are'} gone. Remove from ALLOWED to lock the gain in:`);
         for (const k of stale) console.log(`    ${k}`);
-        return;
+        return true;
     }
 
     console.log('  ✓ every run-time-chosen read target is listed with a reason');
+    return true;
 }
 
-main();
+// Runs only when invoked as the script: check-invariants imports main() and runs the five
+// program-reading gates in one process against one compiler program.
+const invokedDirectly = process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (invokedDirectly && !main() && process.argv.includes('--strict')) process.exit(1);

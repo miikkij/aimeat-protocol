@@ -25,6 +25,12 @@
  * @usage
  *   import { UI_COMPONENTS, componentById, buildUiCatalogue } from './registry.js';
  * @version-history
+ *   v1.20.0 — 2026-09-05 — THE AMBIENT SHELF (append-only, wish-atelier-ambient-visuals): the
+ *     catalogue carries `ambients` — the six presets from the registry (atelier-ambients.ts),
+ *     what each feels like, evokes, how it is drawn and proven, which looks it fits, its
+ *     default alpha and speed and its peak — and every look sheet says which preset it runs
+ *     at idle (`ambient`, from the look's own --ak-ambient token). lounge and dawn arrive in the
+ *     look list on their own.
  *   v1.19.0 — 2026-09-02 — THE MOTION PARTS (append-only, wish-atelier-motion-libraries-and-
  *     parts): `thread`, `calendar`, `priceTable`, `carousel`, `sortable`, `notices` and `facets`
  *     join the components — the parts that ride the vendored Motion, anime.js and Lenis packs
@@ -92,6 +98,7 @@ import type { BlockPropDef } from '../surface-layout/registry-types.js';
 import { LOOKS as LOOK_REGISTRY, STRUCTURES } from '../../data/atelier-looks.js';
 import { UI_LAYOUT_PRESETS, type AppUiLayoutPreset } from './layouts.js';
 import { PATTERNS } from '../../data/atelier-patterns.js';
+import { AMBIENTS } from '../../data/atelier-ambients.js';
 
 /** A mosaic prop: the shared grammar, plus whether a layout must supply it. */
 export type AppUiPropDef = BlockPropDef & {
@@ -668,7 +675,7 @@ export function buildUiCatalogue(): {
   choreographies: { values: readonly string[]; summary: string };
   looks: readonly string[];
   spans: { values: readonly string[]; summary: string };
-  look_sheets: Array<{ id: string; feel: string; structures: string[] }>;
+  look_sheets: Array<{ id: string; feel: string; structures: string[]; ambient: string }>;
   structures: Array<{ id: string; summary: string }>;
   layouts: readonly AppUiLayoutPreset[];
   signature_tokens: { values: Record<string, string>; summary: string };
@@ -682,6 +689,13 @@ export function buildUiCatalogue(): {
       evokes: string;
       use: { ground?: string; prop?: string; zone?: string };
       default_size: string;
+    }>;
+  };
+  ambients: {
+    summary: string;
+    presets: Array<{
+      id: string; feel: string; evokes: string; technique: string; proof: string;
+      fits_looks: string[]; default_alpha: number; default_speed: number; peak: number;
     }>;
   };
 } {
@@ -707,7 +721,11 @@ export function buildUiCatalogue(): {
     },
     // The look data sheets: what each look feels like and which page structures it carries —
     // enough for an AI to pick by intent instead of by trying them all.
-    look_sheets: LOOK_REGISTRY.map((l) => ({ id: l.id, feel: l.feel, structures: l.structures })),
+    look_sheets: LOOK_REGISTRY.map((l) => ({
+      id: l.id, feel: l.feel, structures: l.structures,
+      // The layer this look runs at idle, from its own token — the one place the answer lives.
+      ambient: l.tokens['--ak-ambient'] ?? 'none',
+    })),
     structures: STRUCTURES.map((s) => ({ id: s.id, summary: s.summary })),
     layouts: UI_LAYOUT_PRESETS,
     signature_tokens: {
@@ -751,6 +769,29 @@ export function buildUiCatalogue(): {
         evokes: p.evokes,
         use: p.use,
         default_size: p.defaultSize,
+      })),
+    },
+    ambients: {
+      summary: 'The ambient shelf: the one layer allowed to move at idle, behind the app. '
+        + 'THE LOOK DECIDES — each look sheet says which preset it runs (`ambient`, or none), '
+        + 'and an arrangement overrides with an optional top-level `ambient`: { preset, alpha?, '
+        + 'speed? }, or { preset: "none" } to switch the look\'s own off. A field preset (it lays '
+        + 'pigment under the words) is proven by the contrast matrix at peak × alpha: on a look '
+        + 'that stands on the palette\'s own page it may run only at the whisper (alpha at or '
+        + 'below the preset\'s default), while a world that owns its ground (lounge, dawn, stage, '
+        + 'broadcast) runs it as loud as the ink allows. The layer pauses on a hidden tab, stills '
+        + 'under Less motion and reduced motion, and the viewer\'s weather switch (Off, Calm, '
+        + 'Full) always wins. One per app; a tool someone lives in usually wants none.',
+      presets: AMBIENTS.map((a) => ({
+        id: a.id,
+        feel: a.feel,
+        evokes: a.evokes,
+        technique: a.technique,
+        proof: a.proof,
+        fits_looks: a.fitsLooks,
+        default_alpha: a.defaultAlpha,
+        default_speed: a.defaultSpeed,
+        peak: a.peak,
       })),
     },
   };

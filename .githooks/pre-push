@@ -1,0 +1,71 @@
+#!/bin/sh
+#
+# AIMEAT pre-push gate — the two things a push must not do to the other sessions.
+#
+#   1. Push behind origin. A rebase before the push is the rule; pushing from behind either fails
+#      or, with a force, deletes what a peer landed. The hook fetches and refuses when the local
+#      branch is behind origin/main.
+#   2. Push a tree that does not boot. Every static gate reads files; none of them loads the
+#      server. c932f2f17 (2026-09-04) passed them all and left origin/main unable to start, because
+#      its imports resolved only in the author's worktree. `pnpm boot:smoke` imports the boot path
+#      and refuses when a module throws at load.
+#
+#   3. Push what CI would refuse. The whole unit suite, and the guard tier on both backends when a
+#      commit touches src/routes, src/auth, src/services or src/storage (2026-09-05): what a
+#      developer's machine can answer in a few minutes, CI answers in twenty, after the push.
+#
+# It also lists the commits about to go that carry no Session: trailer, so a session that forgot
+# to set AIMEAT_SESSION sees it before the push rather than after.
+
+set -e
+ROOT="$(git rev-parse --show-toplevel)"
+REMOTE="$1"
+
+git fetch -q "$REMOTE" main 2>/dev/null || true
+BEHIND="$(git rev-list --count HEAD..refs/remotes/$REMOTE/main 2>/dev/null || echo 0)"
+if [ "$BEHIND" != "0" ]; then
+  echo "[pre-push] main is $BEHIND commit(s) behind $REMOTE/main: rebase first (git pull --rebase), then push." >&2
+  exit 1
+fi
+
+UNSTAMPED="$(git log --format='%h %s%n%(trailers:key=Session,valueonly)' "refs/remotes/$REMOTE/main..HEAD" 2>/dev/null | awk 'NR%2==1{line=$0} NR%2==0{ if ($0=="") print line }')"
+if [ -n "$UNSTAMPED" ]; then
+  echo "[pre-push] commits without a Session: trailer (set AIMEAT_SESSION; see skill aimeat-dev-session):" >&2
+  echo "$UNSTAMPED" | sed 's/^/  /' >&2
+fi
+
+cd "$ROOT/aimeat"
+echo "[pre-push] boot smoke (the modules on the boot path load)…"
+pnpm -s boot:smoke
+
+# ── The unit suite and the guard tier (2026-09-05) ──────────────────────────────
+# What CI blocks on, run here first when the commits about to go could have moved it. The unit
+# suite whole (pre-commit runs only the files reachable from a change); the guard tier on both
+# backends when a commit touches src/routes, src/auth, src/services or src/storage
+# (docs/coding-guidelines/testing-requirements.md Rule 1b), Postgres only when its env file is
+# on this machine. Four lanes each (four nodes at once, every suite alone on an empty database):
+# about two minutes for SQLite, and one lane on Postgres where the role cannot create databases.
+RANGE="refs/remotes/$REMOTE/main..HEAD"
+CHANGED="$(git diff --name-only "$RANGE" 2>/dev/null || git diff --name-only HEAD~1..HEAD)"
+
+echo "[pre-push] unit suite, whole (test)…"
+pnpm -s test
+
+if echo "$CHANGED" | grep -qE '^aimeat/src/(routes|auth|services|storage)/'; then
+  # The env files are gitignored, so a fresh worktree has none; node's own "not found" for a
+  # missing --env-file names the file and nothing else.
+  if [ ! -f .env.test.sqlite ]; then
+    echo "[pre-push] aimeat/.env.test.sqlite is missing (gitignored): cp .env.test.sqlite.example .env.test.sqlite, or copy it from the main checkout." >&2
+    exit 1
+  fi
+  echo "[pre-push] guard tier, SQLite (test:e2e:guards:sqlite)…"
+  pnpm -s test:e2e:guards:sqlite
+  if [ -f .env.test.postgres-kysely ]; then
+    echo "[pre-push] guard tier, Postgres (test:e2e:guards:postgres-kysely)…"
+    pnpm -s test:e2e:guards:postgres-kysely
+  else
+    echo "[pre-push] no .env.test.postgres-kysely on this machine: the Postgres tier runs in CI." >&2
+  fi
+else
+  echo "[pre-push] nothing under src/routes, src/auth, src/services or src/storage changed: guard tier left to CI."
+fi

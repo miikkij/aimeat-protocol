@@ -23,6 +23,15 @@
  *   a variable first (`const mine = a.owner === b.owner; if (!mine) …`), one folded into a ternary,
  *   and any decision made inside a helper called with the two names as arguments. The count is a
  *   floor.
+ *
+ *   AND IT IS BLIND TO OVER-REFUSAL BY CONSTRUCTION, which is the half a reader will not think of.
+ *   Every gate here looks for a door that refuses too LITTLE. A fence that refuses too much — the
+ *   naive `installedBy === caller` that hides every bundled cortex, seeded as `system@<nodeId>` and
+ *   private, from everyone on the node — passes a one-fixture test and passes every scanner we own,
+ *   because it errs in the direction none of them measure. Eight of fourteen cortex packs on the dev
+ *   database are exactly that shape (2026-09-05). A green gate says nobody was let in who should not
+ *   have been; it never says anybody who should be got in. Only a test with a second fixture does,
+ *   and writing that test is the part no gate will remind you of.
  * @structure
  *   - main(): report; --strict exits 1 on an unlisted door; --seed rewrites the exemption file
  * @usage
@@ -32,7 +41,6 @@
  * @version-history
  *   v1.0.0 — 2026-09-04 — Initial, the fourth of the four written rules that had no gate.
  */
-import ts from 'typescript';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -55,8 +63,7 @@ const SEED_REASON = 'SEEDED 2026-09-04, NOT TRIAGED — refuses by comparing the
 
 const key = (r: OwnerDecision): string => `${r.file}:${r.unit}`;
 
-function main(): void {
-    const strict = process.argv.includes('--strict');
+export function main(): boolean {
     const seed = process.argv.includes('--seed');
 
     const { program, files } = srcProgram(/[/\\]src[/\\](routes|services)[/\\]/);
@@ -83,7 +90,7 @@ function main(): void {
         };
         writeFileSync(EXEMPTIONS, JSON.stringify(file, null, 2) + '\n', 'utf-8');
         console.log(`  seeded ${units.length} doors → ${EXEMPTIONS}`);
-        return;
+        return true;
     }
 
     const exempt = JSON.parse(readFileSync(EXEMPTIONS, 'utf-8')) as ExemptionFile;
@@ -114,17 +121,20 @@ function main(): void {
         console.error('  everything acting in this one\'s name. If the door protects the ACCOUNT, put it');
         console.error('  behind requireOwnerPrincipal(); if it protects DATA, add it to');
         console.error('  security/owner-principal-exemptions.json with the sentence that says so.');
-        if (strict) process.exit(1);
-        return;
+        return false;
     }
 
     if (stale.length > 0) {
         console.log(`  ✓ ${stale.length} listed door${stale.length === 1 ? '' : 's'} gone. Remove to lock the gain in:`);
         for (const k of stale) console.log(`    ${k}`);
-        return;
+        return true;
     }
 
     console.log(`  ✓ no door refuses on the owner name alone, beyond the ${listed.length} listed`);
+    return true;
 }
 
-main();
+// Runs only when invoked as the script: check-invariants imports main() and runs the five
+// program-reading gates in one process against one compiler program.
+const invokedDirectly = process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (invokedDirectly && !main() && process.argv.includes('--strict')) process.exit(1);

@@ -34,6 +34,11 @@
  *   });
  *   // later, when the app's data changed:  m.refresh('errands.');
  * @version-history
+ *   v0.47.0 — 2026-09-05 — A stored arrangement's `ambient` ({ preset, alpha?, speed? }) reaches
+ *     the frame: with an app, through app.set({ ambient }) (and back to the look's when a later
+ *     layout carries none); without one — the bench page, the Design Book's stage — a layer
+ *     mounts on this root and lives as long as the render. The viewer overlay carries the field
+ *     through (wish-atelier-ambient-visuals).
  *   v0.44.0 — 2026-09-02 — The motion parts join the block vocabulary: `thread` (binds its
  *     record whole, reports onSend), `calendar` and `priceTable` (record whole, two-argument
  *     picks folded into one item), `carousel`, `sortable`, `notices` and `facets`.
@@ -93,6 +98,7 @@ import { graph } from './graph.js';
 import { waveform } from './waveform.js';
 import { scene3d } from './scene3d.js';
 import { reveal } from './disclose.js';
+import { ambient } from './ambient.js';
 import { patchFor, derivedColumns, wireLive } from './mosaic-bind.js';
 import { morph } from './mosaic-motion.js';
 import { appRef, loadLayout, labelOf } from './mosaic-layout.js';
@@ -121,7 +127,7 @@ export { appRef };
 /**
  * The mosaic.
  * @param {{
- *   app?: { main: HTMLElement, el?: HTMLElement, set?: (patch: { look?: string }) => void }, target?: string|Element,
+ *   app?: { main: HTMLElement, el?: HTMLElement, set?: (patch: { look?: string, ambient?: any }) => void }, target?: string|Element,
  *   sources?: Record<string, () => any>,
  *   live?: Record<string, { keyPrefix?: string|string[], domains?: string[], minIntervalMs?: number }>,
  *   actions?: Array<{ id: string, summary: string, params?: Record<string, string>, run?: (params: any) => any }>,
@@ -151,6 +157,8 @@ export function mosaic(spec) {
   /** Everything one render created, so the next render (and destroy) can end it cleanly. */
   let alive = { handles: [], bound: [], cleanup: [] };
   let destroyed = false;
+  /** Whether the app frame's ambient is this mosaic's doing (a stored layout's), not the app's own. */
+  let ambientFromLayout = false;
 
   /** @param {string} name @returns {Promise<any>} */
   function resolveSource(name) {
@@ -470,7 +478,7 @@ export function mosaic(spec) {
    */
   function applyViewerOverlay(layout, o) {
     if (!o) return layout;
-    const out = { v: layout.v, look: layout.look, nav: o.nav || layout.nav, tokens: layout.tokens, meta: layout.meta, blocks: layout.blocks.slice() };
+    const out = { v: layout.v, look: layout.look, nav: o.nav || layout.nav, tokens: layout.tokens, ambient: layout.ambient, meta: layout.meta, blocks: layout.blocks.slice() };
     if (Array.isArray(o.hidden) && o.hidden.length) {
       out.blocks = out.blocks.filter(function (b) { return o.hidden.indexOf(b.id) < 0; });
     }
@@ -500,6 +508,18 @@ export function mosaic(spec) {
     layout = applyViewerOverlay(layout, viewerOverlay);
 
     if (layout.look && spec.app && spec.app.set) spec.app.set({ look: layout.look });
+    // THE AMBIENT in a stored arrangement. With an app frame the frame's own layer takes it, and
+    // a later layout that carries none hands the decision back to the look — but only when it
+    // was this mosaic that set it, so an app's own app({ ambient }) survives an arrangement that
+    // says nothing. Without a frame (the bench page, the Design Book's stage) a layer mounts on
+    // this root and is destroyed with the render.
+    const wish = layout.ambient && typeof layout.ambient === 'object' && layout.ambient.preset ? layout.ambient : null;
+    if (spec.app && spec.app.set) {
+      if (wish) { spec.app.set({ ambient: wish }); ambientFromLayout = true; }
+      else if (ambientFromLayout) { spec.app.set({ ambient: null }); ambientFromLayout = false; }
+    } else if (wish) {
+      alive.handles.push(ambient({ target: root, preset: wish.preset, alpha: wish.alpha, speed: wish.speed }));
+    }
     root.setAttribute('data-ak-nav', layout.nav || 'stack');
     // The choreography is a class the stylesheet reads: scroll timelines live entirely in CSS,
     // so 'cinema' costs the page nothing at idle and reduced motion switches it off wholesale.

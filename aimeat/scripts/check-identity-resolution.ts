@@ -21,6 +21,14 @@
  *   reported — the permissive direction, chosen deliberately, because a gate that cries at correct
  *   code is turned off within a week.
  *
+ *   That choice has a measured cost and it is on the record: GET /v1/memory computes an owner-session
+ *   test three lines above a raw `sub` read, so this gate scored it resolved and the repo's semgrep
+ *   rule found it instead (crud.ts, 2026-09-04). The two cover different halves of one invariant and
+ *   neither alone is coverage — security-development-dna.md 11a. A green run here is not a statement
+ *   about the class, and it is never a statement about a door that refuses too MUCH: every gate in
+ *   this directory looks for too little, and a fence that locks out the people it was meant to serve
+ *   errs in the direction none of them measure.
+ *
  *   RATCHET, NOT A WALL. The exemption file is seeded with today's units and the seeded entries are
  *   NOT triaged: each one is a question nobody has answered yet, kept so the gate can refuse a NEW
  *   one. The count may only go down.
@@ -35,7 +43,6 @@
  *   v1.0.0 — 2026-09-04 — Initial. Measured before it existed: the identity rule was one of four
  *     written rules with no gate at all, and the only one whose failure hides itself from agent tests.
  */
-import ts from 'typescript';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -59,8 +66,7 @@ const SEED_REASON = 'SEEDED 2026-09-04, NOT TRIAGED — reads `sub` and never ca
 
 const key = (r: IdentityRead): string => `${r.file}:${r.unit}`;
 
-function main(): void {
-    const strict = process.argv.includes('--strict');
+export function main(): boolean {
     const seed = process.argv.includes('--seed');
 
     const { program, files } = srcProgram(/[/\\]src[/\\](routes|services)[/\\]/);
@@ -88,7 +94,7 @@ function main(): void {
         };
         writeFileSync(EXEMPTIONS, JSON.stringify(file, null, 2) + '\n', 'utf-8');
         console.log(`  seeded ${units.length} units → ${EXEMPTIONS}`);
-        return;
+        return true;
     }
 
     // Triage needs the whole population, not only what is new: the report below names the unlisted
@@ -97,7 +103,7 @@ function main(): void {
     if (process.argv.includes('--list')) {
         for (const u of units) console.log(`${u.asArgument ? 'ARG ' : '    '}${u.file}:${u.line}\t${u.unit}\t${u.text}`);
         console.log(`\n  ${units.length} units, ${units.filter(u => u.asArgument).length} of them handing the value to a call`);
-        return;
+        return true;
     }
 
     const exempt: ExemptionFile = JSON.parse(readFileSync(EXEMPTIONS, 'utf-8')) as ExemptionFile;
@@ -129,17 +135,21 @@ function main(): void {
         console.error('  update, and every test that uses an AGENT passes either way. Use');
         console.error('  resolveIdentity(req.auth!, config.nodeId), or add the unit to');
         console.error('  security/identity-resolution-exemptions.json with the sentence that makes it right.');
-        if (strict) process.exit(1);
-        return;
+        return false;
     }
 
     if (stale.length > 0) {
         console.log(`  ✓ ${stale.length} listed unit${stale.length === 1 ? '' : 's'} gone. Remove to lock the gain in:`);
         for (const k of stale) console.log(`    ${k}`);
-        return;
+        return true;
     }
 
     console.log(`  ✓ no unit reads \`sub\` without resolving, beyond the ${listed.length} listed`);
+    return true;
 }
 
-main();
+// Runs only when invoked as the script. check-invariants imports main() and runs the five gates that
+// read the compiler's program in one process, against one program; an import that exited the
+// process would end that run at the first red gate and hide the other four.
+const invokedDirectly = process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (invokedDirectly && !main() && process.argv.includes('--strict')) process.exit(1);

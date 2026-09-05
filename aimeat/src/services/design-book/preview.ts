@@ -18,11 +18,16 @@
  * @usage
  *   const html = partPreviewHtml(part);   // a complete self-contained page, kit assets relative
  * @version-history
+ *   v1.1.0 — 2026-09-05 — An ambient part renders as the demo arrangement with the layer running
+ *     behind it, on the part's look or the first look the registry says the preset fits — a
+ *     preview is only honest on the ground the part was proven on, and dust on vivid would be
+ *     invisible (wish-atelier-ambient-visuals).
  *   v1.0.0 — 2026-08-30 — Extracted whole from bench.ts (pure move: DEMO_LAYOUT_FOR_TOKENS,
  *     renderableBodyFor, benchPageHtml) and grown by the illustration page and partPreviewHtml,
  *     for the browsable Design Book gallery (wish-designbook-graafinen-selailu).
  */
 import { getAppTemplates } from '../../data/app-templates.js';
+import { ambientById } from '../../data/atelier-ambients.js';
 import type { DesignBookPart } from './service.js';
 
 /** A representative arrangement for parts that are seasoning rather than a dish: a look or
@@ -51,6 +56,23 @@ export function renderableBodyFor(part: DesignBookPart): Record<string, unknown>
   if (part.kind === 'look' || part.kind === 'motion') {
     const body = part.body as { tokens?: Record<string, string>; look?: string };
     return { ...DEMO_LAYOUT_FOR_TOKENS, look: body.look ?? 'vivid', tokens: body.tokens ?? {} };
+  }
+  // An ambient benches and previews as the demo arrangement with the layer RUNNING behind it —
+  // the mosaic mounts a stored layout's `ambient` — on the part's look, or the first look the
+  // registry says the preset fits: dust on vivid would be invisible, and a preview is only
+  // honest on the ground the part was proven on.
+  if (part.kind === 'ambient') {
+    const body = part.body as { ambient: string; alpha?: number; speed?: number; tokens?: Record<string, string>; look?: string };
+    return {
+      ...DEMO_LAYOUT_FOR_TOKENS,
+      look: body.look ?? ambientById(body.ambient)?.fitsLooks[0] ?? 'vivid',
+      tokens: body.tokens ?? {},
+      ambient: {
+        preset: body.ambient,
+        ...(body.alpha !== undefined ? { alpha: body.alpha } : {}),
+        ...(body.speed !== undefined ? { speed: body.speed } : {}),
+      },
+    };
   }
   if (part.kind === 'illustration') return null;
   return part.body;

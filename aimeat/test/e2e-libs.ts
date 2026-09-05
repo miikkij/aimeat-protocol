@@ -5,6 +5,10 @@
  *   plus the /v1/libs catalogue and the generated JS sources themselves.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=libs
  * @version-history
+ *   v1.11.0 — 2026-09-05 — The ambient (wish-atelier-ambient-visuals): the six new exports, the
+ *     three contract tokens, lounge and dawn, ambient.css among the fetched parts, the layer's
+ *     marker in the bundle — and the infinite-animation claim widened on purpose from one to
+ *     exactly two, named: the hero drift and the ambient drift.
  *   v1.10.0 — 2026-09-03 — aimeat-phaser wave two: the twenty-three new exports asserted (fx,
  *     parallax, dayNight, sprites, world map, tile world, status, achievements, dialogue,
  *     chiptune, designers, boss, brain).
@@ -1139,6 +1143,7 @@ await test('GET /v1/libs/aimeat-atelier.js — serves the Atelier kit with every
         'screenTransition', 'panelTransition', 'curtain',
         'morph', 'draggable', 'burst', 'scrub', 'layoutMove', 'swipeStack', 'micro',
         'parallax', 'readingRail', 'intro', 'setMotion',
+        'ambient', 'ambientStage', 'weather', 'attract', 'setWeather', 'weatherLevel',
     ]) {
         assert(text.includes(part), `should export ${part}`);
     }
@@ -1147,6 +1152,8 @@ await test('GET /v1/libs/aimeat-atelier.js — serves the Atelier kit with every
         'a hero image data: URI must be refused with words, not painted');
     // The look is one attribute the preset blocks key on.
     assert(text.includes('data-ak-look'), 'the look must be selected via data-ak-look');
+    // The ambient layer is one attribute the sheet and the bench key on.
+    assert(text.includes('data-ak-ambient'), 'the ambient layer must carry data-ak-ambient');
 });
 
 await test('GET /v1/libs/aimeat-atelier.js — the version an app prints moves with the library', async () => {
@@ -1226,6 +1233,7 @@ await test('GET /lib/aimeat-atelier.css — serves the theming contract, light, 
         '--ak-display-shadow', '--ak-display-stroke', '--ak-tilt',
         '--ak-gap', '--ak-pad', '--ak-touch', '--ak-motion', '--ak-ease',
         '--ak-enter-distance', '--ak-enter-stagger', '--ak-chrome-bottom', '--ak-main-max', '--ak-hero-min',
+        '--ak-ambient', '--ak-ambient-alpha', '--ak-ambient-speed',
     ]) {
         assert(css.includes(token), `the theming contract must declare ${token}`);
     }
@@ -1240,14 +1248,14 @@ await test('GET /lib/aimeat-atelier.css — serves the theming contract, light, 
     const looksCss = withoutComments(looksText);
     for (const preset of ['flat', 'calm-card', 'editorial', 'sticker', 'neon-dense', 'poster',
         'broadsheet', 'gallery', 'brutalist', 'terminal', 'aurora', 'carnival', 'billboard',
-        'riso', 'stage', 'broadcast']) {
+        'riso', 'stage', 'broadcast', 'lounge', 'dawn']) {
         assert(looksCss.includes(`[data-ak-look='${preset}']`), `the ${preset} preset block must exist`);
         assert(looksText.includes(`@preset-block ${preset}`), `the ${preset} preset must carry its @preset-block tag`);
     }
     assert(text.includes('@preset-block vivid'), 'the base contract must carry the vivid @preset-block tag');
     // The parts the entry imports must actually be reachable, or the kit renders unstyled.
     let parts = '';
-    for (const part of ['shell.css', 'content.css', 'data.css', 'scenics.css', 'patterns.css']) {
+    for (const part of ['shell.css', 'content.css', 'data.css', 'scenics.css', 'patterns.css', 'ambient.css']) {
         assert(css.includes(part), `should import ${part}`);
         const partRes = await fetch(`${BASE}/lib/aimeat-atelier/${part}`);
         assert(partRes.ok, `/lib/aimeat-atelier/${part} failed: ${partRes.status}`);
@@ -1262,9 +1270,14 @@ await test('GET /lib/aimeat-atelier.css — serves the theming contract, light, 
     // direction: the hero's aurora drift (a compositor background tween that mutates no DOM,
     // so the idle-mutation measurement still reads zero, and reduced-motion collapses it).
     // The claim narrows, it does not vanish: exactly one infinite animation, and it is the drift.
+    // Widened to TWO on 2026-09-05 (wish-atelier-ambient-visuals): the ambient layer is the one
+    // declared exception to "nothing loops idle", and its CSS preset (the aurora drift on
+    // ambient.css) is a compositor transform tween that pauses under the layer's own gates and
+    // the kit's less-motion switch. The claim stays exact and named: two, and these two.
     const infinites = (css + parts).match(/animation[^;]*infinite/g) || [];
-    assert(infinites.length === 1 && /ak-hero-drift/.test(infinites[0]!),
-        `exactly one infinite animation (the hero drift) — found ${infinites.length}: ${infinites.join(' | ')}`);
+    assert(infinites.length === 2
+        && infinites.some((a) => /ak-hero-drift/.test(a)) && infinites.some((a) => /ak-ambient-drift/.test(a)),
+        `exactly two infinite animations (the hero drift, the ambient drift) — found ${infinites.length}: ${infinites.join(' | ')}`);
     // A dark-theme-only wash breaks every light look, in the entry and in the parts alike.
     assert(!/rgba\(\s*255\s*,\s*255\s*,\s*255/.test(css + parts), 'must not use rgba(255,255,255,…)');
 });

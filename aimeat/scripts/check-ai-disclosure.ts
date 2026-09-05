@@ -66,6 +66,21 @@ function fail(assertion: string, what: string, fix: string): void {
   failures.push(`✖ [${assertion}] ${what}\n      → ${fix}`);
 }
 
+/**
+ * A file's source with comments stripped, read once per run. Three of the checks below walk the
+ * whole of src/ and each stripped every file again; the unit test that proves this gate runs it
+ * twelve times, so the repeated work was most of what that test cost.
+ */
+const strippedCache = new Map<string, string>();
+function stripped(file: string): string {
+  let s = strippedCache.get(file);
+  if (s === undefined) {
+    s = stripComments(readFileSync(file, 'utf8'));
+    strippedCache.set(file, s);
+  }
+  return s;
+}
+
 /** Every .ts under a directory, recursively. */
 function walk(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
@@ -171,7 +186,7 @@ function checkOneLlmTransport(): void {
   for (const file of walk(join(root, 'src'))) {
     const r = rel(file);
     if (r === LLM_TRANSPORT) continue;
-    const src = stripComments(readFileSync(file, 'utf8'));
+    const src = stripped(file);
     if (providerCall.test(src)) {
       fail('llm-transport', `${r} calls a model provider endpoint directly`,
         `route it through ${LLM_CHOKEPOINT}, which mints provenance and meters the call. `
@@ -182,7 +197,7 @@ function checkOneLlmTransport(): void {
   for (const file of walk(join(root, 'src'))) {
     const r = rel(file);
     if (r === LLM_TRANSPORT || r === LLM_CHOKEPOINT) continue;
-    const src = stripComments(readFileSync(file, 'utf8'));
+    const src = stripped(file);
     if (!importsTransportComplete(src)) continue;
     if (r in LLM_TRANSPORT_LEGACY_CALLERS) {
       notes.push(`  known second LLM path: ${r} — ${LLM_TRANSPORT_LEGACY_CALLERS[r]}`);
@@ -382,7 +397,7 @@ function mcpToolBlocks(): Array<{ name: string; file: string; block: string }> {
     // with a worked `mcp.tool('aimeat_memory_write', … ...aiProvenanceInput …)` example in its
     // @usage block. Reading that as a real registration made the gate believe memory_write was
     // covered no matter what the actual tool did — the gate passed while the label was gone.
-    const src = stripComments(readFileSync(file, 'utf8'));
+    const src = stripped(file);
     const starts = [...src.matchAll(/mcp\.tool\(\s*'([a-z0-9_]+)'/g)];
     starts.forEach((m, i) => {
       const end = i + 1 < starts.length ? starts[i + 1].index! : src.length;
@@ -437,7 +452,7 @@ function catalogProvenanceTools(): string[] {
   const dir = join(root, 'src', 'mcp', 'catalog', 'definitions');
   const out: string[] = [];
   for (const file of walk(dir)) {
-    const src = stripComments(readFileSync(file, 'utf8'));
+    const src = stripped(file);
     const starts = [...src.matchAll(/name:\s*'([a-z0-9_]+)'/g)];
     starts.forEach((m, i) => {
       const end = i + 1 < starts.length ? starts[i + 1].index! : src.length;
@@ -452,7 +467,7 @@ function catalogProvenanceTools(): string[] {
 function connectorMcpToolBlocks(): Array<{ name: string; file: string; block: string }> {
   const out: Array<{ name: string; file: string; block: string }> = [];
   for (const file of walk(join(root, CONNECTOR_MCP_DIR))) {
-    const src = stripComments(readFileSync(file, 'utf8'));
+    const src = stripped(file);
     const starts = [...src.matchAll(/mcp\.tool\(\s*'([a-z0-9_]+)'/g)];
     starts.forEach((m, i) => {
       const end = i + 1 < starts.length ? starts[i + 1].index! : src.length;
@@ -603,7 +618,7 @@ function checkConnectorReadDirection(
   const seen = new Set<string>();
   for (const file of walk(join(root, 'src', 'routes'))) {
     const r = rel(file);
-    if (!/\benvelopeMeta\s*\(/.test(stripComments(readFileSync(file, 'utf8')))) continue;
+    if (!/\benvelopeMeta\s*\(/.test(stripped(file))) continue;
     seen.add(r);
     if (!(r in ENVELOPE_PROVENANCE_ROUTES)) {
       fail('connector-provenance', `${r} serves provenance on meta.provenance and nobody has said what carries it to a caller`,
@@ -649,7 +664,7 @@ function checkOnePublishPath(): void {
   for (const file of walk(join(root, 'src'))) {
     const r = rel(file);
     if (r === PUBLISH_PATH) continue;
-    const src = stripComments(readFileSync(file, 'utf8'));
+    const src = stripped(file);
     if (!/\bstorage\.createApp\s*\(/.test(src)) continue;
     if (r in CREATE_APP_DISTINCT_ACTS) { notes.push(`  app row written outside the publish path: ${r} — ${CREATE_APP_DISTINCT_ACTS[r]}`); continue; }
     fail('one-publish-path', `${r} writes an app version without going through ${PUBLISH_PATH}`,
@@ -687,7 +702,7 @@ function checkVocabularyContainment(): void {
       if (r === ADAPTERS) continue;
       // COMMENTS ARE NOT CODE. ai-provenance-marks.ts documents this very rule by naming the
       // strings; a gate that fails on its own documentation is a gate somebody switches off.
-      const src = stripComments(readFileSync(file, 'utf8'));
+      const src = stripped(file);
       for (const token of EXTERNAL_VOCABULARY) {
         if (src.includes(token)) {
           fail('vocabulary', `${r} spells the external vocabulary value "${token}"`,

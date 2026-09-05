@@ -20,6 +20,8 @@
  *   const { program, files } = srcProgram();                       // all of src/
  *   const { program, files } = srcProgram(/[/\\]src[/\\]routes[/\\]/);  // one area
  * @version-history
+ *   v1.1.0 — 2026-09-05 — Built once per process. Five hook gates each built it (62 s of every
+ *     commit), and check-invariants now runs them in one process against one program.
  *   v1.0.0 — 2026-09-04 — Extracted from the nine scripts that each had it.
  */
 import ts from 'typescript';
@@ -41,16 +43,31 @@ export interface SrcProgram {
  *   tree. Written against the full path, so it must allow both separators: `/[/\\]src[/\\]routes/`.
  */
 export function srcProgram(area?: RegExp): SrcProgram {
-    const config = ts.readConfigFile(join(AIMEAT, 'tsconfig.json'), ts.sys.readFile);
-    const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, AIMEAT);
-    const program = ts.createProgram(parsed.fileNames, { ...parsed.options, noEmit: true });
-    // Forces the binder to run, which is what sets `node.parent`. See the header: leaving this out
-    // does not fail, it silently answers nothing.
-    program.getTypeChecker();
+    const program = fullProgram();
     const files = program.getSourceFiles().filter(f =>
         !f.isDeclarationFile
         && /[/\\]src[/\\]/.test(f.fileName)
         && !f.fileName.includes('node_modules')
         && (area === undefined || area.test(f.fileName)));
     return { program, files };
+}
+
+let cached: ts.Program | undefined;
+
+/**
+ * The whole tree, built once per process. Building it is 8–10 s, and five gates in the pre-commit
+ * hook each did so on their own: 62 s of one commit was the same parse repeated. `check-invariants`
+ * runs them in one process, and every gate keeps working alone because the first call builds and
+ * the rest reuse. `area` above narrows what a gate LOOKS at, never what the compiler binds, so the
+ * cached program is a superset of what any single gate built for itself.
+ */
+function fullProgram(): ts.Program {
+    if (cached) return cached;
+    const config = ts.readConfigFile(join(AIMEAT, 'tsconfig.json'), ts.sys.readFile);
+    const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, AIMEAT);
+    cached = ts.createProgram(parsed.fileNames, { ...parsed.options, noEmit: true });
+    // Forces the binder to run, which is what sets `node.parent`. See the header: leaving this out
+    // does not fail, it silently answers nothing.
+    cached.getTypeChecker();
+    return cached;
 }

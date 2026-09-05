@@ -24,6 +24,11 @@
  *     without tearing them down, delete without removing the seed-data memory. What stays here is
  *     the upload-mode branch, the text rendering and the resource notification.
  *   v1.5.0 -- 2026-09-03 -- cortex_list carries `used_by` (the dependency map).
+ *   v1.6.0 -- 2026-09-05 -- cortex_list passes through visibleCortexes, the same fence GET /v1/cortex
+ *     applies. It returned every owner's PRIVATE cortex to any session until now — the tool surface
+ *     and the HTTP door leaked the same way, so the rule lives in services/cortex-lifecycle.ts and
+ *     both call it. Bundled system@<nodeId> cortexes stay visible to everyone; see that file for why
+ *     a naive owner fence would have hidden all of them.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -34,7 +39,7 @@ import { parseGAII } from '../utils/gaii.js';
 import { generateUploadToken } from '../services/upload-token.js';
 import {
     installCortex, activateCortex, deactivateCortex, deleteCortex,
-    type CortexCaller, type CortexRefusal,
+    visibleCortexes, type CortexCaller, type CortexRefusal,
 } from '../services/cortex-lifecycle.js';
 import { annotationsFor } from './annotations.js';
 import { dependencyIndex, visibleAppRefs, usedBySummary } from '../services/dependency-map.js';
@@ -93,7 +98,9 @@ export function registerCortexTools(
         {},
         annotationsFor('aimeat_cortex_list'),
         async () => {
-            const extensions = await storage.listCortexExtensions({});
+            // The same fence GET /v1/cortex applies: public, the node's own bundled ones, and the
+            // caller's own. This tool listed every owner's private cortex until 2026-09-05.
+            const extensions = visibleCortexes(agentCaller(), await storage.listCortexExtensions({}), config.nodeId);
             // Who loads each cortex, from the dependency map (the rows GET /v1/cortex carries too).
             const deps = await dependencyIndex(storage);
             const viewerOwner = parseGAII(getAgentGaii())?.owner;

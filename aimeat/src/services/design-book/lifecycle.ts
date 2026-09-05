@@ -20,6 +20,11 @@
  *   await seedDesignBook(storage, config);                    // server-bootstrap/service-init.ts
  *   scheduler.registerCoreHandler('designbook-aging', ...);   // services/core-jobs.ts
  * @version-history
+ *   v1.1.0 — 2026-09-05 — The six AMBIENTS are seeded published beside the six leiskat
+ *     (ambient-<preset>, each on the first look it fits at its shelf alpha), through the same
+ *     bench: a fresh node's AMBIENT shelf is never an empty wall, and prod gets them on the
+ *     deploy restart with no publish round. The seed loop is one function now (pure
+ *     extraction), so a third registry can join it (wish-atelier-ambient-visuals).
  *   v1.0.0 — 2026-08-28 — Initial (TARGET-074 phase 5, slice 2).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -27,8 +32,9 @@ import type { Storage } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
 import { systemGhiiFor } from '../compliance-register.js';
 import { UI_LAYOUT_PRESETS } from '../app-ui/layouts.js';
+import { AMBIENTS, type AtelierAmbient } from '../../data/atelier-ambients.js';
 import { DesignBookService, type DesignBookPart } from './service.js';
-import { DesignBookError } from './validate.js';
+import { DesignBookError, type PartKind } from './validate.js';
 
 /** A published part with no adoption for this long fades to `aging`. One adopt un-fades it. */
 export const AGING_AFTER_DAYS = 60;
@@ -40,29 +46,72 @@ export const AGING_AFTER_DAYS = 60;
 export async function seedDesignBook(storage: Storage, config: AimeatConfig): Promise<void> {
   const book = new DesignBookService(storage, config);
   const system = systemGhiiFor(config.nodeId);
-  for (const preset of UI_LAYOUT_PRESETS) {
-    const id = `leiska-${preset.id}`;
+  await seedParts(book, system, UI_LAYOUT_PRESETS.map((preset) => ({
+    id: `leiska-${preset.id}`,
+    kind: 'fill',
+    title: presetTitle(preset.id),
+    summary: `${preset.summary} ${preset.fill}`.slice(0, 240),
+    body: preset.layout as unknown as Record<string, unknown>,
+    tags: ['leiska', 'seed'],
+  })));
+  // The six ambients, each on the first look it fits at its shelf alpha — the propose bench
+  // proves the combination on that look, so a registry entry the matrix refuses is logged
+  // here and never lands, which doubles as a drift check.
+  await seedParts(book, system, AMBIENTS.map(ambientSeed));
+}
+
+/** A part the node seeds: the same shape a proposal carries. */
+interface SeedPart {
+  id: string;
+  kind: PartKind;
+  title: string;
+  summary: string;
+  body: Record<string, unknown>;
+  tags: string[];
+}
+
+/** Propose and publish each seed whose address is still free; a refusal is logged, never thrown. */
+async function seedParts(book: DesignBookService, system: string, seeds: SeedPart[]): Promise<void> {
+  for (const seed of seeds) {
     try {
-      const existing = await book.getRecordVersion(id);
+      const existing = await book.getRecordVersion(seed.id);
       if (existing !== null) continue; // the address is claimed — an operator's Book is theirs
-      await book.propose(system, {
-        id,
-        kind: 'fill',
-        title: presetTitle(preset.id),
-        summary: `${preset.summary} ${preset.fill}`.slice(0, 240),
-        body: preset.layout,
-        tags: ['leiska', 'seed'],
-      }, { principal: system });
-      await book.setStatus(system, true, id, 'published');
+      await book.propose(system, seed, { principal: system });
+      await book.setStatus(system, true, seed.id, 'published');
     } catch (err) {
       if (err instanceof DesignBookError) {
-        // A preset the bench refuses is a REGISTRY drift, not a seeding problem: say so and move on.
-        logger.warn(`design-book seed: preset "${preset.id}" refused by the bench — ${err.code}: ${err.message}`);
+        // A seed the bench refuses is a REGISTRY drift, not a seeding problem: say so and move on.
+        logger.warn(`design-book seed: "${seed.id}" refused by the bench — ${err.code}: ${err.message}`);
         continue;
       }
       throw err;
     }
   }
+}
+
+/** One ambient preset as a seeded part: the demo arrangement will wear it on its first fit. */
+function ambientSeed(a: AtelierAmbient): SeedPart {
+  return {
+    id: `ambient-${a.id}`,
+    kind: 'ambient',
+    title: ambientTitle(a.id),
+    summary: a.feel.slice(0, 240),
+    body: { ambient: a.id, alpha: a.shelfAlpha, speed: a.defaultSpeed, look: a.fitsLooks[0] },
+    tags: ['ambient', 'seed'],
+  };
+}
+
+/** The gallery card name for a seeded ambient — the preset, spoken. */
+function ambientTitle(presetId: string): string {
+  const names: Record<string, string> = {
+    'waves': 'The wave',
+    'aurora': 'The aurora drift',
+    'dust': 'Dust in the light',
+    'grid': 'The floor grid',
+    'static': 'Static',
+    'ink': 'Ink wash',
+  };
+  return names[presetId] ?? presetId;
 }
 
 /** The gallery card name for a seeded preset — the preset id, spoken. */

@@ -139,8 +139,8 @@
   function busy(node) {
     if (!node) return function() {
     };
-    const known = busyMap.get(node);
-    if (known) return known;
+    const known2 = busyMap.get(node);
+    if (known2) return known2;
     node.classList.add("ak-busy");
     node.setAttribute("aria-busy", "true");
     const wasDisabled = (
@@ -318,6 +318,10 @@
     en: {
       loading: "Loading…",
       lessMotion: "Less motion",
+      ambient: "Ambient",
+      ambientOff: "Off",
+      ambientCalm: "Calm",
+      ambientFull: "Full",
       ready: "Ready.",
       retry: "Try again",
       close: "Close",
@@ -388,6 +392,10 @@
     fi: {
       loading: "Ladataan…",
       lessMotion: "Vähemmän liikettä",
+      ambient: "Taustaliike",
+      ambientOff: "Pois",
+      ambientCalm: "Rauhallinen",
+      ambientFull: "Täysi",
       ready: "Valmis.",
       retry: "Yritä uudelleen",
       close: "Sulje",
@@ -458,6 +466,10 @@
     es: {
       loading: "Cargando…",
       lessMotion: "Menos movimiento",
+      ambient: "Ambiente",
+      ambientOff: "Apagado",
+      ambientCalm: "Suave",
+      ambientFull: "Completo",
       ready: "Listo.",
       retry: "Inténtalo otra vez",
       close: "Cerrar",
@@ -1251,10 +1263,1147 @@
     });
   }
 
+  // src/static/sdk-libs/atelier/token-color.js
+  var colorCtx = null;
+  function tokenRgb(node, name, fallbackName) {
+    const probe = document.createElement("span");
+    probe.style.display = "none";
+    probe.style.color = fallbackName ? "var(" + name + ", var(" + fallbackName + ", currentColor))" : "var(" + name + ", currentColor)";
+    node.appendChild(probe);
+    const resolved = getComputedStyle(probe).color;
+    probe.remove();
+    if (!colorCtx) colorCtx = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
+    colorCtx.fillStyle = resolved;
+    colorCtx.fillRect(0, 0, 1, 1);
+    const px = colorCtx.getImageData(0, 0, 1, 1).data;
+    return [px[0], px[1], px[2]];
+  }
+  function tokenColor(node, name, fallbackName) {
+    const c = tokenRgb(node, name, fallbackName);
+    return "rgb(" + c[0] + "," + c[1] + "," + c[2] + ")";
+  }
+
+  // src/static/sdk-libs/atelier/ambient-presets.js
+  var PRESET_IDS = ["waves", "aurora", "dust", "grid", "static", "ink"];
+  var BASE_ALPHA = { waves: 0.22, aurora: 0.3, dust: 0.6, grid: 0.5, static: 0.25, ink: 0.35 };
+  var PEAK = { waves: 0.35, aurora: 0.26, dust: 0.5, grid: 0.6, static: 0.3, ink: 0.22 };
+  var FPS = { waves: 30, aurora: 0, dust: 30, grid: 30, static: 12, ink: 24 };
+  var CSS_PRESETS = { aurora: true };
+  var TAU = Math.PI * 2;
+  function mulberry32(seed) {
+    let a = seed >>> 0;
+    return function() {
+      a = a + 1831565813 >>> 0;
+      let t2 = a;
+      t2 = Math.imul(t2 ^ t2 >>> 15, t2 | 1);
+      t2 ^= t2 + Math.imul(t2 ^ t2 >>> 7, t2 | 61);
+      return ((t2 ^ t2 >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  function rgba(c, a) {
+    return "rgba(" + c[0] + "," + c[1] + "," + c[2] + "," + a + ")";
+  }
+  var waves = {
+    scale: 2,
+    setup(w, h, palette2, rng) {
+      const colours = [palette2.accent, palette2.spectrum2, palette2.spectrum3];
+      const ribbons = [];
+      for (let i = 0; i < 3; i++) {
+        ribbons.push({
+          base: 0.38 + i * 0.13 + (rng() - 0.5) * 0.06,
+          a1: 0.05 + rng() * 0.05,
+          k1: (1.2 + rng() * 1.2) * TAU / w,
+          w1: 0.25 + rng() * 0.2,
+          a2: 0.02 + rng() * 0.03,
+          k2: (3 + rng() * 2) * TAU / w,
+          w2: 0.4 + rng() * 0.3,
+          thick: 0.05 + rng() * 0.05,
+          colour: colours[i % 3]
+        });
+      }
+      const specks = [];
+      for (let i = 0; i < 12; i++) {
+        specks.push({ x: rng(), y: rng(), r: 0.8 + rng() * 1.6, v: 0.01 + rng() * 0.02, phase: rng() * TAU });
+      }
+      return { ribbons, specks };
+    },
+    frame(ctx, state, t2, w, h, palette2) {
+      ctx.clearRect(0, 0, w, h);
+      ctx.globalCompositeOperation = palette2.dark ? "lighter" : "source-over";
+      const step = 8;
+      for (const r of state.ribbons) {
+        const y = function(x, off) {
+          return h * (r.base + off) + h * (r.a1 * Math.sin(r.k1 * x + r.w1 * t2) + r.a2 * Math.sin(r.k2 * x - r.w2 * t2));
+        };
+        ctx.beginPath();
+        ctx.moveTo(0, y(0, -r.thick / 2));
+        for (let x = step; x <= w + step; x += step) ctx.lineTo(x, y(x, -r.thick / 2));
+        for (let x = w + step; x >= 0; x -= step) ctx.lineTo(x, y(x, r.thick / 2));
+        ctx.closePath();
+        ctx.fillStyle = rgba(r.colour, 0.55);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(0, y(0, 0));
+        for (let x = step; x <= w + step; x += step) ctx.lineTo(x, y(x, 0));
+        ctx.lineWidth = h * r.thick * 2.2;
+        ctx.lineCap = "round";
+        ctx.strokeStyle = rgba(r.colour, 0.14);
+        ctx.stroke();
+      }
+      ctx.globalCompositeOperation = "source-over";
+      for (const s of state.specks) {
+        const sy = ((s.y - t2 * s.v) % 1 + 1) % 1;
+        const sx = ((s.x + Math.sin(t2 * 0.3 + s.phase) * 0.01) % 1 + 1) % 1;
+        ctx.beginPath();
+        ctx.arc(sx * w, sy * h, s.r, 0, TAU);
+        ctx.fillStyle = rgba(palette2.ink, 0.6);
+        ctx.fill();
+      }
+    }
+  };
+  var dust = {
+    scale: 1,
+    setup(w, h, palette2, rng) {
+      const count = Math.max(40, Math.min(120, Math.round(w * h / 12e3)));
+      const motes = [];
+      for (let i = 0; i < count; i++) {
+        const z = 0.15 + rng() * 0.85;
+        motes.push({
+          x: rng() * w,
+          y: rng() * h,
+          z,
+          r: 0.8 + z * 2.6,
+          vy: -(4 + z * 12),
+          vx: (rng() - 0.5) * 6,
+          phase: rng() * TAU
+        });
+      }
+      return { motes, t: null };
+    },
+    frame(ctx, state, t2, w, h, palette2) {
+      const dt = state.t == null ? 0 : Math.min(Math.max(t2 - state.t, 0), 0.1);
+      state.t = t2;
+      ctx.clearRect(0, 0, w, h);
+      for (const m of state.motes) {
+        m.x += (m.vx + Math.sin(t2 * 0.7 + m.phase) * 4) * dt;
+        m.y += m.vy * dt;
+        if (m.y < -6) {
+          m.y = h + 6;
+          m.x = (m.x + w * 0.37) % w;
+        }
+        if (m.x < -6) m.x = w + 6;
+        else if (m.x > w + 6) m.x = -6;
+        const c = m.z > 0.6 ? palette2.accent : palette2.ink;
+        const a = PEAK.dust * (0.35 + m.z * 0.65);
+        ctx.beginPath();
+        ctx.arc(m.x, m.y, m.r, 0, TAU);
+        ctx.fillStyle = rgba(c, a);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(m.x, m.y, m.r * 2.4, 0, TAU);
+        ctx.fillStyle = rgba(c, a * 0.18);
+        ctx.fill();
+      }
+    }
+  };
+  var grid = {
+    scale: 1,
+    setup() {
+      return { horizon: 0.44, focal: 1.2, period: 1.5, rows: 18, columns: 22 };
+    },
+    frame(ctx, state, t2, w, h, palette2) {
+      ctx.clearRect(0, 0, w, h);
+      const hz = h * state.horizon;
+      const depth = h - hz;
+      const glow = ctx.createLinearGradient(0, hz - depth * 0.35, 0, hz);
+      glow.addColorStop(0, rgba(palette2.spectrum2, 0));
+      glow.addColorStop(1, rgba(palette2.spectrum2, 0.08));
+      ctx.fillStyle = glow;
+      ctx.fillRect(0, hz - depth * 0.35, w, depth * 0.35);
+      ctx.lineWidth = 1;
+      const vx = w / 2;
+      const fan = ctx.createLinearGradient(0, hz, 0, h);
+      fan.addColorStop(0, rgba(palette2.accent, 0));
+      fan.addColorStop(1, rgba(palette2.accent, PEAK.grid * 0.7));
+      ctx.strokeStyle = fan;
+      for (let i = 0; i <= state.columns; i++) {
+        const bx = vx + (i / state.columns - 0.5) * w * 3;
+        ctx.beginPath();
+        ctx.moveTo(vx, hz);
+        ctx.lineTo(bx, h);
+        ctx.stroke();
+      }
+      const frac = t2 / state.period % 1;
+      for (let i = 0; i < state.rows; i++) {
+        const d = i + 1 - frac;
+        const y = hz + depth * state.focal / (d + state.focal);
+        const a = PEAK.grid * Math.pow((y - hz) / depth, 1.3);
+        ctx.strokeStyle = rgba(palette2.accent, a);
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(w, y);
+        ctx.stroke();
+      }
+    }
+  };
+  var staticNoise = {
+    scale: 1,
+    setup(w, h, palette2, rng) {
+      const tiles = [];
+      const n = 4 + Math.floor(rng() * 3);
+      for (let k = 0; k < n; k++) {
+        const c = document.createElement("canvas");
+        c.width = 128;
+        c.height = 128;
+        const cx = c.getContext("2d");
+        const img = cx.createImageData(128, 128);
+        const d = img.data;
+        for (let i = 0; i < d.length; i += 4) {
+          d[i] = palette2.ink[0];
+          d[i + 1] = palette2.ink[1];
+          d[i + 2] = palette2.ink[2];
+          d[i + 3] = Math.floor(rng() * 255);
+        }
+        cx.putImageData(img, 0, 0);
+        tiles.push(c);
+      }
+      return { tiles, patterns: null, frame: 0 };
+    },
+    frame(ctx, state, t2, w, h) {
+      if (!state.patterns) {
+        state.patterns = state.tiles.map(function(c) {
+          return ctx.createPattern(c, "repeat");
+        });
+      }
+      state.frame++;
+      const i = state.frame % state.patterns.length;
+      const dx = Math.floor((Math.sin(t2 * 37.1) * 0.5 + 0.5) * 128);
+      const dy = Math.floor((Math.cos(t2 * 23.7) * 0.5 + 0.5) * 128);
+      ctx.clearRect(0, 0, w, h);
+      ctx.save();
+      ctx.globalAlpha = PEAK.static;
+      ctx.translate(-dx, -dy);
+      ctx.fillStyle = state.patterns[i];
+      ctx.fillRect(0, 0, w + 128, h + 128);
+      ctx.restore();
+    }
+  };
+  var ink = {
+    scale: 6,
+    setup(w, h, palette2, rng) {
+      const blooms = [];
+      const n = 5 + Math.floor(rng() * 2);
+      for (let i = 0; i < n; i++) {
+        blooms.push({
+          x: 0.1 + rng() * 0.8,
+          y: 0.1 + rng() * 0.8,
+          r: 0.18 + rng() * 0.22,
+          period: 20 + rng() * 20,
+          phase: rng() * TAU,
+          colour: i % 2 ? palette2.spectrum3 : palette2.accent
+        });
+      }
+      return { blooms };
+    },
+    frame(ctx, state, t2, w, h, palette2) {
+      ctx.clearRect(0, 0, w, h);
+      ctx.globalCompositeOperation = palette2.dark ? "lighter" : "source-over";
+      const m = Math.min(w, h);
+      for (const b of state.blooms) {
+        const breathe = 0.75 + 0.25 * Math.sin(TAU * t2 / b.period + b.phase);
+        const r = Math.max(1, m * b.r * breathe);
+        const cx = b.x * w;
+        const cy = b.y * h;
+        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+        g.addColorStop(0, rgba(b.colour, 0.9));
+        g.addColorStop(0.6, rgba(b.colour, 0.35));
+        g.addColorStop(1, rgba(b.colour, 0));
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, TAU);
+        ctx.fill();
+      }
+      ctx.globalCompositeOperation = "source-over";
+    }
+  };
+  var RENDERERS = { waves, dust, grid, static: staticNoise, ink };
+
+  // src/static/sdk-libs/atelier/ambient-gl.js
+  var VERT = "attribute vec2 p; void main() { gl_Position = vec4(p, 0.0, 1.0); }";
+  var FRAG = [
+    "precision mediump float;",
+    "uniform vec2 u_res;",
+    "uniform float u_time;",
+    "uniform vec3 u_c0;",
+    "uniform vec3 u_c1;",
+    "uniform vec3 u_c2;",
+    "uniform float u_peak;",
+    "float ribbon(vec2 uv, float base, float a1, float k1, float w1, float a2, float k2, float w2, float thick) {",
+    "  float y = base + a1 * sin(k1 * uv.x + w1 * u_time) + a2 * sin(k2 * uv.x - w2 * u_time);",
+    "  float d = abs(uv.y - y);",
+    "  float core = 1.0 - smoothstep(0.0, thick, d);",
+    "  float glow = exp(-d * 14.0) * 0.45;",
+    "  return core * 0.85 + glow;",
+    "}",
+    "void main() {",
+    "  vec2 uv = gl_FragCoord.xy / u_res;",
+    "  float r0 = ribbon(uv, 0.60, 0.06, 7.0, 0.30, 0.025, 19.0, 0.50, 0.060);",
+    "  float r1 = ribbon(uv, 0.48, 0.08, 5.5, 0.22, 0.030, 15.0, 0.40, 0.070);",
+    "  float r2 = ribbon(uv, 0.37, 0.05, 8.5, 0.36, 0.020, 23.0, 0.60, 0.050);",
+    "  float sum = r0 + r1 + r2;",
+    "  vec3 col = (u_c0 * r0 + u_c1 * r1 + u_c2 * r2) / max(1.0, sum);",
+    "  float a = clamp(sum, 0.0, 1.0);",
+    "  gl_FragColor = vec4(col * a * u_peak, a * u_peak);",
+    "}"
+  ].join("\n");
+  function compile(gl, kind, src) {
+    const sh = gl.createShader(kind);
+    if (!sh) return null;
+    gl.shaderSource(sh, src);
+    gl.compileShader(sh);
+    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+      gl.deleteShader(sh);
+      return null;
+    }
+    return sh;
+  }
+  function glWaves(canvas, palette2, peak) {
+    let gl = null;
+    try {
+      gl = /** @type {WebGLRenderingContext|null} */
+      canvas.getContext("webgl", {
+        alpha: true,
+        antialias: false,
+        premultipliedAlpha: true,
+        failIfMajorPerformanceCaveat: true,
+        powerPreference: "low-power",
+        preserveDrawingBuffer: false
+      });
+    } catch {
+      gl = null;
+    }
+    if (!gl) return null;
+    const vs = compile(gl, gl.VERTEX_SHADER, VERT);
+    const fs = compile(gl, gl.FRAGMENT_SHADER, FRAG);
+    const program = gl.createProgram();
+    if (!vs || !fs || !program) return null;
+    gl.attachShader(program, vs);
+    gl.attachShader(program, fs);
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      gl.deleteProgram(program);
+      return null;
+    }
+    gl.useProgram(program);
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(program, "p");
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    const u = {
+      res: gl.getUniformLocation(program, "u_res"),
+      time: gl.getUniformLocation(program, "u_time"),
+      c0: gl.getUniformLocation(program, "u_c0"),
+      c1: gl.getUniformLocation(program, "u_c1"),
+      c2: gl.getUniformLocation(program, "u_c2"),
+      peak: gl.getUniformLocation(program, "u_peak")
+    };
+    gl.uniform1f(u.peak, peak);
+    gl.clearColor(0, 0, 0, 0);
+    function colour(where, c) {
+      gl.uniform3f(where, c[0] / 255, c[1] / 255, c[2] / 255);
+    }
+    function setPalette(p) {
+      colour(u.c0, p.accent);
+      colour(u.c1, p.spectrum2);
+      colour(u.c2, p.spectrum3);
+    }
+    setPalette(palette2);
+    return {
+      /** @param {number} t seconds on the layer's clock */
+      frame(t2) {
+        if (gl.isContextLost()) return;
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        gl.uniform2f(u.res, canvas.width, canvas.height);
+        gl.uniform1f(u.time, t2);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+      },
+      setPalette,
+      destroy() {
+        try {
+          gl.deleteBuffer(buf);
+          gl.deleteProgram(program);
+          gl.deleteShader(vs);
+          gl.deleteShader(fs);
+          const lose = gl.getExtension("WEBGL_lose_context");
+          if (lose) lose.loseContext();
+        } catch {
+        }
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/ambient.js
+  var NONE = "none";
+  var WEATHER_ATTR = "data-ak-weather";
+  var WEATHER_KEY = "ak.ambient";
+  var LEVELS = ["off", "calm", "full"];
+  var MAX_DPR = 1.5;
+  var MAX_FPS = 30;
+  var BOUNDS = { alpha: [0, 1], speed: [0.25, 2] };
+  var STYLE_WAIT_MS = 2e3;
+  var HOST_CLASS = "ak-ambient-host";
+  var weatherRestored = false;
+  function restoreWeather() {
+    if (weatherRestored || typeof document === "undefined") return;
+    weatherRestored = true;
+    let saved = null;
+    try {
+      saved = localStorage.getItem(WEATHER_KEY);
+    } catch {
+    }
+    if (saved && LEVELS.indexOf(saved) >= 0 && !document.documentElement.hasAttribute(WEATHER_ATTR)) {
+      document.documentElement.setAttribute(WEATHER_ATTR, saved);
+    }
+  }
+  function weatherLevel() {
+    restoreWeather();
+    const v = document.documentElement.getAttribute(WEATHER_ATTR);
+    return (
+      /** @type {any} */
+      LEVELS.indexOf(v) >= 0 ? v : "full"
+    );
+  }
+  function setWeather(level) {
+    const next = (
+      /** @type {'off'|'calm'|'full'} */
+      LEVELS.indexOf(level) >= 0 ? level : "full"
+    );
+    weatherRestored = true;
+    document.documentElement.setAttribute(WEATHER_ATTR, next);
+    try {
+      localStorage.setItem(WEATHER_KEY, next);
+    } catch {
+    }
+    try {
+      window.dispatchEvent(new CustomEvent("ak-ambient", { detail: { level: next } }));
+    } catch {
+    }
+    return next;
+  }
+  function clamp(v, range) {
+    return Math.min(range[1], Math.max(range[0], v));
+  }
+  function luma(c) {
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  }
+  function known(id) {
+    return id === NONE || !!RENDERERS[id] || !!CSS_PRESETS[id];
+  }
+  function ambient(spec) {
+    const s = spec || {};
+    injectStyle();
+    restoreWeather();
+    const host = resolve(s.target, document.body);
+    const opts = {
+      preset: s.preset == null ? void 0 : String(s.preset),
+      alpha: s.alpha == null ? void 0 : clamp(Number(s.alpha), BOUNDS.alpha),
+      speed: s.speed == null ? void 0 : clamp(Number(s.speed), BOUNDS.speed),
+      fps: s.fps > 0 ? Math.min(s.fps, MAX_FPS) : 0,
+      gl: s.gl !== false
+    };
+    const seed = s.seed > 0 ? Math.floor(s.seed) : 1234567;
+    const layer = el("div", {
+      class: "ak-ambient",
+      "aria-hidden": "true",
+      "data-ak-ambient": NONE,
+      "data-ak-ambient-state": "paused"
+    });
+    host.insertBefore(layer, host.firstChild);
+    host.classList.add(HOST_CLASS);
+    const state = {
+      preset: NONE,
+      alpha: 1,
+      alphaSource: (
+        /** @type {'option'|'token'|'preset'} */
+        "token"
+      ),
+      speed: 1,
+      fps: 0,
+      /** @type {any} */
+      surface: null,
+      /** @type {any} */
+      palette: null,
+      w: 0,
+      h: 0,
+      dpr: 1,
+      clock: 0,
+      last: 0,
+      raf: 0,
+      frames: 0,
+      running: false,
+      gates: {
+        hidden: !!document.hidden,
+        offscreen: false,
+        less: reducedMotion(),
+        off: weatherLevel() === "off",
+        paused: false
+      },
+      destroyed: false,
+      warned: false,
+      resolveQueued: false,
+      styleWait: 0,
+      styleWaiting: false
+    };
+    function readToken(name) {
+      return getComputedStyle(host).getPropertyValue(name).trim();
+    }
+    function wantedPreset() {
+      if (opts.preset !== void 0) {
+        if (known(opts.preset)) return opts.preset;
+        warnOnce(opts.preset);
+        return NONE;
+      }
+      const raw = readToken("--ak-ambient");
+      if (!raw) return null;
+      if (known(raw)) return raw;
+      warnOnce(raw);
+      return NONE;
+    }
+    function warnOnce(id) {
+      if (state.warned) return;
+      state.warned = true;
+      console.warn('aimeat-atelier: "' + id + '" is not an ambient this kit ships (' + PRESET_IDS.join(", ") + ", or none).");
+    }
+    function wantedAlpha(preset) {
+      if (opts.alpha !== void 0) {
+        state.alphaSource = "option";
+        return opts.alpha;
+      }
+      if (opts.preset !== void 0) {
+        state.alphaSource = "preset";
+        return BASE_ALPHA[preset] != null ? BASE_ALPHA[preset] : 1;
+      }
+      state.alphaSource = "token";
+      const raw = parseFloat(readToken("--ak-ambient-alpha"));
+      return isFinite(raw) ? clamp(raw, BOUNDS.alpha) : 1;
+    }
+    function wantedSpeed() {
+      if (opts.speed !== void 0) return opts.speed;
+      if (opts.preset !== void 0) return 1;
+      const raw = parseFloat(readToken("--ak-ambient-speed"));
+      return isFinite(raw) ? clamp(raw, BOUNDS.speed) : 1;
+    }
+    function samplePalette() {
+      const bg = tokenRgb(host, "--ak-bg");
+      const ink2 = tokenRgb(host, "--ak-ink");
+      return {
+        dark: luma(bg) < luma(ink2),
+        bg,
+        ink: ink2,
+        accent: tokenRgb(host, "--ak-accent"),
+        spectrum2: tokenRgb(host, "--ak-spectrum-2", "--ak-accent"),
+        spectrum3: tokenRgb(host, "--ak-spectrum-3", "--ak-accent")
+      };
+    }
+    function markPainted() {
+      if (!layer.hasAttribute("data-ak-ambient-painted")) layer.setAttribute("data-ak-ambient-painted", "1");
+    }
+    function unmountSurface() {
+      stopLoop();
+      const su = state.surface;
+      if (su) {
+        if (su.gl) {
+          su.gl.destroy();
+          su.gl = null;
+        }
+        if (su.canvas) {
+          su.canvas.width = 0;
+          su.canvas.height = 0;
+        }
+        if (su.off) {
+          su.off.width = 0;
+          su.off.height = 0;
+        }
+      }
+      state.surface = null;
+      state.w = 0;
+      state.h = 0;
+      while (layer.firstChild) layer.removeChild(layer.firstChild);
+      layer.removeAttribute("data-ak-ambient-painted");
+    }
+    function mountSurface(preset) {
+      unmountSurface();
+      layer.setAttribute("data-ak-ambient", preset);
+      if (preset === NONE) return;
+      if (CSS_PRESETS[preset]) {
+        layer.appendChild(el("div", { class: "ak-ambient__drift" }));
+        state.surface = { kind: "css" };
+        state.fps = 0;
+        markPainted();
+        return;
+      }
+      const canvas = (
+        /** @type {HTMLCanvasElement} */
+        el("canvas", { class: "ak-ambient__canvas" })
+      );
+      canvas.addEventListener("webglcontextlost", onContextLost);
+      layer.appendChild(canvas);
+      state.surface = {
+        kind: "canvas",
+        renderer: RENDERERS[preset],
+        canvas,
+        ctx: null,
+        off: null,
+        offCtx: null,
+        rstate: null,
+        gl: null,
+        glFailed: false
+      };
+      state.fps = Math.min(opts.fps || FPS[preset] || MAX_FPS, MAX_FPS);
+      size(true);
+    }
+    function onContextLost(ev) {
+      ev.preventDefault();
+      const su = state.surface;
+      if (state.destroyed || !su || su.kind !== "canvas") return;
+      const fresh = (
+        /** @type {HTMLCanvasElement} */
+        el("canvas", { class: "ak-ambient__canvas" })
+      );
+      layer.replaceChild(fresh, su.canvas);
+      su.canvas.removeEventListener("webglcontextlost", onContextLost);
+      su.canvas = fresh;
+      su.gl = null;
+      su.glFailed = true;
+      su.ctx = null;
+      state.w = 0;
+      size(true);
+      draw();
+    }
+    function size(force) {
+      const su = state.surface;
+      if (!su || su.kind !== "canvas") return;
+      const box = layer.getBoundingClientRect();
+      const w = Math.round(box.width);
+      const h = Math.round(box.height);
+      if (!w || !h) return;
+      const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
+      if (!force && w === state.w && h === state.h && dpr === state.dpr && su.rstate) return;
+      state.w = w;
+      state.h = h;
+      state.dpr = dpr;
+      su.canvas.width = Math.round(w * dpr);
+      su.canvas.height = Math.round(h * dpr);
+      const r = su.renderer;
+      const rng = mulberry32(seed);
+      if (r.scale > 1) {
+        const ow = Math.max(1, Math.ceil(w / r.scale));
+        const oh = Math.max(1, Math.ceil(h / r.scale));
+        if (!su.off) {
+          su.off = document.createElement("canvas");
+          su.offCtx = su.off.getContext("2d");
+        }
+        su.off.width = ow;
+        su.off.height = oh;
+        su.rstate = r.setup(ow, oh, state.palette, rng);
+      } else {
+        su.rstate = r.setup(w, h, state.palette, rng);
+      }
+      if (su.gl) {
+        su.gl.setPalette(state.palette);
+        return;
+      }
+      if (!su.ctx) su.ctx = su.canvas.getContext("2d");
+      if (su.ctx) su.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    function tryGl() {
+      const su = state.surface;
+      if (!su || su.kind !== "canvas" || state.preset !== "waves" || !opts.gl || su.gl || su.glFailed) return;
+      const fresh = (
+        /** @type {HTMLCanvasElement} */
+        el("canvas", { class: "ak-ambient__canvas" })
+      );
+      fresh.width = su.canvas.width;
+      fresh.height = su.canvas.height;
+      const gl = glWaves(fresh, state.palette, PEAK.waves);
+      if (!gl) {
+        su.glFailed = true;
+        return;
+      }
+      fresh.addEventListener("webglcontextlost", onContextLost);
+      su.canvas.removeEventListener("webglcontextlost", onContextLost);
+      layer.replaceChild(fresh, su.canvas);
+      su.canvas = fresh;
+      su.ctx = null;
+      su.gl = gl;
+      gl.frame(state.clock);
+    }
+    function draw() {
+      const su = state.surface;
+      if (!su || su.kind !== "canvas" || !state.w || !state.h) return;
+      const t2 = state.clock;
+      if (su.gl) {
+        su.gl.frame(t2);
+      } else if (su.ctx) {
+        const r = su.renderer;
+        if (r.scale > 1) {
+          r.frame(su.offCtx, su.rstate, t2, su.off.width, su.off.height, state.palette);
+          const ctx = su.ctx;
+          ctx.clearRect(0, 0, state.w, state.h);
+          ctx.save();
+          ctx.globalAlpha = PEAK[state.preset];
+          ctx.imageSmoothingEnabled = true;
+          ctx.drawImage(su.off, 0, 0, state.w, state.h);
+          ctx.restore();
+        } else {
+          r.frame(su.ctx, su.rstate, t2, state.w, state.h, state.palette);
+        }
+      } else {
+        return;
+      }
+      state.frames++;
+      markPainted();
+    }
+    function tick(now2) {
+      state.raf = 0;
+      if (!state.running || state.destroyed) return;
+      const interval = 1e3 / (state.fps || MAX_FPS);
+      if (now2 - state.last >= interval - 1) {
+        const dt = state.last ? Math.min((now2 - state.last) / 1e3, 0.1) : 0;
+        state.last = now2;
+        state.clock += dt * state.speed;
+        draw();
+      }
+      state.raf = requestAnimationFrame(tick);
+    }
+    function stopLoop() {
+      state.running = false;
+      if (state.raf) cancelAnimationFrame(state.raf);
+      state.raf = 0;
+    }
+    function evaluate() {
+      const g = state.gates;
+      const off = state.preset === NONE;
+      const canRun = !off && !g.hidden && !g.offscreen && !g.off && !g.paused && !g.less;
+      const next = off || !g.less && !canRun ? "paused" : g.less ? "still" : "running";
+      if (layer.getAttribute("data-ak-ambient-state") !== next) layer.setAttribute("data-ak-ambient-state", next);
+      const canvasLoop = state.surface && state.surface.kind === "canvas";
+      if (canRun && canvasLoop && !state.running) {
+        state.running = true;
+        state.last = 0;
+        state.raf = requestAnimationFrame(tick);
+        tryGl();
+      } else if (!canRun && state.running) {
+        stopLoop();
+        if (g.less) draw();
+      }
+    }
+    function queueResolve() {
+      if (state.resolveQueued || state.destroyed) return;
+      state.resolveQueued = true;
+      requestAnimationFrame(function() {
+        state.resolveQueued = false;
+        resolveNow();
+      });
+    }
+    function waitForStyle() {
+      if (state.styleWaiting || state.destroyed) return;
+      state.styleWaiting = true;
+      const link = (
+        /** @type {HTMLLinkElement|null} */
+        document.getElementById("ak-style")
+      );
+      const done = function() {
+        if (!state.styleWaiting) return;
+        state.styleWaiting = false;
+        if (state.styleWait) {
+          clearTimeout(state.styleWait);
+          state.styleWait = 0;
+        }
+        queueResolve();
+      };
+      if (link) link.addEventListener("load", done, { once: true });
+      state.styleWait = setTimeout(done, STYLE_WAIT_MS);
+    }
+    function resolveNow() {
+      if (state.destroyed) return;
+      const wanted = wantedPreset();
+      if (wanted === null) {
+        waitForStyle();
+        return;
+      }
+      state.palette = samplePalette();
+      const alpha = wantedAlpha(wanted);
+      const speed = wantedSpeed();
+      if (alpha !== state.alpha) {
+        state.alpha = alpha;
+        layer.style.setProperty("--ak-ambient-level", String(alpha));
+      }
+      if (speed !== state.speed) {
+        state.speed = speed;
+        layer.style.setProperty("--ak-ambient-speed", String(speed));
+      }
+      if (wanted !== state.preset) {
+        state.preset = wanted;
+        mountSurface(wanted);
+        host.dispatchEvent(new CustomEvent("ak-ambient-preset", { bubbles: true, detail: { preset: wanted } }));
+      } else if (state.surface && state.surface.kind === "canvas") {
+        size(true);
+      }
+      evaluate();
+      if (!state.running) draw();
+    }
+    const onVisibility = function() {
+      state.gates.hidden = !!document.hidden;
+      evaluate();
+    };
+    const onMotion = function() {
+      state.gates.less = reducedMotion();
+      evaluate();
+    };
+    const onWeather = function() {
+      state.gates.off = weatherLevel() === "off";
+      evaluate();
+    };
+    const onPalette = function() {
+      queueResolve();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("ak-motion", onMotion);
+    window.addEventListener("ak-ambient", onWeather);
+    window.addEventListener("aimeat-theme-change", onPalette);
+    window.addEventListener("aimeat-palette-change", onPalette);
+    const media = typeof matchMedia === "function" ? matchMedia("(prefers-reduced-motion: reduce)") : null;
+    if (media && media.addEventListener) media.addEventListener("change", onMotion);
+    const ro = typeof ResizeObserver === "function" ? new ResizeObserver(function() {
+      if (state.destroyed) return;
+      size(false);
+      if (!state.running) draw();
+    }) : null;
+    if (ro) ro.observe(layer);
+    const io = typeof IntersectionObserver === "function" ? new IntersectionObserver(function(entries) {
+      const e = entries[entries.length - 1];
+      state.gates.offscreen = !!e && !e.isIntersecting;
+      evaluate();
+    }) : null;
+    if (io) io.observe(layer);
+    const moHost = new MutationObserver(onPalette);
+    moHost.observe(host, { attributes: true, attributeFilter: ["data-ak-look", "style", "class"] });
+    const moRoot = new MutationObserver(onPalette);
+    moRoot.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "data-palette"] });
+    resolveNow();
+    return {
+      el: layer,
+      preset() {
+        return state.preset;
+      },
+      /** @param {{ preset?: string|null, alpha?: number|null, speed?: number|null, fps?: number, gl?: boolean }} patch */
+      set(patch) {
+        if (!patch || state.destroyed) return;
+        if ("preset" in patch) opts.preset = patch.preset == null ? void 0 : String(patch.preset);
+        if ("alpha" in patch) opts.alpha = patch.alpha == null ? void 0 : clamp(Number(patch.alpha), BOUNDS.alpha);
+        if ("speed" in patch) opts.speed = patch.speed == null ? void 0 : clamp(Number(patch.speed), BOUNDS.speed);
+        if ("fps" in patch) {
+          opts.fps = patch.fps > 0 ? Math.min(patch.fps, MAX_FPS) : 0;
+          if (state.preset !== NONE && !CSS_PRESETS[state.preset]) {
+            state.fps = Math.min(opts.fps || FPS[state.preset] || MAX_FPS, MAX_FPS);
+          }
+        }
+        if ("gl" in patch) opts.gl = patch.gl !== false;
+        resolveNow();
+      },
+      pause() {
+        state.gates.paused = true;
+        evaluate();
+      },
+      resume() {
+        state.gates.paused = false;
+        evaluate();
+      },
+      still() {
+        draw();
+      },
+      stats() {
+        const su = state.surface;
+        return {
+          preset: state.preset,
+          state: layer.getAttribute("data-ak-ambient-state") || "paused",
+          running: state.running,
+          frames: state.frames,
+          fps: state.fps,
+          gl: !!(su && su.gl),
+          alpha: state.alpha,
+          alphaSource: state.alphaSource,
+          speed: state.speed,
+          level: weatherLevel()
+        };
+      },
+      destroy() {
+        if (state.destroyed) return;
+        state.destroyed = true;
+        unmountSurface();
+        if (ro) ro.disconnect();
+        if (io) io.disconnect();
+        moHost.disconnect();
+        moRoot.disconnect();
+        document.removeEventListener("visibilitychange", onVisibility);
+        window.removeEventListener("ak-motion", onMotion);
+        window.removeEventListener("ak-ambient", onWeather);
+        window.removeEventListener("aimeat-theme-change", onPalette);
+        window.removeEventListener("aimeat-palette-change", onPalette);
+        if (media && media.removeEventListener) media.removeEventListener("change", onMotion);
+        if (state.styleWait) clearTimeout(state.styleWait);
+        host.classList.remove(HOST_CLASS);
+        if (layer.parentNode) layer.parentNode.removeChild(layer);
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/ambient-parts.js
+  var LEVELS2 = ["off", "calm", "full"];
+  var WORDS = { off: "ambientOff", calm: "ambientCalm", full: "ambientFull" };
+  var SVG_NS = "http://www.w3.org/2000/svg";
+  function ambientStage(spec) {
+    const s = spec || {};
+    injectStyle();
+    const body = el("div", { class: "ak-ambient-stage__body" });
+    if (s.body != null) append(body, s.body);
+    const root = el("section", {
+      class: "ak-root ak-ambient-stage",
+      "data-ak-look": s.look || null,
+      vars: s.minHeight ? { "--ak-ambient-stage-min": s.minHeight } : null
+    }, [body]);
+    const host = resolve(s.target, document.body);
+    host.appendChild(root);
+    const sky = ambient({
+      target: root,
+      preset: s.preset == null ? null : s.preset,
+      alpha: s.alpha,
+      speed: s.speed,
+      gl: s.gl
+    });
+    enter(body);
+    return {
+      el: root,
+      body,
+      ambient: sky,
+      /** @param {{ preset?: string|null, alpha?: number|null, speed?: number|null, look?: string }} patch */
+      set(patch) {
+        if (!patch) return;
+        if (patch.look != null) root.setAttribute("data-ak-look", patch.look);
+        if ("preset" in patch || "alpha" in patch || "speed" in patch) sky.set(patch);
+      },
+      destroy() {
+        sky.destroy();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+  function waveIcon() {
+    const svg6 = document.createElementNS(SVG_NS, "svg");
+    svg6.setAttribute("viewBox", "0 0 20 20");
+    svg6.setAttribute("class", "ak-weather__icon");
+    svg6.setAttribute("aria-hidden", "true");
+    for (const y of [5, 10, 15]) {
+      const p = document.createElementNS(SVG_NS, "path");
+      p.setAttribute("class", "ak-weather__wave");
+      p.setAttribute("d", "M2 " + y + " c2 -2.4 4 -2.4 6 0 s4 2.4 6 0 s2 -1.6 4 -1.4");
+      svg6.appendChild(p);
+    }
+    return svg6;
+  }
+  function levelLabel(level) {
+    return t("ambient") + ": " + t(WORDS[level] || WORDS.full);
+  }
+  function weather(spec) {
+    const s = spec || {};
+    injectStyle();
+    const kind = s.kind === "segments" ? "segments" : "cycle";
+    let root;
+    const segs = [];
+    let word = null;
+    function paint() {
+      const level = weatherLevel();
+      root.setAttribute("data-ak-level", level);
+      if (kind === "cycle") {
+        root.setAttribute("aria-label", levelLabel(level));
+        root.setAttribute("title", levelLabel(level));
+        if (word) word.textContent = t(WORDS[level]);
+      } else {
+        root.setAttribute("aria-label", t("ambient"));
+        segs.forEach(function(b, i) {
+          b.setAttribute("aria-checked", LEVELS2[i] === level ? "true" : "false");
+          b.setAttribute("tabindex", LEVELS2[i] === level ? "0" : "-1");
+          b.textContent = t(WORDS[LEVELS2[i]]);
+        });
+      }
+    }
+    if (kind === "cycle") {
+      word = el("span", { class: "ak-weather__word" });
+      root = el("button", {
+        type: "button",
+        class: "ak-weather ak-weather--cycle",
+        "data-ak-noguard": true,
+        on: {
+          click: function() {
+            const i = LEVELS2.indexOf(weatherLevel());
+            setWeather(
+              /** @type {any} */
+              LEVELS2[(i + 1) % LEVELS2.length]
+            );
+          }
+        }
+      }, [waveIcon(), word]);
+    } else {
+      root = el("div", { class: "ak-weather ak-weather--segments", role: "radiogroup" });
+      for (const level of LEVELS2) {
+        const b = el("button", {
+          type: "button",
+          role: "radio",
+          class: "ak-weather__seg",
+          "data-ak-noguard": true,
+          on: {
+            click: function() {
+              setWeather(
+                /** @type {any} */
+                level
+              );
+            },
+            keydown: function(ev) {
+              const i = LEVELS2.indexOf(level);
+              if (ev.key === "ArrowRight" || ev.key === "ArrowDown") {
+                setWeather(
+                  /** @type {any} */
+                  LEVELS2[(i + 1) % 3]
+                );
+                segs[(i + 1) % 3].focus();
+                ev.preventDefault();
+              }
+              if (ev.key === "ArrowLeft" || ev.key === "ArrowUp") {
+                setWeather(
+                  /** @type {any} */
+                  LEVELS2[(i + 2) % 3]
+                );
+                segs[(i + 2) % 3].focus();
+                ev.preventDefault();
+              }
+            }
+          }
+        });
+        segs.push(b);
+        root.appendChild(b);
+      }
+    }
+    paint();
+    const stopLang = i18n.onChange(paint);
+    window.addEventListener("ak-ambient", paint);
+    if (s.target) resolve(s.target, document.body).appendChild(root);
+    return {
+      el: root,
+      level: weatherLevel,
+      /** @param {string} level */
+      set(level) {
+        setWeather(
+          /** @type {any} */
+          level
+        );
+      },
+      destroy() {
+        stopLang();
+        window.removeEventListener("ak-ambient", paint);
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+  var INPUTS = ["pointerdown", "pointermove", "keydown", "wheel", "touchstart"];
+  function attract(spec) {
+    const s = spec || /** @type {any} */
+    {};
+    const app2 = s.app;
+    if (!app2 || !app2.el) throw new Error("attract needs the app handle (the frame it dims)");
+    const after = s.after > 0 ? s.after : 6e4;
+    const dim = s.dim != null ? Math.min(1, Math.max(0, s.dim)) : 0.35;
+    const rise = s.rise != null ? Math.min(1, Math.max(0, s.rise)) : 1;
+    let timer = 0;
+    let on = false;
+    let lastInput = 0;
+    let saved = null;
+    let destroyed = false;
+    function engage() {
+      timer = 0;
+      if (on || destroyed || reducedMotion()) return;
+      on = true;
+      app2.el.setAttribute("data-ak-attract", "on");
+      app2.el.style.setProperty("--ak-attract-dim", String(dim));
+      const sky = app2.ambient;
+      if (sky && sky.set && sky.stats) {
+        const st = sky.stats();
+        saved = st.alphaSource === "option" ? st.alpha : null;
+        sky.set({ alpha: rise });
+      }
+    }
+    function disengage() {
+      if (!on) return;
+      on = false;
+      app2.el.removeAttribute("data-ak-attract");
+      const sky = app2.ambient;
+      if (sky && sky.set) sky.set({ alpha: saved });
+      saved = null;
+    }
+    function arm() {
+      if (timer) clearTimeout(timer);
+      timer = 0;
+      if (destroyed || reducedMotion()) return;
+      timer = setTimeout(engage, after);
+    }
+    function onInput() {
+      const now2 = Date.now();
+      if (!on && now2 - lastInput < 250) return;
+      lastInput = now2;
+      if (on) disengage();
+      arm();
+    }
+    const onMotion = function() {
+      if (reducedMotion()) {
+        if (timer) clearTimeout(timer);
+        timer = 0;
+        disengage();
+      } else arm();
+    };
+    for (const type of INPUTS) window.addEventListener(type, onInput, { capture: true, passive: true });
+    const scroller = app2.main || null;
+    if (scroller) scroller.addEventListener("scroll", onInput, { passive: true });
+    window.addEventListener("ak-motion", onMotion);
+    arm();
+    return {
+      arm,
+      disarm() {
+        if (timer) clearTimeout(timer);
+        timer = 0;
+        disengage();
+      },
+      active() {
+        return on;
+      },
+      destroy() {
+        destroyed = true;
+        if (timer) clearTimeout(timer);
+        timer = 0;
+        disengage();
+        for (const type of INPUTS) window.removeEventListener(type, onInput, { capture: true });
+        if (scroller) scroller.removeEventListener("scroll", onInput);
+        window.removeEventListener("ak-motion", onMotion);
+      }
+    };
+  }
+
   // src/static/sdk-libs/atelier/shell.js
   var BOOT_POLL_MS = 300;
   var SIGNIN_GRACE_MS = 2500;
-  var SVG_NS = "http://www.w3.org/2000/svg";
+  var SVG_NS2 = "http://www.w3.org/2000/svg";
   var MOTION_ATTR2 = "data-ak-motion";
   var MODE_BUTTON = "#aimeat-mode-switch button[data-mode]";
   function motionLabel() {
@@ -1262,7 +2411,7 @@
     return said === "lessMotion" ? "Less motion" : said;
   }
   function motionIcon() {
-    const svg6 = document.createElementNS(SVG_NS, "svg");
+    const svg6 = document.createElementNS(SVG_NS2, "svg");
     svg6.setAttribute("viewBox", "0 0 24 24");
     svg6.setAttribute("width", "18");
     svg6.setAttribute("height", "18");
@@ -1271,10 +2420,10 @@
     svg6.setAttribute("stroke-width", "2");
     svg6.setAttribute("stroke-linecap", "round");
     svg6.setAttribute("aria-hidden", "true");
-    const lines = document.createElementNS(SVG_NS, "path");
+    const lines = document.createElementNS(SVG_NS2, "path");
     lines.setAttribute("class", "ak-app__motion-lines");
     lines.setAttribute("d", "M4 7h15M4 12h11M4 17h7");
-    const slash = document.createElementNS(SVG_NS, "path");
+    const slash = document.createElementNS(SVG_NS2, "path");
     slash.setAttribute("class", "ak-app__motion-slash");
     slash.setAttribute("d", "M20 4 5 20");
     svg6.appendChild(lines);
@@ -1283,6 +2432,19 @@
   }
   function motionIsLess() {
     return document.documentElement.getAttribute(MOTION_ATTR2) === "less";
+  }
+  function ambientSpec(want) {
+    if (typeof want === "string") return { preset: want };
+    if (want && typeof want === "object") {
+      return {
+        preset: want.preset == null ? null : want.preset,
+        alpha: want.alpha,
+        speed: want.speed,
+        fps: want.fps,
+        gl: want.gl
+      };
+    }
+    return { preset: null };
   }
   function app(spec) {
     injectStyle();
@@ -1353,6 +2515,24 @@
     mount.appendChild(root);
     const fullFrame = mount === document.body;
     if (fullFrame) document.body.classList.add("ak-body");
+    let sky = null;
+    let weatherCtl = null;
+    function syncWeather() {
+      if (weatherCtl) weatherCtl.el.hidden = !sky || sky.preset() === "none";
+    }
+    function ensureSky(want) {
+      if (!sky) {
+        sky = ambient(Object.assign({ target: root }, ambientSpec(want)));
+        weatherCtl = weather({ kind: "cycle" });
+        weatherCtl.el.classList.add("ak-app__weather");
+        bar.insertBefore(weatherCtl.el, motionBtn);
+      } else {
+        sky.set(Object.assign({ preset: null, alpha: null, speed: null }, ambientSpec(want)));
+      }
+      syncWeather();
+    }
+    root.addEventListener("ak-ambient-preset", syncWeather);
+    if (spec.ambient !== false) ensureSky(spec.ambient);
     let statusCard = null;
     function status(kind, opts) {
       const o = opts || {};
@@ -1474,12 +2654,20 @@
       el: root,
       main,
       /** @param {{ title?: string, look?: string, density?: 'comfortable'|'compact',
-       *    quiet?: boolean }} patch */
+       *    quiet?: boolean, ambient?: AmbientWish }} patch */
       set(patch) {
         if (!patch) return;
         if (patch.title != null) {
           state.title = patch.title;
           heading.textContent = state.title;
+        }
+        if ("ambient" in patch) {
+          if (patch.ambient === false) {
+            if (sky) {
+              sky.set({ preset: "none" });
+              syncWeather();
+            }
+          } else ensureSky(patch.ambient);
         }
         if (patch.look != null && patch.look !== state.look) {
           state.look = patch.look;
@@ -1505,9 +2693,18 @@
       status,
       t,
       i18n,
+      get ambient() {
+        return sky;
+      },
+      get weather() {
+        return weatherCtl;
+      },
       destroy() {
         stopLang();
         window.removeEventListener("ak-motion", syncMotion);
+        root.removeEventListener("ak-ambient-preset", syncWeather);
+        if (sky) sky.destroy();
+        if (weatherCtl) weatherCtl.destroy();
         bar.removeEventListener("click", onBarClick, true);
         if (pollTimer) {
           clearInterval(pollTimer);
@@ -3050,9 +4247,9 @@
   }
 
   // src/static/sdk-libs/atelier/chart-core.js
-  var SVG_NS2 = "http://www.w3.org/2000/svg";
+  var SVG_NS3 = "http://www.w3.org/2000/svg";
   function svg(name, attrs) {
-    const node = document.createElementNS(SVG_NS2, name);
+    const node = document.createElementNS(SVG_NS3, name);
     for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
     return node;
   }
@@ -3921,9 +5118,9 @@
   var W2 = 720;
   var H2 = 420;
   var PAD2 = 46;
-  var SVG_NS3 = "http://www.w3.org/2000/svg";
+  var SVG_NS4 = "http://www.w3.org/2000/svg";
   function svg2(name, attrs) {
-    const node = document.createElementNS(SVG_NS3, name);
+    const node = document.createElementNS(SVG_NS4, name);
     for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
     return node;
   }
@@ -4026,9 +5223,9 @@
   // src/static/sdk-libs/atelier/waveform.js
   var W3 = 720;
   var H3 = 120;
-  var SVG_NS4 = "http://www.w3.org/2000/svg";
+  var SVG_NS5 = "http://www.w3.org/2000/svg";
   function svg3(name, attrs) {
-    const node = document.createElementNS(SVG_NS4, name);
+    const node = document.createElementNS(SVG_NS5, name);
     for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
     return node;
   }
@@ -4140,20 +5337,6 @@
       return loadersPromise;
     });
   }
-  var colorCtx = null;
-  function tokenColor(node, name, fallbackName) {
-    const probe = document.createElement("span");
-    probe.style.display = "none";
-    probe.style.color = fallbackName ? "var(" + name + ", var(" + fallbackName + ", currentColor))" : "var(" + name + ", currentColor)";
-    node.appendChild(probe);
-    const resolved = getComputedStyle(probe).color;
-    probe.remove();
-    if (!colorCtx) colorCtx = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
-    colorCtx.fillStyle = resolved;
-    colorCtx.fillRect(0, 0, 1, 1);
-    const px = colorCtx.getImageData(0, 0, 1, 1).data;
-    return "rgb(" + px[0] + "," + px[1] + "," + px[2] + ")";
-  }
   function easeOut(x) {
     return 1 - Math.pow(1 - x, 3);
   }
@@ -4214,8 +5397,8 @@
       scene.environment = pmrem.fromScene(new THREE.Addons.RoomEnvironment(), 0.04).texture;
       const inkC = new THREE.Color(tokenColor(root, "--ak-ink"));
       const bgC = new THREE.Color(tokenColor(root, "--ak-bg"));
-      const luma = (c) => c.r + c.g + c.b;
-      scene.background = luma(inkC) < luma(bgC) ? inkC : bgC;
+      const luma2 = (c) => c.r + c.g + c.b;
+      scene.background = luma2(inkC) < luma2(bgC) ? inkC : bgC;
     }
     let raf = 0;
     let entranceUntil = 0;
@@ -4295,7 +5478,7 @@
     function rebuild(data) {
       disposeGroup();
       const accent = tokenColor(root, "--ak-accent");
-      const ink = tokenColor(root, "--ak-ink");
+      const ink2 = tokenColor(root, "--ak-ink");
       const surface = tokenColor(root, "--ak-surface-2", "--ak-surface");
       scene.fog = null;
       let barCols = 3;
@@ -4325,7 +5508,7 @@
           const channels = function(s) {
             return (s.match(/\d+/g) || ["0", "0", "0"]).map(Number);
           };
-          const inkCh = channels(ink);
+          const inkCh = channels(ink2);
           const surfCh = channels(surface);
           const shadow = (inkCh[0] + inkCh[1] + inkCh[2] <= surfCh[0] + surfCh[1] + surfCh[2] ? inkCh : surfCh).map(function(v) {
             return Math.round(v * 0.3);
@@ -4364,7 +5547,7 @@
       if (kind === "globe") {
         const R = 3;
         const accentC = new THREE.Color(accent);
-        const inkC = new THREE.Color(ink);
+        const inkC = new THREE.Color(ink2);
         const surfaceC = new THREE.Color(surface);
         const ball = new THREE.Group();
         group.add(ball);
@@ -4502,7 +5685,7 @@
         }));
         const frame3 = new THREE.LineSegments(
           new THREE.EdgesGeometry(geo),
-          new THREE.LineBasicMaterial({ color: new THREE.Color(ink), transparent: true, opacity: 0.35 })
+          new THREE.LineBasicMaterial({ color: new THREE.Color(ink2), transparent: true, opacity: 0.35 })
         );
         group.add(body, frame3);
         applyEntrance = function(p) {
@@ -4515,7 +5698,7 @@
         const sun = new THREE.DirectionalLight();
         sun.intensity = 2.2;
         sun.position.set(4, 8, 6);
-        const fill = new THREE.HemisphereLight(new THREE.Color(surface), new THREE.Color(ink), 0.7);
+        const fill = new THREE.HemisphereLight(new THREE.Color(surface), new THREE.Color(ink2), 0.7);
         group.add(sun, fill);
       }
       frameCamera(barCols);
@@ -5278,9 +6461,9 @@
   }
 
   // src/static/sdk-libs/atelier/ops.js
-  var SVG_NS5 = "http://www.w3.org/2000/svg";
+  var SVG_NS6 = "http://www.w3.org/2000/svg";
   function svg4(name, attrs) {
-    const node = document.createElementNS(SVG_NS5, name);
+    const node = document.createElementNS(SVG_NS6, name);
     for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
     return node;
   }
@@ -5763,7 +6946,7 @@
     const threshold = o.threshold !== void 0 ? o.threshold : 4;
     node.classList.add("ak-drag");
     let active = null;
-    const clamp = function(v, range) {
+    const clamp2 = function(v, range) {
       return range ? Math.max(range[0], Math.min(range[1], v)) : v;
     };
     const down = function(e) {
@@ -5799,8 +6982,8 @@
       active.lx = e.clientX;
       active.ly = e.clientY;
       const s = stateOf(node);
-      s.x = clamp(active.bx + dx, o.bounds && o.bounds.x);
-      s.y = clamp(active.by + dy, o.bounds && o.bounds.y);
+      s.x = clamp2(active.bx + dx, o.bounds && o.bounds.x);
+      s.y = clamp2(active.by + dy, o.bounds && o.bounds.y);
       node.style.transform = transformOf(s);
       if (h.onMove) h.onMove(s.x - active.bx, s.y - active.by, node);
       e.preventDefault();
@@ -6995,14 +8178,14 @@
       const close = minutes(data.to) ?? Math.min(Math.ceil(Math.max(...events.map((e) => e.toMin)) / 60) * 60 + 60, 1440);
       const span = Math.max(close - open, 60);
       const Y = (m) => Math.min(Math.max((m - open) / span, 0), 1) * 100;
-      const grid = el("div", { class: "ak-schedule__grid" });
+      const grid2 = el("div", { class: "ak-schedule__grid" });
       const hours = el("div", { class: "ak-schedule__hours" });
       for (let m = Math.ceil(open / 60) * 60; m <= close; m += 60) {
         const line = el("span", { class: "ak-schedule__hour", text: `${String(Math.floor(m / 60)).padStart(2, "0")}:00` });
         line.style.top = Y(m) + "%";
         hours.appendChild(line);
       }
-      grid.appendChild(hours);
+      grid2.appendChild(hours);
       days.forEach((label, di) => {
         const inDay = events.filter((e) => e.day === di);
         const col = el("div", { class: "ak-schedule__day", role: "group", "aria-label": `${label} · ${inDay.length}` }, [
@@ -7029,9 +8212,9 @@
           well.appendChild(block);
         });
         col.appendChild(well);
-        grid.appendChild(col);
+        grid2.appendChild(col);
       });
-      root.appendChild(grid);
+      root.appendChild(grid2);
     }
     render(spec.data || null);
     return {
@@ -8765,7 +9948,7 @@
     let shown = monthStart(data && data.month);
     let emptyCard = null;
     const title = el("div", { class: "ak-calendar__title" });
-    const grid = el("div", { class: "ak-calendar__grid", role: "grid" });
+    const grid2 = el("div", { class: "ak-calendar__grid", role: "grid" });
     const head = el("div", { class: "ak-calendar__head" }, [
       el("button", {
         type: "button",
@@ -8818,15 +10001,15 @@
       const mon = shown.getMonth();
       const label = t("m" + (mon + 1)) + " " + year;
       title.textContent = label;
-      grid.setAttribute("aria-label", label);
-      clear(grid);
+      grid2.setAttribute("aria-label", label);
+      clear(grid2);
       const byDay = eventsByDay();
       const today = isoDay(/* @__PURE__ */ new Date());
       const names = el("div", { class: "ak-calendar__row ak-calendar__row--head", role: "row" });
       for (let i = 0; i < 7; i++) {
         names.appendChild(el("span", { class: "ak-calendar__wd", role: "columnheader" }, WEEKDAYS[(weekStart + i) % 7]));
       }
-      grid.appendChild(names);
+      grid2.appendChild(names);
       const lead = (new Date(year, mon, 1).getDay() - weekStart + 7) % 7;
       const length = new Date(year, mon + 1, 0).getDate();
       const weeks = Math.ceil((lead + length) / 7);
@@ -8858,7 +10041,7 @@
           cells.push(button);
           cursor.setDate(cursor.getDate() + 1);
         }
-        grid.appendChild(row);
+        grid2.appendChild(row);
       }
       travel3(cells);
     }
@@ -8885,7 +10068,7 @@
       }
       if (s.title) root.appendChild(el("div", { class: "ak-calendar__name" }, String(s.title)));
       root.appendChild(head);
-      root.appendChild(grid);
+      root.appendChild(grid2);
       paint();
       enter(root);
     }
@@ -9622,9 +10805,9 @@
   }
 
   // src/static/sdk-libs/atelier/atlas.js
-  var SVG_NS6 = "http://www.w3.org/2000/svg";
+  var SVG_NS7 = "http://www.w3.org/2000/svg";
   function svg5(name, attrs) {
-    const node = document.createElementNS(SVG_NS6, name);
+    const node = document.createElementNS(SVG_NS7, name);
     for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
     return node;
   }
@@ -9903,6 +11086,7 @@
     host.appendChild(root);
     let alive = { handles: [], bound: [], cleanup: [] };
     let destroyed = false;
+    let ambientFromLayout = false;
     function resolveSource(name) {
       const fn = (spec.sources || {})[name];
       if (typeof fn !== "function") {
@@ -10254,7 +11438,7 @@
     let viewerOverlay = spec.overlay || null;
     function applyViewerOverlay(layout, o) {
       if (!o) return layout;
-      const out = { v: layout.v, look: layout.look, nav: o.nav || layout.nav, tokens: layout.tokens, meta: layout.meta, blocks: layout.blocks.slice() };
+      const out = { v: layout.v, look: layout.look, nav: o.nav || layout.nav, tokens: layout.tokens, ambient: layout.ambient, meta: layout.meta, blocks: layout.blocks.slice() };
       if (Array.isArray(o.hidden) && o.hidden.length) {
         out.blocks = out.blocks.filter(function(b) {
           return o.hidden.indexOf(b.id) < 0;
@@ -10279,6 +11463,18 @@
       if (!layout || !Array.isArray(layout.blocks)) return;
       layout = applyViewerOverlay(layout, viewerOverlay);
       if (layout.look && spec.app && spec.app.set) spec.app.set({ look: layout.look });
+      const wish = layout.ambient && typeof layout.ambient === "object" && layout.ambient.preset ? layout.ambient : null;
+      if (spec.app && spec.app.set) {
+        if (wish) {
+          spec.app.set({ ambient: wish });
+          ambientFromLayout = true;
+        } else if (ambientFromLayout) {
+          spec.app.set({ ambient: null });
+          ambientFromLayout = false;
+        }
+      } else if (wish) {
+        alive.handles.push(ambient({ target: root, preset: wish.preset, alpha: wish.alpha, speed: wish.speed }));
+      }
       root.setAttribute("data-ak-nav", layout.nav || "stack");
       root.setAttribute("data-ak-choreo", layout.choreography === "cinema" ? "cinema" : "still");
       const tokenHost = (
@@ -11724,7 +12920,7 @@
   var animePromise2 = null;
   var animeOff2 = false;
   var LATE = 400;
-  var SVG_NS7 = "http://www.w3.org/2000/svg";
+  var SVG_NS8 = "http://www.w3.org/2000/svg";
   function ensureAnime2() {
     if (W5.anime && W5.anime.animate) return Promise.resolve(W5.anime);
     if (animePromise2) return animePromise2;
@@ -12194,11 +13390,11 @@
     if (o.path && typeof o.path !== "string") {
       path = o.path;
     } else if (typeof o.path === "string" && o.path.trim()) {
-      stage = document.createElementNS(SVG_NS7, "svg");
+      stage = document.createElementNS(SVG_NS8, "svg");
       stage.setAttribute("class", "ak-orbit__stage");
       stage.setAttribute("viewBox", o.viewBox || "0 0 100 100");
       stage.setAttribute("aria-hidden", "true");
-      path = document.createElementNS(SVG_NS7, "path");
+      path = document.createElementNS(SVG_NS8, "path");
       path.setAttribute("class", "ak-orbit__path");
       path.setAttribute("d", o.path);
       path.setAttribute("fill", "none");
@@ -13406,7 +14602,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.46.0",
+    version: "0.47.0",
     // ── Shell and navigation ──
     app,
     section,
@@ -13545,6 +14741,14 @@
     curtain,
     intro,
     setMotion,
+    // ── The ambient: the one layer allowed to move at idle, its stage, the weather switch and
+    //    attract mode (the look decides; the viewer's weather and Less motion always win) ──
+    ambient,
+    ambientStage,
+    weather,
+    attract,
+    setWeather,
+    weatherLevel,
     // ── Data ──
     form,
     table,
