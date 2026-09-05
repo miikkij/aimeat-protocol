@@ -29,7 +29,7 @@ import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
 import { parseDeclaredProvenanceInput } from '../mcp/ai-provenance-input.js';
-import { buildUiCatalogue } from '../services/app-ui/registry.js';
+import { buildUiCatalogue } from '../services/app-ui/catalogue.js';
 import { validateUiLayout, AppUiError } from '../services/app-ui/validate.js';
 import { AppUiService, type WriteProvenance } from '../services/app-ui/service.js';
 
