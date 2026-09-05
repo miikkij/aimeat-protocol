@@ -116,6 +116,19 @@ export const packagesTools: AimeatToolDefinition[] = [
         },
     },
     {
+        // Updating a whole installed package in one act. The per-component migration road still
+        // exists and is what a component the owner EDITED goes through; this one moves everything
+        // that can move safely and names the rest.
+        name: 'aimeat_package_update',
+        description: 'Update a whole installed package to its latest version. Parts you have edited are left untouched and reported, never overwritten.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            instance_id: { type: 'string', required: true, description: 'The installed copy, from the instances list.' },
+            dry_run: { type: 'boolean', description: 'Report what would change and change nothing.' },
+        },
+    },
+    {
         // Taking a package into use, as opposed to authoring one. It is the step a conversation
         // reaches for by name ("install the company brain"), and until 2026-08-23 it existed on the
         // HTTP route alone, so an agent could list a package and not install it.

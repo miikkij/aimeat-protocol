@@ -308,6 +308,9 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // Not idempotent: composing twice under one name is refused as a conflict, and composing under
     // another name makes a second package. It reads the owner's apps and writes nothing of theirs.
     aimeat_package_compose: { title: 'Compose Package From Apps', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    // Idempotent: run twice and the second call finds nothing left to update. Not destructive,
+    // because a component the owner edited is refused rather than overwritten.
+    aimeat_package_update: { title: 'Update Installed Package', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     // Not idempotent: each install mints a fresh instance with its own component names, so calling
     // it twice leaves two copies rather than one.
     aimeat_package_install: { title: 'Install Package', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },

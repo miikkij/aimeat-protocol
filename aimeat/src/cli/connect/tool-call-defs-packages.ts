@@ -163,6 +163,21 @@ export const packageTools: ConnectCliToolDefinition[] = [
         },
     },
     {
+        // Updating a whole installed package in one act, without touching what the owner edited.
+        name: 'aimeat_package_update',
+        description: 'Update a whole installed package to its latest version. Parts you have edited are left untouched and reported, never overwritten.',
+        input: {
+            instance_id: { type: 'string', required: true, description: 'The installed copy, from the instances list.' },
+            dry_run: { type: 'boolean', description: 'Report what would change and change nothing.' },
+        },
+        handler: ({ client }, input) => {
+            const body: JsonObject = {};
+            const dryRun = optionalBoolean(input, 'dry_run');
+            if (dryRun !== undefined) body.dry_run = dryRun;
+            return client.post(`/v1/instances/${encodeURIComponent(requiredString(input, 'instance_id'))}/update`, body);
+        },
+    },
+    {
         // Taking a package into use, as opposed to authoring one. A fleet daemon reaches the node
         // through this table, so without an entry here the tool exists on the other two doors and
         // not on the one an agent actually calls.

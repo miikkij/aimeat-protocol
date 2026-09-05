@@ -6,6 +6,13 @@
  *   and apply a migration to an instance (replace/skip/custom/install_new actions).
  *   Extracted from src/routes/instances.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-09-05 — The apply-migration body moves to services/package-migrate.ts, so the
+ *     whole-instance update act runs the same loop rather than a second copy of it. Three defects
+ *     went with it, argued in that file: the cortex and extension rewrites were never repeated, a
+ *     newly added component got a name nothing could address, and a refused registration was
+ *     recorded as a success. Here, the migration prompt now reads the owner's live content through
+ *     their GHII: it was passing `sub`, which for an owner session is the bare name, so the lookup
+ *     missed and the AI was handed the ORIGINAL content and asked to preserve changes in it.
  *   v1.1.0 — 2026-08-10 — replace/custom validate the supplied content before anything is deleted.
  *     This road deletes the existing component and then registers the new one, which was safe only
  *     while registration accepted anything; it does not any more.
@@ -14,17 +21,12 @@
 
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
-import type { Storage, InstalledComponent } from '../../storage/interface.js';
+import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
-import { emitChange } from '../../services/event-bus.js';
-import {
-  registerComponent, validateComponentContent,
-  deleteComponent,
-  fetchComponentContent,
-  computeHash,
-} from '../../services/component-registrar.js';
+import { fetchComponentContent } from '../../services/component-registrar.js';
 import { resolveGhii } from '../../utils/ghii-resolver.js';
+import { applyInstanceMigration, updateInstanceToLatest } from '../../services/package-migrate.js';
 
 // ── Register migration routes ─────────────────────────────────────────
 
@@ -71,6 +73,7 @@ export function registerMigrationRoutes(
       return;
     }
 
+    const promptOwnerGaii = await resolveGhii(storage, owner, req.auth!.sub);
     const currentCompMap = new Map(currentPkg.components.map(c => [c.id, c]));
     const latestCompMap = new Map(latestPkg.components.map(c => [c.id, c]));
 
@@ -85,12 +88,16 @@ export function registerMigrationRoutes(
 
       if (!original || !updated) continue;
 
-      // Fetch user's current version from native storage
+      // Fetch user's current version from native storage.
+      //
+      // THE GHII, NOT `sub`. For an owner session `sub` is the bare name, so the lookup missed every
+      // time and the fallback below handed the AI the ORIGINAL content — it was asked to preserve
+      // customisations it was never shown, and it had no way to say so.
       const installed = instance.installedComponents.find(ic => ic.componentId === compId);
       let userCurrentContent = original.content; // fallback
       if (installed) {
         const current = await fetchComponentContent(
-          storage, installed.type, installed.registeredAs, req.auth!.sub,
+          storage, installed.type, installed.registeredAs, promptOwnerGaii,
         );
         if (current !== null) userCurrentContent = current;
       }
@@ -173,236 +180,51 @@ export function registerMigrationRoutes(
     const id = req.params.id as string;
     const owner = req.auth!.owner;
     const ownerGaii = await resolveGhii(storage, owner, req.auth!.sub);
-
-    const instance = await storage.getInstance(id);
-    if (!instance) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Instance not found: ${id}`));
-      return;
-    }
-    if (instance.owner !== owner) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the instance owner can apply migrations'));
-      return;
-    }
-
     const { targetVersion, components: migrationActions } = req.body ?? {};
 
-    if (!targetVersion || typeof targetVersion !== 'string') {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'targetVersion is required'));
-      return;
-    }
-    if (!Array.isArray(migrationActions) || migrationActions.length === 0) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
-        'components must be an array of { componentId, action, content? }'));
-      return;
-    }
+    const out = await applyInstanceMigration({ storage, config },
+      { owner, ownerGhii: ownerGaii, sub: req.auth!.sub },
+      { instanceId: id, targetVersion, actions: migrationActions });
 
-    // Validate target version exists
-    const targetPkg = await storage.getPackageByGroupAndVersion(
-      instance.packageGroupId, targetVersion,
-    );
-    if (!targetPkg) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND',
-        `Target version not found: ${targetVersion}`));
+    if (!out.ok) {
+      res.status(out.status).json(error(config.nodeId, out.code, out.message));
       return;
     }
 
-    const targetCompMap = new Map(targetPkg.components.map(c => [c.id, c]));
-    const validActions = ['replace', 'skip', 'custom', 'install_new'] as const;
-
-    const updatedComponents: string[] = [];
-    const newComponents: string[] = [];
-    const skippedComponents: string[] = [];
-
-    // Build new installedComponents list
-    const existingMap = new Map(
-      instance.installedComponents.map(ic => [ic.componentId, ic]),
-    );
-    const newInstalledComponents: InstalledComponent[] = [];
-
-    for (const action of migrationActions) {
-      const compId = action.componentId as string;
-      const actionType = action.action as string;
-      const content = action.content as string | undefined;
-
-      if (!compId || typeof compId !== 'string') continue;
-      if (!(validActions as readonly string[]).includes(actionType)) {
-        res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
-          `Invalid action "${actionType}" for component "${compId}". Valid: ${validActions.join(', ')}`));
-        return;
-      }
-
-      const targetComp = targetCompMap.get(compId);
-
-      // Check the content BEFORE anything is deleted. `replace` and `custom` both delete the
-      // existing component and then register the new one, and an extension component now goes
-      // through the full manifest builder — so content this node will not accept must be refused
-      // here, while the old component is still there. Body-supplied content is exactly the case:
-      // `content` above comes from the request.
-      if (actionType === 'replace' || actionType === 'custom') {
-        const existingComp = existingMap.get(compId);
-        const proposed = content ?? targetComp?.content ?? '';
-        const compType = targetComp?.type ?? existingComp?.type ?? 'csm';
-        const regAs = existingComp?.registeredAs ?? `${targetPkg.name}-${owner}-${compId}`;
-        const check = validateComponentContent(compType, proposed, regAs, config, owner);
-        if (!check.ok) {
-          res.status(400).json(error(config.nodeId, 'INVALID_COMPONENT',
-            `Component "${compId}" was not applied: ${check.error}`));
-          return;
-        }
-      }
-      const existing = existingMap.get(compId);
-
-      switch (actionType) {
-        case 'replace': {
-          // Use provided content, or fall back to the target version's content
-          const newContent = content ?? targetComp?.content ?? '';
-          const registeredAs = existing?.registeredAs ?? `${targetPkg.name}-${owner}-${compId}`;
-
-          if (existing) {
-            // Delete old, register new — simplest update strategy
-            await deleteComponent(storage, existing.type, registeredAs, ownerGaii);
-          }
-
-          const result = await registerComponent(storage, {
-            config,
-            componentId: compId,
-            type: targetComp?.type ?? existing?.type ?? 'csm',
-            registeredAs,
-            content: newContent,
-            label: targetComp?.label ?? compId,
-            owner,
-            ownerGaii,
-            packageName: targetPkg.name,
-            packageCategory: targetPkg.category,
-            packageTags: targetPkg.tags,
-            packageDescription: targetPkg.description,
-          });
-
-          const newHash = computeHash(newContent);
-          newInstalledComponents.push({
-            componentId: compId,
-            type: targetComp?.type ?? existing?.type ?? 'csm',
-            registeredAs,
-            originalHash: targetComp?.contentHash ?? newHash,
-            customized: false,
-          });
-          updatedComponents.push(compId);
-
-          if (!result.success) {
-            // Non-fatal for migration — log but continue
-            // The component metadata is still updated
-          }
-          break;
-        }
-        case 'skip': {
-          if (existing) {
-            newInstalledComponents.push({ ...existing });
-          }
-          skippedComponents.push(compId);
-          break;
-        }
-        case 'custom': {
-          // User provided AI-merged content
-          const customContent = content ?? targetComp?.content ?? '';
-          const registeredAs = existing?.registeredAs ?? `${targetPkg.name}-${owner}-${compId}`;
-
-          if (existing) {
-            await deleteComponent(storage, existing.type, registeredAs, ownerGaii);
-          }
-
-          await registerComponent(storage, {
-            config,
-            componentId: compId,
-            type: targetComp?.type ?? existing?.type ?? 'csm',
-            registeredAs,
-            content: customContent,
-            label: targetComp?.label ?? compId,
-            owner,
-            ownerGaii,
-            packageName: targetPkg.name,
-            packageCategory: targetPkg.category,
-            packageTags: targetPkg.tags,
-            packageDescription: targetPkg.description,
-          });
-
-          const customHash = computeHash(customContent);
-          newInstalledComponents.push({
-            componentId: compId,
-            type: targetComp?.type ?? existing?.type ?? 'csm',
-            registeredAs,
-            originalHash: targetComp?.contentHash ?? customHash,
-            customized: !!content,
-          });
-          updatedComponents.push(compId);
-          break;
-        }
-        case 'install_new': {
-          if (targetComp) {
-            const registeredAs = `${targetPkg.name}-${owner}-${compId}`;
-
-            await registerComponent(storage, {
-            config,
-              componentId: compId,
-              type: targetComp.type,
-              registeredAs,
-              content: targetComp.content,
-              label: targetComp.label,
-              owner,
-              ownerGaii,
-              packageName: targetPkg.name,
-              packageCategory: targetPkg.category,
-              packageTags: targetPkg.tags,
-              packageDescription: targetPkg.description,
-            });
-
-            newInstalledComponents.push({
-              componentId: compId,
-              type: targetComp.type,
-              registeredAs,
-              originalHash: targetComp.contentHash,
-              customized: false,
-            });
-            newComponents.push(compId);
-          }
-          break;
-        }
-      }
-    }
-
-    // Preserve any existing components not mentioned in the migration actions
-    for (const ic of instance.installedComponents) {
-      const inAction = migrationActions.some(
-        (a: { componentId?: string }) => a.componentId === ic.componentId,
-      );
-      if (!inAction) {
-        newInstalledComponents.push({ ...ic });
-      }
-    }
-
-    // Update instance record
-    const updated = await storage.updateInstance(id, {
-      packageVersion: targetVersion,
-      packageRecordId: targetPkg.id,
-      installedComponents: newInstalledComponents,
-      updatedAt: new Date().toISOString(),
-    });
-
-    if (!updated) {
-      res.status(500).json(error(config.nodeId, 'MIGRATION_FAILED', 'Failed to update instance record'));
-      return;
-    }
-
-    emitChange('instances');
-
-    res.json(success(config.nodeId, {
-      migrated: true,
-      updatedComponents,
-      newComponents,
-      skippedComponents,
-      newVersion: targetVersion,
-    }, [
+    res.json(success(config.nodeId, out.outcome, [
       { description: 'View updated instance', method: 'GET', url: `/v1/instances/${id}` },
       { description: 'Check component status', method: 'GET', url: `/v1/instances/${id}/status` },
+    ]));
+  });
+
+  // POST /v1/instances/:id/update — move a whole instance onto the latest version in one act.
+  //
+  // WHAT IT WILL NOT DO, AND WHY THAT IS THE FEATURE. A component the owner has edited is NOT
+  // overwritten: it comes back in `needs_you` with the address of the prompt that merges it, and its
+  // bytes are untouched. A component the new version DROPPED is reported and left alone, because
+  // deleting somebody's copy of something is a separate act that deserves to be asked for. So this
+  // door updates everything that can be updated safely and says plainly what still needs a person.
+  //
+  // dry_run answers the same shape and writes nothing, which is what lets a page say
+  // "three update, one needs you" before anybody presses anything.
+  router.post('/v1/instances/:id/update', requireAuth(), requireScope('packages:write'), async (req, res) => {
+    const id = req.params.id as string;
+    const owner = req.auth!.owner;
+    const ownerGaii = await resolveGhii(storage, owner, req.auth!.sub);
+    const out = await updateInstanceToLatest({ storage, config },
+      { owner, ownerGhii: ownerGaii, sub: req.auth!.sub },
+      { instanceId: id, dryRun: req.body?.dry_run === true });
+
+    if (!out.ok) {
+      res.status(out.status).json(error(config.nodeId, out.code, out.message));
+      return;
+    }
+
+    res.json(success(config.nodeId, out.answer, [
+      { description: 'Check component status', method: 'GET', url: `/v1/instances/${id}/status` },
+      ...(out.answer.needsYou.length > 0
+        ? [{ description: 'Merge the parts you edited', method: 'POST', url: `/v1/instances/${id}/migration-prompt` }]
+        : []),
     ]));
   });
 }

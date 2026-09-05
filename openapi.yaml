@@ -37858,23 +37858,112 @@ paths:
           application/json:
             schema:
               type: object
+              required: [targetVersion, components]
               properties:
                 targetVersion: { type: string }
-                componentUpdates:
+                components:
                   type: array
+                  minItems: 1
                   items:
                     type: object
+                    required: [componentId, action]
                     properties:
                       componentId: { type: string }
-                      action: { type: string, enum: [safe_overwrite, install_new, remove, skip] }
-                      newContent: { type: string, description: 'Migrated content for components needing migration.' }
+                      action:
+                        type: string
+                        enum: [replace, skip, custom, install_new]
+                        description: >-
+                          replace takes the new version's content, skip keeps yours, custom takes the
+                          content in this request (an AI-merged version), install_new adds a part the
+                          new version introduces.
+                      content:
+                        type: string
+                        description: The content to register, for replace and custom. Validated before anything is deleted.
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
-          description: Instance not found
+          description: Instance or target version not found
+
+  /v1/instances/{id}/update:
+    post:
+      operationId: updateInstance
+      summary: Update a whole installed package in one act
+      description: >-
+        Moves an installed package onto the latest published version. A component the owner has
+        edited is NOT overwritten: it comes back in `needsYou` with the address of the prompt that
+        merges it, and its bytes are untouched. A component the new version dropped is reported in
+        `removed` and left alone, because deleting a copy is a separate act. Everything else moves.
+      tags: [Instances]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dry_run:
+                  type: boolean
+                  default: false
+                  description: Answer the same shape and write nothing.
+      responses:
+        '200':
+          description: What changed, what was left for the owner, and what was only reported
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          currentVersion: { type: string }
+                          latestVersion: { type: string }
+                          updateAvailable: { type: boolean }
+                          changelog: { type: string, nullable: true }
+                          dryRun: { type: boolean }
+                          willUpdate: { type: array, items: { type: string } }
+                          needsYou:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                componentId: { type: string }
+                                type: { type: string }
+                                reason: { type: string }
+                                mergeWith: { type: string }
+                          removed:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                componentId: { type: string }
+                                type: { type: string }
+                          applied:
+                            type: object
+                            nullable: true
+                            description: Null on a dry run, and when nothing could be applied safely.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Instance not found, or the package has no published version
 
   # ── Templates ─────────────────────────────────────────────
   /v1/templates:

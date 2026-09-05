@@ -11,7 +11,7 @@
 
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
-import type { Storage, PackageComponentType } from '../../storage/interface.js';
+import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { refuseNotYours } from '../../middleware/refusals.js';
@@ -23,16 +23,7 @@ import {
 } from '../../services/component-registrar.js';
 import { resolveGhii } from '../../utils/ghii-resolver.js';
 import { logger } from '../../utils/logger.js';
-
-// ── Types for migration diff ──────────────────────────────────────────
-
-interface ComponentDiff {
-  componentId: string;
-  type: PackageComponentType;
-  status: 'unchanged' | 'updated' | 'new' | 'removed';
-  action: 'no_change' | 'safe_overwrite' | 'migration_needed' | 'install_new' | 'remove';
-  customized?: boolean;
-}
+import { planInstanceUpdate } from '../../services/package-update-plan.js';
 
 // ── Register instance management routes ───────────────────────────────
 
@@ -128,105 +119,14 @@ export function registerManageRoutes(
     const id = req.params.id as string;
     const owner = req.auth!.owner;
 
-    const instance = await storage.getInstance(id);
-    if (!instance) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Instance not found: ${id}`));
-      return;
-    }
-    if (instance.owner !== owner) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the instance owner can check for updates'));
+    const ownerGhii = await resolveGhii(storage, owner, req.auth!.sub);
+    const out = await planInstanceUpdate({ storage }, { owner, ownerGhii }, id);
+    if (!out.ok) {
+      res.status(out.status).json(error(config.nodeId, out.code, out.message));
       return;
     }
 
-    // Get latest published version for this package group
-    const latest = await storage.getLatestPublished(instance.packageGroupId);
-    if (!latest) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND',
-        `No published version found for package ${instance.packageGroupId}`));
-      return;
-    }
-
-    const currentVersion = instance.packageVersion;
-    const latestVersion = latest.version;
-    const updateAvailable = currentVersion !== latestVersion;
-
-    if (!updateAvailable) {
-      res.json(success(config.nodeId, {
-        currentVersion,
-        latestVersion,
-        updateAvailable: false,
-        changelog: null,
-        componentDiffs: [],
-      }));
-      return;
-    }
-
-    // Get the installed version's PackageRecord for component comparison
-    const currentPkg = await storage.getPackage(instance.packageRecordId);
-    const oldComponents = new Map(
-      (currentPkg?.components ?? []).map(c => [c.id, c]),
-    );
-    const newComponents = new Map(
-      latest.components.map(c => [c.id, c]),
-    );
-
-    // Build a map of installed component customization status
-    const installedMap = new Map(
-      instance.installedComponents.map(ic => [ic.componentId, ic]),
-    );
-
-    const componentDiffs: ComponentDiff[] = [];
-
-    // Check components in the new version
-    for (const [compId, newComp] of newComponents) {
-      const oldComp = oldComponents.get(compId);
-      const installed = installedMap.get(compId);
-
-      if (!oldComp) {
-        componentDiffs.push({
-          componentId: compId,
-          type: newComp.type,
-          status: 'new',
-          action: 'install_new',
-        });
-      } else if (oldComp.contentHash === newComp.contentHash) {
-        componentDiffs.push({
-          componentId: compId,
-          type: newComp.type,
-          status: 'unchanged',
-          action: 'no_change',
-        });
-      } else {
-        const isCustomized = installed?.customized ?? false;
-        componentDiffs.push({
-          componentId: compId,
-          type: newComp.type,
-          status: 'updated',
-          action: isCustomized ? 'migration_needed' : 'safe_overwrite',
-          customized: isCustomized,
-        });
-      }
-    }
-
-    // Check components only in old version (removed in new)
-    for (const [compId, oldComp] of oldComponents) {
-      if (!newComponents.has(compId)) {
-        componentDiffs.push({
-          componentId: compId,
-          type: oldComp.type,
-          status: 'removed',
-          action: 'remove',
-        });
-      }
-    }
-
-    res.json(success(config.nodeId, {
-      currentVersion,
-      latestVersion,
-      updateAvailable: true,
-      changelog: latest.changelog,
-      componentDiffs,
-    }));
+    res.json(success(config.nodeId, out.plan));
   });
 
   // GET /v1/instances/:id — Get instance details

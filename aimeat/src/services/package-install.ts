@@ -134,7 +134,7 @@ function sortByDependencies(components: PackageComponent[]): string[] {
  *
  * Only NEW installs. An app already installed under a bare filename keeps it.
  */
-function registeredNameFor(
+export function registeredNameFor(
     packageName: string, owner: string, shortId: string,
     comp: { id: string; type: PackageComponentType },
 ): string {
