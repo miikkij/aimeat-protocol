@@ -45,6 +45,10 @@
  *   doc.set('t', 31);
  *   doc.setLanguage('en');   // …or just let the login pill do it
  * @version-history
+ *   v0.4.1 — 2026-09-06 — A control says its answer once: the reading beside it is drawn only for
+ *     the slider and the number field, the two that cannot show it themselves. A pick used to
+ *     print the value the document STORES beside a select showing the option's words, so the same
+ *     row read "Outdoors" and "ulko" at once (render.js).
  *   v0.4.0 — 2026-09-06 — A LIVING RECORD IS BILINGUAL BY CONSTRUCTION (the living document, stage
  *     4). Any human-facing string may be a language map; the page's language decides, the record's
  *     `lang` is the fallback and the map's first key the last resort. mount() follows the
@@ -95,7 +99,7 @@ import {
   onLanguageChange, preference,
 } from './i18n.js';
 
-const VERSION = '0.4.0';
+const VERSION = '0.4.1';
 
 /** The node types whose rendering this library does itself, when the node names a block. */
 const DRAWN = ['control', 'formula', 'text', 'machine', 'value', 'source'];

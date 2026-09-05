@@ -35,6 +35,11 @@
  * @structure controlRow · textView · machineView · valueRow · renderNodeInto
  * @usage  import { renderNodeInto } from './render.js';
  * @version-history
+ *   v0.4.1 — 2026-09-06 — A CONTROL SAYS ITS ANSWER ONCE. The reading beside a control is drawn
+ *     only for the slider and the number field, which cannot show the answer themselves. A pick's
+ *     reading printed the stored value while its select showed the option's words, so one row said
+ *     "Outdoors" and "ulko" at the same time; a toggle printed "true" beside a switch; a text
+ *     field printed a copy of what was in the box.
  *   v0.4.0 — 2026-09-06 — Every human-facing string this file prints is read through the record's
  *     language (i18n.js), and every view answers with relabel() so a language change moves the
  *     words without moving anything else. A number written with `locale: "auto"` follows too.
@@ -74,6 +79,20 @@ function readout(v, format, lang) { return formatParts(v, format, 'after', lang)
 
 /** Which of the kit's field types each control kind is. */
 const FIELD_TYPE = { slider: 'range', toggle: 'toggle', pick: 'select', number: 'number', text: 'text' };
+
+/**
+ * WHICH CONTROLS GET A READING BESIDE THEM, and it is the shorter list. A reading earns its place
+ * only where the control CANNOT show the answer itself: the slider, whose track says nothing, and
+ * the number field, whose box shows the figure but never the unit.
+ *
+ * A pick, a toggle and a text field are their own readout, and a second copy beside them can only
+ * ever disagree. On a pick it always did: the select showed the option's words ("Outdoors") and
+ * the reading printed what the document STORES ("ulko") — the id a guard compares against, which
+ * is not words and does not change with the language. Translating that id into the option's label
+ * would have fixed the disagreement by printing the same word twice on one row, which is not what
+ * a form does.
+ */
+const READS_OUT = ['slider', 'number'];
 
 /**
  * One option of a pick, however the record wrote it: a bare value or { value, label }. The VALUE
@@ -139,15 +158,16 @@ export function controlRow(host, spec) {
   const row = root.querySelector('[data-ak-part="range"]');
   if (row) row.classList.add('ak-living__control-row');
 
-  // The reading is the kit's for a range, which already draws one, and ours for the kinds it does
-  // not — one element either way, so the graph's words (a quantity with its unit, a refusal in
-  // words) always land in the same place and an app has one class to target.
-  let readoutEl = root.querySelector('[data-ak-part="readout"]');
-  if (!readoutEl) {
+  // The reading is the kit's for a range, which already draws one, and ours for the number field,
+  // which the kit gives none — one element either way, so the graph's words (a quantity with its
+  // unit, a refusal in words) always land in the same place and an app has one class to target.
+  // The kinds that show their own answer get none: see READS_OUT.
+  let readoutEl = READS_OUT.indexOf(kind) < 0 ? null : root.querySelector('[data-ak-part="readout"]');
+  if (!readoutEl && READS_OUT.indexOf(kind) >= 0) {
     readoutEl = el('output', { class: 'ak-form__readout', 'data-ak-part': 'readout', for: id });
     (field || root).appendChild(readoutEl);
   }
-  readoutEl.classList.add('ak-living__readout');
+  if (readoutEl) readoutEl.classList.add('ak-living__readout');
 
   function update(v) {
     if (kind === 'toggle') {
@@ -160,6 +180,7 @@ export function controlRow(host, spec) {
       const n = asNumber(v);
       if (Number.isFinite(n) && String(n) !== input.value) handle.setValues({ value: n });
     }
+    if (!readoutEl) return;
     const words = readout(v, target.format, langsOf(spec)[0]);
     if (readoutEl.textContent !== words) readoutEl.textContent = words;
     // The kit mirrors the raw number into aria-valuetext; a living document knows the unit and

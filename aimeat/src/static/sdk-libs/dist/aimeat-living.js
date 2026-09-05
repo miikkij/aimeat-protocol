@@ -2559,6 +2559,7 @@
     return formatParts(v, format, "after", lang).text;
   }
   var FIELD_TYPE = { slider: "range", toggle: "toggle", pick: "select", number: "number", text: "text" };
+  var READS_OUT = ["slider", "number"];
   function asOption(o, langs) {
     const opt = o && typeof o === "object" ? o : { value: o, label: o };
     const label = textOf(opt.label == null ? opt.value : opt.label, langs);
@@ -2612,12 +2613,12 @@
     if (kind === "slider") input.classList.add("ak-living__slider");
     const row = root.querySelector('[data-ak-part="range"]');
     if (row) row.classList.add("ak-living__control-row");
-    let readoutEl = root.querySelector('[data-ak-part="readout"]');
-    if (!readoutEl) {
+    let readoutEl = READS_OUT.indexOf(kind) < 0 ? null : root.querySelector('[data-ak-part="readout"]');
+    if (!readoutEl && READS_OUT.indexOf(kind) >= 0) {
       readoutEl = el("output", { class: "ak-form__readout", "data-ak-part": "readout", for: id });
       (field || root).appendChild(readoutEl);
     }
-    readoutEl.classList.add("ak-living__readout");
+    if (readoutEl) readoutEl.classList.add("ak-living__readout");
     function update(v) {
       if (kind === "toggle") {
         const on = !!(v === true || asNumber(v) === 1);
@@ -2629,6 +2630,7 @@
         const n = asNumber(v);
         if (Number.isFinite(n) && String(n) !== input.value) handle.setValues({ value: n });
       }
+      if (!readoutEl) return;
       const words = readout(v, target.format, langsOf(spec)[0]);
       if (readoutEl.textContent !== words) readoutEl.textContent = words;
       if (input.hasAttribute("aria-valuetext")) input.setAttribute("aria-valuetext", words);
@@ -3021,7 +3023,7 @@
   };
 
   // src/static/sdk-libs/living/index.js
-  var VERSION = "0.4.0";
+  var VERSION = "0.4.1";
   var DRAWN = ["control", "formula", "text", "machine", "value", "source"];
   function nodeLanguageRefusals(id, node, out) {
     for (const field of (NODES[String(node.type)] || {}).languages || []) {
