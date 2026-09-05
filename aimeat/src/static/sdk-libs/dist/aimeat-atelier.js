@@ -2026,16 +2026,18 @@
       svg6.appendChild(document.createElementNS(SVG_NS, "defs"));
       document.body.appendChild(svg6);
     }
+    return (
+      /** @type {Element} */
+      svg6.querySelector("defs")
+    );
+  }
+  function sweepOrphans() {
     for (const [fid, owner] of OWNERS) {
       if (owner.isConnected) continue;
       const orphan = document.getElementById(fid);
       if (orphan && orphan.parentNode) orphan.parentNode.removeChild(orphan);
       OWNERS.delete(fid);
     }
-    return (
-      /** @type {Element} */
-      svg6.querySelector("defs")
-    );
   }
   function settleShared(node, rest) {
     const ids = rest ? Object.keys(rest) : [];
@@ -2239,6 +2241,7 @@
       return null;
     }
     injectStyle();
+    sweepOrphans();
     const node = (
       /** @type {HTMLElement} */
       resolve(target)

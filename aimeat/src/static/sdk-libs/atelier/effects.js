@@ -152,14 +152,18 @@ function ensureDefs() {
     svg.appendChild(document.createElementNS(SVG_NS, 'defs'));
     document.body.appendChild(svg);
   }
-  // A filter whose element is no longer in the document is an orphan: gone with its owner.
+  return /** @type {Element} */ (svg.querySelector('defs'));
+}
+
+/** A filter whose element is no longer in the document is an orphan: gone with its owner. Runs
+ *  on EVERY mount (a CSS-only effect mounts no filter of its own and still sweeps). */
+function sweepOrphans() {
   for (const [fid, owner] of OWNERS) {
     if (owner.isConnected) continue;
     const orphan = document.getElementById(fid);
     if (orphan && orphan.parentNode) orphan.parentNode.removeChild(orphan);
     OWNERS.delete(fid);
   }
-  return /** @type {Element} */ (svg.querySelector('defs'));
 }
 
 /**
@@ -411,6 +415,7 @@ export function fx(target, spec) {
     return null;
   }
   injectStyle();
+  sweepOrphans();
   const node = /** @type {HTMLElement} */ (resolve(target));
   // The same effect twice on one element would fight over the classes and the properties, so
   // the earlier instance steps aside.
