@@ -120,7 +120,9 @@ describe('surface block registry', () => {
                 expect(published.has(domain), `${def.id} listens for "${domain}", which nothing emits`).toBe(true);
             }
         }
-    });
+    // The scan reads every route and service file: a second alone, over five when another
+    // session's gate runs beside it, against vitest's five-second default (seen 2026-09-05).
+    }, 30_000);
 });
 
 describe('default layouts', () => {
