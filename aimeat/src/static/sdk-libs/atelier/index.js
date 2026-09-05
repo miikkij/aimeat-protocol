@@ -31,6 +31,8 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.47.1 — 2026-09-05 — Stylesheet only: the list-detail fold spans its panes on a phone and a
+ *     tall dialog scrolls in its body (content.css v0.37.0); the version moves with the sheet.
  *   v0.47.0 — 2026-09-05 — THE AMBIENT (wish-atelier-ambient-visuals): the one layer allowed to
  *     move at idle. The contract gains --ak-ambient, --ak-ambient-alpha and --ak-ambient-speed,
  *     named by the look and proven by the matrix (AK-AMBIENT); ambient(), ambientStage(),
@@ -282,7 +284,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.47.0',
+  version: '0.47.1',
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,

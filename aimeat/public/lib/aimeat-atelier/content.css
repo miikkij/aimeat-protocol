@@ -12,6 +12,9 @@
  * @structure ak-list · ak-listdetail · ak-grid + ak-card · ak-mediacard · ak-timeline
  * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
  * @version-history
+ *   v0.37.0 — 2026-09-05 — The list-detail fold spans its panes over every track (a container
+ *     query cannot restyle its own container, so the open detail sat at 40 percent of a phone),
+ *     and a dialog taller than the screen scrolls in its body instead of growing past it.
  *   v0.36.0 — 2026-08-30 — The funnel, treemap and flow shapes: bands with a drop-in entrance,
  *     ink labels wearing a surface halo (paint-order) so they read on any series colour.
  *   v0.10.0 — 2026-08-29 — THE NEXT LEVEL, first pieces: the chart mural (data as the decor —
@@ -107,7 +110,12 @@ button.ak-list__row:hover { box-shadow: var(--ak-elev-1); }
 }
 .ak-listdetail__back { display: none; }
 @container (max-width: 640px) {
+  /* The element that declares the container never matches its own container query, so the
+     column rule below is inert and the two tracks stay; the open detail then sat in the 5fr
+     track at 40 percent of a phone (wish-atelier-listdetail-narrow-fold). A child rule does
+     land: each pane spans every track. */
   .ak-listdetail { grid-template-columns: minmax(0, 1fr); }
+  .ak-listdetail__master, .ak-listdetail__detail { grid-column: 1 / -1; }
   .ak-listdetail__detail { display: none; }
   .ak-listdetail--open .ak-listdetail__master { display: none; }
   .ak-listdetail--open .ak-listdetail__detail { display: block; }
@@ -572,7 +580,12 @@ button.ak-card:hover { box-shadow: var(--ak-elev-2); transform: translateY(-2px)
 .ak-dialog {
   margin: auto;
   width: min(34rem, calc(100vw - 2 * var(--ak-pad)));
+  /* A dialog taller than the screen scrolls inside its body rather than growing past the
+     viewport: the panel is capped and the body is the flex child that gives. */
+  max-height: calc(100dvh - 2 * var(--ak-pad));
 }
+.ak-dialog .ak-dialog__panel { max-height: calc(100dvh - 2 * var(--ak-pad)); min-height: 0; box-sizing: border-box; }
+.ak-dialog .ak-dialog__body { flex: 1 1 auto; min-height: 0; }
 .ak-dialog--bottom {
   margin: auto auto 0;
   width: min(42rem, 100vw);

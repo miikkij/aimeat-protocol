@@ -12,7 +12,7 @@ You run checks and report what they said. You do not fix, you do not soften, and
 ## Setup you verify first
 
 - `git worktree list` and `pwd`: you are in the session's worktree, not the shared checkout root. If the lead did not say which, ask in the report and run only the static checks.
-- The port: the lead names it from its claim on the node (pool 40251–40260). `netstat -ano | grep :<port>` must be empty before you start a suite. The E2E runner takes the port from the `.env.test.*` file; if the runner is pinned to another port, say so and stop rather than colliding.
+- The port: the lead names it from its claim on the node (any free port from 40251 up; the board shows the ones in use). `netstat -ano | grep :<port>` must be empty before you start a suite. The E2E runner takes the port from the `.env.test.*` file; if the runner is pinned to another port, say so and stop rather than colliding.
 - Open incidents: the lead pastes them. A red suite that an open incident already explains is reported as that incident, not as a regression.
 
 ## What you run

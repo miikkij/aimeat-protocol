@@ -43,6 +43,8 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.47.1 — 2026-09-05 — content.css: the list-detail fold spans its panes on a phone, and a
+ *     tall dialog scrolls inside its body (wish-atelier-listdetail-narrow-fold).
  *   v0.47.0 — 2026-09-05 — THE AMBIENT (wish-atelier-ambient-visuals): three tokens join the
  *     contract — --ak-ambient (a preset id or none), --ak-ambient-alpha and --ak-ambient-speed —
  *     so a LOOK names the one layer allowed to move at idle and the matrix proves it
