@@ -11,6 +11,8 @@
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-social.js"></script>
  *   await AIMEAT.social.post('general', { title: 'Hi', body: 'Hello!' });
  * @version-history
+ *   v1.2.0 — 2026-09-06 — unreact(): take your own reaction back. Nothing in the platform could,
+ *     so every app that drew a heart drew a one-way door and a mis-tap was permanent.
  *   v1.1.0 — 2026-08-30 — Boards are Core again (RFC §27): updatePost (resolve a notice or move its
  *     expiry), setRules (the board's own rules), and signedIn() so a page can offer a visitor a
  *     sign-in door instead of letting a write throw.
@@ -87,6 +89,19 @@ const social = {
       { method: 'POST', body: JSON.stringify({ reaction }) },
     );
     if (!res.ok) throw new Error(res.error?.message || 'Failed to react');
+    return res.data;
+  },
+
+  // Take your own reaction back. Every app that offered a heart offered a one-way door until
+  // 2026-09-06, because this half did not exist anywhere below it either. Removes only the
+  // signed-in person's own mark; throws when they never made it.
+  async unreact(boardId, postId, reaction) {
+    const res = await authFetch(
+      '/v1/boards/' + encodeURIComponent(boardId) + '/posts/' + encodeURIComponent(postId)
+        + '/react?reaction=' + encodeURIComponent(reaction),
+      { method: 'DELETE' },
+    );
+    if (!res.ok) throw new Error(res.error?.message || 'Failed to take the reaction back');
     return res.data;
   },
 

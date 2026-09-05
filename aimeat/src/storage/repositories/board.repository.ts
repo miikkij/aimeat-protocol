@@ -49,6 +49,14 @@ export interface BoardRepository {
    */
   pruneExpiredBoardPosts(nowIso: string): Promise<number>;
   addReaction(boardId: string, postId: string, emoji: string, gaii: string): Promise<boolean>;
+  /**
+   * Take back one's own reaction. The other half of addReaction, missing until 2026-09-06: a
+   * reaction could be given and never withdrawn, on any surface, so a mis-tap was permanent.
+   * Removes only THIS gaii from THIS emoji, drops the emoji entirely when nobody is left on it
+   * (an empty array would keep counting as a key), and answers false when there was nothing to
+   * take back, which the route turns into a 404 rather than pretending it removed something.
+   */
+  removeReaction(boardId: string, postId: string, emoji: string, gaii: string): Promise<boolean>;
   createBoardSubscription(sub: BoardSubscriptionRecord): Promise<BoardSubscriptionRecord>;
   getBoardSubscription(boardId: string, gaii: string): Promise<BoardSubscriptionRecord | null>;
   listBoardSubscriptions(boardId: string): Promise<BoardSubscriptionRecord[]>;

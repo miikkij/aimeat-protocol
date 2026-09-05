@@ -179,6 +179,22 @@ export function addReaction(db: Database.Database, boardId: string, postId: stri
   return true;
 }
 
+export function removeReaction(db: Database.Database, boardId: string, postId: string, emoji: string, gaii: string): boolean {
+  const row = db.prepare('SELECT reactions FROM board_posts WHERE boardId = ? AND id = ?').get(boardId, postId) as Record<string, unknown> | undefined;
+  if (!row) return false;
+  const reactions = JSON.parse(row.reactions as string) as Record<string, string[]>;
+  const list = reactions[emoji];
+  if (!list || !list.includes(gaii)) return false;
+  const left = list.filter(g => g !== gaii);
+  // An emoji nobody stands behind is not an emoji with an empty list: it is gone, or every
+  // reader counting keys sees a reaction that no longer exists.
+  if (left.length) reactions[emoji] = left; else delete reactions[emoji];
+  db.prepare('UPDATE board_posts SET reactions = ? WHERE boardId = ? AND id = ?').run(
+    JSON.stringify(reactions), boardId, postId,
+  );
+  return true;
+}
+
 // ── Board Subscriptions ──
 
 export function createBoardSubscription(db: Database.Database, sub: BoardSubscriptionRecord): BoardSubscriptionRecord {

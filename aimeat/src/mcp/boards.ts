@@ -38,7 +38,7 @@ import { descriptionFor } from './catalog/shape.js';
 import { createBoardReply } from '../services/board-post.js';
 import { withoutHiddenPosts } from '../services/board-moderation.js';
 import {
-    boardVisibleTo, createBoard, subscribeToBoard, reactToBoardPost, setBoardMembers, deleteBoardById,
+    boardVisibleTo, createBoard, subscribeToBoard, reactToBoardPost, unreactToBoardPost, setBoardMembers, deleteBoardById,
     type BoardWriteCaller,
 } from '../services/board-write.js';
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
@@ -225,13 +225,16 @@ export function registerBoardsTools(
             board_id: z.string(),
             post_id: z.string(),
             emoji: z.string(),
+            remove: z.boolean().optional(),
         },
         annotationsFor('aimeat_board_react'),
-        async ({ board_id, post_id, emoji }) => {
-            // services/board-write.ts — the same reaction POST /v1/boards/:b/posts/:p/react writes.
-            // The route runs BoardReactionSchema over it first; this tool declared z.string(), so an
-            // empty reaction and a ten-thousand-character one both stored.
-            const out = await reactToBoardPost({ storage, config }, await boardCaller(), {
+        async ({ board_id, post_id, emoji, remove }) => {
+            // services/board-write.ts — the same reaction POST /v1/boards/:b/posts/:p/react writes,
+            // and with remove the same withdrawal its DELETE makes. The route runs
+            // BoardReactionSchema over it first; this tool declared z.string(), so an empty
+            // reaction and a ten-thousand-character one both stored.
+            const write = remove ? unreactToBoardPost : reactToBoardPost;
+            const out = await write({ storage, config }, await boardCaller(), {
                 boardId: board_id, postId: post_id, reaction: emoji,
             });
             if (!out.ok) return { content: [{ type: 'text' as const, text: `${out.code}: ${out.message}` }], isError: true };

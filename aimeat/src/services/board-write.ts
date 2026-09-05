@@ -330,6 +330,42 @@ export async function reactToBoardPost(
     return { ok: true };
 }
 
+/**
+ * Take one's own reaction back. Nothing could until 2026-09-06: a heart given by a mis-tap was
+ * permanent on every surface, because add was written and remove never was.
+ *
+ * The read rule is the one above, deliberately: whoever may react may un-react, and a caller who
+ * cannot see the board gets the same 404 a missing post gets, so the refusal does not become the
+ * probe it closes. Removal touches only THIS caller's own mark — there is no door here for taking
+ * away somebody else's, and the storage layer is what enforces that, not this function.
+ */
+export async function unreactToBoardPost(
+    deps: BoardWriteDeps,
+    caller: BoardWriteCaller,
+    input: { boardId: string; postId: string; reaction: string },
+): Promise<BoardReactionResult> {
+    const { storage } = deps;
+
+    const reaction = String(input.reaction ?? '');
+    if (!reaction || reaction.length > BOARD_LIMITS.reactionMax) {
+        return { ok: false, status: 400, code: 'VALIDATION_ERROR', message: `reaction must be 1-${BOARD_LIMITS.reactionMax} characters` };
+    }
+
+    const board = await storage.getBoard(input.boardId);
+    const mayReact = !!board && (boardVisibleTo(board, caller.gaii) || isSameOwner(board.ownerGaii, caller.gaii));
+    if (!mayReact) {
+        return { ok: false, status: 404, code: 'NOT_FOUND', message: 'Post not found' };
+    }
+
+    const removed = await storage.removeReaction(input.boardId, input.postId, reaction, caller.gaii);
+    if (!removed) {
+        return { ok: false, status: 404, code: 'NOT_FOUND', message: 'No such reaction from you on that post' };
+    }
+
+    emitChange('boards');
+    return { ok: true };
+}
+
 export type BoardMembersResult = { ok: true; board: BoardRecord } | BoardWriteRefusal;
 
 /**
