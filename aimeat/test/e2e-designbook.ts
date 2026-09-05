@@ -343,7 +343,7 @@ const GOOD_BODY = {
 
         const r = await json('/v1/designbook', {
             method: 'POST', headers: auth(op.token),
-            body: JSON.stringify({ part: { id: 'look-e2e-forest', kind: 'look', title: 'Forest ledger', summary: 'Editorial calm with a proven green/coral signature pair and sharp corners.', body: { look: 'editorial', tokens: { '--ak-accent': '#0e7c66/#e8564a', '--ak-radius': '3px' } }, tags: ['look'] } }),
+            body: JSON.stringify({ part: { id: 'look-e2e-forest', kind: 'look', title: 'Forest ledger', summary: 'Editorial calm with a proven green/coral signature pair and sharp corners.', body: { look: 'editorial', tokens: { '--ak-accent': '#0e7c66/#f2776c', '--ak-radius': '3px' } }, tags: ['look'] } }),
         });
         assert(r.status === 201, `look propose ${r.status}: ${JSON.stringify(r.body?.error)}`);
         const g = await json('/v1/designbook/look-e2e-forest', { headers: auth(op.token) });
@@ -359,7 +359,7 @@ const GOOD_BODY = {
         assert(adopt.status === 200, `look adopt ${adopt.status}: ${JSON.stringify(adopt.body?.error)}`);
         const ui = await json(`/v1/apps/${other.name}/${otherApp}/ui`);
         assert(ui.body.data.layout?.look === 'editorial', `the look preset landed, got ${ui.body.data.layout?.look}`);
-        assert(ui.body.data.layout?.tokens?.['--ak-accent'] === '#0e7c66/#e8564a', 'the pair landed in the tokens');
+        assert(ui.body.data.layout?.tokens?.['--ak-accent'] === '#0e7c66/#f2776c', 'the pair landed in the tokens');
         assert(Array.isArray(ui.body.data.layout?.blocks) && ui.body.data.layout.blocks.length > 0,
             'the arrangement SURVIVED — a look merges, never replaces');
     });
@@ -386,7 +386,7 @@ const GOOD_BODY = {
         assert(adopt.status === 200, `motion adopt ${adopt.status}: ${JSON.stringify(adopt.body?.error)}`);
         const ui = await json(`/v1/apps/${other.name}/${otherApp}/ui`);
         assert(ui.body.data.layout?.tokens?.['--ak-motion'] === '120ms', 'the recipe landed');
-        assert(ui.body.data.layout?.tokens?.['--ak-accent'] === '#0e7c66/#e8564a',
+        assert(ui.body.data.layout?.tokens?.['--ak-accent'] === '#0e7c66/#f2776c',
             'the earlier look\'s pair SURVIVED — recipes season the same sheet');
     });
 
@@ -519,7 +519,7 @@ const GOOD_BODY = {
             `the layer lands as the arrangement's ambient: ${JSON.stringify(layout.ambient)}`);
         assert(Array.isArray(layout.blocks) && layout.blocks.length > 0, 'the arrangement SURVIVED — an ambient merges, never replaces');
         assert(layout.look === before.body.data.layout.look && layout.look === 'editorial', `the app's own look survives (${layout.look})`);
-        assert(layout.tokens?.['--ak-accent'] === '#0e7c66/#e8564a', 'the earlier look\'s pair SURVIVED');
+        assert(layout.tokens?.['--ak-accent'] === '#0e7c66/#f2776c', 'the earlier look\'s pair SURVIVED');
         assert(layout.tokens?.['--ak-radius-sm'] === '2px', 'the part\'s own token merged in');
         const anon = await json(`/v1/designbook/${ambientId}`);
         assert(anon.status === 200 && typeof anon.body.data.part.published_at === 'string', `published: anonymous read answers ${anon.status}`);
