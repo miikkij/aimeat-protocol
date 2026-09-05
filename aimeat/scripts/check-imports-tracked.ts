@@ -52,6 +52,11 @@ function relativeImports(file: string, text: string): string[] {
     // before the match means we are inside one.
     const before = text.slice(0, m.index || 0);
     if ((before.match(/`/g) || []).length % 2 === 1) continue;
+    // A usage example in a header comment (` *   await import('../x.js')`) is prose, not an
+    // import of this file: skip a match whose line opens as a comment.
+    const lineStart = before.lastIndexOf('\n') + 1;
+    const line = text.slice(lineStart, text.indexOf('\n', m.index || 0));
+    if (/^\s*(\*|\/\/|\/\*)/.test(line)) continue;
     specs.push(m[1] || m[2]);
   }
   return specs;
