@@ -23,6 +23,7 @@
  *     async ({ key }) => { ... }
  *   );
  * @version-history
+ *   2026-09-05 — aimeat_admin_security_overview (read-only) and aimeat_admin_incident_resolve.
  *   2026-08-29 — aimeat_app_marks_set, aimeat_app_legal_set, aimeat_app_audit.
  *   2026-08-28 — The five crew-definition tools.
  *   2026-08-25 — The three data-map tools.
@@ -424,6 +425,8 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_admin_owner_disable: { title: 'Admin: Deactivate Account', readOnlyHint: false, destructiveHint: true, idempotentHint: true },
     aimeat_admin_owner_enable: { title: 'Admin: Reactivate Account', readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     aimeat_admin_totp_reset: { title: 'Admin: Remove Two-Step Sign-In', readOnlyHint: false, destructiveHint: true, idempotentHint: true },
+    aimeat_admin_security_overview: { title: 'Admin: Security Overview', readOnlyHint: true },
+    aimeat_admin_incident_resolve: { title: 'Admin: Resolve Security Incident', readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     aimeat_compliance_report: { title: 'Compliance: Node Report', readOnlyHint: true },
     aimeat_datamap_get: { title: 'Data map: read', readOnlyHint: true },
     aimeat_datamap_set: { title: 'Data map: state it', destructiveHint: true, idempotentHint: true },

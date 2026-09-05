@@ -21,6 +21,7 @@
  *   - PeerPolicyCell — the per-peer control group
  * @usage <${PeerPolicyCell} peer=${p} onUpdate=${(field, value) => doUpdatePolicy(p.node_id, field, value)} />
  * @version-history
+ *   v1.2.0 — 2026-09-05 — A tier-locked switch is marked ✗ with its title, not a padlock emoji: no emoji anywhere in the interface.
  *   v1.1.0 — 2026-09-03 — The routing switch carries a sentence saying which way it points, and is
  *     labelled "Relay to this peer". Every other switch here answers "may this peer do X on my
  *     node"; that one alone points outward, and nothing said so.
@@ -101,7 +102,7 @@ export default function PeerPolicyCell({ peer, onUpdate }) {
                 onChange=${(e) => onUpdate(cap.field, e.target.checked)}
               />
               <span class=${allowed ? '' : 'adm-text-dim'}>${t(`dashboard.${cap.label}`)}</span>
-              ${!allowed && html`<span class="adm-peer-policy-locked" title=${t('dashboard.fedTierLocked')}>\u{1F512}</span>`}
+              ${!allowed && html`<span class="adm-peer-policy-locked" title=${t('dashboard.fedTierLocked')}>✗</span>`}
             </label>
             ${cap.hint && html`<p class="adm-peer-policy-hint">${t(`dashboard.${cap.hint}`)}</p>`}
           </div>`;
