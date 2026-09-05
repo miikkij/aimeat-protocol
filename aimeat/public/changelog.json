@@ -6,6 +6,58 @@
       "version": "3.13.0",
       "kind": "feature",
       "title": {
+        "en": "A part that is nearly right is made yours, not copied",
+        "fi": "Melkein sopiva osa tehdään omaksi, ei kopioida"
+      },
+      "body": {
+        "en": "Every list, table, card grid, queue, timeline, kanban, hero, KPI row, section, tab strip and dialog in the Atelier kit now has four doors for the case where it is almost what you need: named parts your own styles reach by name, slots that fill a line or a figure the kit leaves empty (a third line on a row, a value on the right, a kicker over a title), variants you pick instead of override (dense, numbered, wide, tall, trend), and per-part sizes and colours you set as one variable. A customised part keeps everything the kit gives it: the entrance, the glide, the pick, the empty state. Your AI asks the kit what a part offers with describe(), and the Design Book shows it on every card under 'make it yours'. Copying a part out of the kit is the last step, and the kit says what it costs.",
+        "fi": "Jokaisella Atelier-kitin listalla, taulukolla, korttiruudukolla, jonolla, aikajanalla, kanbanilla, herolla, tunnuslukurivillä, osiolla, välilehtirivillä ja dialogilla on nyt neljä ovea tilanteeseen, jossa se on melkein sitä mitä tarvitset: nimetyt osat, joihin omat tyylisi osuvat nimellä; paikat, jotka täyttävät kitin tyhjäksi jättämän rivin tai luvun (kolmas rivi, luku oikealla, otsikon yläpuolinen iskurivi); variantit, jotka valitset ylikirjoittamisen sijaan (tiivis, numeroitu, leveä, korkea, trendi); ja osakohtaiset koot ja värit, jotka asetat yhtenä muuttujana. Muokattu osa säilyttää kaiken, minkä kitti sille antaa: saapumisen, liu'un, valinnan, tyhjän tilan. Tekoälysi kysyy kitiltä describe()-kutsulla, mitä osa tarjoaa, ja Design Book näyttää sen joka kortissa kohdassa 'make it yours'. Osan kopioiminen kitistä on viimeinen askel, ja kitti kertoo mitä se maksaa."
+      }
+    },
+    {
+      "date": "2026-09-05",
+      "version": "3.13.0",
+      "kind": "feature",
+      "title": {
+        "en": "An Atelier app moves on its own",
+        "fi": "Atelier-sovellus liikkuu itsestään"
+      },
+      "body": {
+        "en": "A screen built with the Atelier kit now arrives, changes and leaves in front of you without the app asking for it: a row that is new rises in, one that left fades out where it stood, one that moved glides there, a number counts to its new value, a tab or a picked row crosses into the next view, a dialog and a toast leave the way they came. The pace and the distance are the look's own, so a calm look stays calm. The bar's Less-motion switch and your system's reduced-motion setting stop all of it, and now they also stop the stylesheet's own animations, which they never did before.",
+        "fi": "Atelier-kitillä rakennettu näyttö saapuu, muuttuu ja poistuu silmiesi edessä ilman että sovellus pyytää sitä: uusi rivi nousee esiin, poistunut häipyy paikaltaan, siirtynyt liukuu paikalleen, luku laskee uuteen arvoonsa, välilehti tai valittu rivi vaihtuu seuraavaan näkymään, dialogi ja ilmoitus poistuvat samaa tietä kuin tulivat. Tahti ja matka ovat lookin omia, joten rauhallinen look pysyy rauhallisena. Palkin Vähemmän liikettä -kytkin ja järjestelmäsi liikkeenvähennys pysäyttävät kaiken, ja nyt ne pysäyttävät myös tyylitiedoston omat animaatiot, mitä ne eivät ennen tehneet."
+      }
+    },
+    {
+      "date": "2026-09-05",
+      "version": "3.13.0",
+      "kind": "fix",
+      "title": {
+        "en": "The kit and the genres work on a phone and read on a desktop",
+        "fi": "Kitti ja genret toimivat puhelimessa ja luettavat työpöydällä"
+      },
+      "body": {
+        "en": "Every Design Book part and every genre was measured at phone, tablet and desktop widths in both themes, and what the numbers found was fixed: eight genres that were cut off at the edge of a phone screen now fold; text under 11 pixels is gone; every control is at least a finger wide; a strip that scrolls sideways fades at the edge that has more; a hero's drift stops under reduced motion; the starting shapes fill a desktop instead of leaving most of it bare; the colours that fell under the contrast line were deepened a shade. The badge in the corner of every app carries a drawn bolt instead of an emoji and reads against any background.",
+        "fi": "Jokainen Design Bookin osa ja jokainen genre mitattiin puhelimen, tabletin ja työpöydän leveydellä molemmissa teemoissa, ja se mitä luvut löysivät korjattiin: kahdeksan genreä, jotka katkesivat puhelimen ruudun reunaan, taittuvat nyt; alle 11 pikselin teksti on poissa; jokainen painike on vähintään sormen levyinen; sivuttain vierivä rivi häivyttää reunan, jolla on lisää; heron ajelehdinta pysähtyy liikkeenvähennyksen alla; aloitusmuodot täyttävät työpöydän sen sijaan että jättäisivät sen enimmäkseen tyhjäksi; kontrastirajan alle jääneet värit syvennettiin sävyllä. Jokaisen sovelluksen kulman merkissä on piirretty salama emojin sijaan, ja se erottuu miltä tahansa pohjalta."
+      }
+    },
+    {
+      "date": "2026-09-05",
+      "version": "3.13.0",
+      "kind": "feature",
+      "title": {
+        "en": "An Atelier app starts from a genre, and an extension can work in your workspace",
+        "fi": "Atelier-sovellus alkaa genrestä, ja laajennus voi työskennellä työtilassasi"
+      },
+      "body": {
+        "en": "An app on the Atelier track now names the register it commits to, a Design Book genre or one of its own, and the node refuses to publish a bare shell in the default look: the refusal says which genre shelf to start from. An existing Atelier app without that line is refused on its next publish, with the one line to add. Separately, an extension that declares it may now read and write in an organism workspace on behalf of whoever called it, under that person's own rights, so a tool your AI calls can keep its rules on the node instead of trusting the caller to follow them.",
+        "fi": "Atelier-radan sovellus nimeää nyt rekisterin, johon se sitoutuu, Design Bookin genren tai omansa, eikä node julkaise paljasta kuorta oletusilmeessä: kieltäytyminen kertoo, miltä genrehyllyltä aloittaa. Vanha Atelier-sovellus ilman tuota riviä torjutaan seuraavassa julkaisussa, ja vastaus kertoo lisättävän rivin. Erikseen: laajennus, joka ilmoittaa sen, voi nyt lukea ja kirjoittaa organismin työtilassa kutsujan puolesta tämän omilla oikeuksilla, joten työkalu, jota tekoälysi kutsuu, voi pitää sääntönsä nodella sen sijaan että luottaisi kutsujan noudattavan niitä."
+      }
+    },
+    {
+      "date": "2026-09-05",
+      "version": "3.13.0",
+      "kind": "feature",
+      "title": {
         "en": "Every key to your account on one page, said in words",
         "fi": "Kaikki tilisi avaimet yhdellä sivulla, sanoin"
       },
