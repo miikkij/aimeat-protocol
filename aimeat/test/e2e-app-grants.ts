@@ -515,6 +515,54 @@ async function main() {
         assert(anon.status === 401, `no credential expected 401, got ${anon.status}`);
     });
 
+    // A PERSON pressing a heart inside a published app. Until 2026-09-06 every board write from
+    // every hosted app came back "Role \"agent\" required": the grant carries role 'app', which is
+    // a sibling of 'agent' and satisfied neither. The scope is what fences an app here, and these
+    // two cases are the whole rule — granted writes, ungranted is refused at the same door.
+    await test('a granted app reacts, posts and subscribes on the person\'s behalf; an ungranted one cannot', async () => {
+        const social = await grantAppToken('social:read social:write');
+        const socialToken = social.access_token as string;
+        const quiet = (await grantAppToken('memory:read')).access_token as string;
+
+        const board = await json('/v1/boards', {
+            method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ name: `grant-board-${Date.now() % 100000}`, description: 'app grant reactions', visibility: 'public' }),
+        });
+        assert(board.status === 201 || board.status === 200, `create board: ${board.status} ${JSON.stringify(board.body).slice(0, 160)}`);
+        const boardId = board.body.data.board?.id ?? board.body.data.id;
+
+        const post = await json(`/v1/boards/${boardId}/posts`, {
+            method: 'POST', headers: { Authorization: `Bearer ${socialToken}` },
+            body: JSON.stringify({ title: 'a tape', body: 'posted from inside an app' }),
+        });
+        assert(post.status === 201 || post.status === 200, `app post expected 2xx, got ${post.status} ${JSON.stringify(post.body.error ?? {})}`);
+        const postId = post.body.data.post?.id ?? post.body.data.id;
+
+        const react = await json(`/v1/boards/${boardId}/posts/${postId}/react`, {
+            method: 'POST', headers: { Authorization: `Bearer ${socialToken}` },
+            body: JSON.stringify({ reaction: '❤️' }),
+        });
+        assert(react.status === 200, `app react expected 200, got ${react.status} ${JSON.stringify(react.body.error ?? {})}`);
+
+        const sub = await json(`/v1/boards/${boardId}/subscribe`, { method: 'POST', headers: { Authorization: `Bearer ${socialToken}` } });
+        assert(sub.status === 200 || sub.status === 201, `app subscribe expected 2xx, got ${sub.status} ${JSON.stringify(sub.body.error ?? {})}`);
+
+        // The fence: the same door, an app grant the owner never gave social:write to.
+        const denied = await json(`/v1/boards/${boardId}/posts/${postId}/react`, {
+            method: 'POST', headers: { Authorization: `Bearer ${quiet}` },
+            body: JSON.stringify({ reaction: '❤️' }),
+        });
+        assert(denied.status === 403, `react without social:write expected 403, got ${denied.status}`);
+        const deniedPost = await json(`/v1/boards/${boardId}/posts`, {
+            method: 'POST', headers: { Authorization: `Bearer ${quiet}` },
+            body: JSON.stringify({ title: 'no', body: 'no' }),
+        });
+        assert(deniedPost.status === 403, `post without social:write expected 403, got ${deniedPost.status}`);
+        const anon = await json(`/v1/boards/${boardId}/posts/${postId}/react`, {
+            method: 'POST', body: JSON.stringify({ reaction: '❤️' }),
+        });
+        assert(anon.status === 401, `no credential expected 401, got ${anon.status}`);
+    });
 
     console.log('\n─────────────────────────────────────');
     console.log(`Results: ${passed} passed, ${failed} failed, ${passed + failed} total`);

@@ -13,6 +13,15 @@
  *   - resolve(): identity resolution via resolveIdentity for owner-scoped writes
  *
  * @version-history
+ *   v1.6.0 — 2026-09-06 — A PERSON INSIDE AN APP MAY REACT. post, react, replies and subscribe
+ *     asked for requireRole('agent'), which an app grant (role 'app') satisfies no more than an
+ *     agent satisfies 'ecosystem' — so every reaction, reply and post from every hosted app was
+ *     refused with "Role \"agent\" required", whoever was signed in. They now take
+ *     requireExternalPrincipal(), the same widening memory's CRUD already carries, and the
+ *     requireScope('social:*') beside each one is unchanged: the owner-approved scope is the
+ *     fence, and an app granted memory:read alone is still refused at the same door
+ *     (e2e-app-grants). Board CREATE, delete, rules and visibility stay agent/owner: those are
+ *     governance, not the person's own interaction with a board they are reading.
  *   v1.5.0 — 2026-08-30 — The board's own rules: PATCH /v1/boards/:id/rules (keeper), rules on the
  *     board in every listing; PATCH /v1/boards/:id/posts/:postId takes a notice down as handled or
  *     moves its expiry; each posts listing carries `authors` (notices, thanks, since) and a single
@@ -48,7 +57,7 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireScope, requireExternalPrincipal } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { checkConsentForRead, auditDataAccess } from '../services/consent.js';
 import { BoardCreateSchema, BoardPostSchema, BoardPostUpdateSchema, BoardReactionSchema, BoardReplySchema, validateBody } from '../models/schemas.js';
@@ -269,8 +278,8 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     }));
   });
 
-  // POST /v1/boards/:boardId/posts — post to a board (agent auth)
-  router.post('/v1/boards/:boardId/posts', requireAuth(), requireRole('agent'), requireScope('social:write'), validateBody(BoardPostSchema, config.nodeId), async (req, res) => {
+  // POST /v1/boards/:boardId/posts — post to a board (any scoped principal: agent, GEAI or app)
+  router.post('/v1/boards/:boardId/posts', requireAuth(), requireExternalPrincipal(), requireScope('social:write'), validateBody(BoardPostSchema, config.nodeId), async (req, res) => {
     // The whole post — access, the extension hook, the public-board price, the provenance stamp, the
     // record, the SSE event and the subscriber fan-out — is services/board-post.ts, which
     // aimeat_board_post also calls. It used to be written out here, and the tool surface then had a
@@ -520,7 +529,13 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // POST /v1/boards/:boardId/posts/:postId/react — react to a post
-  router.post('/v1/boards/:boardId/posts/:postId/react', requireAuth(), requireRole('agent'), requireScope('social:write'), validateBody(BoardReactionSchema, config.nodeId), async (req, res) => {
+  //
+  // A PERSON pressing a heart inside a published app is the ordinary case here, and until
+  // 2026-09-06 this door refused it: an app grant carries role 'app', which is a sibling of
+  // 'agent' and satisfied neither, so every reaction from every hosted app came back
+  // "Role \"agent\" required" no matter who was signed in. The fence that matters is the scope,
+  // which the owner approves per app and requireScope still enforces on the line below.
+  router.post('/v1/boards/:boardId/posts/:postId/react', requireAuth(), requireExternalPrincipal(), requireScope('social:write'), validateBody(BoardReactionSchema, config.nodeId), async (req, res) => {
     // services/board-write.ts — the same reaction aimeat_board_react writes. The bound on the
     // reaction lived in BoardReactionSchema on this door alone.
     const { reaction } = req.body ?? {};
@@ -541,7 +556,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // POST /v1/boards/:boardId/posts/:postId/replies — reply to a post
-  router.post('/v1/boards/:boardId/posts/:postId/replies', requireAuth(), requireRole('agent'), requireScope('social:write'), validateBody(BoardReplySchema, config.nodeId), async (req, res) => {
+  router.post('/v1/boards/:boardId/posts/:postId/replies', requireAuth(), requireExternalPrincipal(), requireScope('social:write'), validateBody(BoardReplySchema, config.nodeId), async (req, res) => {
     // services/board-post.ts — the same reply aimeat_board_reply makes. It carries the board's
     // ACCESS rule, which this handler did not apply to a reply: it checked only that the parent post
     // existed, so a reply could land on a board the replier may not post to.
@@ -572,7 +587,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
   // ───────────────────────────────────────────────
 
   // POST /v1/boards/:boardId/subscribe — subscribe to a board
-  router.post('/v1/boards/:boardId/subscribe', requireAuth(), requireRole('agent'), requireScope('social:read'), async (req, res) => {
+  router.post('/v1/boards/:boardId/subscribe', requireAuth(), requireExternalPrincipal(), requireScope('social:read'), async (req, res) => {
     // services/board-write.ts — the same subscription aimeat_board_subscribe writes, with the
     // visibility rule, the duplicate refusal and the change event in one place.
     const boardId = req.params.boardId as string;
@@ -600,7 +615,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // DELETE /v1/boards/:boardId/subscribe — unsubscribe from a board
-  router.delete('/v1/boards/:boardId/subscribe', requireAuth(), requireRole('agent'), requireScope('social:read'), async (req, res) => {
+  router.delete('/v1/boards/:boardId/subscribe', requireAuth(), requireExternalPrincipal(), requireScope('social:read'), async (req, res) => {
     const boardId = req.params.boardId as string;
     const gaii = resolve(req);
 
