@@ -163,7 +163,7 @@ def _make_handler(
             usage = getattr(event, "usage", None) or {}
             agent_name = _current_agent_name.get() or default_agent
             enqueue(agent_name, build_llm_call_payload(model, usage, _current_run_id.get()))
-        except Exception:
+        except Exception:  # noqa: BLE001, S110 -- a malformed event must never break the crew's own LLM call
             # Best-effort: a malformed event must never break the crew's LLM call.
             pass
 
@@ -201,7 +201,7 @@ class _UsageSender:
                 from .messaging import serve_client  # local import: keep module crewai-free
                 client = serve_client(agent_name, base_url=self._base_url)
                 self._clients[agent_name] = client
-            except Exception:
+            except Exception:  # noqa: BLE001 -- no serve client means no telemetry this call, which is not the crew's problem
                 return None
         return client
 
@@ -222,7 +222,7 @@ class _UsageSender:
                     json=payload,
                     timeout=10,
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001, S110 -- node down, tunnel revoked or a transient network; drop the row and keep the session, since a later call recovers
                 # Node down, tunnel revoked, transient network -- drop and keep the session
                 # (a later call recovers). Never surface to the crew.
                 pass
@@ -256,7 +256,7 @@ def install_usage_telemetry(
         try:
             from crewai.events.base_event_listener import BaseEventListener
             from crewai.events.types.llm_events import LLMCallCompletedEvent
-        except Exception as exc:  # crewai event API absent or changed -> degrade gracefully
+        except Exception as exc:  # noqa: BLE001 -- the crewai event API is absent or renamed; reported, then degrade
             print(f"[usage-telemetry] disabled (crewai event API unavailable): {exc}")
             return False
 
@@ -272,7 +272,7 @@ def install_usage_telemetry(
 
         try:
             _listener = _UsageListener()  # __init__ registers on the bus
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- listener registration failed; reported, then degrade
             print(f"[usage-telemetry] disabled (listener registration failed): {exc}")
             return False
 

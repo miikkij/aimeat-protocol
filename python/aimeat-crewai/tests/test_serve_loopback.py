@@ -282,15 +282,17 @@ def test_mcp_tool_call_over_loopback(env: Env) -> None:
         from mcp.client.streamable_http import streamablehttp_client as streamable_http_client
 
     async def run() -> None:
-        async with streamable_http_client(f"{env.loopback_base}/v1/mcp") as (read, write, _):
-            async with ClientSession(read, write) as session:
-                await session.initialize()
-                tools = await session.list_tools()
-                names = [t.name for t in tools.tools]
-                assert "aimeat_memory_read" in names, f"core tool missing: {names[:5]}..."
-                result = await session.call_tool("aimeat_memory_list", {})
-                assert not result.isError, f"tool call failed: {result.content}"
-                assert result.content, "tool call returned no content"
+        async with (
+            streamable_http_client(f"{env.loopback_base}/v1/mcp") as (read, write, _),
+            ClientSession(read, write) as session,
+        ):
+            await session.initialize()
+            tools = await session.list_tools()
+            names = [t.name for t in tools.tools]
+            assert "aimeat_memory_read" in names, f"core tool missing: {names[:5]}..."
+            result = await session.call_tool("aimeat_memory_list", {})
+            assert not result.isError, f"tool call failed: {result.content}"
+            assert result.content, "tool call returned no content"
 
     asyncio.run(run())
 

@@ -85,9 +85,11 @@ def test_create_liaison_agent_requires_mcp_params() -> None:
 
     from aimeat_crewai import AimeatLiaisonError, create_liaison_agent
 
-    with pytest.raises(AimeatLiaisonError, match="mcp_server_params"):
-        with create_liaison_agent(mcp_server_params=None):
-            pass
+    with (
+        pytest.raises(AimeatLiaisonError, match="mcp_server_params"),
+        create_liaison_agent(mcp_server_params=None),
+    ):
+        pass
 
 
 def test_extract_agent_name_from_stdio_params() -> None:

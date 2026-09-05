@@ -182,12 +182,12 @@ def answers_from_dm(api: Any, event: Mapping[str, Any]) -> dict[str, Any] | None
 def _json(resp: Any) -> dict[str, Any]:
     try:
         return resp.json() or {}
-    except Exception:  # pragma: no cover - defensive
+    except Exception:  # noqa: BLE001 -- a response that will not parse is an empty body to the caller  # pragma: no cover
         return {}
 
 
 def _body_text(resp: Any) -> str:
     try:
         return resp.text[:300]
-    except Exception:  # pragma: no cover - defensive
+    except Exception:  # noqa: BLE001 -- a response with no readable text is an empty string to the caller  # pragma: no cover
         return ""

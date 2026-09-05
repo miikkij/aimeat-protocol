@@ -52,7 +52,12 @@ parquet = [
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
-    "ruff>=0.4",
+    # PINNED, and this is the point: a linter's rule SET is part of the contract, not a detail of
+    # whichever version CI happened to install that morning. `ruff>=0.4` meant the job could turn
+    # red on a rule nobody chose, on a commit that changed nothing — which is the same shape as a
+    # gate that is always red: it stops deciding anything and everyone learns to push past it.
+    # Moving this line is how the rule set changes, deliberately, with the findings it brings.
+    "ruff==0.16.6",
 ]
 
 [project.urls]

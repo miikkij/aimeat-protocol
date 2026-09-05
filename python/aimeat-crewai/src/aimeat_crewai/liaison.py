@@ -159,7 +159,7 @@ def _install_propose_todos_repair(tool: Any) -> None:
     _RepairingProposeTodosSchema.__qualname__ = _RepairingProposeTodosSchema.__name__
     try:
         tool.args_schema = _RepairingProposeTodosSchema
-    except Exception:  # pragma: no cover -- defensive; never break tool wiring
+    except Exception:  # noqa: BLE001, S110 -- defensive; never break tool wiring  # pragma: no cover
         pass
 
 
@@ -195,7 +195,7 @@ def _install_agent_name_default(tool: Any, agent_name: str) -> None:
     _AgentNameDefaultedSchema.__qualname__ = _AgentNameDefaultedSchema.__name__
     try:
         tool.args_schema = _AgentNameDefaultedSchema
-    except Exception:  # pragma: no cover -- defensive; never break tool wiring
+    except Exception:  # noqa: BLE001, S110 -- defensive; never break tool wiring  # pragma: no cover
         pass
 
 
@@ -249,7 +249,7 @@ def _strip_none_kwargs(tool: Any) -> Any:
     # Caching is therefore wrong on every axis for this tool surface.
     try:
         tool.cache_function = lambda *_args, **_kwargs: False
-    except Exception:  # pragma: no cover -- defensive; CrewAI may rename later
+    except Exception:  # noqa: BLE001, S110 -- defensive; CrewAI may rename this later  # pragma: no cover
         pass
 
     # Tool-specific argument normalisation. aimeat_task_propose_todos requires a
@@ -822,7 +822,7 @@ def create_liaison_agent(
         if callable(stop):
             try:
                 stop()
-            except Exception:  # pragma: no cover -- best-effort cleanup
+            except Exception:  # noqa: BLE001, S110 -- best-effort cleanup; the adapter closes its own subprocess anyway  # pragma: no cover
                 pass
 
 
