@@ -13,6 +13,9 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.4.0 — 2026-09-05 — The effects: a block's field or fx() in code, still on the words, a
+ *     moment on a cue, living only behind them; a filter of one's own joins the never-list
+ *     (wish-atelier-post-process-effects).
  *   v1.3.0 — 2026-09-05 — The build starts from a genre, never from the bare shell: the genre
  *     list address joins the fetch table, the register meta is named, and step 3 says the
  *     publish refuses an Atelier app that names no register.
@@ -85,7 +88,11 @@ moved under you says so.
    component is the ONLY place your own raw markup goes. One look via \`app({ look })\` —
    vivid unless the owner asked for something else; flat only on request. The look brings its
    own ambient, the one layer allowed to move at idle: leave it unless the owner asked for
-   weather, then name a preset with \`app({ ambient })\` (the spec lists the six).
+   weather, then name a preset with \`app({ ambient })\` (the spec lists the nine). An EFFECT
+   is a field on a block of the stored arrangement (\`effect: { id, params? }\`) or
+   \`AIMEAT.atelier.fx(el, { id })\` in your code: still on the words, a moment on a cue with
+   \`fxPlay\`, and living motion only as \`ambient.post\` behind the words (the spec lists the
+   nine, where each lands, and the knobs).
 4. **Imagery** — generate at most ONE hero and ONE empty-state image without asking
    (\`aimeat_image_generate\` → storage URL; the spec carries the style-word tables). Check the
    \`atelier.img.*\` cache first; never inline a data: URI. Zero images still looks finished.
@@ -105,6 +112,10 @@ moved under you says so.
 - A background animation of your own — the ambient layer is the kit's, chosen by preset, and it
   pauses on a hidden tab, stills under Less motion and yields to the viewer's weather switch
   without a line from you.
+- A filter of your own — the effects are the kit's nine (scanlines, vignette, duotone, recolour,
+  distort, glitch, vhs, ripple, kaleidoscope), declared with bounds, refused where they would
+  bend or recolour words, proven by the contrast matrix where they sit under them, and never
+  living on content: a loop belongs behind the words, on the ambient layer.
 - The Classic build spec.
 
 When something will not complete or a decision needs a human, say so to the owner in their
