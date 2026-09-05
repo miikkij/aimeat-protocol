@@ -13,6 +13,10 @@
  *   ak-table · ak-search
  * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
  * @version-history
+ *   v0.9.0 — 2026-09-05 — The table, the queue and the health wall read their own tokens instead
+ *     of the literals they carried: --ak-table-cell-pad-y / -x, --ak-queue-row-pad-y /
+ *     -state-min, --ak-health-lamp / -row-pad-y. Every default is the value that was there. The
+ *     empty parts and the variants those three gained live in custom.css.
  *   v0.8.0 — 2026-09-05 — The measured review: the search bar's clear button and the table's
  *     sort header take the 40px target floor (the sort header's sideways floor was 24 since
  *     v0.7.0, which is the WCAG minimum and not this kit's), and Leaflet's licence credit reads
@@ -80,12 +84,12 @@
   text-align: left;
   font-size: var(--ak-text-fine);
   color: var(--ak-ink-dim);
-  padding: 10px var(--ak-pad);
+  padding: var(--ak-table-cell-pad-y) var(--ak-table-cell-pad-x);
   border-bottom: var(--ak-line-w) solid var(--ak-line);
   white-space: nowrap;
 }
 .ak-table td {
-  padding: 10px var(--ak-pad);
+  padding: var(--ak-table-cell-pad-y) var(--ak-table-cell-pad-x);
   border-bottom: var(--ak-line-w) solid color-mix(in oklab, var(--ak-line) 55%, var(--ak-surface));
   overflow-wrap: anywhere;
 }
@@ -105,6 +109,7 @@
 }
 .ak-table__row--pick { cursor: pointer; }
 .ak-table__row--pick:hover td { background: color-mix(in oklab, var(--ak-accent) 6%, var(--ak-surface)); }
+/* The table's three shapes: custom.css, with the rest of the customisation model. */
 
 /* ── Search ───────────────────────────────────────────────────────────────────────────────── */
 .ak-search { position: relative; display: flex; min-width: 0; }
@@ -205,7 +210,7 @@
   align-items: center;
   gap: 12px;
   width: 100%;
-  padding: 10px 12px;
+  padding: var(--ak-health-row-pad-y) 12px;
   border: 0;
   border-radius: var(--ak-radius-sm);
   background: var(--ak-surface);
@@ -217,8 +222,8 @@ button.ak-health__row { cursor: pointer; touch-action: manipulation; }
 button.ak-health__row:hover { background: var(--ak-surface-2); }
 .ak-health__lamp {
   flex: none;
-  width: 11px;
-  height: 11px;
+  width: var(--ak-health-lamp);
+  height: var(--ak-health-lamp);
   border-radius: 50%;
   background: color-mix(in oklab, var(--ak-ink) 22%, var(--ak-surface));
 }
@@ -254,7 +259,7 @@ button.ak-health__row:hover { background: var(--ak-surface-2); }
   align-items: center;
   gap: 12px;
   width: 100%;
-  padding: 9px 12px;
+  padding: var(--ak-queue-row-pad-y) 12px;
   border: 0;
   border-radius: var(--ak-radius-sm);
   background: var(--ak-surface);
@@ -266,7 +271,7 @@ button.ak-queue__row { cursor: pointer; touch-action: manipulation; }
 button.ak-queue__row:hover { background: var(--ak-surface-2); }
 .ak-queue__state {
   flex: none;
-  min-width: 72px;
+  min-width: var(--ak-queue-state-min);
   text-align: center;
   padding: 3px 8px;
   border-radius: var(--ak-radius-pill);
@@ -281,6 +286,7 @@ button.ak-queue__row:hover { background: var(--ak-surface-2); }
 .ak-queue__words { display: flex; flex-direction: column; min-width: 0; }
 .ak-queue__title { font-weight: 600; }
 .ak-queue__sub { color: var(--ak-ink-dim); font-size: var(--ak-text-fine); }
+/* The queue's and the health wall's EMPTY parts and shapes: custom.css. */
 
 /* ── The gauge (ops.js) ────────────────────────────────────────────────────────────────────── */
 .ak-gauge { margin: 0; text-align: center; container-type: inline-size; }

@@ -9,7 +9,21 @@
  *   stylesheet, a data: URI is refused with words, and the fallback is the design.
  * @structure cardGrid(spec) → { el, set, destroy } · mediaCard(spec) → { el, set, destroy }
  * @usage  AIMEAT.atelier.cardGrid({ target: a.main, items, onPick(item) { open(item); } });
+ * @parts cardGrid root · card · art · monogram · badge · body · title · sub · extra · aside
+ * @slots cardGrid title(item) · sub(item) · extra(item) · badge(item) · aside(item) · art(item)
+ * @variants cardGrid dense · wide · plain
+ * @tokens cardGrid --ak-card-min · --ak-card-gap · --ak-card-aspect · --ak-card-pad
+ * @fork cardGrid Copy .ak-grid and .ak-card* out of content.css; you keep the monogram washes and lose the keyed reconcile that stops the wall re-entering on every change.
+ * @parts mediaCard root · card · art · monogram · badge · body · title · sub · extra · actions
+ * @slots mediaCard title(item) · sub(item) · extra(item) · badge(item) · art(item)
+ * @variants mediaCard dense · plain
+ * @tokens mediaCard --ak-card-aspect · --ak-card-pad
+ * @fork mediaCard Same as cardGrid; this is one card and its action row.
  * @version-history
+ *   v0.51.0 — 2026-09-05 — THE CARD TAKES WHAT THE APP GIVES IT: ten named parts, each stamped
+ *     `data-ak-part`; `extra` and `aside` are the two the kit leaves empty; `art` takes the app's
+ *     own mark in place of the monogram; three variants (dense, wide, plain) and four tokens.
+ *     A card nobody customised has exactly the markup it had.
  *   v0.50.0 — 2026-09-05 — CARDS ARE KEPT BY THEIR ID. The grid was cleared and rebuilt on every
  *     set, which re-ran the entrance over the whole wall each time one card changed. Reconciled
  *     now: a card that arrived rises in, a card that is gone fades out where it stood, and a card
@@ -20,6 +34,9 @@ import { el, clear, resolve, enter } from './dom.js';
 import { keyedRows } from './arrive.js';
 import { t } from './i18n.js';
 import { emptyState } from './state.js';
+import { partEl, slotInto, applyVariant, partValue, fillPart } from './parts-model.js';
+
+const CARD_VARIANTS = ['dense', 'wide', 'plain'];
 
 /**
  * @typedef {object} CardItem
@@ -58,30 +75,42 @@ function washOf(id) {
  * @param {CardItem} item
  * @param {boolean} pickable
  * @param {(item: CardItem) => void} [onPick]
+ * @param {any} [spec]  the component's spec, so the app's own parts reach this card
  * @returns {HTMLElement}
  */
-function buildCard(item, pickable, onPick) {
+function buildCard(item, pickable, onPick, spec) {
   const layer = imageLayer(item.image);
-  const art = el('span', {
-    class: 'ak-card__art ak-card__art--w' + washOf(item.id),
+  const art = partEl('span', 'ak-card__art ak-card__art--w' + washOf(item.id), 'art', {
     'aria-hidden': 'true',
     vars: layer ? { '--ak-card-image': layer } : null,
-  }, layer ? null : el('span', { class: 'ak-card__monogram',
+  });
+  const own = layer ? null : partEl('span', 'ak-card__monogram', 'monogram', {
     // Array.from splits by code point: an emoji-led title keeps its emoji instead of showing
     // a broken surrogate half — found in the first real-data experiment run.
-    text: (Array.from(item.title || '?')[0] || '?').toUpperCase() }));
+    text: (Array.from(item.title || '?')[0] || '?').toUpperCase(),
+  });
+  // The art area takes the app's own mark when it declares one; the monogram is the default,
+  // never a floor an app has to fight. The default is appended AS IT WAS — no wrapper — so a
+  // card nobody customised has exactly the markup and the centring it had before.
+  const givenArt = partValue(spec, 'art', item);
+  if (givenArt !== undefined) fillPart(art, givenArt);
+  else if (own) art.appendChild(own);
   if (layer) art.classList.add('ak-card__art--image');
-  const body = el('span', { class: 'ak-card__body' }, [
-    el('span', { class: 'ak-card__title', text: item.title }),
-    item.sub != null ? el('span', { class: 'ak-card__sub', text: item.sub }) : null,
-  ]);
+  const body = partEl('span', 'ak-card__body', 'body');
+  slotInto(body, spec, 'title', item.title, { cls: 'ak-card__title', args: [item] });
+  slotInto(body, spec, 'sub', item.sub == null ? null : item.sub, { cls: 'ak-card__sub', args: [item] });
+  slotInto(body, spec, 'extra', null, { cls: 'ak-card__extra', args: [item] });
   const card = el(pickable ? 'button' : 'div', {
     class: 'ak-card',
     type: pickable ? 'button' : null,
+    'data-ak-part': 'card',
     'data-ak-noguard': true,
     'data-ak-id': item.id,
     on: pickable && onPick ? { click: function () { onPick(item); } } : null,
-  }, [art, item.badge != null ? el('span', { class: 'ak-badge ak-card__badge', text: item.badge }) : null, body]);
+  }, art);
+  slotInto(card, spec, 'badge', item.badge == null ? null : item.badge, { cls: 'ak-badge ak-card__badge', args: [item] });
+  card.appendChild(body);
+  slotInto(card, spec, 'aside', null, { cls: 'ak-card__aside', args: [item] });
   return card;
 }
 
@@ -96,7 +125,8 @@ function buildCard(item, pickable, onPick) {
  */
 export function cardGrid(spec) {
   const pickable = typeof spec.onPick === 'function';
-  const root = el('div', { class: 'ak-root ak-grid' });
+  const root = el('div', { class: 'ak-root ak-grid', 'data-ak-part': 'root' });
+  applyVariant(root, spec, CARD_VARIANTS);
   if (spec.target) resolve(spec.target).appendChild(root);
   let emptyCard = null;
 
@@ -119,7 +149,7 @@ export function cardGrid(spec) {
         // kept card survives an update, and a handler closed over the old item would report it.
         const card = buildCard(item, pickable, pickable
           ? function () { if (spec.onPick) spec.onPick(SHOWING.get(card)); }
-          : undefined);
+          : undefined, spec);
         SHOWING.set(card, item);
         return card;
       },
@@ -127,7 +157,7 @@ export function cardGrid(spec) {
       // element stays (no re-entrance), everything inside it is replaced.
       update: function (node, item) {
         SHOWING.set(node, item);
-        const next = buildCard(item, pickable, undefined);
+        const next = buildCard(item, pickable, undefined, spec);
         node.className = next.className;
         clear(node);
         while (next.firstChild) node.appendChild(next.firstChild);
@@ -161,19 +191,24 @@ export function cardGrid(spec) {
  * @returns {{ el: HTMLElement, set: (patch: { item: CardItem }) => void, destroy: () => void }}
  */
 export function mediaCard(spec) {
-  let card = buildCard(spec.item, typeof spec.onPick === 'function' && !spec.actions, spec.onPick);
+  let card = buildCard(spec.item, typeof spec.onPick === 'function' && !spec.actions, spec.onPick, spec);
   const actions = spec.actions && spec.actions.length
-    ? el('span', { class: 'ak-card__actions' }, spec.actions.map(function (action) {
+    ? partEl('span', 'ak-card__actions', 'actions')
+    : null;
+  if (actions) {
+    for (const action of spec.actions) {
       const kind = action.kind || 'plain';
-      return el('button', {
+      actions.appendChild(el('button', {
         type: 'button',
         class: 'ak-btn' + (kind === 'plain' ? '' : ' ak-btn--' + kind),
+        'data-ak-part': 'action',
         'data-ak-id': action.id,
         on: { click: function () { if (action.onClick) action.onClick(action); } },
-      }, action.label);
-    }))
-    : null;
-  const root = el('div', { class: 'ak-root ak-mediacard' }, [card, actions]);
+      }, action.label));
+    }
+  }
+  const root = el('div', { class: 'ak-root ak-mediacard', 'data-ak-part': 'root' }, [card, actions]);
+  applyVariant(root, spec, ['dense', 'plain']);
   if (spec.target) resolve(spec.target).appendChild(root);
   enter(root);
 
@@ -182,7 +217,7 @@ export function mediaCard(spec) {
     /** @param {{ item: CardItem }} patch */
     set(patch) {
       if (!patch || !patch.item) return;
-      const next = buildCard(patch.item, typeof spec.onPick === 'function' && !spec.actions, spec.onPick);
+      const next = buildCard(patch.item, typeof spec.onPick === 'function' && !spec.actions, spec.onPick, spec);
       card.replaceWith(next);
       card = next;
     },

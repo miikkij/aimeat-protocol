@@ -7,7 +7,15 @@
  * @structure timeline(spec) → { el, set, destroy }
  * @usage  AIMEAT.atelier.timeline({ target: host, items: [
  *           { id: 'e1', ts: '2026-08-27T10:00:00Z', title: 'Published', tone: 'ok' } ] });
+ * @parts timeline root · item · dot · body · when · title · sub · extra · aside
+ * @slots timeline item(item) · when(item) · title(item) · sub(item) · extra(item) · aside(item)
+ * @variants timeline dense · plain
+ * @tokens timeline --ak-timeline-dot · --ak-timeline-rail · --ak-timeline-gap · --ak-timeline-indent
+ * @fork timeline Copy .ak-timeline* out of content.css; the rail is one ::before and the dot is one span, and you give up the keyed line so every event re-enters on every change.
  * @version-history
+ *   v0.51.0 — 2026-09-05 — THE EVENT TAKES WHAT THE APP GIVES IT: nine named parts, `extra` and
+ *     `aside` left empty for a reference and a right-hand figure, `parts.item` for the whole
+ *     event, two variants and four tokens (the dot, the rail's drop, the indent, the gap).
  *   v0.50.0 — 2026-09-05 — EVENTS ARE KEPT BY THEIR ID. The line was rebuilt on every set and
  *     re-ran its entrance over every event each time, so five events arriving one at a time
  *     animated fifteen rows. Reconciled now: a new event rises in on its own, one that is gone
@@ -20,6 +28,7 @@ import { el, clear, resolve } from './dom.js';
 import { keyedRows } from './arrive.js';
 import { t } from './i18n.js';
 import { emptyState } from './state.js';
+import { partEl, slotInto, applyVariant, partValue, fillPart } from './parts-model.js';
 
 /**
  * @typedef {object} TimelineItem
@@ -53,7 +62,8 @@ function fmtTs(ts) {
  */
 export function timeline(spec) {
   const fmt = spec.format || fmtTs;
-  const root = el('ol', { class: 'ak-root ak-timeline' });
+  const root = el('ol', { class: 'ak-root ak-timeline', 'data-ak-part': 'root' });
+  applyVariant(root, spec, ['dense', 'plain']);
   if (spec.target) resolve(spec.target).appendChild(root);
   let emptyCard = null;
 
@@ -63,19 +73,21 @@ export function timeline(spec) {
    *  @param {HTMLElement} node @param {TimelineItem} item */
   function fillItem(node, item) {
     clear(node);
-    node.appendChild(el('span', {
-      class: 'ak-timeline__dot ak-timeline__dot--' + (item.tone || 'plain'), 'aria-hidden': 'true',
-    }));
-    node.appendChild(el('div', { class: 'ak-timeline__body' }, [
-      el('span', { class: 'ak-timeline__when', text: fmt(item.ts) }),
-      el('span', { class: 'ak-timeline__title', text: item.title }),
-      item.sub != null ? el('span', { class: 'ak-timeline__sub', text: item.sub }) : null,
-    ]));
+    const whole = partValue(spec, 'item', item);
+    if (whole !== undefined) { fillPart(node, whole); return; }
+    node.appendChild(partEl('span', 'ak-timeline__dot ak-timeline__dot--' + (item.tone || 'plain'), 'dot', { 'aria-hidden': 'true' }));
+    const body = partEl('div', 'ak-timeline__body', 'body');
+    slotInto(body, spec, 'when', fmt(item.ts), { cls: 'ak-timeline__when', args: [item] });
+    slotInto(body, spec, 'title', item.title, { cls: 'ak-timeline__title', args: [item] });
+    slotInto(body, spec, 'sub', item.sub == null ? null : item.sub, { cls: 'ak-timeline__sub', args: [item] });
+    slotInto(body, spec, 'extra', null, { cls: 'ak-timeline__extra', args: [item] });
+    node.appendChild(body);
+    slotInto(node, spec, 'aside', null, { cls: 'ak-timeline__aside', args: [item] });
   }
 
   /** @param {TimelineItem} item @returns {HTMLElement} */
   function buildItem(item) {
-    const node = el('li', { class: 'ak-timeline__item' });
+    const node = el('li', { class: 'ak-timeline__item', 'data-ak-part': 'item' });
     fillItem(node, item);
     return node;
   }

@@ -11,14 +11,36 @@
  *   listDetail is the same list with a detail pane beside it. The split is a CONTAINER query:
  *   narrow containers get one pane at a time with a back affordance, wide ones get both — the
  *   component adapts to the box it was given, not to the viewport.
+ *
+ *   NEARLY RIGHT IS RIGHT ENOUGH. A row that needs a third line and a right-hand figure does not
+ *   need a fork: `parts: { extra: r => r.note, aside: r => r.amount }` fills two parts the kit
+ *   renders empty by default, inside the same keyed reconcile, so the row still rises in, still
+ *   glides when it moves and still reports the record under the finger. `parts.row` replaces the
+ *   whole row's contents when even that is not enough, and every part carries `data-ak-part`
+ *   so an app's own CSS reaches it without knowing the depth.
  * @structure list(spec) → { el, set, destroy } · listDetail(spec) → { el, set, select, destroy }
  * @usage  AIMEAT.atelier.list({ target: a.main, items, onPick(item) { open(item); } });
+ * @parts list root · row · text · title · sub · extra · side · badge · meta · aside
+ * @slots list row(item) · title(item) · sub(item) · extra(item) · badge(item) · meta(item) · aside(item)
+ * @variants list dense · numbered · plain
+ * @tokens list --ak-list-gap · --ak-list-row-gap · --ak-list-row-pad-y · --ak-list-row-pad-x · --ak-list-line-gap · --ak-list-aside-size
+ * @fork list Copy .ak-list and .ak-list__* out of content.css and build the row yourself; you keep the tokens, the look and settle()/keyedRows() if you call them, and you give up the empty state, the pick mark and every later fix to this row.
+ * @parts listDetail root · master · detail · back · body
+ * @slots listDetail title(item) · sub(item) · extra(item) · badge(item) · meta(item) · aside(item)
+ * @variants listDetail dense · numbered · plain
+ * @tokens listDetail --ak-list-gap · --ak-list-row-gap · --ak-list-aside-size
+ * @fork listDetail Do not fork the container: mark your detail's own heading .ak-listdetail__title and the picked row's words travel into it. Its `variant` and `parts` are the list's, handed to the master pane.
  * @version-history
  *   v0.50.0 — 2026-09-05 — THE CHANGE IS A MOVE, not three separate ones. The whole reconcile runs
  *     inside `settle`, so a row that arrived rises in on the LOOK's distance and pace, a row that
  *     left fades out where it stood instead of blinking away, and a row that moved glides from
  *     where it was standing. The 200 ms / 8 px pair frozen in this file since 0.3.0 is gone: it
  *     was the one place in the kit where a look could not change the feel of its own rows.
+ *   v0.51.0 — 2026-09-05 — THE ROW TAKES WHAT THE APP GIVES IT. Ten named parts, each stamped
+ *     `data-ak-part`; `extra` and `aside` are the two the kit leaves empty, which is the third
+ *     line and the right-hand figure an app used to fork the whole component to get. `variant`
+ *     picks dense, numbered or plain. Six tokens carry the sizes that were literals in the
+ *     stylesheet.
  *   v0.46.0 — 2026-09-02 — The morph is the kit's own now: `morph` from mosaic-motion.js drives
  *     it, and the pair is the two TITLES (the row's words and the detail's heading), so the
  *     name travels out of the list into the pane instead of a whole row growing into a panel.
@@ -36,6 +58,10 @@ import { settle } from './arrive.js';
 import { t } from './i18n.js';
 import { emptyState } from './state.js';
 import { morph } from './mosaic-motion.js';
+import { partEl, slotInto, hasPart, partValue, fillPart, applyVariant } from './parts-model.js';
+
+/** The shapes a list may take without anyone overriding a rule. */
+const LIST_VARIANTS = ['dense', 'numbered', 'plain'];
 
 /** The host writes the detail, so the kit LOOKS for its title rather than dictating one: the
  *  element the host marked, and failing that the first heading in the pane. */
@@ -53,22 +79,30 @@ const DETAIL_HEADING = 'h1, h2, h3';
 
 /**
  * Render one row's inner content (shared by add and update, so the two can never drift).
+ *
+ * Every element here is a NAMED PART: the kit's class plus `data-ak-part`, and `parts.<name>`
+ * on the spec replaces what goes in it. `extra` and `aside` carry nothing of the kit's own, so
+ * they exist only when the app fills them — the third line and the right-hand figure. `parts.row`
+ * is the whole-row escape, and it is still a row: keyed, entered, picked, marked.
  * @param {HTMLElement} row
  * @param {ListItem} item
+ * @param {any} spec
  */
-function fillRow(row, item) {
+function fillRow(row, item, spec) {
   clear(row);
-  const text = el('span', { class: 'ak-list__text' }, [
-    el('span', { class: 'ak-list__title', text: item.title }),
-    item.sub != null ? el('span', { class: 'ak-list__sub', text: item.sub }) : null,
-  ]);
-  const side = (item.meta != null || item.badge != null)
-    ? el('span', { class: 'ak-list__side' }, [
-      item.badge != null ? el('span', { class: 'ak-badge', text: item.badge }) : null,
-      item.meta != null ? el('span', { class: 'ak-list__meta', text: item.meta }) : null,
-    ])
-    : null;
-  append(row, side ? [text, side] : [text]);
+  if (hasPart(spec, 'row')) {
+    fillPart(row, partValue(spec, 'row', item));
+    return;
+  }
+  const text = partEl('span', 'ak-list__text', 'text');
+  slotInto(text, spec, 'title', item.title, { cls: 'ak-list__title', args: [item] });
+  slotInto(text, spec, 'sub', item.sub == null ? null : item.sub, { cls: 'ak-list__sub', args: [item] });
+  slotInto(text, spec, 'extra', null, { cls: 'ak-list__extra', args: [item] });
+  const side = partEl('span', 'ak-list__side', 'side');
+  slotInto(side, spec, 'badge', item.badge == null ? null : item.badge, { cls: 'ak-badge ak-list__badge', args: [item] });
+  slotInto(side, spec, 'meta', item.meta == null ? null : item.meta, { cls: 'ak-list__meta', args: [item] });
+  slotInto(side, spec, 'aside', null, { cls: 'ak-list__aside', args: [item] });
+  append(row, side.childNodes.length ? [text, side] : [text]);
 }
 
 /**
@@ -76,6 +110,8 @@ function fillRow(row, item) {
  * @param {{
  *   target?: string|Element, items: ListItem[],
  *   onPick?: (item: ListItem) => void,
+ *   variant?: 'dense'|'numbered'|'plain',
+ *   parts?: Record<string, any>,
  *   empty?: { title?: string, hint?: string, action?: { label: string, onClick?: () => void } },
  * }} spec
  * @returns {{ el: HTMLElement, set: (patch: { items: ListItem[] }) => void, destroy: () => void }}
@@ -84,7 +120,8 @@ export function list(spec) {
   /** @type {Map<string, { row: HTMLElement, item: ListItem }>} */
   const shown = new Map();
   const pickable = typeof spec.onPick === 'function';
-  const root = el('div', { class: 'ak-root ak-list', role: pickable ? 'list' : null });
+  const root = el('div', { class: 'ak-root ak-list', role: pickable ? 'list' : null, 'data-ak-part': 'root' });
+  applyVariant(root, spec, LIST_VARIANTS);
   if (spec.target) resolve(spec.target).appendChild(root);
 
   let emptyCard = null;
@@ -95,6 +132,7 @@ export function list(spec) {
       class: 'ak-list__row',
       type: pickable ? 'button' : null,
       role: pickable ? 'listitem' : null,
+      'data-ak-part': 'row',
       'data-ak-noguard': true,
       'data-ak-id': item.id,
       on: pickable ? { click: function () {
@@ -109,7 +147,7 @@ export function list(spec) {
         if (spec.onPick) spec.onPick(shown.get(item.id)?.item || item);
       } } : null,
     });
-    fillRow(row, item);
+    fillRow(row, item, spec);
     return row;
   }
 
@@ -144,10 +182,14 @@ export function list(spec) {
         entry = { row, item };
         shown.set(item.id, entry);
       } else {
-        const changed = entry.item.title !== item.title || entry.item.sub !== item.sub
+        // A row the app fills itself is refilled whenever its record is not the same object:
+        // the kit cannot know which of the record's fields a slot function reads, and a stale
+        // third line is a worse failure than one repaint too many.
+        const changed = (spec.parts && entry.item !== item)
+          || entry.item.title !== item.title || entry.item.sub !== item.sub
           || entry.item.meta !== item.meta || entry.item.badge !== item.badge;
         if (changed) {
-          fillRow(entry.row, item);
+          fillRow(entry.row, item, spec);
           entry.row.classList.remove('ak-list__row--changed');
           void entry.row.offsetWidth;
           entry.row.classList.add('ak-list__row--changed');
@@ -189,6 +231,8 @@ export function list(spec) {
  * @param {{
  *   target?: string|Element, items: ListItem[],
  *   renderDetail: (item: ListItem, body: HTMLElement) => void,
+ *   variant?: 'dense'|'numbered'|'plain',
+ *   parts?: Record<string, any>,
  *   empty?: { title?: string, hint?: string },
  *   detailEmpty?: { title?: string, hint?: string },
  * }} spec
@@ -200,23 +244,29 @@ export function listDetail(spec) {
   /** @type {ListItem[]} */
   let items = spec.items || [];
 
-  const detailBody = el('div', { class: 'ak-listdetail__body' });
+  const detailBody = el('div', { class: 'ak-listdetail__body', 'data-ak-part': 'body' });
   const backBtn = el('button', {
-    type: 'button', class: 'ak-btn ak-btn--ghost ak-listdetail__back', 'data-ak-noguard': true,
+    type: 'button', class: 'ak-btn ak-btn--ghost ak-listdetail__back',
+    'data-ak-part': 'back', 'data-ak-noguard': true,
     on: { click: function () { select(null); } },
   }, '↩ ' + t('back'));
-  const detail = el('div', { class: 'ak-listdetail__detail' }, [backBtn, detailBody]);
+  const detail = el('div', { class: 'ak-listdetail__detail', 'data-ak-part': 'detail' }, [backBtn, detailBody]);
 
+  // The master pane IS the kit's list, so everything the list learned reaches it: the variant
+  // and the row's own parts are handed straight down rather than re-declared here.
   const master = list({
     items: items,
     empty: spec.empty,
+    variant: spec.variant,
+    parts: spec.parts,
     onPick: function (item) { select(item.id); },
   });
 
-  const root = el('div', { class: 'ak-root ak-listdetail' }, [
-    el('div', { class: 'ak-listdetail__master' }, master.el),
+  const root = el('div', { class: 'ak-root ak-listdetail', 'data-ak-part': 'root' }, [
+    el('div', { class: 'ak-listdetail__master', 'data-ak-part': 'master' }, master.el),
     detail,
   ]);
+  applyVariant(root, spec, LIST_VARIANTS);
   if (spec.target) resolve(spec.target).appendChild(root);
 
   let detailEmptyCard = null;

@@ -21,12 +21,23 @@
  * @usage
  *   const ok = await AIMEAT.atelier.confirm({ title: 'Delete the draft?', tone: 'danger' });
  *   const name = await AIMEAT.atelier.prompt({ title: 'Name this list', label: 'Name' });
+ * @parts dialog root · panel · head · title · close · body · text · before · after · actions · action
+ * @slots dialog before() · after() · actions() · aside()
+ * @variants dialog danger · celebrate · ai · roomy · wide
+ * @fork dialog Do not: the focus trap, Escape and focus return are the browser's through native <dialog>, and a hand-rolled overlay loses all three. Put your own markup in body(host) instead.
  * @version-history
+ *   v0.51.0 — 2026-09-05 — FOUR SLOTS AND ELEVEN NAMED PARTS: `parts.before` opens the body,
+ *     `parts.after` closes it, `parts.actions` puts the app's own row (a "don't ask again", a
+ *     note) beside the kit's buttons, `parts.aside` marks the head, and `tone` / `size` are
+ *     stamped as `data-ak-variant` so an app reads a dialog's shape the way it reads every other
+ *     component's. Forking this one is still refused in words: the focus trap, Escape and focus
+ *     return are the browser's through native <dialog>.
  *   v0.25.0 — 2026-08-29 — Initial (TARGET-074: the dialog department).
  */
 import { el, reducedMotion } from './dom.js';
 import { t } from './i18n.js';
 import { mosaic } from './mosaic.js';
+import { slotInto } from './parts-model.js';
 
 /** How far a dialog travels on entry, and from where — the sheet arrives from the edge. */
 const ENTER_FROM = { center: '12px', bottom: '100%' };
@@ -59,37 +70,45 @@ export function dialog(spec) {
   const dismissible = spec.dismissible !== false;
   const node = /** @type {HTMLDialogElement} */ (el('dialog', {
     class: 'ak-root ak-dialog ak-dialog--' + from + ' ak-dialog--' + tone + ' ak-dialog--' + size,
+    'data-ak-part': 'root',
+    'data-ak-variant': (spec.tone && tone !== 'plain') ? tone : (size !== 'compact' ? size : null),
     'aria-labelledby': 'ak-dlg-title',
   }));
 
-  const head = el('div', { class: 'ak-dialog__head' }, [
-    el('h2', { class: 'ak-dialog__title', id: 'ak-dlg-title', text: spec.title }),
+  const head = el('div', { class: 'ak-dialog__head', 'data-ak-part': 'head' }, [
+    el('h2', { class: 'ak-dialog__title', 'data-ak-part': 'title', id: 'ak-dlg-title', text: spec.title }),
     dismissible ? el('button', {
-      type: 'button', class: 'ak-btn ak-btn--ghost ak-dialog__x',
+      type: 'button', class: 'ak-btn ak-btn--ghost ak-dialog__x', 'data-ak-part': 'close',
       'aria-label': t('close'), on: { click: function () { close('dismiss'); } },
     }, '✕') : null,
   ]);
-  const body = el('div', { class: 'ak-dialog__body' });
-  if (spec.text) body.appendChild(el('p', { class: 'ak-dialog__text', text: spec.text }));
+  slotInto(head, spec, 'aside', null, { cls: 'ak-dialog__aside' });
+  const body = el('div', { class: 'ak-dialog__body', 'data-ak-part': 'body' });
+  slotInto(body, spec, 'before', null, { cls: 'ak-dialog__before', tag: 'div' });
+  if (spec.text) body.appendChild(el('p', { class: 'ak-dialog__text', 'data-ak-part': 'text', text: spec.text }));
   // A STORED ARRANGEMENT can be the dialog's body: the same mosaic every screen uses, rendered
   // inside the modal. This is what makes a dialog shape adoptable from the Design Book.
   if (spec.layout) {
     mosaic({ target: body, layout: spec.layout, sources: spec.sources || {} });
   }
   if (spec.body) spec.body(body);
+  slotInto(body, spec, 'after', null, { cls: 'ak-dialog__after', tag: 'div' });
 
-  const foot = el('div', { class: 'ak-dialog__actions' });
+  const foot = el('div', { class: 'ak-dialog__actions', 'data-ak-part': 'actions' });
   for (const action of spec.actions || []) {
     foot.appendChild(el('button', {
       type: 'button',
       class: 'ak-btn ak-btn--' + (action.tone === 'danger' ? 'danger' : action.tone === 'primary' ? 'primary' : 'ghost'),
+      'data-ak-part': 'action',
       'data-ak-action': action.id,
       on: { click: function () { if (action.run) action.run(); } },
     }, action.label));
   }
+  // The app's own row beside the kit's buttons: a "don't ask again", a note, a second door.
+  slotInto(foot, spec, 'actions', null, { cls: 'ak-dialog__extra' });
 
-  node.appendChild(el('div', { class: 'ak-dialog__panel' },
-    [head, body, (spec.actions || []).length ? foot : null]));
+  node.appendChild(el('div', { class: 'ak-dialog__panel', 'data-ak-part': 'panel' },
+    [head, body, (spec.actions || []).length || foot.childNodes.length ? foot : null]));
   document.body.appendChild(node);
 
   let closed = false;

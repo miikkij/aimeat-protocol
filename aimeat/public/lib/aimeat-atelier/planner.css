@@ -9,6 +9,9 @@
  *   them; entrances are finite and reduced-motion drops them, like the rest of the kit.
  * @structure .ak-kanban · .ak-plan · .ak-schedule · reduced-motion
  * @version-history
+ *   v0.38.0 — 2026-09-05 — The board reads its own tokens instead of the literals it carried:
+ *     --ak-kanban-col-min, --ak-kanban-gap, --ak-kanban-card-pad. Every default is the value that
+ *     was there. The card's empty parts and the board's variants live in custom.css.
  *   v0.37.0 — 2026-09-05 — The measured review: a kanban card is a control (it is a button you
  *     pick up), so it reaches 40px of hit area, and a booking's time reads at --ak-text-micro
  *     instead of 0.68rem, which resolved to 10.9px.
@@ -19,8 +22,8 @@
 .ak-kanban {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(13rem, 1fr);
-  gap: calc(var(--ak-gap) * 0.75);
+  grid-auto-columns: minmax(var(--ak-kanban-col-min), 1fr);
+  gap: var(--ak-kanban-gap);
   overflow-x: auto;
   padding-bottom: 4px;
 }
@@ -64,7 +67,7 @@
   gap: 2px;
   position: relative;
   min-height: var(--ak-touch-min);
-  padding: 10px 12px;
+  padding: var(--ak-kanban-card-pad) 12px;
   border-radius: var(--ak-radius-sm);
   background: var(--ak-surface);
   border: 1px solid var(--ak-line);
@@ -82,6 +85,7 @@
 .ak-kanban__card--err { border-inline-start: 3px solid var(--ak-err); }
 .ak-kanban__cardtitle { font-weight: 650; font-size: var(--ak-text-body); }
 .ak-kanban__cardsub { font-size: var(--ak-text-fine); color: var(--ak-ink-dim); }
+/* The card's EMPTY parts and the board's two shapes: custom.css. */
 .ak-kanban__badge {
   position: absolute;
   top: 8px;

@@ -22,6 +22,19 @@
  *   and the look presets are `[data-ak-look]` blocks in that same file: vivid is the default and
  *   flat is the deliberate opt-out. A skin or a preset sets variables and nothing else.
  *
+ *   NEARLY RIGHT IS RIGHT ENOUGH. When a component is close but not quite, it is changed rather
+ *   than forked, and every component is changed the same four ways: NAMED PARTS (every element
+ *   the kit builds carries `data-ak-part`, so an app's CSS targets a box by name rather than by
+ *   depth), SLOTS (`parts: { extra: r => r.note, aside: r => r.amount }` fills or replaces a
+ *   part with a string, a node or a function of the row — and `extra`, `aside`, `before` and
+ *   `after` are the ones the kit renders empty, waiting), VARIANTS (`variant: 'dense'` stamps
+ *   `data-ak-variant` and the stylesheet reads it, so a builder PICKS a shape rather than
+ *   overriding one), and PER-COMPONENT TOKENS (`--ak-list-aside-size`, `--ak-stat-figure-size`
+ *   and their kind, each falling back to the global token it descends from, so an app sets a
+ *   variable on its own box and nothing else moves). `describe(name)` answers the whole list at
+ *   run time, read out of the component's own source. Everything customised still enters, keys,
+ *   moves and picks: a slot's content is written into the row the kit already built.
+ *
  *   MOTION IS THE KIT'S, NOT THE APP'S — AND IT IS ON BY DEFAULT. A block arrives, a row that is
  *   new rises in, a row that left fades out where it stood, a row that moved glides there, a
  *   figure counts to its new value and a view change crosses into the next screen, none of it
@@ -37,6 +50,17 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.51.0 — 2026-09-05 — NEARLY RIGHT, MADE RIGHT (wish-atelier-always-excellent, part 3). A
+ *     component that is close is customised instead of copied, and every component is customised
+ *     the same four ways: named parts (`data-ak-part` on every element the kit builds), slots
+ *     (`parts: { … }`, with `extra` / `aside` / `before` / `after` left empty for the app),
+ *     variants (`variant:` → `data-ak-variant`, read by the stylesheet) and per-component tokens
+ *     (thirty-six `--ak-<component>-*` properties, each defaulting to the value the component
+ *     already had, so nothing moves until somebody moves it). parts-model.js is the one
+ *     mechanism underneath; `describe(name)` reads the whole list back at run time, generated
+ *     from each module's own JSDoc by tools/build-atelier-parts.ts and held to it by
+ *     `pnpm check:atelier-parts`. Motion, keying and picking are untouched: a slot fills the row
+ *     the kit already built and keyed.
  *   v0.50.0 — 2026-09-05 — MOTION IS THE DEFAULT (wish-atelier-always-excellent, part 2). Nothing
  *     in an Atelier app appears, changes or disappears without being seen to, and the app asks for
  *     none of it. arrive.js is the engine: `settle` gives a change its three moves (a row that
@@ -314,6 +338,7 @@ import { ambient, setWeather, weatherLevel } from './ambient.js';
 import { ambientStage, weather, attract } from './ambient-parts.js';
 import { fx, fxPlay } from './effects.js';
 import { scrollEdge } from './scroll-edge.js';
+import { PARTS } from './describe-data.js';
 
 const atelier = {
   /**
@@ -321,7 +346,27 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.50.0',
+  version: '0.51.0',
+
+  /**
+   * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
+   * named parts (every one carries `data-ak-part`, so an app's own CSS reaches it), the slots
+   * `parts: { … }` accepts, the shapes `variant:` accepts, the `--ak-*` properties an app may
+   * set on its own box, and what copying the component out would cost.
+   *
+   * The answer is READ OUT OF THE SOURCE: tools/build-atelier-parts.ts collects each module's
+   * own `@parts` / `@slots` / `@variants` / `@tokens` / `@fork` lines, and `pnpm
+   * check:atelier-parts` refuses a commit where the generated list and the modules disagree —
+   * so this is never a second list somebody has to remember to update.
+   * @param {string} [name] - a component id; omitted, every id the kit describes
+   * @returns {object|string[]|null}
+   */
+  describe(name) {
+    if (name == null) return Object.keys(PARTS).sort();
+    const found = PARTS[String(name)];
+    if (!found) return null;
+    return Object.assign({ id: String(name) }, found);
+  },
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,
@@ -412,6 +457,10 @@ const atelier = {
   // ── The DEFAULT motion: the engine the components already run on. An app calls none of it;
   //    these are here so a component built outside the kit can join the same behaviour ──
   settle, keyedRows, viewSwap, motionOff, setMotionDefaults,
+
+  // ── The customisation model: what a component's parts, slots, variants and tokens ARE, read
+  //    out of its own source, so an AI builder asks the kit instead of guessing ──
+  parts: PARTS,
 
   // ── Theme, i18n, helpers ──
   injectStyle, i18n, el, append, $, $$, clear, uid, busy, whileBusy, guardButtons,
