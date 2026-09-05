@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { WorkflowEngine, isAgentReachable } from '../../src/services/workflow/engine.js';
+import { setActiveConnectTunnelManager, type ConnectTunnelManager } from '../../src/services/connect-tunnel.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage, MemoryRecord, AgentRecord } from '../../src/storage/interface.js';
 import type { WorkflowRun, WorkflowDef, WorkflowRunStep, ResolvedStepSignals, Signal } from '../../src/models/workflow-schemas.js';
@@ -32,6 +33,19 @@ function memStorage(opts?: { stepAgent?: Partial<AgentRecord> | null }): Storage
 
 /** A reachable agent (fresh lastSeen) for the "online but slow" case. */
 const reachableAgent = (): Partial<AgentRecord> => ({ gaii: `bot#alice@${NODE}`, lastSeen: new Date().toISOString(), webhookEnabled: false, webhookFailCount: 0 });
+
+/**
+ * A spawn agent between jobs: its runtime exists only while a worker runs, so lastSeen dates the
+ * last edition it wrote rather than whether a wake would reach it. Three days is ordinary here.
+ */
+const staleSpawnAgent = (): Partial<AgentRecord> => ({
+  gaii: `bot#alice@${NODE}`, runMode: 'spawn', webhookEnabled: false, webhookFailCount: 0,
+  lastSeen: new Date(Date.now() - 3 * 24 * 60 * 60_000).toISOString(),
+});
+
+/** The one thing reachability asks the tunnel manager: does this principal hold a live socket. */
+const tunnelHolding = (...principals: string[]) =>
+  ({ isConnected: (p: string) => principals.includes(p) }) as unknown as ConnectTunnelManager;
 
 const NODE = 'test-node';
 const OWNER = `alice@${NODE}`;
@@ -176,6 +190,12 @@ describe('isAgentReachable', () => {
   it('no webhook + stale lastSeen (> online window) is unreachable', () => {
     expect(isAgentReachable(A({ webhookEnabled: false, webhookFailCount: 0, lastSeen: new Date(now - 11 * 60_000).toISOString() }), now)).toBe(false);
   });
+  it('a live connector socket is reachable however old lastSeen is (a spawn agent between jobs)', () => {
+    expect(isAgentReachable(A({ webhookEnabled: false, webhookFailCount: 0, lastSeen: '2020-01-01T00:00:00.000Z' }), now, true)).toBe(true);
+  });
+  it('no socket + stale lastSeen stays unreachable (the spawn agent whose connector is down)', () => {
+    expect(isAgentReachable(A({ webhookEnabled: false, webhookFailCount: 0, lastSeen: '2020-01-01T00:00:00.000Z' }), now, false)).toBe(false);
+  });
 });
 
 describe('watchdog: agent-offline fast-fail', () => {
@@ -203,4 +223,28 @@ describe('watchdog: agent-offline fast-fail', () => {
     const run = await readRun(storage, 'run-1');
     expect(run.steps.a.state).toBe('dispatched');
   });
+
+  // The (L)AIMEAT Sanomat failure of 2026-09-05/06: the writers had just finished, features and
+  // editorial had not started, and their lastSeen was days old because a spawn agent has no runtime
+  // between jobs. The owner got a failure mail for an edition that came out complete.
+  it('a spawn agent stale by days is NOT offline-failed while its connector holds a socket for it', async () => {
+    const storage = memStorage({ stepAgent: staleSpawnAgent() });
+    seed(storage, { successSignal: NOTHING, startedAtMsAgo: 6 * 60_000, timeoutMin: 60 });
+    setActiveConnectTunnelManager(tunnelHolding(`bot#alice@${NODE}`));
+    await engineFor(storage).sweep();
+    const run = await readRun(storage, 'run-1');
+    expect(run.steps.a.state).toBe('dispatched'); // parked and wakeable → keep waiting
+    expect(run.status).toBe('waiting-step');
+  });
+
+  it('the socket is read per agent: one held for a SIBLING leaves this step offline-failed', async () => {
+    const storage = memStorage({ stepAgent: staleSpawnAgent() });
+    seed(storage, { successSignal: NOTHING, startedAtMsAgo: 6 * 60_000, timeoutMin: 60 });
+    setActiveConnectTunnelManager(tunnelHolding(`other#alice@${NODE}`));
+    await engineFor(storage).sweep();
+    const run = await readRun(storage, 'run-1');
+    expect(run.steps.a.state).toBe('agent-offline');
+  });
+
+  afterEach(() => setActiveConnectTunnelManager(null));
 });
