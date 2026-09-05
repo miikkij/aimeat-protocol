@@ -261,6 +261,7 @@ in the supervisor should prevent crash loops.
 from __future__ import annotations
 
 import base64
+import binascii
 import json
 import signal
 import sys
@@ -422,7 +423,11 @@ def _gaii_from_credential(credential_file: Path) -> str | None:
         payload = parts[1]
         payload += "=" * (-len(payload) % 4)
         value = json.loads(base64.urlsafe_b64decode(payload)).get("sub")
-    except Exception:
+    # Named rather than blind: this is a decode of one untrusted string and the ways it can fail are
+    # knowable. binascii.Error is padding or an illegal character, ValueError covers JSON, and
+    # AttributeError is a payload that decodes to something with no .get. Anything else here is a
+    # real defect and should reach the caller instead of turning into a quiet None.
+    except (binascii.Error, ValueError, AttributeError):
         return None
     return value if isinstance(value, str) and value else None
 
@@ -528,7 +533,7 @@ def _poll_tasks(api: _Api, status: str = "queued") -> list[dict[str, Any]]:
             return []
         body = r.json()
         return body.get("data", {}).get("tasks", []) or []
-    except Exception:
+    except Exception:  # noqa: BLE001 -- the node did not answer; an empty task list is the honest reading
         return []
 
 
@@ -569,7 +574,7 @@ def _fetch_max_concurrent(api: _Api) -> int:
             )
             if isinstance(v, int) and v >= 1:
                 return v
-    except Exception:
+    except Exception:  # noqa: BLE001, S110 -- no watchdog spec is the normal case; the default below is the answer
         pass
     return 1
 
@@ -596,7 +601,7 @@ def _is_cancelled(api: _Api, task_id: str) -> bool:
             status = (r.json().get("data", {}).get("task", {}) or {}).get("status")
             if status not in ("active", "stalled"):
                 return True
-    except Exception:
+    except Exception:  # noqa: BLE001, S110 -- the status read failed; the cancel markers below are the second opinion
         pass
     # 2) coordinator-written cancellations. New connectors get these PUSHED over the tunnel
     #    (task.cancelled) and the serve daemon holds the set — a FREE loopback read, no more
@@ -608,7 +613,7 @@ def _is_cancelled(api: _Api, task_id: str) -> bool:
             return task_id in (r.json().get("data", {}).get("cancelled", []) or [])
         if r.status_code != 404:
             return False
-    except Exception:
+    except Exception:  # noqa: BLE001 -- no /local//cancelled on an older connector; the legacy scan below answers
         return False
     # Legacy fallback (old connector without /local/cancelled): the owner-scoped marker scan.
     try:
@@ -621,9 +626,9 @@ def _is_cancelled(api: _Api, task_id: str) -> bool:
                 val = item.get("value")
                 if isinstance(val, list) and task_id in (str(x) for x in val):
                     return True
-                if isinstance(val, dict) and task_id in (str(k) for k in val.keys()):
+                if isinstance(val, dict) and task_id in (str(k) for k in val):
                     return True
-    except Exception:
+    except Exception:  # noqa: BLE001, S110 -- the marker scan failed; not-cancelled is the safe reading of silence
         pass
     return False
 
@@ -636,7 +641,7 @@ def _fail_cancelled(api: _Api, task_id: str) -> None:
             json={"message": "Cancelled before start (cancel marker or status change)"},
             timeout=10,
         )
-    except Exception:
+    except Exception:  # noqa: BLE001, S110 -- the task is being abandoned anyway; a failed /fail changes nothing here
         pass
 
 
@@ -660,7 +665,7 @@ def _fetch_message_content(api: _Api, thread_id: str, msg_id: str) -> str:
             if m.get("id") == msg_id:
                 return m.get("content", "") or ""
         return ""
-    except Exception:
+    except Exception:  # noqa: BLE001 -- the message body did not come back; the caller falls back to its preview
         return ""
 
 
@@ -677,7 +682,7 @@ def _mark_message_delivered(api: _Api, msg_id: str) -> bool:
             json={"status": "delivered"},
         )
         return r.status_code == 200
-    except Exception:
+    except Exception:  # noqa: BLE001 -- marking delivered failed; the node keeps offering it and the next cycle retries
         return False
 
 
@@ -711,7 +716,7 @@ def _poll_messages(api: _Api) -> list[dict[str, Any]]:
                 "content": content or s.get("preview", ""),
             })
         return out
-    except Exception:
+    except Exception:  # noqa: BLE001 -- the inbox read failed; an empty list means this cycle simply has no messages
         return []
 
 
@@ -743,7 +748,7 @@ def _wait_unified(api: _Api, seconds: float, stop: dict[str, Any]) -> str:
             if r.status_code == 404:
                 return "unsupported"
             # 204 -- this chunk timed out with nothing; loop for the next chunk.
-        except Exception:
+        except Exception:  # noqa: BLE001 -- the long poll dropped; sleep out the remaining slice and ask again
             time.sleep(min(1.0, max(remaining, 0.1)))
     return "timeout"
 
@@ -797,7 +802,7 @@ def _wait_for_work(
                     )
                     if rt.status_code == 200:
                         return {}
-                except Exception:
+                except Exception:  # noqa: BLE001, S110 -- the drain is best effort; the wait below is what actually paces the loop
                     pass
             wait_ms = int(min(remaining, 5.0) * 1000)
             try:
@@ -812,9 +817,9 @@ def _wait_for_work(
                     try:
                         data = r.json().get("data")
                         return data if isinstance(data, dict) else {}
-                    except Exception:
+                    except Exception:  # noqa: BLE001 -- a wake body that will not parse is still a wake; the caller re-reads the queue
                         return {}
-            except Exception:
+            except Exception:  # noqa: BLE001 -- serve daemon hiccup; degrade to a plain sleep slice for this round
                 # serve hiccup: degrade to a plain sleep slice for this round
                 time.sleep(min(1.0, max(remaining, 0.1)))
         else:
@@ -830,7 +835,7 @@ def _subscribe_records(api: _Api, spaces: list[dict[str, Any]]) -> int:
         if r.status_code != 200:
             return 0
         return int(r.json().get("data", {}).get("subscribed", 0))
-    except Exception:
+    except Exception:  # noqa: BLE001 -- subscribe failed; zero spaces means this run polls instead of being pushed
         return 0
 
 
@@ -847,7 +852,7 @@ def _drain_records(api: _Api, max_items: int = 50) -> list[dict[str, Any]]:
             if not isinstance(event, dict):
                 break
             out.append(event)
-        except Exception:
+        except Exception:  # noqa: BLE001 -- the event drain ends where it stops answering; what arrived is returned
             break
     return out
 
@@ -864,7 +869,7 @@ def _agent_engagements(api: _Api, org: str, ws: str, agent_name: str) -> list[di
         if r.status_code != 200:
             return None
         engs = (r.json().get("data") or {}).get("engagements") or []
-    except Exception:
+    except Exception:  # noqa: BLE001 -- no engagement list is the same answer as an unreachable node: nothing to do
         return None
     return [e for e in engs if isinstance(e, dict) and e.get("agentName") == agent_name]
 
@@ -885,7 +890,7 @@ def _space_contract(api: _Api, org: str, ws: str, space: str, cache: dict[str, d
                 for ot in ots
                 if isinstance(ot, dict) and ot.get("name") and ot.get("contract")
             }
-        except Exception:
+        except Exception:  # noqa: BLE001 -- the contract read failed; None keeps the caller on its own default
             return None
     return cache.get(key, {}).get(space)
 
@@ -924,7 +929,7 @@ def _backfill_engagement(api: _Api, org: str, ws: str, agent_name: str, contract
             json={"ws": ws, "agent": agent_name, "contract": contract},
             timeout=10,
         )
-    except Exception:
+    except Exception:  # noqa: BLE001, S110 -- recording the engagement is a courtesy; the work does not depend on it
         pass
 
 
@@ -943,7 +948,7 @@ def _drain_dms(api: _Api, max_items: int = 50) -> list[dict[str, Any]]:
             if not isinstance(event, dict):
                 break
             out.append(event)
-        except Exception:
+        except Exception:  # noqa: BLE001 -- the event drain ends where it stops answering; what arrived is returned
             break
     return out
 
@@ -1058,7 +1063,7 @@ def _serve_agent_status(api: _Api) -> dict[str, Any]:
         for a in r.json().get("data", {}).get("agents", []):
             if a.get("agent") == api.agent_name:
                 return a
-    except Exception:
+    except Exception:  # noqa: BLE001 -- the agent list did not come back; an empty profile is what the caller expects
         return {}
     return {}
 
@@ -1510,12 +1515,12 @@ def run_crew_daemon(
                 result = crew.kickoff()
             print(f"[daemon:{agent_name}] {phase_label} task {task_id} done; first 200 chars: {str(result)[:200]}")
             return True
-        except Exception as inner:
+        except Exception as inner:  # noqa: BLE001 -- the crew is the user's own code; report it and keep the daemon alive
             print(f"[daemon:{agent_name}] {phase_label} task {task_id} crashed: {inner}")
             if on_error:
                 try:
                     on_error(inner)
-                except Exception:
+                except Exception:  # noqa: BLE001, S110 -- the error callback is the user's code too; a reporter that fails has nothing left to report with
                     pass
             # Only mark failed during the EXECUTE phase. A PROPOSE-phase crash
             # is recoverable -- the task is still queued, the next poll cycle
@@ -1527,7 +1532,7 @@ def run_crew_daemon(
                         json={"message": f"Crew crashed: {inner}"},
                         timeout=10,
                     )
-                except Exception:
+                except Exception:  # noqa: BLE001, S110 -- the task already crashed; a failed /fail leaves it queued for the next cycle
                     pass
             return False
 
@@ -1561,12 +1566,12 @@ def run_crew_daemon(
                     result = crew.kickoff()
                 print(f"[daemon:{agent_name}] EXECUTE task {task_id} done; first 200 chars: {str(result)[:200]}")
                 return (task_id, "ok")
-        except Exception as inner:
+        except Exception as inner:  # noqa: BLE001 -- the crew is the user's own code; report it and keep the daemon alive
             print(f"[daemon:{agent_name}] EXECUTE task {task_id} crashed: {inner}")
             if on_error:
                 try:
                     on_error(inner)
-                except Exception:
+                except Exception:  # noqa: BLE001, S110 -- the error callback is the user's code too; a reporter that fails has nothing left to report with
                     pass
             try:
                 api.post(
@@ -1574,7 +1579,7 @@ def run_crew_daemon(
                     json={"message": f"Crew crashed: {inner}"},
                     timeout=10,
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001, S110 -- the task already crashed; a failed /fail leaves it queued for the next cycle
                 pass
             return (task_id, "error")
 
@@ -1585,7 +1590,7 @@ def run_crew_daemon(
             in_flight.discard(tid)
             try:
                 _, status = f.result()
-            except Exception:
+            except Exception:  # noqa: BLE001 -- the worker already reported; the future only says whether it got that far
                 status = "error"
             # ok/cancelled leave the active queue for good -> guard against
             # re-dispatch. "error" already POSTed /fail (so the task is no longer
@@ -1656,12 +1661,12 @@ def run_crew_daemon(
             if on_record is not None:
                 try:
                     on_record(event)
-                except Exception as inner:
+                except Exception as inner:  # noqa: BLE001 -- the record handler is the user's own code; report it and keep the daemon alive
                     print(f"[daemon:{agent_name}] on_record handler crashed: {inner}")
                     if on_error:
                         try:
                             on_error(inner)
-                        except Exception:
+                        except Exception:  # noqa: BLE001, S110 -- the error callback is the user's code too; a reporter that fails has nothing left to report with
                             pass
                 return
             rid = f"record-{event.get('ws')}-{event.get('space')}-{event.get('id')}"
@@ -1679,12 +1684,12 @@ def run_crew_daemon(
             try:
                 with usage_run(rid, agent_name):
                     build_crew(synthetic_task, liaison).kickoff()
-            except Exception as inner:
+            except Exception as inner:  # noqa: BLE001 -- the crew is the user's own code; report it and keep the daemon alive
                 print(f"[daemon:{agent_name}] record {rid} crashed: {inner}")
                 if on_error:
                     try:
                         on_error(inner)
-                    except Exception:
+                    except Exception:  # noqa: BLE001, S110 -- the error callback is the user's code too; a reporter that fails has nothing left to report with
                         pass
 
         def _handle_dm(event: dict[str, Any]) -> None:
@@ -1694,12 +1699,12 @@ def run_crew_daemon(
             if on_dm is not None:
                 try:
                     on_dm(event)
-                except Exception as inner:
+                except Exception as inner:  # noqa: BLE001 -- the DM handler is the user's own code; report it and keep the daemon alive
                     print(f"[daemon:{agent_name}] on_dm handler crashed: {inner}")
                     if on_error:
                         try:
                             on_error(inner)
-                        except Exception:
+                        except Exception:  # noqa: BLE001, S110 -- the error callback is the user's code too; a reporter that fails has nothing left to report with
                             pass
                 return
             did = f"dm-{event.get('id')}"
@@ -1718,12 +1723,12 @@ def run_crew_daemon(
             try:
                 with usage_run(did, agent_name):
                     build_crew(synthetic_task, liaison).kickoff()
-            except Exception as inner:
+            except Exception as inner:  # noqa: BLE001 -- the crew is the user's own code; report it and keep the daemon alive
                 print(f"[daemon:{agent_name}] dm {did} crashed: {inner}")
                 if on_error:
                     try:
                         on_error(inner)
-                    except Exception:
+                    except Exception:  # noqa: BLE001, S110 -- the error callback is the user's code too; a reporter that fails has nothing left to report with
                         pass
 
         while not stop["flag"]:
@@ -1886,12 +1891,12 @@ def run_crew_daemon(
                             with usage_run(f"msg-{msg_id}", agent_name):
                                 crew.kickoff()
                             kickoff_ok = True
-                        except Exception as inner:
+                        except Exception as inner:  # noqa: BLE001 -- the crew is the user's own code; report it and leave the message undelivered
                             print(f"[daemon:{agent_name}] message {msg_id} crashed: {inner}")
                             if on_error:
                                 try:
                                     on_error(inner)
-                                except Exception:
+                                except Exception:  # noqa: BLE001, S110 -- the error callback is the user's code too; a reporter that fails has nothing left to report with
                                     pass
                         # Mark delivered so the node stops returning it as pending;
                         # only after a successful kickoff so a crash leaves it for
@@ -1931,20 +1936,20 @@ def run_crew_daemon(
                         _handle_dm(event)
                         dispatched_this_cycle = True
 
-            except Exception as outer:
+            except Exception as outer:  # noqa: BLE001 -- one poll cycle failed; the supervisor decides about a restart, not this loop
                 # The poll itself failed (e.g. network blip). Don't exit;
                 # let the supervisor decide if a restart is warranted.
                 print(f"[daemon:{agent_name}] poll cycle error: {outer}")
                 if on_error:
                     try:
                         on_error(outer)
-                    except Exception:
+                    except Exception:  # noqa: BLE001, S110 -- the error callback is the user's code too; a reporter that fails has nothing left to report with
                         pass
 
             if not dispatched_this_cycle and on_idle:
                 try:
                     on_idle()
-                except Exception:
+                except Exception:  # noqa: BLE001, S110 -- the idle callback is the user's code; an idle tick is not worth ending the run for
                     pass
 
             if one_shot:

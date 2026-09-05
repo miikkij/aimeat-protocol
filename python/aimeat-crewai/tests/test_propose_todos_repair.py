@@ -14,7 +14,7 @@ do not require a running node or LLM.
 """
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from aimeat_crewai.liaison import (
     _PROPOSE_TODOS_TOOL,
@@ -130,7 +130,10 @@ def test_install_repair_makes_schema_accept_missing_title() -> None:
     # Baseline: the unpatched schema rejects a todo with no title.
     import pytest
 
-    with pytest.raises(Exception):
+    # ValidationError, not Exception: the point of the baseline is that the schema REFUSES this
+    # payload. `Exception` would also pass if the call raised a TypeError because the test itself
+    # had drifted, which is the one outcome that must not read as a green baseline.
+    with pytest.raises(ValidationError):
         _ProposeTodosArgs.model_validate(
             {"task_id": "t1", "todos": [{"description": "d"}]}
         )

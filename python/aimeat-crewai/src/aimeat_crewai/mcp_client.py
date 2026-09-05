@@ -321,7 +321,7 @@ def _spawn_serve_daemon(
     else:
         popen_kwargs["start_new_session"] = True
 
-    log = open(home / "serve.log", "ab")
+    log = open(home / "serve.log", "ab")  # noqa: SIM115 -- the handle is handed to the child process as its stdout and stderr and has to outlive this function; a context manager would close it under the daemon
     try:
         return subprocess.Popen(
             argv,

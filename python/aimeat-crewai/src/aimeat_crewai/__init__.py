@@ -121,7 +121,7 @@ from .workflow_spec import (
 # itself as 0.19.0, and the first crew to install it reported the mismatch before we saw it.
 __version__ = "0.25.0"
 
-__all__ = [
+__all__ = [  # noqa: RUF022 -- grouped by topic with the version each group arrived in; alphabetical order would scatter those comments away from what they name
     "__version__",
     "create_liaison_agent",
     "liaison_tools",
