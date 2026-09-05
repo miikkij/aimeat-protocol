@@ -16,19 +16,29 @@
  *   second half is what makes the hand-written t * 9/5 + 32 with unit °F mean what its author
  *   meant — see units.js for why an offset unit leaves arithmetic as a bare number.
  *
+ *   `format` DECIDES HOW IT IS PRINTED AND NOTHING ELSE. The answer under the set formula is
+ *   written the way `format` asks — one decimal, a thousands separator, a currency, the unit
+ *   before or after — while the FULL number goes on to everything standing on this node. That is
+ *   the difference from the round(expr, 1) a document used to have to write to get a readable
+ *   dew point: that one rounded the maths, and the printed formula then said something its author
+ *   did not mean. The vocabulary is format.js's, the same one the sentence template takes.
+ *
  * @node     formula   A spreadsheet expression over the other nodes, worked out with its units.
  * @inputs   formula   expr (an expression naming other nodes)
  * @outputs  formula   value — the result, with its unit · tex — the same expression set as mathematics
- * @options  formula   unit (convert the result, or name a plain one) · format · label · block (a section to print it in)
- * @example  formula   { "type": "formula", "expr": "t * 9/5 + 32", "unit": "°F", "label": "Fahrenheit", "block": "maths" }
+ * @options  formula   unit (convert the result, or name a plain one) · format (how the answer is printed: 1 · "int" · "unit" · { decimals, group, locale, style, currency, unit, prefix, suffix }) · label · block (a section to print it in)
+ * @example  formula   { "type": "formula", "expr": "t * 9/5 + 32", "unit": "°F", "format": 1, "label": "Fahrenheit", "block": "maths" }
  * @structure formula: the node-type module (dependsOn · prepare · evaluate)
  * @usage  import { formula } from './formula.js';
  * @version-history
+ *   v0.3.0 — 2026-09-05 — `format` stops being a documented field nothing read: the answer is
+ *     printed through it, and the value that flows on is untouched.
  *   v0.1.0 — 2026-09-05 — Initial (the living document, stage 1).
  */
 import { parse, symbolsOf } from '../formula-parse.js';
 import { evaluate as run, isError, isQuantity } from '../formula-eval.js';
 import { toTex } from '../tex.js';
+import { formatError } from '../format.js';
 import { parseUnit, convert } from '../units.js';
 
 export const formula = {
@@ -54,6 +64,8 @@ export const formula = {
     const unit = parseUnit(node.unit);
     if (isError(unit)) errors.push(unit.error);
     ctx.compiled.unit = isError(unit) ? null : unit;
+    const badFormat = formatError(node.format);
+    if (badFormat) errors.push(badFormat);
     return errors;
   },
 

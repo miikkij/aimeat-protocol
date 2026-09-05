@@ -12537,7 +12537,15 @@
         case "figure":
           return bound("figure", function(data) {
             const d = patchFor("figure", data);
-            return figure({ target: into, value: d.value, label: d.label || p.title || "", sub: d.sub, delta: d.delta });
+            return figure({
+              target: into,
+              value: d.value,
+              label: d.label || p.title || "",
+              sub: d.sub,
+              delta: d.delta,
+              unit: d.unit,
+              direction: d.direction
+            });
           });
         case "rating":
           return bound("rating", function(data) {
@@ -16314,7 +16322,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.53.0",
+    version: "0.53.1",
     /**
      * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
      * named parts (every one carries `data-ak-part`, so an app's own CSS reaches it), the slots

@@ -22,6 +22,8 @@
  *   parse('t * 9/5 + 32');   // ["Add", ["Multiply", "t", ["Divide", 9, 5]], 32]
  *   symbolsOf(parse('a + b'));  // ['a', 'b']
  * @version-history
+ *   v0.3.0 — 2026-09-05 — fraction() and percent() join the function table: the one explicit
+ *     conversion a percentage gets, now that it is a label on a face number rather than a scale.
  *   v0.1.0 — 2026-09-05 — Initial (the living document, stage 1).
  */
 
@@ -36,6 +38,10 @@ export const FUNCTIONS = {
   sum: 'Sum', avg: 'Mean', mean: 'Mean', count: 'Count',
   clamp: 'Clamp', convert: 'Convert', text: 'Text', number: 'Number',
   and: 'And', or: 'Or', not: 'Not', first: 'First', last: 'Last',
+  // The two doors between a percentage and a fraction of one. They are asked for out loud
+  // because a percentage is a LABEL on a face number here, never a hidden factor — units.js
+  // carries the rule and why it had to be written down.
+  fraction: 'Fraction', percent: 'Percent',
 };
 
 /** The words that are values, not symbols. */

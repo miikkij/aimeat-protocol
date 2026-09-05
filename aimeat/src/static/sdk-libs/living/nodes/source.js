@@ -17,14 +17,17 @@
  * @node     source    A live value from a memory key, or a constant when the page cannot read one.
  * @inputs   source    key (a memory key) · path (a dotted path inside the record) · value (the fallback)
  * @outputs  source    value — what the key holds now, with the node's unit on it
- * @options  source    unit · scope=own|public · owner (for a public read) · label
- * @example  source    { "type": "source", "key": "sensors.livingroom", "path": "celsius", "unit": "°C", "value": 21 }
+ * @options  source    unit · format (how it is printed: 1 · "int" · "unit" · an object) · scope=own|public · owner (for a public read) · label
+ * @example  source    { "type": "source", "key": "sensors.livingroom", "path": "celsius", "unit": "°C", "format": 1, "value": 21 }
  * @structure sourceNode: the node-type module (dependsOn · prepare · evaluate · read)
  * @usage  import { sourceNode } from './source.js';
  * @version-history
+ *   v0.3.0 — 2026-09-05 — `format`: a reading from a device arrives with as many digits as the
+ *     device felt like sending, and this is where a document says how many of them to print.
  *   v0.1.0 — 2026-09-05 — Initial (the living document, stage 1).
  */
 import { parseUnit } from '../units.js';
+import { formatError } from '../format.js';
 import { isError } from '../formula-eval.js';
 import { wrapValue } from './value.js';
 
@@ -53,6 +56,8 @@ export const sourceNode = {
     const unit = parseUnit(node.unit);
     if (isError(unit)) errors.push(unit.error);
     ctx.compiled.unit = isError(unit) ? null : unit;
+    const badFormat = formatError(node.format);
+    if (badFormat) errors.push(badFormat);
     if (!ctx.state.values.has(ctx.id)) ctx.state.values.set(ctx.id, wrapValue(node.value, ctx.compiled.unit));
     return errors;
   },

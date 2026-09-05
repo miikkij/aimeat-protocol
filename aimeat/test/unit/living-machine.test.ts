@@ -10,6 +10,8 @@
  *   waiting.
  * @usage cd aimeat && pnpm vitest run test/unit/living-machine.test.ts
  * @version-history
+ *   v1.1.0 — 2026-09-05 — start(): the initial state is ENTERED, nested initials included, and no
+ *     exit is produced for a state nothing ever left (living 0.3.0).
  *   v1.0.0 — 2026-09-05 — Initial (the living document, stage 1).
  */
 import { describe, it, expect } from 'vitest';
@@ -54,6 +56,66 @@ describe('createMachine: where it starts', () => {
     const m = createMachine({ initial: 'a', states: { a: { on: { GO: { target: 'b', guard: '2 * * 3' } } }, b: {} } } as never);
     expect(m.errors.length).toBe(1);
     expect(m.errors[0]).toMatch(/guard/);
+  });
+});
+
+/**
+ * THE STATE IT STARTS IN IS ENTERED. Without this the entry action of the initial state never
+ * ran, so a value the machine writes sat blank until the first crossing and a document opened
+ * saying nothing — correct only once somebody had touched a control.
+ */
+describe('createMachine: it enters the state it starts in', () => {
+  it('hands back the initial state entry, once', () => {
+    const m = createMachine(THREE);
+    const scope = scopeOf({ t: 20, seen: 0 });
+    const out = m.start();
+    expect(out.path).toBe('fine');
+    expect(applied(out, scope)).toEqual({ advice: '' });
+    // A second call has nothing left to hand out.
+    expect(m.start().assigns).toEqual([]);
+  });
+
+  it('an initial state with something to say says it on the first paint', () => {
+    const m = createMachine({
+      initial: 'cold',
+      states: { cold: { entry: { advice: '"lämmitä"' }, on: { WARM: 'fine' } }, fine: {} },
+    } as never);
+    expect(applied(m.start(), scopeOf({}))).toEqual({ advice: 'lämmitä' });
+  });
+
+  it('runs the nested initial states too, outermost first', () => {
+    const m = createMachine({
+      initial: 'running',
+      states: {
+        running: {
+          entry: { mode: '"running"' },
+          initial: 'slow',
+          states: { slow: { entry: { pace: '"slow"' } }, fast: {} },
+        },
+      },
+    } as never);
+    const out = m.start();
+    expect(out.path).toBe('running.slow');
+    expect(out.assigns.map((a) => a.id)).toEqual(['mode', 'pace']);
+  });
+
+  it('no exit action is produced for a state that was never entered', () => {
+    const m = createMachine({
+      initial: 'fine',
+      states: { fine: { entry: { advice: '""' } }, hot: { exit: { seen: 'seen + 1' } } },
+    } as never);
+    expect(m.start().assigns.map((a) => a.id)).toEqual(['advice']);
+  });
+
+  it('a machine that could not be read hands back nothing rather than throwing', () => {
+    expect(createMachine({ states: {} } as never).start().assigns).toEqual([]);
+  });
+
+  it('a reset puts it back on the line', () => {
+    const m = createMachine(THREE);
+    m.start();
+    m.reset();
+    expect(applied(m.start(), scopeOf({}))).toEqual({ advice: '' });
   });
 });
 

@@ -16,6 +16,17 @@
  *   A CURRENCY IS A DIMENSION OF ITS OWN AND NEVER CONVERTS. EUR + EUR is money; EUR + USD is a
  *   rate this library does not have and will not invent, so it refuses. That is the honest
  *   answer, and it is the one a document about money needs.
+ *
+ *   A PERCENTAGE IS A LABEL ON A FACE NUMBER, NOT A FACTOR — the second rule worth reading
+ *   before the rest. `%` and `ppm` measure nothing, so they cannot be checked the way kg and °C
+ *   are checked, and a scale hidden inside one is a scale nobody can see: 72 % stored as 0.72
+ *   made ln(rh) read the logarithm of 72 while rh / 100 collapsed to 0.0072, both from the same
+ *   node in the same recompute, and neither said so. So a percentage is STORED AND COMPUTED AS
+ *   ITS FACE NUMBER — rh is 72, ln(rh) is ln(72), rh / 100 is 0.72, rh + 5 is 77 — and the unit
+ *   rides along as a word. The one conversion is asked for out loud and is in the formula
+ *   function table: fraction(rh) → 0.72 and percent(x) → 100·x. convert() between two different
+ *   dimensionless labels refuses and names those two, because a silent 72 ppm is exactly the
+ *   answer this rule exists to stop.
  * @structure UNITS/PREFIXES tables · parseUnit · unitLabel · sameDim · convert · mul/div/pow ·
  *   addable · quantity helpers
  * @usage
@@ -23,6 +34,9 @@
  *   const c = parseUnit('°C');            // { dim: { K: 1 }, scale: 1, offset: 273.15 }
  *   convert({ n: 22, u: c }, parseUnit('K'));   // { n: 295.15, u: K }
  * @version-history
+ *   v0.3.0 — 2026-09-05 — A percentage is a label on a face number: `%` and `ppm` carry a scale
+ *     of 1, so arithmetic is on the number the author typed, and convert() refuses between two
+ *     dimensionless labels rather than answering with a rescaled one.
  *   v0.1.0 — 2026-09-05 — Initial (the living document, stage 1).
  */
 
@@ -53,10 +67,12 @@ function u(dim, scale, offset) {
  * "J/(mol*K)" and "km/h" are parsed, not looked up.
  */
 const UNITS = {
-  // dimensionless
+  // dimensionless — a LABEL on a face number, never a hidden factor. See the percentage rule at
+  // the head of this file: the scale is 1 so 72 % computes as 72, and fraction()/percent() are
+  // the two doors between a percentage and a fraction of one.
   '': u({}, 1),
-  '%': u({}, 0.01),
-  'ppm': u({}, 1e-6),
+  '%': u({}, 1),
+  'ppm': u({}, 1),
   'x': u({}, 1),
   // length
   m: u({ m: 1 }), km: u({ m: 1 }, 1e3), cm: u({ m: 1 }, 1e-2), mm: u({ m: 1 }, 1e-3),
@@ -251,6 +267,17 @@ export function convert(q, target) {
     return {
       error: 'I cannot turn ' + (unitLabel(q.u) || 'a plain number') + ' into '
         + (unitLabel(target) || 'a plain number') + ': those measure different things.',
+    };
+  }
+  // Two dimensionless LABELS have no rate between them — % and ppm both measure nothing, and
+  // answering 72 ppm for 72 % would be the quiet wrong answer the percentage rule exists to stop.
+  const from = unitLabel(q.u);
+  const to = unitLabel(target);
+  if (isPlain(q.u) && isPlain(target) && from && to && from !== to) {
+    return {
+      error: 'I cannot turn ' + from + ' into ' + to + ': both are labels on a plain number, not '
+        + 'scales. Say fraction(x) for the number as a fraction of one, or percent(x) for it as a '
+        + 'percentage.',
     };
   }
   return { n: fromBase(toBase(q.n, q.u), target), u: target };

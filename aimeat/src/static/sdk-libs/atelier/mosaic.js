@@ -34,6 +34,9 @@
  *   });
  *   // later, when the app's data changed:  m.refresh('errands.');
  * @version-history
+ *   v0.53.1 — 2026-09-05 — A bound figure carries its `unit` and `direction`. Both are fields
+ *     figure() has always taken and the bound case never forwarded, so the same record read one
+ *     way through the mosaic and another way by hand.
  *   v0.53.0 — 2026-09-05 — `blocks()`: what is on the screen, block by block (id, component,
  *     whether it reads a bound source, the source name, the element), so a caller wiring a block
  *     by id asks the kit instead of keeping its own copy of which components take data.
@@ -236,7 +239,14 @@ export function mosaic(spec) {
       case 'figure':
         return bound('figure', function (data) {
           const d = patchFor('figure', data);
-          return figure({ target: into, value: d.value, label: d.label || p.title || '', sub: d.sub, delta: d.delta });
+          // The unit and the direction come from the record too. They were the two fields figure()
+          // takes that this line did not forward, so a bound figure showed a bare number while the
+          // same figure written by hand showed "22 °C" — and nothing said which of the two doors
+          // the record had come through.
+          return figure({
+            target: into, value: d.value, label: d.label || p.title || '', sub: d.sub,
+            delta: d.delta, unit: d.unit, direction: d.direction,
+          });
         });
       case 'rating':
         return bound('rating', function (data) {

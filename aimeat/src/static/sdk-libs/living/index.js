@@ -36,6 +36,19 @@
  *   const doc = AIMEAT.living.mount(host, record, { onChange(e) { save(record); } });
  *   doc.set('t', 31);
  * @version-history
+ *   v0.3.0 — 2026-09-05 — FOUR FINDINGS FROM THE FIRST DOCUMENT BUILT ON IT, three of them in the
+ *     part a record can see. `format` stops being a documented field nothing read: formula, value
+ *     and source nodes print through format.js — a number of decimals, a word, or an object with
+ *     grouping, a locale, a currency and where the unit goes — and the value that flows on is
+ *     untouched, so a document says `format` instead of putting a round() into the maths it
+ *     prints. A MACHINE ENTERS THE STATE IT STARTS IN: the initial state's entry actions run on
+ *     the first refresh, outermost first through the nested initials, the way SCXML and XState
+ *     run an initial transition, so a value a machine writes is right on the first paint rather
+ *     than blank until the first crossing. A PERCENTAGE IS A LABEL ON A FACE NUMBER: `%` and
+ *     `ppm` carry no hidden scale, so ln(rh) is ln(72) and rh / 100 is 0.72, and fraction(x) and
+ *     percent(x) are the two doors between the two readings — the only behaviour change in this
+ *     version, and the reason it is 0.3.0 rather than 0.2.1. The fourth was the kit's: a bound
+ *     figure dropped the unit in props.data (atelier 0.53.1).
  *   v0.2.0 — 2026-09-05 — THREE COPIES DROPPED, because the kit grew the seams they worked
  *     around (atelier 0.53.0). The control row is one form field of the kit's — the input, the
  *     label wiring, the range's track and its 40px hit area are no longer built here. The chain
@@ -60,7 +73,7 @@ import { resolve, kit } from './dom.js';
 import { isError, isQuantity, asText } from './formula-eval.js';
 import { unitLabel } from './units.js';
 
-const VERSION = '0.2.0';
+const VERSION = '0.3.0';
 
 /** The node types whose rendering this library does itself, when the node names a block. */
 const DRAWN = ['control', 'formula', 'text', 'machine', 'value', 'source'];

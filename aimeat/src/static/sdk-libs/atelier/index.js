@@ -55,6 +55,9 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.53.1 — 2026-09-05 — A bound figure carries its unit. `unit` and `direction` are fields
+ *     figure() has always taken, and the mosaic's bound case forwarded neither, so a record read
+ *     one way through an arrangement and another way when the app called figure() itself.
  *   v0.53.0 — 2026-09-05 — Three seams a library built on this kit had to work around, closed
  *     here so it stops carrying its own copies. THE FORM GAINS A LIVE CONTROL: `type: 'range'`
  *     with min/max/step, a unit, the reading beside the track and the 40px hit area;
@@ -368,7 +371,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.53.0',
+  version: '0.53.1',
 
   /**
    * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's

@@ -37,10 +37,12 @@
     return { dim: d(dim), scale: scale == null ? 1 : scale, offset: offset || 0, label: "" };
   }
   var UNITS = {
-    // dimensionless
+    // dimensionless — a LABEL on a face number, never a hidden factor. See the percentage rule at
+    // the head of this file: the scale is 1 so 72 % computes as 72, and fraction()/percent() are
+    // the two doors between a percentage and a fraction of one.
     "": u({}, 1),
-    "%": u({}, 0.01),
-    "ppm": u({}, 1e-6),
+    "%": u({}, 1),
+    "ppm": u({}, 1),
     "x": u({}, 1),
     // length
     m: u({ m: 1 }),
@@ -135,6 +137,9 @@
   }
   function isAffine(unit) {
     return !!unit && unit.offset !== 0;
+  }
+  function isPlain(unit) {
+    return !unit || Object.keys(unit.dim).length === 0;
   }
   function sameDim(a, b) {
     const da = a ? a.dim : {};
@@ -235,10 +240,21 @@
         error: "I cannot turn " + (unitLabel(q.u) || "a plain number") + " into " + (unitLabel(target) || "a plain number") + ": those measure different things."
       };
     }
+    const from = unitLabel(q.u);
+    const to = unitLabel(target);
+    if (isPlain(q.u) && isPlain(target) && from && to && from !== to) {
+      return {
+        error: "I cannot turn " + from + " into " + to + ": both are labels on a plain number, not scales. Say fraction(x) for the number as a fraction of one, or percent(x) for it as a percentage."
+      };
+    }
     return { n: fromBase(toBase(q.n, q.u), target), u: target };
   }
 
   // src/static/sdk-libs/living/formula-eval.js
+  var PERCENT = (
+    /** @type {any} */
+    parseUnit("%")
+  );
   function isError(v) {
     return !!v && typeof v === "object" && !Array.isArray(v) && typeof v.error === "string";
   }
@@ -515,6 +531,28 @@
         const moved = convert(q, target);
         return isError(moved) ? moved : tidy(moved);
       }
+      // THE TWO DOORS OF THE PERCENTAGE RULE. A percentage is a label on a face number here, so
+      // nothing rescales it behind the author's back; when they DO want the fraction of one, they
+      // say so, and when they want a fraction written as a percentage, they say that.
+      case "Fraction": {
+        const q = num(a, "fraction");
+        if (isError(q)) return q;
+        if (q.u && !isPlain(q.u)) {
+          return { error: "fraction() takes a percentage or a plain number, and this one is in " + unitLabel(q.u) + "." };
+        }
+        return q.n / 100;
+      }
+      case "Percent": {
+        const q = num(a, "percent");
+        if (isError(q)) return q;
+        if (q.u && !isPlain(q.u)) {
+          return { error: "percent() takes a fraction of one or a plain number, and this one is in " + unitLabel(q.u) + "." };
+        }
+        if (unitLabel(q.u) === "%") {
+          return { error: "This is already a percentage. percent() turns a fraction of one into one, so pass the plain number." };
+        }
+        return { n: q.n * 100, u: PERCENT };
+      }
       case "Min":
         return aggregate(args, (v) => Math.min.apply(null, v), "min");
       case "Max":
@@ -540,6 +578,106 @@
     }
   }
 
+  // src/static/sdk-libs/living/format.js
+  var FORMATS = ["unit", "plain", "int", "percent", "upper", "lower", "text", "<digits>"];
+  var PLACES = ["after", "before", "none"];
+  function parseFormat(spec) {
+    if (spec == null || spec === "") return null;
+    if (typeof spec === "number") {
+      return Number.isFinite(spec) ? { decimals: Math.max(0, Math.trunc(spec)) } : null;
+    }
+    if (typeof spec === "string") {
+      const f = spec.trim().toLowerCase();
+      if (f === "" || f === "text") return null;
+      if (/^\d+$/.test(f)) return { decimals: Number(f) };
+      if (f === "unit") return { place: "after" };
+      if (f === "plain") return { place: "none" };
+      if (f === "int") return { decimals: 0 };
+      if (f === "percent") return { style: "percent", maxDecimals: 1 };
+      if (f === "upper" || f === "lower") return { word: f };
+      return { unknown: spec, place: "after" };
+    }
+    if (typeof spec !== "object" || Array.isArray(spec)) return { unknown: String(spec), place: "after" };
+    const out = {};
+    if (typeof spec.decimals === "number" && Number.isFinite(spec.decimals)) out.decimals = Math.max(0, Math.trunc(spec.decimals));
+    if (typeof spec.maxDecimals === "number" && Number.isFinite(spec.maxDecimals)) out.maxDecimals = Math.max(0, Math.trunc(spec.maxDecimals));
+    if (spec.group === true) out.group = true;
+    if (typeof spec.locale === "string" && spec.locale) out.locale = spec.locale;
+    if (spec.style === "percent" || spec.style === "currency" || spec.style === "decimal") out.style = spec.style;
+    if (typeof spec.currency === "string" && spec.currency) out.currency = spec.currency;
+    if (typeof spec.unit === "string" && PLACES.indexOf(spec.unit) >= 0) out.place = spec.unit;
+    if (typeof spec.prefix === "string") out.prefix = spec.prefix;
+    if (typeof spec.suffix === "string") out.suffix = spec.suffix;
+    if (spec.style === "currency" && !out.currency) return { unknown: "a currency format with no currency code" };
+    return out;
+  }
+  function formatError(spec) {
+    const f = parseFormat(spec);
+    if (!f || !f.unknown) return null;
+    return 'a format I do not know, "' + String(f.unknown) + '". It knows ' + FORMATS.join(", ") + ", or an object with decimals, maxDecimals, group, locale, style, currency, unit, prefix and suffix";
+  }
+  function needsIntl(f) {
+    return f.group === true || f.locale != null || f.style === "currency";
+  }
+  function formatNumber(n, spec) {
+    const f = parseFormat(spec) || {};
+    if (!Number.isFinite(n)) return String(n);
+    const scaled = f.style === "percent" ? n * 100 : n;
+    const tail = f.style === "percent" ? " %" : "";
+    let body;
+    if (needsIntl(f)) {
+      const opts = { useGrouping: f.group === true };
+      if (f.decimals != null) {
+        opts.minimumFractionDigits = f.decimals;
+        opts.maximumFractionDigits = f.decimals;
+      } else if (f.maxDecimals != null) {
+        opts.minimumFractionDigits = 0;
+        opts.maximumFractionDigits = f.maxDecimals;
+      }
+      if (f.style === "currency") {
+        opts.style = "currency";
+        opts.currency = f.currency;
+      }
+      try {
+        body = new Intl.NumberFormat(f.locale || void 0, opts).format(scaled);
+      } catch {
+        body = trimNumber(scaled);
+      }
+    } else if (f.decimals != null) {
+      body = scaled.toFixed(f.decimals);
+    } else if (f.maxDecimals != null) {
+      const step = Math.pow(10, f.maxDecimals);
+      body = trimNumber(Math.round(scaled * step) / step);
+    } else {
+      body = trimNumber(scaled);
+    }
+    return (f.prefix || "") + body + tail + (f.suffix || "");
+  }
+  function formatParts(value2, spec, defaultPlace) {
+    const f = parseFormat(spec);
+    const fallback = PLACES.indexOf(String(defaultPlace)) >= 0 ? String(defaultPlace) : "none";
+    if (isError(value2)) {
+      return { number: value2.error, unit: "", place: "none", text: value2.error, refused: true };
+    }
+    if (f && f.word) {
+      const cased = f.word === "upper" ? asText(value2).toUpperCase() : asText(value2).toLowerCase();
+      return { number: cased, unit: "", place: "none", text: cased, refused: false };
+    }
+    if (isQuantity(value2) || typeof value2 === "number") {
+      const n = isQuantity(value2) ? value2.n : value2;
+      const unit = isQuantity(value2) ? unitLabel(value2.u) : "";
+      const number = formatNumber(n, spec);
+      const place = f && f.place ? f.place : fallback;
+      const text = !unit || place === "none" ? number : place === "before" ? unit + " " + number : number + " " + unit;
+      return { number, unit, place, text, refused: false };
+    }
+    const words = asText(value2);
+    return { number: words, unit: "", place: "none", text: words, refused: false };
+  }
+  function formatValue(value2, spec) {
+    return formatParts(value2, spec).text;
+  }
+
   // src/static/sdk-libs/living/nodes/value.js
   function wrapValue(raw, unit) {
     if (raw == null) return unit ? { n: 0, u: unit } : 0;
@@ -561,6 +699,8 @@
       const unit = parseUnit(node.unit);
       if (isError(unit)) errors.push(unit.error);
       ctx.compiled.unit = isError(unit) ? null : unit;
+      const badFormat = formatError(node.format);
+      if (badFormat) errors.push(badFormat);
       if (!ctx.state.values.has(ctx.id)) {
         ctx.state.values.set(ctx.id, wrapValue(node.value, ctx.compiled.unit));
       }
@@ -615,7 +755,12 @@
     or: "Or",
     not: "Not",
     first: "First",
-    last: "Last"
+    last: "Last",
+    // The two doors between a percentage and a fraction of one. They are asked for out loud
+    // because a percentage is a LABEL on a face number here, never a hidden factor — units.js
+    // carries the rule and why it had to be written down.
+    fraction: "Fraction",
+    percent: "Percent"
   };
   var LITERALS = { true: true, false: false };
   var PUNCT = ["<=", ">=", "<>", "!=", "==", "+", "-", "*", "/", "^", "&", "(", ")", ",", "<", ">", "="];
@@ -994,6 +1139,8 @@
       const unit = parseUnit(node.unit);
       if (isError(unit)) errors.push(unit.error);
       ctx.compiled.unit = isError(unit) ? null : unit;
+      const badFormat = formatError(node.format);
+      if (badFormat) errors.push(badFormat);
       return errors;
     },
     evaluate(node, ctx) {
@@ -1078,22 +1225,8 @@
   }
 
   // src/static/sdk-libs/living/text.js
-  function formatValue(value2, format) {
-    if (isError(value2)) return value2.error;
-    const f = format == null ? "" : String(format).trim().toLowerCase();
-    if (f === "unit") return asText(value2);
-    if (f === "upper") return asText(value2).toUpperCase();
-    if (f === "lower") return asText(value2).toLowerCase();
-    if (f === "text" || f === "") {
-      if (isQuantity(value2)) return trimNumber(value2.n);
-      return asText(value2);
-    }
-    const n = asNumber(value2);
-    if (!Number.isFinite(n)) return asText(value2);
-    if (f === "int") return String(Math.round(n));
-    if (f === "percent") return trimNumber(Math.round(n * 1e3) / 10) + " %";
-    if (/^\d+$/.test(f)) return n.toFixed(Number(f));
-    return asText(value2);
+  function formatValue2(value2, format) {
+    return formatValue(value2, format);
   }
   function splitTag(body) {
     const bar = body.lastIndexOf("|");
@@ -1161,7 +1294,7 @@
         continue;
       }
       if (part.kind === "value") {
-        out += formatValue(evaluate(part.tree, scope), part.format);
+        out += formatValue2(evaluate(part.tree, scope), part.format);
         continue;
       }
       if (part.kind === "if") {
@@ -1284,6 +1417,7 @@
     }
     const compiled = compile(model, errors);
     let active = errors.length ? [] : settleInto(model, [model.initial]);
+    let started = false;
     let enteredAt = /* @__PURE__ */ new Map();
     function markEntered(path, now) {
       for (let i = 1; i <= path.length; i++) {
@@ -1327,6 +1461,27 @@
         return active.map((_, i) => active.slice(0, i + 1).join("."));
       },
       errors,
+      /**
+       * ARRIVING WHERE IT STARTS. The entry actions of the initial state, and of every nested
+       * initial state beneath it, outermost first — the same order a transition into that state
+       * would run them in, which is what SCXML and XState call the initial transition.
+       *
+       * No exit action is ever produced here: nothing has been left. It answers once; a second
+       * call hands back nothing, and reset() puts it back on the line.
+       * @returns {{ changed: boolean, path: string, assigns: Array<{ id: string, tree: any }> }}
+       */
+      start() {
+        if (started || errors.length || !active.length) {
+          started = true;
+          return { changed: false, path: active.join("."), assigns: [] };
+        }
+        started = true;
+        const out = [];
+        for (let i = 1; i <= active.length; i++) {
+          for (const a of assignsFor("entry", active.slice(0, i).join("."))) out.push(a);
+        }
+        return { changed: out.length > 0, path: active.join("."), assigns: out };
+      },
       /**
        * Send an event. Looks for a handler from the deepest active state outward, honouring guards.
        * @param {string} event @param {{ get: (id: string) => any }} scope @param {number} [now]
@@ -1407,11 +1562,12 @@
         }
         return out;
       },
-      /** Back to the initial state, with the crossings forgotten. */
+      /** Back to the initial state, with the crossings forgotten and start() armed again. */
       reset() {
         active = errors.length ? [] : settleInto(model, [model.initial]);
         enteredAt = /* @__PURE__ */ new Map();
         markEntered(active, 0);
+        started = false;
         for (const w of compiled.whens) w.was = false;
       }
     };
@@ -1506,6 +1662,8 @@
       const unit = parseUnit(node.unit);
       if (isError(unit)) errors.push(unit.error);
       ctx.compiled.unit = isError(unit) ? null : unit;
+      const badFormat = formatError(node.format);
+      if (badFormat) errors.push(badFormat);
       if (!ctx.state.values.has(ctx.id)) ctx.state.values.set(ctx.id, wrapValue(node.value, ctx.compiled.unit));
       return errors;
     },
@@ -1712,6 +1870,19 @@
         }
       }
     }
+    function startMachines(changed) {
+      const seed = [];
+      for (const id of order) {
+        if ((nodes[id] || {}).type !== "machine") continue;
+        const m = state.machines.get(id);
+        if (!m || typeof m.start !== "function") continue;
+        for (const a of m.start().assigns) {
+          const v = a.tree ? evaluateAssign(a.tree) : void 0;
+          if (put(a.id, v) && seed.indexOf(a.id) < 0) seed.push(a.id);
+        }
+      }
+      if (seed.length) pass(seed, changed);
+    }
     function settleMachines(changed) {
       for (let round = 0; round < MAX_ROUNDS; round++) {
         const seed = [];
@@ -1774,6 +1945,7 @@
       refresh() {
         const changed = [];
         pass(ids, changed);
+        startMachines(changed);
         settleMachines(changed);
         return { changed };
       },
@@ -2055,6 +2227,13 @@
         }
       });
     }
+    let unitNow = "";
+    let placeNow = "none";
+    const write = function(n) {
+      const body = formatNumber(n, spec.format);
+      if (!unitNow || placeNow === "none") return body;
+      return placeNow === "before" ? unitNow + " " + body : body + " " + unitNow;
+    };
     function update(value2, tex) {
       if (tex && tex !== lastTex) typeset(tex);
       if (isError(value2)) {
@@ -2065,14 +2244,17 @@
         return;
       }
       root.removeAttribute("data-living-state");
+      const parts = formatParts(value2, spec.format);
       if (isQuantity(value2) || typeof value2 === "number") {
         const n = isQuantity(value2) ? value2.n : value2;
-        countTo(answerValue, Number.isFinite(lastNumber) ? lastNumber : n, n, trimNumber);
+        unitNow = parts.unit;
+        placeNow = parts.place;
+        countTo(answerValue, Number.isFinite(lastNumber) ? lastNumber : n, n, write);
         lastNumber = n;
-        answerUnit.textContent = isQuantity(value2) ? unitLabel(value2.u) : "";
+        answerUnit.textContent = parts.place === "none" ? parts.unit : "";
         return;
       }
-      answerValue.textContent = asText(value2);
+      answerValue.textContent = parts.text;
       answerUnit.textContent = "";
       lastNumber = NaN;
     }
@@ -2087,10 +2269,8 @@
     seq += 1;
     return "ak-living-" + seq;
   }
-  function readout(v) {
-    if (isError(v)) return v.error;
-    if (isQuantity(v)) return trimNumber(v.n) + (unitLabel(v.u) ? " " + unitLabel(v.u) : "");
-    return asText(v);
+  function readout(v, format) {
+    return formatParts(v, format, "after").text;
   }
   var FIELD_TYPE = { slider: "range", toggle: "toggle", pick: "select", number: "number", text: "text" };
   function asOption(o) {
@@ -2157,7 +2337,7 @@
         const n = asNumber(v);
         if (Number.isFinite(n) && String(n) !== input.value) handle.setValues({ value: n });
       }
-      const words = readout(v);
+      const words = readout(v, target.format);
       if (readoutEl.textContent !== words) readoutEl.textContent = words;
       if (input.hasAttribute("aria-valuetext")) input.setAttribute("aria-valuetext", words);
     }
@@ -2209,15 +2389,25 @@
     ]);
     host.appendChild(root);
     let last = NaN;
+    let unitNow = "";
+    let placeNow = "none";
+    const write = function(n) {
+      const body = formatNumber(n, spec.format);
+      if (!unitNow || placeNow === "none") return body;
+      return placeNow === "before" ? unitNow + " " + body : body + " " + unitNow;
+    };
     function update(v) {
+      const parts = formatParts(v, spec.format);
       if (isQuantity(v) || typeof v === "number") {
         const n = isQuantity(v) ? v.n : v;
-        countTo(figure, Number.isFinite(last) ? last : n, n, trimNumber);
+        unitNow = parts.unit;
+        placeNow = parts.place;
+        countTo(figure, Number.isFinite(last) ? last : n, n, write);
         last = n;
-        unit.textContent = isQuantity(v) ? unitLabel(v.u) : "";
+        unit.textContent = parts.place === "none" ? parts.unit : "";
         return;
       }
-      figure.textContent = asText(v);
+      figure.textContent = parts.text;
       unit.textContent = "";
       last = NaN;
     }
@@ -2257,6 +2447,7 @@
         id: spec.id,
         label: node.label,
         value: value2,
+        format: node.format,
         tex: (graph.fieldsOf(spec.id) || {}).tex || "",
         plain: spec.id + " = " + String(node.expr)
       });
@@ -2271,7 +2462,7 @@
       return { el: view.el, update: () => view.update(String(graph.valueOf(spec.id) || "")), kind: "machine" };
     }
     if (node.type === "value" || node.type === "source") {
-      const view = valueRow(host, { id: spec.id, label: node.label, value: value2 });
+      const view = valueRow(host, { id: spec.id, label: node.label, value: value2, format: node.format });
       return { el: view.el, update: () => view.update(graph.valueOf(spec.id)), kind: node.type };
     }
     return null;
@@ -2416,8 +2607,8 @@
       summary: "A spreadsheet expression over the other nodes, worked out with its units.",
       inputs: ["expr (an expression naming other nodes)"],
       outputs: ["value — the result, with its unit", "tex — the same expression set as mathematics"],
-      options: ["unit (convert the result, or name a plain one)", "format", "label", "block (a section to print it in)"],
-      example: { "type": "formula", "expr": "t * 9/5 + 32", "unit": "°F", "label": "Fahrenheit", "block": "maths" },
+      options: ["unit (convert the result, or name a plain one)", "format (how the answer is printed: 1", '"int"', '"unit"', "{ decimals, group, locale, style, currency, unit, prefix, suffix })", "label", "block (a section to print it in)"],
+      example: { "type": "formula", "expr": "t * 9/5 + 32", "unit": "°F", "format": 1, "label": "Fahrenheit", "block": "maths" },
       file: "nodes/formula.js"
     },
     "machine": {
@@ -2432,8 +2623,8 @@
       summary: "A live value from a memory key, or a constant when the page cannot read one.",
       inputs: ["key (a memory key)", "path (a dotted path inside the record)", "value (the fallback)"],
       outputs: ["value — what the key holds now, with the node's unit on it"],
-      options: ["unit", "scope=own|public", "owner (for a public read)", "label"],
-      example: { "type": "source", "key": "sensors.livingroom", "path": "celsius", "unit": "°C", "value": 21 },
+      options: ["unit", "format (how it is printed: 1", '"int"', '"unit"', "an object)", "scope=own|public", "owner (for a public read)", "label"],
+      example: { "type": "source", "key": "sensors.livingroom", "path": "celsius", "unit": "°C", "format": 1, "value": 21 },
       file: "nodes/source.js"
     },
     "text": {
@@ -2448,14 +2639,14 @@
       summary: "A named quantity: the writable ground the rest of the document stands on.",
       inputs: ["value (the quantity itself, a literal — never a reference)"],
       outputs: ["value — the number with its unit, or the text, truth or list it holds"],
-      options: ["unit", "min", "max", "step", "format", "label"],
-      example: { "type": "value", "value": 22, "unit": "°C", "min": -20, "max": 40, "step": 0.5, "label": "Lämpötila" },
+      options: ["unit", "min", "max", "step", "format (how it is printed: 1", '"int"', '"unit"', "an object)", "label"],
+      example: { "type": "value", "value": 22, "unit": "°C", "min": -20, "max": 40, "step": 0.5, "format": 1, "label": "Lämpötila" },
       file: "nodes/value.js"
     }
   };
 
   // src/static/sdk-libs/living/index.js
-  var VERSION = "0.2.0";
+  var VERSION = "0.3.0";
   var DRAWN = ["control", "formula", "text", "machine", "value", "source"];
   function validate(doc) {
     const refusals = [];

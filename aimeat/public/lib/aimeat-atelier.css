@@ -49,6 +49,9 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.53.1 — 2026-09-05 — No rules changed. The version is pinned to AIMEAT.atelier.version, and
+ *     that moved for a script fix: the mosaic's bound figure forwards `unit` and `direction` to
+ *     figure(), which it had never done, so a bound figure shows what it is measured in.
  *   v0.53.0 — 2026-09-05 — THE SLIDER IS A KIT FIELD. The form's `type: 'range'` brings its own
  *     row (.ak-form__range with the reading beside the track), its own control skin
  *     (.ak-input--range, the hit area the whole --ak-touch band rather than the 6px rail) and
