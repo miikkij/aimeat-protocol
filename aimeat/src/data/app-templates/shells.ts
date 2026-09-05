@@ -7,6 +7,9 @@
  *   from scratch. Consumed by ../app-templates.ts which assembles the TEMPLATES registry.
  * @structure SHELL_PURE_CLIENT · SHELL_CORTEX · SHELL_EXTENSION
  * @version-history
+ *   v1.5.0 — 2026-09-05 — SHELL_ATELIER carries a REPLACE-ME `aimeat-register` line on purpose:
+ *     the publish gate refuses it, so the bare shell cannot go live as a page. A builder forks a
+ *     genre (which names its own register) or replaces the line with `custom:<name>`.
  *   v1.4.0 — 2026-08-27 — SHELL_ATELIER (TARGET-074): the Atelier track's shell. Eight-line head
  *     (aimeat-boot.js replaces the inline theme-restore IIFE), the ceremony lives in the served
  *     kit's app() call, and the aimeat-track meta records which guide built the file.
@@ -298,6 +301,7 @@ entry: index.html
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
   <meta name="aimeat-track" content="atelier" />
+  <meta name="aimeat-register" content="REPLACE-ME: fork a genre from the Design Book (GET /v1/designbook?kind=genre) or name your own register" />
   <meta name="aimeat-locales" content="en fi" />
   <title>{{App Title}}</title>
   <link href="/lib/aimeat-atelier.css" rel="stylesheet" type="text/css" />

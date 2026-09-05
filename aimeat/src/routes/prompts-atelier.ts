@@ -12,6 +12,8 @@
  *   import { registerAtelierPrompt } from './prompts-atelier.js';
  *   registerAtelierPrompt(router, config);   // BEFORE /v1/prompts/:tier
  * @version-history
+ *   v1.2.0 — 2026-09-05 — The Design Book's genre list is the first link: a build starts from a
+ *     genre, and the shell link says the shell is a frame the publish refuses bare.
  *   v1.1.0 — 2026-09-02 — The game shell is a link beside the Atelier shell.
  *   v1.0.0 — 2026-08-27 — Initial (TARGET-074).
  */
@@ -48,7 +50,8 @@ export function registerAtelierPrompt(router: Router, config: AimeatConfig): voi
       // tell the app was built against the Atelier spec currently in force.
       spec_token: buildAtelierSpecToken(config),
     }, [
-      { description: 'The Atelier shell (start from it, never invent structure)', method: 'GET', url: '/v1/app-templates/shell-atelier' },
+      { description: 'The genres: complete pages in a committed register. A build starts here; each carries its aimeat-register meta', method: 'GET', url: '/v1/designbook?kind=genre' },
+      { description: 'The Atelier shell: the frame the genres are built on. Read it for the structure; published bare it is refused', method: 'GET', url: '/v1/app-templates/shell-atelier' },
       { description: 'The game shell: the same frame with a Phaser canvas, menus, settings and a leaderboard wired', method: 'GET', url: '/v1/app-templates/shell-phaser-game' },
       { description: 'Publish the finished app (pass spec_token)', method: 'POST', url: '/v1/apps' },
     ]));

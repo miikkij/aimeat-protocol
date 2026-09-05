@@ -26,6 +26,10 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.22.0 — 2026-09-05 — THE REGISTER IS REQUIRED: the first move of a build is the genre fork,
+ *     the shell paragraph says the shell is a frame that the publish refuses as served, and the
+ *     genre section names the `aimeat-register` meta every genre carries and `custom:<name>` for
+ *     a page that commits to its own look.
  *   v1.21.0 — 2026-09-05 — THE AMBIENT: the one layer allowed to move at idle, taught after the
  *     look (wish-atelier-ambient-visuals) — the six presets rendered from the ambient registry
  *     (feel, evokes, fits, the whisper rule), app({ ambient }) and the stored arrangement's
@@ -250,12 +254,24 @@ function composeBody(config: AimeatConfig): string {
     + '/v1/prompts/build-app, whose vocabulary (daisyUI classes, hand-written boilerplate) does '
     + 'not apply here. The app declares `<meta name="aimeat-track" content="atelier">` so a '
     + 'later session loads the right guide.\n\n';
-  body += 'Start from the shell — fetch it, never invent the structure:\n\n'
+  body += 'THE FIRST MOVE OF THE BUILD IS THE GENRE FORK. An app here starts from a committed '
+    + 'register, never from the bare shell: list the genres with `GET ' + base
+    + '/v1/designbook?kind=genre`, fork the one that carries the page\'s register with `GET ' + base
+    + '/v1/app-templates/genre-<id>`, and swap the words, sources and images (the genre section '
+    + 'below has the menu). Every Atelier app declares the register it committed to — '
+    + '`<meta name="aimeat-register" content="genre-<id>">`, which every genre already carries, '
+    + 'or `custom:<name>` for a page that commits to a look of its own — and the publish REFUSES '
+    + 'an Atelier app that names none.\n\n';
+  body += 'The shell is the frame the genres are built on — fetch it to learn the structure, '
+    + 'never invent it:\n\n'
     + '```\n'
     + `GET ${base}/v1/app-templates/shell-atelier\n`
     + '```\n\n'
+    + 'It carries a REPLACE-ME register line on purpose, so published as it is served it is '
+    + 'refused: the shell is a frame, not a page. '
     + 'A GAME starts from the game shell instead: the same frame with a Phaser canvas, a title '
-    + 'menu, pause, settings and a leaderboard already wired through aimeat-phaser:\n\n'
+    + 'menu, pause, settings and a leaderboard already wired through aimeat-phaser, and its '
+    + 'register is the canvas (`custom:game`):\n\n'
     + '```\n'
     + `GET ${base}/v1/app-templates/shell-phaser-game\n`
     + '```\n\n';
@@ -358,9 +374,16 @@ function composeBody(config: AimeatConfig): string {
   // THE GENRES — rendered from the template registry, never hand-listed (the surface-layout
   // lesson: a hand-written menu drifts and the builder reads the refusal as a broken AI).
   const genres = getAppTemplateIndex().filter((t) => t.kind === 'genre');
-  body += '## Or start from a GENRE — a complete committed register\n\n';
-  body += 'When the owner wants the app to LOOK LIKE SOMETHING — a poster, a console, a departure '
-    + 'board — do not assemble blocks: FORK A GENRE. Each genre is a finished free-composition '
+  body += '## Start from a GENRE — a complete committed register, and the register is required\n\n';
+  body += 'Every Atelier app names the register it committed to, and the publish refuses one that '
+    + 'does not: `<meta name="aimeat-register" content="genre-<id>">` is in every genre\'s head '
+    + 'already, so a fork carries it; a page that commits to a look of its own declares '
+    + '`<meta name="aimeat-register" content="custom:<name>">`, where the name says what the '
+    + 'register is (custom:game, custom:ledger) and is never "default". The bare shell carries a '
+    + 'REPLACE-ME line in that place, and the gate refuses it as served: the shell is a frame, '
+    + 'not a page.\n\n';
+  body += 'Whatever the app is — a poster, a console, a departure board, a ledger — do not '
+    + 'assemble blocks: FORK A GENRE. Each genre is a finished free-composition '
     + 'page in a committed register; fetch it with `GET ' + base + '/v1/app-templates/<id>`, swap '
     + 'the words, sources and images for the app at hand, and KEEP THE PHYSICS (finite entrances, '
     + 'motion only under the hand or the scroll, zero idle repaints — the look\'s ambient layer is '

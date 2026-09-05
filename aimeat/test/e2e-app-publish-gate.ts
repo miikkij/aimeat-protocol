@@ -27,6 +27,12 @@
  *   visible afterwards) · blocking artifacts on all three REST doors · the warnings · next_steps
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-publish-gate
  * @version-history
+ *   v1.2.0 — 2026-09-05 — The REGISTER gate: an Atelier app with no `aimeat-register` meta, or
+ *     with the shell's REPLACE-ME placeholder still in the head, is refused with the
+ *     atelier-register finding; the same app naming `genre-nightfloor` publishes; a Classic app
+ *     without the meta still publishes; the bare shell, published as served, is refused on
+ *     purpose. The track-carry-forward fixture now names a register too: it was an Atelier app
+ *     with no look, which is exactly what the gate refuses (pitfalls §19: setup no longer matched).
  *   v1.1.0 — 2026-08-27 — The Atelier track (TARGET-074): its own spec route and `atelier-`
  *     token satisfy the gate with an answer naming the track; `aimeat-track` lands on the
  *     manifest and carries forward through a silent update; an undeclared track stays absent;
@@ -225,11 +231,11 @@ const publish = (token: string, body: Record<string, unknown>) =>
 
     const trackName = `gatetrack${Date.now()}.html`;
     await test('aimeat-track lands on the manifest, and survives an update that stops declaring it', async () => {
-        const atelierApp = app(trackName).replace(
+        const tracked = app(trackName).replace(
             '<meta name="aimeat-scopes"',
-            '<meta name="aimeat-track" content="atelier">\n<meta name="aimeat-scopes"');
+            '<meta name="aimeat-track" content="atelier">\n<meta name="aimeat-register" content="genre-receipt">\n<meta name="aimeat-scopes"');
         const first = await publish(o.token, {
-            filename: trackName, mime_type: 'text/html', content: b64(atelierApp),
+            filename: trackName, mime_type: 'text/html', content: b64(tracked),
             name: 'Tracked', description: 'An Atelier-track app.', spec_token: atelierToken,
         });
         assert(first.status === 201, `publish ${first.status}: ${JSON.stringify(first.body?.error)}`);
@@ -262,6 +268,90 @@ const publish = (token: string, body: Record<string, unknown>) =>
         assert(content.includes('/v1/prompts/build-app-atelier'), 'the shell must point at the Atelier guide');
         assert(content.includes('/lib/aimeat-boot.js'), 'the shell must use the served boot script, not an inline IIFE');
         assert(!content.includes('daisyui'), 'the Atelier shell must not load the Classic styling stack');
+    });
+
+    // ── The register: an Atelier app names the look it committed to ──────────────────────────
+    // Every Atelier app built from the bare shell came out as stacked sections in the default
+    // look, and the Design Book's genres exist so a page starts from a committed register
+    // (docs/pitfalls.md §34). Nothing enforced that. Now the shell carries a placeholder the
+    // builder has to replace, and the publish refuses the placeholder and the absence alike.
+
+    /** An Atelier app in miniature: track declared, kit loaded, and the register line if given. */
+    const atelierApp = (filename: string, register?: string) => [
+        '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">',
+        '<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">',
+        `<meta name="aimeat-app" content="${filename}">`,
+        '<meta name="aimeat-track" content="atelier">',
+        ...(register ? [`<meta name="aimeat-register" content="${register}">`] : []),
+        '<meta name="aimeat-locales" content="en">',
+        '<link rel="stylesheet" href="/lib/aimeat-atelier.css">',
+        '</head><body><script src="/v1/libs/aimeat-atelier.js"></' + 'script></body></html>',
+    ].join('\n');
+
+    const registerless = `gatenoreg${Date.now()}.html`;
+    await test('an Atelier app that names no register is REFUSED, and the refusal says where the genres are', async () => {
+        const r = await publish(o.token, {
+            filename: registerless, mime_type: 'text/html', content: b64(atelierApp(registerless)),
+            name: 'No register', description: 'The bare shell with words in it.', spec_token: atelierToken,
+        });
+        assert(r.status === 422, `expected 422, got ${r.status}: ${JSON.stringify(r.body?.data ?? r.body?.error)}`);
+        assert(r.body.error?.code === 'APP_ARTIFACT_BROKEN', `error code ${r.body.error?.code}`);
+        const hit = (r.body.error?.details?.findings ?? []).find((f: any) => f.pitfall === 'atelier-register');
+        assert(!!hit, `the refusal must carry the atelier-register finding: ${JSON.stringify(r.body.error?.details)}`);
+        assert((hit.message as string).includes('/v1/designbook?kind=genre') && (hit.message as string).includes('aimeat-register'),
+            `the message must say where the genres are and what line to add: ${hit.message}`);
+        assert(!await appRow(o.name, registerless, o.token), 'the refused app is in the catalogue');
+    });
+
+    await test('the shell\'s REPLACE-ME placeholder is refused the same way — the bare shell is a frame, not a page', async () => {
+        const f = `gatereplaceme${Date.now()}.html`;
+        const r = await publish(o.token, {
+            filename: f, mime_type: 'text/html',
+            content: b64(atelierApp(f, 'REPLACE-ME: fork a genre from the Design Book (GET /v1/designbook?kind=genre) or name your own register')),
+            name: 'Placeholder', description: 'The shell line was never replaced.', spec_token: atelierToken,
+        });
+        assert(r.status === 422, `expected 422, got ${r.status}: ${JSON.stringify(r.body?.data ?? r.body?.error)}`);
+        assert((r.body.error?.details?.findings ?? []).some((f: any) => f.pitfall === 'atelier-register'),
+            `expected the atelier-register finding: ${JSON.stringify(r.body.error?.details)}`);
+        assert(!await appRow(o.name, f, o.token), 'the refused app is in the catalogue');
+    });
+
+    await test('the served Atelier shell carries the placeholder, so published AS IS it is refused on purpose', async () => {
+        const t = await json('/v1/app-templates/shell-atelier');
+        assert(t.status === 200, `shell-atelier ${t.status}`);
+        const shell = t.body.data.template.content as string;
+        assert(/<meta name="aimeat-register" content="REPLACE-ME[^"]*"/.test(shell),
+            'the shell must carry the REPLACE-ME register line for the builder to replace');
+        const f = `gatebareshell${Date.now()}.html`;
+        const r = await publish(o.token, {
+            filename: f, mime_type: 'text/html', content: b64(shell),
+            name: 'Bare shell', description: 'The shell, untouched.', spec_token: atelierToken,
+        });
+        assert(r.status === 422, `the bare shell must not publish — got ${r.status}: ${JSON.stringify(r.body?.data ?? r.body?.error)}`);
+        assert((r.body.error?.details?.findings ?? []).some((f: any) => f.pitfall === 'atelier-register'),
+            `expected the atelier-register finding on the bare shell: ${JSON.stringify(r.body.error?.details)}`);
+    });
+
+    await test('the SAME app naming genre-nightfloor publishes, with no register finding', async () => {
+        const r = await publish(o.token, {
+            filename: registerless, mime_type: 'text/html', content: b64(atelierApp(registerless, 'genre-nightfloor')),
+            name: 'Night floor', description: 'Forked from a genre.', spec_token: atelierToken,
+        });
+        assert(r.status === 201, `an app with a register must publish — got ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        assert(!(r.body.data.app_hints ?? []).some((h: any) => h.pitfall === 'atelier-register'),
+            `a named register must leave no register finding: ${JSON.stringify(r.body.data.app_hints)}`);
+        assert(!!await appRow(o.name, registerless, o.token), 'the accepted app is not in the catalogue');
+    });
+
+    await test('a Classic app that names no register still publishes — the register is an Atelier commitment', async () => {
+        const f = `gateclassicnoreg${Date.now()}.html`;
+        const r = await publish(o.token, {
+            filename: f, mime_type: 'text/html', content: b64(app(f)),
+            name: 'Classic', description: 'Classic track, no register line.', spec_token: specToken,
+        });
+        assert(r.status === 201, `a Classic app must be untouched by the register gate — got ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        assert(!(r.body.data.app_hints ?? []).some((h: any) => h.pitfall === 'atelier-register'),
+            `no register finding on a Classic app: ${JSON.stringify(r.body.data.app_hints)}`);
     });
 
     const skippedName = `gateskip${Date.now()}.html`;
@@ -339,7 +429,7 @@ const publish = (token: string, body: Record<string, unknown>) =>
     });
 
     await test('the pitfall id in a refusal resolves to a real entry', async () => {
-        for (const id of ['inline-js-does-not-parse', 'invented-lib-urls', 'namespace-rule', 'app-meta-declarations']) {
+        for (const id of ['inline-js-does-not-parse', 'invented-lib-urls', 'namespace-rule', 'app-meta-declarations', 'atelier-register']) {
             const r = await json(`/v1/appdev/pitfalls/${id}`);
             assert(r.status === 200 && r.body.data?.pitfall?.id === id,
                 `GET /v1/appdev/pitfalls/${id} → ${r.status}; a finding pointing at nothing is worse than no pointer`);
