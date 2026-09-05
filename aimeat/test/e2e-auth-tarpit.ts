@@ -8,6 +8,11 @@
  *   numbers are four seconds a step to a thirty-second ceiling, which is the right cost for an
  *   attacker and the wrong length for a test.
  * @version-history
+ *   v1.1.0 — 2026-09-06 — Every assertion about a log line WAITS for it. The node answers before it
+ *     appends, so reading the file the instant a call returns is a race, and the refusal this suite
+ *     cares most about is the one that loses it: "refuses CHEAPLY" means the 429 comes back while
+ *     every slower refusal here was still being written. It passed on a developer's machine and
+ *     failed on CI, which is the shape that reads like somebody's regression and is not one.
  *   v1.0.0 — 2026-08-17 — Initial.
  */
 // Run: cd aimeat && pnpm exec node --import tsx test/e2e-auth-tarpit.ts
@@ -50,6 +55,29 @@ async function timed(path: string, opts: RequestInit = {}) {
 const logLines = () => existsSync(LOG)
     ? readFileSync(LOG, 'utf-8').trim().split('\n').filter(Boolean).map(l => JSON.parse(l))
     : [];
+
+/**
+ * The log lines, once the file has caught up with the call that wrote them.
+ *
+ * THE RESPONSE CAN BEAT ITS OWN LOG LINE. The node answers first and appends afterwards, so reading
+ * the file the instant a call returns is a race — and the refusal this suite cares most about is the
+ * one most likely to lose it, because "refuses CHEAPLY" means the 429 returns while every slower
+ * refusal in the suite was still being written. Passing here and failing on a loaded CI machine is
+ * exactly the shape that reads like a regression and is not one; it cost a session an evening of
+ * bisecting somebody else's tree on 2026-09-05.
+ *
+ * Waits for the predicate rather than sleeping a fixed amount: on an idle machine it returns on the
+ * first read, and it only spends the budget when the machine is actually busy.
+ */
+async function logUntil(ready: (rows: any[]) => boolean, ms = 3000): Promise<any[]> {
+    const until = Date.now() + ms;
+    for (;;) {
+        const rows = logLines();
+        if (ready(rows)) return rows;
+        if (Date.now() >= until) return rows;   // hand back what there is; the assertion says what is missing
+        await new Promise(r => setTimeout(r, 25));
+    }
+}
 
 function cleanupDb() {
     for (const f of [DB_PATH, DB_PATH + '-wal', DB_PATH + '-shm']) {
@@ -110,7 +138,7 @@ async function main() {
             const before = logLines().length;
             const r = await json('/v1/contacts');
             assert(r.status === 401, `expected 401, got ${r.status}`);
-            const rows = logLines();
+            const rows = await logUntil(ls => ls.length > before);
             assert(rows.length > before, 'a line was written');
             const row = rows[rows.length - 1];
             assert(row.status === 401 && row.code === 'AUTH_REQUIRED', `shape: ${JSON.stringify(row)}`);
@@ -123,9 +151,9 @@ async function main() {
             const token = 'eyJhbGciOiJFZERTQSJ9.NOTAREALTOKEN-butlongenough.sig';
             const r = await json('/v1/contacts', { headers: { Authorization: `Bearer ${token}` } });
             assert(r.status === 401, `expected 401, got ${r.status}`);
+            const row = (await logUntil(ls => ls.at(-1)?.credential === 'bearer-jwt')).pop();
             const raw = readFileSync(LOG, 'utf-8');
             assert(!raw.includes('NOTAREALTOKEN-butlongenough'), 'the token must not appear anywhere in the file');
-            const row = logLines().pop();
             assert(row.credential === 'bearer-jwt', `credential kind: ${row.credential}`);
             assert(typeof row.credential_digest === 'string' && row.credential_digest.length === 12,
                 `a 12-char digest identifies it without being it: ${row.credential_digest}`);
@@ -138,7 +166,7 @@ async function main() {
             // A PLAIN owner session reaching an operator-only door: authenticated, and not allowed.
             const r = await json('/v1/admin/stats', { headers: { Authorization: `Bearer ${owner}` } });
             assert(r.status === 403, `expected 403, got ${r.status}`);
-            const row = logLines().pop();
+            const row = (await logUntil(ls => ls.at(-1)?.status === 403)).pop();
             assert(row.status === 403, `status: ${row.status}`);
             assert(!!row.principal, `a 403 names who was refused: ${JSON.stringify(row)}`);
             assert(String(row.principal.owner) === USER, `principal: ${JSON.stringify(row.principal)}`);
@@ -177,19 +205,25 @@ async function main() {
             assert(r.ms < STEP_MS, `a refusal must be cheap for us, took ${r.ms}ms`);
             // The wall itself is in the log: a file that shows the guesses and not where they
             // stopped understates the campaign by the part worth seeing.
-            assert(logLines().some(l => l.code === 'ATTEMPTS_REFUSED'),
+            //
+            // Waited for, not read once: this refusal is the cheapest one in the suite, so its
+            // response is the one most likely to arrive before its own log line.
+            const rows = await logUntil(ls => ls.some(l => l.code === 'ATTEMPTS_REFUSED'));
+            assert(rows.some(l => l.code === 'ATTEMPTS_REFUSED'),
                 'hitting the wall is recorded too');
         });
 
         await test('7. The name that was TRIED is in the log, which is what makes a campaign readable', async () => {
-            const rows = logLines().filter(r => r.code === 'CREDENTIAL_REFUSED');
+            const rows = (await logUntil(ls => ls.filter(r => r.code === 'CREDENTIAL_REFUSED').length >= 3))
+                .filter(r => r.code === 'CREDENTIAL_REFUSED');
             assert(rows.length >= 3, `the wrong-password attempts are recorded: ${rows.length}`);
             assert(rows.some(r => String(r.reason).includes(USER)),
                 `the account being guessed at is named: ${JSON.stringify(rows.map(r => r.reason))}`);
         });
 
         await test('8. Every refusal above is in the log, and none of them carries a secret', async () => {
-            const logins = logLines().filter(r => r.path === '/v1/ghii/login');
+            const logins = (await logUntil(ls => ls.filter(r => r.path === '/v1/ghii/login').length >= 3))
+                .filter(r => r.path === '/v1/ghii/login');
             assert(logins.length >= 3, `the wrong-password attempts are recorded: ${logins.length}`);
             const raw = readFileSync(LOG, 'utf-8');
             for (const secret of [PASSWORD, 'wrong-1', 'wrong-2', 'wrong-3', 'wrong-4', 'wrong-5']) {
