@@ -132,6 +132,11 @@ export async function registerExtensionSchedules(
             cron: sched.cron as string,
             enabled: true,
             input: (sched.input as Record<string, unknown>) ?? undefined,
+            // The record carries an IANA zone and the scheduler hands it to croner, but this
+            // builder never read it, so a manifest schedule ran in UTC whatever it asked for and
+            // "every morning at seven" was seven in London. The workaround for the deletion bug
+            // was to move owner schedules INTO the manifest, which walked straight into this.
+            ...(typeof sched.timezone === 'string' && sched.timezone ? { timezone: sched.timezone } : {}),
             // Whose it is, and what the run-time owner fence compares. See the file header.
             ownerScope,
             createdBy: actor,
