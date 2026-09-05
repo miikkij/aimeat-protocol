@@ -143,8 +143,9 @@ def test_a_refusal_names_the_row_and_the_field_in_its_message():
 def test_the_version_the_package_reports_is_the_version_that_shipped():
     """0.20.0 shipped announcing itself as 0.19.0. Two places, kept in step by hand, and nothing
     checked them against each other."""
-    import tomllib
     import pathlib
+
+    import tomllib
 
     import aimeat_crewai
 

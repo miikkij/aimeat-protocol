@@ -29,9 +29,9 @@ __all__ = [
     "OfferValidationError",
     "build_offer",
     "build_offers_doc",
-    "validate_offers_doc",
     "publish_offers",
     "resolve_agent_token",
+    "validate_offers_doc",
 ]
 
 

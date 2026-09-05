@@ -24,8 +24,8 @@ import os
 from typing import Any
 
 from crewai import Agent, Crew, Task
-from aimeat_crewai import run_crew_daemon
 
+from aimeat_crewai import run_crew_daemon
 
 AGENT_NAME = os.environ.get("AIMEAT_AGENT_NAME", "demo-crew")
 

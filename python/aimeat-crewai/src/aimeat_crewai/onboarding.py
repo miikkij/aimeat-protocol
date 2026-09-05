@@ -23,7 +23,8 @@ from __future__ import annotations
 import json
 import re
 import time
-from typing import Any, Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
+from typing import Any
 
 # The frozen list of onboarding *confirm* tools. Every other step is completed by
 # calling its mapped real tool (aimeat_message_send, aimeat_task_propose_todos ...),

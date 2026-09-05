@@ -30,9 +30,10 @@ Without a context manager (manual lifecycle):
 """
 from __future__ import annotations
 
+from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterable, Iterator
+from typing import Any
 
 from .offers_tool import offers_tools
 from .paths import aimeat_home

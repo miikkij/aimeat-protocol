@@ -266,12 +266,13 @@ import signal
 import sys
 import threading
 import time
+from collections.abc import Callable, Iterable
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Iterable
+from typing import Any
 
-from .liaison import create_liaison_agent, AimeatLiaisonError
+from .liaison import AimeatLiaisonError, create_liaison_agent
 from .mcp_client import ensure_serve, serve_params
 from .paths import aimeat_home
 from .usage_telemetry import install_usage_telemetry, usage_run
@@ -296,7 +297,7 @@ class _Api:
     makes the 30s poll cycle effectively free.
     """
 
-    def __init__(self, base_url: str, identity: "AgentIdentity | str", session: Any = None) -> None:
+    def __init__(self, base_url: str, identity: AgentIdentity | str, session: Any = None) -> None:
         # ROUTING TAKES THE GAII, PATHS TAKE THE NAME. On a daemon holding two owners a bare name
         # is ambiguous and the connector refuses it by design, so the header must carry the full
         # identity; the node's `/v1/agents/{name}/...` routes are scoped by the caller the header

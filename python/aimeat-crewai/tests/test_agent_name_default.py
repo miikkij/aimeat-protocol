@@ -9,16 +9,14 @@ defaults agent_name to THIS agent, BEFORE validation (so the None-strip can't dr
 """
 from __future__ import annotations
 
-from typing import Optional
-
 from pydantic import BaseModel
 
 from aimeat_crewai.liaison import _install_agent_name_default
 
 
 class _RoutedArgs(BaseModel):
-    agent_name: Optional[str] = None
-    other: Optional[str] = None
+    agent_name: str | None = None
+    other: str | None = None
 
 
 class _UnroutedArgs(BaseModel):

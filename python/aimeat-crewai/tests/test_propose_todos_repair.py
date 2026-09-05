@@ -14,18 +14,15 @@ do not require a running node or LLM.
 """
 from __future__ import annotations
 
-from typing import Optional
-
 from pydantic import BaseModel
 
 from aimeat_crewai.liaison import (
+    _PROPOSE_TODOS_TOOL,
     _derive_todo_title,
     _install_propose_todos_repair,
     _repair_propose_todos_input,
     _strip_none_kwargs,
-    _PROPOSE_TODOS_TOOL,
 )
-
 
 # --- _derive_todo_title -----------------------------------------------------
 
@@ -107,7 +104,7 @@ def test_repair_missing_title_and_description_yields_present_empty_title() -> No
 
 class _TodoItem(BaseModel):
     title: str  # required, mirrors the node schema
-    description: Optional[str] = None
+    description: str | None = None
 
 
 class _ProposeTodosArgs(BaseModel):

@@ -39,17 +39,18 @@ Usage
 
 from __future__ import annotations
 
-from typing import Any, Iterable, Mapping
+from collections.abc import Iterable, Mapping
+from typing import Any
 
 __all__ = [
     "SPEC",
+    "HumanInvolvement",
     "Level",
     "Method",
-    "HumanInvolvement",
     "declare",
-    "source",
-    "read_provenance",
     "is_model_written",
+    "read_provenance",
+    "source",
 ]
 
 #: The spec string a reader branches on. An unknown spec reads as UNSTATED — never as an error, and

@@ -265,7 +265,7 @@ def test_serve_params_reuses_running_daemon(env: Env) -> None:
 
 
 def test_serve_params_unknown_agent_fails_fast(env: Env) -> None:
-    from aimeat_crewai import serve_params, AimeatServeError
+    from aimeat_crewai import AimeatServeError, serve_params
 
     with pytest.raises(AimeatServeError, match="not registered"):
         serve_params(agent_name="no-such-agent", **SERVE_OPTS)

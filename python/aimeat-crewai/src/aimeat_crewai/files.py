@@ -43,7 +43,8 @@ Changelog:
 from __future__ import annotations
 
 import base64
-from typing import Any, Iterable, Mapping
+from collections.abc import Iterable, Mapping
+from typing import Any
 
 try:
     import requests
@@ -81,7 +82,7 @@ def _quote_key(key: str) -> str:
 def _json(resp: Any) -> dict[str, Any]:
     try:
         body = resp.json()
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         raise AimeatFileError(f"node returned non-JSON (HTTP {resp.status_code})") from exc
     if not isinstance(body, dict):
         raise AimeatFileError(f"unexpected node response: {body!r}")

@@ -1,7 +1,7 @@
 """Tests for the interactive-message (federated AskUserQuestion) helpers."""
 import pytest
 
-from aimeat_crewai import build_question, ask, read_answers, answers_from_dm, AimeatMessagingError
+from aimeat_crewai import AimeatMessagingError, answers_from_dm, ask, build_question, read_answers
 
 
 class _Resp:

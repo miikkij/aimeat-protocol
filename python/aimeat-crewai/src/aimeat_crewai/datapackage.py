@@ -57,8 +57,9 @@ Changelog:
 """
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any
 
 try:
     import requests
@@ -166,7 +167,7 @@ class DataPackage:
 def _unwrap(resp: Any, what: str) -> dict[str, Any]:
     try:
         body = resp.json()
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         raise AimeatPackageError(f"{what}: node returned non-JSON (HTTP {resp.status_code})") from exc
     if not isinstance(body, dict):
         raise AimeatPackageError(f"{what}: unexpected response {body!r}")
@@ -200,7 +201,7 @@ def read_package(url: str, *, timeout: int = 60) -> DataPackage:
         raise AimeatPackageError(f"could not read the package at {url}: HTTP {resp.status_code}")
     try:
         body = resp.json()
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         raise AimeatPackageError(f"{url} did not answer with JSON") from exc
 
     # The node's envelope carries the descriptor AND the permanent address of these exact bytes;
@@ -357,7 +358,7 @@ def to_parquet(pkg: DataPackage, path: str, resource: str | None = None, *, time
     to_parquet that quietly produces something else hands the caller a file that will fail in
     whatever they open it with, one step further from the cause."""
     try:
-        import pyarrow  # noqa: F401
+        import pyarrow
         import pyarrow.parquet  # noqa: F401
     except ImportError as exc:
         raise ImportError(

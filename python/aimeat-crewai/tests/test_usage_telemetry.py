@@ -10,9 +10,9 @@ completion_tokens, optional provider, and run_id as the top-level task_id.
 from __future__ import annotations
 
 from aimeat_crewai.usage_telemetry import (
+    _make_handler,
     build_llm_call_payload,
     usage_run,
-    _make_handler,
 )
 
 
@@ -91,7 +91,7 @@ def test_model_normalization_collapses_routing_prefixes() -> None:
     assert build_llm_call_payload("bytedance-seed/seedream-4.5", {}, None)["data"]["model"] == "bytedance-seed/seedream-4.5"
 
 
-def _collect() -> tuple[list, "callable"]:
+def _collect() -> tuple[list, callable]:
     """A 2-arg (agent, payload) enqueue sink that records (agent, payload) tuples."""
     got: list[tuple] = []
 

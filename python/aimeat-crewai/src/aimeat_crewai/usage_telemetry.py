@@ -52,8 +52,9 @@ from __future__ import annotations
 import contextlib
 import queue
 import threading
+from collections.abc import Callable
 from contextvars import ContextVar
-from typing import Any, Callable
+from typing import Any
 
 # The AIMEAT task id (-> ledger run_id) for the crew kickoff running on this context.
 # Set by usage_run() around each crew.kickoff(); read by the LLM-call handler. Defaults
@@ -88,7 +89,7 @@ def _int(v: Any) -> int:
         n = int(v)
     except (TypeError, ValueError):
         return 0
-    return n if n >= 0 else 0
+    return max(n, 0)
 
 
 # Known LLM ROUTING prefixes (litellm-style). Stripped from the model id so ONE model = ONE

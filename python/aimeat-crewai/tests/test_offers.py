@@ -25,7 +25,6 @@ from aimeat_crewai import (
     validate_signal,
 )
 
-
 # ── signal builder ──────────────────────────────────────────────────────────
 
 def test_sig_builders_are_valid() -> None:
