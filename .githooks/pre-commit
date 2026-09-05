@@ -13,9 +13,11 @@
 # thirty-minute change into a day. So the hook keeps what is warm and fast — about twenty seconds —
 # and the rest moves to ONE command run once, when a piece of work is finished:
 #
-#     pnpm gate          the read-only gates, the five program-reading gates, the unit suite, and
-#                        the guard tier on SQLite
-#     pnpm gate:full     the same plus the guard tier on Postgres
+#     pnpm gate          the read-only gates and the five program-reading gates, then only what the
+#                        change reaches: the unit tests whose imports touch a changed file, an E2E
+#                        suite that itself changed, and the guard tier only when src/routes, auth,
+#                        services, storage, mcp or middleware changed (scripts/gate.ts prints why)
+#     pnpm gate:full     everything, both backends — a release, a storage change, rarely
 #
 # CI runs all of it on every push and blocks a merge on it, so nothing is skipped; it is moved to
 # where waiting for it costs nobody an afternoon. A session says "done" only after `pnpm gate` is
