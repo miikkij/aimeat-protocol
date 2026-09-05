@@ -20,7 +20,7 @@ import { Router } from 'express';
 import { createHash, randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
+import { requireAuth, requireExternalPrincipal, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { resolveIdentity } from '../utils/gaii.js';
@@ -396,9 +396,9 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
   });
 
   // POST /v1/catalogue — publish a service/action (owner/agent auth)
-  router.post('/v1/catalogue', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.post('/v1/catalogue', requireAuth(), requireExternalPrincipal(), requireScope('work:publish'), async (req, res) => {
     // The provider coordinate is stored, shown as provider_gaii and matched by the delete below, so
-    // it must be the resolved identity, not the raw `sub`. requireRole('agent') admits an owner
+    // it must be the resolved identity, not the raw `sub`. requireExternalPrincipal() admits an owner
     // session through the role hierarchy, and there `sub` is the bare name `alice`, which would
     // publish under a half-identity the delete could then miss (audit AI-triage 2026-08-23,
     // invariant 1). resolveIdentity keeps an agent AS the agent (attribution) and only lifts an
@@ -440,7 +440,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
   });
 
   // DELETE /v1/catalogue/:actionId — unpublish a service (owner/agent auth)
-  router.delete('/v1/catalogue/:actionId', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.delete('/v1/catalogue/:actionId', requireAuth(), requireExternalPrincipal(), requireScope('work:publish'), async (req, res) => {
     // Same resolution as the publish above, so an owner deletes the action they published under
     // their GHII rather than missing it behind a bare name.
     const gaii = resolveIdentity(req.auth!, config.nodeId);

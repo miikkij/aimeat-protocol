@@ -48,7 +48,7 @@ import { Router } from 'express';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, DisputeAuditEntry } from '../storage/interface.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireExternalPrincipal, requireAnyScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { returnEscrow, settlePayment } from '../services/morsel.js';
@@ -119,7 +119,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
 
     // POST /v1/work/:tc/dispute — Open dispute
-    router.post('/v1/work/:tc/dispute', requireAuth(), requireRole('agent'), validateBody(DisputeOpenSchema, config.nodeId), async (req, res) => {
+    router.post('/v1/work/:tc/dispute', requireAuth(), requireExternalPrincipal(), requireAnyScope('work:request', 'work:accept'), validateBody(DisputeOpenSchema, config.nodeId), async (req, res) => {
         const tc = param(req.params.tc);
         const work = await storage.getWork(tc);
         if (!work) {
@@ -177,7 +177,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
     });
 
     // GET /v1/work/:tc/dispute — View dispute thread
-    router.get('/v1/work/:tc/dispute', requireAuth(), requireRole('agent'), async (req, res) => {
+    router.get('/v1/work/:tc/dispute', requireAuth(), requireExternalPrincipal(), requireAnyScope('work:read', 'work:request', 'work:accept'), async (req, res) => {
         const tc = param(req.params.tc);
         const work = await storage.getWork(tc);
         if (!work) {
@@ -219,7 +219,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
     });
 
     // POST /v1/work/:tc/counter-dispute — Provider counter-disputes
-    router.post('/v1/work/:tc/counter-dispute', requireAuth(), requireRole('agent'), validateBody(CounterDisputeSchema, config.nodeId), async (req, res) => {
+    router.post('/v1/work/:tc/counter-dispute', requireAuth(), requireExternalPrincipal(), requireAnyScope('work:request', 'work:accept'), validateBody(CounterDisputeSchema, config.nodeId), async (req, res) => {
         const tc = param(req.params.tc);
         const work = await storage.getWork(tc);
         if (!work) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Work item not found: ${tc}`)); return; }
@@ -242,7 +242,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
     });
 
     // POST /v1/work/:tc/redeliver — Re-deliver after dispute
-    router.post('/v1/work/:tc/redeliver', requireAuth(), requireRole('agent'), async (req, res) => {
+    router.post('/v1/work/:tc/redeliver', requireAuth(), requireExternalPrincipal(), requireAnyScope('work:request', 'work:accept'), async (req, res) => {
         const tc = param(req.params.tc);
         const work = await storage.getWork(tc);
         if (!work) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Work item not found: ${tc}`)); return; }
@@ -264,7 +264,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
     });
 
     // POST /v1/work/:tc/accept-fault — Provider accepts fault
-    router.post('/v1/work/:tc/accept-fault', requireAuth(), requireRole('agent'), async (req, res) => {
+    router.post('/v1/work/:tc/accept-fault', requireAuth(), requireExternalPrincipal(), requireAnyScope('work:request', 'work:accept'), async (req, res) => {
         const tc = param(req.params.tc);
         const work = await storage.getWork(tc);
         if (!work) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Work item not found: ${tc}`)); return; }
@@ -285,7 +285,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
     });
 
     // POST /v1/work/:tc/offer-partial — Provider offers partial refund
-    router.post('/v1/work/:tc/offer-partial', requireAuth(), requireRole('agent'), validateBody(PartialOfferSchema, config.nodeId), async (req, res) => {
+    router.post('/v1/work/:tc/offer-partial', requireAuth(), requireExternalPrincipal(), requireAnyScope('work:request', 'work:accept'), validateBody(PartialOfferSchema, config.nodeId), async (req, res) => {
         const tc = param(req.params.tc);
         const work = await storage.getWork(tc);
         if (!work) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Work item not found: ${tc}`)); return; }
@@ -317,7 +317,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
     });
 
     // POST /v1/work/:tc/accept-redelivery — Requester accepts re-delivery
-    router.post('/v1/work/:tc/accept-redelivery', requireAuth(), requireRole('agent'), async (req, res) => {
+    router.post('/v1/work/:tc/accept-redelivery', requireAuth(), requireExternalPrincipal(), requireAnyScope('work:request', 'work:accept'), async (req, res) => {
         const tc = param(req.params.tc);
         const work = await storage.getWork(tc);
         if (!work) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Work item not found: ${tc}`)); return; }
@@ -338,7 +338,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
     });
 
     // POST /v1/work/:tc/accept-partial — Requester accepts partial offer
-    router.post('/v1/work/:tc/accept-partial', requireAuth(), requireRole('agent'), async (req, res) => {
+    router.post('/v1/work/:tc/accept-partial', requireAuth(), requireExternalPrincipal(), requireAnyScope('work:request', 'work:accept'), async (req, res) => {
         const tc = param(req.params.tc);
         const work = await storage.getWork(tc);
         if (!work) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Work item not found: ${tc}`)); return; }
@@ -385,7 +385,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
     });
 
     // POST /v1/work/:tc/reject-partial — Requester rejects partial offer
-    router.post('/v1/work/:tc/reject-partial', requireAuth(), requireRole('agent'), async (req, res) => {
+    router.post('/v1/work/:tc/reject-partial', requireAuth(), requireExternalPrincipal(), requireAnyScope('work:request', 'work:accept'), async (req, res) => {
         const tc = param(req.params.tc);
         const work = await storage.getWork(tc);
         if (!work) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Work item not found: ${tc}`)); return; }
@@ -403,7 +403,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
     });
 
     // POST /v1/work/:tc/withdraw-dispute — Requester withdraws dispute
-    router.post('/v1/work/:tc/withdraw-dispute', requireAuth(), requireRole('agent'), async (req, res) => {
+    router.post('/v1/work/:tc/withdraw-dispute', requireAuth(), requireExternalPrincipal(), requireAnyScope('work:request', 'work:accept'), async (req, res) => {
         const tc = param(req.params.tc);
         const work = await storage.getWork(tc);
         if (!work) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Work item not found: ${tc}`)); return; }
@@ -424,7 +424,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
     });
 
     // POST /v1/work/:tc/escalate — Escalate to operator
-    router.post('/v1/work/:tc/escalate', requireAuth(), requireRole('agent'), async (req, res) => {
+    router.post('/v1/work/:tc/escalate', requireAuth(), requireExternalPrincipal(), requireAnyScope('work:request', 'work:accept'), async (req, res) => {
         const tc = param(req.params.tc);
         const work = await storage.getWork(tc);
         if (!work) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Work item not found: ${tc}`)); return; }

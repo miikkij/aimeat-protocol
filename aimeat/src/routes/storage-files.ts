@@ -84,7 +84,7 @@ import type { AimeatConfig } from '../config.js';
 import { setStoredFileHeaders } from '../utils/file-download-headers.js';
 import { setAcceptRanges, serveStoredFile, needsBytesForType, type StoredFileReader } from '../utils/http-range.js';
 import type { Storage, StorageFileRecord } from '../storage/interface.js';
-import { requireAuth, requireRole, requireExternalPrincipal, requireScope, optionalAuth } from '../auth/middleware.js';
+import { requireAuth, requireExternalPrincipal, requireScope, optionalAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { authorizeRead } from '../services/access-guard.js';
@@ -376,7 +376,9 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
     });
 
     // PUT /v1/storage/upload/:id/:chunk — upload a single chunk
-    router.put('/v1/storage/upload/:id/:chunk', requireAuth(), requireRole('agent'), async (req, res) => {
+    // The one chunk door the widening missed: init and complete beside it already take any scoped
+    // principal, so an app could open an upload and finish it but never send the bytes.
+    router.put('/v1/storage/upload/:id/:chunk', requireAuth(), requireExternalPrincipal(), requireScope('storage:write'), async (req, res) => {
         const uploadId = req.params.id as string;
         const chunkIndex = parseInt(req.params.chunk as string, 10);
         if (isNaN(chunkIndex) || chunkIndex < 0) {

@@ -564,6 +564,49 @@ async function main() {
         assert(anon.status === 401, `no credential expected 401, got ${anon.status}`);
     });
 
+    // The rest of the sweep: the doors written before role 'app' existed. Each one is the same
+    // shape as the board reaction — a thing a PERSON does inside an app, refused because the
+    // grant is not an agent. The scope beside each is what fences it, and four of these doors
+    // carried no scope at all until now, so the widening had to add one.
+    await test('the doors an app was refused by role alone now answer to the scope instead', async () => {
+        const worker = (await grantAppToken('storage:write social:read')).access_token as string;
+        const quiet = (await grantAppToken('memory:read')).access_token as string;
+        const head = (tok: string) => ({ Authorization: `Bearer ${tok}` });
+
+        // Not "it worked" but "it is no longer refused for being an app": a 403 naming the role is
+        // the failure this closes. Anything else — 200, 404, 400 — means the door let us in and
+        // the handler judged the request on its merits.
+        async function admitted(path: string, method: string, tok: string, body?: any) {
+            const r = await json(path, { method, headers: head(tok), body: body ? JSON.stringify(body) : undefined });
+            assert(!(r.status === 403 && /Role "agent" required/.test(JSON.stringify(r.body.error ?? {}))),
+                `${method} ${path} still refuses an app grant: ${r.status} ${JSON.stringify(r.body.error ?? {})}`);
+            return r;
+        }
+        async function refused(path: string, method: string, tok: string, body?: any) {
+            const r = await json(path, { method, headers: head(tok), body: body ? JSON.stringify(body) : undefined });
+            assert(r.status === 403, `${method} ${path} without the scope expected 403, got ${r.status}`);
+            return r;
+        }
+
+        await admitted('/v1/boards/subscriptions', 'GET', worker);
+        await admitted('/v1/storage/upload/nope/0', 'PUT', worker);
+        await refused('/v1/boards/subscriptions', 'GET', quiet);
+        await refused('/v1/storage/upload/nope/0', 'PUT', quiet);
+
+        // Work, disputes, the catalogue and actions are past the role gate too, but no app can
+        // reach them yet for a different reason: `work:*` is not in APP_GRANTABLE_SCOPES, so an
+        // owner cannot grant it to an app however much they want to. The refusal these assert is
+        // therefore the SCOPE, never the role again — the two are different failures and only one
+        // of them is still open. Give the vocabulary a work word and these become admitted.
+        for (const [path, method] of [['/v1/work/inbox', 'GET'], ['/v1/work/sent', 'GET'],
+            ['/v1/work/overview', 'GET'], ['/v1/work/tc-does-not-exist/dispute', 'GET']] as const) {
+            const r = await json(path, { method, headers: head(worker) });
+            assert(r.status === 403, `${method} ${path} expected 403, got ${r.status}`);
+            assert(!/Role "agent" required/.test(JSON.stringify(r.body.error ?? {})),
+                `${method} ${path} must no longer refuse on the ROLE: ${JSON.stringify(r.body.error ?? {})}`);
+        }
+    });
+
     console.log('\n─────────────────────────────────────');
     console.log(`Results: ${passed} passed, ${failed} failed, ${passed + failed} total`);
     if (failed === 0) console.log('✅ All tests passed!');
