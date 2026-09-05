@@ -11,6 +11,8 @@
  * @structure ensureClusterStyles() — idempotent <style> injector.
  * @usage import { ensureClusterStyles } from './cluster.js';   (pill.js calls it once per render)
  * @version-history
+ *   v1.2.0 — 2026-09-05 — `.aimeat-seg--fixed` and the disabled segment: how a control that has
+ *     stood down looks, for the light/dark switch on a page that keeps its own palette.
  *   v1.1.1 — 2026-08-29 — The pressed segment reads --aimeat-ink / --aimeat-paper (defined on the pill's
  *     roots by ink.js), so its fallback follows the theme instead of assuming a light page.
  *   v1.1.0 — 2026-08-29 — The segments and the popover trigger wear the pill's new frame: a 2px
@@ -42,6 +44,13 @@ export function ensureClusterStyles() {
       'background:var(--aimeat-ink);color:var(--aimeat-paper)}',
     '.aimeat-seg button+button{border-left:0}',
     '.aimeat-seg .seg-ico{font-size:13px;line-height:1}',
+    /* A control that has stood down. The group keeps its frame so it still reads as an
+       instrument that exists, and the whole thing dims and takes the arrow cursor so nobody
+       aims at it twice — the reason is on the group's title, because a native tooltip on a
+       disabled button never appears. Used by a page that keeps its own palette (a genre body). */
+    '.aimeat-seg--fixed{opacity:.55;cursor:default}',
+    '.aimeat-seg button[disabled]{cursor:default;opacity:.6}',
+    '.aimeat-seg button[disabled]:hover{opacity:.6}',
 
     /* Popover trigger (palette picker; language picker when 4+ languages). */
     '.aimeat-pop-wrap{position:relative;display:inline-flex;flex:0 0 auto}',

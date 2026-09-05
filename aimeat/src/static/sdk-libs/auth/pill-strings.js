@@ -18,6 +18,8 @@
  * @usage import { pillStrings } from './pill-strings.js';
  *   const i = Object.assign({}, pillStrings(lang), opts.i18n);   // a caller's strings always win
  * @version-history
+ *   v1.1.0 — 2026-09-05 — `fixedRegister`: what the light/dark control says on a page that keeps
+ *     its own palette (a genre body), where the switch now stands down instead of doing nothing.
  *   v1.0.0 — 2026-08-13 — Initial. Born from a Spanish CADENCE showing an English "Logout".
  */
 
@@ -26,18 +28,21 @@ export var PILL_STRINGS = {
     loggedIn: 'logged in', logoutBtn: 'Logout', signInBtn: '❤️ Sign In', account: 'Account',
     federated: 'Federated', manageAccess: 'Manage permissions',
     lightMode: 'Light mode', darkMode: 'Dark mode', themeLabel: 'Theme',
+    fixedRegister: 'This register keeps its own light',
     chooseLook: 'Choose look', switchLanguage: 'Language',
   },
   fi: {
     loggedIn: 'kirjautuneena', logoutBtn: 'Kirjaudu ulos', signInBtn: '❤️ Kirjaudu', account: 'Tili',
     federated: 'Federoitu', manageAccess: 'Hallitse oikeuksia',
     lightMode: 'Vaalea tila', darkMode: 'Tumma tila', themeLabel: 'Teema',
+    fixedRegister: 'Tämä rekisteri pitää oman valonsa',
     chooseLook: 'Valitse tyyli', switchLanguage: 'Kieli',
   },
   es: {
     loggedIn: 'sesión iniciada', logoutBtn: 'Cerrar sesión', signInBtn: '❤️ Entrar', account: 'Cuenta',
     federated: 'Federado', manageAccess: 'Gestionar permisos',
     lightMode: 'Modo claro', darkMode: 'Modo oscuro', themeLabel: 'Tema',
+    fixedRegister: 'Este registro conserva su propia luz',
     chooseLook: 'Elige el aspecto', switchLanguage: 'Idioma',
   },
 };

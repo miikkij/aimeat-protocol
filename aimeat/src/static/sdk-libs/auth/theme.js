@@ -5,10 +5,15 @@
  *   writes the same 'aimeat-theme' localStorage key + <html data-theme> the SPA uses, and fires an
  *   'aimeat-theme-change' window event), plus escHtml, the compact-pill CSS injector, and the
  *   two-letter pill initials. Extracted from auth-lib-part2.ts.
- * @structure escHtml · aimeatReadTheme/aimeatApplyTheme · modeSwitchHtml/wireModeSwitch ·
- *   ensureAuthPillStyles · pillInitials.
+ * @structure escHtml · aimeatReadTheme/aimeatApplyTheme · aimeatFixedRegister ·
+ *   modeSwitchHtml/wireModeSwitch · ensureAuthPillStyles · pillInitials.
  * @usage import { escHtml, modeSwitchHtml, wireModeSwitch } from './theme.js';
  * @version-history
+ *   v1.4.0 — 2026-09-05 — A REGISTER THAT KEEPS ITS OWN LIGHT. A page declaring
+ *     `<meta name="aimeat-register" content="genre-…">` is a world with its own palette, and the
+ *     light/dark control on one of the twenty-two genre bodies had never done anything. It now
+ *     renders disabled and says why, in the pill's own three languages, and it binds nothing —
+ *     the stored preference and the operating system's setting are untouched.
  *   v1.3.1 — 2026-08-29 — The pill's ink and paper come from ink.js: the page's --text / --bg first, then
  *     a fallback that follows the theme. On a dark app page that named --text but not --bg the pill was
  *     a pale slab with pale words (KOTILO).
@@ -64,18 +69,54 @@ export function aimeatRestoreMode() {
 }
 
 /**
+ * A REGISTER THAT KEEPS ITS OWN LIGHT (2026-09-05, the developer's decision).
+ *
+ * The twenty-two genre bodies are theme-blind by design: a genre is a world with its own palette
+ * — a night radio studio is dark because it is night, a receipt is paper because it is paper —
+ * and pressing light/dark on one of them changed nothing at all. A control that does nothing is
+ * worse than no control, so the switch now SAYS so and stands down.
+ *
+ * The signal is the page's own `<meta name="aimeat-register" content="genre-…">`. It was chosen
+ * over an attribute the kit could stamp for three reasons: all twenty-two bodies already carry
+ * it (src/data/app-templates/genres.ts), it is in the document from first paint rather than from
+ * whenever the kit boots, and reading it costs no network call and no kit. `data-ak-look` was the
+ * other candidate and is the wrong one — a look is a costume any app may wear, while the register
+ * is the app declaring what it IS.
+ */
+var FIXED_REGISTER_PREFIX = 'genre-';
+
+export function aimeatFixedRegister() {
+  try {
+    var m = document.querySelector('meta[name="aimeat-register"]');
+    var v = m && m.getAttribute('content');
+    return v && v.indexOf(FIXED_REGISTER_PREFIX) === 0 ? v : null;
+  } catch { return null; }
+}
+
+/**
  * The MODE control: a segmented ☀ | ☾ where both options are visible and the active one is
  * marked — the same pattern as the language switch, so the cluster reads as one instrument.
  * Cluster classes come from cluster.js (ensureClusterStyles).
+ *
+ * On a fixed-register page both buttons are `disabled` and the group carries the reason as its
+ * title, because a native tooltip on a disabled button is not shown — the group is what a hover
+ * lands on. The buttons keep their `#aimeat-mode-switch button[data-mode]` shape so the Atelier
+ * shell's iris interceptor still recognises (and harmlessly ignores) them.
  */
 export function modeSwitchHtml(i) {
   var cur = aimeatReadTheme();
   var light = i.lightMode || 'Light mode';
   var dark = i.darkMode || 'Dark mode';
-  return '<span id="aimeat-mode-switch" class="aimeat-seg" role="group" aria-label="' + escHtml(i.themeLabel || 'Theme') + '">'
-    + '<button type="button" data-mode="light" aria-pressed="' + (cur === 'light') + '" title="' + escHtml(light) + '" aria-label="' + escHtml(light) + '">'
+  var fixed = aimeatFixedRegister();
+  var why = i.fixedRegister || 'This register keeps its own light';
+  var seg = fixed
+    ? ' class="aimeat-seg aimeat-seg--fixed" title="' + escHtml(why) + '" aria-label="' + escHtml(why) + '"'
+    : ' class="aimeat-seg" aria-label="' + escHtml(i.themeLabel || 'Theme') + '"';
+  var off = fixed ? ' disabled aria-disabled="true" title="' + escHtml(why) + '"' : '';
+  return '<span id="aimeat-mode-switch" role="group"' + seg + '>'
+    + '<button type="button" data-mode="light" aria-pressed="' + (cur === 'light') + '"' + (fixed ? off : ' title="' + escHtml(light) + '"') + ' aria-label="' + escHtml(fixed ? why : light) + '">'
     + '<span class="seg-ico" aria-hidden="true">☀</span></button>'
-    + '<button type="button" data-mode="dark" aria-pressed="' + (cur === 'dark') + '" title="' + escHtml(dark) + '" aria-label="' + escHtml(dark) + '">'
+    + '<button type="button" data-mode="dark" aria-pressed="' + (cur === 'dark') + '"' + (fixed ? off : ' title="' + escHtml(dark) + '"') + ' aria-label="' + escHtml(fixed ? why : dark) + '">'
     + '<span class="seg-ico" aria-hidden="true">☾</span></button>'
     + '</span>';
 }
@@ -83,6 +124,9 @@ export function modeSwitchHtml(i) {
 export function wireModeSwitch(container) {
   var root = container.querySelector('#aimeat-mode-switch');
   if (!root) return;
+  // A fixed register binds nothing: no click handler, no follower. The stored preference and the
+  // operating system's setting are left exactly as they were — standing down means standing down.
+  if (aimeatFixedRegister()) return;
   function sync(cur) {
     root.querySelectorAll('button[data-mode]').forEach(function (b) {
       b.setAttribute('aria-pressed', String(b.getAttribute('data-mode') === cur));

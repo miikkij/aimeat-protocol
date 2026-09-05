@@ -25,6 +25,14 @@
  *   const failures = runMatrix({ '--ak-accent': '#b3261e' }).filter((r) => !r.ok);
  *   runMatrix(undefined, { presets: ['riso'], effect: { id: 'duotone', params: { strength: 0.8 } } });
  * @version-history
+ *   v1.6.0 — 2026-09-05 — AK-SOLID: the accent as a FLAT FILL under its own ink, which nothing
+ *     had ever proven. AK-GRAD proves the brand gradient and every look darkens its stops toward
+ *     the ink, so the primary action read; the tab, the chip, the avatar, the compare handle and
+ *     the price badge paint `background: var(--ak-accent)` raw, and the 2026-09-05 measuring
+ *     review found white on the house coral at 3.58:1 across ten components. The new check fails
+ *     on the pre-fix contract in all nineteen looks on aimeat/light and nowhere else. The
+ *     evaluator's oklch grammar gains the second form the contract now uses,
+ *     `oklch(from <colour> min(l, N) c h)` — the lightness cap the light accent carries.
  *   v1.5.0 — 2026-09-05 — AK-FX: a post-process EFFECT is proven on the grounds the rest of the
  *     matrix resolves (wish-atelier-post-process-effects, stage 2). `opts.effect` names one of
  *     the registry's effects and its parameters (clamped as the kit clamps them): a colour effect
@@ -65,14 +73,16 @@ import { EFFECT_IDS, EFFECT_TOKEN_VARS, effectById, resolveParams } from '../dat
 // here so every importer keeps the address it had. The CSS filter transforms beside it are
 // what AK-FX runs.
 import {
-  lum, ratio, rotateHue, mixOklab, over, type Rgba, hueRotateSrgb, saturateSrgb, duotoneSrgb,
+  lum, ratio, rotateHue, capLightness, mixOklab, over, type Rgba,
+  hueRotateSrgb, saturateSrgb, duotoneSrgb,
 } from './atelier-color.js';
-export { lum, ratio, rotateHue, mixOklab, over, type Rgba };
+export { lum, ratio, rotateHue, capLightness, mixOklab, over, type Rgba };
 
 // ── The tiny CSS colour-expression evaluator ─────────────────────────────────────────────────
 // Grammar (and the contract confines itself to it): #hex · transparent · var(--name[, fallback])
 // · color-mix(in oklab, <expr> [N%], <expr>|transparent [N%]) · rgba(r,g,b,a) ·
-// oklch(from <expr> l c calc(h ± N)). Anything else is a refusal naming the token.
+// oklch(from <expr> l c calc(h ± N)) · oklch(from <expr> min(l, N) c h). Anything else is a
+// refusal naming the token.
 
 /** Split a comma-separated argument list at the TOP level (parens stay balanced). */
 function splitArgs(s: string): string[] {
@@ -139,17 +149,22 @@ export function evalColor(expr: string, vars: Vars, trail: string): Rgba {
       return { hex: `#${to(parts[0]!)}${to(parts[1]!)}${to(parts[2]!)}`, alpha: parts[3] ?? 1 };
     }
     if (name === 'oklch') {
-      // Relative colour syntax, the one form the contract uses: oklch(from <expr> l c calc(h ± N))
-      // — a HUE ROTATION that keeps lightness and chroma, which is what makes a derived spectrum
-      // arithmetically safe: every contrast ratio depends on L, and L does not move.
-      const m = /^from\s+(.+?)\s+l\s+c\s+(?:calc\(\s*h\s*([+-])\s*(\d+(?:\.\d+)?)(?:deg)?\s*\)|h)$/is.exec(body.trim());
-      if (!m) throw new Error(`${trail}: oklch() is supported only as "oklch(from <colour> l c calc(h ± N))"`);
+      // Relative colour syntax, the two forms the contract uses:
+      //   oklch(from <expr> l c calc(h ± N))       a HUE ROTATION that keeps lightness and
+      //     chroma, which is what makes a derived spectrum arithmetically safe: every contrast
+      //     ratio depends on L, and L does not move.
+      //   oklch(from <expr> min(l, N) c h)         a LIGHTNESS CAP that keeps chroma and hue —
+      //     the light contract's floor under white-on-accent. It moves L only downward and only
+      //     when the source is above N, so a palette that already reads is untouched.
+      const m = /^from\s+(.+?)\s+(?:l|min\(\s*l\s*,\s*(\d*\.?\d+)\s*\))\s+c\s+(?:calc\(\s*h\s*([+-])\s*(\d+(?:\.\d+)?)(?:deg)?\s*\)|h)$/is.exec(body.trim());
+      if (!m) throw new Error(`${trail}: oklch() is supported only as "oklch(from <colour> l c calc(h ± N))" or "oklch(from <colour> min(l, N) c h)"`);
       const base = evalColor(m[1]!, vars, trail);
-      const delta = m[2] ? (m[2] === '-' ? -1 : 1) * Number(m[3]) : 0;
-      return { hex: rotateHue(base.hex, delta), alpha: base.alpha };
+      const capped = m[2] !== undefined ? capLightness(base.hex, Number(m[2])) : base.hex;
+      const delta = m[3] ? (m[3] === '-' ? -1 : 1) * Number(m[4]) : 0;
+      return { hex: rotateHue(capped, delta), alpha: base.alpha };
     }
   }
-  throw new Error(`${trail}: cannot evaluate colour "${s.slice(0, 60)}" — the contract confines itself to hex, var(), color-mix(in oklab), oklch(from … calc(h ± N)) and gradients over those`);
+  throw new Error(`${trail}: cannot evaluate colour "${s.slice(0, 60)}" — the contract confines itself to hex, var(), color-mix(in oklab), oklch(from … calc(h ± N)), oklch(from … min(l, N) c h) and gradients over those`);
 }
 
 /** Pull the colour stops out of a linear/radial gradient value (positions and angles skipped).
@@ -509,6 +524,14 @@ export function runMatrix(
         add(combo, 'AK-EDGE hairline vs tinted card', ratio(line, strongestTint), MIN_EDGE_VS_CARD, 'the card outline must stay visible on the tint');
         add(combo, 'AK-EDGE hairline vs page', ratio(line, bg), MIN_EDGE_VS_PAGE, 'the card outline must stay visible against the page');
         add(combo, 'AK-EDGE tinted card steps off page', ratio(strongestTint, bg), MIN_STEP, 'a tinted card must still read as raised');
+
+        // AK-SOLID: the accent as a FLAT FILL under its own ink. AK-GRAD below has always proven
+        // the gradient, and every look darkens its gradient stops toward the ink, so the action
+        // that wears --ak-grad was safe — while the tab, the chip, the avatar, the price badge
+        // and the handle paint `background: var(--ak-accent)` raw and were proven by nothing.
+        // The 2026-09-05 measuring review read 3.58:1 there on the house palette, on ten
+        // separate components. Body size, no large-text discount: a tab label is 13px.
+        add(combo, 'AK-SOLID action ink on the flat accent', ratio(accentInk, colorOf('--ak-accent')), MIN_TEXT, 'text on a component filled with the raw accent (tab, chip, avatar, badge)');
 
         // AK-GRAD: the primary action's text on both stops (body-size text — no large-text discount).
         const gradStops = gradientStops(vars.get('--ak-grad')!, vars, `${combo} --ak-grad`);

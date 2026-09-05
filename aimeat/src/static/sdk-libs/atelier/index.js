@@ -44,12 +44,24 @@
  *   Atelier surface repaints zero times, and the finish gate measures that. `app({ motion: false })`
  *   turns the whole thing off for an app, `motion: false` on a block turns it off for that block,
  *   and the viewer's Less-motion switch or reduced-motion setting beats both.
+ *
+ *   A REGISTER KEEPS ITS OWN LIGHT. A page that declares a register — `<meta
+ *   name="aimeat-register" content="genre-…">`, which all twenty-two genre bodies do — is a world
+ *   with a palette of its own, not a surface the viewer recolours, so the login pill's light/dark
+ *   control renders disabled there and says why rather than doing nothing.
  * @structure imports the component modules (dom · i18n · shell · hero · state), composes the
  *   AIMEAT.atelier surface, attaches it via _core/namespace.
  * @usage
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.52.0 — 2026-09-05 — Two decisions from the measuring review. WHITE ON CORAL READS ON
+ *     PAPER: the light accent takes an OKLCh lightness cap, so the house coral deepens to
+ *     #cf3e35 and white on a tab, a chip, an avatar or a price badge goes 3.58:1 → 4.78:1; a
+ *     palette already dark enough is untouched, and AK-SOLID in the contrast matrix is the check
+ *     that had been missing (the gradient was proven, the flat fill never was). A REGISTER KEEPS
+ *     ITS OWN LIGHT: a genre page's light/dark control renders disabled and says so, in the
+ *     pill's three languages, instead of doing nothing (aimeat-auth theme.js v1.4.0).
  *   v0.51.0 — 2026-09-05 — NEARLY RIGHT, MADE RIGHT (wish-atelier-always-excellent, part 3). A
  *     component that is close is customised instead of copied, and every component is customised
  *     the same four ways: named parts (`data-ak-part` on every element the kit builds), slots
@@ -346,7 +358,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.51.0',
+  version: '0.52.0',
 
   /**
    * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
