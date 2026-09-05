@@ -1,0 +1,126 @@
+/* ── Admin Compliance page, in the poster face ──
+ * @file admin-compliance.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The operator's Compliance page (design canvas "AIMEAT Admin Compliance", direction
+ *   A): the toolbar with the period chips, the grouped gap rows, the limits as a two-column list,
+ *   the register table with its filters and the framed sheet an opened entry becomes, the question
+ *   rows with a segmented yes/no, the kept-report rows and the paste. The frame, the sections, the
+ *   metric rows, the numeral strip, the doors, the slab and the dashed box come from admin.css and
+ *   organism.css; only what this page adds lives here. Every value is a theme.css token, so the
+ *   page flips with the theme. The printout's rules stay in admin.css under @media print.
+ * @version-history
+ *   v1.0.0 — 2026-09-05 — Initial.
+ */
+
+/* The last row of a section carries no rule under it; the section's own rule is the next one. */
+.adm-cmp .adm-mrow--last { border-bottom: 0; }
+/* A strip cell's second line wraps rather than truncates: at 1280 the five cells are narrow. */
+.adm-cmp .og-strip small { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.4; }
+.adm-cmp-lead { margin: 0 0 14px; font-size: .95rem; line-height: 1.6; color: var(--text); max-width: 90ch; }
+.adm-cmp-mono { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
+.adm-cmp-code { display: inline-block; padding: 1px 6px; font-family: var(--font-mono); font-size: .75rem; background: var(--code-bg); color: var(--text); }
+.adm-cmp-empty { padding: 10px 0; border-bottom: 1px solid var(--border); font-size: .88rem; color: var(--text-dim); }
+.adm-cmp-empty--last { border-bottom: 0; }
+
+/* The toolbar: period chips on the left with the scope line, the three quiet doors on the right. */
+.adm-cmp-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 6px; }
+.adm-cmp-bar-left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.adm-cmp-scope { margin-left: 12px; font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
+.adm-cmp-fchip { font-family: var(--font-mono); font-size: .72rem; font-weight: 500; padding: 3px 9px; border: 2px solid var(--border); background: none; color: var(--text-dim); cursor: pointer; border-radius: 0; }
+.adm-cmp-fchip:hover { border-color: var(--text); color: var(--text); }
+.adm-cmp-fchip.on { border-color: var(--text); background: var(--sun); color: var(--on-sun); }
+
+/* A chip with a tone: the class of an entry, what an answer implies, and "clear" on a gap row.
+   Two classes deep, because organism.css paints .og-chip in ink and loads after this sheet. */
+.adm-cmp .og-chip.adm-cmp-chip--ok { border-color: var(--success-fg); color: var(--success-fg); }
+.adm-cmp .og-chip.adm-cmp-chip--warn { border-color: var(--warn-fg); color: var(--warn-fg); }
+.adm-cmp .og-chip.adm-cmp-chip--bad { border-color: var(--accent); color: var(--accent); }
+.adm-cmp .og-chip.adm-cmp-chip--dim { border-color: var(--border); color: var(--text-dim); }
+.adm-cmp-right { display: flex; align-items: center; justify-content: flex-end; gap: 14px; }
+/* A door that is busy (the draft being composed, a report being kept) waits rather than vanishes. */
+.adm-cmp .og-door:disabled { opacity: .5; cursor: default; }
+
+/* 02: the limits in the dashed coral box, each with its code on the left. */
+.adm-cmp .og-box { max-width: 1040px; }
+.adm-cmp-box-p { margin: 0 0 8px; font-size: .85rem; line-height: 1.5; color: var(--text-dim); }
+.adm-cmp-limit { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 0 16px; padding: 7px 0; border-bottom: 1px solid var(--border-subtle); font-size: .85rem; line-height: 1.5; color: var(--text); }
+.adm-cmp-limit--last { border-bottom: 0; }
+.adm-cmp-limit i { font-family: var(--font-mono); font-style: normal; font-size: .72rem; color: var(--accent); padding-top: 3px; overflow-wrap: anywhere; }
+.adm-cmp-limit .og-chip { margin-left: 6px; vertical-align: middle; white-space: nowrap; }
+
+/* 03: a value in a metric row may be a list of models, and a list wraps. */
+.adm-cmp .adm-mrow--two > .adm-mval { white-space: normal; }
+
+/* 04: the filters over the register table: class chips and an underline field. */
+.adm-cmp-filters { display: flex; align-items: center; gap: 8px; margin: 4px 0 10px; flex-wrap: wrap; }
+.adm-cmp-sep { width: 1px; height: 22px; background: var(--border); margin: 0 6px; }
+.adm input.adm-cmp-search { flex: 1 1 12rem; border: 0; border-bottom: 3px solid var(--text); border-radius: 0; background: none; padding: 0 0 3px; font: inherit; font-size: .88rem; font-weight: 600; color: var(--text); outline: none; box-shadow: none; }
+.adm input.adm-cmp-search::placeholder { color: var(--text-dim); font-weight: 600; }
+.adm input.adm-cmp-search:focus { border-bottom-color: var(--accent); box-shadow: none; }
+.adm-cmp-tbl td.adm-cmp-name { color: var(--text); }
+.adm-cmp-tbl td.adm-cmp-name b { font-weight: 700; }
+.adm-cmp-tbl td.adm-cmp-cell-mono { font-family: var(--font-mono); font-size: .75rem; white-space: nowrap; }
+.adm-cmp-tbl td.adm-cmp-cell-class { white-space: nowrap; }
+.adm-cmp-foot { display: flex; align-items: baseline; justify-content: space-between; gap: 20px; margin: 12px 0 18px; flex-wrap: wrap; }
+
+/* The opened entry is a framed sheet: 2px ink, the fields on underlines, the questions as rows. */
+.adm-cmp-sheet { border: 2px solid var(--text); background: var(--card-bg); padding: 18px 22px 16px; max-width: 1100px; margin-top: 6px; }
+.adm-cmp-sheet-h { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 14px; flex-wrap: wrap; }
+.adm-cmp-sheet-title { font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: 1.25rem; line-height: var(--font-poster-leading, 1); letter-spacing: var(--font-poster-tracking, .01em); text-transform: uppercase; color: var(--text); }
+.adm-cmp-sheet-title .og-chip { margin-left: 8px; vertical-align: middle; text-transform: lowercase; }
+.adm-cmp-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 32px; margin-bottom: 14px; }
+.adm-cmp-field--wide { grid-column: 1 / -1; }
+/* The admin shell styles every input as a rounded, filled box; on this page a field is the poster
+   underline and a many-line field is the 2px box, so the shell's rule is out-weighed here. */
+.adm .adm-cmp input.og-input { border: 0; border-bottom: 3px solid var(--text); border-radius: 0; background: transparent; padding: .45rem 0; box-shadow: none; font-family: var(--font-showroom-body); font-size: 1rem; font-weight: 600; color: var(--text); }
+.adm .adm-cmp input.og-input:focus { border-bottom-color: var(--accent); box-shadow: none; outline: none; }
+.adm .adm-cmp input.og-input--mono { font-family: var(--font-mono); font-size: .88rem; }
+.adm .adm-cmp textarea.adm-cmp-fbox { width: 100%; box-sizing: border-box; border: 2px solid var(--text); border-radius: 0; background: var(--card-bg); padding: 9px 12px; font-family: var(--font-showroom-body); font-size: .9rem; line-height: 1.5; color: var(--text); resize: vertical; outline: none; box-shadow: none; }
+.adm .adm-cmp textarea.adm-cmp-fbox:focus { border-color: var(--accent); box-shadow: none; }
+.adm-cmp-why-line { margin: 0 0 14px; font-size: .85rem; line-height: 1.5; color: var(--text-dim); }
+.adm-cmp-qlbl { font-size: .66rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin: 6px 0 6px; }
+.adm-cmp-qrow { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 0 18px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--border-subtle); font-size: .88rem; line-height: 1.45; color: var(--text); }
+.adm-cmp-qrow--last { border-bottom: 0; }
+.adm-cmp-q-waits { color: var(--accent); font-weight: 700; }
+.adm-cmp-src { font-family: var(--font-mono); font-size: .68rem; color: var(--text-dim); white-space: nowrap; min-width: 96px; text-align: right; }
+.adm-cmp-src--waits { color: var(--accent); }
+.adm-cmp .og-choice-btn { padding: .3rem .7rem; }
+.adm select.adm-cmp-qsel { border: 0; border-bottom: 2px solid var(--text); border-radius: 0; background: none; padding: 4px 0; font: inherit; font-size: .8rem; font-weight: 700; color: var(--text); max-width: 18rem; outline: none; box-shadow: none; }
+.adm select.adm-cmp-qsel:focus { border-bottom-color: var(--accent); box-shadow: none; }
+.adm-cmp-save { display: flex; align-items: center; gap: 22px; margin-top: 18px; flex-wrap: wrap; }
+
+/* 06 and 07: a kept report's stamp in mono, the opened one's facts under it, and the paste. */
+.adm-cmp-stamp { font-family: var(--font-mono); font-weight: 500; font-size: .85rem; }
+.adm-cmp-stamp + .og-chip { margin-left: 8px; vertical-align: middle; }
+.adm-cmp-open { padding: 6px 0 10px; font-size: .85rem; line-height: 1.5; color: var(--text); }
+.adm-cmp-open .adm-cmp-mono { display: block; margin-bottom: 6px; }
+.adm-cmp-paste { white-space: pre-wrap; font-size: .85rem; line-height: 1.55; color: var(--text); overflow-wrap: anywhere; }
+
+@media (max-width: 1100px) {
+  /* The strip's cells are buttons here, and organism.css folds only its div cells to two a row. */
+  .adm-cmp .og-strip { flex-wrap: wrap; }
+  .adm-cmp .og-strip > button { flex: 1 1 50%; border-right: 0; border-bottom: 1px solid var(--border); }
+  .adm-cmp .adm-ov-grid { grid-template-columns: 1fr; gap: 14px 0; }
+  .adm-cmp-fields { grid-template-columns: 1fr; }
+}
+
+/* A phone: the limit's code sits above its sentence, a register row is a stack, a question puts its
+   choice and its source under the text, and the sheet keeps its frame with less padding. */
+@media (max-width: 768px) {
+  .adm-cmp-limit { grid-template-columns: 1fr; gap: 2px 0; }
+  .adm-cmp .adm-mrow--two > .adm-mval { grid-column: 1 / -1; text-align: left; }
+  .adm-cmp .adm-mrow--two > .adm-cmp-right { grid-column: 1 / -1; justify-content: flex-start; margin-top: 4px; }
+  .adm-cmp-tbl thead { display: none; }
+  .adm-cmp-tbl tr { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 9px 0; border-bottom: 1px solid var(--border-subtle); }
+  .adm-cmp-tbl td { display: inline; padding: 0; border: 0; min-width: 0; }
+  .adm-cmp-tbl td.adm-cmp-name { flex-basis: 100%; }
+  .adm-cmp-tbl td.adm-cmp-cell-mono { white-space: normal; }
+  .adm-cmp-tbl tr:hover td { background: none; }
+  .adm-cmp-sheet { padding: 12px 14px; }
+  .adm-cmp-qrow { grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; }
+  .adm-cmp-qrow > :first-child { grid-column: 1 / -1; }
+  /* The segmented choice keeps its own width under the text; a grid item would stretch it. */
+  .adm-cmp-qrow > .og-choice, .adm-cmp-qrow > .adm-cmp-qsel { justify-self: start; }
+  .adm-cmp-src { min-width: 0; text-align: left; }
+}
