@@ -9,6 +9,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=designbook
  * @version-history
+ *   v1.2.1 — 2026-09-05 — The APP fixture names a register (genre-nightfloor): an Atelier app
+ *     without one is refused at publish now, and this suite is about the Book, not the gate.
  *   v1.2.0 — 2026-09-05 — The AMBIENT kind (wish-atelier-ambient-visuals): the worded refusals
  *     (an unknown preset with the six named, a number outside the bounds, "none", a field too
  *     loud for a palette-page look), a proven combination landing with its benches named, the
@@ -71,6 +73,7 @@ const APP = (filename: string) => [
     '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
     `<meta name="aimeat-app" content="${filename}">`,
     '<meta name="aimeat-track" content="atelier">',
+    '<meta name="aimeat-register" content="genre-nightfloor">',
     '<link rel="stylesheet" href="/lib/aimeat-atelier.css">',
     '</head><body><script src="/v1/libs/aimeat-atelier.js"></' + 'script></body></html>',
 ].join('\n');

@@ -19,6 +19,8 @@
  * @structure SHELL_PHASER_GAME
  * @usage  import { SHELL_PHASER_GAME } from './app-templates/game-shell.js';
  * @version-history
+ *   v1.1.0 — 2026-09-05 — The register meta `custom:game`: a game's screen is the canvas, so the
+ *     shell commits to its own register rather than a Design Book genre, and passes the gate.
  *   v1.0.0 — 2026-09-02 — Initial: the shell-phaser-game template (Atelier shell + aimeat-phaser).
  */
 
@@ -40,6 +42,7 @@ entry: index.html
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
   <meta name="aimeat-app" content="{{app}}.html" />
   <meta name="aimeat-track" content="atelier" />
+  <meta name="aimeat-register" content="custom:game" />
   <meta name="aimeat-scopes" content="memory:read memory:write" />
   <meta name="aimeat-locales" content="en" />
   <title>{{Game Title}}</title>

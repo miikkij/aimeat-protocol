@@ -7,6 +7,8 @@
  *   never refused has never been tested.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-ui
  * @version-history
+ *   v1.1.1 — 2026-09-05 — The APP fixture names a register (genre-nightfloor): an Atelier app
+ *     without one is refused at publish now, and this suite is about arrangements, not the gate.
  *   v1.1.0 — 2026-09-05 — The layout's `ambient` field (a preset with its numbers, none, an
  *     invented one, a number outside the bounds, a field too loud for the palette page) and the
  *     catalogue's ambient shelf with the look sheets' idle layer (wish-atelier-ambient-visuals).
@@ -58,6 +60,7 @@ const APP = (filename: string) => [
     '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
     `<meta name="aimeat-app" content="${filename}">`,
     '<meta name="aimeat-track" content="atelier">',
+    '<meta name="aimeat-register" content="genre-nightfloor">',
     '<link rel="stylesheet" href="/lib/aimeat-atelier.css">',
     '</head><body><script src="/v1/libs/aimeat-atelier.js"></' + 'script></body></html>',
 ].join('\n');

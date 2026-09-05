@@ -2,7 +2,7 @@
  * @file src/services/app-artifact-lint.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description What the node checks about an app's BYTES at publish, and the two findings it
+ * @description What the node checks about an app's BYTES at publish, and the three findings it
  *   refuses to publish over.
  *
  *   THE PUBLISH THIS WAS WRITTEN AGAINST (aimeat.io, 2026-08-11). An app went live loading
@@ -10,11 +10,20 @@
  *   threw before drawing anything. Nothing in the publish path looked at the file. The response
  *   said "published", the catalogue card appeared, and the failure was discovered by opening it.
  *
- *   BLOCKING IS FOR "THIS CANNOT WORK", NEVER FOR "THIS COULD BE BETTER". Two findings block: an
- *   inline `<script>` that does not parse, and an asset URL this node answers 404 for. Both are
- *   claims about the bytes that can be PROVEN here, and both mean the app is broken for every
- *   visitor the moment it goes live. Everything else warns, for the same reason the AI-disclosure
- *   check warns (decision D2): a publish that fails is a publish that gets worked around.
+ *   BLOCKING IS FOR "THIS CANNOT WORK", NEVER FOR "THIS COULD BE BETTER". Two findings block on
+ *   that ground: an inline `<script>` that does not parse, and an asset URL this node answers 404
+ *   for. Both are claims about the bytes that can be PROVEN here, and both mean the app is broken
+ *   for every visitor the moment it goes live. Everything else warns, for the same reason the
+ *   AI-disclosure check warns (decision D2): a publish that fails is a publish that gets worked
+ *   around.
+ *
+ *   THE ONE EXCEPTION IS THE REGISTER (v1.3.0), and it blocks on a different ground: a decision
+ *   rather than a proof. Every Atelier app built from the bare shell came out as stacked sections
+ *   in the default look, and the owner ruled that it must never happen again. So an Atelier app
+ *   names the register it committed to — `<meta name="aimeat-register">` carrying a genre id, a
+ *   Design Book part id or `custom:<name>` — and one that does not, or still carries the shell's
+ *   REPLACE-ME placeholder, is refused. The shell carries the placeholder ON PURPOSE: the frame
+ *   fails the gate, a fork of a genre passes it by construction.
  *
  *   THE PROBE FAILS OPEN ON INFRASTRUCTURE AND CLOSED ON EVIDENCE. Only a completed HTTP exchange
  *   answering 404/410 blocks. A timeout, a refused connection, a 5xx or a disabled probe produces
@@ -25,13 +34,18 @@
  * @structure
  *   - AppArtifactFinding / AppArtifactLintResult — the shapes a publish response carries
  *   - lintAppArtifact(html, config) — the whole check: blocking[] + warnings[]
- *   - checkInlineScripts / collectAssetRefs / probeNodeAssets / checkTheme / checkMetas /
- *     checkAgentDataReads — one concern each
+ *   - checkInlineScripts / collectAssetRefs / probeNodeAssets / checkRegister / checkTheme /
+ *     checkMetas / checkAgentDataReads — one concern each
  * @usage
  *   import { lintAppArtifact } from './app-artifact-lint.js';
  *   const { blocking, warnings } = await lintAppArtifact(html, config);
  *   if (blocking.length) return refusal;
  * @version-history
+ *   v1.3.0 — 2026-09-05 — checkRegister, the third blocking finding (atelier-register): an
+ *     Atelier app with no `aimeat-register` meta, with the shell's REPLACE-ME placeholder, or
+ *     with a custom register that is not a name. Read on the declared track, and on the kit
+ *     loaded with no track declared, so dropping the track line is not a way past. declaredTrack
+ *     is extracted from checkTrackMixing so both read the head the same way.
  *   v1.2.1 — 2026-08-28 — atelier.app() counts as mounting the login pill. The Atelier shell mounts
  *     it internally (sdk-libs/atelier/shell.js), so the pill and the language switch exist without
  *     either verb appearing in the app's bytes — and the first AEB bench run (phase 3) flagged all
@@ -97,6 +111,7 @@ export async function lintAppArtifact(html: string, config: AimeatConfig): Promi
   const refs = collectAssetRefs(html, config);
   warnings.push(...refs.warnings);
   blocking.push(...await probeNodeAssets(refs.nodePaths, config));
+  blocking.push(...checkRegister(html));
 
   warnings.push(...checkTheme(html));
   warnings.push(...checkMetas(html));
@@ -124,9 +139,8 @@ function checkTrackMixing(html: string): AppArtifactFinding[] {
   const out: AppArtifactFinding[] = [];
   const head = html.slice(0, SCAN_BYTES);
 
-  const track = /<meta\b[^>]*name\s*=\s*["']aimeat-track["'][^>]*content\s*=\s*["'](classic|atelier)["']/i
-    .exec(head)?.[1]?.toLowerCase();
-  const loadsAtelier = /aimeat-atelier\.(js|css)/i.test(html);
+  const track = declaredTrack(head);
+  const loadsAtelier = loadsAtelierKit(html);
 
   if (track === 'classic' && loadsAtelier) {
     out.push(finding('track-mixing', 'warn',
@@ -230,6 +244,70 @@ function checkDeclaredButUnused(html: string): AppArtifactFinding[] {
   }
 
   return out;
+}
+
+/** The build track the head declares, or undefined when it declares none. */
+function declaredTrack(head: string): 'classic' | 'atelier' | undefined {
+  const value = /<meta\b[^>]*name\s*=\s*["']aimeat-track["'][^>]*content\s*=\s*["'](classic|atelier)["']/i
+    .exec(head)?.[1]?.toLowerCase();
+  return value === 'classic' || value === 'atelier' ? value : undefined;
+}
+
+/** Whether the page loads the Atelier kit (its script or its stylesheet) anywhere. */
+function loadsAtelierKit(html: string): boolean {
+  return /aimeat-atelier\.(js|css)/i.test(html);
+}
+
+// ── Blocking check 3: does an Atelier app name the look it committed to? ────────────────────────
+
+/**
+ * The shell's placeholder, matched on its prefix so a builder who edits the sentence and leaves the
+ * marker is still told. The exact line lives in shells.ts (SHELL_ATELIER).
+ */
+const REGISTER_PLACEHOLDER = /^REPLACE-ME\b/i;
+
+/**
+ * An Atelier app names its register or it does not publish.
+ *
+ * THE DECISION BEHIND THIS BLOCK. Every Atelier app an agent built from the bare shell came out as
+ * stacked sections in the default look, and the owner ruled it must never happen again. The Design
+ * Book's genres exist so a page starts from a committed register (docs/pitfalls.md §34); this is
+ * the gate that makes starting there the only road. It is the one blocking finding that is a
+ * decision rather than a proof about the bytes — see the file header.
+ *
+ * WHAT COUNTS AS A REGISTER. A genre template id (`genre-nightfloor`, every genre body carries its
+ * own), a Design Book part id, or `custom:<name>` for a page that commits to a look of its own. The
+ * value is not validated against the registries: the meta is a declaration of what the page IS,
+ * and a wrong id is a lie the next edit session catches, while a missing one is the shell. What is
+ * refused is the absence, the shell's REPLACE-ME placeholder, and a custom register with no name in
+ * it (`custom:`, `custom:default`) — "default" is the look this exists to prevent.
+ *
+ * WHICH APPS ARE ASKED. The declared Atelier track, and the Atelier kit loaded with no track
+ * declared at all: deleting the track line must not be the way past, and an app that loads the kit
+ * is an Atelier app whatever its head says. Classic apps never hear about this.
+ */
+function checkRegister(html: string): AppArtifactFinding[] {
+  const head = html.slice(0, SCAN_BYTES);
+  const track = declaredTrack(head);
+  const atelier = track === 'atelier' || (track === undefined && loadsAtelierKit(html));
+  if (!atelier) return [];
+
+  const declared = /<meta\b[^>]*name\s*=\s*["']aimeat-register["'][^>]*content\s*=\s*["']([^"']*)["']/i
+    .exec(head)?.[1]?.trim() ?? '';
+  const placeholder = REGISTER_PLACEHOLDER.test(declared);
+  const unnamedCustom = /^custom:\s*(default)?$/i.test(declared);
+  if (declared && !placeholder && !unnamedCustom) return [];
+
+  const what = placeholder
+    ? 'This Atelier app still carries the shell\'s REPLACE-ME register line, so it names no register. '
+    : declared
+      ? `This Atelier app names "${declared}" as its register, which is not a name. `
+      : 'This Atelier app names no register. ';
+  return [finding('atelier-register', 'critical',
+    what
+    + 'Every app here starts from a committed look: fork a genre from the Design Book '
+    + '(GET /v1/designbook?kind=genre, then GET /v1/app-templates/genre-<id>) or name your own with '
+    + '<meta name="aimeat-register" content="custom:<name>">. The bare shell is a frame, not a page.')];
 }
 
 // ── Blocking check 1: does the app's own JavaScript compile? ────────────────────────────────────

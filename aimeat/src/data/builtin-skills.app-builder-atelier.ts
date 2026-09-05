@@ -13,6 +13,9 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.3.0 — 2026-09-05 — The build starts from a genre, never from the bare shell: the genre
+ *     list address joins the fetch table, the register meta is named, and step 3 says the
+ *     publish refuses an Atelier app that names no register.
  *   v1.2.0 — 2026-09-05 — The look brings its own ambient (the one layer allowed to move at
  *     idle), and a background animation of one's own joins the never-list
  *     (wish-atelier-ambient-visuals).
@@ -45,7 +48,9 @@ motion — lives in the kit and reaches your app from the node.
 
 \`\`\`
 GET /v1/prompts/build-app-atelier   ← the Atelier spec (re-fetch every time, it changes)
-GET /v1/app-templates/shell-atelier ← the shell (start from it, never invent structure)
+GET /v1/designbook?kind=genre       ← the genres: complete pages in a committed register. A build STARTS here
+GET /v1/app-templates/genre-<id>    ← the genre to fork (swap the words, sources and images; keep the physics)
+GET /v1/app-templates/shell-atelier ← the frame the genres are built on (read it for the structure; never publish it bare)
 GET /v1/app-templates/shell-phaser-game ← a GAME starts here instead: canvas, menus, settings, leaderboard wired
 GET /v1/appdev/pitfalls             ← what bites app builders
 \`\`\`
@@ -56,6 +61,12 @@ guides produces an app that belongs to neither. The shell's
 \`<meta name="aimeat-track" content="atelier">\` records which guide built the file, and the
 publish path stores it, so a later session loads the right one.
 
+**Every Atelier app names its register.** \`<meta name="aimeat-register" content="genre-<id>">\`
+is in every genre's head already, so a fork carries it; a page that commits to a look of its own
+declares \`content="custom:<name>"\` (custom:game, custom:ledger; never "default"). The bare shell
+carries a REPLACE-ME line in that place and the publish refuses it: the shell is a frame, not a
+page, and an Atelier app that names no register does not go live.
+
 **Carry the spec token.** The spec response includes \`spec_token\` (an \`atelier-\` prefixed
 digest). Pass it on \`aimeat_app_publish\`; the publish answers \`spec_check\` so a spec that
 moved under you says so.
@@ -65,8 +76,12 @@ moved under you says so.
 1. **Interview** — what the app does, who uses it, how it should FEEL (this picks the look
    preset), which languages, what it must not do.
 2. **Research first** — \`aimeat_appdev_overview\`, existing apps and skills, the pitfalls.
-3. **Build** — start from the shell; compose screens from the catalogue in the spec (hero, list,
-   listDetail, cardGrid, form, table, statRow, searchBar, timeline, tabs); the \`section\`
+3. **Build** — start from a GENRE, never from the bare shell: pick the register the page belongs
+   in from \`GET /v1/designbook?kind=genre\`, fork it from \`GET /v1/app-templates/genre-<id>\`,
+   and keep its \`<meta name="aimeat-register">\` line (or name your own register with
+   \`custom:<name>\`); the publish refuses an Atelier app that names none. Then compose screens
+   from the catalogue in the spec (hero, list, listDetail, cardGrid, form, table, statRow,
+   searchBar, timeline, tabs) where the page needs them; the \`section\`
    component is the ONLY place your own raw markup goes. One look via \`app({ look })\` —
    vivid unless the owner asked for something else; flat only on request. The look brings its
    own ambient, the one layer allowed to move at idle: leave it unless the owner asked for
