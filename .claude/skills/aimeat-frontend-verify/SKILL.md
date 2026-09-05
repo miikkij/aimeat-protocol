@@ -41,7 +41,7 @@ For an app on the Atelier track the numbers above are the floor, not the verdict
 
 That question is the acceptance criterion, and it exists because the metrics answered yes on pages the developer then rejected: three Design Book showcase pages passed element counts, overflow zero and a green contrast matrix while reading as "the same dashboard in new paint" (`docs/pitfalls.md` §34). A screenshot beside the genre is what catches a costume.
 
-Under the picture, seven measured checks, all reported as numbers:
+Under the picture, eight measured checks, all reported as numbers:
 
 | Check | Passes at |
 |---|---|
@@ -52,6 +52,7 @@ Under the picture, seven measured checks, all reported as numbers:
 | Contrast | 4.5 for body text, 3.0 for ≥24 px or ≥19 px bold |
 | Reduced motion | zero animations whose computed duration is over 1 ms (`docs/pitfalls.md` §47) |
 | Console | zero JavaScript errors |
+| The pill's switches | pressed, not looked at: the language switch moves `<html lang>` **and** at least one text the page itself renders (skip when `<meta name="aimeat-locales">` declares fewer than two); the mode buttons take `data-theme` away from its current value and back, unless the page declares `<meta name="aimeat-light" content="fixed">`, where both are `disabled` and say why |
 
 And one measurement only phone width reveals: a kit component that declares `container-type` cannot restyle itself from its own container query, so a fold can succeed and leave the detail pane at 40 % of its panel with no error and a correct page width. When the change touches `listDetail` or another container-query component, measure the panel's width against its container's at 390 (`docs/pitfalls.md` §46).
 
