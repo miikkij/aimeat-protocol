@@ -1,0 +1,263 @@
+/*
+ * @file aimeat-living.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Stylesheet for the aimeat-living SDK library (/v1/libs/aimeat-living.js) — the
+ *   four things a living document draws that the Atelier kit has no component for: the CONTROL
+ *   ROW a person moves, the FORMULA set as mathematics with its answer under it, the SENTENCE
+ *   that changes with the state, and the CHAIN frame the dependency graph is drawn in.
+ *
+ *   IT INTRODUCES NO COLOURS AND NO SIZES OF ITS OWN. Every value here reads an --ak-* token
+ *   from /lib/aimeat-atelier.css, which is the theming contract, so a living document wears
+ *   whatever look the page it is on is wearing — vivid, flat, or a genre's own world — without a
+ *   line of this file changing. What it adds is a short list of --ak-living-* properties, each
+ *   defaulting to the token it descends from, so an app can set ONE variable on its own box and
+ *   move exactly that part.
+ *
+ *   THE FLASH IS THE ONE THING THAT MOVES. A node that just changed lights for a moment in the
+ *   chain, so a slider pushed at the top of the page is SEEN arriving at the sentence at the
+ *   bottom. It is finite by construction, and the still block below carries every selector the
+ *   scripts honour — the media query, the kit's own Less-motion switch and the per-surface
+ *   opt-out — because a switch that reaches the scripts and not the stylesheet is a switch that
+ *   does nothing (docs/pitfalls.md §47).
+ * @structure tokens · control row · formula · sentence · machine state · chain · refusals · still
+ * @version-history
+ *   v0.1.0 — 2026-09-05 — Initial (the living document, stage 1).
+ */
+
+.ak-living__control,
+.ak-living__formula,
+.ak-living__note,
+.ak-living__machine,
+.ak-living__value,
+.ak-living__chain,
+.ak-living__refusals {
+  /* Each falls back to the kit token it descends from: set one of these on your own box. */
+  --ak-living-gap: var(--ak-gap, 0.75rem);
+  --ak-living-pad: var(--ak-pad, 1rem);
+  --ak-living-radius: var(--ak-radius-sm, 0.5rem);
+  --ak-living-line: var(--ak-line, currentColor);
+  --ak-living-ink: var(--ak-ink, currentColor);
+  --ak-living-ink-dim: var(--ak-ink-dim, currentColor);
+  --ak-living-accent: var(--ak-accent, currentColor);
+  --ak-living-figure-size: var(--ak-text-title, 1.5rem);
+  --ak-living-label-size: var(--ak-text-fine, 0.8125rem);
+  --ak-living-mono: var(--ak-font-mono, ui-monospace, monospace);
+  --ak-living-flash-ms: 900ms;
+}
+
+/* ── The control row ───────────────────────────────────────────────────────────────────── */
+
+.ak-living__control {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--ak-living-gap) * 0.4);
+  margin-block-end: var(--ak-living-gap);
+}
+
+.ak-living__label {
+  font-size: var(--ak-living-label-size);
+  color: var(--ak-living-ink-dim);
+}
+
+.ak-living__control-row {
+  display: flex;
+  align-items: center;
+  gap: var(--ak-living-gap);
+}
+
+.ak-living__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: var(--ak-touch, 44px);
+}
+
+.ak-living__control[data-living-kind='toggle'] .ak-living__input {
+  flex: 0 0 auto;
+}
+
+.ak-living__slider {
+  accent-color: var(--ak-living-accent);
+  padding: 0;
+}
+
+.ak-living__readout {
+  flex: 0 0 auto;
+  min-width: 5.5ch;
+  text-align: end;
+  font-family: var(--ak-living-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ak-living-ink);
+}
+
+/* ── The formula, set ──────────────────────────────────────────────────────────────────── */
+
+.ak-living__formula {
+  margin: 0 0 var(--ak-living-gap);
+  padding: var(--ak-living-pad);
+  border: var(--ak-line-w, 1px) solid var(--ak-living-line);
+  border-radius: var(--ak-living-radius);
+  background: var(--ak-surface, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--ak-living-gap) * 0.5);
+  overflow-x: auto;
+}
+
+.ak-living__formula-label {
+  font-size: var(--ak-living-label-size);
+  color: var(--ak-living-ink-dim);
+}
+
+.ak-living__plain {
+  font-family: var(--ak-living-mono);
+  color: var(--ak-living-ink-dim);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ak-living__tex:empty {
+  display: none;
+}
+
+.ak-living__answer {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35em;
+  font-size: var(--ak-living-figure-size);
+  color: var(--ak-living-ink);
+}
+
+.ak-living__answer-eq {
+  color: var(--ak-living-ink-dim);
+}
+
+.ak-living__answer-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--ak-weight-display, 700);
+}
+
+.ak-living__answer-unit,
+.ak-living__figure-unit {
+  font-size: var(--ak-living-label-size);
+  color: var(--ak-living-ink-dim);
+}
+
+.ak-living__formula[data-living-state='refused'] .ak-living__answer {
+  font-size: var(--ak-text-body, 1rem);
+  color: var(--ak-err, currentColor);
+}
+
+/* ── The sentence, the readout and the machine ─────────────────────────────────────────── */
+
+.ak-living__note,
+.ak-living__machine,
+.ak-living__value {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--ak-living-gap) * 0.3);
+  margin-block-end: var(--ak-living-gap);
+}
+
+.ak-living__note-label {
+  font-size: var(--ak-living-label-size);
+  color: var(--ak-living-ink-dim);
+}
+
+.ak-living__text {
+  margin: 0;
+  color: var(--ak-living-ink);
+  max-width: 62ch;
+}
+
+.ak-living__figure-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35em;
+}
+
+.ak-living__figure {
+  font-size: var(--ak-living-figure-size);
+  font-weight: var(--ak-weight-display, 700);
+  font-variant-numeric: tabular-nums;
+  color: var(--ak-living-ink);
+}
+
+.ak-living__states {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--ak-living-gap) * 0.4);
+}
+
+.ak-living__state {
+  padding: 0.25em 0.7em;
+  border: var(--ak-line-w, 1px) solid var(--ak-living-line);
+  border-radius: var(--ak-radius-pill, 999px);
+  font-size: var(--ak-living-label-size);
+  color: var(--ak-living-ink-dim);
+  transition: background-color var(--ak-motion, 220ms) var(--ak-ease, ease),
+    color var(--ak-motion, 220ms) var(--ak-ease, ease);
+}
+
+.ak-living__state[data-on='yes'] {
+  background: var(--ak-living-accent);
+  border-color: var(--ak-living-accent);
+  color: var(--ak-accent-ink, var(--ak-bg, canvas));
+}
+
+/* ── The chain ─────────────────────────────────────────────────────────────────────────── */
+
+.ak-living__chain {
+  border: var(--ak-line-w, 1px) solid var(--ak-living-line);
+  border-radius: var(--ak-living-radius);
+  padding: calc(var(--ak-living-pad) * 0.5);
+  overflow-x: auto;
+}
+
+.ak-living__chain-list {
+  margin: 0;
+  padding-inline-start: 1.2em;
+  font-family: var(--ak-living-mono);
+  font-size: var(--ak-living-label-size);
+  color: var(--ak-living-ink-dim);
+}
+
+.ak-living__chain .ak-graph__node[data-living-flash='yes'] .ak-graph__pill {
+  animation: ak-living-flash var(--ak-living-flash-ms) var(--ak-ease, ease) 1;
+}
+
+@keyframes ak-living-flash {
+  0% { fill-opacity: 1; stroke-width: 3; }
+  100% { fill-opacity: 1; stroke-width: 1; }
+}
+
+/* ── A refusal, when the kit is not on the page to say it properly ─────────────────────── */
+
+.ak-living__refusals {
+  border: var(--ak-line-w, 1px) solid var(--ak-err, currentColor);
+  border-radius: var(--ak-living-radius);
+  padding: var(--ak-living-pad);
+  color: var(--ak-err, currentColor);
+}
+
+.ak-living__refusals p {
+  margin: 0 0 0.4em;
+}
+
+/* ── Still. Whatever the scripts honour, this honours too (docs/pitfalls.md §47). ──────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .ak-living__chain .ak-graph__node[data-living-flash='yes'] .ak-graph__pill,
+  .ak-living__state {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+html[data-ak-motion='less'] .ak-living__chain .ak-graph__node[data-living-flash='yes'] .ak-graph__pill,
+html[data-ak-motion='less'] .ak-living__state,
+[data-ak-motion-defaults='off'] .ak-living__chain .ak-graph__node[data-living-flash='yes'] .ak-graph__pill,
+[data-ak-motion-defaults='off'] .ak-living__state {
+  animation: none !important;
+  transition: none !important;
+}

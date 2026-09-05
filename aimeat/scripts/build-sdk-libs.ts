@@ -15,6 +15,8 @@
  *   - checkSdkLibs()  → --check: fail (non-zero) if any committed bundle is stale vs its sources
  * @usage  pnpm build:sdk   ·   pnpm check:sdk   (also run by `pnpm dev`)
  * @version-history
+ *   v1.8.0 — 2026-09-05 — Register aimeat-living (the living document: one JSON record, one
+ *     dependency graph, formulas with units, a statechart and the chain view).
  *   v1.7.0 — 2026-09-02 — Register aimeat-assets (the asset manager: one manifest per app, files in
  *     storage, the atlas packer, sound export, texts; wish-aimeat-assets-and-game-programme).
  *   v1.6.0 — 2026-09-02 — Register aimeat-phaser (the Phaser 4 base: boot, packs, saves, controls,
@@ -84,6 +86,7 @@ export const SDK_LIBS: SdkLib[] = [
   { name: 'events', entry: 'events/index.js' },
   { name: 'auth', entry: 'auth/index.js' },
   { name: 'atelier', entry: 'atelier/index.js' },
+  { name: 'living', entry: 'living/index.js' },
 ];
 
 function banner(name: string): string {

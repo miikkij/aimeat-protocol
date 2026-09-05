@@ -8,6 +8,11 @@
  *   bundles from src/static/sdk-libs/dist/ via sdkLibSource(); the /v1/libs catalogue; the dev harness.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v2.6.0 - 2026-09-05 - New library aimeat-living.js: the living document — ONE JSON record
+ *   (arrangement plus a dependency graph of values, formulas with units, controls, bindings,
+ *   sentences, a statechart and live sources) mounted as a screen where touching one thing moves
+ *   everything that stood on it. It computes in the browser and makes no call of its own; KaTeX
+ *   is fetched from this node only when a formula is printed.
  * v2.4.0 - 2026-08-29 - aimeat-rows.js joins SDK_LIB_NAMES. It was built and committed on the same
  *   day and served 404 on prod, because the build registry and this list are two lists.
  * v2.5.0 - 2026-09-02 - New library aimeat-assets.js: the asset manager (one manifest per app as
@@ -183,7 +188,7 @@ const SDK_LIB_NAMES = [
   'speech', 'data', 'wallet', 'ai', 'capabilities', 'agents', 'agentface', 'intake', 'organism',
   'workflows', 'header', 'editor', 'live', 'storage', 'social', 'work', 'commerce', 'exchange',
   'webmcp', 'markdown', 'audio', 'tunnel', 'game', 'iam', 'connect', 'datapackage', 'events',
-  'atelier', 'phaser', 'assets',
+  'atelier', 'living', 'phaser', 'assets',
   // aimeat-rows.js — an app's door to an organism row space (the two-hand rule). Built by
   // scripts/build-sdk-libs.ts since 2026-08-29; this list is the second place a lib is named,
   // and a lib missing here is a 404 that the publish gate turns into APP_ARTIFACT_BROKEN.

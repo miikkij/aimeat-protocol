@@ -1,0 +1,2819 @@
+// GENERATED FILE — do not edit directly. Source: src/static/sdk-libs/living/ (+ _core/).
+// Rebuild: pnpm build:sdk  ·  Served at /v1/libs/aimeat-living.js (with a per-node config prelude).
+"use strict";
+(() => {
+  // src/static/sdk-libs/_core/namespace.js
+  function namespace() {
+    if (!window.AIMEAT) window.AIMEAT = {};
+    return window.AIMEAT;
+  }
+  function attach(key, value2) {
+    const ns = namespace();
+    ns[key] = value2;
+    return ns;
+  }
+
+  // src/static/sdk-libs/living/units.js
+  var PREFIXES = {
+    T: 1e12,
+    G: 1e9,
+    M: 1e6,
+    k: 1e3,
+    h: 100,
+    da: 10,
+    d: 0.1,
+    c: 0.01,
+    m: 1e-3,
+    "µ": 1e-6,
+    u: 1e-6,
+    n: 1e-9,
+    p: 1e-12
+  };
+  var PREFIXABLE = ["m", "g", "s", "A", "K", "mol", "cd", "N", "Pa", "J", "W", "V", "L", "Hz", "Ω", "ohm", "F", "C", "B", "Wh", "bar"];
+  function d(dim) {
+    return dim || {};
+  }
+  function u(dim, scale, offset) {
+    return { dim: d(dim), scale: scale == null ? 1 : scale, offset: offset || 0, label: "" };
+  }
+  var UNITS = {
+    // dimensionless
+    "": u({}, 1),
+    "%": u({}, 0.01),
+    "ppm": u({}, 1e-6),
+    "x": u({}, 1),
+    // length
+    m: u({ m: 1 }),
+    km: u({ m: 1 }, 1e3),
+    cm: u({ m: 1 }, 0.01),
+    mm: u({ m: 1 }, 1e-3),
+    mi: u({ m: 1 }, 1609.344),
+    ft: u({ m: 1 }, 0.3048),
+    in: u({ m: 1 }, 0.0254),
+    // mass
+    kg: u({ kg: 1 }),
+    g: u({ kg: 1 }, 1e-3),
+    mg: u({ kg: 1 }, 1e-6),
+    t: u({ kg: 1 }, 1e3),
+    lb: u({ kg: 1 }, 0.45359237),
+    // time
+    s: u({ s: 1 }),
+    ms: u({ s: 1 }, 1e-3),
+    min: u({ s: 1 }, 60),
+    h: u({ s: 1 }, 3600),
+    day: u({ s: 1 }, 86400),
+    a: u({ s: 1 }, 31557600),
+    // current, amount, luminous
+    A: u({ A: 1 }),
+    mol: u({ mol: 1 }),
+    cd: u({ cd: 1 }),
+    // temperature — K is the scale; the other two carry an offset and are handled apart
+    K: u({ K: 1 }),
+    "°C": u({ K: 1 }, 1, 273.15),
+    degC: u({ K: 1 }, 1, 273.15),
+    "°F": u({ K: 1 }, 5 / 9, 255.3722222222222),
+    degF: u({ K: 1 }, 5 / 9, 255.3722222222222),
+    // derived
+    Hz: u({ s: -1 }),
+    N: u({ kg: 1, m: 1, s: -2 }),
+    Pa: u({ kg: 1, m: -1, s: -2 }),
+    bar: u({ kg: 1, m: -1, s: -2 }, 1e5),
+    atm: u({ kg: 1, m: -1, s: -2 }, 101325),
+    J: u({ kg: 1, m: 2, s: -2 }),
+    Wh: u({ kg: 1, m: 2, s: -2 }, 3600),
+    W: u({ kg: 1, m: 2, s: -3 }),
+    C: u({ A: 1, s: 1 }),
+    V: u({ kg: 1, m: 2, s: -3, A: -1 }),
+    "Ω": u({ kg: 1, m: 2, s: -3, A: -2 }),
+    ohm: u({ kg: 1, m: 2, s: -3, A: -2 }),
+    F: u({ kg: -1, m: -2, s: 4, A: 2 }),
+    L: u({ m: 3 }, 1e-3),
+    B: u({ B: 1 }),
+    bit: u({ B: 1 }, 0.125)
+  };
+  var CURRENCIES = ["EUR", "USD", "GBP", "SEK", "NOK", "DKK", "JPY", "CHF", "PLN"];
+  for (const code of CURRENCIES) UNITS[code] = u({ ["cur:" + code]: 1 });
+  function lookup(name) {
+    if (Object.prototype.hasOwnProperty.call(UNITS, name)) return UNITS[name];
+    for (const p of Object.keys(PREFIXES)) {
+      if (name.length > p.length && name.slice(0, p.length) === p) {
+        const rest = name.slice(p.length);
+        if (PREFIXABLE.indexOf(rest) >= 0 && Object.prototype.hasOwnProperty.call(UNITS, rest)) {
+          const base = UNITS[rest];
+          if (base.offset) return null;
+          return { dim: base.dim, scale: base.scale * PREFIXES[p], offset: 0, label: "" };
+        }
+      }
+    }
+    return null;
+  }
+  function mulDim(a, b, sign) {
+    const out = {};
+    for (const k of Object.keys(a)) out[k] = a[k];
+    for (const k of Object.keys(b)) {
+      const next = (out[k] || 0) + sign * b[k];
+      if (next === 0) delete out[k];
+      else out[k] = next;
+    }
+    return out;
+  }
+  function mulUnits(a, b) {
+    if (!a) return b;
+    if (!b) return a;
+    return { dim: mulDim(a.dim, b.dim, 1), scale: a.scale * b.scale, offset: 0, label: "" };
+  }
+  function divUnits(a, b) {
+    const left = a || { dim: {}, scale: 1, offset: 0, label: "" };
+    if (!b) return a;
+    return { dim: mulDim(left.dim, b.dim, -1), scale: left.scale / b.scale, offset: 0, label: "" };
+  }
+  function powUnit(a, k) {
+    if (!a) return null;
+    const out = {};
+    for (const key of Object.keys(a.dim)) out[key] = a.dim[key] * k;
+    return { dim: out, scale: Math.pow(a.scale, k), offset: 0, label: "" };
+  }
+  function isAffine(unit) {
+    return !!unit && unit.offset !== 0;
+  }
+  function sameDim(a, b) {
+    const da = a ? a.dim : {};
+    const db = b ? b.dim : {};
+    const keys = /* @__PURE__ */ new Set([...Object.keys(da), ...Object.keys(db)]);
+    for (const k of keys) if ((da[k] || 0) !== (db[k] || 0)) return false;
+    return true;
+  }
+  function parseUnit(text) {
+    if (text == null) return null;
+    const src = String(text).trim();
+    if (src === "") return null;
+    const direct = lookup(src);
+    if (direct) return { dim: direct.dim, scale: direct.scale, offset: direct.offset, label: src };
+    let i = 0;
+    const s = src.replace(/·/g, "*").replace(/\s+/g, "");
+    let bad = null;
+    function factor() {
+      if (s[i] === "(") {
+        i++;
+        const inner = expr();
+        if (s[i] !== ")") {
+          bad = bad || "a missing )";
+          return null;
+        }
+        i++;
+        return inner;
+      }
+      const start = i;
+      while (i < s.length && !"*/^()".includes(s[i])) i++;
+      const name = s.slice(start, i);
+      if (!name) {
+        bad = bad || "an empty unit name";
+        return null;
+      }
+      const found = lookup(name);
+      if (!found) {
+        bad = bad || '"' + name + '"';
+        return null;
+      }
+      if (found.offset) {
+        bad = bad || name + " (a temperature with an offset cannot be part of a compound unit)";
+        return null;
+      }
+      let out2 = { dim: found.dim, scale: found.scale, offset: 0, label: "" };
+      if (s[i] === "^") {
+        i++;
+        const from = i;
+        if (s[i] === "-") i++;
+        while (i < s.length && s[i] >= "0" && s[i] <= "9") i++;
+        const k = Number(s.slice(from, i));
+        if (!Number.isFinite(k)) {
+          bad = bad || "a power that is not a whole number";
+          return null;
+        }
+        out2 = powUnit(out2, k);
+      }
+      return out2;
+    }
+    function expr() {
+      let left = factor();
+      while (left && (s[i] === "*" || s[i] === "/")) {
+        const op = s[i];
+        i++;
+        const right = factor();
+        if (!right) return null;
+        left = op === "*" ? mulUnits(left, right) : divUnits(left, right);
+      }
+      return left;
+    }
+    const out = expr();
+    if (!out || bad || i < s.length) {
+      return { error: "I do not know the unit " + (bad || '"' + src + '"') + "." };
+    }
+    out.label = src;
+    return out;
+  }
+  function unitLabel(unit) {
+    if (!unit) return "";
+    if (unit.label) return unit.label;
+    const parts = [];
+    for (const k of Object.keys(unit.dim).sort()) {
+      const e = unit.dim[k];
+      const name = k.indexOf("cur:") === 0 ? k.slice(4) : k;
+      parts.push(e === 1 ? name : name + "^" + e);
+    }
+    return parts.join("·");
+  }
+  function toBase(n, unit) {
+    return unit ? n * unit.scale + unit.offset : n;
+  }
+  function fromBase(n, unit) {
+    return unit ? (n - unit.offset) / unit.scale : n;
+  }
+  function convert(q, target) {
+    if (!sameDim(q.u, target)) {
+      return {
+        error: "I cannot turn " + (unitLabel(q.u) || "a plain number") + " into " + (unitLabel(target) || "a plain number") + ": those measure different things."
+      };
+    }
+    return { n: fromBase(toBase(q.n, q.u), target), u: target };
+  }
+
+  // src/static/sdk-libs/living/formula-eval.js
+  function isError(v) {
+    return !!v && typeof v === "object" && !Array.isArray(v) && typeof v.error === "string";
+  }
+  function isQuantity(v) {
+    return !!v && typeof v === "object" && !Array.isArray(v) && typeof v.n === "number" && "u" in v;
+  }
+  function num(v, what) {
+    if (typeof v === "number") return { n: v, u: null };
+    if (typeof v === "boolean") return { n: v ? 1 : 0, u: null };
+    if (isQuantity(v)) return v;
+    if (isError(v)) return v;
+    return { error: "I need a number for " + (what || "this") + ", and got " + describeValue(v) + "." };
+  }
+  function describeValue(v) {
+    if (v == null) return "nothing";
+    if (Array.isArray(v)) return "a list";
+    if (typeof v === "string") return 'the text "' + v + '"';
+    if (typeof v === "boolean") return v ? "yes" : "no";
+    return "something else";
+  }
+  function tidy(q) {
+    if (!q.u) return q.n;
+    if (Object.keys(q.u.dim).length === 0 && !q.u.offset) {
+      return q.u.scale === 1 ? q.n : q.n * q.u.scale;
+    }
+    return q;
+  }
+  function asText(v) {
+    if (v == null) return "";
+    if (isError(v)) return v.error;
+    if (isQuantity(v)) return trimNumber(v.n) + (unitLabel(v.u) ? " " + unitLabel(v.u) : "");
+    if (typeof v === "number") return trimNumber(v);
+    if (typeof v === "boolean") return v ? "true" : "false";
+    if (Array.isArray(v)) return v.map(asText).join(", ");
+    return String(v);
+  }
+  function trimNumber(n) {
+    if (!Number.isFinite(n)) return String(n);
+    if (Number.isInteger(n)) return String(n);
+    const rounded = Math.round(n * 1e10) / 1e10;
+    return String(rounded);
+  }
+  function asNumber(v) {
+    if (typeof v === "number") return v;
+    if (isQuantity(v)) return v.n;
+    if (typeof v === "boolean") return v ? 1 : 0;
+    return NaN;
+  }
+  function truth(v) {
+    if (isError(v)) return v;
+    if (typeof v === "boolean") return v;
+    if (typeof v === "number") return v !== 0;
+    if (isQuantity(v)) return v.n !== 0;
+    if (typeof v === "string") return v !== "";
+    if (Array.isArray(v)) return v.length > 0;
+    return !!v;
+  }
+  function addLike(a, b, sign, head) {
+    const qa = num(a, head.toLowerCase());
+    if (isError(qa)) return qa;
+    const qb = num(b, head.toLowerCase());
+    if (isError(qb)) return qb;
+    if (!qa.u && !qb.u) return qa.n + sign * qb.n;
+    if (!qb.u) return tidy({ n: qa.n + sign * qb.n, u: qa.u });
+    if (!qa.u) return tidy({ n: qa.n + sign * qb.n, u: qb.u });
+    if (!sameDim(qa.u, qb.u)) {
+      return { error: "I cannot " + (sign > 0 ? "add " : "subtract ") + unitLabel(qb.u) + " " + (sign > 0 ? "to " : "from ") + unitLabel(qa.u) + ": those measure different things." };
+    }
+    if (isAffine(qa.u) || isAffine(qb.u)) {
+      if (unitLabel(qa.u) !== unitLabel(qb.u)) {
+        return { error: "I cannot put " + unitLabel(qa.u) + " and " + unitLabel(qb.u) + ' together: two temperature scales with different zeros need a conversion first, so say convert(x, "' + unitLabel(qa.u) + '").' };
+      }
+      return tidy({ n: qa.n + sign * qb.n, u: qa.u });
+    }
+    const moved = convert(qb, qa.u);
+    if (isError(moved)) return moved;
+    return tidy({ n: qa.n + sign * moved.n, u: qa.u });
+  }
+  function mulLike(a, b, divide) {
+    const qa = num(a, divide ? "a division" : "a multiplication");
+    if (isError(qa)) return qa;
+    const qb = num(b, divide ? "a division" : "a multiplication");
+    if (isError(qb)) return qb;
+    const n = divide ? qa.n / qb.n : qa.n * qb.n;
+    if (isAffine(qa.u) || isAffine(qb.u)) return n;
+    const u2 = divide ? divUnits(qa.u, qb.u) : mulUnits(qa.u, qb.u);
+    return tidy({ n, u: u2 });
+  }
+  function compareLike(a, b, test, head) {
+    if (isError(a)) return a;
+    if (isError(b)) return b;
+    if (typeof a === "string" || typeof b === "string") {
+      const left2 = typeof a === "string" ? a : asText(a);
+      const right2 = typeof b === "string" ? b : asText(b);
+      return test(left2 < right2 ? -1 : left2 > right2 ? 1 : 0);
+    }
+    const qa = num(a, head.toLowerCase());
+    if (isError(qa)) return qa;
+    const qb = num(b, head.toLowerCase());
+    if (isError(qb)) return qb;
+    if (qa.u && qb.u && !sameDim(qa.u, qb.u)) {
+      return { error: "I cannot compare " + unitLabel(qa.u) + " with " + unitLabel(qb.u) + ": those measure different things." };
+    }
+    const bothCarry = !!qa.u && !!qb.u;
+    const left = bothCarry ? toBase(qa.n, qa.u) : qa.n;
+    const right = bothCarry ? toBase(qb.n, qb.u) : qb.n;
+    const diff = Math.abs(left - right) < 1e-12 ? 0 : left < right ? -1 : 1;
+    return test(diff);
+  }
+  function spread(args) {
+    const out = [];
+    for (const a of args) {
+      if (isError(a)) return a;
+      if (Array.isArray(a)) {
+        for (const x of a) out.push(x);
+      } else out.push(a);
+    }
+    return out;
+  }
+  function aggregate(args, fold, name) {
+    const items = spread(args);
+    if (isError(items)) return items;
+    if (!items.length) return { error: name + " needs something to work on, and the list was empty." };
+    const quantities = [];
+    for (const x of items) {
+      const q = num(x, name);
+      if (isError(q)) return q;
+      quantities.push(q);
+    }
+    const unit = quantities[0].u;
+    const values = [];
+    for (const q of quantities) {
+      if (unit && q.u && !sameDim(unit, q.u)) {
+        return { error: name + " cannot mix " + unitLabel(unit) + " and " + unitLabel(q.u) + ": those measure different things." };
+      }
+      const moved = unit && q.u && unitLabel(q.u) !== unitLabel(unit) ? convert(q, unit) : q;
+      if (isError(moved)) return moved;
+      values.push(moved.n);
+    }
+    return tidy({ n: fold(values), u: unit });
+  }
+  function evaluate(tree, scope) {
+    if (tree == null) return { error: "an empty formula" };
+    if (typeof tree === "number" || typeof tree === "boolean") return tree;
+    if (typeof tree === "string") {
+      const got = scope.get(tree);
+      if (got === void 0) return { error: 'This document has nothing called "' + tree + '".' };
+      return got;
+    }
+    if (!Array.isArray(tree)) {
+      if (typeof tree.str === "string") return tree.str;
+      if (isError(tree)) return tree;
+      return { error: "something in the formula I cannot work out" };
+    }
+    const head = tree[0];
+    const arg = (i) => evaluate(tree[i], scope);
+    if (head === "If") {
+      const cond = truth(arg(1));
+      if (isError(cond)) return cond;
+      if (cond) return tree.length > 2 ? arg(2) : true;
+      return tree.length > 3 ? arg(3) : false;
+    }
+    if (head === "And" || head === "Or") {
+      const want = head === "And";
+      for (let i = 1; i < tree.length; i++) {
+        const v = truth(arg(i));
+        if (isError(v)) return v;
+        if (v !== want) return !want;
+      }
+      return want;
+    }
+    const args = [];
+    for (let i = 1; i < tree.length; i++) {
+      const v = arg(i);
+      if (isError(v)) return v;
+      args.push(v);
+    }
+    const a = args[0];
+    const b = args[1];
+    switch (head) {
+      case "Add":
+        return addLike(a, b, 1, "Add");
+      case "Subtract":
+        return addLike(a, b, -1, "Subtract");
+      case "Negate": {
+        const q = num(a, "a minus sign");
+        return isError(q) ? q : tidy({ n: -q.n, u: q.u });
+      }
+      case "Multiply":
+        return mulLike(a, b, false);
+      case "Divide":
+        return mulLike(a, b, true);
+      case "Power": {
+        const qa = num(a, "a power");
+        if (isError(qa)) return qa;
+        const qb = num(b, "a power");
+        if (isError(qb)) return qb;
+        if (qb.u) return { error: "A power has to be a plain number, and this one is in " + unitLabel(qb.u) + "." };
+        if (qa.u && !Number.isInteger(qb.n)) return { error: "I can only raise " + unitLabel(qa.u) + " to a whole power." };
+        return tidy({ n: Math.pow(qa.n, qb.n), u: qa.u ? powUnit(qa.u, qb.n) : null });
+      }
+      case "Not": {
+        const v = truth(a);
+        return isError(v) ? v : !v;
+      }
+      case "Equal":
+        return compareLike(a, b, (d2) => d2 === 0, "Equal");
+      case "NotEqual":
+        return compareLike(a, b, (d2) => d2 !== 0, "NotEqual");
+      case "Less":
+        return compareLike(a, b, (d2) => d2 < 0, "Less");
+      case "LessEqual":
+        return compareLike(a, b, (d2) => d2 <= 0, "LessEqual");
+      case "Greater":
+        return compareLike(a, b, (d2) => d2 > 0, "Greater");
+      case "GreaterEqual":
+        return compareLike(a, b, (d2) => d2 >= 0, "GreaterEqual");
+      case "Concat":
+        return asText(a) + asText(b);
+      case "Text":
+        return asText(a);
+      case "Number": {
+        const q = num(a, "number()");
+        return isError(q) ? q : q.n;
+      }
+      case "Abs": {
+        const q = num(a, "abs");
+        return isError(q) ? q : tidy({ n: Math.abs(q.n), u: q.u });
+      }
+      case "Sqrt": {
+        const q = num(a, "sqrt");
+        if (isError(q)) return q;
+        if (q.n < 0) return { error: "There is no square root of " + trimNumber(q.n) + "." };
+        return tidy({ n: Math.sqrt(q.n), u: null });
+      }
+      case "Exp": {
+        const q = num(a, "exp");
+        return isError(q) ? q : Math.exp(q.n);
+      }
+      case "Ln":
+      case "Log": {
+        const q = num(a, "log");
+        if (isError(q)) return q;
+        if (q.n <= 0) return { error: "There is no logarithm of " + trimNumber(q.n) + "." };
+        if (head === "Ln" || args.length < 2) return Math.log(q.n) / (head === "Log" && args.length < 2 ? Math.LN10 : 1);
+        const base = num(b, "log");
+        if (isError(base)) return base;
+        return Math.log(q.n) / Math.log(base.n);
+      }
+      case "Round":
+      case "Floor":
+      case "Ceiling": {
+        const q = num(a, head.toLowerCase());
+        if (isError(q)) return q;
+        const places = args.length > 1 ? Math.trunc(asNumber(b)) : 0;
+        const f = Math.pow(10, places);
+        const fn = head === "Round" ? Math.round : head === "Floor" ? Math.floor : Math.ceil;
+        return tidy({ n: fn(q.n * f) / f, u: q.u });
+      }
+      case "Clamp": {
+        const q = num(a, "clamp");
+        if (isError(q)) return q;
+        const lo = num(b, "clamp");
+        const hi = num(args[2], "clamp");
+        if (isError(lo)) return lo;
+        if (isError(hi)) return hi;
+        return tidy({ n: Math.min(Math.max(q.n, lo.n), hi.n), u: q.u });
+      }
+      case "Convert": {
+        const q = num(a, "convert");
+        if (isError(q)) return q;
+        const target = parseUnit(typeof b === "string" ? b : asText(b));
+        if (isError(target)) return target;
+        const moved = convert(q, target);
+        return isError(moved) ? moved : tidy(moved);
+      }
+      case "Min":
+        return aggregate(args, (v) => Math.min.apply(null, v), "min");
+      case "Max":
+        return aggregate(args, (v) => Math.max.apply(null, v), "max");
+      case "Sum":
+        return aggregate(args, (v) => v.reduce((x, y) => x + y, 0), "sum");
+      case "Mean":
+        return aggregate(args, (v) => v.reduce((x, y) => x + y, 0) / v.length, "avg");
+      case "Count": {
+        const items = spread(args);
+        return isError(items) ? items : items.length;
+      }
+      case "First": {
+        const items = spread(args);
+        return isError(items) ? items : items.length ? items[0] : { error: "first() was given an empty list." };
+      }
+      case "Last": {
+        const items = spread(args);
+        return isError(items) ? items : items.length ? items[items.length - 1] : { error: "last() was given an empty list." };
+      }
+      default:
+        return { error: "a function this document does not have: " + head };
+    }
+  }
+
+  // src/static/sdk-libs/living/nodes/value.js
+  function wrapValue(raw, unit) {
+    if (raw == null) return unit ? { n: 0, u: unit } : 0;
+    if (typeof raw === "number") return unit ? { n: raw, u: unit } : raw;
+    if (typeof raw === "boolean" || typeof raw === "string" || Array.isArray(raw)) return raw;
+    if (typeof raw === "object" && typeof raw.n === "number") return raw;
+    return raw;
+  }
+  var value = {
+    id: "value",
+    settable: true,
+    /** A value stands on nothing: it is where the graph starts. */
+    dependsOn() {
+      return [];
+    },
+    /** Read the unit once and seed the store, so a rebuild does not forget where the slider was. */
+    prepare(node, ctx) {
+      const errors = [];
+      const unit = parseUnit(node.unit);
+      if (isError(unit)) errors.push(unit.error);
+      ctx.compiled.unit = isError(unit) ? null : unit;
+      if (!ctx.state.values.has(ctx.id)) {
+        ctx.state.values.set(ctx.id, wrapValue(node.value, ctx.compiled.unit));
+      }
+      return errors;
+    },
+    evaluate(node, ctx) {
+      return ctx.state.values.get(ctx.id);
+    },
+    /**
+     * What a person, a control or a machine's action is allowed to put here: the number is kept
+     * inside min and max when the node declared them, and the unit is the node's own — a slider
+     * reports 31, not 31 of whatever it thought the unit was.
+     */
+    coerce(node, ctx, raw) {
+      let v = raw;
+      if (v != null && typeof v === "object" && typeof v.n === "number") v = v.n;
+      if (typeof v === "number") {
+        if (typeof node.min === "number") v = Math.max(node.min, v);
+        if (typeof node.max === "number") v = Math.min(node.max, v);
+        return wrapValue(v, ctx.compiled.unit);
+      }
+      if (typeof node.value === "number" && typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v))) {
+        return this.coerce(node, ctx, Number(v));
+      }
+      return v;
+    }
+  };
+
+  // src/static/sdk-libs/living/formula-parse.js
+  var FUNCTIONS = {
+    if: "If",
+    min: "Min",
+    max: "Max",
+    abs: "Abs",
+    sqrt: "Sqrt",
+    pow: "Power",
+    log: "Log",
+    ln: "Ln",
+    exp: "Exp",
+    round: "Round",
+    floor: "Floor",
+    ceil: "Ceiling",
+    sum: "Sum",
+    avg: "Mean",
+    mean: "Mean",
+    count: "Count",
+    clamp: "Clamp",
+    convert: "Convert",
+    text: "Text",
+    number: "Number",
+    and: "And",
+    or: "Or",
+    not: "Not",
+    first: "First",
+    last: "Last"
+  };
+  var LITERALS = { true: true, false: false };
+  var PUNCT = ["<=", ">=", "<>", "!=", "==", "+", "-", "*", "/", "^", "&", "(", ")", ",", "<", ">", "="];
+  function tokenize(src) {
+    const out = [];
+    let i = 0;
+    while (i < src.length) {
+      const c = src[i];
+      if (c === " " || c === "	" || c === "\n" || c === "\r") {
+        i++;
+        continue;
+      }
+      if (c === '"' || c === "'") {
+        const quote = c;
+        let j = i + 1;
+        let text = "";
+        while (j < src.length && src[j] !== quote) {
+          if (src[j] === "\\" && j + 1 < src.length) {
+            text += src[j + 1];
+            j += 2;
+            continue;
+          }
+          text += src[j];
+          j++;
+        }
+        if (j >= src.length) return { error: "a text that never closes", at: i };
+        out.push({ t: "str", v: text, at: i });
+        i = j + 1;
+        continue;
+      }
+      if (c >= "0" && c <= "9" || c === "." && src[i + 1] >= "0" && src[i + 1] <= "9") {
+        let j = i;
+        while (j < src.length && (src[j] >= "0" && src[j] <= "9" || src[j] === ".")) j++;
+        if (src[j] === "e" || src[j] === "E") {
+          let k = j + 1;
+          if (src[k] === "+" || src[k] === "-") k++;
+          if (src[k] >= "0" && src[k] <= "9") {
+            j = k;
+            while (j < src.length && src[j] >= "0" && src[j] <= "9") j++;
+          }
+        }
+        const n = Number(src.slice(i, j));
+        if (!Number.isFinite(n)) return { error: "a number I cannot read: " + src.slice(i, j), at: i };
+        out.push({ t: "num", v: n, at: i });
+        i = j;
+        continue;
+      }
+      if (/[A-Za-z_À-ɏ]/.test(c)) {
+        let j = i;
+        while (j < src.length && /[A-Za-z0-9_.À-ɏ]/.test(src[j])) j++;
+        out.push({ t: "name", v: src.slice(i, j), at: i });
+        i = j;
+        continue;
+      }
+      const punct = PUNCT.find((p) => src.slice(i, i + p.length) === p);
+      if (punct) {
+        out.push({ t: "op", v: punct, at: i });
+        i += punct.length;
+        continue;
+      }
+      return { error: "a character that does not belong in a formula: " + c, at: i };
+    }
+    return out;
+  }
+  function parse(src) {
+    const tokens = tokenize(String(src == null ? "" : src));
+    if (!Array.isArray(tokens)) return tokens;
+    let p = 0;
+    let failed = null;
+    function fail(message, at) {
+      if (!failed) failed = { error: message, at: at == null ? tokens[p] ? tokens[p].at : String(src).length : at };
+      return null;
+    }
+    function peek() {
+      return tokens[p];
+    }
+    function isOp(v) {
+      const tk = tokens[p];
+      return tk && tk.t === "op" && tk.v === v;
+    }
+    function isWord(v) {
+      const tk = tokens[p];
+      return tk && tk.t === "name" && tk.v.toLowerCase() === v;
+    }
+    function eat(v) {
+      if (isOp(v)) {
+        p++;
+        return true;
+      }
+      return false;
+    }
+    function primary() {
+      const tk = peek();
+      if (!tk) return fail("a formula that stops in the middle");
+      if (tk.t === "num") {
+        p++;
+        return tk.v;
+      }
+      if (tk.t === "str") {
+        p++;
+        return { str: tk.v };
+      }
+      if (eat("(")) {
+        const inner = orExpr();
+        if (!eat(")")) return fail("a missing )");
+        return inner;
+      }
+      if (eat("-")) {
+        const v = power();
+        return v == null ? null : ["Negate", v];
+      }
+      if (eat("+")) return power();
+      if (tk.t === "name") {
+        const name = tk.v;
+        p++;
+        const lower = name.toLowerCase();
+        if (Object.prototype.hasOwnProperty.call(LITERALS, lower) && !isOp("(")) return LITERALS[lower];
+        if (isOp("(")) {
+          p++;
+          const head = FUNCTIONS[lower];
+          if (!head) return fail("a function this document does not have: " + name + ". It knows " + Object.keys(FUNCTIONS).join(", ") + ".", tk.at);
+          const args = [];
+          if (!isOp(")")) {
+            for (; ; ) {
+              const a = orExpr();
+              if (a === null && failed) return null;
+              args.push(a);
+              if (eat(",")) continue;
+              break;
+            }
+          }
+          if (!eat(")")) return fail("a missing ) after " + name);
+          return [head].concat(args);
+        }
+        return name;
+      }
+      return fail("something I cannot read here");
+    }
+    function power() {
+      const left = primary();
+      if (left === null && failed) return null;
+      if (eat("^")) {
+        const right = power();
+        if (right === null && failed) return null;
+        return ["Power", left, right];
+      }
+      return left;
+    }
+    function product() {
+      let left = power();
+      if (left === null && failed) return null;
+      while (isOp("*") || isOp("/")) {
+        const op = peek().v;
+        p++;
+        const right = power();
+        if (right === null && failed) return null;
+        left = [op === "*" ? "Multiply" : "Divide", left, right];
+      }
+      return left;
+    }
+    function sum() {
+      let left = product();
+      if (left === null && failed) return null;
+      while (isOp("+") || isOp("-")) {
+        const op = peek().v;
+        p++;
+        const right = product();
+        if (right === null && failed) return null;
+        left = [op === "+" ? "Add" : "Subtract", left, right];
+      }
+      return left;
+    }
+    function join() {
+      let left = sum();
+      if (left === null && failed) return null;
+      while (eat("&")) {
+        const right = sum();
+        if (right === null && failed) return null;
+        left = ["Concat", left, right];
+      }
+      return left;
+    }
+    const COMPARE = { "=": "Equal", "==": "Equal", "<>": "NotEqual", "!=": "NotEqual", "<": "Less", "<=": "LessEqual", ">": "Greater", ">=": "GreaterEqual" };
+    function compare() {
+      let left = join();
+      if (left === null && failed) return null;
+      while (peek() && peek().t === "op" && COMPARE[peek().v]) {
+        const head = COMPARE[peek().v];
+        p++;
+        const right = join();
+        if (right === null && failed) return null;
+        left = [head, left, right];
+      }
+      return left;
+    }
+    function notExpr() {
+      if (isWord("not") && tokens[p + 1] && !(tokens[p + 1].t === "op" && tokens[p + 1].v === "(")) {
+        p++;
+        const v = notExpr();
+        return v === null && failed ? null : ["Not", v];
+      }
+      return compare();
+    }
+    function andExpr() {
+      let left = notExpr();
+      if (left === null && failed) return null;
+      while (isWord("and")) {
+        p++;
+        const right = notExpr();
+        if (right === null && failed) return null;
+        left = ["And", left, right];
+      }
+      return left;
+    }
+    function orExpr() {
+      let left = andExpr();
+      if (left === null && failed) return null;
+      while (isWord("or")) {
+        p++;
+        const right = andExpr();
+        if (right === null && failed) return null;
+        left = ["Or", left, right];
+      }
+      return left;
+    }
+    const tree = orExpr();
+    if (failed) return failed;
+    if (p < tokens.length) return { error: "something left over after the formula ended", at: tokens[p].at };
+    if (tree === null) return { error: "an empty formula", at: 0 };
+    return tree;
+  }
+  function symbolsOf(tree, into) {
+    const out = into || [];
+    if (typeof tree === "string") {
+      if (out.indexOf(tree) < 0) out.push(tree);
+      return out;
+    }
+    if (Array.isArray(tree)) for (let i = 1; i < tree.length; i++) symbolsOf(tree[i], out);
+    return out;
+  }
+
+  // src/static/sdk-libs/living/tex.js
+  var RANK = {
+    Or: 1,
+    And: 2,
+    Not: 3,
+    Equal: 4,
+    NotEqual: 4,
+    Less: 4,
+    LessEqual: 4,
+    Greater: 4,
+    GreaterEqual: 4,
+    Concat: 5,
+    Add: 6,
+    Subtract: 6,
+    Multiply: 7,
+    Divide: 7,
+    Negate: 8,
+    Power: 9
+  };
+  var RELATION = {
+    Equal: "=",
+    NotEqual: "\\ne",
+    Less: "<",
+    LessEqual: "\\le",
+    Greater: ">",
+    GreaterEqual: "\\ge"
+  };
+  var OPERATORS = {
+    Min: "min",
+    Max: "max",
+    Sum: "sum",
+    Mean: "avg",
+    Count: "count",
+    Clamp: "clamp",
+    Convert: "convert",
+    Text: "text",
+    Number: "number",
+    Round: "round",
+    Floor: "floor",
+    Ceiling: "ceil",
+    First: "first",
+    Last: "last",
+    Exp: "exp",
+    Ln: "ln",
+    Log: "log"
+  };
+  function escapeText(s) {
+    return String(s).replace(/([\\{}$&#^_%~])/g, "\\$1");
+  }
+  function texName(name) {
+    const parts = String(name).split(".");
+    const head = parts[0];
+    const rest = parts.slice(1);
+    const base = head.length === 1 ? escapeText(head) : "\\mathrm{" + escapeText(head) + "}";
+    return rest.length ? base + "_{" + escapeText(rest.join(".")) + "}" : base;
+  }
+  function numberTex(n) {
+    if (!Number.isFinite(n)) return "\\text{?}";
+    return String(n);
+  }
+  function wrap(inner, childRank, parentRank) {
+    return childRank < parentRank ? "\\left(" + inner + "\\right)" : inner;
+  }
+  function toTex(tree, parentRank) {
+    const outer = parentRank || 0;
+    if (tree == null) return "";
+    if (typeof tree === "number") return numberTex(tree);
+    if (typeof tree === "boolean") return "\\text{" + (tree ? "true" : "false") + "}";
+    if (typeof tree === "string") return texName(tree);
+    if (!Array.isArray(tree)) {
+      if (typeof tree.str === "string") return "\\text{“" + escapeText(tree.str) + "”}";
+      return "";
+    }
+    const head = tree[0];
+    const rank = RANK[head] || 10;
+    const at = (i) => toTex(tree[i], rank);
+    switch (head) {
+      case "Add":
+        return wrap(at(1) + " + " + at(2), rank, outer);
+      case "Subtract":
+        return wrap(at(1) + " - " + at(2), rank, outer);
+      case "Negate":
+        return wrap("-" + at(1), rank, outer);
+      case "Multiply":
+        return wrap(at(1) + " \\cdot " + at(2), rank, outer);
+      case "Divide":
+        return "\\frac{" + toTex(tree[1], 0) + "}{" + toTex(tree[2], 0) + "}";
+      case "Power":
+        return toTex(tree[1], rank + 1) + "^{" + toTex(tree[2], 0) + "}";
+      case "Sqrt":
+        return "\\sqrt{" + toTex(tree[1], 0) + "}";
+      case "Abs":
+        return "\\left|" + toTex(tree[1], 0) + "\\right|";
+      case "Concat":
+        return wrap(at(1) + " \\mathbin{\\&} " + at(2), rank, outer);
+      case "Not":
+        return wrap("\\lnot " + at(1), rank, outer);
+      case "And":
+        return wrap(tree.slice(1).map((t) => toTex(t, rank)).join(" \\land "), rank, outer);
+      case "Or":
+        return wrap(tree.slice(1).map((t) => toTex(t, rank)).join(" \\lor "), rank, outer);
+      case "If": {
+        const then = toTex(tree[2], 0);
+        const other = tree.length > 3 ? toTex(tree[3], 0) : "";
+        return "\\begin{cases} " + then + " & " + toTex(tree[1], 0) + " \\\\ " + other + " & \\text{otherwise} \\end{cases}";
+      }
+      default: {
+        if (RELATION[head]) return wrap(at(1) + " " + RELATION[head] + " " + at(2), rank, outer);
+        const name = OPERATORS[head] || String(head).toLowerCase();
+        const args = tree.slice(1).map((t) => toTex(t, 0)).join(",\\; ");
+        return "\\operatorname{" + escapeText(name) + "}\\left(" + args + "\\right)";
+      }
+    }
+  }
+
+  // src/static/sdk-libs/living/nodes/formula.js
+  var formula = {
+    id: "formula",
+    /** Every name the expression reads. A name this document does not have is caught in validate. */
+    dependsOn(node, ctx) {
+      const tree = ctx.compiled.tree;
+      return tree ? symbolsOf(tree).map((s) => s.split(".")[0]) : [];
+    },
+    /** Parse the expression and the unit ONCE — a formula is re-evaluated on every move. */
+    prepare(node, ctx) {
+      const errors = [];
+      const tree = parse(node.expr);
+      if (isError(tree)) {
+        errors.push("the formula " + String(node.expr) + " has " + tree.error);
+        ctx.compiled.tree = null;
+      } else {
+        ctx.compiled.tree = tree;
+        ctx.compiled.tex = toTex(tree);
+      }
+      const unit = parseUnit(node.unit);
+      if (isError(unit)) errors.push(unit.error);
+      ctx.compiled.unit = isError(unit) ? null : unit;
+      return errors;
+    },
+    evaluate(node, ctx) {
+      if (!ctx.compiled.tree) return { error: "This formula could not be read." };
+      const out = evaluate(ctx.compiled.tree, ctx.scope);
+      if (isError(out) || !ctx.compiled.unit) return out;
+      if (isQuantity(out)) return convert(out, ctx.compiled.unit);
+      if (typeof out === "number") return { n: out, u: ctx.compiled.unit };
+      return out;
+    },
+    /** The second output: the expression, set. */
+    fields(node, ctx) {
+      return { tex: ctx.compiled.tex || "" };
+    }
+  };
+
+  // src/static/sdk-libs/living/nodes/control.js
+  var CONTROL_KINDS = ["slider", "toggle", "pick", "number", "text"];
+  var control = {
+    id: "control",
+    /** A control READS its target so it can show where the value is now. */
+    dependsOn(node) {
+      return node.target ? [String(node.target)] : [];
+    },
+    prepare(node, ctx) {
+      const errors = [];
+      const kind = String(node.kind || "slider");
+      if (CONTROL_KINDS.indexOf(kind) < 0) {
+        errors.push('a control of kind "' + kind + '"; this document has ' + CONTROL_KINDS.join(", "));
+      }
+      if (!node.target) errors.push("a control with no target to move");
+      if (kind === "pick" && !Array.isArray(node.options)) {
+        errors.push("a pick control with no options to pick from");
+      }
+      ctx.compiled.kind = kind;
+      return errors;
+    },
+    /** A control's own output is its target's value: the control IS that quantity, seen. */
+    evaluate(node, ctx) {
+      return node.target ? ctx.scope.get(String(node.target)) : void 0;
+    }
+  };
+
+  // src/static/sdk-libs/living/nodes/binding.js
+  var BOUND_COMPONENTS = [
+    "statRow",
+    "figure",
+    "rating",
+    "steps",
+    "list",
+    "cardGrid",
+    "table",
+    "timeline",
+    "chart",
+    "matrix",
+    "graph",
+    "waveform",
+    "scene3d",
+    "gauge",
+    "console",
+    "atlas",
+    "map",
+    "health",
+    "queue",
+    "kanban",
+    "plan",
+    "schedule",
+    "crt",
+    "ring",
+    "crew",
+    "poll",
+    "keys",
+    "thread",
+    "calendar",
+    "priceTable",
+    "facets",
+    "carousel",
+    "sortable",
+    "notices"
+  ];
+  var binding = {
+    id: "binding",
+    dependsOn(node) {
+      return node.from ? [String(node.from)] : [];
+    },
+    prepare(node, ctx) {
+      const errors = [];
+      if (!node.block) errors.push("a binding with no block to write to");
+      if (!node.prop) errors.push("a binding with no prop to write");
+      if (!node.from) errors.push("a binding with no node to read");
+      ctx.compiled.path = String(node.prop || "").split(".").filter(Boolean);
+      return errors;
+    },
+    evaluate(node, ctx) {
+      return node.from ? ctx.scope.get(String(node.from)) : void 0;
+    }
+  };
+  function setPath(into, path, v) {
+    if (!path.length) return;
+    let at = into;
+    for (let i = 0; i < path.length - 1; i++) {
+      const key = path[i];
+      if (at[key] == null || typeof at[key] !== "object") at[key] = /^\d+$/.test(path[i + 1]) ? [] : {};
+      at = at[key];
+    }
+    at[path[path.length - 1]] = v;
+  }
+
+  // src/static/sdk-libs/living/text.js
+  function formatValue(value2, format) {
+    if (isError(value2)) return value2.error;
+    const f = format == null ? "" : String(format).trim().toLowerCase();
+    if (f === "unit") return asText(value2);
+    if (f === "upper") return asText(value2).toUpperCase();
+    if (f === "lower") return asText(value2).toLowerCase();
+    if (f === "text" || f === "") {
+      if (isQuantity(value2)) return trimNumber(value2.n);
+      return asText(value2);
+    }
+    const n = asNumber(value2);
+    if (!Number.isFinite(n)) return asText(value2);
+    if (f === "int") return String(Math.round(n));
+    if (f === "percent") return trimNumber(Math.round(n * 1e3) / 10) + " %";
+    if (/^\d+$/.test(f)) return n.toFixed(Number(f));
+    return asText(value2);
+  }
+  function splitTag(body) {
+    const bar = body.lastIndexOf("|");
+    if (bar < 0) return { expr: body.trim(), format: null };
+    const before = body.slice(0, bar);
+    const quotes = (before.match(/"/g) || []).length + (before.match(/'/g) || []).length;
+    if (quotes % 2 === 1) return { expr: body.trim(), format: null };
+    return { expr: before.trim(), format: body.slice(bar + 1).trim() };
+  }
+  function parseTemplate(src) {
+    const text = String(src == null ? "" : src);
+    const root = [];
+    const stack = [{ parts: root, branch: null }];
+    let i = 0;
+    function push(part) {
+      stack[stack.length - 1].parts.push(part);
+    }
+    while (i < text.length) {
+      const open = text.indexOf("{{", i);
+      if (open < 0) {
+        if (i < text.length) push({ kind: "text", text: text.slice(i) });
+        break;
+      }
+      if (open > i) push({ kind: "text", text: text.slice(i, open) });
+      const close = text.indexOf("}}", open);
+      if (close < 0) return { error: "A tag opens with {{ and never closes." };
+      const body = text.slice(open + 2, close);
+      i = close + 2;
+      const trimmed = body.trim();
+      const lower = trimmed.toLowerCase();
+      if (lower === "end") {
+        if (stack.length === 1) return { error: "An {{ end }} with no {{ if }} in front of it." };
+        stack.pop();
+        continue;
+      }
+      if (lower === "else") {
+        const top = stack[stack.length - 1];
+        if (!top.branch) return { error: "An {{ else }} with no {{ if }} in front of it." };
+        top.parts = top.branch.other;
+        continue;
+      }
+      if (lower.indexOf("if ") === 0) {
+        const tree2 = parse(trimmed.slice(3));
+        if (isError(tree2)) return { error: "The condition " + trimmed.slice(3).trim() + " has " + tree2.error + "." };
+        const part = { kind: "if", tree: tree2, then: [], other: [], source: trimmed.slice(3).trim() };
+        push(part);
+        stack.push({ parts: part.then, branch: part });
+        continue;
+      }
+      const { expr, format } = splitTag(body);
+      if (!expr) return { error: "An empty {{ }} tag." };
+      const tree = parse(expr);
+      if (isError(tree)) return { error: "The tag " + expr + " has " + tree.error + "." };
+      push({ kind: "value", tree, format, source: expr });
+    }
+    if (stack.length > 1) return { error: "An {{ if }} that never reaches its {{ end }}." };
+    return root;
+  }
+  function renderTemplate(parts, scope) {
+    if (!Array.isArray(parts)) return parts && parts.error ? parts.error : "";
+    let out = "";
+    for (const part of parts) {
+      if (part.kind === "text") {
+        out += part.text;
+        continue;
+      }
+      if (part.kind === "value") {
+        out += formatValue(evaluate(part.tree, scope), part.format);
+        continue;
+      }
+      if (part.kind === "if") {
+        const v = evaluate(part.tree, scope);
+        if (isError(v)) {
+          out += v.error;
+          continue;
+        }
+        const yes = typeof v === "boolean" ? v : isQuantity(v) ? v.n !== 0 : typeof v === "number" ? v !== 0 : typeof v === "string" ? v !== "" : !!v;
+        out += renderTemplate(yes ? part.then : part.other, scope);
+      }
+    }
+    return out;
+  }
+  function symbolsOfTemplate(parts, into) {
+    const out = into || [];
+    if (!Array.isArray(parts)) return out;
+    for (const part of parts) {
+      if (part.kind === "value" || part.kind === "if") symbolsOf(part.tree, out);
+      if (part.kind === "if") {
+        symbolsOfTemplate(part.then, out);
+        symbolsOfTemplate(part.other, out);
+      }
+    }
+    return out;
+  }
+
+  // src/static/sdk-libs/living/nodes/text-node.js
+  var textNode = {
+    id: "text",
+    dependsOn(node, ctx) {
+      return symbolsOfTemplate(ctx.compiled.parts).map((s) => s.split(".")[0]);
+    },
+    prepare(node, ctx) {
+      const parts = parseTemplate(node.template);
+      if (isError(parts)) {
+        ctx.compiled.parts = [];
+        return [parts.error];
+      }
+      ctx.compiled.parts = parts;
+      return [];
+    },
+    evaluate(node, ctx) {
+      return renderTemplate(ctx.compiled.parts, ctx.scope);
+    }
+  };
+
+  // src/static/sdk-libs/living/machine.js
+  function compile(def, errors) {
+    const guards = /* @__PURE__ */ new Map();
+    const assigns = /* @__PURE__ */ new Map();
+    const whens = [];
+    function expr(src, where) {
+      const tree = parse(src);
+      if (isError(tree)) {
+        errors.push(where + ": " + tree.error);
+        return null;
+      }
+      return tree;
+    }
+    function walkAssign(map, where, key) {
+      if (!map || typeof map !== "object") return;
+      const list = [];
+      for (const id of Object.keys(map)) {
+        const tree = expr(String(map[id]), where + " sets " + id);
+        if (tree) list.push({ id, tree });
+      }
+      assigns.set(key, list);
+    }
+    function walk(states, prefix) {
+      if (!states || typeof states !== "object") return;
+      for (const name of Object.keys(states)) {
+        const node = states[name] || {};
+        const path = prefix ? prefix + "." + name : name;
+        walkAssign(node.entry, "entry of " + path, "entry:" + path);
+        walkAssign(node.exit, "exit of " + path, "exit:" + path);
+        const on = node.on || {};
+        for (const event of Object.keys(on)) {
+          const h = on[event];
+          if (h && typeof h === "object" && h.guard) {
+            const tree = expr(String(h.guard), "the guard on " + path + " → " + event);
+            if (tree) guards.set(path + "|" + event, tree);
+          }
+        }
+        if (node.states) walk(node.states, path);
+      }
+    }
+    walk(def.states, "");
+    for (const w of def.when || []) {
+      const tree = expr(String(w.expr), "the crossing that sends " + w.send);
+      if (tree) whens.push({ tree, send: String(w.send), was: false });
+    }
+    return { guards, assigns, whens };
+  }
+  function stateAt(def, path) {
+    let node = def;
+    for (const part of path) {
+      const kids = node.states || {};
+      if (!kids[part]) return null;
+      node = kids[part];
+    }
+    return node;
+  }
+  function settleInto(def, path) {
+    const out = path.slice();
+    for (; ; ) {
+      const node = stateAt(def, out);
+      if (!node || !node.states || !node.initial) return out;
+      if (!node.states[node.initial]) return out;
+      out.push(node.initial);
+    }
+  }
+  function createMachine(def) {
+    const errors = [];
+    const model = def && typeof def === "object" ? def : {};
+    if (!model.states || typeof model.states !== "object" || !Object.keys(model.states).length) {
+      errors.push("a machine with no states");
+    } else if (!model.initial || !model.states[model.initial]) {
+      errors.push('a machine whose initial state "' + String(model.initial) + '" is not one of its states');
+    }
+    const compiled = compile(model, errors);
+    let active = errors.length ? [] : settleInto(model, [model.initial]);
+    let enteredAt = /* @__PURE__ */ new Map();
+    function markEntered(path, now) {
+      for (let i = 1; i <= path.length; i++) {
+        const key = path.slice(0, i).join(".");
+        if (!enteredAt.has(key)) enteredAt.set(key, now);
+      }
+    }
+    markEntered(active, 0);
+    function assignsFor(kind, path) {
+      return compiled.assigns.get(kind + ":" + path) || [];
+    }
+    function move(target, keep, now) {
+      const out = [];
+      for (let i = active.length; i > keep; i--) {
+        const path = active.slice(0, i).join(".");
+        for (const a of assignsFor("exit", path)) out.push(a);
+        enteredAt.delete(path);
+      }
+      const next = settleInto(model, target);
+      for (let i = keep + 1; i <= next.length; i++) {
+        const path = next.slice(0, i).join(".");
+        if (!enteredAt.has(path)) for (const a of assignsFor("entry", path)) out.push(a);
+      }
+      active = next;
+      markEntered(active, now);
+      return out;
+    }
+    function resolveTarget(target, ownerDepth) {
+      const text = String(target);
+      if (text.indexOf(".") >= 0) return text.split(".");
+      const parent = active.slice(0, ownerDepth - 1);
+      return parent.concat([text]);
+    }
+    const api = {
+      /** The current state as a dotted path. */
+      path() {
+        return active.join(".");
+      },
+      /** Every state on the active path, outermost first. */
+      states() {
+        return active.map((_, i) => active.slice(0, i + 1).join("."));
+      },
+      errors,
+      /**
+       * Send an event. Looks for a handler from the deepest active state outward, honouring guards.
+       * @param {string} event @param {{ get: (id: string) => any }} scope @param {number} [now]
+       * @returns {{ changed: boolean, path: string, assigns: Array<{ id: string, tree: any }> }}
+       */
+      send(event, scope, now) {
+        const clock = now == null ? 0 : now;
+        for (let depth = active.length; depth >= 1; depth--) {
+          const path = active.slice(0, depth);
+          const node = stateAt(model, path);
+          const handler = node && node.on ? node.on[event] : null;
+          if (!handler) continue;
+          const target = typeof handler === "string" ? handler : handler.target;
+          if (!target) continue;
+          const guard = compiled.guards.get(path.join(".") + "|" + event);
+          if (guard) {
+            const v = evaluate(guard, scope);
+            if (isError(v) || !truthy(v)) continue;
+          }
+          const assigns = move(resolveTarget(target, depth), depth - 1, clock);
+          return { changed: true, path: active.join("."), assigns };
+        }
+        return { changed: false, path: active.join("."), assigns: [] };
+      },
+      /**
+       * Fire whichever `after` timer is due. Called by the runtime with the clock; in a test, with
+       * whatever number the test wants.
+       * @param {number} now
+       */
+      tick(now) {
+        for (let depth = active.length; depth >= 1; depth--) {
+          const path = active.slice(0, depth);
+          const node = stateAt(model, path);
+          if (!node || !node.after) continue;
+          const since = enteredAt.get(path.join("."));
+          if (since == null) continue;
+          for (const ms of Object.keys(node.after).map(Number).sort((a, b) => a - b)) {
+            if (!Number.isFinite(ms) || now - since < ms) continue;
+            const handler = node.after[String(ms)];
+            const target = typeof handler === "string" ? handler : handler && handler.target;
+            if (!target) continue;
+            const assigns = move(resolveTarget(target, depth), depth - 1, now);
+            return { changed: true, path: active.join("."), assigns };
+          }
+        }
+        return { changed: false, path: active.join("."), assigns: [] };
+      },
+      /** How long until the earliest pending `after`, or null when nothing is waiting. */
+      nextDue(now) {
+        let best = null;
+        for (let depth = active.length; depth >= 1; depth--) {
+          const path = active.slice(0, depth);
+          const node = stateAt(model, path);
+          if (!node || !node.after) continue;
+          const since = enteredAt.get(path.join("."));
+          if (since == null) continue;
+          for (const ms of Object.keys(node.after).map(Number)) {
+            if (!Number.isFinite(ms)) continue;
+            const left = Math.max(0, since + ms - now);
+            if (best == null || left < best) best = left;
+          }
+        }
+        return best;
+      },
+      /**
+       * Which crossings just became true. A rising edge, so an event fires once when the condition
+       * is crossed rather than on every recompute while it holds.
+       * @param {{ get: (id: string) => any }} scope
+       * @returns {string[]}
+       */
+      crossings(scope) {
+        const out = [];
+        for (const w of compiled.whens) {
+          const v = evaluate(w.tree, scope);
+          const now = !isError(v) && truthy(v);
+          if (now && !w.was) out.push(w.send);
+          w.was = now;
+        }
+        return out;
+      },
+      /** Back to the initial state, with the crossings forgotten. */
+      reset() {
+        active = errors.length ? [] : settleInto(model, [model.initial]);
+        enteredAt = /* @__PURE__ */ new Map();
+        markEntered(active, 0);
+        for (const w of compiled.whens) w.was = false;
+      }
+    };
+    return api;
+  }
+  function truthy(v) {
+    if (typeof v === "boolean") return v;
+    if (typeof v === "number") return v !== 0;
+    if (v && typeof v === "object" && typeof v.n === "number") return v.n !== 0;
+    if (typeof v === "string") return v !== "";
+    return !!v;
+  }
+
+  // src/static/sdk-libs/living/nodes/machine-node.js
+  function referenced(node) {
+    const out = [];
+    const add = (src) => {
+      const tree = parse(String(src));
+      if (!isError(tree)) {
+        for (const s of symbolsOf(tree)) if (out.indexOf(s.split(".")[0]) < 0) out.push(s.split(".")[0]);
+      }
+    };
+    const walk = (states) => {
+      for (const name of Object.keys(states || {})) {
+        const s = states[name] || {};
+        for (const event of Object.keys(s.on || {})) {
+          const h = s.on[event];
+          if (h && typeof h === "object" && h.guard) add(h.guard);
+        }
+        for (const map of [s.entry, s.exit]) {
+          for (const id of Object.keys(map || {})) add(map[id]);
+        }
+        if (s.states) walk(s.states);
+      }
+    };
+    walk(node.states);
+    for (const w of node.when || []) add(w.expr);
+    return out;
+  }
+  function writesOf(node) {
+    const out = [];
+    const walk = (states) => {
+      for (const name of Object.keys(states || {})) {
+        const s = states[name] || {};
+        for (const map of [s.entry, s.exit]) {
+          for (const id of Object.keys(map || {})) if (out.indexOf(id) < 0) out.push(id);
+        }
+        if (s.states) walk(s.states);
+      }
+    };
+    walk(node.states);
+    return out;
+  }
+  var machineNode = {
+    id: "machine",
+    /** A machine reads what its guards and crossings read. What it WRITES is an edge the graph
+     *  adds in the other direction, so the machine is recomputed before the values it assigns. */
+    dependsOn(node) {
+      return referenced(node);
+    },
+    prepare(node, ctx) {
+      if (!ctx.state.machines.has(ctx.id)) ctx.state.machines.set(ctx.id, createMachine(node));
+      const m = ctx.state.machines.get(ctx.id);
+      ctx.compiled.machine = m;
+      return m.errors.slice();
+    },
+    evaluate(node, ctx) {
+      const m = ctx.state.machines.get(ctx.id);
+      return m ? m.path() : "";
+    }
+  };
+
+  // src/static/sdk-libs/living/nodes/source.js
+  function dig(record, path) {
+    if (!path) return record;
+    let at = record;
+    for (const key of String(path).split(".").filter(Boolean)) {
+      if (at == null || typeof at !== "object") return void 0;
+      at = at[key];
+    }
+    return at;
+  }
+  var COMMON_FIELDS = ["value", "reading", "n", "celsius", "temp", "amount"];
+  var sourceNode = {
+    id: "source",
+    settable: true,
+    dependsOn() {
+      return [];
+    },
+    prepare(node, ctx) {
+      const errors = [];
+      const unit = parseUnit(node.unit);
+      if (isError(unit)) errors.push(unit.error);
+      ctx.compiled.unit = isError(unit) ? null : unit;
+      if (!ctx.state.values.has(ctx.id)) ctx.state.values.set(ctx.id, wrapValue(node.value, ctx.compiled.unit));
+      return errors;
+    },
+    evaluate(node, ctx) {
+      return ctx.state.values.get(ctx.id);
+    },
+    coerce(node, ctx, raw) {
+      let v = raw;
+      if (v != null && typeof v === "object" && !Array.isArray(v) && typeof v.n !== "number") {
+        const dug = dig(v, node.path);
+        v = dug;
+        if (v != null && typeof v === "object" && !Array.isArray(v)) {
+          for (const f of COMMON_FIELDS) if (typeof v[f] === "number") {
+            v = v[f];
+            break;
+          }
+        }
+      } else if (node.path && v != null && typeof v === "object") {
+        v = dig(v, node.path);
+      }
+      if (v != null && typeof v === "object" && typeof v.n === "number") v = v.n;
+      return wrapValue(v, ctx.compiled.unit);
+    },
+    /**
+     * Read the key through the platform's data library, when the page has one. Resolves to
+     * undefined where it cannot, and the fallback value stands.
+     * @param {any} node
+     * @returns {Promise<any>}
+     */
+    read(node) {
+      const ns = (
+        /** @type {any} */
+        window.AIMEAT
+      );
+      if (!node.key || !ns || !ns.data) return Promise.resolve(void 0);
+      const call = node.scope === "public" && typeof ns.data.getPublic === "function" ? ns.data.getPublic(node.owner, node.key) : typeof ns.data.get === "function" ? ns.data.get(node.key) : null;
+      if (!call) return Promise.resolve(void 0);
+      return Promise.resolve(call).catch(() => void 0);
+    }
+  };
+
+  // src/static/sdk-libs/living/nodes/index.js
+  var NODE_TYPES = {
+    value,
+    formula,
+    control,
+    binding,
+    text: textNode,
+    machine: machineNode,
+    source: sourceNode
+  };
+  function typeOf(name) {
+    return Object.prototype.hasOwnProperty.call(NODE_TYPES, String(name)) ? NODE_TYPES[String(name)] : null;
+  }
+
+  // src/static/sdk-libs/living/graph.js
+  var MAX_ROUNDS = 8;
+  function same(a, b) {
+    if (a === b) return true;
+    if (typeof a !== typeof b) return false;
+    if (a == null || b == null) return false;
+    if (isQuantity(a) && isQuantity(b)) return a.n === b.n && (a.u ? a.u.label : "") === (b.u ? b.u.label : "");
+    if (isError(a) && isError(b)) return a.error === b.error;
+    if (Array.isArray(a) && Array.isArray(b)) {
+      if (a.length !== b.length) return false;
+      for (let i = 0; i < a.length; i++) if (!same(a[i], b[i])) return false;
+      return true;
+    }
+    if (typeof a === "object" && typeof b === "object") {
+      const ka = Object.keys(a);
+      const kb = Object.keys(b);
+      if (ka.length !== kb.length) return false;
+      for (const k of ka) if (!same(a[k], b[k])) return false;
+      return true;
+    }
+    return false;
+  }
+  function createGraph(doc) {
+    const model = doc && doc.model || {};
+    const nodes = model && model.nodes || {};
+    const ids = Object.keys(nodes);
+    const errors = [];
+    const state = { values: /* @__PURE__ */ new Map(), machines: /* @__PURE__ */ new Map() };
+    const compiled = /* @__PURE__ */ new Map();
+    const outputs = /* @__PURE__ */ new Map();
+    const fields = /* @__PURE__ */ new Map();
+    const scope = {
+      get(symbol) {
+        const parts = String(symbol).split(".");
+        const head = parts[0];
+        if (!Object.prototype.hasOwnProperty.call(nodes, head)) return void 0;
+        if (parts.length === 1) return outputs.get(head);
+        const extra = fields.get(head);
+        if (extra && Object.prototype.hasOwnProperty.call(extra, parts.slice(1).join("."))) {
+          return extra[parts.slice(1).join(".")];
+        }
+        let at = outputs.get(head);
+        for (let i = 1; i < parts.length; i++) {
+          if (at == null || typeof at !== "object") return void 0;
+          at = at[parts[i]];
+        }
+        return at;
+      }
+    };
+    function ctxFor(id) {
+      if (!compiled.has(id)) compiled.set(id, {});
+      return { id, node: nodes[id], doc, scope, state, compiled: compiled.get(id) };
+    }
+    for (const id of ids) {
+      const node = nodes[id] || {};
+      const type = typeOf(node.type);
+      if (!type) {
+        errors.push('Node "' + id + '" is of type "' + String(node.type) + '", which this document does not have. It knows ' + Object.keys(NODE_TYPES).join(", ") + ".");
+        continue;
+      }
+      const found = type.prepare ? type.prepare(node, ctxFor(id)) : [];
+      for (const e of found || []) errors.push('Node "' + id + '" has ' + e + ".");
+    }
+    const deps = /* @__PURE__ */ new Map();
+    for (const id of ids) {
+      const node = nodes[id] || {};
+      const type = typeOf(node.type);
+      const list = [];
+      if (type && type.dependsOn) {
+        for (const on of type.dependsOn(node, ctxFor(id)) || []) {
+          if (!Object.prototype.hasOwnProperty.call(nodes, on)) {
+            errors.push('Node "' + id + '" reads "' + on + '", which this document does not have.');
+            continue;
+          }
+          if (on !== id && list.indexOf(on) < 0) list.push(on);
+        }
+      }
+      deps.set(id, list);
+    }
+    for (const id of ids) {
+      if ((nodes[id] || {}).type !== "machine") continue;
+      for (const target of writesOf(nodes[id])) {
+        if (!Object.prototype.hasOwnProperty.call(nodes, target)) {
+          errors.push('Node "' + id + '" assigns to "' + target + '", which this document does not have.');
+          continue;
+        }
+        const list = deps.get(target) || [];
+        if (list.indexOf(id) < 0) list.push(id);
+        deps.set(target, list);
+      }
+    }
+    const dependents = /* @__PURE__ */ new Map();
+    for (const id of ids) dependents.set(id, []);
+    for (const id of ids) for (const on of deps.get(id) || []) dependents.get(on).push(id);
+    const order = [];
+    const left = /* @__PURE__ */ new Map();
+    for (const id of ids) left.set(id, (deps.get(id) || []).length);
+    const ready = ids.filter((id) => left.get(id) === 0);
+    while (ready.length) {
+      const id = ready.shift();
+      order.push(id);
+      for (const next of dependents.get(id) || []) {
+        left.set(next, left.get(next) - 1);
+        if (left.get(next) === 0) ready.push(next);
+      }
+    }
+    if (order.length !== ids.length) {
+      const stuck = ids.filter((id) => order.indexOf(id) < 0);
+      const a = stuck[0];
+      const b = (deps.get(a) || []).find((x) => stuck.indexOf(x) >= 0) || stuck[1] || a;
+      errors.push('These nodes stand in a circle: "' + a + '" needs "' + b + '", and following "' + b + '" comes back to "' + a + '". A document cannot work out a circle, so break it.');
+      for (const id of stuck) order.push(id);
+    }
+    function computeOne(id) {
+      const node = nodes[id] || {};
+      const type = typeOf(node.type);
+      if (!type) return false;
+      const ctx = ctxFor(id);
+      let out;
+      try {
+        out = type.evaluate(node, ctx);
+      } catch (e) {
+        out = { error: 'Node "' + id + '" could not be worked out: ' + (e && e.message || String(e)) };
+      }
+      if (type.fields) fields.set(id, type.fields(node, ctx));
+      const before = outputs.get(id);
+      if (outputs.has(id) && same(before, out)) return false;
+      outputs.set(id, out);
+      return true;
+    }
+    function put(id, raw) {
+      const node = nodes[id] || {};
+      const type = typeOf(node.type);
+      if (!type || !type.settable) return false;
+      const ctx = ctxFor(id);
+      const next = type.coerce ? type.coerce(node, ctx, raw) : raw;
+      if (same(state.values.get(id), next)) return false;
+      state.values.set(id, next);
+      return true;
+    }
+    function pass(seed, changed) {
+      const dirty = new Set(seed);
+      for (const id of order) {
+        const mine = dirty.has(id) || (deps.get(id) || []).some((on) => dirty.has(on));
+        if (!mine) continue;
+        if (computeOne(id)) {
+          dirty.add(id);
+          if (changed.indexOf(id) < 0) changed.push(id);
+        }
+      }
+    }
+    function settleMachines(changed) {
+      for (let round = 0; round < MAX_ROUNDS; round++) {
+        const seed = [];
+        for (const id of order) {
+          if ((nodes[id] || {}).type !== "machine") continue;
+          const m = state.machines.get(id);
+          if (!m) continue;
+          let moved = false;
+          for (const event of m.crossings(scope)) {
+            const out = m.send(event, scope, Date.now());
+            if (!out.changed) continue;
+            moved = true;
+            for (const a of out.assigns) {
+              const v = a.tree ? evaluateAssign(a.tree) : void 0;
+              if (put(a.id, v) && seed.indexOf(a.id) < 0) seed.push(a.id);
+            }
+          }
+          if (moved && seed.indexOf(id) < 0) seed.push(id);
+        }
+        if (!seed.length) return;
+        pass(seed, changed);
+      }
+      errors.push("The machines in this document kept sending each other events; the engine stopped after " + MAX_ROUNDS + " rounds.");
+    }
+    function evaluateAssign(tree) {
+      return evaluate(tree, scope);
+    }
+    const api = {
+      ids,
+      order,
+      errors,
+      scope,
+      /** The node record, as the document wrote it. */
+      nodeOf(id) {
+        return nodes[id];
+      },
+      /** What one node currently comes to. */
+      valueOf(id) {
+        return outputs.get(id);
+      },
+      /** A node's extra outputs — a formula's TeX, for instance. */
+      fieldsOf(id) {
+        return fields.get(id) || {};
+      },
+      /** Who stands on this node. */
+      dependents(id) {
+        return (dependents.get(id) || []).slice();
+      },
+      /** What this node stands on. */
+      dependencies(id) {
+        return (deps.get(id) || []).slice();
+      },
+      /** Every edge, for the chain view. */
+      edges() {
+        const out = [];
+        for (const id of ids) for (const on of deps.get(id) || []) out.push({ from: on, to: id });
+        return out;
+      },
+      /** Work the whole document out from the top. @returns {{ changed: string[] }} */
+      refresh() {
+        const changed = [];
+        pass(ids, changed);
+        settleMachines(changed);
+        return { changed };
+      },
+      /**
+       * Move one writable node and recompute what stood on it.
+       * @param {string} id @param {any} raw
+       * @returns {{ changed: string[] }}
+       */
+      set(id, raw) {
+        const changed = [];
+        if (!put(id, raw)) return { changed };
+        pass([id], changed);
+        settleMachines(changed);
+        return { changed };
+      },
+      /**
+       * Send an event to every machine that has a handler for it.
+       * @param {string} event
+       * @returns {{ changed: string[] }}
+       */
+      send(event) {
+        const changed = [];
+        const seed = [];
+        for (const id of order) {
+          if ((nodes[id] || {}).type !== "machine") continue;
+          const m = state.machines.get(id);
+          if (!m) continue;
+          const out = m.send(event, scope, Date.now());
+          if (!out.changed) continue;
+          seed.push(id);
+          for (const a of out.assigns) {
+            const v = evaluateAssign(a.tree);
+            if (put(a.id, v)) seed.push(a.id);
+          }
+        }
+        if (!seed.length) return { changed };
+        pass(seed, changed);
+        settleMachines(changed);
+        return { changed };
+      },
+      /**
+       * Fire whichever `after` timers are due.
+       * @param {number} now
+       * @returns {{ changed: string[] }}
+       */
+      tick(now) {
+        const changed = [];
+        const seed = [];
+        for (const id of order) {
+          if ((nodes[id] || {}).type !== "machine") continue;
+          const m = state.machines.get(id);
+          if (!m) continue;
+          for (let i = 0; i < MAX_ROUNDS; i++) {
+            const out = m.tick(now);
+            if (!out.changed) break;
+            seed.push(id);
+            for (const a of out.assigns) {
+              const v = evaluateAssign(a.tree);
+              if (put(a.id, v)) seed.push(a.id);
+            }
+          }
+        }
+        if (!seed.length) return { changed };
+        pass(seed, changed);
+        settleMachines(changed);
+        return { changed };
+      },
+      /** How long until the earliest pending timer in any machine, or null. */
+      nextDue(now) {
+        let best = null;
+        for (const [, m] of state.machines) {
+          const left2 = m.nextDue(now);
+          if (left2 != null && (best == null || left2 < best)) best = left2;
+        }
+        return best;
+      },
+      /** The machine handle for one node — the chain view reads its active states from here. */
+      machineOf(id) {
+        return state.machines.get(id) || null;
+      }
+    };
+    return api;
+  }
+
+  // src/static/sdk-libs/living/bindings.js
+  function sourceNameFor(blockId) {
+    return "living:" + String(blockId);
+  }
+  function planBindings(doc) {
+    const nodes = (doc && doc.model || {}).nodes || {};
+    const plan = /* @__PURE__ */ new Map();
+    for (const id of Object.keys(nodes)) {
+      const node = nodes[id] || {};
+      if (node.type !== "binding" || !node.block) continue;
+      const list = plan.get(String(node.block)) || [];
+      const prop = String(node.prop == null ? "." : node.prop);
+      list.push({ id, path: prop === "." ? [] : prop.split(".").filter(Boolean), from: String(node.from) });
+      plan.set(String(node.block), list);
+    }
+    return plan;
+  }
+  function layoutWithSources(layout, plan) {
+    if (!layout || !Array.isArray(layout.blocks)) return layout;
+    const out = Object.assign({}, layout);
+    out.blocks = layout.blocks.map(function(block) {
+      if (!block || !plan.has(String(block.id))) return block;
+      const props = Object.assign({}, block.props || {});
+      props.source = sourceNameFor(block.id);
+      return Object.assign({}, block, { props });
+    });
+    return out;
+  }
+  function plainValue(v) {
+    if (v == null) return null;
+    if (isError(v)) return null;
+    if (isQuantity(v)) return v.n;
+    return v;
+  }
+  function composeBlock(graph, entries, base) {
+    let whole;
+    let copy = {};
+    if (base && typeof base === "object" && !Array.isArray(base)) {
+      try {
+        copy = JSON.parse(JSON.stringify(base));
+      } catch {
+        copy = Object.assign({}, base);
+      }
+    }
+    const out = copy;
+    for (const entry of entries || []) {
+      const v = plainValue(graph.valueOf(entry.from));
+      if (!entry.path.length) {
+        whole = v;
+        continue;
+      }
+      setPath(out, entry.path, v);
+    }
+    return whole === void 0 ? out : whole;
+  }
+
+  // src/static/sdk-libs/living/dom.js
+  function el(tag, attrs, kids) {
+    const node = document.createElement(tag);
+    for (const key of Object.keys(attrs || {})) {
+      const v = attrs[key];
+      if (v == null || v === false) continue;
+      if (key === "text") {
+        node.textContent = String(v);
+        continue;
+      }
+      if (key === "on") {
+        for (const ev of Object.keys(v)) node.addEventListener(ev, v[ev]);
+        continue;
+      }
+      if (v === true) {
+        node.setAttribute(key, "");
+        continue;
+      }
+      node.setAttribute(key, String(v));
+    }
+    const list = kids == null ? [] : Array.isArray(kids) ? kids : [kids];
+    for (const kid of list) {
+      if (kid == null || kid === false) continue;
+      node.appendChild(typeof kid === "string" || typeof kid === "number" ? document.createTextNode(String(kid)) : kid);
+    }
+    return node;
+  }
+  function clear(node) {
+    while (node && node.firstChild) node.removeChild(node.firstChild);
+  }
+  function resolve(target, fallback) {
+    if (!target) return fallback || document.body;
+    if (typeof target === "string") return document.querySelector(target) || fallback || document.body;
+    return target;
+  }
+  function kit() {
+    const ns = (
+      /** @type {any} */
+      window.AIMEAT
+    );
+    return ns && ns.atelier ? ns.atelier : null;
+  }
+  function reducedMotion() {
+    const k = kit();
+    if (k && typeof k.reducedMotion === "function") return k.reducedMotion();
+    try {
+      return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+    } catch {
+      return false;
+    }
+  }
+  function countTo(node, from, to, format) {
+    const k = kit();
+    if (k && typeof k.countUp === "function" && !reducedMotion() && Number.isFinite(from) && Number.isFinite(to)) {
+      k.countUp(node, from, to, { format });
+      return;
+    }
+    node.textContent = format(to);
+  }
+
+  // src/static/sdk-libs/_core/config.js
+  function cfg() {
+    return window.__AIMEAT_SDK_CFG__ || { nodeId: "", baseUrl: "" };
+  }
+  function resolveNodeUrl() {
+    const meta = document.querySelector('meta[name="aimeat-node"]');
+    if (meta) return (meta.getAttribute("content") || "").replace(/\/$/, "");
+    if (location.protocol === "http:" || location.protocol === "https:") return location.origin;
+    if (typeof self !== "undefined" && typeof self.origin === "string" && self.origin.indexOf("http") === 0) {
+      return self.origin;
+    }
+    return cfg().baseUrl;
+  }
+  var NODE_URL = resolveNodeUrl();
+  var APEX_URL = cfg().baseUrl;
+  var NODE_ID = cfg().nodeId;
+  var HEARTBEAT_MS = cfg().heartbeatMs || 3e4;
+
+  // src/static/sdk-libs/living/formula-view.js
+  var katexPromise = null;
+  function loadKatex() {
+    if (katexPromise) return katexPromise;
+    const ns = (
+      /** @type {any} */
+      window
+    );
+    if (ns.katex) {
+      katexPromise = Promise.resolve(ns.katex);
+      return katexPromise;
+    }
+    const base = (APEX_URL || "").replace(/\/+$/, "");
+    katexPromise = new Promise(function(done) {
+      if (!document.querySelector("link[data-aimeat-katex]")) {
+        const link = el("link", { rel: "stylesheet", href: base + "/lib/katex@0/katex.min.css", "data-aimeat-katex": "css" });
+        document.head.appendChild(link);
+      }
+      const script = document.createElement("script");
+      script.src = base + "/lib/katex@0/katex.min.js";
+      script.setAttribute("data-aimeat-katex", "js");
+      script.onload = function() {
+        done(ns.katex || null);
+      };
+      script.onerror = function() {
+        done(null);
+      };
+      document.head.appendChild(script);
+    });
+    return katexPromise;
+  }
+  function formulaView(host, spec) {
+    const plain = el("div", { class: "ak-living__plain", text: spec.plain });
+    const set = el("div", { class: "ak-living__tex" });
+    const answerValue = el("span", { class: "ak-living__answer-value", text: "—" });
+    const answerUnit = el("span", { class: "ak-living__answer-unit" });
+    const answer = el("div", { class: "ak-living__answer" }, [
+      el("span", { class: "ak-living__answer-eq", "aria-hidden": "true", text: "=" }),
+      answerValue,
+      answerUnit
+    ]);
+    const root = el("figure", { class: "ak-living__formula", "data-living-node": spec.id }, [
+      spec.label ? el("figcaption", { class: "ak-living__formula-label", text: spec.label }) : null,
+      plain,
+      set,
+      answer
+    ]);
+    host.appendChild(root);
+    let lastTex = "";
+    let lastNumber = NaN;
+    function typeset(tex) {
+      if (!tex) return;
+      lastTex = tex;
+      loadKatex().then(function(katex) {
+        if (!katex || lastTex !== tex || !root.isConnected) return;
+        try {
+          katex.render(tex, set, { throwOnError: false, displayMode: false });
+          plain.hidden = true;
+          root.setAttribute("data-living-set", "yes");
+        } catch {
+        }
+      });
+    }
+    function update(value2, tex) {
+      if (tex && tex !== lastTex) typeset(tex);
+      if (isError(value2)) {
+        answerValue.textContent = value2.error;
+        answerUnit.textContent = "";
+        root.setAttribute("data-living-state", "refused");
+        lastNumber = NaN;
+        return;
+      }
+      root.removeAttribute("data-living-state");
+      if (isQuantity(value2) || typeof value2 === "number") {
+        const n = isQuantity(value2) ? value2.n : value2;
+        countTo(answerValue, Number.isFinite(lastNumber) ? lastNumber : n, n, trimNumber);
+        lastNumber = n;
+        answerUnit.textContent = isQuantity(value2) ? unitLabel(value2.u) : "";
+        return;
+      }
+      answerValue.textContent = asText(value2);
+      answerUnit.textContent = "";
+      lastNumber = NaN;
+    }
+    typeset(spec.tex);
+    if ("value" in spec) update(spec.value, spec.tex);
+    return { el: root, update };
+  }
+
+  // src/static/sdk-libs/living/render.js
+  var seq = 0;
+  function uid() {
+    seq += 1;
+    return "ak-living-" + seq;
+  }
+  function readout(v) {
+    if (isError(v)) return v.error;
+    if (isQuantity(v)) return trimNumber(v.n) + (unitLabel(v.u) ? " " + unitLabel(v.u) : "");
+    return asText(v);
+  }
+  function controlRow(host, spec) {
+    const kind = String(spec.node.kind || "slider");
+    const target = spec.target || {};
+    const id = uid();
+    const label = el("label", {
+      class: "ak-form__label ak-living__label",
+      for: id,
+      "data-ak-part": "label",
+      text: spec.node.label || target.label || spec.node.target
+    });
+    const value2 = el("output", { class: "ak-living__readout", "data-ak-part": "readout", for: id });
+    let input;
+    if (kind === "toggle") {
+      input = el("input", { id, type: "checkbox", class: "ak-toggle ak-living__input" });
+    } else if (kind === "pick") {
+      input = el(
+        "select",
+        { id, class: "ak-input ak-living__input" },
+        (spec.node.options || []).map(function(o) {
+          const opt = o && typeof o === "object" ? o : { value: o, label: String(o) };
+          return el("option", { value: String(opt.value) }, String(opt.label == null ? opt.value : opt.label));
+        })
+      );
+    } else if (kind === "text") {
+      input = el("input", { id, type: "text", class: "ak-input ak-living__input" });
+    } else {
+      input = el("input", {
+        id,
+        class: "ak-input ak-living__input" + (kind === "slider" ? " ak-living__slider" : ""),
+        type: kind === "slider" ? "range" : "number",
+        min: target.min == null ? null : String(target.min),
+        max: target.max == null ? null : String(target.max),
+        step: target.step == null ? null : String(target.step)
+      });
+    }
+    input.addEventListener("input", function() {
+      const node = (
+        /** @type {any} */
+        input
+      );
+      if (kind === "toggle") {
+        spec.onSet(!!node.checked);
+        return;
+      }
+      if (kind === "text" || kind === "pick") {
+        spec.onSet(node.value);
+        return;
+      }
+      spec.onSet(node.value === "" ? null : Number(node.value));
+    });
+    const root = el("div", {
+      class: "ak-form__field ak-living__control",
+      "data-living-node": spec.id,
+      "data-living-kind": kind
+    }, [label, el("div", { class: "ak-living__control-row" }, [input, value2])]);
+    host.appendChild(root);
+    function update(v) {
+      const node = (
+        /** @type {any} */
+        input
+      );
+      if (kind === "toggle") node.checked = !!(v === true || asNumber(v) === 1);
+      else if (kind === "text" || kind === "pick") {
+        const s = isQuantity(v) ? String(v.n) : asText(v);
+        if (node.value !== s) node.value = s;
+      } else {
+        const n = asNumber(v);
+        if (Number.isFinite(n) && String(n) !== node.value) node.value = String(n);
+      }
+      value2.textContent = readout(v);
+    }
+    update(spec.value);
+    return { el: root, update };
+  }
+  function textView(host, spec) {
+    const body = el("p", { class: "ak-living__text", text: spec.text });
+    const root = el("div", { class: "ak-living__note", "data-living-node": spec.id }, [
+      spec.label ? el("span", { class: "ak-living__note-label", text: spec.label }) : null,
+      body
+    ]);
+    host.appendChild(root);
+    return { el: root, update(text) {
+      if (body.textContent !== text) body.textContent = String(text);
+    } };
+  }
+  function machineView(host, spec) {
+    const chips = /* @__PURE__ */ new Map();
+    const strip = el("div", { class: "ak-living__states", role: "group" });
+    for (const name of spec.states) {
+      const chip = el("span", { class: "ak-living__state", "data-state": name, text: name });
+      chips.set(name, chip);
+      strip.appendChild(chip);
+    }
+    const root = el("div", { class: "ak-living__machine", "data-living-node": spec.id }, [
+      spec.label ? el("span", { class: "ak-living__note-label", text: spec.label }) : null,
+      strip
+    ]);
+    host.appendChild(root);
+    function update(path) {
+      root.setAttribute("data-living-state", String(path || ""));
+      const on = String(path || "").split(".");
+      for (const [name, chip] of chips) {
+        const active = on.indexOf(name) >= 0 || String(path) === name;
+        chip.setAttribute("data-on", active ? "yes" : "no");
+        chip.setAttribute("aria-current", active ? "true" : "false");
+      }
+    }
+    update(spec.path);
+    return { el: root, update };
+  }
+  function valueRow(host, spec) {
+    const figure = el("span", { class: "ak-living__figure" });
+    const unit = el("span", { class: "ak-living__figure-unit" });
+    const root = el("div", { class: "ak-living__value", "data-living-node": spec.id }, [
+      el("span", { class: "ak-living__note-label", text: spec.label || spec.id }),
+      el("span", { class: "ak-living__figure-row" }, [figure, unit])
+    ]);
+    host.appendChild(root);
+    let last = NaN;
+    function update(v) {
+      if (isQuantity(v) || typeof v === "number") {
+        const n = isQuantity(v) ? v.n : v;
+        countTo(figure, Number.isFinite(last) ? last : n, n, trimNumber);
+        last = n;
+        unit.textContent = isQuantity(v) ? unitLabel(v.u) : "";
+        return;
+      }
+      figure.textContent = asText(v);
+      unit.textContent = "";
+      last = NaN;
+    }
+    update(spec.value);
+    return { el: root, update };
+  }
+  function statesOf(def) {
+    const out = [];
+    const walk = (states) => {
+      for (const name of Object.keys(states || {})) {
+        out.push(name);
+        if (states[name] && states[name].states) walk(states[name].states);
+      }
+    };
+    walk(def && def.states);
+    return out;
+  }
+  function renderNodeInto(host, spec) {
+    const node = spec.node;
+    const graph = spec.graph;
+    const value2 = graph.valueOf(spec.id);
+    if (node.type === "control") {
+      const target = graph.nodeOf(String(node.target)) || {};
+      const view = controlRow(host, {
+        id: spec.id,
+        node,
+        target,
+        value: value2,
+        onSet(v) {
+          spec.set(String(node.target), v);
+        }
+      });
+      return { el: view.el, update: () => view.update(graph.valueOf(spec.id)), kind: "control" };
+    }
+    if (node.type === "formula") {
+      const view = formulaView(host, {
+        id: spec.id,
+        label: node.label,
+        value: value2,
+        tex: (graph.fieldsOf(spec.id) || {}).tex || "",
+        plain: spec.id + " = " + String(node.expr)
+      });
+      return { el: view.el, update: () => view.update(graph.valueOf(spec.id), (graph.fieldsOf(spec.id) || {}).tex || ""), kind: "formula" };
+    }
+    if (node.type === "text") {
+      const view = textView(host, { id: spec.id, label: node.label, text: String(value2 == null ? "" : value2) });
+      return { el: view.el, update: () => view.update(String(graph.valueOf(spec.id) == null ? "" : graph.valueOf(spec.id))), kind: "text" };
+    }
+    if (node.type === "machine") {
+      const view = machineView(host, { id: spec.id, label: node.label, states: statesOf(node), path: String(value2 || "") });
+      return { el: view.el, update: () => view.update(String(graph.valueOf(spec.id) || "")), kind: "machine" };
+    }
+    if (node.type === "value" || node.type === "source") {
+      const view = valueRow(host, { id: spec.id, label: node.label, value: value2 });
+      return { el: view.el, update: () => view.update(graph.valueOf(spec.id)), kind: node.type };
+    }
+    return null;
+  }
+
+  // src/static/sdk-libs/living/chain.js
+  var FLASH_MS = 900;
+  var TONE = {
+    control: "accent",
+    value: "ok",
+    source: "ok",
+    formula: "plain",
+    text: "plain",
+    binding: "plain",
+    machine: "warn"
+  };
+  function depths(graph) {
+    const out = /* @__PURE__ */ new Map();
+    for (const id of graph.order) {
+      let deep = 0;
+      for (const on of graph.dependencies(id)) deep = Math.max(deep, (out.get(on) || 0) + 1);
+      out.set(id, deep);
+    }
+    return out;
+  }
+  function chainData(graph) {
+    const nodes = [];
+    const edges = [];
+    const depth = depths(graph);
+    const column = /* @__PURE__ */ new Map();
+    for (const id of graph.ids) column.set(id, depth.get(id) || 0);
+    for (const id of graph.ids) {
+      const node = graph.nodeOf(id) || {};
+      nodes.push({ id, label: node.label ? node.label + " (" + id + ")" : id, tone: TONE[node.type] || "plain" });
+      if (node.type !== "machine") continue;
+      const active = String(graph.valueOf(id) || "").split(".");
+      for (const state of statesOf(node)) {
+        const sid = id + ":" + state;
+        nodes.push({ id: sid, label: state, tone: active.indexOf(state) >= 0 ? "accent" : "plain" });
+        column.set(sid, (depth.get(id) || 0) + 1);
+        edges.push({ from: id, to: sid });
+      }
+    }
+    for (const edge of graph.edges()) edges.push({ from: edge.from, to: edge.to });
+    const byColumn = /* @__PURE__ */ new Map();
+    for (const n of nodes) {
+      const c = column.get(n.id) || 0;
+      const list = byColumn.get(c) || [];
+      list.push(n);
+      byColumn.set(c, list);
+    }
+    const INSET = 6;
+    const last = Math.max(0, ...byColumn.keys());
+    for (const [c, list] of byColumn) {
+      for (let i = 0; i < list.length; i++) {
+        list[i].x = last === 0 ? 50 : INSET + c / last * (100 - INSET * 2);
+        list[i].y = list.length === 1 ? 50 : i / (list.length - 1) * 100;
+      }
+    }
+    return { nodes, edges };
+  }
+  function chain(host, spec) {
+    const root = el("div", { class: "ak-living__chain", "data-ak-part": "chain" });
+    const target = typeof host === "string" ? document.querySelector(host) : host;
+    if (target) target.appendChild(root);
+    const k = kit();
+    let handle = null;
+    let order = [];
+    const timers = /* @__PURE__ */ new Set();
+    function paint() {
+      const data = chainData(spec.graph);
+      order = data.nodes.map(function(n) {
+        return n.id;
+      });
+      if (k && typeof k.graph === "function") {
+        if (!handle) handle = k.graph({ target: root, data, title: spec.title });
+        else handle.set({ data });
+        return;
+      }
+      clear(root);
+      root.appendChild(el("ul", { class: "ak-living__chain-list" }, data.edges.map(function(e) {
+        return el("li", { text: e.from + " → " + e.to });
+      })));
+    }
+    paint();
+    function nodeElements() {
+      return root.querySelectorAll(".ak-graph__node");
+    }
+    return {
+      el: root,
+      /** Redraw from the graph's current state — a machine that moved changes which state is toned. */
+      set() {
+        paint();
+      },
+      /**
+       * Light the nodes that just changed. Finite, and nothing at all under reduced motion.
+       * @param {string[]} ids
+       */
+      flash(ids) {
+        paint();
+        if (!ids || !ids.length || reducedMotion()) return;
+        const drawn = nodeElements();
+        for (const id of ids) {
+          const at = order.indexOf(id);
+          const node = at >= 0 ? drawn[at] : null;
+          if (!node) continue;
+          node.setAttribute("data-living-flash", "yes");
+          const timer = setTimeout(function() {
+            node.removeAttribute("data-living-flash");
+            timers.delete(timer);
+          }, FLASH_MS);
+          timers.add(timer);
+        }
+      },
+      destroy() {
+        for (const timer of timers) clearTimeout(timer);
+        timers.clear();
+        if (handle && handle.destroy) handle.destroy();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+
+  // src/static/sdk-libs/living/describe-data.js
+  var NODES = {
+    "binding": {
+      summary: "One block prop on this screen reads one node.",
+      inputs: ["from (the node whose output the prop takes)"],
+      outputs: ["value — the same value, so the chain view can show where it went"],
+      options: ["block (a layout block id)", "prop (a prop path on that block, dots allowed)"],
+      example: { "type": "binding", "block": "dial", "prop": "value", "from": "t" },
+      file: "nodes/binding.js"
+    },
+    "control": {
+      summary: "A slider, switch, pick, number or text field bound to one value node.",
+      inputs: ["target (the value node this control moves)"],
+      outputs: ["value — what the target holds now, so a template can read the control by name"],
+      options: ["kind=slider|toggle|pick|number|text", "label", "options (for pick)", "block (a section to put it in)"],
+      example: { "type": "control", "kind": "slider", "target": "t", "label": "Lämpötila", "block": "controls" },
+      file: "nodes/control.js"
+    },
+    "formula": {
+      summary: "A spreadsheet expression over the other nodes, worked out with its units.",
+      inputs: ["expr (an expression naming other nodes)"],
+      outputs: ["value — the result, with its unit", "tex — the same expression set as mathematics"],
+      options: ["unit (convert the result, or name a plain one)", "format", "label", "block (a section to print it in)"],
+      example: { "type": "formula", "expr": "t * 9/5 + 32", "unit": "°F", "label": "Fahrenheit", "block": "maths" },
+      file: "nodes/formula.js"
+    },
+    "machine": {
+      summary: "A statechart in XState's vocabulary; its output is the state it is in.",
+      inputs: ["initial", "states (nested allowed)", "when (crossings that send events)"],
+      outputs: ['value — the current state as a dotted path, e.g. "hot" or "hot.rising"'],
+      options: ["on { EVENT: { target, guard } }", "entry", "exit", "after { ms: target }", "block (a section to show it in)"],
+      example: { "type": "machine", "initial": "fine", "states": { "cold": { "on": { "WARM": "fine" } }, "fine": { "on": { "HOT": "hot", "COLD": "cold" } }, "hot": { "entry": { "note": '"jäähdytä"' }, "on": { "COOL": { "target": "fine", "guard": "t < 30" } } } }, "when": [{ "expr": "t > 30", "send": "HOT" }, { "expr": "t < 30", "send": "COOL" }, { "expr": "t < 5", "send": "COLD" }] },
+      file: "nodes/machine-node.js"
+    },
+    "source": {
+      summary: "A live value from a memory key, or a constant when the page cannot read one.",
+      inputs: ["key (a memory key)", "path (a dotted path inside the record)", "value (the fallback)"],
+      outputs: ["value — what the key holds now, with the node's unit on it"],
+      options: ["unit", "scope=own|public", "owner (for a public read)", "label"],
+      example: { "type": "source", "key": "sensors.livingroom", "path": "celsius", "unit": "°C", "value": 21 },
+      file: "nodes/source.js"
+    },
+    "text": {
+      summary: "A sentence over the graph: it changes when the numbers do.",
+      inputs: ["template (with {{ node }}, {{ node | format }} and {{ if expr }}…{{ else }}…{{ end }})"],
+      outputs: ["value — the rendered sentence"],
+      options: ["block (a section to render it into)", "label"],
+      example: { "type": "text", "template": "Lämpötila on {{ t | 1 }} °C, {{ if t > 30 }}liian kuuma{{ else }}hyvä{{ end }}.", "block": "note" },
+      file: "nodes/text-node.js"
+    },
+    "value": {
+      summary: "A named quantity: the writable ground the rest of the document stands on.",
+      inputs: ["value (the quantity itself, a literal — never a reference)"],
+      outputs: ["value — the number with its unit, or the text, truth or list it holds"],
+      options: ["unit", "min", "max", "step", "format", "label"],
+      example: { "type": "value", "value": 22, "unit": "°C", "min": -20, "max": 40, "step": 0.5, "label": "Lämpötila" },
+      file: "nodes/value.js"
+    }
+  };
+
+  // src/static/sdk-libs/living/index.js
+  var VERSION = "0.1.0";
+  var DRAWN = ["control", "formula", "text", "machine", "value", "source"];
+  function validate(doc) {
+    const refusals = [];
+    if (!doc || typeof doc !== "object") return { ok: false, refusals: ["This is not a document record."] };
+    if (doc.v != null && Number(doc.v) !== 1) refusals.push("This document says it is version " + doc.v + ", and this build reads version 1.");
+    const model = doc.model || {};
+    const nodes = model.nodes || {};
+    if (!nodes || typeof nodes !== "object") return { ok: false, refusals: ["The document has no model.nodes to work out."] };
+    const graph = createGraph(doc);
+    for (const e of graph.errors) refusals.push(e);
+    const blocks = /* @__PURE__ */ new Map();
+    for (const block of (doc.layout || {}).blocks || []) if (block && block.id) blocks.set(String(block.id), block);
+    for (const id of Object.keys(nodes)) {
+      const node = nodes[id] || {};
+      if (node.type === "binding") {
+        const block2 = blocks.get(String(node.block));
+        if (!block2) {
+          refusals.push('The binding "' + id + '" writes to block "' + String(node.block) + '", and the layout has no block by that name.');
+        } else if (BOUND_COMPONENTS.indexOf(String(block2.component)) < 0) {
+          refusals.push('The binding "' + id + '" writes to block "' + block2.id + '", which is a ' + block2.component + " — that component does not read a bound record.");
+        }
+        continue;
+      }
+      if (!node.block) continue;
+      if (DRAWN.indexOf(String(node.type)) < 0) continue;
+      const block = blocks.get(String(node.block));
+      if (!block) {
+        refusals.push('Node "' + id + '" is drawn into block "' + String(node.block) + '", and the layout has no block by that name.');
+      } else if (String(block.component) !== "section") {
+        refusals.push('Node "' + id + '" is drawn into block "' + block.id + '", which is a ' + block.component + ". A node is drawn into a section.");
+      }
+    }
+    return { ok: refusals.length === 0, refusals };
+  }
+  function refusalPanel(host, refusals) {
+    const k = kit();
+    if (k && typeof k.emptyState === "function") {
+      return k.emptyState({
+        target: host,
+        tone: "error",
+        title: "This document cannot be worked out yet",
+        hint: refusals.join(" ")
+      });
+    }
+    const box = document.createElement("div");
+    box.className = "ak-living__refusals";
+    for (const r of refusals) {
+      const line = document.createElement("p");
+      line.textContent = r;
+      box.appendChild(line);
+    }
+    host.appendChild(box);
+    return { destroy() {
+      if (box.parentNode) box.parentNode.removeChild(box);
+    } };
+  }
+  function mount(target, doc, opts) {
+    const options = opts || {};
+    const host = (
+      /** @type {HTMLElement} */
+      resolve(target, document.body)
+    );
+    const check = validate(doc);
+    if (!check.ok) {
+      const panel = refusalPanel(host, check.refusals);
+      return {
+        el: host,
+        refusals: check.refusals,
+        ok: false,
+        ready: Promise.resolve(),
+        set() {
+        },
+        get() {
+        },
+        send() {
+        },
+        values() {
+          return {};
+        },
+        state() {
+          return {};
+        },
+        chain() {
+          return null;
+        },
+        describe,
+        destroy() {
+          panel.destroy();
+        }
+      };
+    }
+    const graph = createGraph(doc);
+    graph.refresh();
+    const plan = planBindings(doc);
+    const layout = layoutWithSources(doc.layout, plan);
+    const drawnByBlock = /* @__PURE__ */ new Map();
+    const nodes = (doc.model || {}).nodes || {};
+    for (const id of Object.keys(nodes)) {
+      const node = nodes[id] || {};
+      if (!node.block || DRAWN.indexOf(String(node.type)) < 0) continue;
+      const list = drawnByBlock.get(String(node.block)) || [];
+      list.push(id);
+      drawnByBlock.set(String(node.block), list);
+    }
+    const views = /* @__PURE__ */ new Map();
+    let chainHandle = null;
+    let timer = null;
+    let destroyed = false;
+    const sources = {};
+    for (const [blockId, entries] of plan) {
+      sources[sourceNameFor(blockId)] = /* @__PURE__ */ (function(id, list) {
+        return function() {
+          const block = ((doc.layout || {}).blocks || []).find(function(b) {
+            return b && String(b.id) === id;
+          });
+          const base = block && block.props ? block.props.data : null;
+          return composeBlock(graph, list, base);
+        };
+      })(blockId, entries);
+    }
+    const fill = {};
+    for (const [blockId, ids] of drawnByBlock) {
+      fill[blockId] = /* @__PURE__ */ (function(list) {
+        return function(body) {
+          for (const id of list) {
+            const view = renderNodeInto(body, { id, node: nodes[id], graph, set: apply });
+            if (view) views.set(id, view);
+          }
+        };
+      })(ids);
+    }
+    if (options.chainBlock) {
+      fill[options.chainBlock] = function(body) {
+        chainHandle = chain(body, { graph, title: "The chain" });
+      };
+    }
+    const k = kit();
+    if (!k || typeof k.mosaic !== "function") {
+      const panel = refusalPanel(host, ["This page needs the Atelier kit: load /v1/libs/aimeat-atelier.js before aimeat-living."]);
+      return {
+        el: host,
+        refusals: ["aimeat-atelier is not on this page."],
+        ok: false,
+        ready: Promise.resolve(),
+        set() {
+        },
+        get() {
+        },
+        send() {
+        },
+        values() {
+          return {};
+        },
+        state() {
+          return {};
+        },
+        chain() {
+          return null;
+        },
+        describe,
+        destroy() {
+          panel.destroy();
+        }
+      };
+    }
+    const surface = k.mosaic({
+      target: host,
+      layout,
+      fallback: layout,
+      sources,
+      fill
+    });
+    function announce(changed) {
+      if (!changed.length) return;
+      for (const id of changed) {
+        const view = views.get(id);
+        if (view) view.update();
+      }
+      const touched = /* @__PURE__ */ new Set();
+      for (const id of changed) {
+        const node = nodes[id] || {};
+        if (node.type === "binding" && node.block) touched.add(String(node.block));
+        for (const next of graph.dependents(id)) {
+          const dep = nodes[next] || {};
+          if (dep.type === "binding" && dep.block) touched.add(String(dep.block));
+        }
+      }
+      for (const blockId of touched) surface.refresh(sourceNameFor(blockId));
+      if (chainHandle) chainHandle.flash(changed);
+      schedule();
+      if (options.onChange) {
+        options.onChange({ changed: changed.slice(), values: valuesNow(), state: statesNow() });
+      }
+    }
+    function apply(id, raw) {
+      if (destroyed) return { changed: [] };
+      const out = graph.set(id, raw);
+      announce(out.changed);
+      return out;
+    }
+    function schedule() {
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      const due = graph.nextDue(Date.now());
+      if (due == null || destroyed) return;
+      timer = setTimeout(function() {
+        timer = null;
+        if (destroyed) return;
+        announce(graph.tick(Date.now()).changed);
+      }, Math.max(16, due));
+    }
+    function valuesNow() {
+      const out = {};
+      for (const id of graph.ids) {
+        const v = graph.valueOf(id);
+        out[id] = isQuantity(v) ? { value: v.n, unit: unitLabel(v.u) } : isError(v) ? { error: v.error } : v;
+      }
+      return out;
+    }
+    function statesNow() {
+      const out = {};
+      for (const id of graph.ids) if ((nodes[id] || {}).type === "machine") out[id] = String(graph.valueOf(id) || "");
+      return out;
+    }
+    const sourceIds = graph.ids.filter(function(id) {
+      return (nodes[id] || {}).type === "source" && nodes[id].key;
+    });
+    function readSources() {
+      if (!sourceIds.length || destroyed) return Promise.resolve();
+      const type = typeOf("source");
+      return Promise.all(sourceIds.map(function(id) {
+        return type.read(nodes[id]).then(function(v) {
+          return { id, v };
+        });
+      })).then(function(got) {
+        if (destroyed) return;
+        const changed = [];
+        for (const one of got) {
+          if (one.v === void 0) continue;
+          for (const c of graph.set(one.id, one.v).changed) if (changed.indexOf(c) < 0) changed.push(c);
+        }
+        announce(changed);
+      });
+    }
+    const onLive = function() {
+      readSources();
+    };
+    if (options.live !== false && sourceIds.length) window.addEventListener("aimeat-live-update", onLive);
+    const ready = Promise.resolve().then(readSources).then(function() {
+      schedule();
+    });
+    return {
+      el: host,
+      ok: true,
+      refusals: [],
+      ready,
+      /** The mosaic this document is rendered through — the arrangement is still the kit's. */
+      mosaic: surface,
+      /** The graph itself, for a host that wants to read the wiring. */
+      graph,
+      /** Move one node. The same door a control uses, so a person and an agent are the same event. */
+      set(id, value2) {
+        return apply(String(id), value2);
+      },
+      /** What one node comes to now. */
+      get(id) {
+        return graph.valueOf(String(id));
+      },
+      /** Every node's current value, in a shape that can be written to a record. */
+      values: valuesNow,
+      /** Every machine's current state. */
+      state: statesNow,
+      /** Send an event to the machines. */
+      send(event) {
+        const out = graph.send(String(event));
+        announce(out.changed);
+        return out;
+      },
+      /** Work the whole document out again. */
+      refresh() {
+        const out = graph.refresh();
+        announce(out.changed);
+        return out;
+      },
+      /** Draw the chain somewhere of the host's choosing, following this same document. */
+      chain(where) {
+        const view = chain(where, { graph, title: "The chain" });
+        if (!chainHandle) chainHandle = view;
+        return view;
+      },
+      describe,
+      version: VERSION,
+      destroy() {
+        destroyed = true;
+        if (timer) clearTimeout(timer);
+        window.removeEventListener("aimeat-live-update", onLive);
+        if (chainHandle) chainHandle.destroy();
+        for (const [, view] of views) if (view.el && view.el.parentNode) view.el.parentNode.removeChild(view.el);
+        views.clear();
+        surface.destroy();
+      }
+    };
+  }
+  function describe(type) {
+    if (type == null) return Object.keys(NODES).sort();
+    const found = NODES[String(type)];
+    if (!found) return null;
+    return Object.assign({ id: String(type) }, found);
+  }
+  function chain2(where, doc) {
+    const graph = createGraph(doc);
+    graph.refresh();
+    return chain(where, { graph, title: "The chain" });
+  }
+  var living = {
+    version: VERSION,
+    mount,
+    validate,
+    describe,
+    chain: chain2,
+    /** The node type ids this build knows, without the documentation. */
+    types() {
+      return Object.keys(NODE_TYPES).sort();
+    },
+    /** What a value comes to, as a person would read it — number, unit, refusal. */
+    read(value2) {
+      return asText(value2);
+    }
+  };
+  attach("living", living);
+})();
